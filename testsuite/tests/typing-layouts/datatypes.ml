@@ -335,7 +335,8 @@ Line 8, characters 32-36:
                                     ^^^^
 Error: This expression has type "float" but an expression was expected of type
          "('a : immediate)"
-       The kind of float is value mod many unyielding stateless immutable
+       The kind of float is
+           value mod many forkable unyielding stateless immutable
          because it is the primitive type float.
        But the kind of float must be a subkind of immediate
          because of the definition of s6 at line 2, characters 0-35.

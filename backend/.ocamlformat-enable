@@ -57,6 +57,8 @@ operation.ml
 operation.mli
 linear.ml
 linear.mli
+llvm/**/*.ml
+llvm/**/*.mli
 polling_utils.ml
 polling_utils.mli
 peephole/**/*.ml

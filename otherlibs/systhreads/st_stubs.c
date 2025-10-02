@@ -117,6 +117,7 @@ struct caml_thread_struct {
   value descr;              /* The heap-allocated descriptor (root) */
   struct caml_thread_struct * next; /* Doubly-linked list of running threads */
   struct caml_thread_struct * prev;
+  value tls_state;    /* saved TLS value */
   int domain_id;      /* The id of the domain to which this thread belongs */
   struct stack_info* current_stack;      /* saved Caml_state->current_stack */
   struct c_stack_link* c_stack;          /* saved Caml_state->c_stack */
@@ -260,6 +261,7 @@ static void caml_thread_scan_roots(
   if (active != NULL) {
     do {
       (*action)(fdata, th->descr, &th->descr);
+      (*action)(fdata, th->tls_state, &th->tls_state);
       (*action)(fdata, th->backtrace_last_exn, &th->backtrace_last_exn);
       /* Don't rescan the stack of the current thread, it was done already */
       if (th != active) {
@@ -288,6 +290,7 @@ static void save_runtime_state(void)
   CAMLassert(th != NULL);
   th->current_stack = Caml_state->current_stack;
   th->current_stack->local_sp = Caml_state->local_sp;
+  th->tls_state = Caml_state->tls_state;
   th->c_stack = Caml_state->c_stack;
   th->gc_regs = Caml_state->gc_regs;
   th->gc_regs_buckets = Caml_state->gc_regs_buckets;
@@ -324,6 +327,8 @@ static void restore_runtime_state(caml_thread_t th)
   Caml_state->local_roots = th->local_roots;
   Caml_state->backtrace_pos = th->backtrace_pos;
   Caml_state->backtrace_buffer = th->backtrace_buffer;
+  caml_modify_generational_global_root
+    (&Caml_state->tls_state, th->tls_state);
   caml_modify_generational_global_root
     (&Caml_state->backtrace_last_exn, th->backtrace_last_exn);
 #ifndef NATIVE_CODE
@@ -408,6 +413,7 @@ static caml_thread_t caml_thread_new_info(caml_thread_t parent)
   if (th == NULL) return NULL;
 
   th->descr = Val_unit;
+  th->tls_state = Atom(0); /* Empty array */
   th->next = NULL;
   th->prev = NULL;
 
@@ -461,6 +467,7 @@ void caml_thread_free_info(caml_thread_t th)
      c_stack: stack-allocated
      local_roots: stack-allocated
      backtrace_last_exn: heap-allocated
+     tls_state: heap-allocated
      gc_regs:
        must be empty for a terminated thread
        (we assume that the C call stack must be empty at
@@ -690,7 +697,10 @@ static void caml_thread_domain_initialize_hook(void)
   new_thread->descr = caml_thread_new_descriptor(Val_unit);
   new_thread->next = new_thread;
   new_thread->prev = new_thread;
+  /* Initialize [backtrace_last_exn] and [tls_state] as they are accessed
+     by the GC via [caml_thread_scan_roots] */
   new_thread->backtrace_last_exn = Val_unit;
+  new_thread->tls_state = Atom(0); /* empty array */
   new_thread->memprof = caml_memprof_main_thread(Caml_state);
   new_thread->dynamic = Caml_state->dynamic_bindings;
   CAMLassert(new_thread->dynamic);

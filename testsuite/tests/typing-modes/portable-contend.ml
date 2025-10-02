@@ -141,7 +141,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over the value "r" (at Line 3, characters 25-26)
+       because it contains a usage (of the value "r" at Line 3, characters 25-26)
        which is expected to be "shared" or "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -156,7 +156,7 @@ Line 3, characters 23-26:
 3 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over the value "r" (at Line 2, characters 25-26)
+       because it contains a usage (of the value "r" at Line 2, characters 25-26)
        which is expected to be "shared" or "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -241,7 +241,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over the value "r" (at Line 3, characters 27-28)
+       because it contains a usage (of the value "r" at Line 3, characters 27-28)
        which is expected to be "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -257,7 +257,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over the value "r" (at Line 3, characters 27-28)
+       because it contains a usage (of the value "r" at Line 3, characters 27-28)
        which is expected to be "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]

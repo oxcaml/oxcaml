@@ -14,7 +14,7 @@
 
 [@@@ocaml.flambda_o3]
 
-type ('a, 'b : any) t : bits64 = ('a, 'b) idx_mut
+type ('a, 'b : any) t : bits64 mod everything = ('a, 'b) idx_mut
 
 external unsafe_get
   : 'a ('b : any).

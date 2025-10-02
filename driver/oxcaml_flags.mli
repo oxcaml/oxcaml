@@ -18,7 +18,7 @@
 
 val dump_cfg : bool ref
 val cfg_invariants : bool ref
-val regalloc : string ref
+val regalloc : Clflags.Register_allocator.t ref
 val default_regalloc_linscan_threshold : int
 val regalloc_linscan_threshold : int ref
 val regalloc_params : string list ref
@@ -93,6 +93,7 @@ val long_frames_threshold : int ref
 val caml_apply_inline_fast_path : bool ref
 
 type function_result_types = Never | Functors_only | All_functions
+type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
 type join_algorithm = Binary | N_way | Checked
 type opt_level = Oclassic | O2 | O3
 type 'a or_default = Set of 'a | Default
@@ -113,6 +114,7 @@ val symbol_visibility_protected : bool ref
 val dump_llvmir : bool ref
 val keep_llvmir : bool ref
 val llvm_path : string option ref
+val llvm_flags : string ref
 
 module Flambda2 : sig
   val debug : bool ref
@@ -127,6 +129,7 @@ module Flambda2 : sig
     val join_algorithm : join_algorithm
     val function_result_types : function_result_types
     val enable_reaper : bool
+    val reaper_preserve_direct_calls : reaper_preserve_direct_calls
     val unicode : bool
     val kind_checks : bool
   end
@@ -144,6 +147,7 @@ module Flambda2 : sig
     join_algorithm : join_algorithm;
     function_result_types : function_result_types;
     enable_reaper : bool;
+    reaper_preserve_direct_calls : reaper_preserve_direct_calls;
     unicode : bool;
     kind_checks : bool;
   }
@@ -160,6 +164,7 @@ module Flambda2 : sig
   val join_depth : int or_default ref
   val join_algorithm : join_algorithm or_default ref
   val enable_reaper : bool or_default ref
+  val reaper_preserve_direct_calls : reaper_preserve_direct_calls or_default ref
   val unicode : bool or_default ref
   val kind_checks : bool or_default ref
 

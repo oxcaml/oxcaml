@@ -399,7 +399,7 @@ let[@inline] seminaive_run cursor ~previous ~diff ~current =
   loop cursor.cursor_binders
 
 module With_parameters = struct
-  type nonrec ('p, 'v) t =
+  type nonrec ('p, !'v) t =
     { parameters : 'p Option_sender.hlist;
       cursor : 'v t
     }

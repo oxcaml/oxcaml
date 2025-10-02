@@ -488,8 +488,11 @@ module Datalog : sig
     *)
   val compile : 'v String.hlist -> ('v Term.hlist -> (nil, 'a) program) -> 'a
 
-  val with_parameters :
-    'p String.hlist -> ('p Term.hlist -> ('p, 'a) program) -> (nil, 'a) program
+  val compile_with_parameters :
+    'p String.hlist ->
+    'v String.hlist ->
+    ('p Term.hlist -> 'v Term.hlist -> ('p, 'a) program) ->
+    'a
 
   (** [foreach vars prog] binds the variables [vars] in [prog].
 

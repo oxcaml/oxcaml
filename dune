@@ -17,13 +17,25 @@
 (env
  (release
   (flags
-   (:standard -principal -w +a-4-9-40-41-42-44-45-48-66-67-70)))
+   (:standard -g -principal -w +a-4-9-40-41-42-44-45-48-66-67-70)))
  (main
   (flags
-   (:standard -principal -warn-error +A -w +a-4-9-40-41-42-44-45-48-66-67-70)))
+   (:standard
+    -g
+    -principal
+    -warn-error
+    +A
+    -w
+    +a-4-9-40-41-42-44-45-48-66-67-70)))
  (dev
   (flags
-   (:standard -principal -w +a-4-9-40-41-42-44-45-48-66-67-70 -warn-error +A))))
+   (:standard
+    -g
+    -principal
+    -w
+    +a-4-9-40-41-42-44-45-48-66-67-70
+    -warn-error
+    +A))))
 
 (include dune.runtime_selection)
 
@@ -54,6 +66,8 @@
 (copy_files# backend/debug/dwarf/dwarf_ocaml/*.ml{,i})
 
 (copy_files# backend/internal_assembler/*.ml{,i})
+
+(copy_files# backend/llvm/*.ml{,i})
 
 (copy_files# backend/peephole/*.ml{,i})
 
@@ -582,6 +596,8 @@
   vectorize
   vectorize_utils
   vectorize_specific
+  ;; backend/llvm
+  llvm_ir
   llvmize
   ;; backend/regalloc
   regalloc_gi

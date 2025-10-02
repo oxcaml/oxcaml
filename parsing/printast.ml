@@ -535,23 +535,23 @@ and jkind_annotation_opt i ppf jkind =
 and jkind_annotation i ppf (jkind : jkind_annotation) =
   line i ppf "jkind %a\n" fmt_location jkind.pjkind_loc;
   match jkind.pjkind_desc with
-  | Default -> line i ppf "Default\n"
-  | Abbreviation jkind ->
-      line i ppf "Abbreviation \"%s\"\n" jkind
-  | Mod (jkind, m) ->
-      line i ppf "Mod\n";
+  | Pjk_default -> line i ppf "Pjk_default\n"
+  | Pjk_abbreviation jkind ->
+      line i ppf "Pjk_abbreviation \"%s\"\n" jkind
+  | Pjk_mod (jkind, m) ->
+      line i ppf "Pjk_mod\n";
       jkind_annotation (i+1) ppf jkind;
       modes (i+1) ppf m
-  | With (jkind, type_, modalities_) ->
-      line i ppf "With\n";
+  | Pjk_with (jkind, type_, modalities_) ->
+      line i ppf "Pjk_with\n";
       jkind_annotation (i+1) ppf jkind;
       core_type (i+1) ppf type_;
       modalities (i+1) ppf modalities_
-  | Kind_of type_ ->
-      line i ppf "Kind_of\n";
+  | Pjk_kind_of type_ ->
+      line i ppf "Pjk_kind_of\n";
       core_type (i+1) ppf type_
-  | Product jkinds ->
-      line i ppf "Product\n";
+  | Pjk_product jkinds ->
+      line i ppf "Pjk_product\n";
       list i jkind_annotation ppf jkinds
 
 and function_param i ppf { pparam_desc = desc; pparam_loc = loc } =

@@ -44,6 +44,10 @@ let class_of_operation (op : Operation.t)
       | Imove32
       | Isignext _ -> Op_pure
       | Isimd op -> of_simd_class (Simd.class_of_operation op)
+      | Illvm_intrinsic intr ->
+        Misc.fatal_errorf "CSE: Unexpected llvm_intrinsic %s: \
+                           not using LLVM backend"
+          intr
     in
     Class op_class
   | Move | Spill | Reload

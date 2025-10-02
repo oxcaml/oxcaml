@@ -69,6 +69,9 @@ void caml_init_domain (void)
   Caml_state->last_return_address = 1; /* not in OCaml code initially */
   Caml_state->gc_regs = NULL;
 
+  Caml_state->tls_state = Val_unit;
+  caml_register_generational_global_root(&Caml_state->tls_state);
+
   Caml_state->stat_minor_words = 0.0;
   Caml_state->stat_promoted_words = 0.0;
   Caml_state->stat_major_words = 0.0;
@@ -137,4 +140,17 @@ CAMLprim value caml_domain_dls_set(void)
 CAMLprim value caml_domain_dls_get(void)
 {
   caml_failwith("Domains not supported on runtime4");
+}
+
+/* Thread-local state */
+
+CAMLprim value caml_domain_tls_set(value t)
+{
+  caml_modify_generational_global_root(&Caml_state->tls_state, t);
+  return Val_unit;
+}
+
+CAMLprim value caml_domain_tls_get(value unused)
+{
+  return Caml_state->tls_state;
 }

@@ -290,9 +290,8 @@ module Datalog = struct
       where (f variables) @@ yield variables
 
     let create_with_parameters ~parameters variables f =
-      compile variables (fun variables ->
-          with_parameters parameters (fun parameters ->
-              where (f parameters variables) @@ yield variables))
+      compile_with_parameters parameters variables (fun parameters variables ->
+          where (f parameters variables) (yield variables))
 
     let fold_with_parameters cursor parameters database ~init ~f =
       Cursor.With_parameters.naive_fold cursor parameters database f init

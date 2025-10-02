@@ -2420,11 +2420,17 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~stub:true ~inline:Inline_attribute.Default_inline
       ~poll_attribute:
         (Poll_attribute.from_lambda (Function_decl.poll_attribute decl))
+      ~regalloc_attribute:
+        (Regalloc_attribute.from_lambda (Function_decl.regalloc_attribute decl))
+      ~regalloc_param_attribute:
+        (Regalloc_param_attribute.from_lambda
+           (Function_decl.regalloc_param_attribute decl))
       ~zero_alloc_attribute:
         (Zero_alloc_attribute.from_lambda
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
-      ~is_opaque:false ~recursive ~newer_version_of:None ~cost_metrics
+      ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
+      ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
       ~dbg ~is_tupled ~is_my_closure_used:true ~inlining_decision
       ~absolute_history ~relative_history ~loopify:Never_loopify
@@ -2818,10 +2824,16 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~stub ~inline
       ~poll_attribute:
         (Poll_attribute.from_lambda (Function_decl.poll_attribute decl))
+      ~regalloc_attribute:
+        (Regalloc_attribute.from_lambda (Function_decl.regalloc_attribute decl))
+      ~regalloc_param_attribute:
+        (Regalloc_param_attribute.from_lambda
+           (Function_decl.regalloc_param_attribute decl))
       ~zero_alloc_attribute:
         (Zero_alloc_attribute.from_lambda
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
+      ~cold:(Function_decl.cold decl)
       ~is_opaque:(Function_decl.is_opaque decl)
       ~recursive ~newer_version_of:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
@@ -2957,6 +2969,13 @@ let close_functions acc external_env ~current_region function_declarations =
         let poll_attribute =
           Poll_attribute.from_lambda (Function_decl.poll_attribute decl)
         in
+        let regalloc_attribute =
+          Regalloc_attribute.from_lambda (Function_decl.regalloc_attribute decl)
+        in
+        let regalloc_param_attribute =
+          Regalloc_param_attribute.from_lambda
+            (Function_decl.regalloc_param_attribute decl)
+        in
         let zero_alloc_attribute =
           Zero_alloc_attribute.from_lambda
             (Function_decl.zero_alloc_attribute decl)
@@ -2975,7 +2994,8 @@ let close_functions acc external_env ~current_region function_declarations =
             ~param_modes ~result_arity ~result_types:Unknown
             ~result_mode:(Function_decl.result_mode decl)
             ~stub:(Function_decl.stub decl) ~inline:Never_inline
-            ~zero_alloc_attribute ~poll_attribute
+            ~zero_alloc_attribute ~poll_attribute ~regalloc_attribute
+            ~regalloc_param_attribute ~cold:(Function_decl.cold decl)
             ~is_a_functor:(Function_decl.is_a_functor decl)
             ~is_opaque:(Function_decl.is_opaque decl)
             ~recursive:(Function_decl.recursive decl)
@@ -3311,6 +3331,9 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         local = Default_local;
         zero_alloc = Default_zero_alloc;
         loop = Default_loop;
+        regalloc = Default_regalloc;
+        regalloc_param = Default_regalloc_params;
+        cold = false;
         is_a_functor = false;
         is_opaque = false;
         stub = true;

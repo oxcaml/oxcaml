@@ -22,5 +22,4 @@ type result =
     code_deps : Traverse_acc.code_dep Code_id.Map.t
   }
 
-val run :
-  get_code_metadata:(Code_id.t -> Code_metadata.t) -> Flambda_unit.t -> result
+val run : Flambda_unit.t -> result

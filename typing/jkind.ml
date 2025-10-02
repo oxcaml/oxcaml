@@ -482,6 +482,7 @@ module Mod_bounds = struct
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Linearity))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Contention))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Portability))
+    @@ Sub_result.combine (modal_less_or_equal (Comonadic Forkable))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Yielding))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Statefulness))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Visibility))
@@ -528,6 +529,7 @@ module Mod_bounds = struct
     |> add_crossing_if (Monadic Uniqueness)
     |> add_crossing_if (Comonadic Portability)
     |> add_crossing_if (Monadic Contention)
+    |> add_crossing_if (Comonadic Forkable)
     |> add_crossing_if (Comonadic Yielding)
     |> add_crossing_if (Comonadic Statefulness)
     |> add_crossing_if (Monadic Visibility)
@@ -544,8 +546,8 @@ module Mod_bounds = struct
   let for_arrow =
     let crossing =
       Crossing.create ~linearity:false ~regionality:false ~uniqueness:true
-        ~portability:false ~contention:true ~yielding:false ~statefulness:false
-        ~visibility:true
+        ~portability:false ~contention:true ~forkable:false ~yielding:false
+        ~statefulness:false ~visibility:true
     in
     create crossing ~externality:Externality.max
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
@@ -1140,6 +1142,7 @@ module Layout_and_axes = struct
                     (value_for_axis ~axis:(Modal (Comonadic Linearity)))
                   ~portability:
                     (value_for_axis ~axis:(Modal (Comonadic Portability)))
+                  ~forkable:(value_for_axis ~axis:(Modal (Comonadic Forkable)))
                   ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
                   ~statefulness:
                     (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
@@ -1438,8 +1441,9 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
-                   ~portability:true ~yielding:true ~uniqueness:false
-                   ~contention:true ~statefulness:true ~visibility:true
+                   ~portability:true ~forkable:true ~yielding:true
+                   ~uniqueness:false ~contention:true ~statefulness:true
+                   ~visibility:true
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1455,8 +1459,9 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:false
-                   ~portability:true ~yielding:false ~uniqueness:false
-                   ~contention:true ~statefulness:false ~visibility:false
+                   ~portability:true ~forkable:false ~yielding:false
+                   ~uniqueness:false ~contention:true ~statefulness:false
+                   ~visibility:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1472,8 +1477,9 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
-                   ~portability:true ~yielding:true ~uniqueness:false
-                   ~contention:true ~statefulness:true ~visibility:false
+                   ~portability:true ~forkable:true ~yielding:true
+                   ~uniqueness:false ~contention:true ~statefulness:true
+                   ~visibility:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1489,8 +1495,9 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
-                   ~portability:true ~yielding:true ~contention:false
-                   ~uniqueness:false ~statefulness:true ~visibility:false
+                   ~portability:true ~forkable:true ~yielding:true
+                   ~contention:false ~uniqueness:false ~statefulness:true
+                   ~visibility:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1566,6 +1573,16 @@ module Const = struct
                 immediate.jkind.mod_bounds
           };
         name = "immediate64"
+      }
+
+    let immediate64_or_null =
+      { jkind =
+          { immediate_or_null.jkind with
+            mod_bounds =
+              Mod_bounds.set_externality Externality.External64
+                immediate_or_null.jkind.mod_bounds
+          };
+        name = "immediate64_or_null"
       }
 
     (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1716,6 +1733,13 @@ module Const = struct
         name = "bits64 mod everything"
       }
 
+    let kind_of_idx =
+      { jkind =
+          mk_jkind (Base Bits64) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits64 mod everything"
+      }
+
     (* CR or_null: nullability here should be [Maybe_null], but is set
        to [Non_null] for now due to inference limitations. *)
     let vec128 =
@@ -1784,6 +1808,7 @@ module Const = struct
         immediate;
         immediate_or_null;
         immediate64;
+        immediate64_or_null;
         float64;
         kind_of_unboxed_float;
         float32;
@@ -1867,6 +1892,13 @@ module Const = struct
           | true, false ->
             (* Otherwise, print [mod global yielding] to indicate [yielding]. *)
             modes @ ["yielding"]
+          | _, _ -> modes
+        in
+        let modes =
+          (* Likewise for [global] and [forkable]. *)
+          match List.mem "global" modes, List.mem "forkable" modes with
+          | true, true -> List.filter (fun m -> m <> "forkable") modes
+          | true, false -> modes @ ["unforkable"]
           | _, _ -> modes
         in
         let modes =
@@ -2041,7 +2073,7 @@ module Const = struct
       (l * r) Context_with_transl.t -> Parsetree.jkind_annotation -> (l * r) t =
    fun context jkind ->
     match jkind.pjkind_desc with
-    | Abbreviation name ->
+    | Pjk_abbreviation name ->
       (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
       (match name with
       | "any" -> Builtin.any.jkind
@@ -2049,6 +2081,7 @@ module Const = struct
       | "value" -> Builtin.value.jkind
       | "void" -> Builtin.void.jkind
       | "immediate64" -> Builtin.immediate64.jkind
+      | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
       | "immediate" -> Builtin.immediate.jkind
       | "immediate_or_null" -> Builtin.immediate_or_null.jkind
       | "float64" -> Builtin.float64.jkind
@@ -2067,19 +2100,19 @@ module Const = struct
       | "mutable_data" -> Builtin.mutable_data.jkind
       | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
       |> allow_left |> allow_right
-    | Mod (base, modifiers) ->
+    | Pjk_mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
       (* for each mode, lower the corresponding modal bound to be that mode *)
       let mod_bounds =
         Mod_bounds.meet base.mod_bounds (Typemode.transl_mod_bounds modifiers)
       in
       { layout = base.layout; mod_bounds; with_bounds = No_with_bounds }
-    | Product ts ->
+    | Pjk_product ts ->
       let jkinds =
         List.map (of_user_written_annotation_unchecked_level context) ts
       in
       jkind_of_product_annotations jkinds
-    | With (base, type_, modalities) -> (
+    | Pjk_with (base, type_, modalities) -> (
       let base = of_user_written_annotation_unchecked_level context base in
       match context with
       | Right_jkind _ -> raise ~loc:type_.ptyp_loc With_on_right
@@ -2094,7 +2127,8 @@ module Const = struct
             With_bounds.add_modality ~modality ~relevant_for_shallow:`Irrelevant
               ~type_expr:type_ base.with_bounds
         })
-    | Default | Kind_of _ -> raise ~loc:jkind.pjkind_loc Unimplemented_syntax
+    | Pjk_default | Pjk_kind_of _ ->
+      raise ~loc:jkind.pjkind_loc Unimplemented_syntax
 
   (* The [annotation_context] parameter can be used to allow annotations / kinds
      in different contexts to be enabled with different extension settings.
@@ -2287,7 +2321,9 @@ end
 
 (* every context where this is used actually wants an [option] *)
 let mk_annot name =
-  Some Parsetree.{ pjkind_loc = Location.none; pjkind_desc = Abbreviation name }
+  Some
+    Parsetree.
+      { pjkind_loc = Location.none; pjkind_desc = Pjk_abbreviation name }
 
 let mark_best (type l r) (t : (l * r) Types.jkind) =
   { (disallow_right t) with quality = Best }
@@ -2712,8 +2748,8 @@ let for_object =
 let for_float ident =
   let crossing =
     Crossing.create ~regionality:false ~linearity:true ~portability:true
-      ~yielding:true ~uniqueness:false ~contention:true ~statefulness:true
-      ~visibility:true
+      ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
+      ~statefulness:true ~visibility:true
   in
   let mod_bounds =
     Mod_bounds.create crossing ~externality:Externality.max

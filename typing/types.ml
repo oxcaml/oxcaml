@@ -68,6 +68,7 @@ module Jkind_mod_bounds = struct
   let uniqueness = Crossing.Axis.Monadic Uniqueness
   let portability = Crossing.Axis.Comonadic Portability
   let contention = Crossing.Axis.Monadic Contention
+  let forkable = Crossing.Axis.Comonadic Forkable
   let yielding = Crossing.Axis.Comonadic Yielding
   let statefulness = Crossing.Axis.Comonadic Statefulness
   let visibility = Crossing.Axis.Monadic Visibility
@@ -106,6 +107,7 @@ module Jkind_mod_bounds = struct
     let uniqueness = modal uniqueness in
     let portability = modal portability in
     let contention = modal contention in
+    let forkable = modal forkable in
     let yielding = modal yielding in
     let statefulness = modal statefulness in
     let visibility = modal visibility in
@@ -129,7 +131,7 @@ module Jkind_mod_bounds = struct
     in
     let comonadic =
       Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
-        ~statefulness
+        ~forkable ~statefulness
     in
     let crossing : Mode.Crossing.t = { monadic; comonadic } in
     {
@@ -153,6 +155,7 @@ module Jkind_mod_bounds = struct
     let uniqueness = modal uniqueness in
     let portability = modal portability in
     let contention = modal contention in
+    let forkable = modal forkable in
     let yielding = modal yielding in
     let statefulness = modal statefulness in
     let visibility = modal visibility in
@@ -176,7 +179,7 @@ module Jkind_mod_bounds = struct
     in
     let comonadic =
       Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
-        ~statefulness
+        ~forkable ~statefulness
     in
     let crossing : Mode.Crossing.t = { monadic; comonadic } in
     {
@@ -198,6 +201,7 @@ module Jkind_mod_bounds = struct
     modal uniqueness &&
     modal portability &&
     modal contention &&
+    modal forkable &&
     modal yielding &&
     modal statefulness &&
     modal visibility &&

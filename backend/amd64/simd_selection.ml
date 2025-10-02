@@ -1248,7 +1248,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _
           | Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence
           | Imfence | Ipackf32 | Isimd _ | Isimd_mem _ | Iprefetch _
-          | Icldemote _ ->
+          | Icldemote _ | Illvm_intrinsic _ ->
             assert false)
         | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Alloc _
         | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
@@ -1381,7 +1381,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
               ( Ifloatarithmem _ | Ioffset_loc _ | Iprefetch _ | Icldemote _
               | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
               | Isimd _ | Isimd_mem _ | Ilea _ | Ibswap _ | Isextend32
-              | Izextend32 )
+              | Izextend32 | Illvm_intrinsic _ )
           | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Alloc _
           | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
@@ -1494,7 +1494,11 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       Misc.fatal_error "Unexpected simd operation with memory arguments"
     | Ioffset_loc _ | Ibswap _ | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
     | Ipackf32 | Isimd _ | Iprefetch _ | Icldemote _ ->
-      None)
+      None
+    | Illvm_intrinsic intr ->
+      Misc.fatal_errorf
+        "Simd_selection: Unexpected llvm_intrinsic %s: not using LLVM backend"
+        intr)
   | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
   | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
   | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _ | Floatop _

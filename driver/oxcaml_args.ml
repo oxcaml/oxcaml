@@ -46,7 +46,12 @@ let mk_dcfg f = ("-dcfg", Arg.Unit f, " (undocumented)")
 let mk_dcfg_invariants f =
   ("-dcfg-invariants", Arg.Unit f, " Extra sanity checks on Cfg")
 
-let mk_regalloc f = ("-regalloc", Arg.String f, " Select the register allocator")
+let mk_regalloc f =
+  ( "-regalloc",
+    Arg.Symbol
+      ( List.map fst Clflags.Register_allocator.assoc_list,
+        fun s -> f (List.assoc s Clflags.Register_allocator.assoc_list) ),
+    " Select the register allocator" )
 
 let mk_regalloc_linscan_threshold f =
   ( "-regalloc-linscan-threshold",
@@ -356,6 +361,11 @@ let mk_keep_llvmir f =
 let mk_llvm_path f =
   ("-llvm-path", Arg.String f, " Specify which LLVM compiler to use")
 
+let mk_llvm_flags f =
+  ( "-llvm-flags",
+    Arg.String f,
+    " Extra flags to pass to LLVM (like -march or -mtune)" )
+
 module Flambda2 = Oxcaml_flags.Flambda2
 
 let mk_flambda2_result_types_functors_only f =
@@ -491,6 +501,18 @@ let mk_no_flambda2_reaper f =
     Arg.Unit f,
     Printf.sprintf " Disable reaper pass%s (Flambda2 only)"
       (format_not_default Flambda2.Default.enable_reaper) )
+
+let mk_reaper_preserve_direct_calls f =
+  ( "-reaper-preserve-direct-calls",
+    Arg.Symbol ([ "never"; "always"; "zero-alloc" ], f),
+    Printf.sprintf
+      " Choose the direct call preservation strategy of the reaper (Flambda2 \
+       only)\n\
+      \      Valid values are: \n\
+      \       \"never\": do not try to preserve direct calls to old functions;\n\
+      \       \"always\": always preserve existing direct calls;\n\
+      \       \"zero-alloc\": preserve direct calls only in zero-alloc checked \
+       functions." )
 
 let mk_flambda2_expert_fallback_inlining_heuristic f =
   ( "-flambda2-expert-fallback-inlining-heuristic",
@@ -945,7 +967,7 @@ module type Oxcaml_options = sig
   val ddwarf_metrics : unit -> unit
   val dcfg : unit -> unit
   val dcfg_invariants : unit -> unit
-  val regalloc : string -> unit
+  val regalloc : Clflags.Register_allocator.t -> unit
   val regalloc_linscan_threshold : int -> unit
   val regalloc_param : string -> unit
   val regalloc_validate : unit -> unit
@@ -997,6 +1019,7 @@ module type Oxcaml_options = sig
   val dllvmir : unit -> unit
   val keep_llvmir : unit -> unit
   val llvm_path : string -> unit
+  val llvm_flags : string -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val flambda2_join_points : unit -> unit
@@ -1015,6 +1038,7 @@ module type Oxcaml_options = sig
   val flambda2_join_depth : int -> unit
   val flambda2_reaper : unit -> unit
   val no_flambda2_reaper : unit -> unit
+  val reaper_preserve_direct_calls : string -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
@@ -1131,6 +1155,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dllvmir F.dllvmir;
       mk_keep_llvmir F.keep_llvmir;
       mk_llvm_path F.llvm_path;
+      mk_llvm_flags F.llvm_flags;
       mk_flambda2_debug F.flambda2_debug;
       mk_no_flambda2_debug F.no_flambda2_debug;
       mk_flambda2_join_points F.flambda2_join_points;
@@ -1154,6 +1179,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_join_depth F.flambda2_join_depth;
       mk_flambda2_reaper F.flambda2_reaper;
       mk_no_flambda2_reaper F.no_flambda2_reaper;
+      mk_reaper_preserve_direct_calls F.reaper_preserve_direct_calls;
       mk_flambda2_expert_fallback_inlining_heuristic
         F.flambda2_expert_fallback_inlining_heuristic;
       mk_no_flambda2_expert_fallback_inlining_heuristic
@@ -1348,6 +1374,7 @@ module Oxcaml_options_impl = struct
   let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
   let keep_llvmir () = set' Oxcaml_flags.keep_llvmir ()
   let llvm_path s = Oxcaml_flags.llvm_path := Some s
+  let llvm_flags s = Oxcaml_flags.llvm_flags := s
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
   let flambda2_join_points = set Flambda2.join_points
@@ -1362,7 +1389,8 @@ module Oxcaml_options_impl = struct
       Oxcaml_flags.Set Oxcaml_flags.All_functions
 
   let no_flambda2_result_types () =
-    Flambda2.function_result_types := Oxcaml_flags.Set Oxcaml_flags.Never
+    Flambda2.function_result_types :=
+      Oxcaml_flags.Set (Oxcaml_flags.Never : Oxcaml_flags.function_result_types)
 
   let flambda2_basic_meet () = ()
   let flambda2_advanced_meet () = ()
@@ -1391,6 +1419,23 @@ module Oxcaml_options_impl = struct
   let flambda2_join_depth n = Flambda2.join_depth := Oxcaml_flags.Set n
   let flambda2_reaper = set Flambda2.enable_reaper
   let no_flambda2_reaper = clear Flambda2.enable_reaper
+
+  let reaper_preserve_direct_calls s =
+    match s with
+    | "never" ->
+        Flambda2.reaper_preserve_direct_calls :=
+          Oxcaml_flags.Set
+            (Oxcaml_flags.Never : Oxcaml_flags.reaper_preserve_direct_calls)
+    | "always" ->
+        Flambda2.reaper_preserve_direct_calls :=
+          Oxcaml_flags.Set Oxcaml_flags.Always
+    | "zero-alloc" ->
+        Flambda2.reaper_preserve_direct_calls :=
+          Oxcaml_flags.Set Oxcaml_flags.Zero_alloc
+    | "auto" ->
+        Flambda2.reaper_preserve_direct_calls :=
+          Oxcaml_flags.Set Oxcaml_flags.Auto
+    | _ -> () (* This should not occur as we use Arg.Symbol *)
 
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic
@@ -1665,7 +1710,21 @@ module Extra_params = struct
         let dummy = ref false in
         set' dummy
     | "cfg-invariants" -> set' Oxcaml_flags.cfg_invariants
-    | "regalloc" -> set_string Oxcaml_flags.regalloc
+    | "regalloc" -> (
+        match Clflags.Register_allocator.of_string v with
+        | Some regalloc ->
+            Oxcaml_flags.regalloc := regalloc;
+            true
+        | None ->
+            let possible_values =
+              String.concat ","
+                (List.map fst Clflags.Register_allocator.assoc_list)
+            in
+            raise
+              (Arg.Bad
+                 (Printf.sprintf
+                    "invalid register allocator %S (possible values: %s)" v
+                    possible_values)))
     | "regalloc-linscan-threshold" ->
         set_int' Oxcaml_flags.regalloc_linscan_threshold
     | "regalloc-param" -> add_string Oxcaml_flags.regalloc_params
@@ -1768,11 +1827,14 @@ module Extra_params = struct
         Oxcaml_flags.llvm_path := Some v;
         true
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
+    | "llvm-flags" -> set_string Oxcaml_flags.llvm_flags
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "flambda2-join-points" -> set Flambda2.join_points
     | "flambda2-result-types" ->
         (match String.lowercase_ascii v with
-        | "never" -> Flambda2.function_result_types := Oxcaml_flags.(Set Never)
+        | "never" ->
+            Flambda2.function_result_types :=
+              Oxcaml_flags.(Set (Never : function_result_types))
         | "functors-only" ->
             Flambda2.function_result_types := Oxcaml_flags.(Set Functors_only)
         | "all-functions" ->
@@ -1891,6 +1953,23 @@ module Extra_params = struct
         Oxcaml_flags.cached_generic_functions_path := v;
         true
     | "reaper" -> set Flambda2.enable_reaper
+    | "reaper-preserve-direct-calls" ->
+        (match String.lowercase_ascii v with
+        | "never" ->
+            Flambda2.reaper_preserve_direct_calls :=
+              Oxcaml_flags.(Set (Never : reaper_preserve_direct_calls))
+        | "always" ->
+            Flambda2.reaper_preserve_direct_calls := Oxcaml_flags.(Set Always)
+        | "zero-alloc" ->
+            Flambda2.reaper_preserve_direct_calls :=
+              Oxcaml_flags.(Set Zero_alloc)
+        | "auto" ->
+            Flambda2.reaper_preserve_direct_calls := Oxcaml_flags.(Set Auto)
+        | _ ->
+            Misc.fatal_error
+              "Syntax: reaper-preserve-direct-calls: \
+               always|never|zero-alloc|auto");
+        true
     | _ -> false
 end
 

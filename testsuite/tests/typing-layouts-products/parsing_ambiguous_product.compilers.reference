@@ -15,17 +15,17 @@
         ptype_jkind_annotation =
           Some
             jkind (parsing_ambiguous_product.ml[12,327+10]..[12,327+49])
-            Product
+            Pjk_product
             [
               jkind (parsing_ambiguous_product.ml[12,327+10]..[12,327+28])
-              Mod
+              Pjk_mod
                 jkind (parsing_ambiguous_product.ml[12,327+11]..[12,327+16])
-                Abbreviation "value"
+                Pjk_abbreviation "value"
                 mode "global" (parsing_ambiguous_product.ml[12,327+21]..[12,327+27])
               jkind (parsing_ambiguous_product.ml[12,327+31]..[12,327+49])
-              Mod
+              Pjk_mod
                 jkind (parsing_ambiguous_product.ml[12,327+32]..[12,327+37])
-                Abbreviation "value"
+                Pjk_abbreviation "value"
                 mode "global" (parsing_ambiguous_product.ml[12,327+42]..[12,327+48])
             ]
     ]
@@ -45,17 +45,17 @@
         ptype_jkind_annotation =
           Some
             jkind (parsing_ambiguous_product.ml[14,380+10]..[14,380+45])
-            Mod
+            Pjk_mod
               jkind (parsing_ambiguous_product.ml[14,380+10]..[14,380+34])
-              Product
+              Pjk_product
               [
                 jkind (parsing_ambiguous_product.ml[14,380+10]..[14,380+26])
-                Mod
+                Pjk_mod
                   jkind (parsing_ambiguous_product.ml[14,380+10]..[14,380+15])
-                  Abbreviation "value"
+                  Pjk_abbreviation "value"
                   mode "global" (parsing_ambiguous_product.ml[14,380+20]..[14,380+26])
                 jkind (parsing_ambiguous_product.ml[14,380+29]..[14,380+34])
-                Abbreviation "value"
+                Pjk_abbreviation "value"
               ]
               mode "global" (parsing_ambiguous_product.ml[14,380+39]..[14,380+45])
     ]
@@ -75,17 +75,17 @@
         ptype_jkind_annotation =
           Some
             jkind (parsing_ambiguous_product.ml[16,429+10]..[16,429+47])
-            Mod
+            Pjk_mod
               jkind (parsing_ambiguous_product.ml[16,429+10]..[16,429+36])
-              Product
+              Pjk_product
               [
                 jkind (parsing_ambiguous_product.ml[16,429+11]..[16,429+27])
-                Mod
+                Pjk_mod
                   jkind (parsing_ambiguous_product.ml[16,429+11]..[16,429+16])
-                  Abbreviation "value"
+                  Pjk_abbreviation "value"
                   mode "global" (parsing_ambiguous_product.ml[16,429+21]..[16,429+27])
                 jkind (parsing_ambiguous_product.ml[16,429+30]..[16,429+35])
-                Abbreviation "value"
+                Pjk_abbreviation "value"
               ]
               mode "global" (parsing_ambiguous_product.ml[16,429+41]..[16,429+47])
     ]

@@ -15,7 +15,7 @@
 (** Mutable indices into blocks. *)
 
 (** An alias for the type of mutable indices into blocks. *)
-type ('a, 'b : any) t : bits64 = ('a, 'b) idx_mut
+type ('a, 'b : any) t : bits64 mod everything = ('a, 'b) idx_mut
 
 (** [unsafe_get a i] uses the index [i] to access [a].
 

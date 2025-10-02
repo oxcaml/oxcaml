@@ -60,6 +60,12 @@ jobs:
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
 
+          - name: metrics_collection
+            config: --enable-middle-end=flambda2
+            os: ubuntu-latest
+            build_ocamlparam: ''
+            ocamlparam: '_,O3=1'
+
           - name: flambda2_frame_pointers_oclassic_polling
             config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
             os: ubuntu-latest
@@ -141,10 +147,10 @@ jobs:
             oxcaml_llvm_source_branch: lldb
 
           - name: llvmize_tests
-            config: --enable-middle-end=flambda2 --enable-runtime5
+            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-frame-pointers
             os: ubuntu-latest
             llvmize_tests_only: true
-            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus0
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
             oxcaml_llvm_source_branch: llvmize-oxcaml
 
     env:
@@ -291,6 +297,12 @@ jobs:
         ulimit -c unlimited
         make $target \
           || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+
+        # Install the compiler for metrics_collection configuration to populate _install directory
+        # This is needed for the metrics collection step to analyze installed artifacts
+        if [ "${{ matrix.name }}" = "metrics_collection" ]; then
+          make install
+        fi
       env:
         BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
         OCAMLPARAM: ${{ matrix.ocamlparam }}
@@ -358,6 +370,51 @@ jobs:
           ./_build/main/tools/regalloc/regalloc.exe _build \
             -validate -param SPLIT_AROUND_LOOPS:on -regalloc $allocator || exit 1; \
         done
+
+    - name: Collect and push metrics
+      if: matrix.name == 'metrics_collection' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+      env:
+        GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }}
+      run: |
+        # Checkout metrics repository
+        gh repo clone oxcaml/oxcaml-metrics metrics-repo
+
+        # Create data directory if it doesn't exist
+        mkdir -p metrics-repo/data
+
+        # Determine the actual commit being tested (not the merge commit for PRs)
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          COMMIT_HASH="${{ github.event.pull_request.head.sha }}"
+        else
+          COMMIT_HASH="${{ github.sha }}"
+        fi
+        SHORT_HASH="${COMMIT_HASH:0:8}"
+        DATE=$(date -u +"%Y-%m-%d")
+
+        # CSV filename
+        CSV_FILE="metrics-repo/data/metrics-${DATE}-${SHORT_HASH}.csv"
+
+        # Use the metrics collection script
+        ${{ github.workspace }}/oxcaml/scripts/collect-size-metrics.sh \
+          "${{ github.workspace }}/_install" \
+          "$CSV_FILE" \
+          "$COMMIT_HASH"
+
+        echo "Contents of generated metrics file:"
+        cat "$CSV_FILE"
+
+        # Commit and push metrics
+        cd metrics-repo
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        # Configure git to use gh for authentication
+        git config --local credential.helper ""
+        git config --local credential.https://github.com.helper "!gh auth git-credential"
+
+        git add data/
+        git commit -m "Add metrics for commit ${COMMIT_HASH}"
+        git push
 
     - uses: actions/upload-artifact@v4
       if: ${{ failure() }}

@@ -47,6 +47,14 @@ val join_algorithm : unit -> join_algorithm
 
 val enable_reaper : unit -> bool
 
+type reaper_preserve_direct_calls = Oxcaml_flags.reaper_preserve_direct_calls =
+  | Never
+  | Always
+  | Zero_alloc
+  | Auto
+
+val reaper_preserve_direct_calls : unit -> reaper_preserve_direct_calls
+
 val kind_checks : unit -> bool
 
 val flat_float_array : unit -> bool

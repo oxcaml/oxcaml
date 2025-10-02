@@ -375,7 +375,9 @@ let make_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units cached_g
   Emitaux.Dwarf_helpers.init ~ppf_dump
     ~disable_dwarf:(not !Dwarf_flags.dwarf_for_startup_file)
     ~sourcefile:sourcefile_for_dwarf;
-  Emit.begin_assembly unix;
+  if !Clflags.llvm_backend
+  then Llvmize.begin_assembly ~is_startup:true ~sourcefile:sourcefile_for_dwarf
+  else Emit.begin_assembly unix;
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
   let name_list =
     List.flatten (List.map (fun u -> u.defines) units) in
@@ -421,7 +423,9 @@ let make_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units cached_g
   compile_phrase (Cmm_helpers.frame_table all_comp_units);
   if !Clflags.output_complete_object then
     force_linking_of_startup ~ppf_dump;
-  Emit.end_assembly ()
+  if !Clflags.llvm_backend
+  then Llvmize.end_assembly ()
+  else Emit.end_assembly ()
 
 let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
@@ -436,7 +440,9 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
   Emitaux.Dwarf_helpers.init ~ppf_dump
     ~disable_dwarf:(not !Dwarf_flags.dwarf_for_startup_file)
     ~sourcefile:sourcefile_for_dwarf;
-  Emit.begin_assembly unix;
+  if !Clflags.llvm_backend
+  then Llvmize.begin_assembly ~is_startup:true ~sourcefile:sourcefile_for_dwarf
+  else Emit.begin_assembly unix;
   emit_ocamlrunparam ~ppf_dump;
   List.iter compile_phrase
     (Cmm_helpers.emit_gc_roots_table ~symbols:[]
@@ -449,7 +455,9 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
     force_linking_of_startup ~ppf_dump;
   (* this is to force a reference to all units, otherwise the linker
      might drop some of them (in case of libraries) *)
-  Emit.end_assembly ()
+  if !Clflags.llvm_backend
+  then Llvmize.end_assembly ()
+  else Emit.end_assembly ()
 
 let call_linker_shared ?(native_toplevel = false) file_list output_name =
   let exitcode =
