@@ -5523,11 +5523,7 @@ let generalize_structure_type_unboxed_access_result
 let vb_exp_constraint
       {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=modes; _ } =
   let open Ast_helper in
-  let {pmode_modes; pmode_crossings; _} = modes in
-  let loc =
-    Location.merge (pat.ppat_loc :: List.map (fun m -> m.loc) pmode_modes
-      @ List.map (fun m -> m.loc) pmode_crossings)
-  in
+  let loc = Location.merge [ pat.ppat_loc; expr.pexp_loc; modes.pmode_loc ] in
   let maybe_add_modes_constraint expr =
     match modes with
     | {pmode_modes = []; pmode_crossings = []; _} -> expr
@@ -5553,11 +5549,7 @@ let vb_pat_constraint
       ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; _ } as vb) =
   let spat =
     let open Ast_helper in
-    let {pmode_modes; pmode_crossings; _} = modes in
-    let loc =
-      Location.merge (pat.ppat_loc :: List.map (fun m -> m.loc) pmode_modes
-        @ List.map (fun m -> m.loc) pmode_crossings)
-    in
+    let loc = Location.merge [ pat.ppat_loc; modes.pmode_loc ] in
     let maybe_add_modes_constraint expr =
       match modes with
       | {pmode_modes = []; pmode_crossings = []; _} -> expr

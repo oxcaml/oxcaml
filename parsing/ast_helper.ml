@@ -49,10 +49,16 @@ module Modes = struct
     { pmode_modes; pmode_crossings; pmode_loc = loc }
 
   let empty = mk [] []
-  let append { pmode_modes = m; pmode_crossings = c; pmode_loc = l }
-             { pmode_modes = m'; pmode_crossings = c'; pmode_loc = l' } =
-    { pmode_modes = m @ m'; pmode_crossings = c @ c'; pmode_loc = Location.merge [l; l'] }
+  let is_empty m = m.pmode_modes = [] && m.pmode_crossings = []
   let of_core_modes ?loc m = mk ?loc m []
+
+  let append ({ pmode_modes = m; pmode_crossings = c; pmode_loc = l } as mode)
+             ({ pmode_modes = m'; pmode_crossings = c'; pmode_loc = l' } as mode') =
+    (* handle empty cases explicitly so that appending with empty gives better locs *)
+    if is_empty mode then mode' else if is_empty mode' then mode else
+    { pmode_modes = m @ m';
+      pmode_crossings = c @ c';
+      pmode_loc = Location.merge ~ghost:false [l; l'] }
 end
 
 module Modalities = struct
@@ -60,12 +66,15 @@ module Modalities = struct
     { pmoda_modalities; pmoda_crossings; pmoda_loc = loc }
 
   let empty = mk [] []
-  let append { pmoda_modalities = m; pmoda_crossings = c; pmoda_loc = l }
-        { pmoda_modalities = m'; pmoda_crossings = c'; pmoda_loc = l' } =
+  let is_empty m = m.pmoda_modalities = [] && m.pmoda_crossings = []
+  let of_core_modalities ?loc pmoda_modalities = mk ?loc pmoda_modalities []
+
+  let append ({ pmoda_modalities = m; pmoda_crossings = c; pmoda_loc = l } as moda)
+             ({ pmoda_modalities = m'; pmoda_crossings = c'; pmoda_loc = l' } as moda') =
+    if is_empty moda then moda' else if is_empty moda' then moda else
     { pmoda_modalities = m @ m';
       pmoda_crossings = c @ c';
-      pmoda_loc = Location.merge [l; l'] }
-  let of_core_modalities ?loc pmoda_modalities = mk ?loc pmoda_modalities []
+      pmoda_loc = Location.merge ~ghost:false [l; l'] }
 end
 
 module Attr = struct

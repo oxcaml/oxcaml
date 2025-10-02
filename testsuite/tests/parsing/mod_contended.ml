@@ -61,9 +61,6 @@ end
 
 module M = struct
   (* value bindings *)
-  (* CR zeisbach: we intend no support for using legacy syntax for modes with the new mod
-     modalities syntax, but maybe some of it will accidentally work. Test this out *)
-
   let (v mod contended aliased) = 42
   let (v @ once portable mod contended aliased) = 42
 
