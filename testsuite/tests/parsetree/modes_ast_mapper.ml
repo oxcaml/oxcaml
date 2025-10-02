@@ -20,7 +20,7 @@ let mapper: Ast_mapper.mapper =
         Format.printf "modes: %s%s\n"
           (locs_to_string pmode_modes (fun (Mode s) -> s))
           (locs_to_string ~sep:"" pmode_crossings
-            (fun (Mod s) -> Format.sprintf " mod %s" s));
+            (fun (Crossing s) -> Format.sprintf " mod %s" s));
       );
       default_mapper.modes sub m
     );
@@ -31,7 +31,7 @@ let mapper: Ast_mapper.mapper =
           Format.printf "modalities: %s%s\n"
             (locs_to_string pmoda_modalities (fun (Modality s) -> s))
             (locs_to_string ~sep:"" pmoda_crossings
-              (fun (Mod s) -> Format.sprintf " mod %s" s));
+              (fun (Crossing s) -> Format.sprintf " mod %s" s));
       );
       default_mapper.modalities sub m
     );
