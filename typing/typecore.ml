@@ -5498,14 +5498,14 @@ let generalize_structure_type_unboxed_access_result
 let vb_exp_constraint
       {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=modes; _ } =
   let open Ast_helper in
-  let {pmode_modes; pmode_crossings} = modes in
+  let {pmode_modes; pmode_crossings; _} = modes in
   let loc =
     Location.merge (pat.ppat_loc :: List.map (fun m -> m.loc) pmode_modes
       @ List.map (fun m -> m.loc) pmode_crossings)
   in
   let maybe_add_modes_constraint expr =
     match modes with
-    | {pmode_modes = []; pmode_crossings = []} -> expr
+    | {pmode_modes = []; pmode_crossings = []; _} -> expr
     | _ -> Exp.constraint_ ~loc expr None modes
   in
   match ct with
@@ -5528,14 +5528,14 @@ let vb_pat_constraint
       ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; _ } as vb) =
   let spat =
     let open Ast_helper in
-    let {pmode_modes; pmode_crossings} = modes in
+    let {pmode_modes; pmode_crossings; _} = modes in
     let loc =
       Location.merge (pat.ppat_loc :: List.map (fun m -> m.loc) pmode_modes
         @ List.map (fun m -> m.loc) pmode_crossings)
     in
     let maybe_add_modes_constraint expr =
       match modes with
-      | {pmode_modes = []; pmode_crossings = []} -> expr
+      | {pmode_modes = []; pmode_crossings = []; _} -> expr
       | _ -> Pat.constraint_ ~loc pat None modes
     in
     match vb.pvb_constraint, pat.ppat_desc, exp.pexp_desc with
@@ -8018,16 +8018,16 @@ and type_function
       let ret_mode = Typemode.transl_mode_annots ret_mode_annotations in
       let type_mode =
         match ret_mode_annotations with
-        | {pmode_modes = _ :: _; pmode_crossings = []} ->
+        | {pmode_modes = _ :: _; pmode_crossings = []; _} ->
             (* if return mode annotation is present, we use that to interpret the return
                type annotation (currying mode behavior) *)
             ret_mode
-        | {pmode_modes = []; pmode_crossings = []} ->
+        | {pmode_modes = []; pmode_crossings = []; _} ->
             (* otherwise, we do not constrain the body mode, and we use the mode of the whole
             function to interpret the return type *)
             (* CR zqian: We should infer from [mode], instead of using directly. *)
             mode
-        | {pmode_modes = _; pmode_crossings = _ :: _} ->
+        | {pmode_modes = _; pmode_crossings = _ :: _; _} ->
             Misc.fatal_error "ZJE: mods are not yet supported"
       in
       match body with
