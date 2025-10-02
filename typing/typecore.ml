@@ -1049,7 +1049,7 @@ let mode_annots_from_pat pat =
   let modes =
     match pat.ppat_desc with
     | Ppat_constraint (_, _, modes) -> modes
-    | _ -> Ast_helper.Modes.empty
+    | _ -> No_modes
   in
   Typemode.transl_mode_annots modes
 
@@ -2777,7 +2777,7 @@ and type_pat_aux
       solve_Ppat_array ~refine:false loc penv mutability expected_ty
     in
     let modalities =
-      Typemode.transl_modalities ~maturity:Stable mutability Ast_helper.Modalities.empty
+      Typemode.transl_modalities ~maturity:Stable mutability No_modalities
     in
     check_project_mutability ~loc ~env:!!penv Array_elements mutability
       alloc_mode.mode;
@@ -5523,11 +5523,13 @@ let generalize_structure_type_unboxed_access_result
 let vb_exp_constraint
       {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=modes; _ } =
   let open Ast_helper in
-  let hack = if modes.pmode_loc = Location.none then [] else [modes.pmode_loc] in
-  let loc = Location.merge ([ pat.ppat_loc; expr.pexp_loc ] @ hack) in
+  let loc = match modes with
+    | No_modes -> Location.merge [ pat.ppat_loc; expr.pexp_loc ]
+    | Modes { pmode_loc; _ } -> Location.merge [ pat.ppat_loc; expr.pexp_loc; pmode_loc ]
+  in
   let maybe_add_modes_constraint expr =
     match modes with
-    | {pmode_modes = []; pmode_crossings = []; _} -> expr
+    | No_modes -> expr
     | _ -> Exp.constraint_ ~loc expr None modes
   in
   match ct with
@@ -5550,11 +5552,14 @@ let vb_pat_constraint
       ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; _ } as vb) =
   let spat =
     let open Ast_helper in
-    let hack = if modes.pmode_loc = Location.none then [] else [modes.pmode_loc] in
-    let loc = Location.merge ([ pat.ppat_loc ] @ hack) in
+    let loc =
+      match modes with
+      | No_modes -> pat.ppat_loc
+      | Modes { pmode_loc; _ } -> Location.merge [ pat.ppat_loc; pmode_loc ]
+    in
     let maybe_add_modes_constraint expr =
       match modes with
-      | {pmode_modes = []; pmode_crossings = []; _} -> expr
+      | No_modes -> expr
       | _ -> Pat.constraint_ ~loc pat None modes
     in
     match vb.pvb_constraint, pat.ppat_desc, exp.pexp_desc with
@@ -7889,7 +7894,7 @@ and type_function
               match pat.ppat_desc with
               | Ppat_constraint (_, Some sty, _) ->
                   let gloc = { default.pexp_loc with loc_ghost = true } in
-                  Ast_helper.(Exp.constraint_ default (Some sty) ~loc:gloc Modes.empty)
+                  Ast_helper.(Exp.constraint_ default (Some sty) ~loc:gloc No_modes)
               | _ -> default
             in
             (* Defaults are always global. They can be moved out of the
@@ -8037,17 +8042,17 @@ and type_function
       let ret_mode = Typemode.transl_mode_annots ret_mode_annotations in
       let type_mode =
         match ret_mode_annotations with
-        | {pmode_modes = _ :: _; pmode_crossings = []; _} ->
-            (* if return mode annotation is present, we use that to interpret the return
-               type annotation (currying mode behavior) *)
-            ret_mode
-        | {pmode_modes = []; pmode_crossings = []; _} ->
-            (* otherwise, we do not constrain the body mode, and we use the mode of the whole
-            function to interpret the return type *)
+        | Modes {pmode_crossings = _ :: _; _} ->
+            Misc.fatal_error "ZJE: mods are not yet supported"
+        | No_modes ->
+            (* if the return mode annotation is absent we do not constrain the body mode,
+              and we use the mode of the whole function to interpret the return type *)
             (* CR zqian: We should infer from [mode], instead of using directly. *)
             mode
-        | {pmode_modes = _; pmode_crossings = _ :: _; _} ->
-            Misc.fatal_error "ZJE: mods are not yet supported"
+        | Modes {pmode_crossings = []; _} ->
+            (* otherwise, if the return mode annotation is present, we use that
+               to interpret the return type annotation (currying mode behavior) *)
+            ret_mode
       in
       match body with
       | Pfunction_body body ->
@@ -10125,7 +10130,7 @@ and type_generic_array
     else Predef.type_iarray
   in
   let modalities =
-    Typemode.transl_modalities ~maturity:Stable mutability Ast_helper.Modalities.empty in
+    Typemode.transl_modalities ~maturity:Stable mutability No_modalities in
   let argument_mode = mode_modality modalities array_mode in
   let jkind, elt_sort = Jkind.for_array_element_sort () in
   let ty = newgenvar jkind in

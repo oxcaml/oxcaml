@@ -15,7 +15,7 @@ let mapper: Ast_mapper.mapper =
   { default_mapper with
     modes = (fun sub m ->
       (match m with
-      | { pmode_modes = []; pmode_crossings = []; _ } -> ();
+      | No_modes -> ();
       | { pmode_modes; pmode_crossings; _ } ->
         Format.printf "modes: %s%s\n"
           (locs_to_string pmode_modes (fun (Mode s) -> s))

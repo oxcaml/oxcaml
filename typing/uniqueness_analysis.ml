@@ -1593,8 +1593,7 @@ end = struct
 
   let array_index mut i t =
     let modality =
-      Typemode.transl_modalities ~maturity:Stable mut
-        Ast_helper.Modalities.empty
+      Typemode.transl_modalities ~maturity:Stable mut No_modalities
     in
     modal_child modality (Projection.Array_index i) t
 

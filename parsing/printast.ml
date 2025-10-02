@@ -156,8 +156,8 @@ let modality i ppf modality =
 
 let modalities i ppf m =
   match m with
-  | { pmoda_modalities = []; pmoda_crossings = []; _ } -> ()
-  | { pmoda_modalities; pmoda_crossings; pmoda_loc } ->
+  | No_modalities -> ()
+  | Modalities { pmoda_modalities; pmoda_crossings; pmoda_loc } ->
     line i ppf "modalities %a\n" fmt_location pmoda_loc;
     let i = i+1 in
     List.iter (fun m -> modality i ppf m) pmoda_modalities;
@@ -169,8 +169,8 @@ let mode i ppf mode =
 
 let modes i ppf m =
   match m with
-  | { pmode_modes = []; pmode_crossings = []; _ } -> ()
-  | { pmode_modes; pmode_crossings; pmode_loc } ->
+  | No_modes -> ()
+  | Modes { pmode_modes; pmode_crossings; pmode_loc } ->
     line i ppf "modes %a\n" fmt_location pmode_loc;
     let i = i+1 in
     List.iter (fun m -> mode i ppf m) pmode_modes;
