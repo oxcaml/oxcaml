@@ -77,6 +77,15 @@
       "info": "Non-memoized lattice decision diagram backend with unboxed leaves for constructor coefficients."
     },
     {
+      "id": "typing/ikinds/ldd_no_fast_path.ml",
+      "x": 20.785,
+      "y": 5.0,
+      "width": 4.1182,
+      "height": 0.5,
+      "label": "typing/ikinds/ldd_no_fast_path.ml",
+      "info": "Unboxed backend variant with fast-path simplifications disabled for experimentation."
+    },
+    {
       "id": "typing/ikinds/ldd_memo.ml",
       "x": 1.6018,
       "y": 4.0,
@@ -682,6 +691,31 @@
       "style": "solid",
       "label": null,
       "info": "Ldd.Make routes to the unboxed non-memoized backend."
+    },
+    {
+      "source": "typing/ikinds/ldd.ml",
+      "target": "typing/ikinds/ldd_no_fast_path.ml",
+      "points": [
+        [
+          16.991,
+          4.3622
+        ],
+        [
+          17.557,
+          4.3829
+        ],
+        [
+          18.249,
+          4.5581
+        ],
+        [
+          18.886,
+          4.5813
+        ]
+      ],
+      "style": "dotted",
+      "label": "No_fast_path",
+      "info": "Alternate backend without join/meet fast paths."
     },
     {
       "source": "typing/ikinds/ldd_memo.ml",

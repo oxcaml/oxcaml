@@ -238,6 +238,7 @@
   ldd
   ldd_no_memo
   ldd_unboxed
+  ldd_no_fast_path
   ldd_jkind_solver
   axis_lattice
   axis_lattice_array
