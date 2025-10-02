@@ -47,7 +47,7 @@ module Shadow = struct
 
   let x = "30.0"
 
-  let i_3 = Printf.printf "%s\n" (id x); 2
+  let i_3 = Printf.printf "%s\n" (id x); 3
 end
 
 
