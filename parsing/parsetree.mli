@@ -59,14 +59,14 @@ type constant =
 
 type location_stack = Location.t list
 
-type mod_ = | Mod of string [@@unboxed]
-type mods = mod_ loc list
+type crossing = | Crossing of string [@@unboxed]
+type crossings = crossing loc list
 
 type modality = | Modality of string [@@unboxed]
 type core_modalities = modality loc list
 type modalities = {
-    core_modalities : core_modalities;
-    mod_modalities : mods
+    pmoda_modalities : core_modalities;
+    pmoda_crossings : crossings
   }
 
 type mode = | Mode of string [@@unboxed]
@@ -75,8 +75,9 @@ type core_modes = mode loc list
    another field storing the location so that it doesn't need to be computed.
    when this is fixed, go back and fix [loc_of_modes] in that file. *)
 type modes = {
-    core_modes : core_modes;
-    mod_modes : mods
+    pmode_modes : core_modes;
+    pmode_crossings : crossings;
+    (* pmode_loc : loc *)
   }
 
 type include_kind = Structure | Functor
@@ -1353,8 +1354,7 @@ and jkind_annotation_desc =
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
      full kind annotations. We may want to narrow this type some.
      Internal ticket 5085. *)
-  (* CR zeisbach: this should be renamed to Jkind_mod or something, to avoid
-     clashing with the other Mod above. Also, this should take in mods and not modes *)
+  (* CR modes: this should store crossings, not modes *)
   | Mod of jkind_annotation * modes
   | With of jkind_annotation * core_type * modalities
   | Kind_of of core_type
