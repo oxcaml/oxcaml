@@ -267,7 +267,8 @@ let () =
                 exn = None;
                 terminator =
                   { id = make_id ();
-                    desc = Call { op = Indirect None; label_after = new_label 1 };
+                    desc =
+                      Call { op = Indirect None; label_after = new_label 1 };
                     arg = [||];
                     res = [||]
                   }
