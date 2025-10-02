@@ -50,7 +50,13 @@ module Modes = struct
 
   let empty = mk [] []
   let is_empty m = m.pmode_modes = [] && m.pmode_crossings = []
-  let of_core_modes ?loc m = mk ?loc m []
+  let of_core_modes core_modes =
+    let loc =
+      match core_modes with
+      | [] -> None
+      | _ :: _ ->
+          Some (Location.merge ~ghost:false (List.map (fun m -> m.loc) core_modes)) in
+    mk ?loc core_modes []
 
   let append ({ pmode_modes = m; pmode_crossings = c; pmode_loc = l } as mode)
              ({ pmode_modes = m'; pmode_crossings = c'; pmode_loc = l' } as mode') =
@@ -67,7 +73,14 @@ module Modalities = struct
 
   let empty = mk [] []
   let is_empty m = m.pmoda_modalities = [] && m.pmoda_crossings = []
-  let of_core_modalities ?loc pmoda_modalities = mk ?loc pmoda_modalities []
+
+  let of_core_modalities core_modalities =
+    let loc =
+      match core_modalities with
+      | [] -> None
+      | _ :: _ ->
+          Some (Location.merge ~ghost:false (List.map (fun m -> m.loc) core_modalities)) in
+    mk ?loc core_modalities []
 
   let append ({ pmoda_modalities = m; pmoda_crossings = c; pmoda_loc = l } as moda)
              ({ pmoda_modalities = m'; pmoda_crossings = c'; pmoda_loc = l' } as moda') =
