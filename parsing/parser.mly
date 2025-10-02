@@ -4053,7 +4053,7 @@ type_parameters:
 ;
 
 jkind_desc:
-    (* CR zeisbach: replace this with mod_mods_expr to change jkind mod type *)
+    (* CR zeisbach: replace this with mod_crossing_expr to change jkind mod type *)
     jkind_annotation MOD mkrhs(LIDENT)+ { (* LIDENTs here are for modes *)
       let core_modes =
         List.map
@@ -4606,21 +4606,21 @@ strict_function_or_labeled_tuple_type:
    | mode_expr_legacy {$1}
 ;
 
-/* Mods */
-%inline mod_:
+/* Crossings */
+%inline crossing:
   | LIDENT { mkloc (Crossing $1) (make_loc $sloc) }
 
-%inline mods:
-  | mod_+ { $1 }
+%inline crossings:
+  | crossing+ { $1 }
 
-mod_mods_expr:
-  | MOD mods {$2}
+mod_crossing_expr:
+  | MOD crossings {$2}
   | MOD error { expecting $loc($2) "mod expression" }
 ;
 
-optional_mod_mods_expr:
+optional_mod_crossing_expr:
   | { [] }
-  | mod_mods_expr
+  | mod_crossing_expr
     { $1 }
 ;
 
@@ -4640,10 +4640,10 @@ at_mode_expr:
 
 mode_annot_expr:
   | pmode_modes = at_mode_expr
-    pmode_crossings = optional_mod_mods_expr
+    pmode_crossings = optional_mod_crossing_expr
     { let pmode_loc = make_loc $sloc in
       { pmode_modes; pmode_crossings; pmode_loc } }
-  | pmode_crossings = mod_mods_expr
+  | pmode_crossings = mod_crossing_expr
     { let pmode_loc = make_loc $sloc in
       { pmode_modes = []; pmode_crossings; pmode_loc } }
 ;
@@ -4679,10 +4679,10 @@ atat_modalities_expr:
 
 modality_annot_expr:
   | pmoda_modalities = atat_modalities_expr
-    pmoda_crossings = optional_mod_mods_expr
+    pmoda_crossings = optional_mod_crossing_expr
     { let pmoda_loc = make_loc $sloc in
       { pmoda_modalities; pmoda_crossings; pmoda_loc } }
-  | pmoda_crossings = mod_mods_expr
+  | pmoda_crossings = mod_crossing_expr
     { let pmoda_loc = make_loc $sloc in
       { pmoda_modalities = []; pmoda_crossings; pmoda_loc } }
 ;

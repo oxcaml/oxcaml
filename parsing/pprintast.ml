@@ -358,16 +358,16 @@ let optional_legacy_modalities f { pmoda_modalities; pmoda_crossings } =
 
 (* new mode and modality syntax *)
 
-let mod_ f { txt = (Crossing s); _ } =
+let crossing f { txt = (Crossing s); _ } =
   pp_print_string f s
 
-let mods f m =
-  pp_print_list ~pp_sep:(fun f () -> pp f " ") mod_ f m
+let crossings f m =
+  pp_print_list ~pp_sep:(fun f () -> pp f " ") crossing f m
 
-let optional_mod_mods f m =
+let optional_mod_crossings f m =
   match m with
   | [] -> ()
-  | m -> pp f " mod %a" mods m
+  | m -> pp f " mod %a" crossings m
 
 let mode f { txt = Mode s; _ } =
   pp_print_string f s
@@ -385,7 +385,7 @@ let optional_mode_annot f m =
   | { pmode_modes = []; pmode_crossings = []; _ } -> ()
   | { pmode_modes; pmode_crossings; _ } ->
     optional_at_core_modes f pmode_modes;
-    optional_mod_mods f pmode_crossings
+    optional_mod_crossings f pmode_crossings
 
 let modality f m =
   let {txt = Modality txt; _} = m in
@@ -405,7 +405,7 @@ let optional_modality_annot ?(pre = fun _ () -> ()) ?(post = fun _ () -> ()) f m
   | { pmoda_modalities; pmoda_crossings } ->
     pre f ();
     optional_atat_core_modalities f pmoda_modalities;
-    optional_mod_mods f pmoda_crossings;
+    optional_mod_crossings f pmoda_crossings;
     post f ()
 
 let optional_space_modality_annot f m =
