@@ -4330,7 +4330,8 @@ module Crossing = struct
 
     let min = Modality (Join_const Mode.Const.max)
 
-    let mod_default = min
+    (* CR zeisbach: for now, this will be the crossing that changes nothing *)
+    let mod_default = max
 
     let legacy = Modality (Join_const Mode.Const.legacy)
 

@@ -1060,7 +1060,6 @@ let expect_mode_cross_jkind env jkind (expected_mode : expected_mode) =
   let crossing = crossing_of_jkind env jkind in
   mode_morph (Crossing.apply_right crossing) expected_mode
 
-(* CR zeisbach: this surely is a function that I will have to change to accomodate *)
 let expect_mode_cross env ty (expected_mode : expected_mode) =
   let crossing = crossing_of_ty env ty in
   mode_morph (Crossing.apply_right crossing) expected_mode
@@ -1109,7 +1108,7 @@ let check_construct_mutability ~loc ~env mutability ?ty ?modalities block_mode =
 let mutvar_mode ~loc ~env m0 exp_mode =
   let m = Value.newvar () in
   (* CR zeisbach: think harder about this *)
-  let mode = mode_default_disallow m (ref Crossing.Monadic.min) in
+  let mode = mode_default_disallow m (ref Crossing.Monadic.max) in
   let modalities = Typemode.let_mutable_modalities in
   submode ~loc ~env exp_mode (mode_modality modalities mode);
   check_construct_mutability ~loc ~env
@@ -1125,7 +1124,7 @@ let mode_project_mutable mut_name =
     |> Value.of_const ~hint_monadic:(Mutable_read mut_name)
   in
   (* CR zeisbach: this is something that might actually stay as min... *)
-  mode_default { mode; crossing = (ref Crossing.Monadic.min) }
+  mode_default { mode; crossing = (ref Crossing.Monadic.max) }
 
 (** The [expected_mode] of the record when mutating a mutable field. *)
 let mode_mutate_mutable mut_name =
@@ -1135,7 +1134,7 @@ let mode_mutate_mutable mut_name =
       contention = Uncontended }
     |> Value.of_const ~hint_monadic:(Mutable_write mut_name)
   in
-  mode_default { mode; crossing = (ref Crossing.Monadic.min) }
+  mode_default { mode; crossing = (ref Crossing.Monadic.max) }
 
 (** The [expected_mode] of the lazy expression when forcing it. *)
 let mode_force_lazy =
@@ -1144,7 +1143,7 @@ let mode_force_lazy =
       contention = Uncontended }
     |> Value.of_const ~hint_monadic:Lazy_forced
   in
-  mode_default { mode; crossing = (ref Crossing.Monadic.min) }
+  mode_default { mode; crossing = (ref Crossing.Monadic.max) }
 
 let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
@@ -5299,10 +5298,10 @@ let unique_use ~loc ~env mode_l mode_r  =
        running a UA which forces everything *)
     (* CR zeisbach: I really don't have a good sense of if this is right... *)
     submode ~loc ~env Value.(of_const {Const.min with uniqueness = Aliased})
-      (mode_default_disallow mode_r (ref Crossing.Monadic.min));
+      (mode_default_disallow mode_r (ref Crossing.Monadic.max));
     submode ~loc ~env mode_l
       (mode_default { mode = Value.(of_const {Const.max with linearity = Many});
-                      crossing = ref Crossing.Monadic.min });
+                      crossing = ref Crossing.Monadic.max });
     (Uniqueness.disallow_left Uniqueness.aliased,
      Linearity.disallow_right Linearity.many)
   end
@@ -5451,7 +5450,7 @@ let split_function_ty
     if not is_final_val_param then
       (* no need to check mode crossing in this case because ty_res always a
       function *)
-      mode_default_disallow ret_value_mode (ref Crossing.Monadic.min)
+      mode_default_disallow ret_value_mode (ref Crossing.Monadic.max)
     else
       let ret_value_mode = mode_return ret_value_mode in
       let ret_value_mode = expect_mode_cross env ty_ret ret_value_mode in
@@ -6846,7 +6845,7 @@ and type_expect_
         | Mutable_variable (id, mode, ty, sort) ->
             let newval =
               (* CR zeisbach: min vs default? seems plausible to be min here... *)
-              type_expect env (mode_default {mode; crossing = (ref Crossing.Monadic.min)})
+              type_expect env (mode_default {mode; crossing = (ref Crossing.Monadic.max)})
                 snewval (mk_expected (instance ty))
             in
             let lid = {txt = id; loc} in
@@ -9006,7 +9005,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   (* CR zeisbach: THIS IS A TEMPORARY HACK! the tuple modes should really be mossings,
      but for now that is not supported so we just bail out for all of them... *)
   let argument_mossings =
-    List.map (fun mode -> { mode; crossing = ref Crossing.Monadic.min}) argument_modes in
+    List.map (fun mode -> { mode; crossing = ref Crossing.Monadic.max}) argument_modes in
   let types_and_modes = List.combine labeled_subtypes argument_mossings in
   let overwrites =
     assign_children arity (fun _loc typ mode ->
@@ -9072,7 +9071,7 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   in
   (* CR zeisbach: This is another TEMPORARY HACK *)
   let argument_mossings =
-    List.map (fun mode -> { mode; crossing = ref Crossing.Monadic.min}) argument_modes in
+    List.map (fun mode -> { mode; crossing = ref Crossing.Monadic.max}) argument_modes in
   let types_sorts_and_modes =
     List.combine labels_types_and_sorts argument_mossings
   in

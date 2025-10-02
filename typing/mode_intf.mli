@@ -928,7 +928,8 @@ module type S = sig
         t
 
       (** Create the default crossing for type checking mods, which is currently
-          the min, but will gradually transition into the max *)
+          the max crossing (which does nothing), but will gradually transition into
+          starting at the min (which allows all crossings) -> accumulate constraints *)
       val mod_default : t
       (* CR zeisbach: get rid of this over time, but using it as a way to find easily *)
     end
