@@ -417,11 +417,9 @@ let optional_modality_annot_newline f m =
 (** For a list of modes, we either print everything in old syntax (if they
   are purely old modes), or everything in new syntax. *)
 let core_modes_in_old_syntax { pmode_modes; pmode_crossings; _ } =
-  match pmode_crossings with
-  | [] -> None
-  | _ :: _ ->
-    if List.for_all (fun {txt = Mode txt; _} -> txt = "local") pmode_modes
-      then Some pmode_modes else None
+  if pmode_crossings = []
+    && (List.for_all (fun {txt = Mode txt; _} -> txt = "local") pmode_modes)
+  then Some pmode_modes else None
 
 (** For a list of modalities, we either print all in old syntax (if they are
   purely old modalities), or all in new syntax. *)
