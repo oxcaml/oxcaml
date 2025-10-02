@@ -27,7 +27,7 @@ window.IKINDS_GRAPH_DATA = {
   ],
   "edges": [
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/ikinds/ikind.ml", "style": "solid", "label": null, "info": "Ikinds builds on Ikind.Ldd for lattice nodes and rigid-name helpers."},
-    {"source": "typing/ikinds/ikinds.ml", "target": "typing/ikinds/ldd_jkind_solver.ml", "style": "solid", "label": null, "info": "Ikinds instantiates Ldd_jkind_solver.Make to obtain JK operations."},
+    {"source": "typing/ikinds/ikinds.ml", "target": "typing/ikinds/ldd_jkind_solver.ml", "style": "solid", "label": null, "info": "Ikinds uses the specialized Ldd_jkind_solver module to obtain JK operations."},
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/ikinds/axis_lattice_bits.ml", "style": "solid", "label": null, "info": "Ikinds calls Axis_lattice_bits for masks/constants when translating jkinds."},
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/jkind.ml", "style": "solid", "label": null, "info": "Ikinds consumes Jkind APIs (disallow/with_bounds/modality) while constructing ckinds."},
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/types.mli", "style": "dashed", "label": "Obj.magic", "info": "Obj.magic bridge: pack_constructor_ikind/unpack_constructor_ikind talk to Types.constructor_ikind without exposing the representation."},

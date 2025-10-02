@@ -225,7 +225,7 @@
       ],
       "style": "solid",
       "label": null,
-      "info": "Ikinds instantiates Ldd_jkind_solver.Make to obtain JK operations."
+      "info": "Ikinds uses the specialized Ldd_jkind_solver module to obtain JK operations."
     },
     {
       "source": "typing/ikinds/ikinds.ml",

@@ -9,24 +9,7 @@ let enable_sub_or_error = false
 
 module Ldd = Ikind.Ldd
 
-module TyM = struct
-  type t = Types.type_expr
-
-  let compare (t1 : t) (t2 : t) =
-    Int.compare (Types.get_id t1) (Types.get_id t2)
-
-  let unique_id (t : t) : int = Types.get_id t
-end
-
-module ConstrM = struct
-  type t = Ldd.constr
-
-  let compare = Path.compare
-
-  let to_string (p : t) : string = Format.asprintf "%a" Path.print p
-end
-
-module JK = Ldd_jkind_solver.Make (Ldd) (TyM) (ConstrM)
+module JK = Ldd_jkind_solver
 
 let ikind_reset : string -> Types.type_ikind = Types.ikind_reset
 

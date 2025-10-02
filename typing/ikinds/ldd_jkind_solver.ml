@@ -1,137 +1,66 @@
-module type LDD = sig
-  type lat
+module Ldd = Ikind.Ldd
 
-  type node
+type ty = Types.type_expr
 
-  type var
+type constr = Ldd.constr
 
-  type constr
+type lat = Ldd.lat
 
-  module Name : sig
-    type t =
-      | Atom of { constr : constr; arg_index : int }
-      | Param of int
+type poly = Ldd.node
 
-    val param : int -> t
+type kind = Ldd.node
 
-    val atomic : constr -> int -> t
-  end
+(* Hash tables avoiding polymorphic structural comparison on deep values. *)
+module TyTbl = Hashtbl.Make (struct
+  type t = ty
 
-  val bot : node
+  let equal a b = Int.equal (Types.get_id a) (Types.get_id b)
 
-  val const : lat -> node
+  let hash t = Hashtbl.hash (Types.get_id t)
+end)
 
-  val rigid : Name.t -> var
+let constr_to_string (p : constr) : string = Format.asprintf "%a" Path.print p
 
-  val new_var : unit -> var
+module ConstrTbl = Hashtbl.Make (struct
+  type t = constr
 
-  val var : var -> node
+  let equal a b = Path.compare a b = 0
 
-  val join : node -> node -> node
+  let hash x = Hashtbl.hash (constr_to_string x)
+end)
 
-  val meet : node -> node -> node
+type ops =
+  { const : lat -> kind;
+    join : kind -> kind -> kind;
+    meet : kind -> kind -> kind;
+    modality : lat -> kind -> kind;
+    constr : constr -> kind list -> kind;
+    kind_of : ty -> kind;
+    rigid : ty -> kind;
+    pp_kind : kind -> string
+  }
 
-  val sub_subsets : node -> node -> node
+type ckind = ops -> kind
 
-  val solve_lfp : var -> node -> unit
+type constr_decl =
+  | Ty of
+      { args : ty list;
+        kind : ckind;
+        abstract : bool
+      }
+  | Poly of poly * poly list
 
-  val enqueue_lfp : var -> node -> unit
+type env =
+  { kind_of : ty -> ckind;
+    lookup : constr -> constr_decl
+  }
 
-  val enqueue_gfp : var -> node -> unit
+type solver =
+  { ops : ops;
+    constr_kind_poly : constr -> poly * poly list
+  }
 
-  val solve_pending : unit -> unit
-
-  val decompose_linear : universe:var list -> node -> node * node list
-
-  val leq : node -> node -> bool
-
-  val leq_with_reason : node -> node -> int list option
-
-  val round_up : node -> lat
-
-  val map_rigid : (Name.t -> node) -> node -> node
-
-  val clear_memos : unit -> unit
-
-  val pp : node -> string
-
-  val pp_debug : node -> string
-end
-
-module Make
-    (Ldd : LDD) (Ty : sig
-      type t
-
-      val compare : t -> t -> int
-
-      val unique_id : t -> int
-    end) (Constr : sig
-      type t = Ldd.constr
-
-      val compare : t -> t -> int
-
-      val to_string : t -> string
-    end) =
-struct
-  type ty = Ty.t
-
-  type constr = Constr.t
-
-  type lat = Ldd.lat
-
-  type poly = Ldd.node
-
-  type kind = Ldd.node
-
-  (* Hash tables avoiding polymorphic structural comparison on deep values. *)
-  module TyTbl = Hashtbl.Make (struct
-    type t = ty
-
-    let equal a b = Ty.compare a b = 0
-
-    let hash t = Hashtbl.hash (Ty.unique_id t)
-  end)
-
-  module ConstrTbl = Hashtbl.Make (struct
-    type t = constr
-
-    let equal a b = Constr.compare a b = 0
-
-    let hash x = Hashtbl.hash (Constr.to_string x)
-  end)
-
-  type ops =
-    { const : lat -> kind;
-      join : kind -> kind -> kind;
-      meet : kind -> kind -> kind;
-      modality : lat -> kind -> kind;
-      constr : constr -> kind list -> kind;
-      kind_of : ty -> kind;
-      rigid : ty -> kind;
-      pp_kind : kind -> string
-    }
-
-  type ckind = ops -> kind
-
-  type constr_decl =
-    | Ty of
-        { args : ty list;
-          kind : ckind;
-          abstract : bool
-        }
-    | Poly of poly * poly list
-
-  type env =
-    { kind_of : ty -> ckind;
-      lookup : constr -> constr_decl
-    }
-
-  type solver =
-    { ops : ops;
-      constr_kind_poly : constr -> poly * poly list
-    }
-
-  let make_solver (env : env) : solver =
+let make_solver (env : env) : solver =
     Ldd.clear_memos ();
     (* Define all the trivial ops *)
     let const l = Ldd.const l in
@@ -141,7 +70,7 @@ struct
     (* Create hash table mapping ty to kind for memoization *)
     let ty_to_kind = TyTbl.create 0 in
     let rigid t =
-      let param = Ty.unique_id t in
+      let param = Types.get_id t in
       Ldd.var (Ldd.rigid (Ldd.Name.param param))
     in
     (* And hash table mapping constructor to coefficients *)
@@ -188,7 +117,7 @@ struct
             match name with
             | Ldd.Name.Param _ -> Ldd.var (Ldd.rigid name)
             | Ldd.Name.Atom { constr = constr'; arg_index } ->
-              if Constr.compare constr' c = 0
+              if Path.compare constr' c = 0
               then Ldd.var (Ldd.rigid name)
               else
                 let base', coeffs' = constr_kind constr' in
@@ -214,7 +143,7 @@ struct
           (* Recursively compute the kind of the body *)
           let rigid_vars =
             List.map
-              (fun ty -> Ldd.rigid (Ldd.Name.param (Ty.unique_id ty)))
+              (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty)))
               args
           in
           List.iter2
@@ -234,7 +163,7 @@ struct
             failwith
               (Printf.sprintf
                  "jkind_solver: coeffs mismatch for constr %s (length %d vs %d)"
-                 (Constr.to_string c) (List.length coeffs) (List.length coeffs'));
+                 (constr_to_string c) (List.length coeffs) (List.length coeffs'));
           if abstract
           then (
             (* We need to assert that kind' is less than or equal to the base *)
@@ -293,36 +222,34 @@ struct
     in
     { ops; constr_kind_poly }
 
-  let normalize (solver : solver) (k : ckind) : poly =
-    let k' = k solver.ops in
-    Ldd.solve_pending ();
-    k'
+let normalize (solver : solver) (k : ckind) : poly =
+  let k' = k solver.ops in
+  Ldd.solve_pending ();
+  k'
 
-  let constr_kind_poly (solver : solver) (c : constr) : poly * poly list =
-    solver.constr_kind_poly c
+let constr_kind_poly (solver : solver) (c : constr) : poly * poly list =
+  solver.constr_kind_poly c
 
-  let leq (solver : solver) (k1 : ckind) (k2 : ckind) : bool =
-    let k2' = k2 solver.ops in
-    let k1' = k1 solver.ops in
-    Ldd.solve_pending ();
-    Ldd.leq k1' k2'
+let leq (solver : solver) (k1 : ckind) (k2 : ckind) : bool =
+  let k2' = k2 solver.ops in
+  let k1' = k1 solver.ops in
+  Ldd.solve_pending ();
+  Ldd.leq k1' k2'
 
-  let leq_with_reason (solver : solver) (k1 : ckind) (k2 : ckind) :
-      int list option =
-    let k2' = k2 solver.ops in
-    let k1' = k1 solver.ops in
-    Ldd.solve_pending ();
-    Ldd.leq_with_reason k1' k2'
+let leq_with_reason (solver : solver) (k1 : ckind) (k2 : ckind) : int list option =
+  let k2' = k2 solver.ops in
+  let k1' = k1 solver.ops in
+  Ldd.solve_pending ();
+  Ldd.leq_with_reason k1' k2'
 
-  let round_up (solver : solver) (k : ckind) : lat =
-    let k' = k solver.ops in
-    Ldd.round_up k'
+let round_up (solver : solver) (k : ckind) : lat =
+  let k' = k solver.ops in
+  Ldd.round_up k'
 
-  let clear_memos () : unit = Ldd.clear_memos ()
+let clear_memos () : unit = Ldd.clear_memos ()
 
-  let pp (p : poly) : string =
-    Ldd.solve_pending ();
-    Ldd.pp p
+let pp (p : poly) : string =
+  Ldd.solve_pending ();
+  Ldd.pp p
 
-  let pp_debug (p : poly) : string = Ldd.pp_debug p
-end
+let pp_debug (p : poly) : string = Ldd.pp_debug p
