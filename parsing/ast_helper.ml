@@ -45,18 +45,19 @@ module Const = struct
 end
 
 module Modes = struct
-  let empty = { core_modes = []; mod_modes = [] }
-  let append { core_modes = cm; mod_modes = mm } { core_modes = cm'; mod_modes = mm' } =
-    { core_modes = cm @ cm'; mod_modes = mm @ mm' }
-  let of_core_modes core_modes = { core_modes; mod_modes = [] }
+  let empty = { pmode_modes = []; pmode_crossings = [] }
+  let append { pmode_modes = m; pmode_crossings = c }
+             { pmode_modes = m'; pmode_crossings = c' } =
+    { pmode_modes = m @ m'; pmode_crossings = c @ c' }
+  let of_core_modes pmode_modes = { pmode_modes; pmode_crossings = [] }
 end
 
 module Modalities = struct
-  let empty = { core_modalities = []; mod_modalities = [] }
-  let append { core_modalities = cm; mod_modalities = mm }
-        { core_modalities = cm'; mod_modalities = mm' } =
-    { core_modalities = cm @ cm'; mod_modalities = mm @ mm' }
-  let of_core_modalities core_modalities = { core_modalities; mod_modalities = [] }
+  let empty = { pmoda_modalities = []; pmoda_crossings = [] }
+  let append { pmoda_modalities = m; pmoda_crossings = c }
+        { pmoda_modalities = m'; pmoda_crossings = c' } =
+    { pmoda_modalities = m @ m'; pmoda_crossings = c @ c' }
+  let of_core_modalities pmoda_modalities = { pmoda_modalities ; pmoda_crossings = [] }
 end
 
 module Attr = struct

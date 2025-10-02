@@ -188,7 +188,7 @@ let mkpat_with_modes ~loc ~pat ~cty ~modes =
     end
   | _ ->
     begin match cty, modes with
-    | None, { core_modes = []; mod_modes = [] } -> pat
+    | None, { pmode_modes = []; pmode_crossings = [] } -> pat
     | cty, modes -> mkpat ~loc (Ppat_constraint (pat, cty, modes))
     end
 
@@ -210,7 +210,7 @@ let mkexp_constraint ~loc ~exp ~cty ~modes =
      end
   | _ ->
      begin match cty, modes with
-     | None, { core_modes = []; mod_modes = [] } -> exp
+     | None, { pmode_modes = []; pmode_crossings = [] } -> exp
      | cty, modes -> mkexp ~loc (Pexp_constraint (exp, cty, modes))
      end
 
@@ -380,7 +380,7 @@ let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
      mk ~loc ~exp:e ~cty:(Some t) ~modes
   | Pcoerce(t1, t2)  ->
      match modes with
-     | { core_modes = []; mod_modes = [] } ->
+     | { pmode_modes = []; pmode_crossings = [] } ->
       let mk = if ghost then ghexp else mkexp ?attrs:None in
       mk ~loc (Pexp_coerce(e, t1, t2))
      | _ -> not_expecting loc "mode annotations"
@@ -951,7 +951,7 @@ let unboxed_type sloc lident tys =
 
 let maybe_pmod_constraint mode expr =
   match mode with
-  | { core_modes = []; mod_modes = [] } -> expr
+  | { pmode_modes = []; pmode_crossings = [] } -> expr
   | _ -> Mod.constraint_ None mode expr
 %}
 
@@ -4608,8 +4608,7 @@ strict_function_or_labeled_tuple_type:
 
 /* Mods */
 %inline mod_:
-  (* CR zeisbach: remove this annotation once the jkind's Mod is renamed *)
-  | LIDENT { mkloc ((Mod $1) : mod_) (make_loc $sloc) }
+  | LIDENT { mkloc (Crossing $1) (make_loc $sloc) }
 
 %inline mods:
   | mod_+ { $1 }
@@ -4640,11 +4639,11 @@ at_mode_expr:
 ;
 
 mode_annot_expr:
-  | core_modes = at_mode_expr
-    mod_modes = optional_mod_mods_expr
-    { { core_modes; mod_modes } }
-  | mod_modes = mod_mods_expr
-    { { core_modes = []; mod_modes } }
+  | pmode_modes = at_mode_expr
+    pmode_crossings = optional_mod_mods_expr
+    { { pmode_modes; pmode_crossings } }
+  | pmode_crossings = mod_mods_expr
+    { { pmode_modes = []; pmode_crossings } }
 ;
 
 %inline core_modes_expr:
@@ -4677,11 +4676,11 @@ atat_modalities_expr:
 ;
 
 modality_annot_expr:
-  | core_modalities = atat_modalities_expr
-    mod_modalities = optional_mod_mods_expr
-    { { core_modalities; mod_modalities } }
-  | mod_modalities = mod_mods_expr
-    { { core_modalities = []; mod_modalities } }
+  | pmoda_modalities = atat_modalities_expr
+    pmoda_crossings = optional_mod_mods_expr
+    { { pmoda_modalities; pmoda_crossings } }
+  | pmoda_crossings = mod_mods_expr
+    { { pmoda_modalities = []; pmoda_crossings } }
 ;
 
 optional_modality_annot_expr:

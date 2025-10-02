@@ -165,7 +165,7 @@ let arg_label i ppf = function
 
 let mod_ i ppf mod_ =
   line i ppf "mod %a\n" fmt_string_loc
-    (Location.map (fun ((Mod x) : mod_) -> x) mod_)
+    (Location.map (fun (Crossing x) -> x) mod_)
 
 let mods i ppf mods =
   List.iter (fun m -> mod_ i ppf m) mods
@@ -174,17 +174,17 @@ let modality i ppf modality =
   line i ppf "modality %a\n" fmt_string_loc
     (Location.map (fun (Modality x) -> x) modality)
 
-let modalities i ppf {core_modalities; mod_modalities} =
-  List.iter (fun m -> modality i ppf m) core_modalities;
-  mods i ppf mod_modalities
+let modalities i ppf {pmoda_modalities; pmoda_crossings} =
+  List.iter (fun m -> modality i ppf m) pmoda_modalities;
+  mods i ppf pmoda_crossings
 
 let mode i ppf mode =
   line i ppf "mode %a\n" fmt_string_loc
     (Location.map (fun (Mode x) -> x) mode)
 
-let modes i ppf {core_modes; mod_modes} =
-  List.iter (fun m -> mode i ppf m) core_modes;
-  mods i ppf mod_modes
+let modes i ppf {pmode_modes; pmode_crossings} =
+  List.iter (fun m -> mode i ppf m) pmode_modes;
+  mods i ppf pmode_crossings
 
 let include_kind i ppf = function
   | Structure -> line i ppf "Structure\n"

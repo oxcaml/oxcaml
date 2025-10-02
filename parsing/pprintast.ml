@@ -327,9 +327,9 @@ let legacy_mode f { txt = Mode s; _ } =
 let legacy_core_modes f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") legacy_mode f m
 
-let optional_legacy_modes f { core_modes; mod_modes } =
-  if mod_modes <> [] then Misc.fatal_error "legacy modes are incompatible with mod modes";
-  match core_modes with
+let optional_legacy_modes f { pmode_modes; pmode_crossings } =
+  if pmode_crossings <> [] then Misc.fatal_error "legacy modes are incompatible with mod modes";
+  match pmode_modes with
   | [] -> ()
   | m ->
     legacy_core_modes f m;
@@ -347,10 +347,10 @@ let legacy_modality f m =
 let legacy_core_modalities f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") legacy_modality f m
 
-let optional_legacy_modalities f { core_modalities; mod_modalities } =
-  if mod_modalities <> [] then
+let optional_legacy_modalities f { pmoda_modalities; pmoda_crossings } =
+  if pmoda_crossings <> [] then
     Misc.fatal_error "legacy modes are incompatible with mod modes";
-  match core_modalities with
+  match pmoda_modalities with
   | [] -> ()
   | m ->
     legacy_core_modalities f m;
@@ -358,8 +358,7 @@ let optional_legacy_modalities f { core_modalities; mod_modalities } =
 
 (* new mode and modality syntax *)
 
-(* CR zeisbach: remove this annotation once jkind's Mod is renamed *)
-let mod_ f { txt = (Mod s : mod_); _ } =
+let mod_ f { txt = (Crossing s); _ } =
   pp_print_string f s
 
 let mods f m =
@@ -383,10 +382,10 @@ let optional_at_core_modes f m =
 
 let optional_mode_annot f m =
   match m with
-  | { core_modes = []; mod_modes = [] } -> ()
-  | { core_modes; mod_modes } ->
-    optional_at_core_modes f core_modes;
-    optional_mod_mods f mod_modes
+  | { pmode_modes = []; pmode_crossings = [] } -> ()
+  | { pmode_modes; pmode_crossings } ->
+    optional_at_core_modes f pmode_modes;
+    optional_mod_mods f pmode_crossings
 
 let modality f m =
   let {txt = Modality txt; _} = m in
@@ -402,11 +401,11 @@ let optional_atat_core_modalities f m =
 
 let optional_modality_annot ?(pre = fun _ () -> ()) ?(post = fun _ () -> ()) f m =
   match m with
-  | { core_modalities = []; mod_modalities = [] } -> ()
-  | { core_modalities; mod_modalities } ->
+  | { pmoda_modalities = []; pmoda_crossings = [] } -> ()
+  | { pmoda_modalities; pmoda_crossings } ->
     pre f ();
-    optional_atat_core_modalities f core_modalities;
-    optional_mod_mods f mod_modalities;
+    optional_atat_core_modalities f pmoda_modalities;
+    optional_mod_mods f pmoda_crossings;
     post f ()
 
 let optional_space_modality_annot f m =
@@ -418,27 +417,27 @@ let optional_modality_annot_newline f m =
 
 (** For a list of modes, we either print everything in old syntax (if they
   are purely old modes), or everything in new syntax. *)
-let print_modes_in_old_syntax { core_modes; mod_modes } =
-  if mod_modes <> [] then false
+let print_modes_in_old_syntax { pmode_modes; pmode_crossings } =
+  if pmode_crossings <> [] then false
   else
     List.for_all (fun m ->
       let Mode txt = m.txt in
       match txt with
       | "local" -> true
       | _ -> false
-    ) core_modes
+    ) pmode_modes
 
 (** For a list of modalities, we either print all in old syntax (if they are
   purely old modalities), or all in new syntax. *)
-let print_modality_in_old_syntax { core_modalities; mod_modalities } =
-  if mod_modalities <> [] then false
+let print_modality_in_old_syntax { pmoda_modalities; pmoda_crossings } =
+  if pmoda_crossings <> [] then false
   else
     List.for_all (fun m ->
       let Modality txt = m.txt in
       match txt with
       | "global" -> true
       | _ -> false
-    ) core_modalities
+    ) pmoda_modalities
 
 let modalities_type pty ctxt f pca =
   let m = pca.pca_modalities in
@@ -464,7 +463,7 @@ let rec class_params_def f =  function
 
 and core_type_with_optional_legacy_modes pty ctxt f (c, m) =
   match m with
-  | { core_modes = []; mod_modes = [] } -> pty ctxt f c
+  | { pmode_modes = []; pmode_crossings = [] } -> pty ctxt f c
   | _ ->
     if print_modes_in_old_syntax m then
       pp f "%a%a" optional_legacy_modes m (core_type1 ctxt) c
@@ -487,15 +486,15 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
   | Default -> pp f "_"
   | Abbreviation s -> pp f "%s" s
   (* CR zeisbach: change this when this gets changed to mods, like other places *)
-  | Mod (t, {core_modes; _}) ->
-    begin match core_modes with
+  | Mod (t, {pmode_modes; _}) ->
+    begin match pmode_modes with
     | [] -> Misc.fatal_error "malformed jkind annotation"
     | _ :: _ ->
       Misc.pp_parens_if nested (fun f (t, modes) ->
         pp f "%a mod %a"
           (jkind_annotation ~nested:true ctxt) t
           (pp_print_list ~pp_sep:pp_print_space mode) modes
-      ) f (t, core_modes)
+      ) f (t, pmode_modes)
     end
   | With (t, ty, modalities) ->
     Misc.pp_parens_if nested (fun f (t, ty, modalities) ->
@@ -689,7 +688,7 @@ and return_type ctxt f (x, m) =
 
 and core_type_with_optional_modes  ctxt f (ty, modes) =
   match modes with
-  | { core_modes = []; mod_modes = []} -> core_type ctxt f ty
+  | { pmode_modes = []; pmode_crossings = []} -> core_type ctxt f ty
   | _ -> pp f "%a%a" (core_type2 ctxt) ty optional_mode_annot modes
 
 (********************pattern********************)
@@ -1002,7 +1001,7 @@ and expression ctxt f x =
         begin match params, constraint_ with
           (* Omit [fun] if there are no params. *)
           | [], { ret_type_constraint = None;
-                  ret_mode_annotations = { core_modes = []; mod_modes = [] }; _ } ->
+                  ret_mode_annotations = { pmode_modes = []; pmode_crossings = [] }; _ } ->
               (* If function cases are a direct body of a function,
                  the function node should be wrapped in parens so
                  it doesn't become part of the enclosing function. *)
@@ -1494,12 +1493,12 @@ and kind_abbrev ctxt f name jkind =
 
 and module_type_with_optional_modes ctxt f (mty, mm) =
   match mm with
-  | { core_modes = []; mod_modes = [] } -> module_type ctxt f mty
+  | { pmode_modes = []; pmode_crossings = [] } -> module_type ctxt f mty
   | _ -> pp f "%a%a" (module_type1 ctxt) mty optional_mode_annot mm
 
 and module_type1_with_optional_modes ctxt f (mty, mm) =
   match mm with
-  | { core_modes = []; mod_modes = [] } -> module_type1 ctxt f mty
+  | { pmode_modes = []; pmode_crossings = [] } -> module_type1 ctxt f mty
   | _ -> pp f "%a%a" (module_type1 ctxt) mty optional_mode_annot mm
 
 and module_type ctxt f x =
@@ -1763,7 +1762,7 @@ and poly_type ctxt core_type f (vars, typ) =
 
 and poly_type_with_optional_modes ctxt f (vars, typ, modes) =
   match modes with
-  | { core_modes = []; mod_modes = [] } -> poly_type ctxt core_type f (vars, typ)
+  | { pmode_modes = []; pmode_crossings = [] } -> poly_type ctxt core_type f (vars, typ)
   | _ -> pp f "%a%a" (poly_type ctxt core_type1) (vars, typ)
       optional_mode_annot modes
 
@@ -1838,7 +1837,7 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = mode
         begin match p with
         | {ppat_desc=Ppat_var _; ppat_attributes=[]} ->
           begin match modes with
-          | { core_modes = []; mod_modes = [] } ->
+          | { pmode_modes = []; pmode_crossings = [] } ->
             pp f "%a@ %a"
               (simple_pattern ctxt) p
               (pp_print_params_then_equals ctxt) x

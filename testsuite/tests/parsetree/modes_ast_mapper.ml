@@ -15,21 +15,23 @@ let mapper: Ast_mapper.mapper =
   { default_mapper with
     modes = (fun sub m ->
       (match m with
-      | { core_modes = []; mod_modes = [] } -> ();
-      | { core_modes; mod_modes } ->
+      | { pmode_modes = []; pmode_crossings = [] } -> ();
+      | { pmode_modes; pmode_crossings } ->
         Format.printf "modes: %s%s\n"
-          (locs_to_string core_modes (fun (Mode s) -> s))
-          (locs_to_string ~sep:"" mod_modes (fun (Mod s) -> Format.sprintf " mod %s" s));
+          (locs_to_string pmode_modes (fun (Mode s) -> s))
+          (locs_to_string ~sep:"" pmode_crossings
+            (fun (Mod s) -> Format.sprintf " mod %s" s));
       );
       default_mapper.modes sub m
     );
     modalities = (fun sub m ->
       (match m with
-        | { core_modalities = []; mod_modalities = [] } -> ();
-        | { core_modalities; mod_modalities } ->
+        | { pmoda_modalities = []; pmoda_crossings = [] } -> ();
+        | { pmoda_modalities; pmoda_crossings } ->
           Format.printf "modalities: %s%s\n"
-            (locs_to_string core_modalities (fun (Modality s) -> s))
-            (locs_to_string ~sep:"" mod_modalities (fun (Mod s) -> Format.sprintf " mod %s" s));
+            (locs_to_string pmoda_modalities (fun (Modality s) -> s))
+            (locs_to_string ~sep:"" pmoda_crossings
+              (fun (Mod s) -> Format.sprintf " mod %s" s));
       );
       default_mapper.modalities sub m
     );
