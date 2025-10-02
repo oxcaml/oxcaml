@@ -24,6 +24,8 @@ open Typedtree
 open Outcometree
 open Ast_helper
 
+module SL = Slambda
+
 module Genprintval = Genprintval_native
 
 type res = Ok of Obj.t | Err of string
@@ -123,9 +125,8 @@ let close_phrase lam =
   ) (free_variables lam) lam
 
 let close_slambda_phrase slam =
-  let open Slambda in
   match slam with
-  | SLquote lam -> SLquote (close_phrase lam)
+  | SL.Quote lam -> SL.Quote (close_phrase lam)
 
 let toplevel_value id =
   let glob, pos = toplevel_value id in
