@@ -61,7 +61,8 @@ module Id = struct
       name : string;
       is_trie : ('t, 'k, 'v) Trie.is_trie;
       columns : ('t, 'k, 'v) Column.hlist;
-      default_value : 'v
+      default_value : 'v;
+      provenance : bool
     }
 
   let is_trie { is_trie; _ } = is_trie
@@ -91,14 +92,16 @@ module Id = struct
   let compare { id = id1; _ } { id = id2; _ } =
     compare (Type.Id.uid id1) (Type.Id.uid id2)
 
-  let create ~name ~columns ~default_value =
+  let create ~provenance ~name ~columns ~default_value =
     (* Store the [is_trie] value in order to avoid a double loop to create it
        when it is used. *)
     (* CR bclement: most iterations on [is_trie] could probably be replaced with
        iterations on [columns] instead, at which point we could get rid of
        [is_trie] entirely. *)
     let is_trie = Column.is_trie columns in
-    { id = Type.Id.make (); name; is_trie; columns; default_value }
+    { id = Type.Id.make (); name; is_trie; columns; default_value; provenance }
+
+  let has_provenance { provenance; _ } = provenance
 
   let[@inline] columns { columns; _ } = columns
 
@@ -189,4 +192,6 @@ module Map = struct
         in
         Some (Binding (id1, table)))
       tables1 tables2
+
+  let fold ~f m ~init = Int.Map.fold (fun _ binding acc -> f binding acc) m init
 end

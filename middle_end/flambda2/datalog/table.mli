@@ -50,9 +50,12 @@ module Id : sig
 
   val is_trie : ('t, 'k, 'v) t -> ('t, 'k, 'v) Trie.is_trie
 
+  val has_provenance : ('t, 'k, 'v) t -> bool
+
   type ('k, 'v) poly = Id : ('t, 'k, 'v) t -> ('k, 'v) poly
 
   val create :
+    provenance:bool ->
     name:string ->
     columns:('t, 'k, 'v) Column.hlist ->
     default_value:'v ->
@@ -77,4 +80,8 @@ module Map : sig
   val set : ('t, 'k, 'v) Id.t -> 't -> t -> t
 
   val concat : earlier:t -> later:t -> t
+
+  type binding = Binding : ('t, 'k, 'v) Id.t * 't -> binding
+
+  val fold : f:(binding -> 'a -> 'a) -> t -> init:'a -> 'a
 end

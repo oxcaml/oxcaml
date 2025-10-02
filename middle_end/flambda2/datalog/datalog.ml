@@ -64,11 +64,20 @@ module Variable = struct
   include T0
   include Heterogenous_list.Make (T0)
 
+  let name { name; _ } = name
+
   let create name = { name; repr = None; level = None }
 
   let rec list : type a. a String.hlist -> a hlist = function
     | [] -> []
     | name :: names -> create name :: list names
+
+  let repr var =
+    match var.repr with
+    | None ->
+      Misc.fatal_errorf "Missing representation for datalog variable %s"
+        var.name
+    | Some repr -> repr
 
   let set_repr var repr =
     match var.repr with
@@ -132,6 +141,30 @@ type filter =
   | Unless_eq : 'k Value.repr * 'k Term.t * 'k Term.t -> filter
   | User : ('k Constant.hlist -> bool) * 'k Term.hlist -> filter
 
+type bindings = Bindings : 'a Variable.hlist * 'a Constant.hlist -> bindings
+
+let print_bindings ppf (Bindings (vars, values)) =
+  let rec loop :
+      type a.
+      first:bool ->
+      Format.formatter ->
+      a Variable.hlist ->
+      a Constant.hlist ->
+      unit =
+   fun ~first ppf vars values ->
+    match vars, values with
+    | [], [] -> ()
+    | var :: vars, value :: values ->
+      if not first then Format.fprintf ppf ";@,";
+      Format.fprintf ppf "@[<1>%s =@ %a@]" (Variable.name var)
+        (Value.print_repr (Variable.repr var))
+        value;
+      loop ~first:false ppf vars values
+  in
+  Format.fprintf ppf "@[<2>{ @[<v>";
+  loop ~first:true ppf vars values;
+  Format.fprintf ppf "@] }@]"
+
 type callback =
   | Callback :
       { func : 'a Constant.hlist -> unit;
@@ -139,8 +172,17 @@ type callback =
         args : 'a Term.hlist
       }
       -> callback
+  | Callback_with_bindings :
+      { func : bindings -> 'a Constant.hlist -> unit;
+        name : string;
+        args : 'a Term.hlist
+      }
+      -> callback
 
 let create_callback func ~name args = Callback { func; name; args }
+
+let create_callback_with_bindings func ~name args =
+  Callback_with_bindings { func; name; args }
 
 type (_, _) terminator =
   | Yield :
@@ -318,23 +360,44 @@ let compile_filter context filter =
     let post_level = find_last_binding (Cursor.initial_actions context) args in
     Cursor.add_action post_level (Cursor.filter fn refs)
 
+let rec cursor_call2 :
+    type a b.
+    name:string ->
+    (a Constant.hlist -> b Constant.hlist -> unit) ->
+    a Term.hlist ->
+    b Term.hlist ->
+    Cursor.call =
+ fun ~name f xs ys ->
+  match xs with
+  | [] -> Cursor.create_call (f []) ~name (compile_terms ys)
+  | x :: xs ->
+    cursor_call2 ~name (fun xs' (x' :: ys) -> f (x' :: xs') ys) xs (x :: ys)
+
 let rec compile_terminator :
-    type p a. callbacks:_ -> _ -> p Parameter.hlist -> (p, a) terminator -> a =
- fun ~callbacks context parameters terminator ->
+    type p a.
+    callbacks:_ -> _ -> _ -> p Parameter.hlist -> (p, a) terminator -> a =
+ fun ~callbacks context levels parameters terminator ->
   match terminator with
   | Yield output ->
     let output = Option.map compile_terms output in
     let calls =
       List.map
-        (fun (Callback { func; name; args }) ->
-          Cursor.create_call func ~name (compile_terms args))
+        (function
+          | Callback { func; name; args } ->
+            Cursor.create_call func ~name (compile_terms args)
+          | Callback_with_bindings { func; name; args } ->
+            let (Levels vars) = levels in
+            cursor_call2 ~name
+              (fun level_values arg_values ->
+                func (Bindings (vars, level_values)) arg_values)
+              (Term.variables vars) args)
         callbacks
     in
     Cursor.With_parameters.create ~calls ?output
       ~parameters:(Parameter.to_senders parameters)
       context
   | Map (terminator, fn) ->
-    fn (compile_terminator ~callbacks context parameters terminator)
+    fn (compile_terminator ~callbacks context levels parameters terminator)
 
 let rec bind_vars : type a. _ -> a Variable.hlist -> unit =
  fun context vars ->
@@ -368,7 +431,7 @@ let compile_program parameters
         (fun condition -> compile_condition context condition)
         conditions;
       List.iter (fun filter -> compile_filter context filter) filters;
-      compile_terminator ~callbacks context parameters terminator)
+      compile_terminator ~callbacks context levels parameters terminator)
 
 let compile_with_parameters0 ps f =
   let ps = Parameter.list ps in

@@ -44,6 +44,11 @@ val print_key : ('t, 'k, 'v) id -> Format.formatter -> 'k -> unit
 val print_keys :
   ('t, 'k, 'v) hlist -> Format.formatter -> 'k Constant.hlist -> unit
 
+val compare_key : ('t, 'k, 'v) id -> 'k -> 'k -> int
+
+val compare_keys :
+  ('t, 'k, 'v) hlist -> 'k Constant.hlist -> 'k Constant.hlist -> int
+
 val is_trie : ('t, 'k, 'v) hlist -> ('t, 'k, 'v) Trie.is_trie
 
 module Make (_ : sig

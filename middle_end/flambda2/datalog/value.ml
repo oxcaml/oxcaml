@@ -35,5 +35,8 @@ let int_repr ~print = Int_repr { print }
 let equal_repr : type a. a repr -> a -> a -> bool =
  fun (Int_repr _) x1 x2 -> Int.equal x1 x2
 
+let compare_repr : type a. a repr -> a -> a -> int =
+ fun (Int_repr _) x1 x2 -> Int.compare x1 x2
+
 let print_repr : type a. a repr -> Format.formatter -> a -> unit =
  fun (Int_repr { print }) ppf x -> print ppf x

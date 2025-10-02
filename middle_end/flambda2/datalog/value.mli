@@ -33,4 +33,6 @@ val int_repr : print:(Format.formatter -> int -> unit) -> int repr
 
 val equal_repr : 'a repr -> 'a -> 'a -> bool
 
+val compare_repr : 'a repr -> 'a -> 'a -> int
+
 val print_repr : 'a repr -> Format.formatter -> 'a -> unit

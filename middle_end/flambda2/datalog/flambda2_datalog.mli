@@ -72,7 +72,12 @@ module Datalog : sig
 
   type ('t, 'k, 'v) table
 
+  (** The [provenance] argument is [true] by default. If set to [false],
+      provenance tracking will be disabled for this table. This is useful for
+      derived tables that are defined by a single rule, such as indices defined
+      by a permutation of another table. *)
   val create_table :
+    ?provenance:bool ->
     name:string ->
     default_value:'v ->
     ('t, 'k, 'v) Column.hlist ->
@@ -89,6 +94,8 @@ module Datalog : sig
         a map from [ty1] whose values are maps from [ty2] to [ty2]. The order of
         arguments provided to a relation thus have profound implication for the
         performance of iterations on the relation, and needs to be chosen carefully.
+
+        See documentation of [create_table] for the [provenance] argument.
 
         @raise Misc.Fatal_error if [schema] is empty.
 
@@ -107,7 +114,10 @@ module Datalog : sig
         ]}
           *)
   val create_relation :
-    name:string -> ('t, 'k, unit) Column.hlist -> ('t, 'k) relation
+    ?provenance:bool ->
+    name:string ->
+    ('t, 'k, unit) Column.hlist ->
+    ('t, 'k) relation
 
   module Constant : sig
     (** The [Constant] module only provides a heterogenous list to represent
@@ -437,6 +447,15 @@ module Datalog : sig
   type rule
 
   module Schedule : sig
+    (** Enable provenance tracking in rules.
+
+      This makes the computation of rules slower and should only be enabled for
+      debugging.
+
+      {b Warning}: This flag is used during the compilation of rules. Enabling it
+      will {b not} allow provenance tracking for rules that already exist. *)
+    val enable_provenance_for_debug : unit -> unit
+
     type t
 
     (** [saturate rules] is a schedule that repeatedly applies the rules in
@@ -457,7 +476,7 @@ module Datalog : sig
 
     type stats
 
-    val create_stats : unit -> stats
+    val create_stats : database -> stats
 
     val print_stats : Format.formatter -> stats -> unit
 
@@ -468,6 +487,10 @@ module Datalog : sig
       *)
     val run : ?stats:stats -> t -> database -> database
   end
+
+  type bindings
+
+  val print_bindings : Format.formatter -> bindings -> unit
 
   (** The type [('p, 'v) program] is the type of programs returning values
       of type ['v] with parameters ['p].

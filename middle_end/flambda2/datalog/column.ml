@@ -70,6 +70,18 @@ let rec is_trie : type t k v. (t, k, v) hlist -> (t, k, v) Trie.is_trie =
   | { repr = Patricia_tree_repr; _ } :: (_ :: _ as columns) ->
     Trie.patricia_tree_of_trie (is_trie columns)
 
+let compare_key : type m k v. (m, k, v) id -> k -> k -> int =
+ fun column x y -> Value.compare_repr (value_repr column) x y
+
+let rec compare_keys :
+    type t k v. (t, k, v) hlist -> k Constant.hlist -> k Constant.hlist -> int =
+ fun columns xs ys ->
+  match columns, xs, ys with
+  | [], [], [] -> 0
+  | column :: columns, x :: xs, y :: ys ->
+    let c = compare_key column x y in
+    if c <> 0 then c else compare_keys columns xs ys
+
 module Make (X : sig
   val name : string
 

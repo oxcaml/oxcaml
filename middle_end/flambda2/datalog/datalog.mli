@@ -33,6 +33,10 @@ module String : sig
   include Heterogenous_list.S with type 'a t := string
 end
 
+type bindings
+
+val print_bindings : Format.formatter -> bindings -> unit
+
 (** The type [('p, 'v) program] is the type of programs returning
       values of type ['v] with parameters ['p].
 
@@ -83,6 +87,12 @@ type callback
 
 val create_callback :
   ('a Constant.hlist -> unit) -> name:string -> 'a Term.hlist -> callback
+
+val create_callback_with_bindings :
+  (bindings -> 'a Constant.hlist -> unit) ->
+  name:string ->
+  'a Term.hlist ->
+  callback
 
 val yield : 'v Term.hlist -> ('p, ('p, 'v) Cursor.With_parameters.t) program
 

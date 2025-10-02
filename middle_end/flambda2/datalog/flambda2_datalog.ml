@@ -72,13 +72,13 @@ module Datalog = struct
 
   type ('t, 'k, 'v) table = ('t, 'k, 'v) Table.Id.t
 
-  let create_table ~name ~default_value columns =
-    Table.Id.create ~name ~columns ~default_value
+  let create_table ?(provenance = true) ~name ~default_value columns =
+    Table.Id.create ~provenance ~name ~columns ~default_value
 
   type ('t, 'k) relation = ('t, 'k, unit) table
 
-  let create_relation ~name columns =
-    create_table ~name ~default_value:() columns
+  let create_relation ?provenance ~name columns =
+    create_table ?provenance ~name ~default_value:() columns
 
   module Schema = struct
     module type S0 = sig
