@@ -176,6 +176,7 @@ let implementation ~hook_parse_tree ~hook_typed_tree info ~backend =
     Unit_info.raw_source_file info.target))) @@ fun () ->
   let exceptionally () =
     let sufs =
+      (* CR jvanburen: fix file extensions here... *)
       if info.native then Unit_info.[ cmx; obj ]
       else Unit_info.[ cmo ] in
     List.iter

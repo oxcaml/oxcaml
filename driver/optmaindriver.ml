@@ -20,182 +20,174 @@ let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
-let main unix argv ppf ~flambda2 ~lambda_to_jsir =
-  if Clflags.backend_target () = None then
-        Clflags.set_backend_target Clflags.Backend.Native;
+let main unix argv ppf ~flambda2 =
+  native_code := true;
   let columns =
     match Sys.getenv "COLUMNS" with
     | exception Not_found -> None
-    | columns -> (try Some (int_of_string columns) with _ -> None)
+    | columns ->
+      try Some (int_of_string columns)
+      with _ -> None
   in
   (match columns with
   | None -> ()
   | Some columns ->
-      (* Avoid getting too close to the edge just in case we've mismeasured
-         the boxes for some reason. *)
-      let columns = columns - 5 in
-      let set_geometry ppf =
-        Format.pp_set_margin ppf columns;
-        (* Make sure the max indent is at least 3/4 of the total width. Without
-           this, output can be unreadable no matter how wide your screen is. Note
-           that [Format.pp_set_margin] already messes with the max indent
-           sometimes, so we want to check [Format.pp_get_max_indent] rather than
-           make assumptions. *)
-        let desired_max_indent = columns * 3 / 4 in
-        if Format.pp_get_max_indent ppf () < desired_max_indent then
-          Format.pp_set_max_indent ppf desired_max_indent
-      in
-      set_geometry Format.std_formatter;
-      set_geometry Format.err_formatter);
-
-  let process_deferred_actions ~machine_width ~output_ext ~archive_ext =
-    try
+    (* Avoid getting too close to the edge just in case we've mismeasured
+       the boxes for some reason. *)
+    let columns = columns - 5 in
+    let set_geometry ppf =
+      Format.pp_set_margin ppf columns;
+      (* Make sure the max indent is at least 3/4 of the total width. Without
+         this, output can be unreadable no matter how wide your screen is. Note
+         that [Format.pp_set_margin] already messes with the max indent
+         sometimes, so we want to check [Format.pp_get_max_indent] rather than
+         make assumptions. *)
+      let desired_max_indent = columns * 3 / 4 in
+      if Format.pp_get_max_indent ppf () < desired_max_indent then
+        Format.pp_set_max_indent ppf desired_max_indent
+    in
+    set_geometry Format.std_formatter;
+    set_geometry Format.err_formatter);
+  match
+    Compenv.warnings_for_discarded_params := true;
+    Compenv.set_extra_params
+      (Some Oxcaml_args.Extra_params.read_param);
+    Compenv.readenv ppf Before_args;
+    Clflags.add_arguments __LOC__ (Arch.command_line_options @ Options.list);
+    Clflags.add_arguments __LOC__
+      ["-depend", Arg.Unit Makedepend.main_from_option,
+       "<options> Compute dependencies \
+        (use 'ocamlopt -depend -help' for details)"];
+    Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
+    Compenv.parse_arguments (ref argv) Compenv.anonymous "ocamlopt";
+    Compmisc.read_clflags_from_env ();
+    (* Set platform-appropriate DWARF fission default when oxcaml-dwarf is
+       enabled *)
+    if Config.oxcaml_dwarf &&
+       !Clflags.dwarf_fission = Clflags.Fission_none &&
+       Target_system.is_macos () then
+      Clflags.dwarf_fission := Clflags.Fission_dsymutil;
+    (* Set up DWARF compression for C compiler invocations *)
+    if !Clflags.debug && !Clflags.native_code then
+      Clflags.dwarf_c_toolchain_flag :=
+        Dwarf_flags.get_dwarf_c_toolchain_flag ();
+    if !Oxcaml_flags.gc_timings then Gc_timings.start_collection ();
+    if !Clflags.plugin then
+      Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
+    let (module Optcompile : Optcompiler.S) =
+      match !Clflags.backend_target () with
+      | None | Native -> Optcompiler.native unix ~flambda2
+      | Js_of_ocaml -> Optcompiler.js_of_ocaml ~flambda2_to_jsir
+    in
+    begin try
       Compenv.process_deferred_actions
-        ( ppf,
-          Optcompile.implementation ~machine_width unix ~flambda2 ~lambda_to_jsir,
-          Optcompile.interface,
-          output_ext,
-          archive_ext )
+        (ppf,
+         Optcompile.implementation,
+         Optcompile.interface,
+         Optcompile.ext_flambda_obj,
+         Optcompile.ext_flambda_lib);
     with Arg.Bad msg ->
-      prerr_endline msg;
-      Clflags.print_arguments usage;
-      exit 2
-  in
-  let report_multiple_actions () =
+      begin
+        prerr_endline msg;
+        Clflags.print_arguments usage;
+        exit 2
+      end
+    end;
+    Compenv.readenv ppf Before_link;
     if
-      List.length
-        (List.filter
-           (fun x -> !x)
-           [
-             make_package;
-             make_archive;
-             shared;
-             instantiate;
-             Compenv.stop_early;
-             output_c_object;
-           ])
-      > 1
-    then begin
+      List.length (List.filter (fun x -> !x)
+                     [make_package; make_archive; shared; instantiate;
+                      Compenv.stop_early; output_c_object]) > 1
+    then
+    begin
       let module P = Clflags.Compiler_pass in
       match !stop_after with
       | None ->
-          Compenv.fatal
-            "Please specify at most one of -pack, -a, -shared, -c, \
-             -output-obj, -instantiate"
-      | Some
-          ( ( P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
-            | P.Simplify_cfg | P.Emit | P.Selection | P.Register_allocation
-            | P.Llvmize ) as p ) ->
-          assert (P.is_compilation_pass p);
-          Printf.ksprintf Compenv.fatal
-            "Options -i and -stop-after (%s) are  incompatible with -pack, \
-             -a, -shared, -output-obj"
-            (String.concat "|"
-               (P.available_pass_names ~filter:(fun _ -> true) ~native:true))
-    end
-  in
-  let link_native () ~machine_width =
+          Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
+                         -output-obj, -instantiate";
+      | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
+              | P.Simplify_cfg | P.Emit | P.Selection
+              | P.Register_allocation | P.Llvmize) as p) ->
+        assert (P.is_compilation_pass p);
+        Printf.ksprintf Compenv.fatal
+          "Options -i and -stop-after (%s) \
+           are  incompatible with -pack, -a, -shared, -output-obj"
+          (String.concat "|"
+             (P.available_pass_names ~filter:(fun _ -> true) ~native:true))
+    end;
     if !make_archive then begin
       Compmisc.init_path ();
       let target = Compenv.extract_output !output_name in
-      Asmlibrarian.create_archive
+      Optcompile.create_archive
         (Compenv.get_objfiles ~with_ocamlparam:false) target;
       Warnings.check_fatal ();
-      Some 0
     end
     else if !make_package then begin
       Compmisc.init_path ();
       let target = Compenv.extract_output !output_name in
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
-          Asmpackager.package_files ~machine_width unix ~ppf_dump
-            (Compmisc.initial_env ())
-            (Compenv.get_objfiles ~with_ocamlparam:false) target
-            ~flambda2);
+        Optcomp.package_files ~ppf_dump (Compmisc.initial_env ())
+          (Compenv.get_objfiles ~with_ocamlparam:false) target);
       Warnings.check_fatal ();
-      Some 0
     end
     else if !instantiate then begin
       Compmisc.init_path ();
+      (* Requiring [-o] isn't really necessary, but we don't intend for humans
+         to be invoking [-instantiate] by hand, and computing the correct value
+         here would be awkward *)
       let target = Compenv.extract_output !output_name in
       let src, args =
         match Compenv.get_objfiles ~with_ocamlparam:false with
         | [] | [_] ->
-            Printf.ksprintf Compenv.fatal
-              "Must specify at least two .cmx files with -instantiate"
-        | src :: args -> src, args
+          Printf.ksprintf Compenv.fatal
+            "Must specify at least two %s files with -instantiate"
+            Optcompile.ext_flambda_obj
+        | src :: args ->
+          src, args
       in
-      Asminstantiator.instantiate ~machine_width unix ~src ~args target
-        ~flambda2 ~lambda_to_jsir;
+      Optcompile.instantiate ~src ~args target;
       Warnings.check_fatal ();
-      Some 0
     end
     else if !shared then begin
       Compmisc.init_path ();
       let target = Compenv.extract_output !output_name in
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
-          Asmlink.link_shared unix ~ppf_dump
-            (Compenv.get_objfiles ~with_ocamlparam:false) target);
+        Optcompile.link_shared unix ~ppf_dump
+          (Compenv.get_objfiles ~with_ocamlparam:false) target);
       Warnings.check_fatal ();
-      Some 0
     end
     else if not !Compenv.stop_early && !objfiles <> [] then begin
       let target =
         if !output_c_object then
           let s = Compenv.extract_output !output_name in
-          if
-            Filename.check_suffix s Config.ext_obj
-            || Filename.check_suffix s Config.ext_dll
+          if (Filename.check_suffix s Config.ext_obj
+            || Filename.check_suffix s Config.ext_dll)
           then s
           else
             Compenv.fatal
               (Printf.sprintf
                  "The extension of the output file must be %s or %s"
-                 Config.ext_obj Config.ext_dll)
+                 Config.ext_obj Config.ext_dll
+              )
         else
           Compenv.default_output !output_name
       in
       Compmisc.init_path ();
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
           let objs = Compenv.get_objfiles ~with_ocamlparam:true in
-          Asmlink.link unix ~ppf_dump objs target);
+          Asmlink.link unix
+            ~ppf_dump objs target);
       Warnings.check_fatal ();
-      Some 0
-    end else None
-  in
-  let link_js () =
-    if !make_archive then begin
-      Compmisc.init_path ();
-      let target = Compenv.extract_output !Clflags.output_name in
-      Jslibrarian.create_archive
-        (Compenv.get_objfiles ~with_ocamlparam:false) target;
-      Warnings.check_fatal ();
-      Some 0
-    end
-    else if !make_package then
-      Compenv.fatal "packaging is not supported by ocamlj"
-    else if !instantiate then
-      Compenv.fatal "instantiation is not supported by ocamlj"
-    else if !shared then
-      Compenv.fatal "shared objects are not supported by ocamlj"
-    else if (not !Compenv.stop_early) && !Clflags.objfiles <> [] then begin
-      let default_js_output output_name =
-        match output_name with
-        | Some s -> s
-        | None -> Config.default_executable_name ^ ".js"
-      in
-      let target = default_js_output !Clflags.output_name in
-      Compmisc.init_path ();
-      Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
-          let objs = Compenv.get_objfiles ~with_ocamlparam:true in
-          Jslink.link ~ppf_dump objs target);
-      Warnings.check_fatal ();
-      Some 0
-    end else None
-  in
-  let finish_profile () =
-    let output_profile_csv ppf_file =
-      Profile.output_to_csv ppf_file !Clflags.profile_columns
-        ~timings_precision:!Clflags.timings_precision
+    end;
+  with
+  | exception (Compenv.Exit_with_status n) ->
+    n
+  | exception x ->
+    Location.report_exception ppf x;
+    2
+  | () ->
+    let output_profile_csv ppf_file = Profile.output_to_csv
+      ppf_file !Clflags.profile_columns ~timings_precision:!Clflags.timings_precision
     in
     let output_profile_standard ppf =
       if !Oxcaml_flags.gc_timings then begin
@@ -210,9 +202,10 @@ let main unix argv ppf ~flambda2 ~lambda_to_jsir =
         Format.fprintf ppf "  %0.*fs minor\n" precision (secs minor);
         Format.fprintf ppf "  %0.*fs major\n" precision (secs major);
         Format.fprintf ppf "- heap\n";
+        (* Having minor + major + promoted = total alloc make more sense for
+          hierarchical stats. *)
         Format.fprintf ppf "  %ib alloc\n"
-          (fw2b stats.minor_words
-         + (fw2b stats.major_words - fw2b stats.promoted_words));
+          (fw2b stats.minor_words + (fw2b stats.major_words - fw2b stats.promoted_words));
         Format.fprintf ppf "    %ib minor\n"
           (fw2b stats.minor_words - fw2b stats.promoted_words);
         Format.fprintf ppf "    %ib major\n"
@@ -225,94 +218,10 @@ let main unix argv ppf ~flambda2 ~lambda_to_jsir =
         Format.fprintf ppf "    %i minor\n" stats.minor_collections;
         Format.fprintf ppf "    %i major\n" stats.major_collections;
       end;
-      Profile.print ppf !Clflags.profile_columns
-        ~timings_precision:!Clflags.timings_precision
+      Profile.print ppf !Clflags.profile_columns ~timings_precision:!Clflags.timings_precision
     in
     if !Clflags.dump_into_csv then
-      Compmisc.with_ppf_file ~file_prefix:"profile" ~file_extension:".csv"
-        output_profile_csv
+      Compmisc.with_ppf_file ~file_prefix:"profile" ~file_extension:".csv" output_profile_csv
     else if !Oxcaml_flags.gc_timings || !Clflags.profile_columns <> [] then
-      Compmisc.with_ppf_dump ~stdout:() ~file_prefix:"profile"
-        output_profile_standard
-  in
-  let run_backend ~machine_width ~output_ext ~archive_ext ~linker ~extra_checks =
-    try
-      extra_checks ();
-      process_deferred_actions ~machine_width ~output_ext ~archive_ext;
-      Compenv.readenv ppf Before_link;
-      report_multiple_actions ();
-      let status =
-        match linker () with
-        | Some status -> status
-        | None -> 0
-      in
-      finish_profile (); status
-    with
-    | Compenv.Exit_with_status n -> n
-    | x ->
-        Location.report_exception ppf x;
-        2
-  in
-
-  let run_native () =
-    let extra_checks () =
-      if
-        Config.oxcaml_dwarf
-        && !Clflags.dwarf_fission = Clflags.Fission_none
-        && Target_system.is_macos ()
-      then
-        Clflags.dwarf_fission := Clflags.Fission_dsymutil;
-      if !Clflags.debug && !Clflags.native_code then
-        Clflags.dwarf_c_toolchain_flag :=
-          Dwarf_flags.get_dwarf_c_toolchain_flag ();
-      if !Oxcaml_flags.gc_timings then Gc_timings.start_collection (); ()
-    in
-    run_backend
-      ~machine_width:Target_system.Machine_width.Sixty_four
-      ~output_ext:".cmx"
-      ~archive_ext:".cmxa"
-      ~linker:( link_native ~machine_width:Target_system.Machine_width.Sixty_four)
-      ~extra_checks
-  in
-
-  let run_js () =
-    let extra_checks () =
-      let reaper_is_enabled () =
-        match !Oxcaml_flags.Flambda2.enable_reaper with
-        | Set set -> set
-        | Default ->
-            let default =
-              Oxcaml_flags.Flambda2.default_for_opt_level
-                !Oxcaml_flags.opt_level
-            in
-            default.Oxcaml_flags.Flambda2.enable_reaper
-      in
-      if reaper_is_enabled () then
-        Compenv.fatal "reaper is not supported in javascript";
-    in
-    run_backend
-      ~machine_width:Target_system.Machine_width.Thirty_two_no_gc_tag_bit
-      ~output_ext:".cmjx"
-      ~archive_ext:".cmjxa"
-      ~linker:link_js
-      ~extra_checks
-  in
-  Compenv.warnings_for_discarded_params := true;
-  Compenv.set_extra_params (Some Oxcaml_args.Extra_params.read_param);
-  Compenv.readenv ppf Before_args;
-  Clflags.add_arguments __LOC__ (Arch.command_line_options @ Options.list);
-  Clflags.add_arguments __LOC__
-    [
-      "-depend",
-      Arg.Unit Makedepend.main_from_option,
-      "<options> Compute dependencies \
-       (use 'ocamlopt -depend -help' for details)";
-    ];
-  Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
-  Compenv.parse_arguments (ref argv) Compenv.anonymous "ocamlopt";
-  Compmisc.read_clflags_from_env ();
-  if !Clflags.plugin then
-    Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
-  match Clflags.backend_target () with
-  | Some Clflags.Backend.Js_of_ocaml -> run_js ()
-  | _ -> run_native ()
+      Compmisc.with_ppf_dump ~stdout:() ~file_prefix:"profile" output_profile_standard;
+    0

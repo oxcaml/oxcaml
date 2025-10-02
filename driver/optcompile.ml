@@ -237,7 +237,7 @@ let implementation_aux ~machine_width unix ~(flambda2 : flambda2)
   let with_backend_info, dump_ext =
     match backend with
     | `Native -> with_info, "cmx"
-    | `Js -> with_js_info, "cmjo"
+    | `Js -> with_js_info, "cmjx"
   in
   with_backend_info ~source_file ~output_prefix ~dump_ext ~compilation_unit
     ~kind:Impl

@@ -33,6 +33,8 @@
 
 (copy_files# parsing/*.ml{,i})
 
+(copy_files# optcomp/*.ml{,i})
+
 (copy_files parsing/parser.mly)
 
 (copy_files# typing/*.ml{,i})
@@ -610,6 +612,12 @@
   dwarf_state
   dwarf_variables_and_parameters
   dwarf_type
+  ;; optcomp/
+  optcompiler
+  optlink
+  optpackager
+  optlibrarian
+  optbackend_intf
   ;; driver/
   opterrors
   optcompile

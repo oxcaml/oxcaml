@@ -177,6 +177,8 @@ val cmjx : t -> Artifact.t
 val cmjxa : t -> Artifact.t
 val annot: t -> Artifact.t
 
+val artifact : t -> extension:string -> Artifact.t
+
 (** The functions below change the type of an artifact by updating the
     extension of its filename.
     Those functions purposefully do not cover all artifact kinds because we want
