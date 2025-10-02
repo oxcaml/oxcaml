@@ -327,7 +327,7 @@ let legacy_mode f { txt = Mode s; _ } =
 let legacy_core_modes f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") legacy_mode f m
 
-let optional_legacy_modes f { pmode_modes; pmode_crossings } =
+let optional_legacy_modes f { pmode_modes; pmode_crossings; _ } =
   if pmode_crossings <> [] then Misc.fatal_error "legacy modes are incompatible with mod modes";
   match pmode_modes with
   | [] -> ()
@@ -382,8 +382,8 @@ let optional_at_core_modes f m =
 
 let optional_mode_annot f m =
   match m with
-  | { pmode_modes = []; pmode_crossings = [] } -> ()
-  | { pmode_modes; pmode_crossings } ->
+  | { pmode_modes = []; pmode_crossings = []; _ } -> ()
+  | { pmode_modes; pmode_crossings; _ } ->
     optional_at_core_modes f pmode_modes;
     optional_mod_mods f pmode_crossings
 
@@ -417,7 +417,7 @@ let optional_modality_annot_newline f m =
 
 (** For a list of modes, we either print everything in old syntax (if they
   are purely old modes), or everything in new syntax. *)
-let print_modes_in_old_syntax { pmode_modes; pmode_crossings } =
+let print_modes_in_old_syntax { pmode_modes; pmode_crossings; _ } =
   if pmode_crossings <> [] then false
   else
     List.for_all (fun m ->
@@ -463,7 +463,7 @@ let rec class_params_def f =  function
 
 and core_type_with_optional_legacy_modes pty ctxt f (c, m) =
   match m with
-  | { pmode_modes = []; pmode_crossings = [] } -> pty ctxt f c
+  | { pmode_modes = []; pmode_crossings = []; _ } -> pty ctxt f c
   | _ ->
     if print_modes_in_old_syntax m then
       pp f "%a%a" optional_legacy_modes m (core_type1 ctxt) c
@@ -688,7 +688,7 @@ and return_type ctxt f (x, m) =
 
 and core_type_with_optional_modes  ctxt f (ty, modes) =
   match modes with
-  | { pmode_modes = []; pmode_crossings = []} -> core_type ctxt f ty
+  | { pmode_modes = []; pmode_crossings = []; _ } -> core_type ctxt f ty
   | _ -> pp f "%a%a" (core_type2 ctxt) ty optional_mode_annot modes
 
 (********************pattern********************)
@@ -1001,7 +1001,7 @@ and expression ctxt f x =
         begin match params, constraint_ with
           (* Omit [fun] if there are no params. *)
           | [], { ret_type_constraint = None;
-                  ret_mode_annotations = { pmode_modes = []; pmode_crossings = [] }; _ } ->
+                  ret_mode_annotations= {pmode_modes = []; pmode_crossings = []; _}; _} ->
               (* If function cases are a direct body of a function,
                  the function node should be wrapped in parens so
                  it doesn't become part of the enclosing function. *)
@@ -1493,12 +1493,12 @@ and kind_abbrev ctxt f name jkind =
 
 and module_type_with_optional_modes ctxt f (mty, mm) =
   match mm with
-  | { pmode_modes = []; pmode_crossings = [] } -> module_type ctxt f mty
+  | { pmode_modes = []; pmode_crossings = []; _ } -> module_type ctxt f mty
   | _ -> pp f "%a%a" (module_type1 ctxt) mty optional_mode_annot mm
 
 and module_type1_with_optional_modes ctxt f (mty, mm) =
   match mm with
-  | { pmode_modes = []; pmode_crossings = [] } -> module_type1 ctxt f mty
+  | { pmode_modes = []; pmode_crossings = []; _ } -> module_type1 ctxt f mty
   | _ -> pp f "%a%a" (module_type1 ctxt) mty optional_mode_annot mm
 
 and module_type ctxt f x =
@@ -1762,7 +1762,7 @@ and poly_type ctxt core_type f (vars, typ) =
 
 and poly_type_with_optional_modes ctxt f (vars, typ, modes) =
   match modes with
-  | { pmode_modes = []; pmode_crossings = [] } -> poly_type ctxt core_type f (vars, typ)
+  | { pmode_modes = []; pmode_crossings = []; _ } -> poly_type ctxt core_type f (vars, typ)
   | _ -> pp f "%a%a" (poly_type ctxt core_type1) (vars, typ)
       optional_mode_annot modes
 
@@ -1837,7 +1837,7 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = mode
         begin match p with
         | {ppat_desc=Ppat_var _; ppat_attributes=[]} ->
           begin match modes with
-          | { pmode_modes = []; pmode_crossings = [] } ->
+          | { pmode_modes = []; pmode_crossings = []; _ } ->
             pp f "%a@ %a"
               (simple_pattern ctxt) p
               (pp_print_params_then_equals ctxt) x

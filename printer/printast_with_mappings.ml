@@ -163,28 +163,32 @@ let arg_label i ppf = function
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
 ;;
 
-let mod_ i ppf mod_ =
+let crossing i ppf crossing =
   line i ppf "mod %a\n" fmt_string_loc
-    (Location.map (fun (Crossing x) -> x) mod_)
+    (Location.map (fun (Crossing x) -> x) crossing)
 
-let mods i ppf mods =
-  List.iter (fun m -> mod_ i ppf m) mods
+let crossings i ppf mods =
+  List.iter (fun m -> crossing i ppf m) mods
 
 let modality i ppf modality =
   line i ppf "modality %a\n" fmt_string_loc
     (Location.map (fun (Modality x) -> x) modality)
 
-let modalities i ppf {pmoda_modalities; pmoda_crossings} =
+let modalities i ppf {pmoda_modalities; pmoda_crossings; pmoda_loc} =
+  line i ppf "modalities %a\n" fmt_location pmoda_loc;
+  let i = i+1 in
   List.iter (fun m -> modality i ppf m) pmoda_modalities;
-  mods i ppf pmoda_crossings
+  crossings i ppf pmoda_crossings
 
 let mode i ppf mode =
   line i ppf "mode %a\n" fmt_string_loc
     (Location.map (fun (Mode x) -> x) mode)
 
-let modes i ppf {pmode_modes; pmode_crossings} =
+let modes i ppf {pmode_modes; pmode_crossings; pmode_loc} =
+  line i ppf "modes %a\n" fmt_location pmode_loc;
+  let i = i+1 in
   List.iter (fun m -> mode i ppf m) pmode_modes;
-  mods i ppf pmode_crossings
+  crossings i ppf pmode_crossings
 
 let include_kind i ppf = function
   | Structure -> line i ppf "Structure\n"

@@ -45,19 +45,27 @@ module Const = struct
 end
 
 module Modes = struct
-  let empty = { pmode_modes = []; pmode_crossings = [] }
-  let append { pmode_modes = m; pmode_crossings = c }
-             { pmode_modes = m'; pmode_crossings = c' } =
-    { pmode_modes = m @ m'; pmode_crossings = c @ c' }
-  let of_core_modes pmode_modes = { pmode_modes; pmode_crossings = [] }
+  let mk ?(loc = !default_loc) pmode_modes pmode_crossings =
+    { pmode_modes; pmode_crossings; pmode_loc = loc }
+
+  let empty = mk [] []
+  let append { pmode_modes = m; pmode_crossings = c; pmode_loc = l }
+             { pmode_modes = m'; pmode_crossings = c'; pmode_loc = l' } =
+    { pmode_modes = m @ m'; pmode_crossings = c @ c'; pmode_loc = Location.merge [l; l'] }
+  let of_core_modes ?loc m = mk ?loc m []
 end
 
 module Modalities = struct
-  let empty = { pmoda_modalities = []; pmoda_crossings = [] }
-  let append { pmoda_modalities = m; pmoda_crossings = c }
-        { pmoda_modalities = m'; pmoda_crossings = c' } =
-    { pmoda_modalities = m @ m'; pmoda_crossings = c @ c' }
-  let of_core_modalities pmoda_modalities = { pmoda_modalities ; pmoda_crossings = [] }
+  let mk ?(loc = !default_loc) pmoda_modalities pmoda_crossings =
+    { pmoda_modalities; pmoda_crossings; pmoda_loc = loc }
+
+  let empty = mk [] []
+  let append { pmoda_modalities = m; pmoda_crossings = c; pmoda_loc = l }
+        { pmoda_modalities = m'; pmoda_crossings = c'; pmoda_loc = l' } =
+    { pmoda_modalities = m @ m';
+      pmoda_crossings = c @ c';
+      pmoda_loc = Location.merge [l; l'] }
+  let of_core_modalities ?loc pmoda_modalities = mk ?loc pmoda_modalities []
 end
 
 module Attr = struct

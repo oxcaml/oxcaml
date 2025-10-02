@@ -66,7 +66,8 @@ type modality = | Modality of string [@@unboxed]
 type core_modalities = modality loc list
 type modalities = {
     pmoda_modalities : core_modalities;
-    pmoda_crossings : crossings
+    pmoda_crossings : crossings;
+    pmoda_loc : Location.t
   }
 
 type mode = | Mode of string [@@unboxed]
@@ -77,7 +78,7 @@ type core_modes = mode loc list
 type modes = {
     pmode_modes : core_modes;
     pmode_crossings : crossings;
-    (* pmode_loc : loc *)
+    pmode_loc : Location.t
   }
 
 type include_kind = Structure | Functor

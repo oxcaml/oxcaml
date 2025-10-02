@@ -167,7 +167,7 @@ module Transled_modifiers = struct
 end
 
 let transl_mod_bounds
-    ({ pmode_modes = annots; pmode_crossings } : Parsetree.modes) =
+    ({ pmode_modes = annots; pmode_crossings; _ } : Parsetree.modes) =
   if pmode_crossings <> []
   then Misc.fatal_error "ZJE: mods are not yet supported";
   let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
@@ -345,7 +345,7 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   { annots with forkable; yielding; contention; portability }
 
 let transl_mode_annots
-    ({ pmode_modes = annots; pmode_crossings } : Parsetree.modes) :
+    ({ pmode_modes = annots; pmode_crossings; _ } : Parsetree.modes) :
     Alloc.Const.Option.t =
   if pmode_crossings <> []
   then Misc.fatal_error "ZJE: mods are not yet supported";
