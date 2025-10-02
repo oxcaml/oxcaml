@@ -4,9 +4,9 @@
 
 let my_unforkable : (unit -> unit) @ unforkable = print_endline "Hello, world!"
 [%%expect{|
-Line 1, characters 4-79:
+Line 1, characters 4-47:
 1 | let my_unforkable : (unit -> unit) @ unforkable = print_endline "Hello, world!"
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "unforkable" but is expected to be "forkable".
 |}]
 
