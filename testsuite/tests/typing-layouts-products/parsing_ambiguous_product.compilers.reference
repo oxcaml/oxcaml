@@ -21,12 +21,14 @@
               Mod
                 jkind (parsing_ambiguous_product.ml[12,327+11]..[12,327+16])
                 Abbreviation "value"
-                mode "global" (parsing_ambiguous_product.ml[12,327+21]..[12,327+27])
+                modes (parsing_ambiguous_product.ml[12,327+21]..[12,327+27])
+                  mode "global" (parsing_ambiguous_product.ml[12,327+21]..[12,327+27])
               jkind (parsing_ambiguous_product.ml[12,327+31]..[12,327+49])
               Mod
                 jkind (parsing_ambiguous_product.ml[12,327+32]..[12,327+37])
                 Abbreviation "value"
-                mode "global" (parsing_ambiguous_product.ml[12,327+42]..[12,327+48])
+                modes (parsing_ambiguous_product.ml[12,327+42]..[12,327+48])
+                  mode "global" (parsing_ambiguous_product.ml[12,327+42]..[12,327+48])
             ]
     ]
   structure_item (parsing_ambiguous_product.ml[14,380+0]..[14,380+45])
@@ -53,11 +55,13 @@
                 Mod
                   jkind (parsing_ambiguous_product.ml[14,380+10]..[14,380+15])
                   Abbreviation "value"
-                  mode "global" (parsing_ambiguous_product.ml[14,380+20]..[14,380+26])
+                  modes (parsing_ambiguous_product.ml[14,380+20]..[14,380+26])
+                    mode "global" (parsing_ambiguous_product.ml[14,380+20]..[14,380+26])
                 jkind (parsing_ambiguous_product.ml[14,380+29]..[14,380+34])
                 Abbreviation "value"
               ]
-              mode "global" (parsing_ambiguous_product.ml[14,380+39]..[14,380+45])
+              modes (parsing_ambiguous_product.ml[14,380+39]..[14,380+45])
+                mode "global" (parsing_ambiguous_product.ml[14,380+39]..[14,380+45])
     ]
   structure_item (parsing_ambiguous_product.ml[16,429+0]..[16,429+47])
     Pstr_type Rec
@@ -83,11 +87,13 @@
                 Mod
                   jkind (parsing_ambiguous_product.ml[16,429+11]..[16,429+16])
                   Abbreviation "value"
-                  mode "global" (parsing_ambiguous_product.ml[16,429+21]..[16,429+27])
+                  modes (parsing_ambiguous_product.ml[16,429+21]..[16,429+27])
+                    mode "global" (parsing_ambiguous_product.ml[16,429+21]..[16,429+27])
                 jkind (parsing_ambiguous_product.ml[16,429+30]..[16,429+35])
                 Abbreviation "value"
               ]
-              mode "global" (parsing_ambiguous_product.ml[16,429+41]..[16,429+47])
+              modes (parsing_ambiguous_product.ml[16,429+41]..[16,429+47])
+                mode "global" (parsing_ambiguous_product.ml[16,429+41]..[16,429+47])
     ]
 ]
 
