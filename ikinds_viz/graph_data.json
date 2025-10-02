@@ -65,16 +65,16 @@
       "width": 2.4074,
       "height": 0.5,
       "label": "typing/ikinds/ldd.ml",
-      "info": "Backend switchboard currently aliasing Ikind.Ldd to the non-memoized implementation."
+      "info": "Backend switchboard currently aliasing Ikind.Ldd to the unboxed non-memoized implementation."
     },
     {
-      "id": "typing/ikinds/ldd_no_memo.ml",
+      "id": "typing/ikinds/ldd_unboxed.ml",
       "x": 20.785,
       "y": 4.5,
       "width": 3.5874,
       "height": 0.5,
-      "label": "typing/ikinds/ldd_no_memo.ml",
-      "info": "Non-memoized lattice decision diagram backend implementing solver primitives."
+      "label": "typing/ikinds/ldd_unboxed.ml",
+      "info": "Non-memoized lattice decision diagram backend with unboxed leaves for constructor coefficients."
     },
     {
       "id": "typing/ikinds/ldd_memo.ml",
@@ -660,7 +660,7 @@
     },
     {
       "source": "typing/ikinds/ldd.ml",
-      "target": "typing/ikinds/ldd_no_memo.ml",
+      "target": "typing/ikinds/ldd_unboxed.ml",
       "points": [
         [
           16.991,
@@ -681,7 +681,7 @@
       ],
       "style": "solid",
       "label": null,
-      "info": "Ldd.Make currently aliases to the non-memoized backend."
+      "info": "Ldd.Make routes to the unboxed non-memoized backend."
     },
     {
       "source": "typing/ikinds/ldd_memo.ml",

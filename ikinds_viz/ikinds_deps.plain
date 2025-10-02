@@ -6,7 +6,7 @@ node "typing/ikinds/axis_lattice.ml" 15.803 1.8611 3.7438 0.5 "typing/ikinds/axi
 node "typing/jkind.ml" 15.803 1.1111 1.9098 0.5 "typing/jkind.ml" solid ellipse black lightgrey
 node "typing/types.mli" 20.785 0.72222 1.9951 0.5 "typing/types.mli" solid ellipse black lightgrey
 node "typing/ikinds/ldd.ml" 15.803 4.3194 2.4074 0.5 "typing/ikinds/ldd.ml" solid ellipse black lightgrey
-node "typing/ikinds/ldd_no_memo.ml" 20.785 4.5 3.5874 0.5 "typing/ikinds/ldd_no_memo.ml" solid ellipse black lightgrey
+node "typing/ikinds/ldd_unboxed.ml" 20.785 4.5 3.5874 0.5 "typing/ikinds/ldd_unboxed.ml" solid ellipse black lightgrey
 node "typing/ikinds/ldd_memo.ml" 1.6018 4 3.2035 0.5 "typing/ikinds/ldd_memo.ml" solid ellipse black lightgrey
 node "typing/ikinds/global_counters.ml" 6.457 4 3.7153 0.5 "typing/ikinds/global_counters.ml" solid ellipse black lightgrey
 node "typing/ikinds/axis_lattice_array.ml" 15.803 3.2222 3.2462 0.5 "typing/ikinds/axis_lattice_array.ml" solid ellipse black lightgrey
@@ -31,7 +31,7 @@ edge "typing/ikinds/axis_lattice_array.ml" "typing/mode.ml" 4 17.609 1.7908 18.2
 edge "typing/jkind.ml" "typing/types.mli" 7 16.399 0.91176 16.818 0.77932 17.399 0.61756 17.925 0.54861 18.537 0.46836 19.228 0.50747 19.776 0.56871 "Obj.magic" 18.326 0.66319 dashed black
 edge "typing/jkind.ml" "typing/jkind_axis.ml" 10 16.636 1.239 16.963 1.2998 17.34 1.3821 17.675 1.4861 17.825 1.5328 18.831 1.9834 18.977 2.0417 19.314 2.1761 19.69 2.3172 20.011 2.4347 solid black
 edge "typing/jkind.ml" "typing/mode.ml" 4 16.691 1.2092 17.537 1.3039 18.818 1.4476 19.718 1.5486 solid black
-edge "typing/ikinds/ldd.ml" "typing/ikinds/ldd_no_memo.ml" 4 16.991 4.3622 17.557 4.3829 18.249 4.4081 18.886 4.4313 solid black
+edge "typing/ikinds/ldd.ml" "typing/ikinds/ldd_unboxed.ml" 4 16.991 4.3622 17.557 4.3829 18.249 4.4081 18.886 4.4313 solid black
 edge "typing/ikinds/ldd_memo.ml" "typing/ikinds/global_counters.ml" 4 3.2097 4 3.603 4 4.0293 4 4.4393 4 solid black
 edge "typing/ikinds/axis_lattice_array.ml" "typing/types.mli" 10 16.335 2.9793 16.941 2.6825 17.958 2.1431 18.727 1.5278 18.847 1.4323 18.846 1.3692 18.977 1.2917 19.246 1.1335 19.563 1.0142 19.856 0.9267 solid black
 edge "typing/ikinds/axis_lattice_array.ml" "typing/ikinds/product_lattice.ml" 4 17.158 3.365 17.78 3.4313 18.524 3.5106 19.175 3.58 solid black
