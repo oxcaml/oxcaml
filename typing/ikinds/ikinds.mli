@@ -22,12 +22,6 @@ val type_declaration_ikind_gated :
   path:Path.t ->
   Types.type_ikind
 
-val apply_constructor_ikind :
-  context:Jkind.jkind_context ->
-  Types.constructor_ikind ->
-  Ikind.Ldd.node list ->
-  Ikind.Ldd.node
-
 val sub_jkind_l :
   ?allow_any_crossing:bool ->
   ?origin:string ->

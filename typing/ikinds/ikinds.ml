@@ -1,5 +1,5 @@
 (* This forces ikinds globally on. *)
-Clflags.ikinds := true
+(* Clflags.ikinds := true *)
 
 (* Types.ikind_debug := true *)
 let enable_crossing = true
@@ -170,14 +170,9 @@ let unpack_constructor_ikind (packed : Types.constructor_ikind) :
     constructor_ikind_payload =
   Obj.magic packed
 
-let rehydrate_constructor_ikind ~(context : Jkind.jkind_context)
-    (payload : constructor_ikind_payload) : constructor_ikind_payload =
-  ignore context;
-  payload
-
-let constructor_ikind_polynomial ~(context : Jkind.jkind_context)
+let constructor_ikind_polynomial
     (packed : Types.constructor_ikind) : JK.poly * JK.poly list =
-  let payload = rehydrate_constructor_ikind ~context (unpack_constructor_ikind packed) in
+  let payload = unpack_constructor_ikind packed in
   payload.base, Array.to_list payload.coeffs
 
 let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
@@ -339,7 +334,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     match decl.type_ikind with
     | Types.Constructor_ikind constructor when !Clflags.ikinds ->
       let base, coeffs =
-        constructor_ikind_polynomial ~context constructor
+        constructor_ikind_polynomial constructor
       in
       JK.Poly (base, coeffs)
     | Types.No_constructor_ikind reason ->
@@ -397,24 +392,6 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
         (String.concat "; " (Array.to_list (Array.map Ikind.Ldd.pp payload.coeffs)))
     end;
     Types.Constructor_ikind ikind
-
-let apply_constructor_ikind ~(context : Jkind.jkind_context)
-    (packed : Types.constructor_ikind) (args : Ikind.Ldd.node list) :
-    Ikind.Ldd.node =
-  let payload = rehydrate_constructor_ikind ~context (unpack_constructor_ikind packed) in
-  let arity = Array.length payload.coeffs in
-  let nargs = List.length args in
-  if nargs <> arity
-  then
-    Misc.fatal_errorf
-      "ikinds: constructor arity mismatch (expected %d, got %d)"
-      arity nargs;
-  let coeffs = Array.to_list payload.coeffs in
-  List.fold_left2
-    (fun acc arg coeff ->
-      let contribution = Ikind.Ldd.meet arg coeff in
-      Ikind.Ldd.join acc contribution)
-    payload.base args coeffs
 
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
