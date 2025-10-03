@@ -4,11 +4,12 @@
 
 set -e
 
+make promote-one DIR=typing-layouts-products
+
 # All typing-related test directories
 # Ordered by likelihood of being affected by layout/mode/jkind changes
 TEST_DIRS=(
   # HIGHEST PRIORITY: Layout tests with products/modes (unboxed records/tuples with local_)
-  "typing-layouts-products"
   "typing-layouts-or-null"
   "typing-jkind-bounds"
 
@@ -94,8 +95,6 @@ TEST_DIRS=(
   "typing-shadowing-of-pervasives-submodules"
   "typing-short-paths"
 )
-
-make
 
 for dir in "${TEST_DIRS[@]}"; do
   make promote-one-no-rebuild DIR="$dir"
