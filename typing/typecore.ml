@@ -268,6 +268,7 @@ type error =
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_access_record_unboxed
   | Block_access_private_record
+  | Block_index_flattened_record of type_expr
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.equate_error }
   | Submode_failed of Value.error * submode_reason * Env.shared_context option
@@ -6548,7 +6549,24 @@ and type_expect_
       | Error err ->
         raise (Error(loc, env, Block_index_modality_mismatch { mut; err }))
     end;
-    let el_ty = if flat_float then Predef.type_unboxed_float else el_ty in
+    let el_ty =
+      if flat_float then
+        let has_unboxed_version p =
+          not (Path.is_unboxed_version p) &&
+          try
+            ignore (Env.find_type (Path.unboxed_version p) env);
+            true
+          with Not_found ->
+            false
+        in
+        match get_desc (expand_head env el_ty) with
+        | Tconstr(p, args, _) when has_unboxed_version p ->
+          newconstr (Path.unboxed_version p) args
+        | _ ->
+          raise (Error(loc, env, Block_index_flattened_record el_ty))
+      else
+        el_ty
+    in
     let ty =
       if mut then
         Predef.type_idx_mut base_ty el_ty
@@ -11530,6 +11548,12 @@ let report_error ~loc env =
   | Block_access_private_record ->
     Location.error ~loc
       "Block indices do not support private records."
+  | Block_index_flattened_record el_ty ->
+    Location.errorf ~loc
+      "This block index points to an element stored as a flattened float.@ \
+       Such block indices require the element type to have an unboxed@ \
+       version, but %a does not."
+      (Style.as_inline_code Printtyp.type_expr) el_ty
   | Block_index_modality_mismatch { mut; err } ->
     let step, Modality.Error(ax, { left; right }) = err in
     let print_modality id ppf m =
