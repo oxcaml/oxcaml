@@ -790,6 +790,18 @@ Line 2, characters 15-16:
 Error: Block indices do not support private records.
 |}]
 
+(***************************************)
+(* Cannot bypass private float aliases *)
+
+type pfa = private float
+type r = { mutable pfa : pfa }
+let bad () : (r, float#) idx_mut = (.pfa)
+[%%expect{|
+type pfa = private float
+type r = { mutable pfa : pfa; }
+val bad : unit -> (r, float#) idx_mut = <fun>
+|}]
+
 (****************)
 (* Principality *)
 
