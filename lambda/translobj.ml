@@ -133,39 +133,6 @@ let transl_label_init_flambda f =
   in
   transl_label_init_general (fun () -> expr, repr)
 
-let add_label_to_module_representation = function
-    (* NB: this assumes [label] has layout value *)
-  | Module_value_only field_count -> Module_value_only (field_count + 1)
-  | Module_mixed (shape, shape_for_read) ->
-    Module_mixed
-      ( Array.append shape [| mixed_block_element_for_module |],
-        Array.append shape_for_read
-          [| mixed_block_element_with_locality_mode_for_module |] )
-
-let transl_store_label_init glob repr f arg =
-  assert(not (Config.flambda || Config.flambda2));
-  assert(!Clflags.native_code);
-  let size = module_representation_field_count repr in
-  method_cache := Lprim(mod_field ~read_semantics:Reads_vary size repr,
-                        (* XXX KC: conservative *)
-                        [Lprim(Pgetglobal glob, [], Loc_unknown)],
-                        Loc_unknown);
-  let expr = f arg in
-  let (repr, expr) =
-    if !method_count = 0 then (repr, expr) else
-    (add_label_to_module_representation repr,
-     Lsequence(
-     Lprim(mod_setfield size repr,
-           [Lprim(Pgetglobal glob, [], Loc_unknown);
-            Lprim (Pccall prim_makearray,
-                   [int !method_count; int 0],
-                   Loc_unknown)],
-           Loc_unknown),
-     expr))
-  in
-  let lam, repr = transl_label_init_general (fun () -> (expr, repr)) in
-  repr, lam
-
 let transl_label_init f =
   if !Clflags.native_code || Clflags.is_flambda2 () then
     transl_label_init_flambda f

@@ -1482,9 +1482,31 @@ let mod_setfield pos = function
   | Module_mixed (shape, _) ->
     Psetmixedfield([pos], shape, Root_initialization)
 
-let transl_module_representation = function
-  | Types.Module_value_only { size } -> Module_value_only size
-  | Types.Module_mixed { shape } ->
+let transl_module_representation ~loc repr =
+  let value_count = ref 0 in
+  let shape =
+    Array.map
+      (fun sort ->
+         let elt =
+           sort
+           |> Jkind.Sort.default_for_transl_and_get
+           |> Types.mixed_block_element_of_const_sort
+         in
+         begin match elt with
+         | Value -> incr value_count
+         | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
+         | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
+         | Product _ | Void -> ()
+         end;
+         elt)
+      repr
+  in
+  if !value_count = Array.length shape
+  then Module_value_only (Array.length shape)
+  else begin
+    Option.iter (fun loc ->
+      Typedecl.assert_mixed_product_support loc Module
+        ~value_prefix_len:(!value_count)) loc;
     Module_mixed
       ( transl_mixed_product_shape shape,
         transl_mixed_product_shape_for_read
@@ -1492,6 +1514,7 @@ let transl_module_representation = function
         ~get_mode:(fun _ ->
            fatal_error "Lambda.transl_module_representation: \
                           unexpected [Float_boxed].") shape)
+  end
 
 (* Translate an access path *)
 
@@ -1501,18 +1524,8 @@ let rec transl_address loc = function
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
       else Lvar id
-  | Env.Adot(addr, field_sorts, pos) ->
-      let module_repr =
-        field_sorts
-        |> Array.map
-            (fun sort ->
-              sort
-              |> Jkind.Sort.default_for_transl_and_get
-              |> Types.mixed_block_element_of_const_sort)
-        |> Mtype.module_representation_of_mixed_product_shape
-             ~check_representable:`No
-        |> transl_module_representation
-      in
+  | Env.Adot(addr, module_repr, pos) ->
+      let module_repr = transl_module_representation ~loc:None module_repr in
       Lprim(mod_field pos module_repr, [transl_address loc addr], loc)
 
 let transl_path find loc env path =

@@ -572,9 +572,7 @@ and mixed_block_element =
 
 and mixed_product_shape = mixed_block_element array
 
-and module_representation =
-  | Module_value_only of { size : int }
-  | Module_mixed of { shape : mixed_product_shape }
+and module_representation = Jkind_types.Sort.t array
 
 and record_representation =
   | Record_unboxed
@@ -981,13 +979,6 @@ let rec compare_mixed_block_element e1 e2 =
 let equal_mixed_product_shape r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element r1 r2
 
-let equal_module_representation r1 r2 = match r1, r2 with
-  | Module_value_only { size = s1 }, Module_value_only { size = s2 } -> s1 = s2
-  | Module_mixed { shape = p1; },
-    Module_mixed { shape = p2; } ->
-    equal_mixed_product_shape p1 p2
-  | (Module_value_only _ | Module_mixed _), _ -> false
-
 let equal_constructor_representation r1 r2 = r1 == r2 || match r1, r2 with
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
@@ -1092,11 +1083,6 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Base Void -> Product [||]
-
-let mixed_block_element_for_type_extension = Value
-let mixed_block_element_for_exception = Value
-let mixed_block_element_for_module = Value
-let mixed_block_element_for_class = Value
 
 let find_unboxed_type decl =
   match decl.type_kind with

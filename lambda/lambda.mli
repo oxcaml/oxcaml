@@ -593,7 +593,6 @@ val extern_repr_involves_unboxed_products : extern_repr -> bool
 
 (* Used to alias module fields in [Translmod] *)
 val layout_of_const_sort : Jkind.Sort.Const.t -> layout
-val layout_of_mixed_block_element : 'a. 'a mixed_block_element -> layout
 
 type structured_constant =
     Const_base of constant
@@ -1150,7 +1149,9 @@ val transl_mixed_product_shape_for_read :
   -> Types.mixed_product_shape
   -> 'a mixed_block_element array
 
+(* CR jrayman: change [~loc] to [~check_representable] *)
 val transl_module_representation :
+  loc:Warnings.loc option ->
   Types.module_representation -> module_representation
 
 val block_of_module_representation :
