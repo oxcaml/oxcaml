@@ -1,124 +1,120 @@
 (* TEST
- flags = "-stop-after parsing -dparsetree";
- setup-ocamlc.byte-build-env;
- ocamlc.byte;
- check-ocamlc.byte-output;
+ toplevel;
 *)
 
+(* This file contains some syntax errors for mod crossings, as well as
+   documentation for behavior which is not currently supported. *)
+
+(* mostly from [typing-modes/syntax-error.ml] *)
+
+let foo : type a. (a -> a) mod  = fun x -> x;;
+
+let (x, y) mod = "hello", "world";;
+
+let (x, y) : _ mod = "hello", "world";;
+
+let foo mod = "hello";;
+
+let foo = ("hello" : _ mod );;
+
+let foo = ("hello" mod );;
+
+let foo ~bar = bar ^ "hello";;
+
+let x =
+  let bar = "world" in
+  (* this error message doesn't say that a crossing expression is expected *)
+  foo ~(bar : _ mod )
+;;
+
+let x =
+  let bar = "world" in
+  foo ~(bar mod )
+;;
+
+type r = {a : string; b : string};;
+
+(* this error is slightly different than in [typing-modes/syntax-error.ml] version *)
+let r = {a : _ mod = "hello";
+         b : _ mod = "world"}
+;;
+
+let r =
+  {a mod  = "hello";
+   b mod  = "world"}
+;;
+
+let foo () =
+  let bar = "hello" in
+  let biz = "world" in
+  ~(bar mod ), ~(biz mod )
+;;
+
+type r = {
+  x : string mod
+}
+;;
+
+let foo ((x mod ), (y@)) = x + y ;;
+
+let foo ((x : _ mod ), (y : _ mod )) = x + y;;
+
+let foo () =
+  let (bar mod ) a b = () in
+  bar 42 24;
+  ()
+;;
+
+let foo = ("bar" :> int mod contended);;
+
+(* currently, mod crossings can appear by some arrows, but will _not_ parse properly.
+   specifically,
+      [val v : int -> int mod contended aliased @@ once portable]
+   currently parses as
+       [val v : (int -> int) mod contended aliased @@ once portable]
+   instead of
+       [val v : int -> (int mod contended aliased @@ once portable)]
+
+   it should parse in the second way, since parentheses are not allowed to appear in
+   that position, whereas they are allowed to appear for the first case.
+*)
+
+(* more examples with arrow types:
+
 module type S = sig
-  (* value descriptions *)
-  val v : int mod contended aliased
-  val v : int @@ once portable mod contended aliased
-  (* currently, these parse in the same way, which is not desired *)
   val v : int -> int mod contended aliased
-  val v : (int -> int) mod contended aliased
   val v : int -> int @@ once portable mod contended aliased
 
-  (* primitive declarations *)
-  external ex : int mod contended aliased = "foo1"
-  external ex : int @@ once portable mod contended aliased = "foo2"
   external ex : int -> int mod contended aliased = "foo3"
   external ex : int -> int @@ once portable mod contended aliased = "foo4"
 
-  (* TODO (ZJE): maybe just add in tests with types? *)
-
-  type t =
-    | T1 of int mod contended aliased
-    | T2 of int @@ once portable mod contended aliased
-    | T3 of (int -> int) mod contended aliased
-    (* [T3 of int -> int mod contended aliased] won't parse, for the same reason why
-       [T3 of int -> int @ once portable] doesn't *)
-    | T4 of (int -> int) @@ once portable mod contended aliased
-    | T5 of int @@ once portable mod contended aliased * int mod contended aliased
-  (* these examples are non-exhaustive; see the OxCaml docs -> modes -> syntax ->
-     "constructor field" examples *)
-
-  type 'a r = {
-    f1 : 'a mod contended aliased
-  ; f2 : 'a @@ once portable mod contended aliased
-  ; f3 : 'a -> 'a mod contended aliased
-  ; f4 : ('a -> 'a) mod contended aliased
-  ; f5 : 'a -> 'a @@ once portable mod contended aliased
-  }
-
-  (* currently, mod modes are properly parsing on arrow types:
-     the following examples will not parse, but they should eventually
-
-  val v : int -> int mod contended aliased @@ once portable
-
   type t = int mod contended aliased -> int
-
-  type 'a r = {
-    f1 : 'a mod contended aliased -> 'a
-  ; f2 : 'a @ once portable mod contended aliased -> 'a
-  ; f3 : 'a -> 'a mod contended aliased @@ once portable
-  }
-  *)
-
-  (* the other places where modalities appear all have to deal with modules, which is
-     not currently intended to be supported and does not parse currently *)
+  type 'a t = 'a -> 'a mod contended aliased @@ once portable
+  type fn = int @ portable contended mod contended aliased -> local_ int @ portable contended;;
 end
 
 module M = struct
-  (* value bindings *)
-  let (v mod contended aliased) = 42
-  let (v @ once portable mod contended aliased) = 42
-
-  let v mod contended aliased = 42
-  let (v mod contended) mod aliased = 42
-
-  let v : int mod contended aliased = 42
-  let v : (int -> int) mod contended aliased = fun _ -> 42
-
-  let v @ once portable mod contended aliased = 42
-  let v : int @ once portable mod contended aliased = 42
-  let v : (int -> int) @ once portable mod contended aliased = fun _ -> 42
-
-  (* these modalities are attached to the [let] itself, not to the pattern. *)
-  let (x, y) mod contended aliased = 4, 2
-  let (x, y) : (int * int) mod contended aliased = 4, 2
-  let (x, y) : (int * int) @ once portable mod contended aliased = 4, 2
-
-  let foo : type a. a @ once portable mod contended aliased = fun x -> x
-  let foo : type a. (a -> a) @ once portable mod contended aliased = fun x -> x
-
-  (* the following syntax is plausible, but currently serves no purpose, since functions
-     cross all monadic axes currently anyways. this may just be a coincedence, so these
-     examples are included to illustrate possibilities: *)
-
-  let (f mod contended aliased) a b = 42
-  let (f @ once portable mod contended aliased) a b = 42
-
-  (* expressions *)
-  let foo = (42 : int mod contended aliased) + (42 : int @ once portable mod contended)
-  let foo = (42 : _ mod contended aliased) + (42 : _ @ once portable mod contended)
-
-  (* like above, there are examples with mod modes on arrow types which do not work.
-     here are a few examples:
-
   let v : int -> int mod contended aliased = fun _ -> 42
   let v : int -> int @ once portable mod contended aliased = fun _ -> 42
   let v : int mod contended aliased -> int = fun _ -> 42
-  *)
-end
 
-(* let expressions (not just as structure items) *)
-let f () =
-  let v mod contended aliased = 42 in
-  let v : int mod contended aliased = 42 in
-  let v : (int -> int) mod contended aliased = fun _ -> 42 in
+  let f ?(x : ('a : any) 'b . 'a -> 'b @ once portable mod contended aliased = assert false)
+      ?x:(local_ (y, z) : ('a : any) 'b . 'a -> 'b @ once portable mod contended aliased = 42)
+      ~(x : ('a : any) 'b . 'a -> 'b @ once portable mod contended aliased)
+      ~x:((y, z) : ('a : any) 'b . 'a -> 'b @ once portable mod contended aliased)
+      ((y, z) : ('a : any) 'b . 'a -> 'b @ once portable mod contended aliased)
 
-  let v @ once portable mod contended aliased = 42
-  and v : int @ once portable mod contended aliased = 42
-  and v : (int -> int) @ once portable mod contended aliased = fun _ -> 42 in
-
+  let g () =
+    let a : ('a : any) 'b. 'a -> 'a @ once portable mod contended aliased = 42 in
+    let a : type (a : any) b. a -> b @ once portable mod contended aliased = 42 in
+    let (a, b) : int -> int @ once portable mod contended aliased = 42 in
   ()
+end
+*)
 
-(* TODO (ZJE): ALSO WORTH TESTING:
-    - make sure that comments work; specifically, that doc comments are attached to the
-      right thing after parsing
-    - make sure that attributes work too
-    - might want to add to the source_jane_street.ml test file, which also has more *)
+(* mod crossings are not supported with modules / functors / etc, both
+   in mode positions and in modality positions. these do not parse and
+   are not currently intended to be supported *)
 
 (* in addition to the mod modes on arrow types, there are some more odd consequences
    of this choice of syntax, which are noted here for examination:
@@ -134,4 +130,38 @@ let f () =
   (* these two cases parse identically *)
   type 'a t : kind_of_ 'a -> 'a mod global
   type 'a t : kind_of_ ('a -> 'a) mod global
+*)
+
+(* it is worthwhile to also test...
+    - that comments work; specifically, that doc comments are attached to the
+      right thing after parsing
+    - that attributes work too
+*)
+
+(* currently, mod crossings can coexist with legacy modes, but this is not
+   explicitly intended to be supported. I believe that these will parse but not
+   pretty-print in the expected way. Examples are included below:
+
+let f ?(local_ x @ once portable mod contended aliased = 42) = ()
+
+type record =
+  { global_ field1 : int mod contended aliased
+  ; global_ field5 : int @@ portable contended mod contended aliased
+  };;
+
+type 'a parameterized_record =
+  { global_ field1 : 'a mod contended aliased
+  ; global_ field5 : 'a @@ portable contended mod contended aliased
+  };;
+
+(* there are more interesting combinations here too *)
+type t =
+  | Foo of global_ int mod contended * int
+  | Foo1 of global_ int @@ portable contended mod contended * int
+
+let g () =
+  let local_ f a b @ once portable mod contended aliased = 42 in
+  let local_ a : (int -> int) @ once portable mod contended aliased = 42 in
+  let local_ a : ('a : any) 'b. ('a -> 'a) @ once portable mod contended aliased = 42 in
+  ()
 *)
