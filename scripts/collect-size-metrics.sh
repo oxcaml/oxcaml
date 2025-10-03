@@ -4,15 +4,15 @@ set -euo pipefail
 # Script to collect file size metrics from _install directory
 # Usage: collect-metrics.sh <install_directory> <output_csv_file> <commit_hash> <pr_number>
 
-if [ $# -lt 3 ] || [ $# -gt 4 ]; then
-    echo "Usage: $0 <install_directory> <output_csv_file> <commit_hash> [pr_number]" >&2
+if [ $# -ne 4 ]; then
+    echo "Usage: $0 <install_directory> <output_csv_file> <commit_hash> <pr_number>" >&2
     exit 1
 fi
 
 INSTALL_DIR="$1"
 CSV_FILE="$2"
 COMMIT_HASH="$3"
-PR_NUMBER="${4:-N/A}"
+PR_NUMBER="$4"
 
 # Validate input directory exists
 if [ ! -d "$INSTALL_DIR" ]; then
