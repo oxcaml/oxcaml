@@ -2240,6 +2240,71 @@ let rewrite_typing_env result ~unit_symbol vars_to_keep typing_env =
   Format.eprintf "NEW typing env: %a@." Typing_env.print r;
   r
 
+let rewrite_result_types result ~old_typing_env func_params func_results
+    result_types =
+  Format.eprintf "OLD result types: %a@." Result_types.print result_types;
+  let params, results, env_extension =
+    Result_types.pattern_match result_types ~f:(fun ~params ~results tee ->
+        params, results, tee)
+  in
+  let variable_pattern var =
+    let kind = Variable.kind var in
+    let name = Variable.name var in
+    let var = Code_id_or_name.var var in
+    if Code_id_or_name.Map.mem var result.unboxed_fields
+    then failwith "todo"
+    else
+      let db = result.db in
+      let metadata =
+        if is_top db var
+        then db, Rewriter.Any_usage
+        else
+          ( db,
+            Rewriter.Usages
+              (get_direct_usages db (Code_id_or_name.Map.singleton var ())) )
+      in
+      let v = Flambda2_types.Rewriter.Var.create () in
+      let pat = Flambda2_types.Rewriter.Pattern.var v (name, metadata) in
+      (pat, kind), [v]
+  in
+  let patterns_list func_vars type_vars =
+    let patterns, vars =
+      List.fold_left2
+        (fun (patterns, vars) funcv typev ->
+          let pat, vs = variable_pattern funcv in
+          ( Variable.Map.add (Bound_parameter.var typev) pat patterns,
+            List.rev_append vs vars ))
+        (Variable.Map.empty, []) func_vars
+        (Bound_parameters.to_list type_vars)
+    in
+    patterns, List.rev vars
+  in
+  let params_patterns, params_vars = patterns_list func_params params in
+  let results_patterns, results_vars = patterns_list func_results results in
+  let new_vars, new_env_extension =
+    TypesRewrite.rewrite_env_extension_with_extra_variables old_typing_env
+      (Variable.Map.disjoint_union params_patterns results_patterns)
+      env_extension
+      (params_vars @ results_vars)
+  in
+  let make_bp vars =
+    Bound_parameters.create
+      (List.map
+         (fun v ->
+           let var = Flambda2_types.Rewriter.Var.Map.find v new_vars in
+           Bound_parameter.create var
+             (Flambda_kind.With_subkind.anything (Variable.kind var))
+             Flambda_debug_uid.none)
+         vars)
+  in
+  let new_result_types =
+    Result_types.create ~params:(make_bp params_vars)
+      ~results:(make_bp results_vars) new_env_extension
+  in
+  Format.eprintf "NEW result\n   types: %a@." Result_types.print
+    new_result_types;
+  new_result_types
+
 let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db fields name_prefix =
   Field.Map.filter_map
     (fun field field_use ->

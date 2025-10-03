@@ -52,7 +52,8 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
   in
   let Rebuild.{ body; free_names; all_code; slot_offsets } =
     Rebuild.rebuild ~machine_width ~code_deps ~fixed_arity_continuations
-      ~continuation_info kinds solved_dep get_code_metadata holed
+      ~continuation_info ~final_typing_env kinds solved_dep get_code_metadata
+      holed
   in
   (* Is this what we really want? This keeps all the code that has not been
      deleted by this pass to be exported in the cmx. It looks like this does the
