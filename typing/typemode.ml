@@ -166,10 +166,14 @@ module Transled_modifiers = struct
     | Nonmodal Separability -> { t with separability = value }
 end
 
-let transl_mod_bounds
-    ({ pmode_modes = annots; pmode_crossings; _ } : Parsetree.modes) =
-  if pmode_crossings <> []
-  then Misc.fatal_error "ZJE: mods are not yet supported";
+let transl_mod_bounds (modes : Parsetree.modes) =
+  let annots =
+    match modes with
+    | No_modes -> []
+    | Modes { pmode_crossings = _ :: _; _ } ->
+      Misc.fatal_error "ZJE: mods are not yet supported"
+    | Modes { pmode_modes; _ } -> pmode_modes
+  in
   let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
     match Modifier_axis_pair.of_string txt with
     | P (type a) ((axis, mode) : a Axis.t * a) ->
@@ -344,11 +348,14 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   in
   { annots with forkable; yielding; contention; portability }
 
-let transl_mode_annots
-    ({ pmode_modes = annots; pmode_crossings; _ } : Parsetree.modes) :
-    Alloc.Const.Option.t =
-  if pmode_crossings <> []
-  then Misc.fatal_error "ZJE: mods are not yet supported";
+let transl_mode_annots (modes : Parsetree.modes) : Alloc.Const.Option.t =
+  let annots =
+    match modes with
+    | No_modes -> []
+    | Modes { pmode_crossings = _ :: _; _ } ->
+      Misc.fatal_error "ZJE: mods are not yet supported"
+    | Modes { pmode_modes; _ } -> pmode_modes
+  in
   let step modes_so_far { txt = Parsetree.Mode txt; loc } =
     Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
     let (P (ax, a)) =
@@ -604,17 +611,21 @@ let sort_dedup_modalities ~warn l =
   in
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map fst
 
-let transl_modalities ~maturity mut
-    ({ pmoda_modalities; pmoda_crossings; _ } : Parsetree.modalities) =
-  if pmoda_crossings <> []
-  then Misc.fatal_error "ZJE: mods are not yet supported";
+let transl_modalities ~maturity mut (modalities : Parsetree.modalities) =
+  let modalities =
+    match modalities with
+    | No_modalities -> []
+    | Modalities { pmoda_crossings = _ :: _; _ } ->
+      Misc.fatal_error "ZJE: mods are not yet supported"
+    | Modalities { pmoda_modalities; pmoda_crossings = []; _ } ->
+      List.map (transl_modality ~maturity) pmoda_modalities
+  in
+  (* axes listed in the order of implication. *)
+  let modalities = sort_dedup_modalities ~warn:true modalities in
   let mut_modalities =
     mutable_implied_modalities (Types.is_mutable mut)
       ~for_mutable_variable:false
   in
-  let modalities = List.map (transl_modality ~maturity) pmoda_modalities in
-  (* axes listed in the order of implication. *)
-  let modalities = sort_dedup_modalities ~warn:true modalities in
   let open Modality in
   (* - mut_modalities is applied before explicit modalities.
      - explicit modalities can override mut_modalities.
