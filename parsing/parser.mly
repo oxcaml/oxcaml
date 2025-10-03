@@ -4610,7 +4610,7 @@ strict_function_or_labeled_tuple_type:
 
 mod_crossing_expr:
   | MOD crossings {$2}
-  | MOD error { expecting $loc($2) "mod expression" }
+  | MOD error { expecting $loc($2) "crossing expression" }
 ;
 
 optional_mod_crossing_expr:
