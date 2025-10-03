@@ -866,9 +866,9 @@ let default_iterator =
          match pjkind_desc with
          | Pjk_default -> ()
          | Pjk_abbreviation (_ : string) -> ()
-         | Pjk_mod (t, mode_list) ->
+         | Pjk_mod (t, crossings) ->
              this.jkind_annotation this t;
-             this.modes this mode_list
+             List.iter (iter_loc this) crossings
          | Pjk_with (t, ty, modalities) ->
              this.jkind_annotation this t;
              this.typ this ty;

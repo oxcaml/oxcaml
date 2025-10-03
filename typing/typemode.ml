@@ -160,16 +160,8 @@ module Transled_modifiers = struct
     | Nonmodal Separability -> { t with separability = value }
 end
 
-(* CR zeisbach: change this to be Parsetree.crossings duh *)
-let transl_mod_bounds (modes : Parsetree.modes) =
-  let annots =
-    match modes with
-    | No_modes -> []
-    | Modes { pmode_crossings = _ :: _; _ } ->
-      Misc.fatal_error "ZJE: mods are not yet supported"
-    | Modes { pmode_modes; _ } -> pmode_modes
-  in
-  let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
+let transl_mod_bounds (crossings : Parsetree.crossings) =
+  let step bounds_so_far { txt = Parsetree.Crossing txt; loc } =
     match Modifier_axis_pair.of_string txt with
     | P (type a) ((axis, mode) : a Axis.t * a) ->
       let is_top = Per_axis.(le axis (max axis) mode) in
@@ -214,7 +206,7 @@ let transl_mod_bounds (modes : Parsetree.modes) =
       | _ -> raise (Error (loc, Unrecognized_modifier (Modifier, txt))))
   in
   let empty_modifiers = Transled_modifiers.empty in
-  let modifiers = List.fold_left step empty_modifiers annots in
+  let modifiers = List.fold_left step empty_modifiers crossings in
   (* Since [yielding] is the default mode in presence of [local],
      the [global] modifier must also apply [unyielding] unless specified. *)
   let modifiers =
