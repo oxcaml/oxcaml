@@ -412,20 +412,23 @@ let optional_space_modality_annot f m =
 let optional_modality_annot_newline f m =
   optional_modality_annot ~post:pp_print_newline f m
 
-(** For a list of modes, we either print everything in old syntax (if they
-  are purely old modes), or everything in new syntax. *)
+(** For a list of modes, we either return [Some core_modes] if they are purely old modes,
+    (including empty modes) or [None] to trigger printing everything in the new syntax *)
 let core_modes_in_old_syntax modes =
   match modes with
-  | No_modes | Modes { pmode_crossings = _ :: _; _ } -> None
+  | No_modes -> Some []
+  | Modes { pmode_crossings = _ :: _; _ } -> None
   | Modes { pmode_modes; pmode_crossings = []; _ } ->
     if (List.for_all (fun {txt = Mode txt; _} -> txt = "local") pmode_modes)
       then Some pmode_modes else None
 
-(** For a list of modalities, we either print all in old syntax (if they are
-  purely old modalities), or all in new syntax. *)
+(** For a list of modalities, we either return [Some core_modalities] if they are
+    purely old modalities, (including empty) or [None] to trigger printing everything
+    in the new syntax *)
 let print_modality_in_old_syntax modalities =
   match modalities with
-  | No_modalities | Modalities { pmoda_crossings = _ :: _; _ } -> None
+  | No_modalities -> Some []
+  | Modalities { pmoda_crossings = _ :: _; _ } -> None
   | Modalities { pmoda_modalities; pmoda_crossings = []; _ } ->
     if (List.for_all (fun {txt = Modality txt; _} -> txt = "global") pmoda_modalities)
       then Some pmoda_modalities else None
@@ -476,13 +479,16 @@ and type_with_label ctxt f (label, c, mode) =
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
   | Pjk_default -> pp f "_"
   | Pjk_abbreviation s -> pp f "%s" s
-  | Pjk_mod (_, No_modes) -> Misc.fatal_error "malformed jkind annotation"
-  | Pjk_mod (t, Modes {pmode_modes; _}) ->
-      Misc.pp_parens_if nested (fun f (t, modes) ->
+  | Pjk_mod (t, crossings) ->
+    begin match crossings with
+    | [] -> Misc.fatal_error "malformed jkind annotation"
+    | _ :: _ ->
+      Misc.pp_parens_if nested (fun f (t, crossings) ->
         pp f "%a mod %a"
           (jkind_annotation ~nested:true ctxt) t
-          (pp_print_list ~pp_sep:pp_print_space mode) modes
-      ) f (t, pmode_modes)
+          (pp_print_list ~pp_sep:pp_print_space crossing) crossings
+      ) f (t, crossings)
+    end
   | Pjk_with (t, ty, modalities) ->
     Misc.pp_parens_if nested (fun f (t, ty, modalities) ->
       pp f "%a with %a%a"

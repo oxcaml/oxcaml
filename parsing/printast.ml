@@ -560,7 +560,7 @@ and jkind_annotation i ppf (jkind : jkind_annotation) =
   | Pjk_mod (jkind, m) ->
       line i ppf "Pjk_mod\n";
       jkind_annotation (i+1) ppf jkind;
-      modes (i+1) ppf m
+      crossings (i+1) ppf m
   | Pjk_with (jkind, type_, modalities_) ->
       line i ppf "Pjk_with\n";
       jkind_annotation (i+1) ppf jkind;
