@@ -45,6 +45,8 @@ type error =
   | Dwarf_fission_dsymutil_not_macos
   | Dsymutil_error of int
   | Objcopy_error of int
+  | Missing_intf_for_quote of Compilation_unit.Name.t
+  | Missing_impl_for_quote of Compilation_unit.Name.t
 
 exception Error of error
 
