@@ -391,6 +391,10 @@ jobs:
         SHORT_HASH="${COMMIT_HASH:0:8}"
         DATE=$(date -u +"%Y-%m-%d")
 
+        # Extract PR number from commit message
+        COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
+        PR_NUMBER=$(echo "$COMMIT_MESSAGE" | grep -oP '\(#\K[0-9]+(?=\))' || echo "N/A")
+
         # CSV filename
         CSV_FILE="metrics-repo/data/metrics-${DATE}-${SHORT_HASH}.csv"
 
@@ -398,7 +402,8 @@ jobs:
         ${{ github.workspace }}/oxcaml/scripts/collect-size-metrics.sh \
           "${{ github.workspace }}/_install" \
           "$CSV_FILE" \
-          "$COMMIT_HASH"
+          "$COMMIT_HASH" \
+          "$PR_NUMBER"
 
         echo "Contents of generated metrics file:"
         cat "$CSV_FILE"
