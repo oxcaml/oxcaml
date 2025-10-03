@@ -242,7 +242,6 @@
   ldd_no_fast_path
   ldd_leaf_specialized
   ldd_jkind_solver
-  axis_bitfield
   axis_lattice
   axis_lattice_array
   ikind

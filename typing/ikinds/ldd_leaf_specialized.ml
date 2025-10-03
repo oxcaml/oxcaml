@@ -33,10 +33,6 @@ module Make (V : ORDERED) = struct
     | Solved of node
     | Rigid of V.t
 
-  (* CR jujacobs: this is dangerous when saving CMIs, because ids are not preserved.
-     Fix it by caching a hash code + using object identity, then use a hash cons table.
-     Code should still work for imprecise hash cons tables, since those are not preserved
-     across separate compilation. *)
   module Var = struct
     type t = var
 
