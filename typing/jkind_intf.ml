@@ -314,6 +314,7 @@ module History = struct
     | Tuple
     | Row_variable
     | Polymorphic_variant
+    | Polymorphic_variant_too_big
     | Arrow
     | Tfield
     | Tnil
