@@ -81,7 +81,8 @@ type env =
       Code_id.t -> Variable.t -> KS.t -> param_decision;
     function_return_decision : param_decision list Code_id.Map.t;
     kinds : K.t Name.Map.t;
-    should_preserve_direct_calls : should_preserve_direct_calls
+    should_preserve_direct_calls : should_preserve_direct_calls;
+    old_typing_env : Typing_env.t option
   }
 
 type rebuild_result =
@@ -1782,16 +1783,18 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     params_and_body
   in
   let code_id = Code_metadata.code_id code_metadata in
-  let updating_calling_convention =
+  let updating_calling_convention, params_vars, results_vars =
     match Code_id.Map.find_opt code_id env.code_deps with
     | None -> assert false
-    | Some _ ->
+    | Some code_dep ->
       let cannot_change_calling_convention =
         DS.cannot_change_calling_convention env.uses code_id
       in
-      if cannot_change_calling_convention
-      then Not_changing_calling_convention
-      else Changing_calling_convention code_id
+      ( (if cannot_change_calling_convention
+        then Not_changing_calling_convention
+        else Changing_calling_convention code_id),
+        code_dep.params,
+        code_dep.return )
   in
   let rebuild_body () =
     let all_vars =
@@ -1814,6 +1817,21 @@ and rebuild_function_params_and_body (env : env) res code_metadata
           ~expr:(Expr.create_invalid (Message msg))
           ~free_names:Name_occurrences.empty,
         res )
+  in
+  let code_metadata =
+    match Code_metadata.result_types code_metadata with
+    | Unknown | Bottom -> code_metadata
+    | Ok result_types ->
+      let old_typing_env =
+        match env.old_typing_env with
+        | None -> Misc.fatal_errorf "Result types without typing env"
+        | Some old_typing_env -> old_typing_env
+      in
+      Code_metadata.with_result_types
+        (Or_unknown_or_bottom.Ok
+           (Dep_solver.rewrite_result_types env.uses ~old_typing_env params_vars
+              results_vars result_types))
+        code_metadata
   in
   match updating_calling_convention with
   | Not_changing_calling_convention ->
@@ -1988,8 +2006,8 @@ type result =
 
 let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
-    ~fixed_arity_continuations kinds (solved_dep : DS.result) get_code_metadata
-    holed =
+    ~fixed_arity_continuations ~final_typing_env kinds (solved_dep : DS.result)
+    get_code_metadata holed =
   let should_keep_function_param code_id =
     let cannot_change_calling_convention =
       DS.cannot_change_calling_convention solved_dep code_id
@@ -2101,7 +2119,8 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       should_keep_function_param;
       function_return_decision;
       kinds;
-      should_preserve_direct_calls
+      should_preserve_direct_calls;
+      old_typing_env = final_typing_env
     }
   in
   let res =

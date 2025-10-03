@@ -79,3 +79,11 @@ val code_id_actually_directly_called :
 
 val rewrite_typing_env :
   result -> unit_symbol:Symbol.t -> Variable.t list -> typing_env -> typing_env
+
+val rewrite_result_types :
+  result ->
+  old_typing_env:typing_env ->
+  Variable.t list ->
+  Variable.t list ->
+  Result_types.t ->
+  Result_types.t
