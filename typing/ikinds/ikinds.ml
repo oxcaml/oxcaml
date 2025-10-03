@@ -1,5 +1,5 @@
 (* This forces ikinds globally on. *)
-Clflags.ikinds := true
+(* Clflags.ikinds := true *)
 
 (* Types.ikind_debug := true *)
 let enable_crossing = true
