@@ -371,6 +371,8 @@ type primitive =
   | Pcpu_relax
   | Pget_idx of layout * Asttypes.mutable_flag
   | Pset_idx of layout * modify_mode
+  | Pget_ptr of layout * Asttypes.mutable_flag
+  | Pset_ptr of layout * modify_mode
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
     compiled away. *)
