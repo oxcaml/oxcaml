@@ -490,6 +490,18 @@ val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
 val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
 |}]
 
+(*****************************************)
+(* Block indices to atomic record fields *)
+type atomic = { mutable i : int [@atomic] }
+let bad () = (.i)
+[%%expect{|
+type atomic = { mutable i : int [@atomic]; }
+Line 2, characters 13-17:
+2 | let bad () = (.i)
+                 ^^^^
+Error: Block indices do not yet support [@atomic] record fields.
+|}]
+
 (**************)
 (* Modalities *)
 

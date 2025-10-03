@@ -270,6 +270,7 @@ type error =
   | Block_access_private_record
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.equate_error }
+  | Block_index_atomic_unsupported
   | Submode_failed of Value.error * submode_reason * Env.shared_context option
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
@@ -6518,9 +6519,13 @@ and type_expect_
       | Baccess_field (_, { lbl_mut = Immutable; _ })
       | Baccess_array { mut = Immutable; _ } | Baccess_block (Immutable, _) ->
         false
-      | Baccess_field (_, { lbl_mut = Mutable _; _ })
+      | Baccess_field
+          (_, { lbl_mut = Mutable { mode = _; atomic = Nonatomic }; _ })
       | Baccess_array { mut = Mutable; _ } | Baccess_block (Mutable, _) ->
         true
+      | Baccess_field
+          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }) ->
+        raise (Error(loc, env, Block_index_atomic_unsupported))
     in
     let (el_ty, modality), uas =
       List.fold_left_map
@@ -11551,6 +11556,9 @@ let report_error ~loc env =
       (if mut then "mutable" else "immutable")
       what_element_must_do
       (print_modality "not") actual
+  | Block_index_atomic_unsupported ->
+    Location.error ~loc
+      "Block indices do not yet support [@atomic] record fields."
   | Submode_failed(e, submode_reason, shared_context) ->
     let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
     (* CR-soon zqian: move the following hints into the new hint system, then

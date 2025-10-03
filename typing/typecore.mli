@@ -315,6 +315,7 @@ type error =
   | Block_access_private_record
   | Block_index_modality_mismatch of
       { mut : bool; err : Mode.Modality.equate_error }
+  | Block_index_atomic_unsupported
   | Submode_failed of Mode.Value.error * submode_reason *
       Env.shared_context option
   | Curried_application_complete of
