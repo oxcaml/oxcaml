@@ -476,7 +476,6 @@ and type_with_label ctxt f (label, c, mode) =
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
   | Pjk_default -> pp f "_"
   | Pjk_abbreviation s -> pp f "%s" s
-  (* CR zeisbach: change this when this gets changed to mods, like other places *)
   | Pjk_mod (_, No_modes) -> Misc.fatal_error "malformed jkind annotation"
   | Pjk_mod (t, Modes {pmode_modes; _}) ->
       Misc.pp_parens_if nested (fun f (t, modes) ->

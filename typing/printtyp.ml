@@ -1425,7 +1425,7 @@ let tree_of_modalities mut t =
   | No_modalities -> []
   (* CR zeisbach: once this supports crossings, consider factoring this out *)
   | Modalities { pmoda_crossings = _ :: _; _ } ->
-    Misc.fatal_error "ZJE: mods are not yet supported"
+    Misc.fatal_error "[untransl_modalities] returned crossings";
   | Modalities { pmoda_modalities; _ } ->
     match all_or_none tree_of_modality_old pmoda_modalities with
     | Some l -> l
@@ -1435,7 +1435,7 @@ let tree_of_modalities_new mut t =
   match Typemode.untransl_modalities mut t with
   | No_modalities -> []
   | Modalities { pmoda_crossings = _ :: _; _ } ->
-    Misc.fatal_error "ZJE: mods are not yet supported"
+    Misc.fatal_error "[untransl_modalities] returned crossings";
   | Modalities { pmoda_modalities; _ } ->
     List.map (fun ({txt = Parsetree.Modality s; _}) -> s) pmoda_modalities
 
@@ -1478,7 +1478,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
   match Typemode.untransl_mode_annots diff with
   | No_modes -> []
   | Modes { pmode_crossings = _ :: _; _ } ->
-    Misc.fatal_error "ZJE: mods are not yet supported";
+    Misc.fatal_error "[untransl_mode_annots] returned crossings";
   | Modes { pmode_modes; _ } ->
     match all_or_none tree_of_mode_old pmode_modes with
     | Some l -> l

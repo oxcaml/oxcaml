@@ -1204,10 +1204,8 @@ and apply_modalities_module_type env modalities = function
 let check_unsupported_modal_module ~env reason modes =
   match modes with
   | No_modes -> ()
-  | Modes {pmode_crossings = []; pmode_loc; _} ->
+  | Modes {pmode_loc; _} ->
       raise(Error(pmode_loc, env, Unsupported_modal_module reason))
-  | Modes {pmode_crossings = _ :: _; _} ->
-      Misc.fatal_error "ZJE: mods not supported yet"
 
 let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
   modalities =
@@ -1216,7 +1214,7 @@ let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
   | Modalities {pmoda_crossings = []; _} ->
     Typemode.transl_modalities ~maturity:Stable Immutable modalities
   | Modalities {pmoda_crossings = _ :: _; _} ->
-      Misc.fatal_error "ZJE: mods are not yet supported"
+      Misc.fatal_error "crossings as modalities are not yet implemented"
 
 let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
   let modalities = transl_modalities ~default_modalities pmd_modalities in
@@ -1432,7 +1430,7 @@ and approx_sig_items env ssg=
                 match moda with
                 | No_modalities -> sg
                 | Modalities { pmoda_crossings = _ :: _; _ } ->
-                    Misc.fatal_error "ZJE: mods are not yet supported"
+                    Misc.fatal_error "crossings on includes are not supported"
                 | Modalities { pmoda_crossings = []; _ } ->
                   let modalities =
                     Typemode.transl_modalities ~maturity:Stable Immutable moda

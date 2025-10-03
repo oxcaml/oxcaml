@@ -160,6 +160,7 @@ module Transled_modifiers = struct
     | Nonmodal Separability -> { t with separability = value }
 end
 
+(* CR zeisbach: change this to be Parsetree.crossings duh *)
 let transl_mod_bounds (modes : Parsetree.modes) =
   let annots =
     match modes with
@@ -325,7 +326,7 @@ let transl_mode_annots (modes : Parsetree.modes) : Alloc.Const.Option.t =
     match modes with
     | No_modes -> []
     | Modes { pmode_crossings = _ :: _; _ } ->
-      Misc.fatal_error "ZJE: mods are not yet supported"
+      Misc.fatal_error "crossings as mode annotations are not yet implemented"
     | Modes { pmode_modes; _ } -> pmode_modes
   in
   let step modes_so_far { txt = Parsetree.Mode txt; loc } =
@@ -577,7 +578,7 @@ let transl_modalities ~maturity mut (modalities : Parsetree.modalities) =
     match modalities with
     | No_modalities -> []
     | Modalities { pmoda_crossings = _ :: _; _ } ->
-      Misc.fatal_error "ZJE: mods are not yet supported"
+      Misc.fatal_error "crossings as modalities are not yet implemented"
     | Modalities { pmoda_modalities; pmoda_crossings = []; _ } ->
       List.map (transl_modality ~maturity) pmoda_modalities
   in

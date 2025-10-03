@@ -8014,7 +8014,7 @@ and type_function
       let type_mode =
         match ret_mode_annotations with
         | Modes {pmode_crossings = _ :: _; _} ->
-            Misc.fatal_error "ZJE: mods are not yet supported"
+            Misc.fatal_error "crossings on arrows not yet implemented"
         | No_modes ->
             (* if the return mode annotation is absent we do not constrain the body mode,
               and we use the mode of the whole function to interpret the return type *)
