@@ -1993,7 +1993,7 @@ module Rewriter = struct
     let[@local] forget_type () =
       Rule.rewrite Pattern.any (Expr.unknown (Flambda2_types.kind flambda_type))
     in
-    Format.eprintf "REWRITE usages = %a@." print_t0 usages;
+    if debug then Format.eprintf "REWRITE usages = %a@." print_t0 usages;
     if match usages with
        | Any_usage -> false
        | Usages m -> Code_id_or_name.Map.is_empty m
@@ -2134,13 +2134,15 @@ module Rewriter = struct
               let fields =
                 get_fields_usage_of_constructors db set_of_closures
               in
-              Format.eprintf "ZZZ: %a@."
-                (Field.Map.print (fun ff t ->
-                     match t with
-                     | Used_as_top -> Format.fprintf ff "Top"
-                     | Used_as_vars m ->
-                       Code_id_or_name.Map.print Unit.print ff m))
-                fields;
+              if debug
+              then
+                Format.eprintf "ZZZ: %a@."
+                  (Field.Map.print (fun ff t ->
+                       match t with
+                       | Used_as_top -> Format.fprintf ff "Top"
+                       | Used_as_vars m ->
+                         Code_id_or_name.Map.print Unit.print ff m))
+                  fields;
               no_representation_change function_slot
                 (Value_slot.Map.mapi
                    (fun value_slot _value_slot_type ->
@@ -2173,10 +2175,12 @@ module Rewriter = struct
           let usages = get_direct_usages db vs in
           db, Usages usages)
     in
-    Format.eprintf "%a -[%d]-> %a@." print_t0 t
-      (Target_ocaml_int.to_int index)
-      print_t0 (snd r);
-    Format.eprintf "%a@." Flambda2_types.print flambda_type;
+    if debug
+    then (
+      Format.eprintf "%a -[%d]-> %a@." print_t0 t
+        (Target_ocaml_int.to_int index)
+        print_t0 (snd r);
+      Format.eprintf "%a@." Flambda2_types.print flambda_type);
     r
 
   let array_slot (db, _t) _index _typing_env _flambda_type =
@@ -2205,7 +2209,8 @@ end
 module TypesRewrite = Flambda2_types.Rewriter.Make (Rewriter)
 
 let rewrite_typing_env result ~unit_symbol vars_to_keep typing_env =
-  Format.eprintf "OLD typing env: %a@." Typing_env.print typing_env;
+  if debug
+  then Format.eprintf "OLD typing env: %a@." Typing_env.print typing_env;
   let db = result.db in
   let symbol_metadata sym =
     if Symbol.equal sym unit_symbol
@@ -2237,7 +2242,7 @@ let rewrite_typing_env result ~unit_symbol vars_to_keep typing_env =
          (fun m v -> Variable.Map.add v (variable_metadata v) m)
          Variable.Map.empty vars_to_keep)
   in
-  Format.eprintf "NEW typing env: %a@." Typing_env.print r;
+  if debug then Format.eprintf "NEW typing env: %a@." Typing_env.print r;
   r
 
 let rewrite_result_types result ~old_typing_env func_params func_results
