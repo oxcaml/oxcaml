@@ -19,6 +19,8 @@ open Misc
 open Compile_common
 
 module type S = sig
+  include Optbackend_intf.File_extensions
+
   val interface: source_file:string -> output_prefix:string -> unit
 
   val implementation
@@ -47,9 +49,16 @@ module type S = sig
     -> args:string list
     -> string
     -> unit
+
+  val package_files
+    :  ppf_dump:Format.formatter
+    -> Env.t
+    -> string list
+    -> string
+    -> unit
 end
 
-module Make (Backend : Optbackend_intf.S) = struct
+module Make (Backend : Optbackend_intf.S) : S = struct
 let tool_name = "ocamlopt"
 include (Backend : Optbackend_intf.File_extensions)
 
@@ -229,41 +238,137 @@ let read_unit_info file : Instantiator.unit_info =
   let { Cmx_format.ui_unit; ui_arg_descr; ui_format; _ } = unit_info in
   { Instantiator.ui_unit; ui_arg_descr; ui_format; }
 
-let instantiate ~machine_width unix ~src ~args targetcmx ~flambda2
-    ~lambda_to_jsir =
+let instantiate  ~src ~args targetcmx =
   Instantiator.instantiate ~src ~args targetcmx
     ~expected_extension:ext_flambda_obj
     ~read_unit_info
     ~compile:(instance ~keep_symbol_tables:false)
 end
 
-let native unix ~lambda_to_cmm =
+let native unix ~flambda2:( lambda_to_cmm:
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    machine_width:Target_system.Machine_width.t ->
+    keep_symbol_tables:bool ->
+    Lambda.program ->
+    Cmm.phrase list ) =
   (module Make (struct
        let ext_asm = Config.ext_asm
        let ext_obj = Config.ext_obj
        let ext_lib = Config.ext_lib
        let ext_flambda_obj = ".cmx"
        let ext_flambda_lib = ".cmxa"
+       let default_executable_name = Config.default_executable_name
 
        let link = Asmlink.link unix
        let link_shared = Asmlink.link_shared unix
 
-       let emit = Some
-        (fun prefix ~progname info ~ppf_dump ->
-          Asmgen.compile_implementation_linear unix
-          prefix
-          ~progname)
+       let emit : Optbackend_intf.emit option =
+        Some
+          (fun prefix ~progname info ~ppf_dump ->
+              Asmgen.compile_implementation_linear unix
+                prefix
+                ~progname
+                ~ppf_dump)
 
+
+        let link_partial target objfiles =
+          let exitcode =
+            Ccomp.call_linker Ccomp.Partial target objfiles ""
+          in
+          if exitcode <> 0 then raise (Optlink_common.Error (Linking_error exitcode))
+
+        let create_archive archive_name objfile_list =
+          if Ccomp.create_archive archive_name objfile_list <> 0
+          then raise (Optlink_common.Error (Archiver_error archive_name))
+
+        let compile_implementation
+          ~keep_symbol_tables
+          ~sourcefile
+          ~prefixname
+          ~ppf_dump
+          program
+        =
+          let machine_width = Target_system.Machine_width.Sixty_four in
+          Asmgen.compile_implementation
+            unix
+            ~pipeline:(Direct_to_cmm (lambda_to_cmm ~machine_width ~keep_symbol_tables))
+            ~sourcefile
+            ~prefixname
+            ~ppf_dump
+            program
      end) : S)
 
 
-let js_of_ocaml ~lambda_to_jsir =
+
+     let js_of_ocaml ~lambda_to_jsir:_ = failwith "JSOO not implemented yet"
+
+(* let js_of_ocaml ~lambda_to_jsir =
   (module Make (struct
        let ext_obj = ".cmjo"
        let ext_lib = ".cmja"
        let ext_flambda_obj = ".cmjx"
        let ext_flambda_lib = ".cmjxa"
+       let default_executable_name = Config.default_executable_name ^ ".js"
+
+        let js_of_oxcaml args =
+          let prog =
+            (* Use jsoo from our PATH when we're bootstrapping *)
+            match Sys.ocaml_release with
+            | { extra = Some (Plus, "ox"); _ } ->
+                Filename.concat Config.bindir "js_of_oxcaml"
+            | _ ->
+                (* Try to find js_of_oxcaml in the same directory as the current executable *)
+                let exe_dir = Filename.dirname Sys.executable_name in
+                let jsoo_path = Filename.concat exe_dir "js_of_oxcaml" in
+                if Sys.file_exists jsoo_path then jsoo_path else "js_of_oxcaml"
+          in
+          let cmdline = Filename.quote_command prog args in
+          match Ccomp.command cmdline with 0 -> () | _ -> raise (Sys_error cmdline)
+
 
        let link_partial _ _ =
         Misc.fatal_error "Partial linking is not supported for js_of_ocaml"
-     end) : S)
+
+        let link objfiles output_name ~genfns:_ ~units_tolink:_ ~ppf_dump:_ =
+          let objfiles =
+            ListLabels.map objfiles ~f:(fun obj_name ->
+            try
+              Load_path.find obj_name
+            with Not_found ->
+              raise (Optlink_common.Error(File_not_found obj_name)))
+            in
+      (* Build the runtime *)
+      let runtime = output_name ^ ".runtime.js" in
+
+      (* Extract runtime files from ccobjs *)
+      let runtime_files, other_objs =
+        ListLabels.partition objfiles ~f:(fun f -> Filename.check_suffix f ".js")
+      in
+      (* Always build runtime - it's required for JavaScript execution *)
+      js_of_oxcaml
+        (List.concat
+          [ ["build-runtime"]
+          ; [ "-o"; runtime ]
+          ; (if !Clflags.debug then ["--debug-info" ] else [])
+          ; runtime_files
+          ]);
+      (* Link everything together *)
+      let files_to_link =
+        runtime ::
+        other_objs @ objfiles
+      in
+      Misc.try_finally
+        ~always:(fun () -> Misc.remove_file runtime)
+        (fun () ->
+          Jscompile.run_jsoo_exn
+            ~args:(List.concat
+              [ ["link"]
+              ; ["-o"; output_name ]
+              ; (if !Clflags.link_everything then ["--linkall"] else [])
+              ; (if !Clflags.debug then ["--debug-info" ] else [])
+              ; files_to_link
+              ; (List.rev !Clflags.all_ccopts)
+              ]))
+
+     end) : S) *)

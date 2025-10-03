@@ -15,6 +15,10 @@ module type File_extensions = sig
   val ext_lib : string
   val ext_flambda_obj : string
   val ext_flambda_lib : string
+
+  (** Name of executable produced by linking if none is given with -o,
+      e.g. [a.out] under Unix. *)
+  val default_executable_name : string
 end
 
 type emit =
@@ -29,7 +33,7 @@ module type S = sig
     :  string list
     -> string
     -> genfns:Generic_fns.Tbl.t
-    -> units_to_link:unit_link_info list
+    -> units_tolink:unit_link_info list
     -> ppf_dump:Format.formatter
     -> unit
 
@@ -38,7 +42,7 @@ module type S = sig
     -> string
     -> cached_genfns_imports:Generic_fns.Partition.Set.t
     -> genfns:Generic_fns.Tbl.t
-    -> units_to_link:unit_link_info list
+    -> units_tolink:unit_link_info list
     -> ppf_dump:Format.formatter
     -> unit
 

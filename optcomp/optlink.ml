@@ -228,7 +228,7 @@ let not_output_to_dev_null output_name =
 let link_shared ~ppf_dump objfiles output_name =
   Profile.(record_call (annotate_file_name output_name)) (fun () ->
     let genfns = Generic_fns.Tbl.make () in
-    let ml_objfiles, units_to_link, _ =
+    let ml_objfiles, units_tolink, _ =
       List.fold_right
         (scan_file ~shared:true genfns)
         objfiles
@@ -241,7 +241,7 @@ let link_shared ~ppf_dump objfiles output_name =
       output_name
       ~ppf_dump
       ~genfns
-      ~units_to_link)
+      ~units_tolink)
 
 let reset () =
   Cmi_consistbl.clear crc_interfaces;
@@ -265,7 +265,7 @@ let link ~ppf_dump objfiles output_name =
       else if !Clflags.output_c_object then stdlib :: objfiles
       else stdlib :: (objfiles @ [stdexit]) in
     let genfns = Generic_fns.Tbl.make () in
-    let ml_objfiles, units_to_link, cached_genfns_imports =
+    let ml_objfiles, units_tolink, cached_genfns_imports =
       List.fold_right
         (scan_file ~shared:false genfns)
         objfiles
@@ -283,7 +283,7 @@ let link ~ppf_dump objfiles output_name =
       output_name
       ~ppf_dump
       ~genfns
-      ~units_to_link
+      ~units_tolink
       ~cached_genfns_imports
   )
 end

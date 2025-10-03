@@ -32,7 +32,7 @@ end
 module Make(Backend : sig
     include Optbackend_intf.S
     include Optlink.S
-  end) = struct
+  end) : S = struct
 
 type error =
     Illegal_renaming of CU.Name.t * string * CU.Name.t
@@ -233,8 +233,8 @@ let build_package_cmx members cmxfile ~main_module_block_size =
 
 (* Make the .cmx and the .o for the package *)
 
-let package_object_files ~machine_width unix ~ppf_dump files target
-                         targetcmx coercion ~flambda2 =
+let package_object_files ~ppf_dump files target
+                         targetcmx coercion =
   let pack_path = Unit_info.Artifact.modname target in
   let members = map_left_right (read_member_info pack_path) files in
   check_units members;
@@ -245,8 +245,7 @@ let package_object_files ~machine_width unix ~ppf_dump files target
 
 (* The entry point *)
 
-let package_files ~machine_width unix ~ppf_dump initial_env files targetcmx
-      ~flambda2 =
+let package_files ~ppf_dump initial_env files targetcmx =
   let files =
     List.map
       (fun f ->
@@ -268,8 +267,8 @@ let package_files ~machine_width unix ~ppf_dump initial_env files targetcmx
   Misc.try_finally (fun () ->
       let coercion =
         Typemod.package_units initial_env files cmi comp_unit in
-      package_object_files ~machine_width unix ~ppf_dump files obj targetcmx
-        coercion ~flambda2
+      package_object_files ~ppf_dump files obj targetcmx
+        coercion
     )
     ~exceptionally:(fun () ->
         remove_file targetcmx; remove_file (Unit_info.Artifact.filename obj)

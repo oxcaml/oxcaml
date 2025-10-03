@@ -4,6 +4,8 @@ open Compilenv
 module String = Misc.Stdlib.String
 module CU = Compilation_unit
 
+(* CR jvanburen: clean up this file, rename to optcommon, add .mli *)
+
 type filepath = string
 
 type error =
@@ -15,6 +17,7 @@ type error =
   | Multiple_definition of CU.Name.t * filepath * filepath
   | Missing_cmx of filepath * CU.t
   | Linking_error of int
+  | Archiver_error of string
 
 exception Error of error
 
@@ -237,6 +240,8 @@ let report_error ppf = function
         CU.print name
   | Linking_error exitcode ->
       fprintf ppf "Error during linking (exit code %d)" exitcode
+  | Archiver_error name ->
+      fprintf ppf "Error while creating the library %s" name
 
 let () =
   Location.register_error_of_exn

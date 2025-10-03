@@ -74,19 +74,19 @@ let main unix argv ppf ~flambda2 ~lambda_to_jsir =
     if !Oxcaml_flags.gc_timings then Gc_timings.start_collection ();
     if !Clflags.plugin then
       Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
-    let (module Optcompile : Optcompiler.S) =
+    let (module Compiler : Optcompiler.S) =
       match Clflags.backend_target () with
       | None | Some Backend.Native -> Optcompiler.native unix ~flambda2
       | Some Backend.Js_of_ocaml ->
-        Optcompiler.js_of_ocaml ~flambda2_to_jsir:lambda_to_jsir
+        Optcompiler.js_of_ocaml ~lambda_to_jsir
     in
     begin try
       Compenv.process_deferred_actions
         (ppf,
-         Optcompile.implementation,
-         Optcompile.interface,
-         Optcompile.ext_flambda_obj,
-         Optcompile.ext_flambda_lib);
+         Compiler.implementation,
+         Compiler.interface,
+         Compiler.ext_flambda_obj,
+         Compiler.ext_flambda_lib);
     with Arg.Bad msg ->
       begin
         prerr_endline msg;
@@ -119,7 +119,7 @@ let main unix argv ppf ~flambda2 ~lambda_to_jsir =
     if !make_archive then begin
       Compmisc.init_path ();
       let target = Compenv.extract_output !output_name in
-      Optcompile.create_archive
+      Compiler.create_archive
         (Compenv.get_objfiles ~with_ocamlparam:false) target;
       Warnings.check_fatal ();
     end
@@ -127,7 +127,7 @@ let main unix argv ppf ~flambda2 ~lambda_to_jsir =
       Compmisc.init_path ();
       let target = Compenv.extract_output !output_name in
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
-        Optcomp.package_files ~ppf_dump (Compmisc.initial_env ())
+        Compiler.package_files ~ppf_dump (Compmisc.initial_env ())
           (Compenv.get_objfiles ~with_ocamlparam:false) target);
       Warnings.check_fatal ();
     end
@@ -142,18 +142,18 @@ let main unix argv ppf ~flambda2 ~lambda_to_jsir =
         | [] | [_] ->
           Printf.ksprintf Compenv.fatal
             "Must specify at least two %s files with -instantiate"
-            Optcompile.ext_flambda_obj
+            Compiler.ext_flambda_obj
         | src :: args ->
           src, args
       in
-      Optcompile.instantiate ~src ~args target;
+      Compiler.instantiate ~src ~args target;
       Warnings.check_fatal ();
     end
     else if !shared then begin
       Compmisc.init_path ();
       let target = Compenv.extract_output !output_name in
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
-        Optcompile.link_shared unix ~ppf_dump
+        Compiler.link_shared ~ppf_dump
           (Compenv.get_objfiles ~with_ocamlparam:false) target);
       Warnings.check_fatal ();
     end
@@ -176,7 +176,7 @@ let main unix argv ppf ~flambda2 ~lambda_to_jsir =
       Compmisc.init_path ();
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
           let objs = Compenv.get_objfiles ~with_ocamlparam:true in
-          Asmlink.link unix
+          Compiler.link
             ~ppf_dump objs target);
       Warnings.check_fatal ();
     end;

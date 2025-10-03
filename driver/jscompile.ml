@@ -28,21 +28,6 @@ let interface ~source_file ~output_prefix =
     ~hook_typed_tree:(fun _ -> ())
     info
 
-let run_jsoo_exn ~args =
-  let prog =
-    (* Use jsoo from our PATH when we're bootstrapping *)
-    match Sys.ocaml_release with
-    | { extra = Some (Plus, "ox"); _ } ->
-        Filename.concat Config.bindir "js_of_oxcaml"
-    | _ ->
-        (* Try to find js_of_oxcaml in the same directory as the current executable *)
-        let exe_dir = Filename.dirname Sys.executable_name in
-        let jsoo_path = Filename.concat exe_dir "js_of_oxcaml" in
-        if Sys.file_exists jsoo_path then jsoo_path else "js_of_oxcaml"
-  in
-  let cmdline = Filename.quote_command prog args in
-  match Ccomp.command cmdline with 0 -> () | _ -> raise (Sys_error cmdline)
-
 (** Js_of_ocaml IR compilation backend for .ml files. *)
 
 let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
