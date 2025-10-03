@@ -182,7 +182,6 @@ let implementation_aux ~start_from
     compile_implementation_linear
       (Unit_info.prefix info.target)
       ~progname:(Unit_info.original_source_file info.target)
-      (* CR jvanburen: keep these args: *)
       info
       ~ppf_dump:info.ppf_dump
   | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
