@@ -8,10 +8,6 @@
   --muted: #6b7280;
   --node-bg: #ffffff;
   --node-stroke: #cbd5f5;
-  --node-ikinds-bg: rgba(37, 99, 235, 0.15);
-  --node-ikinds-stroke: #2563eb;
-  --node-non-ikinds-bg: var(--node-bg);
-  --node-non-ikinds-stroke: var(--node-stroke);
   --info-bg: #ffffff;
   --control-bg: #ffffff;
   --control-border: #e2e8f0;
@@ -27,10 +23,6 @@
   --muted: #94a3b8;
   --node-bg: #1e293b;
   --node-stroke: #334155;
-  --node-ikinds-bg: rgba(96, 165, 250, 0.2);
-  --node-ikinds-stroke: #60a5fa;
-  --node-non-ikinds-bg: var(--node-bg);
-  --node-non-ikinds-stroke: var(--node-stroke);
   --info-bg: #1e293b;
   --control-bg: #1e293b;
   --control-border: #334155;
@@ -144,16 +136,6 @@ svg {
   ry: 6px;
   transition: transform 0.15s ease, filter 0.15s ease, stroke 0.15s ease;
   filter: drop-shadow(0 1px 1px rgba(15, 23, 42, 0.12));
-}
-
-.node.node-ikinds rect {
-  fill: var(--node-ikinds-bg);
-  stroke: var(--node-ikinds-stroke);
-}
-
-.node.node-non-ikinds rect {
-  fill: var(--node-non-ikinds-bg);
-  stroke: var(--node-non-ikinds-stroke);
 }
 
 .node.hidden {

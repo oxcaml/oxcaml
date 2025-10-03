@@ -268,11 +268,7 @@
 
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     const isRooted = rootedNodes.has(node.id);
-    const isIkindsFile = node.id.startsWith('typing/ikinds/');
-    const classes = ['node'];
-    if (!isRooted) classes.push('unrooted');
-    classes.push(isIkindsFile ? 'node-ikinds' : 'node-non-ikinds');
-    group.setAttribute('class', classes.join(' '));
+    group.setAttribute('class', `node ${!isRooted ? 'unrooted' : ''}`);
     group.dataset.nodeId = node.id;
     if (node.info) group.dataset.info = node.info;
 
