@@ -540,9 +540,7 @@ module With_subkind = struct
       type nonrec t = t
 
       let print ppf t =
-        match t with
-        | Nullable -> Format.fprintf ppf "|Null"
-        | Non_nullable -> ()
+        match t with Nullable -> Format.fprintf ppf "?" | Non_nullable -> ()
 
       let compare t1 t2 =
         match t1, t2 with
@@ -718,9 +716,11 @@ module With_subkind = struct
             (* CR mshinwell: share code with "print", below *)
             match kind, value_subkind, nullable with
             | _, Anything, Non_nullable -> print_kind ppf kind
+            | Value, Anything, nullable ->
+              Format.fprintf ppf "%a%a" print_kind kind Nullable.print nullable
             | Value, value_subkind, nullable ->
-              Format.fprintf ppf "@[%a%a%a@]" print_kind kind print
-                value_subkind Nullable.print nullable
+              Format.fprintf ppf "@[%a%a%a@]" print_kind kind Nullable.print
+                nullable print value_subkind
             | ( (Naked_number _ | Region | Rec_info),
                 ( Boxed_float | Boxed_float32 | Boxed_int32 | Boxed_int64
                 | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512
@@ -1096,9 +1096,11 @@ module With_subkind = struct
     let print ppf ({ kind; value_subkind; nullable } : t) =
       match kind, value_subkind, nullable with
       | _, Anything, Non_nullable -> print ppf kind
+      | Value, Anything, nullable ->
+        Format.fprintf ppf "%a%a" print kind Nullable.print nullable
       | Value, value_subkind, nullable ->
-        Format.fprintf ppf "@[%a%a%a@]" print kind Non_null_value_subkind.print
-          value_subkind Nullable.print nullable
+        Format.fprintf ppf "@[%a%a%a@]" print kind Nullable.print nullable
+          Non_null_value_subkind.print value_subkind
       | ( (Naked_number _ | Region | Rec_info),
           ( Boxed_float | Boxed_float32 | Boxed_int32 | Boxed_int64
           | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512
