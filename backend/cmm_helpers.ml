@@ -4981,74 +4981,44 @@ let atomic_compare_exchange_field ~dbg
     atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value
 
 let pack_small_ints_into_word ~bits int_list dbg =
-  let shift a ~amount =
-    if amount = 0 then a else Cop (Clsl, [a; Cconst_int (amount, dbg)], dbg)
-  in
-  let rec loop previously_packed = function
-    | [] -> Misc.fatal_error "Can't pack an empty payload"
-    | [a] -> Cop (Clsl, [a; Cconst_int (previously_packed, dbg)], dbg)
-    | a :: rest ->
-      let a = shift ~amount:previously_packed (zero_extend ~bits ~dbg a) in
-      Cop (Cor, [a; loop (previously_packed + bits) rest], dbg)
-  in
-  loop 0 int_list
-
-type mod8 =
-  | Zero
-  | One
-  | Two
-  | Three
-  | Four
-  | Five
-  | Six
-  | Seven
-
-let make_untagged_int8_array_payload dbg untagged_int8_list =
+  if bits * List.length int_list > arch_bits
+  then Misc.fatal_error "Cmm_helpers.pack_small_ints_into_word: too many bits";
   if Sys.big_endian
   then
     Misc.fatal_error
       "Big-endian platforms not yet supported for untagged arrays";
-  (* values are sign-extended by default. We need to change zero-extend for the
-     `or` operation to be correct. *)
+  let rec loop previously_packed = function
+    | [] -> Misc.fatal_error "Can't pack an empty payload"
+    | [a] -> lsl_int a (Cconst_int (previously_packed, dbg)) dbg
+    | a :: rest ->
+      (* values are sign-extended by default. We need to change zero-extend for
+         the `or` operation to be correct. *)
+      let a =
+        lsl_int (zero_extend ~bits ~dbg a)
+          (Cconst_int (previously_packed, dbg))
+          dbg
+      in
+      or_int a (loop (previously_packed + bits) rest) dbg
+  in
+  loop 0 int_list
+
+let make_untagged_int8_array_payload dbg untagged_int8_list =
   let rec aux acc = function
-    | [] -> Zero, List.rev acc
-    | a :: [] -> One, List.rev (a :: acc)
-    | [_a; _b] as v ->
-      let i = pack_small_ints_into_word ~bits:8 v dbg in
-      Two, List.rev (i :: acc)
-    | [_a; _b; _c] as v ->
-      let i = pack_small_ints_into_word ~bits:8 v dbg in
-      Three, List.rev (i :: acc)
-    | [_a; _b; _c; _d] as v ->
-      let i = pack_small_ints_into_word ~bits:8 v dbg in
-      Four, List.rev (i :: acc)
-    | [_a; _b; _c; _d; _e] as v ->
-      let i = pack_small_ints_into_word ~bits:8 v dbg in
-      Five, List.rev (i :: acc)
-    | [_a; _b; _c; _d; _e; _f] as v ->
-      let i = pack_small_ints_into_word ~bits:8 v dbg in
-      Six, List.rev (i :: acc)
-    | [_a; _b; _c; _d; _e; _f; _g] as v ->
-      let i = pack_small_ints_into_word ~bits:8 v dbg in
-      Seven, List.rev (i :: acc)
+    | [] -> List.rev acc
     | a :: b :: c :: d :: e :: f :: g :: h :: r ->
       let i = pack_small_ints_into_word ~bits:8 [a; b; c; d; e; f; g; h] dbg in
       aux (i :: acc) r
+    | v ->
+      let i = pack_small_ints_into_word ~bits:8 v dbg in
+      List.rev (i :: acc)
   in
   aux [] untagged_int8_list
 
 let allocate_untagged_int8_array ~elements mode dbg =
-  let num_elts, payload = make_untagged_int8_array_payload dbg elements in
+  let payload = make_untagged_int8_array_payload dbg elements in
   let tag =
-    match num_elts with
-    | Zero -> Unboxed_or_untagged_array_tags.untagged_int8_array_zero_tag
-    | One -> Unboxed_or_untagged_array_tags.untagged_int8_array_one_tag
-    | Two -> Unboxed_or_untagged_array_tags.untagged_int8_array_two_tag
-    | Three -> Unboxed_or_untagged_array_tags.untagged_int8_array_three_tag
-    | Four -> Unboxed_or_untagged_array_tags.untagged_int8_array_four_tag
-    | Five -> Unboxed_or_untagged_array_tags.untagged_int8_array_five_tag
-    | Six -> Unboxed_or_untagged_array_tags.untagged_int8_array_six_tag
-    | Seven -> Unboxed_or_untagged_array_tags.untagged_int8_array_seven_tag
+    Unboxed_or_untagged_array_tags.untagged_int8_array_tag
+      (List.length elements)
   in
   let header =
     let size = List.length payload in
@@ -5064,42 +5034,23 @@ let allocate_untagged_int8_array ~elements mode dbg =
       Cconst_natint (header, dbg) :: payload,
       dbg )
 
-type mod4 =
-  | Zero
-  | One
-  | Two
-  | Three
-
 let make_untagged_int16_array_payload dbg untagged_int16_list =
-  if Sys.big_endian
-  then
-    Misc.fatal_error
-      "Big-endian platforms not yet supported for untagged arrays";
-  (* values are sign-extended by default. We need to change zero-extend for the
-     `or` operation to be correct. *)
   let rec aux acc = function
-    | [] -> Zero, List.rev acc
-    | a :: [] -> One, List.rev (a :: acc)
-    | [_a; _b] as v ->
-      let i = pack_small_ints_into_word ~bits:16 v dbg in
-      Two, List.rev (i :: acc)
-    | [_a; _b; _c] as v ->
-      let i = pack_small_ints_into_word ~bits:16 v dbg in
-      Three, List.rev (i :: acc)
+    | [] -> List.rev acc
     | a :: b :: c :: d :: r ->
       let i = pack_small_ints_into_word ~bits:16 [a; b; c; d] dbg in
       aux (i :: acc) r
+    | v ->
+      let i = pack_small_ints_into_word ~bits:16 v dbg in
+      List.rev (i :: acc)
   in
   aux [] untagged_int16_list
 
 let allocate_untagged_int16_array ~elements mode dbg =
-  let num_elts, payload = make_untagged_int16_array_payload dbg elements in
+  let payload = make_untagged_int16_array_payload dbg elements in
   let tag =
-    match num_elts with
-    | Zero -> Unboxed_or_untagged_array_tags.untagged_int16_array_zero_tag
-    | One -> Unboxed_or_untagged_array_tags.untagged_int16_array_one_tag
-    | Two -> Unboxed_or_untagged_array_tags.untagged_int16_array_two_tag
-    | Three -> Unboxed_or_untagged_array_tags.untagged_int16_array_three_tag
+    Unboxed_or_untagged_array_tags.untagged_int16_array_tag
+      (List.length elements)
   in
   let header =
     let size = List.length payload in
