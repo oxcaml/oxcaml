@@ -99,7 +99,7 @@ let read_unit_info filename =
     let buffer = really_input_string ic (String.length cmx_magic_number) in
     if buffer <> cmx_magic_number then begin
       close_in ic;
-      raise(Error(Not_a_unit_info filename))
+      raise(Error(Not_a_unit_info ("102: " ^  filename )))
     end;
     let uir = (input_value ic : unit_infos_raw) in
     let first_section_offset = pos_in ic in
@@ -134,7 +134,7 @@ let read_library_info filename =
   let ic = open_in_bin filename in
   let buffer = really_input_string ic (String.length cmxa_magic_number) in
   if buffer <> cmxa_magic_number then
-    raise(Error(Not_a_unit_info filename));
+    raise(Error(Not_a_unit_info (Printf.sprintf "%S <> %S (%s)" buffer cmxa_magic_number filename)));
   let infos = (input_value ic : library_infos) in
   close_in ic;
   infos

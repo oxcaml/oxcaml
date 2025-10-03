@@ -71,6 +71,10 @@ let dir_cd s = Sys.chdir s
 
 let _ = Hashtbl.add directive_table "cd" (Directive_string dir_cd)
 
+module Compiler = (val Optcompiler.native
+                   (module Unix : Compiler_owee.Unix_intf.S)
+                   ~flambda2:Flambda2.lambda_to_cmm)
+
 (* Load in-core a .cmxs file *)
 
 let load_file ppf name0 =
@@ -82,11 +86,11 @@ let load_file ppf name0 =
   | None -> fprintf ppf "File not found: %s@." name0; false
   | Some name ->
     let fn,tmp =
-      if Filename.check_suffix name ".cmx" || Filename.check_suffix name ".cmxa"
+      if Filename.check_suffix name Compiler.ext_flambda_obj
+         || Filename.check_suffix name Compiler.ext_flambda_lib
       then
         let cmxs = Filename.temp_file "caml" ".cmxs" in
-        Asmlink.link_shared (module Unix : Compiler_owee.Unix_intf.S)
-          ~ppf_dump:ppf [name] cmxs;
+        Compiler.link_shared ~ppf_dump:ppf [name] cmxs;
         cmxs,true
       else
         name,false
