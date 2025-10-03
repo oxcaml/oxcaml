@@ -245,7 +245,8 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
   | Some cmx -> Compilenv.set_export_info cmx);
   { flambda; offsets; reachable_names; all_code }
 
-let lambda_to_jsir ~ppf_dump ~prefixname ~machine_width program =
+let lambda_to_jsir ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables:_
+      (program : Lambda.program) =
   let { flambda; offsets; all_code; reachable_names } =
     lambda_to_flambda ~ppf_dump ~prefixname ~machine_width program
   in

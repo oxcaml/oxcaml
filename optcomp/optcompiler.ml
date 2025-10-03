@@ -41,6 +41,12 @@ module type S = sig
     ppf_dump:Format.formatter -> string list -> string -> unit
 
   val create_archive: string list -> string -> unit
+
+  val instantiate
+    :  src:string
+    -> args:string list
+    -> string
+    -> unit
 end
 
 module Make (Backend : Optbackend_intf.S) = struct
@@ -75,7 +81,7 @@ let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
   | Some _, None -> Misc.fatal_error "No argument field"
   | None, Some _ -> Misc.fatal_error "Unexpected argument field"
 
-let compile_from_raw_lambda i raw_lambda ~as_arg_for =
+let compile_from_raw_lambda i raw_lambda ~keep_symbol_tables ~as_arg_for =
   raw_lambda
   |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
         (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
@@ -92,6 +98,7 @@ let compile_from_raw_lambda i raw_lambda ~as_arg_for =
            if Clflags.(should_stop_after Compiler_pass.Lambda) then ()
            else begin
              Backend.compile_implementation
+               ~keep_symbol_tables
                ~sourcefile:(Some (Unit_info.original_source_file i.target))
                ~prefixname:(Unit_info.prefix i.target)
                ~ppf_dump:i.ppf_dump
@@ -108,11 +115,11 @@ let compile_from_raw_lambda i raw_lambda ~as_arg_for =
                ~arg_descr
            end))
 
-let compile_from_typed i typed ~as_arg_for =
+let compile_from_typed i typed ~keep_symbol_tables ~as_arg_for =
   typed
   |> Profile.(record transl)
     (Translmod.transl_implementation i.module_name)
-  |> compile_from_raw_lambda i ~as_arg_for
+  |> compile_from_raw_lambda i ~keep_symbol_tables ~as_arg_for
 
 type starting_point =
   | Parsing
@@ -155,7 +162,7 @@ let implementation_aux ~start_from
         |> Option.map Global_module.Parameter_name.of_string
       in
       if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-      compile_from_typed info typed ~as_arg_for
+      compile_from_typed info typed ~as_arg_for ~keep_symbol_tables
     in
     Compile_common.implementation
       ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_impl)
@@ -189,7 +196,7 @@ let implementation_aux ~start_from
         ~main_module_block_size ~arg_block_idx
     in
     if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-    compile_from_raw_lambda info impl ~as_arg_for
+    compile_from_raw_lambda info impl ~as_arg_for ~keep_symbol_tables
 
 let implementation ~start_from ~source_file
       ~output_prefix ~keep_symbol_tables =
@@ -216,21 +223,47 @@ end
 include Link
 include Optpackager.Make (Link_input)
 include Optlibrarian.Make(Link_input)
+
+let read_unit_info file : Instantiator.unit_info =
+  let unit_info, _crc = Compilenv.read_unit_info file in
+  let { Cmx_format.ui_unit; ui_arg_descr; ui_format; _ } = unit_info in
+  { Instantiator.ui_unit; ui_arg_descr; ui_format; }
+
+let instantiate ~machine_width unix ~src ~args targetcmx ~flambda2
+    ~lambda_to_jsir =
+  Instantiator.instantiate ~src ~args targetcmx
+    ~expected_extension:ext_flambda_obj
+    ~read_unit_info
+    ~compile:(instance ~keep_symbol_tables:false)
 end
 
-let native unix ~flambda2 =
+let native unix ~lambda_to_cmm =
   (module Make (struct
+       let ext_asm = Config.ext_asm
        let ext_obj = Config.ext_obj
        let ext_lib = Config.ext_lib
        let ext_flambda_obj = ".cmx"
        let ext_flambda_lib = ".cmxa"
+
+       let link = Asmlink.link unix
+       let link_shared = Asmlink.link_shared unix
+
+       let emit = Some
+        (fun prefix ~progname info ~ppf_dump ->
+          Asmgen.compile_implementation_linear unix
+          prefix
+          ~progname)
+
      end) : S)
 
 
-let js_of_ocaml ~flambda2_to_jsir =
+let js_of_ocaml ~lambda_to_jsir =
   (module Make (struct
        let ext_obj = ".cmjo"
        let ext_lib = ".cmja"
        let ext_flambda_obj = ".cmjx"
        let ext_flambda_lib = ".cmjxa"
+
+       let link_partial _ _ =
+        Misc.fatal_error "Partial linking is not supported for js_of_ocaml"
      end) : S)

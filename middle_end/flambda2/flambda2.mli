@@ -44,6 +44,7 @@ val lambda_to_jsir :
   ppf_dump:Format.formatter ->
   prefixname:string ->
   machine_width:Target_system.Machine_width.t ->
+  keep_symbol_tables:bool ->
   Lambda.program ->
   Jsoo_imports.Js_backend.program
 

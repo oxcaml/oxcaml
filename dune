@@ -471,7 +471,6 @@
   compilenv
   ;; asmcomp/
   asmgen
-  asminstantiator
   asmlibrarian
   asmlink
   asmpackager
@@ -619,12 +618,10 @@
   optlibrarian
   optbackend_intf
   ;; driver/
+  optlink_common
   opterrors
   optcompile
   optmaindriver
-  jscompile
-  jslink
-  jslibrarian
   compiler_hooks
   ;; printer/
   printast_with_mappings

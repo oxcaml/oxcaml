@@ -40,14 +40,14 @@ module type S = sig
     -> genfns:Generic_fns.Tbl.t
     -> units_to_link:unit_link_info list
     -> ppf_dump:Format.formatter
-    -> reset:(unit -> unit)
     -> unit
 
   val link_partial :  string -> string list -> unit
   val create_archive : string -> string list -> unit
 
   val compile_implementation
-    : sourcefile:string option
+    : keep_symbol_tables:bool
+    -> sourcefile:string option
     -> prefixname:string
     -> ppf_dump:Format.formatter
     -> Lambda.program

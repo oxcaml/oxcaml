@@ -77,7 +77,7 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
              ~reachable_names:flambda_result.reachable_names
              flambda_result.flambda
            |> print_if i.ppf_dump Clflags.dump_jsir
-                (fun ppf (jsir : Flambda2_to_jsir.To_jsir_result.program) ->
+                (fun ppf (jsir : Jsoo_imports.Js_backend.program) ->
                   Jsoo_imports.Jsir.Print.program ppf
                     (fun _ _ -> "")
                     jsir.program)
@@ -85,8 +85,7 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
          (jsir, program.main_module_block_format, arg_descr))
 
 let emit_jsir i
-    ({ program; imported_compilation_units } :
-      Flambda2_to_jsir.To_jsir_result.program) =
+    ({ program; imported_compilation_units } : Jsoo_imports.Js_backend.program) =
   let jsir = Unit_info.jsir i.target in
   let compilation_unit : Jsoo_imports.Jsir.compilation_unit =
     let info : Jsoo_imports.Unit_info.t =

@@ -53,7 +53,7 @@ let read_member_info pack_path file = (
       then raise(Error(Illegal_renaming(name, file, (CU.name info.ui_unit))));
       if not (CU.is_parent pack_path ~child:info.ui_unit)
       then raise(Error(Wrong_for_pack(file, pack_path)));
-      Asmlink.check_consistency file info crc;
+      Optlink_common.check_consistency file info crc;
       Compilenv.cache_unit_info info;
       PM_impl info
     end in
@@ -202,9 +202,9 @@ let build_package_cmx members cmxfile ~main_module_block_size =
       ui_imports_cmi =
           (Import_info.create modname
             ~crc_with_unit:(Some (ui.ui_unit, Env.crc_of_unit modname))) ::
-            filter (Asmlink.extract_crc_interfaces ());
+            filter (Optlink_common.extract_crc_interfaces ());
       ui_imports_cmx =
-          filter(Asmlink.extract_crc_implementations());
+          filter(Optlink_common.extract_crc_implementations());
       ui_format = format;
       ui_generic_fns =
         { curry_fun =
