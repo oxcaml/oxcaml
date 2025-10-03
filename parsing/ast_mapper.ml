@@ -963,8 +963,8 @@ let default_mapper =
         match pjkind_desc with
         | Pjk_default -> Pjk_default
         | Pjk_abbreviation (s : string) -> Pjk_abbreviation s
-        | Pjk_mod (t, mode_list) ->
-          Pjk_mod (this.jkind_annotation this t, this.modes this mode_list)
+        | Pjk_mod (t, crossings) ->
+          Pjk_mod (this.jkind_annotation this t, List.map (map_loc this) crossings)
         | Pjk_with (t, ty, modalities) ->
           Pjk_with (
             this.jkind_annotation this t,

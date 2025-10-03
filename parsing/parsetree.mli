@@ -1379,7 +1379,7 @@ and jkind_annotation_desc =
      full kind annotations. We may want to narrow this type some.
      Internal ticket 5085. *)
   (* CR modes: this should store crossings, not modes *)
-  | Pjk_mod of jkind_annotation * modes
+  | Pjk_mod of jkind_annotation * crossings
   | Pjk_with of jkind_annotation * core_type * modalities
   | Pjk_kind_of of core_type
   | Pjk_product of jkind_annotation list

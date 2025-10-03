@@ -4054,13 +4054,8 @@ type_parameters:
 
 jkind_desc:
     (* CR modes: this should be replaced by mod_crossing_expr to change jkind mod type *)
-    jkind_annotation MOD mkrhs(LIDENT)+ { (* LIDENTs here are for modes *)
-      let core_modes =
-        List.map
-          (fun {txt; loc} -> {txt = Mode txt; loc})
-          $3
-      in
-      Pjk_mod ($1, Modes.of_core_modes core_modes)
+    jkind_annotation mod_crossing_expr {
+      Pjk_mod ($1, $2)
     }
   | jkind_annotation WITH core_type optional_core_modalities_expr {
       Pjk_with ($1, $3, $4)
