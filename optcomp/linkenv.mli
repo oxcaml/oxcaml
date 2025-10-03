@@ -15,6 +15,10 @@ val extract_crc_interfaces : unit -> Import_info.t list
 
 val extract_crc_implementations : unit -> Import_info.t list
 
+val lib_ccopts : unit -> string list
+
+val lib_ccobjs : unit -> filepath list
+
 val reset : unit -> unit
 
 val make_globals_map :

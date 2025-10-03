@@ -47,21 +47,6 @@ type unit_link_info = Linkenv.unit_link_info = {
   dynunit : Cmxs_format.dynunit option;
 }
 
-(* Add C objects and options and "custom" info from a library descriptor.
-   See bytecomp/bytelink.ml for comments on the order of C objects. *)
-
-let lib_ccobjs = ref []
-let lib_ccopts = ref []
-
-let add_ccobjs origin l =
-  if not !Clflags.no_auto_link then begin
-    lib_ccobjs := l.lib_ccobjs @ !lib_ccobjs;
-    let replace_origin =
-      Misc.replace_substring ~before:"$CAMLORIGIN" ~after:origin
-    in
-    lib_ccopts := List.map replace_origin l.lib_ccopts @ !lib_ccopts
-  end
-
 (* First pass: determine which units are needed *)
 
 type file =
@@ -127,7 +112,7 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
   | Library (file_name,infos) ->
       (* This is an archive file. Each unit contained in it will be linked
          in only if needed. *)
-      add_ccobjs (Filename.dirname file_name) infos;
+      Linkenv.add_ccobjs (Filename.dirname file_name) infos;
       let cached_genfns_imports =
         Generic_fns.Tbl.add ~imports:cached_genfns_imports  genfns infos.lib_generic_fns
       in
@@ -210,8 +195,8 @@ let link_shared ~ppf_dump objfiles output_name =
         objfiles
         ([],[], Generic_fns.Partition.Set.empty)
     in
-    Clflags.ccobjs := !Clflags.ccobjs @ !lib_ccobjs;
-    Clflags.all_ccopts := !lib_ccopts @ !Clflags.all_ccopts;
+    Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs ();
+    Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
     Backend.link_shared
       ml_objfiles
       output_name
@@ -241,8 +226,8 @@ let link ~ppf_dump objfiles output_name =
       (match Linkenv.extract_missing_globals() with
        | [] -> ()
        | mg -> raise(Linkenv.Error (Missing_implementations mg)));
-    Clflags.ccobjs := !Clflags.ccobjs @ !lib_ccobjs;
-    Clflags.all_ccopts := !lib_ccopts @ !Clflags.all_ccopts;
+    Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs ();
+    Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
     (* put user's opts first *)
     Backend.link
       ml_objfiles
