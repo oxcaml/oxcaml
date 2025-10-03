@@ -93,16 +93,6 @@ let check_units members =
       check (list_remove mb.pm_name forbidden) tl in
   check (List.map (fun mb -> mb.pm_name) members) members
 
-(* Make the .o file for the package *)
-
-type flambda2 =
-  ppf_dump:Format.formatter ->
-  prefixname:string ->
-  machine_width:Target_system.Machine_width.t ->
-  keep_symbol_tables:bool ->
-  Lambda.program ->
-  Cmm.phrase list
-
 let make_package_object ~ppf_dump members target coercion =
   let pack_name =
     Printf.sprintf "pack(%s)"
@@ -170,8 +160,6 @@ let make_package_object ~ppf_dump members target coercion =
     main_module_block_size
   )
 
-(* Make the .cmx file for the package *)
-
 let build_package_cmx members cmxfile ~main_module_block_size =
   let unit_names =
     List.map (fun m -> m.pm_name) members in
@@ -230,8 +218,6 @@ let build_package_cmx members cmxfile ~main_module_block_size =
       ui_external_symbols = union (List.map (fun info -> info.ui_external_symbols) units);
     } in
   Compilenv.write_unit_info pkg_infos cmxfile
-
-(* Make the .cmx and the .o for the package *)
 
 let package_object_files ~ppf_dump files target
                          targetcmx coercion =
