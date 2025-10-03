@@ -2615,7 +2615,7 @@ let for_boxed_row row =
           base row
         |> mark_best
       in
-      if With_bounds.length jkind.jkind.with_bounds > 64
+      if With_bounds.length jkind.jkind.with_bounds > 100
       then Builtin.value ~why:Polymorphic_variant
       else jkind
   else Builtin.immediate ~why:Immediate_polymorphic_variant
