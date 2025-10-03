@@ -604,6 +604,10 @@ module With_bounds = struct
     | No_with_bounds -> []
     | With_bounds tys -> tys |> With_bounds_types.to_seq |> List.of_seq
 
+  let length : type d. d with_bounds -> int = function
+    | No_with_bounds -> 0
+    | With_bounds tys -> tys |> With_bounds_types.length
+
   open Allowance
 
   include Magic_allow_disallow (struct
@@ -2714,11 +2718,16 @@ let for_boxed_row row =
       for_open_boxed_row
     else
       let base = Builtin.immutable_data ~why:Polymorphic_variant in
-      Btype.fold_row
-        (fun jkind type_expr ->
-          add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr jkind)
-        base row
-      |> mark_best
+      let jkind =
+        Btype.fold_row
+          (fun jkind type_expr ->
+            add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr jkind)
+          base row
+        |> mark_best
+      in
+      if With_bounds.length jkind.jkind.with_bounds > 64
+      then Builtin.value ~why:Polymorphic_variant
+      else jkind
   else Builtin.immediate ~why:Immediate_polymorphic_variant
 
 let for_arrow =
