@@ -16,7 +16,7 @@ let mapper: Ast_mapper.mapper =
     modes = (fun sub m ->
       (match m with
       | No_modes -> ();
-      | { pmode_modes; pmode_crossings; _ } ->
+      | Modes { pmode_modes; pmode_crossings; _ } ->
         Format.printf "modes: %s%s\n"
           (locs_to_string pmode_modes (fun (Mode s) -> s))
           (locs_to_string ~sep:"" pmode_crossings
@@ -26,8 +26,8 @@ let mapper: Ast_mapper.mapper =
     );
     modalities = (fun sub m ->
       (match m with
-        | { pmoda_modalities = []; pmoda_crossings = []; _ } -> ();
-        | { pmoda_modalities; pmoda_crossings; _ } ->
+        | No_modalities -> ();
+        | Modalities { pmoda_modalities; pmoda_crossings; _ } ->
           Format.printf "modalities: %s%s\n"
             (locs_to_string pmoda_modalities (fun (Modality s) -> s))
             (locs_to_string ~sep:"" pmoda_crossings
