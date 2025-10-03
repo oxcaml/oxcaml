@@ -3,10 +3,7 @@ open Cmx_format
 open Compilenv
 
 type emit =
-  Unit_info.file_prefix ->
-  progname:string ->
-  ppf_dump:Format.formatter ->
-  unit
+  Unit_info.file_prefix -> progname:string -> ppf_dump:Format.formatter -> unit
 
 module type File_extensions = sig
   (** File extensions include exactly one dot, so they can be added with regular string

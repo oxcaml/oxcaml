@@ -127,8 +127,6 @@ let add_ccobjs origin l =
     in
     lib_ccopts := List.map replace_origin l.lib_ccopts @ !lib_ccopts)
 
-
-
 let is_required name =
   try
     ignore (Hashtbl.find missing_globals name);
@@ -199,7 +197,6 @@ let make_globals_map units_list =
 let lib_ccobjs () = !lib_ccobjs
 
 let lib_ccopts () = !lib_ccopts
-
 
 (* Error report *)
 
