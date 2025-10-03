@@ -1912,32 +1912,26 @@ let unboxed_int32_array_ref =
 let untagged_mutable_int8_unboxed_product_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
       bind "index" array_index (fun index ->
-          sign_extend ~bits:8
-            (Cop
-               ( mk_load_mut Byte_signed,
-                 [array_indexing log2_size_addr arr index dbg],
-                 dbg ))
-            ~dbg))
+          Cop
+            ( mk_load_mut Byte_signed,
+              [array_indexing log2_size_addr arr index dbg],
+              dbg )))
 
 let untagged_mutable_int16_unboxed_product_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
       bind "index" array_index (fun index ->
-          sign_extend ~bits:16
-            (Cop
-               ( mk_load_mut Sixteen_signed,
-                 [array_indexing log2_size_addr arr index dbg],
-                 dbg ))
-            ~dbg))
+          Cop
+            ( mk_load_mut Sixteen_signed,
+              [array_indexing log2_size_addr arr index dbg],
+              dbg )))
 
 let unboxed_mutable_int32_unboxed_product_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
       bind "index" array_index (fun index ->
-          sign_extend ~bits:32
-            (Cop
-               ( mk_load_mut Thirtytwo_signed,
-                 [array_indexing log2_size_addr arr index dbg],
-                 dbg ))
-            ~dbg))
+          Cop
+            ( mk_load_mut Thirtytwo_signed,
+              [array_indexing log2_size_addr arr index dbg],
+              dbg )))
 
 let untagged_mutable_int8_unboxed_product_array_set arr ~array_index ~new_value
     dbg =
