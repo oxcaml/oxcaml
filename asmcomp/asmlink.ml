@@ -37,6 +37,8 @@ type error =
   | Dwarf_fission_dsymutil_not_macos
   | Dsymutil_error of int
   | Objcopy_error of int
+  | Missing_intf_for_quote of CU.Name.t
+  | Missing_impl_for_quote of CU.Name.t
 
 exception Error of error
 
@@ -156,6 +158,57 @@ let runtime_lib () =
   with Not_found ->
     raise(Error(File_not_found libname))
 
+let quoted_globals = ref CU.Name.Set.empty
+let cmxs_for_quotes = ref String.Set.empty
+let missing_quoted_globals = CU.Name.Tbl.create 42
+
+let add_quoted_globals unit globals path req_cmxs =
+  quoted_globals := List.fold_left
+    (fun globals global ->
+      (if not (CU.Name.Set.mem global globals) then
+        CU.Name.Tbl.add missing_quoted_globals global ());
+      CU.Name.Set.add global globals)
+    !quoted_globals globals;
+  if CU.Name.Tbl.mem missing_quoted_globals (CU.name unit) then
+    (List.iter
+      (fun cmx ->
+        CU.Name.Tbl.add missing_quoted_globals (Import_info.name cmx) ())
+      req_cmxs;
+    cmxs_for_quotes := String.Set.add path !cmxs_for_quotes;
+    CU.Name.Tbl.remove missing_quoted_globals (CU.name unit))
+
+let cmi_bundle () =
+  let rec loop cmis missing_globals =
+    match missing_globals with
+    | [] -> cmis
+    | global :: missing_globals ->
+      if CU.Name.Map.mem global cmis then
+        loop cmis missing_globals
+      else
+        let path =
+          try Load_path.find_normalized ((CU.Name.to_string global) ^ ".cmi")
+          with Not_found -> raise(Error(Missing_intf_for_quote global))
+        in
+        let cmi = Cmi_format.read_cmi_lazy path in
+        let missing_globals =
+          Array.fold_left
+            (fun missing_globals import -> (Import_info.name import) :: missing_globals)
+            missing_globals
+            cmi.cmi_crcs
+        in
+        let new_cmis = CU.Name.Map.add global path cmis in
+        loop new_cmis missing_globals
+  in
+  let names = loop CU.Name.Map.empty (CU.Name.Set.elements !quoted_globals) in
+  CU.Name.Map.data names
+
+(* TODO: populate this during scan_file rather than reloading the files. *)
+let cmx_bundle () =
+  CU.Name.Tbl.iter
+    (fun name -> raise(Error(Missing_impl_for_quote name)))
+    missing_quoted_globals;
+  String.Set.elements !cmxs_for_quotes
+
 (* First pass: determine which units are needed *)
 
 let missing_globals =
@@ -222,6 +275,7 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
   | Unit (file_name,info,crc) ->
       (* This is a .cmx file. It must be linked in any case. *)
       remove_required info.ui_unit;
+      add_quoted_globals info.ui_unit info.ui_quoted_globals file_name info.ui_imports_cmx;
       List.iter (fun import ->
           add_required (file_name, None) import)
         info.ui_imports_cmx;
@@ -289,6 +343,11 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
                  if Misc.Bitmap.get bits i then Some tbl.(i) else None)
                |> List.filter_map Fun.id
              in
+             let imports_cmx = imports_list infos.lib_imports_cmx info.li_imports_cmx in
+             let quoted_globals =
+              imports_list infos.lib_quoted_globals info.li_quoted_globals
+             in
+             add_quoted_globals info.li_name quoted_globals file_name imports_cmx;
              let dynunit : Cmxs_format.dynunit option =
                if not shared then None else
                  Some {
@@ -298,12 +357,8 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
                    dynu_imports_cmi =
                      imports_list infos.lib_imports_cmi info.li_imports_cmi
                      |> Array.of_list;
-                   dynu_imports_cmx =
-                     imports_list infos.lib_imports_cmx info.li_imports_cmx
-                     |> Array.of_list;
-                   dynu_quoted_globals =
-                     imports_list infos.lib_quoted_globals info.li_quoted_globals
-                     |> Array.of_list }
+                   dynu_imports_cmx = imports_cmx |> Array.of_list;
+                   dynu_quoted_globals = quoted_globals |> Array.of_list }
              in
              let unit =
                { name = info.li_name;
@@ -462,6 +517,37 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
   if !Clflags.llvm_backend
   then Llvmize.end_assembly ()
   else Emit.end_assembly ()
+
+let make_bundled_cm_file unix ~ppf_dump ~sourcefile_for_dwarf objfiles =
+  Location.input_name := "caml_bundled_cm";
+  let bundle_comp_unit =
+    CU.create CU.Prefix.empty (CU.Name.of_string "_bundled_cm") in
+  let bundle_unit_info =
+    Unit_info.make_dummy ~input_name:"caml_bundled_cm" bundle_comp_unit in
+  Compilenv.reset bundle_unit_info;
+  Emitaux.Dwarf_helpers.init ~ppf_dump
+    ~disable_dwarf:(not !Dwarf_flags.dwarf_for_startup_file)
+    ~sourcefile:sourcefile_for_dwarf;
+  Emit.begin_assembly unix;
+  let bundle_cm name strings cont =
+    let symbol = { Cmm.sym_name = name; sym_global = Global } in
+    let length, symbols, cont = List.fold_left
+      (fun (i, symbols, cont) string ->
+        let symbol =
+          { Cmm.sym_name = Printf.sprintf "%s%d" name i
+          ; sym_global = Local } in
+        let cont = Cmm_helpers.emit_string_constant symbol string cont in
+        (i + 1, symbol :: symbols, cont))
+      (0, [], cont) strings in
+    let cont = List.fold_left
+      (fun cont symbol -> Cmm_helpers.symbol_address symbol :: cont)
+      cont symbols in
+    let header = Cmm_helpers.black_block_header 0 length in
+    Cmm_helpers.emit_block symbol header cont in
+  let cont = bundle_cm "caml_bundled_cmis" (cmi_bundle ()) [] in
+  let cont = bundle_cm "caml_bundled_cmxs" (cmx_bundle ()) cont in
+  Asmgen.compile_phrase ~ppf_dump (Cmm.Cdata cont);
+  Emit.end_assembly ()
 
 let call_linker_shared ?(native_toplevel = false) file_list output_name =
   let exitcode =
@@ -632,7 +718,9 @@ let reset () =
   CU.Name.Tbl.reset interfaces;
   implementations := [];
   lib_ccobjs := [];
-  lib_ccopts := []
+  lib_ccopts := [];
+  quoted_globals := CU.Name.Set.empty;
+  cmxs_for_quotes := String.Set.empty
 
 (* Main entry point *)
 
@@ -651,9 +739,11 @@ let link unix ~ppf_dump objfiles output_name =
         (scan_file ~shared:false genfns)
         objfiles
         ([],[], Generic_fns.Partition.Set.empty) in
+    let uses_eval =
+      is_required (Compilation_unit.of_string "Camlinternaleval") in
     let early_pervasives =
       if !Clflags.nopervasives then []
-      else if is_required (Compilation_unit.of_string "Camlinternaleval") then
+      else if uses_eval then
         (Load_path.add_dir
           ~hidden:false
           (Misc.expand_directory Config.standard_library "+unix");
@@ -697,6 +787,24 @@ let link unix ~ppf_dump objfiles output_name =
       (fun () -> make_startup_file unix ~ppf_dump
                    ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf)
                    genfns units_tolink cached_genfns_imports);
+    let ml_objfiles = if not uses_eval then ml_objfiles else
+      let bundled_cm =
+        if named_startup_file
+        then output_name ^ ".bundled_cm" ^ ext_asm
+        else Filename.temp_file "bundled_cm" ext_asm in
+      let sourcefile_for_dwarf =
+        if named_startup_file then bundled_cm else ".bundled_cm" in
+      let bundled_cm_obj = Filename.temp_file "bundled_cm" ext_obj in
+      Asmgen.compile_unit ~output_prefix:output_name
+        ~asm_filename:bundled_cm ~keep_asm:true (* TODO *)
+        ~obj_filename:bundled_cm_obj
+        ~may_reduce_heap:true
+        ~ppf_dump
+        (fun () -> make_bundled_cm_file unix ~ppf_dump
+                     ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf)
+                     ml_objfiles);
+      bundled_cm_obj :: ml_objfiles
+    in
     Emitaux.reduce_heap_size ~reset:(fun () -> reset ());
     Misc.try_finally
       (fun () -> call_linker ml_objfiles startup_obj output_name)
@@ -786,6 +894,14 @@ let report_error ppf = function
       fprintf ppf "Error running dsymutil (exit code %d)" exitcode
   | Objcopy_error exitcode ->
       fprintf ppf "Error running objcopy (exit code %d)" exitcode
+  | Missing_intf_for_quote intf ->
+      fprintf ppf
+        "Missing interface for module %a which is required by quote"
+        CU.Name.print intf
+  | Missing_impl_for_quote impl ->
+      fprintf ppf
+        "Missing implementation for module %a which is required by quote"
+        CU.Name.print impl
 
 let () =
   Location.register_error_of_exn

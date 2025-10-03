@@ -23,6 +23,12 @@ let () =
   Clflags.dont_write_files := true;
   Clflags.shared := true
 
+let bundled_cmis : string array =
+  Obj.obj (Option.get (Jit.jit_lookup_symbol "caml_bundled_cmis"))
+
+let bundled_cmxs : string array =
+  Obj.obj (Option.get (Jit.jit_lookup_symbol "caml_bundled_cmxs"))
+
 let counter = ref 0
 
 let eval code =
@@ -32,6 +38,19 @@ let eval code =
 
   (* TODO: reset all the things *)
   Location.reset ();
+  let paths =
+    Array.fold_left
+      (fun paths path -> Filename.dirname path :: paths)
+      [] bundled_cmis
+  in
+  let paths =
+    Array.fold_left
+      (fun paths path -> Filename.dirname path :: paths)
+      paths bundled_cmxs
+  in
+  Load_path.init ~auto_include:Load_path.no_auto_include ~visible:paths
+    ~hidden:[];
+  Env.reset_cache ~preserve_persistent_env:false;
 
   (* TODO: set commandline flags *)
 
@@ -53,8 +72,7 @@ let eval code =
   in
   let unit_info = Unit_info.make_dummy ~input_name compilation_unit in
 
-  let () = Compmisc.init_path () in
-  let () = Compmisc.init_parameters () in
+  (* let () = Compmisc.init_parameters () in *)
   Compilenv.reset unit_info (* TODO: Work out what this does. *);
   let env = Compmisc.initial_env () in
   let typed_impl =
