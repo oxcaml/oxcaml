@@ -317,9 +317,9 @@ let transl_mode_annots (modes : Parsetree.modes) : Alloc.Const.Option.t =
   let annots =
     match modes with
     | No_modes -> []
-    | Modes { pmode_crossings = _ :: _; _ } ->
+    | Modes { crossings = _ :: _; _ } ->
       Misc.fatal_error "crossings as mode annotations are not yet implemented"
-    | Modes { pmode_modes; _ } -> pmode_modes
+    | Modes { modes; _ } -> modes
   in
   let step modes_so_far { txt = Parsetree.Mode txt; loc } =
     Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
@@ -377,7 +377,7 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) : Parsetree.modes =
   let linearity =
     print_to_string_opt Mode.Linearity.Const.print modes.linearity
   in
-  let pmode_modes =
+  let modes =
     List.filter_map
       (fun x ->
         Option.map (fun s -> { txt = Parsetree.Mode s; loc = Location.none }) x)
@@ -390,7 +390,7 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) : Parsetree.modes =
         statefulness;
         visibility ]
   in
-  Ast_helper.Modes.of_core_modes pmode_modes
+  Ast_helper.Modes.of_core_modes modes
 
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
   Language_extension.assert_enabled ~loc Mode maturity;
@@ -569,10 +569,10 @@ let transl_modalities ~maturity mut (modalities : Parsetree.modalities) =
   let modalities =
     match modalities with
     | No_modalities -> []
-    | Modalities { pmoda_crossings = _ :: _; _ } ->
+    | Modalities { crossings = _ :: _; _ } ->
       Misc.fatal_error "crossings as modalities are not yet implemented"
-    | Modalities { pmoda_modalities; pmoda_crossings = []; _ } ->
-      List.map (transl_modality ~maturity) pmoda_modalities
+    | Modalities { modalities; crossings = []; _ } ->
+      List.map (transl_modality ~maturity) modalities
   in
   (* axes listed in the order of implication. *)
   let modalities = sort_dedup_modalities ~warn:true modalities in

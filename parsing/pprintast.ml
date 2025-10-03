@@ -380,9 +380,9 @@ let optional_at_core_modes f m =
 let optional_mode_annot f m =
   match m with
   | No_modes -> ()
-  | Modes { pmode_modes; pmode_crossings; _ } ->
-    optional_at_core_modes f pmode_modes;
-    optional_mod_crossings f pmode_crossings
+  | Modes { modes; crossings; _ } ->
+    optional_at_core_modes f modes;
+    optional_mod_crossings f crossings
 
 let modality f m =
   let {txt = Modality txt; _} = m in
@@ -399,10 +399,10 @@ let optional_atat_core_modalities f m =
 let optional_modality_annot ?(pre = fun _ () -> ()) ?(post = fun _ () -> ()) f m =
   match m with
   | No_modalities -> ()
-  | Modalities { pmoda_modalities; pmoda_crossings; _ } ->
+  | Modalities { modalities; crossings; _ } ->
     pre f ();
-    optional_atat_core_modalities f pmoda_modalities;
-    optional_mod_crossings f pmoda_crossings;
+    optional_atat_core_modalities f modalities;
+    optional_mod_crossings f crossings;
     post f ()
 
 let optional_space_modality_annot f m =
@@ -417,10 +417,10 @@ let optional_modality_annot_newline f m =
 let core_modes_in_old_syntax modes =
   match modes with
   | No_modes -> Some []
-  | Modes { pmode_crossings = _ :: _; _ } -> None
-  | Modes { pmode_modes; pmode_crossings = []; _ } ->
-    if (List.for_all (fun {txt = Mode txt; _} -> txt = "local") pmode_modes)
-      then Some pmode_modes else None
+  | Modes { crossings = _ :: _; _ } -> None
+  | Modes { modes; crossings = []; _ } ->
+    if (List.for_all (fun {txt = Mode txt; _} -> txt = "local") modes)
+      then Some modes else None
 
 (** For a list of modalities, we either return [Some core_modalities] if they are
     purely old modalities, (including empty) or [None] to trigger printing everything
@@ -428,10 +428,10 @@ let core_modes_in_old_syntax modes =
 let print_modality_in_old_syntax modalities =
   match modalities with
   | No_modalities -> Some []
-  | Modalities { pmoda_crossings = _ :: _; _ } -> None
-  | Modalities { pmoda_modalities; pmoda_crossings = []; _ } ->
-    if (List.for_all (fun {txt = Modality txt; _} -> txt = "global") pmoda_modalities)
-      then Some pmoda_modalities else None
+  | Modalities { crossings = _ :: _; _ } -> None
+  | Modalities { modalities; crossings = []; _ } ->
+    if (List.for_all (fun {txt = Modality txt; _} -> txt = "global") modalities)
+      then Some modalities else None
 
 let modalities_type pty ctxt f pca =
   let m = pca.pca_modalities in

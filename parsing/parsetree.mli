@@ -67,11 +67,11 @@ type core_modalities = modality loc list
 type modalities =
   | No_modalities
   | Modalities of {
-      pmoda_modalities : core_modalities;
-      pmoda_crossings : crossings;
-      pmoda_loc : Location.t
+      modalities : core_modalities;
+      crossings : crossings;
+      loc : Location.t
     }
-(** [Modalities { pmoda_modalities = M; pmoda_crossings = C; pmoda_loc = L }] represents
+(** [Modalities { modalities = M; crossings = C; loc = L }] represents
     - [@@ M mod C]  when [M = _ :: _] and [C = _ :: _]
     - [@@ M]        when [M = _ :: _] and [C = []]
     - [mod C]       when [M = []] and [C = _ :: _]
@@ -85,11 +85,11 @@ type core_modes = mode loc list
 type modes =
   | No_modes
   | Modes of {
-      pmode_modes : core_modes;
-      pmode_crossings : crossings;
-      pmode_loc : Location.t
+      modes : core_modes;
+      crossings : crossings;
+      loc : Location.t
   }
-(** [Modes { pmode_modes = M; pmode_crossings = C; pmode_loc = L }] represents
+(** [Modes { modes = M; crossings = C; loc = L }] represents
     - [@ M mod C]  when [M = _ :: _] and [C = _ :: _]
     - [@ M]        when [M = _ :: _] and [C = []]
     - [mod C]      when [M = []] and [C = _ :: _]

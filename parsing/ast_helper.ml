@@ -45,10 +45,10 @@ module Const = struct
 end
 
 module Modes = struct
-  let mk ?(loc = !default_loc) pmode_modes pmode_crossings =
-    match pmode_modes, pmode_crossings with
+  let mk ?(loc = !default_loc) modes crossings =
+    match modes, crossings with
     | [], [] -> No_modes
-    | _, _ -> Modes { pmode_modes; pmode_crossings; pmode_loc = loc }
+    | _, _ -> Modes { modes; crossings; loc }
 
   let of_core_modes core_modes =
     match core_modes with
@@ -61,17 +61,17 @@ module Modes = struct
     match mode, mode' with
     | No_modes, _ -> mode'
     | _, No_modes -> mode
-    | Modes { pmode_modes = m; pmode_crossings = c; pmode_loc = l },
-      Modes { pmode_modes = m'; pmode_crossings = c'; pmode_loc = l' } ->
+    | Modes { modes = m; crossings = c; loc = l },
+      Modes { modes = m'; crossings = c'; loc = l' } ->
       let loc = Location.merge ~ghost:false [l; l'] in
       mk ~loc (m @ m') (c @ c')
 end
 
 module Modalities = struct
-  let mk ?(loc = !default_loc) pmoda_modalities pmoda_crossings =
-    match pmoda_modalities, pmoda_crossings with
+  let mk ?(loc = !default_loc) modalities crossings =
+    match modalities, crossings with
     | [], [] -> No_modalities
-    | _, _ -> Modalities { pmoda_modalities; pmoda_crossings; pmoda_loc = loc }
+    | _, _ -> Modalities { modalities; crossings; loc }
 
   let of_core_modalities core_modalities =
     match core_modalities with
@@ -84,8 +84,8 @@ module Modalities = struct
     match moda, moda' with
     | No_modalities, _ -> moda'
     | _, No_modalities -> moda
-    | Modalities { pmoda_modalities = m; pmoda_crossings = c; pmoda_loc = l },
-      Modalities { pmoda_modalities = m'; pmoda_crossings = c'; pmoda_loc = l' } ->
+    | Modalities { modalities = m; crossings = c; loc = l },
+      Modalities { modalities = m'; crossings = c'; loc = l' } ->
       let loc = Location.merge ~ghost:false [l; l'] in
       mk ~loc (m @ m') (c @ c')
 end

@@ -1204,16 +1204,16 @@ and apply_modalities_module_type env modalities = function
 let check_unsupported_modal_module ~env reason modes =
   match modes with
   | No_modes -> ()
-  | Modes {pmode_loc; _} ->
-      raise(Error(pmode_loc, env, Unsupported_modal_module reason))
+  | Modes {loc; _} ->
+      raise(Error(loc, env, Unsupported_modal_module reason))
 
 let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
   modalities =
   match modalities with
   | No_modalities -> default_modalities
-  | Modalities {pmoda_crossings = []; _} ->
+  | Modalities {crossings = []; _} ->
     Typemode.transl_modalities ~maturity:Stable Immutable modalities
-  | Modalities {pmoda_crossings = _ :: _; _} ->
+  | Modalities {crossings = _ :: _; _} ->
       Misc.fatal_error "crossings as modalities are not yet implemented"
 
 let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
@@ -1429,9 +1429,9 @@ and approx_sig_items env ssg=
               let sg =
                 match moda with
                 | No_modalities -> sg
-                | Modalities { pmoda_crossings = _ :: _; _ } ->
+                | Modalities { crossings = _ :: _; _ } ->
                     Misc.fatal_error "crossings on includes are not supported"
-                | Modalities { pmoda_crossings = []; _ } ->
+                | Modalities { crossings = []; _ } ->
                   let modalities =
                     Typemode.transl_modalities ~maturity:Stable Immutable moda
                   in
@@ -3483,10 +3483,10 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         let modes =
           match sdesc.pval_modalities with
           | No_modalities -> No_modes
-          | Modalities {pmoda_modalities; pmoda_crossings; pmoda_loc} ->
-            Modes { pmode_modes = List.map modality_to_mode pmoda_modalities;
-                    pmode_crossings = pmoda_crossings;
-                    pmode_loc = pmoda_loc } in
+          | Modalities {modalities; crossings; loc} ->
+            Modes { modes = List.map modality_to_mode modalities;
+                    crossings = crossings;
+                    loc = loc } in
         let mode =
           modes
           |> Typemode.transl_alloc_mode

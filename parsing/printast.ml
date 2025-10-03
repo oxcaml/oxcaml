@@ -157,11 +157,11 @@ let modality i ppf modality =
 let modalities i ppf m =
   match m with
   | No_modalities -> ()
-  | Modalities { pmoda_modalities; pmoda_crossings; pmoda_loc } ->
-    line i ppf "modalities %a\n" fmt_location pmoda_loc;
+  | Modalities { modalities = m; crossings = c; loc } ->
+    line i ppf "modalities %a\n" fmt_location loc;
     let i = i+1 in
-    List.iter (fun m -> modality i ppf m) pmoda_modalities;
-    crossings i ppf pmoda_crossings
+    List.iter (fun m -> modality i ppf m) m;
+    crossings i ppf c
 
 let mode i ppf mode =
   line i ppf "mode %a\n" fmt_string_loc
@@ -170,11 +170,11 @@ let mode i ppf mode =
 let modes i ppf m =
   match m with
   | No_modes -> ()
-  | Modes { pmode_modes; pmode_crossings; pmode_loc } ->
-    line i ppf "modes %a\n" fmt_location pmode_loc;
+  | Modes { modes = m; crossings = c; loc } ->
+    line i ppf "modes %a\n" fmt_location loc;
     let i = i+1 in
-    List.iter (fun m -> mode i ppf m) pmode_modes;
-    crossings i ppf pmode_crossings
+    List.iter (fun m -> mode i ppf m) m;
+    crossings i ppf c
 
 let include_kind i ppf = function
   | Structure -> line i ppf "Structure\n"

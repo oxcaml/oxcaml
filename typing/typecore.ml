@@ -5498,7 +5498,7 @@ let vb_exp_constraint
   let open Ast_helper in
   let loc = match modes with
     | No_modes -> Location.merge [ pat.ppat_loc; expr.pexp_loc ]
-    | Modes { pmode_loc; _ } -> Location.merge [ pat.ppat_loc; expr.pexp_loc; pmode_loc ]
+    | Modes { loc; _ } -> Location.merge [ pat.ppat_loc; expr.pexp_loc; loc ]
   in
   let maybe_add_modes_constraint expr =
     match modes with
@@ -5528,7 +5528,7 @@ let vb_pat_constraint
     let loc =
       match modes with
       | No_modes -> pat.ppat_loc
-      | Modes { pmode_loc; _ } -> Location.merge [ pat.ppat_loc; pmode_loc ]
+      | Modes { loc; _ } -> Location.merge [ pat.ppat_loc; loc ]
     in
     let maybe_add_modes_constraint expr =
       match modes with
@@ -8013,14 +8013,14 @@ and type_function
       let ret_mode = Typemode.transl_mode_annots ret_mode_annotations in
       let type_mode =
         match ret_mode_annotations with
-        | Modes {pmode_crossings = _ :: _; _} ->
+        | Modes {crossings = _ :: _; _} ->
             Misc.fatal_error "crossings on arrows not yet implemented"
         | No_modes ->
             (* if the return mode annotation is absent we do not constrain the body mode,
               and we use the mode of the whole function to interpret the return type *)
             (* CR zqian: We should infer from [mode], instead of using directly. *)
             mode
-        | Modes {pmode_crossings = []; _} ->
+        | Modes {crossings = []; _} ->
             (* otherwise, if the return mode annotation is present, we use that
                to interpret the return type annotation (currying mode behavior) *)
             ret_mode
