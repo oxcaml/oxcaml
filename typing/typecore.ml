@@ -6480,7 +6480,7 @@ and type_expect_
         ~attributes:sexp.pexp_attributes
         sargl
   | Pexp_idx (ba, uas) ->
-    Language_extension.assert_enabled ~loc Layouts Language_extension.Beta;
+    Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
     (* Compute the expected base type, to use for disambiguation of the record
        and unboxed record fields *)
     let expected_base_ty ty_expected =
