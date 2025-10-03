@@ -153,6 +153,7 @@ type 'a t = {
   locals_bound_to_runtime_parameters : unit Ident.Tbl.t;
   imported_units: CU.Name.Set.t ref;
   imported_opaque_units: CU.Name.Set.t ref;
+  quoted_globals: CU.Name.Set.t ref;
   param_imports : Param_set.t ref;
   crc_units: Consistbl.t;
   can_load_cmis: can_load_cmis ref;
@@ -166,6 +167,7 @@ let empty () = {
   locals_bound_to_runtime_parameters = Ident.Tbl.create 17;
   imported_units = ref CU.Name.Set.empty;
   imported_opaque_units = ref CU.Name.Set.empty;
+  quoted_globals = ref CU.Name.Set.empty;
   param_imports = ref Param_set.empty;
   crc_units = Consistbl.create ();
   can_load_cmis = ref Can_load_cmis;
@@ -180,6 +182,7 @@ let clear penv =
     locals_bound_to_runtime_parameters;
     imported_units;
     imported_opaque_units;
+    quoted_globals;
     param_imports;
     crc_units;
     can_load_cmis;
@@ -191,6 +194,7 @@ let clear penv =
   Ident.Tbl.clear locals_bound_to_runtime_parameters;
   imported_units := CU.Name.Set.empty;
   imported_opaque_units := CU.Name.Set.empty;
+  quoted_globals := CU.Name.Set.empty;
   param_imports := Param_set.empty;
   Consistbl.clear crc_units;
   can_load_cmis := Can_load_cmis;
@@ -985,6 +989,11 @@ let imports {imported_units; crc_units; _} =
   in
   List.map (fun (cu_name, spec) -> Import_info.Intf.create cu_name spec)
     imports
+
+let require_global_for_quote {quoted_globals; _} name =
+  quoted_globals := CU.Name.Set.add name !quoted_globals
+
+let quoted_globals {quoted_globals; _} = CU.Name.Set.elements !quoted_globals
 
 let is_imported_parameter penv modname =
   match find_info_in_cache penv modname with

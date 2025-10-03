@@ -82,6 +82,9 @@ let print_impl_import import =
   let crco = Import_info.crc import in
   print_cu_crc name crco
 
+let print_quoted_global global =
+  printf "\t%a\n" Compilation_unit.Name.output global
+
 let print_global_name_binding global =
   printf "\t%a\n" Global_module.With_precision.output global
 
@@ -283,7 +286,7 @@ let print_cms_infos cms =
     (match cms.cms_sourcefile with None -> "(none)" | Some f -> f)
 
 let print_general_infos print_name name crc defines arg_descr mbf
-    iter_cmi iter_cmx =
+    iter_cmi iter_cmx iter_qglobals =
   printf "Name: %a\n" print_name name;
   printf "CRC of implementation: %s\n" (string_of_crc crc);
   printf "Globals defined:\n";
@@ -293,6 +296,8 @@ let print_general_infos print_name name crc defines arg_descr mbf
   iter_cmi print_intf_import;
   printf "Implementations imported:\n";
   iter_cmx print_impl_import;
+  printf "Globals used in quotations:\n";
+  iter_qglobals print_quoted_global;
   Option.iter print_main_module_block_format mbf
 
 let print_global_table table =
@@ -341,7 +346,8 @@ let print_cmx_infos (uir, sections, crc) =
   print_general_infos Compilation_unit.output uir.uir_unit crc uir.uir_defines
     uir.uir_arg_descr (Some uir.uir_format)
     (fun f -> Array.iter f uir.uir_imports_cmi)
-    (fun f -> Array.iter f uir.uir_imports_cmx);
+    (fun f -> Array.iter f uir.uir_imports_cmx)
+    (fun f -> Array.iter f uir.uir_quoted_globals);
   begin
     match uir.uir_export_info with
     | None ->
@@ -378,7 +384,9 @@ let print_cmxa_infos (lib : Cmx_format.library_infos) =
           (fun f ->
             B.iter (fun i -> f lib.lib_imports_cmi.(i)) u.li_imports_cmi)
           (fun f ->
-            B.iter (fun i -> f lib.lib_imports_cmx.(i)) u.li_imports_cmx);
+            B.iter (fun i -> f lib.lib_imports_cmx.(i)) u.li_imports_cmx)
+          (fun f ->
+            B.iter(fun i -> f lib.lib_quoted_globals.(i)) u.li_quoted_globals);
         printf "Force link: %s\n" (if u.li_force_link then "YES" else "no"))
 
 let print_cmxs_infos header =
@@ -391,7 +399,8 @@ let print_cmxs_infos header =
          None
          None
          (fun f -> Array.iter f ui.dynu_imports_cmi)
-         (fun f -> Array.iter f ui.dynu_imports_cmx))
+         (fun f -> Array.iter f ui.dynu_imports_cmx)
+         (fun f -> Array.iter f ui.dynu_quoted_globals);)
     header.dynu_units
 
 let p_title title = printf "%s:\n" title

@@ -72,6 +72,17 @@ let create_archive file_list lib_name =
        Array.iteri (fun i import ->
            Compilation_unit.Tbl.add cmx_index (Import_info.cu import) i)
          cmxs;
+       let quoted_globals = List.fold_left
+         (fun globals (unit, _crc) ->
+            List.fold_left
+              (fun globals global -> Compilation_unit.Name.Set.add global globals)
+              globals unit.ui_quoted_globals)
+         Compilation_unit.Name.Set.empty descr_list
+         |> Compilation_unit.Name.Set.elements |> Array.of_list in
+       let quoted_globals_index = Compilation_unit.Name.Tbl.create (Array.length quoted_globals) in
+       Array.iteri
+         (fun i global -> Compilation_unit.Name.Tbl.add quoted_globals_index global i)
+         quoted_globals;
        let genfns = Generic_fns.Tbl.make () in
        let mk_bitmap arr ix entries ~find ~get_name =
          let module B = Misc.Bitmap in
@@ -97,6 +108,11 @@ let create_archive file_list lib_name =
                mk_bitmap cmxs cmx_index unit.ui_imports_cmx
                  ~find:Compilation_unit.Tbl.find
                  ~get_name:Import_info.cu;
+             li_quoted_globals =
+               mk_bitmap quoted_globals quoted_globals_index
+               unit.ui_quoted_globals
+               ~find:Compilation_unit.Name.Tbl.find
+               ~get_name:Fun.id;
              li_external_symbols = Array.of_list unit.ui_external_symbols })
          descr_list
        in
@@ -104,6 +120,7 @@ let create_archive file_list lib_name =
          { lib_units = units;
            lib_imports_cmi = cmis;
            lib_imports_cmx = cmxs;
+           lib_quoted_globals = quoted_globals;
            lib_generic_fns = Generic_fns.Tbl.entries genfns;
            lib_ccobjs = !Clflags.ccobjs;
            lib_ccopts = !Clflags.all_ccopts } in
