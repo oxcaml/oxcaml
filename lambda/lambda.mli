@@ -938,8 +938,8 @@ type runtime_param =
 (* Like [Types.mixed_block_shape], but the shape in [Module_mixed] has
    been translated *)
 type module_representation =
-  | Module_value_only of int
-  (* All module fields are boxed. The [int] is the number of fields *)
+  | Module_value_only of { field_count : int }
+  (* All module fields are boxed. *)
   | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
   (* The module contains both values and unboxed elements. We have two shapes:
      one for allocating (used by [block_of_module_representation]) and one for

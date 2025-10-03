@@ -1,11 +1,5 @@
 (* TEST
- reference = "${test_source_directory}/sort_variable_defaulting.reference";
- flambda2;
- {
-   native;
- }{
-   bytecode;
- }
+   expect;
 *)
 
 module M = struct
@@ -18,3 +12,7 @@ end
 
 module N : sig end = M (* This should not default sort variables... *)
 module K : S = M       (* ...so this is not an error *)
+
+[%%expect{|
+Exception: Assert_failure ("", 2, 10).
+|}]

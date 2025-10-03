@@ -304,7 +304,7 @@ let load_lambda ppf ~compilation_unit ~required_globals lam repr =
   | None -> default_load ppf program
   | Some {Jit.load; _} -> load ppf program
 
-(* *)
+(* Don't call [outval_of_value] on non-values *)
 let outval_of_sig_value env id val_kind val_type =
   let sort =
     match val_kind with

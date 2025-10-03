@@ -953,11 +953,11 @@ type runtime_param =
   | Rp_unit
 
 type module_representation =
-  | Module_value_only of int
+  | Module_value_only of { field_count : int }
   | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
 
 let module_representation_field_count = function
-  | Module_value_only field_count -> field_count
+  | Module_value_only { field_count } -> field_count
   | Module_mixed (shape, _) -> Array.length shape
 
 type main_module_block_format =
@@ -970,7 +970,7 @@ type main_module_block_format =
 
 let main_module_representation = function
   | Mb_struct { mb_repr } -> mb_repr
-  | Mb_instantiating_functor _ -> Module_value_only 1
+  | Mb_instantiating_functor _ -> Module_value_only { field_count = 1 }
 
 
 type program =
@@ -1502,7 +1502,7 @@ let transl_module_representation ~loc repr =
       repr
   in
   if !value_count = Array.length shape
-  then Module_value_only (Array.length shape)
+  then Module_value_only { field_count = Array.length shape }
   else begin
     Option.iter (fun loc ->
       Typedecl.assert_mixed_product_support loc Module

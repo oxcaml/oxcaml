@@ -3819,15 +3819,20 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
   let module_block_tag = Tag.Scannable.zero in
   let block_shape, field_count, block_access, kind_of_field =
     match module_repr with
-    | Module_value_only size ->
+    | Module_value_only { field_count } ->
       let block_access _pos : P.Block_access_kind.t =
         Values
           { tag = Known Tag.Scannable.zero;
-            size = Known (Target_ocaml_int.of_int (Acc.machine_width acc) size);
+            size =
+              Known
+                (Target_ocaml_int.of_int (Acc.machine_width acc) field_count);
             field_kind = Any_value
           }
       in
-      K.Scannable_block_shape.Value_only, size, block_access, fun _ -> K.value
+      ( K.Scannable_block_shape.Value_only,
+        field_count,
+        block_access,
+        fun _ -> K.value )
     | Module_mixed (shape, _) ->
       let shape =
         K.Mixed_block_lambda_shape.of_mixed_block_elements shape

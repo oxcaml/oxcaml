@@ -1022,7 +1022,8 @@ let required_globals ~flambda body =
 let add_arg_block_to_module_representation = function
     (* NB: this assumes [arg_block] has layout value *)
     (* CR jrayman: there is a bug here *)
-  | Module_value_only field_count -> Module_value_only (field_count + 1)
+  | Module_value_only { field_count } ->
+    Module_value_only { field_count = field_count + 1 }
   | Module_mixed (shape, shape_for_read) ->
     Module_mixed
       ( Array.append shape [| mixed_block_element_for_module |],
@@ -1180,7 +1181,8 @@ let toploop_getvalue id =
     fatal_error "Translmod.toploop_getvalue: expected bytecode";
   Lapply{
     ap_loc=Loc_unknown;
-    ap_func=Lprim(mod_field toploop_getvalue_pos (Module_value_only (-1)),
+    ap_func=Lprim(mod_field toploop_getvalue_pos
+                    (Module_value_only { field_count = -1 }),
                   [Lprim(Pgetglobal toploop_unit, [], Loc_unknown)],
                   Loc_unknown);
     ap_args=[Lconst(Const_base(
@@ -1200,7 +1202,8 @@ let toploop_setvalue id lam =
     fatal_error "Translmod.toploop_setvalue: expected bytecode";
   Lapply{
     ap_loc=Loc_unknown;
-    ap_func=Lprim(mod_field toploop_setvalue_pos (Module_value_only (-1)),
+    ap_func=Lprim(mod_field toploop_setvalue_pos
+                    (Module_value_only { field_count = -1 }),
                   [Lprim(Pgetglobal toploop_unit, [], Loc_unknown)],
                   Loc_unknown);
     ap_args=
@@ -1383,7 +1386,7 @@ let () =
     (* If this assumption is broken, [transl_package] should return a
        module representation instead of a size *)
 let transl_package component_names coercion =
-  let size =
+  let field_count =
     match coercion with
     | Tcoerce_none -> List.length component_names
     | Tcoerce_structure { pos_cc_list; _ } -> List.length pos_cc_list
@@ -1391,9 +1394,9 @@ let transl_package component_names coercion =
     | Tcoerce_primitive _
     | Tcoerce_alias _ -> assert false
   in
-  size,
+  field_count,
   apply_coercion Loc_unknown Strict coercion
-    (Lprim(block_of_module_representation (Module_value_only size),
+    (Lprim(block_of_module_representation (Module_value_only { field_count }),
            List.map get_component component_names,
            Loc_unknown))
 
@@ -1433,7 +1436,7 @@ let transl_instance_impl
   let instantiating_functor_lam =
     (* Any parameterised module has a block with exactly one field, namely the
        instantiating functor (see [Lambda.main_module_block_format]) *)
-    Lprim (mod_field 0 (Module_value_only 1),
+    Lprim (mod_field 0 (Module_value_only { field_count = -1 }),
            [Lprim (Pgetglobal base_compilation_unit, [], Loc_unknown)],
            Loc_unknown)
   in
