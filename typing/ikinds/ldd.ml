@@ -9,4 +9,4 @@ module type ORDERED = sig
 end
 
 (* Switch here to choose the backend. *)
-module Make (V : ORDERED) = Ldd_leaf_specialized.Make (V)
+module Make (V : ORDERED) = Ldd_cached_down0.Make (V)
