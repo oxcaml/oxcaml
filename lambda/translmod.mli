@@ -32,7 +32,7 @@ open Lambda
    mshinwell: PR4527 has now removed transl_store* *)
 val transl_implementation:
       Compilation_unit.t -> structure * module_coercion * module_coercion option
-        -> Lambda.program
+      -> loc:Location.t -> Lambda.program
 
 val transl_toplevel_definition: structure -> lambda
 
@@ -46,6 +46,9 @@ type runtime_arg =
       ra_unit : Compilation_unit.t;
       (* The offset of its argument block, as advertised in its .cmo/.cmx *)
       ra_field_idx : int;
+      (* The representation of the main block, which is needed to
+         index into it *)
+      ra_main_repr : module_representation;
     }
   | (* A module to pass in its entirety *)
     Main_module_block of Compilation_unit.t
@@ -53,7 +56,8 @@ type runtime_arg =
 
 val transl_instance:
       Compilation_unit.t -> runtime_args:runtime_arg list
-        -> main_module_block_size:int -> arg_block_idx:int option
+        -> main_module_block_repr:module_representation
+        -> arg_block_idx:int option
         -> Lambda.program
 
 val toplevel_name: Ident.t -> string
@@ -74,7 +78,6 @@ type unsafe_info =
 type error =
   Circular_dependency of (Ident.t * unsafe_info) list
 | Conflicting_inline_attributes
-| Non_value_jkind of Types.type_expr * Jkind.Sort.Const.t
 | Instantiating_packed of Compilation_unit.t
 
 exception Error of Location.t * error
