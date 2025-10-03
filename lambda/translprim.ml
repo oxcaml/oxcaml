@@ -1094,6 +1094,15 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%unsafe_set_idx" ->
       let layout = List.nth (get_arg_layouts ()) 2 in
       Primitive(Pset_idx (layout, get_first_arg_mode ()), 3)
+    | "%unsafe_get_ptr_imm" ->
+      (* Only safe if the pointer is truly immutable *)
+      Primitive(Pget_ptr (layout, Immutable), 1)
+    | "%unsafe_get_ptr" ->
+      (* [Mutable] is the more conservative version *)
+      Primitive(Pget_ptr (layout, Mutable), 1)
+    | "%unsafe_set_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Primitive(Pset_ptr (layout, get_first_arg_mode ()), 2)
     | "%peek" -> Peek None
     | "%poke" -> Poke None
     | s when String.length s > 0 && s.[0] = '%' ->
@@ -2271,6 +2280,7 @@ let lambda_primitive_needs_event_after = function
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _
   | Pget_idx _ | Pset_idx _
+  | Pget_ptr _ | Pset_ptr _
   | Prunstack | Pperform | Preperform | Presume
   | Ppoll | Pobj_dup | Pget_header _ -> true
   (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
