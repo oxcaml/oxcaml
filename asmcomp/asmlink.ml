@@ -22,6 +22,14 @@ open Compilenv
 
 module CU = Compilation_unit
 
+type error =
+  | Dwarf_fission_objcopy_on_macos
+  | Dwarf_fission_dsymutil_not_macos
+  | Dsymutil_error of int
+  | Objcopy_error of int
+
+exception Error of error
+
 type unit_link_info = Linkenv.unit_link_info = {
   name: Compilation_unit.t;
   defines: Compilation_unit.t list;
@@ -30,14 +38,6 @@ type unit_link_info = Linkenv.unit_link_info = {
   (* for shared libs *)
   dynunit : Cmxs_format.dynunit option;
 }
-
-type error =
-  | Dwarf_fission_objcopy_on_macos
-  | Dwarf_fission_dsymutil_not_macos
-  | Dsymutil_error of int
-  | Objcopy_error of int
-
-exception Error of error
 
 let runtime_lib () =
   let variant =
@@ -366,7 +366,7 @@ let link
       ~always:(fun () -> remove_file startup_obj)
 
 
-(* Error reporting *)
+(* Error report *)
 
 open Format
 
