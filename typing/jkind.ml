@@ -2726,7 +2726,7 @@ let for_boxed_row row =
         |> mark_best
       in
       if With_bounds.length jkind.jkind.with_bounds > 100
-      then Builtin.value ~why:Polymorphic_variant
+      then Builtin.value ~why:Polymorphic_variant_too_big
       else jkind
   else Builtin.immediate ~why:Immediate_polymorphic_variant
 
@@ -3231,6 +3231,8 @@ module Format_history = struct
     | Tuple -> fprintf ppf "it's a tuple type"
     | Row_variable -> format_with_notify_js ppf "it's a row variable"
     | Polymorphic_variant -> fprintf ppf "it's a polymorphic variant type"
+    | Polymorphic_variant_too_big ->
+      fprintf ppf "it's a polymorphic variant type that has a lot of entries"
     | Arrow -> fprintf ppf "it's a function type"
     | Tfield ->
       format_with_notify_js ppf
@@ -4009,6 +4011,7 @@ module Debug_printers = struct
     | Tuple -> fprintf ppf "Tuple"
     | Row_variable -> fprintf ppf "Row_variable"
     | Polymorphic_variant -> fprintf ppf "Polymorphic_variant"
+    | Polymorphic_variant_too_big -> fprintf ppf "Polymorphic_variant_too_big"
     | Arrow -> fprintf ppf "Arrow"
     | Tfield -> fprintf ppf "Tfield"
     | Tnil -> fprintf ppf "Tnil"
