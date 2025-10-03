@@ -149,6 +149,25 @@ let preallocate_set_of_closures (res, updates, env) ~closure_symbols
   let res = R.set_data res data in
   res, updates, env
 
+let pack_small_ints_into_word ~bits int64_list =
+  if bits * List.length int64_list > 64
+  then Misc.fatal_error "To_cmm_static.pack_small_ints_into_word: too many bits";
+  if Sys.big_endian
+  then
+    Misc.fatal_error
+      "Big-endian platforms not yet supported for untagged arrays";
+  let rec loop previously_packed = function
+    | [] -> Misc.fatal_error "Can't pack an empty payload"
+    | [a] -> Int64.shift_left a previously_packed
+    | a :: rest ->
+      (* values are sign-extended by default. We need to change zero-extend for
+         the `or` operation to be correct. *)
+      let mask = Int64.(sub (shift_left 1L bits) 1L) in
+      let a = Int64.(shift_left (logand a mask) previously_packed) in
+      Int64.add a (loop (previously_packed + bits) rest)
+  in
+  loop 0 int64_list
+
 let immutable_unboxed_int_array_payload int_type num_fields ~elts ~to_int64 =
   let int64_of_elts =
     List.map (Or_variable.value_map ~default:0L ~f:to_int64) elts
@@ -158,77 +177,23 @@ let immutable_unboxed_int_array_payload int_type num_fields ~elts ~to_int64 =
     | Int8_u ->
       let rec aux acc = function
         | [] -> List.rev acc
-        | a :: [] -> List.rev (a :: acc)
-        | [a; b] ->
-          let i = Int64.(logand a 0xffL) in
-          let i = Int64.(add i (shift_left b 8)) in
-          List.rev (i :: acc)
-        | [a; b; c] ->
-          let i = Int64.(logand a 0xffL) in
-          let i = Int64.(add i (shift_left (logand b 0xffL) 8)) in
-          let i = Int64.(add i (shift_left c 16)) in
-          List.rev (i :: acc)
-        | [a; b; c; d] ->
-          let i = Int64.(logand a 0xffL) in
-          let i = Int64.(add i (shift_left (logand b 0xffL) 8)) in
-          let i = Int64.(add i (shift_left (logand c 0xffL) 16)) in
-          let i = Int64.(add i (shift_left d 24)) in
-          List.rev (i :: acc)
-        | [a; b; c; d; e] ->
-          let i = Int64.(logand a 0xffL) in
-          let i = Int64.(add i (shift_left (logand b 0xffL) 8)) in
-          let i = Int64.(add i (shift_left (logand c 0xffL) 16)) in
-          let i = Int64.(add i (shift_left (logand d 0xffL) 24)) in
-          let i = Int64.(add i (shift_left e 32)) in
-          List.rev (i :: acc)
-        | [a; b; c; d; e; f] ->
-          let i = Int64.(logand a 0xffL) in
-          let i = Int64.(add i (shift_left (logand b 0xffL) 8)) in
-          let i = Int64.(add i (shift_left (logand c 0xffL) 16)) in
-          let i = Int64.(add i (shift_left (logand d 0xffL) 24)) in
-          let i = Int64.(add i (shift_left (logand e 0xffL) 32)) in
-          let i = Int64.(add i (shift_left f 40)) in
-          List.rev (i :: acc)
-        | [a; b; c; d; e; f; g] ->
-          let i = Int64.(logand a 0xffL) in
-          let i = Int64.(add i (shift_left (logand b 0xffL) 8)) in
-          let i = Int64.(add i (shift_left (logand c 0xffL) 16)) in
-          let i = Int64.(add i (shift_left (logand d 0xffL) 24)) in
-          let i = Int64.(add i (shift_left (logand e 0xffL) 32)) in
-          let i = Int64.(add i (shift_left (logand f 0xffL) 40)) in
-          let i = Int64.(add i (shift_left g 48)) in
-          List.rev (i :: acc)
         | a :: b :: c :: d :: e :: f :: g :: h :: r ->
-          let i = Int64.(logand a 0xffL) in
-          let i = Int64.(add i (shift_left (logand b 0xffL) 8)) in
-          let i = Int64.(add i (shift_left (logand c 0xffL) 16)) in
-          let i = Int64.(add i (shift_left (logand d 0xffL) 24)) in
-          let i = Int64.(add i (shift_left (logand e 0xffL) 32)) in
-          let i = Int64.(add i (shift_left (logand f 0xffL) 40)) in
-          let i = Int64.(add i (shift_left (logand g 0xffL) 48)) in
-          let i = Int64.(add i (shift_left h 56)) in
+          let i = pack_small_ints_into_word ~bits:8 [a; b; c; d; e; f; g; h] in
           aux (i :: acc) r
+        | v ->
+          let i = pack_small_ints_into_word ~bits:8 v in
+          List.rev (i :: acc)
       in
       aux [] int64_of_elts
     | Int16_u ->
       let rec aux acc = function
         | [] -> List.rev acc
-        | a :: [] -> List.rev (a :: acc)
-        | [a; b] ->
-          let i = Int64.(logand a 0xffffL) in
-          let i = Int64.(add i (shift_left b 16)) in
-          List.rev (i :: acc)
-        | [a; b; c] ->
-          let i = Int64.(logand a 0xffffL) in
-          let i = Int64.(add i (shift_left (logand b 0xffffL) 16)) in
-          let i = Int64.(add i (shift_left c 32)) in
-          List.rev (i :: acc)
         | a :: b :: c :: d :: r ->
-          let i = Int64.(logand a 0xffffL) in
-          let i = Int64.(add i (shift_left (logand b 0xffffL) 16)) in
-          let i = Int64.(add i (shift_left (logand c 0xffffL) 32)) in
-          let i = Int64.(add i (shift_left d 48)) in
+          let i = pack_small_ints_into_word ~bits:16 [a; b; c; d] in
           aux (i :: acc) r
+        | v ->
+          let i = pack_small_ints_into_word ~bits:16 v in
+          List.rev (i :: acc)
       in
       aux [] int64_of_elts
     | Int32_u ->
