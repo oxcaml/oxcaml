@@ -4634,13 +4634,13 @@ at_mode_expr:
 ;
 
 mode_annot_expr:
-  | pmode_modes = at_mode_expr
-    pmode_crossings = optional_mod_crossing_expr
+  | modes = at_mode_expr
+    crossings = optional_mod_crossing_expr
     { let loc = make_loc $sloc in
-      Modes.mk ~loc pmode_modes pmode_crossings }
-  | pmode_crossings = mod_crossing_expr
+      Modes.mk ~loc modes crossings }
+  | crossings = mod_crossing_expr
     { let loc = make_loc $sloc in
-      Modes.mk ~loc [] pmode_crossings }
+      Modes.mk ~loc [] crossings }
 ;
 
 %inline core_modes_expr:
@@ -4675,13 +4675,13 @@ atat_modalities_expr:
 ;
 
 modality_annot_expr:
-  | pmoda_modalities = atat_modalities_expr
-    pmoda_crossings = optional_mod_crossing_expr
+  | modalities = atat_modalities_expr
+    crossings = optional_mod_crossing_expr
     { let loc = make_loc $sloc in
-      Modalities.mk ~loc pmoda_modalities pmoda_crossings }
-  | pmoda_crossings = mod_crossing_expr
+      Modalities.mk ~loc modalities crossings }
+  | crossings = mod_crossing_expr
     { let loc = make_loc $sloc in
-      Modalities.mk ~loc [] pmoda_crossings }
+      Modalities.mk ~loc [] crossings }
 ;
 
 optional_modality_annot_expr:

@@ -1424,20 +1424,20 @@ let tree_of_modalities mut t =
   match Typemode.untransl_modalities mut t with
   | No_modalities -> []
   (* CR zeisbach: once this supports crossings, consider factoring this out *)
-  | Modalities { pmoda_crossings = _ :: _; _ } ->
+  | Modalities { crossings = _ :: _; _ } ->
     Misc.fatal_error "[untransl_modalities] returned crossings";
-  | Modalities { pmoda_modalities; _ } ->
-    match all_or_none tree_of_modality_old pmoda_modalities with
+  | Modalities { modalities; _ } ->
+    match all_or_none tree_of_modality_old modalities with
     | Some l -> l
-    | None -> List.map tree_of_modality_new pmoda_modalities
+    | None -> List.map tree_of_modality_new modalities
 
 let tree_of_modalities_new mut t =
   match Typemode.untransl_modalities mut t with
   | No_modalities -> []
-  | Modalities { pmoda_crossings = _ :: _; _ } ->
+  | Modalities { crossings = _ :: _; _ } ->
     Misc.fatal_error "[untransl_modalities] returned crossings";
-  | Modalities { pmoda_modalities; _ } ->
-    List.map (fun ({txt = Parsetree.Modality s; _}) -> s) pmoda_modalities
+  | Modalities { modalities; _ } ->
+    List.map (fun ({txt = Parsetree.Modality s; _}) -> s) modalities
 
 (** [tree_of_mode m l] finds the outcome node in [l] that corresponds to [m].
 Raise if not found. *)
@@ -1484,12 +1484,12 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
   (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
   match Typemode.untransl_mode_annots diff with
   | No_modes -> []
-  | Modes { pmode_crossings = _ :: _; _ } ->
+  | Modes { crossings = _ :: _; _ } ->
     Misc.fatal_error "[untransl_mode_annots] returned crossings";
-  | Modes { pmode_modes; _ } ->
-    match all_or_none tree_of_mode_old pmode_modes with
+  | Modes { modes; _ } ->
+    match all_or_none tree_of_mode_old modes with
     | Some l -> l
-    | None -> List.map tree_of_mode_new pmode_modes
+    | None -> List.map tree_of_mode_new modes
 
 (** The modal context on a type when printing it. This is to reproduce the mode
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)

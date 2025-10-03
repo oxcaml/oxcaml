@@ -980,18 +980,18 @@ let default_mapper =
     modes = (fun this modes ->
       match modes with
       | No_modes -> No_modes
-      | Modes { pmode_modes; pmode_crossings; pmode_loc } ->
-        Modes { pmode_modes = List.map (map_loc this) pmode_modes
-              ; pmode_crossings = List.map (map_loc this) pmode_crossings
-              ; pmode_loc = this.location this pmode_loc } );
+      | Modes { modes; crossings; loc } ->
+        Modes { modes = List.map (map_loc this) modes
+              ; crossings = List.map (map_loc this) crossings
+              ; loc = this.location this loc } );
 
     modalities = (fun this modalities ->
       match modalities with
       | No_modalities -> No_modalities
-      | Modalities { pmoda_modalities; pmoda_crossings; pmoda_loc } ->
-        Modalities { pmoda_modalities = List.map (map_loc this) pmoda_modalities
-                   ; pmoda_crossings = List.map (map_loc this) pmoda_crossings
-                   ; pmoda_loc = this.location this pmoda_loc } );
+      | Modalities { modalities; crossings; loc } ->
+        Modalities { modalities = List.map (map_loc this) modalities
+                   ; crossings = List.map (map_loc this) crossings
+                   ; loc = this.location this loc } );
 
     directive_argument =
       (fun this a ->
