@@ -182,7 +182,6 @@ let implementation_aux ~start_from
     compile_implementation_linear
       (Unit_info.prefix info.target)
       ~progname:(Unit_info.original_source_file info.target)
-      info
       ~ppf_dump:info.ppf_dump
   | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
     begin
@@ -273,9 +272,7 @@ let native unix
       Asmlink.link_shared unix target objfiles ~genfns ~units_tolink ~ppf_dump
 
     let emit : Optcomp_intf.emit option =
-      Some
-        (fun prefix ~progname info ~ppf_dump ->
-          Asmgen.compile_implementation_linear unix prefix ~progname ~ppf_dump)
+      Some (Asmgen.compile_implementation_linear unix)
 
     let link_partial target objfiles =
       let exitcode = Ccomp.call_linker Ccomp.Partial target objfiles "" in

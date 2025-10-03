@@ -5,7 +5,6 @@ open Compilenv
 type emit =
   Unit_info.file_prefix ->
   progname:string ->
-  Compile_common.info ->
   ppf_dump:Format.formatter ->
   unit
 
