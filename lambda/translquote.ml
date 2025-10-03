@@ -555,7 +555,7 @@ module Identifier : sig
 
     val wrap : t' -> t
 
-    val compilation_unit : Location.t -> string -> t'
+    val compilation_unit : Location.t -> Global_module.Name.t -> t'
 
     val dot : Location.t -> t -> string -> t'
 
@@ -736,6 +736,10 @@ end = struct
     let wrap = inject_force
 
     let compilation_unit loc a1 =
+      (* TODO this feels really dodgy *)
+      Env.require_global_for_quote
+        (Compilation_unit.Name.of_head_of_global_name a1);
+      let a1 = Global_module.Name.to_string a1 in
       apply1 "Identifier.Module" "compilation_unit" loc (string loc a1)
 
     let dot loc a1 a2 =
@@ -2038,10 +2042,10 @@ let rec module_for_path loc = function
   | Path.Pident id ->
     (match Hashtbl.find_opt vars_env.env_mod id with
     | Some m -> Identifier.Module.var loc m (quote_loc loc)
-    | None ->
-      if Ident.is_global id
-      then Identifier.Module.compilation_unit loc (Ident.name id)
-      else raise Exit)
+    | None -> (
+      match Ident.to_global id with
+      | Some global -> Identifier.Module.compilation_unit loc global
+      | None -> raise Exit))
     |> Identifier.Module.wrap
   | Path.Pdot (p, s) ->
     Identifier.Module.dot loc (module_for_path loc p) s
@@ -2299,9 +2303,11 @@ type case_binding =
       * (Var.Value.t list -> (Var.Module.t list -> Pat.t) lam) lam
 
 let rec quote_module_path loc = function
-  | Path.Pident s ->
-    Identifier.Module.compilation_unit loc (Ident.name s)
-    |> Identifier.Module.wrap
+  | Path.Pident s -> (
+    match Ident.to_global s with
+    | Some global ->
+      Identifier.Module.compilation_unit loc global |> Identifier.Module.wrap
+    | None -> failwith "TODO")
   | Path.Pdot (p, s) ->
     Identifier.Module.dot loc (quote_module_path loc p) s
     |> Identifier.Module.wrap

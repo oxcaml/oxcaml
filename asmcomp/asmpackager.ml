@@ -205,6 +205,7 @@ let build_package_cmx members cmxfile ~main_module_block_size =
             filter (Asmlink.extract_crc_interfaces ());
       ui_imports_cmx =
           filter(Asmlink.extract_crc_implementations());
+      ui_quoted_globals = [] (* TODO *);
       ui_format = format;
       ui_generic_fns =
         { curry_fun =

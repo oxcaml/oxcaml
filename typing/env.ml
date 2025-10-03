@@ -1200,6 +1200,11 @@ let imports () = Persistent_env.imports !persistent_env
 let import_crcs ~source crcs =
   Persistent_env.import_crcs !persistent_env ~source crcs
 
+let require_global_for_quote name =
+  Persistent_env.require_global_for_quote !persistent_env name
+
+let quoted_globals () = Persistent_env.quoted_globals !persistent_env
+
 let runtime_parameter_bindings () =
   Persistent_env.runtime_parameter_bindings !persistent_env
 

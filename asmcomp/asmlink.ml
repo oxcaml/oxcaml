@@ -231,7 +231,8 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
                  dynu_crc = crc;
                  dynu_defines = info.ui_defines;
                  dynu_imports_cmi = info.ui_imports_cmi |> Array.of_list;
-                 dynu_imports_cmx = info.ui_imports_cmx |> Array.of_list }
+                 dynu_imports_cmx = info.ui_imports_cmx |> Array.of_list;
+                 dynu_quoted_globals = info.ui_quoted_globals |> Array.of_list }
       in
       let unit =
         { name = info.ui_unit;
@@ -299,6 +300,9 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
                      |> Array.of_list;
                    dynu_imports_cmx =
                      imports_list infos.lib_imports_cmx info.li_imports_cmx
+                     |> Array.of_list;
+                   dynu_quoted_globals =
+                     imports_list infos.lib_quoted_globals info.li_quoted_globals
                      |> Array.of_list }
              in
              let unit =

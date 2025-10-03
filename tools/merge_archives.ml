@@ -138,6 +138,7 @@ let merge_cmxa0 ~archives =
       lib_ccopts;
       lib_imports_cmi = cmis;
       lib_imports_cmx = cmxs;
+      lib_quoted_globals = [||] (* TODO *);
       lib_generic_fns = Generic_fns.Tbl.entries genfns
     }
   in

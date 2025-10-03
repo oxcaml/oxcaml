@@ -576,6 +576,13 @@ val imports: unit -> Import_info.t list
 (* may raise Persistent_env.Consistbl.Inconsistency *)
 val import_crcs: source:string -> Import_info.t array -> unit
 
+(* Require that the provided compilation unit will be available at quotation
+   compile time. *)
+val require_global_for_quote: Compilation_unit.Name.t -> unit
+
+(* Return the set of compilation units referenced by quotes *)
+val quoted_globals: unit -> Compilation_unit.Name.t list
+
 (* Return the set of imports represented as runtime parameters (see
    [Persistent_env.runtime_parameter_bindings] for details) *)
 val runtime_parameter_bindings: unit -> (Global_module.t * Ident.t) list
