@@ -632,10 +632,10 @@
   dwarf_variables_and_parameters
   dwarf_type
   ;; optcomp/
-  optbackend_intf
-  optcompiler
+  linkenv
+  optcompile
   optlibrarian
-  optlink_common
+  optcomp_intf
   optlink
   optpackager
   ;; driver/

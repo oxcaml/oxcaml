@@ -21,11 +21,10 @@ module type S = sig
 end
 
 module Make (Backend : sig
-    include Optbackend_intf.S
+    include Optcomp_intf.Backend
     include Optlink.S
-  end) = struct
+  end) : S = struct
 open Cmx_format
-module String = Misc.Stdlib.String
 
 type error =
     File_not_found of string
@@ -62,10 +61,10 @@ let create_archive file_list lib_name =
         List.split (List.map read_info file_list) in
       List.iter2
         (fun file_name (unit, crc) ->
-            Optlink_common.check_consistency file_name unit crc)
+            Backend.check_consistency file_name unit crc)
         file_list descr_list;
-      let cmis = Optlink_common.extract_crc_interfaces () in
-      let cmxs = Optlink_common.extract_crc_implementations () in
+      let cmis = Linkenv.extract_crc_interfaces () in
+      let cmxs = Linkenv.extract_crc_implementations () in
       (* CR mshinwell: see comment in compilenv.ml
       let cmxs =
         Compilenv.ensure_sharing_between_cmi_and_cmx_imports cmis cmxs

@@ -1,11 +1,13 @@
-type unit_link_info =
-  { name : Compilation_unit.t;
-    defines : Compilation_unit.t list;
-    file_name : string;
-    crc : Digest.t;
-    (* for shared libs *)
-    dynunit : Cmxs_format.dynunit option
-  }
+open Format
+open Cmx_format
+open Compilenv
+
+type emit =
+  Unit_info.file_prefix ->
+  progname:string ->
+  Compile_common.info ->
+  ppf_dump:Format.formatter ->
+  unit
 
 module type File_extensions = sig
   (** File extensions include exactly one dot, so they can be added with regular string
@@ -24,21 +26,14 @@ module type File_extensions = sig
   val default_executable_name : string
 end
 
-type emit =
-  Unit_info.file_prefix ->
-  progname:string ->
-  Compile_common.info ->
-  ppf_dump:Format.formatter ->
-  unit
-
-module type S = sig
+module type Backend = sig
   val backend : Compile_common.opt_backend
 
   val link_shared :
     string list ->
     string ->
     genfns:Generic_fns.Tbl.t ->
-    units_tolink:unit_link_info list ->
+    units_tolink:Linkenv.unit_link_info list ->
     ppf_dump:Format.formatter ->
     unit
 
@@ -47,7 +42,7 @@ module type S = sig
     string ->
     cached_genfns_imports:Generic_fns.Partition.Set.t ->
     genfns:Generic_fns.Tbl.t ->
-    units_tolink:unit_link_info list ->
+    units_tolink:Linkenv.unit_link_info list ->
     ppf_dump:Format.formatter ->
     unit
 

@@ -19,7 +19,7 @@ open Misc
 open Compile_common
 
 module type S = sig
-  include Optbackend_intf.File_extensions
+  include Optcomp_intf.File_extensions
 
   val interface: source_file:string -> output_prefix:string -> unit
 
@@ -58,9 +58,9 @@ module type S = sig
     -> unit
 end
 
-module Make (Backend : Optbackend_intf.S) : S = struct
+module Make (Backend : Optcomp_intf.Backend) : S = struct
 let tool_name = "ocamlopt"
-include (Backend : Optbackend_intf.File_extensions)
+include (Backend : Optcomp_intf.File_extensions)
 
 let with_info ~dump_ext =
   let dump_ext =
@@ -131,7 +131,7 @@ let compile_from_typed i typed ~keep_symbol_tables ~as_arg_for =
 
 type starting_point =
   | Parsing
-  | Emit of Optbackend_intf.emit
+  | Emit of Optcomp_intf.emit
   | Instantiation of {
       runtime_args : Translmod.runtime_arg list;
       main_module_block_size : int;
@@ -244,58 +244,53 @@ let instantiate  ~src ~args targetcmx =
     ~compile:(instance ~keep_symbol_tables:false)
 end
 
-let native unix ~flambda2:( lambda_to_cmm:
-    ppf_dump:Format.formatter ->
-    prefixname:string ->
-    machine_width:Target_system.Machine_width.t ->
-    keep_symbol_tables:bool ->
-    Lambda.program ->
-    Cmm.phrase list ) =
+let native unix
+    ~flambda2:
+      (lambda_to_cmm :
+        ppf_dump:Format.formatter ->
+        prefixname:string ->
+        machine_width:Target_system.Machine_width.t ->
+        keep_symbol_tables:bool ->
+        Lambda.program ->
+        Cmm.phrase list) =
   (module Make (struct
-       let backend = Compile_common.Native
-       let ext_asm = Config.ext_asm
-       let ext_obj = Config.ext_obj
-       let ext_lib = Config.ext_lib
-       let ext_flambda_obj = ".cmx"
-       let ext_flambda_lib = ".cmxa"
-       let default_executable_name = Config.default_executable_name
+    let backend = Compile_common.Native
 
-       let link = Asmlink.link unix
-       let link_shared target objfiles ~genfns ~units_tolink ~ppf_dump =
-        Asmlink.link_shared unix target objfiles ~genfns ~units_tolink ~ppf_dump
+    let ext_asm = Config.ext_asm
 
-       let emit : Optbackend_intf.emit option =
-        Some
-          (fun prefix ~progname info ~ppf_dump ->
-              Asmgen.compile_implementation_linear unix
-                prefix
-                ~progname
-                ~ppf_dump)
+    let ext_obj = Config.ext_obj
 
+    let ext_lib = Config.ext_lib
 
-        let link_partial target objfiles =
-          let exitcode =
-            Ccomp.call_linker Ccomp.Partial target objfiles ""
-          in
-          if exitcode <> 0 then raise (Optlink_common.Error (Linking_error exitcode))
+    let ext_flambda_obj = ".cmx"
 
-        let create_archive archive_name objfile_list =
-          if Ccomp.create_archive archive_name objfile_list <> 0
-          then raise (Optlink_common.Error (Archiver_error archive_name))
+    let ext_flambda_lib = ".cmxa"
 
-        let compile_implementation
-          ~keep_symbol_tables
-          ~sourcefile
-          ~prefixname
-          ~ppf_dump
-          program
-        =
-          let machine_width = Target_system.Machine_width.Sixty_four in
-          Asmgen.compile_implementation
-            unix
-            ~pipeline:(Direct_to_cmm (lambda_to_cmm ~machine_width ~keep_symbol_tables))
-            ~sourcefile
-            ~prefixname
-            ~ppf_dump
-            program
-     end) : S)
+    let default_executable_name = Config.default_executable_name
+
+    let link = Asmlink.link unix
+
+    let link_shared target objfiles ~genfns ~units_tolink ~ppf_dump =
+      Asmlink.link_shared unix target objfiles ~genfns ~units_tolink ~ppf_dump
+
+    let emit : Optcomp_intf.emit option =
+      Some
+        (fun prefix ~progname info ~ppf_dump ->
+          Asmgen.compile_implementation_linear unix prefix ~progname ~ppf_dump)
+
+    let link_partial target objfiles =
+      let exitcode = Ccomp.call_linker Ccomp.Partial target objfiles "" in
+      if exitcode <> 0 then raise (Linkenv.Error (Linking_error exitcode))
+
+    let create_archive archive_name objfile_list =
+      if Ccomp.create_archive archive_name objfile_list <> 0
+      then raise (Linkenv.Error (Archiver_error archive_name))
+
+    let compile_implementation ~keep_symbol_tables ~sourcefile ~prefixname
+        ~ppf_dump program =
+      let machine_width = Target_system.Machine_width.Sixty_four in
+      Asmgen.compile_implementation unix
+        ~pipeline:
+          (Direct_to_cmm (lambda_to_cmm ~machine_width ~keep_symbol_tables))
+        ~sourcefile ~prefixname ~ppf_dump program
+  end) : S)

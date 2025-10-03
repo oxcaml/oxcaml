@@ -71,7 +71,7 @@ let dir_cd s = Sys.chdir s
 
 let _ = Hashtbl.add directive_table "cd" (Directive_string dir_cd)
 
-module Compiler = (val Optcompiler.native
+module Compiler = (val Optcompile.native
                    (module Unix : Compiler_owee.Unix_intf.S)
                    ~flambda2:Flambda2.lambda_to_cmm)
 

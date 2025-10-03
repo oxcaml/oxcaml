@@ -1,27 +1,9 @@
-open Format
 open Cmx_format
-open Compilenv
-module String = Misc.Stdlib.String
 module CU = Compilation_unit
-
-(* CR jvanburen: clean up this file, rename to optcommon, add .mli *)
 
 type filepath = string
 
-type error =
-  | File_not_found of filepath
-  | Not_an_object_file of filepath
-  | Missing_implementations of (CU.t * string list) list
-  | Inconsistent_interface of CU.Name.t * filepath * filepath
-  | Inconsistent_implementation of CU.t * filepath * filepath
-  | Multiple_definition of CU.Name.t * filepath * filepath
-  | Missing_cmx of filepath * CU.t
-  | Linking_error of int
-  | Archiver_error of string
-
-exception Error of error
-
-type unit_link_info = Optbackend_intf.unit_link_info =
+type unit_link_info =
   { name : Compilation_unit.t;
     defines : Compilation_unit.t list;
     file_name : string;
@@ -30,15 +12,27 @@ type unit_link_info = Optbackend_intf.unit_link_info =
     dynunit : Cmxs_format.dynunit option
   }
 
-(* Consistency check between interfaces and implementations *)
-
 module Cmi_consistbl = Consistbl.Make (CU.Name) (Import_info.Intf.Nonalias.Kind)
+module Cmx_consistbl = Consistbl.Make (CU) (Unit)
+
+type error =
+  | File_not_found of filepath
+  | Not_an_object_file of filepath
+  | Missing_implementations of (Compilation_unit.t * string list) list
+  | Inconsistent_interface of Compilation_unit.Name.t * filepath * filepath
+  | Inconsistent_implementation of Compilation_unit.t * filepath * filepath
+  | Multiple_definition of Compilation_unit.Name.t * filepath * filepath
+  | Missing_cmx of filepath * Compilation_unit.t
+  | Linking_error of int
+  | Archiver_error of string
+
+exception Error of error
+
+(* Consistency check between interfaces and implementations: *)
 
 let crc_interfaces = Cmi_consistbl.create ()
 
 let interfaces = CU.Name.Tbl.create 100
-
-module Cmx_consistbl = Consistbl.Make (CU) (Unit)
 
 let crc_implementations = Cmx_consistbl.create ()
 
@@ -86,7 +80,7 @@ let check_cmx_consistency file_name cmxs =
   ->
     raise (Error (Inconsistent_implementation (name, user, auth)))
 
-let check_consistency' ~unit cmis cmxs =
+let check_consistency ~unit cmis cmxs =
   check_cmi_consistency unit.file_name cmis;
   check_cmx_consistency unit.file_name cmxs;
   let ui_unit = CU.name unit.name in
@@ -119,6 +113,11 @@ let lib_ccobjs = ref []
 
 let lib_ccopts = ref []
 
+let missing_globals =
+  (Hashtbl.create 17 : (CU.t, (string * CU.Name.t option) list ref) Hashtbl.t)
+
+let check_consistency = check_consistency
+
 let add_ccobjs origin l =
   if not !Clflags.no_auto_link
   then (
@@ -127,11 +126,6 @@ let add_ccobjs origin l =
       Misc.replace_substring ~before:"$CAMLORIGIN" ~after:origin
     in
     lib_ccopts := List.map replace_origin l.lib_ccopts @ !lib_ccopts)
-
-(* First pass: determine which units are needed *)
-
-let missing_globals =
-  (Hashtbl.create 17 : (CU.t, (string * CU.Name.t option) list ref) Hashtbl.t)
 
 let is_required name =
   try
@@ -160,6 +154,8 @@ let extract_missing_globals () =
   !mg
 
 let reset () =
+  (* CR-someday jvanburen: should we [Hashtbl.reset missing_globals;]? *)
+  ignore missing_globals;
   Cmi_consistbl.clear crc_interfaces;
   Cmx_consistbl.clear crc_implementations;
   CU.Tbl.reset implementations_defined;
@@ -169,19 +165,34 @@ let reset () =
   lib_ccobjs := [];
   lib_ccopts := []
 
-(* Exported version for Asmlibrarian / Asmpackager *)
-let check_consistency file_name u crc =
-  let unit =
-    { file_name; name = u.ui_unit; defines = u.ui_defines; crc; dynunit = None }
-  in
-  check_consistency' ~unit
-    (Array.of_list u.ui_imports_cmi)
-    (Array.of_list u.ui_imports_cmx)
-
 let assume_no_prefix modname =
   (* We're the linker, so we assume that everything's already been packed, so
      no module needs its prefix considered. *)
   CU.create CU.Prefix.empty modname
+
+let make_globals_map units_list =
+  (* The order in which entries appear in the globals map does not matter
+     (see the natdynlink code). *)
+  let find_crc name =
+    Cmi_consistbl.find crc_interfaces name
+    |> Option.map (fun (_unit, crc) -> crc)
+  in
+  let interfaces = CU.Name.Tbl.copy interfaces in
+  let defined =
+    List.map
+      (fun unit ->
+        let name = CU.name unit.name in
+        let intf_crc = find_crc name in
+        CU.Name.Tbl.remove interfaces name;
+        let syms = List.map Symbol.for_compilation_unit unit.defines in
+        unit.name, intf_crc, Some unit.crc, syms)
+      units_list
+  in
+  CU.Name.Tbl.fold
+    (fun name () globals_map ->
+      let intf_crc = find_crc name in
+      (assume_no_prefix name, intf_crc, None, []) :: globals_map)
+    interfaces defined
 
 (* Error report *)
 

@@ -29,11 +29,6 @@ module type S = sig
     -> unit
 end
 
-module Make(Backend : sig
-    include Optbackend_intf.S
-    include Optlink.S
-  end) : S = struct
-
 type error =
     Illegal_renaming of CU.Name.t * string * CU.Name.t
   | Forward_reference of string * CU.Name.t
@@ -43,6 +38,11 @@ type error =
   | File_not_found of string
 
 exception Error of error
+
+module Make(Backend : sig
+    include Optcomp_intf.Backend
+    include Optlink.S
+  end) : S = struct
 
 (* Read the unit information from a .cmx file. *)
 
@@ -66,7 +66,7 @@ let read_member_info pack_path file = (
       then raise(Error(Illegal_renaming(name, file, (CU.name info.ui_unit))));
       if not (CU.is_parent pack_path ~child:info.ui_unit)
       then raise(Error(Wrong_for_pack(file, pack_path)));
-      Optlink_common.check_consistency file info crc;
+      Backend.check_consistency file info crc;
       Compilenv.cache_unit_info info;
       PM_impl info
     end in
@@ -212,9 +212,9 @@ let build_package_cmx members cmxfile ~main_module_block_size =
       ui_imports_cmi =
           (Import_info.create modname
             ~crc_with_unit:(Some (ui.ui_unit, Env.crc_of_unit modname))) ::
-            filter (Optlink_common.extract_crc_interfaces ());
+            filter (Linkenv.extract_crc_interfaces ());
       ui_imports_cmx =
-        filter(Optlink_common.extract_crc_implementations());
+        filter(Linkenv.extract_crc_implementations());
       ui_format = format;
       ui_generic_fns =
         { curry_fun =
@@ -273,6 +273,7 @@ let package_files ~ppf_dump initial_env files targetcmx =
     ~exceptionally:(fun () ->
         remove_file targetcmx; remove_file (Unit_info.Artifact.filename obj)
       )
+end
 
 (* Error report *)
 
@@ -307,5 +308,3 @@ let () =
       | Error err -> Some (Location.error_of_printer_file report_error err)
       | _ -> None
     )
-
-end
