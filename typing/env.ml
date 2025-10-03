@@ -204,7 +204,7 @@ let map_summary f = function
 type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * Jkind.Sort.t array * int
+  | Adot of address * module_representation * int
 
 module TycompTbl =
   struct
@@ -719,7 +719,7 @@ and functor_components = {
 and address_unforced =
   | Projection of
     { parent : address_lazy;
-      field_sorts: Jkind.Sort.t array;
+      module_repr: module_representation;
       pos : int }
   | ModAlias of { env : t; path : Path.t; }
 
@@ -1608,8 +1608,8 @@ and find_ident_module_address id env =
   get_address (find_ident_module id env).mda_address
 
 and force_address = function
-  | Projection { parent; field_sorts; pos } ->
-    Adot(get_address parent, field_sorts, pos)
+  | Projection { parent; module_repr; pos } ->
+    Adot(get_address parent, module_repr, pos)
   | ModAlias { env; path } -> find_module_address path env
 
 and get_address a =
@@ -2163,7 +2163,7 @@ let rec components_of_module_maker
       in
       let env = ref cm_env in
       let pos = ref 0 in
-      let field_sorts =
+      let module_repr =
         List.filter_map
           (fun (item, _) -> Subst.Lazy.sort_of_signature_item item)
           items_and_paths
@@ -2172,7 +2172,7 @@ let rec components_of_module_maker
       let next_address () =
         let addr : address_unforced =
           Projection
-            { parent = cm_addr; field_sorts; pos = !pos }
+            { parent = cm_addr; module_repr; pos = !pos }
         in
         incr pos;
         Lazy_backtrack.create addr

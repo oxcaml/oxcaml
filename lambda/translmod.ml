@@ -100,8 +100,10 @@ let rec apply_coercion loc strict restr arg =
       arg
   | Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list } ->
       name_lambda strict arg Lambda.layout_module (fun id ->
-        let input_repr = transl_module_representation input_repr in
-        let output_repr = transl_module_representation output_repr in
+        let input_repr = transl_module_representation ~loc:None input_repr in
+        let output_repr =
+          transl_module_representation ~loc:(Some (to_location loc)) output_repr
+        in
         let get_field pos =
           if pos < 0 then lambda_unit
           else
@@ -211,9 +213,9 @@ let rec compose_coercions c1 c2 =
   match (c1, c2) with
     (Tcoerce_none, c2) -> c2
   | (c1, Tcoerce_none) -> c1
-  | ( Tcoerce_structure { input_repr = ir1; output_repr = or1;
+  | ( Tcoerce_structure { input_repr = _; output_repr = or1;
                           pos_cc_list = pc1; id_pos_list = ids1 },
-      Tcoerce_structure { input_repr = ir2; output_repr = or2;
+      Tcoerce_structure { input_repr = ir2; output_repr = _;
                           pos_cc_list = pc2; id_pos_list = ids2 }
     ) ->
       let v2 = Array.of_list pc2 in
@@ -225,10 +227,6 @@ let rec compose_coercions c1 c2 =
               (id, pos2, compose_coercions c1 c2))
           ids1
       in
-      begin if not (equal_module_representation or2 ir1) then
-        fatal_error
-          "Translmod.compose_coercions: module representations do not align"
-      end;
       let pos_cc_list =
         List.map
            (fun pc ->
@@ -660,18 +658,18 @@ and transl_struct ~scopes loc fields cc rootpath
    warning by increasing locations. *)
 
 and transl_structure ~scopes loc
-  (fields : (Ident.t * Types.mixed_block_element) list) cc rootpath final_env =
+  (fields : (Ident.t * Jkind.Sort.t) list) cc rootpath final_env =
   function
     [] ->
       let body, repr =
         match cc with
           Tcoerce_none ->
             let repr =
-              Mtype.module_representation_of_mixed_product_shape
-                ~check_representable:(`Yes (to_location loc))
-                (List.rev_map (fun (_, mbe) -> mbe) fields |> Array.of_list)
+              List.rev_map (fun (_, sort) -> sort) fields |> Array.of_list
             in
-            let repr = transl_module_representation repr in
+            let repr =
+              transl_module_representation ~loc:(Some (to_location loc)) repr
+            in
             Lprim(block_of_module_representation repr,
                   List.map (fun (id, _) -> Lvar id) (List.rev fields), loc),
               repr
@@ -690,12 +688,15 @@ and transl_structure ~scopes loc
             let get_layout pos =
               if pos < 0 then layout_value_field
               else let _, shape = v.(pos) in
-                shape |> transl_mixed_block_element
-                      |> layout_of_mixed_block_element
+                shape |> Jkind.Sort.default_for_transl_and_get
+                      |> layout_of_const_sort
             in
             let ids = List.fold_right (fun (id, _) s -> Ident.Set.add id s)
               fields Ident.Set.empty in
-            let output_repr = transl_module_representation output_repr in
+            let output_repr =
+              transl_module_representation ~loc:(Some (to_location loc))
+                output_repr
+            in
             let lam =
               Lprim(block_of_module_representation output_repr,
                   List.map
@@ -747,15 +748,7 @@ and transl_structure ~scopes loc
           in
           let ext_fields =
             List.rev_append
-              (pat_expr_list
-                |> let_bound_idents_with_sorts
-                |> List.map
-                    (fun (id, sort) ->
-                      let shape =
-                        sort |> Jkind.Sort.default_for_transl_and_get
-                             |> mixed_block_element_of_const_sort
-                      in
-                      id, shape))
+              (let_bound_idents_with_sorts pat_expr_list)
               fields
           in
           (* Then, translate remainder of struct *)
@@ -772,7 +765,7 @@ and transl_structure ~scopes loc
           let newfields =
             List.map
               (fun ext ->
-                ext.ext_id, Types.mixed_block_element_for_type_extension)
+                ext.ext_id, Jkind.Sort.(of_const Const.for_type_extension))
               tyext.tyext_constructors
           in
           let body, repr =
@@ -787,7 +780,7 @@ and transl_structure ~scopes loc
           let path = field_path rootpath id in
           let body, repr =
             transl_structure ~scopes loc
-              ((id, Types.mixed_block_element_for_exception) :: fields)
+              ((id, Jkind.Sort.(of_const Const.for_exception)) :: fields)
               cc rootpath final_env rem
           in
           Llet(Strict, Lambda.layout_block, id, id_duid,
@@ -799,7 +792,7 @@ and transl_structure ~scopes loc
       | Tstr_module ({mb_presence=Mp_present} as mb) ->
           let id = mb.mb_id in
           let field =
-            Option.map (fun id -> id, Types.mixed_block_element_for_module) id
+            Option.map (fun id -> id, Jkind.Sort.(of_const Const.for_module)) id
           in
           let id_duid = mb.mb_uid in
           (* Translate module first *)
@@ -834,7 +827,7 @@ and transl_structure ~scopes loc
           let newfields =
             List.filter_map
               (fun mb -> Option.map
-                (fun id -> id, Types.mixed_block_element_for_module) mb.mb_id)
+                (fun id -> id, Jkind.Sort.(of_const Const.for_module)) mb.mb_id)
               bindings
           in
           let body, repr =
@@ -855,7 +848,7 @@ and transl_structure ~scopes loc
       | Tstr_class cl_list ->
           let (ids, class_bindings) = transl_class_bindings ~scopes cl_list in
           let newfields =
-            List.map (fun id -> id, Types.mixed_block_element_for_class) ids
+            List.map (fun id -> id, Jkind.Sort.(of_const Const.for_class)) ids
           in
           let body, repr =
             transl_structure ~scopes loc (List.rev_append newfields fields)
@@ -870,17 +863,17 @@ and transl_structure ~scopes loc
           let mid = Ident.create_local "include" in
           let mid_duid = Lambda.debug_uid_none in
           let incl_repr =
-            transl_module_representation incl.incl_repr
+            transl_module_representation
+              ~loc:(Some incl.incl_loc) incl.incl_repr
           in
           let rec rebind_idents pos newfields = function
               [] ->
                 transl_structure ~scopes loc newfields cc rootpath final_env rem
             | (id, sort) :: ids_with_sorts ->
-                let sort = Jkind.Sort.default_for_transl_and_get sort in
-                let shape = mixed_block_element_of_const_sort sort in
-                let lambda_layout = layout_of_const_sort sort in
+                let const_sort = Jkind.Sort.default_for_transl_and_get sort in
+                let lambda_layout = layout_of_const_sort const_sort in
                 let body, repr =
-                  rebind_idents (pos + 1) ((id, shape) :: newfields)
+                  rebind_idents (pos + 1) ((id, sort) :: newfields)
                     ids_with_sorts
                 in
                 let id_duid = Lambda.debug_uid_none in
@@ -925,17 +918,17 @@ and transl_structure ~scopes loc
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
               let open_repr =
-                transl_module_representation od.open_bound_repr
+                transl_module_representation
+                  ~loc:(Some (od.open_loc)) od.open_bound_repr
               in
               let rec rebind_idents pos newfields = function
                   [] -> transl_structure
                           ~scopes loc newfields cc rootpath final_env rem
                 | (id, sort) :: ids_with_sorts ->
-                  let sort = Jkind.Sort.default_for_transl_and_get sort in
-                  let shape = mixed_block_element_of_const_sort sort in
-                  let lambda_layout = layout_of_const_sort sort in
+                  let const_sort = Jkind.Sort.default_for_transl_and_get sort in
+                  let lambda_layout = layout_of_const_sort const_sort in
                   let body, repr =
-                    rebind_idents (pos + 1) ((id, shape) :: newfields)
+                    rebind_idents (pos + 1) ((id, sort) :: newfields)
                       ids_with_sorts
                   in
                   let id_duid = Lambda.debug_uid_none in
@@ -959,7 +952,10 @@ and transl_structure ~scopes loc
 
 (* construct functor application in "include functor" case *)
 and transl_include_functor ~generative ~input_repr modl params scopes loc =
-  let input_repr = transl_module_representation input_repr in
+  let input_repr =
+    transl_module_representation ~loc:(Some (to_location loc))
+      input_repr
+  in
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module modl
   in
@@ -1025,6 +1021,7 @@ let required_globals ~flambda body =
 
 let add_arg_block_to_module_representation = function
     (* NB: this assumes [arg_block] has layout value *)
+    (* CR jrayman: there is a bug here *)
   | Module_value_only field_count -> Module_value_only (field_count + 1)
   | Module_mixed (shape, shape_for_read) ->
     Module_mixed
@@ -1307,7 +1304,7 @@ let transl_toplevel_item ~scopes item =
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in
       let incl_repr =
-        transl_module_representation incl.incl_repr
+        transl_module_representation ~loc:(Some incl.incl_loc) incl.incl_repr
       in
       let rec set_idents pos = function
         [] ->
@@ -1334,7 +1331,8 @@ let transl_toplevel_item ~scopes item =
           let mid = Ident.create_local "open" in
           let mid_duid = Lambda.debug_uid_none in
           let open_repr =
-            transl_module_representation od.open_bound_repr
+            transl_module_representation ~loc:(Some od.open_loc)
+              od.open_bound_repr
           in
           let rec set_idents pos = function
               [] ->

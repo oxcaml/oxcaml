@@ -854,6 +854,7 @@ let lower_nongen nglev mty =
   it.it_module_type it mty;
   it.it_module_type unmark_iterators mty
 
+(*
 let module_representation_of_mixed_product_shape
       ~check_representable shape =
   let value_count = ref 0 in
@@ -894,3 +895,4 @@ let module_representation_of_lazy_signature ~check_representable sg =
 let module_representation_of_signature ~check_representable sg =
   module_representation_of_signature ~check_representable sg
     Types.sort_of_signature_item
+*)
