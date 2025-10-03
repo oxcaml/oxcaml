@@ -20,6 +20,14 @@ open Misc
 open Cmx_format
 
 module CU = Compilation_unit
+module type S = sig
+  val package_files
+    :  ppf_dump:Format.formatter
+    -> Env.t
+    -> string list
+    -> string
+    -> unit
+end
 
 type error =
     Illegal_renaming of CU.Name.t * string * CU.Name.t
@@ -30,6 +38,11 @@ type error =
   | File_not_found of string
 
 exception Error of error
+
+module Make(Backend : sig
+    include Optcomp_intf.Backend
+    include Optlink.S
+  end) : S = struct
 
 (* Read the unit information from a .cmx file. *)
 
@@ -53,7 +66,7 @@ let read_member_info pack_path file = (
       then raise(Error(Illegal_renaming(name, file, (CU.name info.ui_unit))));
       if not (CU.is_parent pack_path ~child:info.ui_unit)
       then raise(Error(Wrong_for_pack(file, pack_path)));
-      Asmlink.check_consistency file info crc;
+      Backend.check_consistency file info crc;
       Compilenv.cache_unit_info info;
       PM_impl info
     end in
@@ -80,18 +93,7 @@ let check_units members =
       check (list_remove mb.pm_name forbidden) tl in
   check (List.map (fun mb -> mb.pm_name) members) members
 
-(* Make the .o file for the package *)
-
-type flambda2 =
-  ppf_dump:Format.formatter ->
-  prefixname:string ->
-  machine_width:Target_system.Machine_width.t ->
-  keep_symbol_tables:bool ->
-  Lambda.program ->
-  Cmm.phrase list
-
-let make_package_object ~machine_width unix ~ppf_dump members target coercion
-      ~(flambda2 : flambda2) =
+let make_package_object ~ppf_dump members target coercion =
   let pack_name =
     Printf.sprintf "pack(%s)"
       (Unit_info.Artifact.modname target |> CU.name_as_string) in
@@ -139,28 +141,24 @@ let make_package_object ~machine_width unix ~ppf_dump members target coercion
         required_globals;
       }
     in
-    let pipeline : Asmgen.pipeline =
-      Direct_to_cmm (flambda2 ~machine_width ~keep_symbol_tables:true)
-    in
-    Asmgen.compile_implementation ~pipeline unix
+    Backend.compile_implementation
+      ~keep_symbol_tables:true
       ~sourcefile:(Unit_info.Artifact.original_source_file target)
       ~prefixname
       ~ppf_dump
       program;
-    let objfiles =
+   let objfiles =
       List.map
         (fun m -> Filename.remove_extension m.pm_file ^ Config.ext_obj)
         (List.filter (fun m -> m.pm_kind <> PM_intf) members) in
-    let exitcode =
-      Ccomp.call_linker Ccomp.Partial (Unit_info.Artifact.filename target)
-        (objtemp :: objfiles) ""
-    in
-    remove_file objtemp;
-    if not (exitcode = 0) then raise(Error Linking_error);
+  Misc.try_finally
+    ~always:(fun () -> remove_file objtemp)
+    (fun () ->
+       Backend.link_partial
+         (Unit_info.Artifact.filename target)
+         (objtemp :: objfiles));
     main_module_block_size
   )
-
-(* Make the .cmx file for the package *)
 
 let build_package_cmx members cmxfile ~main_module_block_size =
   let unit_names =
@@ -202,9 +200,9 @@ let build_package_cmx members cmxfile ~main_module_block_size =
       ui_imports_cmi =
           (Import_info.create modname
             ~crc_with_unit:(Some (ui.ui_unit, Env.crc_of_unit modname))) ::
-            filter (Asmlink.extract_crc_interfaces ());
+            filter (Linkenv.extract_crc_interfaces ());
       ui_imports_cmx =
-          filter(Asmlink.extract_crc_implementations());
+        filter(Linkenv.extract_crc_implementations());
       ui_format = format;
       ui_generic_fns =
         { curry_fun =
@@ -221,23 +219,19 @@ let build_package_cmx members cmxfile ~main_module_block_size =
     } in
   Compilenv.write_unit_info pkg_infos cmxfile
 
-(* Make the .cmx and the .o for the package *)
-
-let package_object_files ~machine_width unix ~ppf_dump files target
-                         targetcmx coercion ~flambda2 =
+let package_object_files ~ppf_dump files target
+                         targetcmx coercion =
   let pack_path = Unit_info.Artifact.modname target in
   let members = map_left_right (read_member_info pack_path) files in
   check_units members;
   let main_module_block_size =
-    make_package_object ~machine_width unix ~ppf_dump members target coercion
-      ~flambda2
+    make_package_object ~ppf_dump members target coercion
   in
   build_package_cmx members targetcmx ~main_module_block_size
 
 (* The entry point *)
 
-let package_files ~machine_width unix ~ppf_dump initial_env files targetcmx
-      ~flambda2 =
+let package_files ~ppf_dump initial_env files targetcmx =
   let files =
     List.map
       (fun f ->
@@ -259,12 +253,13 @@ let package_files ~machine_width unix ~ppf_dump initial_env files targetcmx
   Misc.try_finally (fun () ->
       let coercion =
         Typemod.package_units initial_env files cmi comp_unit in
-      package_object_files ~machine_width unix ~ppf_dump files obj targetcmx
-        coercion ~flambda2
+      package_object_files ~ppf_dump files obj targetcmx
+        coercion
     )
     ~exceptionally:(fun () ->
         remove_file targetcmx; remove_file (Unit_info.Artifact.filename obj)
       )
+end
 
 (* Error report *)
 

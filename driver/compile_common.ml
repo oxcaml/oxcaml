@@ -15,6 +15,10 @@
 
 open Misc
 
+type opt_backend = Native | Js_of_ocaml
+
+type backend = Byte | Opt of opt_backend
+
 (* CR lmaurer: No longer need both [target] and [module_name] here (true in lots
    of places) *)
 type info = {
@@ -23,14 +27,14 @@ type info = {
   env : Env.t;
   ppf_dump : Format.formatter;
   tool_name : string;
-  native : bool;
+  backend : backend;
 }
 
 type compilation_unit_or_inferred =
   | Exactly of Compilation_unit.t
   | Inferred_from_output_prefix
 
-let with_info ~native ~tool_name ~source_file ~output_prefix
+let with_info ~backend ~tool_name ~source_file ~output_prefix
       ~compilation_unit ~kind ~dump_ext k =
   Compmisc.init_path ();
   Compmisc.init_parameters ();
@@ -54,7 +58,7 @@ let with_info ~native ~tool_name ~source_file ~output_prefix
     env;
     ppf_dump;
     tool_name;
-    native;
+    backend;
   })
 
 module Parse_result = struct
@@ -176,8 +180,11 @@ let implementation ~hook_parse_tree ~hook_typed_tree info ~backend =
     Unit_info.raw_source_file info.target))) @@ fun () ->
   let exceptionally () =
     let sufs =
-      if info.native then Unit_info.[ cmx; obj ]
-      else Unit_info.[ cmo ] in
+      match info.backend with
+      | Opt Native ->  Unit_info.[ cmx; obj ]
+      | Byte -> Unit_info.[ cmo ]
+      | Opt Js_of_ocaml -> Unit_info.[ cmjx; cmjo ]
+    in
     List.iter
       (fun suf -> remove_file (Unit_info.Artifact.filename @@ suf info.target))
       sufs;
