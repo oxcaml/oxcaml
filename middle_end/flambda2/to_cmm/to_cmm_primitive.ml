@@ -301,11 +301,8 @@ let array_load_512 = array_load_vector ~vec_kind:Vec512
 
 let array_set_vector ~(vec_kind : Vector_types.Kind.t) ~dbg ~element_width_log2
     arr index new_value =
-  let index = C.untag_int index dbg in
   let index =
-    if element_width_log2 = 0
-    then index
-    else C.lsl_int index (Cconst_int (element_width_log2, dbg)) dbg
+    C.lsl_int (C.untag_int index dbg) (Cconst_int (element_width_log2, dbg)) dbg
   in
   match vec_kind with
   | Vec128 -> C.unaligned_set_128 arr index new_value dbg
