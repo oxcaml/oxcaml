@@ -14,7 +14,7 @@
 (* We only compile for 64 bits. *)
 let bytes_per_word = 8
 
-(* Tag definitions from Cmm_helpers.Unboxed_array_tags *)
+(* Tag definitions from Cmm_helpers.Unboxed_or_untagged_array_tags *)
 let unboxed_product_array_tag = 0
 let unboxed_int64_array_tag = 1
 let unboxed_int32_array_zero_tag = 2

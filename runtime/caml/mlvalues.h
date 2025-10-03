@@ -544,7 +544,7 @@ CAMLextern void caml_Store_double_val (value,double);
 #define Double_array_tag 254
 
 /* Unboxed array tags (for mixed blocks)
-   These must stay in sync with Cmm_helpers.Unboxed_array_tags */
+   These must stay in sync with Cmm_helpers.Unboxed_or_untagged_array_tags */
 #define Unboxed_product_array_tag 0
 #define Unboxed_int64_array_tag 1
 #define Unboxed_int32_array_zero_tag 2
