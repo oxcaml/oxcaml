@@ -666,7 +666,7 @@ and function_constraint =
        This field constrains the mode of function's body.
     *)
     (* CR modes: this documentation should be updated once crossings on arrow types
-       is supported *)
+       are supported *)
     ret_type_constraint : type_constraint option;
     (** The type constraint placed on a function's body. *)
   }
