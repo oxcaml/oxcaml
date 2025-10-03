@@ -1421,20 +1421,23 @@ let tree_of_modality_old (t: Parsetree.modality loc) =
   | _ -> None
 
 let tree_of_modalities mut t =
-  let ({ pmoda_modalities = t; pmoda_crossings; _ } : Parsetree.modalities) =
-    Typemode.untransl_modalities mut t in
-  (* CR zeisbach: this should definitely not raise but I want to make sure that this
-     will not silently pass through. but these should be printed somehow clearly *)
-  if pmoda_crossings <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
-  match all_or_none tree_of_modality_old t with
-  | Some l -> l
-  | None -> List.map tree_of_modality_new t
+  match Typemode.untransl_modalities mut t with
+  | No_modalities -> []
+  (* CR zeisbach: once this supports crossings, consider factoring this out *)
+  | Modalities { pmoda_crossings = _ :: _; _ } ->
+    Misc.fatal_error "ZJE: mods are not yet supported"
+  | Modalities { pmoda_modalities; _ } ->
+    match all_or_none tree_of_modality_old pmoda_modalities with
+    | Some l -> l
+    | None -> List.map tree_of_modality_new pmoda_modalities
 
 let tree_of_modalities_new mut t =
-  let ({ pmoda_modalities = l; pmoda_crossings; _ } : Parsetree.modalities) =
-    Typemode.untransl_modalities mut t in
-  if pmoda_crossings <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
-  List.map (fun ({txt = Parsetree.Modality s; _}) -> s) l
+  match Typemode.untransl_modalities mut t with
+  | No_modalities -> []
+  | Modalities { pmoda_crossings = _ :: _; _ } ->
+    Misc.fatal_error "ZJE: mods are not yet supported"
+  | Modalities { pmoda_modalities; _ } ->
+    List.map (fun ({txt = Parsetree.Modality s; _}) -> s) pmoda_modalities
 
 (** [tree_of_mode m l] finds the outcome node in [l] that corresponds to [m].
 Raise if not found. *)
@@ -1479,12 +1482,14 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
 
   let diff = {diff with forkable; yielding; contention; portability} in
   (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
-  let ({ pmode_modes = l; pmode_crossings; _ } : Parsetree.modes) =
-    Typemode.untransl_mode_annots diff in
-  if pmode_crossings <> [] then Misc.fatal_error "ZJE: mods are not yet supported";
-  match all_or_none tree_of_mode_old l with
-  | Some l -> l
-  | None -> List.map tree_of_mode_new l
+  match Typemode.untransl_mode_annots diff with
+  | No_modes -> []
+  | Modes { pmode_crossings = _ :: _; _ } ->
+    Misc.fatal_error "ZJE: mods are not yet supported";
+  | Modes { pmode_modes; _ } ->
+    match all_or_none tree_of_mode_old pmode_modes with
+    | Some l -> l
+    | None -> List.map tree_of_mode_new pmode_modes
 
 (** The modal context on a type when printing it. This is to reproduce the mode
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)
