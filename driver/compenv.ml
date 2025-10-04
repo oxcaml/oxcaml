@@ -827,6 +827,8 @@ let impl filename = defer (ProcessImplementation filename)
 let intf filename = defer (ProcessInterface filename)
 
 let process_deferred_actions env =
+  (* CR-someday jvanburen: pre-validate JavaScript stubs (similar to a future
+     "js -> cmjo" packer) so we fail earlier than the final link step. *)
   let final_output_name = !output_name in
   (* Make sure the intermediate products don't clash with the final one
      when we're invoked like: ocamlopt -o foo bar.c baz.ml. *)
