@@ -132,7 +132,6 @@ let interesting_type_trees test : Type_structure.t Tree.t list =
 let preamble =
   {|open Stdlib_upstream_compatible
 open Stdlib_stable
-open Stdlib_beta
 
 external[@layout_poly] makearray_dynamic_local :
   ('a : any mod separable) . int -> 'a -> 'a array @ local =
@@ -705,10 +704,8 @@ let main test ~bytecode =
         Type_naming.add_names naming ty
     )
   in
-  line
-    {|(* TEST
+  line {|(* TEST
  include stdlib_stable;
- include stdlib_beta;
  include stdlib_upstream_compatible;|};
   if bytecode
   then (

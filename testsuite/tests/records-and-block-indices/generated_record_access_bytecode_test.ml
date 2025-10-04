@@ -1,6 +1,5 @@
 (* TEST
  include stdlib_stable;
- include stdlib_beta;
  include stdlib_upstream_compatible;
  modules = "idx_repr.ml stubs.c";
  flags = "-extension layouts_alpha";
@@ -16,7 +15,6 @@ let int64x2_u_equal (_ : int64x2#) (_ : int64x2#) = failwith "should not be call
 
 open Stdlib_upstream_compatible
 open Stdlib_stable
-open Stdlib_beta
 
 external[@layout_poly] makearray_dynamic_local :
   ('a : any mod separable) . int -> 'a -> 'a array @ local =

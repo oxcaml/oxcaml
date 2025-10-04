@@ -1,10 +1,10 @@
 (* TEST
  flags = "-extension layouts_alpha";
- include stdlib_beta;
+ include stdlib_stable;
  expect;
 *)
 
-open Stdlib_beta
+open Stdlib_stable
 
 (*********************************)
 (* Basic typechecking of indices *)
