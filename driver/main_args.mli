@@ -259,6 +259,7 @@ module type Optcomp_options = sig
   val _function_sections : unit -> unit
   val _save_ir_after : string -> unit
   val _save_ir_before : string -> unit
+  val _target : Clflags.Backend.t -> unit
   val _probes : unit -> unit
   val _no_probes : unit -> unit
   val _gdwarf_config_shape_reduce_depth : string -> unit

@@ -78,24 +78,20 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
         (prefixname ^ ext_flambda_obj)
       |> Unit_info.Artifact.modname
     in
-    let ({ program; imported_compilation_units }
-          : Jsoo_imports.Js_backend.program) =
-      Flambda2.lambda_to_jsir
-        ~machine_width:Target_system.Machine_width.Thirty_two_no_gc_tag_bit
-        ~ppf_dump
-        ~prefixname
-        program
+    let open Jsoo_imports in
+    let ({ program; imported_compilation_units } : Js_backend.program) =
+      Targetint.set_num_bits 32;
+      Flambda2.lambda_to_jsir ~machine_width:Thirty_two_no_gc_tag_bit ~ppf_dump
+        ~prefixname program
       |> Misc.print_if ppf_dump Clflags.dump_jsir
-           (fun ppf (jsir : Jsoo_imports.Js_backend.program) ->
-             Jsoo_imports.Jsir.Print.program ppf (fun _ _ -> "") jsir.program)
+           (fun ppf (jsir : Js_backend.program) ->
+             Jsir.Print.program ppf (fun _ _ -> "") jsir.program)
     in
     let output_filename = prefixname ^ ext_obj in
     let cmj_filename = prefixname ^ ".cmj" in
-    let open Jsoo_imports in
-    let info : Jsoo_imports.Unit_info.t =
+    let info : Unit_info.t =
       { provides =
-          StringSet.singleton
-            (Compilation_unit.full_path_as_string module_name);
+          StringSet.singleton (Compilation_unit.full_path_as_string module_name);
         requires =
           Compilation_unit.Set.elements imported_compilation_units
           |> ListLabels.map ~f:Compilation_unit.full_path_as_string
@@ -116,7 +112,7 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
           }
       }
     in
-    Jsoo_imports.Jsir.save compilation_unit ~filename:cmj_filename;
+    Jsir.save compilation_unit ~filename:cmj_filename;
     Misc.try_finally
       (fun () ->
         js_of_oxcaml

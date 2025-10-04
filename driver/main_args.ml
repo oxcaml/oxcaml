@@ -121,6 +121,27 @@ let mk_stop_after ~native f =
   "-stop-after", Arg.Symbol (pass_names, f),
   " Stop after the given compilation pass."
 
+let mk_target f =
+  let names = Clflags.Backend.names in
+  let doc =
+    match names with
+    | [] -> "<backend>  Select compilation backend"
+    | _ ->
+      Printf.sprintf
+        "<backend>  Select compilation backend (%s)"
+        (String.concat ", " names)
+  in
+  ( "-target",
+    Arg.Symbol
+      ( names,
+        fun name ->
+          match Clflags.backend_target_of_string name with
+          | Some target -> f target
+          | None ->
+            (* [name] must be in [names]; this is defensive. *)
+            Misc.fatal_errorf "Unknown backend target %s" name ),
+    doc )
+
 let mk_save_ir_after ~native f =
   let pass_names =
     Clflags.Compiler_pass.(available_pass_names
@@ -1268,6 +1289,7 @@ module type Optcomp_options = sig
   val _function_sections : unit -> unit
   val _save_ir_after : string -> unit
   val _save_ir_before : string -> unit
+  val _target : Clflags.Backend.t -> unit
   val _probes : unit -> unit
   val _no_probes : unit -> unit
   val _gdwarf_config_shape_reduce_depth : string -> unit
@@ -1609,6 +1631,7 @@ struct
     mk_no_g F._no_g;
     mk_function_sections F._function_sections;
     mk_stop_after ~native:true F._stop_after;
+    mk_target F._target;
     mk_save_ir_after ~native:true F._save_ir_after;
     mk_save_ir_before ~native:true F._save_ir_before;
     mk_probes F._probes;
@@ -2469,6 +2492,7 @@ module Default = struct
         "Profiling with \"gprof\" (option `-p') is only supported up to \
          OCaml 4.08.0"
     let _shared () = shared := true; dlcode := true
+    let _target = Clflags.set_backend_target
     let _v () = Compenv.print_version_and_library "native-code compiler"
     let _no_probes = clear probes
     let _probes = set probes
