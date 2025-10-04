@@ -29,6 +29,23 @@ open Format
 open Cmx_format
 open Compilenv
 
+module type Flambda2 = sig
+val lambda_to_cmm :
+  ppf_dump:Format.formatter ->
+  prefixname:string ->
+  machine_width:Target_system.Machine_width.t ->
+  keep_symbol_tables:bool ->
+  Lambda.program ->
+  Cmm.phrase list
+
+val lambda_to_jsir :
+  ppf_dump:Format.formatter ->
+  prefixname:string ->
+  machine_width:Target_system.Machine_width.t ->
+  Lambda.program ->
+  Jsoo_imports.Js_backend.program
+end
+
 type emit =
   Unit_info.file_prefix -> progname:string -> ppf_dump:Format.formatter -> unit
 
