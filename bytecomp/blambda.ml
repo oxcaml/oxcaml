@@ -99,6 +99,7 @@ type primitive =
   | Lsrint
   | Asrint
   | Intcomp of comparison
+  | Getstringchar
   | Getbyteschar
   | Getvectitem
   | Setfield of int
