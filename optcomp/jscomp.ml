@@ -70,30 +70,32 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
 
   let emit = None
 
-  let compile_implementation (i : Compile_common.info) ~keep_symbol_tables:_
-      program =
+  let compile_implementation ~keep_symbol_tables:_ ~sourcefile:_ ~prefixname
+      ~ppf_dump program =
+    let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
+    let module_name =
+      Unit_info.Artifact.from_filename ~for_pack_prefix
+        (prefixname ^ ext_flambda_obj)
+      |> Unit_info.Artifact.modname
+    in
     let ({ program; imported_compilation_units }
           : Jsoo_imports.Js_backend.program) =
       Flambda2.lambda_to_jsir
         ~machine_width:Target_system.Machine_width.Thirty_two_no_gc_tag_bit
-        ~ppf_dump:i.ppf_dump
-        ~prefixname:(Unit_info.prefix i.target)
+        ~ppf_dump
+        ~prefixname
         program
-      |> Misc.print_if i.ppf_dump Clflags.dump_jsir
+      |> Misc.print_if ppf_dump Clflags.dump_jsir
            (fun ppf (jsir : Jsoo_imports.Js_backend.program) ->
              Jsoo_imports.Jsir.Print.program ppf (fun _ _ -> "") jsir.program)
     in
-    let output_filename =
-      Unit_info.Artifact.filename
-        (Unit_info.artifact i.target ~extension:ext_obj)
-    in
-    let cmj = Unit_info.cmj i.target in
-    let cmj_filename = Unit_info.Artifact.filename cmj in
+    let output_filename = prefixname ^ ext_obj in
+    let cmj_filename = prefixname ^ ".cmj" in
     let open Jsoo_imports in
     let info : Jsoo_imports.Unit_info.t =
       { provides =
           StringSet.singleton
-            (Compilation_unit.full_path_as_string i.module_name);
+            (Compilation_unit.full_path_as_string module_name);
         requires =
           Compilation_unit.Set.elements imported_compilation_units
           |> ListLabels.map ~f:Compilation_unit.full_path_as_string

@@ -78,7 +78,8 @@ let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
       match Clflags.backend_target () with
       | None | Some Backend.Native ->
         Optcompile.native unix ~flambda2:Flambda2.lambda_to_cmm
-      | Some Backend.Js_of_ocaml -> (module Jscomp.Make(Flambda2))
+      | Some Backend.Js_of_ocaml ->
+        (module Jscomp.Make(Flambda2) : Optcompile.S)
     in
     begin try
       Compenv.process_deferred_actions
