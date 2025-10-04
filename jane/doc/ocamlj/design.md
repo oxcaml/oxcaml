@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document describes the integration of js_of_ocaml into the OxCaml compiler, enabling JavaScript as a first-class compilation target alongside native and bytecode. The integration leverages OxCaml's Flambda2 optimizer to generate optimized JavaScript code, potentially exceeding the performance of standard js_of_ocaml compilation.
+This document describes the integration of js_of_ocaml into the OxCaml compiler, enabling JavaScript as a first-class compilation target alongside native and bytecode. The integration exposes the backend through `ocamlopt -target js_of_ocaml` and leverages OxCaml's Flambda2 optimizer to generate optimized JavaScript code.
 
 ## Goals and Motivation
 
@@ -33,9 +33,9 @@ Source → Lambda → Flambda2 → JSIR → js_of_ocaml → JavaScript
 
 ### Key Components
 
-#### 1. The JavaScript Driver (`ocamlopt -target js_of_ocaml`)
-- **Location**: `driver/jscompile.ml`, `driver/optmaindriver.ml`
-- **Purpose**: JavaScript counterpart to `ocamlopt`, enabled via `-target js_of_ocaml`
+#### 1. The JavaScript Backend (`ocamlopt -target js_of_ocaml`)
+- **Location**: `optcomp/jscomp.ml`, `driver/optmaindriver.ml`, `driver/compenv.ml`
+- **Purpose**: JavaScript counterpart to `ocamlopt`, activated via `-target js_of_ocaml`
 - **Output files**:
   - `.cmjx` - JavaScript compilation metadata (identical format to `.cmx` but for 32-bit JavaScript)
   - `.cmjxa` - JavaScript archives (identical format to `.cmxa` but for 32-bit JavaScript)
@@ -59,11 +59,9 @@ Source → Lambda → Flambda2 → JSIR → js_of_ocaml → JavaScript
 - Reduces our dependency on the bytecode compiler/instruction set
   - This also reduces our need to add new C stubs for every single operation that we add.
 
-#### 3. JavaScript Compilation Subsystem (`jscomp/`)
-- **jslibrarian**: Creates JavaScript library archives (`.cmjxa` and `.cmja`)
-- **jslink**: Links JavaScript executables, manages runtime
-
-**Design Decision**: Moved jslibrarian from `driver/` to `jscomp/` to create a dedicated JavaScript subsystem, separating concerns from the main compiler driver.
+#### 3. JavaScript Compilation Helpers (`optcomp/jscomp.ml`)
+- Wrap the shared `Optcompile` pipeline, translate Flambda2 output to JSIR, and delegate to the vendor `js_of_ocaml` CLI for compilation, archive creation, and linking.
+- Resolve inputs through `Load_path` so `.cmjo`, `.cmjxa`, and raw `.js` support files can be reused by the linker without bespoke tooling.
 
 ## Implementation Details
 
@@ -102,18 +100,18 @@ let with_int_prefix_exn ~(kind : Flambda_kind.Standard_int.t) ~percent_for_imms 
 
 ### Runtime Strategy
 
-The JavaScript linker (`jslink.ml`) implements the js_of_ocaml runtime building strategy:
+`optcomp/jscomp.ml` invokes the js_of_ocaml CLI directly:
 
-1. Build runtime file: `output.js.runtime.js` containing the js_of_ocaml runtime and any additional JavaScript primitives
-2. Link runtime with compiled libraries/objects
-3. Clean up temporary runtime file
+1. `js_of_ocaml build-runtime` produces `output.runtime.js`, combining the js_of_ocaml runtime with any `.js` helper files gathered from `Clflags.ccobjs`.
+2. `js_of_ocaml link` then stitches together the runtime, generated `.cmjo` units, and other JavaScript objects.
+3. The temporary runtime file is removed once linking completes.
 
 
 ### Build System Integration
 
-#### Dune Configuration
-- JavaScript compilation modules (`jscompile`, `jslink`, `jslibrarian`) live in `ocamloptcomp`
-- Dynamic rule generation for standard library compilation (`tools/gen_ocamlj_rules.sh` )
+#### Build Tooling
+- JavaScript compilation logic lives alongside the native backend in `ocamloptcomp` (`optcomp/jscomp.ml`, driver hooks, runtime helpers).
+- `driver/compenv.ml` recognises `.js` stubs when the JavaScript backend is active so they are forwarded to the linker just like `.c` files for native builds.
 
 #### Parallel Build Infrastructure
 Maintains parallel file extensions for each backend:
@@ -123,20 +121,11 @@ Maintains parallel file extensions for each backend:
 
 ### Testing Infrastructure
 
-JavaScript is a first-class backend in the test system:
+JavaScript is a first-class backend in ocamltest:
 
-```ocaml
-type t = Native | Bytecode | Javascript
-
-let module_extension = make_backend_function "cmo" "cmx" "cmjx"
-let library_extension = make_backend_function "cma" "cmxa" "cmjxa"
-let executable_extension = make_backend_function "byte" "opt" "js"
-```
-
-**Key features**:
-- JavaScript-specific test references
-- Stubs for JavaScript-incompatible C bindings
-- Size metrics collection for JavaScript artifacts
+- `ocamltest/ocaml_compilers.ml` defines a compiler descriptor that always applies `-target js_of_ocaml` when the JavaScript backend is requested.
+- `ocamltest/ocaml_actions.ml` filters backend-specific sources so `.c` stubs are ignored and `.js` helpers are retained for JavaScript runs.
+- Built-in predicates skip tests that rely on unsupported libraries and effect handlers. All suites under `testsuite/tests/effects/` are automatically marked as skipped, avoiding noisy failures until the runtime grows real effect support.
 
 ## Areas Requiring Clarification
 
@@ -151,19 +140,7 @@ let executable_extension = make_backend_function "byte" "opt" "js"
 **Design Decision**: Effects are always enabled for simplicity. This could be made configurable in future work but is not a current priority.
 
 ### 3. Float32 Support
-**Implementation**: JavaScript only has Float64, so Float32 operations are emulated:
-- Each operation is performed in 64-bit precision then rounded using `Math.fround()`
-- **Important**: Marshalled float32 data is incompatible between JavaScript and native programs
-
-From `external/js_of_ocaml/runtime/js/float32.js`:
-```javascript
-// 32-bit floats are represented as javascript numbers, i.e. 64-bit floats.
-// Each operation is performed in 64-bit precision and then rounded to the
-// nearest 32-bit float.
-function caml_float32_of_float(x) {
-    return Math.fround(x);
-}
-```
+JavaScript only has Float64, so Float32 operations are emulated (see `external/js_of_ocaml/runtime/js/float32.js`). Each operation is performed in 64-bit precision then rounded using `Math.fround()`. Marshalled float32 data is therefore incompatible between JavaScript and native programs.
 
 ### 4. Domain Operations
 **Implementation**: Domains are executed synchronously in JavaScript's single-threaded environment:
@@ -210,7 +187,7 @@ function caml_float32_of_float(x) {
 3. **Wasm backend**: Leverage JSIR for WebAssembly
 4. **Streaming compilation**: Faster build times
 5. **JavaScript-specific optimizations**: Leverage JavaScript engine quirks
-6. **Configurable effects**: Make effects support optional for performance-sensitive code
+6. **Effects runtime**: Implement real effect handlers instead of skipping the test suite
 7. **True parallelism**: Explore Web Workers for domain support
 
 ### Open Questions
@@ -229,10 +206,34 @@ function caml_float32_of_float(x) {
 
 ## Appendix: Key Source Locations
 
-- `driver/jscompile.ml` - Main compilation driver
-- `driver/optmaindriver.ml` - Command-line interface (shared with native via `-target`)
+- `optcomp/jscomp.ml` - JavaScript backend implementation
+- `driver/optmaindriver.ml` / `driver/compenv.ml` - Driver entry and argument handling
 - `middle_end/flambda2/to_jsir/` - JSIR translation
-- `jscomp/` - JavaScript-specific compilation tools
 - `external/js_of_ocaml/` - Modified js_of_ocaml vendor
 - `testsuite/tests/` - Test modifications
-- `ocamltest/ocaml_backends.ml` - Test backend support
+- `ocamltest/ocaml_compilers.ml`, `ocamltest/ocaml_actions.ml`, `ocamltest/builtin_actions.ml` - Test harness integration
+
+## Implementation Notes (2025)
+
+### ocamlopt Driver and Backend Wiring
+- The `Optcomp.Make` functor in `optcomp/optcompile.ml` provides the shared compilation pipeline. Each backend implements `Optcomp_intf.Backend`, defining extensions, link/emit hooks, and `compile_implementation`. The native backend wraps `Asmgen`, while the JavaScript backend lives in `optcomp/jscomp.ml` and delegates to `js_of_ocaml`.
+- `driver/optmaindriver.ml` chooses a backend by inspecting `Clflags.backend_target ()`. The new `-target` flag wires to `Clflags.set_backend_target` during argument parsing, letting the driver instantiate `Jscomp.Make(Flambda2)` when `-target js_of_ocaml` is supplied.
+- `driver/compenv.ml` drives command processing. It now special-cases `.js` files when the active backend is JavaScript so C-style foreign stubs packaged as raw JavaScript are added to `ccobjs` and forwarded to the js linker. The same module also handles default output naming; when `-o` is omitted, `ocamlopt -target js_of_ocaml` defaults to `a.out.js`.
+
+### JavaScript Backend Specifics
+- `optcomp/jscomp.ml` is the glue layer between the shared `Optcompile` pipeline and the vendor `js_of_ocaml` CLI. It:
+  - Reuses a helper `link_args` to construct `js_of_ocaml` command lines and centralises handling of `--debug-info`, `--linkall`, and `Clflags.all_ccopts`.
+  - Builds the runtime with `js_of_ocaml build-runtime`, then links compiled objects (resolved through `Load_path`) along with any `Clflags.ccobjs` carried over from other build phases.
+  - Emits JSIR intermediates (`prefixname.jsir`) rather than temporary `.cmj` files, saving the serialized IR before invoking `js_of_ocaml compile` and cleaning up the artifact afterwards.
+  - Resolves archive inputs through `Load_path` so `.cmjxa`/`.cmja` creation mirrors native linking semantics.
+
+### ocamltest Integration
+- `ocamltest/ocaml_compilers.ml` defines compiler descriptors. Exposing the `flags` field through the tool interface ensures the JavaScript backend always inserts `-target js_of_ocaml` when ocamltest invokes `ocamlopt`. This is consumed in `ocamltest/ocaml_actions.ml` by prepending `Compiler.flags` to every command line.
+- `ocamltest/ocaml_actions.ml` filters modules per backend (`filter_modules_for_backend`), removing `.c` stubs from JavaScript invocations and ensuring `.js` helpers are retained.
+- JavaScript runs add two predicates up front: `libraries_are_javascript_compatible` guards against tests that depend on unsupported libs, and `javascript_supports_effects` skips whole suites (e.g., everything under `testsuite/tests/effects/`) because the current js runtime throws `Failure("Effect handlers are not supported")`. The predicate checks both the test source file and its directory components for an `effects` segment, avoiding per-test maintenance.
+- With these predicates in place, running `env OCAMLTEST_BACKENDS=javascript make -s test` skips unsupported effect tests but keeps full coverage elsewhere, yielding a clean report without manual filtering.
+
+### Practical Tips
+- When adding new outputs or artifacts to the JavaScript backend, update `Optcomp_intf.File_extensions` first; the `Optcompile.Make` pipeline automatically uses those for dump file naming and artifact saving via `Unit_info`.
+- Any new command-line flags that must always accompany a backend should be threaded through the tool descriptors (`Ocaml_compilers.compiler`) so ocamltest and the CLI stay in sync.
+- If tests rely on auxiliary `.js` files, ensure `driver/compenv` categorises them correctly or they will be dropped before linking.
