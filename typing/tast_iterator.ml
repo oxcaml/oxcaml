@@ -473,7 +473,8 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
     sub.expr sub exp1;
     sub.expr sub exp2
   | Texp_hole _ -> ()
-
+  | Texp_quotation exp -> sub.expr sub exp
+  | Texp_antiquotation exp -> sub.expr sub exp
 
 let package_type sub {pack_fields; pack_txt; _} =
   List.iter (fun (lid, p) -> iter_loc sub lid; sub.typ sub p) pack_fields;
@@ -700,6 +701,8 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
   | Ttyp_open (_, mod_ident, t) ->
       iter_loc sub mod_ident;
       sub.typ sub t
+  | Ttyp_quote t -> sub.typ sub t
+  | Ttyp_splice t -> sub.typ sub t
   | Ttyp_of_kind jkind -> sub.jkind_annotation sub jkind
   | Ttyp_call_pos -> ()
 

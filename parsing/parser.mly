@@ -287,8 +287,8 @@ let unclosed opening_name opening_loc closing_name closing_loc =
   raise(Syntaxerr.Error(Syntaxerr.Unclosed(make_loc opening_loc, opening_name,
                                            make_loc closing_loc, closing_name)))
 
-let quotation_reserved name loc =
-  raise(Syntaxerr.Error(Syntaxerr.Quotation_reserved(make_loc loc, name)))
+let unspliceable loc =
+  raise(Syntaxerr.Error(Syntaxerr.Unspliceable (make_loc loc)))
 
 (* Normal mutable arrays and immutable arrays are parsed identically, just with
    different delimiters.  The parsing is done by the [array_exprs] rule, and the
@@ -1169,7 +1169,7 @@ The precedences must be listed from low to high.
 %nonassoc LBRACKETAT
 %right    COLONCOLON                    /* expr (e :: e :: e) */
 %left     INFIXOP2 PLUS PLUSDOT MINUS MINUSDOT PLUSEQ /* expr (e OP e OP e) */
-%left     PERCENT INFIXOP3 MOD STAR                 /* expr (e OP e OP e) */
+%left     PERCENT INFIXOP3 MOD STAR     /* expr (e OP e OP e) */
 %right    INFIXOP4                      /* expr (e OP e OP e) */
 %nonassoc prec_unboxed_product_kind
 %nonassoc prec_unary_minus prec_unary_plus /* unary - */
@@ -2929,6 +2929,22 @@ unboxed_access:
       { Uaccess_unboxed_field $2 }
 ;
 
+spliceable_expr:
+  | LESSLBRACKET seq_expr RBRACKETGREATER
+      { mkexp ~loc:$sloc (Pexp_quotation ($2)) }
+  | LPAREN seq_expr RPAREN
+      { reloc_exp ~loc:$sloc $2 }
+  | LPAREN seq_expr error
+      { unclosed "(" $loc($1) ")" $loc($3) }
+  | LPAREN seq_expr type_constraint_with_modes RPAREN
+      { let (t, m) = $3 in
+        mkexp_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2 t }
+  | mkrhs(val_longident)
+      { mkexp ~loc:$sloc (Pexp_ident ($1)) }
+  | error
+      { unspliceable $sloc }
+;
+
 simple_expr:
   | LPAREN seq_expr RPAREN
       { reloc_exp ~loc:$sloc $2 }
@@ -3200,17 +3216,17 @@ block_access:
           mkexp_attrs ~loc:($startpos($3), $endpos)
             (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), Some $8, [])) $5 in
         Pexp_open(od, modexp) }
-  | LESSLBRACKET expr_semi_list RBRACKETGREATER
-      { quotation_reserved "<[" $loc($1) }
-  | LESSLBRACKET expr_semi_list error
-      { unclosed "<[" $loc($1) "]>" $loc($3) }
-  | DOLLAR error
-      { quotation_reserved "$" $loc($1) }
   | mod_longident DOT
     LPAREN MODULE ext_attributes module_expr COLON error
       { unclosed "(" $loc($3) ")" $loc($8) }
   | HASHLPAREN labeled_tuple RPAREN
       { Pexp_unboxed_tuple $2 }
+  | DOLLAR spliceable_expr
+      { Pexp_splice $2 }
+  | LESSLBRACKET seq_expr RBRACKETGREATER
+      { Pexp_quotation $2 }
+  | LESSLBRACKET seq_expr error
+      { unclosed "<[" $loc($1) "]>" $loc($3) }
 ;
 labeled_simple_expr:
     simple_expr %prec below_HASH
@@ -4728,6 +4744,7 @@ tuple_type:
     - object types                < x: t; ... >
     - variant types               [ `A ]
     - extension                   [%foo ...]
+    - quoted types                <[ t ]>
 
   We support local opens on the following classes of types:
     - parenthesised
@@ -4767,6 +4784,8 @@ delimited_type_supporting_local_open:
         { Ptyp_variant(fields, Closed, Some tags) }
     | HASHLPAREN unboxed_tuple_type_body RPAREN
         { Ptyp_unboxed_tuple $2 }
+    | LESSLBRACKET core_type RBRACKETGREATER
+        { Ptyp_quote $2 }
   )
   { $1 }
 ;
@@ -4796,6 +4815,18 @@ delimited_type:
     { $1 }
 ;
 
+spliceable_type:
+  | type_ = delimited_type_supporting_local_open
+      { type_ }
+  | mktyp( /* begin mktyp group */
+        tid = mkrhs(type_longident)
+          { Ptyp_constr (tid, []) }
+      | QUOTE ident = ident
+          { Ptyp_var (ident, None) }
+  )
+  { $1 } /* end mktyp group */
+;
+
 atomic_type:
   | type_ = delimited_type
       { type_ }
@@ -4818,6 +4849,8 @@ atomic_type:
         { Ptyp_var (ident, None) }
     | UNDERSCORE
         { Ptyp_any None }
+    | DOLLAR type_ = spliceable_type
+        { Ptyp_splice type_ }
   )
   { $1 } /* end mktyp group */
   | LPAREN QUOTE name=ident COLON jkind=jkind_annotation RPAREN
@@ -4826,12 +4859,6 @@ atomic_type:
       { mktyp ~loc:$sloc (Ptyp_any (Some jkind)) }
   | LPAREN TYPE COLON jkind=jkind_annotation RPAREN
       { mktyp ~loc:$loc (Ptyp_of_kind jkind) }
-  | LESSLBRACKET core_type RBRACKETGREATER
-      { quotation_reserved "<[" $loc($1) }
-  | LESSLBRACKET core_type error
-      { unclosed "<[" $loc($1) "]>" $loc($3) }
-  | DOLLAR error
-      { quotation_reserved "$" $loc($1) }
 
 
 (* This is the syntax of the actual type parameters in an application of
@@ -5016,25 +5043,25 @@ operator:
   /* Still support the two symbols as infix operators */
   | AT             {"@"}
   | ATAT           {"@@"}
-  | op = INFIXOP1 { op }
-  | op = INFIXOP2 { op }
-  | op = infixop3 { op }
-  | op = INFIXOP4 { op }
-  | PLUS           {"+"}
-  | PLUSDOT       {"+."}
-  | PLUSEQ        {"+="}
-  | MINUS          {"-"}
-  | MINUSDOT      {"-."}
-  | STAR           {"*"}
-  | PERCENT        {"%"}
-  | EQUAL          {"="}
-  | LESS           {"<"}
-  | GREATER        {">"}
-  | OR            {"or"}
-  | BARBAR        {"||"}
-  | AMPERSAND      {"&"}
-  | AMPERAMPER    {"&&"}
-  | COLONEQUAL    {":="}
+  | op = INFIXOP1  { op }
+  | op = INFIXOP2  { op }
+  | op = infixop3  { op }
+  | op = INFIXOP4  { op }
+  | PLUS            {"+"}
+  | PLUSDOT        {"+."}
+  | PLUSEQ         {"+="}
+  | MINUS           {"-"}
+  | MINUSDOT       {"-."}
+  | STAR            {"*"}
+  | PERCENT         {"%"}
+  | EQUAL           {"="}
+  | LESS            {"<"}
+  | GREATER         {">"}
+  | OR             {"or"}
+  | BARBAR         {"||"}
+  | AMPERSAND       {"&"}
+  | AMPERAMPER     {"&&"}
+  | COLONEQUAL     {":="}
 ;
 index_mod:
 | { "" }

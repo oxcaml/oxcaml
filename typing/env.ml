@@ -163,8 +163,18 @@ type lock =
   | Region_lock
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
+  | Local_env_lock (* to allow reference of top-level names inside quotations *)
+  | Quotation_lock
+  | Splice_lock
 
 type locks = lock list
+
+type empty = |
+
+type mode_with_locks = Mode.Value.l * locks
+
+let locks_empty = []
+let locks_is_empty l = l = locks_empty
 
 type summary =
     Env_empty
@@ -365,15 +375,6 @@ module TycompTbl =
 
   end
 
-
-type empty = |
-
-type mode_with_locks = Mode.Value.l * locks
-
-let locks_empty = []
-
-let locks_is_empty l = l = locks_empty
-
 module IdTbl =
   struct
     (** This module is used to store all kinds of components except
@@ -471,7 +472,7 @@ module IdTbl =
         | Nothing -> raise exn
         end
 
-    let find_same id (tbl : (empty, _, _) t) =
+    let find_same id (tbl : (_, _, _) t) =
       find_same_without_locks id tbl
 
     let rec find_same_and_locks id tbl macc =
@@ -559,7 +560,7 @@ module IdTbl =
             (Pdot (root, name), desc) :: find_all wrap name next
           with Not_found ->
             find_all wrap name next
-          end
+        end
       | Map {f; next} ->
           List.map (fun (p, desc) -> (p, f desc))
             (find_all wrap name next)
@@ -656,15 +657,16 @@ type t = {
   constrs: (lock, constructor_data) TycompTbl.t;
   labels: (empty, label_data) TycompTbl.t;
   unboxed_labels: (empty, unboxed_label_description) TycompTbl.t;
-  types: (empty, type_data, type_data) IdTbl.t;
+  types: (lock, type_data, type_data) IdTbl.t;
   modules: (lock, module_entry, module_data) IdTbl.t;
-  modtypes: (empty, modtype_data, modtype_data) IdTbl.t;
+  modtypes: (lock, modtype_data, modtype_data) IdTbl.t;
   classes: (lock, class_data, class_data) IdTbl.t;
   cltypes: (empty, cltype_data, cltype_data) IdTbl.t;
   functor_args: unit Ident.tbl;
   summary: summary;
   local_constraints: type_declaration Path.Map.t;
   flags: int;
+  stage: int;
 }
 
 and module_components =
@@ -842,6 +844,8 @@ type lookup_error =
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of
       [`Escape of escaping_context | `Shared of shared_context | `Closure]
+  | Incompatible_stage of Longident.t * Location.t * int * Location.t * int
+  | No_constructor_in_stage of Longident.t * Location.t * int
 
 type error =
   | Missing_module of Location.t * Path.t * Path.t
@@ -939,6 +943,7 @@ let empty = {
   summary = Env_empty; local_constraints = Path.Map.empty;
   flags = 0;
   functor_args = Ident.empty;
+  stage = 0;
  }
 
 let in_signature b env =
@@ -2820,7 +2825,9 @@ let enter_module ~scope ?arg s presence mty ?mode env =
 let add_lock lock env =
   { env with
     values = IdTbl.add_lock lock env.values;
+    types = IdTbl.add_lock lock env.types;
     modules = IdTbl.add_lock lock env.modules;
+    modtypes = IdTbl.add_lock lock env.modtypes;
     classes = IdTbl.add_lock lock env.classes;
     constrs = TycompTbl.add_lock lock env.constrs;
   }
@@ -2845,6 +2852,36 @@ let add_region_lock env = add_lock Region_lock env
 let add_exclave_lock env = add_lock Exclave_lock env
 
 let add_unboxed_lock env = add_lock Unboxed_lock env
+
+let add_local_env_lock env = add_lock Local_env_lock env
+
+let add_quotation_lock env =
+  add_lock Quotation_lock {env with stage = env.stage + 1}
+
+let add_splice_lock env = add_lock Splice_lock {env with stage = env.stage - 1}
+
+let without_open_quotations env = env.stage = 0
+let has_open_quotations env = env.stage <> 0
+let stage env = env.stage
+
+let quotation_locks_offset locks =
+  List.fold_right
+    (fun lock rel_stage ->
+       match rel_stage with
+       | None -> None
+       | Some n ->
+         match lock with
+         | Quotation_lock -> Some (n + 1)
+         | Splice_lock -> Some (n - 1)
+         | Local_env_lock -> None
+         | Escape_lock _
+         | Exclave_lock
+         | Region_lock
+         | Unboxed_lock
+         | Share_lock _
+         | Closure_lock _  -> Some n)
+    locks
+    (Some 0)
 
 (* Insertion of all components of a signature *)
 
@@ -3290,7 +3327,14 @@ let lookup_global_name_module_no_locks
 let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   let path, locks, data =
     match find_name_module ~mark:use s env.modules with
-    | res -> res
+    | path, locks, data -> begin
+        match quotation_locks_offset locks with
+        | None | Some 0 -> path, locks, data
+        | Some n ->
+          may_lookup_error errors loc env
+            (Incompatible_stage (Lident s, loc, env.stage,
+                                 Location.none, env.stage - n))
+    end
     | exception Not_found ->
         may_lookup_error errors loc env (Unbound_module (Lident s))
   in
@@ -3420,6 +3464,7 @@ let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
       | Unboxed_lock ->
           unboxed_type ~errors ~env ~loc ~lid ty;
           vmode
+      | Quotation_lock | Splice_lock | Local_env_lock -> vmode
     ) vmode locks
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
@@ -3462,39 +3507,66 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
       | Closure_lock _ ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure `Closure)
-      | Unboxed_lock -> mode
+      | Unboxed_lock | Quotation_lock | Splice_lock | Local_env_lock ->
+          mode
     ) mode locks
 
 let lookup_ident_value ~errors ~use ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
-  | Ok (path, locks, Val_bound vda) ->
+  | Ok (path, locks, Val_bound vda) -> begin
       begin match vda with
       | {vda_description={val_kind=Val_mut (m0, _); _}; _} ->
           m0
           |> walk_locks_for_mutable_mode ~errors ~loc ~env locks
           |> ignore
       | _ -> () end;
-      use_value ~use ~loc path vda;
-      path, locks, vda
+      match quotation_locks_offset locks with
+      | None | Some 0 -> begin
+          use_value ~use ~loc path vda;
+          path, locks, vda
+        end
+      | Some n ->
+          may_lookup_error errors loc env
+            (Incompatible_stage (Lident name, loc, env.stage,
+                                 vda.vda_description.val_loc, env.stage - n))
+    end
   | Ok (_, _, Val_unbound reason) ->
       report_value_unbound ~errors ~loc env reason (Lident name)
   | Error _ ->
       may_lookup_error errors loc env (Unbound_value (Lident name, No_hint))
 
 let lookup_ident_type ~errors ~use ~loc s env =
-  match IdTbl.find_name wrap_identity ~mark:use s env.types with
-  | (path, data) as res ->
-      use_type ~use ~loc path data;
-      res
-  | exception Not_found ->
+  match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.types with
+  | Ok (path, locks, tda) -> begin
+      match quotation_locks_offset locks with
+      | None | Some 0 -> begin
+          use_type ~use ~loc path tda;
+          path, locks, tda
+        end
+      | Some n ->
+          may_lookup_error errors loc env
+            (Incompatible_stage (Lident s, loc, env.stage,
+                                 tda.tda_declaration.type_loc,
+                                 env.stage - n))
+    end
+  | exception Not_found | Error _ ->
       may_lookup_error errors loc env (Unbound_type (Lident s))
 
 let lookup_ident_modtype ~errors ~use ~loc s env =
-  match IdTbl.find_name wrap_identity ~mark:use s env.modtypes with
-  | (path, data) ->
-      use_modtype ~use ~loc path data.mtda_declaration;
-      (path, data.mtda_declaration)
-  | exception Not_found ->
+  match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.modtypes with
+  | Ok (path, locks, data) -> begin
+      match quotation_locks_offset locks with
+      | None | Some 0 -> begin
+          use_modtype ~use ~loc path data.mtda_declaration;
+          (path, locks, data.mtda_declaration)
+        end
+      | Some n ->
+          may_lookup_error errors loc env
+            (Incompatible_stage (Lident s, loc, env.stage,
+                                 data.mtda_declaration.mtd_loc,
+                                 env.stage -n))
+    end
+  | Error _ ->
       may_lookup_error errors loc env (Unbound_modtype (Lident s))
 
 let lookup_ident_class ~errors ~use ~loc s env =
@@ -3537,8 +3609,23 @@ let lookup_all_ident_labels (type rep) ~(record_form : rep record_form) ~errors
     end
 
 let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
-  match TycompTbl.find_all_and_locks ~mark:use s env.constrs with
-  | [] -> may_lookup_error errors loc env (Unbound_constructor (Lident s))
+  let cstrs = TycompTbl.find_all_and_locks ~mark:use s env.constrs in
+  let cstrs_filtered =
+    List.filter
+      (fun (_, (locks, _)) ->
+         match quotation_locks_offset locks with
+         | None | Some 0 -> true
+         | Some _ -> false)
+      cstrs
+  in
+  match cstrs_filtered with
+  | [] -> begin
+      match cstrs with
+      | [] -> may_lookup_error errors loc env (Unbound_constructor (Lident s))
+      | _ ->
+          may_lookup_error errors loc env
+            (No_constructor_in_stage (Lident s, loc, env.stage))
+    end
   | cstrs ->
       List.map
         (fun (cda, (locks, use_fn)) ->
@@ -3692,22 +3779,26 @@ let lookup_dot_value ~errors ~use ~loc l s env =
       may_lookup_error errors loc env (Unbound_value (Ldot(l, s), No_hint))
 
 let lookup_dot_type ~errors ~use ~loc l s env =
-  let (p, _, comps) = lookup_structure_components ~errors ~use ~loc l env in
+  let (p, (_, locks), comps) =
+    lookup_structure_components ~errors ~use ~loc l env
+  in
   match NameMap.find s comps.comp_types with
   | tda ->
       let path = Pdot(p, s) in
       use_type ~use ~loc path tda;
-      (path, tda)
+      (path, locks, tda)
   | exception Not_found ->
       may_lookup_error errors loc env (Unbound_type (Ldot(l, s)))
 
 let lookup_dot_modtype ~errors ~use ~loc l s env =
-  let (p, _, comps) = lookup_structure_components ~errors ~use ~loc l env in
+  let (p, (_, locks), comps) =
+    lookup_structure_components ~errors ~use ~loc l env
+  in
   match NameMap.find s comps.comp_modtypes with
   | mta ->
       let path = Pdot(p, s) in
       use_modtype ~use ~loc path mta.mtda_declaration;
-      (path, mta.mtda_declaration)
+      (path, locks, mta.mtda_declaration)
   | exception Not_found ->
       may_lookup_error errors loc env (Unbound_modtype (Ldot(l, s)))
 
@@ -3795,10 +3886,10 @@ let add_components slot root env0 comps locks =
     add_v (fun x -> `Value x) comps.comp_values env0.values
   in
   let types =
-    add (fun x -> `Type x) comps.comp_types env0.types
+    add_v (fun x -> `Type x) comps.comp_types env0.types
   in
   let modtypes =
-    add (fun x -> `Module_type x) comps.comp_modtypes env0.modtypes
+    add_v (fun x -> `Module_type x) comps.comp_modtypes env0.modtypes
   in
   let classes =
     add_v (fun x -> `Class x) comps.comp_classes env0.classes
@@ -4012,12 +4103,12 @@ let lid_without_hash = function
 let lookup_type ~errors ~use ~loc lid env =
   match lid_without_hash lid with
   | None ->
-    let path, tda = lookup_type_full ~errors ~use ~loc lid env in
+    let path, _, tda = lookup_type_full ~errors ~use ~loc lid env in
     path, tda.tda_declaration
   | Some lid ->
     (* To get the hash version, look up without the hash, then look for the
        unboxed version *)
-    let path, data = lookup_type_full ~errors ~use ~loc lid env in
+    let path, _, data = lookup_type_full ~errors ~use ~loc lid env in
     match find_type_unboxed_version path env Path.Set.empty with
     | decl ->
       Path.unboxed_version path, decl
@@ -4032,7 +4123,7 @@ let lookup_modtype_lazy ~errors ~use ~loc lid env =
   | Lapply _ -> assert false
 
 let lookup_modtype ~errors ~use ~loc lid env =
-  let (path, mt) = lookup_modtype_lazy ~errors ~use ~loc lid env in
+  let (path, _, mt) = lookup_modtype_lazy ~errors ~use ~loc lid env in
   path, Subst.Lazy.force_modtype_decl mt
 
 let lookup_class ~errors ~use ~loc lid env =
@@ -4196,7 +4287,7 @@ let lookup_modtype ?(use=true) ~loc lid env =
   lookup_modtype ~errors:true ~use ~loc lid env
 
 let lookup_modtype_path ?(use=true) ~loc lid env =
-  fst (lookup_modtype_lazy ~errors:true ~use ~loc lid env)
+  fst3 (lookup_modtype_lazy ~errors:true ~use ~loc lid env)
 
 let lookup_class ?(use=true) ~loc lid env =
   let path, desc, vmode = lookup_class ~errors:true ~use ~loc lid env in
@@ -4630,6 +4721,13 @@ let print_lock_item ppf (item, lid) =
 
 module Style = Misc.Style
 
+let print_stage ppf stage =
+  if stage = 0 then fprintf ppf "no quotations or splices"
+  else if stage = 1 then fprintf ppf "one layer of quotation (<[ ... ]>)"
+  else if stage = -1 then fprintf ppf "one layer of splicing ($)"
+  else if stage > 1 then fprintf ppf "%d layers of quotation (<[ ... ]>)" stage
+  else fprintf ppf "%d layers of splicing ($)" stage
+
 let report_lookup_error _loc env ppf = function
   | Unbound_value(lid, hint) -> begin
       fprintf ppf "Unbound value %a"
@@ -4873,6 +4971,27 @@ let report_lookup_error _loc env ppf = function
       in
       fprintf ppf
         "@[Mutable variable cannot be used inside %s.@]" ctx
+  | Incompatible_stage (lid, usage_loc, usage_stage, intro_loc, intro_stage) ->
+      fprintf ppf
+        "@[Identifier %a is used at %a@ \
+         in a context with %a;@ \
+         it is introduced at %a@ \
+         in a context with %a.@]"
+        (Style.as_inline_code !print_longident) lid
+        Location.print_loc usage_loc
+        print_stage usage_stage
+        Location.print_loc intro_loc
+        print_stage intro_stage
+  | No_constructor_in_stage (lid, usage_loc, usage_stage) ->
+      fprintf ppf
+        "@[Constructor %a used at %a@ \
+         is unbound in this context;@ \
+         identifier %a is unbound@ \
+         in a context with %a.@]"
+        (Style.as_inline_code !print_longident) lid
+        Location.print_loc usage_loc
+        (Style.as_inline_code !print_longident) lid
+        print_stage usage_stage
 
 let report_error ppf = function
   | Missing_module(_, path1, path2) ->

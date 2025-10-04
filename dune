@@ -263,6 +263,7 @@
   typedecl_properties
   typedecl_separability
   cmt2annot
+  camlinternalQuote_bootstrap
   ; manual update: mli only files
   annot
   outcometree
@@ -291,6 +292,7 @@
   translmod
   translobj
   translprim
+  translquote
   ;; bytecomp/
   debug_event
   meta
@@ -311,6 +313,7 @@
   value_rec_types
   asttypes
   cmo_format
+  camlinternalQuote_bootstrap
   cmj_format
   outcometree
   parsetree

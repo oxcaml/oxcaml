@@ -90,6 +90,8 @@ module Typ :
     val package: ?loc:loc -> ?attrs:attrs -> lid -> (lid * core_type) list
                  -> core_type
     val open_ : ?loc:loc -> ?attrs:attrs -> lid -> core_type -> core_type
+    val quote : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
+    val splice : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val of_kind : ?loc:loc -> ?attrs:attrs -> jkind_annotation -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type
 
@@ -219,6 +221,8 @@ module Exp:
     val comprehension :
       ?loc:loc -> ?attrs:attrs -> comprehension_expression -> expression
     val overwrite : ?loc:loc -> ?attrs:attrs -> expression -> expression -> expression
+    val quotation : ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val splice : ?loc:loc -> ?attrs:attrs -> expression -> expression
     val hole : ?loc:loc -> ?attrs:attrs -> unit -> expression
 
     val case: pattern -> ?guard:expression -> expression -> case
