@@ -72,6 +72,7 @@ typedef struct {
                                      initialized already? */
   pthread_mutex_t lock;           /* to protect contents */
   uintnat busy;                   /* 0 = free, 1 = taken */
+  pthread_t last_locked_by;       /* for debugging */
   atomic_uintnat waiters;         /* number of threads waiting on master lock */
   custom_condvar is_free;         /* signaled when free */
 } st_masterlock;
@@ -88,6 +89,7 @@ static int st_masterlock_init(st_masterlock * m)
     m->init = 1;
   }
   m->busy = 1;
+  m->last_locked_by = pthread_self();
   atomic_store_release(&m->waiters, 0);
   return 0;
 
@@ -102,35 +104,6 @@ static uintnat st_masterlock_waiters(st_masterlock * m)
   return atomic_load_acquire(&m->waiters);
 }
 
-static void st_bt_lock_acquire(st_masterlock *m) {
-
-  /* We do not want to signal the backup thread if it is not "working"
-     as it may very well not be, because we could have just resumed
-     execution from another thread right away. */
-  if (caml_bt_is_in_blocking_section()) {
-    caml_bt_enter_ocaml();
-  }
-
-  caml_acquire_domain_lock();
-
-  return;
-}
-
-static void st_bt_lock_release(st_masterlock *m) {
-
-  /* Here we do want to signal the backup thread iff there's
-     no thread waiting to be scheduled, and the backup thread is currently
-     idle. */
-  if (st_masterlock_waiters(m) == 0 &&
-      caml_bt_is_in_blocking_section() == 0) {
-    caml_bt_exit_ocaml();
-  }
-
-  caml_release_domain_lock();
-
-  return;
-}
-
 static void st_masterlock_acquire(st_masterlock *m)
 {
   pthread_mutex_lock(&m->lock);
@@ -140,8 +113,7 @@ static void st_masterlock_acquire(st_masterlock *m)
     atomic_fetch_add(&m->waiters, -1);
   }
   m->busy = 1;
-  if (domain_lockmode == LOCKMODE_DOMAINS)
-    st_bt_lock_acquire(m);
+  m->last_locked_by = pthread_self();
   pthread_mutex_unlock(&m->lock);
 
   return;
@@ -151,8 +123,6 @@ static void st_masterlock_release(st_masterlock * m)
 {
   pthread_mutex_lock(&m->lock);
   m->busy = 0;
-  if (domain_lockmode == LOCKMODE_DOMAINS)
-    st_bt_lock_release(m);
   pthread_mutex_unlock(&m->lock);
   custom_condvar_signal(&m->is_free);
 
@@ -190,8 +160,6 @@ Caml_inline void st_thread_yield(st_masterlock * m)
      messaging the bt should not be required because yield assumes
      that a thread will resume execution (be it the yielding thread
      or a waiting thread */
-  if (domain_lockmode == LOCKMODE_DOMAINS)
-    caml_release_domain_lock();
 
   do {
     /* Note: the POSIX spec prevents the above signal from pairing with this
@@ -202,10 +170,8 @@ Caml_inline void st_thread_yield(st_masterlock * m)
   } while (m->busy);
 
   m->busy = 1;
+  m->last_locked_by = pthread_self();
   atomic_fetch_add(&m->waiters, -1);
-
-  if (domain_lockmode == LOCKMODE_DOMAINS)
-    caml_acquire_domain_lock();
 
   pthread_mutex_unlock(&m->lock);
 
