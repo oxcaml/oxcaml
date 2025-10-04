@@ -26,15 +26,17 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
     let cmdline = Filename.quote_command prog args in
     match Ccomp.command cmdline with 0 -> () | _ -> raise (Sys_error cmdline)
 
-  let link_args ?(linkall = false) ?(ccopts = true) subcommand output_name
-      extra_args files =
+  let link_args ?(linkall = false) ?(include_jsopts = true) subcommand
+      output_name extra_args files =
     let debug_flag = if !Clflags.debug then ["--debug-info"] else [] in
     let linkall_flag =
       if linkall && !Clflags.link_everything then ["--linkall"] else []
     in
-    let ccopts_args = if ccopts then List.rev !Clflags.all_ccopts else [] in
+    let jsopts_args =
+      if include_jsopts then List.rev !Clflags.all_jsopts else []
+    in
     [subcommand; "-o"; output_name]
-    @ linkall_flag @ debug_flag @ files @ extra_args @ ccopts_args
+    @ linkall_flag @ debug_flag @ files @ extra_args @ jsopts_args
 
   let find_files files =
     ListLabels.map files ~f:(fun name ->
@@ -47,16 +49,25 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
   let link objfiles output_name ~cached_genfns_imports:_ ~genfns:_
       ~units_tolink:_ ~ppf_dump:_ : unit =
     let objfiles = find_files objfiles in
-    Clflags.ccobjs := find_files !Clflags.ccobjs;
-    let runtime_files, other_ccobjs =
-      ListLabels.partition !Clflags.ccobjs ~f:(fun f ->
-          Filename.check_suffix f ".js")
+    let js_support_files = find_files !Clflags.js_stubs in
+    let runtime_files, unexpected =
+      List.partition (fun f -> Filename.check_suffix f ".js") js_support_files
     in
+    Clflags.js_stubs := runtime_files;
+    if !Clflags.verbose
+    then
+      List.iter
+        (fun file ->
+          Format.eprintf
+            "ocamlopt: ignoring non-JavaScript support file %s when targeting \
+             js_of_ocaml@."
+            file)
+        unexpected;
     let runtime = output_name ^ ".runtime.js" in
     js_of_oxcaml
-      (link_args ~linkall:false ~ccopts:false "build-runtime" runtime []
+      (link_args ~linkall:false ~include_jsopts:false "build-runtime" runtime []
          runtime_files);
-    let files_to_link = (runtime :: other_ccobjs) @ objfiles in
+    let files_to_link = runtime :: objfiles in
     Misc.try_finally
       ~always:(fun () -> Misc.remove_file runtime)
       (fun () -> link_partial output_name files_to_link)
@@ -131,6 +142,6 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
                (if !Clflags.debug then ["--debug-info"] else []);
                ["-o"; output_filename];
                [jsir_filename];
-               List.rev !Clflags.all_ccopts ]))
+               List.rev !Clflags.all_jsopts ]))
       ~always:(fun () -> Misc.remove_file jsir_filename)
 end)

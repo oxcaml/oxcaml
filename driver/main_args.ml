@@ -65,6 +65,18 @@ let mk_ccopt f =
   "-ccopt", Arg.String f,
   "<opt>  Pass option <opt> to the C compiler and linker"
 
+let mk_jsopt f =
+  "-jsopt", Arg.String f,
+  "<opt>  Pass option <opt> to js_of_ocaml"
+
+let mk_jsopts f =
+  "-jsopts", Arg.String f,
+  "<opt>  Alias for -jsopt"
+
+let mk_jslib f =
+  "-jslib", Arg.String f,
+  "<file> Link additional JavaScript support file <file>"
+
 let mk_clambda_checks f =
   "-clambda-checks", Arg.Unit f, " Instrument clambda code with closure and \
     field access checks (for debugging the compiler)"
@@ -1133,6 +1145,8 @@ module type Compiler_options = sig
   val _cc : string -> unit
   val _cclib : string -> unit
   val _ccopt : string -> unit
+  val _jsopt : string -> unit
+  val _jslib : string -> unit
   val _cmi_file : string -> unit
   val _config : unit -> unit
   val _config_var : string -> unit
@@ -1376,6 +1390,9 @@ struct
     mk_cc F._cc;
     mk_cclib F._cclib;
     mk_ccopt F._ccopt;
+    mk_jsopt F._jsopt;
+    mk_jsopts F._jsopt;
+    mk_jslib F._jslib;
     mk_cmi_file F._cmi_file;
     mk_color F._color;
     mk_error_style F._error_style;
@@ -1612,6 +1629,9 @@ struct
     mk_cc F._cc;
     mk_cclib F._cclib;
     mk_ccopt F._ccopt;
+    mk_jsopt F._jsopt;
+    mk_jsopts F._jsopt;
+    mk_jslib F._jslib;
     mk_cmi_file F._cmi_file;
     mk_clambda_checks F._clambda_checks;
     mk_classic_inlining F._classic_inlining;
@@ -1927,6 +1947,9 @@ struct
     mk_cc F._cc;
     mk_cclib F._cclib;
     mk_ccopt F._ccopt;
+    mk_jsopt F._jsopt;
+    mk_jsopts F._jsopt;
+    mk_jslib F._jslib;
     mk_classic_inlining F._classic_inlining;
     mk_cmi_file F._cmi_file;
     mk_color F._color;
@@ -2367,6 +2390,8 @@ module Default = struct
     let _cc s = c_compiler := (Some s)
     let _cclib s = Compenv.defer (ProcessObjects (Misc.rev_split_words s))
     let _ccopt s = Compenv.first_ccopts := (s :: (!Compenv.first_ccopts))
+    let _jsopt s = Compenv.first_jsopts := (s :: !Compenv.first_jsopts)
+    let _jslib s = Compenv.defer (ProcessOtherFile s)
     let _cmi_file s = cmi_file := (Some s)
     let _config = Misc.show_config_and_exit
     let _config_var = Misc.show_config_variable_and_exit

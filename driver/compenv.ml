@@ -43,6 +43,23 @@ let fatal err =
   prerr_endline err;
   raise (Exit_with_status 2)
 
+let warn_once =
+  let seen = Hashtbl.create 7 in
+  fun message ->
+    if not (Hashtbl.mem seen message) then begin
+      Hashtbl.add seen message ();
+      if !Clflags.verbose then
+        Format.eprintf "ocamlopt: %s@." message
+    end
+
+let warn_js_ignore what =
+  warn_once ("ignoring " ^ what ^ " when targeting js_of_ocaml")
+
+let is_js_backend () =
+  match Clflags.backend_target () with
+  | Some Backend.Js_of_ocaml -> true
+  | _ -> false
+
 let extract_output = function
   | Some s -> s
   | None ->
@@ -60,6 +77,8 @@ let first_include_dirs = ref []
 let last_include_dirs = ref []
 let first_ccopts = ref []
 let last_ccopts = ref []
+let first_jsopts = ref []
+let last_jsopts = ref []
 let first_ppx = ref []
 let last_ppx = ref []
 let first_objfiles = ref []
@@ -469,6 +488,16 @@ let read_one_param ppf position name v =
         first_ccopts := v :: !first_ccopts
     end
 
+  | "jsopt"
+  | "jsopts" ->
+    begin
+      match position with
+      | Before_link | Before_compile _ ->
+        last_jsopts := v :: !last_jsopts
+      | Before_args ->
+        first_jsopts := v :: !first_jsopts
+    end
+
   | "ppx" ->
     begin
       match position with
@@ -658,11 +687,30 @@ let apply_config_file ppf position =
 let readenv ppf position =
   last_include_dirs := [];
   last_ccopts := [];
+  last_jsopts := [];
   last_ppx := [];
   last_objfiles := [];
   apply_config_file ppf position;
   read_OCAMLPARAM ppf position;
-  all_ccopts := !last_ccopts @ !first_ccopts;
+  let backend = match Clflags.backend_target () with
+    | Some backend -> backend
+    | None -> Backend.Native
+  in
+  let ccopts = !last_ccopts @ !first_ccopts in
+  begin match backend with
+  | Backend.Js_of_ocaml ->
+      if ccopts <> [] then warn_js_ignore "-ccopt/-cclib";
+      all_ccopts := []
+  | Backend.Native ->
+      all_ccopts := ccopts
+  end;
+  let jsopts = !last_jsopts @ !first_jsopts in
+  begin match backend with
+  | Backend.Js_of_ocaml -> all_jsopts := jsopts
+  | Backend.Native ->
+      if jsopts <> [] then warn_once "ignoring -jsopt outside of js_of_ocaml backend";
+      all_jsopts := []
+  end;
   all_ppx := !last_ppx @ !first_ppx
 
 let get_objfiles ~with_ocamlparam =
@@ -708,16 +756,23 @@ let process_action
       if !make_package then objfiles := (opref ^ ".cmi") :: !objfiles
   | ProcessCFile name ->
       readenv ppf (Before_compile name);
-      Location.input_name := name;
-      let obj_name = match !output_name with
-        | None -> c_object_of_filename name
-        | Some n -> n
-      in
-      if Ccomp.compile_file ?output:!output_name name <> 0
-      then raise (Exit_with_status 2);
-      ccobjs := obj_name :: !ccobjs
+      if is_js_backend () then
+        warn_js_ignore ("C source " ^ name)
+      else begin
+        Location.input_name := name;
+        let obj_name = match !output_name with
+          | None -> c_object_of_filename name
+          | Some n -> n
+        in
+        if Ccomp.compile_file ?output:!output_name name <> 0
+        then raise (Exit_with_status 2);
+        ccobjs := obj_name :: !ccobjs
+      end
   | ProcessObjects names ->
-      ccobjs := names @ !ccobjs
+      if is_js_backend () then begin
+        List.iter (fun n -> warn_js_ignore ("foreign object " ^ n)) names
+      end else
+        ccobjs := names @ !ccobjs
   | ProcessDLLs names ->
       dllibs := names @ !dllibs
   | ProcessOtherFile name ->
@@ -732,11 +787,15 @@ let process_action
          | _ -> false)
         && Filename.check_suffix name ".js"
       then
-        ccobjs := name :: !ccobjs
+        js_stubs := name :: !js_stubs
       else if Filename.check_suffix name Config.ext_obj
            || Filename.check_suffix name Config.ext_lib then begin
-        has_linker_inputs := true;
-        ccobjs := name :: !ccobjs
+        if is_js_backend () then
+          warn_js_ignore ("foreign object " ^ name)
+        else begin
+          has_linker_inputs := true;
+          ccobjs := name :: !ccobjs
+        end
       end
       else if not !native_code && Filename.check_suffix name Config.ext_dll then
         dllibs := name :: !dllibs

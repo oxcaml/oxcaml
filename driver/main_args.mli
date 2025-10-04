@@ -102,6 +102,8 @@ module type Compiler_options = sig
   val _cc : string -> unit
   val _cclib : string -> unit
   val _ccopt : string -> unit
+  val _jsopt : string -> unit
+  val _jslib : string -> unit
   val _cmi_file : string -> unit
   val _config : unit -> unit
   val _config_var : string -> unit

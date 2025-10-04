@@ -40,6 +40,7 @@ end)
 
 let objfiles = ref ([] : string list)   (* .cmo and .cma files *)
 and ccobjs = ref ([] : string list)     (* .o, .a, .so and -cclib -lxxx *)
+and js_stubs = ref ([] : string list)   (* support .js files for js_of_ocaml *)
 and dllibs = ref ([] : string list)     (* .so and -dllib -lxxx *)
 
 let cmi_file = ref None
@@ -116,6 +117,7 @@ and output_c_object = ref false         (* -output-obj *)
 and output_complete_object = ref false  (* -output-complete-obj *)
 and output_complete_executable = ref false  (* -output-complete-exe *)
 and all_ccopts = ref ([] : string list)     (* -ccopt *)
+and all_jsopts = ref ([] : string list)     (* -jsopt *)
 and classic = ref false                 (* -nolabels *)
 and nopervasives = ref false            (* -nopervasives *)
 and match_context_rows = ref 32         (* -match-context-rows *)

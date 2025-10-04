@@ -108,13 +108,18 @@ let create_archive file_list lib_name =
             li_external_symbols = Array.of_list unit.ui_external_symbols })
         descr_list
       in
+      let lib_ccobjs, lib_ccopts =
+        match Clflags.backend_target () with
+        | Some Clflags.Backend.Js_of_ocaml -> !Clflags.js_stubs, []
+        | _ -> !Clflags.ccobjs, !Clflags.all_ccopts
+      in
       let infos =
         { lib_units = units;
           lib_imports_cmi = cmis;
           lib_imports_cmx = cmxs;
           lib_generic_fns = Generic_fns.Tbl.entries genfns;
-          lib_ccobjs = !Clflags.ccobjs;
-          lib_ccopts = !Clflags.all_ccopts } in
+          lib_ccobjs;
+          lib_ccopts } in
       output_value outchan infos;
       Backend.create_archive archive_name objfile_list
     )

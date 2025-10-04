@@ -35,6 +35,21 @@ open Compilenv
 
 let link_partial = Backend.link_partial
 
+let tool_name = Filename.basename Sys.argv.(0)
+
+let fatal msg = Misc.fatal_errorf "%s: %s" tool_name msg
+
+let ensure_js_support files =
+  List.iter
+    (fun file ->
+       if not (Filename.check_suffix file ".js") then
+         fatal
+           (Printf.sprintf
+              "unsupported foreign object %s when targeting js_of_ocaml"
+              file))
+    files;
+  files
+
 module String = Misc.Stdlib.String
 module CU = Compilation_unit
 
@@ -195,8 +210,20 @@ let link_shared ~ppf_dump objfiles output_name =
         objfiles
         ([],[], Generic_fns.Partition.Set.empty)
     in
-    Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs ();
-    Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
+    let lib_ccobjs = Linkenv.lib_ccobjs () in
+    let lib_ccopts = Linkenv.lib_ccopts () in
+    begin
+      match Clflags.backend_target () with
+      | Some Clflags.Backend.Js_of_ocaml ->
+          let js = ensure_js_support lib_ccobjs in
+          Clflags.js_stubs := !Clflags.js_stubs @ js;
+          if lib_ccopts <> [] then
+            fatal "stored -ccopt flags are not supported when targeting js_of_ocaml"
+      | Some Clflags.Backend.Native
+      | None ->
+          Clflags.ccobjs := !Clflags.ccobjs @ lib_ccobjs;
+          Clflags.all_ccopts := lib_ccopts @ !Clflags.all_ccopts
+    end;
     Backend.link_shared
       ml_objfiles
       output_name
@@ -226,8 +253,20 @@ let link ~ppf_dump objfiles output_name =
       (match Linkenv.extract_missing_globals() with
        | [] -> ()
        | mg -> raise(Linkenv.Error (Missing_implementations mg)));
-    Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs ();
-    Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
+    let lib_ccobjs = Linkenv.lib_ccobjs () in
+    let lib_ccopts = Linkenv.lib_ccopts () in
+    begin
+      match Clflags.backend_target () with
+      | Some Clflags.Backend.Js_of_ocaml ->
+          let js = ensure_js_support lib_ccobjs in
+          Clflags.js_stubs := !Clflags.js_stubs @ js;
+          if lib_ccopts <> [] then
+            fatal "stored -ccopt flags are not supported when targeting js_of_ocaml"
+      | Some Clflags.Backend.Native
+      | None ->
+          Clflags.ccobjs := !Clflags.ccobjs @ lib_ccobjs;
+          Clflags.all_ccopts := lib_ccopts @ !Clflags.all_ccopts
+    end;
     (* put user's opts first *)
     Backend.link
       ml_objfiles
