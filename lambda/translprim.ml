@@ -420,6 +420,9 @@ let indexing_primitives =
       (Ptagged_int_index, "");
       (Punboxed_or_untagged_integer_index Unboxed_nativeint,
        "_indexed_by_nativeint#");
+      (Punboxed_or_untagged_integer_index Untagged_int, "_indexed_by_int#");
+      (Punboxed_or_untagged_integer_index Untagged_int8, "_indexed_by_int8#");
+      (Punboxed_or_untagged_integer_index Untagged_int16, "_indexed_by_int16#");
       (Punboxed_or_untagged_integer_index Unboxed_int32, "_indexed_by_int32#");
       (Punboxed_or_untagged_integer_index Unboxed_int64, "_indexed_by_int64#");
     ]
@@ -478,6 +481,24 @@ let array_vec_primitives =
                                          mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Punboxed_int32_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("untagged_int16_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Puntagged_int16_array_load_vec { size; unsafe; index_kind;
+                                          mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Puntagged_int16_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("untagged_int8_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Puntagged_int8_array_load_vec { size; unsafe; index_kind;
+                                         mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Puntagged_int8_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("untagged_int_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Puntagged_int_array_load_vec { size; unsafe; index_kind;
+                                         mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Puntagged_int_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_nativeint_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
          Punboxed_nativeint_array_load_vec { size; unsafe; index_kind;
@@ -496,6 +517,9 @@ let array_vec_primitives =
       (Ptagged_int_index, "");
       (Punboxed_or_untagged_integer_index Unboxed_nativeint,
        "_indexed_by_nativeint#");
+      (Punboxed_or_untagged_integer_index Untagged_int, "_indexed_by_int#");
+      (Punboxed_or_untagged_integer_index Untagged_int8, "_indexed_by_int8#");
+      (Punboxed_or_untagged_integer_index Untagged_int16, "_indexed_by_int16#");
       (Punboxed_or_untagged_integer_index Unboxed_int32, "_indexed_by_int32#");
       (Punboxed_or_untagged_integer_index Unboxed_int64, "_indexed_by_int64#");
     ]
@@ -1150,7 +1174,7 @@ and glb_scannable_kind kind1 kind2 =
 
 (* The following function computes the greatest lower bound of array kinds:
 
-        gen      unboxed-float  unboxed-int32  unboxed-int64  unboxed-nativeint
+        gen      unboxed-{float,int,int8,int16,int32,int64,nativeint}
          |
       /------\
       |      |
@@ -1186,6 +1210,15 @@ let glb_array_type loc t1 t2 =
     Punboxedfloatarray Unboxed_float32
   | Punboxedfloatarray _, _ | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
+  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int),
+    Punboxedoruntaggedintarray Untagged_int ->
+    Punboxedoruntaggedintarray Untagged_int
+  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int8),
+    Punboxedoruntaggedintarray Untagged_int8 ->
+    Punboxedoruntaggedintarray Untagged_int8
+  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int16),
+    Punboxedoruntaggedintarray Untagged_int16 ->
+    Punboxedoruntaggedintarray Untagged_int16
   | (Pgenarray | Punboxedoruntaggedintarray Unboxed_int32),
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray Unboxed_int32
@@ -1258,6 +1291,15 @@ let glb_array_ref_type loc t1 t2 =
   | Punboxedfloatarray_ref _, _
   | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
+  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int),
+    Punboxedoruntaggedintarray Untagged_int ->
+    Punboxedoruntaggedintarray_ref Untagged_int
+  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int8),
+    Punboxedoruntaggedintarray Untagged_int8 ->
+    Punboxedoruntaggedintarray_ref Untagged_int8
+  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int16),
+    Punboxedoruntaggedintarray Untagged_int16 ->
+    Punboxedoruntaggedintarray_ref Untagged_int16
   | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_int32),
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray_ref Unboxed_int32
@@ -1344,6 +1386,15 @@ let glb_array_set_type loc t1 t2 =
   | Punboxedfloatarray_set _, _
   | _, Punboxedfloatarray _ ->
     Misc.fatal_error "unexpected array kind in glb"
+  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int),
+    Punboxedoruntaggedintarray Untagged_int ->
+    Punboxedoruntaggedintarray_set Untagged_int
+  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int8),
+    Punboxedoruntaggedintarray Untagged_int8 ->
+    Punboxedoruntaggedintarray_set Untagged_int8
+  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int16),
+    Punboxedoruntaggedintarray Untagged_int16 ->
+    Punboxedoruntaggedintarray_set Untagged_int16
   | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_int32),
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray_set Unboxed_int32
