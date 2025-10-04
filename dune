@@ -45,7 +45,7 @@
 
 (copy_files# asmcomp/*.ml{,i})
 
-(copy_files# jscomp/*.ml{,i})
+(copy_files# optcomp/*.ml{,i})
 
 (copy_files# backend/*.ml{,i})
 
@@ -471,9 +471,7 @@
   compilenv
   ;; asmcomp/
   asmgen
-  asmlibrarian
   asmlink
-  asmpackager
   ;; backend/
   afl_instrument
   arch
@@ -612,15 +610,15 @@
   dwarf_variables_and_parameters
   dwarf_type
   ;; optcomp/
-  optcompiler
+  linkenv
+  optcompile
+  optlibrarian
+  optcomp_intf
   optlink
   optpackager
-  optlibrarian
-  optbackend_intf
   ;; driver/
   optlink_common
   opterrors
-  optcompile
   optmaindriver
   compiler_hooks
   ;; printer/
@@ -669,12 +667,12 @@
  (instrumentation
   (backend bisect_ppx))
  (libraries
-  oxcaml_driver
   memtrace
   flambda2
   flambda2_ui
   flambda2_to_cmm
   flambda2_to_jsir
+  gc_timings
   ocamloptcomp
   ocamlcommon
   unix)
@@ -693,11 +691,11 @@
  (ocamlopt_flags
   (:standard -runtime-variant nnp))
  (libraries
-  oxcaml_driver
   memtrace
   flambda2
   flambda2_ui
   flambda2_to_cmm
+  gc_timings
   ocamloptcomp
   ocamlcommon
   unix)
@@ -715,7 +713,6 @@
  (ocamlc_flags unix.cma)
  (ocamlopt_flags unix.cmxa)
  (libraries
-  oxcaml_driver
   flambda2
   flambda2_ui
   flambda2_to_cmm
