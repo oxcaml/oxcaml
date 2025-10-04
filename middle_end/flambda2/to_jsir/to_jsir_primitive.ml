@@ -30,10 +30,15 @@ open! Jsoo_imports
 
 module Unboxed_array_tags = struct
   let unboxed_int64_array_tag = 1
+
   let unboxed_int32_array_even_tag = 2
+
   let unboxed_int32_array_odd_tag = 3
+
   let unboxed_float32_array_even_tag = 4
+
   let unboxed_float32_array_odd_tag = 5
+
   let unboxed_nativeint_array_tag = 9
 end
 
@@ -114,9 +119,7 @@ let ensure_var_from_arg ~env:_ ~res = function
   | Jsir.Pv var -> var, res
   | Jsir.Pc const ->
     let var = Jsir.Var.fresh () in
-    let res =
-      To_jsir_result.add_instr_exn res (Let (var, Constant const))
-    in
+    let res = To_jsir_result.add_instr_exn res (Let (var, Constant const)) in
     var, res
 
 let sign_extend_prim_arg ~env ~res ~bits arg =
@@ -175,9 +178,7 @@ let sign_extend_simple ~env ~res ~bits simple =
   Some var, env, res
 
 let sign_extend_var ~env ~res ~bits var =
-  let var, env, res =
-    sign_extend_prim_arg ~env ~res ~bits (Pv var)
-  in
+  let var, env, res = sign_extend_prim_arg ~env ~res ~bits (Pv var) in
   Some var, env, res
 
 let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
@@ -370,12 +371,9 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
       (* Same type: just return identity since already sign-extended *)
       identity ~env ~res x
     | Naked_int8, Naked_int16 -> identity ~env ~res x
-    | Naked_int16, Naked_int8 ->
-      sign_extend_simple ~env ~res ~bits:8 x
-    | Naked_int8, (Tagged_immediate | Naked_immediate) ->
-      identity ~env ~res x
-    | Naked_int16, (Tagged_immediate | Naked_immediate) ->
-      identity ~env ~res x
+    | Naked_int16, Naked_int8 -> sign_extend_simple ~env ~res ~bits:8 x
+    | Naked_int8, (Tagged_immediate | Naked_immediate) -> identity ~env ~res x
+    | Naked_int16, (Tagged_immediate | Naked_immediate) -> identity ~env ~res x
     | (Tagged_immediate | Naked_immediate), Naked_int8 ->
       sign_extend_simple ~env ~res ~bits:8 x
     | (Tagged_immediate | Naked_immediate), Naked_int16 ->
@@ -596,7 +594,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       use_prim' (Extern extern_name))
   | Int_shift (kind, op) -> (
     match kind with
-    | Naked_int8 | Naked_int16 -> (
+    | Naked_int8 | Naked_int16 ->
       let bits = bits_of_small_int kind in
       let shift_op =
         match op with
@@ -618,7 +616,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         To_jsir_result.add_instr_exn res
           (Let (result, Prim (Extern shift_op, [x; y])))
       in
-      sign_extend_var ~env ~res ~bits result)
+      sign_extend_var ~env ~res ~bits result
     | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
     | Naked_nativeint ->
       let op_name =
@@ -718,7 +716,8 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Unsigned -> (
         match kind with
         | Naked_int8 | Naked_int16 ->
-          (* For small ints, zero-extend both operands then do signed comparison *)
+          (* For small ints, zero-extend both operands then do signed
+             comparison *)
           let bits =
             match kind with
             | Naked_int8 -> 8
@@ -727,13 +726,11 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
             | Naked_nativeint ->
               assert false
           in
-      let x, res = prim_arg ~env ~res x in
-      let y, res = prim_arg ~env ~res y in
-      let x_var, env, res = zero_extend_prim_arg ~env ~res ~bits x in
-      let y_var, env, res = zero_extend_prim_arg ~env ~res ~bits y in
-      use_prim ~env ~res (Extern "caml_int_compare")
-        [Pv x_var; Pv y_var]
-
+          let x, res = prim_arg ~env ~res x in
+          let y, res = prim_arg ~env ~res y in
+          let x_var, env, res = zero_extend_prim_arg ~env ~res ~bits x in
+          let y_var, env, res = zero_extend_prim_arg ~env ~res ~bits y in
+          use_prim ~env ~res (Extern "caml_int_compare") [Pv x_var; Pv y_var]
         | Tagged_immediate | Naked_immediate ->
           (* For regular ints, use unsigned compare by adding min_int to both
              operands to shift them into the positive range, then do signed

@@ -1,4 +1,5 @@
 *.mli
+jscomp.ml
 linkenv.ml
 opterror.ml
 optcomp_intf.ml

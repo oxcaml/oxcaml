@@ -169,9 +169,6 @@ let cmjxa f = mk_artifact ".cmjxa" f
 let annot f = mk_artifact ".annot" f
 let artifact f ~extension = mk_artifact extension f
 
-
-let artifact f ~extension = mk_artifact extension f
-
 let companion_obj f = companion_artifact Config.ext_obj f
 let companion_cmt f = companion_artifact ".cmt" f
 let companion_cms f = companion_artifact ".cms" f

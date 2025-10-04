@@ -30,10 +30,15 @@ open! Jsoo_imports
 
 module Unboxed_array_tags = struct
   let unboxed_int64_array_tag = 1
+
   let unboxed_int32_array_even_tag = 2
+
   let unboxed_int32_array_odd_tag = 3
+
   let unboxed_float32_array_even_tag = 4
+
   let unboxed_float32_array_odd_tag = 5
+
   let unboxed_nativeint_array_tag = 9
 end
 

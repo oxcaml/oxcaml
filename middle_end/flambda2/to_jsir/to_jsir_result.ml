@@ -218,7 +218,4 @@ let to_program_exn
   let program : Jsir.program =
     { Jsir.start = Jsir.Addr.zero; blocks = complete_blocks; free_pc }
   in
-  {
-    Js_backend.program = program;
-    imported_compilation_units = imported_compilation_units;
-  }
+  { Js_backend.program; imported_compilation_units }

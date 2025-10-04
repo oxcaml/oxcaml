@@ -246,16 +246,15 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
   { flambda; offsets; reachable_names; all_code }
 
 let lambda_to_jsir ~ppf_dump ~prefixname ~machine_width
-      (program : Lambda.program) =
+    (program : Lambda.program) =
   let { flambda; offsets; all_code; reachable_names } =
     lambda_to_flambda ~ppf_dump ~prefixname ~machine_width program
   in
   let js_program =
     Flambda2_to_jsir.To_jsir.unit ~offsets ~all_code ~reachable_names flambda
   in
-  {
-    Jsoo_imports.Js_backend.program = js_program.program;
-    imported_compilation_units = js_program.imported_compilation_units;
+  { Jsoo_imports.Js_backend.program = js_program.program;
+    imported_compilation_units = js_program.imported_compilation_units
   }
 
 let reset_symbol_tables () =
