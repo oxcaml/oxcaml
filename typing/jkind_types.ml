@@ -35,6 +35,7 @@ module Sort = struct
 
   and var =
     { mutable contents : t option;
+      mutable level : int;
       uid : int (* For debugging / printing only *)
     }
 
@@ -278,10 +279,21 @@ module Sort = struct
 
   let undo_change (v, t_op) = v.contents <- t_op
 
+  let rec t_iter ~f = function
+    | Var v -> f v
+    | Base _ -> ()
+    | Product ts -> List.iter (fun t -> t_iter ~f t) ts
+
   let set : var -> t option -> unit =
    fun v t_op ->
     log_change (v, v.contents);
-    v.contents <- t_op
+    v.contents <- t_op;
+    Option.iter
+      (t_iter ~f:(fun u ->
+           let new_level = max v.level u.level in
+           v.level <- new_level;
+           u.level <- new_level))
+      t_op
 
   module Static = struct
     (* Statically allocated values of various consts and sorts to save
@@ -435,9 +447,9 @@ module Sort = struct
 
   let last_var_uid = ref 0
 
-  let new_var () =
+  let new_var ~level =
     incr last_var_uid;
-    Var { contents = None; uid = !last_var_uid }
+    Var { contents = None; uid = !last_var_uid; level }
 
   let rec get : t -> t = function
     | Base _ as t -> t
@@ -592,8 +604,8 @@ module Sort = struct
       false
     | Product _ -> false
 
-  let decompose_into_product t n =
-    let ts = List.init n (fun _ -> new_var ()) in
+  let decompose_into_product ~level t n =
+    let ts = List.init n (fun _ -> new_var ~level) in
     if equate t (Product ts) then Some ts else None
 
   (*** pretty printing ***)

@@ -169,7 +169,9 @@ let make_params env path params =
        have jkind any).  But it might be possible to infer [any] in some
        cases. *)
     let jkind =
-      Jkind.of_new_legacy_sort ~why:(Unannotated_type_parameter path)
+      Jkind.of_new_legacy_sort
+        ~why:(Unannotated_type_parameter path)
+        ~level:(Ctype.get_current_level ())
     in
     try
       (transl_type_param env path jkind sty, v)
@@ -465,7 +467,8 @@ let set_private_row env loc p decl =
    constructed.  We've been conservative here in the first version. This is the
    same issue as with arrows. *)
 let check_representable ~why env loc kloc typ =
-  match Ctype.type_sort ~why ~fixed:false env typ with
+  match Ctype.type_sort
+          ~why ~fixed:false ~level:(Ctype.get_current_level ()) env typ with
   | Ok _ -> ()
   | Error err -> raise (Error (loc,Jkind_sort {kloc; typ; err}))
 
@@ -971,7 +974,9 @@ let transl_declaration env sdecl (id, uid) =
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
         let rep, jkind =
           if unbox then
-            Variant_unboxed, Jkind.of_new_sort ~why:Old_style_unboxed_type
+            Variant_unboxed,
+            Jkind.of_new_sort ~why:Old_style_unboxed_type
+              ~level:(Ctype.get_current_level ())
           else
             (* We mark all arg sorts "void" here.  They are updated later,
                after the circular type checks make it safe to check sorts.
@@ -990,7 +995,7 @@ let transl_declaration env sdecl (id, uid) =
                    Constructor_uniform_value, sorts)
                 (Array.of_list cstrs)
             ),
-          Jkind.for_non_float ~why:Boxed_variant
+            Jkind.for_non_float ~why:Boxed_variant
         in
           Ttype_variant tcstrs, Type_variant (cstrs, rep, None), jkind
       | Ptype_record lbls ->
@@ -1002,6 +1007,7 @@ let transl_declaration env sdecl (id, uid) =
             if unbox then
               Record_unboxed,
               Jkind.of_new_sort ~why:Old_style_unboxed_type
+                ~level:(Ctype.get_current_level ())
             else
             (* Note this is inaccurate, using `Record_boxed` in cases where the
                correct representation is [Record_float], [Record_ufloat], or
@@ -3508,7 +3514,8 @@ let error_if_has_deep_native_repr_attributes core_type =
     [external f : ('a : any). 'a -> 'a = "%identity"]
    In such cases, we raise an expection. *)
 let type_sort_external ~is_layout_poly ~why env loc typ =
-  match Ctype.type_sort ~why ~fixed:true env typ with
+  match Ctype.type_sort ~why ~fixed:true
+          ~level:(Ctype.get_current_level ()) env typ with
   | Ok s -> Jkind.Sort.default_to_value_and_get s
   | Error err ->
     let kloc =
