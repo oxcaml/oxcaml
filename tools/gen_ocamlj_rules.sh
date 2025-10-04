@@ -45,7 +45,7 @@ OCAML_OPT_JS_FLAGS+=(-I "${dst}")
 OCAML_OPT_JS_FLAGS+=(-no-alias-deps)
 
 # CR jvanburen: enable sourcemaps when available
-JSOO_FLAGS=(--debuginfo --enable=effects,with-js-error --pretty)
+JSOO_FLAGS=(--debuginfo)
 
 # Transform module names or file names into stdlib file names (without extensions).
 # Idempotent.
