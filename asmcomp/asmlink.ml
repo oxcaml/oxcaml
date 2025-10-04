@@ -19,11 +19,8 @@ open Misc
 open Config
 open Cmx_format
 open Compilenv
-open Optlink_common
 
-module String = Misc.Stdlib.String
 module CU = Compilation_unit
-module Cmi_consistbl = Consistbl.Make (CU.Name) (Import_info.Intf.Nonalias.Kind)
 
 type error =
   | Dwarf_fission_objcopy_on_macos
@@ -32,6 +29,15 @@ type error =
   | Objcopy_error of int
 
 exception Error of error
+
+type unit_link_info = Linkenv.unit_link_info = {
+  name: Compilation_unit.t;
+  defines: Compilation_unit.t list;
+  file_name: string;
+  crc: Digest.t;
+  (* for shared libs *)
+  dynunit : Cmxs_format.dynunit option;
+}
 
 let runtime_lib () =
   let variant =
@@ -43,7 +49,7 @@ let runtime_lib () =
     if !Clflags.nopervasives || not !Clflags.with_runtime then []
     else [ Load_path.find libname ]
   with Not_found ->
-    raise(Optlink_common.Error(File_not_found libname))
+    raise (Linkenv.Error (File_not_found libname))
 
 
 (* Second pass: generate the startup file and link it with everything else *)
@@ -55,29 +61,6 @@ let force_linking_of_startup ~ppf_dump =
   Asmgen.compile_phrase ~ppf_dump
     (Cmm.Cdata ([Cmm.Csymbol_address (Cmm.global_symbol "caml_startup")]))
 
-let make_globals_map units_list =
-  (* The order in which entries appear in the globals map does not matter
-     (see the natdynlink code).
-     We can corrupt [interfaces] since it won't be used again until the next
-     compilation. *)
-  let find_crc name =
-    Cmi_consistbl.find crc_interfaces name
-    |> Option.map (fun (_unit, crc) -> crc)
-  in
-  let defined =
-    List.map (fun unit ->
-        let name = CU.name unit.name in
-        let intf_crc = find_crc name in
-        CU.Name.Tbl.remove interfaces name;
-        let syms = List.map Symbol.for_compilation_unit unit.defines in
-        (unit.name, intf_crc, Some unit.crc, syms))
-      units_list
-  in
-  CU.Name.Tbl.fold (fun name () globals_map ->
-      let intf_crc = find_crc name in
-      (assume_no_prefix name, intf_crc, None, []) :: globals_map)
-    interfaces
-    defined
 
 let sourcefile_for_dwarf ~named_startup_file filename =
   (* Ensure the name emitted into the DWARF is stable, for build
@@ -123,7 +106,7 @@ let make_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units cached_g
     (fun i name -> compile_phrase (Cmm_helpers.predef_exception i name))
     Runtimedef.builtin_exceptions;
   compile_phrase (Cmm_helpers.global_table name_list);
-  let globals_map = make_globals_map units in
+  let globals_map = Linkenv.make_globals_map units in
   compile_phrase (Cmm_helpers.globals_map globals_map);
   compile_phrase
     (Cmm_helpers.data_segment_table (startup_comp_unit :: name_list));
@@ -196,7 +179,7 @@ let call_linker_shared ?(native_toplevel = false) file_list output_name =
     Ccomp.call_linker ~native_toplevel Ccomp.Dll output_name file_list ""
   in
   if not (exitcode = 0)
-  then raise(Optlink_common.Error(Linking_error exitcode))
+  then raise(Linkenv.Error(Linking_error exitcode))
 
 
 (* The compiler allows [-o /dev/null], which can be used for testing linking.
@@ -289,7 +272,7 @@ let call_linker file_list_rev startup_file output_name =
   if not (exitcode = 0)
   then begin
     if needs_objcopy_workflow then Misc.remove_file link_output_name;
-    raise(Optlink_common.Error(Linking_error exitcode))
+    raise (Linkenv.Error(Linking_error exitcode))
   end
   else begin
     (* Handle DWARF fission if requested and linking succeeded *)
@@ -377,13 +360,13 @@ let link
       (fun () -> make_startup_file unix ~ppf_dump
                    ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf)
                    genfns units_tolink cached_genfns_imports);
-    Emitaux.reduce_heap_size ~reset:(fun () -> reset ());
+    Emitaux.reduce_heap_size ~reset:(fun () -> Linkenv.reset ());
     Misc.try_finally
       (fun () -> call_linker ml_objfiles startup_obj output_name)
       ~always:(fun () -> remove_file startup_obj)
 
 
-(* Error reporting *)
+(* Error report *)
 
 open Format
 

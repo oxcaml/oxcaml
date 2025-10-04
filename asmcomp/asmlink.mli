@@ -17,21 +17,20 @@
 
 open Misc
 open Format
-open Optlink_common
 
 val link: (module Compiler_owee.Unix_intf.S)
     -> string list
     -> string
     -> cached_genfns_imports:Generic_fns.Partition.Set.t
     -> genfns:Generic_fns.Tbl.t
-    -> units_tolink:unit_link_info list
+    -> units_tolink:Linkenv.unit_link_info list
     -> ppf_dump:Format.formatter
     -> unit
 
 val link_shared: (module Compiler_owee.Unix_intf.S)
     -> string list -> string
     -> genfns:Generic_fns.Tbl.t
-    -> units_tolink:unit_link_info list
+    -> units_tolink:Linkenv.unit_link_info list
     -> ppf_dump:Format.formatter
     -> unit
 

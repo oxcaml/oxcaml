@@ -454,16 +454,8 @@ let read_one_param ppf position name v =
         ccobjs := Misc.rev_split_words v @ !ccobjs
     end
 
-  | "jslib" when !jsir ->
-    begin
-      match position with
-      | Before_compile _ -> ()
-      | Before_link | Before_args ->
-        ccobjs := Misc.rev_split_words v @ !ccobjs
-    end
-
   | "ccopt"
-  | "ccopts" when not !jsir
+  | "ccopts"
     ->
     begin
       match position with
@@ -472,18 +464,6 @@ let read_one_param ppf position name v =
       | Before_args ->
         first_ccopts := v :: !first_ccopts
     end
-
-  | "jsopt"
-  | "jsopts" when !jsir
-    ->
-    begin
-      match position with
-      | Before_link | Before_compile _ ->
-        last_ccopts := v :: !last_ccopts
-      | Before_args ->
-        first_ccopts := v :: !first_ccopts
-    end
-
 
   | "ppx" ->
     begin
@@ -496,7 +476,7 @@ let read_one_param ppf position name v =
 
 
   | "cmo" | "cma" ->
-    if not !native_code && not !jsir then
+    if not !native_code then
     begin
       match position with
       | Before_link | Before_compile _ ->
@@ -507,16 +487,6 @@ let read_one_param ppf position name v =
 
   | "cmx" | "cmxa" ->
     if !native_code then
-    begin
-      match position with
-      | Before_link | Before_compile _ ->
-        last_objfiles := v ::! last_objfiles
-      | Before_args ->
-        first_objfiles := v :: !first_objfiles
-    end
-
-  | "cmjx" | "cmjxa" ->
-    if !jsir then
     begin
       match position with
       | Before_link | Before_compile _ ->
@@ -707,7 +677,6 @@ type deferred_action =
   | ProcessImplementation of string
   | ProcessInterface of string
   | ProcessCFile of string
-  | ProcessJavaScriptFile of string
   | ProcessOtherFile of string
   | ProcessObjects of string list
   | ProcessDLLs of string list
@@ -743,14 +712,6 @@ let process_action
       if Ccomp.compile_file ?output:!output_name name <> 0
       then raise (Exit_with_status 2);
       ccobjs := obj_name :: !ccobjs
-  | ProcessJavaScriptFile name ->
-      (* JavaScript stub files are handled by js_of_ocaml during linking *)
-      if !Clflags.jsir then
-        (* For JavaScript backend, add .js files to ccobjs for runtime building *)
-        ccobjs := name :: !ccobjs
-      else
-        (* For non-JavaScript backends, ignore .js files *)
-        ()
   | ProcessObjects names ->
       ccobjs := names @ !ccobjs
   | ProcessDLLs names ->
@@ -761,15 +722,8 @@ let process_action
         objfiles := name :: !objfiles
       else if Filename.check_suffix name ".cmi" && !make_package then
         objfiles := name :: !objfiles
-      else if
-        if !jsir
-        then
-          (Filename.check_suffix name ".cmjo" (* javascript object *)
-           || Filename.check_suffix name ".cmja" (* javascript archive *))
-        else
-          (Filename.check_suffix name Config.ext_obj
-           || Filename.check_suffix name Config.ext_lib)
-      then begin
+      else if Filename.check_suffix name Config.ext_obj
+           || Filename.check_suffix name Config.ext_lib then begin
         has_linker_inputs := true;
         ccobjs := name :: !ccobjs
       end
@@ -791,8 +745,6 @@ let action_of_file name =
     ProcessInterface name
   else if Filename.check_suffix name ".c" then
     ProcessCFile name
-  else if Filename.check_suffix name ".js" then
-    ProcessJavaScriptFile name
   else
     ProcessOtherFile name
 
@@ -816,7 +768,6 @@ let process_deferred_actions env =
         if !compile_only then begin
           if List.length (List.filter (function
               | ProcessCFile _
-              | ProcessJavaScriptFile _
               | ProcessImplementation _
               | ProcessInterface _ -> true
               | _ -> false) !deferred_actions) > 1 then

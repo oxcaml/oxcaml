@@ -19,7 +19,7 @@
    NB: Due to internal state in the compiler, calling [main] twice during
    the same process is unsupported. *)
 val main
-  : (module Compiler_owee.Unix_intf.S)
+   : (module Compiler_owee.Unix_intf.S)
   -> string array
   -> Format.formatter
   -> flambda2:(
@@ -29,10 +29,4 @@ val main
     keep_symbol_tables:bool ->
     Lambda.program ->
     Cmm.phrase list)
-  -> lambda_to_jsir:(
-    ppf_dump:Format.formatter ->
-    prefixname:string ->
-    machine_width:Target_system.Machine_width.t ->
-    Lambda.program ->
-    Jsoo_imports.Js_backend.program)
   -> int

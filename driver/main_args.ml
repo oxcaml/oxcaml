@@ -65,20 +65,6 @@ let mk_ccopt f =
   "-ccopt", Arg.String f,
   "<opt>  Pass option <opt> to the C compiler and linker"
 
-let mk_jslib f =
-  "-jslib", Arg.String f, "<opt>  Pass option <opt> to js_of_ocaml link"
-
-let mk_jsopt f =
-  "-jsopt", Arg.String f,
-  "<opt>  Pass option <opt> to js_of_ocaml compile and link"
-
-let mk_target f =
-  let targets = Clflags.Backend.names in
-  "-target",
-  Arg.Symbol (targets, f),
-  Printf.sprintf "<target> Select compilation target (%s)"
-    (String.concat " | " targets)
-
 let mk_clambda_checks f =
   "-clambda-checks", Arg.Unit f, " Instrument clambda code with closure and \
     field access checks (for debugging the compiler)"
@@ -1144,7 +1130,6 @@ module type Compiler_options = sig
   val _keep_locs : unit -> unit
   val _no_keep_locs : unit -> unit
   val _linkall : unit -> unit
-  val _target : string -> unit
   val _noautolink : unit -> unit
   val _o : string -> unit
   val _opaque :  unit -> unit
@@ -1154,8 +1139,6 @@ module type Compiler_options = sig
   val _parameter : string -> unit
   val _plugin : string -> unit
   val _pp : string -> unit
-  val _jslib : string -> unit
-  val _jsopt : string -> unit
   val _principal : unit -> unit
   val _no_principal : unit -> unit
   val _rectypes : unit -> unit
@@ -1329,9 +1312,6 @@ module type Jscomp_options = sig
   val _classic_inlining : unit -> unit
   val _o2 : unit -> unit
   val _o3 : unit -> unit
-
-  val _jslib : string -> unit
-  val _jsopt : string -> unit
 end
 
 module type Opttop_options = sig
@@ -1374,8 +1354,6 @@ struct
     mk_cc F._cc;
     mk_cclib F._cclib;
     mk_ccopt F._ccopt;
-    mk_jslib F._jslib;
-    mk_jsopt F._jsopt;
     mk_cmi_file F._cmi_file;
     mk_color F._color;
     mk_error_style F._error_style;
@@ -1660,7 +1638,6 @@ struct
     mk_no_keep_locs F._no_keep_locs;
     mk_labels F._labels;
     mk_linkall F._linkall;
-    mk_target F._target;
     mk_llvm_backend F._llvm_backend;
     mk_inline_max_depth F._inline_max_depth;
     mk_alias_deps F._alias_deps;
@@ -1959,7 +1936,6 @@ struct
     mk_no_keep_locs F._no_keep_locs;
     mk_labels F._labels;
     mk_linkall F._linkall;
-    mk_target F._target;
     mk_modern F._labels;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
@@ -2064,8 +2040,6 @@ struct
     mk_dflambda_let F._dflambda_let;
     mk_dflambda_verbose F._dflambda_verbose;
     mk_djsir F._djsir;
-    mk_jslib F._jslib;
-    mk_jsopt F._jsopt;
   ]
 end;;
 
@@ -2392,14 +2366,6 @@ module Default = struct
     let _keep_docs = set keep_docs
     let _keep_locs = set keep_locs
     let _linkall = set link_everything
-    let _target target =
-      match Clflags.backend_target_of_string target with
-      | Some backend -> Clflags.set_backend_target backend
-      | None ->
-          let expected = String.concat ", " Clflags.Backend.names in
-          raise (Arg.Bad
-                   (Printf.sprintf "unknown target %S (expected one of: %s)"
-                      target expected))
     let _llvm_backend = set llvm_backend
     let _match_context_rows n = match_context_rows := n
     let _no_keep_docs = clear keep_docs
@@ -2411,10 +2377,6 @@ module Default = struct
     let _parameter s = parameters := !parameters @ [ s ]
     let _plugin _p = plugin := true
     let _pp s = preprocessor := (Some s)
-    let _jslib s =
-      Compenv.defer (ProcessObjects (Misc.rev_split_words s))
-    let _jsopt s =
-      Compenv.first_ccopts := (s :: (!Compenv.first_ccopts))
     let _runtime_variant s = runtime_variant := s
     let _ocamlrunparam s = ocamlrunparam := s
     let _stop_after pass =
@@ -2668,16 +2630,18 @@ third-party libraries such as Lwt, but with a different API."
     let _drawflambda = set dump_rawflambda
 
     let _output_complete_obj () =
-      failwith "-output-complete-obj is not supported by ocamlj"
-
+      output_c_object := true;
+      output_complete_object := true;
+      (* CR selee: ??? *)
+      custom_runtime := true
     let _output_obj () =
-      failwith "-output-obj is not supported by ocamlj"
-
-    let _v () = Compenv.print_version_and_library "js-of-ocaml-backend compiler"
+      output_c_object := true;
+      (* CR selee: ??? *)
+      custom_runtime := true
+    let _v () = Compenv.print_version_and_library "js-of-ocaml IR compiler"
 
     let _classic_inlining () = set_oclassic ()
     let _o2 () = Clflags.set_o2 ()
     let _o3 () = Clflags.set_o3 ()
-
   end
 end

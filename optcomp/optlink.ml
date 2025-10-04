@@ -15,7 +15,6 @@
 
 (* Link a set of native/flambda2 object files and produce an executable *)
 
-type filepath = string
 open Format
 
 module type S = sig
@@ -26,9 +25,11 @@ module type S = sig
     ppf_dump:formatter -> string list -> string -> unit
 
   val link_partial :  string -> string list -> unit
+
+  val check_consistency : string -> Cmx_format.unit_infos -> Digest.t -> unit
 end
 
-module Make (Backend : Optbackend_intf.S) : S = struct
+module Make (Backend : Optcomp_intf.Backend) : S = struct
 open Cmx_format
 open Compilenv
 
@@ -37,7 +38,7 @@ let link_partial = Backend.link_partial
 module String = Misc.Stdlib.String
 module CU = Compilation_unit
 
-type unit_link_info = Optbackend_intf.unit_link_info = {
+type unit_link_info = Linkenv.unit_link_info = {
   name: Compilation_unit.t;
   defines: Compilation_unit.t list;
   file_name: string;
@@ -46,23 +47,7 @@ type unit_link_info = Optbackend_intf.unit_link_info = {
   dynunit : Cmxs_format.dynunit option;
 }
 
-(* Add C objects and options and "custom" info from a library descriptor.
-   See bytecomp/bytelink.ml for comments on the order of C objects. *)
-
-let lib_ccobjs = ref []
-let lib_ccopts = ref []
-
-let add_ccobjs origin l =
-  if not !Clflags.no_auto_link then begin
-    lib_ccobjs := l.lib_ccobjs @ !lib_ccobjs;
-    let replace_origin =
-      Misc.replace_substring ~before:"$CAMLORIGIN" ~after:origin
-    in
-    lib_ccopts := List.map replace_origin l.lib_ccopts @ !lib_ccopts
-  end
-
 (* First pass: determine which units are needed *)
-open Optlink_common
 
 type file =
   | Unit of string * unit_infos * Digest.t
@@ -73,7 +58,7 @@ let read_file obj_name =
     try
       Load_path.find obj_name
     with Not_found ->
-      raise(Error(File_not_found obj_name)) in
+      raise(Linkenv.Error (File_not_found obj_name) ) in
   if Filename.check_suffix file_name Backend.ext_flambda_obj then begin
     (* This is a cmx file. It must be linked in any case.
        Read the infos to see which modules it requires. *)
@@ -83,20 +68,20 @@ let read_file obj_name =
   else if Filename.check_suffix file_name Backend.ext_flambda_lib then begin
     let infos =
       try read_library_info file_name
-      with Compilenv.Error(Not_a_unit_info _) ->
-        raise(Error(Not_an_object_file file_name))
+      with Compilenv.Error(Not_a_unit_info filename) ->
+        raise(Linkenv.Error (Not_an_object_file filename))
     in
     Library (file_name,infos)
   end
-  else raise(Error(Not_an_object_file file_name))
+  else raise(Linkenv.Error (Not_an_object_file file_name))
 
 let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
   match read_file file with
   | Unit (file_name,info,crc) ->
       (* This is a cmx file. It must be linked in any case. *)
-      remove_required info.ui_unit;
+      Linkenv.remove_required info.ui_unit;
       List.iter (fun import ->
-          add_required (file_name, None) import)
+        Linkenv.add_required (file_name, None) import)
         info.ui_imports_cmx;
       let dynunit : Cmxs_format.dynunit option =
         if not shared then None else
@@ -117,7 +102,7 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
         Filename.chop_suffix file_name Backend.ext_flambda_obj
         ^ Backend.ext_obj
       in
-      check_consistency' ~unit
+      Linkenv.check_consistency ~unit
         (Array.of_list info.ui_imports_cmi)
         (Array.of_list info.ui_imports_cmx);
       let cached_genfns_imports =
@@ -127,12 +112,12 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
   | Library (file_name,infos) ->
       (* This is an archive file. Each unit contained in it will be linked
          in only if needed. *)
-      add_ccobjs (Filename.dirname file_name) infos;
+      Linkenv.add_ccobjs (Filename.dirname file_name) infos;
       let cached_genfns_imports =
         Generic_fns.Tbl.add ~imports:cached_genfns_imports  genfns infos.lib_generic_fns
       in
-      check_cmi_consistency file_name infos.lib_imports_cmi;
-      check_cmx_consistency file_name infos.lib_imports_cmx;
+      Linkenv.check_cmi_consistency file_name infos.lib_imports_cmi;
+      Linkenv.check_cmx_consistency file_name infos.lib_imports_cmx;
       let objfiles =
         let obj_file =
           Filename.chop_suffix file_name Backend.ext_flambda_lib
@@ -153,13 +138,13 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
            let li_name = CU.name info.li_name in
            if info.li_force_link
            || !Clflags.link_everything
-           || is_required info.li_name
+           || Linkenv.is_required info.li_name
            then begin
-             remove_required info.li_name;
+             Linkenv.remove_required info.li_name;
              let req_by = (file_name, Some li_name) in
              info.li_imports_cmx |> Misc.Bitmap.iter (fun i ->
                let import = infos.lib_imports_cmx.(i) in
-               add_required req_by import);
+               Linkenv.add_required req_by import);
              let imports_list tbl bits =
                List.init (Array.length tbl) (fun i ->
                  if Misc.Bitmap.get bits i then Some tbl.(i) else None)
@@ -185,7 +170,7 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
                  file_name;
                  dynunit }
              in
-             check_consistency' ~unit [| |] [| |];
+             Linkenv.check_consistency ~unit [| |] [| |];
              unit :: reqd
            end else
            reqd)
@@ -195,30 +180,6 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
 
 let named_startup_file () =
   !Clflags.keep_startup_file || !Emitaux.binary_backend_available
-
-let make_globals_map units_list =
-  (* The order in which entries appear in the globals map does not matter
-     (see the natdynlink code).
-     We can corrupt [interfaces] since it won't be used again until the next
-     compilation. *)
-  let find_crc name =
-    Cmi_consistbl.find crc_interfaces name
-    |> Option.map (fun (_unit, crc) -> crc)
-  in
-  let defined =
-    List.map (fun unit ->
-        let name = CU.name unit.name in
-        let intf_crc = find_crc name in
-        CU.Name.Tbl.remove interfaces name;
-        let syms = List.map Symbol.for_compilation_unit unit.defines in
-        (unit.name, intf_crc, Some unit.crc, syms))
-      units_list
-  in
-  CU.Name.Tbl.fold (fun name () globals_map ->
-      let intf_crc = find_crc name in
-      (assume_no_prefix name, intf_crc, None, []) :: globals_map)
-    interfaces
-    defined
 
 (* The compiler allows [-o /dev/null], which can be used for testing linking.
    In this case, we should not use the DWARF fission workflow during linking. *)
@@ -234,24 +195,14 @@ let link_shared ~ppf_dump objfiles output_name =
         objfiles
         ([],[], Generic_fns.Partition.Set.empty)
     in
-    Clflags.ccobjs := !Clflags.ccobjs @ !lib_ccobjs;
-    Clflags.all_ccopts := !lib_ccopts @ !Clflags.all_ccopts;
+    Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs ();
+    Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
     Backend.link_shared
       ml_objfiles
       output_name
       ~ppf_dump
       ~genfns
       ~units_tolink)
-
-let reset () =
-  Cmi_consistbl.clear crc_interfaces;
-  Cmx_consistbl.clear crc_implementations;
-  CU.Tbl.reset implementations_defined;
-  cmx_required := [];
-  CU.Name.Tbl.reset interfaces;
-  implementations := [];
-  lib_ccobjs := [];
-  lib_ccopts := []
 
 (* Main entry point *)
 
@@ -272,11 +223,11 @@ let link ~ppf_dump objfiles output_name =
         ([],[], Generic_fns.Partition.Set.empty)
     in
     if not shared then
-      (match extract_missing_globals() with
-      | [] -> ()
-      | mg -> raise(Error(Missing_implementations mg)));
-    Clflags.ccobjs := !Clflags.ccobjs @ !lib_ccobjs;
-    Clflags.all_ccopts := !lib_ccopts @ !Clflags.all_ccopts;
+      (match Linkenv.extract_missing_globals() with
+       | [] -> ()
+       | mg -> raise(Linkenv.Error (Missing_implementations mg)));
+    Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs ();
+    Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
     (* put user's opts first *)
     Backend.link
       ml_objfiles
@@ -286,4 +237,18 @@ let link ~ppf_dump objfiles output_name =
       ~units_tolink
       ~cached_genfns_imports
   )
+
+(* Exported version for Asmlibrarian / Asmpackager *)
+let check_consistency file_name u crc =
+  let unit =
+    { file_name;
+      name = u.ui_unit;
+      defines = u.ui_defines;
+      crc;
+      dynunit = None
+    }
+  in
+  Linkenv.check_consistency ~unit
+    (Array.of_list u.ui_imports_cmi)
+    (Array.of_list u.ui_imports_cmx)
 end
