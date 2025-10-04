@@ -726,6 +726,13 @@ let process_action
         objfiles := name :: !objfiles
       else if Filename.check_suffix name ".cmi" && !make_package then
         objfiles := name :: !objfiles
+      else if
+        (match Clflags.backend_target () with
+         | Some Backend.Js_of_ocaml -> true
+         | _ -> false)
+        && Filename.check_suffix name ".js"
+      then
+        ccobjs := name :: !ccobjs
       else if Filename.check_suffix name Config.ext_obj
            || Filename.check_suffix name Config.ext_lib then begin
         has_linker_inputs := true;

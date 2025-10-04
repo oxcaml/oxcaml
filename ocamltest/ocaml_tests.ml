@@ -181,6 +181,7 @@ let javascript =
   let js_actions =
   [
     libraries_are_javascript_compatible;
+    javascript_supports_effects;
     setup_ocamlj_opt_build_env;
     ocamlj_opt;
     check_ocamlj_opt_output;

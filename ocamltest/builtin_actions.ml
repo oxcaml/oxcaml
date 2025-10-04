@@ -408,6 +408,32 @@ let libraries_are_javascript_compatible =
     result, env)
 
 
+let javascript_supports_effects =
+  Actions.make
+    ~name:"javascript-supports-effects"
+    ~description:"Skip tests requiring effect handlers when running on JavaScript backend"
+    ~does_something:false
+    (fun _log env ->
+      let test_file = Actions_helpers.testfile env in
+      let test_dir = Actions_helpers.test_source_directory env in
+      let reason = "JavaScript backend supports effect handlers" in
+      let contains_effects path =
+        let sep = Filename.dir_sep.[0] in
+        String.split_on_char sep path
+        |> List.exists (String.equal "effects")
+      in
+      let supports_effects =
+        not (contains_effects test_file || contains_effects test_dir)
+      in
+      let result =
+        if supports_effects then
+          Result.predicate_satisfied_with_reason reason
+        else
+          Result.predicate_not_satisfied_with_reason reason
+      in
+      result, env)
+
+
 let initialize_test_exit_status_variables _log env =
   Environments.add_bindings
   [
