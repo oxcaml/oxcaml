@@ -331,7 +331,9 @@ let compute_static_size lam =
     | Pscalar _
     | Pphys_equal _
     | Pget_idx _
-    | Pset_idx _ ->
+    | Pset_idx _
+    | Pget_ptr _
+    | Pset_ptr _ ->
         dynamic_size lam
 
     (* Primitives specific to oxcaml *)
