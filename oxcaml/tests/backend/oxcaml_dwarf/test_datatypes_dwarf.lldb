@@ -11,6 +11,14 @@
 (lldb) c
 (lldb) c
 (lldb) c
+(lldb) b Test_datatypes_dwarf.f_complex_variant_second
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_complex_variant_third
+(lldb) c
+(lldb) c
+(lldb) c
 (lldb) b Test_datatypes_dwarf.f_basic_record
 (lldb) c
 (lldb) c
@@ -98,5 +106,42 @@
 (lldb) b Test_datatypes_dwarf.f_forest
 (lldb) c
 (lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_tuple_int_int
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_tuple_mixed_two
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_tuple_three
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_tuple_nested
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_tuple_with_complex
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_tuple_large
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_poly_tuple
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_bigarray1_int
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_bigarray1_float
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_bigarray2_int
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_bigarray2_float
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_bigarray3_int32
 (lldb) c
 (lldb) quit
