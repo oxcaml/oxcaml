@@ -50,7 +50,11 @@ let extract_output = function
 
 let default_output = function
   | Some s -> s
-  | None -> Config.default_executable_name
+  | None ->
+      (match Clflags.backend_target () with
+      | Some Clflags.Backend.Js_of_ocaml ->
+          Config.default_executable_name ^ ".js"
+      | _ -> Config.default_executable_name)
 
 let first_include_dirs = ref []
 let last_include_dirs = ref []

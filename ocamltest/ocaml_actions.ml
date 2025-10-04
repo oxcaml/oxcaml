@@ -289,6 +289,7 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
       let commandline =
       [
         Compiler.name;
+        Compiler.flags;
         Ocaml_flags.runtime_flags env Compiler.target
                                   (has_c_file || bytecode_links_c_code);
         c_headers_flags;
@@ -339,6 +340,7 @@ let compile_module (compiler : Ocaml_compilers.compiler) module_ log env =
   let commandline =
   [
     Compiler.name;
+    Compiler.flags;
     Ocaml_flags.stdlib;
     c_headers_flags;
     directory_flags env;

@@ -26,46 +26,56 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
     let cmdline = Filename.quote_command prog args in
     match Ccomp.command cmdline with 0 -> () | _ -> raise (Sys_error cmdline)
 
+  let link_args ?(linkall = false) ?(ccopts = true) subcommand output_name
+      extra_args files =
+    let debug_flag = if !Clflags.debug then ["--debug-info"] else [] in
+    let linkall_flag =
+      if linkall && !Clflags.link_everything then ["--linkall"] else []
+    in
+    let ccopts_args = if ccopts then List.rev !Clflags.all_ccopts else [] in
+    [subcommand; "-o"; output_name]
+    @ linkall_flag @ debug_flag @ files @ extra_args @ ccopts_args
+
+  let find_files files =
+    ListLabels.map files ~f:(fun name ->
+        try Load_path.find name
+        with Not_found -> raise (Linkenv.Error (File_not_found name)))
+
   let link_partial output_name files_to_link =
-    js_of_oxcaml
-      (List.concat
-         [ ["link"];
-           ["-o"; output_name];
-           (if !Clflags.link_everything then ["--linkall"] else []);
-           (if !Clflags.debug then ["--debug-info"] else []);
-           files_to_link;
-           List.rev !Clflags.all_ccopts ])
+    js_of_oxcaml (link_args ~linkall:true "link" output_name [] files_to_link)
 
   let link objfiles output_name ~cached_genfns_imports:_ ~genfns:_
       ~units_tolink:_ ~ppf_dump:_ : unit =
+    let objfiles = find_files objfiles in
+    Clflags.ccobjs := find_files !Clflags.ccobjs;
+    let runtime_files, other_ccobjs =
+      ListLabels.partition !Clflags.ccobjs ~f:(fun f ->
+          Filename.check_suffix f ".js")
+    in
+    let runtime = output_name ^ ".runtime.js" in
+    js_of_oxcaml
+      (link_args ~linkall:false ~ccopts:false "build-runtime" runtime []
+         runtime_files);
+    let files_to_link = (runtime :: other_ccobjs) @ objfiles in
+    Misc.try_finally
+      ~always:(fun () -> Misc.remove_file runtime)
+      (fun () -> link_partial output_name files_to_link)
+
+  let create_archive output_name files =
+    let files =
+      ListLabels.map files ~f:(fun obj_name ->
+          try Load_path.find obj_name
+          with Not_found -> raise (Linkenv.Error (File_not_found obj_name)))
+    in
+    js_of_oxcaml (link_args ~linkall:true "link" output_name ["-a"] files)
+
+  let link_shared objfiles output_name ~genfns:_ ~units_tolink:_ ~ppf_dump:_ :
+      unit =
     let objfiles =
       ListLabels.map objfiles ~f:(fun obj_name ->
           try Load_path.find obj_name
           with Not_found -> raise (Linkenv.Error (File_not_found obj_name)))
     in
-    (* Build the runtime *)
-    let runtime = output_name ^ ".runtime.js" in
-    (* Extract runtime files from ccobjs *)
-    let runtime_files, other_objs =
-      ListLabels.partition objfiles ~f:(fun f -> Filename.check_suffix f ".js")
-    in
-    (* Always build runtime - it's required for JavaScript execution *)
-    js_of_oxcaml
-      (List.concat
-         [ ["build-runtime"];
-           ["-o"; runtime];
-           (if !Clflags.debug then ["--debug-info"] else []);
-           runtime_files ]);
-    (* Link everything together *)
-    let files_to_link = (runtime :: other_objs) @ objfiles in
-    Misc.try_finally
-      ~always:(fun () -> Misc.remove_file runtime)
-      (fun () -> link_partial output_name files_to_link)
-
-  let create_archive = link_partial
-
-  let link_shared objfiles output_name ~genfns:_ ~units_tolink:_ ~ppf_dump:_ :
-      unit =
     link_partial output_name objfiles
 
   let emit = None
@@ -88,7 +98,7 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
              Jsir.Print.program ppf (fun _ _ -> "") jsir.program)
     in
     let output_filename = prefixname ^ ext_obj in
-    let cmj_filename = prefixname ^ ".cmj" in
+    let jsir_filename = prefixname ^ ".jsir" in
     let info : Unit_info.t =
       { provides =
           StringSet.singleton (Compilation_unit.full_path_as_string module_name);
@@ -112,16 +122,15 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
           }
       }
     in
-    Jsir.save compilation_unit ~filename:cmj_filename;
+    Jsir.save compilation_unit ~filename:jsir_filename;
     Misc.try_finally
       (fun () ->
         js_of_oxcaml
           (List.concat
              [ ["compile"];
                (if !Clflags.debug then ["--debug-info"] else []);
-               (* CR jvanburen: re-add jsopts??? *)
-               (* !Clflags.all_jsopts; *)
                ["-o"; output_filename];
-               [cmj_filename] ]))
-      ~always:(fun () -> Misc.remove_file cmj_filename)
+               [jsir_filename];
+               List.rev !Clflags.all_ccopts ]))
+      ~always:(fun () -> Misc.remove_file jsir_filename)
 end)
