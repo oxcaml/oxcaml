@@ -119,7 +119,6 @@ val mark_deprecated_mutable_used : Parsetree.attributes -> unit
     in late stages of compilation in the backend.
     Registering them helps detect code that is not checked,
     because it is optimized away by the middle-end.  *)
-val register_zero_alloc_attribute : string Location.loc -> unit
 val mark_zero_alloc_attribute_checked : string -> Location.t -> unit
 val warn_unchecked_zero_alloc_attribute : unit -> unit
 
