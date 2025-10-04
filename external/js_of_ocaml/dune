@@ -1,0 +1,62 @@
+(env
+ (dev
+  (flags
+   (:standard -w +a-4-40-41-42-44-48-58-66-70))
+  (binaries
+   (tools/node_wrapper.exe as node)
+   (tools/node_wrapper.exe as node.exe)))
+ (with-effects
+  (js_of_ocaml
+   (compilation_mode separate)
+   (flags
+    (:standard --enable effects)))
+  (wasm_of_ocaml
+   (compilation_mode separate)
+   (flags
+    (:standard --enable effects)))
+  (binaries
+   (tools/node_wrapper.exe as node)
+   (tools/node_wrapper.exe as node.exe)))
+ (with-effects-double-translation
+  (js_of_ocaml
+   (compilation_mode separate)
+   (flags
+    (:standard --effects double-translation))
+   (build_runtime_flags
+    (:standard --effects double-translation)))
+  (wasm_of_ocaml
+   ;; Double transaction is not supported in wasm
+   (enabled_if false))
+  (binaries
+   (tools/node_wrapper.exe as node)
+   (tools/node_wrapper.exe as node.exe)))
+ (bench_no_debug
+  (flags
+   (:standard \ -g))
+  (ocamlc_flags
+   (:standard \ -g))
+  (link_flags
+   (:standard \ -g))
+  (binaries
+   (tools/node_wrapper.exe as node)
+   (tools/node_wrapper.exe as node.exe)))
+ (_
+  (binaries
+   (tools/node_wrapper.exe as node)
+   (tools/node_wrapper.exe as node.exe))))
+
+(rule
+ (targets version.ml.in)
+ (action
+  (with-stdout-to
+   %{targets}
+   (progn
+   (echo "let s = String.trim \"")
+   (cat %{dep:VERSION})
+   (echo "\"")
+   (echo "let git_version = \"\"")
+   ))))
+
+(data_only_dirs _wikidoc doc-dev janestreet)
+
+(vendored_dirs)

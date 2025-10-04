@@ -1,0 +1,9 @@
+(env
+ (_
+  (flags
+   (:standard -w -32-69))))
+
+(tests
+ (names test_str)
+ (libraries str re)
+ (modes js wasm))

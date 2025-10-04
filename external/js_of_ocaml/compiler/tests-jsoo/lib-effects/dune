@@ -1,0 +1,61 @@
+(env
+ (with-effects-double-translation)
+ (with-effects)
+ (_
+  (js_of_ocaml
+   (flags
+    (:standard --enable effects)))))
+
+(library
+ (name jsoo_testsuite_effect)
+ (enabled_if
+  (>= %{ocaml_version} 5))
+ (inline_tests
+  (modes js wasm best))
+ (modules
+  (:standard
+   \
+   assume_no_perform
+   assume_no_perform_unhandled
+   assume_no_perform_nested_handler
+   deep_state
+   effects))
+ (preprocess
+  (pps ppx_expect)))
+
+(tests
+ (build_if
+  (>= %{ocaml_version} 5))
+ (names effects)
+ (modules effects)
+ (modes js wasm))
+
+(tests
+ (build_if
+  (>= %{ocaml_version} 5))
+ (names
+  assume_no_perform
+  assume_no_perform_unhandled
+  assume_no_perform_nested_handler)
+ (modules
+  assume_no_perform
+  assume_no_perform_unhandled
+  assume_no_perform_nested_handler)
+ (libraries jsoo_runtime)
+ (action
+  (ignore-outputs
+   (with-accepted-exit-codes
+    0
+    (run node %{test}))))
+ (modes js wasm))
+
+(executable
+ (name deep_state)
+ (enabled_if
+  (>= %{ocaml_version} 5))
+ (modules deep_state)
+ (js_of_ocaml
+  (compilation_mode whole_program))
+ (wasm_of_ocaml
+  (compilation_mode whole_program))
+ (modes js wasm))
