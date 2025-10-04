@@ -155,21 +155,21 @@ Error: Signature mismatch:
            val y : int ref @@ stateless
            val z : 'a -> 'a
            val x : 'a -> 'a
-         end (* at nonportable *)
+         end (* at stateful *)
        is not included in
          sig
            val y : int ref @@ stateless
            val z : 'a -> 'a
            val x : 'a -> 'a @@ stateless
-         end (* at nonportable *)
+         end (* at stateful *)
        Values do not match:
-         val x : 'a -> 'a (* in a structure at nonportable *)
+         val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
-         val x : 'a -> 'a @@ stateless (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
+         val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
+       The left-hand side is "stateful"
        because it contains a usage (of the value "y" at Line 11, characters 29-30)
-       which is expected to be "uncontended".
-       However, the right-hand side is "portable".
+       which is expected to be "read_write".
+       However, the right-hand side is "stateless".
 |}, Principal{|
 Lines 8-12, characters 33-5:
  8 | .................................struct
@@ -179,21 +179,21 @@ Lines 8-12, characters 33-5:
 12 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end (* at nonportable *)
+         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end (* at stateful *)
        is not included in
          sig
            val y : int ref
            val z : 'a -> 'a
            val x : 'a -> 'a @@ stateless
-         end (* at nonportable *)
+         end (* at stateful *)
        Values do not match:
-         val x : 'a -> 'a (* in a structure at nonportable *)
+         val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
-         val x : 'a -> 'a @@ stateless (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
+         val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
+       The left-hand side is "stateful"
        because it contains a usage (of the value "y" at Line 11, characters 29-30)
-       which is expected to be "uncontended".
-       However, the right-hand side is "portable".
+       which is expected to be "read_write".
+       However, the right-hand side is "stateless".
 |}]
 
 module Module_type_of_monadic = struct
