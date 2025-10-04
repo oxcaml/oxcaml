@@ -75,6 +75,7 @@ include Provers
 include Reify
 include Join_levels
 module Code_age_relation = Code_age_relation
+module Join_analysis = Join_env.Analysis
 
 let remove_outermost_alias env ty =
   Expand_head.expand_head env ty |> Expand_head.Expanded_type.to_type
