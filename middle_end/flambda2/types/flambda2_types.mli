@@ -60,6 +60,13 @@ module Code_age_relation : sig
     Code_id.t ->
     Code_id.t ->
     Code_id.t Or_bottom.t
+
+  val meet_set :
+    t ->
+    resolver:(Compilation_unit.t -> t option) ->
+    Code_id.Set.t ->
+    Code_id.Set.t ->
+    Code_id.Set.t Or_bottom.t
 end
 
 module Typing_env_extension : sig
