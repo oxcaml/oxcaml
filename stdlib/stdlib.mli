@@ -776,7 +776,7 @@ val int_of_string_opt: string -> int option
    @since 4.05
 *)
 
-external int_of_string : string -> int = "caml_int_of_string"
+external int_of_string : (string[@local_opt]) -> int = "caml_int_of_string"
 (** Same as {!Stdlib.int_of_string_opt}, but raise
    [Failure "int_of_string"] instead of returning [None]. *)
 
