@@ -32,7 +32,7 @@ val const : ('a : value_or_null) ('b : value_or_null)
 (** [const c] is a function that always returns the value [c]. For any
     argument [x], [(const c) x] is [c]. *)
 
-val compose : ('a : value_or_null) ('b : value_or_null) 
+val compose : ('a : value_or_null) ('b : value_or_null)
   ('c : value_or_null).
   ('b -> 'c) -> ('a -> 'b) -> 'a -> 'c
 (** [compose f g] is a function composition of applying [g] then [f].
@@ -40,7 +40,7 @@ val compose : ('a : value_or_null) ('b : value_or_null)
 
     @since 5.2 *)
 
-val flip : ('a : value_or_null) ('b : value_or_null) 
+val flip : ('a : value_or_null) ('b : value_or_null)
   ('c : value_or_null).
   ('a -> 'b -> 'c) -> ('b -> 'a -> 'c)
 (** [flip f] reverses the argument order of the binary function
@@ -53,7 +53,7 @@ val negate : ('a : value_or_null) . ('a -> bool) -> ('a -> bool)
 (** {1:exception Exception handling} *)
 
 val protect : ('a : value_or_null).
-  finally:(unit -> unit) -> (unit -> 'a) -> 'a
+  finally:(unit -> unit) @ local once -> (unit -> 'a) @ local once -> 'a
 (** [protect ~finally work] invokes [work ()] and then [finally ()]
     before [work ()] returns with its value or an exception. In the
     latter case the exception is re-raised after [finally ()]. If

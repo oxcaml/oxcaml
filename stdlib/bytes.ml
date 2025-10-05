@@ -26,7 +26,8 @@ open! Stdlib
    These functions have a "duplicated" comment above their definition.
 *)
 
-external length : bytes @ immutable -> int @@ portable = "%bytes_length"
+external length :
+  (bytes[@local_opt]) @ immutable -> int @@ portable = "%bytes_length"
 external string_length : string -> int @@ portable = "%string_length"
 external get : bytes -> int -> char @@ portable = "%bytes_safe_get"
 external set : bytes -> int -> char -> unit @@ portable = "%bytes_safe_set"
@@ -36,7 +37,8 @@ external unsafe_set : bytes -> int -> char -> unit @@ portable = "%bytes_unsafe_
 external unsafe_fill : bytes -> int -> int -> char -> unit @@ portable
                      = "caml_fill_bytes" [@@noalloc]
 external unsafe_to_string : bytes -> string @@ portable = "%bytes_to_string"
-external unsafe_of_string : string -> bytes @@ portable = "%bytes_of_string"
+external unsafe_of_string :
+  (string[@local_opt]) -> (bytes[@local_opt]) @@ portable = "%bytes_of_string"
 
 external unsafe_blit : bytes -> int -> bytes -> int -> int -> unit @@ portable
                      = "caml_blit_bytes" [@@noalloc]
