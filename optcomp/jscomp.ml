@@ -143,5 +143,6 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
                ["-o"; output_filename];
                [jsir_filename];
                List.rev !Clflags.all_jsopts ]))
-      ~always:(fun () -> Misc.remove_file jsir_filename)
+      ~always:(fun () ->
+        if not !Clflags.keep_asm_file then Misc.remove_file jsir_filename)
 end)

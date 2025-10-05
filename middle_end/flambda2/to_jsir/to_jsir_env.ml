@@ -52,7 +52,8 @@ type t =
     function_slots : Jsir.Var.t Function_slot.Map.t;
     value_slots : Jsir.Var.t Value_slot.Map.t;
     traps : Continuation.t list;
-    my_closure : Variable.t option
+    my_closure : Variable.t option;
+    pending_module_block : Jsir.Var.t option
   }
 
 let create ~module_symbol ~return_continuation ~exn_continuation =
@@ -67,7 +68,8 @@ let create ~module_symbol ~return_continuation ~exn_continuation =
     function_slots = Function_slot.Map.empty;
     value_slots = Value_slot.Map.empty;
     traps = [];
-    my_closure = None
+    my_closure = None;
+    pending_module_block = None
   }
 
 let module_symbol t = t.module_symbol
@@ -124,6 +126,15 @@ let add_symbol_without_registering t symbol jvar =
 let add_symbol t ~res symbol jvar =
   let t = add_symbol_without_registering t symbol jvar in
   t, register_symbol' ~res symbol jvar
+
+let set_pending_module_block t var = { t with pending_module_block = Some var }
+
+let take_pending_module_block t =
+  match t.pending_module_block with
+  | None -> t, None
+  | Some var -> { t with pending_module_block = None }, Some var
+
+let clear_pending_module_block t = { t with pending_module_block = None }
 
 let add_code_id t code_id ~addr ~params ~closure =
   let code_ids = Code_id.Map.add code_id { addr; params; closure } t.code_ids in

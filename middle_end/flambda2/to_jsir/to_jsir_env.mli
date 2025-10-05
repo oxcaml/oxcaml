@@ -95,6 +95,12 @@ val add_symbol :
     Otherwise, they will not be available to other compilation units. *)
 val add_symbol_without_registering : t -> Symbol.t -> Jsir.Var.t -> t
 
+val set_pending_module_block : t -> Jsir.Var.t -> t
+
+val take_pending_module_block : t -> t * Jsir.Var.t option
+
+val clear_pending_module_block : t -> t
+
 (** Register the given symbol to the global symbol table. Raises if the symbol is not in
     the environment.
 

@@ -437,12 +437,37 @@ and apply_expr ~env ~res e =
     then env, To_jsir_result.end_block_with_last_exn res (Return return_var)
     else
       let addr = To_jsir_env.get_continuation_exn env cont in
+      let sort = Continuation.sort cont in
+      if !Clflags.verbose
+      then
+        Format.eprintf "[js_of_ocaml] apply_expr returning to %a (sort=%a)@."
+          Continuation.print cont Continuation.Sort.print sort;
+      let env = To_jsir_env.set_pending_module_block env return_var in
+      if !Clflags.verbose
+         && (Continuation.Sort.equal sort Define_root_symbol
+            || Continuation.Sort.equal sort Toplevel_return)
+      then
+        Format.eprintf
+          "[js_of_ocaml] set pending for continuation %a (sort=%a)@."
+          Continuation.print cont Continuation.Sort.print sort;
       let arity =
-        Apply_expr.return_arity e |> Flambda_arity.cardinal_unarized
+        let arity =
+          Apply_expr.return_arity e |> Flambda_arity.cardinal_unarized
+        in
+        if arity = 0
+           && (Continuation.Sort.equal sort Define_root_symbol
+              || Continuation.Sort.equal sort Toplevel_return)
+        then 1
+        else arity
       in
       let return_vars, res =
         match arity with
-        | 0 -> [], res
+        | 0 ->
+          let is_module_return =
+            Continuation.Sort.equal sort Define_root_symbol
+            || Continuation.Sort.equal sort Toplevel_return
+          in
+          if is_module_return then [return_var], res else [], res
         | 1 -> [return_var], res
         | _ as arity ->
           let return_vars = List.init arity (fun i -> i, Jsir.Var.fresh ()) in
@@ -461,6 +486,17 @@ and apply_expr ~env ~res e =
           in
           List.map snd return_vars, res
       in
+      let env, res =
+        if Continuation.Sort.equal sort Define_root_symbol
+           || Continuation.Sort.equal sort Toplevel_return
+        then
+          match return_vars with
+          | v :: _ ->
+            let symbol = To_jsir_env.module_symbol env in
+            To_jsir_env.add_symbol_without_registering env symbol v, res
+          | [] -> env, res
+        else env, res
+      in
       ( env,
         To_jsir_result.end_block_with_last_exn res (Branch (addr, return_vars))
       )
@@ -470,20 +506,58 @@ and apply_cont0 ~env ~res apply_cont =
     To_jsir_shared.simples ~env ~res (Apply_cont.args apply_cont)
   in
   let continuation = Apply_cont.continuation apply_cont in
+  if !Clflags.verbose
+  then (
+    Format.eprintf "[js_of_ocaml] apply_cont %a (sort=%a) with %d args:"
+      Continuation.print continuation Continuation.Sort.print
+      (Continuation.sort continuation)
+      (List.length args);
+    List.iter
+      (fun arg -> Format.eprintf " %a" Simple.print arg)
+      (Apply_cont.args apply_cont);
+    Format.eprintf "@.");
   let get_last ~raise_kind_and_exn_handler : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
     | (Toplevel_return | Define_root_symbol) as sort ->
-      let module_symbol, res =
+      let env, module_block, res =
         match args with
-        | [arg] -> arg, res
-        | [] ->
-          (* Instantiated units reuse the surrounding module's symbol instead
-             of threading it as an explicit argument. *)
+        | [arg] ->
           let symbol = To_jsir_env.module_symbol env in
-          To_jsir_env.get_symbol_exn env ~res symbol
+          let env = To_jsir_env.add_symbol_without_registering env symbol arg in
+          env, arg, res
+        | [] -> (
+          let symbol = To_jsir_env.module_symbol env in
+          let env, pending_block = To_jsir_env.take_pending_module_block env in
+          match pending_block with
+          | Some block_var ->
+            let env =
+              To_jsir_env.add_symbol_without_registering env symbol block_var
+            in
+            (* [block_var] already names the module block; reuse it so we don't
+               synthesize a fresh indirection. *)
+            env, block_var, res
+          | None ->
+            if !Clflags.verbose
+            then
+              Format.eprintf
+                "[js_of_ocaml] missing pending block for continuation %a \
+                 (sort=%a); falling back to symbol lookup@."
+                Continuation.print continuation Continuation.Sort.print sort;
+            let module_block, res =
+              To_jsir_env.get_symbol_exn env ~res symbol
+            in
+            env, module_block, res)
         | _ :: _ ->
           Misc.fatal_errorf "Found %a with multiple arguments"
             Continuation.Sort.print sort
+      in
+      let module_symbol = To_jsir_env.module_symbol env in
+      let module_symbol_var, res =
+        To_jsir_env.get_symbol_exn env ~res module_symbol
+      in
+      let res =
+        To_jsir_result.add_instr_exn res
+          (Assign (module_symbol_var, module_block))
       in
       let compilation_unit =
         To_jsir_env.module_symbol env |> Symbol.compilation_unit
@@ -500,7 +574,7 @@ and apply_cont0 ~env ~res apply_cont =
                Prim
                  ( Extern "caml_register_global",
                    [ Pc (Int (Targetint.of_int_exn 0));
-                     Pv module_symbol;
+                     Pv module_block;
                      Pc
                        (* CR selee: this assumes javascript, WASM needs just
                           String *)
@@ -657,7 +731,8 @@ let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
      environment up front. The actual definition will overwrite this binding
      once the static block for the module is processed. *)
   let env =
-    To_jsir_env.add_symbol_without_registering env module_symbol (Jsir.Var.fresh ())
+    To_jsir_env.add_symbol_without_registering env module_symbol
+      (Jsir.Var.fresh ())
   in
   let res = To_jsir_result.create () in
   let res, _addr = To_jsir_result.new_block res ~params:[] in
