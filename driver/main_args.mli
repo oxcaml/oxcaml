@@ -273,6 +273,7 @@ module type Optcomp_options = sig
   val _gdwarf_config_max_evaluation_steps_per_variable : string -> unit
   val _gdwarf_config_shape_reduce_fuel : string -> unit
   val _gdwarf_fidelity : string -> unit
+  val _djsir : unit -> unit
 end
 
 module type Opttop_options = sig

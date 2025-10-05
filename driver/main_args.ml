@@ -1315,6 +1315,7 @@ module type Optcomp_options = sig
   val _gdwarf_config_max_evaluation_steps_per_variable : string -> unit
   val _gdwarf_config_shape_reduce_fuel : string -> unit
   val _gdwarf_fidelity : string -> unit
+  val _djsir : unit -> unit
 end;;
 
 module type Jscomp_options = sig
@@ -1778,6 +1779,7 @@ struct
     mk_dflambda_no_invariants F._dflambda_no_invariants;
     mk_dflambda_let F._dflambda_let;
     mk_dflambda_verbose F._dflambda_verbose;
+    mk_djsir F._djsir;
 
     mk_dcmm F._dcmm;
     mk_dcse F._dcse;
@@ -2518,6 +2520,7 @@ module Default = struct
          OCaml 4.08.0"
     let _shared () = shared := true; dlcode := true
     let _target = Clflags.set_backend_target
+    let _djsir = set dump_jsir
     let _v () = Compenv.print_version_and_library "native-code compiler"
     let _no_probes = clear probes
     let _probes = set probes
