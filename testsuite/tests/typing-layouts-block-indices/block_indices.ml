@@ -11,16 +11,14 @@
    ocamlc.byte;
    check-ocamlc.byte-output;
  } {
-   flags = "-extension layouts_alpha";
    bytecode;
  }{
-   flags = "-extension layouts_alpha";
    native;
  } {
-   flags = "-extension layouts_alpha -Oclassic";
+   flags = "-Oclassic";
    native;
  } {
-   flags = "-extension layouts_alpha -O3";
+   flags = "-O3";
    native;
  }
 *)
