@@ -523,41 +523,42 @@ and apply_cont0 ~env ~res apply_cont =
         match args with
         | [arg] ->
           let symbol = To_jsir_env.module_symbol env in
-          let env = To_jsir_env.add_symbol_without_registering env symbol arg in
+          let env =
+            To_jsir_env.add_symbol_without_registering env symbol arg
+          in
           env, arg, res
-        | [] -> (
+        | [] ->
           let symbol = To_jsir_env.module_symbol env in
           let env, pending_block = To_jsir_env.take_pending_module_block env in
-          match pending_block with
-          | Some block_var ->
-            let env =
-              To_jsir_env.add_symbol_without_registering env symbol block_var
-            in
-            (* [block_var] already names the module block; reuse it so we don't
-               synthesize a fresh indirection. *)
-            env, block_var, res
-          | None ->
-            if !Clflags.verbose
-            then
-              Format.eprintf
-                "[js_of_ocaml] missing pending block for continuation %a \
-                 (sort=%a); falling back to symbol lookup@."
-                Continuation.print continuation Continuation.Sort.print sort;
-            let module_block, res =
-              To_jsir_env.get_symbol_exn env ~res symbol
-            in
-            env, module_block, res)
+          (match pending_block with
+           | Some block_var ->
+             let env =
+               To_jsir_env.add_symbol_without_registering env symbol block_var
+             in
+             (* [block_var] already names the module block; reuse it so we
+                don't synthesize a fresh indirection. *)
+             env, block_var, res
+           | None ->
+             if !Clflags.verbose
+             then
+               Format.eprintf
+                 "[js_of_ocaml] missing pending block for continuation %a \
+                  (sort=%a); falling back to symbol lookup@."
+                 Continuation.print continuation Continuation.Sort.print sort;
+             let module_block, res =
+               To_jsir_env.get_symbol_exn env ~res symbol
+             in
+             let env =
+               To_jsir_env.add_symbol_without_registering env symbol module_block
+             in
+             env, module_block, res)
         | _ :: _ ->
           Misc.fatal_errorf "Found %a with multiple arguments"
             Continuation.Sort.print sort
       in
       let module_symbol = To_jsir_env.module_symbol env in
-      let module_symbol_var, res =
-        To_jsir_env.get_symbol_exn env ~res module_symbol
-      in
-      let res =
-        To_jsir_result.add_instr_exn res
-          (Assign (module_symbol_var, module_block))
+      let env =
+        To_jsir_env.add_symbol_without_registering env module_symbol module_block
       in
       let compilation_unit =
         To_jsir_env.module_symbol env |> Symbol.compilation_unit

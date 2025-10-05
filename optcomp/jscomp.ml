@@ -94,11 +94,11 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
   let compile_implementation ~keep_symbol_tables:_ ~sourcefile:_ ~prefixname
       ~ppf_dump program =
     let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
-    let module_name =
+    let (_ : Unit_info.Artifact.t) =
       Unit_info.Artifact.from_filename ~for_pack_prefix
         (prefixname ^ ext_flambda_obj)
-      |> Unit_info.Artifact.modname
     in
+    let current_unit = (Compilenv.current_unit_infos ()).ui_unit in
     let open Jsoo_imports in
     let ({ program; imported_compilation_units } : Js_backend.program) =
       Targetint.set_num_bits 32;
@@ -112,7 +112,8 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
     let jsir_filename = prefixname ^ ".jsir" in
     let info : Unit_info.t =
       { provides =
-          StringSet.singleton (Compilation_unit.full_path_as_string module_name);
+          StringSet.singleton
+            (Compilation_unit.full_path_as_string current_unit);
         requires =
           Compilation_unit.Set.elements imported_compilation_units
           |> ListLabels.map ~f:Compilation_unit.full_path_as_string
