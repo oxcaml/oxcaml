@@ -2,7 +2,6 @@
  include stdlib_stable;
  include stdlib_upstream_compatible;
  modules = "idx_repr.ml stubs.c";
- flags = "-extension simd_beta -extension layouts_alpha";
  flambda2;
  stack-allocation;
  native;

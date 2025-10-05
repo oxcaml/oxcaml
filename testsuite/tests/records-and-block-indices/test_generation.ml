@@ -710,12 +710,10 @@ let main test ~bytecode =
   if bytecode
   then (
     line {| modules = "idx_repr.ml stubs.c";|};
-    line {| flags = "-extension layouts_alpha";|};
     line {| bytecode;|}
   )
   else (
     line {| modules = "idx_repr.ml stubs.c";|};
-    line {| flags = "-extension simd_beta -extension layouts_alpha";|};
     line {| flambda2;|};
     line {| stack-allocation;|};
     line {| native;|}
