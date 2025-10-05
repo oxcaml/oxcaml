@@ -473,12 +473,14 @@ and apply_cont0 ~env ~res apply_cont =
   let get_last ~raise_kind_and_exn_handler : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
     | (Toplevel_return | Define_root_symbol) as sort ->
-      let module_symbol =
+      let module_symbol, res =
         match args with
-        | [arg] -> arg
+        | [arg] -> arg, res
         | [] ->
-          Misc.fatal_errorf "Found %a with no arguments" Continuation.Sort.print
-            sort
+          (* Instantiated units reuse the surrounding module's symbol instead
+             of threading it as an explicit argument. *)
+          let symbol = To_jsir_env.module_symbol env in
+          To_jsir_env.get_symbol_exn env ~res symbol
         | _ :: _ ->
           Misc.fatal_errorf "Found %a with multiple arguments"
             Continuation.Sort.print sort
@@ -644,11 +646,18 @@ and invalid ~env ~res msg =
   env, To_jsir_result.end_block_with_last_exn res Stop
 
 let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
+  let module_symbol = Flambda_unit.module_symbol flambda_unit in
   let env =
-    To_jsir_env.create
-      ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
+    To_jsir_env.create ~module_symbol
       ~return_continuation:(Flambda_unit.return_continuation flambda_unit)
       ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
+  in
+  (* Some instantiation paths don't synthesize an explicit [Define_root_symbol]
+     argument, so ensure the module symbol is at least provisioned in the
+     environment up front. The actual definition will overwrite this binding
+     once the static block for the module is processed. *)
+  let env =
+    To_jsir_env.add_symbol_without_registering env module_symbol (Jsir.Var.fresh ())
   in
   let res = To_jsir_result.create () in
   let res, _addr = To_jsir_result.new_block res ~params:[] in

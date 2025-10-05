@@ -19,9 +19,12 @@
    bad_instantiate_missing_arg.reference \
    bad_instantiate_no_such_param.reference \
    bad_instantiate_not_arg.reference \
+    bad_instantiate_not_arg.javascript.reference \
    bad_instantiate_not_parameterised.reference \
+    bad_instantiate_not_parameterised.javascript.reference \
    bad_instantiate_repeated_param.reference \
    bad_instantiate_wrong_target_name.reference \
+    bad_instantiate_wrong_target_name.javascript.reference \
    bad_param_param.mli bad_param_param.reference \
    bad_ref_direct.ml bad_ref_direct.reference \
    bad_ref_direct_imported.ml bad_ref_direct_imported.reference \
@@ -364,7 +367,7 @@
            reason = "output depends on .cmo vs .cmx";
            skip;
 
-           compiler_reference = "bad_instantiate_not_parameterised.reference";
+          compiler_reference = "bad_instantiate_not_parameterised.javascript.reference";
            check-ocamlc.byte-output;
          }{
            module = "";
@@ -378,7 +381,7 @@
            reason = "output depends on .cmo vs .cmx";
            skip;
 
-           compiler_reference = "bad_instantiate_not_arg.reference";
+          compiler_reference = "bad_instantiate_not_arg.javascript.reference";
            check-ocamlc.byte-output;
          }{
            module = "";
@@ -426,7 +429,7 @@
            reason = "output depends on .cmo vs .cmx";
            skip;
 
-           compiler_reference = "bad_instantiate_wrong_target_name.reference";
+          compiler_reference = "bad_instantiate_wrong_target_name.javascript.reference";
            check-ocamlc.byte-output;
          }{
            module = "";
@@ -858,7 +861,7 @@
            ocamlopt_byte_exit_status = "2";
            ocamlopt.byte;
 
-           compiler_reference = "bad_instantiate_not_parameterised.reference";
+          compiler_reference = "bad_instantiate_not_parameterised.javascript.reference";
            check-ocamlopt.byte-output;
          }{
            module = "";
@@ -869,7 +872,7 @@
            ocamlopt_byte_exit_status = "2";
            ocamlopt.byte;
 
-           compiler_reference = "bad_instantiate_not_arg.reference";
+          compiler_reference = "bad_instantiate_not_arg.javascript.reference";
            check-ocamlopt.byte-output;
          }{
            module = "";
@@ -914,7 +917,7 @@
            ocamlopt_byte_exit_status = "2";
            ocamlopt.byte;
 
-           compiler_reference = "bad_instantiate_wrong_target_name.reference";
+          compiler_reference = "bad_instantiate_wrong_target_name.javascript.reference";
            check-ocamlopt.byte-output;
          }{
            module = "";
@@ -1338,7 +1341,7 @@
            ocamlj_opt_exit_status = "2";
            ocamlj.opt;
 
-           compiler_reference = "bad_instantiate_not_parameterised.reference";
+           compiler_reference = "bad_instantiate_not_parameterised.javascript.reference";
            check-ocamlj.opt-output;
          }{
            module = "";
@@ -1349,7 +1352,7 @@
            ocamlj_opt_exit_status = "2";
            ocamlj.opt;
 
-           compiler_reference = "bad_instantiate_not_arg.reference";
+           compiler_reference = "bad_instantiate_not_arg.javascript.reference";
            check-ocamlj.opt-output;
          }{
            module = "";
@@ -1394,7 +1397,7 @@
            ocamlj_opt_exit_status = "2";
            ocamlj.opt;
 
-           compiler_reference = "bad_instantiate_wrong_target_name.reference";
+           compiler_reference = "bad_instantiate_wrong_target_name.javascript.reference";
            check-ocamlj.opt-output;
          }{
            module = "";
