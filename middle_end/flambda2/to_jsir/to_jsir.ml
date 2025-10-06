@@ -438,18 +438,7 @@ and apply_expr ~env ~res e =
     else
       let addr = To_jsir_env.get_continuation_exn env cont in
       let sort = Continuation.sort cont in
-      if !Clflags.verbose
-      then
-        Format.eprintf "[js_of_ocaml] apply_expr returning to %a (sort=%a)@."
-          Continuation.print cont Continuation.Sort.print sort;
       let env = To_jsir_env.set_pending_module_block env return_var in
-      if !Clflags.verbose
-         && (Continuation.Sort.equal sort Define_root_symbol
-            || Continuation.Sort.equal sort Toplevel_return)
-      then
-        Format.eprintf
-          "[js_of_ocaml] set pending for continuation %a (sort=%a)@."
-          Continuation.print cont Continuation.Sort.print sort;
       let arity =
         let arity =
           Apply_expr.return_arity e |> Flambda_arity.cardinal_unarized
@@ -506,16 +495,6 @@ and apply_cont0 ~env ~res apply_cont =
     To_jsir_shared.simples ~env ~res (Apply_cont.args apply_cont)
   in
   let continuation = Apply_cont.continuation apply_cont in
-  if !Clflags.verbose
-  then (
-    Format.eprintf "[js_of_ocaml] apply_cont %a (sort=%a) with %d args:"
-      Continuation.print continuation Continuation.Sort.print
-      (Continuation.sort continuation)
-      (List.length args);
-    List.iter
-      (fun arg -> Format.eprintf " %a" Simple.print arg)
-      (Apply_cont.args apply_cont);
-    Format.eprintf "@.");
   let get_last ~raise_kind_and_exn_handler : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
     | (Toplevel_return | Define_root_symbol) as sort ->
@@ -537,12 +516,6 @@ and apply_cont0 ~env ~res apply_cont =
                synthesize a fresh indirection. *)
             env, block_var, res
           | None ->
-            if !Clflags.verbose
-            then
-              Format.eprintf
-                "[js_of_ocaml] missing pending block for continuation %a \
-                 (sort=%a); falling back to symbol lookup@."
-                Continuation.print continuation Continuation.Sort.print sort;
             let module_block, res =
               To_jsir_env.get_symbol_exn env ~res symbol
             in

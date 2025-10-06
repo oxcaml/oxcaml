@@ -680,13 +680,7 @@
   flambda2
   flambda2_ui
   flambda2_to_cmm
-<<<<<<< HEAD
-  flambda2_to_jsir
   gc_timings
-||||||| 693db210fb
-=======
-  gc_timings
->>>>>>> jvb.refactor-optcomp
   ocamloptcomp
   ocamlcommon
   unix)
