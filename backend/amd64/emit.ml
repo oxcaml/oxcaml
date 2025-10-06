@@ -2949,6 +2949,35 @@ let emit_probe_notes0 () =
     emit_elf_note ~section:Stapsdt_note ~owner:"stapsdt" ~typ:3l ~emit_desc
   in
   List.iter describe_one_probe !probes;
+  ()
+
+let emit_dummy_probe_notes () =
+  (* A semaphore may be used via [%probe_is_enabled] without a corresponding
+     probe site in the same compilation unit or even the entire program due to
+     inlining or optimizations or user defined special cases. Emit dummy probe
+     notes to correctly toggle such semaphores. A dummy note has no associated
+     probe site or probe handler. *)
+  let describe_dummy_probe ~probe_name sym =
+    let semaphore_label = S.create sym in
+    let emit_desc () =
+      emit_probe_note_desc ~probe_name ~probe_label:None ~semaphore_label
+        ~probe_args:""
+    in
+    emit_elf_note ~section:Stapsdt_note ~owner:"stapsdt" ~typ:3l ~emit_desc
+  in
+  let semaphores_without_probes =
+    List.fold_left
+      (fun acc probe -> String.Map.remove probe.probe_name acc)
+      !probe_semaphores !probes
+  in
+  if not (String.Map.is_empty semaphores_without_probes)
+  then (
+    D.switch_to_section Stapsdt_note;
+    String.Map.iter
+      (fun probe_name (sym, _, _) -> describe_dummy_probe ~probe_name sym)
+      semaphores_without_probes)
+
+let emit_probe_semaphores () =
   (match Target_system.is_macos () with
   | false ->
     emit_stapsdt_base_section ();
@@ -2971,7 +3000,11 @@ let emit_probe_notes0 () =
     !probe_semaphores
 
 let emit_probe_notes () =
-  match !probes with [] -> () | _ -> emit_probe_notes0 ()
+  (match !probes with [] -> () | _ -> emit_probe_notes0 ());
+  if not (String.Map.is_empty !probe_semaphores)
+  then (
+    emit_dummy_probe_notes ();
+    emit_probe_semaphores ())
 
 let emit_trap_notes () =
   (* Don't emit trap notes on windows and macos systems *)
