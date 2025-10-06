@@ -144,7 +144,7 @@ and core_type_desc =
   | Ptyp_var of string * jkind_annotation option
     (** A type variable such as ['a] or ['a : k] *)
   | Ptyp_arrow of arg_label * core_type * core_type * modes * modes
-        (** [Ptyp_arrow(lbl, T1, T2, M1, M2)] represents:
+      (** [Ptyp_arrow(lbl, T1, T2, M1, M2)] represents:
             - [T1 @ M1 -> T2 @ M2]    when [lbl] is
                                      {{!arg_label.Nolabel}[Nolabel]},
             - [~l:(T1 @ M1) -> (T2 @ M2)] when [lbl] is

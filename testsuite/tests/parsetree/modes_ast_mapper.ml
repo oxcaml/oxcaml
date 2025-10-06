@@ -47,5 +47,4 @@ let () =
   test mapper "let unique_ f (local_ x) = x";
   test mapper "let local_ f x: int -> int = x";
   test mapper "module M : sig val x : string -> string @ foo @@ bar hello end = struct end";
-  (* CR zeisbach: add test cases for mods *)
   ()
