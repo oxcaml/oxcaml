@@ -13,27 +13,28 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* "Package" a set of .cmx/.o files into one .cmx/.o file having the
-   original compilation units as sub-modules. *)
+(* "Package" a set of .cmx/.o files into one .cmx/.o file having the original
+   compilation units as sub-modules. *)
 
-val package_files
-   : machine_width:Target_system.Machine_width.t
-  -> (module Compiler_owee.Unix_intf.S)
-  -> ppf_dump:Format.formatter
-  -> Env.t
-  -> string list
-  -> string
-  -> flambda2:(
-    ppf_dump:Format.formatter ->
+val package_files :
+  machine_width:Target_system.Machine_width.t ->
+  (module Compiler_owee.Unix_intf.S) ->
+  ppf_dump:Format.formatter ->
+  Env.t ->
+  string list ->
+  string ->
+  flambda2:
+    (ppf_dump:Format.formatter ->
     prefixname:string ->
     machine_width:Target_system.Machine_width.t ->
     keep_symbol_tables:bool ->
     Lambda.program ->
-    Cmm.phrase list)
-  -> unit
+    Cmm.phrase list) ->
+  unit
 
 type error =
-    Illegal_renaming of Compilation_unit.Name.t * string * Compilation_unit.Name.t
+  | Illegal_renaming of
+      Compilation_unit.Name.t * string * Compilation_unit.Name.t
   | Forward_reference of string * Compilation_unit.Name.t
   | Wrong_for_pack of string * Compilation_unit.t
   | Linking_error
@@ -42,4 +43,4 @@ type error =
 
 exception Error of error
 
-val report_error: Format.formatter -> error -> unit
+val report_error : Format.formatter -> error -> unit

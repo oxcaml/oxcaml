@@ -18,21 +18,23 @@
 open Misc
 open Format
 
-val link: (module Compiler_owee.Unix_intf.S)
-    -> string list
-    -> string
-    -> cached_genfns_imports:Generic_fns.Partition.Set.t
-    -> genfns:Generic_fns.Tbl.t
-    -> units_tolink:Linkenv.unit_link_info list
-    -> ppf_dump:Format.formatter
-    -> unit
+val link :
+  (module Compiler_owee.Unix_intf.S) ->
+  string list ->
+  string ->
+  cached_genfns_imports:Generic_fns.Partition.Set.t ->
+  genfns:Generic_fns.Tbl.t ->
+  units_tolink:Linkenv.unit_link_info list ->
+  ppf_dump:Format.formatter ->
+  unit
 
-val link_shared: (module Compiler_owee.Unix_intf.S)
-    -> string list -> string
-    -> genfns:Generic_fns.Tbl.t
-    -> units_tolink:Linkenv.unit_link_info list
-    -> ppf_dump:Format.formatter
-    -> unit
+val link_shared :
+  (module Compiler_owee.Unix_intf.S) ->
+  string list ->
+  string ->
+  genfns:Generic_fns.Tbl.t ->
+  units_tolink:Linkenv.unit_link_info list ->
+  ppf_dump:Format.formatter ->
+  unit
 
-
-val call_linker_shared: ?native_toplevel:bool -> string list -> string -> unit
+val call_linker_shared : ?native_toplevel:bool -> string list -> string -> unit
