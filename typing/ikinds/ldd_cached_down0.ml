@@ -161,9 +161,9 @@ module Make (V : ORDERED) = struct
   (* --------- boolean algebra over nodes (no memoization) --------- *)
   let rec join (a : node) (b : node) =
     if is_leaf a
-    then join_with_left_leaf a b
+    then join_with_leaf a b
     else if is_leaf b
-    then join_with_left_leaf b a
+    then join_with_leaf b a
     else
       let va = node_v a in
       let alo = node_lo a in
@@ -179,27 +179,27 @@ module Make (V : ORDERED) = struct
       then node_raw va (join alo b) (canonicalize ahi b)
       else node_raw vb (join a blo) (canonicalize bhi a)
 
-  and join_with_left_leaf (leaf_a : node) (other : node) =
+  and join_with_leaf (leaf_a : node) (other : node) =
     let leaf_val = leaf_value leaf_a in
     (* Fast path *)
     if C.leq leaf_val (down0 other) then other else
-    join_with_left_leaf_aux leaf_val other
+    join_with_leaf_aux leaf_val other
 
-  and join_with_left_leaf_aux (leaf_a : C.t) (other : node) =
+  and join_with_leaf_aux (leaf_a : C.t) (other : node) =
     if is_leaf other
     then leaf (C.join leaf_a (leaf_value other))
     else
       let vb = node_v other in
       let blo = node_lo other in
       let bhi = node_hi other in
-      node_raw vb (join_with_left_leaf_aux leaf_a blo)
+      node_raw vb (join_with_leaf_aux leaf_a blo)
         (canonicalize_right_leaf_aux bhi leaf_a)
 
   let rec meet (a : node) (b : node) =
     if is_leaf a
-    then meet_with_left_leaf a b
+    then meet_with_leaf a b
     else if is_leaf b
-    then meet_with_left_leaf b a
+    then meet_with_leaf b a
     else
       let va = node_v a in
       let alo = node_lo a in
@@ -216,19 +216,19 @@ module Make (V : ORDERED) = struct
       then node va (meet alo b) (meet ahi b)
       else node vb (meet a blo) (meet a bhi)
 
-  and meet_with_left_leaf (leaf_a : node) (other : node) =
+  and meet_with_leaf (leaf_a : node) (other : node) =
     let leaf_val = leaf_value leaf_a in
-    meet_with_left_leaf_aux leaf_val other
+    meet_with_leaf_aux leaf_val other
 
-  and meet_with_left_leaf_aux (leaf_a : C.t) (other : node) =
+  and meet_with_leaf_aux (leaf_a : C.t) (other : node) =
     if is_leaf other
     then leaf (C.meet leaf_a (leaf_value other))
     else
       let vb = node_v other in
       let blo = node_lo other in
       let bhi = node_hi other in
-      node vb (meet_with_left_leaf_aux leaf_a blo)
-        (meet_with_left_leaf_aux leaf_a bhi)
+      node vb (meet_with_leaf_aux leaf_a blo)
+        (meet_with_leaf_aux leaf_a bhi)
 
   (* --------- public constructors --------- *)
   let const (c : C.t) = leaf c
