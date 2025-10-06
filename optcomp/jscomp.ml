@@ -18,7 +18,8 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
       | { extra = Some (Plus, "ox"); _ } ->
         Filename.concat Config.bindir "js_of_oxcaml"
       | _ ->
-        (* Try to find js_of_oxcaml in the same directory as the current executable *)
+        (* Try to find js_of_oxcaml in the same directory as the current
+           executable *)
         let exe_dir = Filename.dirname Sys.executable_name in
         let jsoo_path = Filename.concat exe_dir "js_of_oxcaml" in
         if Sys.file_exists jsoo_path then jsoo_path else "js_of_oxcaml"

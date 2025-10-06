@@ -73,8 +73,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     in
     if Filename.check_suffix file_name Backend.ext_flambda_obj
     then
-      (* This is a cmx file. It must be linked in any case.
-         Read the infos to see which modules it requires. *)
+      (* This is a cmx file. It must be linked in any case. Read the infos to
+         see which modules it requires. *)
       let info, crc = read_unit_info file_name in
       Unit (file_name, info, crc)
     else if Filename.check_suffix file_name Backend.ext_flambda_lib
@@ -127,8 +127,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       in
       object_file_name :: objfiles, unit :: tolink, cached_genfns_imports
     | Library (file_name, infos) ->
-      (* This is an archive file. Each unit contained in it will be linked
-         in only if needed. *)
+      (* This is an archive file. Each unit contained in it will be linked in
+         only if needed. *)
       Linkenv.add_ccobjs (Filename.dirname file_name) infos;
       let cached_genfns_imports =
         Generic_fns.Tbl.add ~imports:cached_genfns_imports genfns
@@ -141,11 +141,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           Filename.chop_suffix file_name Backend.ext_flambda_lib
           ^ Backend.ext_lib
         in
-        (* MSVC doesn't support empty .lib files, and macOS struggles to
-           make them (#6550), so there shouldn't be one if the cmxa
-           contains no units. The file_exists check is added to be
-           ultra-defensive for the case where a user has manually added
-           things to the .a/.lib file *)
+        (* MSVC doesn't support empty .lib files, and macOS struggles to make
+           them (#6550), so there shouldn't be one if the cmxa contains no
+           units. The file_exists check is added to be ultra-defensive for the
+           case where a user has manually added things to the .a/.lib file *)
         if infos.lib_units = [] && not (Sys.file_exists obj_file)
         then objfiles
         else obj_file :: objfiles
@@ -204,7 +203,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     !Clflags.keep_startup_file || !Emitaux.binary_backend_available
 
   (* The compiler allows [-o /dev/null], which can be used for testing linking.
-     In this case, we should not use the DWARF fission workflow during linking. *)
+     In this case, we should not use the DWARF fission workflow during
+     linking. *)
   let not_output_to_dev_null output_name =
     not (String.equal output_name "/dev/null")
 

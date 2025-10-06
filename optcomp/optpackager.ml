@@ -13,8 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* "Package" a set of .cmx/.o files into one .cmx/.o file having the
-   original compilation units as sub-modules. *)
+(* "Package" a set of .cmx/.o files into one .cmx/.o file having the original
+   compilation units as sub-modules. *)
 
 open Misc
 open Cmx_format
@@ -101,8 +101,8 @@ end) : S = struct
           if !Clflags.keep_asm_file
           then Unit_info.Artifact.prefix target ^ ".pack" ^ Config.ext_obj
           else
-            (* Put the full name of the module in the temporary file name
-               to avoid collisions with MSVC's link /lib in case of successive
+            (* Put the full name of the module in the temporary file name to
+               avoid collisions with MSVC's link /lib in case of successive
                packs *)
             let name =
               Symbol.for_current_unit () |> Symbol.linkage_name

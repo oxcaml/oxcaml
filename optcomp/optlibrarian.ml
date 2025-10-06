@@ -40,10 +40,10 @@ end) : S = struct
     in
     let info, crc = Compilenv.read_unit_info filename in
     info.ui_force_link <- info.ui_force_link || !Clflags.link_everything;
-    (* There is no need to keep the approximation in the library file,
-       since the compiler will go looking directly for object files.
-       The linker, which is the only one that reads library files, does not
-       need the approximation. *)
+    (* There is no need to keep the approximation in the library file, since the
+       compiler will go looking directly for object files. The linker, which is
+       the only one that reads library files, does not need the
+       approximation. *)
     info.ui_export_info <- None;
     ( Filename.chop_suffix filename Backend.ext_flambda_obj ^ Backend.ext_obj,
       (info, crc) )
@@ -67,11 +67,8 @@ end) : S = struct
           file_list descr_list;
         let cmis = Linkenv.extract_crc_interfaces () in
         let cmxs = Linkenv.extract_crc_implementations () in
-        (* CR mshinwell: see comment in compilenv.ml
-           let cmxs =
-             Compilenv.ensure_sharing_between_cmi_and_cmx_imports cmis cmxs
-           in
-        *)
+        (* CR mshinwell: see comment in compilenv.ml let cmxs =
+           Compilenv.ensure_sharing_between_cmi_and_cmx_imports cmis cmxs in *)
         let cmis = Array.of_list cmis in
         let cmxs = Array.of_list cmxs in
         let cmi_index = Compilation_unit.Name.Tbl.create 42 in

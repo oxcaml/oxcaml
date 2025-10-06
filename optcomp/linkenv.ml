@@ -120,8 +120,8 @@ let extract_crc_implementations () =
          let crc = Option.map (fun ((), crc) -> crc) crc in
          Import_info.create_normal cu ~crc)
 
-(* Add C objects and options and "custom" info from a library descriptor.
-   See bytecomp/bytelink.ml for comments on the order of C objects. *)
+(* Add C objects and options and "custom" info from a library descriptor. See
+   bytecomp/bytelink.ml for comments on the order of C objects. *)
 
 let lib_ccobjs = ref []
 
@@ -180,13 +180,13 @@ let reset () =
   lib_ccopts := []
 
 let assume_no_prefix modname =
-  (* We're the linker, so we assume that everything's already been packed, so
-     no module needs its prefix considered. *)
+  (* We're the linker, so we assume that everything's already been packed, so no
+     module needs its prefix considered. *)
   CU.create CU.Prefix.empty modname
 
 let make_globals_map units_list =
-  (* The order in which entries appear in the globals map does not matter
-     (see the natdynlink code). *)
+  (* The order in which entries appear in the globals map does not matter (see
+     the natdynlink code). *)
   let find_crc name =
     Cmi_consistbl.find crc_interfaces name
     |> Option.map (fun (_unit, crc) -> crc)
