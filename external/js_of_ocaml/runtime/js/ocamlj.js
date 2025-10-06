@@ -17,20 +17,12 @@ function caml_invalid_expr(msg) {
         "\n This is a bug in Flambda2 or the Flambda2 -> JSIR pass";
 }
 
-//Provides: caml_symbols
-var caml_symbols = {};
-
-//Provides: caml_register_symbol (const,const,mutable)
-//Requires: caml_symbols
-function caml_register_symbol(compilation_unit, symbol, value) {
-  if (!caml_symbols[compilation_unit]) {
-    caml_symbols[compilation_unit] = {};
-  }
-  caml_symbols[compilation_unit][symbol] = value;
+//Provides: caml_register_symbol (const,mutable)
+function caml_register_symbol(symbol, value) {
+  globalThis.jsoo_runtime[symbol] = value;
 }
 
-//Provides: caml_get_symbol (const,const)
-//Requires: caml_symbols
-function caml_get_symbol(compilation_unit, symbol) {
-  return caml_symbols[compilation_unit][symbol];
+//Provides: caml_get_symbol (const)
+function caml_get_symbol(symbol) {
+  return globalThis.jsoo_runtime[symbol];
 }

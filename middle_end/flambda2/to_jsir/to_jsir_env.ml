@@ -92,12 +92,6 @@ let add_exn_handler t cont ~addr ~exn_param ~extra_args =
 
 let add_var t fvar jvar = { t with vars = Variable.Map.add fvar jvar t.vars }
 
-let symbol_to_native_strings symbol =
-  ( Symbol.compilation_unit symbol
-    |> Compilation_unit.name |> Compilation_unit.Name.to_string
-    |> Jsir.Native_string.of_string,
-    Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string )
-
 let symbol_is_for_compilation_unit symbol =
   let compilation_unit = Symbol.compilation_unit symbol in
   Symbol.equal (Symbol.for_compilation_unit compilation_unit) symbol
@@ -110,15 +104,15 @@ let register_symbol' ~res symbol var =
        [get_symbol_for_global_data]) *)
     res
   | false ->
-    let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
+    let symbol_name =
+      Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string
+    in
     To_jsir_result.add_instr_exn res
       (Let
          ( Jsir.Var.fresh (),
            Prim
              ( Extern "caml_register_symbol",
-               [ Pc (NativeString compilation_unit_name);
-                 Pc (NativeString symbol_name);
-                 Pv var ] ) ))
+               [Pc (NativeString symbol_name); Pv var] ) ))
 
 let add_symbol_without_registering t symbol jvar =
   { t with symbols = Symbol.Map.add symbol jvar t.symbols }
@@ -188,20 +182,17 @@ let get_external_symbol ~res symbol =
     | true ->
       let compilation_unit = Symbol.compilation_unit symbol in
       let compilation_unit_name =
-        Compilation_unit.name_as_string compilation_unit
+        Compilation_unit.full_path_as_string compilation_unit
       in
       get_symbol_from_global_data ~compilation_unit
         ~symbol_name:compilation_unit_name ~res
     | false ->
-      let compilation_unit_name, symbol_name =
-        symbol_to_native_strings symbol
+      let symbol_name =
+        Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string
       in
       let var = Jsir.Var.fresh () in
       let expr : Jsir.expr =
-        Prim
-          ( Extern "caml_get_symbol",
-            [ Pc (NativeString compilation_unit_name);
-              Pc (NativeString symbol_name) ] )
+        Prim (Extern "caml_get_symbol", [Pc (NativeString symbol_name)])
       in
       var, To_jsir_result.add_instr_exn res (Let (var, expr)))
 

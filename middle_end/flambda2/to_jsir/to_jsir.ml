@@ -563,9 +563,7 @@ and apply_cont0 ~env ~res apply_cont =
       let compilation_unit =
         To_jsir_env.module_symbol env |> Symbol.compilation_unit
       in
-      let module_name =
-        Compilation_unit.name compilation_unit
-        |> Compilation_unit.Name.to_string
+      let module_name = Compilation_unit.full_path_as_string compilation_unit
       in
       let var = Jsir.Var.fresh () in
       let res =
