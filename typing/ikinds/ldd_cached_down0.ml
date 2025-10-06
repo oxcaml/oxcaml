@@ -342,7 +342,7 @@ module Make (V : ORDERED) = struct
     | Unsolved ->
       (* let rhs_forced = force rhs_raw in
       var.state <- Solved (restrict0 var rhs_forced) *)
-      var.state <- Solved (restrict0_force var rhs_forced)
+      var.state <- Solved (restrict0_force var rhs_raw)
 
   let solve_gfp (var : var) (rhs_raw : node) : unit =
     match var.state with
