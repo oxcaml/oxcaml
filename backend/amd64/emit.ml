@@ -2902,6 +2902,20 @@ let emit_elf_note ~section ~owner ~typ ~emit_desc =
   D.define_label d;
   D.align ~fill_x86_bin_emitter:Zero ~bytes:4
 
+let emit_probe_note_desc ~probe_name ~probe_label ~semaphore_label ~probe_args =
+  (match probe_label with
+  | Some probe_label ->
+    let lbl = label_to_asm_label ~section:Stapsdt_note probe_label in
+    D.label lbl
+  | None -> D.int64 0L);
+  (match Target_system.is_macos () with
+  | false -> D.symbol S.Predef.stapsdt_base
+  | true -> D.int64 0L);
+  D.symbol semaphore_label;
+  D.string "ocaml_2\000";
+  D.string (probe_name ^ "\000");
+  D.string (probe_args ^ "\000")
+
 let emit_probe_notes0 () =
   D.switch_to_section Stapsdt_note;
   let stap_arg arg =
@@ -2929,15 +2943,8 @@ let emit_probe_notes0 () =
     in
     let semaphore_label = S.create semsym in
     let emit_desc () =
-      let lbl = label_to_asm_label ~section:Stapsdt_note p.probe_label in
-      D.label lbl;
-      (match Target_system.is_macos () with
-      | false -> D.symbol S.Predef.stapsdt_base
-      | true -> D.int64 0L);
-      D.symbol semaphore_label;
-      D.string "ocaml_1\000";
-      D.string (probe_name ^ "\000");
-      D.string (args ^ "\000")
+      emit_probe_note_desc ~probe_label:(Some p.probe_label) ~semaphore_label
+        ~probe_name ~probe_args:args
     in
     emit_elf_note ~section:Stapsdt_note ~owner:"stapsdt" ~typ:3l ~emit_desc
   in
