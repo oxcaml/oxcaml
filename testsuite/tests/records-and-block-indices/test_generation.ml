@@ -401,14 +401,13 @@ let test_record_idx_access ty ~local =
           List.iter unboxed_paths ~f:(fun unboxed_path ->
               line "(* .%s%s *)" lbl (Path.to_string unboxed_path);
               let full_path = Path.Field lbl :: unboxed_path in
-              let flattened_float =
-                Type_structure.is_flat_float_record (Type.structure ty)
-                && Type_structure.layout
-                     (Type.structure (Type.follow_path ty full_path))
-                   = Value { ignorable = false; non_float = false }
-              in
-              if path_is_valid_block_idx ty full_path
-              then (
+              let test_deepening () =
+                let flattened_float =
+                  Type_structure.is_flat_float_record (Type.structure ty)
+                  && Type_structure.layout
+                       (Type.structure (Type.follow_path ty full_path))
+                     = Value { ignorable = false; non_float = false }
+                in
                 let sub_ty =
                   if flattened_float
                   then (
@@ -481,7 +480,9 @@ let test_record_idx_access ty ~local =
                   (sprintf "sub_eq (Idx_mut.unsafe_get r %s) %s" idx
                      next_r_sub_element_flat
                   )
-              )
+              in
+              if path_is_valid_block_idx ty full_path
+              then test_deepening ()
               else (
                 line
                   "(* Note: skipping test as this is not a valid block index,";
@@ -505,8 +506,7 @@ let test_record_idx_deepening ty =
           List.iter unboxed_paths ~f:(fun unboxed_path ->
               let full_path = Path.Field lbl :: unboxed_path in
               line "(* Deepening to (%s) *)" (Path.to_string full_path);
-              if path_is_valid_block_idx ty full_path
-              then (
+              let test_deepening () =
                 line "let idx : (%s, _) idx_mut = (%s) in" (Type.code ty)
                   (Path.to_string full_path);
                 line "iter indices_in_deepening_tests ~f:(fun i ->";
@@ -556,7 +556,9 @@ let test_record_idx_deepening ty =
                     done
                 );
                 line ");"
-              )
+              in
+              if path_is_valid_block_idx ty full_path
+              then test_deepening ()
               else (
                 line
                   "(* Note: skipping test as this is not a valid block index,";
