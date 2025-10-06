@@ -506,6 +506,7 @@
   asminstantiator
   asmlibrarian
   asmlink
+  linkenv
   asmpackager
   ;; backend/
   afl_instrument
