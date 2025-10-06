@@ -67,6 +67,10 @@ val default_ddebug_invariants : bool
 
 val ddebug_invariants : bool ref
 
+val default_ddebug_available_regs : bool
+
+val ddebug_available_regs : bool ref
+
 val default_ddwarf_types : bool
 
 val ddwarf_types : bool ref

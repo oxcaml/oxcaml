@@ -187,7 +187,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     then
       let naming_op =
         SU.make_name_for_debugger ~ident:(VP.var v) ~which_parameter:None
-          ~provenance ~is_assignment:false ~regs:r1
+          ~provenance ~regs:r1
       in
       SU.insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]);
     env
@@ -862,12 +862,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             let bound_name = VP.var bound_name in
             let naming_op =
               Operation.Name_for_debugger
-                { ident = bound_name;
-                  provenance;
-                  which_parameter = None;
-                  is_assignment = false;
-                  regs
-                }
+                { ident = bound_name; provenance; which_parameter = None; regs }
             in
             insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]
       in
@@ -1093,12 +1088,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                   let var = VP.var var in
                   let naming_op =
                     Operation.Name_for_debugger
-                      { ident = var;
-                        provenance;
-                        which_parameter = None;
-                        is_assignment = false;
-                        regs = r
-                      }
+                      { ident = var; provenance; which_parameter = None; regs = r }
                   in
                   insert_debug new_env sub_cfg (Op naming_op) Debuginfo.none
                     [||] [||])
@@ -1373,12 +1363,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                   let var = VP.var var in
                   let naming_op =
                     Operation.Name_for_debugger
-                      { ident = var;
-                        provenance;
-                        which_parameter = None;
-                        is_assignment = false;
-                        regs = r
-                      }
+                      { ident = var; provenance; which_parameter = None; regs = r }
                   in
                   insert_debug new_env sub_cfg (Op naming_op) Debuginfo.none
                     [||] [||])
@@ -1456,7 +1441,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               { ident = var;
                 provenance;
                 which_parameter = Some param_index;
-                is_assignment = false;
                 regs = hard_regs_for_arg
               }
           in

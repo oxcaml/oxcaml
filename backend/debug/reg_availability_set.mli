@@ -15,12 +15,16 @@
 (** Register availability sets. *)
 
 type t =
-  | Ok of Reg_with_debug_info.Set.t
+  | Ok of Reg_with_debug_info.Set_distinguishing_names_and_locations.t
   | Unreachable
 
 (** See comments in the .ml file about these functions. *)
 
 val of_list : Reg_with_debug_info.t list -> t
+
+val of_rd_set : Reg_with_debug_info.Set.t -> t
+
+val to_rd_set : t -> Reg_with_debug_info.Set.t option
 
 val union : t -> t -> t
 

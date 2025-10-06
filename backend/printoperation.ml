@@ -104,8 +104,7 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
   | Static_cast cast ->
     fprintf ppf "%s %a" (Printcmm.static_cast cast) reg arg.(0)
   | Opaque -> fprintf ppf "opaque %a" reg arg.(0)
-  | Name_for_debugger
-      { ident; which_parameter; regs = r; provenance = _; is_assignment = _ } ->
+  | Name_for_debugger { ident; which_parameter; regs = r; provenance = _ } ->
     fprintf ppf "%a holds the value of %a%s" regs r Backend_var.print ident
       (match which_parameter with
       | None -> ""

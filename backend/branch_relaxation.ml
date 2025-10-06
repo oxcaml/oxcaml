@@ -94,7 +94,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Some l ->
         instr_cons
           (Lcondbranch (Iinttest_imm (Ceq, n), l))
-          arg [||] next ~available_before:None ~available_across:None
+          arg [||] next
+          ~available_before:Reg_availability_set.Unreachable
+          ~available_across:Reg_availability_set.Unreachable
     in
     let rec fixup did_fix pc instr =
       match instr.desc with
@@ -123,9 +125,11 @@ module Make (T : Branch_relaxation_intf.S) = struct
             let llabel = Llabel { label = lbl2; section_name = None } in
             let cont =
               instr_cons (Lbranch lbl) [||] [||]
-                (instr_cons llabel [||] [||] instr.next ~available_before:None
-                   ~available_across:None)
-                ~available_before:None ~available_across:None
+                (instr_cons llabel [||] [||] instr.next
+                   ~available_before:Reg_availability_set.Unreachable
+                   ~available_across:Reg_availability_set.Unreachable)
+                ~available_before:Reg_availability_set.Unreachable
+                ~available_across:Reg_availability_set.Unreachable
             in
             instr.desc <- Lcondbranch (Operation.invert_test test, lbl2);
             instr.next <- cont;
