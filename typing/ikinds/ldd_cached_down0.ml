@@ -289,6 +289,7 @@ module Make (V : ORDERED) = struct
         match n.v.state with
         | Solved d ->
           let d' = force d in
+          n.v.state <- Solved d';
           join lo' (meet hi' d')
         | Unsolved ->
           if lo' == n.lo && hi' == n.hi
