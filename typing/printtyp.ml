@@ -947,7 +947,9 @@ let path_size path env =
     | Papply (p1, p2) ->
         let (l, b) = size p1 in
         (l + fst (size p2), b)
-    | Pextra_ty (p, (Pext_ty | Punboxed_ty)) ->
+    | Pextra_ty (p, Pext_ty) ->
+        size p
+    | Pextra_ty (p, Punboxed_ty) ->
         let (l, b) = size p in (1 + l, b)
   in
   let l, s = size path in
