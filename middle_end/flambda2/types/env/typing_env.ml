@@ -1233,7 +1233,7 @@ end = struct
             ~const:(fun const -> VA.Value_const const)
             ~var:(fun _ ~coercion:_ -> VA.Value_unknown)
             ~symbol:(fun symbol ~coercion:_ -> VA.Value_symbol symbol)
-        | Ok (No_alias { is_null = Maybe_null; _ })
+        | Ok (No_alias { is_null = Maybe_null | Is_null _; _ })
         | Ok (No_alias { non_null = Unknown | Bottom; _ }) ->
           VA.Value_unknown
         | Ok (No_alias { is_null = Not_null; non_null = Ok head }) -> (
@@ -1267,20 +1267,26 @@ end = struct
               { immediates = _;
                 blocks = Unknown;
                 extensions = _;
-                is_unique = _
+                is_unique = _;
+                is_int = _;
+                get_tag = _
               }
           | Variant
               { immediates = Unknown;
                 blocks = _;
                 extensions = _;
-                is_unique = _
+                is_unique = _;
+                is_int = _;
+                get_tag = _
               } ->
             Value_unknown
           | Variant
               { immediates = Known imms;
                 blocks = Known blocks;
                 extensions = _;
-                is_unique = _
+                is_unique = _;
+                is_int = _;
+                get_tag = _
               } ->
             if TG.is_obviously_bottom imms
             then
