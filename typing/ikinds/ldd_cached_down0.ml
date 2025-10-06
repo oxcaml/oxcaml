@@ -314,7 +314,10 @@ module Make (V : ORDERED) = struct
     | Solved d -> 
       let lo' = restrict0_force x n.lo in
       let hi' = restrict0_force x n.hi in
-      let d' = restrict0_force x d in
+      (* let d' = restrict0_force x d in *)
+      let d_forced = force d in
+      n.v.state <- Solved d_forced;
+      let d' = restrict0 x d_forced in
       join lo' (meet hi' d')
     | Unsolved ->
       let lo' = restrict0_force x n.lo in
@@ -337,9 +340,9 @@ module Make (V : ORDERED) = struct
     | Rigid _ -> invalid_arg "solve_lfp: rigid variable"
     | Solved _ -> invalid_arg "solve_lfp: solved variable"
     | Unsolved ->
-      (* let rhs_forced = force rhs_raw in *)
-      (* var.state <- Solved (restrict0_force var rhs_forced) *)
-      var.state <- Solved (restrict0_force var rhs_raw)
+      (* let rhs_forced = force rhs_raw in
+      var.state <- Solved (restrict0 var rhs_forced) *)
+      var.state <- Solved (restrict0_force var rhs_forced)
 
   let solve_gfp (var : var) (rhs_raw : node) : unit =
     match var.state with
