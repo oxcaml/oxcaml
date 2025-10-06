@@ -387,6 +387,11 @@ let float_const f = J.ENum (J.Num.of_float (Int64.float_of_bits f))
 
 let s_var name = J.EVar (J.ident (Utf8_string.of_string_exn name))
 
+let jsoo_runtime =
+   J.dot
+    (s_var Global_constant.global_object)
+    (Utf8_string.of_string_exn "jsoo_runtime")
+
 let runtime_fun ctx name =
   match ctx.Ctx.exported_runtime with
   | Some (runtime, runtime_needed) ->
@@ -1494,37 +1499,17 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
             let* co = access ~ctx o in
             let* () = info mutator_p in
             return (J.EUn (J.Delete, J.dot co f))
-        | Extern "caml_register_symbol", [ Pc (NativeString (Utf symbol_name)); v ] ->
+        | Extern "%caml_js_register_symbol", [ Pc (NativeString (Utf symbol_name)); v ] ->
             (* Inline: globalThis.jsoo_runtime[symbol_name] = v *)
             let* cv = access' ~ctx v in
             let* () = info mutator_p in
-            let global_this_ident =
-              J.S
-                { name = Utf8_string.of_string_exn "globalThis"
-                ; var = None
-                ; loc = J.N
-                }
-            in
-            let runtime_obj =
-              J.dot (J.EVar global_this_ident) (Utf8_string.of_string_exn "jsoo_runtime")
-            in
             let symbol_str = J.EStr symbol_name in
-            return (J.EBin (J.Eq, J.EAccess (runtime_obj, J.ANormal, symbol_str), cv))
-        | Extern "caml_get_symbol", [ Pc (NativeString (Utf symbol_name)) ] ->
+            return (J.EBin (J.Eq, J.EAccess (jsoo_runtime, J.ANormal, symbol_str), cv))
+        | Extern "%caml_js_get_symbol", [ Pc (NativeString (Utf symbol_name)) ] ->
             (* Inline: globalThis.jsoo_runtime[symbol_name] *)
             let* () = info mutable_p in
-            let global_this_ident =
-              J.S
-                { name = Utf8_string.of_string_exn "globalThis"
-                ; var = None
-                ; loc = J.N
-                }
-            in
-            let runtime_obj =
-              J.dot (J.EVar global_this_ident) (Utf8_string.of_string_exn "jsoo_runtime")
-            in
             let symbol_str = J.EStr symbol_name in
-            return (J.EAccess (runtime_obj, J.ANormal, symbol_str))
+            return (J.EAccess (jsoo_runtime, J.ANormal, symbol_str))
             (*
            This is only useful for debugging:
          {[
@@ -2290,13 +2275,7 @@ let generate_shared_value ctx =
         ((match ctx.Ctx.exported_runtime with
          | None -> []
          | Some (_, { contents = false }) -> []
-         | Some (v, _) ->
-             [ ( J.V v
-               , ( J.dot
-                     (s_var Global_constant.global_object)
-                     (Utf8_string.of_string_exn "jsoo_runtime")
-                 , J.U ) )
-             ])
+         | Some (v, { contents = true }) -> [ (J.V v, (jsoo_runtime, J.U)) ])
         @ List.map
             (StringMap.bindings ctx.Ctx.share.Share.vars.Share.byte_strings)
             ~f:(fun (s, v) -> v, (str_js_byte s, J.U))
