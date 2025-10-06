@@ -1038,7 +1038,7 @@ module Identifier = struct
 
     let nil = CBuiltin "[]" |> mk
 
-    let cons = CBuiltin "(::)" |> mk
+    let cons = CBuiltin "::" |> mk
 
     let none = CBuiltin "None" |> mk
 
@@ -1352,13 +1352,18 @@ module Ast = struct
       fixity_of_string (suffix_string_of_ident_value l)
     | _ -> `Normal
 
-  let print_tuple_like delim open_sym close_sym printer fmt entries =
+  let print_tuple_like ?(with_space=true) delim open_sym close_sym printer fmt entries =
     pp fmt "%s@[" open_sym;
     (match entries with
     | [] -> ()
     | e :: es ->
       printer fmt e;
-      List.iter (fun e -> pp fmt "%s@ %a" delim printer e) es);
+      List.iter
+        (fun e ->
+           if with_space
+           then pp fmt "%s@ %a" delim printer e
+           else pp fmt "%s@,%a" delim printer e)
+        es);
     pp fmt "@]%s" close_sym
 
   let print_label_tup printer fmt (lab, entry) =
@@ -1414,7 +1419,16 @@ module Ast = struct
     | FBasic s -> pp fmt "%s" s
     | FIdent id -> print_raw_ident_field env fmt id
 
-  and print_pat env fmt = function
+
+  and print_pat_with_parens env fmt pat =
+    match pat with
+    | PatAny | PatVar _ | PatConstant _ | PatTuple _ | PatUnboxedTuple _
+    | PatVariant (_, Some _) | PatRecord _ | PatUnboxedRecord _ | PatArray _ ->
+      print_pat env fmt pat
+    | _ -> pp fmt "(@[%a@])" (print_pat env) pat
+
+  and print_pat env fmt pat =
+    match pat with
     | PatAny -> pp fmt "_"
     | PatVar v -> Var.Value.print env fmt v
     | PatAlias (pat, v) ->
@@ -1423,9 +1437,14 @@ module Ast = struct
     | PatTuple ts -> print_tuple (print_pat env) fmt ts
     | PatUnboxedTuple ts -> pp fmt "#%a" (print_tuple (print_pat env)) ts
     | PatConstruct (ident, pat_opt) -> (
-      match pat_opt with
-      | None -> print_constr env fmt ident
-      | Some pat -> pp fmt "%a@ %a" (print_constr env) ident (print_pat env) pat
+        match pat_opt with
+        | None -> print_constr env fmt ident
+        | Some p ->
+          match ident with
+          | CIdent (CBuiltin "::") -> print_list_pat env fmt pat
+          | _ ->
+            pp fmt "%a@ %a"
+              (print_constr env) ident (print_pat_with_parens env) p
       )
     | PatVariant (variant, pat_opt) -> (
       match pat_opt with
@@ -1611,7 +1630,7 @@ module Ast = struct
         wcs;
       pp fmt "@]"
     | TypeQuote core_type ->
-      pp fmt "@[<2><[@ %a@ ]>@]" (print_core_type env) core_type
+      pp fmt "@[<2><[@,%a@,]>@]" (print_core_type env) core_type
     | TypeCallPos -> pp fmt "call_pos"
 
   and print_arg_lab fmt = function
@@ -1650,8 +1669,44 @@ module Ast = struct
       args;
     pp fmt "@]"
 
-  and print_exp_desc env fmt desc =
-    match desc with
+  and print_list_pat env fmt pat =
+    let rec list_items_and_cons pat =
+      match pat with
+      | PatConstruct (CIdent (CBuiltin "::"), Some p) -> (
+          match p with
+          | PatTuple [(NolabelTup, p); (NolabelTup, tl)] ->
+            let remainder, has_cons = list_items_and_cons tl in
+            p::remainder, has_cons
+          | _ -> failwith "Unexpected list contents encountered."
+        )
+      | PatConstruct (CIdent (CBuiltin "[]"), None) -> [], false
+      | _ -> [pat], true
+    in
+    let items, has_cons = list_items_and_cons pat in
+    if has_cons
+    then print_tuple_like ~with_space:false "::" "" "" (print_pat_with_parens env) fmt items
+    else print_tuple_like ";" "[" "]" (print_pat env) fmt items
+
+  and print_list_exp env fmt exp =
+    let rec list_items_and_cons exp =
+      match exp.desc with
+      | Construct (CIdent (CBuiltin "::"), Some e) -> (
+          match e.desc with
+          | Tuple [(NolabelTup, e); (NolabelTup, tl)] ->
+            let remainder, has_cons = list_items_and_cons tl in
+            e::remainder, has_cons
+          | _ -> failwith "Unexpected list contents encountered."
+        )
+      | Construct (CIdent (CBuiltin "[]"), None) -> [], false
+      | _ -> [exp], true
+    in
+    let items, has_cons = list_items_and_cons exp in
+    if has_cons
+    then print_tuple_like ~with_space:false "::" "" "" (print_exp_with_parens env) fmt items
+    else print_tuple_like ";" "[" "]" (print_exp env) fmt items
+
+  and print_exp_desc env fmt exp =
+    match exp.desc with
     | Ident id -> print_raw_ident_value env fmt id
     | Constant c -> print_const fmt c
     | Apply (exp, args) -> (
@@ -1717,8 +1772,12 @@ module Ast = struct
     | Construct (ident, exp_opt) -> (
       match exp_opt with
       | None -> print_constr env fmt ident
-      | Some exp ->
-        pp fmt "%a@ %a" (print_constr env) ident (print_exp_with_parens env) exp
+      | Some e ->
+        match ident with
+        | CIdent (CBuiltin "::") -> print_list_exp env fmt exp
+        | _ ->
+          pp fmt "%a@ %a"
+            (print_constr env) ident (print_exp_with_parens env) e
       )
     | Variant (s, exp_opt) -> (
       match exp_opt with
@@ -1797,14 +1856,14 @@ module Ast = struct
     | Unboxed_record_product (ts, exp_opt) -> print_record env fmt (ts, exp_opt)
     | Unboxed_field (exp, rec_field) ->
       pp fmt "#%a.%a" (print_exp env) exp (print_field env) rec_field
-    | Quote exp -> pp fmt "@[<2><[@ %a@ @]]>" (print_exp env) exp
-    | Antiquote exp -> pp fmt "@[<2>$@ %a@]" (print_exp_with_parens env) exp
+    | Quote exp -> pp fmt "@[<2><[@,%a@,@]]>" (print_exp env) exp
+    | Antiquote exp -> pp fmt "@[<2>$@,%a@]" (print_exp_with_parens env) exp
     | List_comprehension _ | Array_comprehension _ ->
       pp fmt "(* comprehension *)"
     | Unreachable | Src_pos -> pp fmt "."
 
   and print_exp env fmt exp =
-    print_exp_desc env fmt exp.desc;
+    print_exp_desc env fmt exp;
     List.iter (print_attribute fmt) exp.attributes
 end
 
@@ -2434,7 +2493,7 @@ module Code = struct
 
   let print fmt c =
     let ast_exp = With_free_vars.value ~free:(fun _ _ -> ()) c in
-    Format.fprintf fmt "@[<2><[@ %a@]@ ]>"
+    Format.fprintf fmt "@[<2><[@,%a@]@,]>"
       (Ast.print_exp (new_env ()))
       ast_exp.exp
 end
@@ -2690,10 +2749,6 @@ module Exp_desc = struct
   let splice code =
     let+ exp = Code.to_exp code in
     Ast.(exp.desc)
-
-  let print fmt desc =
-    let ast = With_free_vars.value ~free:(fun _ _ -> ()) desc in
-    Ast.print_exp_desc (new_env ()) fmt ast
 end
 
 module Exp = struct

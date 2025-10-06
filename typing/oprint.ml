@@ -569,10 +569,10 @@ and print_out_type_3 ppf =
     fprintf ppf "(type@ :@ %a)" print_out_jkind jk
   | Otyp_ret _ -> assert false
   | Otyp_quote t ->
-      fprintf ppf "@[<1><[@ %a@ ]>@]"
+      fprintf ppf "@[<1><[@,%a@,]>@]"
         print_out_type_0 t
   | Otyp_splice t ->
-      fprintf ppf "@[<1>$@ (%a)@]"
+      fprintf ppf "@[<1>$@,(%a)@]"
         print_out_type_0 t
 and print_out_type ppf typ =
   print_out_type_0 ppf typ

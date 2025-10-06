@@ -595,8 +595,6 @@ and Exp_desc : sig
   val antiquote : Exp.t -> t
 
   val splice : Code.t -> t
-
-  val print : Format.formatter -> t -> unit
 end
 
 and Exp : sig
