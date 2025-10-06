@@ -23,11 +23,67 @@ let () =
   Clflags.dont_write_files := true;
   Clflags.shared := true
 
-let bundled_cmis : string array =
-  Obj.obj (Option.get (Jit.jit_lookup_symbol "caml_bundled_cmis"))
+let () =
+  let marshaled =
+    Obj.obj (Option.get (Jit.jit_lookup_symbol "caml_bundled_cmis"))
+  in
+  let bundled_cmis : Cmi_format.cmi_infos Compilation_unit.Name.Map.t =
+    Marshal.from_string marshaled 0
+  in
+  let bundled_cmis =
+    Compilation_unit.Name.Map.map
+      (fun (cmi : Cmi_format.cmi_infos) : Cmi_format.cmi_infos_lazy ->
+        { cmi with cmi_sign = Subst.Lazy.of_signature cmi.cmi_sign })
+      bundled_cmis
+  in
+  Persistent_env.Persistent_signature.load :=
+    fun ~allow_hidden:_ ~unit_name ->
+      Option.map
+        (fun cmi ->
+          {
+            Persistent_env.Persistent_signature.filename =
+              Compilation_unit.Name.to_string unit_name;
+            cmi;
+            visibility = Visible;
+          })
+        (Compilation_unit.Name.Map.find_opt unit_name bundled_cmis)
 
-let bundled_cmxs : string array =
-  Obj.obj (Option.get (Jit.jit_lookup_symbol "caml_bundled_cmxs"))
+let cmxs =
+  let marshaled =
+    Obj.obj (Option.get (Jit.jit_lookup_symbol "caml_bundled_cmxs"))
+  in
+  let bundled_cmxs : (Cmx_format.unit_infos_raw * string array) list =
+    Marshal.from_string marshaled 0
+  in
+  List.map
+    (fun ((uir, sections) : Cmx_format.unit_infos_raw * _) ->
+      let sections =
+        Oxcaml_utils.File_sections.from_array
+          (Array.map (fun s -> Marshal.from_string s 0) sections)
+      in
+      let export_info =
+        Option.map
+          (Flambda2_cmx.Flambda_cmx_format.from_raw ~sections)
+          uir.uir_export_info
+      in
+      let ui : Cmx_format.unit_infos =
+        {
+          ui_unit = uir.uir_unit;
+          ui_defines = uir.uir_defines;
+          ui_format = uir.uir_format;
+          ui_arg_descr = uir.uir_arg_descr;
+          ui_imports_cmi = uir.uir_imports_cmi |> Array.to_list;
+          ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
+          ui_quoted_globals = uir.uir_quoted_globals |> Array.to_list;
+          ui_generic_fns = uir.uir_generic_fns;
+          ui_export_info = export_info;
+          ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
+          ui_force_link = uir.uir_force_link;
+          ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
+        }
+      in
+      ui)
+    bundled_cmxs
 
 let counter = ref 0
 
@@ -38,19 +94,7 @@ let eval code =
 
   (* TODO: reset all the things *)
   Location.reset ();
-  let paths =
-    Array.fold_left
-      (fun paths path -> Filename.dirname path :: paths)
-      [] bundled_cmis
-  in
-  let paths =
-    Array.fold_left
-      (fun paths path -> Filename.dirname path :: paths)
-      paths bundled_cmxs
-  in
-  Load_path.init ~auto_include:Load_path.no_auto_include ~visible:paths
-    ~hidden:[];
-  Env.reset_cache ~preserve_persistent_env:false;
+  Env.reset_cache ~preserve_persistent_env:true;
 
   (* TODO: set commandline flags *)
 
@@ -73,7 +117,16 @@ let eval code =
   let unit_info = Unit_info.make_dummy ~input_name compilation_unit in
 
   (* let () = Compmisc.init_parameters () in *)
-  Compilenv.reset unit_info (* TODO: Work out what this does. *);
+  Compilenv.reset unit_info
+    (* TODO: It would be nice to not reset everything here so we don't have to
+       refill the cache. *);
+  let _ =
+    List.for_all
+      (fun info ->
+        Compilenv.cache_unit_info info;
+        true)
+      cmxs
+  in
   let env = Compmisc.initial_env () in
   let typed_impl =
     Typemod.type_implementation unit_info compilation_unit env ast
@@ -104,7 +157,7 @@ let eval code =
     |> Symbol.linkage_name |> Linkage_name.to_string
   in
   let obj = Jit.jit_lookup_symbol linkage_name |> Option.get in
-  Obj.obj (Obj.field obj 0)
+  Obj.field obj 0
 
 let compile_mutex = Mutex.create ()
 

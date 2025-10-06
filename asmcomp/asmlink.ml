@@ -159,23 +159,12 @@ let runtime_lib () =
     raise(Error(File_not_found libname))
 
 let quoted_globals = ref CU.Name.Set.empty
-let cmxs_for_quotes = ref String.Set.empty
-let missing_quoted_globals = CU.Name.Tbl.create 42
 
-let add_quoted_globals unit globals path req_cmxs =
+let add_quoted_globals unit globals =
   quoted_globals := List.fold_left
     (fun globals global ->
-      (if not (CU.Name.Set.mem global globals) then
-        CU.Name.Tbl.add missing_quoted_globals global ());
       CU.Name.Set.add global globals)
-    !quoted_globals globals;
-  if CU.Name.Tbl.mem missing_quoted_globals (CU.name unit) then
-    (List.iter
-      (fun cmx ->
-        CU.Name.Tbl.add missing_quoted_globals (Import_info.name cmx) ())
-      req_cmxs;
-    cmxs_for_quotes := String.Set.add path !cmxs_for_quotes;
-    CU.Name.Tbl.remove missing_quoted_globals (CU.name unit))
+    !quoted_globals globals
 
 let cmi_bundle () =
   let rec loop cmis missing_globals =
@@ -189,25 +178,70 @@ let cmi_bundle () =
           try Load_path.find_normalized ((CU.Name.to_string global) ^ ".cmi")
           with Not_found -> raise(Error(Missing_intf_for_quote global))
         in
-        let cmi = Cmi_format.read_cmi_lazy path in
+        let cmi = Cmi_format.read_cmi path in
         let missing_globals =
           Array.fold_left
             (fun missing_globals import -> (Import_info.name import) :: missing_globals)
             missing_globals
             cmi.cmi_crcs
         in
-        let new_cmis = CU.Name.Map.add global path cmis in
+        let new_cmis = CU.Name.Map.add global cmi cmis in
         loop new_cmis missing_globals
   in
-  let names = loop CU.Name.Map.empty (CU.Name.Set.elements !quoted_globals) in
-  CU.Name.Map.data names
+  loop CU.Name.Map.empty (CU.Name.Set.elements !quoted_globals)
 
-(* TODO: populate this during scan_file rather than reloading the files. *)
+(* We can't populate this during scan_file because a cmxa contains less
+   information than a cmx. *)
 let cmx_bundle () =
-  CU.Name.Tbl.iter
-    (fun name -> raise(Error(Missing_impl_for_quote name)))
-    missing_quoted_globals;
-  String.Set.elements !cmxs_for_quotes
+  let rec loop cmxs missing_globals =
+    match missing_globals with
+    | [] -> cmxs
+    | global :: missing_globals ->
+      if CU.Name.Map.mem global cmxs then
+        loop cmxs missing_globals
+      else
+        let path =
+          try Load_path.find_normalized ((CU.Name.to_string global) ^ ".cmx")
+          with Not_found -> raise(Error(Missing_impl_for_quote global))
+        in
+        let unit_info, _crc = Compilenv.read_unit_info path in
+        let missing_globals =
+          List.fold_left
+            (fun missing_globals import -> (Import_info.name import) :: missing_globals)
+            missing_globals
+            unit_info.ui_imports_cmx
+        in
+        let new_cmxs = CU.Name.Map.add global unit_info cmxs in
+        loop new_cmxs missing_globals
+  in
+  let unit_infos = loop CU.Name.Map.empty (CU.Name.Set.elements !quoted_globals) in
+  CU.Name.Map.data unit_infos
+  |> List.map (fun info ->
+      let raw_export_info, sections =
+        match info.ui_export_info with
+        | None -> None, Oxcaml_utils.File_sections.empty
+        | Some info ->
+          let info, sections = Flambda2_cmx.Flambda_cmx_format.to_raw info in
+          Some info, sections
+      in
+      let serialized_sections, toc, total_length =
+        Oxcaml_utils.File_sections.serialize sections in
+      let raw_info = {
+        uir_unit = info.ui_unit;
+        uir_defines = info.ui_defines;
+        uir_arg_descr = info.ui_arg_descr;
+        uir_imports_cmi = Array.of_list info.ui_imports_cmi;
+        uir_imports_cmx = Array.of_list info.ui_imports_cmx;
+        uir_quoted_globals = Array.of_list info.ui_quoted_globals;
+        uir_format = info.ui_format;
+        uir_generic_fns = info.ui_generic_fns;
+        uir_export_info = raw_export_info;
+        uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
+        uir_force_link = info.ui_force_link;
+        uir_section_toc = toc;
+        uir_sections_length = total_length;
+        uir_external_symbols = Array.of_list info.ui_external_symbols;
+      } in raw_info, serialized_sections)
 
 (* First pass: determine which units are needed *)
 
@@ -275,7 +309,7 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
   | Unit (file_name,info,crc) ->
       (* This is a .cmx file. It must be linked in any case. *)
       remove_required info.ui_unit;
-      add_quoted_globals info.ui_unit info.ui_quoted_globals file_name info.ui_imports_cmx;
+      add_quoted_globals info.ui_unit info.ui_quoted_globals;
       List.iter (fun import ->
           add_required (file_name, None) import)
         info.ui_imports_cmx;
@@ -343,11 +377,10 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
                  if Misc.Bitmap.get bits i then Some tbl.(i) else None)
                |> List.filter_map Fun.id
              in
-             let imports_cmx = imports_list infos.lib_imports_cmx info.li_imports_cmx in
              let quoted_globals =
               imports_list infos.lib_quoted_globals info.li_quoted_globals
              in
-             add_quoted_globals info.li_name quoted_globals file_name imports_cmx;
+             add_quoted_globals info.li_name quoted_globals;
              let dynunit : Cmxs_format.dynunit option =
                if not shared then None else
                  Some {
@@ -357,7 +390,9 @@ let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
                    dynu_imports_cmi =
                      imports_list infos.lib_imports_cmi info.li_imports_cmi
                      |> Array.of_list;
-                   dynu_imports_cmx = imports_cmx |> Array.of_list;
+                   dynu_imports_cmx =
+                     imports_list infos.lib_imports_cmx info.li_imports_cmx
+                     |> Array.of_list;
                    dynu_quoted_globals = quoted_globals |> Array.of_list }
              in
              let unit =
@@ -529,21 +564,10 @@ let make_bundled_cm_file unix ~ppf_dump ~sourcefile_for_dwarf objfiles =
     ~disable_dwarf:(not !Dwarf_flags.dwarf_for_startup_file)
     ~sourcefile:sourcefile_for_dwarf;
   Emit.begin_assembly unix;
-  let bundle_cm name strings cont =
+  let bundle_cm name value cont =
     let symbol = { Cmm.sym_name = name; sym_global = Global } in
-    let length, symbols, cont = List.fold_left
-      (fun (i, symbols, cont) string ->
-        let symbol =
-          { Cmm.sym_name = Printf.sprintf "%s%d" name i
-          ; sym_global = Local } in
-        let cont = Cmm_helpers.emit_string_constant symbol string cont in
-        (i + 1, symbol :: symbols, cont))
-      (0, [], cont) strings in
-    let cont = List.fold_left
-      (fun cont symbol -> Cmm_helpers.symbol_address symbol :: cont)
-      cont symbols in
-    let header = Cmm_helpers.black_block_header 0 length in
-    Cmm_helpers.emit_block symbol header cont in
+    let string = Marshal.to_string value [] in
+    Cmm_helpers.emit_string_constant symbol string cont in
   let cont = bundle_cm "caml_bundled_cmis" (cmi_bundle ()) [] in
   let cont = bundle_cm "caml_bundled_cmxs" (cmx_bundle ()) cont in
   Asmgen.compile_phrase ~ppf_dump (Cmm.Cdata cont);
@@ -719,8 +743,7 @@ let reset () =
   implementations := [];
   lib_ccobjs := [];
   lib_ccopts := [];
-  quoted_globals := CU.Name.Set.empty;
-  cmxs_for_quotes := String.Set.empty
+  quoted_globals := CU.Name.Set.empty
 
 (* Main entry point *)
 
