@@ -507,6 +507,7 @@
   asmlibrarian
   asmlink
   linkenv
+  optlink
   asmpackager
   ;; backend/
   afl_instrument

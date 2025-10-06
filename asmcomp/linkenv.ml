@@ -12,17 +12,18 @@
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
+
 open Cmx_format
 module CU = Compilation_unit
 
 type filepath = string
 
 type unit_link_info =
-  { name : Compilation_unit.t
-  ; defines : Compilation_unit.t list
-  ; file_name : string
-  ; crc : Digest.t
-  ; (* for shared libs *)
+  { name : Compilation_unit.t;
+    defines : Compilation_unit.t list;
+    file_name : string;
+    crc : Digest.t;
+    (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
 
@@ -45,10 +46,15 @@ exception Error of error
 (* Consistency check between interfaces and implementations: *)
 
 let crc_interfaces = Cmi_consistbl.create ()
+
 let interfaces = CU.Name.Tbl.create 100
+
 let crc_implementations = Cmx_consistbl.create ()
+
 let implementations = ref ([] : CU.t list)
+
 let implementations_defined = CU.Tbl.create 100
+
 let cmx_required = ref ([] : CU.t list)
 
 let check_cmi_consistency file_name cmis =
@@ -60,13 +66,14 @@ let check_cmi_consistency file_name cmis =
         CU.Name.Tbl.replace interfaces name ();
         match info with
         | None -> ()
-        | Some (kind, crc) -> Cmi_consistbl.check crc_interfaces name kind crc file_name)
+        | Some (kind, crc) ->
+          Cmi_consistbl.check crc_interfaces name kind crc file_name)
       cmis
   with
   | Cmi_consistbl.Inconsistency
-      { unit_name = name; inconsistent_source = user; original_source = auth } ->
+      { unit_name = name; inconsistent_source = user; original_source = auth }
+  ->
     raise (Error (Inconsistent_interface (name, user, auth)))
-;;
 
 let check_cmx_consistency file_name cmxs =
   try
@@ -79,13 +86,14 @@ let check_cmx_consistency file_name cmxs =
         | None ->
           if List.mem name !cmx_required
           then raise (Error (Missing_cmx (file_name, name)))
-        | Some crc -> Cmx_consistbl.check crc_implementations name () crc file_name)
+        | Some crc ->
+          Cmx_consistbl.check crc_implementations name () crc file_name)
       cmxs
   with
   | Cmx_consistbl.Inconsistency
-      { unit_name = name; inconsistent_source = user; original_source = auth } ->
+      { unit_name = name; inconsistent_source = user; original_source = auth }
+  ->
     raise (Error (Inconsistent_implementation (name, user, auth)))
-;;
 
 let check_consistency ~unit cmis cmxs =
   check_cmi_consistency unit.file_name cmis;
@@ -94,39 +102,34 @@ let check_consistency ~unit cmis cmxs =
   (try
      let source = CU.Tbl.find implementations_defined unit.name in
      raise (Error (Multiple_definition (ui_unit, unit.file_name, source)))
-   with
-   | Not_found -> ());
+   with Not_found -> ());
   implementations := unit.name :: !implementations;
   Cmx_consistbl.check crc_implementations unit.name () unit.crc unit.file_name;
   CU.Tbl.replace implementations_defined unit.name unit.file_name;
   if CU.is_packed unit.name then cmx_required := unit.name :: !cmx_required
-;;
 
 let extract_crc_interfaces () =
   CU.Name.Tbl.fold
     (fun name () crcs ->
       let crc_with_unit = Cmi_consistbl.find crc_interfaces name in
       Import_info.Intf.create name crc_with_unit :: crcs)
-    interfaces
-    []
-;;
+    interfaces []
 
 let extract_crc_implementations () =
   Cmx_consistbl.extract !implementations crc_implementations
   |> List.map (fun (cu, crc) ->
-    let crc = Option.map (fun ((), crc) -> crc) crc in
-    Import_info.create_normal cu ~crc)
-;;
+         let crc = Option.map (fun ((), crc) -> crc) crc in
+         Import_info.create_normal cu ~crc)
 
-(* Add C objects and options and "custom" info from a library descriptor.
-   See bytecomp/bytelink.ml for comments on the order of C objects. *)
+(* Add C objects and options and "custom" info from a library descriptor. See
+   bytecomp/bytelink.ml for comments on the order of C objects. *)
 
 let lib_ccobjs = ref []
+
 let lib_ccopts = ref []
 
 let missing_globals =
   (Hashtbl.create 17 : (CU.t, (string * CU.Name.t option) list ref) Hashtbl.t)
-;;
 
 let check_consistency = check_consistency
 
@@ -134,26 +137,23 @@ let add_ccobjs origin l =
   if not !Clflags.no_auto_link
   then (
     lib_ccobjs := l.lib_ccobjs @ !lib_ccobjs;
-    let replace_origin = Misc.replace_substring ~before:"$CAMLORIGIN" ~after:origin in
+    let replace_origin =
+      Misc.replace_substring ~before:"$CAMLORIGIN" ~after:origin
+    in
     lib_ccopts := List.map replace_origin l.lib_ccopts @ !lib_ccopts)
-;;
 
 let is_required name =
   try
     ignore (Hashtbl.find missing_globals name);
     true
-  with
-  | Not_found -> false
-;;
+  with Not_found -> false
 
 let add_required by import =
   let name = Import_info.cu import in
   try
     let rq = Hashtbl.find missing_globals name in
     rq := by :: !rq
-  with
-  | Not_found -> Hashtbl.add missing_globals name (ref [ by ])
-;;
+  with Not_found -> Hashtbl.add missing_globals name (ref [by])
 
 let remove_required name = Hashtbl.remove missing_globals name
 
@@ -163,9 +163,10 @@ let extract_missing_globals () =
     | file, None -> file
     | file, Some part -> Format.asprintf "%s(%a)" file CU.Name.print part
   in
-  Hashtbl.iter (fun md rq -> mg := (md, List.map fmt !rq) :: !mg) missing_globals;
+  Hashtbl.iter
+    (fun md rq -> mg := (md, List.map fmt !rq) :: !mg)
+    missing_globals;
   !mg
-;;
 
 let reset () =
   (* CR-someday jvanburen: should we [Hashtbl.reset missing_globals;]? *)
@@ -178,19 +179,18 @@ let reset () =
   implementations := [];
   lib_ccobjs := [];
   lib_ccopts := []
-;;
 
 let assume_no_prefix modname =
-  (* We're the linker, so we assume that everything's already been packed, so
-     no module needs its prefix considered. *)
+  (* We're the linker, so we assume that everything's already been packed, so no
+     module needs its prefix considered. *)
   CU.create CU.Prefix.empty modname
-;;
 
 let make_globals_map units_list =
-  (* The order in which entries appear in the globals map does not matter
-     (see the natdynlink code). *)
+  (* The order in which entries appear in the globals map does not matter (see
+     the natdynlink code). *)
   let find_crc name =
-    Cmi_consistbl.find crc_interfaces name |> Option.map (fun (_unit, crc) -> crc)
+    Cmi_consistbl.find crc_interfaces name
+    |> Option.map (fun (_unit, crc) -> crc)
   in
   let interfaces = CU.Name.Tbl.copy interfaces in
   let defined =
@@ -207,11 +207,10 @@ let make_globals_map units_list =
     (fun name () globals_map ->
       let intf_crc = find_crc name in
       (assume_no_prefix name, intf_crc, None, []) :: globals_map)
-    interfaces
-    defined
-;;
+    interfaces defined
 
 let lib_ccobjs () = !lib_ccobjs
+
 let lib_ccopts () = !lib_ccopts
 
 (* Error report *)
@@ -221,11 +220,8 @@ open Format
 let report_error ppf = function
   | File_not_found name -> fprintf ppf "Cannot find file %s" name
   | Not_an_object_file name ->
-    fprintf
-      ppf
-      "The file %a is not a compilation unit description"
-      Location.print_filename
-      name
+    fprintf ppf "The file %a is not a compilation unit description"
+      Location.print_filename name
   | Missing_implementations l ->
     let print_references ppf = function
       | [] -> ()
@@ -235,63 +231,40 @@ let report_error ppf = function
     in
     let print_modules ppf =
       List.iter (fun (md, rq) ->
-        fprintf ppf "@ @[<hov 2>%a referenced from %a@]" CU.print md print_references rq)
+          fprintf ppf "@ @[<hov 2>%a referenced from %a@]" CU.print md
+            print_references rq)
     in
-    fprintf
-      ppf
+    fprintf ppf
       "@[<v 2>No implementations provided for the following modules:%a@]"
-      print_modules
-      l
+      print_modules l
   | Inconsistent_interface (intf, file1, file2) ->
-    fprintf
-      ppf
-      "@[<hov>Files %a@ and %a@ make inconsistent assumptions over interface %a@]"
-      Location.print_filename
-      file1
-      Location.print_filename
-      file2
-      CU.Name.print
+    fprintf ppf
+      "@[<hov>Files %a@ and %a@ make inconsistent assumptions over interface \
+       %a@]"
+      Location.print_filename file1 Location.print_filename file2 CU.Name.print
       intf
   | Inconsistent_implementation (intf, file1, file2) ->
-    fprintf
-      ppf
-      "@[<hov>Files %a@ and %a@ make inconsistent assumptions over implementation %a@]"
-      Location.print_filename
-      file1
-      Location.print_filename
-      file2
-      CU.print
-      intf
+    fprintf ppf
+      "@[<hov>Files %a@ and %a@ make inconsistent assumptions over \
+       implementation %a@]"
+      Location.print_filename file1 Location.print_filename file2 CU.print intf
   | Multiple_definition (modname, file1, file2) ->
-    fprintf
-      ppf
-      "@[<hov>Files %a@ and %a@ both define a module named %a@]"
-      Location.print_filename
-      file1
-      Location.print_filename
-      file2
-      CU.Name.print
+    fprintf ppf "@[<hov>Files %a@ and %a@ both define a module named %a@]"
+      Location.print_filename file1 Location.print_filename file2 CU.Name.print
       modname
   | Missing_cmx (filename, name) ->
-    fprintf
-      ppf
-      "@[<hov>File %a@ was compiled without access@ to the .cmx file@ for module %a,@ \
-       which was produced by `ocamlopt -for-pack'.@ Please recompile %a@ with the \
-       correct `-I' option@ so that %a.cmx@ is found.@]"
-      Location.print_filename
-      filename
-      CU.print
-      name
-      Location.print_filename
-      filename
-      CU.print
-      name
-  | Linking_error exitcode -> fprintf ppf "Error during linking (exit code %d)" exitcode
-  | Archiver_error name -> fprintf ppf "Error while creating the library %s" name
-;;
+    fprintf ppf
+      "@[<hov>File %a@ was compiled without access@ to the .cmx file@ for \
+       module %a,@ which was produced by `ocamlopt -for-pack'.@ Please \
+       recompile %a@ with the correct `-I' option@ so that %a.cmx@ is found.@]"
+      Location.print_filename filename CU.print name Location.print_filename
+      filename CU.print name
+  | Linking_error exitcode ->
+    fprintf ppf "Error during linking (exit code %d)" exitcode
+  | Archiver_error name ->
+    fprintf ppf "Error while creating the library %s" name
 
 let () =
   Location.register_error_of_exn (function
     | Error err -> Some (Location.error_of_printer_file report_error err)
     | _ -> None)
-;;
