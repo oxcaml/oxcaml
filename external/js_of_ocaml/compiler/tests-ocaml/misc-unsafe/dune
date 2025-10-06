@@ -1,0 +1,4 @@
+(tests
+ (names almabench fft quicksort soli)
+ (flags :standard -unsafe)
+ (modes js wasm))
