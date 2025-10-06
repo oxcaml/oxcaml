@@ -132,9 +132,14 @@ module Make (V : ORDERED) = struct
       then
         let lo' = canonicalize hlo llo in
         let hi' = canonicalize (canonicalize hhi lhi) llo in
+        if hlo == lo' && hhi == hi' then h else
         node_raw vh lo' hi'
       else if vh.id < vl.id
-      then node_raw vh (canonicalize hlo l) (canonicalize hhi l)
+      then
+        let lo' = canonicalize hlo l in
+        let hi' = canonicalize hhi l in
+        if hlo == lo' && hhi == hi' then h else
+        node_raw vh lo' hi'
       else canonicalize h llo
 
   and canonicalize_right_leaf (h : node) (leaf_l : node) : node =
