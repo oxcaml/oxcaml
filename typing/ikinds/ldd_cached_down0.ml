@@ -306,6 +306,25 @@ module Make (V : ORDERED) = struct
 
   and var (v : var) = mk_var v
 
+  (* This function is equivalent to `restrict0 x (force w)` *)
+  let rec restrict0_force (x : var) (w : node) : node =
+    if is_leaf w then w else
+    let n = node_block w in
+    match n.v.state with
+    | Solved d -> 
+      let lo' = restrict0_force x n.lo in
+      let hi' = restrict0_force x n.hi in
+      let d' = restrict0_force x d in
+      join lo' (meet hi' d')
+    | Unsolved ->
+      let lo' = restrict0_force x n.lo in
+      if n.v.id == x.id then lo' else
+      let hi' = restrict0_force x n.hi in
+      if lo' == n.lo && hi' == n.hi then w else
+      let d' = mk_var n.v in
+      join lo' (meet hi' d')
+    | Rigid _ -> w
+
   let sub_subsets (a : node) (b : node) =
     let a = force a in
     let b = force b in
@@ -318,8 +337,9 @@ module Make (V : ORDERED) = struct
     | Rigid _ -> invalid_arg "solve_lfp: rigid variable"
     | Solved _ -> invalid_arg "solve_lfp: solved variable"
     | Unsolved ->
-      let rhs_forced = force rhs_raw in
-      var.state <- Solved (restrict0 var rhs_forced)
+      (* let rhs_forced = force rhs_raw in *)
+      (* var.state <- Solved (restrict0_force var rhs_forced) *)
+      var.state <- Solved (restrict0_force var rhs_raw)
 
   let solve_gfp (var : var) (rhs_raw : node) : unit =
     match var.state with
