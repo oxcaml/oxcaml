@@ -1093,6 +1093,9 @@ let tailrec_entry_point = ref None
 type probe =
   { stack_offset : int;
     num_stack_slots : int Stack_class.Tbl.t;
+    probe_name : string;
+    probe_enabled_at_init : bool;
+    probe_handler_code_sym : string;
     (* Record frame info held in the corresponding mutable variables. *)
     probe_label : label;
     (* Probe site, recorded in .note.stapsdt section for enabling and disabling
@@ -2283,11 +2286,14 @@ let emit_instr ~first ~fallthrough i =
     I.mov (domain_field Domainstate.Domain_local_sp) (res i 0)
   | Lop End_region -> I.mov (arg i 0) (domain_field Domainstate.Domain_local_sp)
   | Lop (Name_for_debugger _) -> ()
-  | Lcall_op (Lprobe { enabled_at_init; _ }) ->
+  | Lcall_op (Lprobe { enabled_at_init; name; handler_code_sym }) ->
     let probe_label = Cmm.new_label () in
     let probe =
       { probe_label;
         probe_insn = i;
+        probe_name = name;
+        probe_enabled_at_init = enabled_at_init;
+        probe_handler_code_sym = handler_code_sym;
         stack_offset = !stack_offset;
         num_stack_slots = Stack_class.Tbl.copy num_stack_slots
       }
@@ -2761,20 +2767,8 @@ let stack_locations ~offset regs =
 
 let emit_probe_handler_wrapper p =
   let wrap_label = probe_handler_wrapper_name p.probe_label in
-  let probe_name, handler_code_sym =
-    match p.probe_insn.desc with
-    | Lcall_op (Lprobe { name; handler_code_sym; enabled_at_init = _ }) ->
-      name, handler_code_sym
-    | Lcall_op
-        (Lcall_ind | Ltailcall_ind | Lcall_imm _ | Ltailcall_imm _ | Lextcall _)
-    | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
-    | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Llabel _ | Lbranch _
-    | Lcondbranch (_, _)
-    | Lcondbranch3 (_, _, _)
-    | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-    | Lstackcheck _ ->
-      assert false
-  in
+  let probe_name = p.probe_name in
+  let handler_code_sym = p.probe_handler_code_sym in
   (*= Restore stack frame info as it was at the probe site, so we can easily
      refer to slots in the corresponding frame.  (As per the comment above,
      recall that the wrapper does however have its own frame.) *)
@@ -2924,21 +2918,8 @@ let emit_probe_notes0 () =
     Printf.sprintf "%d@%s" (Select_utils.size_component arg.Reg.typ) arg_name
   in
   let describe_one_probe p =
-    let probe_name, enabled_at_init =
-      match p.probe_insn.desc with
-      | Lcall_op (Lprobe { name; enabled_at_init; handler_code_sym = _ }) ->
-        name, enabled_at_init
-      | Lcall_op
-          ( Lcall_ind | Ltailcall_ind | Lcall_imm _ | Ltailcall_imm _
-          | Lextcall _ )
-      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
-      | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Llabel _ | Lbranch _
-      | Lcondbranch (_, _)
-      | Lcondbranch3 (_, _, _)
-      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-      | Lstackcheck _ ->
-        assert false
-    in
+    let probe_name = p.probe_name in
+    let enabled_at_init = p.probe_enabled_at_init in
     let args =
       Array.fold_right (fun arg acc -> stap_arg arg :: acc) p.probe_insn.arg []
       |> String.concat " "
