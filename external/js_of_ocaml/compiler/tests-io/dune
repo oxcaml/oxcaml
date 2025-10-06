@@ -1,0 +1,100 @@
+(tests
+ (names cat)
+ (modes js wasm)
+ (action
+  (pipe-stdout
+   (run printf "echo ☠")
+   (run node %{test}))))
+
+(tests
+ (names cat_nat)
+ (modes
+  (best exe))
+ (action
+  (pipe-stdout
+   (run printf "echo ☠")
+   (run %{test}))))
+
+(rule
+ (copy cat.ml cat_nat.ml))
+
+(tests
+ (names md5)
+ (modes js wasm)
+ (action
+  (progn
+   (run node %{test} %{dep:some-random-file})
+   (run node %{test} %{dep:some-random-file} %{dep:some-random-file})
+   (run node %{test} -offset 2000 -length 4000 %{dep:some-random-file})
+   (pipe-stdout
+    (echo "tests")
+    (run node %{test}))
+   (pipe-stdout
+    (echo "teststeststests")
+    (run node %{test} -offset 5 -length 5))
+   (pipe-stdout
+    (echo "teststeststests")
+    (run node %{test} -offset 2 -length 5)))))
+
+(tests
+ (names md5_nat)
+ (modes
+  (best exe))
+ (action
+  (progn
+   (run %{test} %{dep:some-random-file})
+   (run %{test} %{dep:some-random-file} %{dep:some-random-file})
+   (run %{test} -offset 2000 -length 4000 %{dep:some-random-file})
+   (pipe-stdout
+    (echo "tests")
+    (run %{test}))
+   (pipe-stdout
+    (echo "teststeststests")
+    (run %{test} -offset 5 -length 5))
+   (pipe-stdout
+    (echo "teststeststests")
+    (run %{test} -offset 2 -length 5)))))
+
+(rule
+ (copy md5.ml md5_nat.ml))
+
+(rule
+ (copy ../../manual/files/performances/time.png some-random-file))
+
+(rule
+ (alias runtest)
+ (action
+  (diff md5.expected md5_nat.expected)))
+
+(rule
+ (alias runtest)
+ (action
+  (diff cat.expected cat_nat.expected)))
+
+(rule
+ (with-stdout-to
+  "accentué"
+  (echo test)))
+
+(tests
+ (names non_ascii_filenames)
+ (deps "accentué")
+ (modes js)
+ (js_of_ocaml
+  (compilation_mode whole_program)
+  (flags
+   (:standard --file "accentué"))))
+
+(rule
+ (with-stdout-to
+  "file.txt"
+  (echo test)))
+
+(tests
+ (names gh1856)
+ (deps file.txt)
+ (modes js)
+ (js_of_ocaml
+  (compilation_mode whole_program)
+  (flags
+   (:standard --file file.txt))))

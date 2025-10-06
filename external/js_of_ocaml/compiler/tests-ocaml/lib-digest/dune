@@ -1,0 +1,13 @@
+(tests
+ (names md5)
+ (libraries)
+ (modules md5)
+ (modes js wasm))
+
+(tests
+ (names digests)
+ (libraries)
+ (build_if
+  (>= %{ocaml_version} 5.2))
+ (modules digests)
+ (modes js wasm))

@@ -1,0 +1,4 @@
+(tests
+ (names test_bytes binary)
+ (libraries ocaml_testing)
+ (modes js wasm))
