@@ -282,14 +282,23 @@ module Transfer = struct
           let results =
             Array.map2
               (fun arg_reg result_reg ->
-                match RD.Set.find_reg_exn avail_before arg_reg with
-                | exception Not_found ->
-                  (* Note that [arg_reg] might not be in
-                     [all_regs_that_might_be_named], meaning it wouldn't be
-                     found in [avail_before]. In that case we shouldn't
-                     propagate anything. *)
-                  None
+                (* We have to use [find_reg_with_same_location_exn] and not just
+                   [find_reg_exn] because the register allocator can elide
+                   moves, meaning that [arg_reg] might have one register stamp
+                   at [instr] but a different register stamp on the previous
+                   occurrence (from which we would have computed
+                   [avail_before]). All that we need here, though, is the debug
+                   info from any register with the same location. *)
+                match
+                  RD.Set.find_reg_with_same_location_exn avail_before arg_reg
+                with
+                | exception Not_found -> None
                 | arg_reg ->
+                  (* CR mshinwell/xclerc: it seems maybe possible for two
+                     distinct variables to end up coalesced into the same hard
+                     register / stack slot. In this case, maybe the choice of
+                     register in [find_reg_with_same_location_exn] could make a
+                     difference to what the user sees in the debugger? *)
                   if Option.is_some (RD.debug_info arg_reg)
                   then
                     Some

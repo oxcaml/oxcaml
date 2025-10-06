@@ -313,11 +313,12 @@ type error =
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_access_record_unboxed
   | Block_access_private_record
+  | Block_index_flattened_record of type_expr
   | Block_index_modality_mismatch of
       { mut : bool; err : Mode.Modality.equate_error }
+  | Block_index_atomic_unsupported
   | Submode_failed of Mode.Value.error * submode_reason *
       Env.shared_context option
-  | Submode_failed_alloc of Mode.Alloc.error
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
   | Param_mode_mismatch of Mode.Alloc.equate_error

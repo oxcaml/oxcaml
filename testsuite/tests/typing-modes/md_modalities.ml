@@ -145,5 +145,6 @@ Error: Signature mismatch:
          val foo : 'a -> 'a (* in a structure at nonportable *)
        is not included in
          val foo : 'a -> 'a @@ portable (* in a structure at nonportable *)
-       The first is "nonportable" but the second is "portable".
+       The left-hand side is "nonportable"
+       but the right-hand side is "portable".
 |}]

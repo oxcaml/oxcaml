@@ -3,7 +3,6 @@
  include stdlib_stable;
  include stdlib_upstream_compatible;
  modules = "stubs.c";
- flags = "-extension layouts_alpha";
  flambda2;
  arch_amd64;
  native;

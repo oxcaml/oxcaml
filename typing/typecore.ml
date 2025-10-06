@@ -268,10 +268,11 @@ type error =
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_access_record_unboxed
   | Block_access_private_record
+  | Block_index_flattened_record of type_expr
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.equate_error }
+  | Block_index_atomic_unsupported
   | Submode_failed of Value.error * submode_reason * Env.shared_context option
-  | Submode_failed_alloc of Alloc.error
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
   | Param_mode_mismatch of Alloc.equate_error
@@ -565,6 +566,7 @@ let mode_lazy expected_mode =
     Value.{
       Const.max with
       areality = Regionality.Const.Global;
+      forkable = Forkable.Const.Forkable;
       yielding = Yielding.Const.Unyielding }
   in
   let expected_mode =
@@ -574,7 +576,7 @@ let mode_lazy expected_mode =
   let mode_crossing =
     Crossing.create ~linearity:true ~portability:true
       ~regionality:false ~uniqueness:false ~contention:false ~statefulness:false
-      ~visibility:false ~yielding:false
+      ~visibility:false ~forkable:false ~yielding:false
   in
   let closure_mode =
     expected_mode |> as_single_mode |> Crossing.apply_right mode_crossing
@@ -660,6 +662,7 @@ let global_pat_mode {mode; _}=
   let mode =
     mode
     |> Value.meet_with Areality Regionality.Const.Global
+    |> Value.meet_with Forkable Forkable.Const.Forkable
     |> Value.meet_with Yielding Yielding.Const.Unyielding
   in
   simple_pat_mode mode
@@ -6479,7 +6482,7 @@ and type_expect_
         ~attributes:sexp.pexp_attributes
         sargl
   | Pexp_idx (ba, uas) ->
-    Language_extension.assert_enabled ~loc Layouts Language_extension.Beta;
+    Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
     (* Compute the expected base type, to use for disambiguation of the record
        and unboxed record fields *)
     let expected_base_ty ty_expected =
@@ -6517,9 +6520,13 @@ and type_expect_
       | Baccess_field (_, { lbl_mut = Immutable; _ })
       | Baccess_array { mut = Immutable; _ } | Baccess_block (Immutable, _) ->
         false
-      | Baccess_field (_, { lbl_mut = Mutable _; _ })
+      | Baccess_field
+          (_, { lbl_mut = Mutable { mode = _; atomic = Nonatomic }; _ })
       | Baccess_array { mut = Mutable; _ } | Baccess_block (Mutable, _) ->
         true
+      | Baccess_field
+          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }) ->
+        raise (Error(loc, env, Block_index_atomic_unsupported))
     in
     let (el_ty, modality), uas =
       List.fold_left_map
@@ -6547,7 +6554,24 @@ and type_expect_
       | Error err ->
         raise (Error(loc, env, Block_index_modality_mismatch { mut; err }))
     end;
-    let el_ty = if flat_float then Predef.type_unboxed_float else el_ty in
+    let el_ty =
+      if flat_float then
+        let has_unboxed_version p =
+          not (Path.is_unboxed_version p) &&
+          try
+            ignore (Env.find_type (Path.unboxed_version p) env);
+            true
+          with Not_found ->
+            false
+        in
+        match get_desc (expand_head env el_ty) with
+        | Tconstr(p, args, _) when has_unboxed_version p ->
+          newconstr (Path.unboxed_version p) args
+        | _ ->
+          raise (Error(loc, env, Block_index_flattened_record el_ty))
+      else
+        el_ty
+    in
     let ty =
       if mut then
         Predef.type_idx_mut base_ty el_ty
@@ -7260,14 +7284,11 @@ and type_expect_
             Value.(of_const ~hint_comonadic:Stack_expression
               { Const.min with areality = Local })
             expected_mode;
-          match
-            Alloc.submode Alloc.(of_const ~hint_comonadic:Stack_expression
-              { Const.min with areality = Local }) alloc_mode
-          with
-          | Ok () -> ()
-          | Error err ->
-              raise (Error (exp.exp_loc, exp.exp_env,
-                Submode_failed_alloc err))
+          let local =
+            Alloc.(of_const ~hint_comonadic:Stack_expression
+              { Const.min with areality = Local })
+          in
+          Alloc.submode_err (exp.exp_loc, Allocation) local alloc_mode
         end
       | Texp_list_comprehension _ -> unsupported List_comprehension
       | Texp_array_comprehension _ -> unsupported Array_comprehension
@@ -7324,6 +7345,7 @@ and type_expect_
         (* CR uniqueness: this shouldn't mention yielding *)
         { Value.Comonadic.Const.max with
           areality = Regionality.Const.Global
+        ; forkable = Forkable.Const.Forkable
         ; yielding = Yielding.Const.Unyielding }
       in
       let exp2 =
@@ -7666,6 +7688,7 @@ and type_ident env ?(recarg=Rejected) lid =
   - Portability: Closing over a nonportable module only to extract a portable
   value is fine.
   - Yielding: Modules are always unyielding (the strongest mode), so it's fine.
+  - Forkable: Modules are always forkable (the strongest mode), so it's fine.
   - All monadic axes: values are in a module via some join_with_m modality.
   Meanwhile, walking locks causes the mode to go through several join_with_m
   where [m] is the mode of a closure lock. Since join is commutative and
@@ -11530,6 +11553,12 @@ let report_error ~loc env =
   | Block_access_private_record ->
     Location.error ~loc
       "Block indices do not support private records."
+  | Block_index_flattened_record el_ty ->
+    Location.errorf ~loc
+      "This block index points to an element stored as a flattened float.@ \
+       Such block indices require the element type to have an unboxed@ \
+       version, but %a does not."
+      (Style.as_inline_code Printtyp.type_expr) el_ty
   | Block_index_modality_mismatch { mut; err } ->
     let step, Modality.Error(ax, { left; right }) = err in
     let print_modality id ppf m =
@@ -11551,8 +11580,14 @@ let report_error ~loc env =
       (if mut then "mutable" else "immutable")
       what_element_must_do
       (print_modality "not") actual
+  | Block_index_atomic_unsupported ->
+    Location.error ~loc
+      "Block indices do not yet support [@atomic] record fields."
   | Submode_failed(e, submode_reason, shared_context) ->
     let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
+    (* CR-soon zqian: move the following hints into the new hint system, then
+      we can invoke [submode_err] instead of [submode], and remove this
+      exception. *)
     let sub =
       match ax with
         | Comonadic Linearity | Monadic Uniqueness ->
@@ -11573,8 +11608,19 @@ let report_error ~loc env =
           (Style.as_inline_code longident) name ]
       | Application _ | Other -> sub
     in
-    Location.errorf ~loc ~sub "%a" Value.report_error e
-  | Submode_failed_alloc e -> Location.errorf ~loc "%a" Alloc.report_error e
+    Location.error_of_printer ~loc ~sub (fun ppf e ->
+      let open Format in
+      let {left; right} : Mode_intf.print_error =
+        Value.print_error (loc, Expression) e
+      in
+      pp_print_string ppf "This value is ";
+    (match left ppf with
+    | Mode_with_hint ->
+      fprintf ppf ".@\nHowever, the highlighted expression is expected to be "
+    | Mode -> fprintf ppf "@ but is expected to be ");
+    ignore (right ppf);
+    pp_print_string ppf "."
+      ) e
   | Curried_application_complete (lbl, e, loc_kind) ->
       let Mode.Alloc.Error (ax, {left; _}) = Mode.Alloc.to_simple_error e in
       let sub =

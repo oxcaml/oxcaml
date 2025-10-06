@@ -29,47 +29,43 @@ L101:
   %20 = load i64, ptr %4
   store i64 %20, ptr %5
   %21 = load i64, ptr %5
-  store i64 %21, ptr %6
-  %22 = load i64, ptr %6
-  %23 = add i64 %22, -2
-  store i64 %23, ptr %6
-  %24 = load i64, ptr %6
-  store i64 %24, ptr %7
-  %25 = load i64, ptr %7
-  %26 = icmp ult i64 %25, 17
-  br i1 %26, label %L106, label %L129
+  %22 = add i64 %21, -2
+  store i64 %22, ptr %6
+  %23 = load i64, ptr %6
+  store i64 %23, ptr %7
+  %24 = load i64, ptr %7
+  %25 = icmp ult i64 %24, 17
+  br i1 %25, label %L106, label %L129
 L129:
-  %27 = load i64, ptr %7
-  %28 = icmp ugt i64 %27, 17
-  br i1 %28, label %L104, label %L106
+  %26 = load i64, ptr %7
+  %27 = icmp ugt i64 %26, 17
+  br i1 %27, label %L104, label %L106
 L104:
-  %29 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
-  store i64 %29, ptr %8
-  %30 = load i64, ptr %8
-  store i64 %30, ptr %4
-  %31 = load i64, ptr %ds
-  %32 = add i64 %31, 240
-  %33 = inttoptr i64 %32 to ptr
-  store i64 0, ptr %33
-  %34 = load i64, ptr %4
-  %35 = load i64, ptr %ds
-  %36 = load i64, ptr %alloc
-  %37 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %35, i64 %36, i64 %34) "statepoint-id"="0"
-  %38 = extractvalue { { i64, i64 }, {  } } %37, 0, 0
-  %39 = extractvalue { { i64, i64 }, {  } } %37, 0, 1
-  store i64 %38, ptr %ds
-  store i64 %39, ptr %alloc
+  %28 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
+  store i64 %28, ptr %8
+  %29 = load i64, ptr %8
+  store i64 %29, ptr %4
+  %30 = load i64, ptr %ds
+  %31 = add i64 %30, 240
+  %32 = inttoptr i64 %31 to ptr
+  store i64 0, ptr %32
+  %33 = load i64, ptr %4
+  %34 = load i64, ptr %ds
+  %35 = load i64, ptr %alloc
+  %36 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %34, i64 %35, i64 %33) "statepoint-id"="0"
+  %37 = extractvalue { { i64, i64 }, {  } } %36, 0, 0
+  %38 = extractvalue { { i64, i64 }, {  } } %36, 0, 1
+  store i64 %37, ptr %ds
+  store i64 %38, ptr %alloc
   unreachable
 L106:
-  %40 = load i64, ptr %7
+  %39 = load i64, ptr %7
+  %40 = ashr i64 %39, 1
   store i64 %40, ptr %9
   %41 = load i64, ptr %9
-  %42 = ashr i64 %41, 1
-  store i64 %42, ptr %9
-  %43 = load i64, ptr %9
-  store i64 %43, ptr %10
-  %44 = load i64, ptr %10
-  switch i64 %44, label %L130 [
+  store i64 %41, ptr %10
+  %42 = load i64, ptr %10
+  switch i64 %42, label %L130 [
 
   i64 0, label %L109
     i64 1, label %L111
@@ -88,131 +84,131 @@ L130:
   unreachable
 L109:
   store i64 5, ptr %11
-  %45 = load i64, ptr %11
-  store i64 %45, ptr %4
-  %46 = load i64, ptr %4
-  %47 = load i64, ptr %ds
-  %48 = load i64, ptr %alloc
-  %49 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %47, 0, 0
-  %50 = insertvalue { { i64, i64 }, { i64 } } %49, i64 %48, 0, 1
-  %51 = insertvalue { { i64, i64 }, { i64 } } %50, i64 %46, 1, 0
-  ret { { i64, i64 }, { i64 } } %51
+  %43 = load i64, ptr %11
+  store i64 %43, ptr %4
+  %44 = load i64, ptr %4
+  %45 = load i64, ptr %ds
+  %46 = load i64, ptr %alloc
+  %47 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %45, 0, 0
+  %48 = insertvalue { { i64, i64 }, { i64 } } %47, i64 %46, 0, 1
+  %49 = insertvalue { { i64, i64 }, { i64 } } %48, i64 %44, 1, 0
+  ret { { i64, i64 }, { i64 } } %49
 L111:
-  %52 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
-  store i64 %52, ptr %12
-  %53 = load i64, ptr %12
-  store i64 %53, ptr %4
-  %54 = load i64, ptr %ds
-  %55 = add i64 %54, 240
-  %56 = inttoptr i64 %55 to ptr
-  store i64 0, ptr %56
-  %57 = load i64, ptr %4
-  %58 = load i64, ptr %ds
-  %59 = load i64, ptr %alloc
-  %60 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %58, i64 %59, i64 %57) "statepoint-id"="0"
-  %61 = extractvalue { { i64, i64 }, {  } } %60, 0, 0
-  %62 = extractvalue { { i64, i64 }, {  } } %60, 0, 1
-  store i64 %61, ptr %ds
-  store i64 %62, ptr %alloc
+  %50 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
+  store i64 %50, ptr %12
+  %51 = load i64, ptr %12
+  store i64 %51, ptr %4
+  %52 = load i64, ptr %ds
+  %53 = add i64 %52, 240
+  %54 = inttoptr i64 %53 to ptr
+  store i64 0, ptr %54
+  %55 = load i64, ptr %4
+  %56 = load i64, ptr %ds
+  %57 = load i64, ptr %alloc
+  %58 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %56, i64 %57, i64 %55) "statepoint-id"="0"
+  %59 = extractvalue { { i64, i64 }, {  } } %58, 0, 0
+  %60 = extractvalue { { i64, i64 }, {  } } %58, 0, 1
+  store i64 %59, ptr %ds
+  store i64 %60, ptr %alloc
   unreachable
 L113:
   store i64 9, ptr %13
-  %63 = load i64, ptr %13
-  store i64 %63, ptr %4
-  %64 = load i64, ptr %4
-  %65 = load i64, ptr %ds
-  %66 = load i64, ptr %alloc
-  %67 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %65, 0, 0
-  %68 = insertvalue { { i64, i64 }, { i64 } } %67, i64 %66, 0, 1
-  %69 = insertvalue { { i64, i64 }, { i64 } } %68, i64 %64, 1, 0
-  ret { { i64, i64 }, { i64 } } %69
+  %61 = load i64, ptr %13
+  store i64 %61, ptr %4
+  %62 = load i64, ptr %4
+  %63 = load i64, ptr %ds
+  %64 = load i64, ptr %alloc
+  %65 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %63, 0, 0
+  %66 = insertvalue { { i64, i64 }, { i64 } } %65, i64 %64, 0, 1
+  %67 = insertvalue { { i64, i64 }, { i64 } } %66, i64 %62, 1, 0
+  ret { { i64, i64 }, { i64 } } %67
 L115:
-  %70 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
-  store i64 %70, ptr %14
-  %71 = load i64, ptr %14
-  store i64 %71, ptr %4
-  %72 = load i64, ptr %ds
-  %73 = add i64 %72, 240
-  %74 = inttoptr i64 %73 to ptr
-  store i64 0, ptr %74
-  %75 = load i64, ptr %4
-  %76 = load i64, ptr %ds
-  %77 = load i64, ptr %alloc
-  %78 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %76, i64 %77, i64 %75) "statepoint-id"="0"
-  %79 = extractvalue { { i64, i64 }, {  } } %78, 0, 0
-  %80 = extractvalue { { i64, i64 }, {  } } %78, 0, 1
-  store i64 %79, ptr %ds
-  store i64 %80, ptr %alloc
+  %68 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
+  store i64 %68, ptr %14
+  %69 = load i64, ptr %14
+  store i64 %69, ptr %4
+  %70 = load i64, ptr %ds
+  %71 = add i64 %70, 240
+  %72 = inttoptr i64 %71 to ptr
+  store i64 0, ptr %72
+  %73 = load i64, ptr %4
+  %74 = load i64, ptr %ds
+  %75 = load i64, ptr %alloc
+  %76 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %74, i64 %75, i64 %73) "statepoint-id"="0"
+  %77 = extractvalue { { i64, i64 }, {  } } %76, 0, 0
+  %78 = extractvalue { { i64, i64 }, {  } } %76, 0, 1
+  store i64 %77, ptr %ds
+  store i64 %78, ptr %alloc
   unreachable
 L117:
   store i64 13, ptr %15
-  %81 = load i64, ptr %15
-  store i64 %81, ptr %4
-  %82 = load i64, ptr %4
-  %83 = load i64, ptr %ds
-  %84 = load i64, ptr %alloc
-  %85 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %83, 0, 0
-  %86 = insertvalue { { i64, i64 }, { i64 } } %85, i64 %84, 0, 1
-  %87 = insertvalue { { i64, i64 }, { i64 } } %86, i64 %82, 1, 0
-  ret { { i64, i64 }, { i64 } } %87
+  %79 = load i64, ptr %15
+  store i64 %79, ptr %4
+  %80 = load i64, ptr %4
+  %81 = load i64, ptr %ds
+  %82 = load i64, ptr %alloc
+  %83 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %81, 0, 0
+  %84 = insertvalue { { i64, i64 }, { i64 } } %83, i64 %82, 0, 1
+  %85 = insertvalue { { i64, i64 }, { i64 } } %84, i64 %80, 1, 0
+  ret { { i64, i64 }, { i64 } } %85
 L119:
-  %88 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
-  store i64 %88, ptr %16
-  %89 = load i64, ptr %16
-  store i64 %89, ptr %4
-  %90 = load i64, ptr %ds
-  %91 = add i64 %90, 240
-  %92 = inttoptr i64 %91 to ptr
-  store i64 0, ptr %92
-  %93 = load i64, ptr %4
-  %94 = load i64, ptr %ds
-  %95 = load i64, ptr %alloc
-  %96 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %94, i64 %95, i64 %93) "statepoint-id"="0"
-  %97 = extractvalue { { i64, i64 }, {  } } %96, 0, 0
-  %98 = extractvalue { { i64, i64 }, {  } } %96, 0, 1
-  store i64 %97, ptr %ds
-  store i64 %98, ptr %alloc
+  %86 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
+  store i64 %86, ptr %16
+  %87 = load i64, ptr %16
+  store i64 %87, ptr %4
+  %88 = load i64, ptr %ds
+  %89 = add i64 %88, 240
+  %90 = inttoptr i64 %89 to ptr
+  store i64 0, ptr %90
+  %91 = load i64, ptr %4
+  %92 = load i64, ptr %ds
+  %93 = load i64, ptr %alloc
+  %94 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %92, i64 %93, i64 %91) "statepoint-id"="0"
+  %95 = extractvalue { { i64, i64 }, {  } } %94, 0, 0
+  %96 = extractvalue { { i64, i64 }, {  } } %94, 0, 1
+  store i64 %95, ptr %ds
+  store i64 %96, ptr %alloc
   unreachable
 L121:
   store i64 17, ptr %17
-  %99 = load i64, ptr %17
-  store i64 %99, ptr %4
-  %100 = load i64, ptr %4
-  %101 = load i64, ptr %ds
-  %102 = load i64, ptr %alloc
-  %103 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %101, 0, 0
-  %104 = insertvalue { { i64, i64 }, { i64 } } %103, i64 %102, 0, 1
-  %105 = insertvalue { { i64, i64 }, { i64 } } %104, i64 %100, 1, 0
-  ret { { i64, i64 }, { i64 } } %105
+  %97 = load i64, ptr %17
+  store i64 %97, ptr %4
+  %98 = load i64, ptr %4
+  %99 = load i64, ptr %ds
+  %100 = load i64, ptr %alloc
+  %101 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %99, 0, 0
+  %102 = insertvalue { { i64, i64 }, { i64 } } %101, i64 %100, 0, 1
+  %103 = insertvalue { { i64, i64 }, { i64 } } %102, i64 %98, 1, 0
+  ret { { i64, i64 }, { i64 } } %103
 L123:
-  %106 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
-  store i64 %106, ptr %18
-  %107 = load i64, ptr %18
-  store i64 %107, ptr %4
-  %108 = load i64, ptr %ds
-  %109 = add i64 %108, 240
-  %110 = inttoptr i64 %109 to ptr
-  store i64 0, ptr %110
-  %111 = load i64, ptr %4
-  %112 = load i64, ptr %ds
-  %113 = load i64, ptr %alloc
-  %114 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %112, i64 %113, i64 %111) "statepoint-id"="0"
-  %115 = extractvalue { { i64, i64 }, {  } } %114, 0, 0
-  %116 = extractvalue { { i64, i64 }, {  } } %114, 0, 1
-  store i64 %115, ptr %ds
-  store i64 %116, ptr %alloc
+  %104 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
+  store i64 %104, ptr %18
+  %105 = load i64, ptr %18
+  store i64 %105, ptr %4
+  %106 = load i64, ptr %ds
+  %107 = add i64 %106, 240
+  %108 = inttoptr i64 %107 to ptr
+  store i64 0, ptr %108
+  %109 = load i64, ptr %4
+  %110 = load i64, ptr %ds
+  %111 = load i64, ptr %alloc
+  %112 = call oxcamlcc { { i64, i64 }, {  } } @caml_raise_exn(i64 %110, i64 %111, i64 %109) "statepoint-id"="0"
+  %113 = extractvalue { { i64, i64 }, {  } } %112, 0, 0
+  %114 = extractvalue { { i64, i64 }, {  } } %112, 0, 1
+  store i64 %113, ptr %ds
+  store i64 %114, ptr %alloc
   unreachable
 L125:
   store i64 21, ptr %19
-  %117 = load i64, ptr %19
-  store i64 %117, ptr %4
-  %118 = load i64, ptr %4
-  %119 = load i64, ptr %ds
-  %120 = load i64, ptr %alloc
-  %121 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %119, 0, 0
-  %122 = insertvalue { { i64, i64 }, { i64 } } %121, i64 %120, 0, 1
-  %123 = insertvalue { { i64, i64 }, { i64 } } %122, i64 %118, 1, 0
-  ret { { i64, i64 }, { i64 } } %123
+  %115 = load i64, ptr %19
+  store i64 %115, ptr %4
+  %116 = load i64, ptr %4
+  %117 = load i64, ptr %ds
+  %118 = load i64, ptr %alloc
+  %119 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %117, 0, 0
+  %120 = insertvalue { { i64, i64 }, { i64 } } %119, i64 %118, 0, 1
+  %121 = insertvalue { { i64, i64 }, { i64 } } %120, i64 %116, 1, 0
+  ret { { i64, i64 }, { i64 } } %121
 }
 
 define  oxcamlcc { { i64, i64 }, { i64 } } @camlSwitch__test_next_HIDE_STAMP(i64 %0, i64 %1, i64 %2) noinline gc "oxcaml" {
@@ -411,7 +407,7 @@ L155:
   %121 = load ptr addrspace(1), ptr %8
   %122 = load i64, ptr %ds
   %123 = load i64, ptr %alloc
-  %124 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @caml_apply2(i64 %122, i64 %123, i64 %119, ptr addrspace(1) %120, ptr addrspace(1) %121) "gc-leaf-function"="true" "statepoint-id"="0"
+  %124 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @caml_apply2(i64 %122, i64 %123, i64 %119, ptr addrspace(1) %120, ptr addrspace(1) %121) "statepoint-id"="0"
   ret { { i64, i64 }, { i64 } } %124
 }
 

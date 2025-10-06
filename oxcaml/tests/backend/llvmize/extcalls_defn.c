@@ -7,6 +7,8 @@ CAMLprim value print_and_add(value xv, value yv) {
     return Val_long(x + y);
 }
 
+CAMLprim value caml_gc_compaction(value v);
+
 CAMLprim value too_many(value x1, value x2, value x3, value x4,  value x5,  value x6,
                         value x7, value x8, value x9, value x10, value x11, value x12) {
     printf("too_many arg list: %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld\n",
@@ -23,6 +25,8 @@ CAMLprim value too_many(value x1, value x2, value x3, value x4,  value x5,  valu
         Long_val(x11),
         Long_val(x12));
     fflush(stdout);
+
+    caml_gc_compaction(Val_unit);
     
     return x10;
 }

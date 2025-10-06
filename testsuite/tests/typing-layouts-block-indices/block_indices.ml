@@ -1,32 +1,28 @@
 (* TEST
  reference = "${test_source_directory}/block_indices.reference";
  flambda2;
- include stdlib_beta;
  include stdlib_stable;
  include stdlib_upstream_compatible;
  {
    ocamlc_byte_exit_status = "2";
    setup-ocamlc.byte-build-env;
-   flags = "";
+   flags = "-extension-universe no_extensions";
    compiler_reference = "${test_source_directory}/block_indices_disabled.compilers.reference";
    ocamlc.byte;
    check-ocamlc.byte-output;
  } {
-   flags = "-extension layouts_alpha";
    bytecode;
  }{
-   flags = "-extension layouts_alpha";
    native;
  } {
-   flags = "-extension layouts_alpha -Oclassic";
+   flags = "-Oclassic";
    native;
  } {
-   flags = "-extension layouts_alpha -O3";
+   flags = "-O3";
    native;
  }
 *)
 
-open Stdlib_beta
 open Stdlib_stable
 open Stdlib_upstream_compatible
 

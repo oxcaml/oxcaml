@@ -91,8 +91,10 @@ struct
             if n > 1
             then Format.fprintf ff "break %d" n
             else Format.fprintf ff "break";
-            Format.fprintf ff "%t%a" pp_terminator pp_instruction
-              (instr, depth - n)
+            for _ = 0 to n - 1 do
+              pp_terminator ff
+            done;
+            pp_instruction ff (instr, depth - n)
         in
         print_breaks 1 instr
       | Open (_iterator, _var, instr1, Dispatch, iterator_name, var_name) ->

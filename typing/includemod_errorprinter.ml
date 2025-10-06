@@ -259,6 +259,8 @@ let zap_axis_to_floor
       Mode.Linearity.zap_to_floor (Mode.Value.proj_comonadic Linearity m)
   | Comonadic Portability ->
       Mode.Portability.zap_to_floor (Mode.Value.proj_comonadic Portability  m)
+  | Comonadic Forkable ->
+      Mode.Forkable.zap_to_floor (Mode.Value.proj_comonadic Forkable m)
   | Comonadic Yielding ->
       Mode.Yielding.zap_to_floor (Mode.Value.proj_comonadic Yielding m)
   | Comonadic Statefulness ->
@@ -281,6 +283,8 @@ let zap_axis_to_ceil
       Mode.Linearity.zap_to_ceil (Mode.Value.proj_comonadic Linearity m)
   | Comonadic Portability ->
       Mode.Portability.zap_to_ceil (Mode.Value.proj_comonadic Portability m)
+  | Comonadic Forkable ->
+      Mode.Forkable.zap_to_ceil (Mode.Value.proj_comonadic Forkable m)
   | Comonadic Yielding ->
       Mode.Yielding.zap_to_ceil (Mode.Value.proj_comonadic Yielding m)
   | Comonadic Statefulness ->
@@ -775,7 +779,7 @@ let core env id x =
         (Printtyp.tree_of_value_description id diff.expected)
         mode2
         (Includecore.report_value_mismatch
-           "the first" "the second" env) diff.symptom
+           "the left-hand side" "the right-hand side" env) diff.symptom
         show_locs (diff.got.val_loc, diff.expected.val_loc)
         Printtyp.Conflicts.print_explanations
   | Err.Modalities e ->

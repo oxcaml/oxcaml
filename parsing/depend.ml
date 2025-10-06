@@ -137,15 +137,15 @@ and add_package_type bv (lid, l) =
    prefixes. *)
 and add_jkind bv (jkind : jkind_annotation) =
   match jkind.pjkind_desc with
-  | Default -> ()
-  | Abbreviation _ -> ()
-  | Mod (jkind, (_ : modes)) -> add_jkind bv jkind
-  | With (jkind, typ, (_ : modalities)) ->
+  | Pjk_default -> ()
+  | Pjk_abbreviation _ -> ()
+  | Pjk_mod (jkind, (_ : modes)) -> add_jkind bv jkind
+  | Pjk_with (jkind, typ, (_ : modalities)) ->
       add_jkind bv jkind;
       add_type bv typ;
-  | Kind_of typ ->
+  | Pjk_kind_of typ ->
       add_type bv typ
-  | Product jkinds ->
+  | Pjk_product jkinds ->
       List.iter (fun jkind -> add_jkind bv jkind) jkinds
 
 and add_vars_jkinds bv vars_jkinds =

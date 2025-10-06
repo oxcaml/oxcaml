@@ -1600,25 +1600,24 @@ let emit_static_cast (cast : Cmm.static_cast) i =
   | V128_of_scalar Float32x4 | V256_of_scalar Float32x8 ->
     if distinct then movss (arg i 0) (resX i 0)
   | Scalar_of_v128 Int16x8 | Scalar_of_v256 Int16x16 ->
-    (* [movw] and [movzx] cannot operate on vector registers. We must zero
-       extend as the result is an untagged positive int. CR mslater: (SIMD)
-       remove zx once we have unboxed int16 *)
+    (* CR-someday mslater: int16# shouldn't require sign extension *)
+    (* [movw] and [movzx] cannot operate on vector registers. We must sign
+       extend as the result is an untagged int8. *)
     movd (argX i 0) (res32 i 0);
-    I.movzx (res16 i 0) (res i 0)
+    I.movsx (res16 i 0) (res i 0)
   | Scalar_of_v128 Int8x16 | Scalar_of_v256 Int8x32 ->
-    (* [movb] and [movzx] cannot operate on vector registers. We must zero
-       extend as the result is an untagged positive int. CR mslater: (SIMD)
-       remove zx once we have unboxed int8 *)
+    (* CR-someday mslater: int8# shouldn't require sign extension *)
+    (* [movb] and [movzx] cannot operate on vector registers. We must sign
+       extend as the result is an untagged int16. *)
     movd (argX i 0) (res32 i 0);
-    I.movzx (res8 i 0) (res i 0)
+    I.movsx (res8 i 0) (res i 0)
   | V128_of_scalar Int16x8
   | V128_of_scalar Int8x16
   | V256_of_scalar Int16x16
   | V256_of_scalar Int8x32 ->
     (* [movw] and [movb] cannot operate on vector registers. Moving 32 bits is
-       OK because the argument is an untagged positive int and these operations
-       leave the top bits of the vector unspecified. CR mslater: (SIMD) don't
-       load 32 bits once we have unboxed int16/int8 *)
+       OK because the argument is an untagged int and these operations leave the
+       top bits of the vector unspecified. *)
     movd (arg32 i 0) (resX i 0)
   | V512_of_scalar _ | Scalar_of_v512 _ ->
     (* CR-soon mslater: avx512 *)

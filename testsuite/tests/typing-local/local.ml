@@ -677,7 +677,9 @@ Line 3, characters 10-11:
 3 |   (module M : S)
               ^
 Error: Signature mismatch:
-       This escapes its region.
+       Got "local"
+       but expected "global"
+       because it is a module and thus needs to be allocated on the heap.
 |}]
 
 (* Don't escape through a lazy value *)
@@ -692,7 +694,7 @@ Line 2, characters 30-31:
 Error: The value "x" is "local" but is expected to be "global"
        because it is used inside a lazy expression
        which is expected to be "global"
-       because it is a lazy expression and thus always needs to be allocated on the heap.
+       because lazy expressions always need to be allocated on the heap.
 |}]
 
 (* Don't escape through a functor *)
@@ -709,7 +711,7 @@ Line 3, characters 27-28:
                                ^
 Error: The value "x" is "local" but is expected to be "global"
        because it is used inside a functor which is expected to be "global"
-       because it is a module and thus always needs to be allocated on the heap.
+       because modules always need to be allocated on the heap.
 |}]
 
 (* Don't escape through a functor with underscore parameter *)
@@ -726,7 +728,7 @@ Line 3, characters 27-28:
                                ^
 Error: The value "x" is "local" but is expected to be "global"
        because it is used inside a functor which is expected to be "global"
-       because it is a module and thus always needs to be allocated on the heap.
+       because modules always need to be allocated on the heap.
 |}]
 
 (* Don't escape through a generative functor *)
@@ -743,7 +745,7 @@ Line 3, characters 27-28:
                                ^
 Error: The value "x" is "local" but is expected to be "global"
        because it is used inside a functor which is expected to be "global"
-       because it is a module and thus always needs to be allocated on the heap.
+       because modules always need to be allocated on the heap.
 |}]
 
 (* Don't escape through a functor with underscore parameter *)
@@ -760,7 +762,7 @@ Line 3, characters 27-28:
                                ^
 Error: The value "x" is "local" but is expected to be "global"
        because it is used inside a functor which is expected to be "global"
-       because it is a module and thus always needs to be allocated on the heap.
+       because modules always need to be allocated on the heap.
 |}]
 
 (* Don't escape through a generative functor *)
@@ -777,7 +779,7 @@ Line 3, characters 27-28:
                                ^
 Error: The value "x" is "local" but is expected to be "global"
        because it is used inside a functor which is expected to be "global"
-       because it is a module and thus always needs to be allocated on the heap.
+       because modules always need to be allocated on the heap.
 |}]
 
 (* Don't escape through a class method *)

@@ -145,3 +145,140 @@ end
 [%%expect{|
 module M : sig type t : immediate_or_null end @@ stateless
 |}]
+
+(* Tests for [immediate64_or_null]. *)
+
+type t_immediate64_or_null : immediate64_or_null
+[%%expect{|
+type t_immediate64_or_null : immediate64_or_null
+|}]
+
+type ('a : immediate64_or_null) accept_immediate64_or_null
+[%%expect{|
+type ('a : immediate64_or_null) accept_immediate64_or_null
+|}]
+
+type should_work = t_immediate64_or_null accept_immediate64_or_null
+[%%expect{|
+type should_work = t_immediate64_or_null accept_immediate64_or_null
+|}]
+
+type ('a : immediate64) accept_immediate64
+[%%expect{|
+type ('a : immediate64) accept_immediate64
+|}]
+
+type should_fail = t_immediate64_or_null accept_immediate64
+[%%expect{|
+Line 1, characters 19-40:
+1 | type should_fail = t_immediate64_or_null accept_immediate64
+                       ^^^^^^^^^^^^^^^^^^^^^
+Error: This type "t_immediate64_or_null" should be an instance of type
+         "('a : immediate64)"
+       The kind of t_immediate64_or_null is immediate64_or_null
+         because of the definition of t_immediate64_or_null at line 1, characters 0-48.
+       But the kind of t_immediate64_or_null must be a subkind of immediate64
+         because of the definition of accept_immediate64 at line 1, characters 0-42.
+|}]
+
+type should_fail = t_immediate64_or_null accept_immediate
+[%%expect{|
+Line 1, characters 19-40:
+1 | type should_fail = t_immediate64_or_null accept_immediate
+                       ^^^^^^^^^^^^^^^^^^^^^
+Error: This type "t_immediate64_or_null" should be an instance of type
+         "('a : immediate)"
+       The kind of t_immediate64_or_null is immediate64_or_null
+         because of the definition of t_immediate64_or_null at line 1, characters 0-48.
+       But the kind of t_immediate64_or_null must be a subkind of immediate
+         because of the definition of accept_immediate at line 1, characters 0-38.
+|}]
+
+type should_fail = t_immediate64_or_null accept_value
+[%%expect{|
+Line 1, characters 19-40:
+1 | type should_fail = t_immediate64_or_null accept_value
+                       ^^^^^^^^^^^^^^^^^^^^^
+Error: This type "t_immediate64_or_null" should be an instance of type
+         "('a : value)"
+       The kind of t_immediate64_or_null is immediate64_or_null
+         because of the definition of t_immediate64_or_null at line 1, characters 0-48.
+       But the kind of t_immediate64_or_null must be a subkind of value
+         because of the definition of accept_value at line 1, characters 0-30.
+|}]
+
+type should_work = t_immediate64_or_null accept_value_or_null
+[%%expect{|
+type should_work = t_immediate64_or_null accept_value_or_null
+|}]
+
+type should_work = t_immediate_or_null accept_immediate64_or_null
+[%%expect{|
+type should_work = t_immediate_or_null accept_immediate64_or_null
+|}]
+
+type succeeds64 = t_immediate64_or_null accepts_nonfloat
+[%%expect{|
+type succeeds64 = t_immediate64_or_null accepts_nonfloat
+|}]
+
+(* CR with-kinds: fix the difference with principality. *)
+type should_fail = exn or_null accept_immediate64_or_null
+[%%expect{|
+Line 1, characters 19-30:
+1 | type should_fail = exn or_null accept_immediate64_or_null
+                       ^^^^^^^^^^^
+Error: This type "exn or_null" should be an instance of type
+         "('a : immediate64_or_null)"
+       The kind of exn or_null is value_or_null mod contended portable
+         because it is the primitive type or_null.
+       But the kind of exn or_null must be a subkind of immediate64_or_null
+         because of the definition of accept_immediate64_or_null at line 1, characters 0-58.
+|}, Principal{|
+Line 1, characters 19-30:
+1 | type should_fail = exn or_null accept_immediate64_or_null
+                       ^^^^^^^^^^^
+Error: This type "exn or_null" should be an instance of type
+         "('a : immediate64_or_null)"
+       The kind of exn or_null is value_or_null mod everything with exn
+         because it is the primitive type or_null.
+       But the kind of exn or_null must be a subkind of immediate64_or_null
+         because of the definition of accept_immediate64_or_null at line 1, characters 0-58.
+|}]
+
+module M64 : sig
+  type t : immediate64_or_null
+end = struct
+  type t = int or_null
+end
+
+[%%expect{|
+module M64 : sig type t : immediate64_or_null end @@ stateless
+|}]
+
+module Fails : sig
+  type t : immediate64_or_null
+end = struct
+  type t = string or_null
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = string or_null
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = string or_null end
+       is not included in
+         sig type t : immediate64_or_null end
+       Type declarations do not match:
+         type t = string or_null
+       is not included in
+         type t : immediate64_or_null
+       The kind of the first is
+           value_or_null mod many forkable unyielding stateless immutable
+         because it is the primitive type or_null.
+       But the kind of the first must be a subkind of immediate64_or_null
+         because of the definition of t at line 2, characters 2-30.
+|}]
