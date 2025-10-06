@@ -16,13 +16,17 @@
 
 (** {2 Initialization} *)
 
+type opt_backend = Native | Js_of_ocaml
+
+type backend = Byte | Opt of opt_backend
+
 type info = {
   target : Unit_info.t;
   module_name : Compilation_unit.t;
   env : Env.t;
   ppf_dump : Format.formatter;
   tool_name : string;
-  native : bool;
+  backend : backend;
 }
 (** Information needed to compile a file. *)
 
@@ -31,7 +35,7 @@ type compilation_unit_or_inferred =
   | Inferred_from_output_prefix
 
 val with_info :
-  native:bool ->
+  backend:backend ->
   tool_name:string ->
   source_file:string ->
   output_prefix:string ->

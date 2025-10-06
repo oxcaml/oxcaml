@@ -151,6 +151,7 @@ let find_dependency target_kind modname (byt_deps, opt_deps) =
   | exception Not_found -> (byt_deps, opt_deps)
   | filename ->
     let basename = Filename.chop_extension filename in
+    (* CR jvanburen: update this for ocamlj? *)
     let cmi_file = basename ^ ".cmi" in
     let cmx_file = basename ^ ".cmx" in
     let mli_exists =
