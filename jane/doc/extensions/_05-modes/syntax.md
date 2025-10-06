@@ -19,6 +19,7 @@ linearity ::= `many` | `once`
 portability ::= `portable` | `nonportable`
 contention ::= `uncontended` | `shared` | `contended`
 yield ::= `unyielding` | `yielding`
+fork ::= `forkable` | `unforkable`
 statefulness ::= `stateless` | `observing` | `stateful`
 visibility ::= `read_write` | `read` | `immutable`
 
@@ -68,7 +69,7 @@ axes that are omitted, the so-called *legacy* modes are used instead. The legacy
 modes are as follows:
 
 ```ocaml
-global aliased many nonportable uncontended unyielding stateful read_write
+global aliased many nonportable uncontended forkable unyielding stateful read_write
 ```
 
 This means that `t1 -> t2` is actually equivalent to
@@ -164,7 +165,7 @@ Modalities are used to describe the relationship between a container and an
 element in that container; for example, if you have a record field `x` with
 a `portable` modality, then `r.x` is `portable` even if `r` is `nonportable`.
 We say that the `portable` modality applied to the `nonportable` record mode
-produces the `portable` mode of the field. 
+produces the `portable` mode of the field.
 
 Modalities work differently on future axes vs. past axes. On a future axis, the
 modality imposes an upper bound on the mode (thus always lowering that
@@ -180,7 +181,7 @@ as the mode of the record.) For future axes, this would be the top mode; for
 past axes, this would be the bottom mode. These are the identity modalities:
 
 ```ocaml
-local unique once nonportable uncontended unyielding stateless immutable
+local unique once nonportable uncontended unforkable yielding stateless immutable
 ```
 
 Note that a legacy mode might or might not be the same as the identity modality.
@@ -271,13 +272,14 @@ for modalities. For example, `local` implies `yielding`. Now consider
 type 'a glob = { g : 'a @@ global }
 let unglob (r : 'a glob @ local) : 'a = r.g
 ```
-Because of the mode implication, `r` has mode `local yielding`. The written
-`global` modality means that `r.g` will have mode `global` (corresponding to
-the unwritten legacy `global` on the return type of `'a`). But without a
-`unyielding` modality, then `r.g` will have mode `yielding`, which is not
-compatible with a return expecting the legacy `unyielding`. We thus extend
-implications to include modalities, such that `global` implies `unyielding`,
-thus getting `unglob` to type-check (because now `r.g` will be `unyielding`).
+Because of the mode implication, `r` has mode `local unforkable yielding`.
+The written `global` modality means that `r.g` will have mode `global`
+(corresponding to the unwritten legacy `global` on the return type of `'a`).
+But without a `unyielding` modality, then `r.g` will have mode `yielding`,
+which is not compatible with a return expecting the legacy `unyielding`.
+We thus extend implications to include modalities, such that `global`
+implies `unyielding`, thus getting `unglob` to type-check (because now
+`r.g` will be `unyielding`).
 
 Other implications
 exist, all to lower users' annotation burden, all applying both to modes
@@ -286,6 +288,8 @@ and modalities, according to this table:
 
 | this          | implies this |
 |---------------|--------------|
+| `global`      | `forkable`   |
+| `local`       | `unforkable` |
 | `global`      | `unyielding` |
 | `local`       | `yielding`   |
 | `stateless`   | `portable`   |

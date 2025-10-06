@@ -167,7 +167,13 @@ let cmja f = mk_artifact ".cmja" f
 let cmjx f = mk_artifact ".cmjx" f
 let cmjxa f = mk_artifact ".cmjxa" f
 let annot f = mk_artifact ".annot" f
+<<<<<<< HEAD
 let artifact f ~extension = mk_artifact extension f
+||||||| 693db210fb
+=======
+let artifact f ~extension = mk_artifact extension f
+
+>>>>>>> jvb.refactor-optcomp
 
 let companion_obj f = companion_artifact Config.ext_obj f
 let companion_cmt f = companion_artifact ".cmt" f

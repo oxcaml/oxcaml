@@ -493,7 +493,7 @@ Line 4, characters 19-20:
 4 |   require_portable f
                        ^
 Error: This value is "nonportable"
-       because it closes over the value "x_13_3" (at Line 3, characters 17-23)
+       because it contains a usage (of the value "x_13_3" at Line 3, characters 17-23)
        which is expected to be "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -509,7 +509,7 @@ Line 5, characters 19-20:
 5 |   require_portable f
                        ^
 Error: This value is "nonportable"
-       because it closes over the value "x_13_3" (at Line 3, characters 17-23)
+       because it contains a usage (of the value "x_13_3" at Line 3, characters 17-23)
        which is expected to be "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]

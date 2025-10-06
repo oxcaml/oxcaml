@@ -395,7 +395,7 @@ Line 4, characters 24-27:
 4 |     let _ @ stateless = bar in
                             ^^^
 Error: This value is "stateful"
-       because it closes over the value "a" (at Line 3, characters 28-29)
+       because it contains a usage (of the value "a" at Line 3, characters 28-29)
        which is expected to be "read_write".
        However, the highlighted expression is expected to be "stateless".
 |}]
@@ -483,7 +483,7 @@ Line 4, characters 22-25:
 4 |   let _ @ stateless = bar in
                           ^^^
 Error: This value is "observing"
-       because it closes over the value "a" (at Line 3, characters 26-27)
+       because it contains a usage (of the value "a" at Line 3, characters 26-27)
        which is expected to be "read" or "read_write".
        However, the highlighted expression is expected to be "stateless".
 |}]

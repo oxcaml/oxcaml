@@ -159,7 +159,7 @@ type shared_context =
 type lock =
   | Escape_lock of escaping_context
   | Share_lock of shared_context
-  | Closure_lock of Mode.Hint.closure_context * Mode.Value.Comonadic.r
+  | Closure_lock of Mode.Hint.pinpoint_desc * Mode.Value.Comonadic.r
   | Region_lock
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
@@ -836,8 +836,6 @@ type lookup_error =
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_escaping of Mode.Hint.lock_item * Longident.t * escaping_context
   | Once_value_used_in of Mode.Hint.lock_item * Longident.t * shared_context
-  | Value_used_in_closure of Mode.Hint.lock_item * Longident.t *
-      Mode.Value.Comonadic.error
   | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
@@ -3348,26 +3346,21 @@ let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
     in
     {mode; context = Some shared_context}
 
-let closure_mode ~errors ~env ~loc ~item ~lid
+let closure_mode ~loc ~item ~lid
   ({mode = {Mode.monadic; comonadic}; _} as vmode) closure_context comonadic0 =
-  let hint : _ Mode.Hint.morph =
-    Is_closed_by {
-      closure_context; value_loc = loc; value_lid = lid; value_item = item }
+  let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
+  let hint_comonadic : _ Mode.Hint.morph =
+    Is_closed_by {closure = closure_context; closed = pp; polarity = Comonadic}
   in
-  begin
-    match
-      Mode.Value.Comonadic.submode comonadic
-        (Mode.Value.Comonadic.apply_hint hint comonadic0)
-    with
-    | Error e ->
-        may_lookup_error errors loc env
-          (Value_used_in_closure (item, lid, e))
-    | Ok () -> ()
-  end;
+  Mode.Value.Comonadic.submode_err pp
+    comonadic (Mode.Value.Comonadic.apply_hint hint_comonadic comonadic0);
+  let hint_monadic : _ Mode.Hint.morph =
+    Is_closed_by {closure = closure_context; closed = pp; polarity = Monadic}
+  in
   let monadic =
     Mode.Value.Monadic.join
       [ monadic;
-        Mode.Value.comonadic_to_monadic ~hint comonadic0 ]
+        Mode.Value.comonadic_to_monadic ~hint:hint_monadic comonadic0 ]
   in
   {vmode with mode = {monadic; comonadic}}
 
@@ -3421,8 +3414,7 @@ let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
       | Share_lock shared_context ->
           share_mode ~errors ~env ~loc ~item ~lid vmode shared_context
       | Closure_lock (closure_context, comonadic) ->
-          closure_mode ~errors ~env ~loc ~item ~lid vmode
-            closure_context comonadic
+          closure_mode ~loc ~item ~lid vmode closure_context comonadic
       | Exclave_lock ->
           exclave_mode ~errors ~env ~loc ~item ~lid vmode
       | Unboxed_lock ->
@@ -4845,8 +4837,6 @@ let report_lookup_error _loc env ppf = function
             inside %s@]"
         print_lock_item (item, lid)
         (string_of_shared_context context)
-  | Value_used_in_closure (item, lid, err) ->
-      Mode.Value.Comonadic.report_error ppf ~target:(item, lid) err
   | Local_value_used_in_exclave (item, lid) ->
       fprintf ppf "@[%a local, so it cannot be used \
                   inside an exclave_@]"
