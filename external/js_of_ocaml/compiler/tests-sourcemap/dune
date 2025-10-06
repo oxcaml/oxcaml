@@ -1,0 +1,28 @@
+(env
+ (_
+  (js_of_ocaml
+   (compilation_mode separate))))
+
+(executable
+ (name test)
+ (modules test)
+ (enabled_if
+  (<> %{profile} with-effects))
+ (modes js)
+ (js_of_ocaml
+  (link_flags
+   (:standard --source-map-root /my/sourceRoot)))
+ (libraries testlib))
+
+(library
+ (name testlib)
+ (modules a b c d))
+
+(test
+ (name dump_sourcemap)
+ (modules dump_sourcemap)
+ (action
+  (run %{test} %{dep:test.bc.js}))
+ (enabled_if
+  (= %{profile} dev))
+ (libraries js_of_ocaml-compiler))
