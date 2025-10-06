@@ -1,6 +1,6 @@
 # Please make a pull request to change this file.
-disable=true
-# There is an .ocamlformat-enable file in this directory.
+disable=false
+# ocamlformat is enabled for the entire directory.
 # Keep the remainder of this file in sync with other .ocamlformat files in this repo.
 assignment-operator=begin-line
 cases-exp-indent=2
