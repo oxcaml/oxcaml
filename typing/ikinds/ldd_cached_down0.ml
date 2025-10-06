@@ -461,7 +461,7 @@ module Make (V : ORDERED) = struct
     solve_pending ();
     let a = force a in
     let b = force b in
-    let diff = sub_subsets a b |> force in
+    let diff = sub_subsets a b in
     let witness = round_up' diff in
     match C.non_bot_axes witness with
     | [] -> None
