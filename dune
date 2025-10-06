@@ -12,6 +12,8 @@
 ;*                                                                        *
 ;**************************************************************************
 
+(vendored_dirs external)
+
 ; set warning as error in release profile
 
 (env

@@ -1,0 +1,47 @@
+(executables
+ (names wasm_of_ocaml wasmoo_link_wasm)
+ (public_names wasm_of_ocaml -)
+ (package wasm_of_ocaml-compiler)
+ (libraries
+  jsoo_cmdline
+  wasm_of_ocaml-compiler
+  cmdliner
+  compiler-libs.common
+  js_of_ocaml-compiler.runtime-files
+  yojson
+  (select
+   findlib_support.ml
+   from
+   ;; Only link wasm_of_ocaml-compiler.findlib-support if it exists
+   (js_of_ocaml-compiler.findlib-support -> findlib_support.empty.ml)
+   (-> findlib_support.empty.ml)))
+ (modes
+  byte
+  (best exe))
+ (flags
+  (:standard -safe-string)))
+
+(rule
+ (target runtime_files.ml)
+ (deps
+  gen/gen.exe
+  ../../runtime/wasm/runtime.js
+  ../../runtime/wasm/deps.json
+  (glob_files ../../runtime/wasm/*.wat)
+  (glob_files ../../runtime/wasm/runtime-*.wasm))
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{deps}))))
+
+(rule
+ (targets wasm_of_ocaml.1)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run %{bin:wasm_of_ocaml} --help=groff))))
+
+(install
+ (section man)
+ (package wasm_of_ocaml-compiler)
+ (files wasm_of_ocaml.1))
