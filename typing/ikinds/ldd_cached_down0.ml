@@ -154,9 +154,7 @@ module Make (V : ORDERED) = struct
 
   let node (v : var) (lo : node) (hi : node) : node =
     let hi' =
-      if is_leaf lo
-      then canonicalize_right_leaf hi lo
-      else canonicalize hi lo
+      canonicalize hi lo
     in
     node_raw v lo hi'
 
@@ -183,6 +181,8 @@ module Make (V : ORDERED) = struct
 
   and join_with_left_leaf (leaf_a : node) (other : node) =
     let leaf_val = leaf_value leaf_a in
+    (* Fast path *)
+    if C.leq leaf_val (down0 other) then other else
     join_with_left_leaf_aux leaf_val other
 
   and join_with_left_leaf_aux (leaf_a : C.t) (other : node) =
