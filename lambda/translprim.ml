@@ -1086,19 +1086,25 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%reinterpret_unboxed_int64_as_tagged_int63" ->
       Primitive(Preinterpret_unboxed_int64_as_tagged_int63, 1)
     | "%unsafe_get_idx_imm" ->
-      (* Only safe if the index is truly immutable *)
+      (* This primitive requires the indexed data to be truly immutable,
+         which the compiler will rely upon when performing optimizations *)
       Primitive(Pget_idx (layout, Immutable), 2)
     | "%unsafe_get_idx" ->
-      (* [Mutable] is the more conservative version *)
+      (* Whenever it's safe to use the "_imm" counterpart to this primitive
+         (just above), it's also safe to use this one. Marking the primitive as
+         [Mutable] just restricts the optimizations that can be performed. *)
       Primitive(Pget_idx (layout, Mutable), 2)
     | "%unsafe_set_idx" ->
       let layout = List.nth (get_arg_layouts ()) 2 in
       Primitive(Pset_idx (layout, get_first_arg_mode ()), 3)
     | "%unsafe_get_ptr_imm" ->
-      (* Only safe if the pointer is truly immutable *)
+      (* This primitive requires the pointed-to data to be truly immutable,
+         which the compiler will rely upon when performing optimizations *)
       Primitive(Pget_ptr (layout, Immutable), 1)
     | "%unsafe_get_ptr" ->
-      (* [Mutable] is the more conservative version *)
+      (* Whenever it's safe to use the "_imm" counterpart to this primitive
+         (just above), it's also safe to use this one. Marking the primitive as
+         [Mutable] just restricts the optimizations that can be performed. *)
       Primitive(Pget_ptr (layout, Mutable), 1)
     | "%unsafe_set_ptr" ->
       let layout = List.nth (get_arg_layouts ()) 1 in
@@ -1455,6 +1461,20 @@ let should_specialize_primitive p =
   | _ ->
     true
 
+let layout_of_ty_for_idx_set env loc ty =
+  (* CR layouts: This is gross - particularly the call to [type_jkind] and the
+    conversion to and from [mixed_block_element]! The slightly less gross
+    thing would be to change [layout_of_const_sort_generic] in the same way
+    that we have changed [transl_mixed_block_element] to desecend into
+    products. But that's a big change that (a) will have substantial
+    performance impacts for lots of cases that don't matter, and (b) will
+    become obsolete when we do complex values. So for now, the gross
+    thing. *)
+  let jkind = Ctype.type_jkind env ty in
+  let mbe = Typedecl.mixed_block_element env ty jkind in
+  let mbe = transl_mixed_block_element env (to_location loc) ty mbe in
+  layout_of_mixed_block_element_for_idx_set mbe
+
 (* Specialize a primitive from available type information. *)
 (* CR layouts v7: This function had a loc argument added just to support the void
    check error message.  Take it out when we remove that. *)
@@ -1688,20 +1708,11 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     | Pointer -> None
     | Immediate -> Some (Atomic (op, kind, Immediate)))
   | Primitive (Pset_idx (_, m), arity), (_ :: _ :: p3 :: _) ->
-    (* CR layouts: This is gross - particularly the call to [type_jkind] and the
-       conversion to and from [mixed_block_element]! The slightly less gross
-       thing would be to change [layout_of_const_sort_generic] in the same way
-       that we have changed [transl_mixed_block_element] to desecend into
-       products. But that's a big change that (a) will have substantial
-       performance impacts for lots of cases that don't matter, and (b) will
-       become obsolete when we do complex values. So for now, the gross
-       thing. *)
-    let jkind = Ctype.type_jkind env p3 in
-    let mbe = Typedecl.mixed_block_element env p3 jkind in
-    let mbe = transl_mixed_block_element env (to_location loc) p3 mbe in
-    Some (Primitive
-            (Pset_idx (layout_of_mixed_block_element_for_idx_set mbe, m),
-             arity))
+    let l = layout_of_ty_for_idx_set env loc p3 in
+    Some (Primitive (Pset_idx (l, m), arity))
+  | Primitive (Pset_ptr (_, m), arity), (_ :: p2 :: _) ->
+    let l = layout_of_ty_for_idx_set env loc p2 in
+    Some (Primitive (Pset_ptr (l, m), arity))
   | _ -> None
 
 let caml_equal =
