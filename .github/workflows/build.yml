@@ -186,7 +186,7 @@ jobs:
       with:
         ocaml-compiler: oxcaml-ci-deps.5.2.0
         opam-repositories: |
-          local: file://${{ github.workspace }}/local-opam
+          local: file://${{ github.workspace }}/tools/ci/local-opam
           default: https://github.com/ocaml/opam-repository.git
         opam-disable-sandboxing: true
         opam-pin: false
