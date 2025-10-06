@@ -25,7 +25,8 @@ let parse_flambda filename =
     (* CR gbury/lmaurer/bclement: add a proper traversal to compute the actual
        code_slot_offsets here (as well as free_names) *)
     let { Simplify.unit = fl2'; _ } =
-      Simplify.run ~cmx_loader ~round:1 fl2 ~code_slot_offsets:Code_id.Map.empty
+      Simplify.run ~machine_width:Sixty_four ~cmx_loader ~round:1 fl2
+        ~code_slot_offsets:Code_id.Map.empty
     in
     Format.printf "simplify:@.%a@." Flambda_unit.print fl2';
     let fl3 = Flambda_to_fexpr.conv fl2' in
