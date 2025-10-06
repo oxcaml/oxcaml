@@ -100,13 +100,13 @@ module Make (V : ORDERED) = struct
     in
     Obj.repr ({ v; lo; hi; down0 } : node_block)
 
-  let leaf (c : C.t) : node = Obj.repr c
+  let[@inline] leaf (c : C.t) : node = Obj.repr c
 
   let bot = leaf C.bot
 
   let top = leaf C.top
 
-  let is_bot_node (n : node) : bool = C.equal (leaf_value n) C.bot
+  let[@inline] is_bot_node (n : node) : bool = C.equal (leaf_value n) C.bot
 
   let[@inline] down0 (n : node) : C.t =
     if is_leaf n then leaf_value n else node_down0 n
@@ -148,9 +148,10 @@ module Make (V : ORDERED) = struct
       let vh = node_v h in
       let hlo = node_lo h in
       let hhi = node_hi h in
-      node_raw vh
-        (canonicalize_right_leaf_aux hlo leaf_l)
-        (canonicalize_right_leaf_aux hhi leaf_l)
+      let lo' = canonicalize_right_leaf_aux hlo leaf_l in
+      let hi' = canonicalize_right_leaf_aux hhi leaf_l in
+      if hlo == lo' && hhi == hi' then h else
+      node_raw vh lo' hi'
 
   let node (v : var) (lo : node) (hi : node) : node =
     let hi' =
@@ -192,8 +193,10 @@ module Make (V : ORDERED) = struct
       let vb = node_v other in
       let blo = node_lo other in
       let bhi = node_hi other in
-      node_raw vb (join_with_leaf_aux leaf_a blo)
-        (canonicalize_right_leaf_aux bhi leaf_a)
+      let lo' = join_with_leaf_aux leaf_a blo in
+      let hi' = canonicalize_right_leaf_aux bhi leaf_a in
+      if lo' == blo && hi' == bhi then other else
+      node_raw vb lo' hi'
 
   let rec meet (a : node) (b : node) =
     if is_leaf a
@@ -227,13 +230,15 @@ module Make (V : ORDERED) = struct
       let vb = node_v other in
       let blo = node_lo other in
       let bhi = node_hi other in
-      node vb (meet_with_leaf_aux leaf_a blo)
-        (meet_with_leaf_aux leaf_a bhi)
+      let lo' = meet_with_leaf_aux leaf_a blo in
+      let hi' = meet_with_leaf_aux leaf_a bhi in
+      if lo' == blo && hi' == bhi then other else
+      node vb lo' hi'
 
   (* --------- public constructors --------- *)
-  let const (c : C.t) = leaf c
+  let[@inline] const (c : C.t) = leaf c
 
-  let mk_var (v : var) = node v bot top
+  let[@inline] mk_var (v : var) = node v bot top
 
   let rigid (name : V.t) = Var.make_rigid ~name ()
 
@@ -248,8 +253,12 @@ module Make (V : ORDERED) = struct
       if x.id < n.v.id
       then w
       else if n.v.id = x.id
-      then restrict0 x n.lo
-      else node n.v (restrict0 x n.lo) (restrict0 x n.hi)
+      then n.lo
+      else
+        let lo' = restrict0 x n.lo in
+        let hi' = restrict0 x n.hi in
+        if lo' == n.lo && hi' == n.hi then w else
+        node n.v lo' hi'
 
   let rec restrict1 (x : var) (w : node) : node =
     if is_leaf w
@@ -260,7 +269,11 @@ module Make (V : ORDERED) = struct
       then w
       else if n.v.id = x.id
       then join n.lo n.hi
-      else node n.v (restrict1 x n.lo) (restrict1 x n.hi)
+      else
+        let lo' = restrict1 x n.lo in
+        let hi' = restrict1 x n.hi in
+        if lo' == n.lo && hi' == n.hi then w else
+        node n.v lo' hi'
 
   (* --------- force (no memoization) --------- *)
   let rec force (w : node) : node =
@@ -281,7 +294,7 @@ module Make (V : ORDERED) = struct
           if lo' == n.lo && hi' == n.hi
           then w
           else
-            let d' = force (mk_var n.v) in
+            let d' = mk_var n.v in
             join lo' (meet hi' d')
         | Rigid _ -> failwith "force: rigid variable shouldn't be here"
 
