@@ -434,7 +434,7 @@ Here is an example of a case that is not matched:
 
 <[ while true do () done ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[while true do  () done]>
+- : 'a expr = <[while true do  () done]>
 |}];;
 
 <[
@@ -460,7 +460,7 @@ Here is an example of a case that is not matched:
 
 <[ assert false ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[assert false]>
+- : 'a expr = <[assert false]>
 |}];;
 
 <[ lazy 42 ]>;;
@@ -530,63 +530,62 @@ type rcd_u = #{ xu : int; yu : string; }
 
 <[ raise (Match_failure ("foo", 42, 100)) ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[Stdlib.raise (Match_failure ("foo", 42, 100))]>
+- : 'a expr = <[Stdlib.raise (Match_failure ("foo", 42, 100))]>
 |}];;
 
 <[ raise Out_of_memory ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[Stdlib.raise Out_of_memory]>
+- : 'a expr = <[Stdlib.raise Out_of_memory]>
 |}];;
 
 <[ raise (Invalid_argument "arg") ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[Stdlib.raise (Invalid_argument "arg")]>
+- : 'a expr = <[Stdlib.raise (Invalid_argument "arg")]>
 |}];;
 
 <[ raise (Failure "fail") ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[Stdlib.raise (Failure "fail")]>
+- : 'a expr = <[Stdlib.raise (Failure "fail")]>
 |}];;
 
 <[ raise Not_found ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[Stdlib.raise Not_found]>
+- : 'a expr = <[Stdlib.raise Not_found]>
 |}];;
 
 <[ raise (Sys_error "err") ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[Stdlib.raise (Sys_error "err")]>
+- : 'a expr = <[Stdlib.raise (Sys_error "err")]>
 |}];;
 
 <[ raise End_of_file ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[Stdlib.raise End_of_file]>
+- : 'a expr = <[Stdlib.raise End_of_file]>
 |}];;
 
 <[ raise Division_by_zero ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[Stdlib.raise Division_by_zero]>
+- : 'a expr = <[Stdlib.raise Division_by_zero]>
 |}];;
 
 <[ raise Stack_overflow ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[Stdlib.raise Stack_overflow]>
+- : 'a expr = <[Stdlib.raise Stack_overflow]>
 |}];;
 
 <[ raise Sys_blocked_io ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[Stdlib.raise Sys_blocked_io]>
+- : 'a expr = <[Stdlib.raise Sys_blocked_io]>
 |}];;
 
 <[ raise (Assert_failure ("assert", 42, 100)) ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[Stdlib.raise (Assert_failure ("assert", 42, 100))]>
+- : 'a expr = <[Stdlib.raise (Assert_failure ("assert", 42, 100))]>
 |}];;
 
 <[ raise (Undefined_recursive_module ("M", 42, 100)) ]>;;
 [%%expect {|
-- : <[$('a)]> expr =
-<[Stdlib.raise (Undefined_recursive_module ("M", 42, 100))]>
+- : 'a expr = <[Stdlib.raise (Undefined_recursive_module ("M", 42, 100))]>
 |}];;
 
 <[ let exception E in () ]>;;
@@ -596,7 +595,7 @@ type rcd_u = #{ xu : int; yu : string; }
 
 <[ let exception E in raise E ]>;;
 [%%expect {|
-- : <[$('a)]> expr = <[let exception E in Stdlib.raise E]>
+- : 'a expr = <[let exception E in Stdlib.raise E]>
 |}];;
 
 <[ let module M = Option in M.map ]>;;
@@ -648,9 +647,9 @@ Line 1, characters 19-20:
 1 | <[ fun (module _ : S) x -> 42 ]>;;
                        ^
 Error: Identifier "S" is used at Line 1, characters 19-20
-       in a context with one layer of quotation (<[ ... ]>);
+       in a context with inside a quotation (<[ ... ]>);
        it is introduced at Lines 1-7, characters 0-3
-       in a context with no quotations or splices.
+       in a context with outside any quotations.
 |}];;
 
 <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
@@ -668,9 +667,9 @@ Line 1, characters 3-9:
 1 | <[ Mod.mk 42 ]>;;
        ^^^^^^
 Error: Identifier "Mod" is used at Line 1, characters 3-9
-       in a context with one layer of quotation (<[ ... ]>);
+       in a context with inside a quotation (<[ ... ]>);
        it is introduced at File "_none_", line 1
-       in a context with no quotations or splices.
+       in a context with outside any quotations.
 |}];;
 
 let x = 42 in <[ x ]>;;
@@ -679,9 +678,9 @@ Line 1, characters 17-18:
 1 | let x = 42 in <[ x ]>;;
                      ^
 Error: Identifier "x" is used at Line 1, characters 17-18
-       in a context with one layer of quotation (<[ ... ]>);
+       in a context with inside a quotation (<[ ... ]>);
        it is introduced at Line 1, characters 4-5
-       in a context with no quotations or splices.
+       in a context with outside any quotations.
 |}];;
 
 let x = <[ 123 ]> in <[ $x ]>;;
@@ -742,7 +741,7 @@ let x = <[ "foo" ]> and y = <[ "bar" ]> in <[ $x ^ $y ]>;;
 
 <[ fun x -> <[ <[ $($x) ]> ]> ]>;;
 [%%expect {|
-- : <[<[<[$($($('a)))]> expr]> expr -> <[<[$($($('a)))]> expr]> expr]> expr =
+- : <[<[$($('a)) expr]> expr -> <[$($('a)) expr]> expr]> expr =
 <[fun x -> <[<[$($x)]>]>]>
 |}];;
 

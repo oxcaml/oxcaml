@@ -3943,8 +3943,8 @@ module Debug_printers = struct
     | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
     | Quotation_result -> fprintf ppf "Quotation_result"
     | Antiquotation_result -> fprintf ppf "it's the result type of splicing"
-    | Tquote -> fprintf ppf "it's a staged type"
-    | Tsplice -> fprintf ppf "it's a splice of a staged type"
+    | Tquote -> fprintf ppf "Tquote"
+    | Tsplice -> fprintf ppf "Tsplice"
     | Unknown s -> fprintf ppf "Unknown %s" s
     | Array_type_kind -> fprintf ppf "Array_type_kind"
 

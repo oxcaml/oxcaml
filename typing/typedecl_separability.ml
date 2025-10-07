@@ -147,7 +147,7 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
       (* these should only occur under Tobject and not at the toplevel,
          but "better safe than sorry" *)
       immediate_subtypes_object_row [] ty
-  | Tquote _ | Tsplice _ -> []
+  | Tquote ty | Tsplice ty -> [ty]
   | Tlink _ | Tsubst _ -> assert false (* impossible due to Ctype.repr *)
   | Tvar _ | Tunivar _ -> []
   | Tof_kind _ -> []

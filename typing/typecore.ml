@@ -235,7 +235,6 @@ type error =
   | Unrefuted_pattern of pattern
   | Invalid_extension_constructor_payload
   | Not_an_extension_constructor
-  | Invalid_quote_payload
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -299,7 +298,6 @@ type error =
   | Toplevel_splice
   | Quotation_object
   | Open_inside_quotation
-  | Unsupported_quotation_construct
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -4490,8 +4488,9 @@ let rec is_nonexpansive exp =
   | Texp_override _
   | Texp_letexception _
   | Texp_letop _
-  | Texp_extension_constructor _
-  | Texp_antiquotation _ -> false
+  | Texp_antiquotation _
+  | Texp_extension_constructor _ ->
+    false
   | Texp_exclave e -> is_nonexpansive e
   (* The underlying mutation of exp1 can not be observed since we have the only reference
      to it. In fact, a completely valid model for Texp_overwrite would be to ignore exp1
@@ -7369,7 +7368,7 @@ and type_expect_
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
   | Pexp_quotation exp ->
-      let expected_mode' = expected_mode in
+      submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       let jkind = Jkind.Builtin.value ~why:Quotation_result in
       let new_env = Env.add_quotation_lock env in
       let ty = newgenvar jkind in
@@ -7377,26 +7376,26 @@ and type_expect_
       let to_unify = Predef.type_code quoted_ty in
       with_explanation (fun () ->
         unify_exp_types loc env to_unify (generic_instance ty_expected));
-      let arg = type_expect new_env expected_mode' exp (mk_expected ty) in
+      let arg = type_expect new_env mode_legacy exp (mk_expected ty) in
       re {
         exp_desc = Texp_quotation arg;
         exp_loc = loc; exp_extra = [];
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = new_env }
+        exp_env = env }
   | Pexp_splice exp ->
+      submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       if Env.without_open_quotations env then
         raise (Error (exp.pexp_loc, env, Toplevel_splice));
-      let argument_mode = mode_legacy in
       let new_env = Env.add_splice_lock env in
-      let ty = newgenconstr Predef.path_code [newgenty (Tquote ty_expected)] in
-      let arg = type_expect new_env argument_mode exp (mk_expected ty) in
+      let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
+      let arg = type_expect new_env mode_legacy exp (mk_expected ty) in
       re {
         exp_desc = Texp_antiquotation arg;
         exp_loc = loc; exp_extra = [];
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = new_env }
+        exp_env = env }
   | Pexp_hole ->
       begin match overwrite with
       | Assigning(typ, fields_mode) ->
@@ -8931,9 +8930,8 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   (* CR layouts v5: non-values in tuples *)
   let unify_as_tuple ty_expected =
     let labeled_subtypes =
-      List.map
-        (fun (label, _) ->
-           label, newgenvar (Jkind.Builtin.value_or_null ~why:Tuple_element))
+      List.map (fun (label, _) -> label,
+                                  newgenvar (Jkind.Builtin.value_or_null ~why:Tuple_element))
       sexpl
     in
     let to_unify = newgenty (Ttuple labeled_subtypes) in
@@ -9065,8 +9063,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
   let constr, locks =
     wrap_disambiguate "This variant expression is expected to have"
       ty_expected_explained
-      (Constructor.disambiguate Env.Positive lid env expected_type)
-      constrs
+      (Constructor.disambiguate Env.Positive lid env expected_type) constrs
   in
   let sargs =
     match sarg with
@@ -9722,7 +9719,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
               type_pattern_list Value existential_context env mutable_flag spatl
                 nvs sorts allow_modules
             ) ~post:(fun (_, _, _, pvs, _) ->
-                iter_pattern_variables_type generalize pvs)
+                       iter_pattern_variables_type generalize pvs)
           in
           (* If recursive, first unify with an approximation of the
              expression *)
@@ -9866,7 +9863,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                - : 'a array -> int -> 'a = <fun>
              ]}
              so we do it anyway. *)
-            generalize exp.exp_type
+              generalize exp.exp_type
           | Some vars ->
               if maybe_expansive exp then
                 lower_contravariant env exp.exp_type;
@@ -11389,9 +11386,6 @@ let report_error ~loc env =
   | Not_an_extension_constructor ->
       Location.errorf ~loc
         "This constructor is not an extension constructor."
-  | Invalid_quote_payload ->
-      Location.errorf ~loc
-        "Invalid quotation payload, an expression is expected."
   | Probe_name_format name ->
       Location.errorf ~loc
         "Illegal characters in probe name `%s'. \
@@ -11787,9 +11781,6 @@ let report_error ~loc env =
   | Open_inside_quotation ->
       Location.errorf ~loc
         "Modules cannot be opened inside quotations."
-  | Unsupported_quotation_construct ->
-      Location.errorf ~loc
-        "This quotation construct is not presently supported."
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env_error env

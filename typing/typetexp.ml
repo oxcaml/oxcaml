@@ -516,36 +516,36 @@ end = struct
     let r = ref [] in
     TyVarMap.iter
       (fun name (ty, loc, s) ->
-        if flavor = Unification || is_in_scope name then
-          let v = new_global_var (Jkind.Builtin.any ~why:Dummy_jkind) in
-          let snap = Btype.snapshot () in
-          if try unify env v ty; true with _ -> Btype.backtrack snap; false
-          then try
-            let (type_expr, stage) = lookup_global name in
-            if stage <> s then
-              raise
-                (Error (loc, env, (Invalid_variable_stage
-                                     {name;
-                                      intro_stage = stage;
-                                      usage_loc = loc;
-                                      usage_stage = s})));
-            r := (loc, v, type_expr, stage) :: !r
-          with Not_found ->
-            match unbound_variable_policy, Btype.is_Tvar ty with
-            | Open, _ | (Closed | Closed_for_upstream_compatibility), false ->
-              let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
-              let v2 = new_global_var jkind in
-              let stage = Env.stage env in
-              r := (loc, v, v2, stage) :: !r;
-              add name v2 jkind stage
-            | Closed, true ->
-              raise(Error(loc, env,
-                          Unbound_type_variable (Pprintast.tyvar_of_name name,
-                                                 get_in_scope_names (),
-                                                 None)))
-            | Closed_for_upstream_compatibility, true ->
-              raise(Error(loc, env,
-                          Unbound_type_variable (Pprintast.tyvar_of_name name,
+         if flavor = Unification || is_in_scope name then
+           let v = new_global_var (Jkind.Builtin.any ~why:Dummy_jkind) in
+           let snap = Btype.snapshot () in
+           if try unify env v ty; true with _ -> Btype.backtrack snap; false
+           then try
+               let (type_expr, stage) = lookup_global name in
+               if stage <> s then
+                 raise
+                   (Error (loc, env, (Invalid_variable_stage
+                                        {name = Pprintast.tyvar_of_name name;
+                                         intro_stage = stage;
+                                         usage_loc = loc;
+                                         usage_stage = s})));
+               r := (loc, v, type_expr, stage) :: !r
+             with Not_found ->
+             match unbound_variable_policy, Btype.is_Tvar ty with
+             | Open, _ | (Closed | Closed_for_upstream_compatibility), false ->
+               let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
+               let v2 = new_global_var jkind in
+               let stage = Env.stage env in
+               r := (loc, v, v2, stage) :: !r;
+               add name v2 jkind stage
+             | Closed, true ->
+               raise(Error(loc, env,
+                           Unbound_type_variable (Pprintast.tyvar_of_name name,
+                                                  get_in_scope_names (),
+                                                  None)))
+             | Closed_for_upstream_compatibility, true ->
+               raise(Error(loc, env,
+                           Unbound_type_variable (Pprintast.tyvar_of_name name,
                                                  get_in_scope_names (),
                                                  Some Upstream_compatibility))))
       !used_variables;
@@ -1501,11 +1501,22 @@ let report_unbound_variable_reason ppf = function
   | None -> ()
 
 let print_stage ppf stage =
-  if stage = 0 then fprintf ppf "no quotations or splices"
-  else if stage = 1 then fprintf ppf "one layer of quotation (<[ ... ]>)"
-  else if stage = -1 then fprintf ppf "one layer of splicing ($)"
-  else if stage > 1 then fprintf ppf "%d layers of quotation (<[ ... ]>)" stage
-  else fprintf ppf "%d layers of splicing ($)" stage
+  if stage = 0 then fprintf ppf "outside quotations"
+  else if stage = 1 then fprintf ppf "within a quotation (<[ ... ]>)"
+  else if stage > 1 then
+    fprintf ppf "within %d layers of quotation (<[ ... ]>)" stage
+  else assert false
+
+let print_with_quote_promote ppf (name, stage_diff) =
+  let rec loop fmt stage_diff =
+    if stage_diff = 1 then fprintf fmt "<[%s]>" name
+    else if stage_diff = -1 then fprintf fmt "$%s" name
+    else if stage_diff > 1 then fprintf fmt "<[%a]>" loop (stage_diff - 1)
+    else if stage_diff < -1 then fprintf fmt "$(%a)" loop (stage_diff + 1)
+    else assert false
+  in
+  loop str_formatter stage_diff;
+  fprintf ppf "%a" Style.inline_code (flush_str_formatter ())
 
 let report_error env ppf =
   function
@@ -1678,13 +1689,15 @@ let report_error env ppf =
         | Labelled _ -> assert false )
   | Invalid_variable_stage {name; intro_stage; usage_loc; usage_stage} ->
     fprintf ppf
-      "@[Type variable %a is used at %a@ \
-       in a context with %a;@ \
-       it should only be used in a context with %a.@]"
+      "@[<v>@[Type variable %a is used at %a,@ \
+         %a;@ \
+         it already occurs %a.@]@,\
+         @[@{<hint>Hint@}: Consider using %a.@]@]"
       Style.inline_code name
       Location.print_loc usage_loc
       print_stage usage_stage
       print_stage intro_stage
+      print_with_quote_promote (name, intro_stage - usage_stage)
 
 let () =
   Location.register_error_of_exn

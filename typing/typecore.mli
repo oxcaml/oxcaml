@@ -280,7 +280,6 @@ type error =
   | Unrefuted_pattern of Typedtree.pattern
   | Invalid_extension_constructor_payload
   | Not_an_extension_constructor
-  | Invalid_quote_payload
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -345,7 +344,6 @@ type error =
   | Toplevel_splice
   | Quotation_object
   | Open_inside_quotation
-  | Unsupported_quotation_construct
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

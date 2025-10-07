@@ -169,13 +169,6 @@ type lock =
 
 type locks = lock list
 
-type empty = |
-
-type mode_with_locks = Mode.Value.l * locks
-
-let locks_empty = []
-let locks_is_empty l = l = locks_empty
-
 type summary =
     Env_empty
   | Env_value of summary * Ident.t * value_description * Mode.Value.l
@@ -375,6 +368,13 @@ module TycompTbl =
 
   end
 
+type empty = |
+
+type mode_with_locks = Mode.Value.l * locks
+
+let locks_empty = []
+let locks_is_empty l = l = locks_empty
+
 module IdTbl =
   struct
     (** This module is used to store all kinds of components except
@@ -472,7 +472,7 @@ module IdTbl =
         | Nothing -> raise exn
         end
 
-    let find_same id (tbl : (_, _, _) t) =
+    let find_same id (tbl : (empty, _, _) t) =
       find_same_without_locks id tbl
 
     let rec find_same_and_locks id tbl macc =
@@ -560,7 +560,7 @@ module IdTbl =
             (Pdot (root, name), desc) :: find_all wrap name next
           with Not_found ->
             find_all wrap name next
-        end
+          end
       | Map {f; next} ->
           List.map (fun (p, desc) -> (p, f desc))
             (find_all wrap name next)
@@ -1462,7 +1462,9 @@ let rec find_type_data path env seen =
     }
   | exception Not_found -> begin
       match path with
-      | Pident id -> IdTbl.find_same id env.types
+      | Pident id ->
+          let ty, _locks =  IdTbl.find_same_and_locks id env.types in
+          ty
       | Pdot(p, s) ->
           let sc = find_structure_components p env in
           NameMap.find s sc.comp_types
@@ -1550,7 +1552,9 @@ and find_type_unboxed_version_data path env seen =
 
 let find_modtype_lazy path env =
   match path with
-  | Pident id -> (IdTbl.find_same id env.modtypes).mtda_declaration
+  | Pident id ->
+      let modtype, _locks = IdTbl.find_same_and_locks id env.modtypes in
+      modtype.mtda_declaration
   | Pdot(p, s) ->
       let sc = find_structure_components p env in
       (NameMap.find s sc.comp_modtypes).mtda_declaration
@@ -1685,7 +1689,8 @@ let has_probe name = String.Set.mem name !probes
 let find_shape env (ns : Shape.Sig_component_kind.t) id =
   match ns with
   | Type ->
-      (IdTbl.find_same id env.types).tda_shape
+      let ty, _locks = IdTbl.find_same_and_locks id env.types in
+      ty.tda_shape
   | Constructor ->
       Shape.leaf ((TycompTbl.find_same id env.constrs).cda_description.cstr_uid)
   | Label ->
@@ -1714,7 +1719,8 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
           Shape.for_persistent_unit (Ident.name id)
       end
   | Module_type ->
-      (IdTbl.find_same id env.modtypes).mtda_shape
+      let modtype, _locks =  IdTbl.find_same_and_locks id env.modtypes in
+      modtype.mtda_shape
   | Class ->
       (IdTbl.find_same_without_locks id env.classes).clda_shape
   | Class_type ->
@@ -4719,11 +4725,11 @@ let print_lock_item ppf (item, lid) =
 module Style = Misc.Style
 
 let print_stage ppf stage =
-  if stage = 0 then fprintf ppf "no quotations or splices"
-  else if stage = 1 then fprintf ppf "one layer of quotation (<[ ... ]>)"
-  else if stage = -1 then fprintf ppf "one layer of splicing ($)"
-  else if stage > 1 then fprintf ppf "%d layers of quotation (<[ ... ]>)" stage
-  else fprintf ppf "%d layers of splicing ($)" stage
+  if stage = 0 then fprintf ppf "outside any quotations"
+  else if stage = 1 then fprintf ppf "inside a quotation (<[ ... ]>)"
+  else if stage > 1 then
+    fprintf ppf "inside %d layers of quotation (<[ ... ]>)" stage
+  else assert false
 
 let report_lookup_error _loc env ppf = function
   | Unbound_value(lid, hint) -> begin
@@ -4982,9 +4988,8 @@ let report_lookup_error _loc env ppf = function
   | No_constructor_in_stage (lid, usage_loc, usage_stage) ->
       fprintf ppf
         "@[Constructor %a used at %a@ \
-         is unbound in this context;@ \
-         identifier %a is unbound@ \
-         in a context with %a.@]"
+         cannot be used in this context;@ \
+         %a is not defined %a.@]"
         (Style.as_inline_code !print_longident) lid
         Location.print_loc usage_loc
         (Style.as_inline_code !print_longident) lid

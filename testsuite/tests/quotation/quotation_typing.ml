@@ -34,14 +34,19 @@ type ('a, 'b) s5 = <[$'a -> [`A of 'b]]> expr;;
 Line 32, characters 35-37:
 32 | type ('a, 'b) s5 = <[$'a -> [`A of 'b]]> expr;;
                                         ^^
-Error: Type variable "b" is used at Line 32, characters 35-37
-       in a context with one layer of quotation (<[ ... ]>);
-       it should only be used in a context with no quotations or splices.
+Error: Type variable "'b" is used at Line 32, characters 35-37,
+       within a quotation (<[ ... ]>); it already occurs outside quotations.
+       Hint: Consider using "$'b".
 |}];;
 
 type s6 = <[string -> bool -> [`A | `B of string]]> expr;;
 [%%expect {|
 type s6 = <[string -> bool -> [ `A | `B of string ]]> expr
+|}];;
+
+type s7 = $(int -> int);;
+[%%expect {|
+type s7 = $(int -> int)
 |}];;
 
 type 'a t1 = 'a expr;;
@@ -51,12 +56,12 @@ type 'a t1 = 'a expr
 
 type 'a t2 = <['a]> expr;;
 [%%expect {|
-Line 52, characters 15-17:
-52 | type 'a t2 = <['a]> expr;;
+Line 57, characters 15-17:
+57 | type 'a t2 = <['a]> expr;;
                     ^^
-Error: Type variable "a" is used at Line 52, characters 15-17
-       in a context with one layer of quotation (<[ ... ]>);
-       it should only be used in a context with no quotations or splices.
+Error: Type variable "'a" is used at Line 57, characters 15-17,
+       within a quotation (<[ ... ]>); it already occurs outside quotations.
+       Hint: Consider using "$'a".
 |}];;
 
 type 'a t3 = $'a -> $'a -> 'a expr;;
@@ -64,24 +69,36 @@ type 'a t3 = $'a -> $'a -> 'a expr;;
 Line 1, characters 27-29:
 1 | type 'a t3 = $'a -> $'a -> 'a expr;;
                                ^^
-Error: Type variable "'a" is used at Line 1, characters 27-29
-       in a context with no quotations or splices;
-       it should only be used in a context with one layer of splicing ($).
+Error: Type variable "'a" is used at Line 1, characters 27-29,
+       outside quotations;
+       it already occurs Uncaught exception: Typetexp.Error(_, _, _)
+
 |}];;
 
 type 'a t4 = $'a -> $'a;;
 [%%expect {|
-Line 72, characters 14-16:
-72 | type 'a t4 = $'a -> $'a;;
+Line 78, characters 14-16:
+78 | type 'a t4 = $'a -> $'a;;
                    ^^
-Error: Type variable "a" is used at Line 72, characters 14-16
-       in a context with one layer of splicing ($);
-       it should only be used in a context with no quotations or splices.
+Error: Type variable "'a" is used at Line 78, characters 14-16,
+       Uncaught exception: Typetexp.Error(_, _, _)
+
+|}];;
+
+let p x = <[x]>;;
+[%%expect {|
+Line 1, characters 12-13:
+1 | let p x = <[x]>;;
+                ^
+Error: Identifier "x" is used at Line 1, characters 12-13
+       in a context with inside a quotation (<[ ... ]>);
+       it is introduced at Line 1, characters 6-7
+       in a context with outside any quotations.
 |}];;
 
 let f (x : $'a) = x
 [%%expect {|
-val f : ('a : any). $(<['a]>) -> $(<['a]>) = <fun>
+val f : ('a : any). 'a -> 'a = <fun>
 |}];;
 
 let foo1 (x: 'a) = <[fun (y : $'a) -> 1]>;;
@@ -94,24 +111,25 @@ let foo2 (x: 'a) = <[fun (y : 'a) -> 1]>;;
 Line 1, characters 30-32:
 1 | let foo2 (x: 'a) = <[fun (y : 'a) -> 1]>;;
                                   ^^
-Error: Type variable "a" is used at Line 1, characters 30-32
-       in a context with one layer of quotation (<[ ... ]>);
-       it should only be used in a context with no quotations or splices.
+Error: Type variable "'a" is used at Line 1, characters 30-32,
+       within a quotation (<[ ... ]>); it already occurs outside quotations.
+       Hint: Consider using "$'a".
 |}];;
 
 let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
 [%%expect {|
-Line 102, characters 32-34:
-102 | let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
+Line 119, characters 32-34:
+119 | let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
                                       ^^
-Error: Type variable "a" is used at Line 102, characters 32-34
-       in a context with 2 layers of quotation (<[ ... ]>);
-       it should only be used in a context with no quotations or splices.
+Error: Type variable "'a" is used at Line 119, characters 32-34,
+       within 2 layers of quotation (<[ ... ]>);
+       it already occurs outside quotations.
+       Hint: Consider using "$($'a)".
 |}];;
 
 let foo4 (x: <['a]> expr) = <[fun (y : 'b) -> ($x, y)]>;;
 [%%expect {|
-val foo4 : <[$('a)]> expr -> <[$('b) -> $('a) * $('b)]> expr = <fun>
+val foo4 : 'a expr -> <[$('b) -> $('a) * $('b)]> expr = <fun>
 |}];;
 
 let foo5 (x: <['a]> expr) = <[fun (y : 'a) -> ($x, y)]>;;
@@ -119,9 +137,9 @@ let foo5 (x: <['a]> expr) = <[fun (y : 'a) -> ($x, y)]>;;
 Line 1, characters 39-41:
 1 | let foo5 (x: <['a]> expr) = <[fun (y : 'a) -> ($x, y)]>;;
                                            ^^
-Error: Type variable "a" is used at Line 1, characters 39-41
-       in a context with one layer of quotation (<[ ... ]>);
-       it should only be used in a context with no quotations or splices.
+Error: Type variable "'a" is used at Line 1, characters 39-41,
+       within a quotation (<[ ... ]>); it already occurs outside quotations.
+       Hint: Consider using "$'a".
 |}];;
 
 let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
@@ -130,16 +148,21 @@ Line 1, characters 42-43:
 1 | let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
                                               ^
 Error: Identifier "a" is used at Line 1, characters 42-43
-       in a context with one layer of quotation (<[ ... ]>);
+       in a context with inside a quotation (<[ ... ]>);
        it is introduced at Line 1, characters 15-16
-       in a context with no quotations or splices.
+       in a context with outside any quotations.
 |}];;
 
-let foo7 (type a) (type b) x = <[fun (y : $a) -> y]> 42;;
+let foo7 (type a) (type b) x = <[fun (y : $a) -> y]>;;
 [%%expect {|
-Line 1, characters 31-52:
-1 | let foo7 (type a) (type b) x = <[fun (y : $a) -> y]> 42;;
-                                   ^^^^^^^^^^^^^^^^^^^^^
+val foo7 : 'b -> <[$('a) -> $('a)]> expr = <fun>
+|}];;
+
+let foo7' (type a) (type b) x = <[fun (y : $a) -> y]> 42;;
+[%%expect {|
+Line 1, characters 32-53:
+1 | let foo7' (type a) (type b) x = <[fun (y : $a) -> y]> 42;;
+                                    ^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "<[$(a) -> $(a)]> expr"
        This is not a function; it cannot be applied.
 |}];;
@@ -158,9 +181,9 @@ Error: This expression has type "<[$(a) * $(b) -> 'a * ($(a) * $(b))]> expr"
 Line 1, characters 33-35:
 1 | (<[fun (y : 'a) -> 1]>, fun (x : 'a) -> ())
                                      ^^
-Error: Type variable "a" is used at Line 1, characters 33-35
-       in a context with no quotations or splices;
-       it should only be used in a context with one layer of quotation (<[ ... ]>).
+Error: Type variable "'a" is used at Line 1, characters 33-35,
+       outside quotations; it already occurs within a quotation (<[ ... ]>).
+       Hint: Consider using "<['a]>".
 |}];;
 
 <[fun (type a) (type b) (x : a) (y : b) -> (x, y)]>;;
@@ -170,18 +193,16 @@ Error: Type variable "a" is used at Line 1, characters 33-35
 |}];;
 
 type t4 = A | B;;
-[%%expect {|
-type t4 = A | B
-|}];;
 
 <[A]>;;
 [%%expect {|
-Line 1, characters 2-3:
-1 | <[A]>;;
+type t4 = A | B
+Line 3, characters 2-3:
+3 | <[A]>;;
       ^
-Error: Constructor "A" used at Line 1, characters 2-3
-       is unbound in this context; identifier "A" is unbound
-       in a context with one layer of quotation (<[ ... ]>).
+Error: Constructor "A" used at Line 3, characters 2-3
+       cannot be used in this context;
+       "A" is not defined inside a quotation (<[ ... ]>).
 |}];;
 
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
@@ -225,39 +246,37 @@ Error: Constructor "A" used at Line 1, characters 2-3
 
 let mk_pair x = <[$x, $x]>;;
 [%%expect {|
-val mk_pair : <[$('a)]> expr -> <[$('a) * $('a)]> expr = <fun>
+val mk_pair : 'a expr -> <[$('a) * $('a)]> expr = <fun>
 |}];;
 
 mk_pair <[123]>;;
 [%%expect {|
-- : <[$(<[int]>) * $(<[int]>)]> expr = <[(123, 123)]>
+- : <[int * int]> expr = <[(123, 123)]>
 |}];;
 
 mk_pair <[[]]>;;
 [%%expect {|
-- : <[$(<[$('a) list]>) * $(<[$('a) list]>)]> expr = <[([], [])]>
+- : <[$('a) list * $('a) list]> expr = <[([], [])]>
 |}];;
 
 mk_pair <[None]>;;
 [%%expect {|
-- : <[$(<[$('a) option]>) * $(<[$('a) option]>)]> expr = <[(None, None)]>
+- : <[$('a) option * $('a) option]> expr = <[(None, None)]>
 |}];;
 
 mk_pair <[Some 123]>;;
 [%%expect {|
-- : <[$(<[int option]>) * $(<[int option]>)]> expr =
-<[((Some 123), (Some 123))]>
+- : <[int option * int option]> expr = <[((Some 123), (Some 123))]>
 |}];;
 
 mk_pair <[fun () -> 42]>;;
 [%%expect {|
-- : <[$(<[unit -> int]>) * $(<[unit -> int]>)]> expr =
-<[((fun () -> 42), (fun () -> 42))]>
+- : <[unit -> int * unit -> int]> expr = <[((fun () -> 42), (fun () -> 42))]>
 |}];;
 
 mk_pair <[fun x -> x]>;;
 [%%expect {|
-- : <[$(<['_weak1 -> '_weak1]>) * $(<['_weak1 -> '_weak1]>)]> expr =
+- : <['_weak1 -> '_weak1 * '_weak1 -> '_weak1]> expr =
 <[((fun x -> x), (fun x -> x))]>
 |}];;
 
@@ -265,12 +284,12 @@ mk_pair <[fun x -> x]>;;
 
 fun (x: 'a) -> (x: <[<[<[$($($'a))]>]>]>);;
 [%%expect {|
-- : 'a -> <[<[<[$($($('a)))]>]>]> = <fun>
+- : 'a -> 'a = <fun>
 |}];;
 
 fun (x: <[<[<[$($($'a))]>]>]>) -> (x: 'a);;
 [%%expect {|
-- : <[<[<[$($($('a)))]>]>]> -> 'a = <fun>
+- : 'a -> 'a = <fun>
 |}];;
 
 fun (x: <[<[<[$($'a)]>]>]>) -> (x: 'a);;
