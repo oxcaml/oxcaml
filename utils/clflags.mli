@@ -73,6 +73,7 @@ end
 
 val objfiles : string list ref
 val ccobjs : string list ref
+val js_stubs : string list ref
 val dllibs : string list ref
 val cmi_file : string option ref
 val compile_only : bool ref
@@ -111,6 +112,7 @@ val output_c_object : bool ref
 val output_complete_object : bool ref
 val output_complete_executable : bool ref
 val all_ccopts : string list ref
+val all_jsopts : string list ref
 val classic : bool ref
 val nopervasives : bool ref
 val match_context_rows : int ref
@@ -182,6 +184,16 @@ val debug_ocaml : bool ref
 val keep_startup_file : bool ref
 val native_code : bool ref
 val jsir : bool ref
+module Backend : sig
+  type t = Native | Js_of_ocaml
+
+  val names : string list
+  val of_string : string -> t option
+end
+
+val backend_target : unit -> Backend.t option
+val set_backend_target : Backend.t -> unit
+val backend_target_of_string : string -> Backend.t option
 val default_inline_threshold : float
 val inline_threshold : Float_arg_helper.parsed ref
 val inlining_report : bool ref

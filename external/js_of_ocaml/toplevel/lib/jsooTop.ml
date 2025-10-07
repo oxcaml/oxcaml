@@ -66,7 +66,6 @@ let refill_lexbuf s p ppf buffer len =
     len''
 
 [%%if ocaml_version < (4, 14, 0)]
-
 let use ffp content =
   let fname, oc =
     Filename.open_temp_file ~mode:[ Open_binary ] "jsoo_toplevel" "fake_stdin"
@@ -80,13 +79,10 @@ let use ffp content =
   with e ->
     Sys.remove fname;
     raise e
-
 [%%endif]
 
 [%%if ocaml_version >= (4, 14, 0)]
-
 let use ffp content = Toploop.use_silently ffp (String content)
-
 [%%endif]
 
 let execute printval ?pp_code ?highlight_location pp_answer s =

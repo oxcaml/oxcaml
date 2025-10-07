@@ -1,5 +1,7 @@
 (* TEST
  include ocamlcommon;
+  { native; }
+  { bytecode; }
 *)
 
 let () =

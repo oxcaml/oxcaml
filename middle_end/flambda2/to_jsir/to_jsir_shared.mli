@@ -26,7 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open! Jsoo_imports.Import
+open! Jsoo_imports
 
 (** Bind a fresh JSIR variable to [expr], and map [fvar] to this new variable in the
     environment. *)

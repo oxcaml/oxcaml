@@ -258,7 +258,7 @@ class MlInt64 {
 
 //Provides: caml_int64_ult const
 function caml_int64_ult(x, y) {
-  return x.ucompare(y) < 0;
+  return +(x.ucompare(y) < 0);
 }
 
 //Provides: caml_int64_compare const

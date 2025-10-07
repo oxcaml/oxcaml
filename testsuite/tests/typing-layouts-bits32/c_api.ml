@@ -1,22 +1,30 @@
 (* TEST
- modules = "c_functions.c";
+ modules = "c_functions.c c_functions.js";
  flambda2;
  {
    native;
  }{
    bytecode;
  }{
+   javascript;
+ }{
    flags = "-extension layouts_alpha";
    native;
  }{
    flags = "-extension layouts_alpha";
    bytecode;
  }{
+   flags = "-extension layouts_alpha";
+   javascript;
+ }{
    flags = "-extension layouts_beta";
    native;
  }{
    flags = "-extension layouts_beta";
    bytecode;
+ }{
+   flags = "-extension layouts_beta";
+   javascript;
  }
 *)
 

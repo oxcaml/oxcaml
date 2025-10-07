@@ -4,4 +4,4 @@ let () =
    | Bytecode | Other _ -> ());
   exit (Optmaindriver.main (module Unix : Compiler_owee.Unix_intf.S)
     Sys.argv Format.err_formatter
-    ~flambda2:Flambda2.lambda_to_cmm)
+    ~flambda2:(module Flambda2))

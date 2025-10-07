@@ -10,3 +10,28 @@
  (name testing)
  (flags (:standard -linkall))
  (modules testing))
+
+(rule
+(targets testing.cmjo testing.cmjx)
+(deps testing.ml testing.mli  .testing.objs/byte/testing.cmi)
+(action (run %{bin:ocamlopt.opt} -target js_of_ocaml -I .testing.objs/byte -c testing.ml))
+)
+
+
+(rule
+(targets testing.cmjxa testing.cmja)
+(deps testing.cmjx testing.cmjo .testing.objs/byte/testing.cmi)
+(action (run %{bin:ocamlopt.opt} -target js_of_ocaml -linkall -a -o testing.cmjxa testing.cmjx)))
+
+
+(rule
+(targets lib.cmjo lib.cmjx)
+(deps lib.ml lib.mli  .lib.objs/byte/lib.cmi)
+(action (run %{bin:ocamlopt.opt} -target js_of_ocaml -I .lib.objs/byte -c lib.ml))
+)
+
+
+(rule
+(targets lib.cmjxa lib.cmja)
+(deps lib.cmjx lib.cmjo)
+(action (run %{bin:ocamlopt.opt} -target js_of_ocaml -a -o lib.cmjxa lib.cmjx)))

@@ -26,7 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open! Jsoo_imports.Import
+open! Jsoo_imports
 
 (** Result structure used during Flambda to Js_of_ocaml IR translation. *)
 
@@ -88,12 +88,7 @@ val import_compilation_unit : t -> Compilation_unit.t -> t
 
 val global_data_var : t -> t * Jsir.Var.t
 
-type program =
-  { program : Jsir.program;
-    imported_compilation_units : Compilation_unit.Set.t
-  }
-
 (** Create a [program] with the blocks in the result, including the
     current block. This function raises if there are still blocks being
     worked on, or there is a reserved address that has not been used yet. *)
-val to_program_exn : t -> program
+val to_program_exn : t -> Js_backend.program

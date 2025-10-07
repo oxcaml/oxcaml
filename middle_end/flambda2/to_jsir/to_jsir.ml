@@ -27,7 +27,7 @@
  ******************************************************************************)
 
 open! Flambda.Import
-open! Jsoo_imports.Import
+open! Jsoo_imports
 
 (** Bind a fresh variable to the result of translating [simple] into JSIR, and
     map [fvar] to this new variable in the environment. *)
@@ -437,12 +437,26 @@ and apply_expr ~env ~res e =
     then env, To_jsir_result.end_block_with_last_exn res (Return return_var)
     else
       let addr = To_jsir_env.get_continuation_exn env cont in
+      let sort = Continuation.sort cont in
+      let env = To_jsir_env.set_pending_module_block env return_var in
       let arity =
-        Apply_expr.return_arity e |> Flambda_arity.cardinal_unarized
+        let arity =
+          Apply_expr.return_arity e |> Flambda_arity.cardinal_unarized
+        in
+        if arity = 0
+           && (Continuation.Sort.equal sort Define_root_symbol
+              || Continuation.Sort.equal sort Toplevel_return)
+        then 1
+        else arity
       in
       let return_vars, res =
         match arity with
-        | 0 -> [], res
+        | 0 ->
+          let is_module_return =
+            Continuation.Sort.equal sort Define_root_symbol
+            || Continuation.Sort.equal sort Toplevel_return
+          in
+          if is_module_return then [return_var], res else [], res
         | 1 -> [return_var], res
         | _ as arity ->
           let return_vars = List.init arity (fun i -> i, Jsir.Var.fresh ()) in
@@ -461,6 +475,17 @@ and apply_expr ~env ~res e =
           in
           List.map snd return_vars, res
       in
+      let env, res =
+        if Continuation.Sort.equal sort Define_root_symbol
+           || Continuation.Sort.equal sort Toplevel_return
+        then
+          match return_vars with
+          | v :: _ ->
+            let symbol = To_jsir_env.module_symbol env in
+            To_jsir_env.add_symbol_without_registering env symbol v, res
+          | [] -> env, res
+        else env, res
+      in
       ( env,
         To_jsir_result.end_block_with_last_exn res (Branch (addr, return_vars))
       )
@@ -473,23 +498,44 @@ and apply_cont0 ~env ~res apply_cont =
   let get_last ~raise_kind_and_exn_handler : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
     | (Toplevel_return | Define_root_symbol) as sort ->
-      let module_symbol =
+      let env, module_block, res =
         match args with
-        | [arg] -> arg
-        | [] ->
-          Misc.fatal_errorf "Found %a with no arguments" Continuation.Sort.print
-            sort
+        | [arg] ->
+          let symbol = To_jsir_env.module_symbol env in
+          let env = To_jsir_env.add_symbol_without_registering env symbol arg in
+          env, arg, res
+        | [] -> (
+          let symbol = To_jsir_env.module_symbol env in
+          let env, pending_block = To_jsir_env.take_pending_module_block env in
+          match pending_block with
+          | Some block_var ->
+            let env =
+              To_jsir_env.add_symbol_without_registering env symbol block_var
+            in
+            (* [block_var] already names the module block; reuse it so we don't
+               synthesize a fresh indirection. *)
+            env, block_var, res
+          | None ->
+            let module_block, res =
+              To_jsir_env.get_symbol_exn env ~res symbol
+            in
+            let env =
+              To_jsir_env.add_symbol_without_registering env symbol module_block
+            in
+            env, module_block, res)
         | _ :: _ ->
           Misc.fatal_errorf "Found %a with multiple arguments"
             Continuation.Sort.print sort
       in
+      let module_symbol = To_jsir_env.module_symbol env in
+      let env =
+        To_jsir_env.add_symbol_without_registering env module_symbol
+          module_block
+      in
       let compilation_unit =
         To_jsir_env.module_symbol env |> Symbol.compilation_unit
       in
-      let module_name =
-        Compilation_unit.name compilation_unit
-        |> Compilation_unit.Name.to_string
-      in
+      let module_name = Compilation_unit.full_path_as_string compilation_unit in
       let var = Jsir.Var.fresh () in
       let res =
         To_jsir_result.add_instr_exn res
@@ -498,7 +544,7 @@ and apply_cont0 ~env ~res apply_cont =
                Prim
                  ( Extern "caml_register_global",
                    [ Pc (Int (Targetint.of_int_exn 0));
-                     Pv module_symbol;
+                     Pv module_block;
                      Pc
                        (* CR selee: this assumes javascript, WASM needs just
                           String *)
@@ -644,11 +690,19 @@ and invalid ~env ~res msg =
   env, To_jsir_result.end_block_with_last_exn res Stop
 
 let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
+  let module_symbol = Flambda_unit.module_symbol flambda_unit in
   let env =
-    To_jsir_env.create
-      ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
+    To_jsir_env.create ~module_symbol
       ~return_continuation:(Flambda_unit.return_continuation flambda_unit)
       ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
+  in
+  (* Some instantiation paths don't synthesize an explicit [Define_root_symbol]
+     argument, so ensure the module symbol is at least provisioned in the
+     environment up front. The actual definition will overwrite this binding
+     once the static block for the module is processed. *)
+  let env =
+    To_jsir_env.add_symbol_without_registering env module_symbol
+      (Jsir.Var.fresh ())
   in
   let res = To_jsir_result.create () in
   let res, _addr = To_jsir_result.new_block res ~params:[] in

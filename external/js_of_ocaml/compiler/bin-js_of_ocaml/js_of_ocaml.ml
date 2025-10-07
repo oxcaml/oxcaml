@@ -43,72 +43,40 @@ let () =
     | _ -> argv
   in
   try
-    Sys.with_async_exns (fun () ->
-      match
-        Cmdliner.Cmd.eval_value
-          ~catch:false
-          ~argv
-          (Cmdliner.Cmd.group
-             ~default:Compile.term
-             (Compile.info "js_of_ocaml")
-             [ Link.command
-             ; Build_fs.command
-             ; Build_runtime.command
-             ; Print_runtime.command
-             ; Check_runtime.command
-             ; Compile.command
-             ])
-      with
-      | Ok (`Ok () | `Help | `Version) ->
-          if !warnings > 0 && !werror
-          then (
-            Format.eprintf "%s: all warnings being treated as errors@." Sys.argv.(0);
-            exit 1)
-          else exit 0
-      | Error `Term -> exit 1
-      | Error `Parse -> exit Cmdliner.Cmd.Exit.cli_error
-      | Error `Exn -> ()
-      (* should not happen *))
+    match
+      Cmdliner.Cmd.eval_value
+        ~catch:false
+        ~argv
+        (Cmdliner.Cmd.group
+           ~default:Compile.term
+           (Compile.info "js_of_ocaml")
+           [ Link.command
+           ; Build_fs.command
+           ; Build_runtime.command
+           ; Print_runtime.command
+           ; Check_runtime.command
+           ; Compile.command
+           ])
+    with
+    | Ok (`Ok () | `Help | `Version) ->
+        if !warnings > 0 && !werror
+        then (
+          Format.eprintf "%s: all warnings being treated as errors@." Sys.argv.(0);
+          exit 1)
+        else exit 0
+    | Error `Term -> exit 1
+    | Error `Parse -> exit Cmdliner.Cmd.Exit.cli_error
+    | Error `Exn -> () (* should not happen *)
   with
   | (Match_failure _ | Assert_failure _ | Not_found) as exc ->
       let backtrace = Printexc.get_backtrace () in
       Format.eprintf
         "%s: You found a bug. Please report it at \
-         https://github.com/ocsigen/js_of_ocaml/issues :@."
+         https://github.com/oxcaml/oxcaml/issues :@."
         Sys.argv.(0);
       Format.eprintf "Error: %s@." (Printexc.to_string exc);
       prerr_string backtrace;
       exit Cmdliner.Cmd.Exit.internal_error
-  | Magic_number.Bad_magic_number s ->
-      Format.eprintf "%s: Error: Not an ocaml bytecode file@." Sys.argv.(0);
-      Format.eprintf "%s: Error: Invalid magic number %S@." Sys.argv.(0) s;
-      exit 1
-  | Magic_number.Bad_magic_version h ->
-      Format.eprintf "%s: Error: Bytecode version mismatch.@." Sys.argv.(0);
-      let k =
-        match Magic_number.kind h with
-        | (`Cmo | `Cma | `Cmj | `Cmja | `Exe) as x -> x
-        | `Other _ -> assert false
-      in
-      let comp =
-        if Magic_number.compare h (Magic_number.current k) < 0
-        then "an older"
-        else "a newer"
-      in
-      Format.eprintf
-        "%s: Error: Your ocaml bytecode and the js_of_ocaml compiler have to be compiled \
-         with the same version of ocaml.@."
-        Sys.argv.(0);
-      Format.eprintf
-        "%s: Error: The Js_of_ocaml compiler has been compiled with ocaml version %s.@."
-        Sys.argv.(0)
-        Sys.ocaml_version;
-      Format.eprintf
-        "%s: Error: Its seems that your ocaml bytecode has been compiled with %s version \
-         of ocaml.@."
-        Sys.argv.(0)
-        comp;
-      exit 1
   | Failure s ->
       let backtrace = Printexc.get_backtrace () in
       Format.eprintf "%s: Error: %s@." Sys.argv.(0) s;

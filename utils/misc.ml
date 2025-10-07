@@ -1683,6 +1683,7 @@ module Magic_number = struct
     | Cmt
     | Cms
     | Ast_impl | Ast_intf
+    | Jsir
 
   (* please keep up-to-date, this is used for sanity checking *)
   let all_kinds = [
@@ -1690,7 +1691,7 @@ module Magic_number = struct
     Cmi; Cmo; Cma;
     Cmx; Cmxa;
     Cmt;
-    Ast_impl; Ast_intf;
+    Ast_impl; Ast_intf; Jsir
   ]
 
   type raw = string
@@ -1721,6 +1722,7 @@ module Magic_number = struct
 
     | "Caml1999M" -> Some Ast_impl
     | "Caml1999N" -> Some Ast_intf
+    | "Caml1999J" -> Some Jsir
     | _ -> None
 
   (* note: over time the magic kind number has changed for certain kinds;
@@ -1738,6 +1740,7 @@ module Magic_number = struct
     | Cms -> "Caml1999S"
     | Ast_impl -> "Caml1999M"
     | Ast_intf -> "Caml1999N"
+    | Jsir -> "Caml1999J"
 
   let string_of_kind : kind -> string = function
     | Exec -> "exec"
@@ -1751,6 +1754,7 @@ module Magic_number = struct
     | Cms -> "cms"
     | Ast_impl -> "ast_impl"
     | Ast_intf -> "ast_intf"
+    | Jsir -> "jsir"
 
   let human_name_of_kind : kind -> string = function
     | Exec -> "executable"
@@ -1764,6 +1768,7 @@ module Magic_number = struct
     | Cms -> "compiled shape file"
     | Ast_impl -> "serialized implementation AST"
     | Ast_intf -> "serialized interface AST"
+    | Jsir -> "js_of_ocaml intermediate AST (JSIR)"
 
   let kind_length = 9
   let version_length = 3
@@ -1832,6 +1837,7 @@ module Magic_number = struct
       | Cms -> cms_magic_number
       | Ast_intf -> ast_intf_magic_number
       | Ast_impl -> ast_impl_magic_number
+      | Jsir -> jsir_magic_number
 
   (* it would seem more direct to define current_version with the
      correct numbers and current_raw on top of it, but for now we

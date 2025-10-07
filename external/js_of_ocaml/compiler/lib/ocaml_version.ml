@@ -49,7 +49,7 @@ let split v =
            x)
         ~f:int_of_string
 
-let current = split Sys.ocaml_version
+let current = split (String.trim Oxcaml_version.version)
 
 let compint (a : int) b = compare a b
 

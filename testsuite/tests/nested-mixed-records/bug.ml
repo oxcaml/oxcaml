@@ -3,6 +3,11 @@
    native;
 *)
 
+(* TEST
+   flambda2;
+   javascript;
+*)
+
 (* Bug found through generated test, kept for regression testing. *)
 
 type t20 = #{ a20 : int; b20 : int }

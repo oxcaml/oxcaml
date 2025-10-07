@@ -127,3 +127,48 @@ type effects_backend =
 val effects : unit -> effects_backend
 
 val set_effects_backend : effects_backend -> unit
+
+val exec_magic_number: string
+(** Magic number for bytecode executable files *)
+
+val cmi_magic_number: string
+(** Magic number for compiled interface files *)
+
+val cmo_magic_number: string
+(** Magic number for object bytecode files *)
+
+val cma_magic_number: string
+(** Magic number for archive files *)
+
+val cmx_magic_number: string
+(** Magic number for compilation unit descriptions *)
+
+val cmxa_magic_number: string
+(** Magic number for libraries of compilation unit descriptions *)
+
+val ast_intf_magic_number: string
+(** Magic number for file holding an interface syntax tree *)
+
+val ast_impl_magic_number: string
+(** Magic number for file holding an implementation syntax tree *)
+
+val cmxs_magic_number: string
+(** Magic number for dynamically-loadable plugins *)
+
+val cmt_magic_number: string
+(** Magic number for compiled interface files *)
+
+val cms_magic_number: string
+(** Magic number for compiled shapes files *)
+
+val jsir_magic_number: string
+(** Magic number for Js_of_ocaml IR files *)
+
+(* Note: .cmjo and .cmja files are JavaScript files, not binary archives with magic
+   numbers *)
+
+val linear_magic_number: string
+(** Magic number for Linear internal representation files *)
+
+val cfg_magic_number: string
+(** Magic number for Cfg internal representation files *)

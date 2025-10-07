@@ -25,6 +25,7 @@ val print_standard_library : unit -> 'a
 val fatal : string -> 'a
 
 val first_ccopts : string list ref
+val first_jsopts : string list ref
 val first_ppx : string list ref
 val first_include_dirs : string list ref
 val last_include_dirs : string list ref
@@ -33,6 +34,7 @@ val last_include_dirs : string list ref
 val get_objfiles : with_ocamlparam:bool -> string list
 val last_objfiles : string list ref
 val first_objfiles : string list ref
+val last_jsopts : string list ref
 
 val stop_early : bool ref
 val has_linker_inputs : bool ref

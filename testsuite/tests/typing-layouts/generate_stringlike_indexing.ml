@@ -17,6 +17,8 @@ let template ~tests = {|(* TEST
  }{
    bytecode;
  }{
+   javascript;
+ }{
    flags = "-extension layouts_alpha";
    native;
  }{
@@ -26,6 +28,9 @@ let template ~tests = {|(* TEST
    flags = "-extension layouts_alpha";
    bytecode;
  }{
+   flags = "-extension layouts_alpha";
+   javascript;
+ }{
    flags = "-extension layouts_beta";
    native;
  }{
@@ -34,6 +39,9 @@ let template ~tests = {|(* TEST
  }{
    flags = "-extension layouts_beta";
    bytecode;
+ }{
+   flags = "-extension layouts_beta";
+   javascript;
  }
 *)
 

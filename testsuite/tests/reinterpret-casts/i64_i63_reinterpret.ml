@@ -1,4 +1,6 @@
-(* TEST *)
+(* TEST
+  native;
+*)
 
 (* Tests for reinterpret-cast primitives tagged_int63 <-> unboxed_int64 *)
 

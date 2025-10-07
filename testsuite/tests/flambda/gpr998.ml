@@ -1,5 +1,4 @@
 (* TEST
- ocamlopt_flags = "-unbox-closures";
 *)
 
 (* This test attempts to check that unused closures are not deleted

@@ -1,7 +1,8 @@
 (* TEST
  flambda;
  ocamlopt_flags = "-O3 -flambda2-inline-small-function-size 0";
- native;
+  { native; }
+  { javascript; }
 *)
 
 (* This test need to *not* be in classic mode to run,

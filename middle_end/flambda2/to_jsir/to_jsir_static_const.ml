@@ -26,7 +26,21 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open! Jsoo_imports.Import
+open! Jsoo_imports
+
+module Unboxed_array_tags = struct
+  let unboxed_int64_array_tag = 1
+
+  let unboxed_int32_array_even_tag = 2
+
+  let unboxed_int32_array_odd_tag = 3
+
+  let unboxed_float32_array_even_tag = 4
+
+  let unboxed_float32_array_odd_tag = 5
+
+  let unboxed_nativeint_array_tag = 9
+end
 
 let static_const_not_supported const =
   Misc.fatal_errorf "The static_const %a is not yet supported."
@@ -149,12 +163,13 @@ let block_like ~env ~res symbol (const : Static_const.t) =
   | Immutable_float32_array values ->
     let tag =
       if length_is_even values
-      then Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_even_tag
-      else Cmm_helpers.Unboxed_array_tags.unboxed_float32_array_odd_tag
+      then Unboxed_array_tags.unboxed_float32_array_even_tag
+      else Unboxed_array_tags.unboxed_float32_array_odd_tag
     in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:(fun float ->
-        Numeric_types.Float32_by_bit_pattern.to_bits float |> Int64.of_int32)
+        Numeric_types.Float32_by_bit_pattern.to_float float
+        |> Int64.bits_of_float)
       ~bits_to_constant:(fun bits -> Float32 bits)
       ~bits_to_array:(fun bits -> Float_array bits)
   | Immutable_value_array values ->
@@ -163,21 +178,21 @@ let block_like ~env ~res symbol (const : Static_const.t) =
   | Immutable_int32_array values ->
     let tag =
       if length_is_even values
-      then Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_even_tag
-      else Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_odd_tag
+      then Unboxed_array_tags.unboxed_int32_array_even_tag
+      else Unboxed_array_tags.unboxed_int32_array_odd_tag
     in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int32_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int32_to_jsir_const bits, Array))
   | Immutable_int64_array values ->
-    let tag = Cmm_helpers.Unboxed_array_tags.unboxed_int64_array_tag in
+    let tag = Unboxed_array_tags.unboxed_int64_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.int64_to_jsir_const
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int64_to_jsir_const bits, Array))
   | Immutable_nativeint_array values ->
-    let tag = Cmm_helpers.Unboxed_array_tags.unboxed_nativeint_array_tag in
+    let tag = Unboxed_array_tags.unboxed_nativeint_array_tag in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
       ~to_bits:Targetint_32_64.to_int32
       ~bits_to_constant:To_jsir_shared.int32_to_jsir_const

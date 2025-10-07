@@ -24,10 +24,7 @@ type t
 
 type kind =
   [ `Runtime
-  | `Exe
-  | `Cmo
-  | `Cma
-  | `Cmj
+  | `Cmjo
   | `Cmja
   | `Unknown
   ]

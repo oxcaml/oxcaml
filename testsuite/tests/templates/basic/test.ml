@@ -19,9 +19,12 @@
    bad_instantiate_missing_arg.reference \
    bad_instantiate_no_such_param.reference \
    bad_instantiate_not_arg.reference \
+    bad_instantiate_not_arg.javascript.reference \
    bad_instantiate_not_parameterised.reference \
+    bad_instantiate_not_parameterised.javascript.reference \
    bad_instantiate_repeated_param.reference \
    bad_instantiate_wrong_target_name.reference \
+    bad_instantiate_wrong_target_name.javascript.reference \
    bad_param_param.mli bad_param_param.reference \
    bad_ref_direct.ml bad_ref_direct.reference \
    bad_ref_direct_imported.ml bad_ref_direct_imported.reference \
@@ -48,6 +51,7 @@
    ref_indirect.ml \
    ref_indirect.cmo.ocamlobjinfo.reference \
    ref_indirect.cmx.ocamlobjinfo.reference \
+   ref_indirect.cmjx.ocamlobjinfo.reference \
    semigroup.mli \
    string_monoid.ml string_monoid.mli \
    string_semigroup.ml string_semigroup.mli \
@@ -363,7 +367,7 @@
            reason = "output depends on .cmo vs .cmx";
            skip;
 
-           compiler_reference = "bad_instantiate_not_parameterised.reference";
+          compiler_reference = "bad_instantiate_not_parameterised.reference";
            check-ocamlc.byte-output;
          }{
            module = "";
@@ -377,7 +381,7 @@
            reason = "output depends on .cmo vs .cmx";
            skip;
 
-           compiler_reference = "bad_instantiate_not_arg.reference";
+          compiler_reference = "bad_instantiate_not_arg.reference";
            check-ocamlc.byte-output;
          }{
            module = "";
@@ -425,7 +429,7 @@
            reason = "output depends on .cmo vs .cmx";
            skip;
 
-           compiler_reference = "bad_instantiate_wrong_target_name.reference";
+          compiler_reference = "bad_instantiate_wrong_target_name.reference";
            check-ocamlc.byte-output;
          }{
            module = "";
@@ -857,7 +861,7 @@
            ocamlopt_byte_exit_status = "2";
            ocamlopt.byte;
 
-           compiler_reference = "bad_instantiate_not_parameterised.reference";
+          compiler_reference = "bad_instantiate_not_parameterised.reference";
            check-ocamlopt.byte-output;
          }{
            module = "";
@@ -868,7 +872,7 @@
            ocamlopt_byte_exit_status = "2";
            ocamlopt.byte;
 
-           compiler_reference = "bad_instantiate_not_arg.reference";
+          compiler_reference = "bad_instantiate_not_arg.reference";
            check-ocamlopt.byte-output;
          }{
            module = "";
@@ -913,7 +917,7 @@
            ocamlopt_byte_exit_status = "2";
            ocamlopt.byte;
 
-           compiler_reference = "bad_instantiate_wrong_target_name.reference";
+          compiler_reference = "bad_instantiate_wrong_target_name.reference";
            check-ocamlopt.byte-output;
          }{
            module = "";
@@ -1076,7 +1080,489 @@
        }
      }
    }
+ }{
+   setup-ocamlj.opt-build-env;
+
+   (* CR-someday lmaurer: Remove these when param libs stop spuriously warning *)
+   ocamlopt_flags = "-w -misplaced-attribute -w -bad-module-name";
+
+   flags = "-as-parameter";
+   module = "monoid.mli";
+   ocamlj.opt;
+   {
+     flags = "";
+     module = "bad_ref_direct.ml";
+     compiler_output = "bad_ref_direct.output";
+     ocamlj_opt_exit_status = "2";
+     ocamlj.opt;
+
+     compiler_reference = "bad_ref_direct.reference";
+     check-ocamlj.opt-output;
+   }{
+     flags = "-parameter Monoid -as-parameter";
+     module = "bad_param_param.mli";
+     compiler_output = "bad_param_param.output";
+     ocamlj_opt_exit_status = "2";
+     ocamlj.opt;
+
+     compiler_reference = "bad_param_param.reference";
+     check-ocamlj.opt-output;
+   }{
+     flags = "-as-argument-for Monoid";
+     module = "bad_arg_impl.ml";
+     compiler_output = "bad_arg_impl.output";
+     ocamlj_opt_exit_status = "2";
+     ocamlj.opt;
+
+     compiler_reference = "bad_arg_impl.reference";
+     check-ocamlj.opt-output;
+   }{
+     flags = "-as-argument-for Monoid";
+     module = "bad_arg_intf.mli";
+     compiler_output = "bad_arg_intf.output";
+     ocamlj_opt_exit_status = "2";
+     ocamlj.opt;
+
+     compiler_reference = "bad_arg_intf.reference";
+     check-ocamlj.opt-output;
+   }{
+     src = "string_monoid.ml";
+     dst = "string_monoid_no_mli.ml";
+     copy;
+
+     flags = "-as-argument-for Monoid";
+     module = "string_monoid_no_mli.ml string_monoid.mli string_monoid.ml";
+     ocamlj.opt;
+
+     flags = "";
+     module = "test_direct_access.ml";
+     ocamlj.opt;
+
+     flags = "";
+     program = "${test_build_directory}/test_direct_access.js";
+     module = "";
+     all_modules = "\
+       string_monoid.cmjx \
+       string_monoid_no_mli.cmjx \
+       test_direct_access.cmjx \
+     ";
+     ocamlj.opt;
+
+     output = "test_direct_access.output";
+     exit_status = "0";
+     run;
+
+     reference = "test_direct_access.reference";
+     check-program-output;
+   }{
+     flags = "-as-parameter";
+     module = "semigroup.mli";
+     ocamlj.opt;
+
+     flags = "";
+     module = "category_intf.ml";
+     ocamlj.opt;
+
+     flags = "-as-parameter";
+     module = "category.mli";
+     ocamlj.opt;
+
+     flags = "-parameter Semigroup -as-argument-for Monoid";
+     module = "monoid_of_semigroup.mli";
+     ocamlj.opt;
+
+     module = "monoid_of_semigroup.ml";
+     ocamlj.opt;
+
+     flags = "-as-parameter";
+     module = "list_element.mli";
+     ocamlj.opt;
+
+     flags = "-parameter List_element -as-argument-for Monoid";
+     module = "list_monoid.mli list_monoid.ml";
+     ocamlj.opt;
+
+     flags = "-parameter Monoid";
+     module = "monoid_utils.mli monoid_utils.ml";
+     ocamlj.opt;
+     {
+       src = "ref_indirect.ml";
+       dst = "bad_ref_indirect.ml";
+       copy;
+
+       flags = "";
+       module = "bad_ref_indirect.ml";
+       compiler_output = "bad_ref_indirect.output";
+       ocamlj_opt_exit_status = "2";
+       ocamlj.opt;
+
+       compiler_reference = "bad_ref_indirect.reference";
+       check-ocamlj.opt-output;
+     }{
+       flags = "-parameter Monoid";
+       module = "ref_indirect.ml";
+       ocamlj.opt;
+
+       program = "-no-code -no-approx ref_indirect.cmjx ref_indirect.cmi";
+       output = "ref_indirect.cmjx.ocamlobjinfo.output";
+       ocamlobjinfo;
+
+       reference = "ref_indirect.cmjx.ocamlobjinfo.reference";
+       check-program-output;
+     }{
+       (* Linking an uninstantiated parameterised module is weird but should be harmless
+          (it's just a module that exports a single functor). We should probably warn in
+          this case, since it's probably not what the user meant to do. *)
+
+       program = "${test_build_directory}/monoid_utils_as_program.js";
+       module = "";
+       all_modules = "monoid_utils.cmjx ";
+       ocamlj.opt;
+
+       output = "monoid_utils_as_program.output";
+       run;
+
+       reference = "monoid_utils_as_program.reference";
+       check-program-output;
+     }{
+       flags = "-parameter Semigroup";
+       module = "bad_instance_repeated_arg_name.ml";
+       compiler_output = "bad_instance_repeated_arg_name.output";
+       ocamlj_opt_exit_status = "2";
+       ocamlj.opt;
+
+       compiler_reference = "bad_instance_repeated_arg_name.reference";
+       check-ocamlj.opt-output;
+     }{
+       flags = "-parameter List_element";
+       module = "bad_instance_arg_name_not_found.ml";
+       compiler_output = "bad_instance_arg_name_not_found.output";
+       ocamlj_opt_exit_status = "2";
+       ocamlj.opt;
+
+       compiler_reference = "bad_instance_arg_name_not_found.reference";
+       check-ocamlj.opt-output;
+     }{
+       flags = "-parameter List_element";
+       module = "bad_instance_arg_value_not_arg.ml";
+       compiler_output = "bad_instance_arg_value_not_arg.output";
+       ocamlj_opt_exit_status = "2";
+       ocamlj.opt;
+
+       compiler_reference = "bad_instance_arg_value_not_arg.reference";
+       check-ocamlj.opt-output;
+     }{
+       flags = "-parameter List_element";
+       module = "bad_instance_arg_value_not_found.ml";
+       compiler_output = "bad_instance_arg_value_not_found.output";
+       ocamlj_opt_exit_status = "2";
+       ocamlj.opt;
+
+       compiler_reference = "bad_instance_arg_value_not_found.reference";
+       check-ocamlj.opt-output;
+     }{
+       flags = "-parameter List_element";
+       module = "bad_instance_wrong_mode.ml";
+       compiler_output = "bad_instance_wrong_mode.output";
+       ocamlj_opt_exit_status = "2";
+       ocamlj.opt;
+
+       compiler_reference = "bad_instance_wrong_mode.reference";
+       check-ocamlj.opt-output;
+     }{
+       flags = "-parameter Semigroup";
+       module = "bad_ref_direct_imported.ml";
+       compiler_output = "bad_ref_direct_imported.output";
+       ocamlj_opt_exit_status = "2";
+       ocamlj.opt;
+
+       compiler_reference = "bad_ref_direct_imported.reference";
+       check-ocamlj.opt-output;
+     }{
+       flags = "-parameter Category";
+       module = "chain.mli chain.ml";
+       ocamlj.opt;
+
+       flags = "-parameter Category";
+       module = "category_utils.mli category_utils.ml";
+       ocamlj.opt;
+
+       flags = "-parameter Monoid -as-argument-for Category";
+       module = "category_of_monoid.mli category_of_monoid.ml";
+       ocamlj.opt;
+       {
+         flags = "-parameter List_element";
+         module = "bad_instance_arg_value_wrong_type.ml";
+         compiler_output = "bad_instance_arg_value_wrong_type.output";
+         ocamlj_opt_exit_status = "2";
+         ocamlj.opt;
+
+         compiler_reference = "bad_instance_arg_value_wrong_type.reference";
+         check-ocamlj.opt-output;
+       }{
+         flags = "-parameter Semigroup -parameter List_element -w -misplaced-attribute";
+         module = "import.ml";
+         ocamlj.opt;
+
+         flags = "-as-argument-for Semigroup";
+         module = "string_semigroup.mli";
+         ocamlj.opt;
+
+         module = "string_semigroup.ml";
+         ocamlj.opt;
+
+         module = "";
+         flags = "-instantiate";
+         program = "monoid_of_semigroup-String_semigroup.cmjx";
+         all_modules = "monoid_of_semigroup.cmjx string_semigroup.cmjx";
+         ocamlj.opt;
+
+         flags = "-as-argument-for List_element";
+         module = "int_list_element.mli int_list_element.ml";
+         ocamlj.opt;
+
+         flags = "-as-argument-for List_element";
+         module = "float_list_element.mli float_list_element.ml";
+         ocamlj.opt;
+
+         flags = "";
+         module = "widget.mli widget.ml";
+         ocamlj.opt;
+
+         (* CR lmaurer: I'm indenting everything after these [bad_instantiate_*] tests
+            under protest. See PR 2693 for a better way. *)
+
+         {
+           module = "";
+           flags = "-instantiate";
+           program = "int_list_element-String_semigroup.cmjx";
+           all_modules = "int_list_element.cmjx string_semigroup.cmjx";
+           compiler_output = "bad_instantiate_not_parameterised.output";
+           ocamlj_opt_exit_status = "2";
+           ocamlj.opt;
+
+           compiler_reference = "bad_instantiate_not_parameterised.javascript.reference";
+           check-ocamlj.opt-output;
+         }{
+           module = "";
+           flags = "-instantiate";
+           program = "list_monoid-Widget.cmjx";
+           all_modules = "list_monoid.cmjx widget.cmjx";
+           compiler_output = "bad_instantiate_not_arg.output";
+           ocamlj_opt_exit_status = "2";
+           ocamlj.opt;
+
+           compiler_reference = "bad_instantiate_not_arg.javascript.reference";
+           check-ocamlj.opt-output;
+         }{
+           module = "";
+           flags = "-instantiate";
+           program = "monoid_of_semigroup-Int_list_element-String_semigroup.cmjx";
+           all_modules =
+             "monoid_of_semigroup.cmjx int_list_element.cmjx string_semigroup.cmjx";
+           compiler_output = "bad_instantiate_no_such_param.output";
+           ocamlj_opt_exit_status = "2";
+           ocamlj.opt;
+
+           compiler_reference = "bad_instantiate_no_such_param.reference";
+           check-ocamlj.opt-output;
+         }{
+           module = "";
+           flags = "-instantiate";
+           program = "import-Int_list_element.cmjx";
+           all_modules = "import.cmjx int_list_element.cmjx";
+           compiler_output = "bad_instantiate_missing_arg.output";
+           ocamlj_opt_exit_status = "2";
+           ocamlj.opt;
+
+           compiler_reference = "bad_instantiate_missing_arg.reference";
+           check-ocamlj.opt-output;
+         }{
+           module = "";
+           flags = "-instantiate";
+           program = "list_monoid-Float_list_element-Int_list_element.cmjx";
+           all_modules = "list_monoid.cmjx float_list_element.cmjx int_list_element.cmjx";
+           compiler_output = "bad_instantiate_repeated_param.output";
+           ocamlj_opt_exit_status = "2";
+           ocamlj.opt;
+
+           compiler_reference = "bad_instantiate_repeated_param.reference";
+           check-ocamlj.opt-output;
+         }{
+           module = "";
+           flags = "-instantiate";
+           program = "not_the_correct_target_name.cmjx";
+           all_modules = "list_monoid.cmjx int_list_element.cmjx";
+           compiler_output = "bad_instantiate_wrong_target_name.output";
+           ocamlj_opt_exit_status = "2";
+           ocamlj.opt;
+
+           compiler_reference = "bad_instantiate_wrong_target_name.javascript.reference";
+           check-ocamlj.opt-output;
+         }{
+           module = "";
+           flags = "-instantiate";
+           program = "list_monoid-Int_list_element.cmjx";
+           all_modules = "list_monoid.cmjx int_list_element.cmjx";
+           ocamlj.opt;
+
+           module = "";
+           flags = "-instantiate";
+           program = "monoid_of_semigroup-String_semigroup.cmjx";
+           all_modules = "monoid_of_semigroup.cmjx string_semigroup.cmjx";
+           ocamlj.opt;
+
+           module = "";
+           flags = "-instantiate";
+           program = "monoid_utils-Monoid_of_semigroup--String_semigroup.cmjx";
+           all_modules = "monoid_utils.cmjx monoid_of_semigroup-String_semigroup.cmjx";
+           ocamlj.opt;
+
+           module = "";
+           flags = "-instantiate";
+           program = "category_of_monoid-List_monoid--Int_list_element.cmjx";
+           all_modules = "category_of_monoid.cmjx list_monoid-Int_list_element.cmjx";
+           ocamlj.opt;
+
+           module = "";
+           flags = "-instantiate";
+           program = "category_of_monoid-Monoid_of_semigroup--String_semigroup.cmjx";
+           all_modules = "category_of_monoid.cmjx monoid_of_semigroup-String_semigroup.cmjx";
+           ocamlj.opt;
+
+           module = "";
+           flags = "-instantiate";
+           program = "chain-Category_of_monoid--List_monoid---Int_list_element.cmjx";
+           all_modules = "chain.cmjx category_of_monoid-List_monoid--Int_list_element.cmjx";
+           ocamlj.opt;
+
+           module = "";
+           flags = "-instantiate";
+           program = "chain-Category_of_monoid--Monoid_of_semigroup---String_semigroup.cmjx";
+           all_modules = "chain.cmjx category_of_monoid-Monoid_of_semigroup--String_semigroup.cmjx";
+           ocamlj.opt;
+
+           module = "";
+           flags = "-instantiate";
+           program = "import-Int_list_element-String_semigroup.cmjx";
+           all_modules = "import.cmjx int_list_element.cmjx string_semigroup.cmjx";
+           ocamlj.opt;
+
+           module = "";
+           flags = "-instantiate";
+           program = "category_utils-Category_of_monoid--List_monoid---Int_list_element.cmjx";
+           all_modules = "category_utils.cmjx category_of_monoid-List_monoid--Int_list_element.cmjx";
+           ocamlj.opt;
+
+           module = "";
+           flags = "-instantiate";
+           program = "category_utils-Category_of_monoid--Monoid_of_semigroup---String_semigroup.cmjx";
+           all_modules = "category_utils.cmjx category_of_monoid-Monoid_of_semigroup--String_semigroup.cmjx";
+           ocamlj.opt;
+
+           {
+             flags = "-open Import -parameter Semigroup -parameter List_element -w -misplaced-attribute";
+             module = "main.mli";
+             ocamlj.opt;
+             {
+               flags = "-open Import -parameter Semigroup -parameter List_element -w -misplaced-attribute -i";
+               module = "main.ml";
+               compiler_output = "main.output";
+               ocamlj.opt;
+
+               compiler_reference = "main.reference";
+               check-ocamlj.opt-output;
+             }{
+               module = "main.ml";
+               ocamlj.opt;
+
+               module = "";
+               flags = "-instantiate";
+               program = "main-Int_list_element-String_semigroup.cmjx";
+               all_modules = "main.cmjx int_list_element.cmjx string_semigroup.cmjx";
+               ocamlj.opt;
+
+               flags = "-w -misplaced-attribute";
+               module = "test.ml";
+               ocamlj.opt;
+
+               flags = "";
+               program = "${test_build_directory}/test.js";
+               module = "";
+               all_modules = "\
+                  string_semigroup.cmjx \
+                  monoid_of_semigroup.cmjx \
+                  monoid_of_semigroup-String_semigroup.cmjx \
+                  monoid_utils.cmjx \
+                  monoid_utils-Monoid_of_semigroup--String_semigroup.cmjx \
+                  int_list_element.cmjx \
+                  list_monoid.cmjx \
+                  list_monoid-Int_list_element.cmjx \
+                  category_of_monoid.cmjx \
+                  category_of_monoid-List_monoid--Int_list_element.cmjx \
+                  category_of_monoid-Monoid_of_semigroup--String_semigroup.cmjx \
+                  chain.cmjx \
+                  chain-Category_of_monoid--List_monoid---Int_list_element.cmjx \
+                  chain-Category_of_monoid--Monoid_of_semigroup---String_semigroup.cmjx \
+                  category_utils.cmjx \
+                  category_utils-Category_of_monoid--List_monoid---Int_list_element.cmjx \
+                  category_utils-Category_of_monoid--Monoid_of_semigroup---String_semigroup.cmjx \
+                  import.cmjx \
+                  import-Int_list_element-String_semigroup.cmjx \
+                  main.cmjx \
+                  main-Int_list_element-String_semigroup.cmjx \
+                  test.cmjx \
+               ";
+               ocamlj.opt;
+
+               output = "test.output";
+               exit_status = "0";
+               run;
+
+               reference = "test.reference";
+               check-program-output;
+             }
+           }{
+             flags = "-as-parameter";
+             module = "category_b.mli";
+             ocamlj.opt;
+
+             flags = "-parameter Category -as-argument-for Category_b";
+             module = "category_b_of_category.mli category_b_of_category.ml";
+             ocamlj.opt;
+
+             flags = "-parameter Category -parameter Category_b -as-argument-for Category";
+             module = "product_category.mli product_category.ml";
+             ocamlj.opt;
+
+             flags = "-parameter Semigroup -parameter List_element -w -misplaced-attribute";
+             module = "import_multi_arg.ml";
+             ocamlj.opt;
+
+             flags = "-parameter Semigroup -parameter List_element -w -misplaced-attribute";
+             module = "main_multi_arg.mli";
+             ocamlj.opt;
+
+             {
+               flags = "-parameter Semigroup -parameter List_element -w -misplaced-attribute -i";
+               module = "main_multi_arg.ml";
+               compiler_output = "main_multi_arg.output";
+               ocamlj.opt;
+
+               compiler_reference = "main_multi_arg.reference";
+               check-ocamlj.opt-output;
+             }{
+               module = "main_multi_arg.ml";
+               ocamlj.opt;
+             }
+           }
+         }
+       }
+     }
+   }
  }
+
+
 *)
 
 module M =

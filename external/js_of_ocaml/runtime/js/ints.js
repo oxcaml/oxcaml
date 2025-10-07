@@ -132,6 +132,84 @@ function caml_int_of_string(s) {
   return res | 0;
 }
 
+//Provides: caml_int8_of_string (const)
+//Requires: caml_ml_string_length, caml_string_unsafe_get
+//Requires: caml_parse_sign_and_base, caml_parse_digit, caml_failwith
+function caml_int8_of_string(s) {
+  var r = caml_parse_sign_and_base(s);
+  var i = r[0],
+    sign = r[1],
+    base = r[2],
+    signedness = r[3];
+  var len = caml_ml_string_length(s);
+  var threshold = -1 >>> 0;
+  var c = i < len ? caml_string_unsafe_get(s, i) : 0;
+  var d = caml_parse_digit(c);
+  if (d < 0 || d >= base) caml_failwith("Int8.of_string");
+  var res = d;
+  for (i++; i < len; i++) {
+    c = caml_string_unsafe_get(s, i);
+    if (c === 95) continue;
+    d = caml_parse_digit(c);
+    if (d < 0 || d >= base) break;
+    res = base * res + d;
+    if (res > threshold) caml_failwith("Int8.of_string");
+  }
+  if (i !== len) caml_failwith("Int8.of_string");
+  if (signedness) {
+    // Signed representation expected, allow -128 to 127
+    res = sign * res;
+    if (res < -128 || res > 127) caml_failwith("Int8.of_string");
+  } else {
+    // Unsigned representation expected, allow 0 to 255
+    if (res > 255) caml_failwith("Int8.of_string");
+    res = sign * res;
+    // Convert to signed 8-bit representation
+    if (res < 0) res = res & 0xff;
+    if (res > 127) res = res - 256;
+  }
+  return res | 0;
+}
+
+//Provides: caml_int16_of_string (const)
+//Requires: caml_ml_string_length, caml_string_unsafe_get
+//Requires: caml_parse_sign_and_base, caml_parse_digit, caml_failwith
+function caml_int16_of_string(s) {
+  var r = caml_parse_sign_and_base(s);
+  var i = r[0],
+    sign = r[1],
+    base = r[2],
+    signedness = r[3];
+  var len = caml_ml_string_length(s);
+  var threshold = -1 >>> 0;
+  var c = i < len ? caml_string_unsafe_get(s, i) : 0;
+  var d = caml_parse_digit(c);
+  if (d < 0 || d >= base) caml_failwith("Int16.of_string");
+  var res = d;
+  for (i++; i < len; i++) {
+    c = caml_string_unsafe_get(s, i);
+    if (c === 95) continue;
+    d = caml_parse_digit(c);
+    if (d < 0 || d >= base) break;
+    res = base * res + d;
+    if (res > threshold) caml_failwith("Int16.of_string");
+  }
+  if (i !== len) caml_failwith("Int16.of_string");
+  if (signedness) {
+    // Signed representation expected, allow -32768 to 32767
+    res = sign * res;
+    if (res < -32768 || res > 32767) caml_failwith("Int16.of_string");
+  } else {
+    // Unsigned representation expected, allow 0 to 65535
+    if (res > 65535) caml_failwith("Int16.of_string");
+    res = sign * res;
+    // Convert to signed 16-bit representation
+    if (res < 0) res = res & 0xffff;
+    if (res > 32767) res = res - 65536;
+  }
+  return res | 0;
+}
+
 //Provides: caml_mul const
 //Alias: caml_int32_mul
 //Alias: caml_nativeint_mul

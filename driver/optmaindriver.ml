@@ -20,7 +20,7 @@ let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
-let main unix argv ppf ~flambda2 =
+let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
   native_code := true;
   let columns =
     match Sys.getenv "COLUMNS" with
@@ -75,7 +75,11 @@ let main unix argv ppf ~flambda2 =
     if !Clflags.plugin then
       Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
     let (module Compiler : Optcompile.S) =
-      Optcompile.native unix ~flambda2
+      match Clflags.backend_target () with
+      | None | Some Backend.Native ->
+        Optcompile.native unix ~flambda2:Flambda2.lambda_to_cmm
+      | Some Backend.Js_of_ocaml ->
+        (module Jscomp.Make(Flambda2) : Optcompile.S)
     in
     begin try
       Compenv.process_deferred_actions

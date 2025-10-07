@@ -101,7 +101,7 @@ let () =
   Clflags.include_dirs := List.rev_append extra_paths !Clflags.include_dirs
 
 let main () =
-  Clflags.native_code := true;
+  Clflags.set_backend_target Clflags.Backend.Native;
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   let list = ref Options.list in
   begin

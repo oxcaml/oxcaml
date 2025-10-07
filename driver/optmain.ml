@@ -1,2 +1,4 @@
 let () =
-  exit (Optmaindriver.main Sys.argv Format.err_formatter)
+  exit (Optmaindriver.main (module Unix : Compiler_owee.Unix_intf.S)
+    Sys.argv Format.err_formatter
+    ~flambda2:(module Flambda2))

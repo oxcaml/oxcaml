@@ -15,10 +15,11 @@ endif
 
 boot_ocamlc = main_native.exe
 boot_ocamlopt = optmain_native.exe
-boot_ocamlj = boot_ocamlj.exe
 boot_ocamlmklib = tools/ocamlmklib.exe
 boot_ocamldep = tools/ocamldep.exe
 boot_ocamlobjinfo = tools/objinfo.exe
+boot_js_of_ocaml = external/js_of_ocaml/compiler/bin-js_of_ocaml/js_of_ocaml.exe
+boot_jsoo_minify = external/js_of_ocaml/compiler/bin-jsoo_minify/jsoo_minify.exe
 ocamldir = .
 #toplevels_installed = top opttop
 toplevels_installed = top

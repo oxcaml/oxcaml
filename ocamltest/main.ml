@@ -357,12 +357,22 @@ let list_tests dir =
   end;
   sort_strings !res
 
+let init_backends () =
+  let backends_string =
+    if Options.backends <> "" then Options.backends
+    else Sys.safe_getenv "OCAMLTEST_BACKENDS" in
+  if backends_string <> "" then begin
+    let backends = Ocaml_backends.parse_backends_string backends_string in
+    Ocaml_backends.set_enabled_backends backends
+  end
+
 let () =
   Actions.init ();
   Builtin_actions.init ();
   Builtin_variables.init ();
   Ocaml_actions.init ();
   Ocaml_modifiers.init ();
+  init_backends();  (* Must be called before Ocaml_tests.init() *)
   Ocaml_tests.init ();
   Ocaml_variables.init ();
   Strace.init ();

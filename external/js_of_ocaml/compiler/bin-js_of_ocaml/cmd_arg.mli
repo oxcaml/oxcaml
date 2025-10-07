@@ -28,7 +28,7 @@ type t =
   ; no_runtime : bool
   ; include_runtime : bool
   ; output_file : [ `Name of string | `Stdout ] * bool
-  ; input : [ `Bytecode_file of string | `Cmj of string | `Cmja of string | `Bytecode_stdin | `None ]
+  ; input : [ `Filename of string | `None ]
   ; params : (string * string) list
   ; static_env : (string * string) list
   ; wrap_with_fun :
@@ -39,9 +39,7 @@ type t =
   ; target_env : Target_env.t
   ; (* toplevel *)
     dynlink : bool
-  ; linkall : bool
   ; toplevel : bool
-  ; export_file : string option
   ; no_cmis : bool
   ; (* filesystem *)
     include_dirs : string list

@@ -1,0 +1,49 @@
+opam-version: "2.0"
+synopsis: "OCaml 4.14.2 patched for OxCaml Bootstrapping"
+maintainer: "oxcaml-team"
+license: "LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception"
+authors: "Xavier Leroy and many contributors"
+homepage: "https://ocaml.org"
+bug-reports: "https://github.com/ocaml/ocaml/issues"
+dev-repo: "git+https://github.com/ocaml/ocaml#4.14"
+depends: [
+  "ocaml" {= "4.14.2" & post}
+  "base-unix" {post}
+  "base-bigarray" {post}
+  "base-threads" {post}
+  "ocaml-options-vanilla" {post}
+]
+conflict-class: "ocaml-core-compiler"
+flags: compiler
+setenv: CAML_LD_LIBRARY_PATH = "%{lib}%/stublibs"
+x-env-path-rewrite: [
+  [CAML_LD_LIBRARY_PATH (";" {os = "win32"} ":" {os != "win32"}) "target"]
+]
+# This patch fixes assembly generation in arm64 and also reduces the size of logs generated
+patches: ["oxcaml-setup.patch"]
+build: [
+  [
+    "./configure"
+    "--prefix=%{prefix}%"
+    "--docdir=%{doc}%/ocaml"
+    "-C"
+    "CC=cc" {os = "openbsd" | os = "macos"}
+    "ASPP=cc -c" {os = "openbsd" | os = "macos"}
+  ]
+  [make "-j%{jobs}%"]
+]
+install: [
+  [make "install"]
+  ["sh" "-c" "rm -rf %{prefix}%/lib/ocaml/expunge %{prefix}%/bin/*.byte"]
+]
+url {
+  src: "https://github.com/ocaml/ocaml/archive/4.14.2.tar.gz"
+  checksum: "sha256=c2d706432f93ba85bd3383fa451d74543c32a4e84a1afaf3e8ace18f7f097b43"
+}
+extra-files: [
+  ["oxcaml-setup.patch" "sha256=95d13bba034b9aa8dd82b9a30ebcbc523a3e7e615ea104439c7105a038cbfb7b"]
+]
+extra-source "ocaml-base-compiler.install" {
+  src: "https://raw.githubusercontent.com/ocaml/opam-source-archives/main/patches/ocaml-base-compiler/ocaml-base-compiler.install"
+  checksum: "sha256=79f2a1a5044a91350a0eb6ce12e261a72a2855c094c425cddf3860e58c486678"
+}

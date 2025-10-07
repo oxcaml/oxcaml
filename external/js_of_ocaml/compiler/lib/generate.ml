@@ -1494,6 +1494,37 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
             let* co = access ~ctx o in
             let* () = info mutator_p in
             return (J.EUn (J.Delete, J.dot co f))
+        | Extern "caml_register_symbol", [ Pc (NativeString (Utf symbol_name)); v ] ->
+            (* Inline: globalThis.jsoo_runtime[symbol_name] = v *)
+            let* cv = access' ~ctx v in
+            let* () = info mutator_p in
+            let global_this_ident =
+              J.S
+                { name = Utf8_string.of_string_exn "globalThis"
+                ; var = None
+                ; loc = J.N
+                }
+            in
+            let runtime_obj =
+              J.dot (J.EVar global_this_ident) (Utf8_string.of_string_exn "jsoo_runtime")
+            in
+            let symbol_str = J.EStr symbol_name in
+            return (J.EBin (J.Eq, J.EAccess (runtime_obj, J.ANormal, symbol_str), cv))
+        | Extern "caml_get_symbol", [ Pc (NativeString (Utf symbol_name)) ] ->
+            (* Inline: globalThis.jsoo_runtime[symbol_name] *)
+            let* () = info mutable_p in
+            let global_this_ident =
+              J.S
+                { name = Utf8_string.of_string_exn "globalThis"
+                ; var = None
+                ; loc = J.N
+                }
+            in
+            let runtime_obj =
+              J.dot (J.EVar global_this_ident) (Utf8_string.of_string_exn "jsoo_runtime")
+            in
+            let symbol_str = J.EStr symbol_name in
+            return (J.EAccess (runtime_obj, J.ANormal, symbol_str))
             (*
            This is only useful for debugging:
          {[
@@ -1540,6 +1571,7 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
             assert (not (cps_transform ()));
             (* CR-soon mshinwell: This is a temporary hack for the period when the
                [Effect] module is in [Stdlib], but no code is actually using it. *)
+            ignore ctx.effect_warning;
             (*
             if not !(ctx.effect_warning)
             then (
