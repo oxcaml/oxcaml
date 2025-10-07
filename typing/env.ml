@@ -1985,7 +1985,12 @@ let run_iter_cont l =
 
 let iter_types f =
   iter_env wrap_identity (fun env -> env.types) (fun sc -> sc.comp_types)
-    (fun p1 (p2, tda) -> f p1 (p2, tda.tda_declaration))
+    (fun p1 (p2, tda) ->
+       f p1 (p2, tda.tda_declaration);
+       Option.iter
+         (fun du ->
+            f (Path.unboxed_version p1) (Path.unboxed_version p2, du))
+         tda.tda_declaration.type_unboxed_version)
 
 let same_types env1 env2 =
   env1.types == env2.types && env1.modules == env2.modules

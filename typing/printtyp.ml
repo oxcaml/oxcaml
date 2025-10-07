@@ -925,14 +925,14 @@ let is_unambiguous path env =
       List.for_all (fun p -> lid_of_path p = id) rem &&
       Path.same p (fst (Env.find_type_by_name id env))
 
-let penalty_size = 10
+let penalty_size = 20
 
 let name_penalty s =
   if s <> "" && s.[0] = '_' then
     penalty_size
   else
     match find_double_underscore s with
-    | None -> 1
+    | None -> 2
     | Some _ -> penalty_size
 
 let ambiguity_penalty path env =
@@ -947,7 +947,10 @@ let path_size path env =
     | Papply (p1, p2) ->
         let (l, b) = size p1 in
         (l + fst (size p2), b)
-    | Pextra_ty (p, _) -> size p
+    | Pextra_ty (p, Pext_ty) ->
+        size p
+    | Pextra_ty (p, Punboxed_ty) ->
+        let (l, b) = size p in (1 + l, b)
   in
   let l, s = size path in
   l + ambiguity_penalty path env, s

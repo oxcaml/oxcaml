@@ -160,12 +160,11 @@ jobs:
     steps:
     - name: Checkout the OxCaml repo
       uses: actions/checkout@master
-      with:
-        path: 'oxcaml'
 
-    - name: Install AFL (for Linux workers)
-      if: matrix.os == 'ubuntu-latest'
-      run: sudo apt-get install afl++
+    # jvanburen: I don't think we actually test this and it takes forever to set up
+    # - name: Install AFL (for Linux workers)
+    #   if: matrix.os == 'ubuntu-latest'
+    #   run: sudo apt-get install afl++
 
     - name: Install clang
       if: matrix.os == 'ubuntu-latest' && matrix.cc == 'clang'
@@ -177,82 +176,32 @@ jobs:
       run: true
       # run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install afl-fuzz
 
-    - name: Install autoconf (for macOS workers)
+    - name: Install autoconf and bash (for macOS workers)
       if: matrix.os == 'macos-latest'
-      run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf
+      run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf bash
+      # bash >=4 is needed for tools/gen_ocamlj_rules.sh
 
-      # NB. The "rev" number in the cache key below must be updated each time
-      # the patch file is changed!
-    - name: Cache OCaml 4.14, dune and menhir
-      uses: actions/cache@v4
-      id: cache
+    - name: Set up Opam
+      uses: ocaml/setup-ocaml@v3
       with:
-        path: ${{ github.workspace }}/ocaml-414/_install
-        key: ${{ matrix.os }}-cache-ocaml-414-dune-3153-menhir-20231231-rev14
+        ocaml-compiler: oxcaml-ci-deps.5.2.0
+        opam-repositories: |
+          local: file://${{ github.workspace }}/tools/ci/local-opam
+          default: https://github.com/ocaml/opam-repository.git
+        opam-disable-sandboxing: true
+        opam-pin: false
+        cache-prefix: ${{ matrix.os }}-v1
 
-    - name: Checkout OCaml 4.14
-      uses: actions/checkout@master
-      if: steps.cache.outputs.cache-hit != 'true'
-      with:
-        repository: 'ocaml/ocaml'
-        path: 'ocaml-414'
-        ref: '4.14'
-
-    - name: Build OCaml 4.14
-      if: steps.cache.outputs.cache-hit != 'true'
-      working-directory: ocaml-414
+    - name: Set up Opam environment
+      # this command adds the opam environment to the PATH.
       run: |
-        ./configure --prefix=$GITHUB_WORKSPACE/ocaml-414/_install
-        patch -p1 < $GITHUB_WORKSPACE/oxcaml/arm64-issue-debug-upstream.patch
-        make -j $J world.opt
-        make install
-        # Remove unneeded parts to shrink cache file
-        rm -rf $GITHUB_WORKSPACE/ocaml-414/_install/{lib/ocaml/expunge,bin/*.byte}
-
-    - name: Checkout dune github repo
-      uses: actions/checkout@master
-      if: steps.cache.outputs.cache-hit != 'true'
-      with:
-        repository: 'ocaml/dune'
-        ref: '3.15.3'
-        path: 'dune'
-
-    - name: Build dune
-      working-directory: dune
-      if: steps.cache.outputs.cache-hit != 'true'
-      run: |
-        PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH make release
-        cp _boot/dune.exe $GITHUB_WORKSPACE/ocaml-414/_install/bin/dune
-
-    # CR mshinwell: This should use git@gitlab.inria.fr:fpottier/menhir.git
-    - name: Checkout menhir github repo
-      uses: actions/checkout@master
-      if: steps.cache.outputs.cache-hit != 'true'
-      with:
-        repository: 'LexiFi/menhir'
-        ref: '20231231'
-        path: 'menhir'
-
-    - name: Build menhir
-      working-directory: menhir
-      if: steps.cache.outputs.cache-hit != 'true'
-      run: |
-        PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH dune build
-        cp _build/install/default/bin/menhir $GITHUB_WORKSPACE/ocaml-414/_install/bin/menhir
-        # Our dune rule uses `menhirLib.mli`, which we can't simply `cp`
-        # because it's a symbolic link to a relative path.
-        export SOURCE_DIR=_build/install/default/lib/menhirLib
-        export TARGET_DIR=$GITHUB_WORKSPACE/ocaml-414/_install/lib/menhirLib
-        mkdir -p $TARGET_DIR
-        cat $SOURCE_DIR/menhirLib.mli > $TARGET_DIR/menhirLib.mli
-        cat $SOURCE_DIR/menhirLib.ml > $TARGET_DIR/menhirLib.ml
+        opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
 
     - name: Install GNU parallel
       if: matrix.os == 'macos-latest'
       run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install parallel
 
     - name: Disable any testcases
-      working-directory: oxcaml
       run: |
         disable_testcases="${{matrix.disable_testcases}}"
         if [ -n "$disable_testcases" ]; then
@@ -260,7 +209,6 @@ jobs:
         fi
 
     - name: Configure OxCaml
-      working-directory: oxcaml
       run: |
         if [[ -n "${{matrix.cc}}" ]]; then
           export CC="${{matrix.cc}}"
@@ -268,7 +216,6 @@ jobs:
         autoconf
         ./configure \
           --prefix=$GITHUB_WORKSPACE/_install \
-          --with-dune=$GITHUB_WORKSPACE/ocaml-414/_install/bin/dune \
           ${{ matrix.config }}
 
     - name: Setup for saving core files (not for macOS)
@@ -285,15 +232,15 @@ jobs:
         sudo chmod 1777 /cores
         sudo sysctl kern.coredump=1
         /usr/libexec/PlistBuddy -c "Add :com.apple.security.get-task-allow bool true" /tmp/core.entitlements
-        codesign -s - -f --entitlements /tmp/core.entitlements $GITHUB_WORKSPACE/ocaml-414/_install/bin/ocamlc.opt
-        codesign -s - -f --entitlements /tmp/core.entitlements $GITHUB_WORKSPACE/ocaml-414/_install/bin/ocamlopt.opt
+        # Find opam's OCaml installation
+        OCAML_BIN=$(opam var bin)
+        codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlc.opt
+        codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlopt.opt
 
     - name: Build, install and test OxCaml
-      working-directory: oxcaml
       if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
       run: |
         if [ "$run_testsuite" = true ]; then target=ci; else target=compiler; fi
-        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
         ulimit -c unlimited
         make $target \
           || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
@@ -333,33 +280,26 @@ jobs:
         tar -xzf oxcaml-llvm.tar.gz -C oxcaml-llvm --strip-components=1
 
     - name: Build and test OxCaml DWARF
-      working-directory: oxcaml
       if: matrix.dwarf_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
       run: |
-        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
         ulimit -c unlimited
         make runtest-dwarf
       env:
         OXCAML_LLDB: ${{ github.workspace }}/oxcaml-llvm/bin/lldb
 
     - name: Build and test OxCaml Llvmize
-      working-directory: oxcaml
       if: matrix.llvmize_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
       run: |
-        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
         ulimit -c unlimited
         make runtest-llvmize
       env:
         OXCAML_CLANG: ${{ github.workspace }}/oxcaml-llvm/bin/clang
 
     - name: Check other architectures
-      working-directory: oxcaml
       if: matrix.check_arch == true
-      run: |
-        PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH make check_all_arches
+      run: make check_all_arches
 
     - name: Run register allocation on artifacts
-      working-directory: oxcaml
       if: matrix.run_regalloc_tool == true
       run: |
         for allocator in irc ls gi; do \
@@ -427,12 +367,6 @@ jobs:
         name: cores-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
         path: /cores
 
-#     - uses: actions/upload-artifact@v4
-#       if: ${{ failure() }}
-#       with:
-#         name: ocaml-414-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-#         path: ${{ github.workspace }}/ocaml-414/_install
-
     - uses: actions/upload-artifact@v4
       if: ${{ failure() }} && matrix.os == 'macos-latest'
       with:
@@ -443,13 +377,13 @@ jobs:
 #       if: ${{ failure() }}
 #       with:
 #         name: _build-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-#         path: ${{ github.workspace }}/oxcaml/_build
+#         path: ${{ github.workspace }}/_build
 #
 #     - uses: actions/upload-artifact@v4
 #       if: ${{ failure() }}
 #       with:
 #         name: _runtest-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-#         path: ${{ github.workspace }}/oxcaml/_runtest
+#         path: ${{ github.workspace }}/_runtest
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
