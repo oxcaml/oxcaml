@@ -1373,6 +1373,16 @@ let datalog_rules =
        filter_field real_field field;
        constructor_rel x field y ]
      ==> cannot_change_representation0 x);
+    (* If a block with a local field escapes, and that field is read again from
+       an [any_source] value, prevent changing the representation. This ensures
+       that for a block whose representation is changed, we can know the source
+       at each point. *)
+    (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
+     [ any_usage_pred x;
+       filter_field is_local_field field;
+       reading_field_rel field z;
+       constructor_rel x field y ]
+     ==> cannot_change_representation0 x);
     (* If there exists an alias which has another source, and which uses any
        real field of our allocation, we cannot change the representation. This
        currently requires 4 rules due to the absence of disjunction in the
@@ -1927,7 +1937,7 @@ module Rewriter = struct
     in
     let q1 =
       mk_exists_query [] ["x"; "fs"] (fun [] [x; fs] ->
-          [out1 x; field_usages_top_rel x fs])
+          [out1 x; field_usages_top_rel x fs; in_all_fs fs])
     in
     let q2 =
       mk_exists_query [] ["x"] (fun [] [x] -> [out1 x; any_usage_pred x])
