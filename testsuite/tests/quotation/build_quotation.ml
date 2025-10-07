@@ -646,10 +646,9 @@ module Mod : sig type t = int val mk : 'a -> 'a end
 Line 1, characters 19-20:
 1 | <[ fun (module _ : S) x -> 42 ]>;;
                        ^
-Error: Identifier "S" is used at Line 1, characters 19-20
-       in a context with inside a quotation (<[ ... ]>);
-       it is introduced at Lines 1-7, characters 0-3
-       in a context with outside any quotations.
+Error: Identifier "S" is used at Line 1, characters 19-20,
+       inside a quotation (<[ ... ]>);
+       it is introduced at Lines 1-7, characters 0-3, outside any quotations.
 |}];;
 
 <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
@@ -666,10 +665,9 @@ Error: Module definitions using "struct..end"
 Line 1, characters 3-9:
 1 | <[ Mod.mk 42 ]>;;
        ^^^^^^
-Error: Identifier "Mod" is used at Line 1, characters 3-9
-       in a context with inside a quotation (<[ ... ]>);
-       it is introduced at File "_none_", line 1
-       in a context with outside any quotations.
+Error: Identifier "Mod" is used at Line 1, characters 3-9,
+       inside a quotation (<[ ... ]>);
+       it is introduced at File "_none_", line 1, outside any quotations.
 |}];;
 
 let x = 42 in <[ x ]>;;
@@ -677,10 +675,9 @@ let x = 42 in <[ x ]>;;
 Line 1, characters 17-18:
 1 | let x = 42 in <[ x ]>;;
                      ^
-Error: Identifier "x" is used at Line 1, characters 17-18
-       in a context with inside a quotation (<[ ... ]>);
-       it is introduced at Line 1, characters 4-5
-       in a context with outside any quotations.
+Error: Identifier "x" is used at Line 1, characters 17-18,
+       inside a quotation (<[ ... ]>);
+       it is introduced at Line 1, characters 4-5, outside any quotations.
 |}];;
 
 let x = <[ 123 ]> in <[ $x ]>;;

@@ -90,10 +90,9 @@ let p x = <[x]>;;
 Line 1, characters 12-13:
 1 | let p x = <[x]>;;
                 ^
-Error: Identifier "x" is used at Line 1, characters 12-13
-       in a context with inside a quotation (<[ ... ]>);
-       it is introduced at Line 1, characters 6-7
-       in a context with outside any quotations.
+Error: Identifier "x" is used at Line 1, characters 12-13,
+       inside a quotation (<[ ... ]>);
+       it is introduced at Line 1, characters 6-7, outside any quotations.
 |}];;
 
 let f (x : $'a) = x
@@ -118,10 +117,10 @@ Error: Type variable "'a" is used at Line 1, characters 30-32,
 
 let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
 [%%expect {|
-Line 119, characters 32-34:
-119 | let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
+Line 118, characters 32-34:
+118 | let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
                                       ^^
-Error: Type variable "'a" is used at Line 119, characters 32-34,
+Error: Type variable "'a" is used at Line 118, characters 32-34,
        within 2 layers of quotation (<[ ... ]>);
        it already occurs outside quotations.
        Hint: Consider using "$($'a)".
@@ -147,10 +146,9 @@ let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
 Line 1, characters 42-43:
 1 | let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
                                               ^
-Error: Identifier "a" is used at Line 1, characters 42-43
-       in a context with inside a quotation (<[ ... ]>);
-       it is introduced at Line 1, characters 15-16
-       in a context with outside any quotations.
+Error: Identifier "a" is used at Line 1, characters 42-43,
+       inside a quotation (<[ ... ]>);
+       it is introduced at Line 1, characters 15-16, outside any quotations.
 |}];;
 
 let foo7 (type a) (type b) x = <[fun (y : $a) -> y]>;;

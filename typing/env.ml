@@ -4976,10 +4976,10 @@ let report_lookup_error _loc env ppf = function
         "@[Mutable variable cannot be used inside %s.@]" ctx
   | Incompatible_stage (lid, usage_loc, usage_stage, intro_loc, intro_stage) ->
       fprintf ppf
-        "@[Identifier %a is used at %a@ \
-         in a context with %a;@ \
-         it is introduced at %a@ \
-         in a context with %a.@]"
+        "@[Identifier %a is used at %a,@ \
+         %a;@ \
+         it is introduced at %a,@ \
+         %a.@]"
         (Style.as_inline_code !print_longident) lid
         Location.print_loc usage_loc
         print_stage usage_stage
