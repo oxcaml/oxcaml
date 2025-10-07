@@ -1,0 +1,6 @@
+(library
+ (public_name jit)
+ (libraries compiler-libs compiler-libs-opttoplevel)
+ (foreign_stubs
+  (language c)
+  (names jit_stubs)))
