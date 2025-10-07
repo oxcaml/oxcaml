@@ -34,7 +34,8 @@ type type_replacement =
 type additional_action =
   | Prepare_for_saving of
       { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
-        prepare_mode : Mode.Alloc.lr -> Mode.Alloc.lr
+        prepare_mode : Mode.Alloc.lr -> Mode.Alloc.lr;
+        prepare_modality : Mode.Modality.t -> Mode.Modality.t
       }
     (* The [prepare_jkind] function should be applied to all jkinds when
        saving; this commons them up, truncates their histories, and runs
@@ -192,7 +193,10 @@ let with_additional_action =
         (* CR-someday zqian: preserve the hints *)
         (* modes should have been zapped already; doesn't hurt to zap again *)
         let prepare_mode mode = Mode.Alloc.(zap_to_legacy mode |> of_const) in
-        Prepare_for_saving { prepare_jkind; prepare_mode }
+        let prepare_modality modality =
+          Mode.Modality.(zap_to_id modality |> of_const)
+        in
+        Prepare_for_saving { prepare_jkind; prepare_mode; prepare_modality }
   in
   { s with additional_action; last_compose = None }
 
@@ -881,8 +885,14 @@ let force_type_expr ty = Wrap.force (fun _ s ty ->
   For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)) ty
 
 let rec subst_lazy_value_description s descr =
+  let val_modalities =
+    match s.additional_action with
+    | Prepare_for_saving { prepare_modality; _ } ->
+        prepare_modality descr.val_modalities
+    | _ -> descr.val_modalities
+  in
   { val_type = Wrap.substitute ~compose Keep s descr.val_type;
-    val_modalities = descr.val_modalities;
+    val_modalities;
     val_kind = descr.val_kind;
     val_loc = loc s descr.val_loc;
     val_zero_alloc =
@@ -902,8 +912,14 @@ let rec subst_lazy_value_description s descr =
 
 and subst_lazy_module_decl scoping s md =
   let md_type = subst_lazy_modtype scoping s md.md_type in
+  let md_modalities =
+    match s.additional_action with
+    | Prepare_for_saving { prepare_modality; _ } ->
+        prepare_modality md.md_modalities
+    | _ -> md.md_modalities
+  in
   { md_type;
-    md_modalities = md.md_modalities;
+    md_modalities;
     md_attributes = attrs s md.md_attributes;
     md_loc = loc s md.md_loc;
     md_uid = md.md_uid }
