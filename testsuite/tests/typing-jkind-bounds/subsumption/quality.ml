@@ -225,14 +225,18 @@ Error: Signature mismatch:
        Modules do not match:
          sig type a = [ `a of string | `b ] type t end
        is not included in
-         sig type a = [ `a of string | `b ] type t : value mod unyielding end
+         sig
+           type a = [ `a of string | `b ]
+           type t : value mod forkable unyielding
+         end
        Type declarations do not match:
          type t
        is not included in
-         type t : value mod unyielding
+         type t : value mod forkable unyielding
        The kind of the first is value
          because of the definition of t at line 6, characters 2-8.
-       But the kind of the first must be a subkind of value mod unyielding
+       But the kind of the first must be a subkind of
+           value mod forkable unyielding
          because of the definition of t at line 3, characters 2-34.
 |}]
 
