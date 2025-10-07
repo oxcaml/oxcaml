@@ -268,7 +268,8 @@ end
    register being spilled (t/1234 in this example). This ensures that the
    spilled register (spill-t/4567) will inherit the debug name. We check
    register locations using [Reg.same_loc] rather than stamps, since the
-   register allocator can change stamps while preserving locations. *)
+   register allocator can reuse the same location for registers with different
+   stamps. *)
 module Insert_skipping_name_for_debugger = struct
   (* Check if a [Name_for_debugger] instruction names a register at the same
      location as [reg]. *)
@@ -297,14 +298,14 @@ module Insert_skipping_name_for_debugger = struct
   (* Insert [instr] after [cell], skipping over any [Name_for_debugger]
      instructions that name [reg]. *)
   let insert_after (cell : Cfg.basic Cfg.instruction DLL.cell)
-      (instr : Cfg.basic Cfg.instruction) (reg : Reg.t) : unit =
+      (instr : Cfg.basic Cfg.instruction) ~(reg : Reg.t) : unit =
     let insertion_cell = find_insertion_point_after cell reg in
     DLL.insert_after insertion_cell instr
 
   (* Add [instr] at the beginning of [list], but after any [Name_for_debugger]
      instructions at the start that name [reg]. *)
   let add_begin (list : Cfg.basic_instruction_list)
-      (instr : Cfg.basic Cfg.instruction) (reg : Reg.t) : unit =
+      (instr : Cfg.basic Cfg.instruction) ~(reg : Reg.t) : unit =
     match DLL.hd_cell list with
     | None -> DLL.add_begin list instr
     | Some first_cell ->
@@ -312,8 +313,7 @@ module Insert_skipping_name_for_debugger = struct
       if names_reg_at_location first_instr reg
       then
         (* Skip forward to find the right insertion point *)
-        let insertion_cell = find_insertion_point_after first_cell reg in
-        DLL.insert_after insertion_cell instr
+        insert_after first_cell instr ~reg
       else DLL.add_begin list instr
 end
 

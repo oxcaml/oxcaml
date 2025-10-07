@@ -252,14 +252,14 @@ let insert_spills_in_block :
       || occurs_array (Proc.destroyed_at_basic instr.desc) reg)
     ~insert:(fun cell instr reg ->
       (* See comment before Insert_skipping_name_for_debugger *)
-      Insert_skipping_name_for_debugger.insert_after cell instr reg)
+      Insert_skipping_name_for_debugger.insert_after cell instr ~reg)
     ~copy_default:
       (match DLL.hd block.body with
       | None -> dummy_instr_of_terminator block.terminator
       | Some hd -> hd)
     ~add_default:(fun list instr reg ->
       (* See comment before Insert_skipping_name_for_debugger *)
-      Insert_skipping_name_for_debugger.add_begin list instr reg)
+      Insert_skipping_name_for_debugger.add_begin list instr ~reg)
     ~move_cell:DLL.prev ~block_subst ~stack_subst block cell
     live_at_destruction_point
 
@@ -329,7 +329,7 @@ let insert_reloads_in_block :
       (* We don't need special handling here, because we wouldn't expect a new
          Name_for_debugger operation anyway (that should have occurred when the
          variable was first introduced, i.e. before the first spill); and
-         furthermore, we prefer the spilled registers (c.f.
+         furthermore, we prefer the spilled registers (cf.
          Reg_availability_set.canonicalise), so it's probably not necessary to
          add a Name_for_debugger on the reloaded one. *)
       DLL.insert_before cell instr)

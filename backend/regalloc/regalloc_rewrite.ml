@@ -220,11 +220,12 @@ let rewrite_gen :
           | Load_before_cell cell -> DLL.insert_before cell new_instr
           | Store_after_cell cell ->
             (* See comment before Insert_skipping_name_for_debugger *)
-            Insert_skipping_name_for_debugger.insert_after cell new_instr from
+            Insert_skipping_name_for_debugger.insert_after cell new_instr
+              ~reg:from
           | Load_after_list list -> DLL.add_end list new_instr
           | Store_before_list list ->
             (* See comment before Insert_skipping_name_for_debugger *)
-            Insert_skipping_name_for_debugger.add_begin list new_instr from);
+            Insert_skipping_name_for_debugger.add_begin list new_instr ~reg:from);
         temp)
       else reg
     in
