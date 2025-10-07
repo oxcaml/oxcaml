@@ -339,7 +339,7 @@ jobs:
         CSV_FILE="metrics-repo/data/metrics-${DATE}-${SHORT_HASH}.csv"
 
         # Use the metrics collection script
-        ${{ github.workspace }}/oxcaml/scripts/collect-size-metrics.sh \
+        ${{ github.workspace }}/scripts/collect-size-metrics.sh \
           "${{ github.workspace }}/_install" \
           "$CSV_FILE" \
           "$COMMIT_HASH" \
