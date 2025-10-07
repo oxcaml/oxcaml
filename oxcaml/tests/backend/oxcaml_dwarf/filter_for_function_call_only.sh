@@ -16,7 +16,8 @@ sed \
   -e 's| at [a-zA-Z0-9_/.-]*\.mli:[0-9]*:[0-9]*.*$||g' \
   -e 's| at [a-zA-Z0-9_/.-]*\.c:[0-9]*:[0-9]*.*$||g' \
   -e 's| at [a-zA-Z0-9_/.-]*\.h:[0-9]*:[0-9]*.*$||g' \
-  -e 's|caml_start_program.*|<Startup code ...>|g' | \
+  -e 's|caml_start_program.*|<Startup code ...>|g' \
+  -e 's|\([a-z_][a-zA-Z0-9_]*\)_[0-9]\+_unboxed|\1_XXX_unboxed|g' | \
 grep -v \
   -e '^(lldb) ' \
   -e '^Process <PID> resuming$' \

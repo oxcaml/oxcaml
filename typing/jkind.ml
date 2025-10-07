@@ -886,26 +886,45 @@ module Layout_and_axes = struct
          recursive descent" bit is why we recur separately down one type before
          iterating down the list.)
       *)
-      (* CR reisenberg: document seen_args *)
       let module Loop_control = struct
+        (** Represents the cache for a specific type constructor *)
+        type seen_constr =
+          { fuel : int;
+            seen_args : type_expr list;
+                (** The arguments the type constructor was most recently seen
+                    with. *)
+            relevant_axes_when_seen : Axis_set.t
+                (** The axes that were relevant when the type constructor was
+                    most recently seen. *)
+          }
+
+        type seen_row_var =
+          { relevant_axes_when_seen : Axis_set.t
+                (** The axes that were relevant when the row var was seen. *)
+          }
+        [@@unboxed]
+
         type t =
           { tuple_fuel : int;
-            constr : (int * type_expr list) Path.Map.t;
-            seen_row_var : Numbers.Int.Set.t;
+            seen_constrs : seen_constr Path.Map.t;
+            seen_row_vars : seen_row_var Numbers.Int.Map.t;
             fuel_status : Fuel_status.t
           }
 
         type result =
-          | Stop of t (* give up, returning [max] *)
-          | Skip (* skip reducing this type, but otherwise continue *)
-          | Continue of t (* continue, with a new [t] *)
+          | Stop of t  (** give up, returning [max] *)
+          | Skip  (** skip reducing this type, but otherwise continue *)
+          | Continue of
+              { ctl : t;
+                skippable_axes : Axis_set.t
+              }  (** continue, with a new [t] *)
 
         let initial_fuel_per_ty = 2
 
         let starting =
           { tuple_fuel = initial_fuel_per_ty;
-            constr = Path.Map.empty;
-            seen_row_var = Numbers.Int.Set.empty;
+            seen_constrs = Path.Map.empty;
+            seen_row_vars = Numbers.Int.Map.empty;
             fuel_status = Sufficient_fuel
           }
 
@@ -960,53 +979,108 @@ module Layout_and_axes = struct
            cutting off the recursion, it continues until it runs out of fuel.
         *)
 
-        let rec check
-            ({ tuple_fuel; constr; seen_row_var; fuel_status = _ } as t) ty =
+        let rec check ~relevant_axes
+            ({ tuple_fuel; seen_constrs; seen_row_vars; fuel_status = _ } as t)
+            ty =
           match Types.get_desc ty with
-          | Tpoly (ty, _) -> check t ty
+          | Tpoly (ty, _) -> check ~relevant_axes t ty
           | Ttuple _ ->
             if tuple_fuel > 0
-            then Continue { t with tuple_fuel = tuple_fuel - 1 }
+            then
+              Continue
+                { ctl = { t with tuple_fuel = tuple_fuel - 1 };
+                  skippable_axes = Axis_set.empty
+                }
             else Stop { t with fuel_status = Ran_out_of_fuel }
           | Tconstr (p, args, _) -> (
-            match Path.Map.find_opt p constr with
+            match Path.Map.find_opt p seen_constrs with
             | None ->
               Continue
-                { t with
-                  constr = Path.Map.add p (initial_fuel_per_ty, args) constr
+                { ctl =
+                    { t with
+                      seen_constrs =
+                        Path.Map.add p
+                          { fuel = initial_fuel_per_ty;
+                            seen_args = args;
+                            relevant_axes_when_seen = relevant_axes
+                          }
+                          seen_constrs
+                    };
+                  skippable_axes = Axis_set.empty
                 }
-            | Some (fuel, seen_args) ->
-              if List.for_all2
-                   (fun ty1 ty2 ->
-                     TransientTypeOps.equal (Transient_expr.repr ty1)
-                       (Transient_expr.repr ty2))
-                   seen_args args
-                 && not (context.is_abstract p)
+            | Some { fuel; seen_args; relevant_axes_when_seen } ->
+              let args_equal =
+                List.for_all2
+                  (fun ty1 ty2 ->
+                    TransientTypeOps.equal (Transient_expr.repr ty1)
+                      (Transient_expr.repr ty2))
+                  seen_args args
+              in
+              let skippable_axes =
+                if args_equal && not (context.is_abstract p)
+                then relevant_axes_when_seen
+                else Axis_set.empty
+              in
+              if Axis_set.is_subset relevant_axes skippable_axes
               then Skip
               else if fuel > 0
               then
                 Continue
-                  { t with constr = Path.Map.add p (fuel - 1, args) constr }
+                  { ctl =
+                      { t with
+                        seen_constrs =
+                          Path.Map.add p
+                            { fuel = fuel - 1;
+                              seen_args = args;
+                              relevant_axes_when_seen =
+                                (* Even if we can't skip the type, if the args match
+                                   the most recently seen args, we can merge the
+                                   relevant axes with the ones seen previously since
+                                   we have now seen the types under all of these
+                                   axes. *)
+                                (if args_equal
+                                then
+                                  Axis_set.union relevant_axes
+                                    relevant_axes_when_seen
+                                else relevant_axes)
+                            }
+                            seen_constrs
+                      };
+                    skippable_axes
+                  }
               else Stop { t with fuel_status = Ran_out_of_fuel })
-          | Tvariant _ -> (
+          | Tvariant _ ->
             let row_var_id = get_id (Btype.proxy ty) in
-            match Numbers.Int.Set.mem row_var_id seen_row_var with
-            | false ->
+            let { relevant_axes_when_seen } =
+              Numbers.Int.Map.find_opt row_var_id seen_row_vars
+              |> Option.value
+                   ~default:{ relevant_axes_when_seen = Axis_set.empty }
+            in
+            (* For our purposes, row variables are like constructors with no arguments,
+               so if we saw one already, we don't need to expand it again. *)
+            if Axis_set.is_subset relevant_axes relevant_axes_when_seen
+            then Skip
+            else
               Continue
-                { t with
-                  seen_row_var = Numbers.Int.Set.add row_var_id seen_row_var
+                { ctl =
+                    { t with
+                      seen_row_vars =
+                        Numbers.Int.Map.add row_var_id
+                          { relevant_axes_when_seen =
+                              Axis_set.union relevant_axes_when_seen
+                                relevant_axes
+                          }
+                          seen_row_vars
+                    };
+                  skippable_axes = relevant_axes_when_seen
                 }
-            | true ->
-              (* For our purposes, row variables are like constructors with no arguments,
-                 so if we saw one already, we don't need to expand it again. *)
-              Skip)
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
           | Tunivar _ | Tpackage _ | Tof_kind _ ->
             (* these cases either cannot be infinitely recursive or their jkinds
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
                should double-check before we're done that they haven't. *)
-            Continue t
+            Continue { ctl = t; skippable_axes = Axis_set.empty }
           | Tlink _ | Tsubst _ ->
             Misc.fatal_error "Tlink or Tsubst in normalize"
       end in
@@ -1028,14 +1102,16 @@ module Layout_and_axes = struct
           in
           (* We don't care about axes that are already max because they can't get
              any better or worse. By ignoring them, we may be able to terminate
-             early *)
-          let ti : With_bounds_type_info.t =
-            { relevant_axes =
-                Axis_set.diff ti.relevant_axes
-                  (Mod_bounds.get_max_axes bounds_so_far)
-            }
+             early.
+
+             We also don't care about axes that aren't in [relevant_axes]. *)
+          let relevant_axes_for_ty =
+            Axis_set.intersection
+              (Axis_set.diff ti.relevant_axes
+                 (Mod_bounds.get_max_axes bounds_so_far))
+              relevant_axes
           in
-          match Axis_set.is_empty ti.relevant_axes with
+          match Axis_set.is_empty relevant_axes_for_ty with
           | true ->
             (* If [ty] is not relevant to any axes, then we can safely drop it and
                thereby avoid doing the work of expanding it. *)
@@ -1078,33 +1154,25 @@ module Layout_and_axes = struct
                 ~separability:(value_for_axis ~axis:(Nonmodal Separability))
             in
             let found_jkind_for_ty new_ctl b_upper_bounds b_with_bounds quality
-                : Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t =
+                skippable_axes :
+                Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t =
+              let relevant_axes_for_ty =
+                Axis_set.diff relevant_axes_for_ty skippable_axes
+              in
               match quality, mode with
               | Best, _ | Not_best, Ignore_best ->
                 (* The relevant axes are the intersection of the relevant axes within our
                    branch of the with-bounds tree, and the relevant axes on this
                    particular with-bound *)
-                let next_relevant_axes =
-                  Axis_set.intersection relevant_axes ti.relevant_axes
-                in
                 let bounds_so_far =
                   join_bounds bounds_so_far b_upper_bounds
-                    ~relevant_axes:next_relevant_axes
+                    ~relevant_axes:relevant_axes_for_ty
                 in
                 (* Descend into the with-bounds of each of our with-bounds types'
                     with-bounds *)
                 let bounds_so_far, nested_with_bounds, fuel_result1 =
-                  loop new_ctl bounds_so_far next_relevant_axes
+                  loop new_ctl bounds_so_far relevant_axes_for_ty
                     (With_bounds.to_list b_with_bounds)
-                in
-                let nested_with_bounds =
-                  With_bounds.map
-                    (fun ti ->
-                      { relevant_axes =
-                          Axis_set.intersection ti.relevant_axes
-                            next_relevant_axes
-                      })
-                    nested_with_bounds
                 in
                 (* CR layouts v2.8: we use [new_ctl] here, not [ctl], to avoid big
                    quadratic stack growth for very widely recursive types. This is
@@ -1127,26 +1195,32 @@ module Layout_and_axes = struct
                 let bounds_so_far, (bs' : (l * r2) With_bounds.t), fuel_result =
                   loop new_ctl bounds_so_far relevant_axes bs
                 in
-                bounds_so_far, With_bounds.add ty ti bs', fuel_result
+                ( bounds_so_far,
+                  With_bounds.add ty
+                    { relevant_axes = relevant_axes_for_ty }
+                    bs',
+                  fuel_result )
             in
-            match Loop_control.check ctl ty with
+            match
+              Loop_control.check ~relevant_axes:relevant_axes_for_ty ctl ty
+            with
             | Stop ctl_after_stop ->
               (* out of fuel, so assume [ty] has the worst possible bounds. *)
               found_jkind_for_ty ctl_after_stop Mod_bounds.max No_with_bounds
-                Not_best [@nontail]
+                Not_best Axis_set.empty [@nontail]
             | Skip -> loop ctl bounds_so_far relevant_axes bs (* skip [b] *)
-            | Continue ctl_after_unpacking_b -> (
+            | Continue { ctl = ctl_after_unpacking_b; skippable_axes } -> (
               match context.jkind_of_type ty with
               | Some b_jkind ->
                 found_jkind_for_ty ctl_after_unpacking_b
                   b_jkind.jkind.mod_bounds b_jkind.jkind.with_bounds
-                  b_jkind.quality [@nontail]
+                  b_jkind.quality skippable_axes [@nontail]
               | None ->
                 (* kind of b is not principally known, so we treat it as having
                    the max bound (only along the axes we care about for this
                    type!) *)
                 found_jkind_for_ty ctl_after_unpacking_b Mod_bounds.max
-                  No_with_bounds Not_best [@nontail])))
+                  No_with_bounds Not_best skippable_axes [@nontail])))
       in
       let mod_bounds = Mod_bounds.set_max_in_set t.mod_bounds skip_axes in
       let mod_bounds, with_bounds, fuel_status =

@@ -99,6 +99,16 @@ module Move : sig
   val to_string : t -> string
 end
 
+module DLL = Oxcaml_utils.Doubly_linked_list
+
+module Insert_skipping_name_for_debugger : sig
+  val insert_after :
+    Instruction.t DLL.cell -> Instruction.t -> reg:Reg.t -> unit
+
+  val add_begin :
+    Cfg.basic_instruction_list -> Instruction.t -> reg:Reg.t -> unit
+end
+
 val same_reg_class : Reg.t -> Reg.t -> bool
 
 val same_stack_class : Reg.t -> Reg.t -> bool

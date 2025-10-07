@@ -181,9 +181,9 @@ let rec insert_spills_or_reloads_in_block :
     instr_id:InstructionId.sequence ->
     make_spill_or_reload:'a make_operation ->
     occur_check:(Instruction.t -> Reg.t -> bool) ->
-    insert:(Instruction.t DLL.cell -> Instruction.t -> unit) ->
+    insert:(Instruction.t DLL.cell -> Instruction.t -> Reg.t -> unit) ->
     copy_default:Instruction.t ->
-    add_default:(Instruction.t DLL.t -> Instruction.t -> unit) ->
+    add_default:(Instruction.t DLL.t -> Instruction.t -> Reg.t -> unit) ->
     move_cell:(Instruction.t DLL.cell -> Instruction.t DLL.cell option) ->
     block_subst:Substitution.t ->
     stack_subst:Substitution.t ->
@@ -206,7 +206,7 @@ let rec insert_spills_or_reloads_in_block :
             make_spill_or_reload state ~instr_id ~stack_subst ~old_reg ~new_reg
               ~copy:copy_default
           in
-          add_default block.body spill_or_reload)
+          add_default block.body spill_or_reload new_reg)
         live_at_interesting_point
     | Some cell ->
       let live_at_interesting_point =
@@ -220,7 +220,7 @@ let rec insert_spills_or_reloads_in_block :
                 make_spill_or_reload state ~instr_id ~stack_subst ~old_reg
                   ~new_reg ~copy:instr
               in
-              insert cell spill_or_reload;
+              insert cell spill_or_reload new_reg;
               false)
             else true)
           live_at_interesting_point
@@ -250,17 +250,20 @@ let insert_spills_in_block :
          explicitly set, but also if it is destroyed by the instruction. *)
       occurs_array instr.res reg
       || occurs_array (Proc.destroyed_at_basic instr.desc) reg)
-    ~insert:DLL.insert_after
+    ~insert:(fun cell instr reg ->
+      (* See comment before Insert_skipping_name_for_debugger *)
+      Insert_skipping_name_for_debugger.insert_after cell instr ~reg)
     ~copy_default:
       (match DLL.hd block.body with
       | None -> dummy_instr_of_terminator block.terminator
       | Some hd -> hd)
-    ~add_default:DLL.add_begin ~move_cell:DLL.prev ~block_subst ~stack_subst
-    block cell live_at_destruction_point
+    ~add_default:(fun list instr reg ->
+      (* See comment before Insert_skipping_name_for_debugger *)
+      Insert_skipping_name_for_debugger.add_begin list instr ~reg)
+    ~move_cell:DLL.prev ~block_subst ~stack_subst block cell
+    live_at_destruction_point
 
 (* Inserts spills in all blocks. *)
-(* CR mshinwell: Add special handling for [Iname_for_debugger] (see
-   [Spill.add_spills]). *)
 let insert_spills :
     State.t -> Cfg_with_infos.t -> Substitution.map -> Substitution.t =
  fun state cfg_with_infos substs ->
@@ -322,10 +325,20 @@ let insert_reloads_in_block :
   insert_spills_or_reloads_in_block state ~instr_id
     ~make_spill_or_reload:make_reload
     ~occur_check:(fun instr reg -> occurs_array instr.arg reg)
-    ~insert:DLL.insert_before
+    ~insert:(fun cell instr _reg ->
+      (* We don't need special handling here, because we wouldn't expect a new
+         Name_for_debugger operation anyway (that should have occurred when the
+         variable was first introduced, i.e. before the first spill); and
+         furthermore, we prefer the spilled registers (cf.
+         Reg_availability_set.canonicalise), so it's probably not necessary to
+         add a Name_for_debugger on the reloaded one. *)
+      DLL.insert_before cell instr)
     ~copy_default:(dummy_instr_of_terminator block.terminator)
-    ~add_default:DLL.add_end ~move_cell:DLL.next ~block_subst ~stack_subst block
-    cell live_at_definition_point
+    ~add_default:(fun list instr _reg ->
+      (* Same reasoning as for insert above *)
+      DLL.add_end list instr)
+    ~move_cell:DLL.next ~block_subst ~stack_subst block cell
+    live_at_definition_point
 
 (* Inserts reloads in all blocks. *)
 let insert_reloads :
