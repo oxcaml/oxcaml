@@ -114,7 +114,7 @@ let ensure_var ~env ~res = function
     var, env, res
 
 module Small_integer = struct
-  type width = Int | Int16 | Int8
+  type t = Int | Int16 | Int8
 
   let bits = function
     | Int -> Targetint.num_bits ()
@@ -131,45 +131,151 @@ module Small_integer = struct
   let require_standard_int kind =
     match of_standard_int kind with
     | Some width -> width
-    | None -> Misc.fatal_error "Expected int8 or int16 kind"
+    | None -> Misc.fatal_error "Expected small integer kind"
 
-  let extend_prim_arg ~op_name ~error_msg ~env ~res width arg =
+  let shift_amount width =
     let bits = bits width in
     let word_bits = Targetint.num_bits () in
     if bits <= 0 || bits > word_bits
     then
-      Misc.fatal_errorf "Cannot %s %d bits when word size is %d" error_msg bits
+      Misc.fatal_errorf "Cannot shift %d-bit value on %d-bit target" bits
         word_bits;
-    let shift = word_bits - bits in
-    if shift = 0
-    then ensure_var ~env ~res arg
-    else
+    word_bits - bits
+
+  let mask = function
+    | Int -> None
+    | Int16 -> Some ((1 lsl 16) - 1)
+    | Int8 -> Some ((1 lsl 8) - 1)
+
+  let sign_extend ~env ~res width arg =
+    match shift_amount width with
+    | 0 -> ensure_var ~env ~res arg
+    | shift ->
+      let var, env, res = ensure_var ~env ~res arg in
       let shift_const = Jsir.Pc (Int (Targetint.of_int_exn shift)) in
       let shifted = Jsir.Var.fresh () in
       let res =
         To_jsir_result.add_instr_exn res
-          (Let (shifted, Prim (Extern "%int_lsl", [arg; shift_const])))
+          (Let (shifted, Prim (Extern "%int_lsl", [Pv var; shift_const])))
       in
       let result = Jsir.Var.fresh () in
       let res =
         To_jsir_result.add_instr_exn res
-          (Let (result, Prim (Extern op_name, [Pv shifted; shift_const])))
+          (Let (result, Prim (Extern "%int_asr", [Pv shifted; shift_const])))
       in
       result, env, res
 
-  let sign_extend_prim_arg ~env ~res width arg =
-    extend_prim_arg ~op_name:"%int_asr" ~error_msg:"sign-extend" ~env ~res width
-      arg
-
-  let zero_extend_prim_arg ~env ~res width arg =
-    extend_prim_arg ~op_name:"%int_lsr" ~error_msg:"zero-extend" ~env ~res width
-      arg
+  let zero_extend ~env ~res width arg =
+    match mask width with
+    | None -> ensure_var ~env ~res arg
+    | Some mask ->
+      let var, env, res = ensure_var ~env ~res arg in
+      let mask_const = Jsir.Pc (Int (Targetint.of_int_exn mask)) in
+      let result = Jsir.Var.fresh () in
+      let res =
+        To_jsir_result.add_instr_exn res
+          (Let (result, Prim (Extern "%int_and", [Pv var; mask_const])))
+      in
+      result, env, res
 
   let sign_extend_var ~env ~res width var =
-    sign_extend_prim_arg ~env ~res width (Pv var)
+    sign_extend ~env ~res width (Pv var)
 end
 
-module Siof = Flambda_kind.Standard_int_or_float
+module Num_conv = struct
+  type boxed = Int32 | Int64 | Nativeint | Float | Float32
+
+  type repr = Small of Small_integer.t | Boxed of boxed
+
+  type call = Identity | Runtime of string
+
+  let classify kind =
+    let open Flambda_kind.Standard_int_or_float in
+    match kind with
+    | Tagged_immediate | Naked_immediate -> Small Small_integer.Int
+    | Naked_int8 -> Small Small_integer.Int8
+    | Naked_int16 -> Small Small_integer.Int16
+    | Naked_int32 -> Boxed Int32
+    | Naked_int64 -> Boxed Int64
+    | Naked_nativeint -> Boxed Nativeint
+    | Naked_float -> Boxed Float
+    | Naked_float32 -> Boxed Float32
+
+  let runtime_to src dst = Format.sprintf "caml_%s_to_%s" src dst
+
+  let runtime_of dst src = Format.sprintf "caml_%s_of_%s" dst src
+
+  let runtime_to_bytecode src dst =
+    Format.sprintf "caml_%s_to_%s_bytecode" src dst
+
+  let runtime_of_bytecode dst src =
+    Format.sprintf "caml_%s_of_%s_bytecode" dst src
+
+  let apply_call ~env ~res arg = function
+    | Identity -> ensure_var ~env ~res arg
+    | Runtime name -> use_prim0 ~env ~res (Extern name) [arg]
+
+  let small_to_boxed = function
+    | Int32 -> Runtime (runtime_of "int32" "int")
+    | Int64 -> Runtime (runtime_of "int64" "int")
+    | Nativeint -> Runtime (runtime_of "nativeint" "int")
+    | Float -> Runtime (runtime_of "float" "int")
+    | Float32 -> Runtime (runtime_of "float32" "int")
+
+  let boxed_to_small = function
+    | Int32 -> Runtime (runtime_to "int32" "int")
+    | Int64 -> Runtime (runtime_to "int64" "int")
+    | Nativeint -> Runtime (runtime_to "nativeint" "int")
+    | Float -> Runtime (runtime_of "int" "float")
+    | Float32 -> Runtime (runtime_of "int" "float32")
+
+  let boxed_to_boxed src dst =
+    match src, dst with
+    | Int32, Int32
+    | Int64, Int64
+    | Nativeint, Nativeint
+    | Float, Float
+    | Float32, Float32 -> Identity
+    | Int32, Int64 -> Runtime (runtime_of "int64" "int32")
+    | Int32, Nativeint -> Runtime (runtime_of "nativeint" "int32")
+    | Int32, Float32 -> Runtime (runtime_of "float32" "int32")
+    | Int32, Float -> Runtime (runtime_to "int32" "float")
+    | Int64, Int32 -> Runtime (runtime_to "int64" "int32")
+    | Int64, Nativeint -> Runtime (runtime_to "int64" "nativeint")
+    | Int64, Float -> Runtime (runtime_to "int64" "float")
+    | Int64, Float32 -> Runtime (runtime_of_bytecode "float32" "int64")
+    | Nativeint, Int32 -> Runtime (runtime_to "nativeint" "int32")
+    | Nativeint, Int64 -> Runtime (runtime_of "int64" "nativeint")
+    | Nativeint, Float -> Runtime (runtime_to "nativeint" "float")
+    | Nativeint, Float32 -> Runtime (runtime_of "float32" "nativeint")
+    | Float, Int32 -> Runtime (runtime_of "int32" "float")
+    | Float, Int64 -> Runtime (runtime_of "int64" "float")
+    | Float, Nativeint -> Runtime (runtime_of "nativeint" "float")
+    | Float, Float32 -> Runtime (runtime_of "float32" "float")
+    | Float32, Int32 -> Runtime (runtime_of "int32" "float32")
+    | Float32, Int64 -> Runtime (runtime_to_bytecode "float32" "int64")
+    | Float32, Nativeint -> Runtime (runtime_of "nativeint" "float32")
+    | Float32, Float -> Runtime (runtime_of "float" "float32")
+
+  let convert_small_to_small ~env ~res ~src ~dst arg =
+    if Small_integer.bits src <= Small_integer.bits dst
+    then ensure_var ~env ~res arg
+    else Small_integer.sign_extend ~env ~res dst arg
+
+  let convert ~env ~res arg ~src_kind ~dst_kind =
+    match classify src_kind, classify dst_kind with
+    | Small src_small, Small dst_small ->
+      convert_small_to_small ~env ~res ~src:src_small ~dst:dst_small arg
+    | Small _, Boxed dst_boxed ->
+      apply_call ~env ~res arg (small_to_boxed dst_boxed)
+    | Boxed src_boxed, Small dst_small ->
+      let var, env, res =
+        apply_call ~env ~res arg (boxed_to_small src_boxed)
+      in
+      Small_integer.sign_extend_var ~env ~res dst_small var
+    | Boxed src_boxed, Boxed dst_boxed ->
+      apply_call ~env ~res arg (boxed_to_boxed src_boxed dst_boxed)
+end
 
 let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
   let use_prim' prim = use_prim ~env ~res prim [] in
@@ -294,7 +400,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
         | Naked_int64 -> "caml_int64_bswap"
         | Naked_nativeint -> "caml_nativeint_bswap"
         | Naked_int16 | Naked_immediate | Tagged_immediate -> "caml_bswap16"
-        | Naked_int8 -> assert false
+        | Naked_int8 -> Misc.fatal_error "Unexpected int8 byte swap"
       in
       use_prim' (Extern extern_name))
   | Float_arith (bitwidth, op) ->
@@ -303,111 +409,8 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     use_prim' (Extern extern_name)
   | Num_conv { src; dst } -> (
     let arg, res = prim_arg ~env ~res x in
-    let module Conv = struct
-      type small = Small_integer.width
-
-      type boxed = Int32 | Int64 | Nativeint | Float | Float32
-
-      type repr = Small of small | Boxed of boxed
-
-      type call =
-        | Identity
-        | Caml_to of string * string
-        | Caml_of of string * string
-        | Caml_to_bytecode of string * string
-        | Caml_of_bytecode of string * string
-
-      let classify (kind : Siof.t) : repr =
-        match kind with
-        | Siof.Tagged_immediate | Siof.Naked_immediate -> Small Small_integer.Int
-        | Siof.Naked_int8 -> Small Small_integer.Int8
-        | Siof.Naked_int16 -> Small Small_integer.Int16
-        | Siof.Naked_int32 -> Boxed Int32
-        | Siof.Naked_int64 -> Boxed Int64
-        | Siof.Naked_nativeint -> Boxed Nativeint
-        | Siof.Naked_float -> Boxed Float
-        | Siof.Naked_float32 -> Boxed Float32
-
-      let apply_call ~env ~res arg = function
-        | Identity -> ensure_var ~env ~res arg
-        | Caml_to (src, dst) ->
-          use_prim0 ~env ~res
-            (Extern (Format.sprintf "caml_%s_to_%s" src dst))
-            [arg]
-        | Caml_of (dst, src) ->
-          use_prim0 ~env ~res
-            (Extern (Format.sprintf "caml_%s_of_%s" dst src))
-            [arg]
-        | Caml_to_bytecode (src, dst) ->
-          use_prim0 ~env ~res
-            (Extern (Format.sprintf "caml_%s_to_%s_bytecode" src dst))
-            [arg]
-        | Caml_of_bytecode (dst, src) ->
-          use_prim0 ~env ~res
-            (Extern (Format.sprintf "caml_%s_of_%s_bytecode" dst src))
-            [arg]
-
-      let small_to_boxed = function
-        | Int32 -> Caml_of ("int32", "int")
-        | Int64 -> Caml_of ("int64", "int")
-        | Nativeint -> Caml_of ("nativeint", "int")
-        | Float -> Caml_of ("float", "int")
-        | Float32 -> Caml_of ("float32", "int")
-
-      let boxed_to_small = function
-        | Int32 -> Caml_to ("int32", "int")
-        | Int64 -> Caml_to ("int64", "int")
-        | Nativeint -> Caml_to ("nativeint", "int")
-        | Float -> Caml_of ("int", "float")
-        | Float32 -> Caml_of ("int", "float32")
-
-      let boxed_to_boxed src dst =
-        match src, dst with
-        | Int32, Int32
-        | Int64, Int64
-        | Nativeint, Nativeint
-        | Float, Float
-        | Float32, Float32 -> Identity
-        | Int32, Int64 -> Caml_of ("int64", "int32")
-        | Int32, Nativeint -> Caml_of ("nativeint", "int32")
-        | Int32, Float32 -> Caml_of ("float32", "int32")
-        | Int32, Float -> Caml_to ("int32", "float")
-        | Int64, Int32 -> Caml_to ("int64", "int32")
-        | Int64, Nativeint -> Caml_to ("int64", "nativeint")
-        | Int64, Float -> Caml_to ("int64", "float")
-        | Int64, Float32 -> Caml_of_bytecode ("float32", "int64")
-        | Nativeint, Int32 -> Caml_to ("nativeint", "int32")
-        | Nativeint, Int64 -> Caml_of ("int64", "nativeint")
-        | Nativeint, Float -> Caml_to ("nativeint", "float")
-        | Nativeint, Float32 -> Caml_of ("float32", "nativeint")
-        | Float, Int32 -> Caml_of ("int32", "float")
-        | Float, Int64 -> Caml_of ("int64", "float")
-        | Float, Nativeint -> Caml_of ("nativeint", "float")
-        | Float, Float32 -> Caml_of ("float32", "float")
-        | Float32, Int32 -> Caml_of ("int32", "float32")
-        | Float32, Int64 -> Caml_to_bytecode ("float32", "int64")
-        | Float32, Nativeint -> Caml_of ("nativeint", "float32")
-        | Float32, Float -> Caml_of ("float", "float32")
-
-      let cast_small_to_small arg ~env ~res src dst =
-        if Small_integer.bits src <= Small_integer.bits dst
-        then ensure_var ~env ~res arg
-        else Small_integer.sign_extend_prim_arg ~env ~res dst arg
-
-      let cast arg ~env ~res ~src ~dst =
-        match src, dst with
-        | Small src_small, Small dst_small ->
-          cast_small_to_small arg ~env ~res src_small dst_small
-        | Small _, Boxed dst_boxed ->
-          apply_call ~env ~res arg (small_to_boxed dst_boxed)
-        | Boxed src_boxed, Small dst_small ->
-          let var, env, res = apply_call ~env ~res arg (boxed_to_small src_boxed) in
-          Small_integer.sign_extend_var ~env ~res dst_small var
-        | Boxed src_boxed, Boxed dst_boxed ->
-          apply_call ~env ~res arg (boxed_to_boxed src_boxed dst_boxed)
-    end in
     let result, env, res =
-      Conv.cast arg ~env ~res ~src:(Conv.classify src) ~dst:(Conv.classify dst)
+      Num_conv.convert ~env ~res arg ~src_kind:src ~dst_kind:dst
     in
     Some result, env, res)
   | Boolean_not -> use_prim' Not
@@ -523,20 +526,11 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       let x, res = prim_arg ~env ~res x in
       let y, res = prim_arg ~env ~res y in
       let result, env, res = use_prim0 ~env ~res (Extern extern_name) [x; y] in
-      match kind with
-      | Naked_int8 ->
-        let result, env, res =
-          Small_integer.sign_extend_var ~env ~res Small_integer.Int8 result
-        in
-        Some result, env, res
-      | Naked_int16 ->
-        let result, env, res =
-          Small_integer.sign_extend_var ~env ~res Small_integer.Int16 result
-        in
-        Some result, env, res
-      | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
-      | Naked_nativeint ->
-        assert false)
+      let width = Small_integer.require_standard_int kind in
+      let result, env, res =
+        Small_integer.sign_extend_var ~env ~res width result
+      in
+      Some result, env, res)
     | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
     | Naked_nativeint ->
       let op_name =
@@ -569,9 +563,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       let x, env, res =
         match op with
         | Lsr ->
-          let var, env, res =
-            Small_integer.zero_extend_prim_arg ~env ~res width x
-          in
+          let var, env, res = Small_integer.zero_extend ~env ~res width x in
           Jsir.Pv var, env, res
         | Lsl | Asr -> x, env, res
       in
@@ -587,15 +579,26 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
     | Naked_nativeint ->
       let op_name =
-        match kind, op with
-        | (Tagged_immediate | Naked_immediate), Lsl -> "lsl"
-        | (Naked_int32 | Naked_int64 | Naked_nativeint), Lsl -> "shift_left"
-        | (Tagged_immediate | Naked_immediate), Lsr -> "lsr"
-        | (Naked_int32 | Naked_int64 | Naked_nativeint), Lsr ->
-          "shift_right_unsigned"
-        | (Tagged_immediate | Naked_immediate), Asr -> "asr"
-        | (Naked_int32 | Naked_int64 | Naked_nativeint), Asr -> "shift_right"
-        | (Naked_int8 | Naked_int16), _ -> assert false
+        match op with
+        | Lsl -> (
+          match kind with
+          | Tagged_immediate | Naked_immediate -> "lsl"
+          | Naked_int32 | Naked_int64 | Naked_nativeint -> "shift_left"
+          | Naked_int8 | Naked_int16 ->
+            Misc.fatal_error "Unexpected small-int shift left")
+        | Lsr -> (
+          match kind with
+          | Tagged_immediate | Naked_immediate -> "lsr"
+          | Naked_int32 | Naked_int64 | Naked_nativeint ->
+            "shift_right_unsigned"
+          | Naked_int8 | Naked_int16 ->
+            Misc.fatal_error "Unexpected small-int logical shift")
+        | Asr -> (
+          match kind with
+          | Tagged_immediate | Naked_immediate -> "asr"
+          | Naked_int32 | Naked_int64 | Naked_nativeint -> "shift_right"
+          | Naked_int8 | Naked_int16 ->
+            Misc.fatal_error "Unexpected small-int arithmetic shift")
       in
       let extern_name =
         with_int_prefix_exn ~kind op_name ~percent_for_imms:true
@@ -646,11 +649,8 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         | ( (Naked_int8 | Naked_int16) as small_kind,
             (Lt Unsigned | Gt Unsigned | Le Unsigned | Ge Unsigned) ) ->
           let width = Small_integer.require_standard_int small_kind in
-          let x_var, env, res =
-            Small_integer.zero_extend_prim_arg ~env ~res width x
-          in
-          let y_var, env, res =
-            Small_integer.zero_extend_prim_arg ~env ~res width y
+          let x_var, env, res = Small_integer.zero_extend ~env ~res width x in
+          let y_var, env, res = Small_integer.zero_extend ~env ~res width y
           in
           Jsir.Pv x_var, Jsir.Pv y_var, env, res
         | ( ( Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
@@ -685,11 +685,8 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
           let width = Small_integer.require_standard_int small_kind in
           let x, res = prim_arg ~env ~res x in
           let y, res = prim_arg ~env ~res y in
-          let x_var, env, res =
-            Small_integer.zero_extend_prim_arg ~env ~res width x
-          in
-          let y_var, env, res =
-            Small_integer.zero_extend_prim_arg ~env ~res width y
+          let x_var, env, res = Small_integer.zero_extend ~env ~res width x in
+          let y_var, env, res = Small_integer.zero_extend ~env ~res width y
           in
           use_prim ~env ~res (Extern "caml_int_compare") [Pv x_var; Pv y_var]
         | Tagged_immediate | Naked_immediate ->
