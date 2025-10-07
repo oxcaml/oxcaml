@@ -480,6 +480,11 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
     | Default_loopify_and_not_tailrec -> Never_loopify
   in
   let code_const, new_code =
+    (* CR vlaviron: Ideally the debuginfo should be associated to the set of
+       closures, not the code, but at the moment To_cmm looks at the debuginfo
+       of the code to compute the debuginfo of the set of closures
+       allocation. *)
+    let dbg = DE.add_inlined_debuginfo (DA.denv outer_dacc) (Code.dbg code) in
     Rebuilt_static_const.create_code
       (DA.are_rebuilding_terms dacc_after_body)
       code_id ~params_and_body ~free_names_of_params_and_body:free_names_of_code
@@ -493,9 +498,9 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~regalloc_attribute:(Code.regalloc_attribute code)
       ~regalloc_param_attribute:(Code.regalloc_param_attribute code)
       ~cold:(Code.cold code) ~is_a_functor ~is_opaque
-      ~recursive:(Code.recursive code) ~cost_metrics ~inlining_arguments
-      ~dbg:(Code.dbg code) ~is_tupled:(Code.is_tupled code) ~is_my_closure_used
-      ~inlining_decision ~absolute_history ~relative_history ~loopify
+      ~recursive:(Code.recursive code) ~cost_metrics ~inlining_arguments ~dbg
+      ~is_tupled:(Code.is_tupled code) ~is_my_closure_used ~inlining_decision
+      ~absolute_history ~relative_history ~loopify
   in
   let code =
     let are_rebuilding = DA.are_rebuilding_terms dacc_after_body in
