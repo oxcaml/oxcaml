@@ -23,10 +23,13 @@ module Typing_env = struct
         add_equation t name ty ~meet_type:(Meet.meet_type ()))
 
   let add_is_null_relation t name ~scrutinee =
-    add_equation t name (Type_grammar.is_null ~scrutinee)
+    let machine_width = machine_width t in
+    add_equation t name (Type_grammar.is_null ~machine_width ~scrutinee)
 
   let add_is_int_relation t name ~scrutinee =
-    add_equation t name (Type_grammar.is_int_for_scrutinee ~scrutinee)
+    let machine_width = machine_width t in
+    add_equation t name
+      (Type_grammar.is_int_for_scrutinee ~machine_width ~scrutinee)
 
   let add_get_tag_relation t name ~scrutinee =
     add_equation t name (Type_grammar.get_tag_for_block ~block:scrutinee)
@@ -51,12 +54,13 @@ end
 module Typing_env_extension = struct
   include Typing_env_extension
 
-  let add_is_null_relation t name ~scrutinee =
-    add_or_replace_equation t name (Type_grammar.is_null ~scrutinee)
-
-  let add_is_int_relation t name ~scrutinee =
+  let add_is_null_relation ~machine_width t name ~scrutinee =
     add_or_replace_equation t name
-      (Type_grammar.is_int_for_scrutinee ~scrutinee)
+      (Type_grammar.is_null ~machine_width ~scrutinee)
+
+  let add_is_int_relation ~machine_width t name ~scrutinee =
+    add_or_replace_equation t name
+      (Type_grammar.is_int_for_scrutinee ~machine_width ~scrutinee)
 
   let add_get_tag_relation t name ~scrutinee =
     add_or_replace_equation t name
