@@ -311,7 +311,7 @@ module Make (V : ORDERED) = struct
     if is_leaf w then w else
     let n = node_block w in
     match n.v.state with
-    | Solved d -> 
+    | Solved d ->
       let lo' = restrict0_force x n.lo in
       let hi' = restrict0_force x n.hi in
       (* let d' = restrict0_force x d in *)
