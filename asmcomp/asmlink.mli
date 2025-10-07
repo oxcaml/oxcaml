@@ -43,15 +43,7 @@ val extract_crc_interfaces : unit -> Import_info.t list
 val extract_crc_implementations : unit -> Import_info.t list
 
 type error =
-  | File_not_found of filepath
-  | Not_an_object_file of filepath
-  | Missing_implementations of (Compilation_unit.t * string list) list
-  | Inconsistent_interface of Compilation_unit.Name.t * filepath * filepath
-  | Inconsistent_implementation of Compilation_unit.t * filepath * filepath
   | Assembler_error of filepath
-  | Linking_error of int
-  | Multiple_definition of Compilation_unit.Name.t * filepath * filepath
-  | Missing_cmx of filepath * Compilation_unit.t
   | Dwarf_fission_objcopy_on_macos
   | Dwarf_fission_dsymutil_not_macos
   | Dsymutil_error of int
