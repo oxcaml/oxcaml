@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 (** The OCaml Standard library.
 
@@ -195,7 +195,9 @@ val max : ('a : value_or_null) . 'a -> 'a -> 'a
     The result is unspecified if one of the arguments contains
     the float value [nan]. *)
 
-external ( == ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%eq"
+external ( == ) :
+  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool
+  @@ portable stateful = "%eq"
 (** [e1 == e2] tests for physical equality of [e1] and [e2].
    On mutable types such as references, arrays, byte sequences, records with
    mutable fields and objects with mutable instance variables,
@@ -207,7 +209,9 @@ external ( == ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) ->
    Left-associative operator,  see {!Ocaml_operators} for more information.
 *)
 
-external ( != ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%noteq"
+external ( != ) :
+  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool
+  @@ portable stateful = "%noteq"
 (** Negation of {!Stdlib.( == )}.
     Left-associative operator,  see {!Ocaml_operators} for more information.
 *)
@@ -838,10 +842,10 @@ val ( @ ) : ('a : value_or_null) . 'a list -> 'a list -> 'a list
     Note: all input/output functions can raise [Sys_error] when the system
     calls they invoke fail. *)
 
-type in_channel : value mod portable contended
+type in_channel : value mod stateless contended
 (** The type of input channel. *)
 
-type out_channel : value mod portable contended
+type out_channel : value mod stateless contended
 (** The type of output channel. *)
 
 val stdin : in_channel
@@ -856,30 +860,30 @@ val stderr : out_channel
 
 (** {2 Output functions on standard output} *)
 
-val print_char : char -> unit
+val print_char : char -> unit @@ portable stateful
 (** Print a character on standard output. *)
 
-val print_string : string -> unit
+val print_string : string -> unit @@ portable stateful
 (** Print a string on standard output. *)
 
-val print_bytes : bytes -> unit
+val print_bytes : bytes -> unit @@ portable stateful
 (** Print a byte sequence on standard output.
    @since 4.02 *)
 
-val print_int : int -> unit
+val print_int : int -> unit @@ portable stateful
 (** Print an integer, in decimal, on standard output. *)
 
-val print_float : float -> unit
+val print_float : float -> unit @@ portable stateful
 (** Print a floating-point number, in decimal, on standard output.
 
     The conversion of the number to a string uses {!string_of_float} and
     can involve a loss of precision. *)
 
-val print_endline : string -> unit
+val print_endline : string -> unit @@ portable stateful
 (** Print a string, followed by a newline character, on
    standard output and flush standard output. *)
 
-val print_newline : unit -> unit
+val print_newline : unit -> unit @@ portable stateful
 (** Print a newline character on standard output, and flush
    standard output. This can be used to simulate line
    buffering of standard output. *)
@@ -887,37 +891,37 @@ val print_newline : unit -> unit
 
 (** {2 Output functions on standard error} *)
 
-val prerr_char : char -> unit
+val prerr_char : char -> unit @@ portable stateful
 (** Print a character on standard error. *)
 
-val prerr_string : string -> unit
+val prerr_string : string -> unit @@ portable stateful
 (** Print a string on standard error. *)
 
-val prerr_bytes : bytes -> unit
+val prerr_bytes : bytes -> unit @@ portable stateful
 (** Print a byte sequence on standard error.
    @since 4.02 *)
 
-val prerr_int : int -> unit
+val prerr_int : int -> unit @@ portable stateful
 (** Print an integer, in decimal, on standard error. *)
 
-val prerr_float : float -> unit
+val prerr_float : float -> unit @@ portable stateful
 (** Print a floating-point number, in decimal, on standard error.
 
     The conversion of the number to a string uses {!string_of_float} and
     can involve a loss of precision. *)
 
-val prerr_endline : string -> unit
+val prerr_endline : string -> unit @@ portable stateful
 (** Print a string, followed by a newline character on standard
    error and flush standard error. *)
 
-val prerr_newline : unit -> unit
+val prerr_newline : unit -> unit @@ portable stateful
 (** Print a newline character on standard error, and flush
    standard error. *)
 
 
 (** {2 Input functions on standard input} *)
 
-val read_line : unit -> string
+val read_line : unit -> string @@ portable stateful
 (** Flush standard output, then read characters from standard input
    until a newline character is encountered.
 
@@ -928,7 +932,7 @@ val read_line : unit -> string
    line.
 *)
 
-val read_int_opt: unit -> int option
+val read_int_opt: unit -> int option @@ portable stateful
 (** Flush standard output, then read one line from standard input
    and convert it to an integer.
 
@@ -936,11 +940,11 @@ val read_int_opt: unit -> int option
    @since 4.05
 *)
 
-val read_int : unit -> int
+val read_int : unit -> int @@ portable stateful
 (** Same as {!Stdlib.read_int_opt}, but raise [Failure "int_of_string"]
    instead of returning [None]. *)
 
-val read_float_opt: unit -> float option
+val read_float_opt: unit -> float option @@ portable stateful
 (** Flush standard output, then read one line from standard input
    and convert it to a floating-point number.
 
@@ -949,7 +953,7 @@ val read_float_opt: unit -> float option
    @since 4.05
 *)
 
-val read_float : unit -> float
+val read_float : unit -> float @@ portable stateful
 (** Same as {!Stdlib.read_float_opt}, but raise [Failure "float_of_string"]
    instead of returning [None]. *)
 
@@ -969,19 +973,20 @@ type open_flag =
 (** Opening modes for {!Stdlib.open_out_gen} and
   {!Stdlib.open_in_gen}. *)
 
-val open_out : string -> out_channel
+val open_out : string -> out_channel @@ portable stateful
 (** Open the named file for writing, and return a new output channel
    on that file, positioned at the beginning of the file. The
    file is truncated to zero length if it already exists. It
    is created if it does not already exists. *)
 
-val open_out_bin : string -> out_channel
+val open_out_bin : string -> out_channel @@ portable stateful
 (** Same as {!Stdlib.open_out}, but the file is opened in binary mode,
    so that no translation takes place during writes. On operating
    systems that do not distinguish between text mode and binary
    mode, this function behaves like {!Stdlib.open_out}. *)
 
-val open_out_gen : open_flag list -> int -> string -> out_channel
+val open_out_gen :
+  open_flag list -> int -> string -> out_channel @@ portable stateful
 (** [open_out_gen mode perm filename] opens the named file for writing,
    as described above. The extra argument [mode]
    specifies the opening mode. The extra argument [perm] specifies
@@ -995,7 +1000,7 @@ val flush : out_channel -> unit
    Interactive programs must be careful about flushing standard
    output and standard error at the right time. *)
 
-val flush_all : unit -> unit
+val flush_all : unit -> unit @@ portable stateful
 (** Flush all open output channels; ignore errors. *)
 
 val output_char : out_channel -> char -> unit
@@ -1014,7 +1019,8 @@ val output : out_channel -> bytes -> int -> int -> unit
    @raise Invalid_argument if [pos] and [len] do not
    designate a valid range of [buf]. *)
 
-val output_substring : out_channel -> string -> int -> int -> unit
+val output_substring :
+  out_channel -> string -> int -> int -> unit
 (** Same as [output] but take a string as argument instead of
    a byte sequence.
    @since 4.02 *)
@@ -1073,7 +1079,8 @@ val close_out : out_channel -> unit
 val close_out_noerr : out_channel -> unit
 (** Same as [close_out], but ignore all errors. *)
 
-val set_binary_mode_out : out_channel -> bool -> unit
+val set_binary_mode_out :
+  out_channel -> bool -> unit
 (** [set_binary_mode_out oc true] sets the channel [oc] to binary
    mode: no translations take place during output.
    [set_binary_mode_out oc false] sets the channel [oc] to text
@@ -1086,17 +1093,18 @@ val set_binary_mode_out : out_channel -> bool -> unit
 
 (** {2 General input functions} *)
 
-val open_in : string -> in_channel
+val open_in : string -> in_channel @@ portable stateful
 (** Open the named file for reading, and return a new input channel
    on that file, positioned at the beginning of the file. *)
 
-val open_in_bin : string -> in_channel
+val open_in_bin : string -> in_channel @@ portable stateful
 (** Same as {!Stdlib.open_in}, but the file is opened in binary mode,
    so that no translation takes place during reads. On operating
    systems that do not distinguish between text mode and binary
    mode, this function behaves like {!Stdlib.open_in}. *)
 
-val open_in_gen : open_flag list -> int -> string -> in_channel
+val open_in_gen :
+  open_flag list -> int -> string -> in_channel @@ portable stateful
 (** [open_in_gen mode perm filename] opens the named file for reading,
    as described above. The extra arguments
    [mode] and [perm] specify the opening mode and file permissions.
@@ -1131,7 +1139,8 @@ val input : in_channel -> bytes -> int -> int -> int
    Exception [Invalid_argument "input"] is raised if [pos] and [len]
    do not designate a valid range of [buf]. *)
 
-val really_input : in_channel -> bytes -> int -> int -> unit
+val really_input :
+  in_channel -> bytes -> int -> int -> unit
 (** [really_input ic buf pos len] reads [len] characters from channel [ic],
    storing them in byte sequence [buf], starting at character number [pos].
    @raise End_of_file if the end of file is reached before [len]
@@ -1139,7 +1148,8 @@ val really_input : in_channel -> bytes -> int -> int -> unit
    @raise Invalid_argument if
    [pos] and [len] do not designate a valid range of [buf]. *)
 
-val really_input_string : in_channel -> int -> string
+val really_input_string :
+  in_channel -> int -> string
 (** [really_input_string ic len] reads [len] characters from channel [ic]
    and returns them in a new string.
    @raise End_of_file if the end of file is reached before [len]
@@ -1209,14 +1219,14 @@ val set_binary_mode_in : in_channel -> bool -> unit
 (** {2 Operations on large files} *)
 
 module LargeFile :
-  sig
+  sig @@ portable stateful
     val seek_out : out_channel -> int64 -> unit
     val pos_out : out_channel -> int64
     val out_channel_length : out_channel -> int64
     val seek_in : in_channel -> int64 -> unit
     val pos_in : in_channel -> int64
     val in_channel_length : in_channel -> int64
-  end
+  end @@ portable stateful
 (** Operations on large files.
   This sub-module provides 64-bit variants of the channel functions
   that manipulate file positions and file sizes.  By representing
@@ -1362,7 +1372,7 @@ val ( ^^ ) :
 
 (** {1 Program termination} *)
 
-val exit : int -> 'a @@ nonportable
+val exit : int -> 'a @@ nonportable stateful
 (** Terminate the process, returning the given status code to the operating
     system: usually 0 to indicate no errors, and a small positive integer to
     indicate failure. All open output channels are flushed with [flush_all].
@@ -1373,7 +1383,7 @@ val exit : int -> 'a @@ nonportable
     An implicit [exit 2] is performed if the program terminates early because
     of an uncaught exception. *)
 
-val at_exit : (unit -> unit) -> unit @@ nonportable
+val at_exit : (unit -> unit) -> unit @@ nonportable stateful
 (** Register the given function to be called at program termination
    time. The functions registered with [at_exit] will be called when
    the program does any of the following:
@@ -1387,13 +1397,13 @@ val at_exit : (unit -> unit) -> unit @@ nonportable
 (** Submodule containing non-backwards-compatible functions which enforce thread safety
     via modes. *)
 module Safe : sig
-  val at_exit : (unit -> unit) @ portable -> unit
+  val at_exit : (unit -> unit) @ portable -> unit @@ portable stateful
   (** Like {!at_exit}, but can be called from any domain.
 
       The provided closure must be [portable] as it might be called from another domain.
       In particular, the primary domain may call {!exit}, thus calling the provided
       closure even if it came from a secondary domain. *)
-end
+end @@ portable stateful
 
 (**/**)
 
