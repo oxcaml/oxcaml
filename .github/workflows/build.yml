@@ -160,6 +160,8 @@ jobs:
     steps:
     - name: Checkout the OxCaml repo
       uses: actions/checkout@master
+      with:
+        path: 'oxcaml' # needed for metrics collection runner
 
     # jvanburen: I don't think we actually test this and it takes forever to set up
     # - name: Install AFL (for Linux workers)
@@ -182,17 +184,19 @@ jobs:
       # bash >=4 is needed for tools/gen_ocamlj_rules.sh
 
     - name: Set up Opam
+      working-directory: oxcaml
       uses: ocaml/setup-ocaml@v3
       with:
         ocaml-compiler: oxcaml-ci-deps.5.2.0
         opam-repositories: |
-          local: file://${{ github.workspace }}/tools/ci/local-opam
+          local: file://${{ github.workspace }}/oxcaml/tools/ci/local-opam
           default: https://github.com/ocaml/opam-repository.git
         opam-disable-sandboxing: true
         opam-pin: false
         cache-prefix: ${{ matrix.os }}-v1
 
     - name: Set up Opam environment
+      working-directory: oxcaml
       # this command adds the opam environment to the PATH.
       run: |
         opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
@@ -202,6 +206,7 @@ jobs:
       run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install parallel
 
     - name: Disable any testcases
+      working-directory: oxcaml
       run: |
         disable_testcases="${{matrix.disable_testcases}}"
         if [ -n "$disable_testcases" ]; then
@@ -209,6 +214,7 @@ jobs:
         fi
 
     - name: Configure OxCaml
+      working-directory: oxcaml
       run: |
         if [[ -n "${{matrix.cc}}" ]]; then
           export CC="${{matrix.cc}}"
@@ -238,6 +244,7 @@ jobs:
         codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlopt.opt
 
     - name: Build, install and test OxCaml
+      working-directory: oxcaml
       if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
       run: |
         if [ "$run_testsuite" = true ]; then target=ci; else target=compiler; fi
@@ -280,6 +287,7 @@ jobs:
         tar -xzf oxcaml-llvm.tar.gz -C oxcaml-llvm --strip-components=1
 
     - name: Build and test OxCaml DWARF
+      working-directory: oxcaml
       if: matrix.dwarf_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
       run: |
         ulimit -c unlimited
@@ -288,6 +296,7 @@ jobs:
         OXCAML_LLDB: ${{ github.workspace }}/oxcaml-llvm/bin/lldb
 
     - name: Build and test OxCaml Llvmize
+      working-directory: oxcaml
       if: matrix.llvmize_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
       run: |
         ulimit -c unlimited
@@ -296,10 +305,12 @@ jobs:
         OXCAML_CLANG: ${{ github.workspace }}/oxcaml-llvm/bin/clang
 
     - name: Check other architectures
+      working-directory: oxcaml
       if: matrix.check_arch == true
       run: make check_all_arches
 
     - name: Run register allocation on artifacts
+      working-directory: oxcaml
       if: matrix.run_regalloc_tool == true
       run: |
         for allocator in irc ls gi; do \
@@ -377,13 +388,13 @@ jobs:
 #       if: ${{ failure() }}
 #       with:
 #         name: _build-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-#         path: ${{ github.workspace }}/_build
+#         path: ${{ github.workspace }}/oxcaml/_build
 #
 #     - uses: actions/upload-artifact@v4
 #       if: ${{ failure() }}
 #       with:
 #         name: _runtest-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-#         path: ${{ github.workspace }}/_runtest
+#         path: ${{ github.workspace }}/oxcaml/_runtest
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
