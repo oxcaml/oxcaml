@@ -1,5 +1,5 @@
 (* TEST
- reference = "${test_source_directory}/block_indices.reference";
+ reference = "${test_source_directory}/block_indices_using_ptr_primitives.reference";
  flambda2;
  include stdlib_stable;
  include stdlib_upstream_compatible;
@@ -7,23 +7,20 @@
    ocamlc_byte_exit_status = "2";
    setup-ocamlc.byte-build-env;
    flags = "-extension-universe no_extensions";
-   compiler_reference = "${test_source_directory}/block_indices_disabled.compilers.reference";
+   compiler_reference = "${test_source_directory}/block_indices_using_ptr_primitives.disabled.compilers.reference";
    ocamlc.byte;
    check-ocamlc.byte-output;
  } {
-   bytecode;
- }{
    native;
  } {
    flags = "-Oclassic";
    native;
  } {
-   flags = "-O3";
    native;
  }
 *)
 
-(* Coupled with block_indices_using_ptr_primitives.ml *)
+(* Coupled with block_indices.ml *)
 
 open Stdlib_stable
 open Stdlib_upstream_compatible
@@ -43,6 +40,14 @@ external[@layout_poly] set :
   ('a : any mod separable) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a -> unit =
   "%array_safe_set"
 
+external[@layout_poly] unsafe_get_ptr :
+  'a ('b : any). (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt])
+  = "%unsafe_get_ptr"
+
+external[@layout_poly] unsafe_set_ptr :
+  'a ('b : any). (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  = "%unsafe_set_ptr"
+
 type void : void
 external void : unit -> void = "%unbox_unit"
 
@@ -56,9 +61,9 @@ type boxed_record = { s : string; mutable f : float }
 let () =
   print_endline "Boxed record";
   let r = { s = "foo"; f = 1.0 } in
-  let x = Idx_mut.unsafe_get r (.f) in
+  let x = unsafe_get_ptr #(r, (.f)) in
   Printf.printf "%f\n" x;
-  Idx_mut.unsafe_set r (.f) 2.0;
+  unsafe_set_ptr #(r, (.f)) 2.0;
   Printf.printf "%f\n" r.f;
   print_newline ()
 
@@ -67,9 +72,9 @@ type float_record = { f' : float; mutable f : float }
 let () =
   print_endline "Float record";
   let r = { f' = -100.0; f = 1.0 } in
-  let x = Idx_mut.unsafe_get r (.f) in
+  let x = unsafe_get_ptr #(r, (.f)) in
   Printf.printf "%f\n" (Float_u.to_float x);
-  Idx_mut.unsafe_set r (.f) #2.0;
+  unsafe_set_ptr #(r, (.f)) #2.0;
   Printf.printf "%f\n" r.f;
   print_newline ()
 
@@ -78,9 +83,9 @@ type mixed_record = { i : int; mutable u : float#; s : string }
 let () =
   print_endline "Mixed block record";
   let r = { i = -100; u = #1.0; s = "foo" } in
-  let x = Idx_mut.unsafe_get r (.u) in
+  let x = unsafe_get_ptr #(r, (.u)) in
   Printf.printf "%f\n" (Float_u.to_float x);
-  Idx_mut.unsafe_set r (.u) #2.0;
+  unsafe_set_ptr #(r, (.u)) #2.0;
   Printf.printf "%f\n" (Float_u.to_float r.u);
   print_newline ()
 
@@ -89,9 +94,9 @@ type mixed_float32_record = { s : string; mutable f : float32# }
 let () =
   print_endline "Mixed block record (float32# field)";
   let r = { s = "foo"; f = #1.0s } in
-  let x = Idx_mut.unsafe_get r (.f) in
+  let x = unsafe_get_ptr #(r, (.f)) in
   Printf.printf "%f\n" (Float_u.to_float (Float32_u.to_float x));
-  Idx_mut.unsafe_set r (.f) #2.0s;
+  unsafe_set_ptr #(r, (.f)) #2.0s;
   Printf.printf "%f\n" (Float_u.to_float (Float32_u.to_float r.f));
   print_newline ()
 
@@ -100,9 +105,9 @@ type nested_record = { f : float#; mutable r : boxed_record# }
 let () =
   print_endline "Nested mixed block record";
   let r = { f = -#100.0; r = #{ s = "foo"; f = 1.0 } } in
-  let x = Idx_mut.unsafe_get r (.r.#f) in
+  let x = unsafe_get_ptr #(r, (.r.#f)) in
   Printf.printf "%f\n" x;
-  Idx_mut.unsafe_set r (.r.#f) 2.0;
+  unsafe_set_ptr #(r, (.r.#f)) 2.0;
   Printf.printf "%f\n" r.r.#f;
   print_newline ()
 
@@ -111,18 +116,18 @@ type mixed_float_record = { mutable f : float; mutable u : float# }
 let () =
   print_endline "Mixed float record (float field)";
   let r = { f = 1.0; u = -#100.0 } in
-  let x = Idx_mut.unsafe_get r (.f) in
+  let x = unsafe_get_ptr #(r, (.f)) in
   Printf.printf "%f\n" (Float_u.to_float x);
-  Idx_mut.unsafe_set r (.f) #2.0;
+  unsafe_set_ptr #(r, (.f)) #2.0;
   Printf.printf "%f\n" r.f;
   print_newline ()
 
 let () =
   print_endline "Mixed float record (float# field)";
   let r = { f = -100.0; u = #1.0 } in
-  let x = Idx_mut.unsafe_get r (.u) in
+  let x = unsafe_get_ptr #(r, (.u)) in
   Printf.printf "%f\n" (Float_u.to_float x);
-  Idx_mut.unsafe_set r (.u) #2.0;
+  unsafe_set_ptr #(r, (.u)) #2.0;
   Printf.printf "%f\n" (Float_u.to_float r.u);
   print_newline ()
 
@@ -135,9 +140,9 @@ let () =
     r1 = #{ f1 = -#100.0; f2 = -#100.0 };
     r2 = #{ f1 = #100.0;  f2 = #1.0 }
   } in
-  let x = Idx_mut.unsafe_get rr (.r2.#f2) in
+  let x = unsafe_get_ptr #(rr, (.r2.#f2)) in
   Printf.printf "%f\n" (Float_u.to_float x);
-  Idx_mut.unsafe_set rr (.r2.#f2) #2.0;
+  unsafe_set_ptr #(rr, (.r2.#f2)) #2.0;
   Printf.printf "%f\n" (Float_u.to_float rr.r2.#f2);
   print_newline ()
 
@@ -146,9 +151,9 @@ type mixed_int32_record = { j : int32#; mutable i : int32# }
 let () =
   print_endline "Mixed block record (int32# field)";
   let r = { j = -#100l; i = #1l } in
-  let x = Idx_mut.unsafe_get r (.i) in
+  let x = unsafe_get_ptr #(r, (.i)) in
   Printf.printf "%d\n" (Int32_u.to_int x);
-  Idx_mut.unsafe_set r (.i) #2l;
+  unsafe_set_ptr #(r, (.i)) #2l;
   Printf.printf "%d\n" (Int32_u.to_int r.i);
   print_newline ()
 
@@ -157,9 +162,9 @@ type mixed_int64_record = { j : int64#; mutable i : int64# }
 let () =
   print_endline "Mixed block record (int64# field)";
   let r = { j = -#100L; i = #1L } in
-  let x = Idx_mut.unsafe_get r (.i) in
+  let x = unsafe_get_ptr #(r, (.i)) in
   Printf.printf "%d\n" (Int64_u.to_int x);
-  Idx_mut.unsafe_set r (.i) #2L;
+  unsafe_set_ptr #(r, (.i)) #2L;
   Printf.printf "%d\n" (Int64_u.to_int r.i);
   print_newline ()
 
@@ -168,9 +173,9 @@ type mixed_nativeint_record = { j : nativeint#; mutable i : nativeint# }
 let () =
   print_endline "Mixed block record (nativeint# field)";
   let r = { j = -#100n; i = #1n } in
-  let x = Idx_mut.unsafe_get r (.i) in
+  let x = unsafe_get_ptr #(r, (.i)) in
   Printf.printf "%d\n" (Nativeint_u.to_int x);
-  Idx_mut.unsafe_set r (.i) #2n;
+  unsafe_set_ptr #(r, (.i)) #2n;
   Printf.printf "%d\n" (Nativeint_u.to_int r.i);
   print_newline ()
 
@@ -181,23 +186,23 @@ let () =
   print_endline
     "Mixed block record with unboxed record with value, flat, and void";
   let r = { u = #{ v = void (); s = "a"; f = #1. } } in
-  let s = Idx_mut.unsafe_get r (.u.#s) in
-  let f = Idx_mut.unsafe_get r (.u.#f) in
-  let v = Idx_mut.unsafe_get r (.u.#v) in
+  let s = unsafe_get_ptr #(r, (.u.#s)) in
+  let f = unsafe_get_ptr #(r, (.u.#f)) in
+  let v = unsafe_get_ptr #(r, (.u.#v)) in
   Printf.printf "{ %s %f %s }\n" s (Float_u.to_float f) (use_void v);
-  Idx_mut.unsafe_set r (.u.#s) "b";
-  Idx_mut.unsafe_set r (.u.#f) #2.;
+  unsafe_set_ptr #(r, (.u.#s)) "b";
+  unsafe_set_ptr #(r, (.u.#f)) #2.;
   Idx_mut.unsafe_set r (.u.#v) (void ());
-  let s = Idx_mut.unsafe_get r (.u.#s) in
-  let f = Idx_mut.unsafe_get r (.u.#f) in
-  let v = Idx_mut.unsafe_get r (.u.#v) in
+  let s = unsafe_get_ptr #(r, (.u.#s)) in
+  let f = unsafe_get_ptr #(r, (.u.#f)) in
+  let v = unsafe_get_ptr #(r, (.u.#v)) in
   Printf.printf "{ %s %f %s }\n" s (Float_u.to_float f) (use_void v);
-  Idx_mut.unsafe_set r (.idx_mut((.u)).#s) "c";
-  Idx_mut.unsafe_set r (.idx_mut((.u)).#f) #3.;
+  unsafe_set_ptr #(r, (.idx_mut((.u)).#s)) "c";
+  unsafe_set_ptr #(r, (.idx_mut((.u)).#f)) #3.;
   Idx_mut.unsafe_set r (.idx_mut((.u)).#v) (void ());
-  let s = Idx_mut.unsafe_get r (.idx_mut((.u)).#s) in
-  let f = Idx_mut.unsafe_get r (.idx_mut((.u)).#f) in
-  let v = Idx_mut.unsafe_get r (.idx_mut((.u)).#v) in
+  let s = unsafe_get_ptr #(r, (.idx_mut((.u)).#s)) in
+  let f = unsafe_get_ptr #(r, (.idx_mut((.u)).#f)) in
+  let v = unsafe_get_ptr #(r, (.idx_mut((.u)).#v)) in
   Printf.printf "{ %s %f %s }\n" s (Float_u.to_float f) (use_void v);
   print_newline ()
 
@@ -209,7 +214,7 @@ type b = { i : int64#; a : a#; s : string }
 type c = { mutable b : b#; s : string }
 
 let print_t_b t =
-  let #{ i = bi; a = #{ s; i }; s = bs } = Idx_mut.unsafe_get t (.b) in
+  let #{ i = bi; a = #{ s; i }; s = bs } = unsafe_get_ptr #(t, (.b)) in
   Printf.printf "{ %s { %s %s } %s }\n"
     (Int.to_string (Int64_u.to_int bi))
     s
@@ -248,27 +253,27 @@ let () =
   in
   print_outer "initial: " r;
   let idx_is = (.idx_mut((.inner)).#is) in
-  let #{ i; j } = Idx_mut.unsafe_get r idx_is in
+  let #{ i; j } = unsafe_get_ptr #(r, idx_is) in
   Printf.printf "will incr: %d %d\n" i j;
   Idx_mut.unsafe_set r (.idx_mut((.inner)).#is) #{ i = 2; j = 22 };
   print_outer "" r;
   print_endline "\nDeepen mixed product to flats (continues above)";
   let idx_fs = (.idx_mut((.inner)).#fs) in
-  let #{ f; g } = Idx_mut.unsafe_get r idx_fs in
+  let #{ f; g } = unsafe_get_ptr #(r, idx_fs) in
   Printf.printf "will incr: %f %f\n" (Float_u.to_float f) (Float_u.to_float g);
   Idx_mut.unsafe_set r (.idx_mut((.inner)).#fs) #{ f = #2.0; g = #22.0 };
   print_outer "" r;
   print_endline "\nDeepen values to values (continues above)";
   let idx_j = (.idx_mut(idx_is).#j) in
-  let j = Idx_mut.unsafe_get r idx_j in
+  let j = unsafe_get_ptr #(r, idx_j) in
   Printf.printf "will incr: %d\n" j;
-  Idx_mut.unsafe_set r (.idx_mut(idx_is).#j) 33;
+  unsafe_set_ptr #(r, (.idx_mut(idx_is).#j)) 33;
   print_outer "" r;
   print_endline "\nDeepen flats to flats (continues above)";
   let idx_g = (.idx_mut(idx_fs).#g) in
-  let g = Idx_mut.unsafe_get r idx_g in
+  let g = unsafe_get_ptr #(r, idx_g) in
   Printf.printf "will incr: %f\n" (Float_u.to_float g);
-  Idx_mut.unsafe_set r (.idx_mut(idx_fs).#g) #33.0;
+  unsafe_set_ptr #(r, (.idx_mut(idx_fs).#g)) #33.0;
   print_outer "" r;
   print_newline ()
 
@@ -280,7 +285,7 @@ let () =
   done;
   for i = 0 to 9 do
     let idx : (_, float32#) idx_mut = (.(i)) in
-    let x = Idx_mut.unsafe_get a idx in
+    let x = unsafe_get_ptr #(a, idx) in
     Printf.printf "%f\n" (Float_u.to_float (Float32_u.to_float x))
   done;
   print_endline "\nWriting to a float32# array";
@@ -296,17 +301,17 @@ let () =
 let () =
   print_endline "Reads of all index types from string array";
   let a = Array.init 10 (fun x -> Int.to_string x) in
-  let s = Idx_mut.unsafe_get a (.(3)) in
+  let s = unsafe_get_ptr #(a, (.(3))) in
   print_endline s;
-  let s = Idx_mut.unsafe_get a (.L(#3L)) in
+  let s = unsafe_get_ptr #(a, (.L(#3L))) in
   print_endline s;
-  let s = Idx_mut.unsafe_get a (.l(#3l)) in
+  let s = unsafe_get_ptr #(a, (.l(#3l))) in
   print_endline s;
-  let s = Idx_mut.unsafe_get a (.S(#3S)) in
+  let s = unsafe_get_ptr #(a, (.S(#3S))) in
   print_endline s;
-  let s = Idx_mut.unsafe_get a (.s(#3s)) in
+  let s = unsafe_get_ptr #(a, (.s(#3s))) in
   print_endline s;
-  let s = Idx_mut.unsafe_get a (.n(#3n)) in
+  let s = unsafe_get_ptr #(a, (.n(#3n))) in
   print_endline s;
   print_newline ()
 
@@ -318,29 +323,29 @@ let () =
   for i = 0 to 9 do
     set a i #{ i = i; j = i * 11 }
   done;
-  let #{ i; j } = Idx_mut.unsafe_get a (.(3)) in
-  let i2 = Idx_mut.unsafe_get a (.(3).#i) in
-  let j2 = Idx_mut.unsafe_get a (.(3).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.(3))) in
+  let i2 = unsafe_get_ptr #(a, (.(3).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.(3).#j)) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
-  let #{ i; j } = Idx_mut.unsafe_get a (.L(#3L)) in
-  let i2 = Idx_mut.unsafe_get a (.L(#3L).#i) in
-  let j2 = Idx_mut.unsafe_get a (.L(#3L).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.L(#3L))) in
+  let i2 = unsafe_get_ptr #(a, (.L(#3L).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.L(#3L).#j)) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
-  let #{ i; j } = Idx_mut.unsafe_get a (.l(#3l)) in
-  let i2 = Idx_mut.unsafe_get a (.l(#3l).#i) in
-  let j2 = Idx_mut.unsafe_get a (.l(#3l).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.l(#3l))) in
+  let i2 = unsafe_get_ptr #(a, (.l(#3l).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.l(#3l).#j)) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
-  let #{ i; j } = Idx_mut.unsafe_get a (.S(#3S)) in
-  let i2 = Idx_mut.unsafe_get a (.S(#3S).#i) in
-  let j2 = Idx_mut.unsafe_get a (.S(#3S).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.S(#3S))) in
+  let i2 = unsafe_get_ptr #(a, (.S(#3S).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.S(#3S).#j)) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
-  let #{ i; j } = Idx_mut.unsafe_get a (.s(#3s)) in
-  let i2 = Idx_mut.unsafe_get a (.s(#3s).#i) in
-  let j2 = Idx_mut.unsafe_get a (.s(#3s).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.s(#3s))) in
+  let i2 = unsafe_get_ptr #(a, (.s(#3s).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.s(#3s).#j)) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
-  let #{ i; j } = Idx_mut.unsafe_get a (.n(#3n)) in
-  let i2 = Idx_mut.unsafe_get a (.n(#3n).#i) in
-  let j2 = Idx_mut.unsafe_get a (.n(#3n).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.n(#3n))) in
+  let i2 = unsafe_get_ptr #(a, (.n(#3n).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.n(#3n).#j)) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
   print_newline ()
 
@@ -353,39 +358,39 @@ let () =
     let f = Float_u.of_int i in
     set a i #{ i = f; j = Float_u.mul f #11. }
   done;
-  let #{ i; j } = Idx_mut.unsafe_get a (.(3)) in
-  let i2 = Idx_mut.unsafe_get a (.(3).#i) in
-  let j2 = Idx_mut.unsafe_get a (.(3).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.(3))) in
+  let i2 = unsafe_get_ptr #(a, (.(3).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.(3).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = Idx_mut.unsafe_get a (.L(#3L)) in
-  let i2 = Idx_mut.unsafe_get a (.L(#3L).#i) in
-  let j2 = Idx_mut.unsafe_get a (.L(#3L).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.L(#3L))) in
+  let i2 = unsafe_get_ptr #(a, (.L(#3L).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.L(#3L).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = Idx_mut.unsafe_get a (.l(#3l)) in
-  let i2 = Idx_mut.unsafe_get a (.l(#3l).#i) in
-  let j2 = Idx_mut.unsafe_get a (.l(#3l).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.l(#3l))) in
+  let i2 = unsafe_get_ptr #(a, (.l(#3l).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.l(#3l).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = Idx_mut.unsafe_get a (.S(#3S)) in
-  let i2 = Idx_mut.unsafe_get a (.S(#3S).#i) in
-  let j2 = Idx_mut.unsafe_get a (.S(#3S).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.S(#3S))) in
+  let i2 = unsafe_get_ptr #(a, (.S(#3S).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.S(#3S).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = Idx_mut.unsafe_get a (.s(#3s)) in
-  let i2 = Idx_mut.unsafe_get a (.s(#3s).#i) in
-  let j2 = Idx_mut.unsafe_get a (.s(#3s).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.s(#3s))) in
+  let i2 = unsafe_get_ptr #(a, (.s(#3s).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.s(#3s).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = Idx_mut.unsafe_get a (.n(#3n)) in
-  let i2 = Idx_mut.unsafe_get a (.n(#3n).#i) in
-  let j2 = Idx_mut.unsafe_get a (.n(#3n).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.n(#3n))) in
+  let i2 = unsafe_get_ptr #(a, (.n(#3n).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.n(#3n).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
@@ -398,39 +403,39 @@ let () =
     let f = Float_u.of_int i in
     set a i #{ i = f; j = Float_u.mul f #11. }
   done;
-  let #{ i; j } = Idx_mut.unsafe_get a (.(3)) in
-  let i2 = Idx_mut.unsafe_get a (.(3).#i) in
-  let j2 = Idx_mut.unsafe_get a (.(3).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.(3))) in
+  let i2 = unsafe_get_ptr #(a, (.(3).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.(3).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = Idx_mut.unsafe_get a (.L(#3L)) in
-  let i2 = Idx_mut.unsafe_get a (.L(#3L).#i) in
-  let j2 = Idx_mut.unsafe_get a (.L(#3L).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.L(#3L))) in
+  let i2 = unsafe_get_ptr #(a, (.L(#3L).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.L(#3L).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = Idx_mut.unsafe_get a (.l(#3l)) in
-  let i2 = Idx_mut.unsafe_get a (.l(#3l).#i) in
-  let j2 = Idx_mut.unsafe_get a (.l(#3l).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.l(#3l))) in
+  let i2 = unsafe_get_ptr #(a, (.l(#3l).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.l(#3l).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = Idx_mut.unsafe_get a (.S(#3S)) in
-  let i2 = Idx_mut.unsafe_get a (.S(#3S).#i) in
-  let j2 = Idx_mut.unsafe_get a (.S(#3S).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.S(#3S))) in
+  let i2 = unsafe_get_ptr #(a, (.S(#3S).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.S(#3S).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = Idx_mut.unsafe_get a (.s(#3s)) in
-  let i2 = Idx_mut.unsafe_get a (.s(#3s).#i) in
-  let j2 = Idx_mut.unsafe_get a (.s(#3s).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.s(#3s))) in
+  let i2 = unsafe_get_ptr #(a, (.s(#3s).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.s(#3s).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
-  let #{ i; j } = Idx_mut.unsafe_get a (.n(#3n)) in
-  let i2 = Idx_mut.unsafe_get a (.n(#3n).#i) in
-  let j2 = Idx_mut.unsafe_get a (.n(#3n).#j) in
+  let #{ i; j } = unsafe_get_ptr #(a, (.n(#3n))) in
+  let i2 = unsafe_get_ptr #(a, (.n(#3n).#i)) in
+  let j2 = unsafe_get_ptr #(a, (.n(#3n).#j)) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
