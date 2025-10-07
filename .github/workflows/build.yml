@@ -310,6 +310,7 @@ jobs:
       if: matrix.collect_metrics == true
       run: |
         set -euo pipefail
+        mkdir -p metrics
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           COMMIT_HASH="${{ github.event.pull_request.head.sha }}"
           PR_NUMBER="${{ github.event.pull_request.number }}"
@@ -317,8 +318,7 @@ jobs:
           COMMIT_HASH="${{ github.sha }}"
           PR_NUMBER="N/A"
         fi
-        SHORT_HASH="${COMMIT_HASH:0:8}"
-        CSV_FILE="metrics-${SHORT_HASH}.csv"
+        CSV_FILE="metrics/metrics.csv"
 
         ${{ github.workspace }}/scripts/collect-size-metrics.sh \
           "${{ github.workspace }}/_install" \
@@ -333,7 +333,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: metrics-${{ github.sha }}-${{ matrix.name }}
-        path: metrics-*.csv
+        path: metrics/
         if-no-files-found: error
 
     - uses: actions/upload-artifact@v4
