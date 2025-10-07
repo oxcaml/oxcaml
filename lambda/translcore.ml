@@ -1334,7 +1334,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_quotation exp -> transl_quote (transl_exp ~scopes sort) exp e.exp_loc
   (* TODO: update scopes *)
   | Texp_antiquotation _ ->
-      failwith "Cannot unqoute outside of a quotation context."
+      failwith "Cannot unquote outside of a quotation context."
 
 and pure_module m =
   match m.mod_desc with
