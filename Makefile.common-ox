@@ -112,7 +112,7 @@ runtime-stdlib-hacking: boot-compiler
 compiler: runtime-stdlib
 	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::compiler"
 	RUNTIME_DIR=$(RUNTIME_DIR) SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
-          ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
+          ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" JS_OF_OXCAML="$(CURDIR)/_build/_bootinstall/bin/js_of_oxcaml" \
           $(dune) build $(ws_main) \
           --only-package=ocaml @install \
           tools/regalloc/regalloc.exe \
