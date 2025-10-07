@@ -22,10 +22,10 @@ module L = Lambda
 module P = Flambda_primitive
 
 let needs_64_bit_target prim dbg ~machine_width =
-  if Target_system.Machine_width.is_32_bit machine_width
+  if not (Target_system.Machine_width.is_64_bit machine_width)
   then
     Misc.fatal_errorf
-      "Primitive %a is not yet supported on 32-bit targets (this is not \
+      "Primitive %a is so far only supported on 64-bit targets (this is not \
        necessarily an inherent incompatibility, but the code in Flambda 2 \
        needs checking and potentially adapting)"
       Printlambda.primitive prim dbg
@@ -2969,8 +2969,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         kinds offsets
     in
     [H.maybe_create_unboxed_product reads]
-  | Pset_idx (layout, mode), [[ptr]; [idx]; new_values] ->
-    needs_64_bit_target prim dbg ~machine_width
   | Pget_ptr _, [([] | [_] | _ :: _ :: _ :: _)] ->
     Misc.fatal_errorf
       "Closure_convertion.convert_primitive: The argument to Pget_ptr should \
