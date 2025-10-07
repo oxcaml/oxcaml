@@ -59,7 +59,6 @@ jobs:
             os: ubuntu-latest
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
-            collect_metrics: true
 
           - name: flambda2_frame_pointers_oclassic_polling
             config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
@@ -140,6 +139,7 @@ jobs:
             dwarf_tests_only: true
             oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus1
             oxcaml_llvm_source_branch: lldb
+            collect_metrics: false
 
           - name: llvmize_tests
             config: --enable-middle-end=flambda2 --enable-runtime5 --enable-frame-pointers
@@ -147,6 +147,7 @@ jobs:
             llvmize_tests_only: true
             oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
             oxcaml_llvm_source_branch: llvmize-oxcaml
+            collect_metrics: false
 
     env:
       J: "3"
@@ -249,7 +250,7 @@ jobs:
         OCAMLPARAM: ${{ matrix.ocamlparam }}
         OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
         USE_RUNTIME: ${{ matrix.use_runtime }}
-        COLLECT_METRICS: ${{ matrix.collect_metrics || 'false' }}
+        COLLECT_METRICS: ${{ matrix.collect_metrics != false }}
 
     - name: Install custom OxCaml LLVM
       if: matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
@@ -307,10 +308,11 @@ jobs:
         done
 
     - name: Collect build metrics
-      if: matrix.collect_metrics == true
+      if: env.COLLECT_METRICS == 'true'
       run: |
         set -euo pipefail
-        mkdir -p metrics
+        METRICS_DIR="metrics/${{ matrix.name }}"
+        mkdir -p "$METRICS_DIR"
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           COMMIT_HASH="${{ github.event.pull_request.head.sha }}"
           PR_NUMBER="${{ github.event.pull_request.number }}"
@@ -318,7 +320,7 @@ jobs:
           COMMIT_HASH="${{ github.sha }}"
           PR_NUMBER="N/A"
         fi
-        CSV_FILE="metrics/metrics.csv"
+        CSV_FILE="$METRICS_DIR/metrics.csv"
 
         ${{ github.workspace }}/scripts/collect-size-metrics.sh \
           "${{ github.workspace }}/_install" \
@@ -329,11 +331,12 @@ jobs:
         echo "Metric file stored at $CSV_FILE"
 
     - name: Upload build metrics artifact
-      if: matrix.collect_metrics == true
+      if: env.COLLECT_METRICS == 'true'
       uses: actions/upload-artifact@v4
       with:
-        name: metrics-${{ github.sha }}-${{ matrix.name }}
-        path: metrics/
+        name: metrics-${{ matrix.name }}
+        path: metrics
+        retention-days: 1
         if-no-files-found: error
 
     - uses: actions/upload-artifact@v4
@@ -359,6 +362,25 @@ jobs:
 #       with:
 #         name: _runtest-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
 #         path: ${{ github.workspace }}/_runtest
+
+  aggregate-metrics:
+    name: aggregate metrics
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: metrics-*
+          merge-multiple: true
+          path: metrics-bundles
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metrics
+          path: metrics-bundles/metrics
+          if-no-files-found: warn
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
