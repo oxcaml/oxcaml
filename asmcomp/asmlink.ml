@@ -20,7 +20,6 @@ open Config
 open Cmx_format
 open Compilenv
 module String = Misc.Stdlib.String
-(* module CU = Compilation_unit *)
 
 include Linkenv
 include Optlink
