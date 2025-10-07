@@ -23,3 +23,6 @@ val as_unlabeled_tuple : (string option * 'a) list -> 'a list option
     [localize_include_sig incl] will turn this into
     [include Bin_prot.Binable.S1__local with type 'a t := 'a t]. *)
 val localize_include_sig : Ast.include_description -> Ast.include_description
+
+(** Like [localize_include_sig], but appends "__stack" rather than "__local". *)
+val stackify_include_sig : Ast.include_description -> Ast.include_description

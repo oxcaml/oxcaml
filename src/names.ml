@@ -24,6 +24,7 @@ module Language_feature_name = struct
     | Pexp_constant c ->
       (match Shim.Constant.of_parsetree c with
        | Pconst_char _ -> "character literal expression"
+       | Pconst_untagged_char _ -> "untagged character literal expression"
        | Pconst_integer _ -> "integer literal expression"
        | Pconst_string _ -> "string literal expression"
        | Pconst_float _ -> "floating point literal expression"
@@ -47,6 +48,7 @@ module Language_feature_name = struct
     | Pexp_setfield _ -> "field set expression"
     | Pexp_array (Mutable, _) -> "array expression"
     | Pexp_array (Immutable, _) -> "immutable array expression"
+    | Pexp_idx _ -> "block index expression"
     | Pexp_ifthenelse (_, _, None) -> "if-then expression"
     | Pexp_ifthenelse (_, _, Some _) -> "if-then-else expression"
     | Pexp_sequence _ -> "sequencing ';' expression"
@@ -56,7 +58,7 @@ module Language_feature_name = struct
     | Pexp_coerce _ -> "type coercion ':>' expression"
     | Pexp_send _ -> "method send '#' expression"
     | Pexp_new _ -> "new-object expression"
-    | Pexp_setinstvar _ -> "instance variable set '<-' expression"
+    | Pexp_setvar _ -> "variable set '<-' expression"
     | Pexp_override _ -> "instance variable override '<{' ... '}>' expression"
     | Pexp_letmodule _ -> "let-module expression"
     | Pexp_letexception _ -> "let-exception expression"
@@ -84,6 +86,7 @@ module Language_feature_name = struct
     | Ppat_constant c ->
       (match Shim.Constant.of_parsetree c with
        | Pconst_char _ -> "character literal pattern"
+       | Pconst_untagged_char _ -> "untagged character literal pattern"
        | Pconst_integer _ -> "integer literal pattern"
        | Pconst_unboxed_integer _ -> "unboxed integer literal pattern"
        | Pconst_string _ -> "string literal pattern"
@@ -208,6 +211,7 @@ module Constructor_name = struct
     | Pexp_unboxed_field _ -> "Pexp_unboxed_field"
     | Pexp_setfield _ -> "Pexp_setfield"
     | Pexp_array _ -> "Pexp_array"
+    | Pexp_idx _ -> "Pexp_idx"
     | Pexp_ifthenelse _ -> "Pexp_ifthenelse"
     | Pexp_sequence _ -> "Pexp_sequence"
     | Pexp_while _ -> "Pexp_while"
@@ -216,7 +220,7 @@ module Constructor_name = struct
     | Pexp_coerce _ -> "Pexp_coerce"
     | Pexp_send _ -> "Pexp_send"
     | Pexp_new _ -> "Pexp_new"
-    | Pexp_setinstvar _ -> "Pexp_setinstvar"
+    | Pexp_setvar _ -> "Pexp_setvar"
     | Pexp_override _ -> "Pexp_override"
     | Pexp_letmodule _ -> "Pexp_letmodule"
     | Pexp_letexception _ -> "Pexp_letexception"

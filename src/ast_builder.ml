@@ -52,6 +52,11 @@ module Default = struct
     | _ :: _ -> tarrow ~loc args { result_modes = []; result_type }
   ;;
 
+  let pexp_let ~loc a b c d =
+    let pexp_desc = Pexp_let (a, b, c, d) |> Shim.Expression_desc.to_parsetree ~loc in
+    mkexp ~loc pexp_desc
+  ;;
+
   let pexp_constraint ~loc a b c =
     let pexp_desc = Pexp_constraint (a, b, c) |> Shim.Expression_desc.to_parsetree ~loc in
     mkexp ~loc pexp_desc
@@ -206,7 +211,14 @@ module Default = struct
   let coalesce_fun_arity ast =
     match Shim.Pexp_function.of_parsetree ast.pexp_desc ~loc:ast.pexp_loc with
     | None | Some (_, _, Pfunction_cases _) -> ast
-    | Some (_, c, _) when not (Shim.Pexp_function.Function_constraint.is_none c) -> ast
+    | Some (params, constraint_, body)
+      when not (Shim.Pexp_function.Function_constraint.is_none constraint_) ->
+      pexp_function
+        ~params
+        ~constraint_
+        ~body
+        ~loc:ast.pexp_loc
+        ~attrs:ast.pexp_attributes
     | Some (params1, _, Pfunction_body ({ pexp_attributes = []; _ } as outer_body)) ->
       (match
          Shim.Pexp_function.of_parsetree outer_body.pexp_desc ~loc:outer_body.pexp_loc
@@ -256,16 +268,16 @@ module Default = struct
     { ptyp_loc_stack = []; ptyp_attributes = []; ptyp_loc = loc; ptyp_desc }
   ;;
 
-  let pexp_unboxed_tuple ~loc a =
+  let pexp_unboxed_tuple ~loc ?attrs a =
     let pexp_desc = Shim.Expression_desc.to_parsetree ~loc (Pexp_unboxed_tuple a) in
-    mkexp ~loc pexp_desc
+    mkexp ?attrs ~loc pexp_desc
   ;;
 
-  let ppat_unboxed_tuple ~loc a closed =
+  let ppat_unboxed_tuple ~loc ?attrs a closed =
     let ppat_desc =
       Shim.Pattern_desc.to_parsetree ~loc (Ppat_unboxed_tuple (a, closed))
     in
-    mkpat ~loc ppat_desc
+    mkpat ?attrs ~loc ppat_desc
   ;;
 
   let exp_constant ~loc c =
@@ -298,13 +310,54 @@ module Default = struct
   let pfloat_u ~loc f = pat_constant ~loc (Pconst_unboxed_float (f, None))
 
   let ptyp_tuple ~loc ?attrs a =
-    let ptyp_desc = Shim.Core_type_desc.to_parsetree (Ptyp_tuple a) in
-    mktyp ?attrs ~loc ptyp_desc
+    match a with
+    | [] -> raise (Invalid_argument "ptyp_tuple: cannot construct a 0-ary tuple")
+    | _ :: _ :: _ ->
+      let ptyp_desc = Shim.Core_type_desc.to_parsetree (Ptyp_tuple a) in
+      mktyp ?attrs ~loc ptyp_desc
+    | [ (name, x) ] ->
+      (match name with
+       | Some _ ->
+         raise (Invalid_argument "ptyp_tuple: cannot construct a 1-ary named tuple")
+       | None ->
+         (match attrs with
+          | None -> x
+          | Some attrs ->
+            { x with ptyp_loc = loc; ptyp_attributes = x.ptyp_attributes @ attrs }))
   ;;
 
   let pexp_tuple ~loc ?attrs a =
-    let pexp_desc = Shim.Expression_desc.to_parsetree ~loc (Pexp_tuple a) in
-    mkexp ?attrs ~loc pexp_desc
+    match a with
+    | [] -> raise (Invalid_argument "pexp_tuple: cannot construct a 0-ary tuple")
+    | _ :: _ :: _ ->
+      let pexp_desc = Shim.Expression_desc.to_parsetree ~loc (Pexp_tuple a) in
+      mkexp ?attrs ~loc pexp_desc
+    | [ (name, x) ] ->
+      (match name with
+       | Some _ ->
+         raise (Invalid_argument "pexp_tuple: cannot construct a 1-ary named tuple")
+       | None ->
+         (match attrs with
+          | None -> x
+          | Some attrs ->
+            { x with pexp_loc = loc; pexp_attributes = x.pexp_attributes @ attrs }))
+  ;;
+
+  let ppat_tuple ~loc ?attrs a closed =
+    match a, closed with
+    | [], _ -> raise (Invalid_argument "ppat_tuple: cannot construct a 0-ary tuple")
+    | _ :: _ :: _, _ | [ _ ], Open ->
+      let ppat_desc = Shim.Pattern_desc.to_parsetree ~loc (Ppat_tuple (a, closed)) in
+      mkpat ?attrs ~loc ppat_desc
+    | [ (name, x) ], Closed ->
+      (match name with
+       | Some _ ->
+         raise (Invalid_argument "ppat_tuple: cannot construct a 1-ary named tuple")
+       | None ->
+         (match attrs with
+          | None -> x
+          | Some attrs ->
+            { x with ppat_loc = loc; ppat_attributes = x.ppat_attributes @ attrs }))
   ;;
 
   let pexp_record_unboxed_product ~loc ?attrs a b =
@@ -326,9 +379,9 @@ module Default = struct
     mkexp ?attrs ~loc pexp_desc
   ;;
 
-  let ppat_tuple ~loc ?attrs a closed =
-    let ppat_desc = Shim.Pattern_desc.to_parsetree ~loc (Ppat_tuple (a, closed)) in
-    mkpat ?attrs ~loc ppat_desc
+  let pexp_idx ~loc ?attrs a b =
+    let pexp_desc = Shim.Expression_desc.to_parsetree ~loc (Pexp_idx (a, b)) in
+    mkexp ?attrs ~loc pexp_desc
   ;;
 
   let ptyp_alias ~loc ?(attrs = []) a b c =
@@ -376,6 +429,7 @@ struct
   let ptyp_arrow arg res : core_type = ptyp_arrow ~loc arg res
   let tarrow args res : core_type = tarrow ~loc args res
   let tarrow_maybe args res : core_type = tarrow_maybe ~loc args res
+  let pexp_let a b c d : expression = pexp_let ~loc a b c d
   let pexp_constraint a b c : expression = pexp_constraint ~loc a b c
   let ppat_constraint a b c : pattern = ppat_constraint ~loc a b c
 
@@ -430,7 +484,7 @@ struct
   ;;
 
   let ptyp_unboxed_tuple a : core_type = ptyp_unboxed_tuple ~loc a
-  let pexp_unboxed_tuple a : expression = pexp_unboxed_tuple ~loc a
+  let pexp_unboxed_tuple ?attrs a : expression = pexp_unboxed_tuple ~loc ?attrs a
 
   let pexp_record_unboxed_product ?attrs a b : expression =
     pexp_record_unboxed_product ~loc ?attrs a b
@@ -441,7 +495,8 @@ struct
   ;;
 
   let pexp_unboxed_field ?attrs a b : expression = pexp_unboxed_field ~loc ?attrs a b
-  let ppat_unboxed_tuple a b : pattern = ppat_unboxed_tuple ~loc a b
+  let pexp_idx ?attrs a b : expression = pexp_idx ~loc ?attrs a b
+  let ppat_unboxed_tuple ?attrs a b : pattern = ppat_unboxed_tuple ~loc ?attrs a b
   let eint64_u c : expression = eint64_u ~loc c
   let eint32_u c : expression = eint32_u ~loc c
   let enativeint_u c : expression = enativeint_u ~loc c

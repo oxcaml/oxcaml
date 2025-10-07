@@ -89,6 +89,7 @@ end
 
 module Value_description : sig
   val extract_modalities : value_description -> Modality.t list * value_description
+  val extract_modalities_with_locs : value_description -> Modalities.t * value_description
 
   val create
     :  loc:Location.t
@@ -145,6 +146,7 @@ module Constant : sig
     | Pconst_integer of string * char option
     | Pconst_unboxed_integer of string * char
     | Pconst_char of char
+    | Pconst_untagged_char of char
     | Pconst_string of string * Location.t * string option
     | Pconst_float of string * char option
     | Pconst_unboxed_float of string * char option
@@ -195,6 +197,21 @@ module Pexp_function : sig
     -> (function_param list * Function_constraint.t * function_body) option
 end
 
+type nonrec index_kind = index_kind =
+  | Index_int
+  | Index_unboxed_int64
+  | Index_unboxed_int32
+  | Index_unboxed_int16
+  | Index_unboxed_int8
+  | Index_unboxed_nativeint
+
+type nonrec block_access = block_access =
+  | Baccess_field of Longident.t loc
+  | Baccess_array of mutable_flag * index_kind * expression
+  | Baccess_block of mutable_flag * expression
+
+type nonrec unboxed_access = unboxed_access = Uaccess_unboxed_field of Longident.t loc
+
 module Core_type_desc : sig
   type t = core_type_desc =
     | Ptyp_any of jkind_annotation option
@@ -237,7 +254,8 @@ module Pattern_desc : sig
     | Ppat_interval of constant * constant
     | Ppat_tuple of (string option * pattern) list * closed_flag
     | Ppat_unboxed_tuple of (string option * pattern) list * closed_flag
-    | Ppat_construct of Longident.t loc * (string loc list * pattern) option
+    | Ppat_construct of
+        Longident.t loc * ((string loc * jkind_annotation option) list * pattern) option
     | Ppat_variant of label * pattern option
     | Ppat_record of (Longident.t loc * pattern) list * closed_flag
     | Ppat_record_unboxed_product of (Longident.t loc * pattern) list * closed_flag
@@ -259,7 +277,7 @@ module Expression_desc : sig
   type t = expression_desc =
     | Pexp_ident of Longident.t loc
     | Pexp_constant of constant
-    | Pexp_let of rec_flag * value_binding list * expression
+    | Pexp_let of mutable_flag * rec_flag * value_binding list * expression
     | Pexp_function of
         Pexp_function.function_param list
         * Pexp_function.Function_constraint.t
@@ -278,6 +296,7 @@ module Expression_desc : sig
     | Pexp_unboxed_field of expression * Longident.t loc
     | Pexp_setfield of expression * Longident.t loc * expression
     | Pexp_array of mutable_flag * expression list
+    | Pexp_idx of block_access * unboxed_access list
     | Pexp_ifthenelse of expression * expression * expression option
     | Pexp_sequence of expression * expression
     | Pexp_while of expression * expression
@@ -286,7 +305,7 @@ module Expression_desc : sig
     | Pexp_coerce of expression * core_type option * core_type
     | Pexp_send of expression * label loc
     | Pexp_new of Longident.t loc
-    | Pexp_setinstvar of label loc * expression
+    | Pexp_setvar of label loc * expression
     | Pexp_override of (label loc * expression) list
     | Pexp_letmodule of string option loc * module_expr * expression
     | Pexp_letexception of extension_constructor * expression
@@ -450,4 +469,7 @@ module Ast_traverse : sig
   class virtual ['acc] fold : ['acc] Ppxlib_ast.Ast.fold
   class virtual ['acc] fold_map : ['acc] Ppxlib_ast.Ast.fold_map
   class virtual ['ctx] map_with_context : ['ctx] Ppxlib_ast.Ast.map_with_context
+
+  class virtual ['ctx, 'res] lift_map_with_context :
+    ['ctx, 'res] Ppxlib_ast.Ast.lift_map_with_context
 end

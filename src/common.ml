@@ -33,19 +33,21 @@ let mangle_longident ~suffix : Longident.t -> Longident.t = function
 ;;
 
 let localize_longident = mangle_longident ~suffix:"__local"
+let stackify_longident = mangle_longident ~suffix:"__stack"
 
-let localize_include_sig incl =
+let mangle_include_sig incl ~f =
   { incl with
     pincl_mod =
       { incl.pincl_mod with
         pmty_desc =
           (match incl.pincl_mod.pmty_desc with
-           | Pmty_ident { txt; loc } -> Pmty_ident { txt = localize_longident txt; loc }
+           | Pmty_ident { txt; loc } -> Pmty_ident { txt = f txt; loc }
            | Pmty_with (({ pmty_desc = Pmty_ident { txt; loc }; _ } as mty), cstrs) ->
-             Pmty_with
-               ( { mty with pmty_desc = Pmty_ident { txt = localize_longident txt; loc } }
-               , cstrs )
+             Pmty_with ({ mty with pmty_desc = Pmty_ident { txt = f txt; loc } }, cstrs)
            | _ -> failwith "expected [include S] or [include S with ...]")
       }
   }
 ;;
+
+let localize_include_sig incl = mangle_include_sig incl ~f:localize_longident
+let stackify_include_sig incl = mangle_include_sig incl ~f:stackify_longident

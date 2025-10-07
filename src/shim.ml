@@ -88,8 +88,14 @@ module Label_declaration = struct
 end
 
 module Value_description = struct
+  let extract_modalities_with_locs vd =
+    vd.pval_modalities, { vd with pval_modalities = [] }
+  ;;
+
   let extract_modalities vd =
-    Modality.of_ast_modalities_list vd.pval_modalities, { vd with pval_modalities = [] }
+    let modalities, vd = extract_modalities_with_locs vd in
+    let modalities = Modality.of_ast_modalities_list modalities in
+    modalities, vd
   ;;
 
   let create ~loc ~name ~type_ ~modalities ~prim =
@@ -167,13 +173,35 @@ module Pexp_function = struct
 
   let to_parsetree ~params ~constraint_ ~body = Pexp_function (params, constraint_, body)
 
-  (* The ignored [loc] argument is used in shim_upstream.ml. *)
-  let of_parsetree expr_desc ~loc:_ =
+  let rec of_parsetree expr_desc ~loc =
     match expr_desc with
     | Pexp_function (a, b, c) -> Some (a, b, c)
+    | Pexp_newtype (newtype, jkind_annotation, body) ->
+      (match of_parsetree body.pexp_desc ~loc with
+       | Some (a, b, c) ->
+         let function_param : function_param =
+           { pparam_loc = loc; pparam_desc = Pparam_newtype (newtype, jkind_annotation) }
+         in
+         Some (function_param :: a, b, c)
+       | None -> None)
     | _ -> None
   ;;
 end
+
+type nonrec index_kind = index_kind =
+  | Index_int
+  | Index_unboxed_int64
+  | Index_unboxed_int32
+  | Index_unboxed_int16
+  | Index_unboxed_int8
+  | Index_unboxed_nativeint
+
+type nonrec block_access = block_access =
+  | Baccess_field of Longident.t loc
+  | Baccess_array of mutable_flag * index_kind * expression
+  | Baccess_block of mutable_flag * expression
+
+type nonrec unboxed_access = unboxed_access = Uaccess_unboxed_field of Longident.t loc
 
 module Core_type_desc = struct
   type t = core_type_desc =
@@ -205,7 +233,8 @@ module Pattern_desc = struct
     | Ppat_interval of constant * constant
     | Ppat_tuple of (string option * pattern) list * closed_flag
     | Ppat_unboxed_tuple of (string option * pattern) list * closed_flag
-    | Ppat_construct of Longident.t loc * (string loc list * pattern) option
+    | Ppat_construct of
+        Longident.t loc * ((string loc * jkind_annotation option) list * pattern) option
     | Ppat_variant of label * pattern option
     | Ppat_record of (Longident.t loc * pattern) list * closed_flag
     | Ppat_record_unboxed_product of (Longident.t loc * pattern) list * closed_flag
@@ -227,7 +256,7 @@ module Expression_desc = struct
   type t = expression_desc =
     | Pexp_ident of Longident.t loc
     | Pexp_constant of constant
-    | Pexp_let of rec_flag * value_binding list * expression
+    | Pexp_let of mutable_flag * rec_flag * value_binding list * expression
     | Pexp_function of
         Pexp_function.function_param list
         * Pexp_function.Function_constraint.t
@@ -246,6 +275,7 @@ module Expression_desc = struct
     | Pexp_unboxed_field of expression * Longident.t loc
     | Pexp_setfield of expression * Longident.t loc * expression
     | Pexp_array of mutable_flag * expression list
+    | Pexp_idx of block_access * unboxed_access list
     | Pexp_ifthenelse of expression * expression * expression option
     | Pexp_sequence of expression * expression
     | Pexp_while of expression * expression
@@ -254,7 +284,7 @@ module Expression_desc = struct
     | Pexp_coerce of expression * core_type option * core_type
     | Pexp_send of expression * label loc
     | Pexp_new of Longident.t loc
-    | Pexp_setinstvar of label loc * expression
+    | Pexp_setvar of label loc * expression
     | Pexp_override of (label loc * expression) list
     | Pexp_letmodule of string option loc * module_expr * expression
     | Pexp_letexception of extension_constructor * expression
@@ -362,6 +392,7 @@ module Constant = struct
     | Pconst_integer of string * char option
     | Pconst_unboxed_integer of string * char
     | Pconst_char of char
+    | Pconst_untagged_char of char
     | Pconst_string of string * Location.t * string option
     | Pconst_float of string * char option
     | Pconst_unboxed_float of string * char option
@@ -464,4 +495,7 @@ module Ast_traverse = struct
   class virtual ['acc] fold = ['acc] Ppxlib_ast.Ast.fold
   class virtual ['acc] fold_map = ['acc] Ppxlib_ast.Ast.fold_map
   class virtual ['ctx] map_with_context = ['ctx] Ppxlib_ast.Ast.map_with_context
+
+  class virtual ['ctx, 'res] lift_map_with_context =
+    ['ctx, 'res] Ppxlib_ast.Ast.lift_map_with_context
 end

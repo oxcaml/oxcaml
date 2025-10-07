@@ -22,3 +22,8 @@ class ['ctx] map_with_context : object
   inherit ['ctx] Ppxlib_traverse_builtins.map_with_context
   inherit ['ctx] Shim.Ast_traverse.map_with_context
 end
+
+class virtual ['ctx, 'res] lift_map_with_context : object
+  inherit ['ctx, 'res] Ppxlib_traverse_builtins.lift_map_with_context
+  inherit ['ctx, 'res] Shim.Ast_traverse.lift_map_with_context
+end
