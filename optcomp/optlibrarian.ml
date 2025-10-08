@@ -40,9 +40,9 @@ end) : S = struct
     in
     let info, crc = Compilenv.read_unit_info filename in
     info.ui_force_link <- info.ui_force_link || !Clflags.link_everything;
-    (* There is no need to keep the approximation in the library file, since the
-       compiler will go looking directly for object files. The linker, which is
-       the only one that reads library files, does not need the
+    (* There is no need to keep the approximation in the flambda library file,
+       since the compiler will go looking directly for flambda object files. The
+       linker, which is the only one that reads library files, does not need the
        approximation. *)
     info.ui_export_info <- None;
     ( Filename.chop_suffix filename Backend.ext_flambda_obj ^ Backend.ext_obj,

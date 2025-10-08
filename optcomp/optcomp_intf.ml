@@ -25,12 +25,12 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
+
 open Format
 open Cmx_format
 open Compilenv
 
-type emit =
-  Unit_info.file_prefix -> progname:string -> ppf_dump:Format.formatter -> unit
+type emit = Compile_common.unit -> unit
 
 module type File_extensions = sig
   (** File extensions include exactly one dot, so they can be added with regular string

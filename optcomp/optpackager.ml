@@ -29,7 +29,6 @@ type error =
   | Illegal_renaming of CU.Name.t * string * CU.Name.t
   | Forward_reference of string * CU.Name.t
   | Wrong_for_pack of string * CU.t
-  | Linking_error
   | Assembler_error of string
   | File_not_found of string
 
@@ -293,7 +292,6 @@ let report_error ppf = function
     fprintf ppf "File %a not found" Style.inline_code file
   | Assembler_error file ->
     fprintf ppf "Error while assembling %a" Style.inline_code file
-  | Linking_error -> fprintf ppf "Error during partial linking"
 
 let () =
   Location.register_error_of_exn (function

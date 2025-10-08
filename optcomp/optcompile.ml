@@ -170,12 +170,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         ~hook_typed_tree:(fun (impl : Typedtree.implementation) ->
           Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
         info ~backend
-    | Emit compile_implementation_linear ->
-      (* Emit assembly directly from Linear IR *)
-      compile_implementation_linear
-        (Unit_info.prefix info.target)
-        ~progname:(Unit_info.original_source_file info.target)
-        ~ppf_dump:info.ppf_dump
+    | Emit emit -> emit info (* Emit assembly directly from Linear IR *)
     | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
       (match !Clflags.as_argument_for with
       | Some _ ->
@@ -262,7 +257,12 @@ let native unix
       Asmlink.link_shared unix target objfiles ~genfns ~units_tolink ~ppf_dump
 
     let emit : Optcomp_intf.emit option =
-      Some (Asmgen.compile_implementation_linear unix)
+      Some
+        (fun info ->
+          Asmgen.compile_implementation_linear unix
+            (Unit_info.prefix info.target)
+            ~progname:(Unit_info.original_source_file info.target)
+            ~ppf_dump:info.ppf_dump)
 
     let link_partial target objfiles =
       let exitcode = Ccomp.call_linker Ccomp.Partial target objfiles "" in
