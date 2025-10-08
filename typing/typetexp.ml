@@ -98,6 +98,7 @@ type error =
   | Bad_jkind_annot of type_expr * Jkind.Violation.t
   | Did_you_mean_unboxed of Longident.t
   | Invalid_label_for_call_pos of Parsetree.arg_label
+  | Unsupported_runtime_metaprogramming
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -1078,6 +1079,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_open (path, mod_ident, cty)) cty.ctyp_type
+  | Ptyp_quote _ -> raise (Error (loc, env, Unsupported_runtime_metaprogramming))
+  | Ptyp_splice _ -> raise (Error (loc, env, Unsupported_runtime_metaprogramming))
   | Ptyp_of_kind jkind ->
     let tjkind = jkind_of_annotation (Type_of_kind loc) styp.ptyp_attributes jkind in
     let ty = newty (Tof_kind tjkind) in
@@ -1630,6 +1633,8 @@ let report_error env ppf =
         | Nolabel -> "unlabelled"
         | Optional _ -> "optional"
         | Labelled _ -> assert false )
+  | Unsupported_runtime_metaprogramming ->
+      fprintf ppf "Runtime metaprogramming is not fully supported."
 
 let () =
   Location.register_error_of_exn
