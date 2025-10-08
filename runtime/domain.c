@@ -556,6 +556,7 @@ static uintnat fresh_domain_unique_id(void) {
 }
 
 static inline void domain_root_register(value *root, value t);
+static inline void domain_root_set(value *root, value t);
 static inline void domain_root_remove(value *root);
 
 /* must be run on the domain's thread */
@@ -1798,6 +1799,11 @@ CAMLexport value caml_domain_preempt_self(void) {
   Caml_state->preemption = Val_long(1);
   caml_interrupt_self();
   CAMLreturn(Val_unit);
+}
+
+void caml_domain_setup_preemption(void) {
+  value cont = caml_alloc_3(Cont_tag, Val_long(0), Val_long(0), Val_long(0));
+  domain_root_set(&Caml_state->preemption, cont);
 }
 
 /*  This function is async-signal-safe as [all_domains] and

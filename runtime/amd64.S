@@ -1267,10 +1267,14 @@ ENDFUNCTION(G(caml_callback3_asm))
 /******************************************************************************/
 /* Fibers */
 /*
- * A continuation is a one word object that points to a fiber. A fiber [f] will
- * point to its parent at Handler_parent(Stack_handler(f)). In the following,
- * the [last_fiber] refers to the last fiber in the linked-list formed by the
- * parent pointer.
+ * A continuation is either a two or three word object:
+ *
+ *  - The first field points to the fiber to resume
+ *  - The second field points to the parent fiber
+ *  - The third field, if present, points to the saved gc_regs of a continuation for a preemption
+ * A fiber [f] will point to its parent at Handler_parent(Stack_handler(f)). In
+ * the following, the [last_fiber] refers to the last fiber in the linked-list
+ * formed by the parent pointer.
  */
 /******************************************************************************/
 
@@ -1373,7 +1377,9 @@ ENDFUNCTION(G(caml_reperform))
 
 FUNCTION(G(caml_preempt))
 CFI_STARTPROC
+        movq    Caml_state(young_ptr), %r15
         SWITCH_OCAML_TO_C
+        C_call  (GCALL(caml_maybe_expand_stack)) /* CR aspsmith: replace with a new ensure_gc_regs_bucket function */
         C_call  (GCALL(caml_get_tick_effect)) /* %rax := Tick */
         SWITCH_C_TO_OCAML
         movq    Caml_state(preemption), %rbx
