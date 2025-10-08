@@ -181,6 +181,11 @@ jobs:
       run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf bash
       # bash >=4 is needed for tools/gen_ocamlj_rules.sh
 
+    - name: Pretend we're running in a container (makes setup-ocaml go faster)
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo touch /.dockerenv
+      # makes setup-ocaml skip apt-get, which is slow on first invocation
+
     - name: Set up Opam
       uses: ocaml/setup-ocaml@v3
       with:

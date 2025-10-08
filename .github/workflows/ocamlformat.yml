@@ -10,14 +10,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Fake running in a container
-      run: sudo touch /.dockerenv # makes setup-ocaml go much faster
-
     - name: Checkout the OxCaml repo
       uses: actions/checkout@master
 
     - name: Checkout the parent branch
       run: git fetch origin HEAD --deepen 1
+
+    - name: Pretend we're running in a container (makes setup-ocaml go faster)
+      run: sudo touch /.dockerenv
+      # makes setup-ocaml skip apt-get, which is slow on first invocation
 
     - name: Set up Opam
       uses: ocaml/setup-ocaml@v3
