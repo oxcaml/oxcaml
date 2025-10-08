@@ -2,7 +2,6 @@ window.IKINDS_GRAPH_DATA = {
   "nodes": [
     {"id": "typing/ikinds/ikinds.ml", "label": "typing/ikinds/ikinds.ml", "loc": 666, "loc_mli": 73, "info": "Ikinds facade: builds the LDD solver, normalizes jkinds, and exposes subkind/substitution APIs consumed by typing.*"},
     {"id": "typing/ikinds/ikind.ml", "label": "typing/ikinds/ikind.ml", "loc": 92, "loc_mli": 74, "info": "Ikind core layer: defines rigid atoms and instantiates Ikind.Ldd over Axis_lattice and the chosen backend."},
-    {"id": "typing/ikinds/ldd_jkind_solver.ml", "label": "typing/ikinds/ldd_jkind_solver.ml", "loc": 331, "loc_mli": 142, "info": "JKind solver functor: interprets jkinds as lattice polynomials and provides normalize/leq/round_up operations."},
     {"id": "typing/ikinds/axis_lattice.ml", "label": "typing/ikinds/axis_lattice.ml", "loc": 588, "loc_mli": 93, "info": "Bitset-backed axis lattice with modality masks, conversions to/from mod bounds, and canned constants."},
     {"id": "typing/jkind.ml", "label": "typing/jkind.ml", "info": "Jkind definitions, allowance helpers, and normalization logic that Ikinds reuses."},
     {"id": "typing/types.mli", "label": "typing/types.mli", "info": "Types interface defining type_ikind and constructor_ikind as opaque types, with ikinds passing data via Obj.magic."},
@@ -28,7 +27,6 @@ window.IKINDS_GRAPH_DATA = {
   ],
   "edges": [
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/ikinds/ikind.ml", "style": "solid", "label": null, "info": "Ikinds builds on Ikind.Ldd for lattice nodes and rigid-name helpers."},
-    {"source": "typing/ikinds/ikinds.ml", "target": "typing/ikinds/ldd_jkind_solver.ml", "style": "solid", "label": null, "info": "Ikinds uses the specialized Ldd_jkind_solver module to obtain JK operations."},
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/ikinds/axis_lattice.ml", "style": "solid", "label": null, "info": "Ikinds calls Axis_lattice for masks/constants when translating jkinds."},
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/jkind.ml", "style": "solid", "label": null, "info": "Ikinds consumes Jkind APIs (disallow/with_bounds/modality) while constructing ckinds."},
     {"source": "typing/ikinds/ikinds.ml", "target": "typing/types.mli", "style": "dashed", "label": "Obj.magic", "info": "Obj.magic bridge: pack_constructor_ikind/unpack_constructor_ikind talk to Types.constructor_ikind without exposing the representation."},

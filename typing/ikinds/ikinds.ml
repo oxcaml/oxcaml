@@ -9,7 +9,251 @@ let enable_sub_or_error = false
 
 module Ldd = Ikind.Ldd
 
-module JK = Ldd_jkind_solver
+module JK = struct
+  (* The JKind solver specialized to Ikind.Ldd and Types.type_expr. *)
+
+  module Ldd = Ikind.Ldd
+
+  type ty = Types.type_expr
+
+  type constr = Ldd.constr
+
+  type lat = Ldd.lat
+
+  type poly = Ldd.node
+
+  type kind = Ldd.node
+
+  (* Hash tables avoiding polymorphic structural comparison on deep values. *)
+  module TyTbl = Hashtbl.Make (struct
+    type t = ty
+
+    let equal a b = Int.equal (Types.get_id a) (Types.get_id b)
+
+    let hash t = Hashtbl.hash (Types.get_id t)
+  end)
+
+  let constr_to_string (p : constr) : string = Format.asprintf "%a" Path.print p
+
+  module ConstrTbl = Hashtbl.Make (struct
+    type t = constr
+
+    let equal a b = Path.compare a b = 0
+
+    let hash x = Path.hash x
+  end)
+
+  type ops =
+    { const : lat -> kind;
+      join : kind -> kind -> kind;
+      meet : kind -> kind -> kind;
+      modality : lat -> kind -> kind;
+      constr : constr -> kind list -> kind;
+      kind_of : ty -> kind;
+      rigid : ty -> kind
+    }
+
+  type ckind = ops -> kind
+
+  type constr_decl =
+    | Ty of
+        { args : ty list;
+          kind : ckind;
+          abstract : bool
+        }
+    | Poly of poly * poly list
+
+  type env =
+    { kind_of : ty -> ckind;
+      lookup : constr -> constr_decl
+    }
+
+  type solver =
+    { ops : ops;
+      constr_kind_poly : constr -> poly * poly list
+    }
+
+  let make_solver (env : env) : solver =
+    Ldd.clear_memos ();
+    (* Define all the trivial ops *)
+    let const l = Ldd.const l in
+    let join a b = Ldd.join a b in
+    let modality l k = Ldd.meet (Ldd.const l) k in
+    let meet a b = Ldd.meet a b in
+    (* Create hash table mapping ty to kind for memoization *)
+    let ty_to_kind = TyTbl.create 0 in
+    let rigid t =
+      let param = Types.get_id t in
+      Ldd.var (Ldd.rigid (Ldd.Name.param param))
+    in
+    (* And hash table mapping constructor to coefficients *)
+    let constr_to_coeffs = ConstrTbl.create 0 in
+    (* Define kind_of and constr ops *)
+    let rec kind_of (t : ty) : kind =
+      match TyTbl.find_opt ty_to_kind t with
+      | Some k -> k
+      | None ->
+        (* Pre-insert lattice solver var for this type *)
+        let v = Ldd.new_var () in
+        TyTbl.add ty_to_kind t (Ldd.var v);
+        let kind = env.kind_of t ops in
+        (* Always solve LFPs here to avoid correctness issues *)
+        Ldd.solve_lfp v kind;
+        kind
+    and constr_kind c =
+      match ConstrTbl.find_opt constr_to_coeffs c with
+      | Some base_and_coeffs -> base_and_coeffs
+      | None -> (
+        match env.lookup c with
+        | Poly (base, coeffs) ->
+          (* CR jujacobs: cycle-breaker for cached polynomials
+             --------------------------------------------------
+             We install placeholder LDD variables for the base and each
+             coefficient before rehydrating the polynomial via map_rigid.
+             This prevents recursive rehydration from looping when cached
+             polynomials reference each other cyclically (common in recursive
+             type groups). Once placeholders are published to the cache, we
+             rehydrate the right-hand sides and solve LFPs to define them.
+
+             A more principled approach would construct these polynomials in a
+             strictly topologically-safe order or use an explicit fixpoint
+             builder for constructor coefficients; this hack should be replaced
+             by such a mechanism when the solver grows a dedicated interface. *)
+          let base_var = Ldd.new_var () in
+          let coeff_vars =
+            List.init (List.length coeffs) (fun _ -> Ldd.new_var ())
+          in
+          ConstrTbl.add constr_to_coeffs c
+            (Ldd.var base_var, List.map Ldd.var coeff_vars);
+          let instantiate (name : Ldd.Name.t) : kind =
+            match name with
+            | Ldd.Name.Param _ -> Ldd.var (Ldd.rigid name)
+            | Ldd.Name.Atom { constr = constr'; arg_index } ->
+              if Path.compare constr' c = 0
+              then Ldd.var (Ldd.rigid name)
+              else
+                let base', coeffs' = constr_kind constr' in
+                if arg_index = 0
+                then base'
+                else
+                  match List.nth_opt coeffs' (arg_index - 1) with
+                  | Some coeff -> coeff
+                  | None -> Ldd.var (Ldd.rigid name)
+          in
+          let rehydrate node = Ldd.map_rigid instantiate node in
+          let base_rhs = rehydrate base in
+          let coeffs_rhs = List.map rehydrate coeffs in
+          Ldd.solve_lfp base_var base_rhs;
+          List.iter2 (fun v rhs -> Ldd.solve_lfp v rhs) coeff_vars coeffs_rhs;
+          Ldd.var base_var, List.map Ldd.var coeff_vars
+        | Ty { args; kind; abstract } ->
+          let base = Ldd.new_var () in
+          (* Allocate coefficient vars based on declared arity, not on ks
+             length *)
+          let coeffs = List.init (List.length args) (fun _ -> Ldd.new_var ()) in
+          ConstrTbl.add constr_to_coeffs c
+            (Ldd.var base, List.map Ldd.var coeffs);
+          (* Recursively compute the kind of the body *)
+          let rigid_vars =
+            List.map
+              (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty)))
+              args
+          in
+          List.iter2
+            (fun ty var -> TyTbl.add ty_to_kind ty (Ldd.var var))
+            args rigid_vars;
+          (* Compute body kind *)
+          (* CR jujacobs: we shouldn't need to compute the kind if
+             we are in Right mode and abstract=true, but currently this is
+             needed to correctly populate the cache. *)
+          let kind' = kind ops in
+          (* Extract coeffs' from kind' *)
+          let base', coeffs' =
+            Ldd.decompose_linear ~universe:rigid_vars kind'
+          in
+          if List.length coeffs <> List.length coeffs'
+          then
+            failwith
+              (Printf.sprintf
+                 "jkind_solver: coeffs mismatch for constr %s (length %d vs %d)"
+                 (constr_to_string c) (List.length coeffs) (List.length coeffs'));
+          if abstract
+          then (
+            (* We need to assert that kind' is less than or equal to the base *)
+            Ldd.enqueue_gfp base
+              (Ldd.meet base' (Ldd.var (Ldd.rigid (Ldd.Name.atomic c 0))));
+            let i = ref 0 in
+            List.iter2
+              (fun coeff coeff' ->
+                let idx = !i in
+                let rhs = Ldd.join coeff' base' in
+                let bound =
+                  Ldd.meet rhs
+                    (Ldd.var (Ldd.rigid (Ldd.Name.atomic c (idx + 1))))
+                in
+                incr i;
+                Ldd.enqueue_gfp coeff bound)
+              coeffs coeffs')
+          else (
+            Ldd.solve_lfp base base';
+            List.iter2
+              (fun coeff coeff' -> Ldd.solve_lfp coeff coeff')
+              coeffs coeffs');
+          Ldd.var base, List.map Ldd.var coeffs)
+    and constr c ks =
+      let base, coeffs = constr_kind c in
+      (* Meet each arg with the corresponding coeff *)
+      let ks' =
+        List.mapi
+          (fun i coeff ->
+            match List.nth_opt ks i with
+            | Some k -> Ldd.meet k coeff
+            | None -> failwith "Missing arg")
+          coeffs
+      in
+      (* Join all the ks'' plus the base *)
+      List.fold_left Ldd.join base ks'
+    and ops =
+      { const;
+        join;
+        meet;
+        modality;
+        constr;
+        kind_of;
+        rigid
+      }
+    in
+    let constr_kind_poly c =
+      let base, coeffs = constr_kind c in
+      (* Ensure any pending fixpoints are installed before inspecting. *)
+      Ldd.solve_pending ();
+      let coeffs_minus_base =
+        List.map (fun p -> Ldd.sub_subsets p base) coeffs
+      in
+      base, coeffs_minus_base
+    in
+    { ops; constr_kind_poly }
+
+  let normalize (solver : solver) (k : ckind) : poly =
+    let k' = k solver.ops in
+    Ldd.solve_pending ();
+    k'
+
+  let constr_kind_poly (solver : solver) (c : constr) : poly * poly list =
+    solver.constr_kind_poly c
+
+  let leq_with_reason (solver : solver) (k1 : ckind) (k2 : ckind) :
+      int list option =
+    let k2' = k2 solver.ops in
+    let k1' = k1 solver.ops in
+    Ldd.solve_pending ();
+    Ldd.leq_with_reason k1' k2'
+
+  let round_up (solver : solver) (k : ckind) : lat =
+    let k' = k solver.ops in
+    Ldd.round_up k'
+
+end
 
 let ikind_reset : string -> Types.type_ikind = Types.ikind_reset
 

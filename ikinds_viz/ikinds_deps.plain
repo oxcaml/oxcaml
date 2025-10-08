@@ -1,7 +1,6 @@
 graph 1 22.593 4.75
 node "typing/ikinds/ikinds.ml" 6.457 1.75 2.7059 0.5 "typing/ikinds/ikinds.ml" solid ellipse black lightgrey
 node "typing/ikinds/ikind.ml" 10.729 1.75 2.6064 0.5 "typing/ikinds/ikind.ml" solid ellipse black lightgrey
-node "typing/ikinds/ldd_jkind_solver.ml" 10.729 2.5 3.8006 0.5 "typing/ikinds/ldd_jkind_solver.ml" solid ellipse black lightgrey
 node "typing/ikinds/axis_lattice.ml" 15.803 1.8611 3.7438 0.5 "typing/ikinds/axis_lattice.ml" solid ellipse black lightgrey
 node "typing/jkind.ml" 15.803 1.1111 1.9098 0.5 "typing/jkind.ml" solid ellipse black lightgrey
 node "typing/types.mli" 20.785 0.72222 1.9951 0.5 "typing/types.mli" solid ellipse black lightgrey
@@ -20,7 +19,6 @@ node "typing/typemod.ml" 1.6018 1.75 2.2937 0.5 "typing/typemod.ml" solid ellips
 node "typing/includecore.ml" 1.6018 1 2.578 0.5 "typing/includecore.ml" solid ellipse black lightgrey
 node "typing/subst.ml" 1.6018 0.25 1.9098 0.5 "typing/subst.ml" solid ellipse black lightgrey
 edge "typing/ikinds/ikinds.ml" "typing/ikinds/ikind.ml" 4 7.8138 1.75 8.2753 1.75 8.7938 1.75 9.2635 1.75 solid black
-edge "typing/ikinds/ikinds.ml" "typing/ikinds/ldd_jkind_solver.ml" 4 7.4553 1.924 8.0378 2.0269 8.7827 2.1585 9.4134 2.27 solid black
 edge "typing/ikinds/ikinds.ml" "typing/ikinds/axis_lattice.ml" 10 6.8477 1.9953 7.2977 2.2723 8.0833 2.7063 8.8286 2.875 10.476 3.2479 10.96 3.1362 12.629 2.875 13.494 2.7397 14.444 2.4083 15.075 2.1609 solid black
 edge "typing/ikinds/ikinds.ml" "typing/jkind.ml" 7 7.4254 1.5715 7.8531 1.4985 8.3646 1.4205 8.8286 1.375 10.892 1.1725 13.314 1.1229 14.689 1.1122 solid black
 edge "typing/ikinds/ikinds.ml" "typing/types.mli" 13 7.1336 1.5285 7.6018 1.3814 8.2468 1.1976 8.8286 1.0972 12.823 0.40799 13.874 0.5896 17.925 0.44444 18.281 0.43168 18.372 0.42039 18.727 0.44444 19.074 0.46792 19.452 0.51356 19.788 0.56117 "Obj.magic" 13.28 0.7065 dashed black

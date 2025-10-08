@@ -23,15 +23,6 @@
       "info": "Ikind core layer: defines rigid atoms and instantiates Ikind.Ldd over Axis_lattice and the chosen backend."
     },
     {
-      "id": "typing/ikinds/ldd_jkind_solver.ml",
-      "x": 10.729,
-      "y": 2.5,
-      "width": 3.8006,
-      "height": 0.5,
-      "label": "typing/ikinds/ldd_jkind_solver.ml",
-      "info": "JKind solver functor: interprets jkinds as lattice polynomials and provides normalize/leq/round_up operations."
-    },
-    {
       "id": "typing/ikinds/axis_lattice.ml",
       "x": 15.803,
       "y": 1.8611,
@@ -210,31 +201,6 @@
       "style": "solid",
       "label": null,
       "info": "Ikinds builds on Ikind.Ldd for lattice nodes and rigid-name helpers."
-    },
-    {
-      "source": "typing/ikinds/ikinds.ml",
-      "target": "typing/ikinds/ldd_jkind_solver.ml",
-      "points": [
-        [
-          7.4553,
-          1.924
-        ],
-        [
-          8.0378,
-          2.0269
-        ],
-        [
-          8.7827,
-          2.1585
-        ],
-        [
-          9.4134,
-          2.27
-        ]
-      ],
-      "style": "solid",
-      "label": null,
-      "info": "Ikinds uses the specialized Ldd_jkind_solver module to obtain JK operations."
     },
     {
       "source": "typing/ikinds/ikinds.ml",
