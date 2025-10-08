@@ -4,7 +4,7 @@
   addressSanitizer ? false,
   dev ? false,
   flambdaInvariants ? false,
-  framePointers ? false,
+  framePointers ? addressSanitizer,
   multidomain ? false,
   ocamltest ? true,
   pollInsertion ? false,
@@ -181,22 +181,21 @@ stdenv.mkDerivation {
   # step, which expects --libdir to be $out/lib/ocaml
   setOutputFlags = false;
 
-  nativeBuildInputs =
-    [
-      pkgs.autoconf
-      menhir
-      ocaml
-      dune
-      pkgs.pkg-config
-      pkgs.rsync
-      pkgs.which
-      pkgs.parallel
-      gfortran # Required for Bigarray Fortran tests
-      upstream.ocamlformat_0_24_1 # required for make fmt
-      pkgs.removeReferencesTo
-    ]
-    ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
-    ++ lib.optional oxcamlLldb pkgs.python312;
+  nativeBuildInputs = [
+    pkgs.autoconf
+    menhir
+    ocaml
+    dune
+    pkgs.pkg-config
+    pkgs.rsync
+    pkgs.which
+    pkgs.parallel
+    gfortran # Required for Bigarray Fortran tests
+    upstream.ocamlformat_0_24_1 # required for make fmt
+    pkgs.removeReferencesTo
+  ]
+  ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
+  ++ lib.optional oxcamlLldb pkgs.python312;
 
   buildInputs = [
     pkgs.llvm # llvm-objcopy is used for debuginfo
@@ -252,4 +251,8 @@ stdenv.mkDerivation {
       make test-one TEST=...   - Run a single test
     EOF
   '';
+
+  meta =
+    { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
+
 }
