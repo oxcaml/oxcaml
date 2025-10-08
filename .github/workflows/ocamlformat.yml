@@ -12,6 +12,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
+        ocaml-compiler:
+          - "4.14.0"
+          # this is no longer true, but I can't change it because this specific name of
+          # test is a "required" check. We should change that...
 
     steps:
     - name: Checkout the OxCaml repo
