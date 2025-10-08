@@ -1,8 +1,12 @@
 #! /bin/bash
 
+# This script is used to generate large polymorphic variants. This is used to
+# test how jkind inference handles them.
+
 outfile="$1"
 exec > "$outfile"
 
+# Function to print out a polymorphic variant with n rows.
 gen_type() {
   count="$1"
   echo "type poly_variant_with_${count} = ["
