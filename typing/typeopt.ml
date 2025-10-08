@@ -702,7 +702,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     add_nullability_from_jkind env (Ctype.estimate_type_jkind env ty) Pgenval
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
-      (field : Types.mixed_block_element) ty
+      (field : Types.mixed_block_element) (externality : Jkind_axis.Externality.t option) ty
   : int * unit Lambda.mixed_block_element =
   match field with
   | Value ->
@@ -712,7 +712,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       num_nodes_visited, Value kind
-    | None -> num_nodes_visited, Value (nullable Pgenval)
+    | None -> num_nodes_visited, Value (nullable (match externality with None | Some Internal -> Pgenval | Some (External | External64) -> Pintval))
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
@@ -757,7 +757,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       Array.fold_left_map (fun (i, num_nodes_visited) field ->
         let num_nodes_visited, kind =
           value_kind_mixed_block_field env ~loc ~visited ~depth
-            ~num_nodes_visited field types.(i)
+            ~num_nodes_visited field externality types.(i)
         in
         (i + 1, num_nodes_visited), kind
       ) (0, num_nodes_visited) fs
@@ -772,7 +772,7 @@ and value_kind_mixed_block
       (fun (i, num_nodes_visited) typ ->
          let num_nodes_visited, kind =
            value_kind_mixed_block_field env ~loc ~visited ~depth
-             ~num_nodes_visited shape.(i) typ
+             ~num_nodes_visited shape.(i) None typ
          in
          (i+1, num_nodes_visited), kind)
       (0, num_nodes_visited) types
@@ -1002,11 +1002,11 @@ let value_kind env loc ty =
   with
   | Missing_cmi_fallback -> raise (Error (loc, Non_value_layout (ty, None)))
 
-let transl_mixed_block_element env loc ty mbe =
+let transl_mixed_block_element env loc externality ty mbe =
   try
     let (_num_nodes_visited, value_kind) =
       value_kind_mixed_block_field env ~loc ~visited:Numbers.Int.Set.empty
-        ~depth:0 ~num_nodes_visited:0 mbe (Some ty)
+        ~depth:0 ~num_nodes_visited:0 mbe externality (Some ty)
     in
     value_kind
   with

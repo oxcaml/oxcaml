@@ -812,7 +812,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         | Record_mixed shape ->
           let field_shape =
             Typeopt.transl_mixed_block_element newval.exp_env newval.exp_loc
-              newval.exp_type shape.(lbl.lbl_pos)
+              None newval.exp_type shape.(lbl.lbl_pos)
           in
           let shape = Lambda.transl_mixed_product_shape shape in
           (* Update the shape with details for the modified field. *)
@@ -2081,7 +2081,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             | Record_mixed shape ->
                 let field_shape =
                   Typeopt.transl_mixed_block_element expr.exp_env expr.exp_loc
-                    expr.exp_type shape.(lbl.lbl_pos)
+                    None expr.exp_type shape.(lbl.lbl_pos)
                 in
                 let shape = Lambda.transl_mixed_product_shape shape in
                 (* Update the shape with details for the modified field. *)
