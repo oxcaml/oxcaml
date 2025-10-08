@@ -183,10 +183,6 @@ let prepare_error err =
         "Syntax error: expression cannot be spliced.\n\
          @{<hint>Hint@}: consider putting parentheses around the \
          expression."
-  | Unsupported loc ->
-      Location.errorf ~loc
-        "Syntax error: expressions that are quotations of types are \
-         not currently supported."
   | Let_mutable_not_allowed_at_structure_level loc ->
       Location.errorf ~loc
         "Syntax error: Mutable let bindings are not allowed \

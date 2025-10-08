@@ -220,7 +220,7 @@ module Exp:
     val stack : ?loc:loc -> ?attrs:attrs -> expression -> expression
     val comprehension :
       ?loc:loc -> ?attrs:attrs -> comprehension_expression -> expression
-    val quote : ?loc:loc -> ?attrs:attrs -> expression -> expression
+    val quotation : ?loc:loc -> ?attrs:attrs -> expression -> expression
     val splice : ?loc:loc -> ?attrs:attrs -> expression -> expression
     val overwrite : ?loc:loc -> ?attrs:attrs -> expression -> expression -> expression
     val hole : ?loc:loc -> ?attrs:attrs -> unit -> expression

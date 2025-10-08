@@ -633,8 +633,8 @@ module E = struct
     | Pexp_stack e -> stack ~loc ~attrs (sub.expr sub e)
     | Pexp_comprehension c -> comprehension ~loc ~attrs (map_cexp sub c)
     | Pexp_overwrite (e1, e2) -> overwrite ~loc ~attrs (sub.expr sub e1) (sub.expr sub e2)
-    | Pexp_quotation _ -> failwith "Convert to Texp_quote"
-    | Pexp_splice _ -> failwith "Convert to Texp_splice"
+    | Pexp_quotation e -> quotation ~loc ~attrs e
+    | Pexp_splice e -> splice ~loc ~attrs e
     | Pexp_hole -> hole ~loc ~attrs ()
 
   let map_binding_op sub {pbop_op; pbop_pat; pbop_exp; pbop_loc} =

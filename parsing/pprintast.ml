@@ -612,9 +612,9 @@ and core_type1 ctxt f x =
     | Ptyp_open(li, ct) ->
        pp f "@[<hov2>%a.(%a)@]" longident_loc li (core_type ctxt) ct
     | Ptyp_quote t ->
-        pp f "<[@[%a@]]>" (core_type ctxt) t
+        pp f "@[<hov2><[@[%a@]]>@]" (core_type ctxt) t
     | Ptyp_splice t ->
-        pp f "$(@[%a@])" (core_type ctxt) t
+        pp f "@[<hov2>$(@[%a@])@]" (core_type ctxt) t
     | Ptyp_extension e -> extension ctxt f e
     | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_of_kind _) ->
        paren true (core_type ctxt) f x
@@ -1134,7 +1134,7 @@ and expression ctxt f x =
     | Pexp_quotation e ->
         pp f "@[<hov2><[%a]>@]" (expression ctxt) e
     | Pexp_splice e ->
-        pp f "@[<hov2>$%a@]" (simple_expr ctxt) e
+        pp f "@[$%a@]" (simple_expr ctxt) e
     | Pexp_hole -> pp f "_"
     | _ -> expression1 ctxt f x
 
