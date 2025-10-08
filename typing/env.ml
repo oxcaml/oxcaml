@@ -2869,7 +2869,6 @@ let enter_splice ~loc env =
     raise (Error (Toplevel_splice loc));
   add_lock Splice_lock {env with stage = env.stage - 1}
 
-let without_open_quotations env = env.stage = 0
 let has_open_quotations env = env.stage <> 0
 let stage env = env.stage
 
@@ -3206,6 +3205,13 @@ let may_lookup_error report_errors loc env err =
   if report_errors then lookup_error loc env err
   else raise Not_found
 
+let check_cross_quotation report_errors loc_use loc_def env lid locks =
+  match quotation_locks_offset locks with
+  | None | Some 0 -> ()
+  | Some n ->
+    may_lookup_error report_errors loc_use env
+      (Incompatible_stage (lid, loc_use, env.stage, loc_def, env.stage - n))
+
 let report_module_unbound ~errors ~loc env reason =
   match reason with
   | Mod_unbound_illegal_recursion { container; unbound } ->
@@ -3337,12 +3343,8 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   let path, locks, data =
     match find_name_module ~mark:use s env.modules with
     | path, locks, data -> begin
-        match quotation_locks_offset locks with
-        | None | Some 0 -> path, locks, data
-        | Some n ->
-          may_lookup_error errors loc env
-            (Incompatible_stage (Lident s, loc, env.stage,
-                                 Location.none, env.stage - n))
+        check_cross_quotation errors loc Location.none env (Lident s) locks;
+        path, locks, data
     end
     | exception Not_found ->
         may_lookup_error errors loc env (Unbound_module (Lident s))
@@ -3526,15 +3528,9 @@ let lookup_ident_value ~errors ~use ~loc name env =
           |> walk_locks_for_mutable_mode ~errors ~loc ~env locks
           |> ignore
       | _ -> () end;
-      match quotation_locks_offset locks with
-      | None | Some 0 -> begin
-          use_value ~use ~loc path vda;
-          path, locks, vda
-        end
-      | Some n ->
-          may_lookup_error errors loc env
-            (Incompatible_stage (Lident name, loc, env.stage,
-                                 vda.vda_description.val_loc, env.stage - n))
+      check_cross_quotation errors loc vda.vda_description.val_loc env (Lident name) locks;
+      use_value ~use ~loc path vda;
+      path, locks, vda
     end
   | Ok (_, _, Val_unbound reason) ->
       report_value_unbound ~errors ~loc env reason (Lident name)
@@ -3543,35 +3539,19 @@ let lookup_ident_value ~errors ~use ~loc name env =
 
 let lookup_ident_type ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.types with
-  | Ok (path, locks, tda) -> begin
-      match quotation_locks_offset locks with
-      | None | Some 0 -> begin
-          use_type ~use ~loc path tda;
-          path, locks, tda
-        end
-      | Some n ->
-          may_lookup_error errors loc env
-            (Incompatible_stage (Lident s, loc, env.stage,
-                                 tda.tda_declaration.type_loc,
-                                 env.stage - n))
-    end
+  | Ok (path, locks, tda) ->
+      check_cross_quotation errors loc tda.tda_declaration.type_loc env (Lident s) locks;
+      use_type ~use ~loc path tda;
+      path, locks, tda
   | exception Not_found | Error _ ->
       may_lookup_error errors loc env (Unbound_type (Lident s))
 
 let lookup_ident_modtype ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.modtypes with
-  | Ok (path, locks, data) -> begin
-      match quotation_locks_offset locks with
-      | None | Some 0 -> begin
-          use_modtype ~use ~loc path data.mtda_declaration;
-          (path, locks, data.mtda_declaration)
-        end
-      | Some n ->
-          may_lookup_error errors loc env
-            (Incompatible_stage (Lident s, loc, env.stage,
-                                 data.mtda_declaration.mtd_loc,
-                                 env.stage -n))
-    end
+  | Ok (path, locks, data) ->
+      check_cross_quotation errors loc data.mtda_declaration.mtd_loc env (Lident s) locks;
+      use_modtype ~use ~loc path data.mtda_declaration;
+      (path, locks, data.mtda_declaration)
   | Error _ ->
       may_lookup_error errors loc env (Unbound_modtype (Lident s))
 
@@ -5023,7 +5003,7 @@ let report_error ppf = function
   | Toplevel_splice loc ->
       fprintf ppf
         "@[<hov>Splices ($) are not allowed in the initial stage,@ \
-         as encountered at %a.@, \
+         as encountered at %a.@,\
          Did you forget to insert a quotation?@]"
         Location.print_loc loc
 

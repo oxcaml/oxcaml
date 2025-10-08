@@ -35,7 +35,8 @@ Line 32, characters 35-37:
 32 | type ('a, 'b) s5 = <[$'a -> [`A of 'b]]> expr;;
                                         ^^
 Error: Type variable "'b" is used at Line 32, characters 35-37,
-       within a quotation (<[ ... ]>); it already occurs outside quotations.
+       inside a quotation (<[ ... ]>);
+       it already occurs outside any quotations.
        Hint: Consider using "$'b".
 |}];;
 
@@ -46,7 +47,12 @@ type s6 = <[string -> bool -> [ `A | `B of string ]]> expr
 
 type s7 = $(int -> int);;
 [%%expect {|
-type s7 = $(int -> int)
+Line 1, characters 10-23:
+1 | type s7 = $(int -> int);;
+              ^^^^^^^^^^^^^
+Error: Splices ($) are not allowed in the initial stage,
+       as encountered at Line 1, characters 10-23.
+       Did you forget to insert a quotation?
 |}];;
 
 type 'a t1 = 'a expr;;
@@ -56,33 +62,33 @@ type 'a t1 = 'a expr
 
 type 'a t2 = <['a]> expr;;
 [%%expect {|
-Line 57, characters 15-17:
-57 | type 'a t2 = <['a]> expr;;
+Line 63, characters 15-17:
+63 | type 'a t2 = <['a]> expr;;
                     ^^
-Error: Type variable "'a" is used at Line 57, characters 15-17,
-       within a quotation (<[ ... ]>); it already occurs outside quotations.
+Error: Type variable "'a" is used at Line 63, characters 15-17,
+       inside a quotation (<[ ... ]>);
+       it already occurs outside any quotations.
        Hint: Consider using "$'a".
 |}];;
 
 type 'a t3 = $'a -> $'a -> 'a expr;;
 [%%expect {|
-Line 1, characters 27-29:
+Line 1, characters 13-16:
 1 | type 'a t3 = $'a -> $'a -> 'a expr;;
-                               ^^
-Error: Type variable "'a" is used at Line 1, characters 27-29,
-       outside quotations;
-       it already occurs Uncaught exception: Typetexp.Error(_, _, _)
-
+                 ^^^
+Error: Splices ($) are not allowed in the initial stage,
+       as encountered at Line 1, characters 13-16.
+       Did you forget to insert a quotation?
 |}];;
 
 type 'a t4 = $'a -> $'a;;
 [%%expect {|
-Line 78, characters 14-16:
-78 | type 'a t4 = $'a -> $'a;;
-                   ^^
-Error: Type variable "'a" is used at Line 78, characters 14-16,
-       Uncaught exception: Typetexp.Error(_, _, _)
-
+Line 1, characters 13-16:
+1 | type 'a t4 = $'a -> $'a;;
+                 ^^^
+Error: Splices ($) are not allowed in the initial stage,
+       as encountered at Line 1, characters 13-16.
+       Did you forget to insert a quotation?
 |}];;
 
 let p x = <[x]>;;
@@ -97,7 +103,12 @@ Error: Identifier "x" is used at Line 1, characters 12-13,
 
 let f (x : $'a) = x
 [%%expect {|
-val f : ('a : any). 'a -> 'a = <fun>
+Line 1, characters 11-14:
+1 | let f (x : $'a) = x
+               ^^^
+Error: Splices ($) are not allowed in the initial stage,
+       as encountered at Line 1, characters 11-14.
+       Did you forget to insert a quotation?
 |}];;
 
 let foo1 (x: 'a) = <[fun (y : $'a) -> 1]>;;
@@ -111,18 +122,19 @@ Line 1, characters 30-32:
 1 | let foo2 (x: 'a) = <[fun (y : 'a) -> 1]>;;
                                   ^^
 Error: Type variable "'a" is used at Line 1, characters 30-32,
-       within a quotation (<[ ... ]>); it already occurs outside quotations.
+       inside a quotation (<[ ... ]>);
+       it already occurs outside any quotations.
        Hint: Consider using "$'a".
 |}];;
 
 let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
 [%%expect {|
-Line 118, characters 32-34:
-118 | let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
+Line 138, characters 32-34:
+138 | let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
                                       ^^
-Error: Type variable "'a" is used at Line 118, characters 32-34,
-       within 2 layers of quotation (<[ ... ]>);
-       it already occurs outside quotations.
+Error: Type variable "'a" is used at Line 138, characters 32-34,
+       inside 2 layers of quotation (<[ ... ]>);
+       it already occurs outside any quotations.
        Hint: Consider using "$($'a)".
 |}];;
 
@@ -137,7 +149,8 @@ Line 1, characters 39-41:
 1 | let foo5 (x: <['a]> expr) = <[fun (y : 'a) -> ($x, y)]>;;
                                            ^^
 Error: Type variable "'a" is used at Line 1, characters 39-41,
-       within a quotation (<[ ... ]>); it already occurs outside quotations.
+       inside a quotation (<[ ... ]>);
+       it already occurs outside any quotations.
        Hint: Consider using "$'a".
 |}];;
 
@@ -180,7 +193,8 @@ Line 1, characters 33-35:
 1 | (<[fun (y : 'a) -> 1]>, fun (x : 'a) -> ())
                                      ^^
 Error: Type variable "'a" is used at Line 1, characters 33-35,
-       outside quotations; it already occurs within a quotation (<[ ... ]>).
+       outside any quotations;
+       it already occurs inside a quotation (<[ ... ]>).
        Hint: Consider using "<['a]>".
 |}];;
 

@@ -515,43 +515,43 @@ end = struct
     let r = ref [] in
     TyVarMap.iter
       (fun name (ty, loc, s) ->
-         if flavor = Unification || is_in_scope name then
-           let v = new_global_var (Jkind.Builtin.any ~why:Dummy_jkind) in
-           let snap = Btype.snapshot () in
-           if try unify env v ty; true with _ -> Btype.backtrack snap; false
-           then try
-               let (type_expr, stage) = lookup_global name in
-               if stage <> s then
-                 raise
-                   (Error (loc, env, (Invalid_variable_stage
-                                        {name = Pprintast.tyvar_of_name name;
-                                         intro_stage = stage;
-                                         usage_loc = loc;
-                                         usage_stage = s})));
-               r := (loc, v, type_expr, stage) :: !r
-             with Not_found ->
-             match unbound_variable_policy, Btype.is_Tvar ty with
-             | Open, _ | (Closed | Closed_for_upstream_compatibility), false ->
-               let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
-               let v2 = new_global_var jkind in
-               let stage = Env.stage env in
-               r := (loc, v, v2, stage) :: !r;
-               add name v2 jkind stage
-             | Closed, true ->
-               raise(Error(loc, env,
-                           Unbound_type_variable (Pprintast.tyvar_of_name name,
-                                                  get_in_scope_names (),
-                                                  None)))
-             | Closed_for_upstream_compatibility, true ->
-               raise(Error(loc, env,
-                           Unbound_type_variable (Pprintast.tyvar_of_name name,
+        if flavor = Unification || is_in_scope name then
+          let v = new_global_var (Jkind.Builtin.any ~why:Dummy_jkind) in
+          let snap = Btype.snapshot () in
+          if try unify env v ty; true with _ -> Btype.backtrack snap; false
+          then try
+              let (type_expr, stage) = lookup_global name in
+              if stage <> s then
+                raise
+                  (Error (loc, env, (Invalid_variable_stage
+                                       {name = Pprintast.tyvar_of_name name;
+                                        intro_stage = stage;
+                                        usage_loc = loc;
+                                        usage_stage = s})));
+              r := (loc, v, type_expr) :: !r
+            with Not_found ->
+            match unbound_variable_policy, Btype.is_Tvar ty with
+            | Open, _ | (Closed | Closed_for_upstream_compatibility), false ->
+              let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
+              let v2 = new_global_var jkind in
+              let stage = Env.stage env in
+              r := (loc, v, v2) :: !r;
+              add name v2 jkind stage
+            | Closed, true ->
+              raise(Error(loc, env,
+                          Unbound_type_variable (Pprintast.tyvar_of_name name,
                                                  get_in_scope_names (),
-                                                 Some Upstream_compatibility))))
+                                                 None)))
+            | Closed_for_upstream_compatibility, true ->
+              raise(Error(loc, env,
+                          Unbound_type_variable (Pprintast.tyvar_of_name name,
+                                                get_in_scope_names (),
+                                                Some Upstream_compatibility))))
       !used_variables;
     used_variables := TyVarMap.empty;
     fun () ->
       List.iter
-        (function (loc, t1, t2, _) ->
+        (function (loc, t1, t2) ->
           try unify env t1 t2 with Unify err ->
             raise (Error(loc, env, Type_mismatch err)))
         !r
@@ -1438,7 +1438,7 @@ let transl_type_scheme_mono env styp =
       TyVarEnv.reset ();
       transl_simple_type ~new_var_jkind:Sort env ~closed:false Alloc.Const.legacy styp
     end
-      ~post:generalize_ctyp
+    ~post:generalize_ctyp
   in
   (* This next line is very important: it stops [val] and [external]
      declarations from having undefaulted jkind variables. Without

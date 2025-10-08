@@ -4682,7 +4682,7 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
-let rec filter_arrow env t l ~force_tpoly =
+let filter_arrow env t l ~force_tpoly =
   let function_type level =
     let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let k_res = Jkind.Builtin.any ~why:Inside_of_Tarrow in
@@ -4747,8 +4747,6 @@ let rec filter_arrow env t l ~force_tpoly =
       else raise (Filter_arrow_failed
                     (Label_mismatch
                        { got = l; expected = l'; expected_type = t }))
-  | Tsplice ty -> filter_arrow env ty l ~force_tpoly
-  | Tquote ty -> filter_arrow env ty l ~force_tpoly
   | _ ->
       raise (Filter_arrow_failed Not_a_function)
 

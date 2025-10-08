@@ -532,7 +532,6 @@ val add_local_env_lock : t -> t
 val enter_quotation : t -> t
 val enter_splice : loc:Location.t -> t -> t
 
-val without_open_quotations : t -> bool
 val has_open_quotations : t -> bool
 val stage : t -> int
 val quotation_locks_offset : locks -> int option
