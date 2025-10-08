@@ -1079,8 +1079,10 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_open (path, mod_ident, cty)) cty.ctyp_type
-  | Ptyp_quote _ -> raise (Error (loc, env, Unsupported_runtime_metaprogramming))
-  | Ptyp_splice _ -> raise (Error (loc, env, Unsupported_runtime_metaprogramming))
+  | Ptyp_quote _ ->
+      raise (Error (loc, env, Unsupported_runtime_metaprogramming))
+  | Ptyp_splice _ ->
+      raise (Error (loc, env, Unsupported_runtime_metaprogramming))
   | Ptyp_of_kind jkind ->
     let tjkind = jkind_of_annotation (Type_of_kind loc) styp.ptyp_attributes jkind in
     let ty = newty (Tof_kind tjkind) in
