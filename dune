@@ -186,7 +186,7 @@
   ast_invariants
   depend
   parser_types ; manual update: mli only files asttypes parsetree
-  ;; TYPING
+               ;; TYPING
   ident
   path
   jkind
@@ -251,7 +251,6 @@
   typedecl_properties
   typedecl_separability
   cmt2annot
-  camlinternalQuote_bootstrap
   ; manual update: mli only files
   annot
   outcometree
@@ -301,11 +300,35 @@
   value_rec_types
   asttypes
   cmo_format
-  camlinternalQuote_bootstrap
   cmj_format
   outcometree
   parsetree
-  debug_event))
+  debug_event
+  ; See note below about camlinternalQuote
+  (:include
+   %{project_root}/duneconf/camlinternalquote_if_missing_from_stdlib)))
+
+; Our system compiler doesn't have CamlInternalQuote in its stdlib, so
+; we need to compile it as an additional target, but only for the first
+; stage build.  See also duneconf/dune.
+
+(rule
+ (targets camlinternalQuote.ml)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy#
+   %{project_root}/stdlib/camlinternalQuote.ml
+   %{project_root}/camlinternalQuote.ml)))
+
+(rule
+ (targets camlinternalQuote.mli)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy#
+   %{project_root}/stdlib/camlinternalQuote.mli
+   %{project_root}/camlinternalQuote.mli)))
 
 (library
  (name ocamlbytecomp)
@@ -357,10 +380,7 @@
  (ocamlopt_flags
   (:include %{project_root}/ocamlopt_flags.sexp))
  (libraries ocamlcommon flambda2)
- (modules
-   jsmaindriver
-   jscompile
-   jslibrarian))
+ (modules jsmaindriver jscompile jslibrarian))
 
 (executable
  (name boot_ocamlj)
