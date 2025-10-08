@@ -3117,7 +3117,7 @@ module Format_history = struct
     | Row_variable -> format_with_notify_js ppf "it's a row variable"
     | Polymorphic_variant -> fprintf ppf "it's a polymorphic variant type"
     | Polymorphic_variant_too_big ->
-      fprintf ppf "it's a polymorphic variant type that has a lot of entries"
+      fprintf ppf "it's a polymorphic variant type that has more than %d entries" limit_for_mode_crossing_rows
     | Arrow -> fprintf ppf "it's a function type"
     | Tfield ->
       format_with_notify_js ppf
