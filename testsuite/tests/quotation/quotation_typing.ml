@@ -129,10 +129,10 @@ Error: Type variable "'a" is used at Line 1, characters 30-32,
 
 let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
 [%%expect {|
-Line 138, characters 32-34:
-138 | let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
+Line 130, characters 32-34:
+130 | let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
                                       ^^
-Error: Type variable "'a" is used at Line 138, characters 32-34,
+Error: Type variable "'a" is used at Line 130, characters 32-34,
        inside 2 layers of quotation (<[ ... ]>);
        it already occurs outside any quotations.
        Hint: Consider using "$($'a)".
