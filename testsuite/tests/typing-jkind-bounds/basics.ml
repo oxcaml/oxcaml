@@ -2092,3 +2092,78 @@ Error: The kind of type "c" is immutable_data with a
            value mod contended portable
          because of the annotation on the declaration of the type c.
 |}]
+
+(************************************)
+(* Test 22: limit with-bounds to 10 *)
+
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) t10 =
+  { a : 'a
+  ; b : 'b
+  ; c : 'c
+  ; d : 'd
+  ; e : 'e
+  ; f : 'f
+  ; g : 'g
+  ; h : 'h
+  ; i : 'i
+  ; j : 'j
+  }
+type ('a : immutable_data) u : immutable_data
+  = ('a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a) t10
+[%%expect{|
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) t10 = {
+  a : 'a;
+  b : 'b;
+  c : 'c;
+  d : 'd;
+  e : 'e;
+  f : 'f;
+  g : 'g;
+  h : 'h;
+  i : 'i;
+  j : 'j;
+}
+type ('a : immutable_data) u = ('a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a) t10
+|}]
+
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j, 'k) t11 =
+  { a : 'a
+  ; b : 'b
+  ; c : 'c
+  ; d : 'd
+  ; e : 'e
+  ; f : 'f
+  ; g : 'g
+  ; h : 'h
+  ; i : 'i
+  ; j : 'j
+  ; k : 'k
+  }
+type ('a : immutable_data) u : immutable_data =
+  ('a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a) t11
+[%%expect{|
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j, 'k) t11 = {
+  a : 'a;
+  b : 'b;
+  c : 'c;
+  d : 'd;
+  e : 'e;
+  f : 'f;
+  g : 'g;
+  h : 'h;
+  i : 'i;
+  j : 'j;
+  k : 'k;
+}
+Lines 14-15, characters 0-50:
+14 | type ('a : immutable_data) u : immutable_data =
+15 |   ('a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a) t11
+Error: The kind of type "('a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a) t11" is
+           value mod non_float
+         because of the definition of t11 at lines 1-13, characters 0-3.
+       But the kind of type "('a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a) t11" must be a subkind of
+         immutable_data
+         because of the definition of u at lines 14-15, characters 0-50.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
+|}]
