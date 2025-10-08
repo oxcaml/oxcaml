@@ -403,17 +403,44 @@ let () =
     (fun () -> unsafe_set_prod t idx #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
 
+(* specialized, but on abstract type *)
 let () =
   let open struct
     type t = { mutable a : #(int * int) }
   end in
-  let unsafe_set_imm64_x2 (type a : immediate64 & immediate64) box (idx : (_, a) idx_mut) (v : a) =
+  let unsafe_set_imm64_imm64 (type a : immediate64 & immediate64) box (idx : (_, a) idx_mut) (v : a) =
     unsafe_set box idx v
   in
   let t = { a = #(1, 2) } in
   let idx = (.a) in
   test ~expect_caml_modifies:0
-    (fun () -> unsafe_set_imm64_x2 t idx #(1, 2);
+    (fun () -> unsafe_set_imm64_imm64 t idx #(0, 0);
+               ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type t = { mutable a : #(int * int) }
+  end in
+  let unsafe_set_imm64_imm (type a : immediate64 & immediate) box (idx : (_, a) idx_mut) (v : a) =
+    unsafe_set box idx v
+  in
+  let t = { a = #(1, 2) } in
+  let idx = (.a) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_imm64_imm t idx #(0, 0);
+               ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type t = { mutable a : #(int * #(int * int)) }
+  end in
+  let unsafe_set_imm_and_imm_imm (type a : immediate & (immediate & immediate)) box (idx : (_, a) idx_mut) (v : a) =
+    unsafe_set box idx v
+  in
+  let t = { a = #(1, #(2, 3)) } in
+  let idx = (.a) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_imm_and_imm_imm t idx #(0, #(0, 0));
                ignore (Sys.opaque_identity t))
 
 (* Setting an immediate or non-value block index via the ptr primitives should
