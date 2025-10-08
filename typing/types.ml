@@ -1374,6 +1374,8 @@ module With_bounds_types : sig
   val find_opt : type_expr -> t -> info option
   val for_all : (type_expr -> info -> bool) -> t -> bool
   val exists : (type_expr -> info -> bool) -> t -> bool
+  val length : t -> int
+  val fold : (type_expr -> info -> 'a -> 'a) -> t -> 'a -> 'a
 end = struct
   module M = Map.Make(struct
       (* CR layouts v2.8: A [Map] with mutable values (of which [type_expr] is
@@ -1413,6 +1415,8 @@ end = struct
     fold (fun key value acc ->
       let key, value = f key value in
       M.add key value acc) (to_map t) M.empty |> of_map
+  let length t = M.cardinal (to_map t)
+  let fold f t acc = M.fold f (to_map t) acc
 end
 
 let equal_unsafe_mode_crossing
