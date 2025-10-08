@@ -2705,7 +2705,7 @@ let for_open_boxed_row =
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Value_creation Polymorphic_variant)
 
-let limit_of_mode_crossing_rows = 100
+let limit_for_mode_crossing_rows = 100
 
 let for_boxed_row row =
   if Btype.tvariant_not_immediate row
@@ -2716,7 +2716,7 @@ let for_boxed_row row =
       for_open_boxed_row
     else
       let bounds_count = Btype.fold_row (fun acc _ -> acc + 1) 0 row in
-      if bounds_count <= limit_of_mode_crossing_rows
+      if bounds_count <= limit_for_mode_crossing_rows
       then
         let base = Builtin.immutable_data ~why:Polymorphic_variant in
         Btype.fold_row
@@ -3229,7 +3229,9 @@ module Format_history = struct
     | Row_variable -> format_with_notify_js ppf "it's a row variable"
     | Polymorphic_variant -> fprintf ppf "it's a polymorphic variant type"
     | Polymorphic_variant_too_big ->
-      fprintf ppf "it's a polymorphic variant type that has more than %d entries" limit_for_mode_crossing_rows
+      fprintf ppf
+        "it's a polymorphic variant type that has more than %d entries"
+        limit_for_mode_crossing_rows
     | Arrow -> fprintf ppf "it's a function type"
     | Tfield ->
       format_with_notify_js ppf
