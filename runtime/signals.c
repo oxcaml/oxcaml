@@ -26,6 +26,7 @@
 #endif
 #include "caml/alloc.h"
 #include "caml/callback.h"
+#include "caml/domain.h"
 #include "caml/fail.h"
 #include "caml/memory.h"
 #include "caml/misc.h"
@@ -422,6 +423,10 @@ value caml_do_pending_actions_exn(void)
   value exn = caml_process_pending_signals_exn();
   check_async_exn(exn, "signal handler");
   if (Is_exception_result(exn)) goto exception;
+  /* Check for a pending preemption */
+  if (Caml_state->preemption == Val_long(1)) {
+    caml_domain_setup_preemption();
+  }
 
   /* Call memprof callbacks */
   exn = caml_memprof_run_callbacks_exn();
