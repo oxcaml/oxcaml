@@ -38,6 +38,6 @@ jobs:
       if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
       run: echo SKIP_80CH=y >> "$GITHUB_ENV"
 
-    - name: Check formatting of Flambda 2 and Cfg code
+    - name: Check OCaml Formatting
       working-directory: oxcaml
       run: opam exec -- bash tools/ci/actions/check-fmt.sh
