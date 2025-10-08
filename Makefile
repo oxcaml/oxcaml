@@ -94,7 +94,8 @@ promote:
 
 .PHONY: fmt
 fmt: $(dune_config_targets)
-	$(if $(filter 1,$(V)),,@)dune build @fmt @80ch --auto-promote
+	$(if $(filter 1,$(V)),,@)bash scripts/fmt.sh
+
 
 .PHONY: check-fmt
 check-fmt: $(dune_config_targets)

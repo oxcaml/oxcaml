@@ -22,4 +22,7 @@ cd "$repo_root"
 # needed for the root dune file to parse
 touch dune.runtime_selection duneconf/dirs-to-ignore.inc duneconf/ox-extra.inc
 
-dune build @fmt @80ch
+exit_code=0
+dune build @fmt || exit_code=1
+scripts/80ch.sh || exit_code=1
+exit $exit_code

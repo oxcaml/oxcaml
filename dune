@@ -978,9 +978,3 @@
   otherlibs/dynlink/dynlink.cmxa
   middle_end/flambda2/from_lambda/flambda2_from_lambda.cma
   middle_end/flambda2/from_lambda/flambda2_from_lambda.cmxa))
-
-(rule
-  (alias 80ch)
-  (deps (universe) (sandbox none))
-  (enabled_if (<> %{env:SKIP_80CH=} ""))
-  (action (bash %{dep:scripts/80ch.sh})))
