@@ -12,8 +12,6 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        ocaml-compiler:
-          - "4.14.0"
 
     steps:
     - name: Checkout the OxCaml repo
@@ -25,31 +23,16 @@ jobs:
       working-directory: oxcaml
       run: git fetch origin HEAD --deepen 1
 
-    - name: Setup OCaml ${{ matrix.ocaml-compiler }}
+    - name: Set up Opam
       uses: ocaml/setup-ocaml@v3
       with:
-        ocaml-compiler: ${{ matrix.ocaml-compiler }}
-
-    - name: Install a recent version of re
-      run: opam install 're>=1.10.0'
-
-    - name: Install cmdliner 1.3.0
-      run: opam pin -y cmdliner 1.3.0
-
-    - name: Install ocamlformat 0.24.1
-      run: opam pin -y ocamlformat 0.24.1
-
-    - name: autoconf
-      working-directory: oxcaml
-      run: autoconf
-
-    - name: configure
-      working-directory: oxcaml
-      run: |
-        ./configure \
-          --prefix=$GITHUB_WORKSPACE/_install \
-          --enable-middle-end=flambda2 \
-          --with-dune=/bin/false
+        ocaml-compiler: oxcaml-ci-deps.5.2.0
+        opam-repositories: |
+          local: file://${{ github.workspace }}/tools/ci/local-opam
+          default: https://github.com/ocaml/opam-repository.git
+        opam-disable-sandboxing: true
+        opam-pin: false
+        cache-prefix: ${{ matrix.os }}-v1
 
     - name: 'Check for the "skip 80ch" PR tag'
       if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
@@ -57,4 +40,4 @@ jobs:
 
     - name: Check formatting of Flambda 2 and Cfg code
       working-directory: oxcaml
-      run: opam exec -- make check-fmt
+      run: opam exec -- bash tools/ci/actions/check-fmt.sh
