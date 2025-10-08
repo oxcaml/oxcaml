@@ -361,7 +361,15 @@ jobs:
         ARTIFACT_URL=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
           --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\") | .archive_download_url")
         if [ -n "$ARTIFACT_URL" ]; then
-          echo "./tools/apply-diff.sh $ARTIFACT_URL"
+          COMMAND="./tools/apply-diff.sh $ARTIFACT_URL"
+          echo "$COMMAND"
+          gh pr comment --body "$(cat <<EOF
+        Test failures detected in ${{ matrix.name }} configuration. Apply the diff with:
+        ```bash
+        $COMMAND
+        ```
+        EOF
+        )"
         else
           echo "Artifact uploaded but URL not yet available. Check: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         fi
