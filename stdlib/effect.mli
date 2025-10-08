@@ -38,6 +38,8 @@ external perform : 'a t -> 'a = "%perform"
 
     @raise Unhandled if there is no handler for [e]. *)
 
+val preempt_with : 'a t -> unit
+
 module Deep : sig
   (** Deep handlers *)
 

@@ -903,9 +903,15 @@ static void verify_object(struct heap_verify_state* st, value v) {
   CAMLassert(Has_status_val(v, caml_global_heap_state.UNMARKED));
 
   if (Tag_val(v) == Cont_tag) {
+    mlsize_t size = Wosize_val(v);
+    CAMLassert(size == 2 || size == 3);
     struct stack_info* stk = Ptr_val(Field(v, 0));
+    value *gc_regs = 0;
+    if (size == 3) {
+      gc_regs = (value *)(Field(v, 2));
+    }
     if (stk != NULL)
-      caml_scan_stack(verify_push, verify_scanning_flags, st, stk, 0);
+      caml_scan_stack(verify_push, verify_scanning_flags, st, stk, gc_regs);
   } else if (Scannable_val(v)) {
     int i = 0;
     if (Tag_val(v) == Closure_tag) {
@@ -1088,9 +1094,16 @@ static void compact_update_block(header_t* p)
   CAMLassert(tag != Infix_tag);
 
   if (tag == Cont_tag) {
-    value stk = Field(Val_hp(p), 0);
+    value v = Val_hp(p);
+    value stk = Field(v, 0);
     if (Ptr_val(stk)) {
-      caml_scan_stack(&compact_update_value, 0, NULL, Ptr_val(stk), 0);
+      value *gc_regs = 0;
+      mlsize_t size = Wosize_hd(hd);
+      CAMLassert(size == 2 || size == 3);
+      if (size == 3) {
+        gc_regs = (value *)(Field(v, 2));
+      }
+      caml_scan_stack(&compact_update_value, 0, NULL, Ptr_val(stk), gc_regs);
     }
   } else {
     uintnat offset = 0;

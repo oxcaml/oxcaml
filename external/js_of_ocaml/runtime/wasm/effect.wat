@@ -273,7 +273,7 @@
 
    (func $resume (export "%resume")
       (param $stack_head (ref eq)) (param $f (ref eq)) (param $v (ref eq))
-      (param $stack_tail (ref eq)) (result (ref eq))
+      (param $stack_tail (ref eq)) (param $gc_regs (ref eq)) (result (ref eq))
       (local $k (ref $cont))
       (local $pair (ref $pair))
       (if (ref.eq (local.get $stack_head) (ref.i31 (i32.const 0)))
