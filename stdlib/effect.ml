@@ -12,6 +12,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+external register_named_value : string -> 'a -> unit
+  = "caml_register_named_value"
+
 type 'a t = ..
 external perform : 'a t -> 'a = "%perform"
 
@@ -37,6 +40,10 @@ let _ = Callback.Safe.register_exception "Effect.Unhandled"
           (Unhandled Should_not_see_this__)
 let _ = Callback.Safe.register_exception "Effect.Continuation_already_resumed"
           Continuation_already_resumed
+
+type _ t += Tick : unit t
+let () = register_named_value "Effect.Tick" Tick
+
 
 type (-'a, +'b) cont
 
