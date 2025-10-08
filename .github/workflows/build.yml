@@ -361,13 +361,15 @@ jobs:
         git commit -m "Add metrics for commit ${COMMIT_HASH}"
         git push
 
-    - uses: actions/upload-artifact@v4
+    - name: Upload core dumps
+      uses: actions/upload-artifact@v4
       if: failure()
       with:
         name: cores-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
         path: /cores
 
-    - uses: actions/upload-artifact@v4
+    - name: Upload DiagnosticReports (macOS only)
+      uses: actions/upload-artifact@v4
       if: failure() && matrix.os == 'macos-latest'
       with:
         name: DiagnosticReports-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
