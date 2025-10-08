@@ -716,22 +716,39 @@ Make_call_realloc_stack(_avx512, ZMM)
         ENTER_FUNCTION;                              \
 LBL(caml_call_gc ## suffix):                         \
         SAVE_ALL_REGS(simd);                         \
-        movq    %r15, Caml_state(gc_regs);           \
-        TSAN_ENTER_FUNCTION(0);                      \
-        SWITCH_OCAML_TO_C;                           \
-        C_call (GCALL(caml_garbage_collection));     \
-        SWITCH_C_TO_OCAML;                           \
-        TSAN_EXIT_FUNCTION;                          \
-        movq    Caml_state(gc_regs), %r15;           \
-        RESTORE_ALL_REGS(simd);                      \
         LEAVE_FUNCTION;                              \
-        ret;                                         \
-    CFI_ENDPROC                 ;                    \
+        jmp G(caml_do_call_gc);                      \
+    CFI_ENDPROC;                                     \
     ENDFUNCTION(G(caml_call_gc ## suffix))
 
 Make_call_gc(, XMM)
 Make_call_gc(_avx, YMM)
 Make_call_gc(_avx512, ZMM)
+
+FUNCTION(G(caml_do_call_gc))
+CFI_STARTPROC
+        ENTER_FUNCTION
+        movq    %r15, Caml_state(gc_regs)
+        TSAN_ENTER_FUNCTION(0)
+        SWITCH_OCAML_TO_C
+        C_call (GCALL(caml_garbage_collection))
+        SWITCH_C_TO_OCAML
+        TSAN_EXIT_FUNCTION
+        movq    Caml_state(gc_regs), %r15
+        movq    Gc_regs_kind(%r15), %r11
+        cmpq    $GC_REGS_YMM, %r11
+        je      1f
+        cmpq    $GC_REGS_ZMM, %r11
+        je      2f
+        RESTORE_ALL_REGS(XMM)
+        jmp 3f
+1:      RESTORE_ALL_REGS(YMM)
+        jmp 3f
+2:      RESTORE_ALL_REGS(ZMM)
+3:      LEAVE_FUNCTION
+        ret
+CFI_ENDPROC
+ENDFUNCTION(G(caml_do_call_gc))
 
 FUNCTION(G(caml_raise_stack_overflow_nat))
 CFI_STARTPROC
