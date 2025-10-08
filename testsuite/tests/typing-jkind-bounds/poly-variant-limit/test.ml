@@ -19,9 +19,10 @@ type foo : immutable_data = Types.poly_variant_with_100
 type foo = Types.poly_variant_with_100
 |}]
 
-(* CR-someday: This isn't currently accepted because we have a restriction that
-   we don't do inference when the polymorphic variant has more than 100 rows.
-   In the future, we should remove this restriction. *)
+(* CR layouts v2.8: This isn't currently accepted because we have a restriction
+   that we don't do inference when the polymorphic variant has more than 100
+   rows. In the future, we should remove this restriction. Internal ticket
+   5435. *)
 type foo : immutable_data = Types.poly_variant_with_101
 [%%expect {|
 Line 1, characters 0-55:
