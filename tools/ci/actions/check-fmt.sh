@@ -1,29 +1,25 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
-# Derived from the former 'check-fmt' target in the Makefile.
+#**************************************************************************#
+#*                                                                        *#
+#*                                 OCaml                                  *#
+#*                                                                        *#
+#*                  Jacob Van Buren, Jane Street, New York                *#
+#*                                                                        *#
+#*   Copyright 2025 Jane Street Group LLC                                 *#
+#*                                                                        *#
+#*   All rights reserved.  This file is distributed under the terms of    *#
+#*   the GNU Lesser General Public License version 2.1, with the          *#
+#*   special exception on linking described in the file LICENSE.          *#
+#*                                                                        *#
+#**************************************************************************#
+
+set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-if [[ -n "$(git status --porcelain)" ]]; then
-  echo "$0: Tree must be clean to check formatting" >&2
-  exit 1
-fi
+# needed for the root dune file to parse
+touch dune.runtime_selection duneconf/dirs-to-ignore.inc duneconf/ox-extra.inc
 
-dune build @fmt
-
-if [ -z "${SKIP_80CH:-}" ]; then
-  bash "$repo_root/scripts/80ch.sh"
-fi
-
-
-if ! git diff --no-ext-diff --quiet; then
-  echo >&2
-  echo "The following code was not formatted correctly:" >&2
-  echo "(the + side of the diff is how it should be formatted)" >&2
-  echo "(working copy now contains correctly-formatted code)" >&2
-  echo >&2
-  git diff --no-ext-diff
-  exit 1
-fi
+dune build @fmt @80ch
