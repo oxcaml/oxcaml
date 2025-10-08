@@ -760,6 +760,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->requested_minor_gc = 0;
   domain_state->major_slice_epoch = 0;
   domain_state->requested_external_interrupt = 0;
+  domain_root_register(&domain_state->preemption, Val_unit);
 
   domain_state->parser_trace = 0;
 
