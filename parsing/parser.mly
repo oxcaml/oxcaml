@@ -5041,27 +5041,27 @@ operator:
 %inline infix_operator:
   | op = INFIXOP0 { op }
   /* Still support the two symbols as infix operators */
-  | AT             {"@"}
-  | ATAT           {"@@"}
-  | op = INFIXOP1  { op }
-  | op = INFIXOP2  { op }
-  | op = infixop3  { op }
-  | op = INFIXOP4  { op }
-  | PLUS            {"+"}
-  | PLUSDOT        {"+."}
-  | PLUSEQ         {"+="}
-  | MINUS           {"-"}
-  | MINUSDOT       {"-."}
-  | STAR            {"*"}
-  | PERCENT         {"%"}
-  | EQUAL           {"="}
-  | LESS            {"<"}
-  | GREATER         {">"}
-  | OR             {"or"}
-  | BARBAR         {"||"}
-  | AMPERSAND       {"&"}
-  | AMPERAMPER     {"&&"}
-  | COLONEQUAL     {":="}
+  | AT            {"@"}
+  | ATAT          {"@@"}
+  | op = INFIXOP1 { op }
+  | op = INFIXOP2 { op }
+  | op = infixop3 { op }
+  | op = INFIXOP4 { op }
+  | PLUS           {"+"}
+  | PLUSDOT       {"+."}
+  | PLUSEQ        {"+="}
+  | MINUS          {"-"}
+  | MINUSDOT      {"-."}
+  | STAR           {"*"}
+  | PERCENT        {"%"}
+  | EQUAL          {"="}
+  | LESS           {"<"}
+  | GREATER        {">"}
+  | OR            {"or"}
+  | BARBAR        {"||"}
+  | AMPERSAND      {"&"}
+  | AMPERAMPER    {"&&"}
+  | COLONEQUAL    {":="}
 ;
 index_mod:
 | { "" }
