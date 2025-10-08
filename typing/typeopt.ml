@@ -702,7 +702,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     add_nullability_from_jkind env (Ctype.estimate_type_jkind env ty) Pgenval
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
-      (field : Types.mixed_block_element) (externality : Jkind_axis.Externality.t option) ty
+      (field : Types.mixed_block_element)
+      (externality : Jkind_axis.Externality.t option) ty
   : int * unit Lambda.mixed_block_element =
   match field with
   | Value ->
@@ -712,7 +713,14 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       num_nodes_visited, Value kind
-    | None -> num_nodes_visited, Value (nullable (match externality with None | Some Internal -> Pgenval | Some (External | External64) -> Pintval))
+    | None ->
+      (* When exploring the type structure fails, use available externality information *)
+      let value_kind =
+        match externality with
+        | None | Some Internal -> Pgenval
+        | Some (External | External64) -> Pintval
+      in
+      num_nodes_visited, Value (nullable value_kind)
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
