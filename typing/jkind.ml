@@ -2705,6 +2705,8 @@ let for_open_boxed_row =
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Value_creation Polymorphic_variant)
 
+let limit_of_mode_crossing_rows = 100
+
 let for_boxed_row row =
   if Btype.tvariant_not_immediate row
   then
@@ -2714,7 +2716,7 @@ let for_boxed_row row =
       for_open_boxed_row
     else
       let bounds_count = Btype.fold_row (fun acc _ -> acc + 1) 0 row in
-      if bounds_count <= 100
+      if bounds_count <= limit_of_mode_crossing_rows
       then
         let base = Builtin.immutable_data ~why:Polymorphic_variant in
         Btype.fold_row
