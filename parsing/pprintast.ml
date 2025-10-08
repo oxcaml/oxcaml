@@ -610,7 +610,7 @@ and core_type1 ctxt f x =
              pp f "@[<hov2>(module@ %a@ with@ %a)@]" longident_loc lid
                (list aux  ~sep:"@ and@ ")  cstrs)
     | Ptyp_open(li, ct) ->
-        pp f "@[<hov2>%a.(%a)@]" longident_loc li (core_type ctxt) ct
+       pp f "@[<hov2>%a.(%a)@]" longident_loc li (core_type ctxt) ct
     | Ptyp_quote t ->
         pp f "<[@[%a@]]>" (core_type ctxt) t
     | Ptyp_splice t ->
