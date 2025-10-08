@@ -17,8 +17,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           nix eval --json '.#githubActions.matrix' |
-            tee /dev/stderr |
-            jq -c '.include |= map(select(.os | startswith("macos-") | not))' |
+            jq -c '.include |= map(select(any(.os[]; startswith("macos-")) | not))' |
             cat <(echo -n matrix=) - >> "$GITHUB_OUTPUT"
 
   # jvanburen 2025-10-08: our macOS CI capacity is limited, so i enabled fail-fast and
