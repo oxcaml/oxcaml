@@ -1089,7 +1089,7 @@ module Layout_and_axes = struct
           Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t = function
         (* early cutoff *)
         | [] -> bounds_so_far, No_with_bounds, ctl.fuel_status
-        | _ when Mod_bounds.equal Mod_bounds.max bounds_so_far ->
+        | _ when Mod_bounds.is_max_within_set bounds_so_far relevant_axes ->
           (* CR layouts v2.8: we can do better by early-terminating on a per-axis
              basis *)
           bounds_so_far, No_with_bounds, Sufficient_fuel
@@ -2705,20 +2705,38 @@ let for_open_boxed_row =
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Value_creation Polymorphic_variant)
 
+let limit_for_mode_crossing_rows = 100
+
 let for_boxed_row row =
   if Btype.tvariant_not_immediate row
   then
     if not (Btype.static_row row)
     then
-      (* CR layouts v2.8: We can probably do a fair bit better here in most cases. Internal ticket 5097 and 5098. *)
+      (* CR layouts v2.8: We can probably do a fair bit better here in most cases. But if we ever allow open types to mode-cross, we have to get rid of the 100-row limit below. Internal ticket 5097 and 5098. *)
       for_open_boxed_row
     else
-      let base = Builtin.immutable_data ~why:Polymorphic_variant in
-      Btype.fold_row
-        (fun jkind type_expr ->
-          add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr jkind)
-        base row
-      |> mark_best
+      (* Here we count how many rows are in the polymorphic variant and default
+         to value if there are more than 100. This is to avoid regressions in
+         compilation time, which was observed in some files with large
+         polymorphic variants.
+
+         We choose to make two different calls to [Btype.fold_row] to avoid
+         doing allocations in the case where there's a large number of variants,
+         as those allocations were enough to slow down the problematic files
+         with large polymorphic variants. Presumably the second loop is fast
+         anyways due to caching. *)
+      (* CR layouts v2.8: Remove this [limit_for_mode_crossing_rows]
+         restriction. See internal ticket 5435. *)
+      let bounds_count = Btype.fold_row (fun acc _ -> acc + 1) 0 row in
+      if bounds_count <= limit_for_mode_crossing_rows
+      then
+        let base = Builtin.immutable_data ~why:Polymorphic_variant in
+        Btype.fold_row
+          (fun jkind type_expr ->
+            add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr jkind)
+          base row
+        |> mark_best
+      else Builtin.value ~why:Polymorphic_variant_too_big
   else Builtin.immediate ~why:Immediate_polymorphic_variant
 
 let for_arrow =
@@ -3222,6 +3240,10 @@ module Format_history = struct
     | Tuple -> fprintf ppf "it's a tuple type"
     | Row_variable -> format_with_notify_js ppf "it's a row variable"
     | Polymorphic_variant -> fprintf ppf "it's a polymorphic variant type"
+    | Polymorphic_variant_too_big ->
+      fprintf ppf
+        "it's a polymorphic variant type that has more than %d entries"
+        limit_for_mode_crossing_rows
     | Arrow -> fprintf ppf "it's a function type"
     | Tfield ->
       format_with_notify_js ppf
@@ -4000,6 +4022,7 @@ module Debug_printers = struct
     | Tuple -> fprintf ppf "Tuple"
     | Row_variable -> fprintf ppf "Row_variable"
     | Polymorphic_variant -> fprintf ppf "Polymorphic_variant"
+    | Polymorphic_variant_too_big -> fprintf ppf "Polymorphic_variant_too_big"
     | Arrow -> fprintf ppf "Arrow"
     | Tfield -> fprintf ppf "Tfield"
     | Tnil -> fprintf ppf "Tnil"

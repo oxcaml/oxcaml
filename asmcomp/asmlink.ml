@@ -19,18 +19,24 @@ open Misc
 open Config
 open Cmx_format
 open Compilenv
-module String = Misc.Stdlib.String
-include Linkenv
-include Optlink
+module CU = Compilation_unit
 
 type error =
-  | Assembler_error of filepath
   | Dwarf_fission_objcopy_on_macos
   | Dwarf_fission_dsymutil_not_macos
   | Dsymutil_error of int
   | Objcopy_error of int
 
 exception Error of error
+
+type unit_link_info = Linkenv.unit_link_info =
+  { name : Compilation_unit.t;
+    defines : Compilation_unit.t list;
+    file_name : string;
+    crc : Digest.t;
+    (* for shared libs *)
+    dynunit : Cmxs_format.dynunit option
+  }
 
 let runtime_lib () =
   let variant =
@@ -43,7 +49,7 @@ let runtime_lib () =
     if !Clflags.nopervasives || not !Clflags.with_runtime
     then []
     else [Load_path.find libname]
-  with Not_found -> raise (Linkenv.Error (Linkenv.File_not_found libname))
+  with Not_found -> raise (Linkenv.Error (File_not_found libname))
 
 (* Second pass: generate the startup file and link it with everything else *)
 
@@ -95,7 +101,7 @@ let make_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     (fun i name -> compile_phrase (Cmm_helpers.predef_exception i name))
     Runtimedef.builtin_exceptions;
   compile_phrase (Cmm_helpers.global_table name_list);
-  let globals_map = make_globals_map units in
+  let globals_map = Linkenv.make_globals_map units in
   compile_phrase (Cmm_helpers.globals_map globals_map);
   compile_phrase
     (Cmm_helpers.data_segment_table (startup_comp_unit :: name_list));
@@ -163,60 +169,46 @@ let call_linker_shared ?(native_toplevel = false) file_list output_name =
   let exitcode =
     Ccomp.call_linker ~native_toplevel Ccomp.Dll output_name file_list ""
   in
-  if exitcode <> 0 then raise (Linkenv.Error (Linkenv.Linking_error exitcode))
+  if not (exitcode = 0) then raise (Linkenv.Error (Linking_error exitcode))
 
 (* The compiler allows [-o /dev/null], which can be used for testing linking. In
    this case, we should not use the DWARF fission workflow during linking. *)
 let not_output_to_dev_null output_name =
   not (String.equal output_name "/dev/null")
 
-let link_shared unix ~ppf_dump objfiles output_name =
-  Profile.(record_call (annotate_file_name output_name)) (fun () ->
-      if !Oxcaml_flags.use_cached_generic_functions
-      then
-        (* When doing shared linking do not use the shared generated startup
-           file. Frametables for the imported functions needs to be initialized,
-           which is a bit tricky to do in the context of shared libraries as the
-           frametables are initialized at runtime. *)
-        Oxcaml_flags.use_cached_generic_functions := false;
-      if !Oxcaml_flags.internal_assembler
-      then
-        (* CR-soon gyorsh: workaround to turn off internal assembler
-           temporarily, until it is properly tested for shared library
-           linking. *)
-        Emitaux.binary_backend_available := false;
-      let genfns = Generic_fns.Tbl.make () in
-      let ml_objfiles, units_tolink, _ =
-        List.fold_right
-          (scan_file ~shared:true genfns)
-          objfiles
-          ([], [], Generic_fns.Partition.Set.empty)
-      in
-      Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs ();
-      Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
-      let objfiles = List.rev ml_objfiles @ List.rev !Clflags.ccobjs in
-      let named_startup_file = named_startup_file () in
-      let startup =
-        if named_startup_file
-        then output_name ^ ".startup" ^ ext_asm
-        else Filename.temp_file "camlstartup" ext_asm
-      in
-      let startup_obj = output_name ^ ".startup" ^ ext_obj in
-      let sourcefile_for_dwarf =
-        sourcefile_for_dwarf ~named_startup_file startup
-      in
-      Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:startup
-        ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
-        ~may_reduce_heap:true ~ppf_dump (fun () ->
-          make_shared_startup_file unix ~ppf_dump
-            ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns
-            units_tolink);
-      call_linker_shared (startup_obj :: objfiles) output_name;
-      if !Oxcaml_flags.internal_assembler
-      then
-        (* CR gyorsh: restore after workaround. *)
-        Emitaux.binary_backend_available := true;
-      remove_file startup_obj)
+let link_shared unix ml_objfiles output_name ~genfns ~units_tolink ~ppf_dump =
+  if !Oxcaml_flags.use_cached_generic_functions
+  then
+    (* When doing shared linking do not use the shared generated startup file.
+       Frametables for the imported functions needs to be initialized, which is
+       a bit tricky to do in the context of shared libraries as the frametables
+       are initialized at runtime. *)
+    Oxcaml_flags.use_cached_generic_functions := false;
+  if !Oxcaml_flags.internal_assembler
+  then
+    (* CR-soon gyorsh: workaround to turn off internal assembler temporarily,
+       until it is properly tested for shared library linking. *)
+    Emitaux.binary_backend_available := false;
+  let objfiles = List.rev ml_objfiles @ List.rev !Clflags.ccobjs in
+  let named_startup_file = named_startup_file () in
+  let startup =
+    if named_startup_file
+    then output_name ^ ".startup" ^ ext_asm
+    else Filename.temp_file "camlstartup" ext_asm
+  in
+  let startup_obj = output_name ^ ".startup" ^ ext_obj in
+  let sourcefile_for_dwarf = sourcefile_for_dwarf ~named_startup_file startup in
+  Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:startup
+    ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
+    ~may_reduce_heap:true ~ppf_dump (fun () ->
+      make_shared_startup_file unix ~ppf_dump
+        ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns units_tolink);
+  call_linker_shared (startup_obj :: objfiles) output_name;
+  if !Oxcaml_flags.internal_assembler
+  then
+    (* CR gyorsh: restore after workaround. *)
+    Emitaux.binary_backend_available := true;
+  remove_file startup_obj
 
 let call_linker file_list_rev startup_file output_name =
   let main_dll =
@@ -259,10 +251,10 @@ let call_linker file_list_rev startup_file output_name =
     else output_name
   in
   let exitcode = Ccomp.call_linker mode link_output_name files c_lib in
-  if exitcode <> 0
+  if not (exitcode = 0)
   then (
     if needs_objcopy_workflow then Misc.remove_file link_output_name;
-    raise (Linkenv.Error (Linkenv.Linking_error exitcode)))
+    raise (Linkenv.Error (Linking_error exitcode)))
   else
     (* Handle DWARF fission if requested and linking succeeded *)
     match !Clflags.dwarf_fission with
@@ -321,60 +313,34 @@ let call_linker file_list_rev startup_file output_name =
 
 (* Main entry point *)
 
-let link unix ~ppf_dump objfiles output_name =
+let link unix ml_objfiles output_name ~cached_genfns_imports ~genfns
+    ~units_tolink ~ppf_dump : unit =
   if !Oxcaml_flags.internal_assembler
   then Emitaux.binary_backend_available := true;
-  Profile.(record_call (annotate_file_name output_name)) (fun () ->
-      let stdlib = "stdlib.cmxa" in
-      let stdexit = "std_exit.cmx" in
-      let objfiles =
-        if !Clflags.nopervasives
-        then objfiles
-        else if !Clflags.output_c_object
-        then stdlib :: objfiles
-        else stdlib :: (objfiles @ [stdexit])
-      in
-      let genfns = Generic_fns.Tbl.make () in
-      let ml_objfiles, units_tolink, cached_genfns_imports =
-        List.fold_right
-          (scan_file ~shared:false genfns)
-          objfiles
-          ([], [], Generic_fns.Partition.Set.empty)
-      in
-      (match Linkenv.extract_missing_globals () with
-      | [] -> ()
-      | mg -> raise (Linkenv.Error (Linkenv.Missing_implementations mg)));
-      Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs ();
-      Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
-      (* put user's opts first *)
-      let named_startup_file = named_startup_file () in
-      let startup =
-        if named_startup_file
-        then output_name ^ ".startup" ^ ext_asm
-        else Filename.temp_file "camlstartup" ext_asm
-      in
-      let sourcefile_for_dwarf =
-        sourcefile_for_dwarf ~named_startup_file startup
-      in
-      let startup_obj = Filename.temp_file "camlstartup" ext_obj in
-      Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:startup
-        ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
-        ~may_reduce_heap:true ~ppf_dump (fun () ->
-          make_startup_file unix ~ppf_dump
-            ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns
-            units_tolink cached_genfns_imports);
-      Emitaux.reduce_heap_size ~reset:(fun () -> reset ());
-      Misc.try_finally
-        (fun () -> call_linker ml_objfiles startup_obj output_name)
-        ~always:(fun () -> remove_file startup_obj))
+  let named_startup_file = named_startup_file () in
+  let startup =
+    if named_startup_file
+    then output_name ^ ".startup" ^ ext_asm
+    else Filename.temp_file "camlstartup" ext_asm
+  in
+  let sourcefile_for_dwarf = sourcefile_for_dwarf ~named_startup_file startup in
+  let startup_obj = Filename.temp_file "camlstartup" ext_obj in
+  Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:startup
+    ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
+    ~may_reduce_heap:true ~ppf_dump (fun () ->
+      make_startup_file unix ~ppf_dump
+        ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns units_tolink
+        cached_genfns_imports);
+  Emitaux.reduce_heap_size ~reset:(fun () -> Linkenv.reset ());
+  Misc.try_finally
+    (fun () -> call_linker ml_objfiles startup_obj output_name)
+    ~always:(fun () -> remove_file startup_obj)
 
 (* Error report *)
 
 open Format
 
 let report_error ppf = function
-  | Assembler_error file ->
-    fprintf ppf "Error while assembling %a" Location.print_filename file
   | Dwarf_fission_objcopy_on_macos ->
     fprintf ppf
       "Error: -gdwarf-fission=objcopy is not supported on macOS systems.@ \

@@ -1,0 +1,6 @@
+(library
+ (name ocaml_jit)
+ (libraries ocamlcommon ocamlopttoplevel)
+ (foreign_stubs
+  (language c)
+  (names jit_stubs)))
