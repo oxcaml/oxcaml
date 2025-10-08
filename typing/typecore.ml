@@ -294,6 +294,7 @@ type error =
   | Impossible_function_jkind of
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
+  | Unsupported_construct_metaprogramming
   | Unexpected_hole
 
 exception Error of Location.t * Env.t * error
@@ -7356,6 +7357,10 @@ and type_expect_
             exp_type = exp2.exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
+  | Pexp_quotation _ ->
+      raise (Error (loc, env, Unsupported_construct_metaprogramming))
+  | Pexp_splice _ ->
+      raise (Error (loc, env, Unsupported_construct_metaprogramming))
   | Pexp_hole ->
       begin match overwrite with
       | Assigning(typ, fields_mode) ->
@@ -11727,6 +11732,9 @@ let report_error ~loc env =
   | Overwrite_of_invalid_term ->
       Location.errorf ~loc
         "Overwriting is only supported on tuples, constructors and boxed records."
+  | Unsupported_construct_metaprogramming ->
+      Location.errorf ~loc
+        "Runtime metaprogramming is not fully supported."
   | Unexpected_hole ->
       Location.errorf ~loc
         "wildcard \"_\" not expected."

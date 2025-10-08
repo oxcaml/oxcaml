@@ -527,6 +527,8 @@ and expression_desc =
           - [CLAUSES] is a series of [comprehension_clause].
     *)
   | Pexp_overwrite of expression * expression (** overwrite_ exp with exp *)
+  | Pexp_quotation of expression (** runtime metaprogramming quotations <[E]> *)
+  | Pexp_splice of expression (** runtime metaprogramming: quotations $(E) *)
   | Pexp_hole (** _ *)
 
 and case =

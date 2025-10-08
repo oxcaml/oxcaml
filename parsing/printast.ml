@@ -472,6 +472,12 @@ and expression i ppf x =
       line i ppf "Pexp_overwrite\n";
       expression i ppf e1;
       expression i ppf e2;
+  | Pexp_quotation e ->
+      line i ppf "Pexp_quotation\n";
+      expression i ppf e
+  | Pexp_splice e ->
+      line i ppf "Pexp_splice\n";
+      expression i ppf e
   | Pexp_hole ->
     line i ppf "Pexp_hole"
 
