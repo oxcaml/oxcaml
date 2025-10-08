@@ -602,6 +602,15 @@ module With_bounds = struct
     | No_with_bounds -> []
     | With_bounds tys -> tys |> With_bounds_types.to_seq |> List.of_seq
 
+  let length : type d. d with_bounds -> int = function
+    | No_with_bounds -> 0
+    | With_bounds tys -> tys |> With_bounds_types.length
+
+  let fold (type d) f (t : d with_bounds) init =
+    match t with
+    | No_with_bounds -> init
+    | With_bounds tys -> With_bounds_types.fold f tys init
+
   open Allowance
 
   include Magic_allow_disallow (struct
@@ -846,46 +855,47 @@ module Layout_and_axes = struct
       when Mod_bounds.is_max_within_set t.mod_bounds
              (Axis_set.complement skip_axes) ->
       { t with with_bounds = No_with_bounds }, Sufficient_fuel
-    | _ ->
-      (* Sadly, it seems hard (impossible?) to be sure to expand all types
-         here without using a fuel parameter to stop infinite regress. Here
-         is a nasty case:
+    | _ -> (
+      let module (* Sadly, it seems hard (impossible?) to be sure to expand all types
+                    here without using a fuel parameter to stop infinite regress. Here
+                    is a nasty case:
 
-         {[
-           type zero
-           type 'n succ
+                    {[
+                      type zero
+                      type 'n succ
 
-           type 'n loopy = Mk of 'n succ loopy list [@@unboxed]
-         ]}
+                      type 'n loopy = Mk of 'n succ loopy list [@@unboxed]
+                    ]}
 
-         First off: this type *is* inhabited, because of the [list] intervening
-         type (which can be empty). It's also inhabited by various circular
-         structures.
+                    First off: this type *is* inhabited, because of the [list] intervening
+                    type (which can be empty). It's also inhabited by various circular
+                    structures.
 
-         But what's the jkind of ['n loopy]? It must be the jkind of
-         ['n succ loopy list], which is [immutable_data with 'n succ loopy].
-         In order to see if we shouldn't mode-cross, we have to expand the
-         ['n succ loopy] in the jkind, but expanding that just yields the need
-         to expand ['n succ succ loopy], and around we go.
+                    But what's the jkind of ['n loopy]? It must be the jkind of
+                    ['n succ loopy list], which is [immutable_data with 'n succ loopy].
+                    In order to see if we shouldn't mode-cross, we have to expand the
+                    ['n succ loopy] in the jkind, but expanding that just yields the need
+                    to expand ['n succ succ loopy], and around we go.
 
-         It seems hard to avoid this problem. And so we use fuel. Yet we want
-         both a small amount of fuel (a type like [type t = K of (t * t) list]
-         gets big very quickly) and a lot of fuel (we can imagine using a unit
-         of fuel for each level of a deeply nested record structure). The
-         compromise is to track fuel per type head, where a type head is either
-         the path to a type constructor (like [t] or [loopy]) or a tuple.
-         (We need to include tuples because of the possibility of recursive
-         types and the fact that tuples track their element types in their
-         jkind's with_bounds.)
+                    It seems hard to avoid this problem. And so we use fuel. Yet we want
+                    both a small amount of fuel (a type like [type t = K of (t * t) list]
+                    gets big very quickly) and a lot of fuel (we can imagine using a unit
+                    of fuel for each level of a deeply nested record structure). The
+                    compromise is to track fuel per type head, where a type head is either
+                    the path to a type constructor (like [t] or [loopy]) or a tuple.
+                    (We need to include tuples because of the possibility of recursive
+                    types and the fact that tuples track their element types in their
+                    jkind's with_bounds.)
 
-         The initial fuel per type head is 10, as it seems hard to imagine that
-         we're going to make meaningful progress if we've seen the same type
-         head 10 times in one line of recursive descent. (This "one line of
-         recursive descent" bit is why we recur separately down one type before
-         iterating down the list.)
-      *)
-      (* CR reisenberg: document seen_args *)
-      let module Loop_control = struct
+                    The initial fuel per type head is 10, as it seems hard to imagine that
+                    we're going to make meaningful progress if we've seen the same type
+                    head 10 times in one line of recursive descent. (This "one line of
+                    recursive descent" bit is why we recur separately down one type before
+                    iterating down the list.)
+                 *)
+                 (* CR reisenberg: document seen_args *)
+          Loop_control =
+      struct
         type t =
           { tuple_fuel : int;
             constr : (int * type_expr list) Path.Map.t;
@@ -1151,7 +1161,35 @@ module Layout_and_axes = struct
           (Axis_set.complement skip_axes)
           (With_bounds.to_list t.with_bounds)
       in
-      { t with mod_bounds; with_bounds }, fuel_status
+      match With_bounds.length with_bounds > 10 with
+      | false -> { t with mod_bounds; with_bounds }, fuel_status
+      | true ->
+        (* If there are more than 10 with-bounds, we assume they're all max and
+           drop them. This is an optimization unnecessary for correctness. In
+           practice, this optimization doesn't seem to hinder inference much. We
+           were unable to find real-world use-cases where more than 10
+           with-bounds were necessary.
+
+           With-bounds can get very large in number if there is a complex
+           recursive type that references many abstract types. For example,
+           we've observed a real-world instance of inferring ~350 with-bounds.
+           This is problematic if the type is then used a large number of times
+           across the file (a "usage" can also mean a usage of a value with the
+           given type). This is because at each usage we check the kind of the
+           type, but before checking the kind, we must substitute types into the
+           with-bounds. This subsitution involves copying the with-bounds, which
+           can become expensive when done many times. In the example with 350
+           with-bounds, this copying was done hundreds of times, which took up
+           the majority of run-time. *)
+        let relevant_axes_in_with_bounds =
+          With_bounds.fold
+            (fun _ { relevant_axes } acc -> Axis_set.union acc relevant_axes)
+            with_bounds Axis_set.empty
+        in
+        let mod_bounds =
+          Mod_bounds.set_max_in_set mod_bounds relevant_axes_in_with_bounds
+        in
+        { t with mod_bounds; with_bounds = No_with_bounds }, Ran_out_of_fuel)
 end
 
 (*********************************)
