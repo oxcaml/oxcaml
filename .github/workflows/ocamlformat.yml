@@ -36,5 +36,4 @@ jobs:
       run: echo SKIP_80CH=y >> "$GITHUB_ENV"
 
     - name: Check OCaml Formatting
-      working-directory: oxcaml
       run: opam exec -- bash tools/ci/actions/check-fmt.sh
