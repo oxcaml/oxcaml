@@ -182,7 +182,7 @@ jobs:
       # bash >=4 is needed for tools/gen_ocamlj_rules.sh
 
     - name: Set up Opam
-      uses: ocaml/setup-ocaml@v3
+      uses: oxcaml/setup-ocaml@master
       with:
         ocaml-compiler: oxcaml-ci-deps.5.2.0
         opam-repositories: |
