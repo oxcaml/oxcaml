@@ -1793,6 +1793,13 @@ void caml_interrupt_self(void)
   interrupt_domain_local(Caml_state);
 }
 
+CAMLexport value caml_domain_preempt_self(void) {
+  CAMLparam0();
+  Caml_state->preemption = Val_long(1);
+  caml_interrupt_self();
+  CAMLreturn(Val_unit);
+}
+
 /*  This function is async-signal-safe as [all_domains] and
     [caml_params->max_domains] are set before signal handlers are installed and
     do not change afterwards. */
