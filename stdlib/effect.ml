@@ -15,6 +15,8 @@
 type 'a t = ..
 external perform : 'a t -> 'a = "%perform"
 
+external preempt_with : 'a t -> unit = "caml_domain_preempt_with" [@@noalloc]
+
 type exn += Unhandled: 'a t -> exn
 exception Continuation_already_resumed
 
