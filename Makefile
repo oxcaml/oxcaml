@@ -93,11 +93,11 @@ promote:
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) promote $(ws_main)
 
 .PHONY: fmt
-fmt:
+fmt: $(dune_config_targets)
 	$(if $(filter 1,$(V)),,@)dune build @fmt @80ch --auto-promote
 
 .PHONY: check-fmt
-check-fmt:
+check-fmt: $(dune_config_targets)
 	$(if $(filter 1,$(V)),,@)bash tools/ci/actions/check-fmt.sh
 
 .PHONY: regen-flambda2-parser

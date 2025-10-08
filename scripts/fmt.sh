@@ -18,4 +18,7 @@ set -euo pipefail
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
+# needed for the root dune file to parse
+touch dune.runtime_selection duneconf/dirs-to-ignore.inc duneconf/ox-extra.inc
+
 dune build @fmt @80ch --auto-promote
