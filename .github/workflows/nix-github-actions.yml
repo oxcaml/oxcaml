@@ -19,12 +19,16 @@ jobs:
           matrix="$(nix eval --json '.#githubActions.matrix')"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
+  # jvanburen 2025-10-08: our macOS CI capacity is limited, so i enabled fail-fast and
+  # disabled macos runners for now to help hopefully improve queueing time. we should
+  # revert these changes once we get more capacity
   nix-build:
     name: ${{ matrix.name }} (${{ matrix.system }})
     needs: nix-matrix
     runs-on: ${{ matrix.os }}
+    if: ${{ !startsWith(matrix.os, 'macos-') }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix: ${{fromJSON(needs.nix-matrix.outputs.matrix)}}
     steps:
       - uses: actions/checkout@v4
