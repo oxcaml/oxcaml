@@ -8,8 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/actions/ubuntu:latest
+    container: ubuntu:24.04
 
     steps:
     - name: Checkout the OxCaml repo
