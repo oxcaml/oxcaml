@@ -453,6 +453,7 @@ promote-one-no-rebuild:
 hacking: _build/_bootinstall
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) -w \
       $(boot_targets) \
+      @oxcaml/tests/backend/validators/all \
       @middle_end/flambda2/tests/tools/all
 
 # The `hacking-emacs-poller` and `hacking-emacs-builder` targets make it
