@@ -828,12 +828,16 @@ module Layout_and_axes = struct
      of this function for these axes is undefined; do *not* look at the results for these
      axes.
   *)
-  let normalize (type layout l r1 r2) ~context ~(mode : r2 normalize_mode)
-      ~skip_axes
-      ?(map_type_info :
-         (type_expr -> With_bounds_type_info.t -> With_bounds_type_info.t)
-         option) (t : (layout, l * r1) layout_and_axes) :
+  let normalize :
+      type layout l r1 r2.
+      context:_ ->
+      mode:r2 normalize_mode ->
+      skip_axes:_ ->
+      ?map_type_info:
+        (type_expr -> With_bounds_type_info.t -> With_bounds_type_info.t) ->
+      (layout, l * r1) layout_and_axes ->
       (layout, l * r2) layout_and_axes * Fuel_status.t =
+   fun ~context ~mode ~skip_axes ?map_type_info t ->
     (* handle a few common cases first, before doing anything else *)
     (* DEBUGGING
        Format.printf "@[normalize: %a@;  relevant_axes: %a@]@;"
@@ -1231,7 +1235,13 @@ module Layout_and_axes = struct
           (Axis_set.complement skip_axes)
           (With_bounds.to_list t.with_bounds)
       in
-      { t with mod_bounds; with_bounds }, fuel_status
+      let normalized_t : (layout, l * r2) layout_and_axes =
+        match mode, fuel_status with
+        | Require_best, Ran_out_of_fuel -> t |> disallow_right
+        | Require_best, Sufficient_fuel | Ignore_best, _ ->
+          { t with mod_bounds; with_bounds }
+      in
+      normalized_t, fuel_status
 end
 
 (*********************************)
