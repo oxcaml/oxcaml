@@ -362,25 +362,25 @@ jobs:
         git push
 
     - uses: actions/upload-artifact@v4
-      if: ${{ failure() }}
+      if: failure()
       with:
         name: cores-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
         path: /cores
 
     - uses: actions/upload-artifact@v4
-      if: ${{ failure() }} && matrix.os == 'macos-latest'
+      if: failure() && matrix.os == 'macos-latest'
       with:
         name: DiagnosticReports-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
         path: /Users/runner/Library/Logs/DiagnosticReports
 
 #     - uses: actions/upload-artifact@v4
-#       if: ${{ failure() }}
+#       if: failure()
 #       with:
 #         name: _build-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
 #         path: ${{ github.workspace }}/_build
 #
 #     - uses: actions/upload-artifact@v4
-#       if: ${{ failure() }}
+#       if: failure()
 #       with:
 #         name: _runtest-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
 #         path: ${{ github.workspace }}/_runtest
