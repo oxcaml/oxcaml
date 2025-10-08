@@ -5014,7 +5014,7 @@ let run_stack ~dbg ~stack ~f ~arg =
       [Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg); stack; f; arg],
       dbg )
 
-let resume ~dbg ~stack ~f ~arg ~last_fiber =
+let resume ~dbg ~stack ~f ~arg ~last_fiber ~maybe_gc_regs =
   (* Rc_normal is required here, because there are some uses of effects with
      repeated resumes, and these should consume O(1) stack space by tail-calling
      caml_resume. *)
@@ -5024,7 +5024,8 @@ let resume ~dbg ~stack ~f ~arg ~last_fiber =
         stack;
         f;
         arg;
-        last_fiber ],
+        last_fiber;
+        maybe_gc_regs ],
       dbg )
 
 let reperform ~dbg ~eff ~cont ~last_fiber =

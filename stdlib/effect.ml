@@ -12,6 +12,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+external register_named_value : string -> 'a -> unit
+  = "caml_register_named_value"
+
 type 'a t = ..
 external perform : 'a t -> 'a = "%perform"
 
@@ -38,6 +41,10 @@ let _ = Callback.Safe.register_exception "Effect.Unhandled"
 let _ = Callback.Safe.register_exception "Effect.Continuation_already_resumed"
           Continuation_already_resumed
 
+type _ t += Tick : unit t
+let () = register_named_value "Effect.Tick" Tick
+
+
 type (-'a, +'b) cont
 
 (* A last_fiber is a tagged pointer, so does not keep the fiber alive.
@@ -48,6 +55,17 @@ type last_fiber [@@immediate]
 external cont_last_fiber : ('a, 'b) cont -> last_fiber = "%field1"
 external cont_set_last_fiber :
   ('a, 'b) cont -> last_fiber -> unit = "%setfield1"
+
+type gc_regs
+
+let[@inline] cont_gc_regs : ('a, 'b) cont -> gc_regs or_null =
+  fun cont ->
+  let open struct
+    external size : ('a, 'b) cont -> int = "%obj_size"
+    external field : ('a, 'b) cont -> int -> 'c = "%obj_field"
+  end
+  in
+  if size cont = 3 then This (field cont 2) else Null
 
 module Must_not_enter_gc = struct
 
@@ -73,7 +91,14 @@ module Must_not_enter_gc = struct
     ('d t -> ('d,'b) cont -> last_fiber -> 'c) ->
     ('a,'c) stack = "caml_continuation_use_and_update_handler_noexc" [@@noalloc]
 
-  external resume : ('a, 'b) stack -> ('c -> 'a) -> 'c -> last_fiber -> 'b = "%resume"
+  external resume
+    : ('a, 'b) stack
+    -> ('c -> 'a)
+    -> 'c
+    -> last_fiber
+    -> gc_regs or_null
+    -> 'b
+    = "%resume"
 
   (* Allocate a stack and immediately run [f x] using that stack.
      We must not enter the GC between [alloc_stack] and [runstack].
@@ -85,13 +110,18 @@ module Must_not_enter_gc = struct
      We must not enter the GC between [take_cont_noexc] and [resume].
      [with_cont] is marked as [@inline never] to avoid reordering. *)
   let[@inline never] with_cont cont f x =
-    resume (take_cont_noexc cont) f x (cont_last_fiber cont)
+    resume (take_cont_noexc cont) f x (cont_last_fiber cont) (cont_gc_regs cont)
 
   (* Retrieve the stack from a [cont]inuation, update its handlers, and run [f x] using it.
      We must not enter the GC between [take_cont_and_update_handler_noexc] and [resume].
      [with_cont] is marked as [@inline never] to avoid reordering. *)
   let[@inline never] with_handler cont valuec exnc effc f x =
-    resume (take_cont_and_update_handler_noexc cont valuec exnc effc) f x (cont_last_fiber cont)
+    resume
+      (take_cont_and_update_handler_noexc cont valuec exnc effc)
+      f
+      x
+      (cont_last_fiber cont)
+      (cont_gc_regs cont)
 end
 
 module Deep = struct

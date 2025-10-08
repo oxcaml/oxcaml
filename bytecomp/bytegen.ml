@@ -515,7 +515,7 @@ and comp_expr stack_info env exp sz cont =
     comp_args stack_info env args sz
       (Kmake_faux_mixedblock (total_len, tag) :: cont)
   | Context_switch (Resume, args) ->
-    let nargs = List.length args - 1 in
+    let nargs = List.length args - 2 in
     assert (nargs = 3);
     if is_tailcall cont
     then (

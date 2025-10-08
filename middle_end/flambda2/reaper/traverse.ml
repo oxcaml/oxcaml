@@ -585,11 +585,12 @@ and traverse_apply denv acc apply : rev_expr =
       Acc.used ~denv stack acc;
       Acc.used ~denv f acc;
       Acc.used ~denv arg acc
-    | Effect (Resume { stack; f; arg; last_fiber }) ->
+    | Effect (Resume { stack; f; arg; last_fiber; maybe_gc_regs }) ->
       Acc.used ~denv stack acc;
       Acc.used ~denv f acc;
       Acc.used ~denv arg acc;
-      Acc.used ~denv last_fiber acc
+      Acc.used ~denv last_fiber acc;
+      Acc.used ~denv maybe_gc_regs acc
   in
   traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc;
   let expr = Apply apply in

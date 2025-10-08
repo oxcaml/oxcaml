@@ -133,6 +133,13 @@ DOMAIN_STATE(uintnat, requested_minor_gc)
 
 DOMAIN_STATE(atomic_uintnat, requested_external_interrupt)
 
+DOMAIN_STATE(value, preemption)
+/* Pending preemption:
+   - Val_unit    if there is no pending preemption
+   - Val_long(1) if there has been a preemption triggered
+   - Block(...)  containing a continuation object, indicating a preemption should happen
+ */
+
 DOMAIN_STATE(int, parser_trace)
 /* See parsing.c */
 

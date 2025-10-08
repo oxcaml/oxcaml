@@ -26,6 +26,7 @@
 #endif
 #include "caml/alloc.h"
 #include "caml/callback.h"
+#include "caml/domain.h"
 #include "caml/fail.h"
 #include "caml/memory.h"
 #include "caml/misc.h"
@@ -129,6 +130,9 @@ CAMLexport value caml_process_pending_signals_exn(void)
         /* curr was refreshed, test it again */
         if (curr == 0) goto next_word;
         if ((curr & mask) == 0) goto next_bit;
+      }
+      if (signo == SIGALRM) {
+        return Val_long(-1);
       }
       exn = caml_execute_signal_exn(signo);
       if (Is_exception_result(exn)) return exn;
@@ -422,6 +426,10 @@ value caml_do_pending_actions_exn(void)
   value exn = caml_process_pending_signals_exn();
   check_async_exn(exn, "signal handler");
   if (Is_exception_result(exn)) goto exception;
+  /* Check for a pending preemption */
+  if (exn == /* CR aspsmith: extract constant */ Val_long(-1)) {
+    caml_domain_setup_preemption();
+  }
 
   /* Call memprof callbacks */
   exn = caml_memprof_run_callbacks_exn();

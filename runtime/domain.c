@@ -557,6 +557,10 @@ static uintnat fresh_domain_unique_id(void) {
     return next;
 }
 
+static inline void domain_root_register(value *root, value t);
+static inline void domain_root_set(value *root, value t);
+static inline void domain_root_remove(value *root);
+
 /* must be run on the domain's thread */
 static void domain_create(uintnat initial_minor_heap_wsize,
                           caml_domain_state *parent)
@@ -763,6 +767,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->requested_minor_gc = 0;
   domain_state->major_slice_epoch = 0;
   domain_state->requested_external_interrupt = 0;
+  domain_root_register(&domain_state->preemption, Val_unit);
 
   domain_state->parser_trace = 0;
 
@@ -1794,6 +1799,18 @@ void caml_interrupt_self(void)
   interrupt_domain_local(Caml_state);
 }
 
+CAMLexport value caml_domain_preempt_self(void) {
+  CAMLparam0();
+  Caml_state->preemption = Val_long(1);
+  caml_interrupt_self();
+  CAMLreturn(Val_unit);
+}
+
+void caml_domain_setup_preemption(void) {
+  value cont = caml_alloc_3(Cont_tag, Val_long(0), Val_long(0), Val_long(0));
+  domain_root_set(&Caml_state->preemption, cont);
+}
+
 /*  This function is async-signal-safe as [all_domains] and
     [caml_params->max_domains] are set before signal handlers are installed and
     do not change afterwards. */
@@ -2206,6 +2223,32 @@ CAMLprim value caml_ml_domain_cpu_relax(value t)
   return Val_unit;
 #endif
 }
+
+/* OCaml values stored in the domain state. */
+
+static inline void domain_root_register(value *root, value t) {
+  CAMLnoalloc;
+  *root = t;
+  caml_register_generational_global_root(root);
+}
+
+static inline void domain_root_set(value *root, value t) {
+  CAMLnoalloc;
+  caml_modify_generational_global_root(root, t);
+}
+
+static inline value domain_root_get(value *root) {
+  CAMLnoalloc;
+  return *root;
+}
+
+static inline void domain_root_remove(value *root) {
+  CAMLnoalloc;
+  caml_remove_generational_global_root(root);
+  *root = Val_unit;
+}
+
+/* Domain-local state */
 
 CAMLprim value caml_domain_dls_set(value t)
 {
