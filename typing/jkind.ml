@@ -2600,7 +2600,7 @@ let for_boxed_row row =
   then
     if not (Btype.static_row row)
     then
-      (* CR layouts v2.8: We can probably do a fair bit better here in most cases. Internal ticket 5097 and 5098. *)
+      (* CR layouts v2.8: We can probably do a fair bit better here in most cases. But if we ever allow open types to mode-cross, we have to get rid of the 100-row limit below. Internal ticket 5097 and 5098. *)
       for_open_boxed_row
     else
       let bounds_count = Btype.fold_row (fun acc _ -> acc + 1) 0 row in
