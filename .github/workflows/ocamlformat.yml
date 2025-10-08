@@ -8,9 +8,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: ubuntu:24.04
 
     steps:
+    - name: Fake running in a container
+      run: sudo touch /.dockerenv # makes setup-ocaml go much faster
+
     - name: Checkout the OxCaml repo
       uses: actions/checkout@master
 
