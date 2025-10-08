@@ -257,7 +257,6 @@ jobs:
         USE_RUNTIME: ${{ matrix.use_runtime }}
 
     - name: Promote failed tests and capture diffs
-      working-directory: oxcaml
       if: failure() && matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
       continue-on-error: true
       run: |
@@ -304,7 +303,6 @@ jobs:
         OXCAML_LLDB: ${{ github.workspace }}/oxcaml-llvm/bin/lldb
 
     - name: Promote failed DWARF tests and capture diffs
-      working-directory: oxcaml
       if: failure() && matrix.dwarf_tests_only == true
       continue-on-error: true
       run: |
@@ -328,7 +326,6 @@ jobs:
         OXCAML_CLANG: ${{ github.workspace }}/oxcaml-llvm/bin/clang
 
     - name: Promote failed llvmize tests and capture diffs
-      working-directory: oxcaml
       if: failure() && matrix.llvmize_tests_only == true
       continue-on-error: true
       run: |
