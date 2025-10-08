@@ -7,7 +7,15 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        ocaml-compiler:
+          - "4.14.0"
+          # this is no longer true, but I can't change it because this specific name of
+          # test is a "required" check. We should change that...
 
     steps:
     - name: Checkout the OxCaml repo
@@ -29,7 +37,7 @@ jobs:
           default: https://github.com/ocaml/opam-repository.git
         opam-disable-sandboxing: true
         opam-pin: false
-        cache-prefix: ubuntu-latest-v1
+        cache-prefix: ${{ matrix.os }}-v1
 
     - name: 'Check for the "skip 80ch" PR tag'
       if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
