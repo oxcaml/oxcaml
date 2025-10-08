@@ -748,6 +748,9 @@ OCaml 5.4.0
   under certain conditions in prerelease versions of OCaml 5.4.
   (Antonin Décimo, review by Nicolás Ojeda Bär)
 
+- #14287: Bugfix for GC root mishandling in memprof.c
+  (Stephen Dolan, review by Leo White)
+
 OCaml 5.3.0 (8 January 2025)
 ----------------------------
 
