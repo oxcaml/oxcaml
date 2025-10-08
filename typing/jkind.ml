@@ -3942,7 +3942,7 @@ module Debug_printers = struct
     | Debug_printer_argument -> fprintf ppf "Debug_printer_argument"
     | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
     | Quotation_result -> fprintf ppf "Quotation_result"
-    | Antiquotation_result -> fprintf ppf "it's the result type of splicing"
+    | Antiquotation_result -> fprintf ppf "Antiquotation_result"
     | Tquote -> fprintf ppf "Tquote"
     | Tsplice -> fprintf ppf "Tsplice"
     | Unknown s -> fprintf ppf "Unknown %s" s

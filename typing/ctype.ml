@@ -7439,6 +7439,7 @@ let print_global_state fmt global_state =
     print_field fmt "global_level" global_level;
   in
   Format.fprintf fmt "@[<1>{@;%a}@]" print_fields global_state
+
               (*******************************)
               (* checking declaration jkinds *)
               (* this is down here so it can use [is_equal] *)

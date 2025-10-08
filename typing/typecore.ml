@@ -295,7 +295,6 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Toplevel_splice
   | Quotation_object
   | Open_inside_quotation
 
@@ -7370,7 +7369,7 @@ and type_expect_
   | Pexp_quotation exp ->
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       let jkind = Jkind.Builtin.value ~why:Quotation_result in
-      let new_env = Env.add_quotation_lock env in
+      let new_env = Env.enter_quotation env in
       let ty = newgenvar jkind in
       let quoted_ty = newgenty (Tquote ty) in
       let to_unify = Predef.type_code quoted_ty in
@@ -7385,9 +7384,7 @@ and type_expect_
         exp_env = env }
   | Pexp_splice exp ->
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
-      if Env.without_open_quotations env then
-        raise (Error (exp.pexp_loc, env, Toplevel_splice));
-      let new_env = Env.add_splice_lock env in
+      let new_env = Env.enter_splice ~loc env in
       let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
       let arg = type_expect new_env mode_legacy exp (mk_expected ty) in
       re {
@@ -11770,10 +11767,6 @@ let report_error ~loc env =
   | Unexpected_hole ->
       Location.errorf ~loc
         "wildcard \"_\" not expected."
-  | Toplevel_splice ->
-      Location.errorf ~loc
-        "Splices ($) are not allowed in the initial stage.\n\
-         Did you forget to place it inside a quotation?"
   | Quotation_object ->
       Location.errorf ~loc
         "Objects cannot be defined inside quotations using %a@ blocks."

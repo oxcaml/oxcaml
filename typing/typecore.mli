@@ -341,7 +341,6 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Toplevel_splice
   | Quotation_object
   | Open_inside_quotation
 

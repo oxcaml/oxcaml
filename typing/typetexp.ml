@@ -1103,11 +1103,11 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let ty = newty (Tof_kind tjkind) in
       ctyp (Ttyp_of_kind jkind) ty
   | Ptyp_quote t ->
-      let new_env = Env.add_quotation_lock env in
+      let new_env = Env.enter_quotation env in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_quote cty) (newty (Tquote cty.ctyp_type))
   | Ptyp_splice t ->
-      let new_env = Env.add_splice_lock env in
+      let new_env = Env.enter_splice ~loc env in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_splice cty) (newty (Tsplice cty.ctyp_type))
   | Ptyp_extension ext ->
@@ -1500,13 +1500,6 @@ let report_unbound_variable_reason ppf = function
                    Enable non-erasable extensions to disable this check."
   | None -> ()
 
-let print_stage ppf stage =
-  if stage = 0 then fprintf ppf "outside quotations"
-  else if stage = 1 then fprintf ppf "within a quotation (<[ ... ]>)"
-  else if stage > 1 then
-    fprintf ppf "within %d layers of quotation (<[ ... ]>)" stage
-  else assert false
-
 let print_with_quote_promote ppf (name, stage_diff) =
   let rec loop fmt stage_diff =
     if stage_diff = 1 then fprintf fmt "<[%s]>" name
@@ -1695,8 +1688,8 @@ let report_error env ppf =
          @[@{<hint>Hint@}: Consider using %a.@]@]"
       Style.inline_code name
       Location.print_loc usage_loc
-      print_stage usage_stage
-      print_stage intro_stage
+      Env.print_stage usage_stage
+      Env.print_stage intro_stage
       print_with_quote_promote (name, intro_stage - usage_stage)
 
 let () =

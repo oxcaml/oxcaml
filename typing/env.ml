@@ -852,6 +852,7 @@ type error =
   | Illegal_value_name of Location.t * string
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t }
+  | Toplevel_splice of Location.t
 
 exception Error of error
 
@@ -1463,8 +1464,7 @@ let rec find_type_data path env seen =
   | exception Not_found -> begin
       match path with
       | Pident id ->
-          let ty, _locks =  IdTbl.find_same_and_locks id env.types in
-          ty
+          IdTbl.find_same_without_locks id env.types
       | Pdot(p, s) ->
           let sc = find_structure_components p env in
           NameMap.find s sc.comp_types
@@ -1553,7 +1553,7 @@ and find_type_unboxed_version_data path env seen =
 let find_modtype_lazy path env =
   match path with
   | Pident id ->
-      let modtype, _locks = IdTbl.find_same_and_locks id env.modtypes in
+      let modtype = IdTbl.find_same_without_locks id env.modtypes in
       modtype.mtda_declaration
   | Pdot(p, s) ->
       let sc = find_structure_components p env in
@@ -1689,7 +1689,7 @@ let has_probe name = String.Set.mem name !probes
 let find_shape env (ns : Shape.Sig_component_kind.t) id =
   match ns with
   | Type ->
-      let ty, _locks = IdTbl.find_same_and_locks id env.types in
+      let ty = IdTbl.find_same_without_locks id env.types in
       ty.tda_shape
   | Constructor ->
       Shape.leaf ((TycompTbl.find_same id env.constrs).cda_description.cstr_uid)
@@ -1719,7 +1719,7 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
           Shape.for_persistent_unit (Ident.name id)
       end
   | Module_type ->
-      let modtype, _locks =  IdTbl.find_same_and_locks id env.modtypes in
+      let modtype =  IdTbl.find_same_without_locks id env.modtypes in
       modtype.mtda_shape
   | Class ->
       (IdTbl.find_same_without_locks id env.classes).clda_shape
@@ -2861,10 +2861,13 @@ let add_unboxed_lock env = add_lock Unboxed_lock env
 
 let add_local_env_lock env = add_lock Local_env_lock env
 
-let add_quotation_lock env =
+let enter_quotation env =
   add_lock Quotation_lock {env with stage = env.stage + 1}
 
-let add_splice_lock env = add_lock Splice_lock {env with stage = env.stage - 1}
+let enter_splice ~loc env =
+  if env.stage = 0 then
+    raise (Error (Toplevel_splice loc));
+  add_lock Splice_lock {env with stage = env.stage - 1}
 
 let without_open_quotations env = env.stage = 0
 let has_open_quotations env = env.stage <> 0
@@ -5017,6 +5020,12 @@ let report_error ppf = function
       fprintf ppf "@[<hov>Not enough instance arguments: the parameter@ %a@ is \
                    required.@]"
         Global_module.Parameter_name.print unset_param
+  | Toplevel_splice loc ->
+      fprintf ppf
+        "@[<hov>Splices ($) are not allowed in the initial stage,@ \
+         as encountered at %a.@, \
+         Did you forget to insert a quotation?@]"
+        Location.print_loc loc
 
 let () =
   Location.register_error_of_exn
@@ -5026,6 +5035,7 @@ let () =
             match err with
             | Missing_module (loc, _, _)
             | Illegal_value_name (loc, _)
+            | Toplevel_splice loc
             | Lookup_error(loc, _, _) -> loc
             | Incomplete_instantiation _ -> Location.none
           in
