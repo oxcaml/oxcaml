@@ -403,6 +403,19 @@ let () =
     (fun () -> unsafe_set_prod t idx #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
 
+let () =
+  let open struct
+    type t = { mutable a : #(int * int) }
+  end in
+  let unsafe_set_imm64_x2 (type a : immediate64 & immediate64) box (idx : (_, a) idx_mut) (v : a) =
+    unsafe_set box idx v
+  in
+  let t = { a = #(1, 2) } in
+  let idx = (.a) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_imm64_x2 t idx #(1, 2);
+               ignore (Sys.opaque_identity t))
+
 (* Setting an immediate or non-value block index via the ptr primitives should
    give only the needed number of caml_modifies *)
 
