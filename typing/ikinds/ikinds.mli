@@ -26,7 +26,7 @@ val crossing_of_jkind :
   ('l * 'r) Types.jkind ->
   Mode.Crossing.t
 
-type sub_or_intersect = Ikind.sub_or_intersect
+type sub_or_intersect = Jkind.sub_or_intersect
 
 val sub_or_intersect :
   ?origin:string ->

@@ -226,7 +226,9 @@ let ikind_reset : string -> Types.type_ikind = Types.ikind_reset
 let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
  fun (ctx : JK.ctx) ->
   (* Base is the modality bounds stored on this jkind. *)
-  let base = Ldd.const (Axis_lattice.of_mod_bounds j.jkind.mod_bounds) in
+  let base =
+    Ldd.const (Axis_lattice_conv.of_mod_bounds j.jkind.mod_bounds)
+  in
   (* For each with-bound (ty, axes), contribute
      modality(axes_mask, kind_of ty). *)
   Jkind.With_bounds.to_seq j.jkind.with_bounds
@@ -245,7 +247,7 @@ let ckind_of_jkind_r (j : Types.jkind_r) : JK.ckind =
   (* For r-jkinds used in sub checks, with-bounds are not present
      on the right (see Jkind_desc.sub's precondition). So only the
      base mod-bounds matter. *)
-  Ldd.const (Axis_lattice.of_mod_bounds j.jkind.mod_bounds)
+  Ldd.const (Axis_lattice_conv.of_mod_bounds j.jkind.mod_bounds)
 
 let kind_of_depth = ref 0
 
@@ -346,23 +348,9 @@ let relevance_of_rep = function
   | `Variant Types.Variant_unboxed -> `Relevant
   | (`Record _ | `Variant _) -> `Irrelevant
 
-type constructor_ikind_payload =
-  { base : JK.poly;
-    coeffs : JK.poly array
-  }
-
-let pack_constructor_ikind (payload : constructor_ikind_payload) :
-    Types.constructor_ikind =
-  Obj.magic payload
-
-let unpack_constructor_ikind (packed : Types.constructor_ikind) :
-    constructor_ikind_payload =
-  Obj.magic packed
-
 let constructor_ikind_polynomial
     (packed : Types.constructor_ikind) : JK.poly * JK.poly list =
-  let payload = unpack_constructor_ikind packed in
-  payload.base, Array.to_list payload.coeffs
+  packed.base, Array.to_list packed.coeffs
 
 let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     JK.constr_decl =
@@ -552,7 +540,7 @@ let type_declaration_ikind ~(context : Jkind.jkind_context)
   let ctx = make_ctx ~context in
   let base, coeffs = JK.constr_kind_poly ctx path in
   let coeffs_array = Array.of_list coeffs in
-  pack_constructor_ikind { base; coeffs = coeffs_array }
+  { base; coeffs = coeffs_array }
 
 let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
     ~(path : Path.t) : Types.type_ikind =
@@ -560,7 +548,7 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
   then Types.ikind_reset "ikinds disabled"
   else
     let ikind = type_declaration_ikind ~context ~path in
-    let payload = unpack_constructor_ikind ikind in
+    let payload = ikind in
     if !Types.ikind_debug
     then begin
       let stored_jkind =
@@ -645,13 +633,13 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
   else
     let ctx = make_ctx ~context in
     let lat = JK.round_up ctx (ckind_of_jkind jkind) in
-    let mb = Axis_lattice.to_mod_bounds lat in
+  let mb = Axis_lattice_conv.to_mod_bounds lat in
     Jkind.Mod_bounds.to_mode_crossing mb
 
 (* Intentionally no ikind versions of sub_or_intersect / sub_or_error.
    Keep Jkind as the single source for classification and error reporting. *)
 (* CR jujacobs: fix this *)
-type sub_or_intersect = Ikind.sub_or_intersect
+type sub_or_intersect = Jkind.sub_or_intersect
 
 (* CR jujacobs: performance issue here. *)
 let sub_or_intersect ?origin:_origin
@@ -768,7 +756,7 @@ let substitute_decl_ikind_with_lookup
   match entry with
   | Types.No_constructor_ikind _ -> entry
   | Types.Constructor_ikind packed ->
-      let payload = unpack_constructor_ikind packed in
+      let payload = packed in
       let memo : (Path.t, (JK.poly * JK.poly list)) Hashtbl.t = Hashtbl.create 17 in
       let map_name (name : Ldd.Name.t) : Ldd.node =
         match name with
@@ -802,4 +790,4 @@ let substitute_decl_ikind_with_lookup
       in
       let base' = Ldd.map_rigid map_name payload.base in
       let coeffs' = Array.map (Ldd.map_rigid map_name) payload.coeffs in
-      Types.Constructor_ikind (pack_constructor_ikind { base = base'; coeffs = coeffs' })
+      Types.Constructor_ikind { base = base'; coeffs = coeffs' }

@@ -138,7 +138,9 @@
   ldd_no_fast_path
   ldd_leaf_specialized
   axis_lattice
+  axis_lattice_conv
   axis_lattice_array
+  axis_lattice_array_conv
   ikind
   ikinds
   value_rec_types

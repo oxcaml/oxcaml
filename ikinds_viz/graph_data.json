@@ -29,7 +29,7 @@
       "width": 3.7438,
       "height": 0.5,
       "label": "typing/ikinds/axis_lattice.ml",
-      "info": "Bitset-backed axis lattice with modality masks, conversions to/from mod bounds, and canned constants."
+      "info": "Bitset-backed axis lattice with modality masks and canned constants; conversions live in Axis_lattice_conv."
     },
     {
       "id": "typing/jkind.ml",
@@ -47,7 +47,7 @@
       "width": 1.9951,
       "height": 0.5,
       "label": "typing/types.mli",
-      "info": "Types interface exposing constructor_ikind/ikind_reset while hiding the concrete representation via Obj.t."
+      "info": "Types interface defining constructor_ikind records alongside ikind reset helpers."
     },
     {
       "id": "typing/ikinds/ldd.ml",
@@ -101,7 +101,7 @@
       "width": 3.2462,
       "height": 0.5,
       "label": "typing/ikinds/axis_lattice_array.ml",
-      "info": "Array-based axis lattice mirroring Jkind axis order and wrapping the generic product lattice."
+      "info": "Array-based axis lattice mirroring Jkind axis order and wrapping the generic product lattice; conversions live in Axis_lattice_array_conv."
     },
     {
       "id": "typing/ikinds/product_lattice.ml",
@@ -345,9 +345,9 @@
           0.56117
         ]
       ],
-      "style": "dashed",
-      "label": "Obj.magic",
-      "info": "Obj.magic bridge: pack_constructor_ikind/unpack_constructor_ikind talk to Types.constructor_ikind without exposing the representation."
+      "style": "solid",
+      "label": null,
+      "info": "Ikinds stores constructor polynomials directly through the shared constructor_ikind record."
     },
     {
       "source": "typing/ikinds/ikind.ml",
@@ -555,9 +555,9 @@
           0.56871
         ]
       ],
-      "style": "dashed",
-      "label": "Obj.magic",
-      "info": "Obj.magic reuse: jkinds reuse Types records when adjusting allowances and mod_bounds."
+      "style": "solid",
+      "label": null,
+      "info": "Jkind reads Types constructor metadata (allowances and mod_bounds) via the shared record accessors."
     },
     {
       "source": "typing/jkind.ml",

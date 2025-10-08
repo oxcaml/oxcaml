@@ -1,8 +1,3 @@
-type sub_or_intersect = Jkind.sub_or_intersect =
-  | Sub
-  | Disjoint of Jkind.Sub_failure_reason.t Misc.Nonempty_list.t
-  | Has_intersection of Jkind.Sub_failure_reason.t Misc.Nonempty_list.t
-
 module RigidName : sig
   type constr = Path.t
 

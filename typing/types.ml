@@ -18,8 +18,10 @@
 open Allowance
 open Asttypes
 
-(* CR jujacobs: temporary hack to avoid dependency cycle *)
-type constructor_ikind = Obj.t
+type constructor_ikind =
+  { base : Ikind.Ldd.node;
+    coeffs : Ikind.Ldd.node array;
+  }
 
 type constructor_ikind_entry =
   | Constructor_ikind of constructor_ikind
