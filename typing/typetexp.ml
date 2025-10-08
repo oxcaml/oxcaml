@@ -170,15 +170,15 @@ module TyVarEnv : sig
   (* evaluate with a locally extended set of univars *)
 
   val ttyp_poly_arg :
-    poly_univars -> (string * Parsetree.jkind_annotation option * int) list
+    poly_univars -> (string * Parsetree.jkind_annotation option) list
   (* something suitable as an argument to [Ttyp_poly] *)
 
   val make_poly_univars : (string Location.loc * int) list -> poly_univars
   (* a version of [make_poly_univars_jkinds] that doesn't take jkinds *)
 
   val make_poly_univars_jkinds :
-    context:(string -> Jkind.History.annotation_context_lr)
-    -> (string Location.loc * Parsetree.jkind_annotation option * int) list
+    context:(string -> Jkind.History.annotation_context_lr) ->
+    (string Location.loc * Parsetree.jkind_annotation option * int) list
     -> poly_univars
   (* see mli file *)
 
@@ -339,10 +339,9 @@ end = struct
       ~finally:(fun () -> univars := old_univars)
 
   let ttyp_poly_arg (poly_univars : poly_univars) = List.map
-      (fun (name, pending_univar, stage) ->
+      (fun (name, pending_univar, _stage) ->
         name,
-        Jkind.get_annotation pending_univar.jkind_info.original_jkind,
-        stage)
+        Jkind.get_annotation pending_univar.jkind_info.original_jkind)
       poly_univars
 
   let mk_pending_univar name jkind jkind_info =
@@ -380,7 +379,7 @@ end = struct
            match get_desc v with
            | Tvar { name; jkind } when get_level v = Btype.generic_level ->
                set_type_desc v (Tunivar { name; jkind });
-               v::acc
+               v :: acc
            | _ -> acc
         )
         promoted vars
@@ -1167,7 +1166,6 @@ and transl_type_poly env ~policy ~row_context mode loc vars st =
   let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in
   let ty' = Btype.newgenty (Tpoly(ty, ty_list)) in
   unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)) ty';
-  let typed_vars = List.map (fun (n, v, _) -> (n, v)) typed_vars in
   Ttyp_poly (typed_vars, cty), ty'
 
 and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
@@ -1465,7 +1463,6 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
           transl_simple_type_impl ~new_var_jkind:Sort env ~univars ~policy:Open
             Alloc.Const.legacy inner_type
       in
-      let typed_vars = List.map (fun (n, jkind, _) -> (n, jkind)) typed_vars in
       (typed_vars, univars, typ)
     end
     ~post:(fun (_,_,typ) -> generalize_ctyp typ)
