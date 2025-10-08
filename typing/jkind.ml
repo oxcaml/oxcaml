@@ -2605,6 +2605,18 @@ let for_boxed_row row =
       (* CR layouts v2.8: We can probably do a fair bit better here in most cases. But if we ever allow open types to mode-cross, we have to get rid of the 100-row limit below. Internal ticket 5097 and 5098. *)
       for_open_boxed_row
     else
+      (* Here we count how many rows are in the polymorphic variant and default
+         to value if there are more than 100. This is to avoid regressions in
+         compilation time, which was observed in some files with large
+         polymorphic variants.
+
+         We choose to make two different calls to [Btype.fold_row] to avoid
+         doing allocations in the case where there's a large number of variants,
+         as those allocations were enough to slow down the problematic files
+         with large polymorphic variants. Presumably the second loop is fast
+         anyways due to caching. *)
+      (* CR layouts v2.8: Remove this [limit_for_mode_crossing_rows]
+         restriction. See internal ticket 5435. *)
       let bounds_count = Btype.fold_row (fun acc _ -> acc + 1) 0 row in
       if bounds_count <= limit_for_mode_crossing_rows
       then
