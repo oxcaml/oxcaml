@@ -530,9 +530,18 @@ G(caml_system__code_begin):
 /* Allocation */
 /******************************************************************************/
 
+/* CR aspsmith: these need to be valid tagged ints for now. probably
+   scan_stack_frames should learn about this instead. */
+#define GC_REGS_XMM 1
+#define GC_REGS_YMM 3
+#define GC_REGS_ZMM 5
+
+#define Gc_regs_kind 13*8
+
 /* Loading and saving SIMD registers XMM/YMM/ZMM */
 
-#define SIMD_REGS_OFFSET (13*8) /* gc_regs_bucket starts with 13 int64 regs */
+#define SIMD_REGS_OFFSET (14*8)
+    /* gc_regs_bucket starts with 13 int64 regs, then the simd kind */
 
 #define SAVE_XMM(i) movupd %xmm##i, (i*16 + SIMD_REGS_OFFSET)(%r15);
 #define SAVE_XMM_REGS DO_0_15(SAVE_XMM)
@@ -576,6 +585,7 @@ G(caml_system__code_begin):
         movq    %r10,        10*8(%r15);               \
              /* %r11 is at   11*8(%r15); */            \
         movq    %rbp,        12*8(%r15);               \
+        movq    $GC_REGS_##simd, Gc_regs_kind(%r15);   \
         SAVE_ ## simd ## _REGS
 
 /* Undo SAVE_ALL_REGS. Expects gc_regs bucket in %r15 */
