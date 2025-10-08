@@ -30,7 +30,7 @@ open Format
 open Cmx_format
 open Compilenv
 
-type emit = Compile_common.unit -> unit
+type emit = Compile_common.info -> unit
 
 module type File_extensions = sig
   (** File extensions include exactly one dot, so they can be added with regular string
