@@ -181,7 +181,7 @@ let prepare_error err =
   | Unspliceable loc ->
       Location.errorf ~loc
         "Syntax error: expression cannot be spliced.\n\
-         @{<hint>Hint@}: considering putting parentheses around the \
+         @{<hint>Hint@}: consider putting parentheses around the \
          expression."
   | Unsupported loc ->
       Location.errorf ~loc
