@@ -158,6 +158,16 @@ svg {
   pointer-events: none;
 }
 
+.node.ikind rect {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 1.8;
+}
+
+.node.ikind text {
+  font-weight: 600;
+}
+
 .node:hover rect,
 .node.active rect {
   stroke: var(--accent);
@@ -192,12 +202,6 @@ svg {
   fill: none;
   stroke: transparent;
   stroke-width: 18px;
-}
-
-.edge.dashed path,
-.edge.dashed .edge-main {
-  stroke: var(--edge-dashed);
-  stroke-dasharray: 6 4;
 }
 
 .edge.highlight path,
@@ -269,34 +273,6 @@ svg {
   font-size: 14px;
   line-height: 1.4;
   color: var(--muted);
-}
-
-.legend {
-  margin-top: 16px;
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
-  padding-top: 12px;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.legend-swatch {
-  width: 18px;
-  height: 3px;
-  border-radius: 999px;
-  background: var(--edge);
-}
-
-.legend-swatch.dashed {
-  background: var(--edge-dashed);
-  border-bottom: 2px dashed var(--edge-dashed);
-  height: 0;
 }
 
 @media (max-width: 960px) {

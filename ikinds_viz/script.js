@@ -72,7 +72,7 @@
     id: 'ikinds-graph',
     layoutOptions: {
       'elk.algorithm': 'layered',
-      'elk.direction': 'RIGHT',
+      'elk.direction': 'UP',
       'elk.layered.unnecessaryBendpoints': 'true',
       'elk.layered.spacing.nodeNodeBetweenLayers': '80',
       'elk.spacing.nodeNode': '32',
@@ -165,14 +165,12 @@
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     const isRooted = rootedNodes.has(meta.source) && rootedNodes.has(meta.target);
     const classes = ['edge'];
-    if (meta.style === 'dashed') classes.push('dashed');
     if (!isRooted) classes.push('unrooted');
     group.setAttribute('class', classes.join(' '));
     group.dataset.edgeId = edge.id;
     group.dataset.source = meta.source;
     group.dataset.target = meta.target;
     if (meta.info) group.dataset.info = meta.info;
-    if (meta.label) group.dataset.label = meta.label;
 
     const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
     polyline.setAttribute('class', 'edge-main');
@@ -200,7 +198,7 @@
       edgeElements.set(edge.id, group);
       registerEdgeAdjacency(meta.source, meta.target, edge.id);
 
-      if (meta.label) {
+      if (false) {
         const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         label.setAttribute('class', 'edge-label');
         label.setAttribute('text-anchor', 'middle');
@@ -248,7 +246,6 @@
         labelContainer.dataset.source = meta.source;
         labelContainer.dataset.target = meta.target;
         if (meta.info) labelContainer.dataset.info = meta.info;
-        if (meta.label) labelContainer.dataset.label = meta.label;
         labelContainer.appendChild(bg);
         labelContainer.appendChild(label);
         labelGroup.appendChild(labelContainer);
@@ -268,7 +265,10 @@
 
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     const isRooted = rootedNodes.has(node.id);
-    group.setAttribute('class', `node ${!isRooted ? 'unrooted' : ''}`);
+    const classes = ['node'];
+    if (!isRooted) classes.push('unrooted');
+    if (node.id.startsWith('typing/ikinds/')) classes.push('ikind');
+    group.setAttribute('class', classes.join(' '));
     group.dataset.nodeId = node.id;
     if (node.info) group.dataset.info = node.info;
 
@@ -286,21 +286,6 @@
 
     group.appendChild(rect);
     group.appendChild(text);
-
-    if (node.loc !== undefined) {
-      const locText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      locText.setAttribute('x', offsetX(layoutNode.x) + layoutNode.width / 2);
-      locText.setAttribute('y', offsetY(layoutNode.y) + layoutNode.height / 2 + 16);
-      locText.setAttribute('text-anchor', 'middle');
-      locText.setAttribute('font-size', '11');
-      locText.setAttribute('fill', '#64748b');
-      if (node.loc_mli !== undefined) {
-        locText.textContent = `${node.loc} + ${node.loc_mli} LOC`;
-      } else {
-        locText.textContent = `${node.loc} LOC`;
-      }
-      group.appendChild(locText);
-    }
 
     nodeGroup.appendChild(group);
     nodeElements.set(node.id, group);
