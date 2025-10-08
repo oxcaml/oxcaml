@@ -10,7 +10,8 @@ let enable_sub_or_error = false
 module Ldd = Ikind.Ldd
 
 module JK = struct
-  (* The JKind solver specialized to Ikind.Ldd and Types.type_expr. *)
+  (* The JKind solver specialized to Ikind.Ldd and Types.type_expr, now without
+     threading an ops record through every evaluation. *)
 
   module Ldd = Ikind.Ldd
 
@@ -43,19 +44,9 @@ module JK = struct
     let hash x = Path.hash x
   end)
 
-  type ops =
-    { const : lat -> kind;
-      join : kind -> kind -> kind;
-      meet : kind -> kind -> kind;
-      modality : lat -> kind -> kind;
-      constr : constr -> kind list -> kind;
-      kind_of : ty -> kind;
-      rigid : ty -> kind
-    }
+  type ckind = ctx -> kind
 
-  type ckind = ops -> kind
-
-  type constr_decl =
+  and constr_decl =
     | Ty of
         { args : ty list;
           kind : ckind;
@@ -63,207 +54,179 @@ module JK = struct
         }
     | Poly of poly * poly list
 
-  type env =
+  and env =
     { kind_of : ty -> ckind;
       lookup : constr -> constr_decl
     }
 
-  type solver =
-    { ops : ops;
-      constr_kind_poly : constr -> poly * poly list
+  and ctx =
+    { env : env;
+      ty_to_kind : kind TyTbl.t;
+      constr_to_coeffs : (poly * poly list) ConstrTbl.t
     }
 
-  let make_solver (env : env) : solver =
+  let create (env : env) : ctx =
     Ldd.clear_memos ();
-    (* Define all the trivial ops *)
-    let const l = Ldd.const l in
-    let join a b = Ldd.join a b in
-    let modality l k = Ldd.meet (Ldd.const l) k in
-    let meet a b = Ldd.meet a b in
-    (* Create hash table mapping ty to kind for memoization *)
-    let ty_to_kind = TyTbl.create 0 in
-    let rigid t =
-      let param = Types.get_id t in
-      Ldd.var (Ldd.rigid (Ldd.Name.param param))
-    in
-    (* And hash table mapping constructor to coefficients *)
-    let constr_to_coeffs = ConstrTbl.create 0 in
-    (* Define kind_of and constr ops *)
-    let rec kind_of (t : ty) : kind =
-      match TyTbl.find_opt ty_to_kind t with
-      | Some k -> k
-      | None ->
-        (* Pre-insert lattice solver var for this type *)
+    { env;
+      ty_to_kind = TyTbl.create 0;
+      constr_to_coeffs = ConstrTbl.create 0
+    }
+
+  let rigid (t : ty) : kind =
+    let param = Types.get_id t in
+    Ldd.var (Ldd.rigid (Ldd.Name.param param))
+
+  let rec kind (ctx : ctx) (t : ty) : kind =
+    match TyTbl.find_opt ctx.ty_to_kind t with
+    | Some k -> k
+    | None ->
         let v = Ldd.new_var () in
-        TyTbl.add ty_to_kind t (Ldd.var v);
-        let kind = env.kind_of t ops in
-        (* Always solve LFPs here to avoid correctness issues *)
-        Ldd.solve_lfp v kind;
-        kind
-    and constr_kind c =
-      match ConstrTbl.find_opt constr_to_coeffs c with
-      | Some base_and_coeffs -> base_and_coeffs
-      | None -> (
-        match env.lookup c with
+        let placeholder = Ldd.var v in
+        TyTbl.add ctx.ty_to_kind t placeholder;
+        let rhs = ctx.env.kind_of t ctx in
+        Ldd.solve_lfp v rhs;
+        rhs
+
+  and constr_kind (ctx : ctx) (c : constr) : poly * poly list =
+    match ConstrTbl.find_opt ctx.constr_to_coeffs c with
+    | Some base_and_coeffs -> base_and_coeffs
+    | None -> (
+        match ctx.env.lookup c with
         | Poly (base, coeffs) ->
-          (* CR jujacobs: cycle-breaker for cached polynomials
-             --------------------------------------------------
-             We install placeholder LDD variables for the base and each
-             coefficient before rehydrating the polynomial via map_rigid.
-             This prevents recursive rehydration from looping when cached
-             polynomials reference each other cyclically (common in recursive
-             type groups). Once placeholders are published to the cache, we
-             rehydrate the right-hand sides and solve LFPs to define them.
-
-             A more principled approach would construct these polynomials in a
-             strictly topologically-safe order or use an explicit fixpoint
-             builder for constructor coefficients; this hack should be replaced
-             by such a mechanism when the solver grows a dedicated interface. *)
-          let base_var = Ldd.new_var () in
-          let coeff_vars =
-            List.init (List.length coeffs) (fun _ -> Ldd.new_var ())
-          in
-          ConstrTbl.add constr_to_coeffs c
-            (Ldd.var base_var, List.map Ldd.var coeff_vars);
-          let instantiate (name : Ldd.Name.t) : kind =
-            match name with
-            | Ldd.Name.Param _ -> Ldd.var (Ldd.rigid name)
-            | Ldd.Name.Atom { constr = constr'; arg_index } ->
-              if Path.compare constr' c = 0
-              then Ldd.var (Ldd.rigid name)
-              else
-                let base', coeffs' = constr_kind constr' in
-                if arg_index = 0
-                then base'
-                else
-                  match List.nth_opt coeffs' (arg_index - 1) with
-                  | Some coeff -> coeff
-                  | None -> Ldd.var (Ldd.rigid name)
-          in
-          let rehydrate node = Ldd.map_rigid instantiate node in
-          let base_rhs = rehydrate base in
-          let coeffs_rhs = List.map rehydrate coeffs in
-          Ldd.solve_lfp base_var base_rhs;
-          List.iter2 (fun v rhs -> Ldd.solve_lfp v rhs) coeff_vars coeffs_rhs;
-          Ldd.var base_var, List.map Ldd.var coeff_vars
-        | Ty { args; kind; abstract } ->
-          let base = Ldd.new_var () in
-          (* Allocate coefficient vars based on declared arity, not on ks
-             length *)
-          let coeffs = List.init (List.length args) (fun _ -> Ldd.new_var ()) in
-          ConstrTbl.add constr_to_coeffs c
-            (Ldd.var base, List.map Ldd.var coeffs);
-          (* Recursively compute the kind of the body *)
-          let rigid_vars =
-            List.map
-              (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty)))
-              args
-          in
-          List.iter2
-            (fun ty var -> TyTbl.add ty_to_kind ty (Ldd.var var))
-            args rigid_vars;
-          (* Compute body kind *)
-          (* CR jujacobs: we shouldn't need to compute the kind if
-             we are in Right mode and abstract=true, but currently this is
-             needed to correctly populate the cache. *)
-          let kind' = kind ops in
-          (* Extract coeffs' from kind' *)
-          let base', coeffs' =
-            Ldd.decompose_linear ~universe:rigid_vars kind'
-          in
-          if List.length coeffs <> List.length coeffs'
-          then
-            failwith
-              (Printf.sprintf
-                 "jkind_solver: coeffs mismatch for constr %s (length %d vs %d)"
-                 (constr_to_string c) (List.length coeffs) (List.length coeffs'));
-          if abstract
-          then (
-            (* We need to assert that kind' is less than or equal to the base *)
-            Ldd.enqueue_gfp base
-              (Ldd.meet base' (Ldd.var (Ldd.rigid (Ldd.Name.atomic c 0))));
-            let i = ref 0 in
+            (* CR jujacobs: cycle-breaker for cached polynomials
+               --------------------------------------------------
+               We install placeholder LDD variables for the base and each
+               coefficient before rehydrating the polynomial via map_rigid.
+               This prevents recursive rehydration from looping when cached
+               polynomials reference each other cyclically (common in recursive
+               type groups). Once placeholders are published to the cache, we
+               rehydrate the right-hand sides and solve LFPs to define them. *)
+            let base_var = Ldd.new_var () in
+            let coeff_vars =
+              List.init (List.length coeffs) (fun _ -> Ldd.new_var ())
+            in
+            let base_node = Ldd.var base_var in
+            let coeff_nodes = List.map Ldd.var coeff_vars in
+            ConstrTbl.add ctx.constr_to_coeffs c (base_node, coeff_nodes);
+            let instantiate (name : Ldd.Name.t) : kind =
+              match name with
+              | Ldd.Name.Param _ -> Ldd.var (Ldd.rigid name)
+              | Ldd.Name.Atom { constr = constr'; arg_index } ->
+                  if Path.compare constr' c = 0
+                  then Ldd.var (Ldd.rigid name)
+                  else
+                    let base', coeffs' = constr_kind ctx constr' in
+                    if arg_index = 0
+                    then base'
+                    else
+                      match List.nth_opt coeffs' (arg_index - 1) with
+                      | Some coeff -> coeff
+                      | None -> Ldd.var (Ldd.rigid name)
+            in
+            let rehydrate node = Ldd.map_rigid instantiate node in
+            let base_rhs = rehydrate base in
+            let coeffs_rhs = List.map rehydrate coeffs in
+            Ldd.solve_lfp base_var base_rhs;
+            List.iter2 (fun v rhs -> Ldd.solve_lfp v rhs) coeff_vars coeffs_rhs;
+            base_node, coeff_nodes
+        | Ty { args; kind = body; abstract } ->
+            let base_var = Ldd.new_var () in
+            let coeff_vars =
+              List.init (List.length args) (fun _ -> Ldd.new_var ())
+            in
+            let base_node = Ldd.var base_var in
+            let coeff_nodes = List.map Ldd.var coeff_vars in
+            ConstrTbl.add ctx.constr_to_coeffs c (base_node, coeff_nodes);
+            let rigid_vars =
+              List.map
+                (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty)))
+                args
+            in
             List.iter2
-              (fun coeff coeff' ->
-                let idx = !i in
-                let rhs = Ldd.join coeff' base' in
-                let bound =
-                  Ldd.meet rhs
-                    (Ldd.var (Ldd.rigid (Ldd.Name.atomic c (idx + 1))))
-                in
-                incr i;
-                Ldd.enqueue_gfp coeff bound)
-              coeffs coeffs')
-          else (
-            Ldd.solve_lfp base base';
-            List.iter2
-              (fun coeff coeff' -> Ldd.solve_lfp coeff coeff')
-              coeffs coeffs');
-          Ldd.var base, List.map Ldd.var coeffs)
-    and constr c ks =
-      let base, coeffs = constr_kind c in
-      (* Meet each arg with the corresponding coeff *)
-      let ks' =
-        List.mapi
-          (fun i coeff ->
-            match List.nth_opt ks i with
-            | Some k -> Ldd.meet k coeff
-            | None -> failwith "Missing arg")
-          coeffs
-      in
-      (* Join all the ks'' plus the base *)
-      List.fold_left Ldd.join base ks'
-    and ops =
-      { const;
-        join;
-        meet;
-        modality;
-        constr;
-        kind_of;
-        rigid
-      }
-    in
-    let constr_kind_poly c =
-      let base, coeffs = constr_kind c in
-      (* Ensure any pending fixpoints are installed before inspecting. *)
-      Ldd.solve_pending ();
-      let coeffs_minus_base =
-        List.map (fun p -> Ldd.sub_subsets p base) coeffs
-      in
-      base, coeffs_minus_base
-    in
-    { ops; constr_kind_poly }
+              (fun ty var -> TyTbl.add ctx.ty_to_kind ty (Ldd.var var))
+              args rigid_vars;
+            (* Compute body kind *)
+            (* CR jujacobs: we shouldn't need to compute the kind if
+               we are in Right mode and abstract=true, but currently this is
+               needed to correctly populate the cache. *)
+            let kind' = body ctx in
+            (* Extract coeffs' from kind' *)
+            let base', coeffs' =
+              Ldd.decompose_linear ~universe:rigid_vars kind'
+            in
+            if List.length coeff_vars <> List.length coeffs'
+            then
+              failwith
+                (Printf.sprintf
+                   "jkind_solver: coeffs mismatch for constr %s (length %d vs %d)"
+                   (constr_to_string c) (List.length coeff_vars)
+                   (List.length coeffs'));
+            if abstract
+            then (
+              (* We need to assert that kind' is less than or equal to the base *)
+              Ldd.enqueue_gfp base_var
+                (Ldd.meet base' (Ldd.var (Ldd.rigid (Ldd.Name.atomic c 0))));
+              let i = ref 0 in
+              List.iter2
+                (fun coeff coeff' ->
+                  let idx = !i in
+                  let rhs = Ldd.join coeff' base' in
+                  let bound =
+                    Ldd.meet rhs
+                      (Ldd.var (Ldd.rigid (Ldd.Name.atomic c (idx + 1))))
+                  in
+                  incr i;
+                  Ldd.enqueue_gfp coeff bound)
+                coeff_vars coeffs')
+            else (
+              Ldd.solve_lfp base_var base';
+              List.iter2
+                (fun coeff coeff' -> Ldd.solve_lfp coeff coeff')
+                coeff_vars coeffs');
+            base_node, coeff_nodes)
 
-  let normalize (solver : solver) (k : ckind) : poly =
-    let k' = k solver.ops in
+  let constr (ctx : ctx) (c : constr) (args : kind list) : kind =
+    let base, coeffs = constr_kind ctx c in
+    let ks =
+      List.mapi
+        (fun i coeff ->
+          match List.nth_opt args i with
+          | Some k -> Ldd.meet k coeff
+          | None -> failwith "Missing arg")
+        coeffs
+    in
+    List.fold_left Ldd.join base ks
+
+  let normalize (ctx : ctx) (k : ckind) : poly =
+    let k' = k ctx in
     Ldd.solve_pending ();
     k'
 
-  let constr_kind_poly (solver : solver) (c : constr) : poly * poly list =
-    solver.constr_kind_poly c
+  let constr_kind_poly (ctx : ctx) (c : constr) : poly * poly list =
+    let base, coeffs = constr_kind ctx c in
+    Ldd.solve_pending ();
+    let coeffs_minus_base =
+      List.map (fun p -> Ldd.sub_subsets p base) coeffs
+    in
+    base, coeffs_minus_base
 
-  let leq_with_reason (solver : solver) (k1 : ckind) (k2 : ckind) :
+  let leq_with_reason (ctx : ctx) (k1 : ckind) (k2 : ckind) :
       int list option =
-    let k2' = k2 solver.ops in
-    let k1' = k1 solver.ops in
+    let k2' = k2 ctx in
+    let k1' = k1 ctx in
     Ldd.solve_pending ();
     Ldd.leq_with_reason k1' k2'
 
-  let round_up (solver : solver) (k : ckind) : lat =
-    let k' = k solver.ops in
+  let round_up (ctx : ctx) (k : ckind) : lat =
+    let k' = k ctx in
     Ldd.round_up k'
-
 end
-
 let ikind_reset : string -> Types.type_ikind = Types.ikind_reset
 
 let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
- fun (ops : JK.ops) ->
+ fun (ctx : JK.ctx) ->
   (* Base is the modality bounds stored on this jkind. *)
-  let base =
-    ops.const
-      (Axis_lattice.of_mod_bounds j.jkind.mod_bounds)
-  in
+  let base = Ldd.const (Axis_lattice.of_mod_bounds j.jkind.mod_bounds) in
   (* For each with-bound (ty, axes), contribute
      modality(axes_mask, kind_of ty). *)
   Jkind.With_bounds.to_seq j.jkind.with_bounds
@@ -271,26 +234,25 @@ let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
   |> List.fold_left (fun acc (ty, info) ->
          let axes = Jkind.With_bounds.type_info_relevant_axes info in
          let mask = Axis_lattice.of_axis_set axes in
-         let kty = ops.kind_of ty in
-         ops.join acc (ops.modality mask kty))
+         let kty = JK.kind ctx ty in
+         Ldd.join acc (Ldd.meet (Ldd.const mask) kty))
        base
 
 let ckind_of_jkind_l (j : Types.jkind_l) : JK.ckind = ckind_of_jkind j
 
 let ckind_of_jkind_r (j : Types.jkind_r) : JK.ckind =
- fun (ops : JK.ops) ->
+ fun (_ctx : JK.ctx) ->
   (* For r-jkinds used in sub checks, with-bounds are not present
      on the right (see Jkind_desc.sub's precondition). So only the
      base mod-bounds matter. *)
-  let base = ops.const (Axis_lattice.of_mod_bounds j.jkind.mod_bounds) in
-  base
+  Ldd.const (Axis_lattice.of_mod_bounds j.jkind.mod_bounds)
 
 let kind_of_depth = ref 0
 
 let kind_of_counter = ref 0
 
 let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
- fun (ops : JK.ops) ->
+ fun (ctx : JK.ctx) ->
   ignore context;
   incr kind_of_depth;
   if !kind_of_depth > 50 then failwith "kind_of_depth too deep" else ();
@@ -299,22 +261,22 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
   let res =
     match Types.get_desc ty with
     | Types.Tvar { name = _name; jkind } | Types.Tunivar { name = _name; jkind }
-      ->
+      -> 
       (* TODO: allow general jkinds here (including with-bounds) *)
       let jkind_l = Jkind.disallow_right jkind in
       let ckind = ckind_of_jkind_l jkind_l in
-      ops.meet (ops.rigid ty) (ckind ops)
+      Ldd.meet (JK.rigid ty) (ckind ctx)
     | Types.Tconstr (p, args, _abbrev_memo) ->
-      let arg_kinds = List.map ops.kind_of args in
-      ops.constr p arg_kinds
+      let arg_kinds = List.map (fun t -> JK.kind ctx t) args in
+      JK.constr ctx p arg_kinds
     | Types.Ttuple elts ->
       (* Boxed tuples: immutable_data base + per-element contributions
          under id modality. *)
-      let base = ops.const Axis_lattice.immutable_data in
+      let base = Ldd.const Axis_lattice.immutable_data in
       List.fold_left
         (fun acc (_lbl, t) ->
           let mask = Axis_lattice.mask_shallow in
-          ops.join acc (ops.modality mask (ops.kind_of t)))
+          Ldd.join acc (Ldd.meet (Ldd.const mask) (JK.kind ctx t)))
         base elts
     | Types.Tunboxed_tuple elts ->
       (* Unboxed tuples: per-element contributions; shallow axes relevant
@@ -326,25 +288,25 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
       in
       List.fold_left
         (fun acc (_lbl, t) ->
-          ops.join acc (ops.modality mask (ops.kind_of t)))
-        (ops.const Axis_lattice.bot) elts
+          Ldd.join acc (Ldd.meet (Ldd.const mask) (JK.kind ctx t)))
+        (Ldd.const Axis_lattice.bot) elts
     | Types.Tarrow (_lbl, _t1, _t2, _commu) ->
       (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
-      ops.const Axis_lattice.arrow
+      Ldd.const Axis_lattice.arrow
     | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind_of"
     | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind_of"
     | Types.Tpoly _ ->
-      ops.const Axis_lattice.value
+      Ldd.const Axis_lattice.value
     | Types.Tof_kind jkind ->
-      ckind_of_jkind jkind ops
+      ckind_of_jkind jkind ctx
     | Types.Tobject _ ->
-      ops.const Axis_lattice.object_legacy
+      Ldd.const Axis_lattice.object_legacy
     | Types.Tfield _ ->
       failwith "Tfield shouldn't appear in kind_of"
-      (* ops.const Axis_lattice.value *)
+      (* Ldd.const Axis_lattice.value *)
     | Types.Tnil ->
       failwith "Tnil shouldn't appear in kind_of"
-      (* ops.const Axis_lattice.value *)
+      (* Ldd.const Axis_lattice.value *)
     | Types.Tvariant row ->
       if Btype.tvariant_not_immediate row
       then
@@ -352,22 +314,22 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
         then
           (* Closed, boxed polymorphic variant: immutable_data base plus
              per-constructor args. *)
-          let base = ops.const Axis_lattice.immutable_data in
+          let base = Ldd.const Axis_lattice.immutable_data in
           let mask = Axis_lattice.mask_shallow in
           Btype.fold_row
             (fun acc ty ->
-              let k_ty = ops.kind_of ty in
-              let k = ops.modality mask k_ty in
-              ops.join acc k)
+              let k_ty = JK.kind ctx ty in
+              let k = Ldd.meet (Ldd.const mask) k_ty in
+              Ldd.join acc k)
             base row
         else
           (* Open row: conservative non-float value (boxed). *)
-          ops.const Axis_lattice.nonfloat_value
+          Ldd.const Axis_lattice.nonfloat_value
       else
         (* All-constant (immediate) polymorphic variant. *)
-        ops.const Axis_lattice.immediate
+        Ldd.const Axis_lattice.immediate
     | Types.Tpackage _ ->
-      ops.const Axis_lattice.nonfloat_value
+      Ldd.const Axis_lattice.nonfloat_value
   in
   decr kind_of_depth;
   res
@@ -415,7 +377,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
        Longer-term, we should ensure contexts always supply enough lookup
        information, or thread Env through places that need it, and delete this
        fallback. *)
-    let kind : JK.ckind = fun (ops : JK.ops) -> ops.const Axis_lattice.value in
+    let kind : JK.ckind = fun _ctx -> Ldd.const Axis_lattice.value in
     JK.Ty { args = []; kind; abstract = true }
   | Some decl ->
     (* Here we can switch to using the cached ikind or not. *)
@@ -439,8 +401,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           in
           let relevant_for_shallow = relevance_of_rep (`Record rep) in
           let kind : JK.ckind =
-           fun (ops : JK.ops) ->
-            let base = ops.const base_lat in
+           fun (ctx : JK.ctx) ->
+            let base = Ldd.const base_lat in
             List.fold_left
               (fun acc (lbl : Types.label_declaration) ->
                 let mask =
@@ -448,7 +410,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                     ~relevant_for_shallow
                     lbl.ld_modalities
                 in
-                ops.join acc (ops.modality mask (ops.kind_of lbl.ld_type)))
+                Ldd.join acc
+                  (Ldd.meet (Ldd.const mask) (JK.kind ctx lbl.ld_type)))
               base lbls
           in
           JK.Ty { args = decl.type_params; kind; abstract = false }
@@ -461,8 +424,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
             else Axis_lattice.nonfloat_value
           in
           let kind : JK.ckind =
-           fun (ops : JK.ops) ->
-            let base = ops.const base_lat in
+           fun (ctx : JK.ctx) ->
+            let base = Ldd.const base_lat in
             let relevant_for_shallow =
               match List.length lbls with
               | 1 -> `Relevant
@@ -474,7 +437,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                   Axis_lattice.mask_of_modality
                     ~relevant_for_shallow lbl.ld_modalities
                 in
-                ops.join acc (ops.modality mask (ops.kind_of lbl.ld_type)))
+                Ldd.join acc
+                  (Ldd.meet (Ldd.const mask) (JK.kind ctx lbl.ld_type)))
               base lbls
           in
           JK.Ty { args = decl.type_params; kind; abstract = false }
@@ -514,8 +478,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           in
           let relevant_for_shallow = relevance_of_rep (`Variant rep) in
           let kind : JK.ckind =
-           fun (ops : JK.ops) ->
-            let base = ops.const base_lat in
+           fun (ctx : JK.ctx) ->
+            let base = Ldd.const base_lat in
             List.fold_left
               (fun acc (c : Types.constructor_declaration) ->
                 match c.cd_args with
@@ -527,7 +491,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                           ~relevant_for_shallow
                           arg.ca_modalities
                       in
-                      ops.join acc (ops.modality mask (ops.kind_of arg.ca_type)))
+                      Ldd.join acc
+                        (Ldd.meet (Ldd.const mask) (JK.kind ctx arg.ca_type)))
                     acc args
                 | Types.Cstr_record lbls ->
                   List.fold_left
@@ -537,15 +502,16 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
                           ~relevant_for_shallow
                           lbl.ld_modalities
                       in
-                      ops.join acc (ops.modality mask (ops.kind_of lbl.ld_type)))
+                      Ldd.join acc
+                        (Ldd.meet (Ldd.const mask) (JK.kind ctx lbl.ld_type)))
                     acc lbls)
               base cstrs
           in
           JK.Ty { args = decl.type_params; kind; abstract = false }
         | Types.Type_open ->
           let kind : JK.ckind =
-           fun ops ->
-            ops.const Axis_lattice.value
+           fun _ctx ->
+            Ldd.const Axis_lattice.value
           in
           JK.Ty { args = decl.type_params; kind; abstract = false }
         end
@@ -553,8 +519,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
         (* Concrete: compute kind of body. *)
         let args = decl.type_params in
         let kind : JK.ckind =
-         fun ops ->
-          ops.kind_of body_ty
+         fun ctx ->
+          JK.kind ctx body_ty
         in
         JK.Ty { args; kind; abstract = false }
     in
@@ -571,20 +537,20 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
       fallback ()
     | Types.Constructor_ikind _ -> fallback ()
 
-(* Package the above into a full solver environment. *)
-let make_solver ~(context : Jkind.jkind_context) : JK.solver =
-  JK.make_solver
+(* Package the above into a full evaluation context. *)
+let make_ctx ~(context : Jkind.jkind_context) : JK.ctx =
+  JK.create
     { kind_of = kind_of ~context; lookup = lookup_of_context ~context }
 
 let normalize ~(context : Jkind.jkind_context) (jkind : Types.jkind_l) :
     Ikind.Ldd.node =
-  let solver = make_solver ~context in
-  JK.normalize solver (ckind_of_jkind_l jkind)
+  let ctx = make_ctx ~context in
+  JK.normalize ctx (ckind_of_jkind_l jkind)
 
 let type_declaration_ikind ~(context : Jkind.jkind_context)
     ~(path : Path.t) : Types.constructor_ikind =
-  let solver = make_solver ~context in
-  let base, coeffs = JK.constr_kind_poly solver path in
+  let ctx = make_ctx ~context in
+  let base, coeffs = JK.constr_kind_poly ctx path in
   let coeffs_array = Array.of_list coeffs in
   pack_constructor_ikind { base; coeffs = coeffs_array }
 
@@ -626,7 +592,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
   if not (enable_sub_jkind_l && !Clflags.ikinds)
   then Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context sub super
   else
-    let solver = make_solver ~context in
+    let ctx = make_ctx ~context in
     let allow_any =
       match allow_any_crossing with Some true -> true | _ -> false
     in
@@ -635,7 +601,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
     else
       let sub_ckind = ckind_of_jkind_l sub in
       let super_ckind = ckind_of_jkind_l super in
-      let ik_leq = JK.leq_with_reason solver sub_ckind super_ckind in
+      let ik_leq = JK.leq_with_reason ctx sub_ckind super_ckind in
       match ik_leq with
       | None -> Ok ()
       | Some violating_axes ->
@@ -664,9 +630,9 @@ let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
   if not !Clflags.ikinds
   then Jkind.sub ~type_equal ~context sub super
   else
-    let solver = make_solver ~context in
+    let ctx = make_ctx ~context in
     match
-      JK.leq_with_reason solver (ckind_of_jkind_l sub) (ckind_of_jkind_r super)
+      JK.leq_with_reason ctx (ckind_of_jkind_l sub) (ckind_of_jkind_r super)
     with
     | None -> true
     | Some _ -> false
@@ -677,8 +643,8 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
   if not (enable_crossing && !Clflags.ikinds) (* CR jujacobs: fix this *)
   then Jkind.get_mode_crossing ~context jkind
   else
-    let solver = make_solver ~context in
-    let lat = JK.round_up solver (ckind_of_jkind jkind) in
+    let ctx = make_ctx ~context in
+    let lat = JK.round_up ctx (ckind_of_jkind jkind) in
     let mb = Axis_lattice.to_mod_bounds lat in
     Jkind.Mod_bounds.to_mode_crossing mb
 
@@ -787,8 +753,8 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
   in
   let kind_of_identity = kind_of ~context:dummy_context in
   let env : JK.env = { kind_of = kind_of_identity; lookup } in
-  let solver = JK.make_solver env in
-  let poly = JK.normalize solver (kind_of_identity body)
+  let ctx = JK.create env in
+  let poly = JK.normalize ctx (kind_of_identity body)
   in
   let rigid_vars =
     List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
