@@ -335,7 +335,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: metrics-${{ matrix.name }}
-        path: metrics
+        path: metrics/${{ matrix.name }}/
         retention-days: 1
         if-no-files-found: error
 
@@ -374,12 +374,12 @@ jobs:
         with:
           pattern: metrics-*
           merge-multiple: true
-          path: metrics-bundles
+          path: .
 
       - uses: actions/upload-artifact@v4
         with:
-          name: metrics
-          path: metrics-bundles/metrics
+          name: metrics-combined
+          path: metrics
           if-no-files-found: warn
 
 concurrency:
