@@ -42,7 +42,8 @@
  (targets parser.ml)
  (deps ../../parser.ml)
  (action
-  (with-stdout-to %{targets}
+  (with-stdout-to
+   %{targets}
    (progn
     (echo "module MenhirLib = CamlinternalMenhirLib")
     (cat %{deps})))))
@@ -51,7 +52,8 @@
  (targets parser.mli)
  (deps ../../parser.mli)
  (action
-  (with-stdout-to %{targets}
+  (with-stdout-to
+   %{targets}
    (progn
     (echo "module MenhirLib = CamlinternalMenhirLib")
     (cat %{deps})))))
@@ -188,9 +190,9 @@
 
 (rule
  (action
-   (progn
-     (copy# ../../stdlib/camlinternalQuote.ml camlinternalQuote_bootstrap.ml)
-     (copy# ../../stdlib/camlinternalQuote.mli camlinternalQuote_bootstrap.mli))))
+  (progn
+   (copy# ../../stdlib/camlinternalQuote.ml camlinternalQuote_bootstrap.ml)
+   (copy# ../../stdlib/camlinternalQuote.mli camlinternalQuote_bootstrap.mli))))
 
 (copy_files ../../utils/runtimetags.ml)
 
@@ -573,7 +575,15 @@
 (rule
  (targets dynlink.cma)
  (action
-  (run %{ocamlc} -g -a -ccopt %{read:natdynlinkops} -o dynlink.cma %{deps}))
+  (run
+   %{ocamlc}
+   -g
+   -a
+   -ccopt
+   %{read:../../natdynlinkops}
+   -o
+   dynlink.cma
+   %{deps}))
  (deps
   ; NOTE: Be sure to keep these arguments in dependency order!
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Runtimetags.cmo
@@ -670,7 +680,7 @@
    -g
    -a
    -ccopt
-   %{read:natdynlinkops}
+   %{read:../../natdynlinkops}
    -o
    dynlink.cmxa
    %{deps}))

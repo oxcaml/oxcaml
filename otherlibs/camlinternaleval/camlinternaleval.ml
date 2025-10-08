@@ -21,12 +21,14 @@ let () =
   Clflags.no_cwd := true;
   Clflags.native_code := true;
   Clflags.dont_write_files := true;
-  Clflags.shared := true
+  Clflags.shared := true;
+  Clflags.dlcode := false
+
+external bundled_cmis : unit -> string = "bundled_cmis"
+external bundled_cmxs : unit -> string = "bundled_cmxs"
 
 let () =
-  let marshaled =
-    Obj.obj (Option.get (Jit.jit_lookup_symbol "caml_bundled_cmis"))
-  in
+  let marshaled = bundled_cmis () in
   let bundled_cmis : Cmi_format.cmi_infos Compilation_unit.Name.Map.t =
     Marshal.from_string marshaled 0
   in
@@ -49,9 +51,7 @@ let () =
         (Compilation_unit.Name.Map.find_opt unit_name bundled_cmis)
 
 let cmxs =
-  let marshaled =
-    Obj.obj (Option.get (Jit.jit_lookup_symbol "caml_bundled_cmxs"))
-  in
+  let marshaled = bundled_cmxs () in
   let bundled_cmxs : (Cmx_format.unit_infos_raw * string array) list =
     Marshal.from_string marshaled 0
   in
@@ -118,8 +118,8 @@ let eval code =
 
   (* let () = Compmisc.init_parameters () in *)
   Compilenv.reset unit_info
-    (* TODO: It would be nice to not reset everything here so we don't have to
-       refill the cache. *);
+  (* TODO: It would be nice to not reset everything here so we don't have to
+     refill the cache. *);
   let _ =
     List.for_all
       (fun info ->

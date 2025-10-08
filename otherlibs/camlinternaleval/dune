@@ -24,13 +24,17 @@
  (ocamlopt_flags
   (:include %{project_root}/ocamlopt_flags.sexp))
  (library_flags
-  (:standard -linkall)))
+  (:standard -linkall -ccopt %{read:../../natdynlinkops}))
+ (foreign_stubs
+  (language c)
+  (names eval_stubs)))
 
 (install
  (files
   (.camlinternaleval.objs/native/camlinternaleval.cmx as camlinternaleval.cmx)
   camlinternaleval.cmxa
   camlinternaleval.a
+  libcamlinternaleval_stubs.a
   camlinternaleval.cmxs
   camlinternaleval.cma
   ; (camlinternaleval.mli as camlinternaleval/eval.mli)
