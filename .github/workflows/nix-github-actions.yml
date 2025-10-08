@@ -15,7 +15,7 @@ jobs:
       - id: set-matrix
         name: Generate Nix Matrix
         run: |
-          set -Eeu
+          set -Eeuo pipefail
           nix eval --json '.#githubActions.matrix' |
             jq -c '.include |= map(select(.os | startswith("macos-") | not))' |
             cat <(echo -n matrix=) - >> "$GITHUB_OUTPUT"
