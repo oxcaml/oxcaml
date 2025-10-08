@@ -734,6 +734,9 @@ CFI_STARTPROC
         C_call (GCALL(caml_garbage_collection))
         SWITCH_C_TO_OCAML
         TSAN_EXIT_FUNCTION
+    /* CR aspsmith: document this constant */
+        cmpq    $3, Caml_state(preemption)
+        ja      G(caml_preempt)
         movq    Caml_state(gc_regs), %r15
         movq    Gc_regs_kind(%r15), %r11
         cmpq    $GC_REGS_YMM, %r11
@@ -1367,6 +1370,23 @@ CFI_STARTPROC
         jmp     LBL(do_perform)
 CFI_ENDPROC
 ENDFUNCTION(G(caml_reperform))
+
+FUNCTION(G(caml_preempt))
+CFI_STARTPROC
+        SWITCH_OCAML_TO_C
+        C_call  (GCALL(caml_get_tick_effect)) /* %rax := Tick */
+        SWITCH_C_TO_OCAML
+        movq    Caml_state(preemption), %rbx
+        movq    $1, Caml_state(preemption)
+        movq    Caml_state(current_stack), %rsi /* %rsi := old stack */
+        leaq    1(%rsi), %rdi /* %rdi (last_fiber) := Val_ptr(old stack) */
+        movq    %rdi, 0*8(%rbx) /* Initialise continuation */
+        movq    $0, 1*8(%rbx) /* set last fiber of continuation to NULL */
+        movq    Caml_state(gc_regs), %r12
+        movq    %r12, 2*8(%rbx) /* save gc_regs in continuation */
+        jmp     LBL(do_perform)
+CFI_ENDPROC
+ENDFUNCTION(G(caml_preempt))
 
 FUNCTION(G(caml_resume))
 CFI_STARTPROC
