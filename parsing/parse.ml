@@ -178,10 +178,15 @@ let prepare_error err =
   | Malformed_instance_identifier loc ->
       Location.errorf ~loc
         "Syntax error: Unexpected in module instance"
-  | Quotation_reserved (loc, symb) ->
+  | Unspliceable loc ->
       Location.errorf ~loc
-        "Syntax error: `%s` is reserved for use in runtime metaprogramming."
-        symb
+        "Syntax error: expression cannot be spliced.\n\
+         @{<hint>Hint@}: considering putting parentheses around the \
+         expression."
+  | Unsupported loc ->
+      Location.errorf ~loc
+        "Syntax error: expressions that are quotations of types are \
+         not currently supported."
   | Let_mutable_not_allowed_at_structure_level loc ->
       Location.errorf ~loc
         "Syntax error: Mutable let bindings are not allowed \
