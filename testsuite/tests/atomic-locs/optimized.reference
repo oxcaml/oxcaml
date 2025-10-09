@@ -10,3 +10,5 @@ Or_null atomic get after set to This: This 456
 Float or_null atomic get initial: This 1.23
 Float or_null atomic get after set to Null: Null
 Float or_null atomic get after set to This: This 4.56
+{ padding = #(1, 2, 3); field = 4 }
+{ padding = #(1, 2, 3); field = 5 }

@@ -75,3 +75,25 @@ let test_or_null_atomic () =
 ;;
 
 let () = test_or_null_atomic ()
+
+let test_mixed_blocks () =
+  let open struct
+    type t = {
+      padding : #(int * int * int);
+      mutable field : int [@atomic]
+    }
+
+    let incr_field t = Atomic.Loc.incr [%atomic.loc t.field]
+
+    let print t =
+      let #(x, y, z) = t.padding in
+      Format.printf "{ padding = #(%d, %d, %d); field = %d }@."
+        x y z t.field
+  end in
+  let t = { padding = #(1, 2, 3); field = 4 } in
+  print t;
+  incr_field t;
+  print t
+;;
+
+let () = test_mixed_blocks ()
