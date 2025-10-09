@@ -958,6 +958,10 @@ type module_representation =
   | Module_value_only of int
   | Module_mixed of mixed_block_shape
 
+let module_representation_field_count = function
+  | Module_value_only field_count -> field_count
+  | Module_mixed shape -> Array.length shape
+
 type main_module_block_format =
   | Mb_struct of { mb_repr : module_representation }
   | Mb_instantiating_functor of
@@ -1093,6 +1097,8 @@ let unboxed_vector_of_boxed_vector = function
 (* CR ncourant: use [Ptop] or remove this as soon as possible. *)
 let layout_top = layout_any_value
 let layout_bottom = Pbottom
+
+let mixed_block_element_for_module = Value generic_value
 
 let default_function_attribute = {
   inline = Default_inline;
@@ -1528,7 +1534,8 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
 
 and transl_mixed_product_shape ~get_value_kind shape =
   Array.mapi
-    (fun i elt -> transl_mixed_block_element elt ~value_kind:(get_value_kind i))
+    (fun i elt -> transl_mixed_block_element elt
+      ~value_kind:(lazy (get_value_kind i)))
     shape
 
 let transl_module_representation = function
@@ -1539,18 +1546,23 @@ let transl_module_representation = function
         ~get_value_kind:(fun _ -> generic_value) shape)
         (* CR jrayman: disallow [Float_boxed] *)
 
-let module_representation_of_signature sig_ =
-  sig_
-  |> List.filter_map Env.layout_of_signature_item
-  |> List.map
-       (fun layout -> layout
-                      |> Jkind.Layout.to_sort
-                      |> Option.get (* CR jrayman *)
-                      |> Jkind.Sort.default_for_transl_and_get
-                      |> Types.mixed_block_element_of_const_sort)
-  |> Array.of_list
-  |> Types.module_representation_of_mixed_product_shape
-  |> transl_module_representation
+(* CR jrayman: this is duplicated in includemod *)
+(* let module_representation_of_signature sig_ = *)
+(*   sig_ |> List.filter_map Env.layout_of_signature_item *)
+(*        |> List.map *)
+(*          (fun layout -> *)
+(*             layout *)
+(*             |> Jkind.Layout.to_sort *)
+(*                (1* we already checked that [sig_] is representable *)
+(*                   in [transl_decl_value] *1) *)
+(*             |> Misc.Stdlib.Option.get_or_fatal_error *)
+(*                  ~error:"Includemod.signatures: \ *)
+(*                            unexpected unrepresentable sig item" *)
+(*             |> Jkind.Sort.default_for_transl_and_get *)
+(*             |> Types.mixed_block_element_of_const_sort) *)
+(*        |> Array.of_list *)
+(*        |> Typedecl.module_representation_of_mixed_product_shape *)
+(*        |> transl_module_representation *)
 
 let block_of_module_representation = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
