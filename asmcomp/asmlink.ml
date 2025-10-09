@@ -26,6 +26,7 @@ type error =
   | Dwarf_fission_dsymutil_not_macos
   | Dsymutil_error of int
   | Objcopy_error of int
+  | Cm_bundle_error of Cm_bundle.error
 
 exception Error of error
 
@@ -314,7 +315,7 @@ let call_linker file_list_rev startup_file output_name =
 (* Main entry point *)
 
 let link unix ml_objfiles output_name ~cached_genfns_imports ~genfns
-    ~units_tolink ~ppf_dump : unit =
+    ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump : unit =
   if !Oxcaml_flags.internal_assembler
   then Emitaux.binary_backend_available := true;
   let named_startup_file = named_startup_file () in
@@ -325,6 +326,17 @@ let link unix ml_objfiles output_name ~cached_genfns_imports ~genfns
   in
   let sourcefile_for_dwarf = sourcefile_for_dwarf ~named_startup_file startup in
   let startup_obj = Filename.temp_file "camlstartup" ext_obj in
+  let ml_objfiles =
+    if not uses_eval
+    then ml_objfiles
+    else
+      match
+        Cm_bundle.make_bundled_cm_file unix ~ppf_dump ~quoted_globals
+          ~named_startup_file ~output_name
+      with
+      | exception Cm_bundle.Error error -> raise (Error (Cm_bundle_error error))
+      | bundled_cm_obj -> bundled_cm_obj :: ml_objfiles
+  in
   Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:startup
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
@@ -352,6 +364,13 @@ let report_error ppf = function
     fprintf ppf "Error running dsymutil (exit code %d)" exitcode
   | Objcopy_error exitcode ->
     fprintf ppf "Error running objcopy (exit code %d)" exitcode
+  | Cm_bundle_error (Missing_intf_for_quote intf) ->
+    fprintf ppf "Missing interface for module %a which is required by quote"
+      CU.Name.print intf
+  | Cm_bundle_error (Missing_impl_for_quote impl) ->
+    fprintf ppf
+      "Missing implementation for module %a which is required by quote"
+      CU.Name.print impl
 
 let () =
   Location.register_error_of_exn (function

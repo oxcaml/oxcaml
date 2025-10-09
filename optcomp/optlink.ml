@@ -77,6 +77,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     | Unit (file_name, info, crc) ->
       (* This is a cmx file. It must be linked in any case. *)
       Linkenv.remove_required info.ui_unit;
+      Linkenv.add_quoted_globals info.ui_unit info.ui_quoted_globals;
       List.iter
         (fun import -> Linkenv.add_required (file_name, None) import)
         info.ui_imports_cmx;
@@ -89,7 +90,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               dynu_crc = crc;
               dynu_defines = info.ui_defines;
               dynu_imports_cmi = info.ui_imports_cmi |> Array.of_list;
-              dynu_imports_cmx = info.ui_imports_cmx |> Array.of_list
+              dynu_imports_cmx = info.ui_imports_cmx |> Array.of_list;
+              dynu_quoted_globals = info.ui_quoted_globals |> Array.of_list
             }
       in
       let unit =
@@ -152,6 +154,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                     if Misc.Bitmap.get bits i then Some tbl.(i) else None)
                 |> List.filter_map Fun.id
               in
+              let quoted_globals =
+                imports_list infos.lib_quoted_globals info.li_quoted_globals
+              in
+              Linkenv.add_quoted_globals info.li_name quoted_globals;
               let dynunit : Cmxs_format.dynunit option =
                 if not shared
                 then None
@@ -165,7 +171,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                         |> Array.of_list;
                       dynu_imports_cmx =
                         imports_list infos.lib_imports_cmx info.li_imports_cmx
-                        |> Array.of_list
+                        |> Array.of_list;
+                      dynu_quoted_globals = quoted_globals |> Array.of_list
                     }
               in
               let unit =
@@ -215,17 +222,35 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         let stdlib = "stdlib" ^ Backend.ext_flambda_lib in
         let stdexit = "std_exit" ^ Backend.ext_flambda_obj in
         let objfiles =
-          if !Clflags.nopervasives
+          (* stdlib is added below as part of [early_pervasives], if required *)
+          if !Clflags.nopervasives || !Clflags.output_c_object
           then objfiles
-          else if !Clflags.output_c_object
-          then stdlib :: objfiles
-          else stdlib :: (objfiles @ [stdexit])
+          else objfiles @ [stdexit]
         in
         let genfns = Generic_fns.Tbl.make () in
+        let uses_eval =
+          Linkenv.is_required (Compilation_unit.of_string "Camlinternaleval")
+        in
+        let quoted_globals = Linkenv.get_quoted_globals () in
+        let needs_metaprogramming =
+          uses_eval || not (CU.Name.Set.is_empty quoted_globals)
+        in
+        if needs_metaprogramming && not Backend.supports_metaprogramming
+        then
+          raise
+            (Linkenv.Error
+               (Metaprogramming_not_supported_by_backend output_name));
+        let stdlib_and_support_files_for_eval =
+          if !Clflags.nopervasives
+          then []
+          else
+            stdlib
+            :: (if uses_eval then Backend.support_files_for_eval () else [])
+        in
         let ml_objfiles, units_tolink, cached_genfns_imports =
           List.fold_right
             (scan_file ~shared:false genfns)
-            objfiles
+            (stdlib_and_support_files_for_eval @ objfiles)
             ([], [], Generic_fns.Partition.Set.empty)
         in
         (if not shared
@@ -237,7 +262,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
         (* put user's opts first *)
         Backend.link ml_objfiles output_name ~ppf_dump ~genfns ~units_tolink
-          ~cached_genfns_imports)
+          ~uses_eval ~quoted_globals ~cached_genfns_imports)
 
   (* Exported version for Asmlibrarian / Asmpackager *)
   let check_consistency file_name u crc =

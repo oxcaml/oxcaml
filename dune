@@ -508,6 +508,7 @@
   ;; asmcomp/
   asmgen
   asmlink
+  cm_bundle
   linkenv
   optlink
   ;; backend/

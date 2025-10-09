@@ -61,6 +61,10 @@ val add_required : filepath * CU.Name.t option -> Import_info.t -> unit
 
 val remove_required : CU.t -> unit
 
+val add_quoted_globals : CU.t -> CU.Name.t list -> unit
+
+val get_quoted_globals : unit -> CU.Name.Set.t
+
 val extract_missing_globals : unit -> (CU.t * filepath list) list
 
 val check_cmi_consistency : filepath -> Import_info.t array -> unit
@@ -80,5 +84,6 @@ type error =
   | Missing_cmx of filepath * Compilation_unit.t
   | Linking_error of int
   | Archiver_error of string
+  | Metaprogramming_not_supported_by_backend of filepath
 
 exception Error of error
