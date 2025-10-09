@@ -76,22 +76,22 @@ val assigned_to_stack : t -> bool
 
 val clear_debug_info : t -> t
 
-module Set_distinguishing_names_and_locations : Set.S with type elt = t
-
-module Map_distinguishing_names_and_locations : Map.S with type key = t
-
 module Set : sig
   include Set.S with type elt = t
+
+  val print : Format.formatter -> t -> unit
 
   val of_array : reg_with_debug_info array -> t
 
   val mem_reg : t -> Reg.t -> bool
 
+  val mem_reg_by_loc : t -> Reg.t -> bool
+
   val find_reg_exn : t -> Reg.t -> reg_with_debug_info
 
   val find_reg_with_same_location_exn : t -> Reg.t -> reg_with_debug_info
 
-  val filter_reg : t -> Reg.t -> t
+  val filter_reg_by_loc : t -> Reg.t -> t
 
   val forget_debug_info : t -> Reg.Set.t
 
@@ -103,6 +103,30 @@ module Set : sig
       registers.) *)
   val made_unavailable_by_clobber : t -> regs_clobbered:Reg.t array -> t
 end
+
+module Set_distinguishing_names_and_locations : sig
+  include Stdlib.Set.S with type elt = t
+
+  val forget_debug_info : t -> Reg.Set.t
+
+  val of_set : Set.t -> t
+
+  val to_set : t -> Set.t
+
+  val mem_reg_by_loc : t -> Reg.t -> bool
+
+  val filter_reg_by_loc : t -> Reg.t -> t
+
+  val without_debug_info : Reg.Set.t -> t
+
+  val made_unavailable_by_clobber : t -> regs_clobbered:Reg.t array -> t
+
+  val print : Format.formatter -> t -> unit
+
+  val find_reg_with_same_location_exn : t -> Reg.t -> elt
+end
+
+module Map_distinguishing_names_and_locations : Map.S with type key = t
 
 val print :
   print_reg:(Format.formatter -> Reg.t -> unit) -> Format.formatter -> t -> unit

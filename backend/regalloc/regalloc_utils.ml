@@ -117,8 +117,8 @@ module Instruction = struct
       stack_offset = -1;
       id = InstructionId.none;
       irc_work_list = Unknown_list;
-      available_before = None;
-      available_across = None
+      available_before = Reg_availability_set.Unreachable;
+      available_across = Reg_availability_set.Unreachable
     }
 
   let compare (left : t) (right : t) : int =

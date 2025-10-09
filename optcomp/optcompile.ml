@@ -239,6 +239,8 @@ let native unix
   (module Make (struct
     let backend = Compile_common.Native
 
+    let supports_metaprogramming = true
+
     let ext_asm = Config.ext_asm
 
     let ext_obj = Config.ext_obj
@@ -279,4 +281,22 @@ let native unix
         ~pipeline:
           (Direct_to_cmm (lambda_to_cmm ~machine_width ~keep_symbol_tables))
         ~sourcefile ~prefixname ~ppf_dump program
+
+    let extra_load_paths_for_eval =
+      ["unix"; "compiler-libs"; "ocaml-jit"; "eval"]
+
+    let extra_libraries_for_eval =
+      [ "unix/unix";
+        "compiler-libs/ocamlcommon";
+        "compiler-libs/ocamloptcomp";
+        "ocaml-jit/jit";
+        "eval/camlinternaleval" ]
+
+    let support_files_for_eval () =
+      List.iter
+        (fun lib ->
+          Load_path.add_dir ~hidden:false
+            (Misc.expand_directory Config.standard_library ("+" ^ lib)))
+        extra_load_paths_for_eval;
+      List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval
   end) : S)

@@ -40,8 +40,21 @@ type error =
   | Missing_cmx of filepath * Compilation_unit.t
   | Linking_error of int
   | Archiver_error of string
+  | Metaprogramming_not_supported_by_backend of filepath
 
 exception Error of error
+
+(* Globals for quotations *)
+
+let quoted_globals = ref CU.Name.Set.empty
+
+let add_quoted_globals globals =
+  quoted_globals
+    := List.fold_left
+         (fun globals global -> CU.Name.Set.add global globals)
+         !quoted_globals globals
+
+let get_quoted_globals () = !quoted_globals
 
 (* Consistency check between interfaces and implementations: *)
 
@@ -178,7 +191,8 @@ let reset () =
   CU.Name.Tbl.reset interfaces;
   implementations := [];
   lib_ccobjs := [];
-  lib_ccopts := []
+  lib_ccopts := [];
+  quoted_globals := CU.Name.Set.empty
 
 let assume_no_prefix modname =
   (* We're the linker, so we assume that everything's already been packed, so no
@@ -263,6 +277,11 @@ let report_error ppf = function
     fprintf ppf "Error during linking (exit code %d)" exitcode
   | Archiver_error name ->
     fprintf ppf "Error while creating the library %s" name
+  | Metaprogramming_not_supported_by_backend filename ->
+    fprintf ppf
+      "@[<hov>The file %a@ can only be compiled with a backend with support \
+       for metaprogramming@]"
+      Location.print_filename filename
 
 let () =
   Location.register_error_of_exn (function

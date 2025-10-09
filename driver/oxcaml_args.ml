@@ -333,6 +333,11 @@ let mk_ddebug_invariants f =
     Arg.Unit f,
     " Run invariant checks during generation of debugging information" )
 
+let mk_ddebug_available_regs f =
+  ( "-ddebug-available-regs",
+    Arg.Unit f,
+    " Enable debug output for available registers analysis" )
+
 let mk_ddwarf_types f =
   ("-ddwarf-types", Arg.Unit f, " Enable debug output for DWARF type generation")
 
@@ -963,6 +968,7 @@ module type Oxcaml_options = sig
   val davail : unit -> unit
   val dranges : unit -> unit
   val ddebug_invariants : unit -> unit
+  val ddebug_available_regs : unit -> unit
   val ddwarf_types : unit -> unit
   val ddwarf_metrics : unit -> unit
   val dcfg : unit -> unit
@@ -1095,6 +1101,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_davail F.davail;
       mk_dranges F.dranges;
       mk_ddebug_invariants F.ddebug_invariants;
+      mk_ddebug_available_regs F.ddebug_available_regs;
       mk_ddwarf_types F.ddwarf_types;
       mk_ddwarf_metrics F.ddwarf_metrics;
       mk_ocamlcfg F.ocamlcfg;
@@ -1308,6 +1315,7 @@ module Oxcaml_options_impl = struct
   let davail = set' Oxcaml_flags.davail
   let dranges = set' Oxcaml_flags.dranges
   let ddebug_invariants = set' Dwarf_flags.ddebug_invariants
+  let ddebug_available_regs = set' Dwarf_flags.ddebug_available_regs
   let ddwarf_types = set' Dwarf_flags.ddwarf_types
   let ddwarf_metrics = set' Dwarf_flags.ddwarf_metrics
   let heap_reduction_threshold x = Oxcaml_flags.heap_reduction_threshold := x
@@ -1743,6 +1751,7 @@ module Extra_params = struct
     | "davail" -> set' Oxcaml_flags.davail
     | "dranges" -> set' Oxcaml_flags.dranges
     | "ddebug-invariants" -> set' Dwarf_flags.ddebug_invariants
+    | "ddebug-available-regs" -> set' Dwarf_flags.ddebug_available_regs
     | "ddwarf-types" -> set' Dwarf_flags.ddwarf_types
     | "ddwarf-metrics" -> set' Dwarf_flags.ddwarf_metrics
     | "reorder-blocks-random" ->

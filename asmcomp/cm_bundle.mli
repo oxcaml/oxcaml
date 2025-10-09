@@ -1,6 +1,5 @@
 (******************************************************************************
  *                                  OxCaml                                    *
- *                        Jacob Van Buren, Jane Street                        *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
@@ -26,69 +25,18 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open Format
-open Cmx_format
-open Compilenv
+(* CR mshinwell: This file has not been code reviewed *)
 
-type emit = Compile_common.info -> unit
+type error = private
+  | Missing_intf_for_quote of Compilation_unit.Name.t
+  | Missing_impl_for_quote of Compilation_unit.Name.t
 
-module type File_extensions = sig
-  (** File extensions include exactly one dot, so they can be added with regular string
-      append, and removed by Filename.strip_extension *)
+exception Error of error
 
-  val ext_obj : string
-
-  val ext_lib : string
-
-  val ext_flambda_obj : string
-
-  val ext_flambda_lib : string
-
-  (** Name of executable produced by linking if none is given with -o,
-      e.g. [a.out] under Unix. *)
-  val default_executable_name : string
-end
-
-module type Backend = sig
-  val backend : Compile_common.opt_backend
-
-  val supports_metaprogramming : bool
-
-  val link_shared :
-    string list ->
-    string ->
-    genfns:Generic_fns.Tbl.t ->
-    units_tolink:Linkenv.unit_link_info list ->
-    ppf_dump:Format.formatter ->
-    unit
-
-  val link :
-    string list ->
-    string ->
-    cached_genfns_imports:Generic_fns.Partition.Set.t ->
-    genfns:Generic_fns.Tbl.t ->
-    units_tolink:Linkenv.unit_link_info list ->
-    uses_eval:bool ->
-    quoted_globals:Compilation_unit.Name.Set.t ->
-    ppf_dump:Format.formatter ->
-    unit
-
-  val link_partial : string -> string list -> unit
-
-  val create_archive : string -> string list -> unit
-
-  val compile_implementation :
-    keep_symbol_tables:bool ->
-    sourcefile:string option ->
-    prefixname:string ->
-    ppf_dump:Format.formatter ->
-    Lambda.program ->
-    unit
-
-  val emit : emit option
-
-  (** This function may have the side effect of updating the load path. *)
-  val support_files_for_eval : unit -> string list
-
-  include File_extensions
-end
+val make_bundled_cm_file :
+  (module Compiler_owee.Unix_intf.S) ->
+  ppf_dump:Format.formatter ->
+  quoted_globals:Compilation_unit.Name.Set.t ->
+  output_name:string ->
+  named_startup_file:bool ->
+  string
