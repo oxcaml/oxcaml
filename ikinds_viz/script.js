@@ -8,6 +8,7 @@
   const zoomOutBtn = document.getElementById('zoom-out');
   const zoomResetBtn = document.getElementById('zoom-reset');
   const toggleDarkBtn = document.getElementById('toggle-dark');
+  const toggleInactiveBtn = document.getElementById('toggle-inactive');
   const depsList = document.getElementById('dependencies-list');
   const depsSection = document.getElementById('dependencies-section');
   const depsntsList = document.getElementById('dependents-list');
@@ -25,6 +26,18 @@
 
   const elk = new ELK();
   const arrowsPointForward = false;
+  const baseNodeWidth = 230;
+  const baseNodeHeight = 58;
+  const margin = 40;
+
+  const inactiveNodes = new Set(
+    (data.nodes || [])
+      .filter((node) => node.inactive)
+      .map((node) => node.id)
+  );
+
+  let hideInactive = false;
+  let currentSearchQuery = '';
 
   let zoomLevel = 1;
   let panX = 0;
@@ -33,78 +46,17 @@
   let dragStartX = 0;
   let dragStartY = 0;
 
-  const baseNodeWidth = 230;
-  const baseNodeHeight = 58;
+  let mainGroup = null;
+  let nodeGroup = null;
+  let edgeGroup = null;
 
-  const edgeMeta = new Map();
-  const nodeDeps = new Map();
-  const nodeDepnts = new Map();
-
-  data.nodes.forEach(node => {
-    nodeDeps.set(node.id, []);
-    nodeDepnts.set(node.id, []);
-  });
-
-  data.edges.forEach((edge) => {
-    const id = `${edge.source}→${edge.target}`;
-    edgeMeta.set(id, edge);
-    nodeDeps.get(edge.source)?.push(edge.target);
-    nodeDepnts.get(edge.target)?.push(edge.source);
-  });
-
-  function getTransitiveDependencies(nodeId, visited = new Set()) {
-    if (visited.has(nodeId)) return visited;
-    visited.add(nodeId);
-    const deps = nodeDeps.get(nodeId) || [];
-    deps.forEach(dep => getTransitiveDependencies(dep, visited));
-    return visited;
-  }
-
-  const rootedNodes = new Set();
-  data.nodes.forEach(node => {
-    if (!node.id.startsWith('typing/ikinds/')) {
-      const reachable = getTransitiveDependencies(node.id);
-      reachable.forEach(id => rootedNodes.add(id));
-    }
-  });
-
-  const elkGraph = {
-    id: 'ikinds-graph',
-    layoutOptions: {
-      'elk.algorithm': 'layered',
-      'elk.direction': 'UP',
-      'elk.layered.unnecessaryBendpoints': 'true',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '80',
-      'elk.spacing.nodeNode': '32',
-      'elk.spacing.componentComponent': '80',
-      'elk.margin': '[top=20,left=20,bottom=20,right=20]'
-    },
-    children: data.nodes.map((node) => ({
-      id: node.id,
-      width: Math.max(baseNodeWidth, node.label.length * 7),
-      height: baseNodeHeight
-    })),
-    edges: data.edges.map((edge, index) => ({
-      id: `${edge.source}→${edge.target}`,
-      sources: [edge.source],
-      targets: [edge.target]
-    }))
-  };
-
-  let layout;
-  try {
-    layout = await elk.layout(elkGraph);
-  } catch (err) {
-    console.error('Failed to compute layout with ELK', err);
-    infoTitle.textContent = 'Layout error';
-    infoBody.textContent = 'Could not compute layout with ELK. See console for details.';
-    return;
-  }
-
-  const margin = 40;
-  const width = layout.width + margin * 2;
-  const height = layout.height + margin * 2;
-  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  let nodeElements = new Map();
+  let edgeElements = new Map();
+  let adjacency = new Map();
+  let nodeDeps = new Map();
+  let nodeDepnts = new Map();
+  let rootedNodes = new Set();
+  let visibleNodes = new Map();
 
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
   const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
@@ -124,26 +76,20 @@
   defs.appendChild(marker);
   svg.appendChild(defs);
 
-  const mainGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  const edgeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  const labelGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  labelGroup.setAttribute('class', 'edge-labels');
-
-  mainGroup.appendChild(edgeGroup);
-  mainGroup.appendChild(labelGroup);
-  mainGroup.appendChild(nodeGroup);
-  svg.appendChild(mainGroup);
-
-  const nodeElements = new Map();
-  const edgeElements = new Map();
-  const adjacency = new Map();
-
   function offsetX(x) {
     return margin + x;
   }
+
   function offsetY(y) {
     return margin + y;
+  }
+
+  function applyTransform() {
+    if (!mainGroup) return;
+    mainGroup.setAttribute(
+      'transform',
+      `translate(${panX}, ${panY}) scale(${zoomLevel})`
+    );
   }
 
   function registerEdgeAdjacency(source, target, edgeId) {
@@ -153,94 +99,26 @@
     adjacency.get(target).add(edgeId);
   }
 
-  const childLookup = new Map();
-  layout.children?.forEach((child) => {
-    childLookup.set(child.id, child);
-  });
-
-  layout.edges?.forEach((edge) => {
-    const meta = edgeMeta.get(edge.id);
-    if (!meta) return;
-
-    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    const isRooted = rootedNodes.has(meta.source) && rootedNodes.has(meta.target);
-    const classes = ['edge'];
-    if (!isRooted) classes.push('unrooted');
-    group.setAttribute('class', classes.join(' '));
-    group.dataset.edgeId = edge.id;
-    group.dataset.source = meta.source;
-    group.dataset.target = meta.target;
-    if (meta.info) group.dataset.info = meta.info;
-
-    const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    polyline.setAttribute('class', 'edge-main');
-    polyline.setAttribute('stroke-linecap', 'round');
-
-    const section = edge.sections?.[0];
-    if (section) {
-      const rawPoints = [section.startPoint, ...(section.bendPoints || []), section.endPoint];
-      const drawPoints = arrowsPointForward ? rawPoints : rawPoints.slice().reverse();
-      const pointsAttr = drawPoints
-        .map((pt) => `${offsetX(pt.x)},${offsetY(pt.y)}`)
-        .join(' ');
-
-      const hitPolyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-      hitPolyline.setAttribute('points', pointsAttr);
-      hitPolyline.setAttribute('class', 'edge-hit');
-      hitPolyline.setAttribute('stroke-linecap', 'round');
-      hitPolyline.setAttribute('pointer-events', 'stroke');
-      group.appendChild(hitPolyline);
-
-      polyline.setAttribute('points', pointsAttr);
-      polyline.setAttribute('marker-end', 'url(#arrowhead)');
-      group.appendChild(polyline);
-      edgeGroup.appendChild(group);
-      edgeElements.set(edge.id, group);
-      registerEdgeAdjacency(meta.source, meta.target, edge.id);
-    }
-
-    group.addEventListener('mouseenter', () => focusEdge(edge.id));
-    group.addEventListener('mouseleave', clearFocus);
-  });
-
-  data.nodes.forEach((node) => {
-    const layoutNode = childLookup.get(node.id);
-    if (!layoutNode) return;
-
-    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    const isRooted = rootedNodes.has(node.id);
-    const classes = ['node'];
-    if (!isRooted) classes.push('unrooted');
-    if (node.id.startsWith('typing/ikinds/')) classes.push('ikind');
-    group.setAttribute('class', classes.join(' '));
-    group.dataset.nodeId = node.id;
-    if (node.info) group.dataset.info = node.info;
-
-    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rect.setAttribute('x', offsetX(layoutNode.x));
-    rect.setAttribute('y', offsetY(layoutNode.y));
-    rect.setAttribute('width', layoutNode.width);
-    rect.setAttribute('height', layoutNode.height);
-
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', offsetX(layoutNode.x) + layoutNode.width / 2);
-    text.setAttribute('y', offsetY(layoutNode.y) + layoutNode.height / 2);
-    text.setAttribute('text-anchor', 'middle');
-    text.textContent = node.label;
-
-    group.appendChild(rect);
-    group.appendChild(text);
-
-    nodeGroup.appendChild(group);
-    nodeElements.set(node.id, group);
-
-    group.addEventListener('mouseenter', () => focusNode(node.id));
-    group.addEventListener('mouseleave', clearFocus);
-  });
+  function clearClasses() {
+    nodeElements.forEach((el) => el.classList.remove('highlight', 'active'));
+    edgeElements.forEach((el) => el.classList.remove('highlight'));
+  }
 
   function setInfo(title, body) {
     infoTitle.textContent = title;
     infoBody.textContent = body || '';
+  }
+
+  function clearFocus() {
+    clearClasses();
+    depsSection.style.display = 'none';
+    depsntsSection.style.display = 'none';
+     depsList.replaceChildren();
+     depsntsList.replaceChildren();
+    setInfo(
+      'Browse dependencies',
+      'Hover nodes or edges to inspect how Ikinds modules connect.'
+    );
   }
 
   function focusNode(nodeId) {
@@ -254,35 +132,53 @@
       const edgeEl = edgeElements.get(edgeId);
       if (!edgeEl) return;
       edgeEl.classList.add('highlight');
-      const otherId = edgeEl.dataset.source === nodeId ? edgeEl.dataset.target : edgeEl.dataset.source;
+      const otherId =
+        edgeEl.dataset.source === nodeId
+          ? edgeEl.dataset.target
+          : edgeEl.dataset.source;
       const otherNode = nodeElements.get(otherId);
       if (otherNode) otherNode.classList.add('highlight');
     });
 
     const info = nodeEl.dataset.info || 'No additional details available.';
-    setInfo(nodeId, info);
+    const label = visibleNodes.get(nodeId)?.label || nodeId;
+    setInfo(label, info);
 
     const deps = nodeDeps.get(nodeId) || [];
     const depnts = nodeDepnts.get(nodeId) || [];
 
     if (deps.length > 0) {
       depsSection.style.display = 'block';
-      depsList.innerHTML = deps.map(d => `<div data-node="${d}">${d}</div>`).join('');
-      depsList.querySelectorAll('div').forEach(el => {
-        el.addEventListener('click', () => focusNode(el.dataset.node));
+      const fragment = document.createDocumentFragment();
+      deps.forEach((dep) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.node = dep;
+        button.textContent = dep;
+        button.addEventListener('click', () => focusNode(dep));
+        fragment.appendChild(button);
       });
+      depsList.replaceChildren(fragment);
     } else {
       depsSection.style.display = 'none';
+      depsList.replaceChildren();
     }
 
     if (depnts.length > 0) {
       depsntsSection.style.display = 'block';
-      depsntsList.innerHTML = depnts.map(d => `<div data-node="${d}">${d}</div>`).join('');
-      depsntsList.querySelectorAll('div').forEach(el => {
-        el.addEventListener('click', () => focusNode(el.dataset.node));
+      const fragment = document.createDocumentFragment();
+      depnts.forEach((dep) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.node = dep;
+        button.textContent = dep;
+        button.addEventListener('click', () => focusNode(dep));
+        fragment.appendChild(button);
       });
+      depsntsList.replaceChildren(fragment);
     } else {
       depsntsSection.style.display = 'none';
+      depsntsList.replaceChildren();
     }
   }
 
@@ -296,54 +192,255 @@
     if (srcNode) srcNode.classList.add('highlight');
     if (dstNode) dstNode.classList.add('highlight');
 
-    const label = edgeEl.dataset.label;
     const info = edgeEl.dataset.info || 'Dependency edge';
-    const parts = arrowsPointForward
-      ? [`${edgeEl.dataset.source} → ${edgeEl.dataset.target}`]
-      : [`${edgeEl.dataset.source} ← ${edgeEl.dataset.target}`];
-    if (label) {
-      parts[0] += ` (${label})`;
-    }
-    const title = parts[0];
+    const title = arrowsPointForward
+      ? `${edgeEl.dataset.source} → ${edgeEl.dataset.target}`
+      : `${edgeEl.dataset.source} ← ${edgeEl.dataset.target}`;
     setInfo(title, info);
   }
 
-  function clearClasses() {
-    nodeElements.forEach((el) => el.classList.remove('highlight', 'active'));
-    edgeElements.forEach((el) => el.classList.remove('highlight'));
-  }
-
-  function clearFocus() {
-    clearClasses();
-    setInfo(
-      'Ikinds dependency graph',
-      'Hover nodes or edges to inspect how ikinds modules relate. Arrows point from a dependency toward the module that relies on it. Dashed edges capture hacks such as Obj.magic bridges or identity environments.'
-    );
-    depsSection.style.display = 'none';
-    depsntsSection.style.display = 'none';
-  }
-
-  function applyTransform() {
-    const mainGroup = svg.querySelector('g');
-    if (mainGroup) {
-      mainGroup.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
-      mainGroup.style.transformOrigin = '0 0';
+  function applySearchFilter(query) {
+    currentSearchQuery = query;
+    const q = query.trim().toLowerCase();
+    if (!q) {
+      nodeElements.forEach((el) => el.classList.remove('hidden'));
+      edgeElements.forEach((el) => el.classList.remove('hidden'));
+      return;
     }
+
+    const matches = new Set();
+    nodeElements.forEach((_, id) => {
+      const node = visibleNodes.get(id);
+      const haystack = `${id} ${(node?.label || '')}`.toLowerCase();
+      if (haystack.includes(q)) matches.add(id);
+    });
+
+    nodeElements.forEach((el, id) => {
+      el.classList.toggle('hidden', !matches.has(id));
+    });
+
+    edgeElements.forEach((el) => {
+      const src = el.dataset.source;
+      const tgt = el.dataset.target;
+      const visible = matches.has(src) && matches.has(tgt);
+      el.classList.toggle('hidden', !visible);
+    });
+  }
+
+  async function renderGraph() {
+    const filteredNodes = hideInactive
+      ? data.nodes.filter((node) => !inactiveNodes.has(node.id))
+      : data.nodes.slice();
+    const activeNodeIds = new Set(filteredNodes.map((node) => node.id));
+    const filteredEdges = data.edges.filter(
+      (edge) =>
+        activeNodeIds.has(edge.source) && activeNodeIds.has(edge.target)
+    );
+
+    nodeElements = new Map();
+    edgeElements = new Map();
+    adjacency = new Map();
+    nodeDeps = new Map();
+    nodeDepnts = new Map();
+    rootedNodes = new Set();
+    visibleNodes = new Map();
+
+    filteredNodes.forEach((node) => {
+      nodeDeps.set(node.id, []);
+      nodeDepnts.set(node.id, []);
+      visibleNodes.set(node.id, node);
+    });
+
+    filteredEdges.forEach((edge) => {
+      nodeDeps.get(edge.source)?.push(edge.target);
+      nodeDepnts.get(edge.target)?.push(edge.source);
+    });
+
+    const memo = new Map();
+    function getTransitiveDependencies(nodeId) {
+      if (memo.has(nodeId)) return memo.get(nodeId);
+      const visited = new Set([nodeId]);
+      const deps = nodeDeps.get(nodeId) || [];
+      deps.forEach((dep) => {
+        getTransitiveDependencies(dep).forEach((v) => visited.add(v));
+      });
+      memo.set(nodeId, visited);
+      return visited;
+    }
+
+    filteredNodes.forEach((node) => {
+      if (!node.id.startsWith('typing/ikinds/')) {
+        getTransitiveDependencies(node.id).forEach((id) =>
+          rootedNodes.add(id)
+        );
+      }
+    });
+
+    const elkGraph = {
+      id: 'ikinds-graph',
+      layoutOptions: {
+        'elk.algorithm': 'layered',
+        'elk.direction': 'UP',
+        'elk.layered.unnecessaryBendpoints': 'true',
+        'elk.layered.spacing.nodeNodeBetweenLayers': '80',
+        'elk.spacing.nodeNode': '32',
+        'elk.spacing.componentComponent': '80',
+        'elk.margin': `[top=${margin},left=${margin},bottom=${margin},right=${margin}]`
+      },
+      children: filteredNodes.map((node) => ({
+        id: node.id,
+        width: Math.max(baseNodeWidth, node.label.length * 7),
+        height: baseNodeHeight
+      })),
+      edges: filteredEdges.map((edge) => ({
+        id: `${edge.source}→${edge.target}`,
+        sources: [edge.source],
+        targets: [edge.target]
+      }))
+    };
+
+    let layout;
+    try {
+      layout = await elk.layout(elkGraph);
+    } catch (err) {
+      console.error('Failed to compute layout with ELK', err);
+      setInfo('Layout error', 'Could not compute layout. See console for details.');
+      return;
+    }
+
+    const width = layout.width + margin * 2;
+    const height = layout.height + margin * 2;
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    if (mainGroup) {
+      svg.removeChild(mainGroup);
+    }
+
+    mainGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    edgeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    mainGroup.appendChild(edgeGroup);
+    mainGroup.appendChild(nodeGroup);
+    svg.appendChild(mainGroup);
+
+    const childLookup = new Map();
+    layout.children?.forEach((child) => {
+      childLookup.set(child.id, child);
+    });
+
+    const layoutEdgeLookup = new Map();
+    layout.edges?.forEach((edge) => {
+      layoutEdgeLookup.set(edge.id, edge);
+    });
+
+    filteredEdges.forEach((edge) => {
+      const layoutEdge = layoutEdgeLookup.get(`${edge.source}→${edge.target}`);
+      if (!layoutEdge) return;
+
+      const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      const isRooted =
+        rootedNodes.has(edge.source) && rootedNodes.has(edge.target);
+      const classes = ['edge'];
+      if (!isRooted) classes.push('unrooted');
+      if (inactiveNodes.has(edge.source) || inactiveNodes.has(edge.target)) {
+        classes.push('inactive');
+      }
+      group.setAttribute('class', classes.join(' '));
+      const edgeId = `${edge.source}→${edge.target}`;
+      group.dataset.edgeId = edgeId;
+      group.dataset.source = edge.source;
+      group.dataset.target = edge.target;
+      if (edge.info) group.dataset.info = edge.info;
+
+      const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      polyline.setAttribute('class', 'edge-main');
+      polyline.setAttribute('stroke-linecap', 'round');
+
+      const section = layoutEdge.sections?.[0];
+      if (section) {
+        const rawPoints = [
+          section.startPoint,
+          ...(section.bendPoints || []),
+          section.endPoint
+        ];
+        const drawPoints = arrowsPointForward
+          ? rawPoints
+          : rawPoints.slice().reverse();
+        const pointsAttr = drawPoints
+          .map((pt) => `${offsetX(pt.x)},${offsetY(pt.y)}`)
+          .join(' ');
+
+        const hitPolyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        hitPolyline.setAttribute('points', pointsAttr);
+        hitPolyline.setAttribute('class', 'edge-hit');
+        hitPolyline.setAttribute('stroke-linecap', 'round');
+        hitPolyline.setAttribute('pointer-events', 'stroke');
+        group.appendChild(hitPolyline);
+
+        polyline.setAttribute('points', pointsAttr);
+        polyline.setAttribute('marker-end', 'url(#arrowhead)');
+        group.appendChild(polyline);
+        edgeGroup.appendChild(group);
+        edgeElements.set(edgeId, group);
+        registerEdgeAdjacency(edge.source, edge.target, edgeId);
+
+        group.addEventListener('mouseenter', () => focusEdge(edgeId));
+        group.addEventListener('mouseleave', clearFocus);
+      }
+    });
+
+    filteredNodes.forEach((node) => {
+      const layoutNode = childLookup.get(node.id);
+      if (!layoutNode) return;
+
+      const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      const isRooted = rootedNodes.has(node.id);
+      const classes = ['node'];
+      if (!isRooted) classes.push('unrooted');
+      if (node.id.startsWith('typing/ikinds/')) classes.push('ikind');
+      if (inactiveNodes.has(node.id)) classes.push('inactive');
+      group.setAttribute('class', classes.join(' '));
+      group.dataset.nodeId = node.id;
+      if (node.info) group.dataset.info = node.info;
+
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', offsetX(layoutNode.x));
+      rect.setAttribute('y', offsetY(layoutNode.y));
+      rect.setAttribute('width', layoutNode.width);
+      rect.setAttribute('height', layoutNode.height);
+
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', offsetX(layoutNode.x) + layoutNode.width / 2);
+      text.setAttribute('y', offsetY(layoutNode.y) + layoutNode.height / 2);
+      text.setAttribute('text-anchor', 'middle');
+      text.textContent = node.label;
+
+      group.appendChild(rect);
+      group.appendChild(text);
+      nodeGroup.appendChild(group);
+      nodeElements.set(node.id, group);
+
+      group.addEventListener('mouseenter', () => focusNode(node.id));
+      group.addEventListener('mouseleave', clearFocus);
+    });
+
+    zoomLevel = 1;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+
+    applySearchFilter(currentSearchQuery);
+    clearFocus();
   }
 
   function handleZoom(delta) {
-    const oldZoom = zoomLevel;
-    zoomLevel = Math.max(0.25, Math.min(4, zoomLevel + delta));
-    const rect = svg.getBoundingClientRect();
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    panX = centerX - (centerX - panX) * (zoomLevel / oldZoom);
-    panY = centerY - (centerY - panY) * (zoomLevel / oldZoom);
+    const nextZoom = Math.min(Math.max(zoomLevel + delta, 0.2), 2.5);
+    zoomLevel = nextZoom;
     applyTransform();
   }
 
-  zoomInBtn.addEventListener('click', () => handleZoom(0.2));
-  zoomOutBtn.addEventListener('click', () => handleZoom(-0.2));
+  zoomInBtn.addEventListener('click', () => handleZoom(0.1));
+  zoomOutBtn.addEventListener('click', () => handleZoom(-0.1));
   zoomResetBtn.addEventListener('click', () => {
     zoomLevel = 1;
     panX = 0;
@@ -378,38 +475,7 @@
   });
 
   searchInput.addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase();
-    if (!query) {
-      nodeElements.forEach(el => el.classList.remove('hidden'));
-      edgeElements.forEach(el => el.classList.remove('hidden'));
-      return;
-    }
-
-    const matches = new Set();
-    data.nodes.forEach(node => {
-      if (node.id.toLowerCase().includes(query) ||
-          node.label.toLowerCase().includes(query)) {
-        matches.add(node.id);
-      }
-    });
-
-    nodeElements.forEach((el, id) => {
-      if (matches.has(id)) {
-        el.classList.remove('hidden');
-      } else {
-        el.classList.add('hidden');
-      }
-    });
-
-    edgeElements.forEach((el, id) => {
-      const src = el.dataset.source;
-      const tgt = el.dataset.target;
-      if (matches.has(src) && matches.has(tgt)) {
-        el.classList.remove('hidden');
-      } else {
-        el.classList.add('hidden');
-      }
-    });
+    applySearchFilter(e.target.value || '');
   });
 
   toggleDarkBtn.addEventListener('click', () => {
@@ -418,5 +484,16 @@
     body.setAttribute('data-theme', isDark ? '' : 'dark');
   });
 
-  clearFocus();
+  toggleInactiveBtn?.addEventListener('click', async () => {
+    hideInactive = !hideInactive;
+    toggleInactiveBtn.setAttribute('aria-pressed', hideInactive ? 'true' : 'false');
+    toggleInactiveBtn.classList.toggle('active', hideInactive);
+    toggleInactiveBtn.textContent = hideInactive ? 'Show unused' : 'Hide unused';
+    toggleInactiveBtn.title = hideInactive
+      ? 'Show unused Ikinds modules'
+      : 'Hide unused Ikinds modules';
+    await renderGraph();
+  });
+
+  await renderGraph();
 })();

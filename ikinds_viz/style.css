@@ -82,8 +82,9 @@ a {
 }
 
 .controls button {
-  width: 36px;
+  min-width: 36px;
   height: 36px;
+  padding: 0 12px;
   border: 1px solid var(--control-border);
   border-radius: 6px;
   background: var(--control-bg);
@@ -99,6 +100,12 @@ a {
 .controls button:hover {
   background: var(--accent-soft);
   border-color: var(--accent);
+}
+
+.controls button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
 }
 
 #viz-container svg {
@@ -158,6 +165,20 @@ svg {
   pointer-events: none;
 }
 
+.node.inactive {
+  opacity: 0.4;
+}
+
+.node.inactive text {
+  opacity: 0.75;
+}
+
+.node.inactive:hover,
+.node.inactive.highlight,
+.node.inactive.active {
+  opacity: 1;
+}
+
 .node.ikind rect {
   fill: var(--accent-soft);
   stroke: var(--accent);
@@ -181,6 +202,11 @@ svg {
   stroke-width: 1.8;
   opacity: 0.85;
   transition: stroke 0.15s ease, stroke-width 0.15s ease, opacity 0.15s ease;
+}
+
+.edge.inactive path,
+.edge.inactive .edge-main {
+  opacity: 0.3;
 }
 
 .edge.hidden {
@@ -240,6 +266,27 @@ svg {
   color: var(--muted);
 }
 
+#dependencies-list button,
+#dependents-list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-bottom: 6px;
+  color: var(--fg);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#dependencies-list button:hover,
+#dependents-list button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
 #dependencies-list,
 #dependents-list {
   font-size: 13px;
@@ -256,11 +303,6 @@ svg {
 #dependencies-list div:hover,
 #dependents-list div:hover {
   text-decoration: underline;
-}
-
-#info-pane h1 {
-  font-size: 20px;
-  margin: 0 0 12px;
 }
 
 #info-title {

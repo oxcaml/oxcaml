@@ -23,17 +23,23 @@ window.IKINDS_GRAPH_DATA = {
     {
       "id": "typing/ikinds/axis_lattice_array.ml",
       "label": "typing/ikinds/axis_lattice_array.ml",
-      "info": "Array-based lattice aligned with Jkind axis order, instantiated from the generic product lattice."
+      "info": "Array-based lattice aligned with Jkind axis order, instantiated from the generic product lattice.",
+      "inactive": true,
+      "unused": true
     },
     {
       "id": "typing/ikinds/axis_lattice_array_conv.ml",
       "label": "typing/ikinds/axis_lattice_array_conv.ml",
-      "info": "Translates Types metadata to and from axis-lattice-array encodings with Mode-aware masks."
+      "info": "Translates Types metadata to and from axis-lattice-array encodings with Mode-aware masks.",
+      "inactive": true,
+      "unused": true
     },
     {
       "id": "typing/ikinds/product_lattice.ml",
       "label": "typing/ikinds/product_lattice.ml",
-      "info": "Generic product lattice functor providing join/meet/co_sub over fixed axis shapes."
+      "info": "Generic product lattice functor providing join/meet/co_sub over fixed axis shapes.",
+      "inactive": true,
+      "unused": true
     },
     {
       "id": "typing/ikinds/ldd.ml",
@@ -48,32 +54,38 @@ window.IKINDS_GRAPH_DATA = {
     {
       "id": "typing/ikinds/ldd_leaf_specialized.ml",
       "label": "typing/ikinds/ldd_leaf_specialized.ml",
-      "info": "Leaf-specialized cached-down0 backend with unboxed Axis_lattice leaves for profiling experiments."
+      "info": "Leaf-specialized cached-down0 backend with unboxed Axis_lattice leaves for profiling experiments.",
+      "inactive": true
     },
     {
       "id": "typing/ikinds/ldd_no_memo.ml",
       "label": "typing/ikinds/ldd_no_memo.ml",
-      "info": "Non-memoizing backend variant retaining down0 caches but dropping unique tables/memo tables."
+      "info": "Non-memoizing backend variant retaining down0 caches but dropping unique tables/memo tables.",
+      "inactive": true
     },
     {
       "id": "typing/ikinds/ldd_no_fast_path.ml",
       "label": "typing/ikinds/ldd_no_fast_path.ml",
-      "info": "Cached-down0 backend variant with join/meet fast paths disabled for debugging baselines."
+      "info": "Cached-down0 backend variant with join/meet fast paths disabled for debugging baselines.",
+      "inactive": true
     },
     {
       "id": "typing/ikinds/ldd_unboxed.ml",
       "label": "typing/ikinds/ldd_unboxed.ml",
-      "info": "Legacy unboxed backend kept to benchmark against cached-down0 implementations."
+      "info": "Legacy unboxed backend kept to benchmark against cached-down0 implementations.",
+      "inactive": true
     },
     {
       "id": "typing/ikinds/ldd_memo.ml",
       "label": "typing/ikinds/ldd_memo.ml",
-      "info": "Memoizing backend with unique tables and instrumentation hooks for Global_counters."
+      "info": "Memoizing backend with unique tables and instrumentation hooks for Global_counters.",
+      "inactive": true
     },
     {
       "id": "typing/ikinds/global_counters.ml",
       "label": "typing/ikinds/global_counters.ml",
-      "info": "Global counter storage used to instrument memoizing solver backends."
+      "info": "Global counter storage used to instrument memoizing solver backends.",
+      "inactive": true
     },
     {
       "id": "typing/jkind.ml",

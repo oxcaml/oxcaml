@@ -10,19 +10,19 @@
     <div id="layout">
       <section id="viz-container">
         <div class="controls">
-          <input type="search" id="search" placeholder="Search nodes..." />
+          <input type="search" id="search" placeholder="Search modules..." />
           <button id="zoom-in" title="Zoom in">+</button>
           <button id="zoom-out" title="Zoom out">−</button>
           <button id="zoom-reset" title="Reset zoom">⊙</button>
           <button id="toggle-dark" title="Toggle dark mode">◐</button>
+          <button id="toggle-inactive" title="Hide unused Ikinds modules" aria-pressed="false">Hide unused</button>
         </div>
         <svg id="ikinds-graph" role="img" aria-labelledby="graph-title"></svg>
         <div id="graph-title" class="sr-only">Dependency graph for ikinds modules</div>
       </section>
       <aside id="info-pane">
-        <h1>Ikinds graph explorer</h1>
-        <div id="info-title"></div>
-        <div id="info-body"></div>
+        <div id="info-title">Browse dependencies</div>
+        <div id="info-body">Hover nodes or edges to inspect how Ikinds modules connect, or use search to filter by filename.</div>
         <div id="dependencies-section">
           <h3>Uses</h3>
           <div id="dependencies-list"></div>
