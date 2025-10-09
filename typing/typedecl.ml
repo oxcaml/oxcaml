@@ -143,6 +143,8 @@ type error =
   | No_unboxed_version of Path.t
   | Atomic_field_must_be_mutable of string
   | Constructor_submode_failed of Mode.Value.error
+  | Atomic_field_in_mixed_block
+  | Non_value_atomic_field
 
 open Typedtree
 
@@ -1854,6 +1856,7 @@ let rec update_decl_jkind env dpath decl =
             has layout value and is known to be a float.
          *)
          mutable atomic_floats : bool;
+         mutable atomic_fields : bool;
          mutable float64s : bool;
          mutable non_float64_unboxed_fields : bool;
          (* Includes product containing void *)
@@ -1888,12 +1891,14 @@ let rec update_decl_jkind env dpath decl =
       in
       let repr_summary =
         { values = false; floats = false; atomic_floats = false;
-          float64s = false; non_float64_unboxed_fields = false;
-          voids = false;
+          atomic_fields = false; float64s = false;
+          non_float64_unboxed_fields = false; voids = false;
         }
       in
       List.iter2
         (fun ((repr : Element_repr.t), _) lbl ->
+           if Types.is_atomic lbl.Types.ld_mutable
+           then repr_summary.atomic_fields <- true;
            match repr with
            | Float_element ->
                repr_summary.floats <- true;
@@ -1934,6 +1939,36 @@ let rec update_decl_jkind env dpath decl =
             in
             assert_mixed_product_support loc Record ~value_prefix_len:0;
             Record_mixed shape
+        (* Forbid atomic fields in mixed blocks *)
+        | { values = true; voids = true; atomic_fields = true }
+        | { floats = true; voids = true; atomic_fields = true }
+        | { float64s = true; voids = true; atomic_fields = true }
+        | { values = true; float64s = true; atomic_fields = true }
+        | { non_float64_unboxed_fields = true; atomic_fields = true } -> begin
+            let error =
+              (* Print a different error if an atomic field itself is non-value *)
+              match
+                List.find_map
+                  (fun ((repr : Element_repr.t), lbl) ->
+                     match repr with
+                     | Value_element | Float_element -> None
+                     | _ ->
+                       if Types.is_atomic lbl.Types.ld_mutable
+                       then Some lbl
+                       else None)
+                  (List.map2 (fun (repr, _) lbl -> repr, lbl) reprs lbls)
+              with
+              | Some lbl ->
+                Error(lbl.ld_loc, Non_value_atomic_field)
+              | None ->
+                (* Find the first atomic field, to get a better location for the error *)
+                let lbl =
+                  List.find (fun lbl -> Types.is_atomic lbl.Types.ld_mutable) lbls
+                in
+                Error(lbl.ld_loc, Atomic_field_in_mixed_block)
+            in
+            raise error
+          end
         (* For other mixed blocks, float fields are stored as flat
            only when they're unboxed.
         *)
@@ -1973,7 +2008,7 @@ let rec update_decl_jkind env dpath decl =
           rep
         | { values = false; floats = false; atomic_floats = false;
             float64s = false; non_float64_unboxed_fields = false;
-            voids = _ }
+            voids = _; atomic_fields = _ }
           [@warning "+9"] ->
           Misc.fatal_error "Typedecl.update_record_kind: empty record"
       in
@@ -4833,6 +4868,13 @@ let report_error ppf = function
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right;
       fprintf ppf "@[<hv>@[@{<hint>Hint@}: all argument types must \
         mode-cross for rebinding to succeed.@]"
+  | Atomic_field_in_mixed_block ->
+    fprintf ppf
+      "@[Atomic record fields are not permitted in mixed blocks.@]"
+  | Non_value_atomic_field ->
+    fprintf ppf
+      "@[Atomic record fields must have layout value.@]"
+
 
 let () =
   Location.register_error_of_exn
