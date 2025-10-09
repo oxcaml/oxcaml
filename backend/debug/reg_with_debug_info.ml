@@ -28,19 +28,40 @@ module Debug_info = struct
     }
 
   let compare t1 t2 =
-    let c = V.compare t1.holds_value_of t2.holds_value_of in
+    let { holds_value_of = holds_value_of1;
+          part_of_value = part_of_value1;
+          num_parts_of_value = num_parts_of_value1;
+          which_parameter = which_parameter1;
+          provenance = provenance1
+        } =
+      t1
+    in
+    let { holds_value_of = holds_value_of2;
+          part_of_value = part_of_value2;
+          num_parts_of_value = num_parts_of_value2;
+          which_parameter = which_parameter2;
+          provenance = provenance2
+        } =
+      t2
+    in
+    let c = V.compare holds_value_of1 holds_value_of2 in
     if c <> 0
     then c
     else
-      let c = Int.compare t1.part_of_value t2.part_of_value in
+      let c = Int.compare part_of_value1 part_of_value2 in
       if c <> 0
       then c
       else
-        let c = Int.compare t1.num_parts_of_value t2.num_parts_of_value in
+        let c = Int.compare num_parts_of_value1 num_parts_of_value2 in
         if c <> 0
         then c
-        else Option.compare Int.compare t1.which_parameter t2.which_parameter
-  (* XXX should compare provenance *)
+        else
+          let c = Option.compare Int.compare which_parameter1 which_parameter2 in
+          if c <> 0
+          then c
+          else
+            Option.compare Backend_var.Provenance.compare provenance1
+              provenance2
 
   let holds_value_of t = t.holds_value_of
 
