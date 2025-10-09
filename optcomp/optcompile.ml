@@ -282,16 +282,20 @@ let native unix
           (Direct_to_cmm (lambda_to_cmm ~machine_width ~keep_symbol_tables))
         ~sourcefile ~prefixname ~ppf_dump program
 
+    let extra_load_paths_for_eval = ["unix"; "compiler-libs"; "ocaml-jit"]
+
+    let extra_libraries_for_eval =
+      [ "unix/unix";
+        "compiler-libs/ocamlcommon";
+        "compiler-libs/ocamloptcomp";
+        "ocaml-jit/jit";
+        "camlinternaleval" ]
+
     let support_files_for_eval () =
-      Load_path.add_dir ~hidden:false
-        (Misc.expand_directory Config.standard_library "+unix");
-      Load_path.add_dir ~hidden:false
-        (Misc.expand_directory Config.standard_library "+compiler-libs");
-      Load_path.add_dir ~hidden:false
-        (Misc.expand_directory Config.standard_library "+ocaml-jit");
-      [ "unix/unix" ^ ext_flambda_lib;
-        "compiler-libs/ocamlcommon" ^ ext_flambda_lib;
-        "compiler-libs/ocamloptcomp" ^ ext_flambda_lib;
-        "ocaml-jit/jit" ^ ext_flambda_lib;
-        "camlinternaleval" ^ ext_flambda_lib ]
+      List.iter
+        (fun lib ->
+          Load_path.add_dir ~hidden:false
+            (Misc.expand_directory Config.standard_library ("+" ^ lib)))
+        extra_load_paths_for_eval;
+      List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval
   end) : S)
