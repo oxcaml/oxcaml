@@ -284,8 +284,7 @@ let write_unit_info info filename =
   let ui_format =
     match info.ui_format with
     | Some ui_format -> ui_format
-    | None ->
-      Misc.fatal_error "Compilenv.write_unit_info: ui_format is None"
+    | None -> Misc.fatal_error "Compilenv.write_unit_info: ui_format is None"
   in
   let serialized_sections, toc, total_length = File_sections.serialize sections in
   let raw_info = {
