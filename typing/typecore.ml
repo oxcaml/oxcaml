@@ -7254,6 +7254,10 @@ and type_expect_
     begin match Builtin_attributes.get_eval_payload payload with
     | Error () -> raise (Error (loc, env, Eval_format))
     | Ok typ ->
+      let _ =
+        (* Check that the type is valid in a quote too. *)
+        let env' = Env.add_quotation_lock env in
+        Typetexp.transl_simple_type env' ~new_var_jkind:Any ~closed:true Alloc.Const.legacy typ in
       let typ = Typetexp.transl_simple_type env ~new_var_jkind:Any ~closed:true Alloc.Const.legacy typ in
       let sort = match type_sort ~why:Function_result ~fixed:false env typ.ctyp_type with
       | Ok sort -> sort
@@ -11819,7 +11823,7 @@ let report_error ~loc env =
   | Eval_format ->
       Location.errorf ~loc
         "The eval extension takes a single type as its argument, for example %a."
-         Style.inline_code "[%eval: int]"
+        Style.inline_code "[%eval: int]"
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env_error env

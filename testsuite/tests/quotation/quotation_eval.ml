@@ -4,6 +4,8 @@
  }
 *)
 
+#syntax quotations on
+
 let test_simple_eval =
   Printf.printf "\nTest simple eval\n";
   let eval : <[int]> expr -> int = [%eval: int] in

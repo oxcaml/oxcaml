@@ -721,7 +721,7 @@ and expression i ppf x =
     line i ppf "Texp_antiquotation";
     expression i ppf e
   | Texp_eval (typ, _) ->
-    line i ppf "Texp_eval ";
+    line i ppf "Texp_eval";
     core_type i ppf typ;
 
 and value_description i ppf x =

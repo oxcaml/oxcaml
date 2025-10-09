@@ -1,21 +1,29 @@
-(**************************************************************************)
-(*                                                                        *)
-(*                                 OCaml                                  *)
-(*                                                                        *)
-(*                      Implementation of [%eval]                         *)
-(*                                                                        *)
-(*   All rights reserved.  This file is distributed under the terms of    *)
-(*   the GNU Lesser General Public License version 2.1, with the          *)
-(*   special exception on linking described in the file LICENSE.          *)
-(*                                                                        *)
-(**************************************************************************)
-
-type compiler_settings = {
-  debug : bool;
-  unsafe : bool;
-  noassert : bool;
-  native_code : bool;
-}
+(******************************************************************************
+ *                                  OxCaml                                    *
+ * -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
 
 let () =
   Clflags.no_cwd := true;
@@ -25,6 +33,7 @@ let () =
   Clflags.dlcode := false
 
 external bundled_cmis : unit -> string = "bundled_cmis"
+
 external bundled_cmxs : unit -> string = "bundled_cmxs"
 
 let () =
@@ -38,17 +47,16 @@ let () =
         { cmi with cmi_sign = Subst.Lazy.of_signature cmi.cmi_sign })
       bundled_cmis
   in
-  Persistent_env.Persistent_signature.load :=
-    fun ~allow_hidden:_ ~unit_name ->
-      Option.map
-        (fun cmi ->
-          {
-            Persistent_env.Persistent_signature.filename =
-              Compilation_unit.Name.to_string unit_name;
-            cmi;
-            visibility = Visible;
-          })
-        (Compilation_unit.Name.Map.find_opt unit_name bundled_cmis)
+  Persistent_env.Persistent_signature.load
+    := fun ~allow_hidden:_ ~unit_name ->
+         Option.map
+           (fun cmi ->
+             { Persistent_env.Persistent_signature.filename =
+                 Compilation_unit.Name.to_string unit_name;
+               cmi;
+               visibility = Visible
+             })
+           (Compilation_unit.Name.Map.find_opt unit_name bundled_cmis)
 
 let cmxs =
   let marshaled = bundled_cmxs () in
@@ -67,8 +75,7 @@ let cmxs =
           uir.uir_export_info
       in
       let ui : Cmx_format.unit_infos =
-        {
-          ui_unit = uir.uir_unit;
+        { ui_unit = uir.uir_unit;
           ui_defines = uir.uir_defines;
           ui_format = uir.uir_format;
           ui_arg_descr = uir.uir_arg_descr;
@@ -79,7 +86,7 @@ let cmxs =
           ui_export_info = export_info;
           ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
           ui_force_link = uir.uir_force_link;
-          ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
+          ui_external_symbols = uir.uir_external_symbols |> Array.to_list
         }
       in
       ui)
@@ -91,14 +98,13 @@ let eval code =
   (* TODO: assert Linux x86-64 *)
   let id = !counter in
   incr counter;
-
   (* TODO: reset all the things *)
   Location.reset ();
   Env.reset_cache ~preserve_persistent_env:true;
-
   (* TODO: set commandline flags *)
 
-  (* Compilation happens here during partial application, not when thunk is called *)
+  (* Compilation happens here during partial application, not when thunk is
+     called *)
   let exp = CamlinternalQuote.Code.to_exp code in
   let code_string =
     Format.asprintf "let eval = (%a)" CamlinternalQuote.Exp.print exp
@@ -106,7 +112,6 @@ let eval code =
   let lexbuf = Lexing.from_string code_string in
   Location.input_lexbuf := Some lexbuf;
   Location.init lexbuf "//eval//";
-
   let ast = Parse.implementation lexbuf in
   (* Definitely won't clash, might be too weird. *)
   let input_name = Printf.sprintf "Eval__%i" id in
@@ -115,14 +120,13 @@ let eval code =
       (Compilation_unit.Name.of_string input_name)
   in
   let unit_info = Unit_info.make_dummy ~input_name compilation_unit in
-
   (* let () = Compmisc.init_parameters () in *)
   Compilenv.reset unit_info
   (* TODO: It would be nice to not reset everything here so we don't have to
      refill the cache. *);
   let _ =
     List.for_all
-      (fun info ->
+      (fun (info : Cmx_format.unit_infos) ->
         Compilenv.cache_unit_info info;
         true)
       cmxs
@@ -131,7 +135,6 @@ let eval code =
   let typed_impl =
     Typemod.type_implementation unit_info compilation_unit env ast
   in
-
   let program =
     Translmod.transl_implementation compilation_unit
       ( typed_impl.structure,
@@ -148,10 +151,9 @@ let eval code =
   (match Jit.jit_load ~phrase_name:input_name ppf program with
   | Result _ -> ()
   | Exception exn -> raise exn);
-
-  (* Compilenv.save_unit_info
-     (Unit_info.Artifact.filename (Unit_info.cmx unit_info))
-     ~main_module_block_format:program.main_module_block_format ~arg_descr:None; *)
+  (* Compilenv.save_unit_info (Unit_info.Artifact.filename (Unit_info.cmx
+     unit_info)) ~main_module_block_format:program.main_module_block_format
+     ~arg_descr:None; *)
   let linkage_name =
     Symbol.for_compilation_unit compilation_unit
     |> Symbol.linkage_name |> Linkage_name.to_string
