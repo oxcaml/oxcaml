@@ -498,3 +498,84 @@ module Pattern_matching_wildcard :
     val also_allowed : t -> int
   end
 |}]
+
+(* Test atomic record fields in mixed blocks *)
+
+module Mixed_blocks = struct
+  type t = {
+    padding : #(int * int * int);
+    mutable field : int [@atomic]
+  }
+end
+
+[%%expect{|
+Line 4, characters 4-33:
+4 |     mutable field : int [@atomic]
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields are not permitted in mixed blocks.
+|}]
+
+module Mixed_blocks_2 = struct
+  type t = {
+    mutable field : float [@atomic];
+    padding : #(int * int * int)
+  }
+end
+
+[%%expect{|
+Line 3, characters 4-36:
+3 |     mutable field : float [@atomic];
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields are not permitted in mixed blocks.
+|}]
+
+module Mixed_blocks_rec = struct
+  type t = {
+    padding : u;
+    mutable field : int [@atomic]
+  }
+
+  and u = #{
+    x : int#;
+    y : float#
+  }
+end
+
+[%%expect{|
+Line 4, characters 4-33:
+4 |     mutable field : int [@atomic]
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields are not permitted in mixed blocks.
+|}]
+
+(* Test atomic record fields with non-value layouts *)
+
+module Non_value_atomic = struct
+  type t = {
+    mutable field : #(int * float#) [@atomic]
+  }
+end
+
+[%%expect{|
+Line 3, characters 4-45:
+3 |     mutable field : #(int * float#) [@atomic]
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields must have layout value.
+|}]
+
+module Non_value_atomic_rec = struct
+  type t = {
+    mutable field : u [@atomic]
+  }
+
+  and u = #{
+    x : int#
+  }
+end
+
+[%%expect{|
+Line 3, characters 4-31:
+3 |     mutable field : u [@atomic]
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields must have layout value.
+|}]
