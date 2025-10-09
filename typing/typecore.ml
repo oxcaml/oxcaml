@@ -7357,7 +7357,7 @@ and type_expect_
             exp_type = exp2.exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
-  | Pexp_quotation _ ->
+  | Pexp_quote _ ->
       raise (Error (loc, env, Unsupported_construct_metaprogramming))
   | Pexp_splice _ ->
       raise (Error (loc, env, Unsupported_construct_metaprogramming))

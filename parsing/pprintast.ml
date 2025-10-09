@@ -1131,7 +1131,7 @@ and expression ctxt f x =
         pp f "@[<hov2>overwrite_@ %a@ with@ %a@]"
           (expression2 reset_ctxt) e1
           (expression2 reset_ctxt) e2
-    | Pexp_quotation e ->
+    | Pexp_quote e ->
         pp f "@[<hov2><[%a]>@]" (expression ctxt) e
     | Pexp_splice e ->
         pp f "@[$%a@]" (simple_expr ctxt) e

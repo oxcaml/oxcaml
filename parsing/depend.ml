@@ -325,7 +325,7 @@ let rec add_expr bv exp =
   | Pexp_overwrite (e1, e2) -> add_expr bv e1; add_expr bv e2
   | Pexp_hole -> ()
   | Pexp_unreachable -> ()
-  | Pexp_quotation e -> add_expr bv e
+  | Pexp_quote e -> add_expr bv e
   | Pexp_splice e -> add_expr bv e
   | Pexp_comprehension x -> add_comprehension_expr bv x
 
