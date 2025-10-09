@@ -3359,7 +3359,8 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   let path, locks, data =
     match find_name_module ~mark:use s env.modules with
     | path, locks, data -> begin
-        check_cross_quotation errors loc Location.none env path (Lident s) locks;
+        check_cross_quotation
+          errors loc Location.none env path (Lident s) locks;
         path, locks, data
     end
     | exception Not_found ->
@@ -4112,7 +4113,8 @@ let lookup_type ~errors ~use ~loc lid env =
   match lid_without_hash lid with
   | None ->
     let path, locks, tda = lookup_type_full ~errors ~use ~loc lid env in
-    check_cross_quotation errors loc tda.tda_declaration.type_loc env path lid locks;
+    check_cross_quotation errors
+      loc tda.tda_declaration.type_loc env path lid locks;
     path, tda.tda_declaration
   | Some lid ->
     (* To get the hash version, look up without the hash, then look for the
