@@ -10,6 +10,7 @@ Interfaces imported:
 	00000000000000000000000000000000	Monoid
 	00000000000000000000000000000000	CamlinternalFormatBasics
 Implementations imported:
+Globals used in quotations:
 Runtime parameters:
 	Monoid
 	Monoid_utils
