@@ -32,9 +32,10 @@ let interface ~source_file ~output_prefix =
 
 (** Bytecode compilation backend for .ml files. *)
 
-let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
+let make_arg_descr ~param ~arg_block_idx ~main_repr : Lambda.arg_descr option =
   match param, arg_block_idx with
-  | Some arg_param, Some arg_block_idx -> Some { arg_param; arg_block_idx }
+  | Some arg_param, Some arg_block_idx ->
+    Some { arg_param; arg_block_idx; main_repr }
   | None, None -> None
   | Some _, None -> Misc.fatal_error "No argument field"
   | None, Some _ -> Misc.fatal_error "Unexpected argument field"
@@ -57,7 +58,11 @@ let raw_lambda_to_bytecode i raw_lambda ~as_arg_for =
        |> Bytegen.compile_implementation i.module_name
        |> print_if i.ppf_dump Clflags.dump_instr Printinstr.instrlist
        |> fun bytecode ->
-          let arg_descr = make_arg_descr ~param:as_arg_for ~arg_block_idx in
+          let arg_descr =
+            make_arg_descr ~param:as_arg_for ~arg_block_idx
+            ~main_repr:(
+              Lambda.main_module_representation main_module_block_format)
+          in
           bytecode, required_globals, main_module_block_format, arg_descr
     )
 

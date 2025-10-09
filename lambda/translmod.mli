@@ -47,6 +47,9 @@ type runtime_arg =
       ra_unit : Compilation_unit.t;
       (* The offset of its argument block, as advertised in its .cmo/.cmx *)
       ra_field_idx : int;
+      (* The representation of the main block, which is needed to
+         index into it *)
+      ra_main_repr : module_representation;
     }
   | (* A module to pass in its entirety *)
     Main_module_block of Compilation_unit.t

@@ -60,6 +60,7 @@ let close_phrase lam =
   Ident.Set.fold (fun id l ->
     let glb, pos = toplevel_value id in
     let glob =
+      (* CR jrayman: [Pfield] *)
       Lprim (Pfield (pos, Pointer, Reads_agree),
              [Lprim (Pgetglobal glb, [], Loc_unknown)],
              Loc_unknown)
