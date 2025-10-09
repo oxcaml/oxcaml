@@ -197,62 +197,6 @@
       edgeGroup.appendChild(group);
       edgeElements.set(edge.id, group);
       registerEdgeAdjacency(meta.source, meta.target, edge.id);
-
-      if (false) {
-        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        label.setAttribute('class', 'edge-label');
-        label.setAttribute('text-anchor', 'middle');
-        label.setAttribute('font-size', '11');
-        label.setAttribute('fill', 'var(--edge-dashed)');
-
-        const labelPoints = rawPoints;
-        const midIndex = Math.floor(labelPoints.length / 2);
-        const midpoint = labelPoints[midIndex];
-        const prevPt = labelPoints[Math.max(0, midIndex - 1)];
-        const nextPt = labelPoints[Math.min(labelPoints.length - 1, midIndex + 1)];
-        const dx = nextPt.x - prevPt.x;
-        const dy = nextPt.y - prevPt.y;
-        const len = Math.hypot(dx, dy) || 1;
-        const offsetDist = 14;
-        const offsetXLocal = midpoint.x - (dy / len) * offsetDist;
-        const offsetYLocal = midpoint.y + (dx / len) * offsetDist;
-
-        label.setAttribute('x', offsetX(offsetXLocal));
-        label.setAttribute('y', offsetY(offsetYLocal));
-        label.textContent = meta.label;
-
-        labelGroup.appendChild(label);
-        const bbox = label.getBBox();
-        labelGroup.removeChild(label);
-        const paddingX = 6;
-        const paddingY = 4;
-        const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        bg.setAttribute('class', 'edge-label-bg');
-        bg.setAttribute('x', bbox.x - paddingX);
-        bg.setAttribute('y', bbox.y - paddingY);
-        bg.setAttribute('width', bbox.width + paddingX * 2);
-        bg.setAttribute('height', bbox.height + paddingY * 2);
-        bg.setAttribute('rx', '4');
-        bg.setAttribute('ry', '4');
-        bg.setAttribute('fill', '#ffffff');
-        bg.setAttribute('fill-opacity', '0.92');
-        bg.setAttribute('stroke', '#94a3b8');
-        bg.setAttribute('stroke-opacity', '0.4');
-        bg.setAttribute('stroke-width', '0.5');
-
-        const labelContainer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        labelContainer.setAttribute('class', 'edge-label-hit');
-        labelContainer.dataset.edgeId = edge.id;
-        labelContainer.dataset.source = meta.source;
-        labelContainer.dataset.target = meta.target;
-        if (meta.info) labelContainer.dataset.info = meta.info;
-        labelContainer.appendChild(bg);
-        labelContainer.appendChild(label);
-        labelGroup.appendChild(labelContainer);
-
-        labelContainer.addEventListener('mouseenter', () => focusEdge(edge.id));
-        labelContainer.addEventListener('mouseleave', clearFocus);
-      }
     }
 
     group.addEventListener('mouseenter', () => focusEdge(edge.id));
