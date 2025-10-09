@@ -36,7 +36,7 @@
       .map((node) => node.id)
   );
 
-  let hideInactive = false;
+  let hideInactive = true;
   let currentSearchQuery = '';
 
   let zoomLevel = 1;
@@ -113,11 +113,11 @@
     clearClasses();
     depsSection.style.display = 'none';
     depsntsSection.style.display = 'none';
-     depsList.replaceChildren();
-     depsntsList.replaceChildren();
+    depsList.replaceChildren();
+    depsntsList.replaceChildren();
     setInfo(
-      'Browse dependencies',
-      'Hover nodes or edges to inspect how Ikinds modules connect.'
+      'Graph controls',
+      'Use the toolbar to zoom, reset, or toggle unused Ikinds modules. Hover nodes or edges to view dependency details, or type in the search box to filter by filename.'
     );
   }
 
