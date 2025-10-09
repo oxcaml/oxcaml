@@ -1,7 +1,7 @@
 File "type_variable_eval.ml", line 10, characters 40-41:
 10 | let variable_eval (type a) () = [%eval: a]
                                              ^
-Error: Identifier "a" is used at File "type_variable_eval.ml", line 10, characters 40-41
-       in a context with one layer of quotation (<[ ... ]>);
-       it is introduced at File "type_variable_eval.ml", line 10, characters 24-25
-       in a context with no quotations or splices.
+Error: Identifier "a" is used at File "type_variable_eval.ml", line 10, characters 40-41,
+       inside a quotation (<[ ... ]>);
+       it is introduced at File "type_variable_eval.ml", line 10, characters 24-25,
+       outside any quotations.

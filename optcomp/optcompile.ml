@@ -283,14 +283,14 @@ let native unix
         ~sourcefile ~prefixname ~ppf_dump program
 
     let extra_load_paths_for_eval =
-      ["unix"; "compiler-libs"; "ocaml-jit"; "eval"]
+      ["unix"; "compiler-libs"; "ocaml-jit"]
 
     let extra_libraries_for_eval =
       [ "unix/unix";
         "compiler-libs/ocamlcommon";
         "compiler-libs/ocamloptcomp";
         "ocaml-jit/jit";
-        "eval/camlinternaleval" ]
+        "camlinternaleval" ]
 
     let support_files_for_eval () =
       List.iter
