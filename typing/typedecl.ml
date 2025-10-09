@@ -1920,7 +1920,8 @@ let rec update_decl_jkind env dpath decl =
         (* We store floats flatly in mixed records if all fields are
            float/float64/void. *)
         | { values = false; floats = true; atomic_floats = false;
-            float64s = true; non_float64_unboxed_fields = false }
+            float64s = true; non_float64_unboxed_fields = false;
+            atomic_fields = false }
            ->
             let shape =
               List.map
@@ -1946,7 +1947,8 @@ let rec update_decl_jkind env dpath decl =
         | { values = true; float64s = true; atomic_fields = true }
         | { non_float64_unboxed_fields = true; atomic_fields = true } -> begin
             let error =
-              (* Print a different error if an atomic field itself is non-value *)
+              (* Print a different error if an atomic field itself is
+                 non-value *)
               match
                 List.find_map
                   (fun ((repr : Element_repr.t), lbl) ->
@@ -1961,9 +1963,11 @@ let rec update_decl_jkind env dpath decl =
               | Some lbl ->
                 Error(lbl.ld_loc, Non_value_atomic_field)
               | None ->
-                (* Find the first atomic field, to get a better location for the error *)
+                (* Find the first atomic field, to get a better location for the
+                   error *)
                 let lbl =
-                  List.find (fun lbl -> Types.is_atomic lbl.Types.ld_mutable) lbls
+                  List.find (fun lbl -> Types.is_atomic lbl.Types.ld_mutable)
+                    lbls
                 in
                 Error(lbl.ld_loc, Atomic_field_in_mixed_block)
             in
@@ -1972,11 +1976,11 @@ let rec update_decl_jkind env dpath decl =
         (* For other mixed blocks, float fields are stored as flat
            only when they're unboxed.
         *)
-        | { values = true; voids = true }
-        | { floats = true; voids = true }
-        | { float64s = true; voids = true }
-        | { values = true; float64s = true }
-        | { non_float64_unboxed_fields = true } ->
+        | { values = true; voids = true; atomic_fields = false }
+        | { floats = true; voids = true; atomic_fields = false }
+        | { float64s = true; voids = true; atomic_fields = false }
+        | { values = true; float64s = true; atomic_fields = false }
+        | { non_float64_unboxed_fields = true; atomic_fields = false } ->
             let shape =
               Element_repr.mixed_product_shape loc reprs Record
             in
@@ -2006,6 +2010,12 @@ let rec update_decl_jkind env dpath decl =
           if floats && not values
           then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
           rep
+        | { voids=false; values=false; floats=true; atomic_floats=false;
+            atomic_fields=true; float64s=true; non_float64_unboxed_fields=false
+          } ->
+          Misc.fatal_error
+            "Typedecl.update_record_kind: invariant broken in repr_summary \
+             (only floats, some atomic fields, no atomic floats?)"
         | { values = false; floats = false; atomic_floats = false;
             float64s = false; non_float64_unboxed_fields = false;
             voids = _; atomic_fields = _ }
