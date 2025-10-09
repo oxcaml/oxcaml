@@ -93,14 +93,7 @@ module JK = struct
     | None -> (
         match ctx.env.lookup c with
         | Poly (base, coeffs) ->
-            (* CR jujacobs: cycle-breaker for cached polynomials
-               --------------------------------------------------
-               We install placeholder LDD variables for the base and each
-               coefficient before rehydrating the polynomial via map_rigid.
-               This prevents recursive rehydration from looping when cached
-               polynomials reference each other cyclically (common in recursive
-               type groups). Once placeholders are published to the cache, we
-               rehydrate the right-hand sides and solve LFPs to define them. *)
+            (* Install placeholder nodes before rehydrating cached polynomials to break recursion cycles. *)
             let base_var = Ldd.new_var () in
             let coeff_vars =
               List.init (List.length coeffs) (fun _ -> Ldd.new_var ())
@@ -146,9 +139,7 @@ module JK = struct
               (fun ty var -> TyTbl.add ctx.ty_to_kind ty (Ldd.var var))
               args rigid_vars;
             (* Compute body kind *)
-            (* CR jujacobs: we shouldn't need to compute the kind if
-               we are in Right mode and abstract=true, but currently this is
-               needed to correctly populate the cache. *)
+            (* CR jujacobs: still compute the kind in Right mode to keep the cache consistent. *)
             let kind' = body ctx in
             (* Extract coeffs' from kind' *)
             let base', coeffs' =
@@ -357,14 +348,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
   (* We may need to be careful here to look up the right thing: what happens on GADT-installed equations? *)
   match context.lookup_type p with
   | None ->
-    (* CR jujacobs: unknown-constructor fallback
-       ----------------------------------------
-       When we don't find a declaration in [context.lookup_type], we treat the
-       constructor as abstract with a conservative [value] base, ignoring
-       arguments. This avoids deep recursion and speculation about arities.
-       Longer-term, we should ensure contexts always supply enough lookup
-       information, or thread Env through places that need it, and delete this
-       fallback. *)
+    (* Fallback for unknown constructors: treat them as abstract non-recursive values. *)
     let kind : JK.ckind = fun _ctx -> Ldd.const Axis_lattice.value in
     JK.Ty { args = []; kind; abstract = true }
   | Some decl ->
@@ -673,22 +657,7 @@ let sub_or_error ?origin:_origin
     (* Delegate to Jkind for detailed error reporting. *)
     Jkind.sub_or_error ~type_equal ~context t1 t2
 
-(**
-  Substitution over constructor ikinds (polynomials)
-
-  We sometimes need to apply a Subst-style mapping of type constructors to
-  other constructors or to type functions, but without access to an Env. For
-  ikinds, we can interpret such substitutions directly on the cached
-  polynomials (constructor_ikind) by mapping rigid atoms via Ldd.map_rigid.
-
-  The caller supplies a [lookup] function that describes the substitution:
-  - None: the path is unchanged (identity)
-  - `Path q: replace occurrences of constructor [p] with [q]
-  - `Type_fun (params, body): inline a type function; we convert [body] to a
-    polynomial in an identity environment (where every constructor [r] has a
-    polynomial consisting solely of its self-atoms) and use its base/coefficient
-    polynomials. This avoids Env while keeping results stable.
-*)
+(** Substitute constructor ikinds according to [lookup] without requiring Env. *)
 
 let rec max_arity_in_type (acc : int Path.Map.t) (ty : Types.type_expr) =
   let open Types in
@@ -719,16 +688,7 @@ let identity_lookup_from_arity_map (arity : int Path.Map.t) (p : Path.t)
 
 let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
     ~(body : Types.type_expr) : JK.poly * JK.poly list =
-  (* CR jujacobs: identity-environment evaluation of type functions
-     --------------------------------------------------------------
-     We approximate type-function substitution for ikinds without Env by
-     evaluating the body in an "identity environment" where every constructor
-     [p] is mapped to a polynomial consisting solely of its own rigid atoms
-     (one base and as many coefficients as observed arity in [body]). This
-     intentionally does not recurse into other environments or unfold further
-     information; it is a local, stable interpretation suitable for
-     substitution. If/when Env is available here, we should replace this with a
-     proper evaluation against real declarations and cached constructor ikinds. *)
+  (* Approximate type-function substitution by evaluating in an identity environment. *)
   let arity = max_arity_in_type Path.Map.empty body in
   let lookup p = identity_lookup_from_arity_map arity p in
   let dummy_context =
