@@ -28,7 +28,10 @@ let of_list rds = Ok (RD_quotient_set.of_list rds)
 
 let union t1 t2 =
   match t1, t2 with
-  | Ok avail1, Ok avail2 -> Ok (RD_quotient_set.union avail1 avail2)
+  | Ok avail1, Ok avail2 ->
+    (* CR mshinwell: Seems like this could cause sets with multiple locations
+       for the same name, or vice-versa. *)
+    Ok (RD_quotient_set.union avail1 avail2)
   | Unreachable, _ | _, Unreachable -> Unreachable
 
 let inter t1 t2 =
