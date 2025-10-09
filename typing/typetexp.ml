@@ -544,8 +544,8 @@ end = struct
             | Closed_for_upstream_compatibility, true ->
               raise(Error(loc, env,
                           Unbound_type_variable (Pprintast.tyvar_of_name name,
-                                                get_in_scope_names (),
-                                                Some Upstream_compatibility))))
+                                                 get_in_scope_names (),
+                                                 Some Upstream_compatibility))))
       !used_variables;
     used_variables := TyVarMap.empty;
     fun () ->
