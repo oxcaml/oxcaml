@@ -218,22 +218,6 @@ let increase_global_level () =
 let restore_global_level gl =
   global_level := gl
 
-(**** Control variable stage in inference *)
-
-let rec update_variable_stage stage_offset ty name jkind =
-  if stage_offset = 0 then ()
-  else if stage_offset < 0 then begin
-    let v = newgenvar ?name jkind in
-    let ty' = newgenty (Tquote v) in
-    link_type ty ty';
-    update_variable_stage (stage_offset + 1) v name jkind
-  end else begin
-    let v = newgenvar ?name jkind in
-    let ty' = newgenty (Tsplice v) in
-    link_type ty ty';
-    update_variable_stage (stage_offset - 1) v name jkind
-  end
-
 (**** Control tracing of GADT instances *)
 
 let trace_gadt_instances = ref false
@@ -285,6 +269,22 @@ let newconstr path tyl = newty (Tconstr (path, tyl, ref Mnil))
 let newmono ty = newty (Tpoly(ty, []))
 
 let none = newty (Ttuple [])                (* Clearly ill-formed type *)
+
+(**** Control variable stage in inference *)
+
+let rec update_variable_stage stage_offset ty name jkind =
+  if stage_offset = 0 then ()
+  else if stage_offset < 0 then begin
+    let v = newvar2 ?name (get_level ty) jkind in
+    let ty' = newty2 ~level:(get_level ty) (Tquote v) in
+    link_type ty ty';
+    update_variable_stage (stage_offset + 1) v name jkind
+  end else begin
+    let v = newvar2 ?name (get_level ty) jkind in
+    let ty' = newty2 ~level:(get_level ty) (Tsplice v) in
+    link_type ty ty';
+    update_variable_stage (stage_offset - 1) v name jkind
+  end
 
 (**** information for [Typecore.unify_pat_*] ****)
 
