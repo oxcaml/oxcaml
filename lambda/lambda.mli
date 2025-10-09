@@ -1151,13 +1151,11 @@ val transl_mixed_product_shape_for_read :
   -> Types.mixed_product_shape
   -> 'a mixed_block_element array
 
-(* CR jrayman: change [~loc] to [~check_representable] *)
 val transl_module_representation :
-  loc:Warnings.loc option ->
   Types.module_representation -> module_representation
 
 val block_of_module_representation :
-  module_representation -> primitive
+  loc:Warnings.loc -> module_representation -> primitive
 
 val make_sequence: ('a -> lambda) -> 'a list -> lambda
 

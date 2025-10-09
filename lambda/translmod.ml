@@ -100,10 +100,8 @@ let rec apply_coercion loc strict restr arg =
       arg
   | Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list } ->
       name_lambda strict arg Lambda.layout_module (fun id ->
-        let input_repr = transl_module_representation ~loc:None input_repr in
-        let output_repr =
-          transl_module_representation ~loc:(Some (to_location loc)) output_repr
-        in
+        let input_repr = transl_module_representation input_repr in
+        let output_repr = transl_module_representation output_repr in
         let get_field pos =
           if pos < 0 then lambda_unit
           else
@@ -114,7 +112,8 @@ let rec apply_coercion loc strict restr arg =
           else layout_of_module_field input_repr pos
         in
         let lam =
-          Lprim(block_of_module_representation output_repr,
+          Lprim(block_of_module_representation
+                  ~loc:(to_location loc) output_repr,
                 List.map (apply_coercion_field loc get_field) pos_cc_list,
                 loc)
         in
@@ -667,10 +666,8 @@ and transl_structure ~scopes loc
             let repr =
               List.rev_map (fun (_, sort) -> sort) fields |> Array.of_list
             in
-            let repr =
-              transl_module_representation ~loc:(Some (to_location loc)) repr
-            in
-            Lprim(block_of_module_representation repr,
+            let repr = transl_module_representation repr in
+            Lprim(block_of_module_representation ~loc:(to_location loc) repr,
                   List.map (fun (id, _) -> Lvar id) (List.rev fields), loc),
               repr
         | Tcoerce_structure
@@ -693,12 +690,10 @@ and transl_structure ~scopes loc
             in
             let ids = List.fold_right (fun (id, _) s -> Ident.Set.add id s)
               fields Ident.Set.empty in
-            let output_repr =
-              transl_module_representation ~loc:(Some (to_location loc))
-                output_repr
-            in
+            let output_repr = transl_module_representation output_repr in
             let lam =
-              Lprim(block_of_module_representation output_repr,
+              Lprim(block_of_module_representation
+                      ~loc:(to_location loc) output_repr,
                   List.map
                     (fun (pos, cc) ->
                       match cc with
@@ -862,10 +857,7 @@ and transl_structure ~scopes loc
           let modl = incl.incl_mod in
           let mid = Ident.create_local "include" in
           let mid_duid = Lambda.debug_uid_none in
-          let incl_repr =
-            transl_module_representation
-              ~loc:(Some incl.incl_loc) incl.incl_repr
-          in
+          let incl_repr = transl_module_representation incl.incl_repr in
           let rec rebind_idents pos newfields = function
               [] ->
                 transl_structure ~scopes loc newfields cc rootpath final_env rem
@@ -917,10 +909,7 @@ and transl_structure ~scopes loc
               in
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
-              let open_repr =
-                transl_module_representation
-                  ~loc:(Some (od.open_loc)) od.open_bound_repr
-              in
+              let open_repr = transl_module_representation od.open_bound_repr in
               let rec rebind_idents pos newfields = function
                   [] -> transl_structure
                           ~scopes loc newfields cc rootpath final_env rem
@@ -952,17 +941,14 @@ and transl_structure ~scopes loc
 
 (* construct functor application in "include functor" case *)
 and transl_include_functor ~generative ~input_repr modl params scopes loc =
-  let input_repr =
-    transl_module_representation ~loc:(Some (to_location loc))
-      input_repr
-  in
+  let input_repr = transl_module_representation input_repr in
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module modl
   in
   let modl = transl_module ~scopes Tcoerce_none None modl in
   let params = if generative then [params;[]] else [params] in
   let params = List.map (fun coercion ->
-    Lprim(block_of_module_representation input_repr,
+    Lprim(block_of_module_representation ~loc:(to_location loc) input_repr,
           List.map (fun (name, cc) ->
             apply_coercion loc Strict cc (Lvar name))
             coercion,
@@ -1021,7 +1007,6 @@ let required_globals ~flambda body =
 
 let add_arg_block_to_module_representation = function
     (* NB: this assumes [arg_block] has layout value *)
-    (* CR jrayman: there is a bug here *)
   | Module_value_only { field_count } ->
     Module_value_only { field_count = field_count + 1 }
   | Module_mixed (shape, shape_for_read) ->
@@ -1030,7 +1015,7 @@ let add_arg_block_to_module_representation = function
         Array.append shape_for_read
           [| mixed_block_element_with_locality_mode_for_module |] )
 
-let add_arg_block_to_module_block primary_block_lam primary_repr restr =
+let add_arg_block_to_module_block ~loc primary_block_lam primary_repr restr =
   let primary_block_id = Ident.create_local "*primary-block*" in
   let primary_block_id_duid = Lambda.debug_uid_none in
   let arg_block_id = Ident.create_local "*arg-block*" in
@@ -1049,7 +1034,7 @@ let add_arg_block_to_module_block primary_block_lam primary_repr restr =
        primary_block_id_duid, primary_block_lam,
        Llet(Strict, layout_module, arg_block_id,
             arg_block_id_duid, arg_block_lam,
-            Lprim(block_of_module_representation new_repr,
+            Lprim(block_of_module_representation ~loc new_repr,
                   all_fields,
                   Loc_unknown))),
   new_repr,
@@ -1090,7 +1075,7 @@ let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
   match cc2 with
   | None -> lam, repr, None
   | Some cc2 ->
-    add_arg_block_to_module_block lam repr cc2
+    add_arg_block_to_module_block ~loc lam repr cc2
 
 let wrap_toplevel_functor_in_struct code =
   Lprim(Pmakeblock(0, Immutable, None, Lambda.alloc_heap),
@@ -1120,7 +1105,7 @@ let transl_implementation compilation_unit impl ~loc =
   let body, main_module_block_format =
     match has_parameters () with
     | false ->
-      body, Mb_struct { mb_repr = repr }
+        body, Mb_struct { mb_repr = repr }
     | true ->
         let mb_runtime_params, runtime_param_idents =
           match Env.runtime_parameter_bindings () with
@@ -1306,9 +1291,7 @@ let transl_toplevel_item ~scopes item =
       in
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in
-      let incl_repr =
-        transl_module_representation ~loc:(Some incl.incl_loc) incl.incl_repr
-      in
+      let incl_repr = transl_module_representation incl.incl_repr in
       let rec set_idents pos = function
         [] ->
           lambda_unit
@@ -1333,10 +1316,7 @@ let transl_toplevel_item ~scopes item =
           let ids = bound_value_identifiers od.open_bound_items in
           let mid = Ident.create_local "open" in
           let mid_duid = Lambda.debug_uid_none in
-          let open_repr =
-            transl_module_representation ~loc:(Some od.open_loc)
-              od.open_bound_repr
-          in
+          let open_repr = transl_module_representation od.open_bound_repr in
           let rec set_idents pos = function
               [] ->
                 lambda_unit
@@ -1396,7 +1376,8 @@ let transl_package component_names coercion =
   in
   field_count,
   apply_coercion Loc_unknown Strict coercion
-    (Lprim(block_of_module_representation (Module_value_only { field_count }),
+    (Lprim(block_of_module_representation ~loc:Location.none
+             (Module_value_only { field_count }),
            List.map get_component component_names,
            Loc_unknown))
 

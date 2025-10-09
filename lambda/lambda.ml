@@ -969,7 +969,6 @@ type main_module_block_format =
         mb_returned_repr : module_representation;
       }
 
-
 let main_module_representation = function
   | Mb_struct { mb_repr } -> mb_repr
   | Mb_instantiating_functor _ -> Module_value_only { field_count = 1 }
@@ -1484,7 +1483,7 @@ let mod_setfield pos = function
   | Module_mixed (shape, _) ->
     Psetmixedfield([pos], shape, Root_initialization)
 
-let transl_module_representation ~loc repr =
+let transl_module_representation repr =
   let value_count = ref 0 in
   let shape =
     Array.map
@@ -1505,10 +1504,7 @@ let transl_module_representation ~loc repr =
   in
   if !value_count = Array.length shape
   then Module_value_only { field_count = Array.length shape }
-  else begin
-    Option.iter (fun loc ->
-      Typedecl.assert_mixed_product_support loc Module
-        ~value_prefix_len:(!value_count)) loc;
+  else
     Module_mixed
       ( transl_mixed_product_shape shape,
         transl_mixed_product_shape_for_read
@@ -1516,7 +1512,6 @@ let transl_module_representation ~loc repr =
         ~get_mode:(fun _ ->
            fatal_error "Lambda.transl_module_representation: \
                           unexpected [Float_boxed].") shape)
-  end
 
 (* Translate an access path *)
 
@@ -1527,7 +1522,7 @@ let rec transl_address loc = function
       then Lprim (Pgetpredef id, [], loc)
       else Lvar id
   | Env.Adot(addr, module_repr, pos) ->
-      let module_repr = transl_module_representation ~loc:None module_repr in
+      let module_repr = transl_module_representation module_repr in
       Lprim(mod_field pos module_repr, [transl_address loc addr], loc)
 
 let transl_path find loc env path =
@@ -1559,9 +1554,18 @@ let transl_prim mod_name name =
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
 
-let block_of_module_representation = function
+let block_of_module_representation ~loc = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
-  | Module_mixed (shape, _) -> Pmakemixedblock(0, Immutable, shape, alloc_heap)
+  | Module_mixed (shape, _) ->
+    let value_count = ref 0 in
+    Array.iter (function
+      | Value _ -> incr value_count
+      | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+      | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+      | Product _ -> ()) shape;
+    Typedecl.assert_mixed_product_support loc Module
+      ~value_prefix_len:(!value_count);
+    Pmakemixedblock(0, Immutable, shape, alloc_heap)
 
 (* Compile a sequence of expressions *)
 
