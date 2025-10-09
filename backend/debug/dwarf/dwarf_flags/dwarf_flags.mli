@@ -73,6 +73,8 @@ val ddwarf_types : bool ref
 
 val gdwarf_may_alter_codegen : bool ref
 
+val gdwarf_may_alter_codegen_experimental : bool ref
+
 (** Setting this to [true] will emit sufficient DWARF to get inlined frame
     information, but won't emit information e.g. about local variables (unless
     [restrict_to_upstream_dwarf] is set to [false], although that implies

@@ -161,6 +161,8 @@ module type Debugging_options = sig
   val no_dwarf_for_startup_file : unit -> unit
   val gdwarf_may_alter_codegen : unit -> unit
   val no_gdwarf_may_alter_codegen : unit -> unit
+  val gdwarf_may_alter_codegen_experimental : unit -> unit
+  val no_gdwarf_may_alter_codegen_experimental : unit -> unit
   val gdwarf_max_function_complexity : int -> unit
   val gdwarf_compression : string -> unit
   val gdwarf_fission : string -> unit
