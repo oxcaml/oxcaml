@@ -394,6 +394,8 @@ module Operation : sig
 
   val to_string : any_locality_mode t -> string
 
+  val all : any_locality_mode t list
+
   module With_percent_prefix : sig
     type nonrec t = any_locality_mode t
 
