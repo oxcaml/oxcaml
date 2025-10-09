@@ -7366,7 +7366,7 @@ and type_expect_
             exp_type = exp2.exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
-  | Pexp_quotation exp ->
+  | Pexp_quote exp ->
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       let jkind = Jkind.Builtin.value ~why:Quotation_result in
       let new_env = Env.enter_quotation env in
