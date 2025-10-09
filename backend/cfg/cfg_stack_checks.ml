@@ -172,8 +172,7 @@ let insert_instruction (cfg : Cfg.t) (label : Label.t) ~max_frame_size =
     let id = InstructionId.get_and_incr cfg.next_instruction_id in
     Cfg.make_instruction ()
       ~desc:(Cfg.Stack_check { max_frame_size_bytes = max_frame_size })
-      ~stack_offset ~id
-      ~available_before:Reg_availability_set.Unreachable
+      ~stack_offset ~id ~available_before:Reg_availability_set.Unreachable
       ~available_across:Reg_availability_set.Unreachable
   in
   DLL.add_begin block.body check

@@ -1088,7 +1088,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                   let var = VP.var var in
                   let naming_op =
                     Operation.Name_for_debugger
-                      { ident = var; provenance; which_parameter = None; regs = r }
+                      { ident = var;
+                        provenance;
+                        which_parameter = None;
+                        regs = r
+                      }
                   in
                   insert_debug new_env sub_cfg (Op naming_op) Debuginfo.none
                     [||] [||])
@@ -1363,7 +1367,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                   let var = VP.var var in
                   let naming_op =
                     Operation.Name_for_debugger
-                      { ident = var; provenance; which_parameter = None; regs = r }
+                      { ident = var;
+                        provenance;
+                        which_parameter = None;
+                        regs = r
+                      }
                   in
                   insert_debug new_env sub_cfg (Op naming_op) Debuginfo.none
                     [||] [||])

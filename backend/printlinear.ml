@@ -55,12 +55,12 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
     let ras_is_nonempty (set : RAS.t) =
       match set with
       | Ok set ->
-        not (Reg_with_debug_info.Set_distinguishing_names_and_locations.is_empty
-               set)
+        not
+          (Reg_with_debug_info.Set_distinguishing_names_and_locations.is_empty
+             set)
       | Unreachable -> true
     in
-    if ras_is_nonempty i.available_before
-       || ras_is_nonempty i.available_across
+    if ras_is_nonempty i.available_before || ras_is_nonempty i.available_across
     then
       if RAS.equal i.available_before i.available_across
       then
