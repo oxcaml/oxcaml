@@ -18,34 +18,25 @@
 open Misc
 open Format
 
-val link: (module Compiler_owee.Unix_intf.S) -> ppf_dump:formatter ->
-  string list -> string -> unit
+val link :
+  (module Compiler_owee.Unix_intf.S) ->
+  string list ->
+  string ->
+  cached_genfns_imports:Generic_fns.Partition.Set.t ->
+  genfns:Generic_fns.Tbl.t ->
+  units_tolink:Linkenv.unit_link_info list ->
+  uses_eval:bool ->
+  quoted_globals:Compilation_unit.Name.Set.t ->
+  ppf_dump:Format.formatter ->
+  unit
 
-val link_shared: (module Compiler_owee.Unix_intf.S) ->
-  ppf_dump:formatter -> string list -> string -> unit
+val link_shared :
+  (module Compiler_owee.Unix_intf.S) ->
+  string list ->
+  string ->
+  genfns:Generic_fns.Tbl.t ->
+  units_tolink:Linkenv.unit_link_info list ->
+  ppf_dump:Format.formatter ->
+  unit
 
-val call_linker_shared: ?native_toplevel:bool -> string list -> string -> unit
-
-val reset : unit -> unit
-val check_consistency: filepath -> Cmx_format.unit_infos -> Digest.t -> unit
-val extract_crc_interfaces: unit -> Import_info.t list
-val extract_crc_implementations: unit -> Import_info.t list
-
-type error =
-  | File_not_found of filepath
-  | Not_an_object_file of filepath
-  | Missing_implementations of (Compilation_unit.t * string list) list
-  | Inconsistent_interface of Compilation_unit.Name.t * filepath * filepath
-  | Inconsistent_implementation of Compilation_unit.t * filepath * filepath
-  | Assembler_error of filepath
-  | Linking_error of int
-  | Multiple_definition of Compilation_unit.Name.t * filepath * filepath
-  | Missing_cmx of filepath * Compilation_unit.t
-  | Dwarf_fission_objcopy_on_macos
-  | Dwarf_fission_dsymutil_not_macos
-  | Dsymutil_error of int
-  | Objcopy_error of int
-
-exception Error of error
-
-val report_error: formatter -> error -> unit
+val call_linker_shared : ?native_toplevel:bool -> string list -> string -> unit

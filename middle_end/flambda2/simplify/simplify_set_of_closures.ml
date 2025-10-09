@@ -480,6 +480,11 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
     | Default_loopify_and_not_tailrec -> Never_loopify
   in
   let code_const, new_code =
+    (* CR vlaviron: Ideally the debuginfo should be associated to the set of
+       closures, not the code, but at the moment To_cmm looks at the debuginfo
+       of the code to compute the debuginfo of the set of closures
+       allocation. *)
+    let dbg = DE.add_inlined_debuginfo (DA.denv outer_dacc) (Code.dbg code) in
     Rebuilt_static_const.create_code
       (DA.are_rebuilding_terms dacc_after_body)
       code_id ~params_and_body ~free_names_of_params_and_body:free_names_of_code
@@ -493,9 +498,9 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~regalloc_attribute:(Code.regalloc_attribute code)
       ~regalloc_param_attribute:(Code.regalloc_param_attribute code)
       ~cold:(Code.cold code) ~is_a_functor ~is_opaque
-      ~recursive:(Code.recursive code) ~cost_metrics ~inlining_arguments
-      ~dbg:(Code.dbg code) ~is_tupled:(Code.is_tupled code) ~is_my_closure_used
-      ~inlining_decision ~absolute_history ~relative_history ~loopify
+      ~recursive:(Code.recursive code) ~cost_metrics ~inlining_arguments ~dbg
+      ~is_tupled:(Code.is_tupled code) ~is_my_closure_used ~inlining_decision
+      ~absolute_history ~relative_history ~loopify
   in
   let code =
     let are_rebuilding = DA.are_rebuilding_terms dacc_after_body in
@@ -540,8 +545,9 @@ let simplify_function context ~outer_dacc function_slot code_id
           if should_resimplify && Flambda_features.dump_flambda () && debug ()
           then
             Format.eprintf
-              "@\n%tAfter a single simplify_set_of_closures:%t@\n%a@\n@."
-              Flambda_colours.each_file Flambda_colours.pop Code.print new_code;
+              "@\n%tAfter a single simplify_set_of_closures:%t@\n%a:@\n%a@\n@."
+              Flambda_colours.each_file Flambda_colours.pop Code_id.print
+              code_id Code.print new_code;
           if should_resimplify && count < max_function_simplify_run
           then run ~outer_dacc ~code:new_code (count + 1)
           else
@@ -780,6 +786,10 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
       (DA.denv dacc)
       (Function_slot.Lmap.bindings closure_symbols)
   in
+  let denv =
+    DE.map_specialization_cost denv
+      ~f:(Specialization_cost.add_lifted_set_of_closures set_of_closures)
+  in
   Simplify_named_result.create_have_lifted_set_of_closures
     (DA.with_denv dacc denv) bindings
     ~original_defining_expr:(Named.create_set_of_closures set_of_closures)
@@ -979,6 +989,12 @@ let simplify_lifted_set_of_closures0 dacc context ~closure_symbols
     Rebuilt_static_const.create_set_of_closures
       (DA.are_rebuilding_terms dacc)
       set_of_closures
+  in
+  let dacc =
+    DA.map_denv dacc
+      ~f:
+        (DE.map_specialization_cost
+           ~f:(Specialization_cost.add_lifted_set_of_closures set_of_closures))
   in
   set_of_closures_pattern, set_of_closures_static_const, dacc
 

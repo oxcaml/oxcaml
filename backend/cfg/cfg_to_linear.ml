@@ -35,7 +35,13 @@ let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
   let arg, res, dbg, live, fdo, available_before, available_across =
     match like with
     | None ->
-      [||], [||], Debuginfo.none, Reg.Set.empty, Fdo_info.none, None, None
+      ( [||],
+        [||],
+        Debuginfo.none,
+        Reg.Set.empty,
+        Fdo_info.none,
+        Reg_availability_set.Unreachable,
+        Reg_availability_set.Unreachable )
     | Some like ->
       ( like.arg,
         like.res,

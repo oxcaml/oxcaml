@@ -408,8 +408,8 @@ let print_basic' ?print_reg ppf (instruction : basic instruction) =
       dbg = Debuginfo.none;
       fdo = None;
       live = Reg.Set.empty;
-      available_before = None;
-      available_across = None
+      available_before = Reg_availability_set.Unreachable;
+      available_across = Reg_availability_set.Unreachable
     }
   in
   Printlinear.instr' ?print_reg ppf instruction
@@ -552,8 +552,9 @@ let string_of_irc_work_list = function
 
 let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     ?(fdo = Fdo_info.none) ?(live = Reg.Set.empty) ~stack_offset ~id
-    ?(irc_work_list = Unknown_list) ?(available_before = None)
-    ?(available_across = None) () =
+    ?(irc_work_list = Unknown_list)
+    ?(available_before = Reg_availability_set.Unreachable)
+    ?(available_across = Reg_availability_set.Unreachable) () =
   { desc;
     arg;
     res;

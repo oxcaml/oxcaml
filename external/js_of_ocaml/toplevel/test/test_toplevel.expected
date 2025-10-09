@@ -1,0 +1,21 @@
+
+external parseInt : float -> int = "parseInt"
+let f = 3.14
+let () = Printf.printf "parseInt(%f) = %d\n" f (parseInt f);;
+Dynlink: looking for symbol parseInt
+parseInt(3.140000) = 3
+external parseInt : float -> int = "parseInt"
+val f : float = 3.14
+
+let () = print_endline "hello";;
+hello
+1+;;
+<ERR>: Line 3, characters 2-4:
+<ERR>: Error: Syntax error
+
+let () =
+  let regex = Re.compile Re.(seq [str "//"; rep print ]) in
+  Printf.printf "%b\n%!" (Re.execp regex "// a C comment");
+  Printf.printf "%b\n%!" (Re.execp ~pos:1 regex "// a C comment");;
+true
+false

@@ -1,0 +1,25 @@
+(tests
+ (names hfun)
+ (deps ../../../LICENSE)
+ (modules hfun)
+ (libraries)
+ (modes wasm))
+
+(tests
+ (names hfun_js)
+ (deps ../../../LICENSE)
+ (modules hfun_js)
+ (libraries)
+ (modes js))
+
+(rule
+ (copy hfun.ml hfun_js.ml))
+
+(tests
+ (names htbl)
+ (deps ../../../LICENSE)
+ (modules htbl)
+ (build_if
+  (>= %{ocaml_version} 5))
+ (libraries)
+ (modes js wasm))

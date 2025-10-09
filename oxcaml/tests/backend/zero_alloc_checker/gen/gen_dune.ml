@@ -143,6 +143,9 @@ let () =
   (* deleting dead functions works *)
   print_test_expected_output ~cutoff:default_cutoff
     ~extra_dep:(Some "test_warning199.mli") ~exit_code:0 "test_warning199";
+  print_test_expected_output ~cutoff:default_cutoff
+    ~extra_dep:(Some "test_warning199_disabled.mli") ~exit_code:0
+    "test_warning199_disabled";
   print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:0
     "test_never_returns_normally";
   print_test_expected_output ~extra_flags:"-zero-alloc-check opt"

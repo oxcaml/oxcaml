@@ -213,40 +213,54 @@ end
 (* Even though our lattices are all bi-heyting algebras, that knowledge is
    internal to this module. Externally they are seen as normal lattices. *)
 module Lattices = struct
-  module Total = struct
-    (** A lattice is total order, if for any [a] [b], [a <= b] or [b <= a]. *)
+  module type Total = sig
+    (** A lattice is total order, if for any [a] [b], [a <= b] or [b <= a].
 
-    module CoHeyting (L : Lattice) : CoHeyting with type t := L.t = struct
-      (** A total lattice has a co-heyting structure. *)
+      If it's also finite, then the ordering can be represented as a monotone
+      injection [ord] into [int], where [a <= b] iff [ord a <= ord b]. *)
 
-      include L
+    type t
 
-      (* Prove the [subtract] below is the left adjoint of [join].
-         - If [subtract a c <= b], by the definition of [subtract] below,
-           that could mean one of two things:
-           - Took the branch [a <= c], and [min <= b]. In this case, we have [a <= c <= join c b].
-           - Took the other branch, and [a <= b]. In this case, we have [a <= b <= join c b].
+    val ord : t -> int
 
-         - In the other direction: Given [a <= join c b], compare [c] and [b]:
-           - if [c <= b], then [a <= join c b = b], and:
-             - either [a <= c], then [subtract a c = min <= b]
-             - or the other branch, then [subtract a c = a <= b]
-           - if [b <= c], then [a <= join c b = c], then [subtract a c = min <= b]
-      *)
-      let subtract a c = if le a c then min else a
-    end
-    [@@inline]
+    val min : t
 
-    module Heyting (L : Lattice) : Heyting with type t := L.t = struct
-      (** A total lattice has a heyting structure. *)
-
-      include L
-
-      (* The proof for [imply] is dual and omitted. *)
-      let imply c b = if le c b then max else b
-    end
-    [@@inline]
+    val max : t
   end
+
+  module Total (L : Total) = struct
+    let min = L.min
+
+    let max = L.max
+
+    let le a b = L.ord a <= L.ord b
+
+    let equal a b = L.ord a = L.ord b
+
+    let join a b = if L.ord a > L.ord b then a else b
+
+    let meet a b = if L.ord a < L.ord b then a else b
+
+    (* A total lattice has a co-heyting structure.
+       Prove the [subtract] below is the left adjoint of [join].
+        - If [subtract a c <= b], by the definition of [subtract] below,
+          that could mean one of two things:
+          - Took the branch [a <= c], and [min <= b]. In this case, we have [a <= c <= join c b].
+          - Took the other branch, and [a <= b]. In this case, we have [a <= b <= join c b].
+
+        - In the other direction: Given [a <= join c b], compare [c] and [b]:
+          - if [c <= b], then [a <= join c b = b], and:
+            - either [a <= c], then [subtract a c = min <= b]
+            - or the other branch, then [subtract a c = a <= b]
+          - if [b <= c], then [a <= join c b = c], then [subtract a c = min <= b]
+    *)
+    let subtract a c = if le a c then L.min else a
+
+    (* A total lattice has a heyting structure. The proof for [imply] is dual
+       and omitted. *)
+    let imply c b = if le c b then L.max else b
+  end
+  [@@inline]
 
   (* Make the type of [Locality] and [Regionality] below distinguishable,
      so that we can be sure [Comonadic_with] is applied correctly. *)
@@ -261,37 +275,21 @@ module Lattices = struct
       | Global
       | Local
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Global
 
       let max = Local
 
-      let legacy = Global
-
-      let[@inline] le a b =
-        match a, b with Global, _ | _, Local -> true | Local, Global -> false
-
-      let[@inline] equal a b =
-        match a, b with
-        | Global, Global | Local, Local -> true
-        | Global, Local | Local, Global -> false
-
-      let join a b =
-        match a, b with
-        | Local, _ | _, Local -> Local
-        | Global, Global -> Global
-
-      let meet a b =
-        match a, b with
-        | Global, _ | _, Global -> Global
-        | Local, Local -> Local
-
-      let print ppf = function
-        | Global -> Format.fprintf ppf "global"
-        | Local -> Format.fprintf ppf "local"
+      let ord = function Global -> 0 | Local -> 1
     end)
+
+    let legacy = Global
+
+    let print ppf = function
+      | Global -> Format.fprintf ppf "global"
+      | Local -> Format.fprintf ppf "local"
 
     let _is_areality = ()
   end
@@ -302,48 +300,22 @@ module Lattices = struct
       | Regional
       | Local
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Global
 
       let max = Local
 
-      let legacy = Global
-
-      let[@inline] equal a b =
-        match a, b with
-        | Global, Global -> true
-        | Regional, Regional -> true
-        | Local, Local -> true
-        | Global, (Regional | Local)
-        | Regional, (Global | Local)
-        | Local, (Global | Regional) ->
-          false
-
-      let join a b =
-        match a, b with
-        | Local, _ | _, Local -> Local
-        | Regional, _ | _, Regional -> Regional
-        | Global, Global -> Global
-
-      let meet a b =
-        match a, b with
-        | Global, _ | _, Global -> Global
-        | Regional, _ | _, Regional -> Regional
-        | Local, Local -> Local
-
-      let[@inline] le a b =
-        match a, b with
-        | Global, _ | _, Local -> true
-        | _, Global | Local, _ -> false
-        | Regional, Regional -> true
-
-      let print ppf = function
-        | Global -> Format.fprintf ppf "global"
-        | Regional -> Format.fprintf ppf "regional"
-        | Local -> Format.fprintf ppf "local"
+      let ord = function Global -> 0 | Regional -> 1 | Local -> 2
     end)
+
+    let legacy = Global
+
+    let print ppf = function
+      | Global -> Format.fprintf ppf "global"
+      | Regional -> Format.fprintf ppf "regional"
+      | Local -> Format.fprintf ppf "local"
 
     let _is_areality = ()
   end
@@ -353,40 +325,21 @@ module Lattices = struct
       | Unique
       | Aliased
 
-    include Total.CoHeyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Unique
 
       let max = Aliased
 
-      let legacy = Aliased
-
-      let[@inline] le a b =
-        match a, b with
-        | Unique, _ | _, Aliased -> true
-        | Aliased, Unique -> false
-
-      let[@inline] equal a b =
-        match a, b with
-        | Unique, Unique -> true
-        | Aliased, Aliased -> true
-        | Unique, Aliased | Aliased, Unique -> false
-
-      let join a b =
-        match a, b with
-        | Aliased, _ | _, Aliased -> Aliased
-        | Unique, Unique -> Unique
-
-      let meet a b =
-        match a, b with
-        | Unique, _ | _, Unique -> Unique
-        | Aliased, Aliased -> Aliased
-
-      let print ppf = function
-        | Aliased -> Format.fprintf ppf "aliased"
-        | Unique -> Format.fprintf ppf "unique"
+      let ord = function Unique -> 0 | Aliased -> 1
     end)
+
+    let legacy = Aliased
+
+    let print ppf = function
+      | Aliased -> Format.fprintf ppf "aliased"
+      | Unique -> Format.fprintf ppf "unique"
   end
 
   module Linearity = struct
@@ -394,34 +347,21 @@ module Lattices = struct
       | Many
       | Once
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Many
 
       let max = Once
 
-      let legacy = Many
-
-      let[@inline] le a b =
-        match a, b with Many, _ | _, Once -> true | Once, Many -> false
-
-      let[@inline] equal a b =
-        match a, b with
-        | Many, Many -> true
-        | Once, Once -> true
-        | Many, Once | Once, Many -> false
-
-      let join a b =
-        match a, b with Once, _ | _, Once -> Once | Many, Many -> Many
-
-      let meet a b =
-        match a, b with Many, _ | _, Many -> Many | Once, Once -> Once
-
-      let print ppf = function
-        | Once -> Format.fprintf ppf "once"
-        | Many -> Format.fprintf ppf "many"
+      let ord = function Many -> 0 | Once -> 1
     end)
+
+    let legacy = Many
+
+    let print ppf = function
+      | Once -> Format.fprintf ppf "once"
+      | Many -> Format.fprintf ppf "many"
   end
 
   module Portability = struct
@@ -429,172 +369,89 @@ module Lattices = struct
       | Portable
       | Nonportable
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Portable
 
       let max = Nonportable
 
-      let legacy = Nonportable
-
-      let[@inline] le a b =
-        match a, b with
-        | Portable, _ | _, Nonportable -> true
-        | Nonportable, Portable -> false
-
-      let[@inline] equal a b =
-        match a, b with
-        | Portable, Portable -> true
-        | Nonportable, Nonportable -> true
-        | Portable, Nonportable | Nonportable, Portable -> false
-
-      let join a b =
-        match a, b with
-        | Nonportable, _ | _, Nonportable -> Nonportable
-        | Portable, Portable -> Portable
-
-      let meet a b =
-        match a, b with
-        | Portable, _ | _, Portable -> Portable
-        | Nonportable, Nonportable -> Nonportable
-
-      let print ppf = function
-        | Portable -> Format.fprintf ppf "portable"
-        | Nonportable -> Format.fprintf ppf "nonportable"
+      let ord = function Portable -> 0 | Nonportable -> 1
     end)
+
+    let legacy = Nonportable
+
+    let print ppf = function
+      | Portable -> Format.fprintf ppf "portable"
+      | Nonportable -> Format.fprintf ppf "nonportable"
   end
 
   module Contention = struct
     type t =
-      | Contended
-      | Shared
       | Uncontended
+      | Shared
+      | Contended
 
-    include Total.CoHeyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Uncontended
 
       let max = Contended
 
-      let legacy = Uncontended
-
-      let[@inline] le a b =
-        match a, b with
-        | Uncontended, _ | _, Contended -> true
-        | _, Uncontended | Contended, _ -> false
-        | Shared, Shared -> true
-
-      let[@inline] equal a b =
-        match a, b with
-        | Contended, Contended -> true
-        | Shared, Shared -> true
-        | Uncontended, Uncontended -> true
-        | Contended, (Shared | Uncontended)
-        | Shared, (Contended | Uncontended)
-        | Uncontended, (Contended | Shared) ->
-          false
-
-      let join a b =
-        match a, b with
-        | Contended, _ | _, Contended -> Contended
-        | Shared, _ | _, Shared -> Shared
-        | Uncontended, Uncontended -> Uncontended
-
-      let meet a b =
-        match a, b with
-        | Uncontended, _ | _, Uncontended -> Uncontended
-        | Shared, _ | _, Shared -> Shared
-        | Contended, Contended -> Contended
-
-      let print ppf = function
-        | Contended -> Format.fprintf ppf "contended"
-        | Shared -> Format.fprintf ppf "shared"
-        | Uncontended -> Format.fprintf ppf "uncontended"
+      let ord = function Uncontended -> 0 | Shared -> 1 | Contended -> 2
     end)
+
+    let legacy = Uncontended
+
+    let print ppf = function
+      | Contended -> Format.fprintf ppf "contended"
+      | Shared -> Format.fprintf ppf "shared"
+      | Uncontended -> Format.fprintf ppf "uncontended"
   end
 
   module Forkable = struct
     type t =
-      | Unforkable
       | Forkable
+      | Unforkable
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Forkable
 
       let max = Unforkable
 
-      let legacy = Forkable
-
-      let[@inline] le a b =
-        match a, b with
-        | Forkable, _ | _, Unforkable -> true
-        | Unforkable, Forkable -> false
-
-      let[@inline] equal a b =
-        match a, b with
-        | Unforkable, Unforkable -> true
-        | Forkable, Forkable -> true
-        | Unforkable, Forkable | Forkable, Unforkable -> false
-
-      let join a b =
-        match a, b with
-        | Unforkable, _ | _, Unforkable -> Unforkable
-        | Forkable, Forkable -> Forkable
-
-      let meet a b =
-        match a, b with
-        | Forkable, _ | _, Forkable -> Forkable
-        | Unforkable, Unforkable -> Unforkable
-
-      let print ppf = function
-        | Unforkable -> Format.fprintf ppf "unforkable"
-        | Forkable -> Format.fprintf ppf "forkable"
+      let ord = function Forkable -> 0 | Unforkable -> 1
     end)
+
+    let legacy = Forkable
+
+    let print ppf = function
+      | Unforkable -> Format.fprintf ppf "unforkable"
+      | Forkable -> Format.fprintf ppf "forkable"
   end
 
   module Yielding = struct
     type t =
-      | Yielding
       | Unyielding
+      | Yielding
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Unyielding
 
       let max = Yielding
 
-      let legacy = Unyielding
-
-      let[@inline] le a b =
-        match a, b with
-        | Unyielding, _ | _, Yielding -> true
-        | Yielding, Unyielding -> false
-
-      let[@inline] equal a b =
-        match a, b with
-        | Yielding, Yielding -> true
-        | Unyielding, Unyielding -> true
-        | Yielding, Unyielding | Unyielding, Yielding -> false
-
-      let join a b =
-        match a, b with
-        | Yielding, _ | _, Yielding -> Yielding
-        | Unyielding, Unyielding -> Unyielding
-
-      let meet a b =
-        match a, b with
-        | Unyielding, _ | _, Unyielding -> Unyielding
-        | Yielding, Yielding -> Yielding
-
-      let print ppf = function
-        | Yielding -> Format.fprintf ppf "yielding"
-        | Unyielding -> Format.fprintf ppf "unyielding"
+      let ord = function Unyielding -> 0 | Yielding -> 1
     end)
+
+    let legacy = Unyielding
+
+    let print ppf = function
+      | Yielding -> Format.fprintf ppf "yielding"
+      | Unyielding -> Format.fprintf ppf "unyielding"
   end
 
   module Statefulness = struct
@@ -603,98 +460,46 @@ module Lattices = struct
       | Observing
       | Stateful
 
-    include Total.Heyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Stateless
 
       let max = Stateful
 
-      let legacy = Stateful
-
-      let[@inline] le a b =
-        match a, b with
-        | Stateless, _ | _, Stateful -> true
-        | _, Stateless | Stateful, _ -> false
-        | Observing, Observing -> true
-
-      let[@inline] equal a b =
-        match a, b with
-        | Stateless, Stateless -> true
-        | Observing, Observing -> true
-        | Stateful, Stateful -> true
-        | Stateless, (Observing | Stateful)
-        | Observing, (Stateless | Stateful)
-        | Stateful, (Stateless | Observing) ->
-          false
-
-      let join a b =
-        match a, b with
-        | Stateful, _ | _, Stateful -> Stateful
-        | Observing, _ | _, Observing -> Observing
-        | Stateless, Stateless -> Stateless
-
-      let meet a b =
-        match a, b with
-        | Stateless, _ | _, Stateless -> Stateless
-        | Observing, _ | _, Observing -> Observing
-        | Stateful, Stateful -> Stateful
-
-      let print ppf = function
-        | Stateless -> Format.fprintf ppf "stateless"
-        | Observing -> Format.fprintf ppf "observing"
-        | Stateful -> Format.fprintf ppf "stateful"
+      let ord = function Stateless -> 0 | Observing -> 1 | Stateful -> 2
     end)
+
+    let legacy = Stateful
+
+    let print ppf = function
+      | Stateless -> Format.fprintf ppf "stateless"
+      | Observing -> Format.fprintf ppf "observing"
+      | Stateful -> Format.fprintf ppf "stateful"
   end
 
   module Visibility = struct
     type t =
-      | Immutable
-      | Read
       | Read_write
+      | Read
+      | Immutable
 
-    include Total.CoHeyting (struct
+    include Total (struct
       type nonrec t = t
 
       let min = Read_write
 
       let max = Immutable
 
-      let legacy = Read_write
-
-      let[@inline] le a b =
-        match a, b with
-        | Read_write, _ | _, Immutable -> true
-        | _, Read_write | Immutable, _ -> false
-        | Read, Read -> true
-
-      let[@inline] equal a b =
-        match a, b with
-        | Immutable, Immutable -> true
-        | Read, Read -> true
-        | Read_write, Read_write -> true
-        | Immutable, (Read | Read_write)
-        | Read, (Immutable | Read_write)
-        | Read_write, (Immutable | Read) ->
-          false
-
-      let join a b =
-        match a, b with
-        | Immutable, _ | _, Immutable -> Immutable
-        | Read, _ | _, Read -> Read
-        | Read_write, Read_write -> Read_write
-
-      let meet a b =
-        match a, b with
-        | Read_write, _ | _, Read_write -> Read_write
-        | Read, _ | _, Read -> Read
-        | Immutable, Immutable -> Immutable
-
-      let print ppf = function
-        | Immutable -> Format.fprintf ppf "immutable"
-        | Read -> Format.fprintf ppf "read"
-        | Read_write -> Format.fprintf ppf "read_write"
+      let ord = function Read_write -> 0 | Read -> 1 | Immutable -> 2
     end)
+
+    let legacy = Read_write
+
+    let print ppf = function
+      | Immutable -> Format.fprintf ppf "immutable"
+      | Read -> Format.fprintf ppf "read"
+      | Read_write -> Format.fprintf ppf "read_write"
   end
 
   type monadic =
@@ -1160,7 +965,9 @@ module Lattices_mono = struct
       | Visibility : (Monadic_op.t, Visibility_op.t) t
       | Contention : (Monadic_op.t, Contention_op.t) t
 
-    let to_int : type a b. (a, b) t -> int = function
+    (* Index must reflect implication order: if A implies B, then index A <
+       index B. This is needed by the implication logic in [typemode]. *)
+    let index : type p r. (p, r) t -> int = function
       | Areality -> 0
       | Forkable -> 1
       | Yielding -> 2
@@ -1171,7 +978,7 @@ module Lattices_mono = struct
       | Visibility -> 7
       | Contention -> 8
 
-    let compare a b = to_int a - to_int b
+    let compare a b = index a - index b
 
     let print : type p r. _ -> (p, r) t -> unit =
      fun ppf -> function
@@ -2141,13 +1948,15 @@ module Report = struct
     | Expression -> Some (dprintf "expression")
     | Allocation -> Some (dprintf "allocation")
 
-  let print_pinpoint : pinpoint -> (formatter -> unit) option =
-   fun (loc, desc) ->
+  let print_pinpoint : ?parens:bool -> pinpoint -> (formatter -> unit) option =
+   fun ?(parens = true) (loc, desc) ->
     print_pinpoint_desc desc
     |> Option.map (fun print_desc ppf ->
-           if not (Location.is_none loc)
+           if Location.is_none loc
+           then fprintf ppf "a %t" print_desc
+           else if parens
            then fprintf ppf "the %t (at %a)" print_desc Location.print_loc loc
-           else fprintf ppf "a %t" print_desc)
+           else fprintf ppf "the %t at %a" print_desc Location.print_loc loc)
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and gives the source pinpoint. *)
@@ -2157,9 +1966,13 @@ module Report = struct
    fun pp -> function
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
     | Unknown | Unknown_non_rigid -> None
-    | Close_over { closed = pp; _ } ->
+    | Close_over { closed = pp; polarity = Comonadic; _ } ->
       print_pinpoint pp
       |> Option.map (fun print_pp -> dprintf "closes over %t" print_pp, pp)
+    | Close_over { closed = pp; polarity = Monadic; _ } ->
+      print_pinpoint ~parens:false pp
+      |> Option.map (fun print_pp ->
+             dprintf "contains a usage (of %t)" print_pp, pp)
     | Is_closed_by { closure; _ } ->
       let pp = Location.none, closure in
       print_pinpoint pp
@@ -2898,6 +2711,8 @@ module Comonadic_with (Areality : Areality) = struct
 
     let compare = Axis.compare
 
+    let proj = Axis.proj
+
     let all =
       [ P Areality;
         P Linearity;
@@ -2913,6 +2728,8 @@ module Comonadic_with (Areality : Areality) = struct
   module Const = struct
     include C.Comonadic_with (Areality.Const)
     include Lattice_Product (C.Comonadic_with (Areality.Const))
+
+    let proj = Axis.proj
 
     module Per_axis = struct
       let print ax ppf a =
@@ -2952,6 +2769,16 @@ module Comonadic_with (Areality : Areality) = struct
 
   let proj ax m = Solver.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
 
+  module Per_axis = struct
+    let zap_to_floor ax m =
+      let obj = proj_obj ax in
+      with_log (Solver.zap_to_floor obj m)
+
+    let zap_to_ceil ax m =
+      let obj = proj_obj ax in
+      with_log (Solver.zap_to_ceil obj m)
+  end
+
   let min_with ax m =
     Solver.apply Obj.obj (Min_with ax) (Solver.disallow_right m)
 
@@ -2978,44 +2805,15 @@ module Comonadic_with (Areality : Areality) = struct
     | Error : 'a Axis.t * 'a Mode_intf.simple_error -> simple_error
 
   let axis_of_error (actual : Obj.const) (expected : Obj.const) : simple_error =
-    let { areality = areality1;
-          linearity = linearity1;
-          portability = portability1;
-          forkable = forkable1;
-          yielding = yielding1;
-          statefulness = statefulness1
-        } =
-      actual
-    in
-    let { areality = areality2;
-          linearity = linearity2;
-          portability = portability2;
-          forkable = forkable2;
-          yielding = yielding2;
-          statefulness = statefulness2
-        } =
-      expected
-    in
-    if Areality.Const.le areality1 areality2
-    then
-      if Linearity.Const.le linearity1 linearity2
-      then
-        if Portability.Const.le portability1 portability2
-        then
-          if Forkable.Const.le forkable1 forkable2
-          then
-            if Yielding.Const.le yielding1 yielding2
-            then
-              if Statefulness.Const.le statefulness1 statefulness2
-              then assert false
-              else
-                Error
-                  (Statefulness, { left = statefulness1; right = statefulness2 })
-            else Error (Yielding, { left = yielding1; right = yielding2 })
-          else Error (Forkable, { left = forkable1; right = forkable2 })
-        else Error (Portability, { left = portability1; right = portability2 })
-      else Error (Linearity, { left = linearity1; right = linearity2 })
-    else Error (Areality, { left = areality1; right = areality2 })
+    List.find_map
+      (fun (Axis.P ax) ->
+        let left = Const.proj ax actual in
+        let right = Const.proj ax expected in
+        if Const.Per_axis.le ax left right
+        then None
+        else Some (Error (ax, { left; right })))
+      Axis.all
+    |> Option.get
 
   (* overriding to report the offending axis *)
   let to_simple_error ({ left; right; _ } : error) = axis_of_error left right
@@ -3052,6 +2850,8 @@ module Monadic = struct
 
     let print = Axis.print
 
+    let proj = Axis.proj
+
     let all =
       [P Uniqueness; P Contention; P Visibility]
       |> List.sort (fun (P ax0) (P ax1) -> compare ax0 ax1)
@@ -3062,6 +2862,8 @@ module Monadic = struct
   module Const = struct
     include C.Monadic
     include Lattice_Product (C.Monadic)
+
+    let proj = Axis.proj
 
     module Per_axis = struct
       let print ax ppf a =
@@ -3103,6 +2905,16 @@ module Monadic = struct
 
   let proj ax m = Solver.apply ~hint:Skip (proj_obj ax) (Proj (Obj.obj, ax)) m
 
+  module Per_axis = struct
+    let zap_to_floor ax m =
+      let obj = proj_obj ax in
+      with_log (Solver.zap_to_ceil obj m)
+
+    let zap_to_ceil ax m =
+      let obj = proj_obj ax in
+      with_log (Solver.zap_to_floor obj m)
+  end
+
   (* The monadic fragment is inverted. *)
 
   let join_with ax c m = join_const (Const.min_with ax c) m
@@ -3124,27 +2936,15 @@ module Monadic = struct
     | Error : 'a Axis.t * 'a Mode_intf.simple_error -> simple_error
 
   let axis_of_error (actual : Obj.const) (expected : Obj.const) : simple_error =
-    let { uniqueness = uniqueness1;
-          contention = contention1;
-          visibility = visibility1
-        } =
-      actual
-    in
-    let { uniqueness = uniqueness2;
-          contention = contention2;
-          visibility = visibility2
-        } =
-      expected
-    in
-    if Uniqueness.Const.le uniqueness1 uniqueness2
-    then
-      if Contention.Const.le contention1 contention2
-      then
-        if Visibility.Const.le visibility1 visibility2
-        then assert false
-        else Error (Visibility, { left = visibility1; right = visibility2 })
-      else Error (Contention, { left = contention1; right = contention2 })
-    else Error (Uniqueness, { left = uniqueness1; right = uniqueness2 })
+    List.find_map
+      (fun (Axis.P ax) ->
+        let left = Const.proj ax actual in
+        let right = Const.proj ax expected in
+        if Const.Per_axis.le ax left right
+        then None
+        else Some (Error (ax, { left; right })))
+      Axis.all
+    |> Option.get
 
   let to_simple_error ({ left; right; _ } : error) =
     (* monadic fragment is flipped *)
@@ -3490,20 +3290,15 @@ module Value_with (Areality : Areality) = struct
     (** See [Alloc.close_over] for explanation. *)
     let close_over m =
       let { monadic; comonadic } = split m in
-      let comonadic =
-        Comonadic.join comonadic
-          (C.monadic_to_comonadic_min
-             (C.comonadic_with_obj Areality.Obj.obj)
-             monadic)
-      in
-      let monadic = Monadic.min in
-      merge { comonadic; monadic }
+      Comonadic.join comonadic
+        (C.monadic_to_comonadic_min
+           (C.comonadic_with_obj Areality.Obj.obj)
+           monadic)
 
     (** See [Alloc.partial_apply] for explanation. *)
     let partial_apply m =
       let { comonadic; _ } = split m in
-      let monadic = Monadic.min in
-      merge { comonadic; monadic }
+      comonadic
 
     let print_axis : type a. a Axis.t -> _ -> a -> unit =
      fun ax ppf a ->
@@ -3717,15 +3512,17 @@ module Value_with (Areality : Areality) = struct
     let comonadic1 = monadic_to_comonadic_min monadic in
     (* It's also constrained by the comonadic of the closed argument. *)
     let comonadic = Comonadic.join [comonadic; comonadic1] in
-    (* The returned function crosses all monadic axes that we know of
-       (uniqueness/contention). *)
+    (* The closure will access [A] at the specified monadic modes, and thus the
+       monadic mode of the closure itself is not constrained by it. *)
     let monadic = Monadic.disallow_right Monadic.min in
     { comonadic; monadic }
 
   (** Similar to above, but we are given the mode of [A -> B -> C], and need to
       give the lower bound mode of [B -> C]. *)
   let partial_apply { comonadic; _ } =
-    (* The returned function crosses all monadic axes that we know of. *)
+    (* The closure will invoke the original function at the specified monadic
+       modes, and thus the monadic mode of the closure itself is not constrained by
+       it. *)
     let monadic = Monadic.disallow_right Monadic.min in
     let comonadic = Comonadic.disallow_right comonadic in
     { comonadic; monadic }
@@ -4724,51 +4521,21 @@ module Crossing = struct
 
   let create ~regionality ~linearity ~uniqueness ~portability ~contention
       ~forkable ~yielding ~statefulness ~visibility =
-    let regionality =
-      if regionality
-      then Per_axis.min (Comonadic Areality)
-      else Per_axis.max (Comonadic Areality)
+    let comonadic b ax =
+      if b then Per_axis.min (Comonadic ax) else Per_axis.max (Comonadic ax)
     in
-    let linearity =
-      if linearity
-      then Per_axis.min (Comonadic Linearity)
-      else Per_axis.max (Comonadic Linearity)
+    let monadic b ax =
+      if b then Per_axis.min (Monadic ax) else Per_axis.max (Monadic ax)
     in
-    let uniqueness =
-      if uniqueness
-      then Per_axis.min (Monadic Uniqueness)
-      else Per_axis.max (Monadic Uniqueness)
-    in
-    let portability =
-      if portability
-      then Per_axis.min (Comonadic Portability)
-      else Per_axis.max (Comonadic Portability)
-    in
-    let contention =
-      if contention
-      then Per_axis.min (Monadic Contention)
-      else Per_axis.max (Monadic Contention)
-    in
-    let forkable =
-      if forkable
-      then Per_axis.min (Comonadic Forkable)
-      else Per_axis.max (Comonadic Forkable)
-    in
-    let yielding =
-      if yielding
-      then Per_axis.min (Comonadic Yielding)
-      else Per_axis.max (Comonadic Yielding)
-    in
-    let statefulness =
-      if statefulness
-      then Per_axis.min (Comonadic Statefulness)
-      else Per_axis.max (Comonadic Statefulness)
-    in
-    let visibility =
-      if visibility
-      then Per_axis.min (Monadic Visibility)
-      else Per_axis.max (Monadic Visibility)
-    in
+    let regionality = comonadic regionality Areality in
+    let linearity = comonadic linearity Linearity in
+    let uniqueness = monadic uniqueness Uniqueness in
+    let portability = comonadic portability Portability in
+    let contention = monadic contention Contention in
+    let forkable = comonadic forkable Forkable in
+    let yielding = comonadic yielding Yielding in
+    let statefulness = comonadic statefulness Statefulness in
+    let visibility = monadic visibility Visibility in
     let monadic = Monadic.create ~uniqueness ~contention ~visibility in
     let comonadic =
       Comonadic.create ~regionality ~linearity ~portability ~yielding ~forkable

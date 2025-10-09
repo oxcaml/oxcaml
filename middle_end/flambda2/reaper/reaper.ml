@@ -40,7 +40,7 @@ let run ~machine_width ~cmx_loader ~all_code (unit : Flambda_unit.t) =
           continuation_info;
           code_deps
         } =
-    Traverse.run ~get_code_metadata unit
+    Traverse.run unit
   in
   let solved_dep = Dep_solver.fixpoint deps in
   let () =

@@ -29,8 +29,6 @@ AC_INIT([OxCaml],
 # argv
 CONFIGURE_ARGS="$*"
 
-DUNE_MAX_VERSION=[3.15]
-
 AC_MSG_NOTICE([Configuring OxCaml version AC_PACKAGE_VERSION])
 
 m4_include([build-aux/ax_compare_version.m4])
@@ -51,11 +49,6 @@ dune_version=`$dune --version | sed -e 's/^\([[0-9]]\.[[0-9]]\).*/\1/'`
 
 AS_IF([test x"$dune_version" = "x"],
   [AC_MSG_ERROR([unable to execute dune at $dune])])
-
-dnl If dune is too new, keep going but warn at the end
-AX_COMPARE_VERSION([$dune_version], [le], [$DUNE_MAX_VERSION],
-  [dune_version_good=true],
-  [dune_version_good=false])
 
 AC_MSG_NOTICE([Using dune executable: $dune])
 
@@ -3231,6 +3224,3 @@ ${mkdll_ldflags}"
 ])
 
 AC_OUTPUT
-
-AS_IF([test x"$dune_version_good" = "xfalse"],
-  [AC_MSG_WARN([dune $dune_version found; only dune up to $DUNE_MAX_VERSION known to work])])

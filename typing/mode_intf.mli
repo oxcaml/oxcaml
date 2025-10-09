@@ -392,9 +392,9 @@ module type S = sig
   module Contention : sig
     module Const : sig
       type t =
-        | Contended
-        | Shared
         | Uncontended
+        | Shared
+        | Contended
 
       include Lattice with type t := t
     end
@@ -405,8 +405,8 @@ module type S = sig
   module Forkable : sig
     module Const : sig
       type t =
-        | Unforkable
         | Forkable
+        | Unforkable
 
       include Lattice with type t := t
     end
@@ -421,8 +421,8 @@ module type S = sig
   module Yielding : sig
     module Const : sig
       type t =
-        | Yielding
         | Unyielding
+        | Yielding
 
       include Lattice with type t := t
     end
@@ -456,9 +456,9 @@ module type S = sig
   module Visibility : sig
     module Const : sig
       type t =
-        | Immutable
-        | Read
         | Read_write
+        | Read
+        | Immutable
 
       include Lattice with type t := t
     end
@@ -521,6 +521,12 @@ module type S = sig
 
       val proj : 'a Axis.t -> ('r * 'l) t -> ('a, 'l * 'r) mode
 
+      module Per_axis : sig
+        val zap_to_floor : 'a Axis.t -> ('a, 'l * allowed) mode -> 'a
+
+        val zap_to_ceil : 'a Axis.t -> ('a, allowed * 'r) mode -> 'a
+      end
+
       val min_with : 'a Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
     end
 
@@ -533,6 +539,12 @@ module type S = sig
            and type 'd hint_const := 'd pos_hint_const
 
       val proj : 'a Axis.t -> ('l * 'r) t -> ('a, 'l * 'r) mode
+
+      module Per_axis : sig
+        val zap_to_floor : 'a Axis.t -> ('a, allowed * 'r) mode -> 'a
+
+        val zap_to_ceil : 'a Axis.t -> ('a, 'l * allowed) mode -> 'a
+      end
 
       val max_with : 'a Axis.t -> ('a, 'l * 'r) mode -> (disallowed * 'r) t
     end
@@ -613,10 +625,10 @@ module type S = sig
       val diff : t -> t -> Option.t
 
       (** Similar to [Alloc.close_over] but for constants *)
-      val close_over : t -> t
+      val close_over : t -> Comonadic.Const.t
 
       (** Similar to [Alloc.partial_apply] but for constants *)
-      val partial_apply : t -> t
+      val partial_apply : t -> Comonadic.Const.t
 
       (** Prints a constant on any axis. *)
       val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit

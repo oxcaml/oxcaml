@@ -1238,8 +1238,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pmake_unboxed_product _ | Punboxed_product_field _
       | Parray_element_size_in_bytes _ | Pget_header _ | Prunstack | Pperform
       | Presume | Preperform | Pmake_idx_field _ | Pmake_idx_mixed_field _
-      | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _ | Pset_idx _
-      | Patomic_exchange_field _ | Patomic_compare_exchange_field _
+      | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _ | Pset_idx _ | Pget_ptr _
+      | Pset_ptr _ | Patomic_exchange_field _ | Patomic_compare_exchange_field _
       | Patomic_compare_set_field _ | Patomic_fetch_add_field
       | Patomic_add_field | Patomic_sub_field | Patomic_land_field
       | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ppoll
