@@ -66,7 +66,7 @@ type unit_infos =
                                           (* Infos imported *)
     mutable ui_quoted_globals: Compilation_unit.Name.t list;
                                           (* Globals that are used in quotes *)
-    mutable ui_format: Lambda.main_module_block_format;
+    mutable ui_format: Lambda.main_module_block_format option;
                                           (* Structure of the main module block *)
     mutable ui_generic_fns: generic_fns;  (* Generic functions needed *)
     mutable ui_export_info: Flambda2_cmx.Flambda_cmx_format.t option;
