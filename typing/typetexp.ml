@@ -170,15 +170,15 @@ module TyVarEnv : sig
   (* evaluate with a locally extended set of univars *)
 
   val ttyp_poly_arg :
-    poly_univars -> (string * Parsetree.jkind_annotation option * int) list
+    poly_univars -> (string * Parsetree.jkind_annotation option) list
   (* something suitable as an argument to [Ttyp_poly] *)
 
   val make_poly_univars : (string Location.loc * int) list -> poly_univars
   (* a version of [make_poly_univars_jkinds] that doesn't take jkinds *)
 
   val make_poly_univars_jkinds :
-    context:(string -> Jkind.History.annotation_context_lr)
-    -> (string Location.loc * Parsetree.jkind_annotation option * int) list
+    context:(string -> Jkind.History.annotation_context_lr) ->
+    (string Location.loc * Parsetree.jkind_annotation option * int) list
     -> poly_univars
   (* see mli file *)
 
@@ -339,10 +339,9 @@ end = struct
       ~finally:(fun () -> univars := old_univars)
 
   let ttyp_poly_arg (poly_univars : poly_univars) = List.map
-      (fun (name, pending_univar, stage) ->
+      (fun (name, pending_univar, _stage) ->
         name,
-        Jkind.get_annotation pending_univar.jkind_info.original_jkind,
-        stage)
+        Jkind.get_annotation pending_univar.jkind_info.original_jkind)
       poly_univars
 
   let mk_pending_univar name jkind jkind_info =
@@ -380,7 +379,7 @@ end = struct
            match get_desc v with
            | Tvar { name; jkind } when get_level v = Btype.generic_level ->
                set_type_desc v (Tunivar { name; jkind });
-               v::acc
+               v :: acc
            | _ -> acc
         )
         promoted vars
@@ -427,7 +426,7 @@ end = struct
     vs |> List.iter (fun v ->
       match get_desc v with
       | Tunivar { name; jkind } ->
-          set_type_desc v (Tvar { name; jkind })
+         set_type_desc v (Tvar { name; jkind })
       | _ -> assert false);
     vs
 
@@ -521,23 +520,22 @@ end = struct
           let snap = Btype.snapshot () in
           if try unify env v ty; true with _ -> Btype.backtrack snap; false
           then try
-            let (type_expr, stage) = lookup_global name in
-            if stage <> s then
-              raise
-                (Error (loc, env, (Invalid_variable_stage
-                                     {name;
-                                      intro_stage = stage;
-                                      usage_loc = loc;
-                                      usage_stage = s})));
-            r := (loc, v, type_expr, stage) :: !r
-          with Not_found ->
+              let (type_expr, stage) = lookup_global name in
+              if s <> stage then
+                raise
+                  (Error (loc, env, (Invalid_variable_stage
+                                       {name = Pprintast.tyvar_of_name name;
+                                        intro_stage = stage;
+                                        usage_loc = loc;
+                                        usage_stage = s})));
+              r := (loc, v, type_expr) :: !r
+            with Not_found ->
             match unbound_variable_policy, Btype.is_Tvar ty with
             | Open, _ | (Closed | Closed_for_upstream_compatibility), false ->
               let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
               let v2 = new_global_var jkind in
-              let stage = Env.stage env in
-              r := (loc, v, v2, stage) :: !r;
-              add name v2 jkind stage
+              r := (loc, v, v2) :: !r;
+              add name v2 jkind s
             | Closed, true ->
               raise(Error(loc, env,
                           Unbound_type_variable (Pprintast.tyvar_of_name name,
@@ -552,7 +550,7 @@ end = struct
     used_variables := TyVarMap.empty;
     fun () ->
       List.iter
-        (function (loc, t1, t2, _) ->
+        (function (loc, t1, t2) ->
           try unify env t1 t2 with Unify err ->
             raise (Error(loc, env, Type_mismatch err)))
         !r
@@ -1103,11 +1101,11 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let ty = newty (Tof_kind tjkind) in
       ctyp (Ttyp_of_kind jkind) ty
   | Ptyp_quote t ->
-      let new_env = Env.add_quotation_lock env in
+      let new_env = Env.enter_quotation env in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_quote cty) (newty (Tquote cty.ctyp_type))
   | Ptyp_splice t ->
-      let new_env = Env.add_splice_lock env in
+      let new_env = Env.enter_splice ~loc env in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_splice cty) (newty (Tsplice cty.ctyp_type))
   | Ptyp_extension ext ->
@@ -1167,7 +1165,6 @@ and transl_type_poly env ~policy ~row_context mode loc vars st =
   let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in
   let ty' = Btype.newgenty (Tpoly(ty, ty_list)) in
   unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)) ty';
-  let typed_vars = List.map (fun (n, v, _) -> (n, v)) typed_vars in
   Ttyp_poly (typed_vars, cty), ty'
 
 and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
@@ -1440,7 +1437,7 @@ let transl_type_scheme_mono env styp =
       TyVarEnv.reset ();
       transl_simple_type ~new_var_jkind:Sort env ~closed:false Alloc.Const.legacy styp
     end
-      ~post:generalize_ctyp
+    ~post:generalize_ctyp
   in
   (* This next line is very important: it stops [val] and [external]
      declarations from having undefaulted jkind variables. Without
@@ -1465,7 +1462,6 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
           transl_simple_type_impl ~new_var_jkind:Sort env ~univars ~policy:Open
             Alloc.Const.legacy inner_type
       in
-      let typed_vars = List.map (fun (n, jkind, _) -> (n, jkind)) typed_vars in
       (typed_vars, univars, typ)
     end
     ~post:(fun (_,_,typ) -> generalize_ctyp typ)
@@ -1500,12 +1496,16 @@ let report_unbound_variable_reason ppf = function
                    Enable non-erasable extensions to disable this check."
   | None -> ()
 
-let print_stage ppf stage =
-  if stage = 0 then fprintf ppf "no quotations or splices"
-  else if stage = 1 then fprintf ppf "one layer of quotation (<[ ... ]>)"
-  else if stage = -1 then fprintf ppf "one layer of splicing ($)"
-  else if stage > 1 then fprintf ppf "%d layers of quotation (<[ ... ]>)" stage
-  else fprintf ppf "%d layers of splicing ($)" stage
+let print_with_quote_promote ppf (name, stage_diff) =
+  let rec loop fmt stage_diff =
+    if stage_diff = 1 then fprintf fmt "<[%s]>" name
+    else if stage_diff = -1 then fprintf fmt "$%s" name
+    else if stage_diff > 1 then fprintf fmt "<[%a]>" loop (stage_diff - 1)
+    else if stage_diff < -1 then fprintf fmt "$(%a)" loop (stage_diff + 1)
+    else assert false
+  in
+  loop str_formatter stage_diff;
+  fprintf ppf "%a" Style.inline_code (flush_str_formatter ())
 
 let report_error env ppf =
   function
@@ -1678,13 +1678,15 @@ let report_error env ppf =
         | Labelled _ -> assert false )
   | Invalid_variable_stage {name; intro_stage; usage_loc; usage_stage} ->
     fprintf ppf
-      "@[Type variable %a is used at %a@ \
-       in a context with %a;@ \
-       it should only be used in a context with %a.@]"
+      "@[<v>@[Type variable %a is used at %a,@ \
+         %a;@ \
+         it already occurs %a.@]@,\
+         @[@{<hint>Hint@}: Consider using %a.@]@]"
       Style.inline_code name
       Location.print_loc usage_loc
-      print_stage usage_stage
-      print_stage intro_stage
+      Env.print_stage usage_stage
+      Env.print_stage intro_stage
+      print_with_quote_promote (name, intro_stage - usage_stage)
 
 let () =
   Location.register_error_of_exn

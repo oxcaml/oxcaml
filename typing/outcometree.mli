@@ -62,7 +62,7 @@ type out_value =
   | Oval_unboxed_tuple of (string option * out_value) list
   | Oval_variant of string * out_value option
   | Oval_lazy of out_value
-  | Oval_code of CamlinternalQuote_bootstrap.Code.t
+  | Oval_code of CamlinternalQuote.Code.t
 
 type out_modality_legacy = Ogf_global
 

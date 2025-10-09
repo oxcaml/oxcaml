@@ -418,7 +418,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
           | Tconstr (path, [_], _)
             when Path.same path Predef.path_code ->
-            Oval_code (O.obj obj : CamlinternalQuote_bootstrap.Code.t)
+            Oval_code (O.obj obj : CamlinternalQuote.Code.t)
 
           | Tconstr(path, ty_list, _) -> begin
               try

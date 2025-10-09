@@ -238,8 +238,8 @@ val make_instruction :
   stack_offset:int ->
   id:InstructionId.t ->
   ?irc_work_list:irc_work_list ->
-  ?available_before:Reg_availability_set.t option ->
-  ?available_across:Reg_availability_set.t option ->
+  ?available_before:Reg_availability_set.t ->
+  ?available_across:Reg_availability_set.t ->
   unit ->
   'a instruction
 

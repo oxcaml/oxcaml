@@ -93,30 +93,13 @@ promote:
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) promote $(ws_main)
 
 .PHONY: fmt
-fmt:
-	$(if $(filter 1,$(V)),,@)find . \( -name "*.ml" -or -name "*.mli" \) | \
-	  xargs -P $$(nproc 2>/dev/null || echo 1) -n 20 ocamlformat -i
-ifndef SKIP_80CH
-	$(if $(filter 1,$(V)),,@)bash scripts/80ch.sh
-endif
+fmt: $(dune_config_targets)
+	$(if $(filter 1,$(V)),,@)bash scripts/fmt.sh
+
 
 .PHONY: check-fmt
-check-fmt:
-	@if [ "$$(git status --porcelain)" != "" ]; then \
-	  echo; \
-	  echo "Tree must be clean before running 'make check-fmt'"; \
-	  exit 1; \
-	fi
-	$(MAKE) fmt
-	@if [ "$$(git diff)" != "" ]; then \
-	  echo; \
-	  echo "The following code was not formatted correctly:"; \
-	  echo "(the + side of the diff is how it should be formatted)"; \
-	  echo "(working copy now contains correctly-formatted code)"; \
-	  echo; \
-	  git diff --no-ext-diff; \
-	  exit 1; \
-	fi
+check-fmt: $(dune_config_targets)
+	$(if $(filter 1,$(V)),,@)bash tools/ci/actions/check-fmt.sh
 
 .PHONY: regen-flambda2-parser
 regen-flambda2-parser: $(dune_config_targets)

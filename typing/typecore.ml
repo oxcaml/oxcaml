@@ -235,7 +235,6 @@ type error =
   | Unrefuted_pattern of pattern
   | Invalid_extension_constructor_payload
   | Not_an_extension_constructor
-  | Invalid_quote_payload
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -269,8 +268,10 @@ type error =
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_access_record_unboxed
   | Block_access_private_record
+  | Block_index_flattened_record of type_expr
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.equate_error }
+  | Block_index_atomic_unsupported
   | Submode_failed of Value.error * submode_reason * Env.shared_context option
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
@@ -296,10 +297,8 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Toplevel_splice
   | Quotation_object
   | Open_inside_quotation
-  | Unsupported_quotation_construct
   | Eval_format
 
 exception Error of Location.t * Env.t * error
@@ -4492,8 +4491,9 @@ let rec is_nonexpansive exp =
   | Texp_override _
   | Texp_letexception _
   | Texp_letop _
-  | Texp_extension_constructor _
-  | Texp_antiquotation _ -> false
+  | Texp_antiquotation _
+  | Texp_extension_constructor _ ->
+    false
   | Texp_exclave e -> is_nonexpansive e
   (* The underlying mutation of exp1 can not be observed since we have the only reference
      to it. In fact, a completely valid model for Texp_overwrite would be to ignore exp1
@@ -6491,7 +6491,7 @@ and type_expect_
         ~attributes:sexp.pexp_attributes
         sargl
   | Pexp_idx (ba, uas) ->
-    Language_extension.assert_enabled ~loc Layouts Language_extension.Beta;
+    Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
     (* Compute the expected base type, to use for disambiguation of the record
        and unboxed record fields *)
     let expected_base_ty ty_expected =
@@ -6529,9 +6529,13 @@ and type_expect_
       | Baccess_field (_, { lbl_mut = Immutable; _ })
       | Baccess_array { mut = Immutable; _ } | Baccess_block (Immutable, _) ->
         false
-      | Baccess_field (_, { lbl_mut = Mutable _; _ })
+      | Baccess_field
+          (_, { lbl_mut = Mutable { mode = _; atomic = Nonatomic }; _ })
       | Baccess_array { mut = Mutable; _ } | Baccess_block (Mutable, _) ->
         true
+      | Baccess_field
+          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }) ->
+        raise (Error(loc, env, Block_index_atomic_unsupported))
     in
     let (el_ty, modality), uas =
       List.fold_left_map
@@ -6559,7 +6563,24 @@ and type_expect_
       | Error err ->
         raise (Error(loc, env, Block_index_modality_mismatch { mut; err }))
     end;
-    let el_ty = if flat_float then Predef.type_unboxed_float else el_ty in
+    let el_ty =
+      if flat_float then
+        let has_unboxed_version p =
+          not (Path.is_unboxed_version p) &&
+          try
+            ignore (Env.find_type (Path.unboxed_version p) env);
+            true
+          with Not_found ->
+            false
+        in
+        match get_desc (expand_head env el_ty) with
+        | Tconstr(p, args, _) when has_unboxed_version p ->
+          newconstr (Path.unboxed_version p) args
+        | _ ->
+          raise (Error(loc, env, Block_index_flattened_record el_ty))
+      else
+        el_ty
+    in
     let ty =
       if mut then
         Predef.type_idx_mut base_ty el_ty
@@ -7256,7 +7277,7 @@ and type_expect_
     | Ok typ ->
       let _ =
         (* Check that the type is valid in a quote too. *)
-        let env' = Env.add_quotation_lock env in
+        let env' = Env.enter_quotation env in
         Typetexp.transl_simple_type env' ~new_var_jkind:Any ~closed:true Alloc.Const.legacy typ in
       let typ = Typetexp.transl_simple_type env ~new_var_jkind:Any ~closed:true Alloc.Const.legacy typ in
       let sort = match type_sort ~why:Function_result ~fixed:false env typ.ctyp_type with
@@ -7398,35 +7419,33 @@ and type_expect_
             exp_type = exp2.exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
-  | Pexp_quotation exp ->
-      let expected_mode' = expected_mode in
+  | Pexp_quote exp ->
+      submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       let jkind = Jkind.Builtin.value ~why:Quotation_result in
-      let new_env = Env.add_quotation_lock env in
+      let new_env = Env.enter_quotation env in
       let ty = newgenvar jkind in
       let quoted_ty = newgenty (Tquote ty) in
       let to_unify = Predef.type_code quoted_ty in
       with_explanation (fun () ->
         unify_exp_types loc env to_unify (generic_instance ty_expected));
-      let arg = type_expect new_env expected_mode' exp (mk_expected ty) in
+      let arg = type_expect new_env mode_legacy exp (mk_expected ty) in
       re {
         exp_desc = Texp_quotation arg;
         exp_loc = loc; exp_extra = [];
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = new_env }
+        exp_env = env }
   | Pexp_splice exp ->
-      if Env.without_open_quotations env then
-        raise (Error (exp.pexp_loc, env, Toplevel_splice));
-      let argument_mode = mode_legacy in
-      let new_env = Env.add_splice_lock env in
-      let ty = newgenconstr Predef.path_code [newgenty (Tquote ty_expected)] in
-      let arg = type_expect new_env argument_mode exp (mk_expected ty) in
+      submode ~loc ~env ~reason:Other Value.legacy expected_mode;
+      let new_env = Env.enter_splice ~loc env in
+      let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
+      let arg = type_expect new_env mode_legacy exp (mk_expected ty) in
       re {
         exp_desc = Texp_antiquotation arg;
         exp_loc = loc; exp_extra = [];
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
-        exp_env = new_env }
+        exp_env = env }
   | Pexp_hole ->
       begin match overwrite with
       | Assigning(typ, fields_mode) ->
@@ -8961,9 +8980,8 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   (* CR layouts v5: non-values in tuples *)
   let unify_as_tuple ty_expected =
     let labeled_subtypes =
-      List.map
-        (fun (label, _) ->
-           label, newgenvar (Jkind.Builtin.value_or_null ~why:Tuple_element))
+      List.map (fun (label, _) -> label,
+                                  newgenvar (Jkind.Builtin.value_or_null ~why:Tuple_element))
       sexpl
     in
     let to_unify = newgenty (Ttuple labeled_subtypes) in
@@ -9095,8 +9113,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
   let constr, locks =
     wrap_disambiguate "This variant expression is expected to have"
       ty_expected_explained
-      (Constructor.disambiguate Env.Positive lid env expected_type)
-      constrs
+      (Constructor.disambiguate Env.Positive lid env expected_type) constrs
   in
   let sargs =
     match sarg with
@@ -9752,7 +9769,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
               type_pattern_list Value existential_context env mutable_flag spatl
                 nvs sorts allow_modules
             ) ~post:(fun (_, _, _, pvs, _) ->
-                iter_pattern_variables_type generalize pvs)
+                       iter_pattern_variables_type generalize pvs)
           in
           (* If recursive, first unify with an approximation of the
              expression *)
@@ -9896,7 +9913,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                - : 'a array -> int -> 'a = <fun>
              ]}
              so we do it anyway. *)
-            generalize exp.exp_type
+              generalize exp.exp_type
           | Some vars ->
               if maybe_expansive exp then
                 lower_contravariant env exp.exp_type;
@@ -11419,9 +11436,6 @@ let report_error ~loc env =
   | Not_an_extension_constructor ->
       Location.errorf ~loc
         "This constructor is not an extension constructor."
-  | Invalid_quote_payload ->
-      Location.errorf ~loc
-        "Invalid quotation payload, an expression is expected."
   | Probe_name_format name ->
       Location.errorf ~loc
         "Illegal characters in probe name `%s'. \
@@ -11606,6 +11620,12 @@ let report_error ~loc env =
   | Block_access_private_record ->
     Location.error ~loc
       "Block indices do not support private records."
+  | Block_index_flattened_record el_ty ->
+    Location.errorf ~loc
+      "This block index points to an element stored as a flattened float.@ \
+       Such block indices require the element type to have an unboxed@ \
+       version, but %a does not."
+      (Style.as_inline_code Printtyp.type_expr) el_ty
   | Block_index_modality_mismatch { mut; err } ->
     let step, Modality.Error(ax, { left; right }) = err in
     let print_modality id ppf m =
@@ -11627,6 +11647,9 @@ let report_error ~loc env =
       (if mut then "mutable" else "immutable")
       what_element_must_do
       (print_modality "not") actual
+  | Block_index_atomic_unsupported ->
+    Location.error ~loc
+      "Block indices do not yet support [@atomic] record fields."
   | Submode_failed(e, submode_reason, shared_context) ->
     let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
     (* CR-soon zqian: move the following hints into the new hint system, then
@@ -11806,10 +11829,6 @@ let report_error ~loc env =
   | Unexpected_hole ->
       Location.errorf ~loc
         "wildcard \"_\" not expected."
-  | Toplevel_splice ->
-      Location.errorf ~loc
-        "Splices ($) are not allowed in the initial stage.\n\
-         Did you forget to place it inside a quotation?"
   | Quotation_object ->
       Location.errorf ~loc
         "Objects cannot be defined inside quotations using %a@ blocks."
@@ -11817,9 +11836,6 @@ let report_error ~loc env =
   | Open_inside_quotation ->
       Location.errorf ~loc
         "Modules cannot be opened inside quotations."
-  | Unsupported_quotation_construct ->
-      Location.errorf ~loc
-        "This quotation construct is not presently supported."
   | Eval_format ->
       Location.errorf ~loc
         "The eval extension takes a single type as its argument, for example %a."

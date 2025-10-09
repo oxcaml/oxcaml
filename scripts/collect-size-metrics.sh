@@ -2,16 +2,17 @@
 set -euo pipefail
 
 # Script to collect file size metrics from _install directory
-# Usage: collect-metrics.sh <install_directory> <output_csv_file> <commit_hash>
+# Usage: collect-metrics.sh <install_directory> <output_csv_file> <commit_hash> <pr_number>
 
-if [ $# -ne 3 ]; then
-    echo "Usage: $0 <install_directory> <output_csv_file> <commit_hash>" >&2
+if [ $# -ne 4 ]; then
+    echo "Usage: $0 <install_directory> <output_csv_file> <commit_hash> <pr_number>" >&2
     exit 1
 fi
 
 INSTALL_DIR="$1"
 CSV_FILE="$2"
 COMMIT_HASH="$3"
+PR_NUMBER="$4"
 
 # Validate input directory exists
 if [ ! -d "$INSTALL_DIR" ]; then
@@ -26,7 +27,7 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 EXTENSIONS="exe opt a cmxa cma cmi cmx cmo cms cmsi cmt cmti o"
 
 # Write CSV header
-echo "timestamp,commit_hash,extension,total_size_bytes" > "$CSV_FILE"
+echo "timestamp,commit_hash,pr_number,extension,total_size_bytes" > "$CSV_FILE"
 
 # Collect metrics for each extension
 for ext in $EXTENSIONS; do
@@ -45,7 +46,7 @@ for ext in $EXTENSIONS; do
         rm -f "$temp_file"
     fi
     # Write to CSV
-    echo "${TIMESTAMP},${COMMIT_HASH},${ext},${total_size}" >> "$CSV_FILE"
+    echo "${TIMESTAMP},${COMMIT_HASH},${PR_NUMBER},${ext},${total_size}" >> "$CSV_FILE"
 done
 
 echo "Generated metrics file: $CSV_FILE"

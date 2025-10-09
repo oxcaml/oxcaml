@@ -12,6 +12,8 @@
 ;*                                                                        *
 ;**************************************************************************
 
+(vendored_dirs external)
+
 ; set warning as error in release profile
 
 (env
@@ -20,10 +22,22 @@
    (:standard -g -principal -w +a-4-9-40-41-42-44-45-48-66-67-70)))
  (main
   (flags
-   (:standard -g -principal -warn-error +A -w +a-4-9-40-41-42-44-45-48-66-67-70)))
+   (:standard
+    -g
+    -principal
+    -warn-error
+    +A
+    -w
+    +a-4-9-40-41-42-44-45-48-66-67-70)))
  (dev
   (flags
-   (:standard -g -principal -w +a-4-9-40-41-42-44-45-48-66-67-70 -warn-error +A))))
+   (:standard
+    -g
+    -principal
+    -w
+    +a-4-9-40-41-42-44-45-48-66-67-70
+    -warn-error
+    +A))))
 
 (include dune.runtime_selection)
 
@@ -40,6 +54,8 @@
 (copy_files# driver/*.ml{,i})
 
 (copy_files# asmcomp/*.ml{,i})
+
+(copy_files# optcomp/*.ml{,i})
 
 (copy_files# backend/*.ml{,i})
 
@@ -251,7 +267,6 @@
   typedecl_properties
   typedecl_separability
   cmt2annot
-  camlinternalQuote_bootstrap
   ; manual update: mli only files
   annot
   outcometree
@@ -301,11 +316,35 @@
   value_rec_types
   asttypes
   cmo_format
-  camlinternalQuote_bootstrap
   cmj_format
   outcometree
   parsetree
-  debug_event))
+  debug_event
+  ; See note below about camlinternalQuote
+  (:include
+   %{project_root}/duneconf/camlinternalquote_if_missing_from_stdlib)))
+
+; Our system compiler doesn't have CamlInternalQuote in its stdlib, so
+; we need to compile it as an additional target, but only for the first
+; stage build.  See also duneconf/dune.
+
+(rule
+ (targets camlinternalQuote.ml)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy#
+   %{project_root}/stdlib/camlinternalQuote.ml
+   %{project_root}/camlinternalQuote.ml)))
+
+(rule
+ (targets camlinternalQuote.mli)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy#
+   %{project_root}/stdlib/camlinternalQuote.mli
+   %{project_root}/camlinternalQuote.mli)))
 
 (library
  (name ocamlbytecomp)
@@ -357,10 +396,7 @@
  (ocamlopt_flags
   (:include %{project_root}/ocamlopt_flags.sexp))
  (libraries ocamlcommon flambda2)
- (modules
-   jsmaindriver
-   jscompile
-   jslibrarian))
+ (modules jsmaindriver jscompile jslibrarian))
 
 (executable
  (name boot_ocamlj)
@@ -494,10 +530,10 @@
   compilenv
   ;; asmcomp/
   asmgen
-  asminstantiator
-  asmlibrarian
   asmlink
-  asmpackager
+  cm_bundle
+  linkenv
+  optlink
   ;; backend/
   afl_instrument
   arch
@@ -635,9 +671,15 @@
   dwarf_state
   dwarf_variables_and_parameters
   dwarf_type
+  ;; optcomp/
+  linkenv
+  optcompile
+  optlibrarian
+  optcomp_intf
+  optlink
+  optpackager
   ;; driver/
   opterrors
-  optcompile
   optmaindriver
   compiler_hooks
   ;; printer/
@@ -685,11 +727,11 @@
  (instrumentation
   (backend bisect_ppx))
  (libraries
-  oxcaml_driver
   memtrace
   flambda2
   flambda2_ui
   flambda2_to_cmm
+  gc_timings
   ocamloptcomp
   ocamlcommon
   unix)
@@ -708,11 +750,11 @@
  (ocamlopt_flags
   (:standard -runtime-variant nnp))
  (libraries
-  oxcaml_driver
   memtrace
   flambda2
   flambda2_ui
   flambda2_to_cmm
+  gc_timings
   ocamloptcomp
   ocamlcommon
   unix)
@@ -730,7 +772,6 @@
  (ocamlc_flags unix.cma)
  (ocamlopt_flags unix.cmxa)
  (libraries
-  oxcaml_driver
   flambda2
   flambda2_ui
   flambda2_to_cmm

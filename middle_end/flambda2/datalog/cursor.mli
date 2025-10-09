@@ -15,10 +15,6 @@
 
 open Datalog_imports
 
-type 'a value_repr
-
-val int_repr : int value_repr
-
 type action
 
 val bind_iterator :
@@ -31,7 +27,7 @@ val unless :
   action
 
 val unless_eq :
-  'k value_repr ->
+  'k Value.repr ->
   'k option Channel.receiver with_name ->
   'k option Channel.receiver with_name ->
   action
@@ -156,7 +152,7 @@ val seminaive_run :
   unit
 
 module With_parameters : sig
-  type ('p, 'v) t
+  type ('p, !'v) t
 
   val print : Format.formatter -> ('p, 'v) t -> unit
 

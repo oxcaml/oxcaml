@@ -8,7 +8,7 @@ title: Syntax
 
 [overview]: ../intro
 [manual]: https://ocaml.org/manual/language.html
-[unboxed types]: ../../unboxed-types/intro
+[unboxed types]: ../../unboxed-types/01-intro
 [nullability]: ../non-modal#nullability
 [externality]: ../non-modal#externality
 

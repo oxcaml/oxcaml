@@ -293,7 +293,7 @@ let print_out_value ppf tree =
     | Oval_unboxed_tuple tree_list ->
         fprintf ppf "@[<1>#(%a)@]" (print_labeled_tree_list print_tree_1 ",")
           tree_list
-    | Oval_code e -> CamlinternalQuote_bootstrap.Code.print ppf e
+    | Oval_code e -> CamlinternalQuote.Code.print ppf e
     | tree -> fprintf ppf "@[<1>(%a)@]" (cautious print_tree_1) tree
   and print_fields first ppf =
     function
@@ -421,6 +421,21 @@ let print_arg_label_and_out_type ppf (lbl : arg_label) ty ~print_type =
   | Labelled l -> fprintf ppf "%a:%a" print_lident l print_type ty
   | Position l -> fprintf ppf "%a:[%%call_pos]" print_lident l
   | Optional l -> fprintf ppf "?%a:%a" print_lident l print_type ty
+
+exception Cannot_cancel
+
+let rec cancel_quote_splice ty =
+  let rec cancel_once = function
+  | Otyp_quote (Otyp_splice t) -> t
+  | Otyp_splice (Otyp_quote t) -> t
+  | Otyp_quote t -> Otyp_quote (cancel_once t)
+  | Otyp_splice t -> Otyp_splice (cancel_once t)
+  | _ -> raise Cannot_cancel
+  in
+  try
+    let ty' = cancel_once ty in
+    cancel_quote_splice ty'
+  with Cannot_cancel -> ty
 
 let rec print_out_type_0 ppf =
   function
@@ -568,12 +583,20 @@ and print_out_type_3 ppf =
   | Otyp_of_kind jk ->
     fprintf ppf "(type@ :@ %a)" print_out_jkind jk
   | Otyp_ret _ -> assert false
-  | Otyp_quote t ->
-      fprintf ppf "@[<1><[@,%a@,]>@]"
-        print_out_type_0 t
-  | Otyp_splice t ->
-      fprintf ppf "@[<1>$@,(%a)@]"
-        print_out_type_0 t
+  | Otyp_quote t -> (
+      let t' = cancel_quote_splice (Otyp_quote t) in
+      match t' with
+      | Otyp_quote t' ->
+        fprintf ppf "@[<1><[@,%a@,]>@]"
+          print_out_type_0 t'
+      | t' -> print_out_type ppf t')
+  | Otyp_splice t -> (
+      let t' = cancel_quote_splice (Otyp_splice t) in
+      match t' with
+      | Otyp_splice t' ->
+        fprintf ppf "@[<1>$@,(%a)@]"
+          print_out_type_0 t'
+      | t' -> print_out_type ppf t')
 and print_out_type ppf typ =
   print_out_type_0 ppf typ
 and print_simple_out_type ppf typ =

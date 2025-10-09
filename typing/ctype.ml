@@ -218,22 +218,6 @@ let increase_global_level () =
 let restore_global_level gl =
   global_level := gl
 
-(**** Control variable stage in inference *)
-
-let rec update_variable_stage stage_offset ty name jkind =
-  if stage_offset = 0 then ()
-  else if stage_offset < 0 then begin
-    let v = newgenvar ?name jkind in
-    let ty' = newgenty (Tquote v) in
-    link_type ty ty';
-    update_variable_stage (stage_offset + 1) v name jkind
-  end else begin
-    let v = newgenvar ?name jkind in
-    let ty' = newgenty (Tsplice v) in
-    link_type ty ty';
-    update_variable_stage (stage_offset - 1) v name jkind
-  end
-
 (**** Control tracing of GADT instances *)
 
 let trace_gadt_instances = ref false
@@ -285,6 +269,22 @@ let newconstr path tyl = newty (Tconstr (path, tyl, ref Mnil))
 let newmono ty = newty (Tpoly(ty, []))
 
 let none = newty (Ttuple [])                (* Clearly ill-formed type *)
+
+(**** Control variable stage in inference *)
+
+let rec update_variable_stage stage_offset ty name jkind =
+  if stage_offset = 0 then ()
+  else if stage_offset < 0 then begin
+    let v = newvar2 ?name (get_level ty) jkind in
+    let ty' = newty2 ~level:(get_level ty) (Tquote v) in
+    link_type ty ty';
+    update_variable_stage (stage_offset + 1) v name jkind
+  end else begin
+    let v = newvar2 ?name (get_level ty) jkind in
+    let ty' = newty2 ~level:(get_level ty) (Tsplice v) in
+    link_type ty ty';
+    update_variable_stage (stage_offset - 1) v name jkind
+  end
 
 (**** information for [Typecore.unify_pat_*] ****)
 
@@ -1752,26 +1752,20 @@ let with_locality_and_forkable_yielding (locality, fy) m =
   Alloc.submode_exn (Alloc.meet_const c m) m';
   m'
 
+(* When user writes an (uncurried) arrow type [A -> B -> C], the corresponding
+implementation is typically [fun a b -> ...], in which case [fun b -> ...] will
+close over [a] and partially apply the original function. Therefore, we let the
+comonadic axes of [B -> C] reflect that.
+On the other hand, the monadic axes of [fun b -> ...] won't be constrained by
+this (but maybe constrained by other things); therefore, we take it to be legacy
+for compatibility. *)
 let curry_mode alloc arg : Alloc.Const.t =
   let acc =
-    Alloc.Const.join
+    Alloc.Comonadic.Const.join
       (Alloc.Const.close_over arg)
       (Alloc.Const.partial_apply alloc)
   in
-  (* For A -> B -> C, we always interpret (B -> C) to be of aliased. This is the
-    legacy mode which helps with legacy compatibility. Arrow types cross
-    uniqueness so we are not losing too much expressvity here. One
-    counter-example is:
-
-    let g : (A -> B -> C) = ...
-    let f (g : A -> unique_ (B -> C)) = ...
-
-    And [f g] would not work, as mode crossing doesn't work deeply into arrows.
-    Our answer to this issue is that, the author of f shouldn't ask B -> C to be
-    unique_. Instead, they should leave it as default which is aliased, and mode
-    crossing it to unique at the location where B -> C is a real value (instead
-    of the return of a function). *)
-  {acc with uniqueness=Uniqueness.Const.Aliased}
+  Alloc.Const.merge {comonadic = acc; monadic = Alloc.Monadic.Const.legacy}
 
 let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
   match locals, get_desc ty with
@@ -2432,9 +2426,7 @@ let rec estimate_type_jkind ~expand_component env ty =
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
-     if tvariant_not_immediate row
-     then Jkind.for_non_float ~why:Polymorphic_variant
-     else Jkind.Builtin.immediate ~why:Immediate_polymorphic_variant
+     Jkind.for_boxed_row row
   | Tunivar { jkind } -> Jkind.disallow_right jkind
   | Tpoly (ty, _) ->
     let context = mk_jkind_context_check_principal_ref env in
@@ -4255,9 +4247,6 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tquote t1, Tquote t2)
       | (Tsplice t1, Tsplice t2) ->
           unify uenv t1 t2
-      | (Tconstr (_,[],_), Tquote _)
-      | (Tquote _, Tconstr (_,[],_)) ->
-          unify uenv t1 t2
       | (Tsplice s1, _) ->
           set_type_desc t2' d2;
           let t =
@@ -4682,7 +4671,7 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
-let rec filter_arrow env t l ~force_tpoly =
+let filter_arrow env t l ~force_tpoly =
   let function_type level =
     let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let k_res = Jkind.Builtin.any ~why:Inside_of_Tarrow in
@@ -4747,8 +4736,6 @@ let rec filter_arrow env t l ~force_tpoly =
       else raise (Filter_arrow_failed
                     (Label_mismatch
                        { got = l; expected = l'; expected_type = t }))
-  | Tsplice ty -> filter_arrow env ty l ~force_tpoly
-  | Tquote ty -> filter_arrow env ty l ~force_tpoly
   | _ ->
       raise (Filter_arrow_failed Not_a_function)
 
@@ -7439,6 +7426,7 @@ let print_global_state fmt global_state =
     print_field fmt "global_level" global_level;
   in
   Format.fprintf fmt "@[<1>{@;%a}@]" print_fields global_state
+
               (*******************************)
               (* checking declaration jkinds *)
               (* this is down here so it can use [is_equal] *)

@@ -8,11 +8,11 @@ title: Block indices
 
 This document describes the language feature and implementation for explicit
 _indices_ into a block. Before reading this document, you may wish to read up
-through the [layouts](./01-intro.md#layouts) section of the main document.
+through the [layouts](../01-intro#layouts) section of the main document.
 
 As a quick example:
 ```ocaml
-open Stdlib_beta
+open Stdlib_stable
 
 type pt = { x : int; y : int }
 type line = { p : pt#; q : pt# }
@@ -76,7 +76,7 @@ immutable block indices), then an `idx_imm` is created.
 
 **Using indices.** Naturally, block indices can be used to read and write
 within blocks. This can be done via the `Idx_imm.unsafe_get`,
-`Idx_mut.unsafe_get`, and `Idx_mut.unsafe_set` functions in [`Stdlib_beta`](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_beta
+`Idx_mut.unsafe_get`, and `Idx_mut.unsafe_set` functions in [`Stdlib_stable`](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_stable
 ).
 (These functions are unsafe only for array indices, which may be out of range.
 Uses of block indices built without the use of an array-indexing operation are
@@ -138,7 +138,7 @@ let drop_last_to_y_axis (s : line Stack.t) =
    `float#`.
 4. Indices to some records containing both values and non-values, and occupying
    over 2^16 bytes, cannot be created. See [Representation of block
-   indices](#Representation-of-block-indices) for details.
+   indices](#representation-of-block-indices) for details.
 5. Indices to structures with non-default modalities are not supported.
    Specifically, the composition of modalities of the accesses of an `idx_imm`
    must have the identity modality, while the composition of modalities of the
@@ -161,7 +161,7 @@ type c = { mutable b : b; s : string }
 The record `c` presents an interesting problem for block indices: the fields of
 its contained unboxed records `a` and `b` are not actually contiguous at runtime
 when using the native code compiler. This problem is caused by the
-[mixed block representation](01-intro.md#the-mixed-block-representation),
+[mixed block representation](../01-intro#the-mixed-block-representation),
 which mandates that we reorder fields so that values come before unboxed types.
 
 While the layout of `c` has the shape

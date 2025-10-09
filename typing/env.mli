@@ -528,14 +528,11 @@ val add_closure_lock : Mode.Hint.pinpoint_desc
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
-val add_local_env_lock : t -> t
-val add_quotation_lock : t -> t
-val add_splice_lock : t -> t
+val enter_quotation : t -> t
+val enter_splice : loc:Location.t -> t -> t
 
-val without_open_quotations : t -> bool
 val has_open_quotations : t -> bool
 val stage : t -> int
-val quotation_locks_offset : locks -> int option
 
 (* Initialize the cache of in-core module interfaces. *)
 val reset_cache: preserve_persistent_env:bool -> unit
@@ -632,6 +629,7 @@ type error =
   | Illegal_value_name of Location.t * string
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t; }
+  | Toplevel_splice of Location.t
 
 exception Error of error
 
@@ -724,3 +722,5 @@ type address_head =
 val address_head : address -> address_head
 
 val sharedness_hint : Format.formatter -> shared_context -> unit
+
+val print_stage : Format.formatter -> int -> unit

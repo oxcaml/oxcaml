@@ -14,44 +14,34 @@ jobs:
         os: [ubuntu-latest]
         ocaml-compiler:
           - "4.14.0"
+          # this is no longer true, but I can't change it because this specific name of
+          # test is a "required" check. We should change that...
 
     steps:
     - name: Checkout the OxCaml repo
       uses: actions/checkout@master
-      with:
-        path: 'oxcaml'
 
     - name: Checkout the parent branch
-      working-directory: oxcaml
       run: git fetch origin HEAD --deepen 1
 
-    - name: Setup OCaml ${{ matrix.ocaml-compiler }}
+    - name: Pretend we're running in a container (makes setup-ocaml go faster)
+      run: sudo touch /.dockerenv
+      # makes setup-ocaml skip apt-get, which is slow on first invocation
+
+    - name: Set up Opam
       uses: ocaml/setup-ocaml@v3
       with:
-        ocaml-compiler: ${{ matrix.ocaml-compiler }}
-
-    - name: Install a recent version of re
-      run: opam install 're>=1.10.0'
-
-    - name: Install ocamlformat 0.24.1
-      run: opam pin -y ocamlformat 0.24.1
-
-    - name: autoconf
-      working-directory: oxcaml
-      run: autoconf
-
-    - name: configure
-      working-directory: oxcaml
-      run: |
-        ./configure \
-          --prefix=$GITHUB_WORKSPACE/_install \
-          --enable-middle-end=flambda2 \
-          --with-dune=/bin/false
+        ocaml-compiler: oxcaml-ci-deps.5.2.0
+        opam-repositories: |
+          local: file://${{ github.workspace }}/tools/ci/local-opam
+          default: https://github.com/ocaml/opam-repository.git
+        opam-disable-sandboxing: true
+        opam-pin: false
+        cache-prefix: ${{ matrix.os }}-v1
 
     - name: 'Check for the "skip 80ch" PR tag'
       if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
       run: echo SKIP_80CH=y >> "$GITHUB_ENV"
 
-    - name: Check formatting of Flambda 2 and Cfg code
-      working-directory: oxcaml
-      run: opam exec -- make check-fmt
+    - name: Check OCaml Formatting
+      run: opam exec -- bash tools/ci/actions/check-fmt.sh

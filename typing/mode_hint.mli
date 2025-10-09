@@ -49,10 +49,15 @@ type pinpoint_desc =
 (** A pinpoint is a location in the source code, accompanied by additional description *)
 type pinpoint = Location.t * pinpoint_desc
 
+type polarity =
+  | Monadic
+  | Comonadic
+
 type closure_details =
   { closure : pinpoint_desc;
     (* CR-soon zqian: add location to [closure]. *)
-    closed : pinpoint
+    closed : pinpoint;
+    polarity : polarity
   }
 
 (** Hint for morphisms. When acompanied by a destination [pinpoint], [morph]

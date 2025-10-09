@@ -2931,7 +2931,7 @@ unboxed_access:
 
 spliceable_expr:
   | LESSLBRACKET seq_expr RBRACKETGREATER
-      { mkexp ~loc:$sloc (Pexp_quotation ($2)) }
+      { mkexp ~loc:$sloc (Pexp_quote ($2)) }
   | LPAREN seq_expr RPAREN
       { reloc_exp ~loc:$sloc $2 }
   | LPAREN seq_expr error
@@ -3224,7 +3224,7 @@ block_access:
   | DOLLAR spliceable_expr
       { Pexp_splice $2 }
   | LESSLBRACKET seq_expr RBRACKETGREATER
-      { Pexp_quotation $2 }
+      { Pexp_quote $2 }
   | LESSLBRACKET seq_expr error
       { unclosed "<[" $loc($1) "]>" $loc($3) }
 ;
@@ -5041,27 +5041,27 @@ operator:
 %inline infix_operator:
   | op = INFIXOP0 { op }
   /* Still support the two symbols as infix operators */
-  | AT             {"@"}
-  | ATAT           {"@@"}
-  | op = INFIXOP1  { op }
-  | op = INFIXOP2  { op }
-  | op = infixop3  { op }
-  | op = INFIXOP4  { op }
-  | PLUS            {"+"}
-  | PLUSDOT        {"+."}
-  | PLUSEQ         {"+="}
-  | MINUS           {"-"}
-  | MINUSDOT       {"-."}
-  | STAR            {"*"}
-  | PERCENT         {"%"}
-  | EQUAL           {"="}
-  | LESS            {"<"}
-  | GREATER         {">"}
-  | OR             {"or"}
-  | BARBAR         {"||"}
-  | AMPERSAND       {"&"}
-  | AMPERAMPER     {"&&"}
-  | COLONEQUAL     {":="}
+  | AT            {"@"}
+  | ATAT          {"@@"}
+  | op = INFIXOP1 { op }
+  | op = INFIXOP2 { op }
+  | op = infixop3 { op }
+  | op = INFIXOP4 { op }
+  | PLUS           {"+"}
+  | PLUSDOT       {"+."}
+  | PLUSEQ        {"+="}
+  | MINUS          {"-"}
+  | MINUSDOT      {"-."}
+  | STAR           {"*"}
+  | PERCENT        {"%"}
+  | EQUAL          {"="}
+  | LESS           {"<"}
+  | GREATER        {">"}
+  | OR            {"or"}
+  | BARBAR        {"||"}
+  | AMPERSAND      {"&"}
+  | AMPERAMPER    {"&&"}
+  | COLONEQUAL    {":="}
 ;
 index_mod:
 | { "" }

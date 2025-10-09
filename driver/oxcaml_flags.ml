@@ -37,7 +37,7 @@ let cfg_eliminate_dead_trap_handlers = ref false  (* -cfg-eliminate-dead-trap-ha
 
 let cfg_prologue_validate = ref false    (* -[no-]cfg-prologue-validate *)
 let cfg_prologue_shrink_wrap = ref false    (* -[no-]cfg-prologue-shrink-wrap *)
-let cfg_prologue_shrink_wrap_threshold = ref 16384
+let cfg_prologue_shrink_wrap_threshold = ref 16384 
                                        (* -cfg-prologue-shrink-wrap-threshold *)
 
 let reorder_blocks_random = ref None    (* -reorder-blocks-random seed *)
@@ -107,8 +107,10 @@ let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
 
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked
+type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
 type opt_level = Oclassic | O2 | O3
 type 'a or_default = Set of 'a | Default
+
 
 let dump_inlining_paths = ref false
 let davail = ref false
@@ -150,8 +152,9 @@ module Flambda2 = struct
     let cse_depth = 2
     let join_depth = 5
     let join_algorithm = Binary
-    let function_result_types = Never
+    let function_result_types : function_result_types = Never
     let enable_reaper = false
+    let reaper_preserve_direct_calls : reaper_preserve_direct_calls = Zero_alloc
     let unicode = true
     let kind_checks = false
   end
@@ -166,6 +169,7 @@ module Flambda2 = struct
     join_algorithm : join_algorithm;
     function_result_types : function_result_types;
     enable_reaper : bool;
+    reaper_preserve_direct_calls : reaper_preserve_direct_calls;
     unicode : bool;
     kind_checks : bool;
   }
@@ -180,6 +184,7 @@ module Flambda2 = struct
     join_algorithm = Default.join_algorithm;
     function_result_types = Default.function_result_types;
     enable_reaper = Default.enable_reaper;
+    reaper_preserve_direct_calls = Default.reaper_preserve_direct_calls;
     unicode = Default.unicode;
     kind_checks = Default.kind_checks;
   }
@@ -216,6 +221,7 @@ module Flambda2 = struct
   let kind_checks = ref Default
   let function_result_types = ref Default
   let enable_reaper = ref Default
+  let reaper_preserve_direct_calls = ref Default
 
   module Dump = struct
     type target = Nowhere | Main_dump_stream | File of Misc.filepath

@@ -248,53 +248,27 @@ module Is_modal = struct
     | _ -> None
 end
 
-(* CR zqian: refactor to remove the following two functions *)
 let zap_axis_to_floor
   : type a. a Mode.Value.Axis.t -> Mode.Value.l -> a
   = fun ax m ->
   match ax with
-  | Comonadic Areality ->
-      Mode.Regionality.zap_to_floor (Mode.Value.proj_comonadic Areality m)
-  | Comonadic Linearity ->
-      Mode.Linearity.zap_to_floor (Mode.Value.proj_comonadic Linearity m)
-  | Comonadic Portability ->
-      Mode.Portability.zap_to_floor (Mode.Value.proj_comonadic Portability  m)
-  | Comonadic Forkable ->
-      Mode.Forkable.zap_to_floor (Mode.Value.proj_comonadic Forkable m)
-  | Comonadic Yielding ->
-      Mode.Yielding.zap_to_floor (Mode.Value.proj_comonadic Yielding m)
-  | Comonadic Statefulness ->
-      Mode.Statefulness.zap_to_floor
-        (Mode.Value.proj_comonadic Statefulness m)
-  | Monadic Uniqueness ->
-      Mode.Uniqueness.zap_to_floor (Mode.Value.proj_monadic Uniqueness m)
-  | Monadic Contention ->
-      Mode.Contention.zap_to_floor (Mode.Value.proj_monadic Contention m)
-  | Monadic Visibility ->
-      Mode.Visibility.zap_to_floor (Mode.Value.proj_monadic Visibility m)
+  | Comonadic ax ->
+      Mode.Value.Comonadic.Per_axis.zap_to_floor ax
+        (Mode.Value.proj_comonadic ax m)
+  | Monadic ax ->
+      Mode.Value.Monadic.Per_axis.zap_to_floor ax
+        (Mode.Value.proj_monadic ax m)
 
 let zap_axis_to_ceil
   : type a. a Mode.Value.Axis.t -> Mode.Value.r -> a
   = fun ax m ->
   match ax with
-  | Comonadic Areality ->
-      Mode.Regionality.zap_to_ceil (Mode.Value.proj_comonadic Areality m)
-  | Comonadic Linearity ->
-      Mode.Linearity.zap_to_ceil (Mode.Value.proj_comonadic Linearity m)
-  | Comonadic Portability ->
-      Mode.Portability.zap_to_ceil (Mode.Value.proj_comonadic Portability m)
-  | Comonadic Forkable ->
-      Mode.Forkable.zap_to_ceil (Mode.Value.proj_comonadic Forkable m)
-  | Comonadic Yielding ->
-      Mode.Yielding.zap_to_ceil (Mode.Value.proj_comonadic Yielding m)
-  | Comonadic Statefulness ->
-      Mode.Statefulness.zap_to_ceil (Mode.Value.proj_comonadic Statefulness m)
-  | Monadic Uniqueness ->
-      Mode.Uniqueness.zap_to_ceil (Mode.Value.proj_monadic Uniqueness m)
-  | Monadic Contention ->
-      Mode.Contention.zap_to_ceil (Mode.Value.proj_monadic Contention m)
-  | Monadic Visibility ->
-      Mode.Visibility.zap_to_ceil (Mode.Value.proj_monadic Visibility m)
+  | Comonadic ax ->
+      Mode.Value.Comonadic.Per_axis.zap_to_ceil ax
+        (Mode.Value.proj_comonadic ax m)
+  | Monadic ax ->
+      Mode.Value.Monadic.Per_axis.zap_to_ceil ax
+        (Mode.Value.proj_monadic ax m)
 
 let print_out_mode
 : type a. ?in_structure:_ -> a Mode.Value.Axis.t -> a -> _
@@ -779,7 +753,7 @@ let core env id x =
         (Printtyp.tree_of_value_description id diff.expected)
         mode2
         (Includecore.report_value_mismatch
-           "the first" "the second" env) diff.symptom
+           "the left-hand side" "the right-hand side" env) diff.symptom
         show_locs (diff.got.val_loc, diff.expected.val_loc)
         Printtyp.Conflicts.print_explanations
   | Err.Modalities e ->

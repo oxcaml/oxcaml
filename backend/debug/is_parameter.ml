@@ -33,7 +33,7 @@ include Identifiable.Make (struct
     match t1, t2 with
     | Local, Local -> 0
     | Parameter { index = index1 }, Parameter { index = index2 } ->
-      Stdlib.compare index1 index2
+      Int.compare index1 index2
     | Local, Parameter _ -> -1
     | Parameter _, Local -> 1
 

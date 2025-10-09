@@ -280,7 +280,6 @@ type error =
   | Unrefuted_pattern of Typedtree.pattern
   | Invalid_extension_constructor_payload
   | Not_an_extension_constructor
-  | Invalid_quote_payload
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -314,8 +313,10 @@ type error =
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_access_record_unboxed
   | Block_access_private_record
+  | Block_index_flattened_record of type_expr
   | Block_index_modality_mismatch of
       { mut : bool; err : Mode.Modality.equate_error }
+  | Block_index_atomic_unsupported
   | Submode_failed of Mode.Value.error * submode_reason *
       Env.shared_context option
   | Curried_application_complete of
@@ -342,10 +343,8 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Toplevel_splice
   | Quotation_object
   | Open_inside_quotation
-  | Unsupported_quotation_construct
   | Eval_format
 
 exception Error of Location.t * Env.t * error

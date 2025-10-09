@@ -117,8 +117,8 @@ module Instruction = struct
       stack_offset = -1;
       id = InstructionId.none;
       irc_work_list = Unknown_list;
-      available_before = None;
-      available_across = None
+      available_before = Reg_availability_set.Unreachable;
+      available_across = Reg_availability_set.Unreachable
     }
 
   let compare (left : t) (right : t) : int =
@@ -261,6 +261,60 @@ module Move = struct
       ~arg:[| from |] ~res:[| to_ |] ~id ()
 
   let to_string = function Plain -> "move" | Load -> "load" | Store -> "store"
+end
+
+(* When inserting a spill instruction like `spill-t/4567[s:0] <- t/1234`, we
+   must insert it after any [Name_for_debugger] instructions that name the
+   register being spilled (t/1234 in this example). This ensures that the
+   spilled register (spill-t/4567) will inherit the debug name. We check
+   register locations using [Reg.same_loc] rather than stamps, since the
+   register allocator can reuse the same location for registers with different
+   stamps. *)
+module Insert_skipping_name_for_debugger = struct
+  (* Check if a [Name_for_debugger] instruction names a register at the same
+     location as [reg]. *)
+  let names_reg_at_location (instr : Cfg.basic Cfg.instruction) (reg : Reg.t) :
+      bool =
+    match instr.desc with
+    | Op (Name_for_debugger { regs; _ }) ->
+      Array.exists ~f:(fun named_reg -> Reg.same_loc named_reg reg) regs
+    | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
+    | Stack_check _ | Op _ ->
+      false
+    [@@ocaml.warning "-4"]
+
+  (* Find the insertion point after skipping [Name_for_debugger] instructions
+     that name [reg]. *)
+  let rec find_insertion_point_after (cell : Cfg.basic Cfg.instruction DLL.cell)
+      (reg : Reg.t) : Cfg.basic Cfg.instruction DLL.cell =
+    match DLL.next cell with
+    | None -> cell
+    | Some next_cell ->
+      let next_instr = DLL.value next_cell in
+      if names_reg_at_location next_instr reg
+      then find_insertion_point_after next_cell reg
+      else cell
+
+  (* Insert [instr] after [cell], skipping over any [Name_for_debugger]
+     instructions that name [reg]. *)
+  let insert_after (cell : Cfg.basic Cfg.instruction DLL.cell)
+      (instr : Cfg.basic Cfg.instruction) ~(reg : Reg.t) : unit =
+    let insertion_cell = find_insertion_point_after cell reg in
+    DLL.insert_after insertion_cell instr
+
+  (* Add [instr] at the beginning of [list], but after any [Name_for_debugger]
+     instructions at the start that name [reg]. *)
+  let add_begin (list : Cfg.basic_instruction_list)
+      (instr : Cfg.basic Cfg.instruction) ~(reg : Reg.t) : unit =
+    match DLL.hd_cell list with
+    | None -> DLL.add_begin list instr
+    | Some first_cell ->
+      let first_instr = DLL.value first_cell in
+      if names_reg_at_location first_instr reg
+      then
+        (* Skip forward to find the right insertion point *)
+        insert_after first_cell instr ~reg
+      else DLL.add_begin list instr
 end
 
 let same_reg_class : Reg.t -> Reg.t -> bool =
