@@ -707,22 +707,26 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
   : int * unit Lambda.mixed_block_element =
   match field with
   | Value ->
-    let externality_implied_value_kind =
+    let is_external =
       match externality with
-      | None -> Pgenval
-      | Some ext -> if Jkind_axis.Externality.le ext External64 then Pintval else Pgenval
+      | None -> false
+      | Some ext -> Jkind_axis.Externality.le ext External64
     in
     begin match ty with
     | Some ty ->
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
-      (* Could always improve kind with externality_implied_value_kind here,
-         but this would cover up problems in the value_kind computation *)
+      (* This might cover up problems in the value_kind computation *)
+      let kind =
+        match kind, is_external with
+        | { raw_kind = Pgenval; _ }, true -> { kind with raw_kind = Pintval }
+        | _ -> kind
+      in
       num_nodes_visited, Value kind
     | None ->
       (* When exploring the type structure fails, use externality information *)
-      num_nodes_visited, Value (nullable externality_implied_value_kind)
+      num_nodes_visited, Value (nullable (if is_external then Pintval else Pgenval))
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
