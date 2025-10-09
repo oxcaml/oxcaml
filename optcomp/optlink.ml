@@ -77,7 +77,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     | Unit (file_name, info, crc) ->
       (* This is a cmx file. It must be linked in any case. *)
       Linkenv.remove_required info.ui_unit;
-      Linkenv.add_quoted_globals info.ui_unit info.ui_quoted_globals;
+      Linkenv.add_quoted_globals info.ui_quoted_globals;
       List.iter
         (fun import -> Linkenv.add_required (file_name, None) import)
         info.ui_imports_cmx;
@@ -157,7 +157,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               let quoted_globals =
                 imports_list infos.lib_quoted_globals info.li_quoted_globals
               in
-              Linkenv.add_quoted_globals info.li_name quoted_globals;
+              Linkenv.add_quoted_globals quoted_globals;
               let dynunit : Cmxs_format.dynunit option =
                 if not shared
                 then None
@@ -232,10 +232,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           Linkenv.is_required (Compilation_unit.of_string "Camlinternaleval")
         in
         let quoted_globals = Linkenv.get_quoted_globals () in
-        let needs_metaprogramming =
-          uses_eval || not (CU.Name.Set.is_empty quoted_globals)
-        in
-        if needs_metaprogramming && not Backend.supports_metaprogramming
+        if uses_eval && not Backend.supports_metaprogramming
         then
           raise
             (Linkenv.Error

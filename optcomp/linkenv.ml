@@ -48,7 +48,7 @@ exception Error of error
 
 let quoted_globals = ref CU.Name.Set.empty
 
-let add_quoted_globals unit globals =
+let add_quoted_globals globals =
   quoted_globals
     := List.fold_left
          (fun globals global -> CU.Name.Set.add global globals)

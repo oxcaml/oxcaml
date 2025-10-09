@@ -203,7 +203,7 @@ end) : S = struct
             ~crc_with_unit:(Some (ui.ui_unit, Env.crc_of_unit modname))
           :: filter (Linkenv.extract_crc_interfaces ());
         ui_imports_cmx = filter (Linkenv.extract_crc_implementations ());
-        ui_quoted_globals = [] (* TODO *);
+        ui_quoted_globals = [] (* CR jrickard: Metaprogramming support. *);
         ui_format = format;
         ui_generic_fns =
           { curry_fun =

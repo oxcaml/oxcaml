@@ -61,7 +61,7 @@ val add_required : filepath * CU.Name.t option -> Import_info.t -> unit
 
 val remove_required : CU.t -> unit
 
-val add_quoted_globals : CU.t -> CU.Name.t list -> unit
+val add_quoted_globals : CU.Name.t list -> unit
 
 val get_quoted_globals : unit -> CU.Name.Set.t
 
