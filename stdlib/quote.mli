@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR aivaskovic: This file has not been code reviewed *)
+
 #syntax quotations on
 
 module Expr : sig

@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR aivaskovic: This file has not been code reviewed *)
+
 open Asttypes
 open Lambda
 open Misc

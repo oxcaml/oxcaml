@@ -26,6 +26,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR aivaskovic: This file has not been code reviewed *)
+
 type 'a lam = 'a
 
 module Stamp : sig
