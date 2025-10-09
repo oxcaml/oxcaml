@@ -1472,9 +1472,10 @@ let layout_of_ty_for_idx_set env loc ty =
     thing. *)
   let jkind = Ctype.type_jkind env ty in
   let mbe = Typedecl.mixed_block_element env ty jkind in
+  let context = Ctype.mk_jkind_context_check_principal env in
   let mbe =
     transl_mixed_block_element env (to_location loc)
-    (Some (Jkind_mod_bounds.externality jkind.jkind.mod_bounds)) ty mbe
+    (Some (Jkind.get_externality_upper_bound ~context jkind)) ty mbe
   in
   layout_of_mixed_block_element_for_idx_set mbe
 
