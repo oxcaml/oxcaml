@@ -426,7 +426,7 @@ end = struct
     vs |> List.iter (fun v ->
       match get_desc v with
       | Tunivar { name; jkind } ->
-          set_type_desc v (Tvar { name; jkind })
+         set_type_desc v (Tvar { name; jkind })
       | _ -> assert false);
     vs
 
