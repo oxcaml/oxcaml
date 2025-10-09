@@ -4255,9 +4255,6 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tquote t1, Tquote t2)
       | (Tsplice t1, Tsplice t2) ->
           unify uenv t1 t2
-      | (Tconstr (_,[],_), Tquote _)
-      | (Tquote _, Tconstr (_,[],_)) ->
-          unify uenv t1 t2
       | (Tsplice s1, _) ->
           set_type_desc t2' d2;
           let t =
