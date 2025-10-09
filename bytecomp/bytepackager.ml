@@ -222,7 +222,7 @@ let build_global_target ~ppf_dump oc ~packed_compilation_unit state members
   in
   if !Clflags.dump_rawlambda then
     Format.fprintf ppf_dump "%a@." Printlambda.lambda lam;
-  let lam = Simplif.simplify_lambda lam in
+  let lam = Simplif.simplify_lambda_for_bytecode lam in
   if !Clflags.dump_lambda then
     Format.fprintf ppf_dump "%a@." Printlambda.lambda lam;
   let blam =

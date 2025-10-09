@@ -124,7 +124,11 @@ end) : S = struct
         let main_module_block_size, code =
           Translmod.transl_package components coercion
         in
-        let code = Simplif.simplify_lambda code in
+        let code =
+          Simplif.simplify_lambda code
+            ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
+            ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
+        in
         let main_module_block_format : Lambda.main_module_block_format =
           Mb_struct { mb_size = main_module_block_size }
         in
