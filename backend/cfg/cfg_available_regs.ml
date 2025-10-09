@@ -76,7 +76,11 @@ module Domain = struct
 
   let join ({ avail_before = left_avail } : t)
       ({ avail_before = right_avail } : t) : t =
-    let res = { avail_before = RAS.inter left_avail right_avail } in
+    let res =
+      { avail_before =
+          RAS.inter_removing_conflicting_debug_info left_avail right_avail
+      }
+    in
     dprintf "JOIN: %a\n%a\n->%a\n%!" ras_print left_avail ras_print right_avail
       ras_print res.avail_before;
     res
