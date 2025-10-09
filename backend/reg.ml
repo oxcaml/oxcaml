@@ -280,7 +280,10 @@ let same_loc left right =
 let same_loc_fatal_on_unknown ~fatal_message left right =
   match left.loc with
   | Unknown -> Misc.fatal_error fatal_message
-  | Reg _ | Stack _ -> same_loc left right
+  | Reg _ | Stack _ ->
+    match right.loc with
+    | Unknown -> Misc.fatal_error fatal_message
+    | Reg _ | Stack _ -> same_loc left right
 
 let compare_loc left right =
   let loc_cmp = compare_location left.loc right.loc in
@@ -300,7 +303,10 @@ let compare_loc left right =
 let compare_loc_fatal_on_unknown ~fatal_message left right =
   match left.loc with
   | Unknown -> Misc.fatal_error fatal_message
-  | Reg _ | Stack _ -> compare_loc left right
+  | Reg _ | Stack _ ->
+    match right.loc with
+    | Unknown -> Misc.fatal_error fatal_message
+    | Reg _ | Stack _ -> compare_loc left right
 
 let is_of_type_addr t =
   match t.typ with

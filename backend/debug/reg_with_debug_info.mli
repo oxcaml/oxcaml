@@ -84,13 +84,13 @@ module Set : sig
   val of_array : reg_with_debug_info array -> t
 
   val mem_reg : t -> Reg.t -> bool
+
   val mem_reg_by_loc : t -> Reg.t -> bool
 
   val find_reg_exn : t -> Reg.t -> reg_with_debug_info
 
   val find_reg_with_same_location_exn : t -> Reg.t -> reg_with_debug_info
 
-  val filter_reg : t -> Reg.t -> t
   val filter_reg_by_loc : t -> Reg.t -> t
 
   val forget_debug_info : t -> Reg.Set.t

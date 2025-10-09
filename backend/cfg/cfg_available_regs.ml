@@ -68,7 +68,7 @@ let check_invariants :
         args print_instr instr
 
 module Domain = struct
-  type t = { avail_before : Reg_availability_set.t } [@@unboxed]
+  type t = { avail_before : RAS.t } [@@unboxed]
 
   let bot = { avail_before = Unreachable }
 
@@ -165,7 +165,12 @@ module Transfer = struct
                  might have been elided, and the stamps might not match between
                  the live set and a [Reg.t] we have which is actually in it. *)
               Reg.Set.exists
-                (fun live_reg -> Reg.same_loc live_reg (RD.reg reg))
+                (fun live_reg ->
+                  Reg.same_loc_fatal_on_unknown
+                    ~fatal_message:
+                      "Found Unknown register location, but we should now be \
+                       post-register allocation"
+                    live_reg (RD.reg reg))
                 instr.live
             in
             let remains_available =

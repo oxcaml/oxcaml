@@ -56,7 +56,9 @@ module Debug_info = struct
         if c <> 0
         then c
         else
-          let c = Option.compare Int.compare which_parameter1 which_parameter2 in
+          let c =
+            Option.compare Int.compare which_parameter1 which_parameter2
+          in
           if c <> 0
           then c
           else
@@ -138,9 +140,12 @@ let assigned_to_stack t =
   | Stack (Local _ | Incoming _ | Outgoing _) -> true
   | Stack (Domainstate _) | Reg _ | Unknown -> false
 
+let fatal_message =
+  "Found Unknown register location, but we should now be post-register \
+   allocation"
+
 let regs_at_same_location (reg1 : Reg.t) (reg2 : Reg.t) =
-  Reg.same_loc_fatal_on_unknown
-    ~fatal_message:"regs_at_same_location got Unknown locations" reg1 reg2
+  Reg.same_loc_fatal_on_unknown ~fatal_message reg1 reg2
 
 let at_same_location t (reg : Reg.t) = regs_at_same_location t.reg reg
 
@@ -174,12 +179,15 @@ module Set = struct
   let mem_reg t (reg : Reg.t) = exists (fun t -> Reg.same t.reg reg) t
 
   let mem_reg_by_loc t (reg : Reg.t) =
-    exists (fun t -> Reg.same_loc t.reg reg) t
+    exists (fun t -> Reg.same_loc_fatal_on_unknown ~fatal_message t.reg reg) t
 
-  let filter_reg t (reg : Reg.t) = filter (fun t -> not (Reg.same t.reg reg)) t
-
+  (* CR gyorsh/mshinwell: consider renaming filter_reg_by_loc to something like
+     remove_reg_by_loc to be consistent with the positive meaning of filtering
+     on sets. *)
   let filter_reg_by_loc t (reg : Reg.t) =
-    filter (fun t -> not (Reg.same_loc t.reg reg)) t
+    filter
+      (fun t -> not (Reg.same_loc_fatal_on_unknown ~fatal_message t.reg reg))
+      t
 
   (* CR-someday mshinwell: Well, it looks like we should have used a map.
      mshinwell: Also see @chambart's suggestion on GPR#856. *)
@@ -190,7 +198,12 @@ module Set = struct
     | _ -> assert false
 
   let find_reg_with_same_location_exn t (reg : Reg.t) =
-    match elements (filter (fun t -> Reg.same_loc t.reg reg) t) with
+    match
+      elements
+        (filter
+           (fun t -> Reg.same_loc_fatal_on_unknown ~fatal_message t.reg reg)
+           t)
+    with
     | [] -> raise Not_found
     | reg :: _ -> reg
 
@@ -221,7 +234,7 @@ module Order_distinguishing_names_and_locations = struct
     | None, Some _ -> -1
     | Some _, None -> 1
     | Some di1, Some di2 ->
-      let c = V.compare di1.holds_value_of di2.holds_value_of in
+      let c = Debug_info.compare di1 di2 in
       if c <> 0
       then c
       else Reg.compare_loc_fatal_on_unknown ~fatal_message t1.reg t2.reg
@@ -237,10 +250,13 @@ module Set_distinguishing_names_and_locations = struct
 
   let to_set (t : t) : Set.t = fold Set.add t Set.empty
 
-  let mem_reg_by_loc t (r : Reg.t) = exists (fun t -> Reg.same_loc t.reg r) t
+  let mem_reg_by_loc t (r : Reg.t) =
+    exists (fun t -> Reg.same_loc_fatal_on_unknown ~fatal_message t.reg r) t
 
   let filter_reg_by_loc t (r : Reg.t) =
-    filter (fun t -> not (Reg.same_loc t.reg r)) t
+    filter
+      (fun t -> not (Reg.same_loc_fatal_on_unknown ~fatal_message t.reg r))
+      t
 
   let without_debug_info regs =
     Reg.Set.fold
@@ -263,9 +279,8 @@ module Set_distinguishing_names_and_locations = struct
       Set.print_el ppf (elements t)
 
   let find_reg_with_same_location_exn t (r : Reg.t) =
-    match elements (filter (fun t -> Reg.same_loc t.reg r) t) with
-    | [] -> raise Not_found
-    | reg :: _ -> reg
+    filter (fun t -> Reg.same_loc_fatal_on_unknown ~fatal_message t.reg r) t
+    |> choose
 end
 
 module Map_distinguishing_names_and_locations =

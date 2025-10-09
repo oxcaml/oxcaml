@@ -41,10 +41,8 @@ let make_instr desc arg res dbg =
     stack_offset = Cfg.invalid_stack_offset;
     id = next_instr_id ();
     irc_work_list = Unknown_list;
-    available_before =
-      Reg_availability_set.Ok
-        Reg_with_debug_info.Set_distinguishing_names_and_locations.empty;
-    available_across = Reg_availability_set.Unreachable
+    available_before = Unreachable;
+    available_across = Unreachable
   }
 
 type t =

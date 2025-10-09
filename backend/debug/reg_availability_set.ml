@@ -12,8 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-[@@@ocaml.warning "+a-4-9-30-40-41-42"]
-
+open! Int_replace_polymorphic_compare
 module RD = Reg_with_debug_info
 
 module RD_quotient_set =
@@ -26,14 +25,6 @@ type t =
   | Unreachable
 
 let of_list rds = Ok (RD_quotient_set.of_list rds)
-
-let of_rd_set (s : RD.Set.t) : t =
-  Ok (RD.Set_distinguishing_names_and_locations.of_set s)
-
-let to_rd_set (t : t) : RD.Set.t option =
-  match t with
-  | Unreachable -> None
-  | Ok s -> Some (RD.Set_distinguishing_names_and_locations.to_set s)
 
 let union t1 t2 =
   match t1, t2 with

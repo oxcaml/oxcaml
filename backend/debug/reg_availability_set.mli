@@ -22,10 +22,6 @@ type t =
 
 val of_list : Reg_with_debug_info.t list -> t
 
-val of_rd_set : Reg_with_debug_info.Set.t -> t
-
-val to_rd_set : t -> Reg_with_debug_info.Set.t option
-
 val union : t -> t -> t
 
 val inter : t -> t -> t

@@ -16,6 +16,9 @@
 
 [@@@ocaml.warning "+a-40-41-42"]
 
+(* CR gyorsh/mshinwell: This pass needs fixing for register availability set
+   propagation *)
+
 open! Int_replace_polymorphic_compare
 open Linear
 
@@ -94,8 +97,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Some l ->
         instr_cons
           (Lcondbranch (Iinttest_imm (Ceq, n), l))
-          arg [||] next
-          ~available_before:Reg_availability_set.Unreachable
+          arg [||] next ~available_before:Reg_availability_set.Unreachable
           ~available_across:Reg_availability_set.Unreachable
     in
     let rec fixup did_fix pc instr =
