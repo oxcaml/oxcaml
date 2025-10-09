@@ -2280,7 +2280,7 @@ and transl_atomic_loc ~scopes arg arg_sort lbl =
   | Record_float | Record_ufloat
     ->
       (* Atomic fields not allowed here *)
-      assert false
+      Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
   | Record_boxed _
   | Record_inlined (_, _, ( Variant_boxed _
                           | Variant_extensible
