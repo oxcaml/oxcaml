@@ -1,2 +1,12 @@
-File "big_module.ml", line 1:
+File "big_module.ml", lines 17-277, characters 20-3:
+ 17 | ....................struct
+ 18 |   (* Won't compile on native because the scannable prefix is too big *)
+ 19 |   let f_0 = #42.0
+ 20 |   let a_0 = "a"
+ 21 |   let a_1 = "a"
+...
+274 |   let a_254 = "a"
+275 |   let a_255 = "a"
+276 |   let a_256 = "a"
+277 | end
 Error: Mixed modules may contain at most 254 value fields prior to the flat suffix, but this one contains 257.

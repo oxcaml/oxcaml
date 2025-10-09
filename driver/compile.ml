@@ -73,9 +73,10 @@ let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
         Some ai_coercion_from_primary
     | None -> None
   in
+  let loc = Location.in_file (Unit_info.source_file i.target) in
   (structure, coercion, argument_coercion)
   |> Profile.(record transl)
-    (Translmod.transl_implementation i.module_name)
+    (Translmod.transl_implementation ~loc i.module_name)
   |> raw_lambda_to_bytecode i
 
 let emit_bytecode i

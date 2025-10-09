@@ -1156,7 +1156,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           in
           let body, _ =
             List.fold_left (fun (body, pos) id ->
-              (* CR jrayman *)
               Llet(Alias, layout_of_module_field open_repr pos, id,
                    Lambda.debug_uid_none,
                    Lprim(mod_field pos open_repr, [Lvar oid],

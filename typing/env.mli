@@ -58,7 +58,7 @@ type address = Persistent_env.address =
   | Alocal of Ident.t
   | Adot of address * Jkind.Sort.t Jkind.Layout.t array * int
 
-(* CR jrayman for reviewer: Is there a better place to put these functions?
+(* CR jrayman: Is there a better place to put these functions?
    Both are used in Env and Includemod, and depend on Subst and Jkind (not just
    Jkind_types)
 

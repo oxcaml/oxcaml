@@ -195,7 +195,7 @@ let extract_sig_functor_open funct_body env loc mty sig_acc =
           raise (Error(loc, env, Not_included_functor msg))
       in
       let param_repr =
-        Includemod.module_representation_of_signature ~loc sg_param
+        Includemod.module_representation_of_signature sg_param
       in
       (* We must scrape the result type in an environment expanded with the
          parameter type (to avoid `Not_found` exceptions when it is referenced).
@@ -313,7 +313,7 @@ let type_open_descr ?used_slot ?toplevel env sod =
     {
       open_expr = (path, sod.popen_expr);
       open_bound_items = [];
-      open_bound_repr = Module_value_only 0;
+      open_bound_repr = Module_value_only { size = 0 };
       open_override = sod.popen_override;
       open_env = newenv;
       open_attributes = sod.popen_attributes;
@@ -2011,7 +2011,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
     let incl =
       { incl_mod = tmty;
         incl_type = sg;
-        incl_repr = Includemod.module_representation_of_signature ~loc sg;
+        incl_repr = Includemod.module_representation_of_signature sg;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;
@@ -3295,7 +3295,7 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     let open_descr = {
       open_expr = md;
       open_bound_items = [];
-      open_bound_repr = Module_value_only 0;
+      open_bound_repr = Module_value_only { size = 0 };
       open_override = od.popen_override;
       open_env = newenv;
       open_loc = loc;
@@ -3332,7 +3332,7 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     let open_descr = {
       open_expr = md;
       open_bound_items = sg;
-      open_bound_repr = Includemod.module_representation_of_signature ~loc sg;
+      open_bound_repr = Includemod.module_representation_of_signature sg;
       open_override = od.popen_override;
       open_env = newenv;
       open_loc = loc;
@@ -3377,7 +3377,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
     let incl =
       { incl_mod = modl;
         incl_type = sg;
-        incl_repr = Includemod.module_representation_of_signature ~loc sg;
+        incl_repr = Includemod.module_representation_of_signature sg;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;
@@ -4401,9 +4401,7 @@ let package_units initial_env objfiles target_cmi modulename =
   (* Compute signature of packaged unit *)
   Ident.reinit();
   let sg = package_signatures units in
-  let repr =
-    Includemod.module_representation_of_signature ~loc:Location.none sg
-  in
+  let repr = Includemod.module_representation_of_signature sg in
   (* Compute the shape of the package *)
   let pack_uid = Uid.of_compilation_unit_id modulename in
   let shape =

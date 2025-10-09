@@ -2985,7 +2985,7 @@ and type_pat_aux
           let sort = Jkind.Sort.(of_const Const.for_module) in
           let id, uid =
             enter_variable tps loc v alloc_mode.mode t ~is_module:true
-            ~kind:Val_reg (Jkind.Layout.Sort sort) sp.ppat_attributes sort
+              ~kind:(Val_reg (Jkind.Layout.Sort sort)) sp.ppat_attributes sort
           in
           rvp {
             pat_desc = Tpat_var (id, v, uid, sort, alloc_mode.mode);
@@ -3000,14 +3000,9 @@ and type_pat_aux
       let q = type_pat tps Value sq expected_ty sort in
       let ty_var, mode = solve_Ppat_alias ~mode:alloc_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
-      let layout =
-        match Ctype.type_sort !!penv ty_var ~why:Let_binding ~fixed:false with
-        | Error _ -> assert false
-        | Ok sort -> Jkind.Layout.Sort sort
-      in
       let id, uid =
         enter_variable ~is_as_variable:true
-          ~kind:Val_reg (Jkind.Layout.Sort sort) tps name.loc name mode
+          ~kind:(Val_reg (Jkind.Layout.Sort sort)) tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
       rvp { pat_desc = Tpat_alias(q, id, name, uid, sort, mode, ty_var);
@@ -3395,7 +3390,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
   in
   let (pv, val_env, met_env) =
     List.fold_right
-      (fun {pv_id; pv_uid; pv_type; pv_loc; pv_as_var; pv_attributes; pv_layout}
+      (fun {pv_id; pv_uid; pv_type; pv_loc; pv_as_var; pv_attributes; pv_sort}
         (pv, val_env, met_env) ->
          let check s =
            if pv_as_var then Warnings.Unused_var { name = s; mutated = false }
@@ -3404,7 +3399,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
          let val_env =
           Env.add_value ~mode:Mode.Value.legacy pv_id
             { val_type = pv_type
-            ; val_kind = Val_reg pv_layout
+            ; val_kind = Val_reg (Jkind.Layout.Sort pv_sort)
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.id
@@ -8635,7 +8630,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       let var_pair ~(mode : Value.lr) name ty sort =
         let id = Ident.create_local name in
         let desc =
-          { val_type = ty; val_kind = Val_reg layout;
+          { val_type = ty; val_kind = Val_reg (Jkind.Layout.Sort sort);
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
             val_modalities = Modality.id;

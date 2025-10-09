@@ -1544,8 +1544,8 @@ and transl_mixed_product_shape ~get_value_kind shape =
     shape
 
 let transl_module_representation = function
-  | Types.Module_value_only size -> Module_value_only size
-  | Types.Module_mixed shape ->
+  | Types.Module_value_only { size } -> Module_value_only size
+  | Types.Module_mixed { shape; value_count = _ } ->
     Module_mixed
       ( transl_mixed_product_shape
         ~get_value_kind:(fun _ -> generic_value) shape,
