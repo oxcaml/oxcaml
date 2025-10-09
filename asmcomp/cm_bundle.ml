@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR mshinwell: This file has not been code reviewed *)
+
 module CU = Compilation_unit
 
 type error =
