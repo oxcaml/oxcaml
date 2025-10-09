@@ -199,12 +199,7 @@ type t4 = A | B;;
 <[A]>;;
 [%%expect {|
 type t4 = A | B
-Line 3, characters 2-3:
-3 | <[A]>;;
-      ^
-Error: Constructor "A" used at Line 3, characters 2-3
-       cannot be used in this context;
-       "A" is not defined inside a quotation (<[ ... ]>).
+- : <[t4]> expr = <[A]>
 |}];;
 
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
@@ -241,6 +236,15 @@ Error: Constructor "A" used at Line 3, characters 2-3
 =
 <[fun (f : 'a. 'a -> 'a) (g : 'b 'c. 'b list -> ('b -> 'c) -> 'c list) -> f g
 ]>
+|}];;
+
+let bar (f : <[int -> int]>) = f 42;;
+[%%expect {|
+Line 1, characters 31-32:
+1 | let bar (f : <[int -> int]>) = f 42;;
+                                   ^
+Error: This expression has type "<[int -> int]>"
+       This is not a function; it cannot be applied.
 |}];;
 
 (* The mk_pair examples exist to test whether unification behaves well when

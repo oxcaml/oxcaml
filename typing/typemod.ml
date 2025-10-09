@@ -296,7 +296,7 @@ let initial_env ~loc ~initially_opened_module
         (open_module env m, units)
   in
   let env = List.fold_left add_units env units in
-  Env.add_local_env_lock (List.fold_left open_module env open_implicit_modules)
+  List.fold_left open_module env open_implicit_modules
 
 let type_open_descr ?used_slot ?toplevel env sod =
   let (path, _, newenv) =
