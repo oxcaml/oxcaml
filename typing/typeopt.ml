@@ -726,7 +726,8 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       num_nodes_visited, Value kind
     | None ->
       (* When exploring the type structure fails, use externality information *)
-      num_nodes_visited, Value (nullable (if is_external then Pintval else Pgenval))
+      let raw_kind = if is_external then Pintval else Pgenval in
+      num_nodes_visited, Value (nullable raw_kind)
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end

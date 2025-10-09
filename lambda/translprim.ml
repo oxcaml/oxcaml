@@ -1474,7 +1474,9 @@ let layout_of_ty_for_idx_set env loc ty =
   let mbe = Typedecl.mixed_block_element env ty jkind in
   let context = Ctype.mk_jkind_context_check_principal env in
   let ext = Jkind.get_externality_upper_bound ~context jkind in
-  let mbe = transl_mixed_block_element env (to_location loc) (Some ext) ty mbe in
+  let mbe =
+    transl_mixed_block_element env (to_location loc) (Some ext) ty mbe
+  in
   layout_of_mixed_block_element_for_idx_set mbe
 
 (* Specialize a primitive from available type information. *)
