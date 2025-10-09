@@ -20,6 +20,19 @@ type t =
 
 (** See comments in the .ml file about these functions. *)
 
+(* CR gyorsh/mshinwell: The treatment of Unreachable in the implementation of
+   union,interf and diff seems inconsistent. What is the intended meaning of
+   these operations on Unreachable? I guess my higher-level point is that we use
+   Reg_availability_set.t for two different things: the domain in
+   Cfg_availability and the keys in Compute_ranges for Available_ranges_vars.
+   The latter only uses a canonicalized form of this set. I think this should be
+   a separate type that is a simple set (not a variant type). Then, canonicalize
+   will return None for Unreachable, matching the behavior expected in
+   Compute_ranges. Also, we won't need to define any set operations on
+   Unreachable, because the set operations on Reg_availability_set.t are only
+   used in Compute_ranges. We can then expose join and less_equal directly from
+   Available_ranges_vars. *)
+
 val of_list : Reg_with_debug_info.t list -> t
 
 val union : t -> t -> t

@@ -156,6 +156,21 @@ module Transfer = struct
     let made_unavailable_2 =
       match is_interesting_constructor instr.desc with
       | true ->
+        (* CR gyorsh/mshinwell: There are some tricky corner cases here. I just
+           wanted to write down a comment about it, nothing to fix here.
+
+           Machtypes associated with Reg.t may be wrong at this point due to
+           aliasing with hardregs and elided moves, even for instructions that
+           need a frametable entry. The only guarantee we have for these program
+           points is that for every physical location that may have a value that
+           is live across, there is a register in the live set that has the
+           correct type, and hence the location will be updated. It's possible
+           that there is another Reg.t in the live set for which the location is
+           the same but the type is different, and it's not the one that we put
+           in avail_before. This could lead to dropping debug info associated
+           with a register. For registers that are not in the live set and whose
+           type is not a pointer, they may still be containing values (that are
+           not live across) and we shouldn't try to inspect them. *)
         RD_quotient_set.filter
           (fun reg ->
             let holds_immediate = RD.holds_non_pointer reg in
@@ -211,6 +226,16 @@ module Transfer = struct
     instr.available_before <- avail_before;
     if !Dwarf_flags.ddebug_invariants
     then check_invariants instr ~print_instr:Cfg.print_basic ~avail_before;
+    (* CR gyorsh/mshinwell: There is something subtle here about the handling of
+       Name_for_debugger in Cfg_availability : the field regs is part of the
+       operation description (not instruction argument or result), and it starts
+       with pseudo-registers. We rely on the mutability of Reg.loc to update
+       these regs to physical locations. Right? If so, there is nothing that
+       forces these registers to be updated throughout the backend, or preserve
+       sharing of Reg.t. For example, register allocation can introduce new
+       temporaries in the split phase and substitute them into instructions,
+       leaving old temporaries in Name_for_debugger only. This could be another
+       source of missing debug info. *)
     let avail_across, avail_after =
       match avail_before with
       | Unreachable -> unreachable, unreachable
