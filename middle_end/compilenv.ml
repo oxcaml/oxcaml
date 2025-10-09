@@ -58,7 +58,7 @@ let current_unit =
     ui_imports_cmi = [];
     ui_imports_cmx = [];
     ui_quoted_globals = [];
-    ui_format = Mb_struct { mb_size = -1 };
+    ui_format = Mb_struct { mb_repr = Lambda.Module_value_only (-1) };
     ui_generic_fns = { curry_fun = []; apply_fun = []; send_fun = [] };
     ui_force_link = false;
     ui_zero_alloc_info = Zero_alloc_info.create ();
@@ -77,7 +77,8 @@ let reset unit_info =
   current_unit.ui_imports_cmi <- [];
   current_unit.ui_imports_cmx <- [];
   current_unit.ui_quoted_globals <- [];
-  current_unit.ui_format <- Mb_struct { mb_size = -1 };
+  current_unit.ui_format <-
+    Mb_struct { mb_repr = Lambda.Module_value_only (-1) };
   current_unit.ui_generic_fns <-
     { curry_fun = []; apply_fun = []; send_fun = [] };
   current_unit.ui_force_link <- !Clflags.link_everything;

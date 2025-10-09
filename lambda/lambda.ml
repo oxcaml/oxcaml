@@ -954,17 +954,16 @@ type runtime_param =
   | Rp_main_module_block of Global_module.t
   | Rp_unit
 
+type module_representation =
+  | Module_value_only of int
+  | Module_mixed of mixed_block_shape
+
 type main_module_block_format =
-  | Mb_struct of { mb_size : int }
+  | Mb_struct of { mb_repr : module_representation }
   | Mb_instantiating_functor of
       { mb_runtime_params : runtime_param list;
         mb_returned_size : int;
       }
-
-let main_module_block_size format =
-  match format with
-  | Mb_struct { mb_size } -> mb_size
-  | Mb_instantiating_functor _ -> 1
 
 type program =
   { compilation_unit : Compilation_unit.t;
