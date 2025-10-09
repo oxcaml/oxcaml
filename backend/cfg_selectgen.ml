@@ -1525,6 +1525,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
            (Cfg.Always (Sub_cfg.start_label body))
            [||] [||] Debuginfo.none)
     in
+    insert_param_name_for_debugger tailrec_block f.Cmm.fun_args loc_arg
+      num_regs_per_arg;
     Cfg.add_block_exn cfg tailrec_block;
     DLL.add_end layout tailrec_block.start;
     Sub_cfg.iter_basic_blocks body ~f:(fun (block : Cfg.basic_block) ->
