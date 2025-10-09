@@ -2282,7 +2282,7 @@ and transl_atomic_loc ~scopes arg arg_sort lbl =
       (* Atomic fields not allowed here *)
       assert false
   | Record_boxed _
-  | Record_inlined (_, _, (Variant_boxed _
+  | Record_inlined (_, _, ( Variant_boxed _
                           | Variant_extensible
                           | Variant_with_null))
     -> ()
