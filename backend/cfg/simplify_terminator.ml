@@ -180,12 +180,15 @@ let evaluate_terminator (known_values : known_value Reg.Tbl.t)
     None
 
 let block_known_values (block : C.basic_block) : bool =
-  let known_values = collect_known_values block.body in
-  match evaluate_terminator known_values block.terminator with
-  | None -> false
-  | Some succ ->
-    block.terminator <- { block.terminator with desc = Always succ };
-    true
+  if not !Oxcaml_flags.cfg_value_propagation
+  then false
+  else
+    let known_values = collect_known_values block.body in
+    match evaluate_terminator known_values block.terminator with
+    | None -> false
+    | Some succ ->
+      block.terminator <- { block.terminator with desc = Always succ };
+      true
 
 (* CR-someday gyorsh: merge (Lbranch | Lcondbranch | Lcondbranch3)+ into a
    single terminator when the argments are the same. Enables reordering of
