@@ -1827,11 +1827,15 @@ and rebuild_function_params_and_body (env : env) res code_metadata
         | None -> Misc.fatal_errorf "Result types without typing env"
         | Some old_typing_env -> old_typing_env
       in
-      Code_metadata.with_result_types
-        (Or_unknown_or_bottom.Ok
-           (Dep_solver.rewrite_result_types env.uses ~old_typing_env params_vars
-              results_vars result_types))
-        code_metadata
+      let result_types =
+        if Sys.getenv_opt "FORGETALL" <> None && true
+        then Or_unknown_or_bottom.Unknown
+        else
+          Or_unknown_or_bottom.Ok
+            (Dep_solver.rewrite_result_types env.uses ~old_typing_env
+               params_vars results_vars result_types)
+      in
+      Code_metadata.with_result_types result_types code_metadata
   in
   match updating_calling_convention with
   | Not_changing_calling_convention ->

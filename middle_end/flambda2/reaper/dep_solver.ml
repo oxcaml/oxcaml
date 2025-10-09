@@ -87,7 +87,8 @@ let pp_changed_representation ff = function
 type result =
   { db : Datalog.database;
     unboxed_fields : unboxed Code_id_or_name.Map.t;
-    changed_representation : changed_representation Code_id_or_name.Map.t
+    changed_representation :
+      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
   }
 
 let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
@@ -1860,6 +1861,8 @@ let rewrite_kind_with_subkind uses var kind =
       (Code_id_or_name.Map.singleton var ())
       kind
 
+let forget_all_types = Sys.getenv_opt "FORGETALL" <> None
+
 module Rewriter = struct
   type t0 =
     | Any_usage
@@ -1979,6 +1982,8 @@ module Rewriter = struct
       t0 * (t0 * use_of_function_slot) Function_slot.Map.t =
     (* CR-someday ncourant: once the datalog API supports something cleaner, use
        it. *)
+    (* CR ncourant: I think this is missing projections of value slots inside
+       the closures, as usual. *)
     let out1_tbl, out1 = rel1_r "out1" Cols.[n] in
     let out2_tbl, out2 = rel2_r "out2" Cols.[f; n] in
     let out_known_arity_tbl, out_known_arity =
@@ -2191,9 +2196,11 @@ module Rewriter = struct
       Rule.rewrite Pattern.any (Expr.unknown (Flambda2_types.kind flambda_type))
     in
     if debug then Format.eprintf "REWRITE usages = %a@." print_t0 usages;
-    if match usages with
-       | Any_usage -> false
-       | Usages m -> Code_id_or_name.Map.is_empty m
+    if forget_all_types
+    then forget_type ()
+    else if match usages with
+            | Any_usage -> false
+            | Usages m -> Code_id_or_name.Map.is_empty m
     then
       (* No usages, this might have been deleted: convert to Unknown *)
       forget_type ()
@@ -2350,19 +2357,77 @@ module Rewriter = struct
         (* Don't handle representation change for now *)
         match usages_for_value_slots with
         | Usages usages_for_value_slots ->
-          let usages_of_value_slots =
-            Value_slot.Map.mapi
-              (fun value_slot _value_slot_type ->
-                match
-                  get_one_field db (Field.Value_slot value_slot)
-                    (Usages usages_for_value_slots)
-                with
-                | Used_as_top -> Any_usage
-                | Used_as_vars vs -> Usages (get_direct_usages db vs))
-              value_slot_types
+          let usages =
+            match usages with
+            | Any_usage -> assert false
+            | Usages usages -> usages
           in
-          no_representation_change function_slot usages_of_value_slots
-            usages_of_function_slots
+          if Code_id_or_name.Map.exists
+               (fun clos () ->
+                 Code_id_or_name.Map.mem clos result.changed_representation)
+               usages
+          then (
+            assert (
+              Code_id_or_name.Map.for_all
+                (fun clos () ->
+                  Code_id_or_name.Map.mem clos result.changed_representation)
+                usages_for_value_slots);
+            Format.eprintf "USAGES_FOR_VALUE_SLOTS is: %a@."
+              (Code_id_or_name.Map.print Unit.print)
+              usages_for_value_slots;
+            let changed_representation =
+              Code_id_or_name.Map.bindings
+                (Code_id_or_name.Map.mapi
+                   (fun clos () ->
+                     Code_id_or_name.Map.find clos result.changed_representation)
+                   usages)
+            in
+            let value_slots_reprs, function_slots_reprs, alloc_point =
+              match snd (List.hd changed_representation) with
+              | ( Closure_representation
+                    (value_slots_reprs, function_slots_reprs, _),
+                  alloc_point ) ->
+                value_slots_reprs, function_slots_reprs, alloc_point
+              | Block_representation _, _ ->
+                Misc.fatal_errorf
+                  "Changed representation of a closure with \
+                   [Block_representation]"
+            in
+            List.iter
+              (fun (_, (repr, alloc_point')) ->
+                assert (alloc_point == alloc_point');
+                match repr with
+                | Closure_representation (vs, fs, _) ->
+                  if vs != value_slots_reprs || fs != function_slots_reprs
+                  then
+                    Misc.fatal_errorf
+                      "In set of closures, all closures do not have the same \
+                       representation changes."
+                | Block_representation _ ->
+                  Misc.fatal_errorf
+                    "Changed representation of a closure with \
+                     [Block_representation]")
+              changed_representation;
+            let fields =
+              get_fields_usage_of_constructors db
+                (Code_id_or_name.Map.singleton alloc_point ())
+            in
+            change_representation_of_closures fields value_slots_reprs
+              function_slots_reprs)
+          else
+            let usages_of_value_slots =
+              Value_slot.Map.mapi
+                (fun value_slot _value_slot_type ->
+                  match
+                    get_one_field db (Field.Value_slot value_slot)
+                      (Usages usages_for_value_slots)
+                  with
+                  | Used_as_top -> Any_usage
+                  | Used_as_vars vs -> Usages (get_direct_usages db vs))
+                value_slot_types
+            in
+            no_representation_change function_slot usages_of_value_slots
+              usages_of_function_slots
         | Any_usage ->
           let is_local_value_slot vs _ =
             Compilation_unit.is_current (Value_slot.get_compilation_unit vs)
@@ -2430,8 +2495,9 @@ module Rewriter = struct
                   Code_id_or_name.Map.bindings
                     (Code_id_or_name.Map.mapi
                        (fun clos () ->
-                         Code_id_or_name.Map.find clos
-                           result.changed_representation)
+                         fst
+                           (Code_id_or_name.Map.find clos
+                              result.changed_representation))
                        set_of_closures)
                 in
                 let value_slots_reprs, function_slots_reprs =
@@ -2760,13 +2826,15 @@ let fixpoint (graph : Global_flow_graph.graph) =
       if Code_id_or_name.Map.mem code_id_or_name !changed_representation
       then ()
       else
-        let add_to_s repr c =
+        let add_to_s repr alloc_point =
           Code_id_or_name.Set.iter
             (fun c ->
               changed_representation
-                := Code_id_or_name.Map.add c repr !changed_representation)
+                := Code_id_or_name.Map.add c (repr, alloc_point)
+                     !changed_representation)
             (match
-               Code_id_or_name.Map.find_opt c dominated_by_allocation_points
+               Code_id_or_name.Map.find_opt alloc_point
+                 dominated_by_allocation_points
              with
             | None -> Code_id_or_name.Set.empty
             | Some s -> s)
@@ -2828,7 +2896,9 @@ let fixpoint (graph : Global_flow_graph.graph) =
   if debug
   then
     Format.eprintf "@.TO_CHG: %a@."
-      (Code_id_or_name.Map.print pp_changed_representation)
+      (Code_id_or_name.Map.print (fun ff (repr, alloc_point) ->
+           Format.fprintf ff "[from %a]%a" Code_id_or_name.print alloc_point
+             pp_changed_representation repr))
       !changed_representation;
   let no_unbox = Sys.getenv_opt "NOUNBOX" <> None in
   { db;
@@ -2865,7 +2935,7 @@ let get_unboxed_fields uses cn =
   Code_id_or_name.Map.find_opt cn uses.unboxed_fields
 
 let get_changed_representation uses cn =
-  Code_id_or_name.Map.find_opt cn uses.changed_representation
+  Option.map fst (Code_id_or_name.Map.find_opt cn uses.changed_representation)
 
 let has_use uses v = has_use uses.db v
 
