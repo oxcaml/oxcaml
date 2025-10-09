@@ -1708,6 +1708,87 @@ let rec mapi_unboxed_fields (not_unboxed : 'a -> 'b -> 'c)
 let map_unboxed_fields f uf =
   mapi_unboxed_fields (fun () x -> f x) (fun _ () -> ()) () uf
 
+type 'a block_or_closure_fields =
+  | Empty
+  | Block_fields of
+      { is_int : 'a option;
+        get_tag : 'a option;
+        fields : (Flambda_kind.t * 'a) option list
+      }
+  | Closure_fields of 'a Value_slot.Map.t * 'a Function_slot.Map.t
+  | Could_not_classify
+
+let classify_field_map fields =
+  let r =
+    Field.Map.fold
+      (fun field x acc ->
+        match acc with
+        | `Could_not_classify -> `Could_not_classify
+        | (`Block_fields _ | `Closure_fields _ | `Empty) as acc -> (
+          let[@inline] block_fields k =
+            let[@local] k is_int get_tag fields =
+              (k [@inlined hint]) ~is_int ~get_tag ~fields
+            in
+            match acc with
+            | `Closure_fields _ -> `Could_not_classify
+            | `Block_fields (is_int, get_tag, fields) -> k is_int get_tag fields
+            | `Empty -> k None None Numeric_types.Int.Map.empty
+          in
+          let[@inline] closure_fields k =
+            let[@local] k value_slots function_slots =
+              (k [@inlined hint]) ~value_slots ~function_slots
+            in
+            match acc with
+            | `Closure_fields (value_slots, function_slots) ->
+              k value_slots function_slots
+            | `Block_fields _ -> `Could_not_classify
+            | `Empty -> k Value_slot.Map.empty Function_slot.Map.empty
+          in
+          match field with
+          | Code_of_closure _ | Apply _ | Code_id_of_call_witness ->
+            `Could_not_classify
+          | Value_slot vs ->
+            closure_fields (fun ~value_slots ~function_slots ->
+                `Closure_fields
+                  (Value_slot.Map.add vs x value_slots, function_slots))
+          | Function_slot fs ->
+            closure_fields (fun ~value_slots ~function_slots ->
+                `Closure_fields
+                  (value_slots, Function_slot.Map.add fs x function_slots))
+          | Is_int ->
+            block_fields (fun ~is_int ~get_tag ~fields ->
+                assert (Option.is_none is_int);
+                `Block_fields (Some x, get_tag, fields))
+          | Get_tag ->
+            block_fields (fun ~is_int ~get_tag ~fields ->
+                assert (Option.is_none get_tag);
+                `Block_fields (is_int, Some x, fields))
+          | Block (i, kind) ->
+            block_fields (fun ~is_int ~get_tag ~fields ->
+                if Numeric_types.Int.Map.mem i fields
+                then `Could_not_classify
+                else
+                  `Block_fields
+                    ( is_int,
+                      get_tag,
+                      Numeric_types.Int.Map.add i (kind, x) fields ))))
+      fields `Empty
+  in
+  match r with
+  | `Empty -> Empty
+  | `Could_not_classify -> Could_not_classify
+  | `Closure_fields (vs, fs) -> Closure_fields (vs, fs)
+  | `Block_fields (is_int, get_tag, fields) ->
+    let n =
+      if Numeric_types.Int.Map.is_empty fields
+      then 0
+      else fst (Numeric_types.Int.Map.max_binding fields) + 1
+    in
+    let fields =
+      List.init n (fun i -> Numeric_types.Int.Map.find_opt i fields)
+    in
+    Block_fields { is_int; get_tag; fields }
+
 (* Note that this depends crucially on the fact that the poison value is not
    nullable. If it was, we could instead keep the subkind but erase the
    nullability part instead. *)
@@ -1784,7 +1865,7 @@ module Rewriter = struct
     | Any_usage
     | Usages of unit Code_id_or_name.Map.t
 
-  type t = Datalog.database * t0
+  type t = result * t0
 
   type set_of_closures = |
 
@@ -1796,7 +1877,7 @@ module Rewriter = struct
     | Any_usage, Usages _ -> -1
     | Usages _, Any_usage -> 1
 
-  let compare (_db1, t1) (_db2, t2) = compare_t0 t1 t2
+  let compare (_result1, t1) (_result2, t2) = compare_t0 t1 t2
 
   let print_t0 ff t =
     match t with
@@ -1814,7 +1895,7 @@ module Rewriter = struct
 
     let hash _t = failwith "hash"
 
-    let print ff (_db, t) = print_t0 ff t
+    let print ff (_result, t) = print_t0 ff t
   end)
 
   module Map = T.Map
@@ -1998,8 +2079,114 @@ module Rewriter = struct
                 Function_slot.Map.add fs (Usages uses, calls) m)
               uses_for_function_slots Function_slot.Map.empty )
 
-  let rewrite (db, usages) typing_env flambda_type =
+  let rec patterns_for_unboxed_fields ~machine_width ~bind_function_slots db
+      ~var fields unboxed_fields acc =
     let open Flambda2_types.Rewriter in
+    let combined =
+      Field.Map.merge
+        (fun field field_use unboxed_field ->
+          match field_use, unboxed_field with
+          | None, None -> assert false
+          | Some _, None ->
+            None
+            (* This should only happen for fields like [Code_of_closure _],
+               which are ignored when creating unboxed fields. TODO: check
+               this? *)
+          | None, Some _ ->
+            (* This should not happen if we only start
+               [patterns_for_unboxed_fields] on the allocation points
+               themselves. *)
+            Misc.fatal_errorf
+              "In [patterns_for_unboxed_fields], field %a existed in \
+               [unboxed_fields] but not in [fields]"
+              Field.print field
+          | Some field_use, Some unboxed_fields ->
+            Some (field_use, unboxed_fields))
+        fields unboxed_fields
+    in
+    let rec forget unboxed_fields acc =
+      match unboxed_fields with
+      | Not_unboxed x -> (None, x) :: acc
+      | Unboxed unboxed_fields ->
+        Field.Map.fold
+          (fun _ unboxed_fields acc -> forget unboxed_fields acc)
+          unboxed_fields acc
+    in
+    let for_one_use (field_use, unboxed_fields) acc =
+      match unboxed_fields with
+      | Not_unboxed x ->
+        let v = Var.create () in
+        (Some v, x) :: acc, Pattern.var v (var field_use)
+      | Unboxed unboxed_fields -> (
+        match field_use with
+        | Used_as_top ->
+          Misc.fatal_errorf
+            "In [patterns_for_unboxed_fields], field was unboxed but has \
+             [Used_as_top] usage"
+        | Used_as_vars flow_to ->
+          let fields =
+            get_fields db
+              (get_all_usages ~follow_known_arity_calls:true db flow_to)
+          in
+          patterns_for_unboxed_fields ~machine_width ~bind_function_slots:None
+            db ~var fields unboxed_fields acc)
+    in
+    match classify_field_map combined with
+    | Empty | Could_not_classify ->
+      ( Field.Map.fold
+          (fun _ (_, unboxed_fields) acc -> forget unboxed_fields acc)
+          combined acc,
+        Pattern.any )
+    | Block_fields { is_int; get_tag; fields } ->
+      if Option.is_some bind_function_slots
+      then
+        Misc.fatal_errorf
+          "[patterns_for_unboxed_fields] sees a block but needs to bind \
+           function slots";
+      let acc =
+        match is_int with
+        | None -> acc
+        | Some (_, unboxed_fields) -> forget unboxed_fields acc
+      in
+      let acc =
+        match get_tag with
+        | None -> acc
+        | Some (_, unboxed_fields) -> forget unboxed_fields acc
+      in
+      let acc = ref acc in
+      let pats = ref [] in
+      List.iteri
+        (fun i use ->
+          match use with
+          | None -> ()
+          | Some (kind, use) ->
+            let nacc, pat = for_one_use use !acc in
+            acc := nacc;
+            pats
+              := Pattern.block_field
+                   (Target_ocaml_int.of_int machine_width i)
+                   kind pat
+                 :: !pats)
+        fields;
+      !acc, Pattern.block !pats
+    | Closure_fields (value_slots, function_slots) ->
+      assert (Function_slot.Map.is_empty function_slots);
+      let value_slots = Value_slot.Map.bindings value_slots in
+      let acc, pats =
+        List.fold_left_map
+          (fun acc (value_slot, use) ->
+            let acc, pat = for_one_use use acc in
+            acc, Pattern.value_slot value_slot pat)
+          acc value_slots
+      in
+      let pats =
+        match bind_function_slots with None -> pats | Some p -> p @ pats
+      in
+      acc, Pattern.closure pats
+
+  let rewrite (result, usages) typing_env flambda_type =
+    let open Flambda2_types.Rewriter in
+    let db = result.db in
     let[@local] forget_type () =
       Rule.rewrite Pattern.any (Expr.unknown (Flambda2_types.kind flambda_type))
     in
@@ -2033,6 +2220,82 @@ module Rewriter = struct
         let usages_for_value_slots, usages_of_function_slots =
           uses_for_set_of_closures db usages function_slot function_slot_types
         in
+        let[@local] change_representation_of_closures fields value_slots_reprs
+            function_slots_reprs =
+          let patterns = ref [] in
+          let all_closure_types_in_set =
+            Function_slot.Map.mapi
+              (fun function_slot (metadata, _uses) ->
+                let v = Var.create () in
+                patterns
+                  := Pattern.function_slot function_slot
+                       (Pattern.var v (result, metadata))
+                     :: !patterns;
+                Expr.var v)
+              usages_of_function_slots
+          in
+          let all_function_slots_in_set =
+            Function_slot.Map.fold
+              (fun function_slot (_, uses) m ->
+                let new_function_slot =
+                  Function_slot.Map.find function_slot function_slots_reprs
+                in
+                let r =
+                  match uses with
+                  | Never_called -> Or_unknown.Unknown
+                  | Only_called_with_known_arity | Any_call ->
+                    let v = Var.create () in
+                    patterns
+                      := Pattern.rec_info function_slot
+                           (Pattern.var v (result, Any_usage))
+                         :: !patterns;
+                    let function_type =
+                      Flambda2_types.Closures_entry.find_function_type
+                        closures_entry function_slot
+                    in
+                    Or_unknown.map function_type ~f:(fun function_type ->
+                        Expr.Function_type.create
+                          (Function_type.code_id function_type)
+                          ~rec_info:(Expr.var v))
+                in
+                Function_slot.Map.add new_function_slot r m)
+              usages_of_function_slots Function_slot.Map.empty
+          in
+          let bind_function_slots = Some !patterns in
+          let bound, pat =
+            patterns_for_unboxed_fields
+              ~machine_width:(Typing_env.machine_width typing_env)
+              ~bind_function_slots db
+              ~var:(fun field_use ->
+                let metadata =
+                  match field_use with
+                  | Used_as_top -> Any_usage
+                  | Used_as_vars flow_to ->
+                    let usages = get_direct_usages result.db flow_to in
+                    Usages usages
+                in
+                result, metadata)
+              fields value_slots_reprs []
+          in
+          let all_value_slots_in_set =
+            List.fold_left
+              (fun m (var, value_slot) ->
+                let e =
+                  match var with
+                  | None -> Expr.unknown (Value_slot.kind value_slot)
+                  | Some var -> Expr.var var
+                in
+                Value_slot.Map.add value_slot e m)
+              Value_slot.Map.empty bound
+          in
+          let new_function_slot =
+            Function_slot.Map.find function_slot function_slots_reprs
+          in
+          Rule.rewrite pat
+            (Expr.exactly_this_closure new_function_slot
+               ~all_function_slots_in_set ~all_closure_types_in_set
+               ~all_value_slots_in_set alloc_mode)
+        in
         let[@local] no_representation_change function_slot value_slots_metadata
             function_slots_metadata_and_uses =
           let all_patterns = ref [] in
@@ -2042,9 +2305,9 @@ module Rewriter = struct
                 let v = Var.create () in
                 all_patterns
                   := Pattern.value_slot value_slot
-                       (Pattern.var v (db, metadata))
+                       (Pattern.var v (result, metadata))
                      :: !all_patterns;
-                v)
+                Expr.var v)
               value_slots_metadata
           in
           let all_closure_types_in_set =
@@ -2053,9 +2316,9 @@ module Rewriter = struct
                 let v = Var.create () in
                 all_patterns
                   := Pattern.function_slot function_slot
-                       (Pattern.var v (db, metadata))
+                       (Pattern.var v (result, metadata))
                      :: !all_patterns;
-                v)
+                Expr.var v)
               function_slots_metadata_and_uses
           in
           let all_function_slots_in_set =
@@ -2067,7 +2330,7 @@ module Rewriter = struct
                   let v = Var.create () in
                   all_patterns
                     := Pattern.rec_info function_slot
-                         (Pattern.var v (db, Any_usage))
+                         (Pattern.var v (result, Any_usage))
                        :: !all_patterns;
                   let function_type =
                     Flambda2_types.Closures_entry.find_function_type
@@ -2076,7 +2339,7 @@ module Rewriter = struct
                   Or_unknown.map function_type ~f:(fun function_type ->
                       Expr.Function_type.create
                         (Function_type.code_id function_type)
-                        ~rec_info:v))
+                        ~rec_info:(Expr.var v)))
               function_slots_metadata_and_uses
           in
           Rule.rewrite
@@ -2153,18 +2416,63 @@ module Rewriter = struct
                        | Used_as_vars m ->
                          Code_id_or_name.Map.print Unit.print ff m))
                   fields;
-              no_representation_change function_slot
-                (Value_slot.Map.mapi
-                   (fun value_slot _value_slot_type ->
-                     match
-                       Field.Map.find_opt (Value_slot value_slot) fields
-                     with
-                     | Some Used_as_top -> Any_usage
-                     | Some (Used_as_vars vs) ->
-                       Usages (get_direct_usages db vs)
-                     | None -> Usages Code_id_or_name.Map.empty)
-                   value_slot_types)
-                usages_of_function_slots)
+              if Code_id_or_name.Map.exists
+                   (fun clos () ->
+                     Code_id_or_name.Map.mem clos result.changed_representation)
+                   set_of_closures
+              then (
+                assert (
+                  Code_id_or_name.Map.for_all
+                    (fun clos () ->
+                      Code_id_or_name.Map.mem clos result.changed_representation)
+                    set_of_closures);
+                let changed_representation =
+                  Code_id_or_name.Map.bindings
+                    (Code_id_or_name.Map.mapi
+                       (fun clos () ->
+                         Code_id_or_name.Map.find clos
+                           result.changed_representation)
+                       set_of_closures)
+                in
+                let value_slots_reprs, function_slots_reprs =
+                  match snd (List.hd changed_representation) with
+                  | Closure_representation
+                      (value_slots_reprs, function_slots_reprs, _) ->
+                    value_slots_reprs, function_slots_reprs
+                  | Block_representation _ ->
+                    Misc.fatal_errorf
+                      "Changed representation of a closure with \
+                       [Block_representation]"
+                in
+                List.iter
+                  (fun (_, repr) ->
+                    match repr with
+                    | Closure_representation (vs, fs, _) ->
+                      if vs != value_slots_reprs || fs != function_slots_reprs
+                      then
+                        Misc.fatal_errorf
+                          "In set of closures, all closures do not have the \
+                           same representation changes."
+                    | Block_representation _ ->
+                      Misc.fatal_errorf
+                        "Changed representation of a closure with \
+                         [Block_representation]")
+                  changed_representation;
+                change_representation_of_closures fields value_slots_reprs
+                  function_slots_reprs)
+              else
+                no_representation_change function_slot
+                  (Value_slot.Map.mapi
+                     (fun value_slot _value_slot_type ->
+                       match
+                         Field.Map.find_opt (Value_slot value_slot) fields
+                       with
+                       | Some Used_as_top -> Any_usage
+                       | Some (Used_as_vars vs) ->
+                         Usages (get_direct_usages db vs)
+                       | None -> Usages Code_id_or_name.Map.empty)
+                     value_slot_types)
+                  usages_of_function_slots)
           else
             no_representation_change function_slot
               (Value_slot.Map.map
@@ -2172,18 +2480,18 @@ module Rewriter = struct
                  value_slot_types)
               usages_of_function_slots)
 
-  let block_slot ?tag:_ (db, t) index _typing_env flambda_type =
+  let block_slot ?tag:_ (result, t) index _typing_env flambda_type =
     let r =
       match t with
-      | Any_usage -> db, Any_usage
+      | Any_usage -> result, Any_usage
       | Usages usages -> (
         let field_kind = Flambda2_types.kind flambda_type in
         let field = Field.Block (Target_ocaml_int.to_int index, field_kind) in
-        match get_one_field db field (Usages usages) with
-        | Used_as_top -> db, Any_usage
+        match get_one_field result.db field (Usages usages) with
+        | Used_as_top -> result, Any_usage
         | Used_as_vars vs ->
-          let usages = get_direct_usages db vs in
-          db, Usages usages)
+          let usages = get_direct_usages result.db vs in
+          result, Usages usages)
     in
     if debug
     then (
@@ -2193,11 +2501,11 @@ module Rewriter = struct
       Format.eprintf "%a@." Flambda2_types.print flambda_type);
     r
 
-  let array_slot (db, _t) _index _typing_env _flambda_type =
+  let array_slot (result, _t) _index _typing_env _flambda_type =
     (* Array primitives are opaque. Thus, anything put inside the array when it
        was created has been treated as escaping, thus giving a [Any_usage]
        result. *)
-    db, Any_usage
+    result, Any_usage
 
   let set_of_closures _t _function_slot _typing_env _closures_entry =
     Misc.fatal_error
@@ -2226,9 +2534,9 @@ let rewrite_typing_env result ~unit_symbol vars_to_keep typing_env =
     if Symbol.equal sym unit_symbol
        || (not (Compilation_unit.is_current (Symbol.compilation_unit sym)))
        || is_top db (Code_id_or_name.symbol sym)
-    then db, Rewriter.Any_usage
+    then result, Rewriter.Any_usage
     else
-      ( db,
+      ( result,
         Rewriter.Usages
           (get_direct_usages db
              (Code_id_or_name.Map.singleton (Code_id_or_name.symbol sym) ())) )
@@ -2237,9 +2545,9 @@ let rewrite_typing_env result ~unit_symbol vars_to_keep typing_env =
     let kind = Variable.kind var in
     let metadata =
       if is_top db (Code_id_or_name.var var)
-      then db, Rewriter.Any_usage
+      then result, Rewriter.Any_usage
       else
-        ( db,
+        ( result,
           Rewriter.Usages
             (get_direct_usages db
                (Code_id_or_name.Map.singleton (Code_id_or_name.var var) ())) )
@@ -2257,7 +2565,8 @@ let rewrite_typing_env result ~unit_symbol vars_to_keep typing_env =
 
 let rewrite_result_types result ~old_typing_env func_params func_results
     result_types =
-  Format.eprintf "OLD result types: %a@." Result_types.print result_types;
+  if debug
+  then Format.eprintf "OLD result types: %a@." Result_types.print result_types;
   let params, results, env_extension =
     Result_types.pattern_match result_types ~f:(fun ~params ~results tee ->
         params, results, tee)
@@ -2272,9 +2581,9 @@ let rewrite_result_types result ~old_typing_env func_params func_results
       let db = result.db in
       let metadata =
         if is_top db var
-        then db, Rewriter.Any_usage
+        then result, Rewriter.Any_usage
         else
-          ( db,
+          ( result,
             Rewriter.Usages
               (get_direct_usages db (Code_id_or_name.Map.singleton var ())) )
       in
@@ -2316,8 +2625,10 @@ let rewrite_result_types result ~old_typing_env func_params func_results
     Result_types.create ~params:(make_bp params_vars)
       ~results:(make_bp results_vars) new_env_extension
   in
-  Format.eprintf "NEW result\n   types: %a@." Result_types.print
-    new_result_types;
+  if debug
+  then
+    Format.eprintf "NEW result\n   types: %a@." Result_types.print
+      new_result_types;
   new_result_types
 
 let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db fields name_prefix =

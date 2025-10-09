@@ -54,6 +54,8 @@ let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
       (Flambda_arity.unarize arity)
   in
   let has_unsafe_result_type =
+    false
+    &&
     match Code.result_types code with
     | Unknown -> false
     | Bottom -> false
