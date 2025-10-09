@@ -145,13 +145,7 @@ val foo4 : 'a expr -> <[$('b) -> $('a) * $('b)]> expr = <fun>
 
 let foo5 (x: <['a]> expr) = <[fun (y : 'a) -> ($x, y)]>;;
 [%%expect {|
-Line 1, characters 39-41:
-1 | let foo5 (x: <['a]> expr) = <[fun (y : 'a) -> ($x, y)]>;;
-                                           ^^
-Error: Type variable "'a" is used at Line 1, characters 39-41,
-       inside a quotation (<[ ... ]>);
-       it already occurs outside any quotations.
-       Hint: Consider using "$'a".
+val foo5 : 'a expr -> <[$('a) -> $('a) * $('a)]> expr = <fun>
 |}];;
 
 let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
@@ -169,13 +163,9 @@ let foo7 (type a) (type b) x = <[fun (y : $a) -> y]>;;
 val foo7 : 'b -> <[$('a) -> $('a)]> expr = <fun>
 |}];;
 
-let foo7' (type a) (type b) x = <[fun (y : $a) -> y]> 42;;
+let foo7' = (fun (type a) (type b) x -> <[fun (y : $a) -> y]>) 42;;
 [%%expect {|
-Line 1, characters 32-53:
-1 | let foo7' (type a) (type b) x = <[fun (y : $a) -> y]> 42;;
-                                    ^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "<[$(a) -> $(a)]> expr"
-       This is not a function; it cannot be applied.
+val foo7' : <[$('_a) -> $('_a)]> expr = <[fun (y : _) -> y]>
 |}];;
 
 let foo8 (type a) (type b) x = <[fun ((p, q) : $a * $b) -> ($x, (p, q))]> <["foo"]>;;
@@ -306,10 +296,11 @@ fun (x: <[<[<[$($($'a))]>]>]>) -> (x: 'a);;
 
 fun (x: <[<[<[$($'a)]>]>]>) -> (x: 'a);;
 [%%expect {|
-Line 1, characters 32-33:
+Line 1, characters 35-37:
 1 | fun (x: <[<[<[$($'a)]>]>]>) -> (x: 'a);;
-                                    ^
-Error: This expression has type "<['a]>" but an expression was expected of type
-         "'a"
-       The type variable "'a" occurs inside "<['a]>"
+                                       ^^
+Error: Type variable "'a" is used at Line 1, characters 35-37,
+       outside any quotations;
+       it already occurs inside a quotation (<[ ... ]>).
+       Hint: Consider using "<['a]>".
 |}];;

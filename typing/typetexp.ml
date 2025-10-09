@@ -521,7 +521,7 @@ end = struct
           if try unify env v ty; true with _ -> Btype.backtrack snap; false
           then try
               let (type_expr, stage) = lookup_global name in
-              if stage <> s then
+              if s <> stage then
                 raise
                   (Error (loc, env, (Invalid_variable_stage
                                        {name = Pprintast.tyvar_of_name name;
@@ -534,9 +534,8 @@ end = struct
             | Open, _ | (Closed | Closed_for_upstream_compatibility), false ->
               let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
               let v2 = new_global_var jkind in
-              let stage = Env.stage env in
               r := (loc, v, v2) :: !r;
-              add name v2 jkind stage
+              add name v2 jkind s
             | Closed, true ->
               raise(Error(loc, env,
                           Unbound_type_variable (Pprintast.tyvar_of_name name,
