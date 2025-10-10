@@ -51,7 +51,7 @@ and ident_extension_constructor = ident_create "extension_constructor"
 and ident_floatarray = ident_create "floatarray"
 and ident_lexing_position = ident_create "lexing_position"
 and ident_atomic_loc = ident_create "atomic_loc"
-(* CR aivaskovic: there is a question about naming;
+(* CR metaprogramming aivaskovic: there is a question about naming;
    keep `expr` for now instead of `code` *)
 and ident_code = ident_create "expr"
 

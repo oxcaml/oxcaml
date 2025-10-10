@@ -2524,7 +2524,8 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
       Paths.mark
         (Usage.maybe_unique use occ)
         Learned_tags.empty Overwrites.empty p)
-  (* CR aivaskovic: it might be reasonable to treat `Texp_quotation e` as `e` *)
+  (* CR metaprogramming aivaskovic:
+     it might be reasonable to treat `Texp_quotation e` as `e` *)
   | Texp_quotation e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     UF.quote uf
