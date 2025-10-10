@@ -310,8 +310,8 @@ static void oldify_one (void* st_v, value v, volatile value *p)
       Field(result, 0) = stack_value;
       Field(result, 1) = Field(v, 1);
       if (size == 3) {
-        gc_regs = (value *)(&Field(v, 2));
-        Field(result, 2) = *gc_regs;
+        Field(result, 2) = Field(v, 2);
+        gc_regs = (value *)(Field(result, 2));
       }
       if (stk != NULL) {
         caml_scan_stack(&oldify_one, oldify_scanning_flags, st,

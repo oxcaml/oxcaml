@@ -1370,7 +1370,7 @@ void caml_darken_cont(value cont)
           mlsize_t size = Wosize_hd(hd);
           CAMLassert(size == 2 || size == 3);
           if (size == 3) {
-            gc_regs = (value *)(&Field(cont, 2));
+            gc_regs = (value *)(Field(cont, 2));
           }
 
           caml_scan_stack(&caml_darken, darken_scanning_flags, Caml_state,
