@@ -31,72 +31,55 @@
    Dynlink code, whereby state in compilerlibs needs to be updated, meaning that
    it could conflict with other use of compilerlibs in an application. *)
 
-let () =
-  Clflags.no_cwd := true;
-  Clflags.native_code := true;
-  Clflags.dont_write_files := true;
-  Clflags.shared := true;
-  Clflags.dlcode := false
-
 external bundled_cmis : unit -> string = "bundled_cmis"
 
 external bundled_cmxs : unit -> string = "bundled_cmxs"
 
-let () =
-  let marshaled = bundled_cmis () in
-  let bundled_cmis : Cmi_format.cmi_infos Compilation_unit.Name.Map.t =
-    Marshal.from_string marshaled 0
-  in
-  let bundled_cmis =
-    Compilation_unit.Name.Map.map
-      (fun (cmi : Cmi_format.cmi_infos) : Cmi_format.cmi_infos_lazy ->
-        { cmi with cmi_sign = Subst.Lazy.of_signature cmi.cmi_sign })
-      bundled_cmis
-  in
-  Persistent_env.Persistent_signature.load
-    := fun ~allow_hidden:_ ~unit_name ->
-         Option.map
-           (fun cmi ->
-             { Persistent_env.Persistent_signature.filename =
-                 Compilation_unit.Name.to_string unit_name;
-               cmi;
-               visibility = Visible
-             })
-           (Compilation_unit.Name.Map.find_opt unit_name bundled_cmis)
+let cmis =
+  lazy
+    (let marshaled = bundled_cmis () in
+     let bundled_cmis : Cmi_format.cmi_infos Compilation_unit.Name.Map.t =
+       Marshal.from_string marshaled 0
+     in
+     Compilation_unit.Name.Map.map
+       (fun (cmi : Cmi_format.cmi_infos) : Cmi_format.cmi_infos_lazy ->
+         { cmi with cmi_sign = Subst.Lazy.of_signature cmi.cmi_sign })
+       bundled_cmis)
 
 let cmxs =
-  let marshaled = bundled_cmxs () in
-  let bundled_cmxs : (Cmx_format.unit_infos_raw * string array) list =
-    Marshal.from_string marshaled 0
-  in
-  List.map
-    (fun ((uir, sections) : Cmx_format.unit_infos_raw * _) ->
-      let sections =
-        Oxcaml_utils.File_sections.from_array
-          (Array.map (fun s -> Marshal.from_string s 0) sections)
-      in
-      let export_info =
-        Option.map
-          (Flambda2_cmx.Flambda_cmx_format.from_raw ~sections)
-          uir.uir_export_info
-      in
-      let ui : Cmx_format.unit_infos =
-        { ui_unit = uir.uir_unit;
-          ui_defines = uir.uir_defines;
-          ui_format = uir.uir_format;
-          ui_arg_descr = uir.uir_arg_descr;
-          ui_imports_cmi = uir.uir_imports_cmi |> Array.to_list;
-          ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
-          ui_quoted_globals = uir.uir_quoted_globals |> Array.to_list;
-          ui_generic_fns = uir.uir_generic_fns;
-          ui_export_info = export_info;
-          ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
-          ui_force_link = uir.uir_force_link;
-          ui_external_symbols = uir.uir_external_symbols |> Array.to_list
-        }
-      in
-      ui)
-    bundled_cmxs
+  lazy
+    (let marshaled = bundled_cmxs () in
+     let bundled_cmxs : (Cmx_format.unit_infos_raw * string array) list =
+       Marshal.from_string marshaled 0
+     in
+     List.map
+       (fun ((uir, sections) : Cmx_format.unit_infos_raw * _) ->
+         let sections =
+           Oxcaml_utils.File_sections.from_array
+             (Array.map (fun s -> Marshal.from_string s 0) sections)
+         in
+         let export_info =
+           Option.map
+             (Flambda2_cmx.Flambda_cmx_format.from_raw ~sections)
+             uir.uir_export_info
+         in
+         let ui : Cmx_format.unit_infos =
+           { ui_unit = uir.uir_unit;
+             ui_defines = uir.uir_defines;
+             ui_format = uir.uir_format;
+             ui_arg_descr = uir.uir_arg_descr;
+             ui_imports_cmi = uir.uir_imports_cmi |> Array.to_list;
+             ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
+             ui_quoted_globals = uir.uir_quoted_globals |> Array.to_list;
+             ui_generic_fns = uir.uir_generic_fns;
+             ui_export_info = export_info;
+             ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
+             ui_force_link = uir.uir_force_link;
+             ui_external_symbols = uir.uir_external_symbols |> Array.to_list
+           }
+         in
+         ui)
+       bundled_cmxs)
 
 let counter = ref 0
 
@@ -105,6 +88,11 @@ let eval code =
   let id = !counter in
   incr counter;
   (* TODO: reset all the things *)
+  Clflags.no_cwd := true;
+  Clflags.native_code := true;
+  Clflags.dont_write_files := true;
+  Clflags.shared := true;
+  Clflags.dlcode := false;
   Location.reset ();
   Env.reset_cache ~preserve_persistent_env:true;
   (* TODO: set commandline flags *)
@@ -135,9 +123,19 @@ let eval code =
       (fun (info : Cmx_format.unit_infos) ->
         Compilenv.cache_unit_info info;
         true)
-      cmxs
+      (Lazy.force cmxs)
   in
   let env = Compmisc.initial_env () in
+  (Persistent_env.Persistent_signature.load
+     := fun ~allow_hidden:_ ~unit_name ->
+          Option.map
+            (fun cmi ->
+              { Persistent_env.Persistent_signature.filename =
+                  Compilation_unit.Name.to_string unit_name;
+                cmi;
+                visibility = Visible
+              })
+            (Compilation_unit.Name.Map.find_opt unit_name (Lazy.force cmis)));
   let typed_impl =
     Typemod.type_implementation unit_info compilation_unit env ast
   in
