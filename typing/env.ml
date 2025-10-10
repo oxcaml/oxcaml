@@ -3630,8 +3630,8 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
   let cstrs_filtered =
     List.filter
       (fun (cstr_data, (locks, _)) ->
-         let path =
-           (Path.Pident (Ident.create_predef cstr_data.cda_description.cstr_name))
+         let path = (Path.Pident
+                       (Ident.create_predef cstr_data.cda_description.cstr_name))
          in does_not_cross_quotation path locks = Ok ())
       cstrs
   in
@@ -4766,7 +4766,7 @@ let print_unsupported_quotation ppf =
   | Struct_qt ->
       fprintf ppf "Module definition using %a" (Style.inline_code) "struct..end"
   | Sig_qt ->
-      fprintf ppf "Module type definition using %a" (Style.inline_code) "sig..end"
+      fprintf ppf "Defining module types using %a" (Style.inline_code) "sig..end"
   | Open_qt -> fprintf ppf "Opening modules"
 
 
