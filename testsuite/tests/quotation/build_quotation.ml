@@ -656,8 +656,9 @@ Error: Identifier "S" is used at Line 1, characters 19-20,
 Line 1, characters 18-52:
 1 | <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Module definitions using "struct..end"
-       blocks are not allowed inside quotations.
+Error: Module definition using "struct..end"
+       is not supported inside quoted expressions,
+       as seen at Line 1, characters 18-52.
 |}];;
 
 <[ Mod.mk 42 ]>;;
@@ -690,7 +691,9 @@ let x = <[ 123 ]> in <[ $x ]>;;
 Line 1, characters 11-34:
 1 | <[ let o = object method f = 1 end in o#f ]>;;
                ^^^^^^^^^^^^^^^^^^^^^^^
-Error: Objects cannot be defined inside quotations using "object..end" blocks.
+Error: Object definition using "object..end"
+       is not supported inside quoted expressions,
+       as seen at Line 1, characters 11-34.
 |}];;
 
 <[ let open List in map ]>;;
@@ -698,7 +701,8 @@ Error: Objects cannot be defined inside quotations using "object..end" blocks.
 Line 1, characters 3-23:
 1 | <[ let open List in map ]>;;
        ^^^^^^^^^^^^^^^^^^^^
-Error: Modules cannot be opened inside quotations.
+Error: Opening modules is not supported inside quoted expressions,
+       as seen at Line 1, characters 3-23.
 |}];;
 
 <[ fun x -> $ (<[ x ]>) ]>;;
