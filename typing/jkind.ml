@@ -1413,8 +1413,9 @@ module Const = struct
 
     let any_mod_everything =
       { jkind =
-          mk_jkind Any ~crossing:Crossing.min ~externality:Externality.min
-            ~nullability:Maybe_null ~separability:Maybe_separable;
+          mk_jkind Any ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Maybe_null
+            ~separability:Maybe_separable;
         name = "any mod everything"
       }
 
@@ -1428,7 +1429,7 @@ module Const = struct
 
     let value_or_null_mod_everything =
       { jkind =
-          mk_jkind (Base Value) ~crossing:Crossing.min
+          mk_jkind (Base Value) ~crossing:cross_all_except_staticity
             ~externality:Externality.min ~nullability:Maybe_null
             ~separability:Maybe_separable;
         name = "value_or_null mod everything"
@@ -1524,7 +1525,7 @@ module Const = struct
 
     let void_mod_everything =
       { jkind =
-          mk_jkind (Base Void) ~crossing:Crossing.min
+          mk_jkind (Base Void) ~crossing:cross_all_except_staticity
             ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "void mod everything"

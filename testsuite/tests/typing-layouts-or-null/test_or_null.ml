@@ -99,9 +99,7 @@ Line 1, characters 14-25:
                   ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type
          "('a : value_or_null mod non_null)"
-       The kind of int or_null is
-           value_or_null
-             mod global aliased many stateless immutable external_
+       The kind of int or_null is value_or_null mod everything
          because it is the primitive type or_null.
        But the kind of int or_null must be a subkind of
            value_or_null mod non_null
@@ -325,9 +323,7 @@ Line 1, characters 26-42:
 1 | type object_with_null = < x : int or_null; .. >
                               ^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
-       The kind of "int or_null" is
-           value_or_null
-             mod global aliased many stateless immutable external_
+       The kind of "int or_null" is value_or_null mod everything
          because it is the primitive type or_null.
        But the kind of "int or_null" must be a subkind of value
          because it's the type of an object field.
@@ -456,9 +452,7 @@ Line 1, characters 35-51:
                                        ^^^^^^^^^^^^^^^^
 Error: This expression has type "unboxed_rec"
        but an expression was expected of type "('a : value)"
-       The kind of unboxed_rec is
-           value_or_null
-             mod global aliased many stateless immutable external_
+       The kind of unboxed_rec is value_or_null mod everything
          because it is the primitive type or_null.
        But the kind of unboxed_rec must be a subkind of value
          because of the definition of t at line 1, characters 0-69.
@@ -472,9 +466,7 @@ Line 1, characters 35-46:
                                        ^^^^^^^^^^^
 Error: This expression has type "unboxed_var"
        but an expression was expected of type "('a : value)"
-       The kind of unboxed_var is
-           value_or_null
-             mod global aliased many stateless immutable external_
+       The kind of unboxed_var is value_or_null mod everything
          because it is the primitive type or_null.
        But the kind of unboxed_var must be a subkind of value
          because of the definition of t at line 1, characters 0-69.

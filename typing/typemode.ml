@@ -214,8 +214,7 @@ let transl_mod_bounds annots =
               Some { txt = Per_axis.min (Modal (Comonadic Statefulness)); loc };
             visibility =
               Some { txt = Per_axis.min (Modal (Monadic Visibility)); loc };
-            staticity =
-              Some { txt = Per_axis.min (Modal (Monadic Staticity)); loc };
+            staticity = None;
             nullability =
               Transled_modifiers.get ~axis:(Nonmodal Nullability) bounds_so_far;
             separability =
