@@ -222,9 +222,12 @@ let block (cfg : C.t) (block : C.basic_block) ~(is_after_regalloc : bool) : bool
     let successor_block = C.get_block_exn cfg successor_label in
     if Dll.is_empty successor_block.body
     then
-      let known_values = collect_known_values block.body in
       let new_successor =
-        evaluate_terminator known_values successor_block.terminator
+        if is_after_regalloc
+        then
+          let known_values = collect_known_values block.body in
+          evaluate_terminator known_values successor_block.terminator
+        else None
       in
       match new_successor with
       | Some succ ->
