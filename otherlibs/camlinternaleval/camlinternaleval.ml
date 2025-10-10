@@ -27,6 +27,10 @@
 
 (* CR metaprogramming jrickard: This file has not been code reviewed *)
 
+(* CR mshinwell: It seems like this file is running into similar issues to the
+   Dynlink code, whereby state in compilerlibs needs to be updated, meaning that
+   it could conflict with other use of compilerlibs in an application. *)
+
 let () =
   Clflags.no_cwd := true;
   Clflags.native_code := true;
