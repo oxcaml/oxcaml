@@ -21,14 +21,10 @@ let compile_file filename =
     let out_name = Filename.chop_extension filename ^ ".s" in
     Emitaux.output_channel := open_out out_name
   end; (* otherwise, stdout *)
-  let compilation_unit =
-    Compilation_unit.create Compilation_unit.Prefix.empty
-      ("test" |> Compilation_unit.Name.of_string)
-  in
+  let compilation_unit = "test" |> Compilation_unit.of_string in
   let unit_info = Unit_info.make_dummy ~input_name:"test" compilation_unit in
   Compilenv.reset unit_info;
-  Clflags.cmm_invariants := true;
-  Emit.begin_assembly();
+  Emit.begin_assembly (module Unix : Compiler_owee.Unix_intf.S);
   let ic = open_in filename in
   let lb = Lexing.from_channel ic in
   lb.Lexing.lex_curr_p <- Lexing.{ lb.lex_curr_p with pos_fname = filename };
@@ -39,7 +35,7 @@ let compile_file filename =
     done
   with
       End_of_file ->
-        close_in ic; Emit.end_assembly();
+        close_in ic; Emit.end_assembly ();
         if !write_asm_file then close_out !Emitaux.output_channel
     | Lexcmm.Error msg ->
         close_in ic; Lexcmm.report_error lb msg
@@ -65,14 +61,9 @@ let main() =
      "-S", Arg.Set write_asm_file,
        " Output file to filename.s (default is stdout)";
      "-g", Arg.Set Clflags.debug, "";
+     "-dcfg", Arg.Set Oxcaml_flags.dump_cfg, "";
      "-dcmm", Arg.Set dump_cmm, "";
      "-dcse", Arg.Set dump_cse, "";
-     "-dspill", Arg.Set dump_spill, "";
-     "-dsplit", Arg.Set dump_split, "";
-     "-dinterf", Arg.Set dump_interf, "";
-     "-dprefer", Arg.Set dump_prefer, "";
-     "-dalloc", Arg.Set dump_regalloc, "";
-     "-dreload", Arg.Set dump_reload, "";
      "-dlinear", Arg.Set dump_linear, "";
      "-dtimings", Arg.Unit (fun () -> profile_columns := [ `Time ]), "";
      "-dcounters", Arg.Unit (fun () -> profile_columns := [ `Counters ]), "";

@@ -3,7 +3,14 @@
  compare_programs = "false";
  poll-insertion;
  arch64;
- native;
+ runtime5;
+ {
+   flags = "-Oclassic";
+   native;
+ } {
+   flags = "-O3";
+   native;
+ }
 *)
 
 (* This set of tests examine poll insertion behaviour. We do this by requesting
