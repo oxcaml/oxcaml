@@ -25,6 +25,8 @@
 //* DEALINGS IN THE SOFTWARE.                                                  *
 //******************************************************************************
 
+// CR metaprogramming jrickard: This file has not been code reviewed
+
 #include "caml/mlvalues.h"
 
 extern char caml_bundled_cmis[];
