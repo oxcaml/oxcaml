@@ -274,6 +274,7 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_try _
     | Texp_override _
     | Texp_letop _
+    (* CR aivaskovic: verify for quotations and splices *)
     | Texp_quotation _
     | Texp_antiquotation _ ->
         Dynamic

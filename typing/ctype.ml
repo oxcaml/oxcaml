@@ -2088,6 +2088,7 @@ let safe_abbrev env ty =
 (* Cancel out all pairs of $ and <[_]>, or <[_]> and $.
    This ensures type unification works correctly. *)
 let rec quote_splice_cancel ty =
+  (* CR aivaskovic: try to remove type_desc mutation here *)
   match get_desc ty with
   | Tquote t -> begin
       match get_desc t with
@@ -3985,6 +3986,8 @@ let rec unify uenv t1 t2 =
   try
     type_changed := true;
     begin match (get_desc t1, get_desc t2) with
+    | (Tconstr _, Tvar _) when deep_occur t2 t1 ->
+        unify2 uenv t1 t2
     | (Tvar _, Tquote _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tquote _, Tvar _) when deep_occur t2 t1 ->
@@ -3994,8 +3997,6 @@ let rec unify uenv t1 t2 =
     | (Tsplice _, Tvar _) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
     | (Tvar _, Tconstr _) when deep_occur t1 t2 ->
-        unify2 uenv t1 t2
-    | (Tconstr _, Tvar _) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
     | (Tvar _, _) ->
         if unify1_var uenv t1 t2 then () else unify2 uenv t1 t2
