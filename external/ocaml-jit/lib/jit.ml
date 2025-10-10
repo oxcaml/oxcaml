@@ -16,14 +16,13 @@
 
 open Import
 
-type evaluation_outcome =
-  | Result of Obj.t
-  | Exception of exn
+type evaluation_outcome = Result of Obj.t | Exception of exn
 
 let outcome_global : evaluation_outcome option ref = ref None
 
 external ndl_loadsym : string -> Obj.t
   = "caml_sys_exit" "caml_natdynlink_loadsym"
+
 external ndl_existssym : string -> bool
   = "caml_sys_exit" "caml_natdynlink_existssym"
   [@@noalloc]
@@ -66,21 +65,22 @@ let alloc_all jit_text_section binary_section_map =
   in
   match Externals.memalign total_size with
   | Error msg ->
-    failwithf "posix_memalign for %d bytes failed: %s" total_size msg
+      failwithf "posix_memalign for %d bytes failed: %s" total_size msg
   | Ok address ->
-    let text = { address; value = jit_text_section } in
-    let address = Address.add_int address text_size in
-    let map, _address =
-      String.Map.fold binary_section_map
-        ~init:(String.Map.empty, address)
-        ~f:(fun ~key ~data:binary_section (map, address) ->
-          let data = { address; value = binary_section } in
-          let map = String.Map.add map ~key ~data in
-          let size = round_to_pages (X86_binary_emitter.size binary_section) in
-          let address = Address.add_int address size in
-          map, address)
-    in
-    text, map
+      let text = { address; value = jit_text_section } in
+      let address = Address.add_int address text_size in
+      let map, _address =
+        String.Map.fold binary_section_map ~init:(String.Map.empty, address)
+          ~f:(fun ~key ~data:binary_section (map, address) ->
+            let data = { address; value = binary_section } in
+            let map = String.Map.add map ~key ~data in
+            let size =
+              round_to_pages (X86_binary_emitter.size binary_section)
+            in
+            let address = Address.add_int address size in
+            (map, address))
+      in
+      (text, map)
 
 let local_symbol_map binary_section_map =
   String.Map.fold binary_section_map ~init:Symbols.empty
@@ -132,7 +132,9 @@ let load_sections addressed_sections =
 
 let entry_points ~phrase_name symbols =
   let separator = (* if Config.runtime5 then "." else *) "__" in
-  let symbol_name name = Printf.sprintf "caml%s%s%s" phrase_name separator name in
+  let symbol_name name =
+    Printf.sprintf "caml%s%s%s" phrase_name separator name
+  in
   let find_symbol name = Symbols.find symbols (symbol_name name) in
   let frametable = find_symbol "frametable" in
   let gc_roots = find_symbol "gc_roots" in
@@ -178,13 +180,12 @@ let get_arch () =
 let jit_load_x86 ~phrase_name ~outcome_ref ~delayed:_ section_map _filename =
   let arch = get_arch () in
   let section_map =
-   List.fold_left
+    List.fold_left
       ~f:(fun section_map (name, instrs) ->
         String.Map.add section_map
           ~key:(X86_proc.Section_name.to_string name)
           ~data:instrs)
-      section_map
-      ~init:String.Map.empty
+      section_map ~init:String.Map.empty
   in
   let binary_section_map = binary_section_map ~arch section_map in
   Debug.print_binary_section_map binary_section_map;
@@ -245,10 +246,10 @@ let jit_load_body ~phrase_name ppf (program : Lambda.program) =
     Direct_to_cmm
       (Flambda2.lambda_to_cmm ~machine_width ~keep_symbol_tables:true)
   in
-    Asmgen.compile_implementation
-      (module Unix : Compiler_owee.Unix_intf.S)
-      ~toplevel:need_symbol ~pipeline ~sourcefile:(Some filename)
-      ~prefixname:filename ~ppf_dump:ppf program;
+  Asmgen.compile_implementation
+    (module Unix : Compiler_owee.Unix_intf.S)
+    ~toplevel:need_symbol ~pipeline ~sourcefile:(Some filename)
+    ~prefixname:filename ~ppf_dump:ppf program;
   match !outcome_global with
   | None -> failwith "No evaluation outcome"
   | Some res ->
@@ -260,7 +261,6 @@ let jit_load ~phrase_name ppf program =
 
 let jit_lookup_symbol symbol =
   match Symbols.find !Globals.symbols symbol with
-  | None -> (match ndl_loadsym symbol with
-    | exception _ -> None
-    | obj -> Some obj)
+  | None -> (
+      match ndl_loadsym symbol with exception _ -> None | obj -> Some obj)
   | Some x -> Some (Address.to_obj x)
