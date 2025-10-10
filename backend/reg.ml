@@ -308,7 +308,31 @@ let compare_loc_fatal_on_unknown ~fatal_message left right =
     | Unknown -> Misc.fatal_error fatal_message
     | Reg _ | Stack _ -> compare_loc left right
 
+let hash_stack_loc = function 
+  | Local x -> 400 + x
+  | Incoming x -> 200 + x
+  | Outgoing x -> 300 + x
+  | Domainstate x -> 100 + x
+
+let hash_loc = function
+  | Unknown -> -1
+  | Reg r -> r
+  | Stack stack_loc  -> hash_stack_loc stack_loc
+
 let is_of_type_addr t =
   match t.typ with
   | Addr -> true
   | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
+
+module UsingLocEquality = struct
+  module RegOrder = struct
+    type t = reg
+    let equal = same_loc
+    let compare = compare_loc
+    let hash r = hash_loc r.loc
+  end
+
+  module Set = Stdlib.Set.Make (RegOrder)
+  module Map = Stdlib.Map.Make (RegOrder)
+  module Tbl = Stdlib.Hashtbl.Make (RegOrder)
+end

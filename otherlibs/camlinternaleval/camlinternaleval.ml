@@ -150,7 +150,15 @@ let eval code =
   in
   Warnings.check_fatal () (* TODO: more error handling? *);
   (* TODO: assert program.arg_block_idx is none? *)
-  let program = { program with code = Simplif.simplify_lambda program.code } in
+  let program =
+    { program with
+      code =
+        Simplif.simplify_lambda
+          ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
+          ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
+          program.code
+    }
+  in
   let ppf = Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ()) in
   (match Jit.jit_load ~phrase_name:input_name ppf program with
   | Result _ -> ()

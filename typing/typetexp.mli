@@ -31,14 +31,14 @@ module TyVarEnv : sig
   (** Evaluate in a narrowed type-variable scope *)
 
   type poly_univars
-  val make_poly_univars : (string Location.loc * int) list -> poly_univars
+  val make_poly_univars : (string Location.loc * Env.stage) list -> poly_univars
     (** A variant of [make_poly_univars_jkinds] that gets variables
         without jkind annotations *)
 
   val make_poly_univars_jkinds :
     context:(string -> Jkind.History.annotation_context_lr) ->
-    (string Location.loc * Parsetree.jkind_annotation option * int) list ->
-    poly_univars
+    (string Location.loc * Parsetree.jkind_annotation option * Env.stage) list
+    -> poly_univars
     (** remember that a list of strings connotes univars; this must
         always be paired with a [check_poly_univars]. *)
 
@@ -183,9 +183,8 @@ type error =
   | Invalid_label_for_call_pos of Parsetree.arg_label
   | Invalid_variable_stage of
       {name : string;
-       intro_stage : int;
-       usage_loc : Location.t;
-       usage_stage : int}
+       intro_stage : Env.stage;
+       usage_stage : Env.stage}
 
 exception Error of Location.t * Env.t * error
 

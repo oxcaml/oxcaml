@@ -100,9 +100,8 @@ type error =
   | Invalid_label_for_call_pos of Parsetree.arg_label
   | Invalid_variable_stage of
       {name : string;
-       intro_stage : int;
-       usage_loc : Location.t;
-       usage_stage : int}
+       intro_stage : Env.stage;
+       usage_stage : Env.stage}
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -158,7 +157,7 @@ module TyVarEnv : sig
 
   val is_in_scope : string -> bool
 
-  val add : string -> type_expr -> jkind_lr -> int -> unit
+  val add : string -> type_expr -> jkind_lr -> Env.stage -> unit
   (* add a global type variable to the environment, with the given jkind.
      Precondition: the [type_expr] must be a [Tvar] with the given jkind. *)
 
@@ -173,12 +172,12 @@ module TyVarEnv : sig
     poly_univars -> (string * Parsetree.jkind_annotation option) list
   (* something suitable as an argument to [Ttyp_poly] *)
 
-  val make_poly_univars : (string Location.loc * int) list -> poly_univars
+  val make_poly_univars : (string Location.loc * Env.stage) list -> poly_univars
   (* a version of [make_poly_univars_jkinds] that doesn't take jkinds *)
 
   val make_poly_univars_jkinds :
     context:(string -> Jkind.History.annotation_context_lr) ->
-    (string Location.loc * Parsetree.jkind_annotation option * int) list
+    (string Location.loc * Parsetree.jkind_annotation option * Env.stage) list
     -> poly_univars
   (* see mli file *)
 
@@ -217,7 +216,7 @@ module TyVarEnv : sig
        are in scope. *)
 
   val lookup_local :
-    row_context:type_expr option ref list -> string -> type_expr * int
+    row_context:type_expr option ref list -> string -> type_expr * Env.stage
     (* look up a local type variable; throws Not_found if it isn't in scope *)
 
   val lookup_global_jkind : string -> jkind_lr
@@ -225,7 +224,7 @@ module TyVarEnv : sig
        assigned. Throws [Not_found] if the variable isn't in scope. See
        Note [Global type variables]. *)
 
-  val remember_used : string -> type_expr -> Location.t -> int -> unit
+  val remember_used : string -> type_expr -> Location.t -> Env.stage -> unit
     (* remember that a given name is bound to a given type *)
 
   val globalize_used_variables : policy -> Env.t -> unit -> unit
@@ -250,13 +249,13 @@ end = struct
      we started processing the current type. See Note [Global type variables].
   *)
   let type_variables =
-    ref (TyVarMap.empty : (type_expr * jkind_lr * int) TyVarMap.t)
+    ref (TyVarMap.empty : (type_expr * jkind_lr * Env.stage) TyVarMap.t)
 
   (* These are variables that have been used in the currently-being-checked
      type, possibly including the variables in [type_variables].
   *)
   let used_variables =
-    ref (TyVarMap.empty : (type_expr * Location.t * int) TyVarMap.t)
+    ref (TyVarMap.empty : (type_expr * Location.t * Env.stage) TyVarMap.t)
 
   (* These are variables that will become univars when we're done with the
      current type. Used to force free variables in method types to become
@@ -317,7 +316,7 @@ end = struct
     jkind_info : jkind_info (** the original kind *)
   }
 
-  type poly_univars = (string * pending_univar * int) list
+  type poly_univars = (string * pending_univar * Env.stage) list
 
   let univars = ref ([] : poly_univars)
   let assert_univars uvs =
@@ -526,7 +525,6 @@ end = struct
                   (Error (loc, env, (Invalid_variable_stage
                                        {name = Pprintast.tyvar_of_name name;
                                         intro_stage = stage;
-                                        usage_loc = loc;
                                         usage_stage = s})));
               r := (loc, v, type_expr) :: !r
             with Not_found ->
@@ -1133,7 +1131,6 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
       (Error (loc, env,
               Invalid_variable_stage {name = print_name;
                                       intro_stage = stage;
-                                      usage_loc = loc;
                                       usage_stage = Env.stage env}));
   let jkind_annot =
     match jkind_annot_opt with
@@ -1496,17 +1493,6 @@ let report_unbound_variable_reason ppf = function
                    Enable non-erasable extensions to disable this check."
   | None -> ()
 
-let print_with_quote_promote ppf (name, stage_diff) =
-  let rec loop fmt stage_diff =
-    if stage_diff = 1 then fprintf fmt "<[%s]>" name
-    else if stage_diff = -1 then fprintf fmt "$%s" name
-    else if stage_diff > 1 then fprintf fmt "<[%a]>" loop (stage_diff - 1)
-    else if stage_diff < -1 then fprintf fmt "$(%a)" loop (stage_diff + 1)
-    else assert false
-  in
-  loop str_formatter stage_diff;
-  fprintf ppf "%a" Style.inline_code (flush_str_formatter ())
-
 let report_error env ppf =
   function
   | Unbound_type_variable (name, in_scope_names, reason) ->
@@ -1676,17 +1662,15 @@ let report_error env ppf =
         | Nolabel -> "unlabelled"
         | Optional _ -> "optional"
         | Labelled _ -> assert false )
-  | Invalid_variable_stage {name; intro_stage; usage_loc; usage_stage} ->
+  | Invalid_variable_stage {name; intro_stage; usage_stage} ->
     fprintf ppf
-      "@[<v>@[Type variable %a is used at %a,@ \
-         %a;@ \
+      "@[<v>@[Type variable %a is used %a,@ \
          it already occurs %a.@]@,\
          @[@{<hint>Hint@}: Consider using %a.@]@]"
       Style.inline_code name
-      Location.print_loc usage_loc
       Env.print_stage usage_stage
       Env.print_stage intro_stage
-      print_with_quote_promote (name, intro_stage - usage_stage)
+      Env.print_with_quote_promote (name, intro_stage, usage_stage)
 
 let () =
   Location.register_error_of_exn

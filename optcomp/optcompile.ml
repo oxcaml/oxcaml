@@ -92,7 +92,12 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
     |> Profile.(record generate) (fun (program : Lambda.program) ->
            Builtin_attributes.warn_unused ();
-           let code = Simplif.simplify_lambda program.Lambda.code in
+           let code =
+             Simplif.simplify_lambda program.Lambda.code
+               ~restrict_to_upstream_dwarf:
+                 !Dwarf_flags.restrict_to_upstream_dwarf
+               ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
+           in
            { program with Lambda.code }
            |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.program
            |> Compiler_hooks.execute_and_pipe Compiler_hooks.Lambda

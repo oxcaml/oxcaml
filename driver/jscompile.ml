@@ -44,7 +44,8 @@ let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
          Builtin_attributes.warn_unused ();
          program.code
          |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
-         |> Simplif.simplify_lambda
+         |> Simplif.simplify_lambda ~restrict_to_upstream_dwarf:true
+              ~gdwarf_may_alter_codegen:false
          |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
          |> fun lambda ->
          let arg_descr =

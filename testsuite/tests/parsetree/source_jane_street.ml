@@ -1614,3 +1614,8 @@ let triangle_10 = let mutable x = 0 in
 [%%expect{|
 val triangle_10 : int = 55
 |}]
+
+(*********************)
+(* quotations syntax *)
+
+(* Test will only be added once quotations work end-to-end. *)

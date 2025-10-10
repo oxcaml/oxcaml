@@ -26,7 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* CR aivaskovic: This file has not been code reviewed *)
+(* CR metaprogramming aivaskovic: This file has not been code reviewed *)
 
 type 'a lam = 'a
 
@@ -1383,7 +1383,8 @@ module Ast = struct
       fixity_of_string (suffix_string_of_ident_value l)
     | _ -> `Normal
 
-  let print_tuple_like ?(with_space=true) delim open_sym close_sym printer fmt entries =
+  let print_tuple_like
+        ?(with_space=true) delim open_sym close_sym printer fmt entries =
     pp fmt "%s@[" open_sym;
     (match entries with
     | [] -> ()
@@ -1715,7 +1716,8 @@ module Ast = struct
     in
     let items, has_cons = list_items_and_cons pat in
     if has_cons
-    then print_tuple_like ~with_space:false "::" "" "" (print_pat_with_parens env) fmt items
+    then print_tuple_like ~with_space:false "::" "" ""
+           (print_pat_with_parens env) fmt items
     else print_tuple_like ";" "[" "]" (print_pat env) fmt items
 
   and print_list_exp env fmt exp =
@@ -1733,7 +1735,8 @@ module Ast = struct
     in
     let items, has_cons = list_items_and_cons exp in
     if has_cons
-    then print_tuple_like ~with_space:false "::" "" "" (print_exp_with_parens env) fmt items
+    then print_tuple_like ~with_space:false "::" "" ""
+           (print_exp_with_parens env) fmt items
     else print_tuple_like ";" "[" "]" (print_exp env) fmt items
 
   and print_exp_desc env fmt exp =

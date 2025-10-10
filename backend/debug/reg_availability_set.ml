@@ -28,14 +28,56 @@ let of_list rds = Ok (RD_quotient_set.of_list rds)
 
 let union t1 t2 =
   match t1, t2 with
-  | Ok avail1, Ok avail2 -> Ok (RD_quotient_set.union avail1 avail2)
+  | Ok avail1, Ok avail2 ->
+    (* CR mshinwell: Seems like this could cause sets with multiple locations
+       for the same name, or vice-versa. *)
+    Ok (RD_quotient_set.union avail1 avail2)
   | Unreachable, _ | _, Unreachable -> Unreachable
 
 let inter t1 t2 =
+  (* This is for Compute_ranges, not the join in Cfg_available_regs. *)
   match t1, t2 with
   | Unreachable, _ -> t2
   | _, Unreachable -> t1
   | Ok avail1, Ok avail2 -> Ok (RD_quotient_set.inter avail1 avail2)
+
+let inter_removing_conflicting_debug_info t1 t2 =
+  (* This is for the join in Cfg_available_regs, not for Compute_ranges. *)
+  match t1, t2 with
+  | Unreachable, _ -> t2
+  | _, Unreachable -> t1
+  | Ok avail1, Ok avail2 ->
+    (* Conflicting debug info values for the same location need to be cleared,
+       with the register still being put in the output set, otherwise we might
+       completely forget that such register is available. As such this can't
+       just be [RD_quotient_set.inter]. *)
+    let result =
+      RD_quotient_set.fold
+        (fun reg1 result ->
+          match
+            RD_quotient_set.find_reg_with_same_location_exn avail2 (RD.reg reg1)
+          with
+          | exception Not_found ->
+            (* Not in the intersection, even ignoring debug info *)
+            result
+          | reg2 ->
+            let reg =
+              (* Clear out any conflicting debug info, but remember that the
+                 register is available. *)
+              if Option.equal RD.Debug_info.equal (RD.debug_info reg1)
+                   (RD.debug_info reg2)
+              then
+                (* [reg1] has the same location and debug info as [reg2] *)
+                reg1
+              else
+                (* Debug info conflict. We arbitrarily pick [reg1]; we know it
+                   has the same location as [reg2]. *)
+                RD.create_without_debug_info ~reg:(RD.reg reg1)
+            in
+            RD_quotient_set.add reg result)
+        avail1 RD_quotient_set.empty
+    in
+    Ok result
 
 let diff t1 t2 =
   match t1, t2 with

@@ -370,7 +370,6 @@ module TycompTbl =
 
 type empty = |
 
-
 type mode_with_locks = Mode.Value.l * locks
 
 let locks_empty = []
@@ -653,6 +652,7 @@ type type_descr_kind =
 type type_descriptions = type_descr_kind
 
 let in_signature_flag = 0x01
+type stage = int
 
 type t = {
   values: (lock, value_entry, value_data) IdTbl.t;
@@ -668,7 +668,7 @@ type t = {
   summary: summary;
   local_constraints: type_declaration Path.Map.t;
   flags: int;
-  stage: int;
+  stage: stage;
 }
 
 and module_components =
@@ -806,6 +806,12 @@ type structure_components_reason =
   | Project
   | Open
 
+type no_open_quotations_context =
+  | Object_qt
+  | Struct_qt
+  | Sig_qt
+  | Open_qt
+
 let print_structure_components_reason ppf = function
   | Project -> Format.fprintf ppf "have any components"
   | Open -> Format.fprintf ppf "be opend"
@@ -846,7 +852,7 @@ type lookup_error =
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of
       [`Escape of escaping_context | `Shared of shared_context | `Closure]
-  | Incompatible_stage of Longident.t * Location.t * int * Location.t * int
+  | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
   | No_constructor_in_stage of Longident.t * Location.t * int
 
 type error =
@@ -855,6 +861,7 @@ type error =
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t }
   | Toplevel_splice of Location.t
+  | Unsupported_inside_quotation of Location.t * no_open_quotations_context
 
 exception Error of error
 
@@ -2879,7 +2886,11 @@ let enter_splice ~loc env =
     raise (Error (Toplevel_splice loc));
   add_lock Splice_lock {env with stage = env.stage - 1}
 
-let has_open_quotations env = env.stage <> 0
+let check_no_open_quotations loc env context =
+  if env.stage = 0
+  then ()
+  else raise (Error (Unsupported_inside_quotation (loc, context)))
+
 let stage env = env.stage
 
 let quotation_locks_offset locks =
@@ -3216,22 +3227,20 @@ let rec path_head_is_global_or_predef = function
   | Pdot(p, _) | Pextra_ty (p, _) -> path_head_is_global_or_predef p
   | Papply _ -> false
 
-let crosses_quotation path locks =
-  path_head_is_global_or_predef path
-  ||
-  (match quotation_locks_offset locks with
-   | 0 -> false
-   | _ -> true)
+let does_not_cross_quotation path locks =
+  if path_head_is_global_or_predef path
+  then Ok ()
+  else
+    (match quotation_locks_offset locks with
+     | 0 -> Ok ()
+     | n -> Result.Error n)
 
 let check_cross_quotation report_errors loc_use loc_def env path lid locks =
-  if path_head_is_global_or_predef path
-  then ()
-  else
-    match quotation_locks_offset locks with
-    | 0 -> ()
-    | n ->
-      may_lookup_error report_errors loc_use env
-        (Incompatible_stage (lid, loc_use, env.stage, loc_def, env.stage - n))
+  match does_not_cross_quotation path locks with
+  | Ok () -> ()
+  | Error n ->
+    may_lookup_error report_errors loc_use env
+      (Incompatible_stage (lid, loc_use, env.stage, loc_def, env.stage - n))
 
 let report_module_unbound ~errors ~loc env reason =
   match reason with
@@ -3364,7 +3373,8 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   let path, locks, data =
     match find_name_module ~mark:use s env.modules with
     | path, locks, data -> begin
-        check_cross_quotation errors loc Location.none env path (Lident s) locks;
+        check_cross_quotation
+          errors loc Location.none env path (Lident s) locks;
         path, locks, data
     end
     | exception Not_found ->
@@ -3624,11 +3634,11 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
   let cstrs = TycompTbl.find_all_and_locks ~mark:use s env.constrs in
   let cstrs_filtered =
     List.filter
-      (fun (cstr_data, (locks, _))
-        -> crosses_quotation
-             (Path.Pident
-                (Ident.create_predef cstr_data.cda_description.cstr_name))
-             locks)
+      (fun (cstr_data, (locks, _)) ->
+         let path =
+           (Path.Pident
+              (Ident.create_predef cstr_data.cda_description.cstr_name))
+         in does_not_cross_quotation path locks = Ok ())
       cstrs
   in
   match cstrs_filtered with
@@ -4117,7 +4127,8 @@ let lookup_type ~errors ~use ~loc lid env =
   match lid_without_hash lid with
   | None ->
     let path, locks, tda = lookup_type_full ~errors ~use ~loc lid env in
-    check_cross_quotation errors loc tda.tda_declaration.type_loc env path lid locks;
+    check_cross_quotation errors
+      loc tda.tda_declaration.type_loc env path lid locks;
     path, tda.tda_declaration
   | Some lid ->
     (* To get the hash version, look up without the hash, then look for the
@@ -4742,6 +4753,30 @@ let print_stage ppf stage =
     fprintf ppf "inside %d layers of quotation (<[ ... ]>)" stage
   else assert false
 
+let print_with_quote_promote ppf (name, intro_stage, usage_stage) =
+  let stage_diff = intro_stage - usage_stage in
+  let rec loop fmt stage_diff =
+    if stage_diff = 1 then fprintf fmt "<[%s]>" name
+    else if stage_diff = -1 then fprintf fmt "$%s" name
+    else if stage_diff > 1 then fprintf fmt "<[%a]>" loop (stage_diff - 1)
+    else if stage_diff < -1 then fprintf fmt "$(%a)" loop (stage_diff + 1)
+    else assert false
+  in
+  loop str_formatter stage_diff;
+  fprintf ppf "%a" Style.inline_code (flush_str_formatter ())
+
+let print_unsupported_quotation ppf =
+  function
+  | Object_qt ->
+      fprintf ppf "Object definition using %a" (Style.inline_code) "object..end"
+  | Struct_qt ->
+      fprintf ppf "Module definition using %a" (Style.inline_code) "struct..end"
+  | Sig_qt ->
+      fprintf ppf "Module type definition using %a"
+        (Style.inline_code) "sig..end"
+  | Open_qt -> fprintf ppf "Opening modules"
+
+
 let report_lookup_error _loc env ppf = function
   | Unbound_value(lid, hint) -> begin
       fprintf ppf "Unbound value %a"
@@ -5034,6 +5069,12 @@ let report_error ppf = function
          as encountered at %a.@,\
          Did you forget to insert a quotation?@]"
         Location.print_loc loc
+  | Unsupported_inside_quotation (loc, context) ->
+      fprintf ppf
+        "@[<hov>%a@ is not supported inside quoted expressions,@ \
+         as seen at %a.@]"
+        print_unsupported_quotation context
+        Location.print_loc loc
 
 let () =
   Location.register_error_of_exn
@@ -5044,6 +5085,7 @@ let () =
             | Missing_module (loc, _, _)
             | Illegal_value_name (loc, _)
             | Toplevel_splice loc
+            | Unsupported_inside_quotation (loc, _)
             | Lookup_error(loc, _, _) -> loc
             | Incomplete_instantiation _ -> Location.none
           in

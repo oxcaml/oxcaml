@@ -49,7 +49,7 @@ let raw_lambda_to_bytecode i raw_lambda ~as_arg_for =
        |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
           (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
-       |> Simplif.simplify_lambda
+       |> Simplif.simplify_lambda_for_bytecode
        |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
        |> Blambda_of_lambda.blambda_of_lambda
             ~compilation_unit:(Some i.module_name)
