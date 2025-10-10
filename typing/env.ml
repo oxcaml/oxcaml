@@ -370,7 +370,6 @@ module TycompTbl =
 
 type empty = |
 
-
 type mode_with_locks = Mode.Value.l * locks
 
 let locks_empty = []
@@ -3211,22 +3210,20 @@ let rec path_head_is_global_or_predef = function
   | Pdot(p, _) | Pextra_ty (p, _) -> path_head_is_global_or_predef p
   | Papply _ -> false
 
-let crosses_quotation path locks =
-  path_head_is_global_or_predef path
-  ||
-  (match quotation_locks_offset locks with
-   | 0 -> false
-   | _ -> true)
+let does_not_cross_quotation path locks =
+  if path_head_is_global_or_predef path
+  then Ok ()
+  else
+    (match quotation_locks_offset locks with
+     | 0 -> Ok ()
+     | n -> Result.Error n)
 
 let check_cross_quotation report_errors loc_use loc_def env path lid locks =
-  if path_head_is_global_or_predef path
-  then ()
-  else
-    match quotation_locks_offset locks with
-    | 0 -> ()
-    | n ->
-      may_lookup_error report_errors loc_use env
-        (Incompatible_stage (lid, loc_use, env.stage, loc_def, env.stage - n))
+  match does_not_cross_quotation path locks with
+  | Ok () -> ()
+  | Error n ->
+    may_lookup_error report_errors loc_use env
+      (Incompatible_stage (lid, loc_use, env.stage, loc_def, env.stage - n))
 
 let report_module_unbound ~errors ~loc env reason =
   match reason with
@@ -3620,11 +3617,10 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
   let cstrs = TycompTbl.find_all_and_locks ~mark:use s env.constrs in
   let cstrs_filtered =
     List.filter
-      (fun (cstr_data, (locks, _))
-        -> crosses_quotation
-             (Path.Pident
-                (Ident.create_predef cstr_data.cda_description.cstr_name))
-             locks)
+      (fun (cstr_data, (locks, _)) ->
+         let path =
+           (Path.Pident (Ident.create_predef cstr_data.cda_description.cstr_name))
+         in does_not_cross_quotation path locks = Ok ())
       cstrs
   in
   match cstrs_filtered with
