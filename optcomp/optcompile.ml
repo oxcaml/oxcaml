@@ -282,8 +282,7 @@ let native unix
           (Direct_to_cmm (lambda_to_cmm ~machine_width ~keep_symbol_tables))
         ~sourcefile ~prefixname ~ppf_dump program
 
-    let extra_load_paths_for_eval =
-      ["unix"; "compiler-libs"; "ocaml-jit"]
+    let extra_load_paths_for_eval = ["unix"; "compiler-libs"; "ocaml-jit"]
 
     let extra_libraries_for_eval =
       [ "unix/unix";
