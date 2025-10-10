@@ -2530,7 +2530,9 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
   | Texp_antiquotation e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     UF.antiquote uf
-  | Texp_eval _ -> UF.unused
+  | Texp_eval _ ->
+    (* CR metaprogramming mshinwell: Make sure this is correct *)
+    UF.unused
 
 (**
 Corresponds to the first mode.
