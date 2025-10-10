@@ -309,14 +309,14 @@ let compare_loc_fatal_on_unknown ~fatal_message left right =
     | Reg _ | Stack _ -> compare_loc left right
 
 let hash_stack_loc = function 
-  | Local x -> 10 + x
-  | Incoming x -> 20 + x
-  | Outgoing x -> 30 + x
-  | Domainstate x -> 40 + x
+  | Local x -> 400 + x
+  | Incoming x -> 200 + x
+  | Outgoing x -> 300 + x
+  | Domainstate x -> 100 + x
 
 let hash_loc = function
-  | Unknown -> 0
-  | Reg r -> 1000 + r
+  | Unknown -> -1
+  | Reg r -> r
   | Stack stack_loc  -> hash_stack_loc stack_loc
 
 let is_of_type_addr t =
