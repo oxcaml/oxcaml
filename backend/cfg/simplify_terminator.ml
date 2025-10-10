@@ -91,8 +91,7 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
   let replace reg value =
     if not (Reg.is_unknown reg)
     then Reg.UsingLocEquality.Tbl.replace known_values reg value
-    else
-      Misc.fatal_errorf "unexpected unknown location (%a)" Printreg.Printreg reg
+    else Misc.fatal_errorf "unexpected unknown location (%a)" Printreg.reg reg
   in
   let find_opt reg = Reg.UsingLocEquality.Tbl.find_opt known_values reg in
   let remove reg = Reg.UsingLocEquality.Tbl.remove known_values reg in
