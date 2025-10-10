@@ -34,8 +34,7 @@ type ('a, 'b) s5 = <[$'a -> [`A of 'b]]> expr;;
 Line 32, characters 35-37:
 32 | type ('a, 'b) s5 = <[$'a -> [`A of 'b]]> expr;;
                                         ^^
-Error: Type variable "'b" is used at Line 32, characters 35-37,
-       inside a quotation (<[ ... ]>);
+Error: Type variable "'b" is used inside a quotation (<[ ... ]>),
        it already occurs outside any quotations.
        Hint: Consider using "$'b".
 |}];;
@@ -62,11 +61,10 @@ type 'a t1 = 'a expr
 
 type 'a t2 = <['a]> expr;;
 [%%expect {|
-Line 63, characters 15-17:
-63 | type 'a t2 = <['a]> expr;;
+Line 62, characters 15-17:
+62 | type 'a t2 = <['a]> expr;;
                     ^^
-Error: Type variable "'a" is used at Line 63, characters 15-17,
-       inside a quotation (<[ ... ]>);
+Error: Type variable "'a" is used inside a quotation (<[ ... ]>),
        it already occurs outside any quotations.
        Hint: Consider using "$'a".
 |}];;
@@ -121,19 +119,17 @@ let foo2 (x: 'a) = <[fun (y : 'a) -> 1]>;;
 Line 1, characters 30-32:
 1 | let foo2 (x: 'a) = <[fun (y : 'a) -> 1]>;;
                                   ^^
-Error: Type variable "'a" is used at Line 1, characters 30-32,
-       inside a quotation (<[ ... ]>);
+Error: Type variable "'a" is used inside a quotation (<[ ... ]>),
        it already occurs outside any quotations.
        Hint: Consider using "$'a".
 |}];;
 
 let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
 [%%expect {|
-Line 130, characters 32-34:
-130 | let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
+Line 127, characters 32-34:
+127 | let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
                                       ^^
-Error: Type variable "'a" is used at Line 130, characters 32-34,
-       inside 2 layers of quotation (<[ ... ]>);
+Error: Type variable "'a" is used inside 2 layers of quotation (<[ ... ]>),
        it already occurs outside any quotations.
        Hint: Consider using "$($'a)".
 |}];;
@@ -182,8 +178,7 @@ Error: This expression has type "<[$(a) * $(b) -> 'a * ($(a) * $(b))]> expr"
 Line 1, characters 33-35:
 1 | (<[fun (y : 'a) -> 1]>, fun (x : 'a) -> ())
                                      ^^
-Error: Type variable "'a" is used at Line 1, characters 33-35,
-       outside any quotations;
+Error: Type variable "'a" is used outside any quotations,
        it already occurs inside a quotation (<[ ... ]>).
        Hint: Consider using "<['a]>".
 |}];;
@@ -303,8 +298,7 @@ fun (x: <[<[<[$($'a)]>]>]>) -> (x: 'a);;
 Line 1, characters 35-37:
 1 | fun (x: <[<[<[$($'a)]>]>]>) -> (x: 'a);;
                                        ^^
-Error: Type variable "'a" is used at Line 1, characters 35-37,
-       outside any quotations;
+Error: Type variable "'a" is used outside any quotations,
        it already occurs inside a quotation (<[ ... ]>).
        Hint: Consider using "<['a]>".
 |}];;

@@ -184,7 +184,6 @@ type error =
   | Invalid_variable_stage of
       {name : string;
        intro_stage : Env.stage;
-       usage_loc : Location.t;
        usage_stage : Env.stage}
 
 exception Error of Location.t * Env.t * error

@@ -101,7 +101,6 @@ type error =
   | Invalid_variable_stage of
       {name : string;
        intro_stage : Env.stage;
-       usage_loc : Location.t;
        usage_stage : Env.stage}
 
 exception Error of Location.t * Env.t * error
@@ -526,7 +525,6 @@ end = struct
                   (Error (loc, env, (Invalid_variable_stage
                                        {name = Pprintast.tyvar_of_name name;
                                         intro_stage = stage;
-                                        usage_loc = loc;
                                         usage_stage = s})));
               r := (loc, v, type_expr) :: !r
             with Not_found ->
@@ -1133,7 +1131,6 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
       (Error (loc, env,
               Invalid_variable_stage {name = print_name;
                                       intro_stage = stage;
-                                      usage_loc = loc;
                                       usage_stage = Env.stage env}));
   let jkind_annot =
     match jkind_annot_opt with
@@ -1665,14 +1662,12 @@ let report_error env ppf =
         | Nolabel -> "unlabelled"
         | Optional _ -> "optional"
         | Labelled _ -> assert false )
-  | Invalid_variable_stage {name; intro_stage; usage_loc; usage_stage} ->
+  | Invalid_variable_stage {name; intro_stage; usage_stage} ->
     fprintf ppf
-      "@[<v>@[Type variable %a is used at %a,@ \
-         %a;@ \
+      "@[<v>@[Type variable %a is used %a,@ \
          it already occurs %a.@]@,\
          @[@{<hint>Hint@}: Consider using %a.@]@]"
       Style.inline_code name
-      Location.print_loc usage_loc
       Env.print_stage usage_stage
       Env.print_stage intro_stage
       Env.print_with_quote_promote (name, intro_stage, usage_stage)
