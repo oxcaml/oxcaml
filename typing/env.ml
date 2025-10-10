@@ -806,6 +806,12 @@ type structure_components_reason =
   | Project
   | Open
 
+type no_open_quotations_context =
+  | Object_qt
+  | Struct_qt
+  | Sig_qt
+  | Open_qt
+
 let print_structure_components_reason ppf = function
   | Project -> Format.fprintf ppf "have any components"
   | Open -> Format.fprintf ppf "be opend"
@@ -855,6 +861,7 @@ type error =
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t }
   | Toplevel_splice of Location.t
+  | Unsupported_inside_quotation of Location.t * no_open_quotations_context
 
 exception Error of error
 
@@ -2874,7 +2881,11 @@ let enter_splice ~loc env =
     raise (Error (Toplevel_splice loc));
   add_lock Splice_lock {env with stage = env.stage - 1}
 
-let has_open_quotations env = env.stage <> 0
+let check_no_open_quotations loc env context =
+  if env.stage = 0
+  then ()
+  else raise (Error (Unsupported_inside_quotation (loc, context)))
+
 let stage env = env.stage
 
 let quotation_locks_offset locks =
@@ -4736,7 +4747,7 @@ let print_stage ppf stage =
     fprintf ppf "inside %d layers of quotation (<[ ... ]>)" stage
   else assert false
 
-let print_with_quote_promote ppf (name, intro_stage, usage_stage)=
+let print_with_quote_promote ppf (name, intro_stage, usage_stage) =
   let stage_diff = intro_stage - usage_stage in
   let rec loop fmt stage_diff =
     if stage_diff = 1 then fprintf fmt "<[%s]>" name
@@ -4747,6 +4758,16 @@ let print_with_quote_promote ppf (name, intro_stage, usage_stage)=
   in
   loop str_formatter stage_diff;
   fprintf ppf "%a" Style.inline_code (flush_str_formatter ())
+
+let print_unsupported_quotation ppf =
+  function
+  | Object_qt ->
+      fprintf ppf "Object definition using %a" (Style.inline_code) "object..end"
+  | Struct_qt ->
+      fprintf ppf "Module definition using %a" (Style.inline_code) "struct..end"
+  | Sig_qt ->
+      fprintf ppf "Module type definition using %a" (Style.inline_code) "sig..end"
+  | Open_qt -> fprintf ppf "Opening modules"
 
 
 let report_lookup_error _loc env ppf = function
@@ -5041,6 +5062,12 @@ let report_error ppf = function
          as encountered at %a.@,\
          Did you forget to insert a quotation?@]"
         Location.print_loc loc
+  | Unsupported_inside_quotation (loc, context) ->
+      fprintf ppf
+        "@[<hov>%a@ is not supported inside quoted expressions,@ \
+         as seen at %a.@]"
+        print_unsupported_quotation context
+        Location.print_loc loc
 
 let () =
   Location.register_error_of_exn
@@ -5051,6 +5078,7 @@ let () =
             | Missing_module (loc, _, _)
             | Illegal_value_name (loc, _)
             | Toplevel_splice loc
+            | Unsupported_inside_quotation (loc, _)
             | Lookup_error(loc, _, _) -> loc
             | Incomplete_instantiation _ -> Location.none
           in

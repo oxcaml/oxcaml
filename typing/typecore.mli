@@ -343,8 +343,6 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Quotation_object
-  | Open_inside_quotation
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

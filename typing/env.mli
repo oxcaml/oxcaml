@@ -225,6 +225,12 @@ type structure_components_reason =
   | Project
   | Open
 
+type no_open_quotations_context =
+  | Object_qt
+  | Struct_qt
+  | Sig_qt
+  | Open_qt
+
 type lookup_error =
   | Unbound_value of Longident.t * unbound_value_hint
   | Unbound_type of Longident.t
@@ -533,7 +539,8 @@ val add_unboxed_lock : t -> t
 val enter_quotation : t -> t
 val enter_splice : loc:Location.t -> t -> t
 
-val has_open_quotations : t -> bool
+val check_no_open_quotations :
+  Location.t -> t -> no_open_quotations_context -> unit
 val stage : t -> stage
 
 (* Initialize the cache of in-core module interfaces. *)
@@ -625,6 +632,7 @@ type error =
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t; }
   | Toplevel_splice of Location.t
+  | Unsupported_inside_quotation of Location.t * no_open_quotations_context
 
 exception Error of error
 
