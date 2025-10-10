@@ -37,8 +37,8 @@ let union t1 t2 =
 let inter t1 t2 =
   (* This is for Compute_ranges, not the join in Cfg_available_regs. *)
   match t1, t2 with
-  | Unreachable, _ -> Unreachable
-  | _, Unreachable -> Unreachable
+  | Unreachable, _ -> t2
+  | _, Unreachable -> t1
   | Ok avail1, Ok avail2 -> Ok (RD_quotient_set.inter avail1 avail2)
 
 let inter_removing_conflicting_debug_info t1 t2 =
