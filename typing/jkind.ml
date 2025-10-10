@@ -1763,7 +1763,8 @@ module Const = struct
 
     let kind_of_idx =
       { jkind =
-          mk_jkind (Base Bits64) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Bits64) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "bits64 mod everything"
       }

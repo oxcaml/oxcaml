@@ -1026,6 +1026,7 @@ module Lattices_mono = struct
       | Uniqueness -> 6
       | Visibility -> 7
       | Contention -> 8
+      | Staticity -> 9
 
     let compare a b = index a - index b
 
