@@ -1349,6 +1349,7 @@ static scanning_action_flags darken_scanning_flags = 0;
 
 void caml_darken_cont(value cont)
 {
+  fprintf(stderr, "caml_darken_cont called: cont=%p\n", (void*)cont);
   CAMLassert(Is_block(cont) && !Is_young(cont) && Tag_val(cont) == Cont_tag);
   {
     SPIN_WAIT {
@@ -1370,7 +1371,11 @@ void caml_darken_cont(value cont)
           mlsize_t size = Wosize_hd(hd);
           CAMLassert(size == 2 || size == 3);
           if (size == 3) {
-            gc_regs = (value *)(&Field(cont, 2));
+            value gc_regs_val = Field(cont, 2);
+            gc_regs = (value *)(gc_regs_val);
+            fprintf(stderr, "caml_darken_cont: cont=%p, Field(cont,2)=%p, "
+                    "gc_regs=%p\n",
+                    (void*)cont, (void*)gc_regs_val, (void*)gc_regs);
           }
 
           caml_scan_stack(&caml_darken, darken_scanning_flags, Caml_state,
