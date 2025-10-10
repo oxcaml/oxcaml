@@ -369,7 +369,7 @@ jobs:
         if [ -n "$ARTIFACT_URL" ]; then
           COMMAND="./tools/apply-diff.sh $ARTIFACT_URL"
           echo "$COMMAND"
-          gh pr comment --body "$(cat <<EOF
+          gh pr comment ${{ github.event.pull_request.number }} --body "$(cat <<EOF
         Test failures detected in ${{ matrix.name }} configuration. Apply the diff with:
         ```bash
         $COMMAND
