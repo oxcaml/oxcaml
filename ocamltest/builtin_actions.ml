@@ -253,6 +253,15 @@ let no_frame_pointers = make
      "frame-pointers not available"
      "frame-pointers available")
 
+let legacy_ocaml_name_mangling = make
+  ~name:"legacy-ocaml-name-mangling"
+  ~description:"Pass if legacy name mangling must be used"
+  ~does_something:false
+  (Actions_helpers.predicate (Ocamltest_config.legacy_ocaml_name_mangling)
+     "legacy-name-mangling"
+     "runlength-name-mangling")
+
+
 let probes = make
   ~name:"probes"
   ~description:"Pass if probes are available"
@@ -429,6 +438,7 @@ let init () =
     function_sections;
     frame_pointers;
     no_frame_pointers;
+    legacy_ocaml_name_mangling;
     naked_pointers;
     file_exists;
     copy;

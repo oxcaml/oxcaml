@@ -5,7 +5,7 @@
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{architecture} "amd64")))
+   (and (= %{architecture} "amd64") (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "LegacyOCaml"))))
  (deps disabled256.expected disabled256.corrected)
  (action
   (progn
@@ -15,7 +15,7 @@
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{architecture} "amd64")))
+   (and (= %{architecture} "amd64") (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "LegacyOCaml"))))
  (targets disabled256.corrected)
  (deps
   (:ml disabled256.ml))

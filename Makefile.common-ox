@@ -121,10 +121,10 @@ compiler: runtime-stdlib
 # and implement [runtest-upstream-boot] for testing when the final compiler
 # itself is miscompiled.
 runtest: compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest $(ws_main)
+	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_VERSION) $(dune) runtest $(ws_main)
 
 runtest-llvmize: compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-llvmize $(ws_main)
+	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_VERSION) $(dune) build @runtest-llvmize $(ws_main)
 
 runtest-dwarf: compiler
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-dwarf $(ws_main)

@@ -1894,7 +1894,7 @@ and transl_function ~in_new_scope ~scopes e params body
   let scopes =
     if in_new_scope then
       update_assume_zero_alloc ~scopes ~assume_zero_alloc
-    else enter_anonymous_function ~scopes ~assume_zero_alloc
+    else enter_anonymous_function ~scopes ~assume_zero_alloc ~loc:e.exp_loc
   in
   let sreturn_mode = transl_alloc_mode_l sreturn_mode in
   let { params; body; return_sort; return_mode; region } =

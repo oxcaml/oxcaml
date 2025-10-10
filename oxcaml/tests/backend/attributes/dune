@@ -4,6 +4,7 @@
  (modules grep_dump))
 
 (rule
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "LegacyOCaml"))))
  (targets backend_attributes.output.corrected)
  (deps backend_attributes.ml grep_dump.exe)
  (action
@@ -17,6 +18,7 @@
 
 (rule
  (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "LegacyOCaml"))))
  (deps backend_attributes.output backend_attributes.output.corrected)
  (action
   (diff backend_attributes.output backend_attributes.output.corrected)))
