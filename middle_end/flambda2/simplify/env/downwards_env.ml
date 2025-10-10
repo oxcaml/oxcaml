@@ -73,9 +73,11 @@ type t =
     replay_history : Replay_history.t;
         (* Replay history for the current continuation handler (or toplevel) *)
     specialization_cost : Specialization_cost.t;
-        (* Accumulator to record whether the handler of the current continuation
-           can be specialized, or whether there are reasons why it could not (or
-           rather why it would not be beneficial) *)
+    (* Accumulator to record whether the handler of the current continuation can
+       be specialized, or whether there are reasons why it could not (or rather
+       why it would not be beneficial) *)
+    join_analysis : Apply_cont_rewrite_id.t Join_analysis.t option;
+    (* Analysis from the latest join point. *)
     defined_variables_by_scope : Lifted_cont_params.t list;
         (* Stack of variables defined. The first element of the list refers to
            variables defined by the current continuation, and the last element
@@ -105,6 +107,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
                 get_imported_code = _; inlining_history_tracker = _;
                 loopify_state; replay_history; specialization_cost; defined_variables_by_scope;
                 lifted = _; cost_of_lifting_continuations_out_of_current_one;
+                join_analysis;
               } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(round@ %d)@]@ \
@@ -126,6 +129,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
       @[<hov 1>(loopify_state@ %a)@]@ \
       @[<hov 1>(binding_histories@ %a)@]@ \
       @[<hov 1>(specialization_cost@ %a)@]@ \
+      @[<hov 1>(join_analysis@ %a)@]@ \
       @[<hov 1>(defined_variables_by_scope@ %a)@]@ \
       @[<hov 1>(cost_of_lifting_continuation_out_of_current_one %d)@]\
       )@]"
@@ -148,6 +152,8 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
     Loopify_state.print loopify_state
     Replay_history.print replay_history
     Specialization_cost.print specialization_cost
+    (Format.pp_print_option Join_analysis.print
+      ~none:(fun ppf () -> Format.fprintf ppf "()")) join_analysis
     (Format.pp_print_list ~pp_sep:Format.pp_print_space Lifted_cont_params.print) defined_variables_by_scope
     cost_of_lifting_continuations_out_of_current_one
 
@@ -232,7 +238,8 @@ let create ~round ~machine_width ~(resolver : resolver)
       specialization_cost = Specialization_cost.can_specialize;
       defined_variables_by_scope = [Lifted_cont_params.empty];
       lifted = Variable.Set.empty;
-      cost_of_lifting_continuations_out_of_current_one = 0
+      cost_of_lifting_continuations_out_of_current_one = 0;
+      join_analysis = None
     }
   in
   let my_region_duid = Flambda_debug_uid.none in
@@ -316,7 +323,8 @@ let enter_set_of_closures
       specialization_cost = _;
       defined_variables_by_scope = _;
       lifted = _;
-      cost_of_lifting_continuations_out_of_current_one = _
+      cost_of_lifting_continuations_out_of_current_one = _;
+      join_analysis = _
     } ~in_stub =
   let disable_inlining : Disable_inlining.t =
     if in_stub then Disable_inlining Stub else disable_inlining
@@ -342,6 +350,7 @@ let enter_set_of_closures
     loopify_state = Loopify_state.do_not_loopify;
     replay_history = Replay_history.first_pass;
     specialization_cost = Specialization_cost.can_specialize;
+    join_analysis = None;
     defined_variables_by_scope = [Lifted_cont_params.empty];
     lifted = Variable.Set.empty;
     cost_of_lifting_continuations_out_of_current_one = 0
@@ -660,6 +669,10 @@ let with_code_age_relation code_age_relation t =
     typing_env = TE.with_code_age_relation t.typing_env code_age_relation
   }
 
+let with_join_analysis join_analysis t = { t with join_analysis }
+
+let join_analysis t = t.join_analysis
+
 let with_replay_history replay t =
   (* CR gbury: should we try and have a "dummy" replay history for the temporary
      envs created during join points ? *)
@@ -736,6 +749,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     comparison_results = denv_for_join.comparison_results;
     replay_history = denv_for_join.replay_history;
     specialization_cost = denv_for_join.specialization_cost;
+    join_analysis = denv_for_join.join_analysis;
     defined_variables_by_scope = denv_for_join.defined_variables_by_scope;
     lifted = denv_for_join.lifted;
     cost_of_lifting_continuations_out_of_current_one =
