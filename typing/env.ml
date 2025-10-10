@@ -652,6 +652,7 @@ type type_descr_kind =
 type type_descriptions = type_descr_kind
 
 let in_signature_flag = 0x01
+type stage = int
 
 type t = {
   values: (lock, value_entry, value_data) IdTbl.t;
@@ -667,7 +668,7 @@ type t = {
   summary: summary;
   local_constraints: type_declaration Path.Map.t;
   flags: int;
-  stage: int;
+  stage: stage;
 }
 
 and module_components =
@@ -845,7 +846,7 @@ type lookup_error =
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of
       [`Escape of escaping_context | `Shared of shared_context | `Closure]
-  | Incompatible_stage of Longident.t * Location.t * int * Location.t * int
+  | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
   | No_constructor_in_stage of Longident.t * Location.t * int
 
 type error =
@@ -4734,6 +4735,19 @@ let print_stage ppf stage =
   else if stage > 1 then
     fprintf ppf "inside %d layers of quotation (<[ ... ]>)" stage
   else assert false
+
+let print_with_quote_promote ppf (name, intro_stage, usage_stage)=
+  let stage_diff = intro_stage - usage_stage in
+  let rec loop fmt stage_diff =
+    if stage_diff = 1 then fprintf fmt "<[%s]>" name
+    else if stage_diff = -1 then fprintf fmt "$%s" name
+    else if stage_diff > 1 then fprintf fmt "<[%a]>" loop (stage_diff - 1)
+    else if stage_diff < -1 then fprintf fmt "$(%a)" loop (stage_diff + 1)
+    else assert false
+  in
+  loop str_formatter stage_diff;
+  fprintf ppf "%a" Style.inline_code (flush_str_formatter ())
+
 
 let report_lookup_error _loc env ppf = function
   | Unbound_value(lid, hint) -> begin
