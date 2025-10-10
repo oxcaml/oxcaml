@@ -1,0 +1,23 @@
+(rule
+ (target ocamlc_config.output)
+ (deps (:ocamlc %{bin:ocamlc}))
+ (action (with-outputs-to %{target}
+          (bash "%{ocamlc} -config | cut -d: -f1 | sort"))))
+
+(rule
+ (target ocamlopt_config.output)
+ (deps (:ocamlopt %{bin:ocamlopt}))
+ (action (with-outputs-to %{target}
+          (bash "%{ocamlopt} -config | cut -d: -f1 | sort"))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (deps config_print_all.expected ocamlc_config.output)
+ (action (diff config_print_all.expected ocamlc_config.output)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (deps ocamlc_config.output ocamlopt_config.output)
+ (action (diff ocamlc_config.output ocamlopt_config.output)))

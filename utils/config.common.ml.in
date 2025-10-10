@@ -80,10 +80,17 @@ let configuration_variables () =
   let p_bool x v = (x, Bool v) in
 [
   p "version" version;
+  p "bindir" bindir;
   p "standard_library_default" standard_library_default;
   p "standard_library" standard_library;
   p "ccomp_type" ccomp_type;
   p "c_compiler" c_compiler;
+  p "c_output_obj" c_output_obj;
+  p_bool "c_has_debug_prefix_map" c_has_debug_prefix_map;
+  p_bool "as_has_debug_prefix_map" as_has_debug_prefix_map;
+  p "as_compress_debug_sections_flag" as_compress_debug_sections_flag;
+  p "cc_compress_debug_sections_flag" cc_compress_debug_sections_flag;
+  p "objcopy_compress_debug_sections_flag" objcopy_compress_debug_sections_flag;
   p "ocamlc_cflags" ocamlc_cflags;
   p "ocamlc_cppflags" ocamlc_cppflags;
   p "ocamlopt_cflags" ocamlopt_cflags;
@@ -94,6 +101,12 @@ let configuration_variables () =
   p "native_c_libraries" native_c_libraries;
   p "native_ldflags" native_ldflags;
   p "native_pack_linker" native_pack_linker;
+  p "mkdll" mkdll;
+  p "mkexe" mkexe;
+  p "mkmaindll" mkmaindll;
+  p "default_rpath" default_rpath;
+  p "mksharedlibrpath" mksharedlibrpath;
+  p "ar" ar;
   p_bool "native_compiler" native_compiler;
   p "architecture" architecture;
   p "model" model;
@@ -117,6 +130,8 @@ let configuration_variables () =
   p "target" target;
   p_bool "flambda" flambda;
   p_bool "flambda2" flambda2;
+  p_bool "with_flambda_invariants" with_flambda_invariants;
+  p_bool "with_cmm_invariants" with_cmm_invariants;
   p_bool "safe_string" safe_string;
   p_bool "default_safe_string" default_safe_string;
   p_bool "flat_float_array" flat_float_array;
@@ -128,6 +143,14 @@ let configuration_variables () =
   p_bool "native_dynlink" native_dynlink;
   p_bool "naked_pointers" naked_pointers;
   p_bool "parameterised_modules" parameterised_modules;
+
+  p_int "max_tag" max_tag;
+  p_int "lazy_tag" lazy_tag;
+  p_int "max_young_wosize" max_young_wosize;
+  p_int "stack_threshold" stack_threshold;
+  p_int "stack_safety_margin" stack_safety_margin;
+  p_int "reserved_header_bits" reserved_header_bits;
+  p_int "custom_ops_struct_size" custom_ops_struct_size;
 
   p "exec_magic_number" exec_magic_number;
   p "cmi_magic_number" cmi_magic_number;
@@ -143,6 +166,7 @@ let configuration_variables () =
   p "cmj_magic_number" cmj_magic_number;
   p "cmja_magic_number" cmja_magic_number;
   p "linear_magic_number" linear_magic_number;
+  p "cfg_magic_number" cfg_magic_number;
 
   (* "flambda_backend" is still printed for compatibility *)
   p_bool "flambda_backend" flambda_backend;
@@ -155,6 +179,20 @@ let configuration_variables () =
   p_bool "ox" oxcaml;
   p_bool "oxcaml_dwarf" oxcaml_dwarf;
   p "objcopy" objcopy;
+
+  p_bool "ar_supports_response_files" ar_supports_response_files;
+  p_bool "runtime5" runtime5;
+  p_bool "syntax_quotations" syntax_quotations;
+  p_bool "has_pclmul" has_pclmul;
+  p_bool "has_popcnt" has_popcnt;
+  p_bool "has_sse3" has_sse3;
+  p_bool "has_ssse3" has_ssse3;
+  p_bool "has_sse4_1" has_sse4_1;
+  p_bool "has_sse4_2" has_sse4_2;
+  p_bool "has_bmi" has_bmi;
+  p_bool "has_bmi2" has_bmi2;
+  p_bool "has_avx" has_avx;
+  p_bool "has_avx2" has_avx2;
 ]
 
 let print_config_value oc = function
