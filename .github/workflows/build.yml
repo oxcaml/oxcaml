@@ -369,13 +369,14 @@ jobs:
         if [ -n "$ARTIFACT_URL" ]; then
           COMMAND="./tools/apply-diff.sh $ARTIFACT_URL"
           echo "$COMMAND"
-          gh pr comment ${{ github.event.pull_request.number }} --body "$(cat <<EOF
-        Test failures detected in ${{ matrix.name }} configuration. Apply the diff with:
-        ```bash
-        $COMMAND
-        ```
-        EOF
-        )"
+#         Disabled as posting comment would need write permisions
+#          gh pr comment ${{ github.event.pull_request.number }} --body "$(cat <<EOF
+#        Test failures detected in ${{ matrix.name }} configuration. Apply the diff with:
+#        ```bash
+#        $COMMAND
+#        ```
+#        EOF
+#        )"
         else
           echo "Artifact uploaded but URL not yet available. Check: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         fi
