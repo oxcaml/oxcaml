@@ -674,7 +674,7 @@ type loop_attribute =
 type regalloc_attribute =
   | Default_regalloc
   | Regalloc of Clflags.Register_allocator.t
-  
+
 type regalloc_param_attribute =
   | Default_regalloc_params
   | Regalloc_params of string list
@@ -1232,9 +1232,15 @@ val structured_constant_layout : structured_constant -> layout
 
 val mixed_block_element_of_layout : layout -> unit mixed_block_element
 
+(** [Pintval] if a type of [value] jkind is GC-ignorable based on its provided
+    externality, and [Pgenval] otherwise. *)
+val value_kind_of_value_with_externality
+  : Jkind_axis.Externality.t -> value_kind_non_null
+
 (* Translates [Float_boxed] as [Punboxed_float Unboxed_float64], for
    compatibility with block indices. *)
-val layout_of_mixed_block_element_for_idx_set : _ mixed_block_element -> layout
+val layout_of_mixed_block_element_for_idx_set
+  : Jkind_axis.Externality.t -> _ mixed_block_element -> layout
 
 val mixed_block_element_leaves
   : 'a mixed_block_element -> 'a mixed_block_element list

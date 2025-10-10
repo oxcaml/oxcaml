@@ -71,6 +71,12 @@ module Externality = struct
     | External -> Format.fprintf ppf "external_"
     | External64 -> Format.fprintf ppf "external64"
     | Internal -> Format.fprintf ppf "internal"
+
+  let upper_bound_if_is_always_gc_ignorable () =
+    (* We check that we're compiling to (64-bit) native code before counting
+        External64 types as gc_ignorable, because bytecode is intended to be
+        platform independent. *)
+    if !Clflags.native_code && Sys.word_size = 64 then External64 else External
 end
 
 module Nullability = struct

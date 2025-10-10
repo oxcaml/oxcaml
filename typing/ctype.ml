@@ -2667,15 +2667,8 @@ let check_type_externality env ty ext =
   | Error _ -> false
 
 let is_always_gc_ignorable env ty =
-  let ext : Jkind_axis.Externality.t =
-    (* We check that we're compiling to (64-bit) native code before counting
-       External64 types as gc_ignorable, because bytecode is intended to be
-       platform independent. *)
-    if !Clflags.native_code && Sys.word_size = 64
-    then External64
-    else External
-  in
-  check_type_externality env ty ext
+  check_type_externality
+    env ty (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
 
 let check_type_nullability env ty null =
   let upper_bound =

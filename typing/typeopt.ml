@@ -406,16 +406,15 @@ let value_kind_of_value_jkind env jkind =
      the principality check, as we're just trying to compute optimizations. *)
   let context = Ctype.mk_jkind_context_always_principal env in
   let externality_upper_bound =
-    Jkind.get_externality_upper_bound ~context jkind in
-  match layout, externality_upper_bound with
-  | Base Value, External -> Pintval
-  | Base Value, External64 ->
-    if !Clflags.native_code && Sys.word_size = 64 then Pintval else Pgenval
-  | Base Value, Internal -> Pgenval
-  | Any, _
-  | Product _, _
+    Jkind.get_externality_upper_bound ~context jkind
+  in
+  match layout with
+  | Base Value ->
+    value_kind_of_value_with_externality externality_upper_bound
+  | Any
+  | Product _
   | Base (Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 |
-          Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) , _ ->
+          Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
     Misc.fatal_error "expected a layout of value"
 
 (* [value_kind] has a pre-condition that it is only called on values.  With the
@@ -702,32 +701,18 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     add_nullability_from_jkind env (Ctype.estimate_type_jkind env ty) Pgenval
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
-      (field : Types.mixed_block_element)
-      (externality : Jkind_axis.Externality.t option) ty
+      (field : Types.mixed_block_element) ty
   : int * unit Lambda.mixed_block_element =
   match field with
   | Value ->
-    let is_external =
-      match externality with
-      | None -> false
-      | Some ext -> Jkind_axis.Externality.le ext External64
-    in
     begin match ty with
     | Some ty ->
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
-      (* This might cover up problems in the value_kind computation *)
-      let kind =
-        match kind, is_external with
-        | { raw_kind = Pgenval; _ }, true -> { kind with raw_kind = Pintval }
-        | _ -> kind
-      in
       num_nodes_visited, Value kind
     | None ->
-      (* When exploring the type structure fails, use externality information *)
-      let raw_kind = if is_external then Pintval else Pgenval in
-      num_nodes_visited, Value (nullable raw_kind)
+      num_nodes_visited, Value (nullable Pgenval)
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
@@ -772,7 +757,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       Array.fold_left_map (fun (i, num_nodes_visited) field ->
         let num_nodes_visited, kind =
           value_kind_mixed_block_field env ~loc ~visited ~depth
-            ~num_nodes_visited field externality types.(i)
+            ~num_nodes_visited field types.(i)
         in
         (i + 1, num_nodes_visited), kind
       ) (0, num_nodes_visited) fs
@@ -787,7 +772,7 @@ and value_kind_mixed_block
       (fun (i, num_nodes_visited) typ ->
          let num_nodes_visited, kind =
            value_kind_mixed_block_field env ~loc ~visited ~depth
-             ~num_nodes_visited shape.(i) None typ
+             ~num_nodes_visited shape.(i) typ
          in
          (i+1, num_nodes_visited), kind)
       (0, num_nodes_visited) types
@@ -1017,11 +1002,11 @@ let value_kind env loc ty =
   with
   | Missing_cmi_fallback -> raise (Error (loc, Non_value_layout (ty, None)))
 
-let transl_mixed_block_element env loc externality ty mbe =
+let transl_mixed_block_element env loc ty mbe =
   try
     let (_num_nodes_visited, value_kind) =
       value_kind_mixed_block_field env ~loc ~visited:Numbers.Int.Set.empty
-        ~depth:0 ~num_nodes_visited:0 mbe externality (Some ty)
+        ~depth:0 ~num_nodes_visited:0 mbe (Some ty)
     in
     value_kind
   with

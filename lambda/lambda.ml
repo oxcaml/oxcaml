@@ -2361,12 +2361,22 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_vector Unboxed_vec512 -> Vec512
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
 
-let rec layout_of_mixed_block_element_for_idx_set (mbe : _ mixed_block_element)
+let value_kind_of_value_with_externality ext =
+  let open Jkind_axis.Externality in
+  if le ext (upper_bound_if_is_always_gc_ignorable ()) then Pintval else Pgenval
+
+let rec layout_of_mixed_block_element_for_idx_set
+  ext (mbe : _ mixed_block_element)
   : layout =
   match mbe with
   | Product mbes ->
+    (* Propagate known externality to components *)
     Punboxed_product
-      (Array.to_list (Array.map layout_of_mixed_block_element_for_idx_set mbes))
+      (Array.to_list
+        (Array.map (layout_of_mixed_block_element_for_idx_set ext) mbes))
+  | Value ({ raw_kind = Pgenval; _ } as value_kind) ->
+    let raw_kind = value_kind_of_value_with_externality ext in
+    Pvalue { value_kind with raw_kind }
   | Value value_kind -> Pvalue value_kind
   | Float64 | Float_boxed _ -> Punboxed_float Unboxed_float64
   | Float32 -> Punboxed_float Unboxed_float32
