@@ -139,7 +139,9 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     then
       Reg.UsingLocEquality.Tbl.find_opt known_values
         (Array.unsafe_get term.arg arg_idx)
-    else None
+    else
+      Misc.fatal_errorf "invalid argument index (%d) for instruction %a" arg_idx
+        InstructionId.format term.id
   in
   match term.desc with
   | Parity_test { ifso; ifnot } -> (
