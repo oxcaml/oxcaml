@@ -32,6 +32,12 @@ let test_side_effects =
   let () = compiled () in
   Printf.printf "Done\n"
 
+(* CR jrickard: This test highlights a bug in eval: The cmx that gets built
+   from this claims it depends on [Stdlib] because it depends on [Stdlib.Buffer]
+   which is correct for the cmi lookup but breaks for cmx lookup because
+   [Stdlib] doesn't depend on the implementation of [Stdlib__Buffer]. Maybe I
+   need to split the quotation depends into intf and impls? (and somehow do a
+   lookup that resolves to Stdlib__Buffer). *)
 let test_reference_to_global =
   Printf.printf "\nTest reference to global\n";
   let eval = [%eval: Buffer.t] in

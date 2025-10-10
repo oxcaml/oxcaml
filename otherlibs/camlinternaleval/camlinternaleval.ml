@@ -125,7 +125,6 @@ let eval code =
         true)
       (Lazy.force cmxs)
   in
-  let env = Compmisc.initial_env () in
   (Persistent_env.Persistent_signature.load
      := fun ~allow_hidden:_ ~unit_name ->
           Option.map
@@ -136,6 +135,7 @@ let eval code =
                 visibility = Visible
               })
             (Compilation_unit.Name.Map.find_opt unit_name (Lazy.force cmis)));
+  let env = Compmisc.initial_env () in
   let typed_impl =
     Typemod.type_implementation unit_info compilation_unit env ast
   in
