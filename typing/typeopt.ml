@@ -711,8 +711,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       num_nodes_visited, Value kind
-    | None ->
-      num_nodes_visited, Value (nullable Pgenval)
+    | None -> num_nodes_visited, Value (nullable Pgenval)
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end

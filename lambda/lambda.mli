@@ -674,7 +674,6 @@ type loop_attribute =
 type regalloc_attribute =
   | Default_regalloc
   | Regalloc of Clflags.Register_allocator.t
-
 type regalloc_param_attribute =
   | Default_regalloc_params
   | Regalloc_params of string list
