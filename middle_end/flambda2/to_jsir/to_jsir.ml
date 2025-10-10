@@ -380,13 +380,24 @@ and apply_expr ~env ~res e =
           let f, res = To_jsir_shared.simple ~env ~res f in
           let arg, res = To_jsir_shared.simple ~env ~res arg in
           let unit = Pc (Int Targetint.zero) in
-          "%resume", [Pv stack; Pv f; Pv arg; unit], res
-        | Resume { stack; f; arg; last_fiber } ->
+          ( "%resume",
+            [ Pv stack;
+              Pv f;
+              Pv arg;
+              unit;
+              unit (* CR aspsmith: should be null *) ],
+            res )
+        | Resume { stack; f; arg; last_fiber; maybe_gc_regs } ->
           let stack, res = To_jsir_shared.simple ~env ~res stack in
           let f, res = To_jsir_shared.simple ~env ~res f in
           let arg, res = To_jsir_shared.simple ~env ~res arg in
           let last_fiber, res = To_jsir_shared.simple ~env ~res last_fiber in
-          "%resume", [Pv stack; Pv f; Pv arg; Pv last_fiber], res
+          let maybe_gc_regs, res =
+            To_jsir_shared.simple ~env ~res maybe_gc_regs
+          in
+          ( "%resume",
+            [Pv stack; Pv f; Pv arg; Pv last_fiber; Pv maybe_gc_regs],
+            res )
       in
       let prim : Jsir.expr = Prim (Extern prim_name, args) in
       let var = Jsir.Var.fresh () in

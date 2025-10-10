@@ -59,7 +59,8 @@ module Effect : sig
         { stack : Simple.t;
           f : Simple.t;
           arg : Simple.t;
-          last_fiber : Simple.t
+          last_fiber : Simple.t;
+          maybe_gc_regs : Simple.t
         }
 
   include Contains_names.S with type t := t
@@ -71,7 +72,8 @@ module Effect : sig
   val run_stack : stack:Simple.t -> f:Simple.t -> arg:Simple.t -> t
 
   val resume :
-    stack:Simple.t -> f:Simple.t -> arg:Simple.t -> last_fiber:Simple.t -> t
+    stack:Simple.t -> f:Simple.t -> arg:Simple.t -> last_fiber:Simple.t ->
+    maybe_gc_regs:Simple.t -> t
 end
 
 (* The allocation mode corresponds to the type of the function that is called:

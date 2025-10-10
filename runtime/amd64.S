@@ -738,17 +738,20 @@ CFI_STARTPROC
         cmpq    $3, Caml_state(preemption)
         ja      G(caml_preempt)
         movq    Caml_state(gc_regs), %r15
+LBL(resume_from_preempt):
         movq    Gc_regs_kind(%r15), %r11
         cmpq    $GC_REGS_YMM, %r11
         je      1f
         cmpq    $GC_REGS_ZMM, %r11
         je      2f
         RESTORE_ALL_REGS(XMM)
-        jmp 3f
+        LEAVE_FUNCTION
+        ret
 1:      RESTORE_ALL_REGS(YMM)
-        jmp 3f
+        LEAVE_FUNCTION
+        ret
 2:      RESTORE_ALL_REGS(ZMM)
-3:      LEAVE_FUNCTION
+        LEAVE_FUNCTION
         ret
 CFI_ENDPROC
 ENDFUNCTION(G(caml_do_call_gc))
@@ -1379,14 +1382,14 @@ FUNCTION(G(caml_preempt))
 CFI_STARTPROC
         movq    Caml_state(young_ptr), %r15
         SWITCH_OCAML_TO_C
-        C_call  (GCALL(caml_maybe_expand_stack)) /* CR aspsmith: replace with a new ensure_gc_regs_bucket function */
+        C_call  (GCALL(caml_ensure_gc_regs))
         C_call  (GCALL(caml_get_tick_effect)) /* %rax := Tick */
         SWITCH_C_TO_OCAML
         movq    Caml_state(preemption), %rbx
         movq    $1, Caml_state(preemption)
         movq    Caml_state(current_stack), %rsi /* %rsi := old stack */
         leaq    1(%rsi), %rdi /* %rdi (last_fiber) := Val_ptr(old stack) */
-        movq    %rdi, 0*8(%rbx) /* Initialise continuation */
+        movq    %rdi, 0*8(%rbx) /* Store fiber in continuation */
         movq    $0, 1*8(%rbx) /* set last fiber of continuation to NULL */
         movq    Caml_state(gc_regs), %r12
         movq    %r12, 2*8(%rbx) /* save gc_regs in continuation */
@@ -1396,12 +1399,12 @@ ENDFUNCTION(G(caml_preempt))
 
 FUNCTION(G(caml_resume))
 CFI_STARTPROC
-    /* %rax -> fiber, %rbx -> fun, %rdi -> arg, %rsi -> last_fiber */
+    /* %rax -> fiber, %rbx -> fun, %rdi -> arg, %rsi -> last_fiber, %rdx -> maybe_gc_regs */
         leaq    -1(%rax), %r10  /* %r10 (new stack) = Ptr_val(%rax) */
         movq    %rdi, %rax      /* %rax := argument to the function in %rbx */
     /*  check if stack null, then already used */
         testq   %r10, %r10
-        jz      1f
+        jz      2f
 #if defined(WITH_THREAD_SANITIZER)
     /* Save non-callee-saved registers %rax, %rsi and %r10 before C call */
         ENTER_FUNCTION
@@ -1435,8 +1438,22 @@ CFI_STARTPROC
         UPDATE_BASE_POINTER(%rdi)
         SWITCH_OCAML_STACKS
         FLUSH_DYNAMIC_CACHE(%r12)
-        jmp     *(%rbx)
-1:      ENTER_FUNCTION
+        testq   %rdx, %rdx /* Do we have a gc_regs? */
+        jnz     1f
+        jmpq    *(%rbx)    /* no, just jump into the continuation */
+1:      /* This continuation represents a preemption, meaning we have to restore
+           its gc_regs before resuming */
+        movq    (%rbx), %rdi /* Load the point to resume from */
+        pushq   %rdi         /* Push that point to the stack, so that when caml
+                              * do_call_gc `ret`s, it jumps back into the
+                              * continuation
+                              */
+        movq    %rdx, %r15   /* Load the gc_regs */
+        jmp     LBL(resume_from_preempt) /* Jump into the second half of
+                                          * caml_do_call_gc, which will restore
+                                          * the registers and `ret` to resume
+                                          */
+2:      ENTER_FUNCTION
         TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller of caml_resume
                                   in the TSan backtrace */
         LEA_VAR(caml_raise_continuation_already_resumed, %rax)

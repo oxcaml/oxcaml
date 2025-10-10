@@ -1,0 +1,18 @@
+Test 1: Basic preemption
+  Basic preemption: PASSED
+Test 2: Delayed resume with live values
+  Delayed resume: PASSED
+Test 3: Nested computation with preemption
+  Nested computation: PASSED
+Test 4: Multiple preemptions
+  Multiple preemptions: PASSED
+Test 5: Preemption with allocations
+  Preemption with allocations: PASSED
+Test 6: Many live registers
+  Many live registers: PASSED
+Test 7: Register values survive GC
+  Register values survive GC: PASSED
+Test 8: GC with deep recursion
+  GC with deep recursion: PASSED
+
+All preemption tests PASSED!
