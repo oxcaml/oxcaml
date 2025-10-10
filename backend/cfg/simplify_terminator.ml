@@ -89,9 +89,10 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
     known_value Reg.UsingLocEquality.Tbl.t =
   let known_values = Reg.UsingLocEquality.Tbl.create 17 in
   let replace reg value =
-    (* CR xclerc for xclerc: defensive, maybe we should assert / Misc.fatal *)
     if not (Reg.is_unknown reg)
     then Reg.UsingLocEquality.Tbl.replace known_values reg value
+    else
+      Misc.fatal_errorf "unexpected unknown location (%a)" Printreg.Printreg reg
   in
   let find_opt reg = Reg.UsingLocEquality.Tbl.find_opt known_values reg in
   let remove reg = Reg.UsingLocEquality.Tbl.remove known_values reg in
