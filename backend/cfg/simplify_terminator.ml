@@ -86,21 +86,27 @@ type known_value = Const_int of nativeint
    been executed. Currently only tracks constant values and moves between
    registers. *)
 let collect_known_values (instrs : Cfg.basic_instruction_list) :
-    known_value Reg.Tbl.t =
-  let known_values = Reg.Tbl.create 17 in
+    known_value Reg.UsingLocEquality.Tbl.t =
+  let known_values = Reg.UsingLocEquality.Tbl.create 17 in
+  let replace reg value =
+    (* CR xclerc for xclerc: defensive, maybe we should assert / Misc.fatal *)
+    if not (Reg.is_unknown reg)
+    then Reg.UsingLocEquality.Tbl.replace known_values reg value
+  in
+  let find_opt reg = Reg.UsingLocEquality.Tbl.find_opt known_values reg in
+  let remove reg = Reg.UsingLocEquality.Tbl.remove known_values reg in
   Dll.iter instrs ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
       match instr.desc with
-      | Op (Const_int c) ->
-        Reg.Tbl.replace known_values instr.res.(0) (Const_int c)
+      | Op (Const_int c) -> replace instr.res.(0) (Const_int c)
       | Op Move -> (
         (* CR xclerc for xclerc: double check the "magic" / conversions behind
            moves in `Emit` will not result in invalid tracking here. *)
-        match Reg.Tbl.find_opt known_values instr.arg.(0) with
+        match find_opt instr.arg.(0) with
         | Some value
           when Cmm.equal_machtype_component instr.res.(0).typ instr.arg.(0).typ
           ->
-          Reg.Tbl.replace known_values instr.res.(0) value
-        | Some _ | None -> Reg.Tbl.remove known_values instr.res.(0))
+          replace instr.res.(0) value
+        | Some _ | None -> remove instr.res.(0))
       | Op
           ( Spill | Reload | Const_float32 _ | Const_float _ | Const_symbol _
           | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
@@ -112,13 +118,14 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
       | Stack_check _ ->
         (* CR xclerc for xclerc: should it happen only after register
            allocation? *)
-        Array.iter (fun reg -> Reg.Tbl.remove known_values reg) instr.res;
+        Array.iter
+          (fun reg -> Reg.UsingLocEquality.Tbl.remove known_values reg)
+          instr.res;
         let destroyed_regs = Proc.destroyed_at_basic instr.desc in
-        Reg.Tbl.filter_map_inplace
+        Reg.UsingLocEquality.Tbl.filter_map_inplace
           (fun reg known_value ->
             let is_destroyed =
-              (not (Reg.is_unknown reg))
-              && Array.exists (fun r -> Reg.same_loc r reg) destroyed_regs
+              Array.exists (fun r -> Reg.same_loc r reg) destroyed_regs
             in
             if is_destroyed then None else Some known_value)
           known_values);
@@ -127,11 +134,13 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
 (* Compute the destination of a terminator, using [known_values] to determine
    the values of some registers, returning [None] if the destination is not
    statically known. *)
-let evaluate_terminator (known_values : known_value Reg.Tbl.t)
+let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     (term : Cfg.terminator Cfg.instruction) : Label.t option =
   let get_known_value ~(arg_idx : int) : known_value option =
     if arg_idx >= 0 && arg_idx < Array.length term.arg
-    then Reg.Tbl.find_opt known_values (Array.unsafe_get term.arg arg_idx)
+    then
+      Reg.UsingLocEquality.Tbl.find_opt known_values
+        (Array.unsafe_get term.arg arg_idx)
     else None
   in
   match term.desc with
@@ -179,16 +188,17 @@ let evaluate_terminator (known_values : known_value Reg.Tbl.t)
   | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
     None
 
-let block_known_values (block : C.basic_block) : bool =
-  if not !Oxcaml_flags.cfg_value_propagation
-  then false
-  else
+let block_known_values (block : C.basic_block) ~(is_after_regalloc : bool) :
+    bool =
+  if !Oxcaml_flags.cfg_value_propagation && is_after_regalloc
+  then (
     let known_values = collect_known_values block.body in
     match evaluate_terminator known_values block.terminator with
     | None -> false
     | Some succ ->
       block.terminator <- { block.terminator with desc = Always succ };
-      true
+      true)
+  else false
 
 (* CR-someday gyorsh: merge (Lbranch | Lcondbranch | Lcondbranch3)+ into a
    single terminator when the argments are the same. Enables reordering of
@@ -202,7 +212,8 @@ let block_known_values (block : C.basic_block) : bool =
    order. Also, for linear to cfg and back will be harder to generate exactly
    the same layout. Also, how do we map execution counts about branches onto
    this terminator? *)
-let block (cfg : C.t) (block : C.basic_block) : bool =
+let block (cfg : C.t) (block : C.basic_block) ~(is_after_regalloc : bool) : bool
+    =
   match block.terminator.desc with
   | Always successor_label ->
     (* If we have a jump to an empty block whose terminator is a condition, we
@@ -253,9 +264,9 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       let l = Label.Set.min_elt labels in
       block.terminator <- { block.terminator with desc = Always l };
       false)
-    else block_known_values block
+    else block_known_values block ~is_after_regalloc
   | Switch labels ->
-    let shortcircuit = block_known_values block in
+    let shortcircuit = block_known_values block ~is_after_regalloc in
     if shortcircuit
     then true
     else (
@@ -265,10 +276,10 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
   | Call _ | Prim _ ->
     false
 
-let run cfg =
+let run cfg ~is_after_regalloc =
   let registration_needed =
     C.fold_blocks cfg ~init:false ~f:(fun _ b registration_needed ->
-        let shortcircuit = block cfg b in
+        let shortcircuit = block cfg b ~is_after_regalloc in
         registration_needed || shortcircuit)
   in
   if registration_needed

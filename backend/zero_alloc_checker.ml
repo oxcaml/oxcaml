@@ -2775,7 +2775,9 @@ let update_caml_flambda_invalid_cfg cfg_with_layout =
     if not !modified
     then cfg_with_layout
     else
-      Profile.record ~accumulate:true "cleanup" Cfg_simplify.run cfg_with_layout
+      Profile.record ~accumulate:true "cleanup"
+        (Cfg_simplify.run ~is_after_regalloc:true)
+        cfg_with_layout
 
 let cfg ppf_dump ~future_funcnames cl =
   let cfg = Cfg_with_layout.cfg cl in
