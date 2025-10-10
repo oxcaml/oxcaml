@@ -65,6 +65,8 @@ module Debug_info = struct
             Option.compare Backend_var.Provenance.compare provenance1
               provenance2
 
+  let equal t1 t2 = compare t1 t2 = 0
+
   let holds_value_of t = t.holds_value_of
 
   let part_of_value t = t.part_of_value
@@ -95,7 +97,10 @@ module T = struct
       debug_info : Debug_info.t option
     }
 
-  let compare t1 t2 = Reg.compare t1.reg t2.reg
+  (* CR mshinwell: Why is this failing to compare [debug_info]? We should fix
+     this when we re-enable [Set], below.
+
+     let compare t1 t2 = Reg.compare t1.reg t2.reg *)
 end
 
 include T
@@ -154,70 +159,53 @@ let debug_info t = t.debug_info
 let clear_debug_info t = { t with debug_info = None }
 
 module Set = struct
-  include Set.Make (T)
+  (* This code is commented out until such time as we use it for
+     [Compute_ranges], instead of using [Reg_availability_set] for both the
+     dataflow analysis and [Compute_ranges]. *)
 
-  let of_array elts = of_list (Array.to_list elts)
+  (* include Set.Make (T)
 
-  let forget_debug_info t =
-    fold (fun t acc -> Reg.Set.add (reg t) acc) t Reg.Set.empty
+     let of_array elts = of_list (Array.to_list elts)
 
-  let without_debug_info regs =
-    Reg.Set.fold
-      (fun reg acc -> add (create_without_debug_info ~reg) acc)
-      regs empty
+     let forget_debug_info t = fold (fun t acc -> Reg.Set.add (reg t) acc) t
+     Reg.Set.empty
 
-  let made_unavailable_by_clobber t ~regs_clobbered =
-    Reg.Set.fold
-      (fun reg acc ->
-        let made_unavailable =
-          filter (fun reg' -> regs_at_same_location reg'.reg reg) t
-        in
-        union made_unavailable acc)
-      (Reg.set_of_array regs_clobbered)
-      (* ~init:*) empty
+     let without_debug_info regs = Reg.Set.fold (fun reg acc -> add
+     (create_without_debug_info ~reg) acc) regs empty
 
-  let mem_reg t (reg : Reg.t) = exists (fun t -> Reg.same t.reg reg) t
+     let made_unavailable_by_clobber t ~regs_clobbered = Reg.Set.fold (fun reg
+     acc -> let made_unavailable = filter (fun reg' -> regs_at_same_location
+     reg'.reg reg) t in union made_unavailable acc) (Reg.set_of_array
+     regs_clobbered) (* ~init:*) empty
 
-  let mem_reg_by_loc t (reg : Reg.t) =
-    exists (fun t -> Reg.same_loc_fatal_on_unknown ~fatal_message t.reg reg) t
+     let mem_reg t (reg : Reg.t) = exists (fun t -> Reg.same t.reg reg) t
 
-  (* CR gyorsh/mshinwell: consider renaming filter_reg_by_loc to something like
-     remove_reg_by_loc to be consistent with the positive meaning of filtering
-     on sets. *)
-  let filter_reg_by_loc t (reg : Reg.t) =
-    filter
-      (fun t -> not (Reg.same_loc_fatal_on_unknown ~fatal_message t.reg reg))
-      t
+     let mem_reg_by_loc t (reg : Reg.t) = exists (fun t ->
+     Reg.same_loc_fatal_on_unknown ~fatal_message t.reg reg) t
 
-  (* CR-someday mshinwell: Well, it looks like we should have used a map.
-     mshinwell: Also see @chambart's suggestion on GPR#856. *)
-  let find_reg_exn t (reg : Reg.t) =
-    match elements (filter (fun t -> Reg.same t.reg reg) t) with
-    | [] -> raise Not_found
-    | [reg] -> reg
-    | _ -> assert false
+     (* CR gyorsh/mshinwell: consider renaming filter_reg_by_loc to something
+     like remove_reg_by_loc to be consistent with the positive meaning of
+     filtering on sets. *) let filter_reg_by_loc t (reg : Reg.t) = filter (fun t
+     -> not (Reg.same_loc_fatal_on_unknown ~fatal_message t.reg reg)) t
 
-  let find_reg_with_same_location_exn t (reg : Reg.t) =
-    match
-      elements
-        (filter
-           (fun t -> Reg.same_loc_fatal_on_unknown ~fatal_message t.reg reg)
-           t)
-    with
-    | [] -> raise Not_found
-    | reg :: _ -> reg
+     (* CR-someday mshinwell: Well, it looks like we should have used a map.
+     mshinwell: Also see @chambart's suggestion on GPR#856. *) let find_reg_exn
+     t (reg : Reg.t) = match elements (filter (fun t -> Reg.same t.reg reg) t)
+     with | [] -> raise Not_found | [reg] -> reg | _ -> assert false
 
+     let find_reg_with_same_location_exn t (reg : Reg.t) = match elements
+     (filter (fun t -> Reg.same_loc_fatal_on_unknown ~fatal_message t.reg reg)
+     t) with | [] -> raise Not_found | reg :: _ -> reg *)
+
+  (**
+   let print ppf t = Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf
+   ppf ", ") print_el ppf (elements t) *)
   let print_el ppf t =
     let print_reg = Printreg.reg in
     match t.debug_info with
     | None -> Format.fprintf ppf "%a" print_reg t.reg
     | Some debug_info ->
       Format.fprintf ppf "%a(%a)" print_reg t.reg Debug_info.print debug_info
-
-  let print ppf t =
-    Format.pp_print_list
-      ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
-      print_el ppf (elements t)
 end
 
 module Order_distinguishing_names_and_locations = struct
@@ -246,9 +234,9 @@ module Set_distinguishing_names_and_locations = struct
   let forget_debug_info t =
     fold (fun t acc -> Reg.Set.add (reg t) acc) t Reg.Set.empty
 
-  let of_set (s : Set.t) : t = Set.fold add s empty
+  (* let of_set (s : Set.t) : t = Set.fold add s empty
 
-  let to_set (t : t) : Set.t = fold Set.add t Set.empty
+     let to_set (t : t) : Set.t = fold Set.add t Set.empty *)
 
   let mem_reg_by_loc t (r : Reg.t) =
     exists (fun t -> Reg.same_loc_fatal_on_unknown ~fatal_message t.reg r) t

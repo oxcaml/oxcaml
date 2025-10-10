@@ -61,23 +61,18 @@ let inter_removing_conflicting_debug_info t1 t2 =
             (* Not in the intersection, even ignoring debug info *)
             result
           | reg2 ->
-            let debug_info1 = RD.debug_info reg1 in
-            let debug_info2 = RD.debug_info reg2 in
-            let debug_info =
-              (* Clear out any conflicting debug info, but remember that the
-                 register is available *)
-              match debug_info1, debug_info2 with
-              | None, None -> None
-              | None, Some _ | Some _, None -> None
-              | Some debug_info1, Some debug_info2 ->
-                if RD.Debug_info.compare debug_info1 debug_info2 = 0
-                then Some debug_info1 (* arbitrary choice *)
-                else None
-            in
             let reg =
-              (* [reg1] is an arbitrary choice, but we know it has the same
-                 location as [reg2] *)
-              RD.create_with_debug_info ~reg:(RD.reg reg1) ~debug_info
+              (* Clear out any conflicting debug info, but remember that the
+                 register is available. *)
+              if Option.equal RD.Debug_info.equal (RD.debug_info reg1)
+                   (RD.debug_info reg2)
+              then
+                (* [reg1] has the same location and debug info as [reg2] *)
+                reg1
+              else
+                (* Debug info conflict. We arbitrarily pick [reg1]; we know it
+                   has the same location as [reg2]. *)
+                RD.create_without_debug_info ~reg:(RD.reg reg1)
             in
             RD_quotient_set.add reg result)
         avail1 RD_quotient_set.empty
