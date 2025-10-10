@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* CR metaprogramming jrickard: This file has not been code reviewed *)
+
 let () =
   Clflags.no_cwd := true;
   Clflags.native_code := true;

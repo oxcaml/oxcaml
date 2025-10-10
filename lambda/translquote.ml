@@ -766,7 +766,10 @@ end = struct
     let wrap = inject_force
 
     let compilation_unit loc a1 =
-      (* TODO this feels really dodgy *)
+      (* CR metaprogramming jrickard: I'm pretty confident this is bugged:
+         it ignores parameterized libraries, and references the wrong file for
+         impls (for example Stdlib.Buffer should reference Stdlib__Buffer but
+         this references Stdlib). *)
       Env.require_global_for_quote
         (Compilation_unit.Name.of_head_of_global_name a1);
       let a1 = Global_module.Name.to_string a1 in
@@ -2333,6 +2336,9 @@ type case_binding =
       * (Var.Value.t list -> (Var.Module.t list -> Pat.t) lam) lam
 
 let rec quote_module_path loc = function
+  (* CR metaprogramming jrickard: I think this should probably use
+     [Env.find_module_address] at least it should do to register the globals
+     that will be needed. *)
   | Path.Pident s -> (
     match Ident.to_global s with
     | Some global ->
