@@ -1,7 +1,6 @@
 (* TEST
- {
+  arch_amd64;
   native;
- }
 *)
 
 #syntax quotations on
