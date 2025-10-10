@@ -116,8 +116,6 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
           | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ )
       | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
       | Stack_check _ ->
-        (* CR xclerc for xclerc: should it happen only after register
-           allocation? *)
         Array.iter
           (fun reg -> Reg.UsingLocEquality.Tbl.remove known_values reg)
           instr.res;
@@ -242,12 +240,12 @@ let block (cfg : C.t) (block : C.basic_block) ~(is_after_regalloc : bool) : bool
              the entry block". *)
           match successor_block.terminator.desc with
           | Parity_test _ | Truth_test _ | Int_test _ | Float_test _ | Return ->
-            (* CR xclerc for xclerc: should we also copy `dbg`? *)
             block.terminator
               <- { block.terminator with
                    desc = successor_block.terminator.desc;
                    arg = Array.copy successor_block.terminator.arg;
-                   res = Array.copy successor_block.terminator.res
+                   res = Array.copy successor_block.terminator.res;
+                   dbg = successor_block.terminator.dbg
                  };
             true
           | Never | Always _ | Switch _ | Raise _ | Tailcall_self _
