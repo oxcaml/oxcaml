@@ -1,11 +1,15 @@
 (library
  (name jit)
+ (enabled_if
+  (= %{architecture} "amd64"))
  (libraries ocamlcommon ocamloptcomp flambda2 unix)
  (foreign_stubs
   (language c)
   (names jit_stubs)))
 
 (install
+ (enabled_if
+  (= %{architecture} "amd64"))
  (files
   (.jit.objs/native/jit.cmx as ocaml-jit/jit.cmx)
   (jit.cmxa as ocaml-jit/jit.cmxa)
