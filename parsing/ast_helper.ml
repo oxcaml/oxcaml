@@ -136,9 +136,9 @@ module Typ = struct
         | Ptyp_open (mod_ident, core_type) ->
             Ptyp_open (mod_ident, loop core_type)
         | Ptyp_quote core_type ->
-            Ptyp_quote core_type
+            Ptyp_quote (loop core_type)
         | Ptyp_splice core_type ->
-            Ptyp_splice core_type
+            Ptyp_splice (loop core_type)
         | Ptyp_of_kind jkind ->
             Ptyp_of_kind (loop_jkind jkind)
         | Ptyp_extension (s, arg) ->
@@ -262,8 +262,8 @@ module Exp = struct
   let stack ?loc ?attrs e = mk ?loc ?attrs (Pexp_stack e)
   let comprehension ?loc ?attrs e = mk ?loc ?attrs (Pexp_comprehension e)
   let overwrite ?loc ?attrs a b = mk ?loc ?attrs (Pexp_overwrite (a, b))
-  let quotation ?loc ?attrs e = mk ?loc ?attrs (Pexp_quote e)
-  let splice ?loc ?attrs e = mk ?loc ?attrs (Pexp_splice e)
+  let quote ?loc ?attrs a = mk ?loc ?attrs (Pexp_quote a)
+  let splice ?loc ?attrs a = mk ?loc ?attrs (Pexp_splice a)
   let hole ?loc ?attrs () = mk ?loc ?attrs Pexp_hole
 
   let case lhs ?guard rhs =

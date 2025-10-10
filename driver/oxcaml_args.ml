@@ -899,7 +899,20 @@ let mk_gdwarf_may_alter_codegen f =
 let mk_no_gdwarf_may_alter_codegen f =
   ( "-gno-dwarf-may-alter-codegen",
     Arg.Unit f,
-    " Do not alter code\n     generation when emitting debugging information" )
+    " Do not alter code generation when emitting debugging information" )
+
+let mk_gdwarf_may_alter_codegen_experimental f =
+  ( "-gdwarf-may-alter-codegen-experimental",
+    Arg.Unit f,
+    " Like -gdwarf-may-alter-codegen but with more experimental features.\n\
+    \     Implies -gdwarf-may-alter-codegen.\n\
+    \     THIS MAY GENERATE BROKEN CODE." )
+
+let mk_no_gdwarf_may_alter_codegen_experimental f =
+  ( "-gno-dwarf-may-alter-codegen-experimental",
+    Arg.Unit f,
+    " Disable experimental changes to code generation when emitting\n\
+    \     debugging information." )
 
 let mk_gdwarf_max_function_complexity f =
   ( "-gdwarf-max-function-complexity",
@@ -1598,6 +1611,8 @@ module type Debugging_options = sig
   val no_dwarf_for_startup_file : unit -> unit
   val gdwarf_may_alter_codegen : unit -> unit
   val no_gdwarf_may_alter_codegen : unit -> unit
+  val gdwarf_may_alter_codegen_experimental : unit -> unit
+  val no_gdwarf_may_alter_codegen_experimental : unit -> unit
   val gdwarf_max_function_complexity : int -> unit
   val gdwarf_compression : string -> unit
   val gdwarf_fission : string -> unit
@@ -1615,6 +1630,10 @@ module Make_debugging_options (F : Debugging_options) = struct
       mk_no_dwarf_for_startup_file F.no_dwarf_for_startup_file;
       mk_gdwarf_may_alter_codegen F.gdwarf_may_alter_codegen;
       mk_no_gdwarf_may_alter_codegen F.no_gdwarf_may_alter_codegen;
+      mk_gdwarf_may_alter_codegen_experimental
+        F.gdwarf_may_alter_codegen_experimental;
+      mk_no_gdwarf_may_alter_codegen_experimental
+        F.no_gdwarf_may_alter_codegen_experimental;
       mk_gdwarf_max_function_complexity F.gdwarf_max_function_complexity;
       mk_gdwarf_compression F.gdwarf_compression;
       mk_gdwarf_fission F.gdwarf_fission;
@@ -1642,7 +1661,15 @@ module Debugging_options_impl = struct
   let gdwarf_may_alter_codegen () = Debugging.gdwarf_may_alter_codegen := true
 
   let no_gdwarf_may_alter_codegen () =
-    Debugging.gdwarf_may_alter_codegen := false
+    Debugging.gdwarf_may_alter_codegen := false;
+    Debugging.gdwarf_may_alter_codegen_experimental := false
+
+  let gdwarf_may_alter_codegen_experimental () =
+    Debugging.gdwarf_may_alter_codegen := true;
+    Debugging.gdwarf_may_alter_codegen_experimental := true
+
+  let no_gdwarf_may_alter_codegen_experimental () =
+    Debugging.gdwarf_may_alter_codegen_experimental := false
 
   let gdwarf_max_function_complexity c =
     Debugging.dwarf_max_function_complexity := c
@@ -1822,6 +1849,8 @@ module Extra_params = struct
     | "dasm-comments" -> set' Oxcaml_flags.dasm_comments
     | "gupstream-dwarf" -> set' Debugging.restrict_to_upstream_dwarf
     | "gdwarf-may-alter-codegen" -> set' Debugging.gdwarf_may_alter_codegen
+    | "gdwarf-may-alter-codegen-experimental" ->
+        set' Debugging.gdwarf_may_alter_codegen_experimental
     | "gstartup" -> set' Debugging.dwarf_for_startup_file
     | "gdwarf-pedantic" -> set' Clflags.dwarf_pedantic
     | "gdwarf-max-function-complexity" ->

@@ -119,6 +119,12 @@ val compare_loc_fatal_on_unknown : fatal_message:string -> t -> t -> int
 
 val is_of_type_addr : t -> bool
 
+module UsingLocEquality : sig
+  module Set: Stdlib.Set.S with type elt = t
+  module Map: Stdlib.Map.S with type key = t
+  module Tbl: Hashtbl.S with type key = t
+end
+
 module For_testing : sig
   val get_stamp : unit -> int
   val set_state : stamp:int -> relocatable_regs:t list -> unit

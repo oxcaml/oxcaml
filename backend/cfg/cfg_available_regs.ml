@@ -17,10 +17,9 @@ let dprintf fmt =
    to be seen in the debugger, for example when the last use of some variable is
    just before a call, and the debugger is standing in the callee. It may
    however affect the semantics of e.g. finalizers. *)
-let extend_live () = false
-(* CR sspies: This used to be set by [-gdwarf-may-alter-codegen]. But the
-   computation is currently broken, so we've disabled the flag. Fix the
-   compuation and re-enable the flag. *)
+(* CR mshinwell: We've seen a bug when enabling this, so it should be assumed
+   codegen is broken when enabled. *)
+let extend_live () = !Dwarf_flags.gdwarf_may_alter_codegen_experimental
 
 (* CR mshinwell: The old "all_regs_that_might_be_named" (see git history) seems
    broken, I think a backwards dataflow pass may be necessary to compute this *)
