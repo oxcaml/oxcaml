@@ -32,3 +32,4 @@ val add_path_for : string -> string -> unit
 val emacs : bool ref
 
 val machine_readable : bool ref
+val quiet : bool ref
