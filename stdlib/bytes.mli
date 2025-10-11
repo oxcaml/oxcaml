@@ -59,7 +59,7 @@ open! Stdlib
 
    *)
 
-external length : bytes @ immutable -> int = "%bytes_length"
+external length : (bytes[@local_opt]) @ immutable -> int = "%bytes_length"
 (** Return the length (number of bytes) of the argument. *)
 
 external get : bytes -> int -> char = "%bytes_safe_get"
@@ -420,7 +420,8 @@ let bytes_length (s : bytes) =
    closure is fully applied and returns ownership.
 *)
 
-val unsafe_of_string : string -> bytes
+external unsafe_of_string :
+  (string[@local_opt]) -> (bytes[@local_opt]) = "%bytes_of_string"
 (** Unsafely convert a shared string to a byte sequence that should
     not be mutated.
 
