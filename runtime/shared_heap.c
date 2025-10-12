@@ -908,7 +908,7 @@ static void verify_object(struct heap_verify_state* st, value v) {
     struct stack_info* stk = Ptr_val(Field(v, 0));
     value *gc_regs = 0;
     if (size == 3) {
-      gc_regs = (value *)(&Field(v, 2));
+      gc_regs = (value *)(Field(v, 2));
     }
     if (stk != NULL)
       caml_scan_stack(verify_push, verify_scanning_flags, st, stk, gc_regs);
@@ -1101,7 +1101,7 @@ static void compact_update_block(header_t* p)
       mlsize_t size = Wosize_hd(hd);
       CAMLassert(size == 2 || size == 3);
       if (size == 3) {
-        gc_regs = (value *)(&Field(v, 2));
+        gc_regs = (value *)(Field(v, 2));
       }
       caml_scan_stack(&compact_update_value, 0, NULL, Ptr_val(stk), gc_regs);
     }
