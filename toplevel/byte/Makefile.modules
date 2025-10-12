@@ -1,0 +1,4 @@
+include StdlibModules
+
+display:
+	@echo $(STDLIB_MODULES) | tr ' ' '\n'
