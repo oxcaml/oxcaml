@@ -30,6 +30,8 @@
                     stdlib__Arg
                     stdlib__Array
                     stdlib__ArrayLabels
+                    stdlib__Atomic
+                    stdlib__Backoff
                     stdlib__Bigarray
                     stdlib__Bool
                     stdlib__Buffer
@@ -46,8 +48,10 @@
                     camlinternalQuote
                     stdlib__Char
                     stdlib__Complex
+                    stdlib__Condition
                     stdlib__Digest
                     stdlib__Domain
+                    stdlib__Dynarray
                     stdlib__Either
                     stdlib__Effect
                     stdlib__Ephemeron
@@ -57,7 +61,6 @@
                     stdlib__Format
                     stdlib__Fun
                     stdlib__Gc
-                    stdlib__Genlex
                     stdlib__Hashtbl
                     stdlib__Iarray
                     stdlib__IarrayLabels
@@ -73,7 +76,9 @@
                     stdlib__ListLabels
                     stdlib__Map
                     stdlib__Marshal
+                    stdlib__Modes
                     stdlib__MoreLabels
+                    stdlib__Mutex
                     stdlib__Nativeint
                     stdlib__Nativeint_u
                     stdlib__Obj
@@ -81,7 +86,6 @@
                     stdlib__Option
                     stdlib__Out_channel
                     stdlib__Parsing
-                    stdlib__Pervasives
                     stdlib__Printexc
                     stdlib__Printf
                     stdlib__Queue
@@ -89,15 +93,16 @@
                     stdlib__Random
                     stdlib__Result
                     stdlib__Scanf
+                    stdlib__Semaphore
                     stdlib__Seq
                     stdlib__Set
                     stdlib__Stack
                     stdlib__StdLabels
                     stdlib
-                    stdlib__Stream
                     stdlib__String
                     stdlib__StringLabels
                     stdlib__Sys
+                    stdlib__Type
                     stdlib__Uchar
                     stdlib__Unit
                     stdlib__Weak
