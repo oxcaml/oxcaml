@@ -10,7 +10,7 @@ type 'a my_list = Nil | Cons of 'a * 'a my_list
 
 type 'a my_list : immutable_data with 'a = 'a list = [] | ( :: ) of 'a * 'a my_list
 [%%expect {|
-type 'a my_list = 'a list = [] | (::) of 'a * 'a my_list
+type ('a : value_or_null) my_list = 'a list = [] | (::) of 'a * 'a my_list
 |}]
 
 type 'a my_list : immutable_data with 'a = Nil | Cons of 'a * 'a foo
