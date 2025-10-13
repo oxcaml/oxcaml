@@ -296,7 +296,7 @@ module Type_shape = struct
                 | Tvariant _ | Tunivar _
                 | Tpoly (_, _)
                 | Tpackage (_, _)
-                | Tof_kind _ ->
+                | Tquote _ | Tsplice _ | Tof_kind _ ->
                   assert false
               in
               Misc.fatal_errorf
@@ -332,6 +332,8 @@ module Type_shape = struct
             in
             Shape.poly_variant row_fields
           | Tarrow (_, _, _, _) -> Shape.arrow ()
+          | Tquote _ -> unknown_shape
+          | Tsplice _ -> unknown_shape
           | Tunivar _ -> unknown_shape
           | Tof_kind _ -> unknown_shape
           | Tpackage _ -> unknown_shape

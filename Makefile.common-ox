@@ -174,7 +174,7 @@ $(ocamldir)/dune.runtime_selection:
 	fi
 
 _build/_bootinstall: Makefile.config $(dune_config_targets)
-	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/otherlibs/dynlink/natdynlinkops
+	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/natdynlinkops
 
 # flags.sexp
 	echo '(:standard $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_upstream_flags.sexp
@@ -314,7 +314,7 @@ install_for_test: _install
 	 done; \
 	 ln -s . lex; ln -s . yacc; \
 	 ln -s _install/lib/ocaml/compiler-libs compilerlibs; \
-	 mkdir -p otherlibs/{unix,dynlink/native,str,bigarray,runtime_events}; \
+	 mkdir -p otherlibs/{unix,dynlink/native,str,bigarray,runtime_events,camlinternaleval}; \
 	 ln -s ../stdlib/threads otherlibs/systhreads$(RUNTIME_SUFFIX); \
          $(cpl) stdlib/unix/{lib,}unix* otherlibs/unix; \
          $(cpl) stdlib/dynlink/dynlink* otherlibs/dynlink; \

@@ -1075,7 +1075,7 @@ module Layout_and_axes = struct
                   skippable_axes = relevant_axes_when_seen
                 }
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-          | Tunivar _ | Tpackage _ | Tof_kind _ ->
+          | Tunivar _ | Tpackage _ | Tquote _ | Tsplice _ | Tof_kind _ ->
             (* these cases either cannot be infinitely recursive or their jkinds
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
@@ -3285,6 +3285,10 @@ module Format_history = struct
       fprintf ppf
         "it's the type of the first argument to a function in a recursive \
          module"
+    | Quotation_result -> fprintf ppf "it's the result type of a quotation"
+    | Antiquotation_result -> fprintf ppf "it's the result type of splicing"
+    | Tquote -> fprintf ppf "it's a staged type"
+    | Tsplice -> fprintf ppf "it's a splice of a staged type"
     | Unknown s ->
       fprintf ppf
         "unknown @[(please alert the Jane Street@;\
@@ -4041,6 +4045,10 @@ module Debug_printers = struct
     | Class_term_argument -> fprintf ppf "Class_term_argument"
     | Debug_printer_argument -> fprintf ppf "Debug_printer_argument"
     | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
+    | Quotation_result -> fprintf ppf "Quotation_result"
+    | Antiquotation_result -> fprintf ppf "Antiquotation_result"
+    | Tquote -> fprintf ppf "Tquote"
+    | Tsplice -> fprintf ppf "Tsplice"
     | Unknown s -> fprintf ppf "Unknown %s" s
     | Array_type_kind -> fprintf ppf "Array_type_kind"
 

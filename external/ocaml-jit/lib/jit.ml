@@ -16,7 +16,16 @@
 
 open Import
 
-let outcome_global : Opttoploop.evaluation_outcome option ref = ref None
+type evaluation_outcome = Result of Obj.t | Exception of exn
+
+let outcome_global : evaluation_outcome option ref = ref None
+
+external ndl_loadsym : string -> Obj.t
+  = "caml_sys_exit" "caml_natdynlink_loadsym"
+
+external ndl_existssym : string -> bool
+  = "caml_sys_exit" "caml_natdynlink_existssym"
+  [@@noalloc]
 
 (** Assemble each section using X86_binary_emitter. Empty sections are filtered *)
 let binary_section_map ~arch section_map =
@@ -56,21 +65,22 @@ let alloc_all jit_text_section binary_section_map =
   in
   match Externals.memalign total_size with
   | Error msg ->
-    failwithf "posix_memalign for %d bytes failed: %s" total_size msg
+      failwithf "posix_memalign for %d bytes failed: %s" total_size msg
   | Ok address ->
-    let text = { address; value = jit_text_section } in
-    let address = Address.add_int address text_size in
-    let map, _address =
-      String.Map.fold binary_section_map
-        ~init:(String.Map.empty, address)
-        ~f:(fun ~key ~data:binary_section (map, address) ->
-          let data = { address; value = binary_section } in
-          let map = String.Map.add map ~key ~data in
-          let size = round_to_pages (X86_binary_emitter.size binary_section) in
-          let address = Address.add_int address size in
-          map, address)
-    in
-    text, map
+      let text = { address; value = jit_text_section } in
+      let address = Address.add_int address text_size in
+      let map, _address =
+        String.Map.fold binary_section_map ~init:(String.Map.empty, address)
+          ~f:(fun ~key ~data:binary_section (map, address) ->
+            let data = { address; value = binary_section } in
+            let map = String.Map.add map ~key ~data in
+            let size =
+              round_to_pages (X86_binary_emitter.size binary_section)
+            in
+            let address = Address.add_int address size in
+            (map, address))
+      in
+      (text, map)
 
 let local_symbol_map binary_section_map =
   String.Map.fold binary_section_map ~init:Symbols.empty
@@ -122,7 +132,9 @@ let load_sections addressed_sections =
 
 let entry_points ~phrase_name symbols =
   let separator = (* if Config.runtime5 then "." else *) "__" in
-  let symbol_name name = Printf.sprintf "caml%s%s%s" phrase_name separator name in
+  let symbol_name name =
+    Printf.sprintf "caml%s%s%s" phrase_name separator name
+  in
   let find_symbol name = Symbols.find symbols (symbol_name name) in
   let frametable = find_symbol "frametable" in
   let gc_roots = find_symbol "gc_roots" in
@@ -148,7 +160,6 @@ let entry_points ~phrase_name symbols =
         entry_name
 
 let jit_run entry_points =
-  let open Opttoploop in
   match
     try Result (Obj.magic (Externals.run_toplevel entry_points))
     with exn -> Exception exn
@@ -166,16 +177,15 @@ let get_arch () =
   | 64 -> X86_ast.X64
   | i -> failwithf "Unexpected word size: %d" i 16
 
-let jit_load_x86 ~outcome_ref ~delayed:_ section_map _filename =
+let jit_load_x86 ~phrase_name ~outcome_ref ~delayed:_ section_map _filename =
   let arch = get_arch () in
   let section_map =
-   List.fold_left
+    List.fold_left
       ~f:(fun section_map (name, instrs) ->
         String.Map.add section_map
           ~key:(X86_proc.Section_name.to_string name)
           ~data:instrs)
-      section_map
-      ~init:String.Map.empty
+      section_map ~init:String.Map.empty
   in
   let binary_section_map = binary_section_map ~arch section_map in
   Debug.print_binary_section_map binary_section_map;
@@ -192,14 +202,11 @@ let jit_load_x86 ~outcome_ref ~delayed:_ section_map _filename =
   Globals.symbols := symbols;
   let relocated_text = relocate_text ~symbols addressed_text in
   relocate_other ~symbols addressed_sections;
-  Debug.save_binary_sections ~phrase_name:!Opttoploop.phrase_name
-    addressed_sections;
-  Debug.save_text_section ~phrase_name:!Opttoploop.phrase_name relocated_text;
+  Debug.save_binary_sections ~phrase_name addressed_sections;
+  Debug.save_text_section ~phrase_name relocated_text;
   load_text relocated_text;
   load_sections addressed_sections;
-  let entry_points =
-    entry_points ~phrase_name:!Opttoploop.phrase_name symbols
-  in
+  let entry_points = entry_points ~phrase_name symbols in
   let result = jit_run entry_points in
   outcome_ref := Some result
 
@@ -208,10 +215,10 @@ let set_debug () =
   | Some ("true" | "1") -> Globals.debug := true
   | None | Some _ -> Globals.debug := false
 
-let with_jit_x86 f =
+let with_jit_x86 ~phrase_name f =
   let ias = !X86_proc.internal_assembler in
   X86_proc.register_internal_assembler
-    (jit_load_x86 ~outcome_ref:outcome_global);
+    (jit_load_x86 ~phrase_name ~outcome_ref:outcome_global);
   try
     let res = f () in
     X86_proc.internal_assembler := ias;
@@ -220,12 +227,16 @@ let with_jit_x86 f =
     X86_proc.internal_assembler := ias;
     raise exn
 
-let jit_load_body ppf (program : Lambda.program) =
+let need_symbol sym =
+  match Symbols.find !Globals.symbols sym with
+  | Some _ -> false
+  | None -> not (ndl_existssym sym)
+
+let jit_load_body ~phrase_name ppf (program : Lambda.program) =
   let open Config in
-  let open Opttoploop in
   let dll =
-    if !Clflags.keep_asm_file then !phrase_name ^ ext_dll
-    else Filename.temp_file ("caml" ^ !phrase_name) ext_dll
+    if !Clflags.keep_asm_file then phrase_name ^ ext_dll
+    else Filename.temp_file ("caml" ^ phrase_name) ext_dll
   in
   let filename = Filename.chop_extension dll in
   Arch.trap_notes := false;
@@ -235,24 +246,21 @@ let jit_load_body ppf (program : Lambda.program) =
     Direct_to_cmm
       (Flambda2.lambda_to_cmm ~machine_width ~keep_symbol_tables:true)
   in
-    Asmgen.compile_implementation
-      (module Unix : Compiler_owee.Unix_intf.S)
-      ~toplevel:need_symbol ~pipeline ~sourcefile:(Some filename)
-      ~prefixname:filename ~ppf_dump:ppf program;
+  Asmgen.compile_implementation
+    (module Unix : Compiler_owee.Unix_intf.S)
+    ~toplevel:need_symbol ~pipeline ~sourcefile:(Some filename)
+    ~prefixname:filename ~ppf_dump:ppf program;
   match !outcome_global with
   | None -> failwith "No evaluation outcome"
   | Some res ->
       outcome_global := None;
       res
 
-let jit_load ppf program = with_jit_x86 (fun () -> jit_load_body ppf program)
+let jit_load ~phrase_name ppf program =
+  with_jit_x86 ~phrase_name (fun () -> jit_load_body ~phrase_name ppf program)
 
 let jit_lookup_symbol symbol =
   match Symbols.find !Globals.symbols symbol with
-  | None -> Opttoploop.default_lookup symbol
+  | None -> (
+      match ndl_loadsym symbol with exception _ -> None | obj -> Some obj)
   | Some x -> Some (Address.to_obj x)
-
-let init_top () =
-  set_debug ();
-  Opttoploop.register_jit
-    { Opttoploop.Jit.load = jit_load; lookup_symbol = jit_lookup_symbol }

@@ -51,6 +51,9 @@ and ident_extension_constructor = ident_create "extension_constructor"
 and ident_floatarray = ident_create "floatarray"
 and ident_lexing_position = ident_create "lexing_position"
 and ident_atomic_loc = ident_create "atomic_loc"
+(* CR metaprogramming aivaskovic: there is a question about naming;
+   keep `expr` for now instead of `code` *)
+and ident_code = ident_create "expr"
 
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
@@ -100,6 +103,7 @@ and path_lexing_position = Pident ident_lexing_position
 and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
 and path_atomic_loc = Pident ident_atomic_loc
+and path_code = Pident ident_code
 
 and path_or_null = Pident ident_or_null
 
@@ -175,6 +179,7 @@ and type_extension_constructor =
 and type_floatarray = newgenty (Tconstr(path_floatarray, [], ref Mnil))
 and type_lexing_position = newgenty (Tconstr(path_lexing_position, [], ref Mnil))
 and type_atomic_loc t = newgenty (Tconstr(path_atomic_loc, [t], ref Mnil))
+and type_code t = newgenty (Tconstr(path_code, [t], ref Mnil))
 
 and type_unboxed_float = newgenty (Tconstr(path_unboxed_float, [], ref Mnil))
 and type_unboxed_float32 = newgenty (Tconstr(path_unboxed_float32, [], ref Mnil))
@@ -658,6 +663,14 @@ let build_initial_env add_type add_extension empty_env =
            ~modality:Mode.Modality.Const.id
            ~type_expr:param)
   |> add_type ident_string ~jkind:Jkind.Const.Builtin.immutable_data
+  |> add_type1 ident_code
+       ~variance:Variance.covariant
+       ~separability:Separability.Ind
+       ~jkind:(fun param ->
+         Jkind.Builtin.immutable_data ~why:Tquote |>
+           Jkind.add_with_bounds
+             ~modality:Mode.Modality.Const.id
+             ~type_expr:param)
   |> add_type ident_bytes ~jkind:Jkind.Const.Builtin.mutable_data
   |> add_type ident_unit
        ~kind:(variant [cstr ident_void []])

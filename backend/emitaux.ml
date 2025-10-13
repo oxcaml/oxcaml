@@ -570,6 +570,8 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
     if insert_stack_check
     then
       let fun_body =
+        (* CR mshinwell: These availability sets aren't taking into account any
+           potential clobbers by the stack check. *)
         Linear.instr_cons
           (Lstackcheck { max_frame_size_bytes = max_frame_size })
           [||] [||] ~available_before:fundecl.fun_body.available_before

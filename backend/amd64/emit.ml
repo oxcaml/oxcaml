@@ -1093,6 +1093,9 @@ let tailrec_entry_point = ref None
 type probe =
   { stack_offset : int;
     num_stack_slots : int Stack_class.Tbl.t;
+    probe_name : string;
+    probe_enabled_at_init : bool;
+    probe_handler_code_sym : string;
     (* Record frame info held in the corresponding mutable variables. *)
     probe_label : label;
     (* Probe site, recorded in .note.stapsdt section for enabling and disabling
@@ -2283,11 +2286,14 @@ let emit_instr ~first ~fallthrough i =
     I.mov (domain_field Domainstate.Domain_local_sp) (res i 0)
   | Lop End_region -> I.mov (arg i 0) (domain_field Domainstate.Domain_local_sp)
   | Lop (Name_for_debugger _) -> ()
-  | Lcall_op (Lprobe { enabled_at_init; _ }) ->
+  | Lcall_op (Lprobe { enabled_at_init; name; handler_code_sym }) ->
     let probe_label = Cmm.new_label () in
     let probe =
       { probe_label;
         probe_insn = i;
+        probe_name = name;
+        probe_enabled_at_init = enabled_at_init;
+        probe_handler_code_sym = handler_code_sym;
         stack_offset = !stack_offset;
         num_stack_slots = Stack_class.Tbl.copy num_stack_slots
       }
@@ -2761,20 +2767,8 @@ let stack_locations ~offset regs =
 
 let emit_probe_handler_wrapper p =
   let wrap_label = probe_handler_wrapper_name p.probe_label in
-  let probe_name, handler_code_sym =
-    match p.probe_insn.desc with
-    | Lcall_op (Lprobe { name; handler_code_sym; enabled_at_init = _ }) ->
-      name, handler_code_sym
-    | Lcall_op
-        (Lcall_ind | Ltailcall_ind | Lcall_imm _ | Ltailcall_imm _ | Lextcall _)
-    | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
-    | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Llabel _ | Lbranch _
-    | Lcondbranch (_, _)
-    | Lcondbranch3 (_, _, _)
-    | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-    | Lstackcheck _ ->
-      assert false
-  in
+  let probe_name = p.probe_name in
+  let handler_code_sym = p.probe_handler_code_sym in
   (*= Restore stack frame info as it was at the probe site, so we can easily
      refer to slots in the corresponding frame.  (As per the comment above,
      recall that the wrapper does however have its own frame.) *)
@@ -2908,6 +2902,20 @@ let emit_elf_note ~section ~owner ~typ ~emit_desc =
   D.define_label d;
   D.align ~fill_x86_bin_emitter:Zero ~bytes:4
 
+let emit_probe_note_desc ~probe_name ~probe_label ~semaphore_label ~probe_args =
+  (match probe_label with
+  | Some probe_label ->
+    let lbl = label_to_asm_label ~section:Stapsdt_note probe_label in
+    D.label lbl
+  | None -> D.int64 0L);
+  (match Target_system.is_macos () with
+  | false -> D.symbol S.Predef.stapsdt_base
+  | true -> D.int64 0L);
+  D.symbol semaphore_label;
+  D.string "ocaml_2\000";
+  D.string (probe_name ^ "\000");
+  D.string (probe_args ^ "\000")
+
 let emit_probe_notes0 () =
   D.switch_to_section Stapsdt_note;
   let stap_arg arg =
@@ -2924,21 +2932,8 @@ let emit_probe_notes0 () =
     Printf.sprintf "%d@%s" (Select_utils.size_component arg.Reg.typ) arg_name
   in
   let describe_one_probe p =
-    let probe_name, enabled_at_init =
-      match p.probe_insn.desc with
-      | Lcall_op (Lprobe { name; enabled_at_init; handler_code_sym = _ }) ->
-        name, enabled_at_init
-      | Lcall_op
-          ( Lcall_ind | Ltailcall_ind | Lcall_imm _ | Ltailcall_imm _
-          | Lextcall _ )
-      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
-      | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Llabel _ | Lbranch _
-      | Lcondbranch (_, _)
-      | Lcondbranch3 (_, _, _)
-      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-      | Lstackcheck _ ->
-        assert false
-    in
+    let probe_name = p.probe_name in
+    let enabled_at_init = p.probe_enabled_at_init in
     let args =
       Array.fold_right (fun arg acc -> stap_arg arg :: acc) p.probe_insn.arg []
       |> String.concat " "
@@ -2948,19 +2943,41 @@ let emit_probe_notes0 () =
     in
     let semaphore_label = S.create semsym in
     let emit_desc () =
-      let lbl = label_to_asm_label ~section:Stapsdt_note p.probe_label in
-      D.label lbl;
-      (match Target_system.is_macos () with
-      | false -> D.symbol S.Predef.stapsdt_base
-      | true -> D.int64 0L);
-      D.symbol semaphore_label;
-      D.string "ocaml_1\000";
-      D.string (probe_name ^ "\000");
-      D.string (args ^ "\000")
+      emit_probe_note_desc ~probe_label:(Some p.probe_label) ~semaphore_label
+        ~probe_name ~probe_args:args
     in
     emit_elf_note ~section:Stapsdt_note ~owner:"stapsdt" ~typ:3l ~emit_desc
   in
   List.iter describe_one_probe !probes;
+  ()
+
+let emit_dummy_probe_notes () =
+  (* A semaphore may be used via [%probe_is_enabled] without a corresponding
+     probe site in the same compilation unit or even the entire program due to
+     inlining or optimizations or user defined special cases. Emit dummy probe
+     notes to correctly toggle such semaphores. A dummy note has no associated
+     probe site or probe handler. *)
+  let describe_dummy_probe ~probe_name sym =
+    let semaphore_label = S.create sym in
+    let emit_desc () =
+      emit_probe_note_desc ~probe_name ~probe_label:None ~semaphore_label
+        ~probe_args:""
+    in
+    emit_elf_note ~section:Stapsdt_note ~owner:"stapsdt" ~typ:3l ~emit_desc
+  in
+  let semaphores_without_probes =
+    List.fold_left
+      (fun acc probe -> String.Map.remove probe.probe_name acc)
+      !probe_semaphores !probes
+  in
+  if not (String.Map.is_empty semaphores_without_probes)
+  then (
+    D.switch_to_section Stapsdt_note;
+    String.Map.iter
+      (fun probe_name (sym, _, _) -> describe_dummy_probe ~probe_name sym)
+      semaphores_without_probes)
+
+let emit_probe_semaphores () =
   (match Target_system.is_macos () with
   | false ->
     emit_stapsdt_base_section ();
@@ -2983,7 +3000,11 @@ let emit_probe_notes0 () =
     !probe_semaphores
 
 let emit_probe_notes () =
-  match !probes with [] -> () | _ -> emit_probe_notes0 ()
+  (match !probes with [] -> () | _ -> emit_probe_notes0 ());
+  if not (String.Map.is_empty !probe_semaphores)
+  then (
+    emit_dummy_probe_notes ();
+    emit_probe_semaphores ())
 
 let emit_trap_notes () =
   (* Don't emit trap notes on windows and macos systems *)

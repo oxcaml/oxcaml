@@ -24,7 +24,7 @@
 (rule
  (targets bytetop)
  ; This should be generated from the stdlib modules files
- (action (run %{ocaml_where}/../../bin/ocamlrun 
+ (action (run %{ocaml_where}/../../bin/ocamlrun
               -I ../../middle_end/flambda2/numbers/floats
               %{exe:../expunge.bc} %{dep:../topstart.bc} %{targets}
                     stdlib__Arg
@@ -43,6 +43,7 @@
                     camlinternalComprehension
                     camlinternalOO
                     camlinternalAtomic
+                    camlinternalQuote
                     stdlib__Char
                     stdlib__Complex
                     stdlib__Digest
@@ -84,6 +85,7 @@
                     stdlib__Printexc
                     stdlib__Printf
                     stdlib__Queue
+                    stdlib__Quote
                     stdlib__Random
                     stdlib__Result
                     stdlib__Scanf

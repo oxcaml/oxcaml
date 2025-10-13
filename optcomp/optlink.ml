@@ -228,7 +228,15 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           else objfiles @ [stdexit]
         in
         let genfns = Generic_fns.Tbl.make () in
+        let ml_objfiles, units_tolink, cached_genfns_imports =
+          List.fold_right
+            (scan_file ~shared:false genfns)
+            objfiles
+            ([], [], Generic_fns.Partition.Set.empty)
+        in
         let uses_eval =
+          (* This query must come after scan_file has been called on objfiles,
+             otherwise is_required will always return false. *)
           Linkenv.is_required (Compilation_unit.of_string "Camlinternaleval")
         in
         let quoted_globals = Linkenv.get_quoted_globals () in
@@ -247,8 +255,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         let ml_objfiles, units_tolink, cached_genfns_imports =
           List.fold_right
             (scan_file ~shared:false genfns)
-            (stdlib_and_support_files_for_eval @ objfiles)
-            ([], [], Generic_fns.Partition.Set.empty)
+            stdlib_and_support_files_for_eval
+            (ml_objfiles, units_tolink, cached_genfns_imports)
         in
         (if not shared
         then

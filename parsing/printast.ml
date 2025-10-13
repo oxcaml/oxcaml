@@ -237,7 +237,7 @@ let rec core_type i ppf x =
       line i ppf "Ptyp_splice\n";
       core_type i ppf t
   | Ptyp_of_kind jkind ->
-    line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i + 1)) jkind
+      line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i + 1)) jkind
   | Ptyp_extension (s, arg) ->
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
       payload i ppf arg

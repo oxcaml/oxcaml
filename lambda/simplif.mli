@@ -27,7 +27,13 @@
 
 open Lambda
 
-val simplify_lambda: lambda -> lambda
+val simplify_lambda
+   : lambda
+  -> restrict_to_upstream_dwarf:bool
+  -> gdwarf_may_alter_codegen:bool
+  -> lambda
+
+val simplify_lambda_for_bytecode : lambda -> lambda
 
 val split_default_wrapper
    : id:Ident.t

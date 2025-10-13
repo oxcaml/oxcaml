@@ -172,6 +172,13 @@ val import_crcs : 'a t -> source:filepath ->
 (* Return the set of compilation units imported, with their CRC *)
 val imports : 'a t -> Import_info.Intf.t list
 
+(* Require that the specified compilation unit will be available at quotation
+   compile time. *)
+val require_global_for_quote : 'a t -> Compilation_unit.Name.t -> unit
+
+(* Return the set of compilation units referenced by quotes *)
+val quoted_globals : 'a t -> Compilation_unit.Name.t list
+
 (* Return the set of imports represented as runtime parameters. If this module is indeed
    parameterised (that is, [parameters] returns a non-empty list), it will be compiled as
    a functor rather than a [struct] as usual, and the parameters to this functor are what

@@ -60,6 +60,8 @@ type address = Persistent_env.address =
 
 type t
 
+type stage
+
 val empty: t
 
 (* This environment is lazy so that it may depend on the enabled extensions,
@@ -223,6 +225,12 @@ type structure_components_reason =
   | Project
   | Open
 
+type no_open_quotations_context =
+  | Object_qt
+  | Struct_qt
+  | Sig_qt
+  | Open_qt
+
 type lookup_error =
   | Unbound_value of Longident.t * unbound_value_hint
   | Unbound_type of Longident.t
@@ -259,6 +267,8 @@ type lookup_error =
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of
       [`Escape of escaping_context | `Shared of shared_context | `Closure]
+  | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
+  | No_constructor_in_stage of Longident.t * Location.t * int
 
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
@@ -526,6 +536,12 @@ val add_closure_lock : Mode.Hint.pinpoint_desc
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
+val enter_quotation : t -> t
+val enter_splice : loc:Location.t -> t -> t
+
+val check_no_open_quotations :
+  Location.t -> t -> no_open_quotations_context -> unit
+val stage : t -> stage
 
 (* Initialize the cache of in-core module interfaces. *)
 val reset_cache: preserve_persistent_env:bool -> unit
@@ -565,6 +581,13 @@ val imports: unit -> Import_info.t list
 
 (* may raise Persistent_env.Consistbl.Inconsistency *)
 val import_crcs: source:string -> Import_info.t array -> unit
+
+(* Require that the provided compilation unit will be available at quotation
+   compile time. *)
+val require_global_for_quote: Compilation_unit.Name.t -> unit
+
+(* Return the set of compilation units referenced by quotes *)
+val quoted_globals: unit -> Compilation_unit.Name.t list
 
 (* Return the set of imports represented as runtime parameters (see
    [Persistent_env.runtime_parameter_bindings] for details) *)
@@ -615,6 +638,8 @@ type error =
   | Illegal_value_name of Location.t * string
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t; }
+  | Toplevel_splice of Location.t
+  | Unsupported_inside_quotation of Location.t * no_open_quotations_context
 
 exception Error of error
 
@@ -707,3 +732,8 @@ type address_head =
 val address_head : address -> address_head
 
 val sharedness_hint : Format.formatter -> shared_context -> unit
+
+val print_stage : Format.formatter -> stage -> unit
+
+val print_with_quote_promote :
+  Format.formatter -> (string * stage * stage) -> unit

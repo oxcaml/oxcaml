@@ -442,9 +442,15 @@ let run cfg_with_layout =
           let body =
             if need_starting_label cfg_with_layout block ~prev_block
             then
-              to_linear_instr
-                (make_Llabel cfg_with_layout block.start)
-                ~next:body
+              let instr =
+                to_linear_instr
+                  (make_Llabel cfg_with_layout block.start)
+                  ~next:body
+              in
+              { instr with
+                available_before = body.available_before;
+                available_across = body.available_across
+              }
             else body
           in
           adjust_stack_offset body block ~prev_block

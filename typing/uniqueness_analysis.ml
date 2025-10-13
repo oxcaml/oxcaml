@@ -394,6 +394,11 @@ module Usage : sig
     | Aliased of Aliased.t  (** A aliased usage *)
     | Maybe_unique of Maybe_unique.t
         (** A usage that could be either unique or aliased. *)
+    | Antiquote of t
+        (** A usage within an antiquote. Behaves as the underlying
+            usage but is protected from the "lifting" operations
+            that make implicitly borrowed usages into aliased
+            usages. *)
 
   val aliased : Occurrence.t -> Aliased.reason -> t
 
@@ -425,6 +430,10 @@ module Usage : sig
 
   (** Non-deterministic choice *)
   val choose : t -> t -> t
+
+  val quote : t -> t
+
+  val antiquote : t -> t
 
   (** Parallel composition *)
   val par : t -> t -> t
@@ -492,22 +501,24 @@ end = struct
     | Maybe_aliased of Maybe_aliased.t
     | Aliased of Aliased.t
     | Maybe_unique of Maybe_unique.t
+    | Antiquote of t
 
   let aliased occ reason = Aliased (Aliased.singleton occ reason)
 
   let maybe_unique unique_use occ =
     Maybe_unique (Maybe_unique.singleton unique_use occ)
 
-  let extract_occurrence = function
+  let rec extract_occurrence = function
     | Unused -> None
     | Borrowed occ -> Some occ
     | Maybe_aliased t -> Some (Maybe_aliased.extract_occurrence t)
     | Aliased t -> Some (Aliased.extract_occurrence t)
     | Maybe_unique t -> Some (Maybe_unique.extract_occurrence t)
+    | Antiquote t -> extract_occurrence t
 
   let empty = Unused
 
-  let choose m0 m1 =
+  let rec choose m0 m1 =
     match m0, m1 with
     | Unused, m | m, Unused -> m
     | Borrowed _, t | t, Borrowed _ -> t
@@ -519,6 +530,9 @@ end = struct
       t
     | Aliased _, t | t, Aliased _ -> t
     | Maybe_unique l0, Maybe_unique l1 -> Maybe_unique (Maybe_unique.meet l0 l1)
+    | Antiquote t1, Antiquote t2 -> Antiquote (choose t1 t2)
+    | Antiquote t1, t2 -> choose t1 t2
+    | t1, Antiquote t2 -> choose t1 t2
 
   type first_or_second =
     | First
@@ -539,7 +553,7 @@ end = struct
     | Error cannot_force ->
       raise (Error { cannot_force; there; first_or_second; access_order })
 
-  let par m0 m1 =
+  let rec par m0 m1 =
     match m0, m1 with
     | Unused, m | m, Unused -> m
     | Borrowed occ, Borrowed _ -> Borrowed occ
@@ -572,8 +586,11 @@ end = struct
       force_aliased_multiuse t0 m1 First Par;
       force_aliased_multiuse t1 m0 Second Par;
       aliased (Maybe_unique.extract_occurrence t0) Aliased.Forced
+    | Antiquote t1, Antiquote t2 -> Antiquote (par t1 t2)
+    | Antiquote t1, t2 -> par t1 t2
+    | t1, Antiquote t2 -> par t1 t2
 
-  let seq m0 m1 =
+  let rec seq m0 m1 =
     match m0, m1 with
     | Unused, m | m, Unused -> m
     | Borrowed _, t -> t
@@ -642,8 +659,21 @@ end = struct
       force_aliased_multiuse l0 m1 First Seq;
       force_aliased_multiuse l1 m0 Second Seq;
       aliased (Maybe_unique.extract_occurrence l0) Aliased.Forced
+    | Antiquote t1, Antiquote t2 -> Antiquote (seq t1 t2)
+    | Antiquote t1, t2 -> seq t1 t2
+    | t1, Antiquote t2 -> seq t1 t2
 
-  let print ppf =
+  let quote = function
+    | Maybe_aliased a ->
+      let occ = Maybe_aliased.extract_occurrence a in
+      let access = Maybe_aliased.extract_access a in
+      aliased occ (Aliased.Lifted access)
+    | Antiquote t -> t
+    | t -> t
+
+  let antiquote t = Antiquote t
+
+  let rec print ppf =
     let open Format in
     function
     | Unused -> fprintf ppf "Unused"
@@ -651,6 +681,7 @@ end = struct
     | Maybe_aliased ma -> fprintf ppf "Maybe_aliased(%a)" Maybe_aliased.print ma
     | Aliased a -> fprintf ppf "Aliased(%a)" Aliased.print a
     | Maybe_unique mu -> fprintf ppf "Maybe_unique(%a)" Maybe_unique.print mu
+    | Antiquote t -> fprintf ppf "Antiquote(%a)" print t
 end
 
 module Tag : sig
@@ -1369,6 +1400,10 @@ module Usage_forest : sig
   (** The forest with only one usage, given by the path and the usage *)
   val singleton : Usage.t -> Learned_tags.t -> Overwrites.t -> Path.t -> t
 
+  val quote : t -> t
+
+  val antiquote : t -> t
+
   (** Run a function through a forest. The function must be monotone *)
   val map :
     (Usage.t -> Usage.t) ->
@@ -1471,6 +1506,10 @@ end = struct
   let map fu fl fo =
     Root_id.Map.mapi (fun _root tree ->
         Usage_tree.mapi (fun _projs usage -> fu usage) fl fo tree)
+
+  let quote t = map Usage.quote (fun x -> x) (fun x -> x) t
+
+  let antiquote t = map Usage.antiquote (fun x -> x) (fun x -> x) t
 
   let check_no_remaining_overwritten_as t =
     Root_id.Map.iter
@@ -2485,6 +2524,17 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
       Paths.mark
         (Usage.maybe_unique use occ)
         Learned_tags.empty Overwrites.empty p)
+  (* CR metaprogramming aivaskovic:
+     it might be reasonable to treat `Texp_quotation e` as `e` *)
+  | Texp_quotation e ->
+    let uf = check_uniqueness_exp ~overwrite:None ienv e in
+    UF.quote uf
+  | Texp_antiquotation e ->
+    let uf = check_uniqueness_exp ~overwrite:None ienv e in
+    UF.antiquote uf
+  | Texp_eval _ ->
+    (* CR metaprogramming mshinwell: Make sure this is correct *)
+    UF.unused
 
 (**
 Corresponds to the first mode.

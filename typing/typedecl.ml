@@ -607,7 +607,7 @@ let make_constructor
           let univar_list =
             TyVarEnv.make_poly_univars_jkinds
               ~context:(fun v -> Constructor_type_parameter (cstr_path, v))
-              svars
+              (List.map (fun (v, l) -> (v, l, Env.stage env)) svars)
           in
           let univars = if closed then Some univar_list else None in
           let args, targs =

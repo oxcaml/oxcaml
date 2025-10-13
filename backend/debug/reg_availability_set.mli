@@ -39,6 +39,8 @@ val union : t -> t -> t
 
 val inter : t -> t -> t
 
+val inter_removing_conflicting_debug_info : t -> t -> t
+
 val diff : t -> t -> t
 
 (** This returns the initial value in the [Unreachable] case *)

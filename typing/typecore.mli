@@ -342,8 +342,8 @@ type error =
   | Impossible_function_jkind of
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
-  | Unsupported_construct_metaprogramming
   | Unexpected_hole
+  | Eval_format
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

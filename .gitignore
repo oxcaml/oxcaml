@@ -408,7 +408,7 @@ ocaml/primitives.new
 /yacc/version.h
 /yacc/.gdb_history
 
-/otherlibs/dynlink/natdynlinkops
+/natdynlinkops
 
 dune.runtime_selection
 /otherlibs/dune
