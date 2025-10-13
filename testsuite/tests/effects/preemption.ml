@@ -1,7 +1,7 @@
 (* TEST
    include unix;
    hasunix;
-   flags += "-alert -unsafe_multidomain";
+   flags += "-alert -unsafe_multidomain -w -21";
    { native; }
 *)
 
@@ -9,6 +9,8 @@ open Effect
 open Effect.Deep
 
 external preempt_self : unit -> unit = "caml_domain_preempt_self"
+
+type _ Effect.t += Nested : int -> int Effect.t
 
 (* Basic preemption test - immediate resume *)
 let test_basic () =
@@ -329,7 +331,7 @@ let test_gc_deep_recursion () =
 
   (* Recursive function that keeps objects live across many stack frames *)
   let rec deep_compute obj depth acc =
-    if depth = 0 then (!obj, acc)
+    if depth = 0 then (obj, acc)
     else begin
       obj := !obj + 1;
       if not !preempted then begin
@@ -350,8 +352,8 @@ let test_gc_deep_recursion () =
          if Sys.time () -. start_at > 5.
          then failwith "Didn't get preempted after 5s!";
          if not !preempted then begin
-           let (v, _) = deep_compute obj 50 0 in
-           if v > 10000 then obj := 100;
+           let (obj_ref, _) = deep_compute obj 50 0 in
+           if !obj_ref > 10000 then obj_ref := 100;
            loop ()
          end else begin
            deep_compute obj 100 0
@@ -370,8 +372,8 @@ let test_gc_deep_recursion () =
         | _ -> None) }
   in
 
-  let (final_val, _) = result in
-  assert (final_val > 0);
+  let (obj_ref, _) = result in
+  assert (!obj_ref > 0);
   Gc.full_major ();
 
   if !finalized then
@@ -379,7 +381,388 @@ let test_gc_deep_recursion () =
   else
     print_endline "  GC with deep recursion: PASSED";
 
-  (* Keep result alive until after the check *)
+  (* Keep obj_ref alive until after the check *)
+  ignore (Sys.opaque_identity obj_ref)
+
+(* Test 9: Repeated preemptions with GC each time *)
+let test_repeated_gc () =
+  print_endline "Test 9: Repeated preemptions with GC";
+  let _ = Unix.setitimer ITIMER_REAL { it_interval = 0.02; it_value = 0.02 } in
+  let _ = Sys.set_signal Sys.sigalrm (Signal_handle (fun _ -> preempt_self ())) in
+  let count = ref 0 in
+  let finalized_count = ref 0 in
+
+  let make_finalizable n =
+    let obj = (n, ref 0) in
+    Gc.finalise (fun _ -> incr finalized_count) obj;
+    obj
+  in
+
+  let result = try_with
+    (fun () ->
+       let start_at = Sys.time () in
+       let obj1 = make_finalizable 1 in
+       let obj2 = make_finalizable 2 in
+       let obj3 = make_finalizable 3 in
+
+       while !count < 10 do
+         if Sys.time () -. start_at > 10.
+         then failwith "Repeated GC timed out!";
+         let (_, r1) = obj1 in incr r1;
+         let (_, r2) = obj2 in incr r2;
+         let (_, r3) = obj3 in incr r3
+       done;
+       (obj1, obj2, obj3))
+    ()
+    { effc = (fun (type a) (e : a t) ->
+        match e with
+        | Tick -> Some (fun (k : (a, _) continuation) ->
+          incr count;
+          (* GC on every preemption! *)
+          Gc.full_major ();
+          if !count mod 3 = 0 then Gc.compact ();
+          continue k ())
+        | _ -> None) }
+  in
+
+  let (obj1, obj2, obj3) = result in
+  let (_, r1) = obj1 in assert (!r1 > 0);
+  let (_, r2) = obj2 in assert (!r2 > 0);
+  let (_, r3) = obj3 in assert (!r3 > 0);
+
+  Gc.full_major ();
+
+  if !finalized_count > 0 then
+    failwith (Printf.sprintf "Repeated GC: %d objects finalized!" !finalized_count)
+  else if !count < 10 then
+    failwith "Repeated GC: insufficient preemptions"
+  else
+    print_endline "  Repeated preemptions with GC: PASSED";
+
+  ignore (Sys.opaque_identity (obj1, obj2, obj3))
+
+(* Test 10: Massive allocation during preemption *)
+let test_massive_allocation () =
+  print_endline "Test 10: Massive allocation during preemption";
+  let _ = Unix.setitimer ITIMER_REAL { it_interval = 0.; it_value = 0.1 } in
+  let _ = Sys.set_signal Sys.sigalrm (Signal_handle (fun _ -> preempt_self ())) in
+  let preempted = ref false in
+  let finalized = ref false in
+
+  let make_finalizable () =
+    let obj = ref [1; 2; 3; 4; 5] in
+    Gc.finalise (fun _ -> finalized := true) obj;
+    obj
+  in
+
+  let result = try_with
+    (fun () ->
+       let start_at = Sys.time () in
+       let obj = make_finalizable () in
+
+       while not !preempted do
+         if Sys.time () -. start_at > 5.
+         then failwith "Didn't get preempted after 5s!";
+         obj := List.map (fun x -> x + 1) !obj
+       done;
+       obj)
+    ()
+    { effc = (fun (type a) (e : a t) ->
+        match e with
+        | Tick -> Some (fun (k : (a, _) continuation) ->
+          preempted := true;
+          (* Allocate ~10MB of data *)
+          let _ = Array.init 10000 (fun i ->
+            Array.init 100 (fun j -> (i, j, ref (i + j)))
+          ) in
+          Gc.full_major ();
+          Gc.compact ();
+          continue k ())
+        | _ -> None) }
+  in
+
+  assert (List.length !result = 5);
+  Gc.full_major ();
+
+  if !finalized then
+    failwith "Massive allocation: object finalized!"
+  else
+    print_endline "  Massive allocation: PASSED";
+
+  ignore (Sys.opaque_identity result)
+
+(* Test 11: Large complex data structures in registers *)
+let test_large_structures () =
+  print_endline "Test 11: Large structures in registers";
+  let _ = Unix.setitimer ITIMER_REAL { it_interval = 0.; it_value = 0.1 } in
+  let _ = Sys.set_signal Sys.sigalrm (Signal_handle (fun _ -> preempt_self ())) in
+  let preempted = ref false in
+  let finalized_count = ref 0 in
+
+  let make_complex_structure n =
+    let arr = Array.init 100 (fun i -> (n * 1000 + i, ref i)) in
+    Gc.finalise (fun _ -> incr finalized_count) arr;
+    arr
+  in
+
+  let result = try_with
+    (fun () ->
+       let start_at = Sys.time () in
+       let s1 = make_complex_structure 1 in
+       let s2 = make_complex_structure 2 in
+       let s3 = make_complex_structure 3 in
+
+       while not !preempted do
+         if Sys.time () -. start_at > 5.
+         then failwith "Didn't get preempted after 5s!";
+         (* Touch all structures *)
+         let (_, r) = s1.(0) in incr r;
+         let (_, r) = s2.(50) in incr r;
+         let (_, r) = s3.(99) in incr r
+       done;
+       (s1, s2, s3))
+    ()
+    { effc = (fun (type a) (e : a t) ->
+        match e with
+        | Tick -> Some (fun (k : (a, _) continuation) ->
+          preempted := true;
+          Gc.full_major ();
+          Gc.compact ();
+          continue k ())
+        | _ -> None) }
+  in
+
+  let (s1, s2, s3) = result in
+  assert (Array.length s1 = 100);
+  assert (Array.length s2 = 100);
+  assert (Array.length s3 = 100);
+  Gc.full_major ();
+
+  if !finalized_count > 0 then
+    failwith "Large structures: objects finalized!"
+  else
+    print_endline "  Large structures: PASSED";
+
+  ignore (Sys.opaque_identity (s1, s2, s3))
+
+(* Test 12: Weak references with strong refs in registers *)
+let test_weak_references () =
+  print_endline "Test 12: Weak references";
+  let _ = Unix.setitimer ITIMER_REAL { it_interval = 0.; it_value = 0.1 } in
+  let _ = Sys.set_signal Sys.sigalrm (Signal_handle (fun _ -> preempt_self ())) in
+  let preempted = ref false in
+
+  let result = try_with
+    (fun () ->
+       let start_at = Sys.time () in
+       (* Create objects and weak refs *)
+       let obj1 = ref 100 in
+       let obj2 = ref 200 in
+       let obj3 = ref 300 in
+       let weak = Weak.create 3 in
+       Weak.set weak 0 (Some obj1);
+       Weak.set weak 1 (Some obj2);
+       Weak.set weak 2 (Some obj3);
+
+       while not !preempted do
+         if Sys.time () -. start_at > 5.
+         then failwith "Didn't get preempted after 5s!";
+         incr obj1; incr obj2; incr obj3
+       done;
+       (obj1, obj2, obj3, weak))
+    ()
+    { effc = (fun (type a) (e : a t) ->
+        match e with
+        | Tick -> Some (fun (k : (a, _) continuation) ->
+          preempted := true;
+          (* Aggressive GC should not clear weak refs *)
+          Gc.full_major ();
+          Gc.compact ();
+          continue k ())
+        | _ -> None) }
+  in
+
+  Gc.full_major ();
+  let (obj1, obj2, obj3, weak) = (Sys.opaque_identity result) in
+
+  (* Objects should still be accessible via weak array *)
+  match Weak.get weak 0, Weak.get weak 1, Weak.get weak 2 with
+  | Some w1, Some w2, Some w3 ->
+      assert (!w1 > 100);
+      assert (!w2 > 200);
+      assert (!w3 > 300);
+      print_endline "  Weak references: PASSED"
+  | _ -> failwith "Weak references: objects were collected!";
+
+  ignore (Sys.opaque_identity (obj1, obj2, obj3, weak))
+
+(* Test 13: Nested effect handlers with preemption *)
+let test_nested_handlers () =
+  print_endline "Test 13: Nested effect handlers";
+  let _ = Unix.setitimer ITIMER_REAL { it_interval = 0.; it_value = 0.1 } in
+  let _ = Sys.set_signal Sys.sigalrm (Signal_handle (fun _ -> preempt_self ())) in
+  let preempted = ref false in
+  let finalized = ref false in
+
+  let make_finalizable v =
+    let obj = ref v in
+    Gc.finalise (fun _ -> finalized := true) obj;
+    obj
+  in
+
+  let result = try_with
+    (fun () ->
+       let obj = make_finalizable 42 in
+       try_with
+         (fun () ->
+            let start_at = Sys.time () in
+            while not !preempted do
+              if Sys.time () -. start_at > 5.
+              then failwith "Didn't get preempted after 5s!";
+              incr obj;
+              let _ = Effect.perform (Nested !obj) in
+              ()
+            done;
+            obj)
+         ()
+         { effc = (fun (type a) (e : a t) ->
+             match e with
+             | Nested n -> Some (fun (k : (a, _) continuation) ->
+                 continue k (n * 2))
+             | _ -> None) })
+    ()
+    { effc = (fun (type a) (e : a t) ->
+        match e with
+        | Tick -> Some (fun (k : (a, _) continuation) ->
+          preempted := true;
+          Gc.full_major ();
+          continue k ())
+        | _ -> None) }
+  in
+
+  assert (!result > 42);
+  Gc.full_major ();
+
+  if !finalized then
+    failwith "Nested handlers: object finalized!"
+  else
+    print_endline "  Nested handlers: PASSED";
+
+  ignore (Sys.opaque_identity result)
+
+(* Test 14: Lazy values forced during preemption *)
+let test_lazy_values () =
+  print_endline "Test 14: Lazy values";
+  let _ = Unix.setitimer ITIMER_REAL { it_interval = 0.; it_value = 0.1 } in
+  let _ = Sys.set_signal Sys.sigalrm (Signal_handle (fun _ -> preempt_self ())) in
+  let preempted = ref false in
+  let finalized = ref false in
+
+  let make_finalizable v =
+    let obj = ref v in
+    Gc.finalise (fun _ -> finalized := true) obj;
+    obj
+  in
+
+  let result = try_with
+    (fun () ->
+       let start_at = Sys.time () in
+       let obj = make_finalizable 100 in
+       let lazy_val = lazy (
+         incr obj;
+         let arr = Array.init 100 (fun i -> !obj + i) in
+         (obj, arr)
+       ) in
+
+       while not !preempted do
+         if Sys.time () -. start_at > 5.
+         then failwith "Didn't get preempted after 5s!";
+         incr obj
+       done;
+       lazy_val)
+    ()
+    { effc = (fun (type a) (e : a t) ->
+        match e with
+        | Tick -> Some (fun (k : (a, _) continuation) ->
+          preempted := true;
+          Gc.full_major ();
+          continue k ())
+        | _ -> None) }
+  in
+
+  (* Force the lazy value after preemption *)
+  let (obj, arr) = Lazy.force result in
+  assert (!obj > 100);
+  assert (Array.length arr = 100);
+  Gc.full_major ();
+
+  if !finalized then
+    failwith "Lazy values: object finalized!"
+  else
+    print_endline "  Lazy values: PASSED";
+
+  ignore (Sys.opaque_identity (obj, arr))
+
+(* Test 15: Extremely deep recursion with live values *)
+let test_extreme_depth () =
+  print_endline "Test 15: Extreme recursion depth";
+  let _ = Unix.setitimer ITIMER_REAL { it_interval = 0.; it_value = 0.1 } in
+  let _ = Sys.set_signal Sys.sigalrm (Signal_handle (fun _ -> preempt_self ())) in
+  let preempted = ref false in
+  let finalized_count = ref 0 in
+
+  let make_finalizable n =
+    let obj = ref n in
+    Gc.finalise (fun _ -> incr finalized_count) obj;
+    obj
+  in
+
+  (* Create chain of 1000 objects through deep recursion *)
+  let rec deep_chain depth objs =
+    if depth = 0 then objs
+    else begin
+      let obj = make_finalizable depth in
+      if not !preempted then
+        deep_chain depth objs
+      else begin
+        incr obj;
+        deep_chain (depth - 1) (obj :: objs)
+      end
+    end
+  in
+
+  let result = try_with
+    (fun () ->
+       let start_at = Sys.time () in
+       let rec loop () =
+         if Sys.time () -. start_at > 5.
+         then failwith "Didn't get preempted after 5s!";
+         if not !preempted then
+           loop ()
+         else
+           deep_chain 1000 []
+       in
+       loop ())
+    ()
+    { effc = (fun (type a) (e : a t) ->
+        match e with
+        | Tick -> Some (fun (k : (a, _) continuation) ->
+          preempted := true;
+          Gc.full_major ();
+          Gc.compact ();
+          continue k ())
+        | _ -> None) }
+  in
+
+  assert (List.length result = 1000);
+  List.iter (fun obj -> assert (!obj > 0)) result;
+  Gc.full_major ();
+
+  if !finalized_count > 0 then
+    failwith "Extreme depth: objects finalized!"
+  else
+    print_endline "  Extreme recursion depth: PASSED";
+
   ignore (Sys.opaque_identity result)
 
 (* Run all tests *)
@@ -392,6 +775,13 @@ let () =
   test_many_live_registers ();
   test_gc_register_values ();
   test_gc_deep_recursion ();
+  test_repeated_gc ();
+  test_massive_allocation ();
+  test_large_structures ();
+  test_weak_references ();
+  test_nested_handlers ();
+  test_lazy_values ();
+  test_extreme_depth ();
   (* Disable timer *)
   let _ = Unix.setitimer ITIMER_REAL { it_interval = 0.; it_value = 0. } in
   print_endline "\nAll preemption tests PASSED!"

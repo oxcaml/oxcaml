@@ -1385,8 +1385,8 @@ CFI_STARTPROC
         C_call  (GCALL(caml_ensure_gc_regs))
         C_call  (GCALL(caml_get_tick_effect)) /* %rax := Tick */
         SWITCH_C_TO_OCAML
-        movq    Caml_state(preemption), %rbx
-        movq    $1, Caml_state(preemption)
+        movq    Caml_state(preemption), %rbx /* %rbx := continuation */
+        movq    $1, Caml_state(preemption)   /* preemption := Val_unit */
         movq    Caml_state(current_stack), %rsi /* %rsi := old stack */
         leaq    1(%rsi), %rdi /* %rdi (last_fiber) := Val_ptr(old stack) */
         movq    %rdi, 0*8(%rbx) /* Store fiber in continuation */
@@ -1443,16 +1443,18 @@ CFI_STARTPROC
         jmpq    *(%rbx)    /* no, just jump into the continuation */
 1:      /* This continuation represents a preemption, meaning we have to restore
            its gc_regs before resuming */
-        movq    (%rbx), %rdi /* Load the point to resume from */
-        pushq   %rdi         /* Push that point to the stack, so that when caml
-                              * do_call_gc `ret`s, it jumps back into the
-                              * continuation
-                              */
-        movq    %rdx, %r15   /* Load the gc_regs */
-        jmp     LBL(resume_from_preempt) /* Jump into the second half of
-                                          * caml_do_call_gc, which will restore
-                                          * the registers and `ret` to resume
-                                          */
+        movq    %rdx, Caml_state(gc_regs)  /* Save gc_regs */
+        movq    %r15, Caml_state(young_ptr)
+        /* Before restoring registers, redo whatever allocation that was
+           interrupted by preemption. This ensures r15 will point to a valid
+           allocation in the (possibly new) young heap. */
+        SWITCH_OCAML_TO_C
+        C_call  (GCALL(caml_redo_preempted_allocation))
+        SWITCH_C_TO_OCAML
+        movq    Caml_state(gc_regs), %r15  /* Restore gc_regs */
+        /* Jump into the second half of caml_do_call_gc, which will restore the
+           registers and `ret` to resume */
+        jmp     LBL(resume_from_preempt)
 2:      ENTER_FUNCTION
         TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller of caml_resume
                                   in the TSan backtrace */

@@ -14,5 +14,19 @@ Test 7: Register values survive GC
   Register values survive GC: PASSED
 Test 8: GC with deep recursion
   GC with deep recursion: PASSED
+Test 9: Repeated preemptions with GC
+  Repeated preemptions with GC: PASSED
+Test 10: Massive allocation during preemption
+  Massive allocation: PASSED
+Test 11: Large structures in registers
+  Large structures: PASSED
+Test 12: Weak references
+  Weak references: PASSED
+Test 13: Nested effect handlers
+  Nested handlers: PASSED
+Test 14: Lazy values
+  Lazy values: PASSED
+Test 15: Extreme recursion depth
+  Extreme recursion depth: PASSED
 
 All preemption tests PASSED!
