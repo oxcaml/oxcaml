@@ -1314,7 +1314,6 @@ and prepare_dacc_for_handlers dacc ~replay ~env_at_fork ~params ~is_recursive
   let code_age_relation = TE.code_age_relation (DA.typing_env dacc) in
   let handler_env =
     DE.with_code_age_relation code_age_relation join_result.handler_env
-    |> DE.with_join_analysis join_result.analysis
     |> DE.bump_current_level_scope
   in
   let do_not_unbox () =

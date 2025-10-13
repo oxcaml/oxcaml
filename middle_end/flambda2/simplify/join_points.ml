@@ -21,8 +21,7 @@ type result =
   { handler_env : DE.t;
     extra_params_and_args : Continuation_extra_params_and_args.t;
     is_single_inlinable_use : bool;
-    escapes : bool;
-    analysis : Apply_cont_rewrite_id.t Join_analysis.t option
+    escapes : bool
   }
 
 let introduce_extra_params_in_use_env epa (denv_at_use, use_id, kind) =
@@ -254,8 +253,7 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
     { handler_env;
       extra_params_and_args = previous_extra_params_and_args;
       is_single_inlinable_use = true;
-      escapes = false;
-      analysis = None
+      escapes = false
     }
   | _ ->
     let use_envs_with_ids =
@@ -295,6 +293,7 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
         in
         denv, None, previous_extra_params_and_args
     in
+    let handler_env = DE.with_join_analysis join_analysis handler_env in
     let escapes =
       List.exists
         (fun (_, _, (cont_use_kind : Continuation_use_kind.t)) ->
@@ -306,6 +305,5 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
     { handler_env;
       extra_params_and_args;
       is_single_inlinable_use = false;
-      escapes;
-      analysis = join_analysis
+      escapes
     }
