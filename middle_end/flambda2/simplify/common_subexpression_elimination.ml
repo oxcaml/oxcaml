@@ -267,7 +267,9 @@ let join_one_cse_equation ~cse_at_each_use prim bound_to_map
       let var = Variable.create "cse_param" prim_result_kind in
       let var_duid = Flambda_debug_uid.none in
       let extra_param =
-        BP.create var (K.With_subkind.anything prim_result_kind) var_duid
+        BP.create var
+          (K.With_subkind.anything prim_result_kind)
+          var_duid ~dbg:Debuginfo.none
       in
       let bound_to = RI.Map.map Rhs_kind.bound_to bound_to_map in
       let cse = EP.Map.add prim (Simple.var var) cse in

@@ -85,6 +85,39 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
       Use_regalloc_param params :: of_cmm_codegen_option tl
     | Cold -> Cold :: of_cmm_codegen_option tl)
 
+type phantom_defining_expr =
+  | Cphantom_const_int of Targetint.t
+  | Cphantom_const_symbol of string
+  | Cphantom_var of Backend_var.t
+  | Cphantom_offset_var of
+      { var : Backend_var.t;
+        offset_in_words : int
+      }
+  | Cphantom_read_field of
+      { var : Backend_var.t;
+        field : int
+      }
+  | Cphantom_read_symbol_field of
+      { sym : string;
+        field : int
+      }
+  | Cphantom_block of
+      { tag : int;
+        fields : Backend_var.t list
+      }
+
+let phantom_defining_expr_of_cmm (expr : Cmm.phantom_defining_expr) =
+  match expr with
+  | Cphantom_const_int i -> Cphantom_const_int i
+  | Cphantom_const_symbol s -> Cphantom_const_symbol s
+  | Cphantom_var v -> Cphantom_var v
+  | Cphantom_offset_var { var; offset_in_words } ->
+    Cphantom_offset_var { var; offset_in_words }
+  | Cphantom_read_field { var; field } -> Cphantom_read_field { var; field }
+  | Cphantom_read_symbol_field { sym; field } ->
+    Cphantom_read_symbol_field { sym; field }
+  | Cphantom_block { tag; fields } -> Cphantom_block { tag; fields }
+
 type t =
   { blocks : basic_block Label.Tbl.t;
     fun_name : string;
@@ -98,13 +131,16 @@ type t =
     fun_poll : Lambda.poll_attribute;
     next_instruction_id : InstructionId.sequence;
     fun_ret_type : Cmm.machtype;
+    fun_phantom_lets :
+      (Backend_var.Provenance.t option * phantom_defining_expr)
+      Backend_var.Map.t;
     mutable allowed_to_be_irreducible : bool;
     mutable register_locations_are_set : bool
   }
 
 let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
     ~fun_num_stack_slots ~fun_poll ~next_instruction_id ~fun_ret_type
-    ~allowed_to_be_irreducible =
+    ~fun_phantom_lets ~allowed_to_be_irreducible =
   { fun_name;
     fun_args;
     fun_codegen_options;
@@ -118,6 +154,7 @@ let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
     fun_poll;
     next_instruction_id;
     fun_ret_type;
+    fun_phantom_lets;
     allowed_to_be_irreducible;
     register_locations_are_set = false
   }
@@ -234,6 +271,8 @@ let first_instruction_stack_offset (block : basic_block) : int =
 
 let fun_name t = t.fun_name
 
+let fun_phantom_lets t = t.fun_phantom_lets
+
 let entry_label t = t.entry_label
 
 let iter_blocks t ~f = Label.Tbl.iter f t.blocks
@@ -283,6 +322,178 @@ let register_predecessors_for_all_blocks (t : t) =
             <- Label.Set.add label target_block.predecessors)
         targets)
     t.blocks
+
+(* Printing for debug *)
+
+let dump_basic ppf (basic : basic) =
+  let open Format in
+  match basic with
+  | Op op -> Operation.dump ppf op
+  | Reloadretaddr -> fprintf ppf "reloadretaddr"
+  | Pushtrap { lbl_handler } ->
+    fprintf ppf "pushtrap handler=%a" Label.format lbl_handler
+  | Poptrap { lbl_handler } ->
+    fprintf ppf "poptrap handler=%a" Label.format lbl_handler
+  | Prologue -> fprintf ppf "prologue"
+  | Epilogue -> fprintf ppf "epilogue"
+  | Stack_check { max_frame_size_bytes } ->
+    fprintf ppf "stack_check size=%d" max_frame_size_bytes
+
+let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
+    ?(sep = "\n") ppf (terminator : terminator) =
+  (if !Oxcaml_flags.davail || !Dwarf_flags.debug_avail_sets
+   then
+     match ti.phantom_available_before with
+     | None -> ()
+     | Some phantom_vars ->
+       if not (Backend_var.Set.is_empty phantom_vars)
+       then
+         Format.fprintf Format.str_formatter "@[<1>PAB={%a}@]@,"
+           Backend_var.Set.print phantom_vars);
+  let first_arg =
+    if Array.length args >= 1
+    then Format.fprintf Format.str_formatter " %a" print_reg args.(0);
+    Format.flush_str_formatter ()
+  in
+  let second_arg =
+    if Array.length args >= 2
+    then Format.fprintf Format.str_formatter " %a" print_reg args.(1);
+    Format.flush_str_formatter ()
+  in
+  let print_args ppf args =
+    if Array.length args = 0
+    then ()
+    else Format.fprintf ppf " %a" (Printreg.regs' ~print_reg) args
+  in
+  let print_res ppf =
+    if Array.length res > 0
+    then Format.fprintf ppf "%a := " (Printreg.regs' ~print_reg) res
+  in
+  let dump_linear_call_op ppf op =
+    Printlinear.call_operation ~print_reg ppf op args
+  in
+  let open Format in
+  match terminator with
+  | Never -> fprintf ppf "deadend"
+  | Always l -> fprintf ppf "goto %a" Label.format l
+  | Parity_test { ifso; ifnot } ->
+    fprintf ppf "if even%s goto %a%selse goto %a" first_arg Label.format ifso
+      sep Label.format ifnot
+  | Truth_test { ifso; ifnot } ->
+    fprintf ppf "if true%s goto %a%selse goto %a" first_arg Label.format ifso
+      sep Label.format ifnot
+  | Float_test { width = _; lt; eq; gt; uo } ->
+    fprintf ppf "if%s <%s goto %a%s" first_arg second_arg Label.format lt sep;
+    fprintf ppf "if%s =%s goto %a%s" first_arg second_arg Label.format eq sep;
+    fprintf ppf "if%s >%s goto %a%s" first_arg second_arg Label.format gt sep;
+    fprintf ppf "else goto %a" Label.format uo
+  | Int_test { lt; eq; gt; is_signed; imm } ->
+    let cmp =
+      Printf.sprintf " %s%s"
+        (match is_signed with Signed -> "s" | Unsigned -> "u")
+        (match imm with None -> second_arg | Some i -> " " ^ Int.to_string i)
+    in
+    fprintf ppf "if%s <%s goto %a%s" first_arg cmp Label.format lt sep;
+    fprintf ppf "if%s =%s goto %a%s" first_arg cmp Label.format eq sep;
+    fprintf ppf "if%s >%s goto %a" first_arg cmp Label.format gt
+  | Switch labels ->
+    fprintf ppf "switch%s%s" first_arg sep;
+    let label_count = Array.length labels in
+    if label_count >= 1
+    then (
+      for i = 0 to label_count - 2 do
+        fprintf ppf "case %d: goto %a%s" i Label.format labels.(i) sep
+      done;
+      let i = label_count - 1 in
+      fprintf ppf "case %d: goto %a" i Label.format labels.(i))
+  | Call_no_return { func_symbol; _ } ->
+    fprintf ppf "call_no_return %s%a" func_symbol print_args args
+  | Return -> fprintf ppf "return%a" print_args args
+  | Raise _ -> fprintf ppf "raise%a" print_args args
+  | Tailcall_self { destination } ->
+    dump_linear_call_op ppf
+      (Linear.Ltailcall_imm
+         { func =
+             { sym_name =
+                 Printf.sprintf "self(%s)" (Label.to_string destination);
+               sym_global = Local
+             }
+         })
+  | Tailcall_func call ->
+    (* CR ncourant: here and below, maybe the callees should be printed when
+       they are known *)
+    dump_linear_call_op ppf
+      (match call with
+      | Indirect _callees -> Linear.Ltailcall_ind
+      | Direct func -> Linear.Ltailcall_imm { func })
+  | Call { op = call; label_after } ->
+    Format.fprintf ppf "%t%a" print_res dump_linear_call_op
+      (match call with
+      | Indirect _callees -> Linear.Lcall_ind
+      | Direct func -> Linear.Lcall_imm { func });
+    Format.fprintf ppf "%s\n           goto %a" sep Label.format label_after
+  | Prim { op = prim; label_after } ->
+    Format.fprintf ppf "%t%a" print_res dump_linear_call_op
+      (match prim with
+      | External
+          { func_symbol = func;
+            ty_res;
+            ty_args;
+            alloc;
+            stack_ofs;
+            stack_align;
+            effects = _
+          } ->
+        Linear.Lextcall
+          { func;
+            ty_res;
+            ty_args;
+            returns = true;
+            alloc;
+            stack_ofs;
+            stack_align
+          }
+      | Probe { name; handler_code_sym; enabled_at_init } ->
+        Linear.Lprobe { name; handler_code_sym; enabled_at_init });
+    Format.fprintf ppf "%sgoto %a" sep Label.format label_after
+  | Invalid { message; label_after; _ } ->
+    Format.fprintf ppf "Invalid %S" message;
+    Option.iter (Format.fprintf ppf "%sgoto %a" sep Label.format) label_after
+
+let dump_terminator ?sep ppf terminator = dump_terminator' ?sep ppf terminator
+
+let print_basic' ?print_reg ppf (instruction : basic instruction) =
+  let desc = Cfg_to_linear_desc.from_basic instruction.desc in
+  let instruction =
+    { Linear.desc;
+      next = Linear.end_instr;
+      arg = instruction.arg;
+      res = instruction.res;
+      dbg = Debuginfo.none;
+      fdo = None;
+      live = Reg.Set.empty;
+      available_before = instruction.available_before;
+      available_across = instruction.available_across;
+      phantom_available_before = instruction.phantom_available_before
+    }
+  in
+  Printlinear.instr' ?print_reg ppf instruction
+
+let print_basic ppf i = print_basic' ppf i
+
+let print_terminator' ?print_reg ppf (ti : terminator instruction) =
+  Format.fprintf ppf "%t%a%t" Cfg_colours.terminator
+    (dump_terminator' ?print_reg ~res:ti.res ~args:ti.arg ~sep:"")
+    ti.desc Cfg_colours.pop
+
+let print_terminator ppf ti = print_terminator' ppf ti
+
+let print_instruction' ?print_reg ppf i =
+  match i with
+  | `Basic i -> print_basic' ?print_reg ppf i
+  | `Terminator i -> print_terminator' ?print_reg ppf i
+
+let print_instruction ppf i = print_instruction' ppf i
 
 let can_raise_terminator (i : terminator) =
   match i with
@@ -402,7 +613,8 @@ let set_live (instr : _ instruction) live = instr.live <- live
 let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     ?(fdo = Fdo_info.none) ?(live = Reg.Set.empty) ~stack_offset ~id
     ?(available_before = Reg_availability_set.Unreachable)
-    ?(available_across = Reg_availability_set.Unreachable) () =
+    ?(available_across = Reg_availability_set.Unreachable)
+    ?(phantom_available_before = None) () =
   { desc;
     arg;
     res;
@@ -412,7 +624,8 @@ let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     stack_offset;
     id;
     available_before;
-    available_across
+    available_across;
+    phantom_available_before
   }
 
 let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
@@ -426,7 +639,8 @@ let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
     stack_offset = copy.stack_offset;
     id;
     available_before = copy.available_before;
-    available_across = copy.available_across
+    available_across = copy.available_across;
+    phantom_available_before = copy.phantom_available_before
   }
 
 let invalid_stack_offset = -1

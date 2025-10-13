@@ -18,6 +18,7 @@ open! Flambda.Import
 module Env = To_cmm_env
 module Ece = Effects_and_coeffects
 module K = Flambda_kind
+module P = Flambda_primitive
 
 module C = struct
   include Cmm_helpers
@@ -816,7 +817,9 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
   match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
   | Singleton v, Simple s ->
     (* CR mshinwell: Try to get a proper [dbg] here (although the majority of
-       these bindings should have been substituted out). *)
+       these bindings should have been substituted out).
+
+       mshinwell: we should be able to get this from [Bound_pattern] now *)
     (* CR gbury: once we get proper debuginfo here, remember to apply
        Env.add_inlined_debuginfo to it *)
     let dbg_with_inlined = Debuginfo.none in
@@ -880,6 +883,114 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
     Misc.fatal_errorf "Mismatch between pattern and defining expression:@ %a"
       Let.print let_expr
 
+and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
+  let make_phantom_let env res bound_var defining_expr ~body =
+    let var = Bound_var.var bound_var in
+    let debug_uid = Bound_var.debug_uid bound_var in
+    let dbg = Bound_var.dbg bound_var in
+    let bv_is_parameter = Bound_var.is_parameter bound_var in
+    let env, backend_var_with_prov =
+      To_cmm_env.add_phantom_let_binding env var ~debug_uid ~dbg
+        ~bv_is_parameter
+    in
+    let wrap, env, res =
+      Env.flush_delayed_lets ~mode:Flush_everything env res
+    in
+    let body_cmm, free_vars, symbol_inits, res = expr env res body in
+    let cmm =
+      C.make_phantom_let backend_var_with_prov defining_expr body_cmm
+    in
+    let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
+    cmm, free_vars, symbol_inits, res
+  in
+  match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
+  | Singleton bound_var, Simple simple ->
+    Simple.pattern_match' simple
+      ~var:(fun var ~coercion:_ ->
+        let To_cmm_env.{ expr = { cmm; _ }; _ } =
+          C.simple ~dbg:Debuginfo.none env res (Simple.var var)
+        in
+        match cmm with
+        | Cvar backend_var ->
+          make_phantom_let env res bound_var
+            (Some (Cmm.Cphantom_var backend_var))
+            ~body
+        | _ -> expr env res body)
+      ~symbol:(fun sym ~coercion:_ ->
+        let sym_name = Symbol.linkage_name_as_string sym in
+        make_phantom_let env res bound_var
+          (Some (Cmm.Cphantom_const_symbol sym_name))
+          ~body)
+      ~const:(fun const ->
+        match Reg_width_const.descr const with
+        | Tagged_immediate i ->
+          let machine_width = Target_system.Machine_width.Sixty_four in
+          let targetint_32_64 = Target_ocaml_int.to_targetint machine_width i in
+          let targetint =
+            Targetint.of_int64 (Targetint_32_64.to_int64 targetint_32_64)
+          in
+          make_phantom_let env res bound_var
+            (Some (Cmm.Cphantom_const_int targetint))
+            ~body
+        | _ -> expr env res body)
+  | ( Singleton bound_var,
+      Prim (Variadic (Make_block (block_kind, _mut, _alloc_mode), args), _dbg) )
+    ->
+    let tag_opt =
+      match (block_kind : P.Block_kind.t) with
+      | Values (tag, _) -> Some (Tag.Scannable.to_int tag)
+      | Naked_floats -> Some (Tag.to_int Tag.double_array_tag)
+      | Mixed (tag, _) -> Some (Tag.Scannable.to_int tag)
+    in
+    (match tag_opt with
+    | None -> expr env res body
+    | Some tag ->
+      let rec translate_args args =
+        match args with
+        | [] -> Some []
+        | arg :: rest -> (
+          match Simple.must_be_var arg with
+          | Some (var, _coercion) -> (
+            let To_cmm_env.{ expr = { cmm; _ }; _ } =
+              C.simple ~dbg:Debuginfo.none env res (Simple.var var)
+            in
+            match cmm with
+            | Cvar backend_var -> (
+              match translate_args rest with
+              | Some rest_vars -> Some (backend_var :: rest_vars)
+              | None -> None)
+            | _ -> None)
+          | None -> None)
+      in
+      match translate_args args with
+      | Some fields ->
+        make_phantom_let env res bound_var
+          (Some (Cmm.Cphantom_block { tag; fields }))
+          ~body
+      | None -> expr env res body)
+  | ( Singleton bound_var,
+      Prim (Unary (Block_load { kind = _; mut = _; field }, arg), _dbg) ) -> (
+    match Simple.must_be_var arg with
+    | Some (var, _coercion) ->
+      let To_cmm_env.{ expr = { cmm; _ }; _ } =
+        C.simple ~dbg:Debuginfo.none env res (Simple.var var)
+      in
+      (match cmm with
+      | Cvar backend_var ->
+        let field_int =
+          Targetint_32_64.to_int_checked
+            (Target_system.Machine_width.Sixty_four)
+            (Target_ocaml_int.to_targetint
+               (Target_system.Machine_width.Sixty_four)
+               field)
+        in
+        make_phantom_let env res bound_var
+          (Some (Cmm.Cphantom_read_field { var = backend_var; field = field_int }))
+          ~body
+      | _ -> expr env res body)
+    | None -> expr env res body)
+  | _ -> expr env res body
+
 and let_expr env res let_expr =
   Let.pattern_match' let_expr
     ~f:(fun bound_pattern ~num_normal_occurrences_of_bound_vars ~body ->
@@ -887,7 +998,7 @@ and let_expr env res let_expr =
       | Normal ->
         let_expr0 env res let_expr bound_pattern
           ~num_normal_occurrences_of_bound_vars ~body
-      | Phantom -> expr env res body
+      | Phantom -> let_expr_phantom env res let_expr bound_pattern ~body
       | In_types ->
         Misc.fatal_errorf "Cannot bind In_types variables in terms:@ %a"
           Let.print let_expr)
@@ -1175,7 +1286,10 @@ and apply_expr env res apply =
       match handler_params with
       | [param] ->
         let param_var, param_uid = Bound_parameter.var_and_uid param in
-        let var = Bound_var.create param_var param_uid Name_mode.normal in
+        let var =
+          Bound_var.create param_var param_uid Name_mode.normal
+            ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
+        in
         let env, res =
           Env.bind_variable env res var
             ~effects_and_coeffects_of_defining_expr:effs ~defining_expr:call
@@ -1195,7 +1309,7 @@ and apply_expr env res apply =
         in
         let env, cmm_params =
           Env.create_bound_parameters env
-            (List.map Bound_parameter.var_and_uid params)
+            (List.map Bound_parameter.var_and_uid_and_debuginfo params)
         in
         let label = Lambda.next_raise_count () in
         let params_with_machtype =
@@ -1275,6 +1389,8 @@ and apply_cont env res apply_cont =
                 let param_var, param_uid = Bound_parameter.var_and_uid param in
                 let var =
                   Bound_var.create param_var param_uid Name_mode.normal
+                    ~dbg:Debuginfo.none
+                    ~is_parameter:Bound_var.Is_parameter.local_var
                 in
                 bind_var_to_simple ~dbg_with_inlined env res var
                   ~num_normal_occurrences_of_bound_vars:

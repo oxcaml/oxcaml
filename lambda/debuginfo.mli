@@ -134,6 +134,8 @@ val assume_zero_alloc : t -> ZA.Assume_info.t
 val to_structured_mangling_path :
   name:string -> t -> Compilation_unit.t Structured_mangling.path
 
+val remove_outermost_frame : t -> t
+
 module Dbg : sig
   type t
 

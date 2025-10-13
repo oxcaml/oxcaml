@@ -155,12 +155,14 @@ val exported_offsets : t -> Exported_offsets.t
     the new environment and the created variable. Will produce a fatal error if
     the given variable is already bound. *)
 val create_bound_parameter :
-  t -> Variable.t * Flambda_debug_uid.t -> t * Backend_var.With_provenance.t
+  t ->
+  Variable.t * Flambda_debug_uid.t * Debuginfo.t ->
+  t * Backend_var.With_provenance.t
 
 (** Same as {!create_variable} but for a list of variables. *)
 val create_bound_parameters :
   t ->
-  (Variable.t * Flambda_debug_uid.t) list ->
+  (Variable.t * Flambda_debug_uid.t * Debuginfo.t) list ->
   t * Backend_var.With_provenance.t list
 
 (** {2 Delayed let-bindings}
@@ -285,6 +287,18 @@ val add_alias :
   t * To_cmm_result.t
 
 val add_symbol_init : t -> Backend_var.t -> Cmm.expression -> t
+
+(** Add a phantom let binding to the environment. This creates a backend
+    variable with proper provenance and registers it in the environment
+    so it can be referenced later. Returns the updated environment and
+    the created backend variable. *)
+val add_phantom_let_binding :
+  t ->
+  Variable.t ->
+  debug_uid:Flambda_debug_uid.t ->
+  dbg:Debuginfo.t ->
+  bv_is_parameter:Bound_var.Is_parameter.t ->
+  t * Backend_var.With_provenance.t
 
 (** Try and inline an Flambda variable using the delayed let-bindings. *)
 val inline_variable :
