@@ -390,7 +390,10 @@ let ( let$ ) (name, kind, prim, dbg) k uacc ~dacc_before_switch =
     let machine_width = UE.machine_width (UA.uenv uacc) in
     let binding =
       EB.Keep_binding
-        { let_bound = BPt.singleton (BV.create var duid NM.normal);
+        { let_bound =
+            BPt.singleton
+              (BV.create var duid NM.normal ~dbg:Debuginfo.none
+                 ~is_parameter:BV.Is_parameter.local_var);
           simplified_defining_expr =
             Simplified_named.create ~machine_width named;
           original_defining_expr = None
@@ -539,7 +542,11 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
      let free_names_of_body = Apply_cont.free_names apply_cont in
      let expr =
        let body = RE.create_apply_cont apply_cont in
-       let bound = BPt.singleton (BV.create arg_var arg_var_duid NM.normal) in
+       let bound =
+         BPt.singleton
+           (BV.create arg_var arg_var_duid NM.normal ~dbg:Debuginfo.none
+              ~is_parameter:BV.Is_parameter.local_var)
+       in
        RE.create_let rebuilding bound load_from_block ~body ~free_names_of_body
      in
      let extra_free_names =

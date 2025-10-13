@@ -144,7 +144,8 @@ module All_summaries = Identifiable.Make (struct
 end)
 
 let die_for_inlined_frame state ~compilation_unit_proto_die ~parent
-    range_list_attributes block =
+    ~value_type_proto_die ~function_symbol ~frame_path range_list_attributes
+    block ~available_ranges_all_vars =
   let abstract_instance_symbol =
     Dwarf_abstract_instances.find state ~compilation_unit_proto_die block
   in
@@ -165,23 +166,38 @@ let die_for_inlined_frame state ~compilation_unit_proto_die ~parent
          for now, until we sort out how to properly reference DIEs across units
          (in a way which will also work on macOS). In particular it should
          otherwise suffice for backtraces. *)
+      (* XXX maybe this can work for parameters, if we pass the uids through
+         in order to construct the correct DIE here? *)
       [ DAH.create_name demangled_name;
         DAH.create_linkage_name ~linkage_name:(Asm_symbol.encode fun_symbol);
         DAH.create_external ~is_visible_externally:true ]
   in
   let block : Debuginfo.item = List.hd (Debuginfo.to_items block) in
-  Proto_die.create ~parent:(Some parent) ~tag:Inlined_subroutine
-    ~attribute_values:
-      (abstract_instance @ range_list_attributes
-      @ [DAH.create_call_file (Dwarf_state.get_file_num state block.dinfo_file)]
-      @ (if block.dinfo_line >= 0
-         then [DAH.create_call_line block.dinfo_line]
-         else [])
-      @
-      if block.dinfo_char_start >= 0
-      then [DAH.create_call_column block.dinfo_char_start]
-      else [])
-    ()
+  let concrete_inlined_instance_die =
+    Proto_die.create ~parent:(Some parent) ~tag:Inlined_subroutine
+      ~attribute_values:
+        (abstract_instance @ range_list_attributes
+        @ [ DAH.create_call_file
+              (Dwarf_state.get_file_num state block.dinfo_file) ]
+        @ (if block.dinfo_line >= 0
+           then [DAH.create_call_line block.dinfo_line]
+           else [])
+        @
+        if block.dinfo_char_start >= 0
+        then [DAH.create_call_column block.dinfo_char_start]
+        else [])
+      ()
+  in
+  (match value_type_proto_die with
+  | None -> ()
+  | Some value_type_proto_die ->
+    Profile.record "dwarf_variables_and_parameters for inlined frames"
+      (fun () ->
+        Dwarf_variables_and_parameters.dwarf state ~value_type_proto_die
+          ~function_symbol ~function_proto_die:concrete_inlined_instance_die
+          ~frame_path available_ranges_all_vars)
+      ~accumulate:true ());
+  concrete_inlined_instance_die
 
 let create_range_list_attributes_and_summarise state ~start_of_code_symbol
     ~dwarf_4_base_address_entry range all_summaries =
@@ -233,7 +249,8 @@ let create_range_list_attributes_and_summarise state ~start_of_code_symbol
 let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
     ~dwarf_4_base_address_entry ~compilation_unit_proto_die
     ~(prefix : Debuginfo.item list) ~(blocks_outermost_first : Debuginfo.t)
-    scope_proto_dies all_summaries ~parent_die range inlined_frame_ranges =
+    scope_proto_dies all_summaries ~parent_die range inlined_frame_ranges
+    ~value_type_proto_die ~function_symbol ~available_ranges_all_vars =
   DS.Debug.log ">> create_down_to_innermost_frame: %a || %a\n%!"
     Debuginfo.print_compact_extended
     (Debuginfo.of_items prefix)
@@ -263,7 +280,8 @@ let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
         ~prefix:(prefix @ [block_item])
         ~blocks_outermost_first:(Debuginfo.of_items deeper_blocks)
         scope_proto_dies all_summaries ~parent_die:existing_die range
-        inlined_frame_ranges
+        inlined_frame_ranges ~value_type_proto_die ~function_symbol
+        ~available_ranges_all_vars
     | exception Not_found ->
       (* See comment in the [dwarf] function below. The DIEs for everything
          except the innermost inlined frame should already exist because of the
@@ -289,7 +307,9 @@ let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
       in
       let inlined_subroutine_die =
         die_for_inlined_frame state ~compilation_unit_proto_die
-          ~parent:parent_die range_list_attributes block
+          ~parent:parent_die ~value_type_proto_die ~function_symbol
+          ~frame_path:scope_key range_list_attributes block
+          ~available_ranges_all_vars
       in
       DS.Debug.log "Our DIE ref (DW_TAG_inlined_subroutine) for %a is %a\n%!"
         Debuginfo.print_compact_extended block Asm_label.print
@@ -299,8 +319,8 @@ let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
       in
       scope_proto_dies, all_summaries)
 
-let dwarf state (fundecl : L.fundecl) inlined_frame_ranges ~function_symbol
-    ~function_proto_die =
+let dwarf state (fundecl : L.fundecl) inlined_frame_ranges ~value_type_proto_die
+    ~function_symbol ~function_proto_die ~available_ranges_all_vars =
   DS.Debug.log "\n\nDwarf_inlined_frames.dwarf: function proto DIE is %a\n%!"
     Asm_label.print
     (Proto_die.reference function_proto_die);
@@ -358,7 +378,8 @@ let dwarf state (fundecl : L.fundecl) inlined_frame_ranges ~function_symbol
               ~prefix:[first_item]
               ~blocks_outermost_first:parents_outermost_first scope_proto_dies
               all_summaries ~parent_die:function_proto_die range
-              inlined_frame_ranges
+              inlined_frame_ranges ~value_type_proto_die ~function_symbol
+              ~available_ranges_all_vars
           | exception Not_found ->
             Misc.fatal_errorf
               "Function %s:@ couldn't find block_with_parents=%a.@ All ranges:"

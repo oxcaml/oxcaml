@@ -1291,7 +1291,9 @@ struct
         (fun var (_, kind) env ->
           let bound_name =
             Bound_name.create_var
-              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal
+                 ~dbg:Debuginfo.none
+                 ~is_parameter:Bound_var.Is_parameter.local_var)
           in
           TE.add_definition env bound_name kind)
         live_vars env
@@ -1314,7 +1316,9 @@ struct
               let ty', acc = rewrite_arbitrary_type env acc abs ty in
               let bound_name =
                 Bound_name.create_var
-                  (Bound_var.create var' Flambda_debug_uid.none Name_mode.normal)
+                  (Bound_var.create var' Flambda_debug_uid.none Name_mode.normal
+                     ~dbg:Debuginfo.none
+                     ~is_parameter:Bound_var.Is_parameter.local_var)
               in
               let base_env =
                 TE.add_definition base_env bound_name (TG.kind ty')
@@ -1341,7 +1345,9 @@ struct
                     let bound_name =
                       Bound_name.create_var
                         (Bound_var.create var_after_rewrite
-                           Flambda_debug_uid.none Name_mode.in_types)
+                           Flambda_debug_uid.none Name_mode.in_types
+                           ~dbg:Debuginfo.none
+                           ~is_parameter:Bound_var.Is_parameter.local_var)
                     in
                     TE.add_definition base_env bound_name kind))
             aliases_of_name base_env)
@@ -1412,7 +1418,8 @@ struct
                   let bound_name =
                     Bound_name.create_var
                       (Bound_var.create var_after_rewrite Flambda_debug_uid.none
-                         Name_mode.in_types)
+                         Name_mode.in_types ~dbg:Debuginfo.none
+                         ~is_parameter:Bound_var.Is_parameter.local_var)
                   in
                   TE.add_definition base_env bound_name kind))
             aliases_of_name base_env)

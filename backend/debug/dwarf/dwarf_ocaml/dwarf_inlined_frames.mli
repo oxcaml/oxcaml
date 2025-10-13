@@ -35,6 +35,8 @@ val dwarf :
   Dwarf_state.t ->
   Linear.fundecl ->
   Inlined_frame_ranges.t ->
+  value_type_proto_die:Proto_die.t option ->
   function_symbol:Asm_targets.Asm_symbol.t ->
   function_proto_die:Proto_die.t ->
+  available_ranges_all_vars:Available_ranges_all_vars.t ->
   Proto_die.t Inlined_frame_ranges.Inlined_frames.Key.Map.t

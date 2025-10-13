@@ -92,7 +92,8 @@ let wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
                 (Flambda_kind.With_subkind.kind k)
             in
             let wrapper_return_duid = Flambda_debug_uid.none in
-            Bound_parameter.create wrapper_return k wrapper_return_duid)
+            Bound_parameter.create wrapper_return k wrapper_return_duid
+              ~dbg:Debuginfo.none)
           (Flambda_arity.unarized_components result_arity)
       in
       let trap_action =
@@ -110,7 +111,8 @@ let wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
   let param = Variable.create "exn" Flambda_kind.value in
   let param_duid = Flambda_debug_uid.none in
   let wrapper_handler_params =
-    [Bound_parameter.create param Flambda_kind.With_subkind.any_value param_duid]
+    [ Bound_parameter.create param Flambda_kind.With_subkind.any_value
+        param_duid ~dbg:Debuginfo.none ]
     |> Bound_parameters.create
   in
   let exn_handler = Exn_continuation.exn_handler apply_exn_continuation in
