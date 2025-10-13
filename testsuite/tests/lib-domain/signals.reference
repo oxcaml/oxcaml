@@ -1,0 +1,6 @@
+sigmask from toplevel: <empty>
+sigmask from thread in main domain: <empty>
+sigmask from main thread in child domain: -28, -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -15, -14, -13, -12, -11, -10, -9, -8, -6, -5, -4, -3, -2, -1, 16, 28, 30, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64
+sigmask from other thread in child domain: -28, -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -15, -14, -13, -12, -11, -10, -9, -8, -6, -5, -4, -3, -2, -1, 16, 28, 30, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64
+sigmask from toplevel again: <empty>
+sigmask from thread in main domain again: <empty>
