@@ -1757,11 +1757,16 @@ module Analysis = struct
             (Name_in_target_env.create (Name.var var))
             t.definitions_in_joined_envs
         with
-        | None -> Not_refined_at_join
+        | None ->
+          (* CR bclement: This is not entirely true -- variables in the source
+             env could have been refined at some (but not all!) of the uses, in
+             which case we won't have a [definition_in_join_env].
+
+             This could be fixed by storing a [definition_in_join_env] in the
+             [Latest_bound_source_var] / [Canonical_in_source_env] case in
+             [join_aliases_into_bindings]. *)
+          Not_refined_at_join
         | Some (Imported_var (var, _)) ->
-          (* CR bclement: This is not entirely true -- the imported variable
-             could have been refined at some (but not all!) of the uses, and the
-             analysis should reflect that. *)
           Invariant_in_all_uses
             (Simple.var (var : Variable_in_one_joined_env.t :> Variable.t))
         | Some (These_canonicals (canonicals_in_joined_envs, kind)) ->
