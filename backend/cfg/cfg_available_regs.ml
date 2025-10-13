@@ -252,7 +252,17 @@ module Transfer = struct
              advance.) *)
           for part_of_value = 0 to num_parts_of_value - 1 do
             let reg = regs.(part_of_value) in
-            if RD_quotient_set.mem_reg_by_loc avail_before reg
+            (* Registers that still have unknown locations should not be used in
+               the Cfg at this point (they would cause fatal errors in the
+               emitter). As such we ignore them explicitly here
+               ([mem_reg_by_loc] would cause a fatal error otherwise).
+
+               Registers in [Name_for_debugger] operations that are still in
+               use, but which have been substituted since the original
+               construction of such operations, should have been renamed by
+               [Regalloc_substitution.apply_basic_instruction_in_place]. *)
+            if (not (Reg.is_unknown reg))
+               && RD_quotient_set.mem_reg_by_loc avail_before reg
             then
               let regd =
                 RD.create ~reg ~holds_value_of:ident ~part_of_value
