@@ -29,5 +29,6 @@ val dwarf :
   value_type_proto_die:Proto_die.t ->
   function_symbol:Asm_targets.Asm_symbol.t ->
   function_proto_die:Proto_die.t ->
+  debuginfo_missing_outermost_frame:Debuginfo.t ->
   Available_ranges_vars.t ->
   unit

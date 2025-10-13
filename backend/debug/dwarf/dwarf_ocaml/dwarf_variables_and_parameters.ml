@@ -40,6 +40,7 @@ let proto_dies_for_variable var ~proto_dies_for_vars =
 
 let normal_type_for_var ?reference ~parent ident_for_type is_parameter =
   let name_attribute =
+    (* CR mshinwell: remove [ident_for_type] now we use uids *)
     match ident_for_type with
     | None -> []
     | Some (compilation_unit, var) ->
@@ -265,21 +266,42 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
       ~attribute_values:(type_and_name_attributes @ location_attribute_value)
       ()
 
-let iterate_over_variable_like_things state ~available_ranges_vars ~f =
+let matches_debuginfo_missing_outermost_frame ~debuginfo_missing_outermost_frame
+    range =
+  let range_info = ARV.Range.info range in
+  match ARV.Range_info.provenance range_info with
+  | None ->
+    (* These ones are further filtered - see above. *)
+    true
+  | Some provenance ->
+    let location = Backend_var.Provenance.location provenance in
+    let location_without_outermost =
+      Debuginfo.remove_outermost_frame location
+    in
+    Debuginfo.compare location_without_outermost
+      debuginfo_missing_outermost_frame
+    = 0
+
+let iterate_over_variable_like_things _state ~available_ranges_vars
+    ~debuginfo_missing_outermost_frame ~f =
   ARV.iter available_ranges_vars ~f:(fun var range ->
-      let ident_for_type = Some (Compilation_unit.get_current_exn (), var) in
-      f var ~ident_for_type ~range)
+      if matches_debuginfo_missing_outermost_frame
+           ~debuginfo_missing_outermost_frame range
+      then
+        let ident_for_type = Some (Compilation_unit.get_current_exn (), var) in
+        f var ~ident_for_type ~range)
 
 let dwarf state ~value_type_proto_die ~function_symbol ~function_proto_die
-    available_ranges_vars =
+    ~debuginfo_missing_outermost_frame available_ranges_vars =
   let proto_dies_for_vars = Backend_var.Tbl.create 42 in
   iterate_over_variable_like_things state ~available_ranges_vars
-    ~f:(fun var ~ident_for_type:_ ~range:_ ->
+    ~debuginfo_missing_outermost_frame ~f:(fun var ~ident_for_type:_ ~range:_ ->
       let value_die_lvalue = Proto_die.create_reference () in
       let type_die = Proto_die.create_reference () in
       assert (not (Backend_var.Tbl.mem proto_dies_for_vars var));
       Backend_var.Tbl.add proto_dies_for_vars var { value_die_lvalue; type_die });
   iterate_over_variable_like_things state ~available_ranges_vars
+    ~debuginfo_missing_outermost_frame
     ~f:
       (dwarf_for_variable state ~value_type_proto_die ~function_symbol
          ~function_proto_die ~proto_dies_for_vars)

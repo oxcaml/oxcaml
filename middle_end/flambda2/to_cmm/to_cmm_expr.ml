@@ -746,7 +746,9 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
   match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
   | Singleton v, Simple s ->
     (* CR mshinwell: Try to get a proper [dbg] here (although the majority of
-       these bindings should have been substituted out). *)
+       these bindings should have been substituted out).
+
+       mshinwell: we should be able to get this from [Bound_pattern] now *)
     (* CR gbury: once we get proper debuginfo here, remember to apply
        Env.add_inlined_debuginfo to it *)
     let dbg_with_inlined = Debuginfo.none in
@@ -1105,7 +1107,10 @@ and apply_expr env res apply =
       match handler_params with
       | [param] ->
         let param_var, param_uid = Bound_parameter.var_and_uid param in
-        let var = Bound_var.create param_var param_uid Name_mode.normal in
+        let var =
+          Bound_var.create param_var param_uid Name_mode.normal
+            ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
+        in
         let env, res =
           Env.bind_variable env res var
             ~effects_and_coeffects_of_defining_expr:effs ~defining_expr:call
@@ -1125,7 +1130,7 @@ and apply_expr env res apply =
         in
         let env, cmm_params =
           Env.create_bound_parameters env
-            (List.map Bound_parameter.var_and_uid params)
+            (List.map Bound_parameter.var_and_uid_and_debuginfo params)
         in
         let label = Lambda.next_raise_count () in
         let params_with_machtype =
@@ -1205,6 +1210,8 @@ and apply_cont env res apply_cont =
                 let param_var, param_uid = Bound_parameter.var_and_uid param in
                 let var =
                   Bound_var.create param_var param_uid Name_mode.normal
+                    ~dbg:Debuginfo.none
+                    ~is_parameter:Bound_var.Is_parameter.local_var
                 in
                 bind_var_to_simple ~dbg_with_inlined env res var
                   ~num_normal_occurrences_of_bound_vars:

@@ -489,3 +489,8 @@ let to_structured_mangling_path ~name dbg : Structured_mangling.path =
   Structured_mangling.Function name
   :: drop_partials_and_last_function (List.rev path_from_debug)
   |> List.rev
+
+let remove_outermost_frame t =
+  match t.dbg with
+  | [] -> t
+  | _ :: rest -> { t with dbg = rest }

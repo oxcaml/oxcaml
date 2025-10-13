@@ -81,6 +81,7 @@ let add_extra_params_from_join_analysis denv analysis use_envs_with_ids' =
     let join_param_duid = Flambda_debug_uid.none in
     let extra_param =
       BP.create join_param (K.With_subkind.anything kind) join_param_duid
+        ~dbg:Debuginfo.none
     in
     let env_extension =
       TEE.add_or_replace_equation env_extension (Name.var join_param)
