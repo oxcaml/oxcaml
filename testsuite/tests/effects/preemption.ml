@@ -8,9 +8,12 @@
 open Effect
 open Effect.Deep
 
-external preempt_self : unit -> unit = "caml_domain_preempt_self"
+type _ Effect.t +=
+  | Tick : unit Effect.t
+  | Nested : int -> int Effect.t
 
-type _ Effect.t += Nested : int -> int Effect.t
+let preempt_self () =
+  preempt_with Tick
 
 let with_preemption_setup ?(interval = 0.1) ?(repeating = false) f =
   let it_interval = if repeating then interval else 0. in

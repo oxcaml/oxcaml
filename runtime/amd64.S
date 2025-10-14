@@ -1400,8 +1400,12 @@ CFI_STARTPROC
         movq    Caml_state(young_ptr), %r15
         SWITCH_OCAML_TO_C
         C_call  (GCALL(caml_ensure_gc_regs))
-        C_call  (GCALL(caml_get_tick_effect)) /* %rax := Tick */
+        movq    Caml_state(preemption_effect), %rbx
+        lea     Caml_state(preemption_effect), %rdi
+        movq    $1, %rsi
+        C_call  (GCALL(caml_modify_generational_global_root))
         SWITCH_C_TO_OCAML
+        movq    %rbx, %rax
         movq    Caml_state(preemption), %rbx /* %rbx := continuation */
         movq    $1, Caml_state(preemption)   /* preemption := Val_unit */
         movq    Caml_state(current_stack), %rsi /* %rsi := old stack */
