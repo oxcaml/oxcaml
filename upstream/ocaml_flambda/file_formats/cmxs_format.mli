@@ -24,6 +24,7 @@ type dynunit = {
   dynu_crc: Digest.t;
   dynu_imports_cmi: Import_info.t array;
   dynu_imports_cmx: Import_info.t array;
+  dynu_quoted_globals: Compilation_unit.Name.t array;
   dynu_defines: Compilation_unit.t list;
 }
 

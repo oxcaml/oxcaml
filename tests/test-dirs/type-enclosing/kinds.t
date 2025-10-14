@@ -75,7 +75,7 @@ Non-Tconstr types
   Verbosity 0:
   type t = [ `Bar of int | `Foo ]
   Verbosity 1:
-  type t : value mod non_float = [ `Bar of int | `Foo ]
+  type t : immutable_data with int = [ `Bar of int | `Foo ]
 
 Module types
 # CR-someday: Make kinds get printed when verbosity is 1

@@ -270,6 +270,22 @@ let newmono ty = newty (Tpoly(ty, []))
 
 let none = newty (Ttuple [])                (* Clearly ill-formed type *)
 
+(**** Control variable stage in inference *)
+
+let rec update_variable_stage stage_offset ty name jkind =
+  if stage_offset = 0 then ()
+  else if stage_offset < 0 then begin
+    let v = newvar2 ?name (get_level ty) jkind in
+    let ty' = newty2 ~level:(get_level ty) (Tquote v) in
+    link_type ty ty';
+    update_variable_stage (stage_offset + 1) v name jkind
+  end else begin
+    let v = newvar2 ?name (get_level ty) jkind in
+    let ty' = newty2 ~level:(get_level ty) (Tsplice v) in
+    link_type ty ty';
+    update_variable_stage (stage_offset - 1) v name jkind
+  end
+
 (**** information for [Typecore.unify_pat_*] ****)
 
 module Pattern_env : sig
@@ -806,6 +822,12 @@ let duplicate_class_type ty =
                          (*  Type level manipulation  *)
                          (*****************************)
 
+let rec lower_all ty =
+  if get_level ty > !current_level then begin
+    set_level ty !current_level;
+    iter_type_expr lower_all ty
+  end
+
 (*
    It would be a bit more efficient to remove abbreviation expansions
    rather than generalizing them: these expansions will usually not be
@@ -813,22 +835,30 @@ let duplicate_class_type ty =
    [expand_abbrev] (via [subst]) requires these expansions to be
    preserved. Does it worth duplicating this code ?
 *)
-let rec generalize ty =
+let rec generalize stage_offset ty =
   let level = get_level ty in
   if (level > !current_level) && (level <> generic_level) then begin
     set_level ty generic_level;
     (* recur into abbrev for the speed *)
     begin match get_desc ty with
-      Tconstr (_, _, abbrev) ->
-        iter_abbrev generalize !abbrev
-    | _ -> ()
+    | Tvar name -> update_variable_stage stage_offset ty name.name name.jkind
+    | Tvariant row ->
+        if stage_offset <> 0 && is_Tvar (row_more row) then
+          lower_all ty
+        else
+          iter_type_expr (generalize stage_offset) ty
+    | Tquote ty' -> generalize (stage_offset + 1) ty'
+    | Tsplice ty' -> generalize (stage_offset - 1) ty'
+    | Tconstr (_, _, abbrev) ->
+        iter_abbrev (generalize stage_offset) !abbrev;
+        iter_type_expr (generalize stage_offset) ty
+    | _ -> iter_type_expr (generalize stage_offset) ty
     end;
-    iter_type_expr generalize ty
   end
 
 let generalize ty =
   simple_abbrevs := Mnil;
-  generalize ty
+  generalize 0 ty
 
 (* Generalize the structure and lower the variables *)
 
@@ -1307,7 +1337,7 @@ let rec copy ?partial ?keep_names copy_scope ty =
                   Tsubst (ty, None) -> ty
                   (* TODO: is this case possible?
                      possibly an interaction with (copy more) below? *)
-                | Tconstr _ | Tnil | Tof_kind _ ->
+                | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _ ->
                     copy more
                 | Tvar _ | Tunivar _ ->
                     if keep then more else newty mored
@@ -1686,58 +1716,61 @@ let prim_mode' mvars = function
     Locality.allow_right Locality.local, None
   | Primitive.Prim_poly, _ ->
     match mvars with
-    | Some (mvar_l, mvar_y) -> mvar_l, Some mvar_y
+    | Some (mvar_l, (mvar_f, mvar_y)) -> mvar_l, Some (mvar_f, mvar_y)
     | None -> assert false
 
 (* Exported version. *)
 let prim_mode mvar prim =
-  let mvars = Option.map (fun mvar_l -> mvar_l, Yielding.newvar ()) mvar in
-  fst (prim_mode' mvars prim)
+  let mvar = Option.map
+    (fun mvar_l -> mvar_l, (Forkable.newvar (), Yielding.newvar ())) mvar
+  in
+  fst (prim_mode' mvar prim)
 
 (** Returns a new mode variable whose locality is the given locality and
     whose yieldingness is the given yieldingness, while all other axes are
     from the given [m]. This function is too specific to be put in [mode.ml] *)
-let with_locality_and_yielding (locality, yielding) m =
+let with_locality_and_forkable_yielding (locality, fy) m =
+  let forkable = Option.map fst fy in
+  let yielding = Option.map snd fy in
   let m' = Alloc.newvar () in
   Locality.equate_exn (Alloc.proj_comonadic Areality m') locality;
+  let forkable =
+    Option.value ~default:(Alloc.proj_comonadic Forkable m) forkable
+  in
   let yielding =
     Option.value ~default:(Alloc.proj_comonadic Yielding m) yielding
   in
+  Forkable.equate_exn (Alloc.proj_comonadic Forkable m') forkable;
   Yielding.equate_exn (Alloc.proj_comonadic Yielding m') yielding;
   let c =
     { Alloc.Comonadic.Const.max with
       areality = Locality.Const.min;
+      forkable = Forkable.Const.min;
       yielding = Yielding.Const.min}
   in
   Alloc.submode_exn (Alloc.meet_const c m') m;
   Alloc.submode_exn (Alloc.meet_const c m) m';
   m'
 
+(* When user writes an (uncurried) arrow type [A -> B -> C], the corresponding
+implementation is typically [fun a b -> ...], in which case [fun b -> ...] will
+close over [a] and partially apply the original function. Therefore, we let the
+comonadic axes of [B -> C] reflect that.
+On the other hand, the monadic axes of [fun b -> ...] won't be constrained by
+this (but maybe constrained by other things); therefore, we take it to be legacy
+for compatibility. *)
 let curry_mode alloc arg : Alloc.Const.t =
   let acc =
-    Alloc.Const.join
+    Alloc.Comonadic.Const.join
       (Alloc.Const.close_over arg)
       (Alloc.Const.partial_apply alloc)
   in
-  (* For A -> B -> C, we always interpret (B -> C) to be of aliased. This is the
-    legacy mode which helps with legacy compatibility. Arrow types cross
-    uniqueness so we are not losing too much expressvity here. One
-    counter-example is:
-
-    let g : (A -> B -> C) = ...
-    let f (g : A -> unique_ (B -> C)) = ...
-
-    And [f g] would not work, as mode crossing doesn't work deeply into arrows.
-    Our answer to this issue is that, the author of f shouldn't ask B -> C to be
-    unique_. Instead, they should leave it as default which is aliased, and mode
-    crossing it to unique at the location where B -> C is a real value (instead
-    of the return of a function). *)
-  {acc with uniqueness=Uniqueness.Const.Aliased}
+  Alloc.Const.merge {comonadic = acc; monadic = Alloc.Monadic.Const.legacy}
 
 let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
   match locals, get_desc ty with
   | l :: locals, Tarrow ((lbl,marg,mret),arg,ret,commu) ->
-     let marg = with_locality_and_yielding
+     let marg = with_locality_and_forkable_yielding
       (prim_mode' (Some (mvar_l, mvar_y)) l) marg
      in
      let macc =
@@ -1749,7 +1782,7 @@ let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
      in
      let mret =
        match locals with
-       | [] -> with_locality_and_yielding (loc, yld) mret
+       | [] -> with_locality_and_forkable_yielding (loc, yld) mret
        | _ :: _ ->
           let mret', _ = Alloc.newvar_above macc in (* curried arrow *)
           mret'
@@ -1830,11 +1863,13 @@ let instance_prim_mode (desc : Primitive.description) ty =
   if is_poly desc.prim_native_repr_res ||
        List.exists is_poly desc.prim_native_repr_args then
     let mode_l = Locality.newvar () in
-    let mode_y = Yielding.newvar () in
-    let finalret = prim_mode' (Some (mode_l, mode_y)) desc.prim_native_repr_res in
+    let mode_fy = Forkable.newvar (), Yielding.newvar () in
+    let finalret =
+      prim_mode' (Some (mode_l, mode_fy)) desc.prim_native_repr_res
+    in
     instance_prim_locals desc.prim_native_repr_args
-      mode_l mode_y (Alloc.disallow_right Alloc.legacy) finalret ty,
-    Some mode_l, Some mode_y
+      mode_l mode_fy (Alloc.disallow_right Alloc.legacy) finalret ty,
+    Some mode_l, Some mode_fy
   else
     ty, None, None
 
@@ -2050,12 +2085,37 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
+(* Cancel out all pairs of $ and <[_]>, or <[_]> and $.
+   This ensures type unification works correctly. *)
+let rec quote_splice_cancel ty =
+  (* CR metaprogramming aivaskovic: try to remove type_desc mutation here *)
+  match get_desc ty with
+  | Tquote t -> begin
+      match get_desc t with
+      | Tsplice t' -> t'
+      | Tquote _ -> set_type_desc ty (Tquote (quote_splice_cancel t)); ty
+      | _ -> raise Cannot_expand
+    end
+  | Tsplice t -> begin
+      match get_desc t with
+      | Tquote t' -> t'
+      | Tsplice _ -> set_type_desc t (Tsplice (quote_splice_cancel t)); ty
+      | _ -> raise Cannot_expand
+    end
+  | _ -> raise Cannot_expand
+
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
-let try_expand_once env ty =
+let rec try_expand_once env ty =
+  let expand_and_cancel t =
+    match try_expand_once env t with
+    | _ | exception Cannot_expand -> quote_splice_cancel ty
+  in
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
+  | Tsplice t -> expand_and_cancel t
+  | Tquote t -> expand_and_cancel t
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2116,6 +2176,8 @@ let rec extract_concrete_typedecl env ty =
           end
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
+  | Tquote ty -> extract_concrete_typedecl env ty
+  | Tsplice ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
@@ -2138,9 +2200,11 @@ let safe_abbrev_opt env ty =
     Btype.backtrack snap;
     false
 
-let try_expand_once_opt env ty =
+let rec try_expand_once_opt env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev_opt env ty
+  | Tsplice t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
+  | Tquote t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =
@@ -2244,7 +2308,8 @@ let contained_without_boxing env ty =
     List.map snd labeled_tys
   | Tpoly (ty, _) -> [ty]
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
-  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _ -> []
+  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
+  | Tquote _ | Tsplice _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
@@ -2357,12 +2422,12 @@ let rec estimate_type_jkind ~expand_component env ty =
     end
   | Tobject _ -> Jkind.for_object
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
+  | Tquote _ -> Jkind.Builtin.value ~why:Tquote
+  | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
-     if tvariant_not_immediate row
-     then Jkind.for_non_float ~why:Polymorphic_variant
-     else Jkind.Builtin.immediate ~why:Immediate_polymorphic_variant
+     Jkind.for_boxed_row row
   | Tunivar { jkind } -> Jkind.disallow_right jkind
   | Tpoly (ty, _) ->
     let context = mk_jkind_context_check_principal_ref env in
@@ -2660,6 +2725,17 @@ let check_type_externality env ty ext =
   match check_type_jkind env ty upper_bound with
   | Ok () -> true
   | Error _ -> false
+
+let is_always_gc_ignorable env ty =
+  let ext : Jkind_axis.Externality.t =
+    (* We check that we're compiling to (64-bit) native code before counting
+       External64 types as gc_ignorable, because bytecode is intended to be
+       platform independent. *)
+    if !Clflags.native_code && Sys.word_size = 64
+    then External64
+    else External
+  in
+  check_type_externality env ty ext
 
 let check_type_nullability env ty null =
   let upper_bound =
@@ -3428,6 +3504,18 @@ let rec mcomp type_pairs env t1 t2 =
         | (Tunivar {jkind=jkind1}, Tunivar {jkind=jkind2}, _, _) ->
             (try unify_univar t1' t2' jkind1 jkind2 !univar_pairs
              with Cannot_unify_universal_variables -> raise Incompatible)
+        | (Tquote t1, Tquote t2, _, _) ->
+            mcomp type_pairs env t1 t2
+        | (Tsplice t1, Tsplice t2, _, _) ->
+            mcomp type_pairs env t1 t2
+        | (Tsplice t1, _, _, _) ->
+            mcomp type_pairs env t1 t2'
+        | (_, Tsplice t2, _, _) ->
+            mcomp type_pairs env t1' t2
+        | (Tquote t1, _, _, _) ->
+            mcomp type_pairs env t1 t2'
+        | (_, Tquote t2, _, _) ->
+            mcomp type_pairs env t1' t2
         | (_, _, _, _) ->
             raise Incompatible
       end
@@ -3898,9 +3986,17 @@ let rec unify uenv t1 t2 =
   try
     type_changed := true;
     begin match (get_desc t1, get_desc t2) with
-      (Tvar _, Tconstr _) when deep_occur t1 t2 ->
+      (Tconstr _, Tvar _) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tconstr _, Tvar _) when deep_occur t2 t1 ->
+    | (Tvar _, Tquote _) when deep_occur t1 t2 ->
+        unify2 uenv t1 t2
+    | (Tquote _, Tvar _) when deep_occur t2 t1 ->
+        unify2 uenv t1 t2
+    | (Tvar _, Tsplice _) when deep_occur t1 t2 ->
+        unify2 uenv t1 t2
+    | (Tsplice _, Tvar _) when deep_occur t2 t1 ->
+        unify2 uenv t1 t2
+    | (Tvar _, Tconstr _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tvar _, _) ->
         if unify1_var uenv t1 t2 then () else unify2 uenv t1 t2
@@ -4149,6 +4245,21 @@ and unify3 uenv t1 t1' t2 t2' =
           raise_for Unify (Obj (Abstract_row Second))
       | (Tconstr _,  Tnil ) ->
           raise_for Unify (Obj (Abstract_row First))
+      | (Tquote t1, Tquote t2)
+      | (Tsplice t1, Tsplice t2) ->
+          unify uenv t1 t2
+      | (Tsplice s1, _) ->
+          set_type_desc t2' d2;
+          let t =
+            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tquote t2')
+          in
+          unify uenv s1 t
+      | (_, Tsplice s2) ->
+          set_type_desc t1' d1;
+          let t =
+            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
+          in
+          unify uenv s2 t
       | (_, _) -> raise_unexplained_for Unify
       end;
       (* XXX Commentaires + changer "create_recursion"
@@ -5099,6 +5210,7 @@ let mode_crossing_structure_memaddr =
     ~regionality:false
     ~linearity:true
     ~portability:true
+    ~forkable:true
     ~yielding:true
     ~statefulness:true
 
@@ -5111,6 +5223,7 @@ let mode_crossing_functor =
     ~regionality:false
     ~linearity:false
     ~portability:false
+    ~forkable:false
     ~yielding:false
     ~statefulness:false
 
@@ -5275,6 +5388,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                 (moregen inst_nongen variance type_pairs env)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Moregen t1' t2' k1 k2 !univar_pairs
+          | (Tquote t1, Tquote t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
+          | (Tsplice t1, Tsplice t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
           | (_, _) ->
               raise_unexplained_for Moregen
         end
@@ -5730,6 +5847,10 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
                 (eqtype rename type_pairs subst env ~do_jkind_check)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Equality t1' t2' k1 k2 !univar_pairs
+          | (Tquote t1, Tquote t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
+          | (Tsplice t1, Tsplice t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
               raise_unexplained_for Equality
         end
@@ -6433,6 +6554,14 @@ let rec build_subtype env (visited : transient_expr list)
       let c = max_change c1 c2 in
       if c > Unchanged then (newty (Tfield(s, field_public, t1', t2')), c)
       else (t, Unchanged)
+  | Tquote t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tquote t1'), c)
+      else (t, Unchanged)
+  | Tsplice t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tsplice t1'), c)
+      else (t, Unchanged)
   | Tnil ->
       if posi then
         let v = newvar (Jkind.Builtin.value ~why:Tnil) in
@@ -6624,6 +6753,10 @@ let rec subtype_rec env trace t1 t2 cstrs =
         with Not_found ->
           (trace, t1, t2, !univar_pairs)::cstrs
         end
+    | (Tquote t1, Tquote t2) ->
+         subtype_rec env trace t1 t2 cstrs
+    | (Tsplice t1, Tsplice t2) ->
+         subtype_rec env trace t1 t2 cstrs
     | (_, _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
   end

@@ -74,6 +74,8 @@ module Typ = struct
   let package ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_package (a, b))
   let extension ?loc ?attrs a = mk ?loc ?attrs (Ptyp_extension a)
   let open_ ?loc ?attrs mod_ident t = mk ?loc ?attrs (Ptyp_open (mod_ident, t))
+  let quote ?loc ?attrs t = mk ?loc ?attrs (Ptyp_quote t)
+  let splice ?loc ?attrs t = mk ?loc ?attrs (Ptyp_splice t)
   let of_kind ?loc ?attrs a = mk ?loc ?attrs (Ptyp_of_kind a)
 
   let force_poly t =
@@ -133,6 +135,10 @@ module Typ = struct
             Ptyp_package(longident,List.map (fun (n,typ) -> (n,loop typ) ) lst)
         | Ptyp_open (mod_ident, core_type) ->
             Ptyp_open (mod_ident, loop core_type)
+        | Ptyp_quote core_type ->
+            Ptyp_quote (loop core_type)
+        | Ptyp_splice core_type ->
+            Ptyp_splice (loop core_type)
         | Ptyp_of_kind jkind ->
             Ptyp_of_kind (loop_jkind jkind)
         | Ptyp_extension (s, arg) ->
@@ -142,12 +148,13 @@ module Typ = struct
     and loop_jkind jkind =
       let pjkind_desc =
         match jkind.pjkind_desc with
-        | Default as x -> x
-        | Abbreviation _ as x -> x
-        | Mod (jkind, modes) -> Mod (loop_jkind jkind, modes)
-        | With (jkind, typ, modalities) -> With (loop_jkind jkind, loop typ, modalities)
-        | Kind_of typ -> Kind_of (loop typ)
-        | Product jkinds -> Product (List.map loop_jkind jkinds)
+        | Pjk_default as x -> x
+        | Pjk_abbreviation _ as x -> x
+        | Pjk_mod (jkind, modes) -> Pjk_mod (loop_jkind jkind, modes)
+        | Pjk_with (jkind, typ, modalities) ->
+          Pjk_with (loop_jkind jkind, loop typ, modalities)
+        | Pjk_kind_of typ -> Pjk_kind_of (loop typ)
+        | Pjk_product jkinds -> Pjk_product (List.map loop_jkind jkinds)
       in
       { jkind with pjkind_desc }
     and loop_row_field field =
@@ -255,6 +262,8 @@ module Exp = struct
   let stack ?loc ?attrs e = mk ?loc ?attrs (Pexp_stack e)
   let comprehension ?loc ?attrs e = mk ?loc ?attrs (Pexp_comprehension e)
   let overwrite ?loc ?attrs a b = mk ?loc ?attrs (Pexp_overwrite (a, b))
+  let quote ?loc ?attrs a = mk ?loc ?attrs (Pexp_quote a)
+  let splice ?loc ?attrs a = mk ?loc ?attrs (Pexp_splice a)
   let hole ?loc ?attrs () = mk ?loc ?attrs Pexp_hole
 
   let case lhs ?guard rhs =

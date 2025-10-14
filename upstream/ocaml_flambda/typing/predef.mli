@@ -40,6 +40,7 @@ val type_extension_constructor:type_expr
 val type_floatarray:type_expr
 val type_lexing_position:type_expr
 val type_atomic_loc:type_expr -> type_expr
+val type_code: type_expr -> type_expr
 val type_unboxed_float:type_expr
 val type_unboxed_float32:type_expr
 val type_unboxed_nativeint:type_expr
@@ -114,6 +115,7 @@ val path_lazy_t: Path.t
 val path_extension_constructor: Path.t
 val path_floatarray: Path.t
 val path_lexing_position: Path.t
+val path_code: Path.t
 
 val path_unboxed_float: Path.t
 val path_unboxed_float32: Path.t

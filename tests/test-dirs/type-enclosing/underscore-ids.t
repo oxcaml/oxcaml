@@ -443,9 +443,9 @@ We try several places in the identifier to check the result stability
       [
         <def>
           pattern (under.ml[1,0+4]..under.ml[1,0+6])
-            Tpat_var \"aa/281\"
+            Tpat_var \"aa/282\"
             sort value
-            value_mode meet(local,once,nonportable,yielding,stateful)(modevar#2[global,many,portable,unyielding,stateless .. global,once,nonportable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#3[aliased,contended,immutable .. unique,uncontended,read_write])
+            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#2[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#3[aliased,contended,immutable .. unique,uncontended,read_write])
           expression (under.ml[1,0+9]..under.ml[1,0+12])
             Texp_constant Const_float 4.2
       ]
@@ -454,19 +454,19 @@ We try several places in the identifier to check the result stability
       [
         <def>
           pattern (under.ml[2,13+4]..under.ml[2,13+5])
-            Tpat_var \"f/282\"
+            Tpat_var \"f/283\"
             sort value
-            value_mode meet(local,once,nonportable,yielding,stateful)(modevar#9[global,many,portable,unyielding,stateless .. global,once,nonportable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#a[aliased,contended,immutable .. unique,uncontended,read_write])
+            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#9[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#a[aliased,contended,immutable .. unique,uncontended,read_write])
           expression (under.ml[2,13+6]..under.ml[5,70+17]) ghost
             Texp_function
-            alloc_mode map_comonadic(regional_to_global)(modevar#b[global,many,portable,unyielding,stateless .. global,once,nonportable,yielding,stateful]);id(modevar#c[aliased,contended,immutable .. unique,uncontended,read_write])
+            alloc_mode map_comonadic(regional_to_global)(modevar#b[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#c[aliased,contended,immutable .. unique,uncontended,read_write])
             [
               Nolabel
               Param_pat
                 pattern (under.ml[2,13+6]..under.ml[2,13+9])
-                  Tpat_var \"x/284\"
+                  Tpat_var \"x/285\"
                   sort '_representable_layout_1
-                  value_mode map_comonadic(local_to_regional)(modevar#d[global,many,portable,unyielding,stateless .. local,once,nonportable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#e[aliased,contended,immutable .. unique,uncontended,read_write])
+                  value_mode map_comonadic(local_to_regional)(modevar#d[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#e[aliased,contended,immutable .. unique,uncontended,read_write])
             ]
             Tfunction_body
               expression (under.ml[2,13+18]..under.ml[5,70+17])
@@ -479,7 +479,7 @@ We try several places in the identifier to check the result stability
                       expression (_none_[0,0+-1]..[0,0+-1]) ghost
                         Pexp_constant PConst_int (1,None)
                   ]
-                Texp_ident \"*type-error*/287\"
+                Texp_ident \"*type-error*/288\"
       ]
   ]
   

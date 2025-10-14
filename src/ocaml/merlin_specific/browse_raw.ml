@@ -504,6 +504,9 @@ let rec of_expression_desc loc = function
     of_block_access block_access ** list_fold of_unboxed_access unboxed_access
   | Texp_atomic_loc (exp, _, _, _, _) -> of_expression exp
   | Texp_hole _ -> id_fold
+  | Texp_quotation exp -> of_expression exp
+  | Texp_antiquotation exp -> of_expression exp
+  | Texp_eval (ct, _) -> of_core_type ct
 
 (* We should consider taking into account param.fp_loc at some point, as it
    allows us to respond with the *parameter*'s type (as opposed to the
@@ -645,6 +648,8 @@ and of_core_type_desc = function
     of_core_type ct ** of_jkind_annotation_opt jkind
   | Ttyp_variant (rfs, _, _) -> list_fold (fun rf -> app (Row_field rf)) rfs
   | Ttyp_package pt -> app (Package_type pt)
+  | Ttyp_quote ct -> of_core_type ct
+  | Ttyp_splice ct -> of_core_type ct
 
 and of_class_type_desc = function
   | Tcty_constr (_, _, cts) -> list_fold of_core_type cts
@@ -671,13 +676,14 @@ let of_jkind_annotation_desc : Parsetree.jkind_annotation_desc -> _ =
     id_fold
   in
   function
-  | Default | Abbreviation _ -> id_fold
-  | Mod (jkind, modes) -> of_jkind_annotation jkind ** list_fold of_mode modes
-  | With (jkind, ct, modalities) ->
+  | Pjk_default | Pjk_abbreviation _ -> id_fold
+  | Pjk_mod (jkind, modes) ->
+    of_jkind_annotation jkind ** list_fold of_mode modes
+  | Pjk_with (jkind, ct, modalities) ->
     of_jkind_annotation jkind ** of_core_type ct
     ** list_fold of_modality modalities
-  | Kind_of ct -> of_core_type ct
-  | Product jkinds -> list_fold of_jkind_annotation jkinds
+  | Pjk_kind_of ct -> of_core_type ct
+  | Pjk_product jkinds -> list_fold of_jkind_annotation jkinds
 
 let of_attribute (attr : attribute) =
   let name = attr.attr_name.txt in

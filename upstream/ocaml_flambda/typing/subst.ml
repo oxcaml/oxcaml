@@ -130,7 +130,7 @@ end = struct
         const_jkind
         ~quality
         ~annotation:(Some { pjkind_loc = Location.none;
-                            pjkind_desc = Abbreviation builtin.name })
+                            pjkind_desc = Pjk_abbreviation builtin.name })
         ~why:Jkind.History.Imported)
 
   let best_builtins : (allowed * disallowed) builtins = make_builtins Best
@@ -475,7 +475,8 @@ let rec typexp copy_scope s ty =
               let more' =
                 match mored with
                   Tsubst (ty, None) -> ty
-                | Tconstr _ | Tnil | Tof_kind _ -> typexp copy_scope s more
+                | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _ ->
+                    typexp copy_scope s more
                 | Tunivar _ | Tvar _ ->
                     if should_duplicate_vars then newpersty mored
                     else if dup && is_Tvar more then newgenty mored

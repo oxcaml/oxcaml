@@ -134,6 +134,8 @@ and core_type type_expr =
     in
     Typ.poly names @@ core_type type_expr
   | Tof_kind _jkind -> (* CR modes: this is terrible *) Typ.any None
+  | Tquote type_expr -> Typ.quote (core_type type_expr)
+  | Tsplice type_expr -> Typ.splice (core_type type_expr)
   | Tpackage (path, lids_type_exprs) ->
     let loc = mknoloc (Untypeast.lident_of_path path) in
     let args =

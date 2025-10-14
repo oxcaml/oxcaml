@@ -148,6 +148,7 @@ type t =
       overriden_by : string;
     }                                       (* 213 *)
   | Atomic_float_record_boxed               (* 214 *)
+  | Implied_attribute of { implying: string; implied : string} (* 215 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 

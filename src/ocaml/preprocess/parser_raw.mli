@@ -388,6 +388,8 @@ module MenhirInterpreter : sig
     | N_strict_function_or_labeled_tuple_type : (Parsetree.core_type) nonterminal
     | N_strict_binding_modes : (Parsetree.modes -> Parsetree.expression) nonterminal
     | N_str_exception_declaration : (Parsetree.type_exception * string Location.loc option) nonterminal
+    | N_spliceable_type : (Parsetree.core_type) nonterminal
+    | N_spliceable_expr : (Parsetree.expression) nonterminal
     | N_single_attr_id : (string) nonterminal
     | N_simple_pattern_not_ident : (Parsetree.pattern) nonterminal
     | N_simple_pattern_extend_modes_or_poly : (Parsetree.pattern) nonterminal
@@ -513,7 +515,7 @@ module MenhirInterpreter : sig
     | N_mk_longident_mod_ext_longident_type_trailing_no_hash_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_type_trailing_hash_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_ident_ : (Longident.t) nonterminal
-    | N_mk_longident_mod_ext_longident___anonymous_50_ : (Longident.t) nonterminal
+    | N_mk_longident_mod_ext_longident___anonymous_51_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_UIDENT_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_LIDENT_ : (Longident.t) nonterminal
     | N_method_ : ((string Location.loc * Asttypes.private_flag * Parsetree.class_field_kind) *

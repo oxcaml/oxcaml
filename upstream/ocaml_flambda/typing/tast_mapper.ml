@@ -660,6 +660,12 @@ let expr sub x =
     | Texp_overwrite (exp1, exp2) ->
         Texp_overwrite (sub.expr sub exp1, sub.expr sub exp2)
     | Texp_hole use -> Texp_hole use
+    | Texp_quotation exp ->
+        Texp_quotation (sub.expr sub exp)
+    | Texp_antiquotation exp ->
+        Texp_antiquotation (sub.expr sub exp)
+    | Texp_eval (typ, sort) ->
+        Texp_eval (sub.typ sub typ, sort)
   in
   let exp_attributes = sub.attributes sub x.exp_attributes in
   {x with exp_loc; exp_extra; exp_desc; exp_env; exp_attributes}
@@ -970,7 +976,9 @@ let typ sub x =
     | Ttyp_open (path, mod_ident, t) ->
         Ttyp_open (path, map_loc sub mod_ident, sub.typ sub t)
     | Ttyp_of_kind jkind ->
-      Ttyp_of_kind (sub.jkind_annotation sub jkind)
+        Ttyp_of_kind (sub.jkind_annotation sub jkind)
+    | Ttyp_quote t -> Ttyp_quote (sub.typ sub t)
+    | Ttyp_splice t -> Ttyp_splice (sub.typ sub t)
   in
   let ctyp_attributes = sub.attributes sub x.ctyp_attributes in
   {x with ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes}

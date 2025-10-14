@@ -489,6 +489,7 @@ module Mod_bounds = struct
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Linearity))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Contention))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Portability))
+    @@ Sub_result.combine (modal_less_or_equal (Comonadic Forkable))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Yielding))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Statefulness))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Visibility))
@@ -535,6 +536,7 @@ module Mod_bounds = struct
     |> add_crossing_if (Monadic Uniqueness)
     |> add_crossing_if (Comonadic Portability)
     |> add_crossing_if (Monadic Contention)
+    |> add_crossing_if (Comonadic Forkable)
     |> add_crossing_if (Comonadic Yielding)
     |> add_crossing_if (Comonadic Statefulness)
     |> add_crossing_if (Monadic Visibility)
@@ -551,8 +553,8 @@ module Mod_bounds = struct
   let for_arrow =
     let crossing =
       Crossing.create ~linearity:false ~regionality:false ~uniqueness:true
-        ~portability:false ~contention:true ~yielding:false ~statefulness:false
-        ~visibility:true
+        ~portability:false ~contention:true ~forkable:false ~yielding:false
+        ~statefulness:false ~visibility:true
     in
     create crossing ~externality:Externality.max
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
@@ -891,26 +893,45 @@ module Layout_and_axes = struct
          recursive descent" bit is why we recur separately down one type before
          iterating down the list.)
       *)
-      (* CR reisenberg: document seen_args *)
       let module Loop_control = struct
+        (** Represents the cache for a specific type constructor *)
+        type seen_constr =
+          { fuel : int;
+            seen_args : type_expr list;
+                (** The arguments the type constructor was most recently seen
+                    with. *)
+            relevant_axes_when_seen : Axis_set.t
+                (** The axes that were relevant when the type constructor was
+                    most recently seen. *)
+          }
+
+        type seen_row_var =
+          { relevant_axes_when_seen : Axis_set.t
+                (** The axes that were relevant when the row var was seen. *)
+          }
+        [@@unboxed]
+
         type t =
           { tuple_fuel : int;
-            constr : (int * type_expr list) Path.Map.t;
-            seen_row_var : Numbers.Int.Set.t;
+            seen_constrs : seen_constr Path.Map.t;
+            seen_row_vars : seen_row_var Numbers.Int.Map.t;
             fuel_status : Fuel_status.t
           }
 
         type result =
-          | Stop of t (* give up, returning [max] *)
-          | Skip (* skip reducing this type, but otherwise continue *)
-          | Continue of t (* continue, with a new [t] *)
+          | Stop of t  (** give up, returning [max] *)
+          | Skip  (** skip reducing this type, but otherwise continue *)
+          | Continue of
+              { ctl : t;
+                skippable_axes : Axis_set.t
+              }  (** continue, with a new [t] *)
 
         let initial_fuel_per_ty = 2
 
         let starting =
           { tuple_fuel = initial_fuel_per_ty;
-            constr = Path.Map.empty;
-            seen_row_var = Numbers.Int.Set.empty;
+            seen_constrs = Path.Map.empty;
+            seen_row_vars = Numbers.Int.Map.empty;
             fuel_status = Sufficient_fuel
           }
 
@@ -965,53 +986,108 @@ module Layout_and_axes = struct
            cutting off the recursion, it continues until it runs out of fuel.
         *)
 
-        let rec check
-            ({ tuple_fuel; constr; seen_row_var; fuel_status = _ } as t) ty =
+        let rec check ~relevant_axes
+            ({ tuple_fuel; seen_constrs; seen_row_vars; fuel_status = _ } as t)
+            ty =
           match Types.get_desc ty with
-          | Tpoly (ty, _) -> check t ty
+          | Tpoly (ty, _) -> check ~relevant_axes t ty
           | Ttuple _ ->
             if tuple_fuel > 0
-            then Continue { t with tuple_fuel = tuple_fuel - 1 }
+            then
+              Continue
+                { ctl = { t with tuple_fuel = tuple_fuel - 1 };
+                  skippable_axes = Axis_set.empty
+                }
             else Stop { t with fuel_status = Ran_out_of_fuel }
           | Tconstr (p, args, _) -> (
-            match Path.Map.find_opt p constr with
+            match Path.Map.find_opt p seen_constrs with
             | None ->
               Continue
-                { t with
-                  constr = Path.Map.add p (initial_fuel_per_ty, args) constr
+                { ctl =
+                    { t with
+                      seen_constrs =
+                        Path.Map.add p
+                          { fuel = initial_fuel_per_ty;
+                            seen_args = args;
+                            relevant_axes_when_seen = relevant_axes
+                          }
+                          seen_constrs
+                    };
+                  skippable_axes = Axis_set.empty
                 }
-            | Some (fuel, seen_args) ->
-              if List.for_all2
-                   (fun ty1 ty2 ->
-                     TransientTypeOps.equal (Transient_expr.repr ty1)
-                       (Transient_expr.repr ty2))
-                   seen_args args
-                 && not (context.is_abstract p)
+            | Some { fuel; seen_args; relevant_axes_when_seen } ->
+              let args_equal =
+                List.for_all2
+                  (fun ty1 ty2 ->
+                    TransientTypeOps.equal (Transient_expr.repr ty1)
+                      (Transient_expr.repr ty2))
+                  seen_args args
+              in
+              let skippable_axes =
+                if args_equal && not (context.is_abstract p)
+                then relevant_axes_when_seen
+                else Axis_set.empty
+              in
+              if Axis_set.is_subset relevant_axes skippable_axes
               then Skip
               else if fuel > 0
               then
                 Continue
-                  { t with constr = Path.Map.add p (fuel - 1, args) constr }
+                  { ctl =
+                      { t with
+                        seen_constrs =
+                          Path.Map.add p
+                            { fuel = fuel - 1;
+                              seen_args = args;
+                              relevant_axes_when_seen =
+                                (* Even if we can't skip the type, if the args match
+                                   the most recently seen args, we can merge the
+                                   relevant axes with the ones seen previously since
+                                   we have now seen the types under all of these
+                                   axes. *)
+                                (if args_equal
+                                then
+                                  Axis_set.union relevant_axes
+                                    relevant_axes_when_seen
+                                else relevant_axes)
+                            }
+                            seen_constrs
+                      };
+                    skippable_axes
+                  }
               else Stop { t with fuel_status = Ran_out_of_fuel })
-          | Tvariant _ -> (
+          | Tvariant _ ->
             let row_var_id = get_id (Btype.proxy ty) in
-            match Numbers.Int.Set.mem row_var_id seen_row_var with
-            | false ->
+            let { relevant_axes_when_seen } =
+              Numbers.Int.Map.find_opt row_var_id seen_row_vars
+              |> Option.value
+                   ~default:{ relevant_axes_when_seen = Axis_set.empty }
+            in
+            (* For our purposes, row variables are like constructors with no arguments,
+               so if we saw one already, we don't need to expand it again. *)
+            if Axis_set.is_subset relevant_axes relevant_axes_when_seen
+            then Skip
+            else
               Continue
-                { t with
-                  seen_row_var = Numbers.Int.Set.add row_var_id seen_row_var
+                { ctl =
+                    { t with
+                      seen_row_vars =
+                        Numbers.Int.Map.add row_var_id
+                          { relevant_axes_when_seen =
+                              Axis_set.union relevant_axes_when_seen
+                                relevant_axes
+                          }
+                          seen_row_vars
+                    };
+                  skippable_axes = relevant_axes_when_seen
                 }
-            | true ->
-              (* For our purposes, row variables are like constructors with no arguments,
-                 so if we saw one already, we don't need to expand it again. *)
-              Skip)
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-          | Tunivar _ | Tpackage _ | Tof_kind _ ->
+          | Tunivar _ | Tpackage _ | Tquote _ | Tsplice _ | Tof_kind _ ->
             (* these cases either cannot be infinitely recursive or their jkinds
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
                should double-check before we're done that they haven't. *)
-            Continue t
+            Continue { ctl = t; skippable_axes = Axis_set.empty }
           | Tlink _ | Tsubst _ ->
             Misc.fatal_error "Tlink or Tsubst in normalize"
       end in
@@ -1020,7 +1096,7 @@ module Layout_and_axes = struct
           Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t = function
         (* early cutoff *)
         | [] -> bounds_so_far, No_with_bounds, ctl.fuel_status
-        | _ when Mod_bounds.equal Mod_bounds.max bounds_so_far ->
+        | _ when Mod_bounds.is_max_within_set bounds_so_far relevant_axes ->
           (* CR layouts v2.8: we can do better by early-terminating on a per-axis
              basis *)
           bounds_so_far, No_with_bounds, Sufficient_fuel
@@ -1033,14 +1109,16 @@ module Layout_and_axes = struct
           in
           (* We don't care about axes that are already max because they can't get
              any better or worse. By ignoring them, we may be able to terminate
-             early *)
-          let ti : With_bounds_type_info.t =
-            { relevant_axes =
-                Axis_set.diff ti.relevant_axes
-                  (Mod_bounds.get_max_axes bounds_so_far)
-            }
+             early.
+
+             We also don't care about axes that aren't in [relevant_axes]. *)
+          let relevant_axes_for_ty =
+            Axis_set.intersection
+              (Axis_set.diff ti.relevant_axes
+                 (Mod_bounds.get_max_axes bounds_so_far))
+              relevant_axes
           in
-          match Axis_set.is_empty ti.relevant_axes with
+          match Axis_set.is_empty relevant_axes_for_ty with
           | true ->
             (* If [ty] is not relevant to any axes, then we can safely drop it and
                thereby avoid doing the work of expanding it. *)
@@ -1071,6 +1149,7 @@ module Layout_and_axes = struct
                     (value_for_axis ~axis:(Modal (Comonadic Linearity)))
                   ~portability:
                     (value_for_axis ~axis:(Modal (Comonadic Portability)))
+                  ~forkable:(value_for_axis ~axis:(Modal (Comonadic Forkable)))
                   ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
                   ~statefulness:
                     (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
@@ -1082,33 +1161,25 @@ module Layout_and_axes = struct
                 ~separability:(value_for_axis ~axis:(Nonmodal Separability))
             in
             let found_jkind_for_ty new_ctl b_upper_bounds b_with_bounds quality
-                : Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t =
+                skippable_axes :
+                Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t =
+              let relevant_axes_for_ty =
+                Axis_set.diff relevant_axes_for_ty skippable_axes
+              in
               match quality, mode with
               | Best, _ | Not_best, Ignore_best ->
                 (* The relevant axes are the intersection of the relevant axes within our
                    branch of the with-bounds tree, and the relevant axes on this
                    particular with-bound *)
-                let next_relevant_axes =
-                  Axis_set.intersection relevant_axes ti.relevant_axes
-                in
                 let bounds_so_far =
                   join_bounds bounds_so_far b_upper_bounds
-                    ~relevant_axes:next_relevant_axes
+                    ~relevant_axes:relevant_axes_for_ty
                 in
                 (* Descend into the with-bounds of each of our with-bounds types'
                     with-bounds *)
                 let bounds_so_far, nested_with_bounds, fuel_result1 =
-                  loop new_ctl bounds_so_far next_relevant_axes
+                  loop new_ctl bounds_so_far relevant_axes_for_ty
                     (With_bounds.to_list b_with_bounds)
-                in
-                let nested_with_bounds =
-                  With_bounds.map
-                    (fun ti ->
-                      { relevant_axes =
-                          Axis_set.intersection ti.relevant_axes
-                            next_relevant_axes
-                      })
-                    nested_with_bounds
                 in
                 (* CR layouts v2.8: we use [new_ctl] here, not [ctl], to avoid big
                    quadratic stack growth for very widely recursive types. This is
@@ -1131,26 +1202,32 @@ module Layout_and_axes = struct
                 let bounds_so_far, (bs' : (l * r2) With_bounds.t), fuel_result =
                   loop new_ctl bounds_so_far relevant_axes bs
                 in
-                bounds_so_far, With_bounds.add ty ti bs', fuel_result
+                ( bounds_so_far,
+                  With_bounds.add ty
+                    { relevant_axes = relevant_axes_for_ty }
+                    bs',
+                  fuel_result )
             in
-            match Loop_control.check ctl ty with
+            match
+              Loop_control.check ~relevant_axes:relevant_axes_for_ty ctl ty
+            with
             | Stop ctl_after_stop ->
               (* out of fuel, so assume [ty] has the worst possible bounds. *)
               found_jkind_for_ty ctl_after_stop Mod_bounds.max No_with_bounds
-                Not_best [@nontail]
+                Not_best Axis_set.empty [@nontail]
             | Skip -> loop ctl bounds_so_far relevant_axes bs (* skip [b] *)
-            | Continue ctl_after_unpacking_b -> (
+            | Continue { ctl = ctl_after_unpacking_b; skippable_axes } -> (
               match context.jkind_of_type ty with
               | Some b_jkind ->
                 found_jkind_for_ty ctl_after_unpacking_b
                   b_jkind.jkind.mod_bounds b_jkind.jkind.with_bounds
-                  b_jkind.quality [@nontail]
+                  b_jkind.quality skippable_axes [@nontail]
               | None ->
                 (* kind of b is not principally known, so we treat it as having
                    the max bound (only along the axes we care about for this
                    type!) *)
                 found_jkind_for_ty ctl_after_unpacking_b Mod_bounds.max
-                  No_with_bounds Not_best [@nontail])))
+                  No_with_bounds Not_best skippable_axes [@nontail])))
       in
       let mod_bounds = Mod_bounds.set_max_in_set t.mod_bounds skip_axes in
       let mod_bounds, with_bounds, fuel_status =
@@ -1371,8 +1448,9 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
-                   ~portability:true ~yielding:true ~uniqueness:false
-                   ~contention:true ~statefulness:true ~visibility:true
+                   ~portability:true ~forkable:true ~yielding:true
+                   ~uniqueness:false ~contention:true ~statefulness:true
+                   ~visibility:true
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1388,8 +1466,9 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:false
-                   ~portability:true ~yielding:false ~uniqueness:false
-                   ~contention:true ~statefulness:false ~visibility:false
+                   ~portability:true ~forkable:false ~yielding:false
+                   ~uniqueness:false ~contention:true ~statefulness:false
+                   ~visibility:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1405,8 +1484,9 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
-                   ~portability:true ~yielding:true ~uniqueness:false
-                   ~contention:true ~statefulness:true ~visibility:false
+                   ~portability:true ~forkable:true ~yielding:true
+                   ~uniqueness:false ~contention:true ~statefulness:true
+                   ~visibility:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1422,8 +1502,9 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
-                   ~portability:true ~yielding:true ~contention:false
-                   ~uniqueness:false ~statefulness:true ~visibility:false
+                   ~portability:true ~forkable:true ~yielding:true
+                   ~contention:false ~uniqueness:false ~statefulness:true
+                   ~visibility:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1499,6 +1580,16 @@ module Const = struct
                 immediate.jkind.mod_bounds
           };
         name = "immediate64"
+      }
+
+    let immediate64_or_null =
+      { jkind =
+          { immediate_or_null.jkind with
+            mod_bounds =
+              Mod_bounds.set_externality Externality.External64
+                immediate_or_null.jkind.mod_bounds
+          };
+        name = "immediate64_or_null"
       }
 
     (* CR or_null: nullability here should be [Maybe_null], but is set
@@ -1649,6 +1740,13 @@ module Const = struct
         name = "bits64 mod everything"
       }
 
+    let kind_of_idx =
+      { jkind =
+          mk_jkind (Base Bits64) ~mode_crossing:true ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits64 mod everything"
+      }
+
     (* CR or_null: nullability here should be [Maybe_null], but is set
        to [Non_null] for now due to inference limitations. *)
     let vec128 =
@@ -1717,6 +1815,7 @@ module Const = struct
         immediate;
         immediate_or_null;
         immediate64;
+        immediate64_or_null;
         float64;
         kind_of_unboxed_float;
         float32;
@@ -1800,6 +1899,13 @@ module Const = struct
           | true, false ->
             (* Otherwise, print [mod global yielding] to indicate [yielding]. *)
             modes @ ["yielding"]
+          | _, _ -> modes
+        in
+        let modes =
+          (* Likewise for [global] and [forkable]. *)
+          match List.mem "global" modes, List.mem "forkable" modes with
+          | true, true -> List.filter (fun m -> m <> "forkable") modes
+          | true, false -> modes @ ["unforkable"]
           | _, _ -> modes
         in
         let modes =
@@ -1974,7 +2080,7 @@ module Const = struct
       (l * r) Context_with_transl.t -> Parsetree.jkind_annotation -> (l * r) t =
    fun context jkind ->
     match jkind.pjkind_desc with
-    | Abbreviation name ->
+    | Pjk_abbreviation name ->
       (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
       (match name with
       | "any" -> Builtin.any.jkind
@@ -1982,6 +2088,7 @@ module Const = struct
       | "value" -> Builtin.value.jkind
       | "void" -> Builtin.void.jkind
       | "immediate64" -> Builtin.immediate64.jkind
+      | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
       | "immediate" -> Builtin.immediate.jkind
       | "immediate_or_null" -> Builtin.immediate_or_null.jkind
       | "float64" -> Builtin.float64.jkind
@@ -2000,19 +2107,19 @@ module Const = struct
       | "mutable_data" -> Builtin.mutable_data.jkind
       | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
       |> allow_left |> allow_right
-    | Mod (base, modifiers) ->
+    | Pjk_mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
       (* for each mode, lower the corresponding modal bound to be that mode *)
       let mod_bounds =
         Mod_bounds.meet base.mod_bounds (Typemode.transl_mod_bounds modifiers)
       in
       { layout = base.layout; mod_bounds; with_bounds = No_with_bounds }
-    | Product ts ->
+    | Pjk_product ts ->
       let jkinds =
         List.map (of_user_written_annotation_unchecked_level context) ts
       in
       jkind_of_product_annotations jkinds
-    | With (base, type_, modalities) -> (
+    | Pjk_with (base, type_, modalities) -> (
       let base = of_user_written_annotation_unchecked_level context base in
       match context with
       | Right_jkind _ -> raise ~loc:type_.ptyp_loc With_on_right
@@ -2027,7 +2134,8 @@ module Const = struct
             With_bounds.add_modality ~modality ~relevant_for_shallow:`Irrelevant
               ~type_expr:type_ base.with_bounds
         })
-    | Default | Kind_of _ -> raise ~loc:jkind.pjkind_loc Unimplemented_syntax
+    | Pjk_default | Pjk_kind_of _ ->
+      raise ~loc:jkind.pjkind_loc Unimplemented_syntax
 
   (* The [annotation_context] parameter can be used to allow annotations / kinds
      in different contexts to be enabled with different extension settings.
@@ -2220,7 +2328,9 @@ end
 
 (* every context where this is used actually wants an [option] *)
 let mk_annot name =
-  Some Parsetree.{ pjkind_loc = Location.none; pjkind_desc = Abbreviation name }
+  Some
+    Parsetree.
+      { pjkind_loc = Location.none; pjkind_desc = Pjk_abbreviation name }
 
 let mark_best (type l r) (t : (l * r) Types.jkind) =
   { (disallow_right t) with quality = Best }
@@ -2602,20 +2712,38 @@ let for_open_boxed_row =
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Value_creation Polymorphic_variant)
 
+let limit_for_mode_crossing_rows = 100
+
 let for_boxed_row row =
   if Btype.tvariant_not_immediate row
   then
     if not (Btype.static_row row)
     then
-      (* CR layouts v2.8: We can probably do a fair bit better here in most cases. Internal ticket 5097 and 5098. *)
+      (* CR layouts v2.8: We can probably do a fair bit better here in most cases. But if we ever allow open types to mode-cross, we have to get rid of the 100-row limit below. Internal ticket 5097 and 5098. *)
       for_open_boxed_row
     else
-      let base = Builtin.immutable_data ~why:Polymorphic_variant in
-      Btype.fold_row
-        (fun jkind type_expr ->
-          add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr jkind)
-        base row
-      |> mark_best
+      (* Here we count how many rows are in the polymorphic variant and default
+         to value if there are more than 100. This is to avoid regressions in
+         compilation time, which was observed in some files with large
+         polymorphic variants.
+
+         We choose to make two different calls to [Btype.fold_row] to avoid
+         doing allocations in the case where there's a large number of variants,
+         as those allocations were enough to slow down the problematic files
+         with large polymorphic variants. Presumably the second loop is fast
+         anyways due to caching. *)
+      (* CR layouts v2.8: Remove this [limit_for_mode_crossing_rows]
+         restriction. See internal ticket 5435. *)
+      let bounds_count = Btype.fold_row (fun acc _ -> acc + 1) 0 row in
+      if bounds_count <= limit_for_mode_crossing_rows
+      then
+        let base = Builtin.immutable_data ~why:Polymorphic_variant in
+        Btype.fold_row
+          (fun jkind type_expr ->
+            add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr jkind)
+          base row
+        |> mark_best
+      else Builtin.value ~why:Polymorphic_variant_too_big
   else Builtin.immediate ~why:Immediate_polymorphic_variant
 
 let for_arrow =
@@ -2645,8 +2773,8 @@ let for_object =
 let for_float ident =
   let crossing =
     Crossing.create ~regionality:false ~linearity:true ~portability:true
-      ~yielding:true ~uniqueness:false ~contention:true ~statefulness:true
-      ~visibility:true
+      ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
+      ~statefulness:true ~visibility:true
   in
   let mod_bounds =
     Mod_bounds.create crossing ~externality:Externality.max
@@ -3121,6 +3249,10 @@ module Format_history = struct
     | Tuple -> fprintf ppf "it's a tuple type"
     | Row_variable -> format_with_notify_js ppf "it's a row variable"
     | Polymorphic_variant -> fprintf ppf "it's a polymorphic variant type"
+    | Polymorphic_variant_too_big ->
+      fprintf ppf
+        "it's a polymorphic variant type that has more than %d entries"
+        limit_for_mode_crossing_rows
     | Arrow -> fprintf ppf "it's a function type"
     | Tfield ->
       format_with_notify_js ppf
@@ -3162,6 +3294,10 @@ module Format_history = struct
       fprintf ppf
         "it's the type of the first argument to a function in a recursive \
          module"
+    | Quotation_result -> fprintf ppf "it's the result type of a quotation"
+    | Antiquotation_result -> fprintf ppf "it's the result type of splicing"
+    | Tquote -> fprintf ppf "it's a staged type"
+    | Tsplice -> fprintf ppf "it's a splice of a staged type"
     | Unknown s ->
       fprintf ppf
         "unknown @[(please alert the Jane Street@;\
@@ -3900,6 +4036,7 @@ module Debug_printers = struct
     | Tuple -> fprintf ppf "Tuple"
     | Row_variable -> fprintf ppf "Row_variable"
     | Polymorphic_variant -> fprintf ppf "Polymorphic_variant"
+    | Polymorphic_variant_too_big -> fprintf ppf "Polymorphic_variant_too_big"
     | Arrow -> fprintf ppf "Arrow"
     | Tfield -> fprintf ppf "Tfield"
     | Tnil -> fprintf ppf "Tnil"
@@ -3918,6 +4055,10 @@ module Debug_printers = struct
     | Class_term_argument -> fprintf ppf "Class_term_argument"
     | Debug_printer_argument -> fprintf ppf "Debug_printer_argument"
     | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
+    | Quotation_result -> fprintf ppf "Quotation_result"
+    | Antiquotation_result -> fprintf ppf "Antiquotation_result"
+    | Tquote -> fprintf ppf "Tquote"
+    | Tsplice -> fprintf ppf "Tsplice"
     | Unknown s -> fprintf ppf "Unknown %s" s
     | Array_type_kind -> fprintf ppf "Array_type_kind"
 

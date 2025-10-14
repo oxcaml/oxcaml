@@ -85,6 +85,10 @@ let compute_variance env visited vari ty =
         end
     | Tobject (ty, _) ->
         compute_same ty
+    | Tquote ty ->
+        compute_same ty
+    | Tsplice ty ->
+        compute_same ty
     | Tfield (_, _, ty1, ty2) ->
         compute_same ty1;
         compute_same ty2

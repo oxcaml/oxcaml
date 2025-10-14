@@ -452,9 +452,9 @@ and type_with_label ctxt f (label, c, mode) =
       (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
 
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
-  | Default -> pp f "_"
-  | Abbreviation s -> pp f "%s" s
-  | Mod (t, modes) ->
+  | Pjk_default -> pp f "_"
+  | Pjk_abbreviation s -> pp f "%s" s
+  | Pjk_mod (t, modes) ->
     begin match modes with
     | [] -> Misc.fatal_error "malformed jkind annotation"
     | _ :: _ ->
@@ -464,15 +464,15 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
           (pp_print_list ~pp_sep:pp_print_space mode) modes
       ) f (t, modes)
     end
-  | With (t, ty, modalities) ->
+  | Pjk_with (t, ty, modalities) ->
     Misc.pp_parens_if nested (fun f (t, ty, modalities) ->
       pp f "%a with %a%a"
         (jkind_annotation ~nested:true ctxt) t
         (core_type ctxt) ty
         optional_space_atat_modalities modalities;
     ) f (t, ty, modalities)
-  | Kind_of ty -> pp f "kind_of_ %a" (core_type ctxt) ty
-  | Product ts ->
+  | Pjk_kind_of ty -> pp f "kind_of_ %a" (core_type ctxt) ty
+  | Pjk_product ts ->
     Misc.pp_parens_if nested (fun f ts ->
       pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep:"@ & ") ts
     ) f ts
@@ -611,6 +611,10 @@ and core_type1 ctxt f x =
                (list aux  ~sep:"@ and@ ")  cstrs)
     | Ptyp_open(li, ct) ->
        pp f "@[<hov2>%a.(%a)@]" longident_loc li (core_type ctxt) ct
+    | Ptyp_quote t ->
+        pp f "@[<hov2><[%a]>@]" (core_type ctxt) t
+    | Ptyp_splice t ->
+        pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
     | Ptyp_extension e -> extension ctxt f e
     | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_of_kind _) ->
        paren true (core_type ctxt) f x
@@ -1127,6 +1131,10 @@ and expression ctxt f x =
         pp f "@[<hov2>overwrite_@ %a@ with@ %a@]"
           (expression2 reset_ctxt) e1
           (expression2 reset_ctxt) e2
+    | Pexp_quote e ->
+        pp f "@[<hov2><[%a]>@]" (expression ctxt) e
+    | Pexp_splice e ->
+        pp f "@[$%a@]" (simple_expr ctxt) e
     | Pexp_hole -> pp f "_"
     | _ -> expression1 ctxt f x
 

@@ -160,9 +160,12 @@ let cmti f = mk_artifact ".cmti" f
 let cms f = mk_artifact ".cms" f
 let cmsi f = mk_artifact ".cmsi" f
 let cmj f = mk_artifact ".cmj" f
+let cmjo f = mk_artifact ".cmjo" f
 let cmja f = mk_artifact ".cmja" f
 let cmjx f = mk_artifact ".cmjx" f
 let annot f = mk_artifact ".annot" f
+let artifact f ~extension = mk_artifact extension f
+
 
 let companion_cmt f = companion_artifact ".cmt" f
 let companion_cms f = companion_artifact ".cms" f

@@ -3,7 +3,7 @@
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 # Script arguments with their default values
-repository=https://github.com/ocaml-flambda/flambda-backend
+repository=https://github.com/oxcaml/oxcaml
 subdirectory=.
 old_subdirectory=.
 
@@ -80,7 +80,7 @@ current_head="$(git symbolic-ref --short HEAD)"
 # First, add any files that have been added since the last import.
 ./import-added-ocaml-source-files.sh "$commitish" "$repository" "$subdirectory" "$old_subdirectory"
 
-# Then, fetch the new flambda-backend sources (which include ocaml-jst) and
+# Then, fetch the new oxcaml sources (which include ocaml-jst) and
 # copy into upstream/ocaml_flambda
 git fetch "$repository" "$commitish"
 rev=$(git rev-parse FETCH_HEAD)

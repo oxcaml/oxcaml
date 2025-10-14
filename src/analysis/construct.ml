@@ -558,6 +558,7 @@ module Gen = struct
           List.map choices ~f:(fun choice ->
               Ast_helper.Exp.unboxed_tuple choice)
         | Tvariant row_desc -> variant env rtyp row_desc
+        | Tquote _ | Tsplice _ -> []
         | Tpackage (path, lids_args) -> begin
           let open Ast_helper in
           try

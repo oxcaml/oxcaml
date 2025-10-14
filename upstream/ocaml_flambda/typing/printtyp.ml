@@ -703,6 +703,10 @@ and raw_type_desc ppf = function
           match !nm with None -> fprintf ppf " None"
           | Some(p,tl) ->
               fprintf ppf "(Some(@,%a,@,%a))" path p raw_type_list tl)
+  | Tquote t ->
+      fprintf ppf "@[Tquote@ %a@]" raw_type t
+  | Tsplice t ->
+      fprintf ppf "@[Tsplice@ %a@]" raw_type t
   | Tfield (f, k, t1, t2) ->
       fprintf ppf "@[<hov1>Tfield(@,%s,@,%s,@,%a,@;<0 -1>%a)@]" f
         (string_of_field_kind k)
@@ -925,14 +929,14 @@ let is_unambiguous path env =
       List.for_all (fun p -> lid_of_path p = id) rem &&
       Path.same p (fst (Env.find_type_by_name id env))
 
-let penalty_size = 10
+let penalty_size = 20
 
 let name_penalty s =
   if s <> "" && s.[0] = '_' then
     penalty_size
   else
     match find_double_underscore s with
-    | None -> 1
+    | None -> 2
     | Some _ -> penalty_size
 
 let ambiguity_penalty path env =
@@ -947,7 +951,10 @@ let path_size path env =
     | Papply (p1, p2) ->
         let (l, b) = size p1 in
         (l + fst (size p2), b)
-    | Pextra_ty (p, _) -> size p
+    | Pextra_ty (p, Pext_ty) ->
+        size p
+    | Pextra_ty (p, Punboxed_ty) ->
+        let (l, b) = size p in (1 + l, b)
   in
   let l, s = size path in
   l + ambiguity_penalty path env, s
@@ -1443,6 +1450,13 @@ let tree_of_mode_new (t: Parsetree.mode loc) =
 let tree_of_modes (modes : Mode.Alloc.Const.t) =
   let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
 
+  (* [forkable] has implied defaults depending on [areality]: *)
+  let forkable =
+    match modes.areality, modes.forkable with
+    | Local, Unforkable | Global, Forkable -> None
+    | _, _ -> Some modes.forkable
+  in
+
   (* [yielding] has implied defaults depending on [areality]: *)
   let yielding =
     match modes.areality, modes.yielding with
@@ -1464,7 +1478,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
     | _, _ -> Some modes.portability
   in
 
-  let diff = {diff with yielding; contention; portability} in
+  let diff = {diff with forkable; yielding; contention; portability} in
   (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
   let l = Typemode.untransl_mode_annots diff in
   match all_or_none tree_of_mode_old l with
@@ -1593,6 +1607,10 @@ let rec tree_of_modal_typexp mode modal ty =
         end
     | Tobject (fi, nm) ->
         tree_of_typobject mode fi !nm
+    | Tquote ty ->
+        Otyp_quote (tree_of_typexp mode alloc_mode ty)
+    | Tsplice ty ->
+        Otyp_splice (tree_of_typexp mode alloc_mode ty)
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
     | Tsubst _ ->

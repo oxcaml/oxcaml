@@ -527,6 +527,9 @@ and expression_desc =
        Position argument in function application *)
   | Texp_overwrite of expression * expression (** overwrite_ exp with exp *)
   | Texp_hole of unique_use (** _ *)
+  | Texp_quotation of expression
+  | Texp_antiquotation of expression
+  | Texp_eval of core_type * Jkind.sort
   (* merlin-specific: a [Texp_typed_hole] is a typed hole written by the user as a
       placeholder. This is in contrast to a Texp_hole, which is used in overwrite
       expressions *)
@@ -1038,6 +1041,8 @@ and core_type_desc =
   | Ttyp_poly of (string * Parsetree.jkind_annotation option) list * core_type
   | Ttyp_package of package_type
   | Ttyp_open of Path.t * Longident.t loc * core_type
+  | Ttyp_quote of core_type
+  | Ttyp_splice of core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
       (** [Ttyp_call_pos] represents the type of the value of a Position
@@ -1361,3 +1366,7 @@ val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
 
 val unpack_functor_me : module_expr -> functor_parameter * module_expr
 val unpack_functor_mty : module_type -> functor_parameter * module_type
+
+(** Fold over the antiquotations in an expression. This function defines the
+    evaluation order of antiquotations. *)
+val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a

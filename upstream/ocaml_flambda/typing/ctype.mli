@@ -232,8 +232,9 @@ val prim_mode :
         -> (Mode.allowed * 'r) Mode.Locality.t
 val instance_prim:
         Primitive.description -> type_expr ->
-        type_expr * Mode.Locality.lr option
-        * Mode.Yielding.lr option * Jkind.Sort.t option
+        type_expr *
+        Mode.Locality.lr option * (Mode.Forkable.lr * Mode.Yielding.lr) option *
+        Jkind.Sort.t option
 
 (** Given (a @ m1 -> b -> c) @ m0, where [m0] and [m1] are modes expressed by
     user-syntax, [curry_mode m0 m1] gives the mode we implicitly interpret b->c
@@ -665,6 +666,10 @@ val constrain_type_jkind :
    expansion once it succeeds. *)
 val check_type_externality :
   Env.t -> type_expr -> Jkind_axis.Externality.t -> bool
+
+(* Check whether a type is gc ignorable based on its externality and the target
+   platform. *)
+val is_always_gc_ignorable : Env.t -> type_expr -> bool
 
 (* Check whether a type's nullability is less than some target.
    Uses get_nullability which is potentially cheaper than calling type_jkind

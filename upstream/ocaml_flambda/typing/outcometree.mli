@@ -62,6 +62,8 @@ type out_value =
   | Oval_unboxed_tuple of (string option * out_value) list
   | Oval_variant of string * out_value option
   | Oval_lazy of out_value
+  | Oval_code of CamlinternalQuote.Code.t
+
 type out_modality_legacy = Ogf_global
 
 type out_modality_new = string
@@ -153,6 +155,8 @@ and out_type =
   | Otyp_unboxed_tuple of (string option * out_type) list
   | Otyp_var of bool * string
   | Otyp_variant of out_variant * bool * (string list) option
+  | Otyp_quote of out_type
+  | Otyp_splice of out_type
   | Otyp_poly of out_vars_jkinds * out_type
   | Otyp_module of out_ident * (string * out_type) list
   | Otyp_attribute of out_type * out_attribute

@@ -325,6 +325,12 @@ let rec core_type i ppf x =
   | Ttyp_open (path, _mod_ident, t) ->
       line i ppf "Ttyp_open %a\n" fmt_path path;
       core_type i ppf t
+  | Ttyp_quote t ->
+      line i ppf "Ttyp_quote\n";
+      core_type i ppf t
+  | Ttyp_splice t ->
+      line i ppf "Ttyp_splice\n";
+      core_type i ppf t
   | Ttyp_of_kind jkind ->
       line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";
@@ -708,6 +714,15 @@ and expression i ppf x =
     expression i ppf e2
   | Texp_hole _ ->
     line i ppf "Texp_hole"
+  | Texp_quotation e ->
+    line i ppf "Texp_quotation";
+      expression i ppf e
+  | Texp_antiquotation e ->
+    line i ppf "Texp_antiquotation";
+    expression i ppf e
+  | Texp_eval (typ, _) ->
+    line i ppf "Texp_eval";
+    core_type i ppf typ;
 
 and value_description i ppf x =
   line i ppf "value_description %a %a\n" fmt_ident x.val_id fmt_location

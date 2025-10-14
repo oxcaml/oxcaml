@@ -259,6 +259,10 @@ let get_mode_doc mode =
       Some "Functions with this mode can read but not write mutable data"
     | Comonadic Statefulness, Stateless ->
       Some "Functions with this mode cannot access mutable data"
+    | Comonadic Forkable, Forkable ->
+      Some "Functions with this mode may be executed concurrently."
+    | Comonadic Forkable, Unforkable ->
+      Some "Functions with this mode cannot be executed concurrently."
   in
   let doc_url =
     let subpage =
@@ -271,6 +275,7 @@ let get_mode_doc mode =
       | Comonadic Yielding -> "modes/intro/"
       | Monadic Visibility -> "modes/intro/"
       | Comonadic Statefulness -> "modes/intro/"
+      | Comonadic Forkable -> "modes/intro/"
     in
     syntax_doc_url Oxcaml subpage
   in
@@ -641,16 +646,16 @@ let get_oxcaml_syntax_doc cursor_loc nodes : syntax_info =
       get_modality_doc modality
     | _ -> get_modality_doc modality)
   (* Jkinds *)
-  | Jkind_annotation { pjkind_desc = Abbreviation abbrev; _ } :: _ ->
+  | Jkind_annotation { pjkind_desc = Pjk_abbreviation abbrev; _ } :: _ ->
     get_jkind_abbrev_doc abbrev
-  | Jkind_annotation { pjkind_desc = Mod _; _ } :: _ ->
+  | Jkind_annotation { pjkind_desc = Pjk_mod _; _ } :: _ ->
     Some
       { name = "`mod` keyword (in a kind)";
         description = "Types of this kind will cross the following modes";
         documentation = syntax_doc_url Oxcaml "kinds/intro/";
         level = Advanced
       }
-  | Jkind_annotation { pjkind_desc = With (_, with_type, _); _ } :: _ -> (
+  | Jkind_annotation { pjkind_desc = Pjk_with (_, with_type, _); _ } :: _ -> (
     match compare_cursor_to_loc with_type.ptyp_loc with
     | Before ->
       Some

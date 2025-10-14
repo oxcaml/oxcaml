@@ -87,9 +87,9 @@ The error is reported and foo still has mode nonportable
   >   | revert-newlines \
   >   | jq .value[].message -r
   The value foo is nonportable
-  because it closes over the value y (at File "closure2.ml", line 3, characters 2-3)
+  because it contains a usage (of the value y at File "closure2.ml", line 3, characters 2-3)
   which is expected to be uncontended.
-  However, the highlighted expression is expected to be portable
+  However, the highlighted value foo is expected to be portable
   because it is used inside a function which is expected to be portable.
   The value bar is nonportable but is expected to be portable
   because it is used inside a function which is expected to be portable.
