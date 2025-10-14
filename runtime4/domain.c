@@ -138,3 +138,8 @@ CAMLprim value caml_domain_dls_get(void)
 {
   caml_failwith("Domains not supported on runtime4");
 }
+
+CAMLprim value caml_domain_preempt_with(value eff)
+{
+  caml_failwith("Domains not supported on runtime4");
+}
