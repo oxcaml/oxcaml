@@ -15,7 +15,21 @@ let print_annot_axis (type a) (annot_type : a annot_type) ppf (ax : a) =
     let (P ax) = Modality.Axis.to_value (P ax) in
     Value.Axis.print ppf ax
 
+type forbidden_modality_kind =
+  | Global_and_unique
+      (** [@@ global unique] must be forbidden, with [global] implying [aliased].
+      Otherwise, borrowing would be unsound:
+
+  {v
+      type 'a t = { x : 'a @@ global unique }
+
+      let clone (x @ unique) =
+        borrow {x} ~f:(fun (t @ local) -> t.x : 'a @ global) (* leak *)
+  v}
+  *)
+
 type error =
+  | Forbidden_modality of forbidden_modality_kind
   | Duplicated_axis : 'a annot_type * 'a -> error
   | Unrecognized_modifier : 'a annot_type * string -> error
 
@@ -528,18 +542,21 @@ let idx_expected_modalities ~(mut : bool) =
 (* Since [unforkable yielding] is the default mode in presence of [local], the
    [global] modality must also apply [forkable unyielding] unless specified.
 
-   Similarly [visibility]/[contention] and [statefulness]/[portability]. *)
+   Similarly [visibility]/[contention] and [statefulness]/[portability].
+
+   [global] must imply [aliased] for soundness of borrowing. *)
 let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
   match[@warning "-18"] ax, a with
-  | Comonadic Areality, Meet_with a ->
-    let f, y =
-      match a with
-      | Global -> Forkable.Const.Forkable, Yielding.Const.Unyielding
-      | Local -> Forkable.Const.Unforkable, Yielding.Const.Yielding
-      | Regional -> assert false
-    in
-    [ Atom (Comonadic Forkable, Meet_with f);
-      Atom (Comonadic Yielding, Meet_with y) ]
+  | Comonadic Areality, Meet_with a -> (
+    match a with
+    | Global ->
+      [ Atom (Comonadic Forkable, Meet_with Forkable.Const.Forkable);
+        Atom (Comonadic Yielding, Meet_with Yielding.Const.Unyielding);
+        Atom (Monadic Uniqueness, Join_with Uniqueness.Const.Aliased) ]
+    | Local ->
+      [ Atom (Comonadic Forkable, Meet_with Forkable.Const.Unforkable);
+        Atom (Comonadic Yielding, Meet_with Yielding.Const.Yielding) ]
+    | Regional -> assert false)
   | Monadic Visibility, Join_with a ->
     let b : Contention.Const.t =
       match a with
@@ -611,6 +628,16 @@ let sort_dedup_modalities ~warn l =
   in
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map fst
 
+let enforce_forbidden_modalities m =
+  match Modality.Const.proj (Comonadic Areality) m with
+  | Meet_with Global -> (
+    match Modality.Const.proj (Monadic Uniqueness) m with
+    | Modality.Monadic.Atom.Join_with Mode.Uniqueness.Const.Unique ->
+      raise (Error (Location.none, Forbidden_modality Global_and_unique))
+    | _ -> m)
+  | Meet_with Local -> m
+  | Meet_with Regional -> assert false
+
 let transl_modalities ~maturity mut modalities =
   let mut_modalities =
     mutable_implied_modalities (Types.is_mutable mut)
@@ -630,6 +657,7 @@ let transl_modalities ~maturity mut modalities =
         (fun m (Atom (ax, a)) -> Const.set ax a m)
         m (implied_modalities t))
     mut_modalities modalities
+  |> enforce_forbidden_modalities
 
 let let_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:true
@@ -657,6 +685,9 @@ let report_error ppf =
     fprintf ppf "The %a axis has already been specified."
       (print_annot_axis annot_type)
       axis
+  | Forbidden_modality Global_and_unique ->
+    fprintf ppf "%a modality can't be used together with %a"
+      Misc.Style.inline_code "global" Misc.Style.inline_code "unique"
   | Unrecognized_modifier (annot_type, modifier) ->
     let annot_type_str =
       match annot_type with
