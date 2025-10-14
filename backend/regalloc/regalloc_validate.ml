@@ -235,12 +235,12 @@ end = struct
     }
 
   let to_dummy_reg (t : t) : Reg.t =
-    { name = t.for_print.name;
-      typ = t.for_print.typ;
-      stamp = t.for_print.stamp;
-      preassigned = t.for_print.preassigned;
-      loc = Reg_id.to_loc_lossy t.reg_id
-    }
+    let name = t.for_print.name in
+    let typ = t.for_print.typ in
+    let stamp = t.for_print.stamp in
+    let preassigned = t.for_print.preassigned in
+    let loc = Reg_id.to_loc_lossy t.reg_id in
+    Reg.For_printing.create ~name ~typ ~stamp ~preassigned ~loc
 
   let typ (t : t) = t.for_print.typ
 
@@ -297,11 +297,11 @@ module Description : sig
       instructions within or between basic blocks.
 
       The validator checks that the register allocator does not remove
-      instructions, and does not add any new instructions except Spill and 
-      Reload. The unique IDs of instructions are sufficient to determine this, 
-      and the description does not need to record the block an instruction 
-      belongs to. It is possible to reconstruct some information about the CFG 
-      structure from the description. 
+      instructions, and does not add any new instructions except Spill and
+      Reload. The unique IDs of instructions are sufficient to determine this,
+      and the description does not need to record the block an instruction
+      belongs to. It is possible to reconstruct some information about the CFG
+      structure from the description.
       For example, successors of a block can be reconstructed from the labels
       that appear in terminator's [desc]. It also checks that all [fun_args]
       were preassigned before allocation and that they haven't changed after. *)

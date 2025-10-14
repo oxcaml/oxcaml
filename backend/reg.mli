@@ -32,7 +32,7 @@ end
    that it remembers adjacency between machine registers aliased at multiple types.
 *)
 
-type t =
+type t = private
   { name : Name.t; (* Name *)
     stamp : int; (* Unique stamp *)
     typ : Cmm.machtype_component; (* Type of contents *)
@@ -78,6 +78,12 @@ val equal_location : location -> location -> bool
 
 val dummy : t
 
+(* CR-someday gyorsh: [dummy_for_regalloc] is currently only used is for
+   ArraySet, which could arguably be rewritten using DynArray (the latest
+   upstream version, not the one we currently have in this repository), which is
+   based on its own non-domain-specific notion of a dummy... *)
+val dummy_for_regalloc : t
+
 val create : Cmm.machtype_component -> t
 
 val create_with_typ : t -> t
@@ -85,6 +91,11 @@ val create_with_typ : t -> t
 val create_with_typ_and_name : ?prefix_if_var:string -> t -> t
 
 val create_at_location : Cmm.machtype_component -> location -> t
+
+(* [create_alias t typ] given a physical register [t], creates a [Reg.t] with
+   the same stamp and location as [t], but with type [typ]. This is not related
+   to IRC's notion of alias. *)
+val create_alias : t -> typ:Cmm.machtype_component -> t
 
 val createv : Cmm.machtype -> t array
 
@@ -106,6 +117,8 @@ val is_unknown : t -> bool
 val is_preassigned : t -> bool
 
 val is_domainstate : t -> bool
+
+val set_loc : t -> location -> unit
 
 module Set : Set.S with type elt = t
 
@@ -157,4 +170,18 @@ module For_testing : sig
   val get_stamp : unit -> int
 
   val set_state : stamp:int -> relocatable_regs:t list -> unit
+
+  val with_loc : t -> location -> t
+end
+
+module For_printing : sig
+  (** The result of [create] will not be aded to the internal lists of registers,
+      and therefore should not be kept around after printing. *)
+  val create :
+    name:Name.t ->
+    typ:Cmm.machtype_component ->
+    stamp:int ->
+    preassigned:bool ->
+    loc:location ->
+    t
 end

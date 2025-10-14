@@ -73,8 +73,8 @@ let hard_reg_gen typ =
 let hard_int_reg = hard_reg_gen Int
 let hard_float_reg = hard_reg_gen Float
 
-let hard_vec128_reg = Array.map (fun r -> {r with typ = Vec128}) hard_float_reg
-let hard_float32_reg = Array.map (fun r -> {r with typ = Float32}) hard_float_reg
+let hard_vec128_reg = Array.map (Reg.create_alias ~typ:Vec128) hard_float_reg
+let hard_float32_reg = Array.map (Reg.create_alias ~typ:Float32) hard_float_reg
 
 let all_phys_regs =
   Array.concat [hard_int_reg; hard_float_reg; hard_float32_reg; hard_vec128_reg; ]
@@ -91,7 +91,7 @@ let phys_reg ty n =
        allocator relies on. It is safe to guard it with this flag since the LLVM
        backend doesn't get that far. *)
     if !Clflags.llvm_backend
-    then { hard_int_reg.(n) with typ = ty }
+    then Reg.create_alias hard_int_reg.(n) ~typ:ty
     else hard_int_reg.(n)
   | Float -> hard_float_reg.(n - 100)
   | Float32 -> hard_float32_reg.(n - 100)

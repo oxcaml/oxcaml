@@ -10,7 +10,7 @@ module RegWorkListSet = Arrayset.Make (struct
 
   let compare = Reg.compare
 
-  let dummy = { Reg.dummy with stamp = -1 }
+  let dummy = Reg.dummy_for_regalloc
 end)
 
 let reg_set_of_reg_work_list (rwl : RegWorkListSet.t) : Reg.Set.t =
@@ -564,7 +564,7 @@ let update_register_locations state =
           ()
         | Some color ->
           if debug then log "updating %a to %d" Printreg.reg reg color;
-          reg.Reg.loc <- Reg color))
+          Reg.set_loc reg (Reg color)))
 
 let[@inline] check_disjoint sets ~is_disjoint =
   List.iter sets ~f:(fun (name1, set1) ->

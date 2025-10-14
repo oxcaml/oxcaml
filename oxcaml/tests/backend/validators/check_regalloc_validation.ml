@@ -78,7 +78,8 @@ let base_templ () : Cfg_desc.t * (unit -> InstructionId.t) =
     let locs = f (Array.map (fun (r : Reg.t) -> r.typ) regs) in
     let regs =
       Array.map2
-        (fun (reg : Reg.t) (loc : Reg.t) -> { reg with loc = loc.loc })
+        (fun (reg : Reg.t) (loc : Reg.t) ->
+          Reg.For_testing.with_loc reg loc.loc)
         regs locs
     in
     regs, locs
@@ -88,7 +89,7 @@ let base_templ () : Cfg_desc.t * (unit -> InstructionId.t) =
      [fun f x y a -> let y = f x y a in let x = x + y in x] *)
   let int_arg1 = int.(0) in
   let int_arg2 = int.(1) in
-  let stack_loc = Reg.create_at_location int_arg1.typ (Stack (Local 0)) in
+  let stack_loc = Reg.For_testing.with_loc int_arg1 (Stack (Local 0)) in
   let args, arg_locs =
     make_locs [| val_.(0); int_arg1; int_arg2; float.(0) |] Proc.loc_parameters
   in
@@ -643,7 +644,8 @@ let make_loop ~loop_loc_first n =
     let locs = f (Array.map (fun (r : Reg.t) -> r.typ) regs) in
     let regs =
       Array.map2
-        (fun (reg : Reg.t) (loc : Reg.t) -> { reg with loc = loc.loc })
+        (fun (reg : Reg.t) (loc : Reg.t) ->
+          Reg.For_testing.with_loc reg loc.loc)
         regs locs
     in
     regs, locs
@@ -669,7 +671,7 @@ let make_loop ~loop_loc_first n =
   let int_arg2 = args.(1) in
   let int_arg3 = args.(2) in
   let extra_regs =
-    Array.init n (fun _ -> { (Reg.create Int) with loc = int_arg3.loc })
+    Array.init n (fun _ -> Reg.create_at_location Int int_arg3.loc)
   in
   let results, result_locs = make_locs [| int_arg1 |] Proc.loc_results_return in
   let make_moves src dst =
