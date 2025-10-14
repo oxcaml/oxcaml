@@ -1154,7 +1154,7 @@ Error: The kind of type "t" is value
 type 'a t : value mod global portable contended many aliased unyielding =
   { x : 'a @@ global portable contended many aliased } [@@unboxed]
 [%%expect {|
-type 'a t = { x : 'a @@ global many portable aliased contended; } [@@unboxed]
+type 'a t = { x : 'a @@ global many portable contended; } [@@unboxed]
 |}]
 
 type 'a t : value mod global immutable stateless many aliased unyielding non_float =
