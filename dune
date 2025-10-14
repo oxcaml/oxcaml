@@ -183,6 +183,11 @@
   language_extension
   zero_alloc_utils
   zero_alloc_annotations
+  compression
+  doubly_linked_list
+  file_sections
+  lru
+  runtimetags
   ;; PARSING
   location
   longident
