@@ -1937,6 +1937,15 @@ module Const = struct
           | _, _ -> modes
         in
         let modes =
+          (* Likewise for [global] and [aliased]. *)
+          match List.mem "global" modes, List.mem "aliased" modes with
+          | true, true -> List.filter (fun m -> m <> "aliased") modes
+          | true, false ->
+            modes @ ["unique"]
+            (* This case is not very meaningful but permitted. *)
+          | _, _ -> modes
+        in
+        let modes =
           (* Likewise for [stateless] and [portable]. *)
           match List.mem "stateless" modes, List.mem "portable" modes with
           | true, true -> List.filter (fun m -> m <> "portable") modes
@@ -2792,7 +2801,14 @@ let for_object =
   let comonadic =
     Crossing.Comonadic.always_constructed_at Value.Comonadic.Const.legacy
   in
-  let monadic = Crossing.Monadic.max in
+  let monadic =
+    Crossing.Monadic.create
+      ~uniqueness:(Crossing.Per_axis.min (Crossing.Axis.Monadic Uniqueness))
+        (* Since [global] implies [aliased] in presence of borrowing,
+           objects also cross uniqueness. *)
+      ~contention:(Crossing.Per_axis.max (Crossing.Axis.Monadic Contention))
+      ~visibility:(Crossing.Per_axis.max (Crossing.Axis.Monadic Visibility))
+  in
   fresh_jkind
     { layout = Sort (Base Value);
       mod_bounds =

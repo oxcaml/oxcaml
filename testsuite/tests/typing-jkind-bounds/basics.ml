@@ -223,12 +223,11 @@ type b = a
 type a : value mod global aliased once contended portable external_
 type b : value mod local unique many contended nonportable internal = a
 [%%expect{|
-type a : value mod global aliased contended portable external_
+type a : value mod global contended portable external_
 Line 2, characters 0-71:
 2 | type b : value mod local unique many contended nonportable internal = a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "a" is
-           value mod global aliased contended portable external_
+Error: The kind of type "a" is value mod global contended portable external_
          because of the definition of a at line 1, characters 0-67.
        But the kind of type "a" must be a subkind of value mod many contended
          because of the definition of b at line 2, characters 0-71.
@@ -996,6 +995,7 @@ Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
 
        The first mode-crosses less than the second along:
          locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
 |}]
 
 type ('a : immediate) t : value mod aliased = { mutable x : 'a }
@@ -1167,7 +1167,7 @@ Error: The kind of type "t" is value
          because it instantiates an unannotated type parameter of t,
          chosen to have kind value.
        But the kind of type "t" must be a subkind of
-           immutable_data mod global aliased yielding unforkable
+           immutable_data mod global yielding unforkable
          because of the annotation on the declaration of the type t.
 |}]
 (* CR layouts v2.8: this could be accepted, if we infer ('a : value mod
@@ -1260,6 +1260,7 @@ Error: The kind of type "t" is immutable_data with 'a @@ forkable unyielding
 
        The first mode-crosses less than the second along:
          locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
 |}]
 
 (*****************************)
@@ -1273,13 +1274,13 @@ type ('a : value) t = ('a : any)
 type ('a : value) t = ('a : value)
 type ('a : bits32 mod aliased) t = ('a : any mod global)
 [%%expect {|
-type ('a : value mod global aliased) t = 'a
+type ('a : value mod global) t = 'a
 type ('a : immediate) t = 'a
 type ('a : immediate) t = 'a
 type ('a : immediate) t = 'a
 type 'a t = 'a
 type 'a t = 'a
-type ('a : bits32 mod global aliased) t = 'a
+type ('a : bits32 mod global) t = 'a
 |}]
 
 type ('a : bits32) t = ('a : word)
@@ -1298,7 +1299,7 @@ let f : ('a : any mod global aliased) -> ('a: any mod contended) = fun x -> x
 let f : ('a : value mod external64) -> ('a: any mod external_) = fun x -> x
 let f : ('a : value) -> ('a: immediate) = fun x -> x
 [%%expect {|
-val f : ('a : value_or_null mod global aliased contended). 'a -> 'a = <fun>
+val f : ('a : value_or_null mod global contended). 'a -> 'a = <fun>
 val f : ('a : value mod external_). 'a -> 'a = <fun>
 val f : ('a : immediate). 'a -> 'a = <fun>
 |}]
@@ -1430,15 +1431,7 @@ val x : <  > = <obj>
 
 let x : (_ as (_ : value mod aliased)) = object end
 [%%expect {|
-Line 1, characters 41-51:
-1 | let x : (_ as (_ : value mod aliased)) = object end
-                                             ^^^^^^^^^^
-Error: This expression has type "<  >" but an expression was expected of type
-         "('a : value mod aliased)"
-       The kind of <  > is value mod global many non_float
-         because it's the type of an object.
-       But the kind of <  > must be a subkind of value mod aliased
-         because of the annotation on the wildcard _ at line 1, characters 19-36.
+val x : <  > = <obj>
 |}]
 
 let x : (_ as (_ : value mod portable)) = object end

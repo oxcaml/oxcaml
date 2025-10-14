@@ -264,6 +264,22 @@ let transl_mod_bounds annots =
         (Some { txt = Modality (Meet_with Unyielding); loc = Location.none })
     | _, _ -> modifiers
   in
+  (* Likewise, [global] => [aliased]. *)
+  let modifiers =
+    match
+      ( Transled_modifiers.get ~axis:(Modal (Monadic Uniqueness)) modifiers,
+        Transled_modifiers.get ~axis:(Modal (Comonadic Areality)) modifiers )
+    with
+    | None, Some { txt = Modality (Meet_with Global); _ } ->
+      let set = Transled_modifiers.set ~axis:(Modal (Monadic Uniqueness)) in
+      set modifiers
+        (Some
+           { txt = Modality (Join_with Uniqueness.Const.Aliased);
+             loc = Location.none
+           })
+    | _, _ -> modifiers
+    (* [mod global unique] is not very meaningful but permitted. *)
+  in
   (* Likewise, [immutable] => [contended], [read] => [shared]. *)
   let modifiers =
     match
