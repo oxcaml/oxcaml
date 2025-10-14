@@ -794,7 +794,6 @@ end = struct
                   respecting the row count property. *)
               ({ arg1 with
                  pat_desc = Tpat_or (arg1, arg2, None);
-                 pat_loc = arg1.pat_loc
                }
               :: ps
               )
@@ -2753,7 +2752,7 @@ module SArg = struct
   let make_offset loc arg n =
     match n with
     | 0 -> arg
-    | _ -> Lambda.add int arg (tagged_immediate n) ~loc:loc
+    | _ -> Lambda.add int arg (tagged_immediate n) ~loc
 
   let bind arg body =
     let newvar, newvar_duid, newarg =
@@ -2777,7 +2776,7 @@ module SArg = struct
 
   let make_is_nonzero loc arg =
     if !Clflags.native_code || Clflags.is_flambda2 ()
-    then icmp Cne int arg (tagged_immediate 0) ~loc:loc
+    then icmp Cne int arg (tagged_immediate 0) ~loc
     else arg
 
   let arg_as_test arg = arg
