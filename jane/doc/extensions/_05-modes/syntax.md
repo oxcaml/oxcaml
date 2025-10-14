@@ -299,3 +299,22 @@ and modalities, according to this table:
 
 These implications exist only in the surface syntax for mode and modality
 expressions. Mode inference does not necessarily follow these implications.
+
+## Global and aliased
+
+`global` also has a special interaction with the uniqueness axis.
+For modes, `global` and `local` do not affect uniqueness.
+However, for modalities, `global` always implies `aliased` and can't be used
+with `unique`. For now, this is also a syntactic check.
+
+Allowing `@@ global unique` would make borrowing unsound when it's implemented:
+
+```ocaml
+val borrow : 'a @ unique -> f:('a @ local -> 'b @ unique) -> ('a * 'b) @ unique
+
+type 'a t = { x : 'a @@ global unique }
+type 'a s = { y : 'a @@ aliased }
+
+let clone (x : 'a @ unique) : ('a * 'a s) @ unique =
+  borrow {x} ~f:(fun (t @ local) -> {y = t.x}) (* leak *)
+```
