@@ -371,19 +371,19 @@ Warning 213: This locality is overriden by global later.
 type r = { x : string @@ global; }
 |}]
 
-(* Modalities don't imply each other; this will change as we add borrowing. *)
+(* [global] implies [aliased]. *)
 type r = {
   global_ x : string @@ aliased
 }
 [%%expect{|
-type r = { x : string @@ global aliased; }
+type r = { global_ x : string; }
 |}]
 
 type r = {
   x : string @@ aliased global many
 }
 [%%expect{|
-type r = { x : string @@ global many aliased; }
+type r = { x : string @@ global many; }
 |}]
 
 type r = {
@@ -395,12 +395,12 @@ Line 2, characters 16-23:
                     ^^^^^^^
 Warning 213: This uniqueness is overriden by aliased later.
 
-type r = { x : string @@ global many aliased; }
+type r = { x : string @@ global many; }
 |}]
 
 type r = Foo of string @@ global aliased many
 [%%expect{|
-type r = Foo of string @@ global many aliased
+type r = Foo of string @@ global many
 |}]
 
 (* mutable implies [global many unyielding], and legacy modalities for monadic

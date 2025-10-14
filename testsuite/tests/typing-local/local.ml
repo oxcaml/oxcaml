@@ -1562,7 +1562,7 @@ Error: Signature mismatch:
          "foo : string @@ global;"
        is not the same as:
          "foo : string;"
-       The first is global and the second is not.
+       The second is empty and the first is aliased.
 |}]
 
 (* Unboxed records version of the same test *)
@@ -1616,7 +1616,7 @@ Error: Signature mismatch:
          "foo : string @@ global;"
        is not the same as:
          "foo : string;"
-       The first is global and the second is not.
+       The second is empty and the first is aliased.
 |}]
 
 (* Special handling of tuples in matches and let bindings *)
@@ -2457,7 +2457,7 @@ Error: Signature mismatch:
        is not the same as:
          "Bar of int * string"
        Modality mismatch at argument position 2:
-       The first is global and the second is not.
+       The second is empty and the first is aliased.
 |}]
 
 (* global_ binds closer than star *)

@@ -554,7 +554,6 @@ type 'a portable = { portable : 'a @@ portable }
 type 'a contended = { contended : 'a @@ contended }
 type 'a mut_not_global = { mutable mut_not_global : 'a @@ local }
 type 'a mut_not_many = { mutable mut_not_many : 'a @@ once }
-type 'a mut_not_aliased = { mutable mut_not_aliased : 'a @@ unique }
 type 'a mut_not_unyielding = { mutable mut_not_unyielding : 'a @@ yielding }
 [%%expect{|
 type 'a box = { item : 'a; }
@@ -567,7 +566,6 @@ type 'a portable = { portable : 'a @@ portable; }
 type 'a contended = { contended : 'a @@ contended; }
 type 'a mut_not_global = { mutable mut_not_global : 'a @@ local; }
 type 'a mut_not_many = { mutable mut_not_many : 'a @@ once; }
-type 'a mut_not_aliased = { mutable mut_not_aliased : 'a @@ unique; }
 type 'a mut_not_unyielding = { mutable mut_not_unyielding : 'a @@ yielding; }
 |}]
 
@@ -578,7 +576,7 @@ Line 1, characters 13-22:
 1 | let bad () = (.global)
                  ^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is global.
+       immutable elements must have the identity modality, but this is aliased.
 |}]
 let bad () = (.aliased)
 [%%expect{|
@@ -640,15 +638,6 @@ Error: Block indices do not yet support non-default modalities. In particular,
        mutable elements must be many, but this is not.
 |}]
 
-let bad () = (.mut_not_aliased)
-[%%expect{|
-Line 1, characters 13-31:
-1 | let bad () = (.mut_not_aliased)
-                 ^^^^^^^^^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be aliased, but this is not.
-|}]
-
 let bad () = (.mut_not_unyielding)
 [%%expect{|
 Line 1, characters 13-34:
@@ -699,7 +688,7 @@ Line 1, characters 13-28:
 1 | let bad () = (.:(0).#global)
                  ^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is global.
+       immutable elements must have the identity modality, but this is aliased.
 |}]
 let bad () = (.:(0).#item.#global.#item)
 [%%expect{|
@@ -707,7 +696,7 @@ Line 1, characters 13-40:
 1 | let bad () = (.:(0).#item.#global.#item)
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is global.
+       immutable elements must have the identity modality, but this is aliased.
 |}]
 
 (* A few positive examples to show that it's the composition of modalities we
