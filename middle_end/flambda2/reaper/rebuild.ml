@@ -719,7 +719,7 @@ let make_apply_wrapper env
               in
               (* let direct_or_indirect = match Apply.call_kind apply with |
                  Function { function_call = Direct _; _ } -> error () | Function
-                 { function_call = Indirect_known_arity; _ } ->
+                 { function_call = Indirect_known_arity _; _ } ->
                  GFG.Known_arity_code_pointer | Function { function_call =
                  Indirect_unknown_arity; _ } | C_call _ | Method _ | Effect _ ->
                  GFG.Unknown_arity_code_pointer in let field = GFG.Field.Apply
@@ -894,7 +894,9 @@ let decide_whether_apply_needs_calling_convention_change env apply =
         let new_call_kind =
           match singleton_code_id with
           | Some code_id -> Call_kind.direct_function_call code_id alloc_mode
-          | None -> call_kind
+          | None ->
+            Call_kind.indirect_function_call_known_arity
+              ~code_ids:(Known code_ids) alloc_mode
         in
         singleton_code_id, new_call_kind, was_indirect_unknown_arity
     in
@@ -911,7 +913,9 @@ let decide_whether_apply_needs_calling_convention_change env apply =
           else
             match env.should_preserve_direct_calls with
             | Yes -> call_kind
-            | No -> Call_kind.indirect_function_call_known_arity alloc_mode
+            | No ->
+              Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
+                alloc_mode
             | Auto ->
               (* In [auto] mode, the direct call is preserved if and only if we
                  cannot identify which set of code_ids can be called. Since this
@@ -923,8 +927,13 @@ let decide_whether_apply_needs_calling_convention_change env apply =
     | Function { function_call = Indirect_unknown_arity; alloc_mode = _ } ->
       (* called (Option.get (Apply.callee apply)) alloc_mode call_kind true *)
       None, call_kind, false
-    | Function { function_call = Indirect_known_arity; alloc_mode } ->
-      called (Option.get (Apply.callee apply)) alloc_mode call_kind false
+    | Function { function_call = Indirect_known_arity _; alloc_mode } ->
+      called
+        (Option.get (Apply.callee apply))
+        alloc_mode
+        (Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
+           alloc_mode)
+        false
     | C_call _ | Method _ | Effect _ -> None, call_kind, false
   in
   match code_id_actually_called with
@@ -978,7 +987,7 @@ let rebuild_apply env apply =
        apply; *)
     let _callee_with_known_arity =
       match (call_kind : Call_kind.t) with
-      | Function { function_call = Direct _ | Indirect_known_arity; _ } -> (
+      | Function { function_call = Direct _ | Indirect_known_arity _; _ } -> (
         match Apply.callee apply with
         | None -> None
         | Some callee ->

@@ -1075,7 +1075,7 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
         | Some { params_arity = Some params_arity; ret_arity } ->
           let params_arity = arity params_arity in
           let return_arity = arity ret_arity in
-          ( Call_kind.indirect_function_call_known_arity alloc,
+          ( Call_kind.indirect_function_call_known_arity ~code_ids:Unknown alloc,
             params_arity,
             return_arity )
         | None | Some { params_arity = None; ret_arity = _ } ->

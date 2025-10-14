@@ -149,7 +149,7 @@ let linearize_terminator cfg_with_layout (func : string) start
     match terminator.desc with
     | Return -> [L.Lreturn], None
     | Raise kind -> [L.Lraise kind], None
-    | Tailcall_func Indirect -> [L.Lcall_op Ltailcall_ind], None
+    | Tailcall_func (Indirect _) -> [L.Lcall_op Ltailcall_ind], None
     | Tailcall_func (Direct func_symbol) ->
       [L.Lcall_op (Ltailcall_imm { func = func_symbol })], None
     | Tailcall_self { destination } ->
@@ -180,7 +180,7 @@ let linearize_terminator cfg_with_layout (func : string) start
     | Call { op; label_after } ->
       let op : Linear.call_operation =
         match op with
-        | Indirect -> Lcall_ind
+        | Indirect _ -> Lcall_ind
         | Direct func_symbol -> Lcall_imm { func = func_symbol }
       in
       branch_or_fallthrough [L.Lcall_op op] label_after, None
