@@ -1468,8 +1468,8 @@ module Const = struct
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:false
                    ~portability:true ~forkable:false ~yielding:false
-                   ~uniqueness:false ~contention:true ~statefulness:false
-                   ~visibility:false ~staticity:false
+                   ~uniqueness:false ~contention:true ~statefulness:true
+                   ~visibility:true ~staticity:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
