@@ -1915,6 +1915,8 @@ module Rewriter = struct
       Format.fprintf ff "(Usages %a)" Code_id_or_name.Set.print
         (Code_id_or_name.Map.keys usages)
 
+  let print ppf (_, t) = print_t0 ppf t
+
   module T = Container_types.Make (struct
     type nonrec t = t
 
