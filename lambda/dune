@@ -13,6 +13,15 @@
 ;**************************************************************************
 
 (rule
+ (targets primitives.txt)
+ (mode    promote)
+ (deps    (:listprims ../tools/listprims.exe) translprim.ml)
+ (action  (with-stdout-to %{targets}
+            (progn
+              (bash "grep --only-matching --perl-regexp '(?<=\\| \")%[^\"]*(?=\"\\s*->)' %{dep:translprim.ml}")
+              (run %{listprims})))))
+
+(rule
  (targets runtimedef.ml)
  (mode    fallback)
  (deps    (:fail (file ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/fail.h))
