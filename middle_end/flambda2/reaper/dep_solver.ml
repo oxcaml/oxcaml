@@ -2338,17 +2338,6 @@ module Rewriter = struct
         let[@local] change_representation_of_closures fields value_slots_reprs
             function_slots_reprs =
           let patterns = ref [] in
-          let all_closure_types_in_set =
-            Function_slot.Map.mapi
-              (fun function_slot (metadata, _uses) ->
-                let v = Var.create () in
-                patterns
-                  := Pattern.function_slot function_slot
-                       (Pattern.var v (result, metadata))
-                     :: !patterns;
-                Expr.var v)
-              usages_of_function_slots
-          in
           Format.eprintf "OLD->NEW function slots: %a@."
             (Function_slot.Map.print Function_slot.print)
             function_slots_reprs;
@@ -2379,6 +2368,20 @@ module Rewriter = struct
                           ~rec_info:(Expr.var v))
                 in
                 Function_slot.Map.add new_function_slot r m)
+              usages_of_function_slots Function_slot.Map.empty
+          in
+          let all_closure_types_in_set =
+            Function_slot.Map.fold
+              (fun function_slot (metadata, _uses) m ->
+                let v = Var.create () in
+                patterns
+                  := Pattern.function_slot function_slot
+                       (Pattern.var v (result, metadata))
+                     :: !patterns;
+                let new_function_slot =
+                  Function_slot.Map.find function_slot function_slots_reprs
+                in
+                Function_slot.Map.add new_function_slot (Expr.var v) m)
               usages_of_function_slots Function_slot.Map.empty
           in
           let bind_function_slots = Some !patterns in
