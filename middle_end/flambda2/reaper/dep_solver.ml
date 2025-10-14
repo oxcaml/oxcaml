@@ -1384,6 +1384,27 @@ let datalog_rules =
        reading_field_rel field z;
        constructor_rel x field y ]
      ==> cannot_change_representation0 x);
+    (* Likewise, if a block with a local field escapes, and that field is read
+       again from a value with several sources, prevent changing the
+       representation. *)
+    (let$ [usage; field; source1; source2; _v] =
+       ["usage"; "field"; "source1"; "source2"; "_v"]
+     in
+     [ field_usages_rel usage field _v;
+       filter_field is_local_field field;
+       sources_rel usage source1;
+       sources_rel usage source2;
+       distinct Cols.n source1 source2 ]
+     ==> cannot_change_representation0 source1);
+    (let$ [usage; field; source1; source2] =
+       ["usage"; "field"; "source1"; "source2"]
+     in
+     [ field_usages_top_rel usage field;
+       filter_field is_local_field field;
+       sources_rel usage source1;
+       sources_rel usage source2;
+       distinct Cols.n source1 source2 ]
+     ==> cannot_change_representation0 source1);
     (* If there exists an alias which has another source, and which uses any
        real field of our allocation, we cannot change the representation. This
        currently requires 4 rules due to the absence of disjunction in the
@@ -1978,12 +1999,10 @@ module Rewriter = struct
       Datalog.database ->
       t0 ->
       Function_slot.t ->
-      'a Function_slot.Map.t ->
+      Code_id.t Or_unknown.t Function_slot.Map.t ->
       t0 * (t0 * use_of_function_slot) Function_slot.Map.t =
     (* CR-someday ncourant: once the datalog API supports something cleaner, use
        it. *)
-    (* CR ncourant: I think this is missing projections of value slots inside
-       the closures, as usual. *)
     let out1_tbl, out1 = rel1_r "out1" Cols.[n] in
     let out2_tbl, out2 = rel2_r "out2" Cols.[f; n] in
     let out_known_arity_tbl, out_known_arity =
@@ -1995,17 +2014,41 @@ module Rewriter = struct
     let in_tbl, in_ = rel1_r "in_" Cols.[n] in
     let in_fs_tbl, in_fs = rel1_r "in_fs" Cols.[f] in
     let in_all_fs_tbl, in_all_fs = rel1_r "in_all_fs" Cols.[f] in
+    let in_code_id_tbl, in_code_id = rel2_r "in_code_id" Cols.[f; n] in
+    let in_unknown_code_id_tbl, in_unknown_code_id =
+      rel1_r "in_unknown_code_id" Cols.[f]
+    in
     let open! Syntax in
     let open! Global_flow_graph in
+    let is_value_slot : Field.t -> bool = function
+      | Value_slot _ -> true
+      | Function_slot _ | Is_int | Get_tag | Code_id_of_call_witness | Block _
+      | Code_of_closure _ | Apply _ ->
+        false
+    in
     let rs =
       [ (let$ [x; y] = ["x"; "y"] in
-         [in_fs x; in_ y] ==> and_ [out1 y; out2 x y]);
-        (let$ [usage; fs; to_; fs_usage] = ["usage"; "fs"; "to_"; "fs_usage"] in
-         [ out1 usage;
+         [in_fs x; in_ y] ==> out2 x y);
+        (let$ [fs; usage; field; field_usage] =
+           ["fs"; "usage"; "field"; "field_usage"]
+         in
+         [ out2 fs usage;
+           field_usages_rel usage field field_usage;
+           filter_field is_value_slot field ]
+         ==> out1 usage);
+        (let$ [fs; usage; field] = ["fs"; "usage"; "field"] in
+         [ out2 fs usage;
+           field_usages_top_rel usage field;
+           filter_field is_value_slot field ]
+         ==> out1 usage);
+        (let$ [fs0; usage; fs; to_; fs_usage] =
+           ["fs0"; "usage"; "fs"; "to_"; "fs_usage"]
+         in
+         [ out2 fs0 usage;
            field_usages_rel usage fs to_;
            in_all_fs fs;
            usages_rel to_ fs_usage ]
-         ==> and_ [out1 fs_usage; out2 fs fs_usage]);
+         ==> out2 fs fs_usage);
         (let$ [fs; usage] = ["fs"; "usage"] in
          [ out2 fs usage;
            field_usages_top_rel usage
@@ -2019,21 +2062,46 @@ module Rewriter = struct
              (Term.constant
                 (Field.encode (Field.Code_of_closure Unknown_arity_code_pointer)))
          ]
-         ==> out_unknown_arity fs) ]
+         ==> out_unknown_arity fs);
+        (let$ [fs; code_id; my_closure; usage] =
+           ["fs"; "code_id"; "my_closure"; "usage"]
+         in
+         [ out_known_arity fs;
+           in_code_id fs code_id;
+           code_id_my_closure_rel code_id my_closure;
+           usages_rel my_closure usage ]
+         ==> out2 fs usage);
+        (let$ [fs; code_id; my_closure; usage] =
+           ["fs"; "code_id"; "my_closure"; "usage"]
+         in
+         [ out_unknown_arity fs;
+           in_code_id fs code_id;
+           code_id_my_closure_rel code_id my_closure;
+           usages_rel my_closure usage ]
+         ==> out2 fs usage) ]
     in
     let q1 =
-      mk_exists_query [] ["x"; "fs"] (fun [] [x; fs] ->
-          [out1 x; field_usages_top_rel x fs; in_all_fs fs])
+      mk_exists_query [] ["fs0"; "x"; "fs"] (fun [] [fs0; x; fs] ->
+          [out2 fs0 x; field_usages_top_rel x fs; in_all_fs fs])
     in
     let q2 =
-      mk_exists_query [] ["x"] (fun [] [x] -> [out1 x; any_usage_pred x])
+      mk_exists_query [] ["fs0"; "x"] (fun [] [fs0; x] ->
+          [out2 fs0 x; any_usage_pred x])
     in
-    fun db usages current_function_slot all_function_slots ->
+    let q3 =
+      mk_exists_query [] ["fs"] (fun [] [fs] ->
+          [out_known_arity fs; in_unknown_code_id fs])
+    in
+    let q4 =
+      mk_exists_query [] ["fs"] (fun [] [fs] ->
+          [out_unknown_arity fs; in_unknown_code_id fs])
+    in
+    fun db usages current_function_slot code_ids_of_function_slots ->
       let[@local] any () =
         ( Any_usage,
           Function_slot.Map.map
             (fun _ -> Any_usage, Any_call)
-            all_function_slots )
+            code_ids_of_function_slots )
       in
       match usages with
       | Any_usage -> any ()
@@ -2051,11 +2119,41 @@ module Rewriter = struct
             (Function_slot.Map.fold
                (fun fs _ m ->
                  Field.Encoded.Map.add (Field.encode (Function_slot fs)) () m)
-               all_function_slots Field.Encoded.Map.empty)
+               code_ids_of_function_slots Field.Encoded.Map.empty)
+            db
+        in
+        let db =
+          Datalog.set_table in_code_id_tbl
+            (Function_slot.Map.fold
+               (fun fs (code_id : _ Or_unknown.t) m ->
+                 match code_id with
+                 | Unknown -> m
+                 | Known code_id ->
+                   Field.Encoded.Map.add
+                     (Field.encode (Function_slot fs))
+                     (Code_id_or_name.Map.singleton
+                        (Code_id_or_name.code_id code_id)
+                        ())
+                     m)
+               code_ids_of_function_slots Field.Encoded.Map.empty)
+            db
+        in
+        let db =
+          Datalog.set_table in_unknown_code_id_tbl
+            (Function_slot.Map.fold
+               (fun fs (code_id : _ Or_unknown.t) m ->
+                 match code_id with
+                 | Known _ -> m
+                 | Unknown ->
+                   Field.Encoded.Map.add (Field.encode (Function_slot fs)) () m)
+               code_ids_of_function_slots Field.Encoded.Map.empty)
             db
         in
         let db = Datalog.Schedule.run (Datalog.Schedule.saturate rs) db in
-        if exists_with_parameters q1 [] db || exists_with_parameters q2 [] db
+        if exists_with_parameters q1 [] db
+           || exists_with_parameters q2 [] db
+           || exists_with_parameters q3 [] db
+           || exists_with_parameters q4 [] db
         then any ()
         else
           let uses_for_value_slots = Datalog.get_table out1_tbl db in
@@ -2224,8 +2322,18 @@ module Rewriter = struct
         let function_slot_types =
           Flambda2_types.Closures_entry.function_slot_types closures_entry
         in
+        let code_id_of_function_slots =
+          Function_slot.Map.mapi
+            (fun function_slot _ ->
+              let function_type =
+                Closures_entry.find_function_type closures_entry function_slot
+              in
+              Or_unknown.map function_type ~f:Function_type.code_id)
+            function_slot_types
+        in
         let usages_for_value_slots, usages_of_function_slots =
-          uses_for_set_of_closures db usages function_slot function_slot_types
+          uses_for_set_of_closures db usages function_slot
+            code_id_of_function_slots
         in
         let[@local] change_representation_of_closures fields value_slots_reprs
             function_slots_reprs =
@@ -2241,9 +2349,14 @@ module Rewriter = struct
                 Expr.var v)
               usages_of_function_slots
           in
+          Format.eprintf "OLD->NEW function slots: %a@."
+            (Function_slot.Map.print Function_slot.print)
+            function_slots_reprs;
           let all_function_slots_in_set =
             Function_slot.Map.fold
               (fun function_slot (_, uses) m ->
+                Format.eprintf "OLD function slot: %a@." Function_slot.print
+                  function_slot;
                 let new_function_slot =
                   Function_slot.Map.find function_slot function_slots_reprs
                 in
@@ -2354,18 +2467,12 @@ module Rewriter = struct
             (Expr.exactly_this_closure function_slot ~all_function_slots_in_set
                ~all_closure_types_in_set ~all_value_slots_in_set alloc_mode)
         in
-        (* Don't handle representation change for now *)
         match usages_for_value_slots with
         | Usages usages_for_value_slots ->
-          let usages =
-            match usages with
-            | Any_usage -> assert false
-            | Usages usages -> usages
-          in
           if Code_id_or_name.Map.exists
                (fun clos () ->
                  Code_id_or_name.Map.mem clos result.changed_representation)
-               usages
+               usages_for_value_slots
           then (
             assert (
               Code_id_or_name.Map.for_all
@@ -2380,7 +2487,7 @@ module Rewriter = struct
                 (Code_id_or_name.Map.mapi
                    (fun clos () ->
                      Code_id_or_name.Map.find clos result.changed_representation)
-                   usages)
+                   usages_for_value_slots)
             in
             let value_slots_reprs, function_slots_reprs, alloc_point =
               match snd (List.hd changed_representation) with
