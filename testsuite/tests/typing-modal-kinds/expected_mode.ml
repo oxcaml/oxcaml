@@ -38,7 +38,7 @@ end
 module Hidden_string : sig type t val hide : string -> t end
 module Hidden_int : sig type t : immediate val hide : int -> t end
 module Hidden_float_u :
-  sig type t : float64 mod global aliased many val hide : float# -> t end
+  sig type t : float64 mod global many val hide : float# -> t end
 module Hidden_function :
   sig type (-'a, +'b) t val hide : ('a -> 'b) -> ('a, 'b) t end
 |}]

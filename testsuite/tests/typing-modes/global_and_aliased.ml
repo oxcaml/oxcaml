@@ -115,3 +115,52 @@ type 'a mut6 = { mutable x6 : 'a @@ unique }
 File "_none_", line 1:
 Error: "global" modality can't be used together with "unique"
 |}]
+
+(* [mod global] implies [mod aliased]. *)
+
+type ('a : value mod global) u_global
+
+type ('a : value mod aliased) u_aliased
+
+type w_aliased : value mod aliased
+
+type w_global : value mod global
+
+[%%expect{|
+type ('a : value mod global) u_global
+type ('a : value mod aliased) u_aliased
+type w_aliased : value mod aliased
+type w_global : value mod global
+|}]
+
+type _fail = w_aliased u_global
+
+[%%expect{|
+Line 1, characters 13-22:
+1 | type _fail = w_aliased u_global
+                 ^^^^^^^^^
+Error: This type "w_aliased" should be an instance of type
+         "('a : value mod global)"
+       The kind of w_aliased is value mod aliased
+         because of the definition of w_aliased at line 5, characters 0-34.
+       But the kind of w_aliased must be a subkind of value mod global
+         because of the definition of u_global at line 1, characters 0-37.
+|}]
+
+type _z2 = w_global u_global
+
+[%%expect{|
+type _z2 = w_global u_global
+|}]
+
+type _z3 = w_aliased u_aliased
+
+[%%expect{|
+type _z3 = w_aliased u_aliased
+|}]
+
+type _z4 = w_global u_aliased
+
+[%%expect{|
+type _z4 = w_global u_aliased
+|}]
