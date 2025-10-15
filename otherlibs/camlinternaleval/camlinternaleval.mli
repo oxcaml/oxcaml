@@ -32,3 +32,24 @@
 
 (** Evaluate a quoted OCaml expression at runtime. *)
 val eval : CamlinternalQuote.Code.t -> Obj.t
+
+module type Jit_intf = sig
+  val jit_load
+    :  phrase_name:string
+    -> Format.formatter
+    -> Lambda.program
+    -> (Obj.t, exn) Result.t
+
+  val jit_lookup_symbol : string -> Obj.t option
+end
+
+(** Use the given JIT and do all symbol lookups, including for .cmi and
+    .cmx bundles, through it (in addition to compilation). *)
+val set_jit : (module Jit_intf) -> unit
+
+(** Force re-reading of bundled .cmi and .cmx files, in case the underlying
+    symbol definitions (when having used [set_jit]) have changed.
+    Calling this from an actual quotation during evaluation will result in
+    a deadlock, so don't do that. *)
+val reread_bundled_cmis_and_cmxs : unit -> unit
+
