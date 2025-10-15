@@ -79,7 +79,7 @@ ocamlc_cppflags
 ocamlopt_cflags
 ocamlopt_cppflags
 os_type
-ox
+oxcaml
 oxcaml_dwarf
 parameterised_modules
 poll_insertion

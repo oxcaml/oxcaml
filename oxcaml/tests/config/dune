@@ -21,3 +21,24 @@
  (enabled_if (= %{context_name} "main"))
  (deps ocamlc_config.output ocamlopt_config.output)
  (action (diff ocamlc_config.output ocamlopt_config.output)))
+
+(rule
+ (target config_mli_vars.output)
+ (deps (source_tree %{workspace_root}/utils/config.mli) extract_mli_vars.sh)
+ (action (with-outputs-to %{target}
+          (bash "./extract_mli_vars.sh %{workspace_root}/utils/config.mli"))))
+
+(rule
+ (target legacy_config_vars_printed_for_compatibility.output)
+ (deps config_print_all.expected config_mli_vars.output)
+ (action (with-outputs-to %{target}
+         (with-accepted-exit-codes 1
+         (bash "patdiff -ascii -context 0 config_mli_vars.output config_print_all.expected")))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (deps  legacy_config_vars_printed_for_compatibility.expected
+        legacy_config_vars_printed_for_compatibility.output)
+ (action (diff legacy_config_vars_printed_for_compatibility.expected
+               legacy_config_vars_printed_for_compatibility.output)))
