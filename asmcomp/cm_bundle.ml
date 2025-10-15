@@ -117,6 +117,12 @@ let cmx_bundle ~quoted_globals =
       in
       raw_info, serialized_sections)
 
+let marshalled_cmi_bundle ~quoted_globals =
+  Marshal.to_string (cmi_bundle ~quoted_globals) []
+
+let marshalled_cmx_bundle ~quoted_globals =
+  Marshal.to_string (cmx_bundle ~quoted_globals) []
+
 let make_bundled_cm_file unix ~ppf_dump ~quoted_globals ~output_name
     ~named_startup_file =
   let bundled_cm =
@@ -143,16 +149,15 @@ let make_bundled_cm_file unix ~ppf_dump ~quoted_globals ~output_name
         ~disable_dwarf:(not !Dwarf_flags.dwarf_for_startup_file)
         ~sourcefile:sourcefile_for_dwarf;
       Emit.begin_assembly unix;
-      let bundle_cm name value cont =
+      let bundle_cm name string cont =
         let symbol = { Cmm.sym_name = name; sym_global = Global } in
-        let string = Marshal.to_string value [] in
         Cmm_helpers.emit_string_constant symbol string cont
       in
       let cont =
-        bundle_cm "caml_bundled_cmis" (cmi_bundle ~quoted_globals) []
+        bundle_cm "caml_bundled_cmis" (marshalled_cmi_bundle ~quoted_globals) []
       in
       let cont =
-        bundle_cm "caml_bundled_cmxs" (cmx_bundle ~quoted_globals) cont
+        bundle_cm "caml_bundled_cmxs" (marshalled_cmx_bundle ~quoted_globals) cont
       in
       Asmgen.compile_phrase ~ppf_dump (Cmm.Cdata cont);
       Emit.end_assembly ());

@@ -43,13 +43,18 @@ module type Jit_intf = sig
   val jit_lookup_symbol : string -> Obj.t option
 end
 
-(** Use the given JIT and do all symbol lookups, including for .cmi and
-    .cmx bundles, through it (in addition to compilation). *)
+(** Use the given JIT instead of the compiler's one.  This will also suppress
+    reading of bundles from the executable itself.  You must then use
+    [set_bundled_cmis_and_cmxs], below, instead. *)
 val set_jit : (module Jit_intf) -> unit
 
-(** Force re-reading of bundled .cmi and .cmx files, in case the underlying
-    symbol definitions (when having used [set_jit]) have changed.
+(** Provide new .cmi and .cmx bundles to use.  Will cause an error if [set_jit]
+    has not been called first.
     Calling this from an actual quotation during evaluation will result in
     a deadlock, so don't do that. *)
-val reread_bundled_cmis_and_cmxs : unit -> unit
+(* CR mshinwell: we could actually skip the (de)marshalling here *)
+val set_bundled_cmis_and_cmxs
+   : marshalled_cmi_bundle:string
+  -> marshalled_cmx_bundle:string
+  -> unit
 

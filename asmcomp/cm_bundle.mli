@@ -40,3 +40,11 @@ val make_bundled_cm_file :
   output_name:string ->
   named_startup_file:bool ->
   string
+
+val marshalled_cmi_bundle :
+  quoted_globals:Compilation_unit.Name.Set.t
+  -> string
+
+val marshalled_cmx_bundle :
+  quoted_globals:Compilation_unit.Name.Set.t
+  -> string

@@ -52,11 +52,11 @@ end
 
 let jit = ref (module Default_jit : Jit_intf)
 
-let use_jit_for_bundle_lookups = ref false
+let use_exe_for_bundle_lookups = ref true
 
 let set_jit new_jit =
   jit := new_jit;
-  use_jit_for_bundle_lookups := true
+  use_exe_for_bundle_lookups := false
 
 module Jit = struct
   let jit_load ~phrase_name fmt prog =
@@ -76,31 +76,21 @@ external bundled_cmxs_this_exe : unit -> bundle = "caml_bundled_cmxs_this_exe"
 
 external bundle_not_available : bundle -> bool = "caml_bundle_not_available"
 
-let find_bundle ~ext get_this_exe =
-  if !use_jit_for_bundle_lookups then
-    let symbol = "caml_bundled_" ^ ext ^ "s" in
-    match Jit.jit_lookup_symbol symbol with
-    | Some obj -> ((Obj.obj obj) : bundle)
-    | None -> failwith ("JIT did not find the '" ^ symbol ^ "' symbol")
+let find_bundle_in_exe ~ext get_this_exe =
+  let bundle = get_this_exe () in
+  if bundle_not_available bundle then
+    failwith ("Executable does not contain ."
+              ^ ext ^ " bundle and [set_jit] has not been called")
   else
-    let bundle = get_this_exe () in
-    if bundle_not_available bundle then
-      failwith ("Executable does not contain ."
-        ^ ext ^ " bundle and no replacement JIT given")
-    else
-      bundle
-
-let bundled_cmis () = find_bundle ~ext:"cmi" bundled_cmis_this_exe
-let bundled_cmxs () = find_bundle ~ext:"cmx" bundled_cmxs_this_exe
+    bundle
 
 let cmis = ref Compilation_unit.Name.Map.empty
 
 let cmxs = ref []
 
-let reread_bundled_cmis_and_cmxs0 () =
-  let marshaled = bundled_cmis () in
+let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
   let bundled_cmis : Cmi_format.cmi_infos Compilation_unit.Name.Map.t =
-    Marshal.from_string (marshaled :> string) 0
+    Marshal.from_string marshalled_cmi_bundle 0
   in
   let new_cmis =
     Compilation_unit.Name.Map.map
@@ -108,9 +98,8 @@ let reread_bundled_cmis_and_cmxs0 () =
         { cmi with cmi_sign = Subst.Lazy.of_signature cmi.cmi_sign })
       bundled_cmis
   in
-  let marshaled = bundled_cmxs () in
   let bundled_cmxs : (Cmx_format.unit_infos_raw * string array) list =
-    Marshal.from_string (marshaled :> string) 0
+    Marshal.from_string marshalled_cmx_bundle 0
   in
   let new_cmxs =
     List.map
@@ -145,10 +134,22 @@ let reread_bundled_cmis_and_cmxs0 () =
   cmis := new_cmis;
   cmxs := new_cmxs
 
+let read_bundles_from_exe () =
+  (* The [api_mutex] is already held at this point *)
+  assert !use_exe_for_bundle_lookups;
+  let marshalled_cmi_bundle = find_bundle_in_exe ~ext:"cmi" bundled_cmis_this_exe in
+  let marshalled_cmx_bundle = find_bundle_in_exe ~ext:"cmx" bundled_cmxs_this_exe in
+  let marshalled_cmi_bundle = (marshalled_cmi_bundle :> string) in
+  let marshalled_cmx_bundle = (marshalled_cmx_bundle :> string) in
+  read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle
+
 let api_mutex = Mutex.create ()
 
-let reread_bundled_cmis_and_cmxs () =
-  Mutex.protect api_mutex reread_bundled_cmis_and_cmxs0
+let set_bundled_cmis_and_cmxs ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
+  if !use_exe_for_bundle_lookups then
+    failwith "Must call [set_jit] before [set_bundled_cmis_and_cmxs]";
+  Mutex.protect api_mutex (fun () ->
+    read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle)
 
 let counter = ref 0
 
@@ -156,7 +157,7 @@ let eval code =
   (* TODO: assert Linux x86-64 *)
   let id = !counter in
   incr counter;
-  if id = 0 then reread_bundled_cmis_and_cmxs ();
+  if id = 0 && !use_exe_for_bundle_lookups then read_bundles_from_exe ();
   (* TODO: reset all the things *)
   Clflags.no_cwd := true;
   Clflags.native_code := true;
