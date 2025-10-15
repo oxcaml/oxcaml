@@ -176,7 +176,7 @@ let configuration_variables () =
   p_bool "no_stack_checks" no_stack_checks;
   p_bool "multidomain" multidomain;
   p_bool "poll_insertion" poll_insertion;
-  p_bool "ox" oxcaml;
+  p_bool "oxcaml" oxcaml;
   p_bool "oxcaml_dwarf" oxcaml_dwarf;
   p "objcopy" objcopy;
 
