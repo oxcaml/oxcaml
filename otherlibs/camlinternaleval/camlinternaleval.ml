@@ -148,8 +148,7 @@ let api_mutex = Mutex.create ()
 let set_bundled_cmis_and_cmxs ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
   if !use_exe_for_bundle_lookups then
     failwith "Must call [set_jit] before [set_bundled_cmis_and_cmxs]";
-  Mutex.protect api_mutex (fun () ->
-    read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle)
+  read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle
 
 let counter = ref 0
 
