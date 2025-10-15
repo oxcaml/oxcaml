@@ -1692,11 +1692,16 @@ let map_from_allocation_points_to_dominated =
      "y"] in [ sources_rel x y; not (multiple_allocation_points x) ] ==>
      dominator y x in [ map_rule; dominator_rule ] *)
   let open! Syntax in
+  let any_source_query =
+    compile ["x"] (fun [x] ->
+        where [Global_flow_graph.any_source_pred x] (yield [x]))
+  in
   let sources_query =
     compile ["x"; "y"] (fun [x; y] -> where [sources_rel x y] (yield [x; y]))
   in
   fun db ->
     let h = Hashtbl.create 17 in
+    Cursor.iter ~f:(fun [x] -> Hashtbl.replace h x None) any_source_query db;
     Cursor.iter
       ~f:(fun [x; y] ->
         if Hashtbl.mem h x
@@ -2226,7 +2231,7 @@ module Rewriter = struct
       match unboxed_fields with
       | Not_unboxed x ->
         let v = Var.create () in
-        (Some v, x) :: acc, Pattern.var v (var field_use)
+        (Some v, x) :: acc, Pattern.var v (var x field_use)
       | Unboxed unboxed_fields -> (
         match field_use with
         | Used_as_top ->
@@ -2402,7 +2407,7 @@ module Rewriter = struct
             patterns_for_unboxed_fields
               ~machine_width:(Typing_env.machine_width typing_env)
               ~bind_function_slots db
-              ~var:(fun field_use ->
+              ~var:(fun _ field_use ->
                 let metadata =
                   match field_use with
                   | Used_as_top -> Any_usage
@@ -2764,10 +2769,48 @@ let rewrite_result_types result ~old_typing_env func_params func_results
     let kind = Variable.kind var in
     let name = Variable.name var in
     let var = Code_id_or_name.var var in
+    let db = result.db in
     if Code_id_or_name.Map.mem var result.unboxed_fields
-    then failwith "todo"
+    then (
+      let unboxed_fields = Code_id_or_name.Map.find var result.unboxed_fields in
+      if is_top db var
+      then
+        Misc.fatal_errorf "In [rewrite_result_types], var %a is unboxed but top"
+          Code_id_or_name.print var;
+      let fields =
+        get_fields db
+          (get_all_usages ~follow_known_arity_calls:true db
+             (Code_id_or_name.Map.singleton var ()))
+      in
+      let bound, pat =
+        Rewriter.patterns_for_unboxed_fields
+          ~machine_width:(Typing_env.machine_width old_typing_env)
+          ~bind_function_slots:None db
+          ~var:(fun v field_use ->
+            let metadata =
+              match field_use with
+              | Used_as_top -> Rewriter.Any_usage
+              | Used_as_vars flow_to ->
+                let usages = get_direct_usages db flow_to in
+                Rewriter.Usages usages
+            in
+            Variable.name v, (result, metadata))
+          fields unboxed_fields []
+      in
+      let all_vars =
+        List.rev_map
+          (fun (pattern_var, v) ->
+            if Option.is_none pattern_var
+            then
+              Format.eprintf
+                "In [rewrite_result_types], could not get a pattern variable \
+                 for unboxed var %a@."
+                Variable.print v;
+            Option.get pattern_var)
+          bound
+      in
+      (pat, kind), all_vars)
     else
-      let db = result.db in
       let metadata =
         if is_top db var
         then result, Rewriter.Any_usage
@@ -2820,43 +2863,83 @@ let rewrite_result_types result ~old_typing_env func_params func_results
       new_result_types;
   new_result_types
 
-let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db fields name_prefix =
+type single_field_source =
+  | No_source
+  | One of Code_id_or_name.t
+  | Many
+
+let _z = [No_source; Many]
+
+let get_single_field_source =
+  let _q_any_source =
+    mk_exists_query ["block"; "field"] [] (fun [block; field] [] ->
+        [field_sources_top_rel block field])
+  in
+  let _q_source =
+    Datalog.(
+      compile_with_parameters ["block"; "field"] [] (fun [block; field] [] ->
+          foreach ["source"] (fun [source] ->
+              where [field_sources_rel block field source] (yield [source]))))
+  in
+  fun _db block _field -> One block
+(* let field = Field.encode field in if exists_with_parameters q_any_source
+   [block; field] db then Many else Datalog.Cursor.fold_with_parameters q_source
+   [block; field] db ~init:No_source ~f:(fun [source] acc -> match acc with
+   No_source -> One source | One _ | Many -> Many) *)
+
+let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
+    name_prefix =
   Field.Map.filter_map
     (fun field field_use ->
       match field with
       | Function_slot _ | Code_id_of_call_witness | Apply _ -> assert false
       | Code_of_closure _ -> None
       | Block _ | Value_slot _ | Is_int | Get_tag -> (
-        let new_name =
-          Flambda_colours.without_colours ~f:(fun () ->
-              Format.asprintf "%s_field_%a" name_prefix Field.print field)
-        in
-        let[@local] default () =
-          Some (Not_unboxed (mk (Field.kind field) new_name))
-        in
-        match field_use with
-        | Used_as_top -> default ()
-        | Used_as_vars flow_to ->
-          if Code_id_or_name.Map.is_empty flow_to
-          then Misc.fatal_errorf "Empty set in [get_fields]";
-          if Code_id_or_name.Map.for_all
-               (fun k () -> has_to_be_unboxed k)
-               flow_to
-          then
-            Some
-              (Unboxed
-                 (mk_unboxed_fields ~has_to_be_unboxed ~mk db
-                    (get_fields db
-                       (get_all_usages ~follow_known_arity_calls:true db flow_to))
-                    new_name))
-          else if Code_id_or_name.Map.exists
-                    (fun k () -> has_to_be_unboxed k)
-                    flow_to
-          then
-            Misc.fatal_errorf
-              "Field %a of %s flows to both unboxed and non-unboxed variables"
-              Field.print field name_prefix
-          else default ()))
+        let field_source = get_single_field_source db unboxed_block field in
+        match field_source with
+        | No_source -> None
+        | One _ | Many -> (
+          let new_name =
+            Flambda_colours.without_colours ~f:(fun () ->
+                Format.asprintf "%s_field_%a" name_prefix Field.print field)
+          in
+          let[@local] default () =
+            Some (Not_unboxed (mk (Field.kind field) new_name))
+          in
+          match field_use with
+          | Used_as_top -> default ()
+          | Used_as_vars flow_to ->
+            if Code_id_or_name.Map.is_empty flow_to
+            then Misc.fatal_errorf "Empty set in [get_fields]";
+            if Code_id_or_name.Map.for_all
+                 (fun k () -> has_to_be_unboxed k)
+                 flow_to
+            then
+              let new_unboxed_block =
+                match field_source with
+                | No_source -> assert false
+                | Many ->
+                  Misc.fatal_errorf
+                    "[mk_unboxed_fields]: unboxed fields, but [Many] sources"
+                | One v -> v
+              in
+              let unboxed_fields =
+                mk_unboxed_fields ~has_to_be_unboxed ~mk db new_unboxed_block
+                  (get_fields db
+                     (get_all_usages ~follow_known_arity_calls:true db flow_to))
+                  new_name
+              in
+              if false && Field.Map.is_empty unboxed_fields
+              then None
+              else Some (Unboxed unboxed_fields)
+            else if Code_id_or_name.Map.exists
+                      (fun k () -> has_to_be_unboxed k)
+                      flow_to
+            then
+              Misc.fatal_errorf
+                "Field %a of %s flows to both unboxed and non-unboxed variables"
+                Field.print field name_prefix
+            else default ())))
     fields
 
 let fixpoint (graph : Global_flow_graph.graph) =
@@ -2928,7 +3011,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
           let fields =
             mk_unboxed_fields ~has_to_be_unboxed
               ~mk:(fun kind name -> Variable.create name kind)
-              db
+              db code_or_name
               (get_fields db
                  (get_all_usages ~follow_known_arity_calls:true db
                     (Code_id_or_name.Map.singleton to_patch ())))
@@ -2939,7 +3022,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
     to_unbox;
   if debug
   then
-    Format.printf "new vars: %a"
+    Format.printf "TO UNBOX: %a@."
       (Code_id_or_name.Map.print
          (Field.Map.print (pp_unboxed_elt Variable.print)))
       !unboxed;
@@ -2983,7 +3066,8 @@ let fixpoint (graph : Global_flow_graph.graph) =
               (Code_id_or_name.Map.singleton code_id_or_name ())
           in
           let repr =
-            mk_unboxed_fields ~has_to_be_unboxed ~mk db (get_fields db uses) ""
+            mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name
+              (get_fields db uses) ""
           in
           add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
         | Set_of_closures l ->
@@ -2999,7 +3083,8 @@ let fixpoint (graph : Global_flow_graph.graph) =
                  Code_id_or_name.Map.empty l)
           in
           let repr =
-            mk_unboxed_fields ~has_to_be_unboxed ~mk db fields "unboxed"
+            mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name fields
+              "unboxed"
           in
           let fss =
             List.fold_left

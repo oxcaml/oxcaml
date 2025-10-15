@@ -1585,28 +1585,41 @@ and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
   let bound_pattern, new_defining_expr, res =
     default_defining_expr_for_rebuilding_let env res bound_pattern defining_expr
   in
-  let subexpr, res =
-    match (bound_pattern : Bound_pattern.t) with
-    | Set_of_closures _ | Static _ ->
-      rebuild_let_expr_holed0 env res ~bound_pattern ~defining_expr
-        ~new_defining_expr ~hole
-    | Singleton v ->
-      let v = Bound_var.var v in
-      (* CR ncourant: we should probably properly track regions *)
-      let is_begin_region =
-        match defining_expr with
-        | Named (Prim (prim, _)) -> P.is_begin_region prim
-        | Named (Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _)
-        | Set_of_closures _ | Static_consts _ ->
-          false
-      in
-      if is_begin_region || is_var_used env v
-      then
+  if Bound_pattern.fold_all_bound_vars bound_pattern
+       ~f:(fun b v -> b || is_dead_var env (Bound_var.var v))
+       ~init:false
+  then
+    ( RE.from_expr
+        ~expr:
+          (Expr.create_invalid
+             (Message
+                (Format.asprintf "Dead variable in bound pattern: %a"
+                   Bound_pattern.print bound_pattern)))
+        ~free_names:Name_occurrences.empty,
+      res )
+  else
+    let subexpr, res =
+      match (bound_pattern : Bound_pattern.t) with
+      | Set_of_closures _ | Static _ ->
         rebuild_let_expr_holed0 env res ~bound_pattern ~defining_expr
           ~new_defining_expr ~hole
-      else hole, res
-  in
-  rebuild_holed env res parent subexpr
+      | Singleton v ->
+        let v = Bound_var.var v in
+        (* CR ncourant: we should probably properly track regions *)
+        let is_begin_region =
+          match defining_expr with
+          | Named (Prim (prim, _)) -> P.is_begin_region prim
+          | Named (Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _)
+          | Set_of_closures _ | Static_consts _ ->
+            false
+        in
+        if is_begin_region || is_var_used env v
+        then
+          rebuild_let_expr_holed0 env res ~bound_pattern ~defining_expr
+            ~new_defining_expr ~hole
+        else hole, res
+    in
+    rebuild_holed env res parent subexpr
 
 and rebuild_holed (env : env) res (rev_expr : Rev_expr.rev_expr_holed)
     (hole : RE.t) : RE.t * rebuild_result =
