@@ -386,6 +386,10 @@ jobs:
         done
         for allocator in irc ls gi; do \
           ./_build/main/tools/regalloc/regalloc.exe _build \
+            -validate -insert-prologue -regalloc $allocator || exit 1; \
+        done
+        for allocator in irc ls gi; do \
+          ./_build/main/tools/regalloc/regalloc.exe _build \
             -validate -param SPLIT_AROUND_LOOPS:on -regalloc $allocator || exit 1; \
         done
 
