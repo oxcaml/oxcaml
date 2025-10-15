@@ -2295,24 +2295,22 @@ let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)
 
 and layout_of_scannable_kind = function
-  | Pext_scannable -> layout_int
-  | Paddr_scannable -> layout_value_field
+  | Pext_scannable | Paddr_scannable -> layout_value_field
   | Pproduct_scannable kinds -> layout_of_scannable_kinds kinds
 
 let rec layout_of_ignorable_kinds kinds =
   Punboxed_product (List.map layout_of_ignorable_kind kinds)
 
 and layout_of_ignorable_kind = function
-  | Pext_ignorable -> layout_int
+  | Pext_ignorable -> layout_value_field
   | Punboxedfloat_ignorable f -> layout_unboxed_float f
   | Punboxedoruntaggedint_ignorable i -> layout_unboxed_int i
   | Pproduct_ignorable kinds -> layout_of_ignorable_kinds kinds
 
 let array_ref_kind_result_layout = function
-  | Pextarray_ref -> layout_int
   | Pfloatarray_ref _ -> layout_boxed_float Boxed_float64
   | Punboxedfloatarray_ref bf -> layout_unboxed_float bf
-  | Pgenarray_ref _ | Paddrarray_ref -> layout_value_field
+  | Pgenarray_ref _ | Paddrarray_ref | Pextarray_ref -> layout_value_field
   | Punboxedoruntaggedintarray_ref i -> layout_unboxed_int i
   | Punboxedvectorarray_ref bv -> layout_unboxed_vector bv
   | Pgcscannableproductarray_ref kinds -> layout_of_scannable_kinds kinds

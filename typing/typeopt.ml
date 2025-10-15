@@ -121,7 +121,7 @@ let type_sort ~why env loc ty =
    products and in the latter it would be wasteful to compute that information,
    so this type is polymorphic in what it remembers about products. *)
 type 'a classification =
-  | Int   (* any immediate type *)
+  | Immediate_or_null
   | Float
   | Void
   | Unboxed_float of unboxed_float
@@ -139,11 +139,8 @@ let classify ~classify_product env ty sort : _ classification =
   let ty = scrape_ty env ty in
   match (sort : Jkind.Sort.Const.t) with
   | Base Value -> begin
-  (* CR or_null: [immediate_or_null] arrays can be intarrays once that is
-     supported by the middle-end *)
   if Ctype.is_always_gc_ignorable env ty
-    && Ctype.check_type_nullability env ty Non_null
-  then Int
+  then Immediate_or_null
   else match get_desc ty with
   | Tvar _ | Tunivar _ ->
       Any
@@ -275,7 +272,7 @@ let array_kind_of_elt ~elt_sort env loc ty =
     else Paddrarray
   | Float -> if Config.flat_float_array then Pfloatarray else Paddrarray
   | Addr | Lazy -> Paddrarray
-  | Int -> Pextarray
+  | Immediate_or_null -> Pextarray
   | Unboxed_float f -> Punboxedfloatarray f
   | Unboxed_int Untagged_int -> Punboxedoruntaggedintarray Untagged_int
   | Unboxed_int Unboxed_int64 -> Punboxedoruntaggedintarray Unboxed_int64
@@ -1143,7 +1140,7 @@ let lazy_val_requires_forward env loc ty =
   | Unboxed_float _ | Unboxed_int _ | Unboxed_vector _ | Void ->
     Misc.fatal_error "Unboxed value encountered inside lazy expression"
   | Float -> Config.flat_float_array
-  | Addr | Int -> false
+  | Addr | Immediate_or_null -> false
   | Product _ -> assert false (* because [classify_product] raises *)
 
 (** The compilation of the expression [lazy e] depends on the form of e:
