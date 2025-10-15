@@ -2185,6 +2185,13 @@ module Rewriter = struct
   let rec patterns_for_unboxed_fields ~machine_width ~bind_function_slots db
       ~var fields unboxed_fields acc =
     let open Flambda2_types.Rewriter in
+    Format.eprintf "FIELD_USAGE = %a@.unboxed_fields = %a@."
+      (Field.Map.print (fun ff -> function
+         | Used_as_top -> Format.fprintf ff "Top"
+         | Used_as_vars vs -> Code_id_or_name.Map.print Unit.print ff vs))
+      fields
+      (Field.Map.print (pp_unboxed_elt (fun ff _ -> Format.fprintf ff "_")))
+      unboxed_fields;
     let combined =
       Field.Map.merge
         (fun field field_use unboxed_field ->
@@ -2234,7 +2241,23 @@ module Rewriter = struct
           patterns_for_unboxed_fields ~machine_width ~bind_function_slots:None
             db ~var fields unboxed_fields acc)
     in
+    let[@local] closure value_slots =
+      let value_slots = Value_slot.Map.bindings value_slots in
+      let acc, pats =
+        List.fold_left_map
+          (fun acc (value_slot, use) ->
+            let acc, pat = for_one_use use acc in
+            acc, Pattern.value_slot value_slot pat)
+          acc value_slots
+      in
+      let pats =
+        match bind_function_slots with None -> pats | Some p -> p @ pats
+      in
+      acc, Pattern.closure pats
+    in
     match classify_field_map combined with
+    | Empty when Option.is_some bind_function_slots ->
+      closure Value_slot.Map.empty
     | Empty | Could_not_classify ->
       ( Field.Map.fold
           (fun _ (_, unboxed_fields) acc -> forget unboxed_fields acc)
@@ -2274,18 +2297,7 @@ module Rewriter = struct
       !acc, Pattern.block !pats
     | Closure_fields (value_slots, function_slots) ->
       assert (Function_slot.Map.is_empty function_slots);
-      let value_slots = Value_slot.Map.bindings value_slots in
-      let acc, pats =
-        List.fold_left_map
-          (fun acc (value_slot, use) ->
-            let acc, pat = for_one_use use acc in
-            acc, Pattern.value_slot value_slot pat)
-          acc value_slots
-      in
-      let pats =
-        match bind_function_slots with None -> pats | Some p -> p @ pats
-      in
-      acc, Pattern.closure pats
+      closure value_slots
 
   let rewrite (result, usages) typing_env flambda_type =
     let open Flambda2_types.Rewriter in
@@ -2338,6 +2350,7 @@ module Rewriter = struct
         let[@local] change_representation_of_closures fields value_slots_reprs
             function_slots_reprs =
           let patterns = ref [] in
+          Format.eprintf "OLD type: %a@." Flambda2_types.print flambda_type;
           Format.eprintf "OLD->NEW function slots: %a@."
             (Function_slot.Map.print Function_slot.print)
             function_slots_reprs;
