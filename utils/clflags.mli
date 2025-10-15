@@ -146,6 +146,7 @@ val applicative_functors : bool ref
 val make_runtime : bool ref
 val c_compiler : string option ref
 val no_auto_link : bool ref
+val no_auto_camlinternaleval : bool ref
 val dllpaths : string list ref
 val make_package : bool ref
 val for_package : string option ref

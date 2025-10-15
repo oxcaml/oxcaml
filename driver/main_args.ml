@@ -388,6 +388,11 @@ let mk_noautolink_opt f =
   "-noautolink", Arg.Unit f,
   " Do not automatically link C libraries specified in .cmxa files"
 
+let mk_no_auto_camlinternaleval f =
+  "-no-auto-camlinternaleval", Arg.Unit f,
+  " Do not link the Camlinternaleval library and its dependencies even if \
+   metaprogramming quotations requiring evaluation are found at link time"
+
 let mk_nodynlink f =
   "-nodynlink", Arg.Unit f,
   " Enable optimizations for code that will not be dynlinked"
@@ -1259,6 +1264,7 @@ module type Optcomp_options = sig
   include Compiler_options
   include Optcommon_options
   val _nodynlink : unit -> unit
+  val _no_auto_camlinternaleval : unit -> unit
   val _p : unit -> unit
   val _pp : string -> unit
   val _S : unit -> unit
@@ -1649,6 +1655,7 @@ struct
     mk_no_float_const_prop F._no_float_const_prop;
     mk_noassert F._noassert;
     mk_noautolink_opt F._noautolink;
+    mk_no_auto_camlinternaleval F._no_auto_camlinternaleval;
     mk_nodynlink F._nodynlink;
     mk_no_insn_sched F._no_insn_sched;
     mk_nolabels F._nolabels;
@@ -2371,6 +2378,7 @@ module Default = struct
     let _no_keep_docs = clear keep_docs
     let _no_keep_locs = clear keep_locs
     let _noautolink = set no_auto_link
+    let _no_auto_camlinternaleval = set no_auto_camlinternaleval
     let _o s = output_name := (Some s)
     let _opaque = set opaque
     let _pack = set make_package
