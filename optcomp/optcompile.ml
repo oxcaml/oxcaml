@@ -289,15 +289,12 @@ let native unix
 
     let extra_load_paths_for_eval = ["unix"; "compiler-libs"; "ocaml-jit"]
 
-    let extra_libraries_for_eval () =
-      if !Clflags.no_auto_camlinternaleval
-      then []
-      else
-        [ "unix/unix";
-          "compiler-libs/ocamlcommon";
-          "compiler-libs/ocamloptcomp";
-          "ocaml-jit/jit";
-          "camlinternaleval" ]
+    let extra_libraries_for_eval =
+      [ "unix/unix";
+        "compiler-libs/ocamlcommon";
+        "compiler-libs/ocamloptcomp";
+        "ocaml-jit/jit";
+        "camlinternaleval" ]
 
     let support_files_for_eval () =
       List.iter
@@ -305,5 +302,5 @@ let native unix
           Load_path.add_dir ~hidden:false
             (Misc.expand_directory Config.standard_library ("+" ^ lib)))
         extra_load_paths_for_eval;
-      List.map (fun lib -> lib ^ ext_flambda_lib) (extra_libraries_for_eval ())
+      List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval
   end) : S)

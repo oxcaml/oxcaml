@@ -250,7 +250,6 @@ module type Optcomp_options = sig
   include Compiler_options
   include Optcommon_options
   val _nodynlink : unit -> unit
-  val _no_auto_camlinternaleval : unit -> unit
   val _p : unit -> unit
   val _pp : string -> unit
   val _S : unit -> unit
