@@ -57,16 +57,22 @@ end = struct
   module Transfer = struct
     type domain = Domain.t
 
+    type d = domain
+
+    type input = domain
+
+    type output = domain Cfg_dataflow.control
+
     type context = unit
 
-    type image =
-      { normal : domain;
-        exceptional : domain
-      }
+    type error = |
 
-    let basic value _ _ = value
+    let basic value _ _ = Ok value
 
-    let terminator value _ _ = { normal = value; exceptional = value }
+    let terminator value _ _ : (output, error) result =
+      Ok { normal = value; exceptional = value }
+
+    let exception_ d _ = Ok d
   end
 
   module Dataflow = Cfg_dataflow.Forward (Domain) (Transfer)
@@ -77,11 +83,23 @@ end = struct
     let handlers_are_entry_points =
       not !Oxcaml_flags.cfg_eliminate_dead_trap_handlers
     in
-    match Dataflow.run cfg ~init:Reachable ~handlers_are_entry_points () with
-    | Result.Error _ ->
-      Misc.fatal_error
-        "Dataflow.run_dead_code: forward analysis did not reach a fix-point"
-    | Result.Ok map ->
+    let init : Dataflow.init =
+      { normal = Reachable;
+        exceptional =
+          (if handlers_are_entry_points then Reachable else Unreachable)
+      }
+    in
+    match Dataflow.run cfg ~map:Cfg_dataflow.Block ~init () with
+    | Aborted _ ->
+      Misc.fatal_errorf
+        "Cfg_simplify.Eliminate_dead_code.run: Aborted on CFG for function %s@."
+        cfg.Cfg.fun_name ()
+    | Max_iterations_reached ->
+      Misc.fatal_errorf
+        "Cfg_simplify.Eliminate_dead_code.run: Max_iterations_reached on CFG \
+         for function %s@."
+        cfg.Cfg.fun_name ()
+    | Ok map ->
       let unreachable_labels =
         Label.Tbl.fold
           (fun label value acc ->

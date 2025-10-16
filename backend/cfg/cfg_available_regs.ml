@@ -119,7 +119,15 @@ end
 module Transfer = struct
   type domain = Domain.t
 
+  type d = domain
+
+  type input = domain
+
+  type output = domain Cfg_dataflow.control
+
   type context = unit
+
+  type error = |
 
   type image =
     { normal : domain;
@@ -223,7 +231,7 @@ module Transfer = struct
     ok avail_across, ok avail_after
 
   let basic ({ avail_before } : domain) (instr : Cfg.basic Cfg.instruction) () :
-      domain =
+      (domain, error) result =
     dprintf "Instruction: (id=%a) %a\n%!" InstructionId.print instr.id
       Cfg.print_basic instr;
     instr.available_before <- avail_before;
@@ -367,10 +375,10 @@ module Transfer = struct
             ~is_end_region:is_op_end_region instr)
     in
     instr.available_across <- avail_across;
-    { avail_before = avail_after }
+    Ok { avail_before = avail_after }
 
   let terminator ({ avail_before } : domain)
-      (term : Cfg.terminator Cfg.instruction) () : image =
+      (term : Cfg.terminator Cfg.instruction) () : (output, error) result =
     dprintf "Instruction: (id=%a) %a\n%!" InstructionId.print term.id
       Cfg.print_terminator term;
     term.available_before <- avail_before;
@@ -414,9 +422,12 @@ module Transfer = struct
         in
         ok with_anonymous_exn_bucket
     in
-    { normal = { avail_before = avail_after };
-      exceptional = { avail_before = avail_before_exn_handler }
-    }
+    Ok
+      { normal = { avail_before = avail_after };
+        exceptional = { avail_before = avail_before_exn_handler }
+      }
+
+  let exception_ d _ = Ok d
 end
 
 module Analysis = Cfg_dataflow.Forward (Domain) (Transfer)
@@ -430,10 +441,19 @@ let run : Cfg_with_layout.t -> Cfg_with_layout.t =
     let fun_name = Cfg.fun_name cfg in
     dprintf "Function %s\n%!" fun_name;
     let avail_before = RAS.Ok (RD_quotient_set.without_debug_info fun_args) in
-    let init : Domain.t = { Domain.avail_before } in
-    match Analysis.run cfg ~init ~handlers_are_entry_points:false () with
-    | Error () ->
-      Misc.fatal_errorf "Cfg_available_regs.run: dataflow analysis failed"
+    let init : Analysis.init =
+      { normal = { Domain.avail_before }; exceptional = Domain.bot }
+    in
+    match Analysis.run cfg ~map:Block ~init () with
+    | Aborted _ ->
+      Misc.fatal_errorf
+        "Cfg_available_regs.run: analysis failed for function %s@."
+        cfg.Cfg.fun_name ()
+    | Max_iterations_reached ->
+      Misc.fatal_errorf
+        "Cfg_available_regs.run: analysis reached max_iterations_reached for \
+         function %s@."
+        cfg.Cfg.fun_name ()
     | Ok (_ : Domain.t Label.Tbl.t) ->
       (* CR mshinwell: consider adding command-line flag to save cfg as .dot *)
       ());

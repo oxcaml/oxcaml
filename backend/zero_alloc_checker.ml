@@ -2567,6 +2567,12 @@ end = struct
     module Backward_transfer = struct
       type domain = Value.t
 
+      type d = domain
+
+      type input = domain Cfg_dataflow.control
+
+      type output = domain
+
       type context = t
 
       type error = unit
@@ -2691,7 +2697,13 @@ end = struct
           transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
             dbg
 
-      let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =
+      let terminator :
+          input ->
+          Cfg.terminator Cfg.instruction ->
+          context ->
+          (output, error) result =
+       fun { normal = next; exceptional = exn }
+           (i : Cfg.terminator Cfg.instruction) t ->
         Ok (terminator next ~exn i t)
 
       let exception_ next _t : (domain, error) result =
@@ -2706,10 +2718,10 @@ end = struct
     let a = Annotation.of_cfg fd.fun_codegen_options fd.fun_name fd.fun_dbg in
     let check_body t =
       (* CR gyorsh: initialize loops with [Value.Diverges] *)
-      match
-        Check_cfg_backward.run fd ~init:Value.bot ~exnescape:Value.exn_escape
-          ~map:Instr t
-      with
+      let init : Check_cfg_backward.init =
+        { normal = Value.bot; exceptional = Value.exn_escape }
+      in
+      match Check_cfg_backward.run fd ~init ~map:Instr t with
       | Ok map ->
         let entry_block = Cfg.get_block_exn fd fd.entry_label in
         let res =

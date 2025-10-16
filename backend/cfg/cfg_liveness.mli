@@ -9,14 +9,14 @@ module Domain : Cfg_dataflow.Domain_S with type t = domain
 
 type error = |
 
-module Transfer :
-  Cfg_dataflow.Backward_transfer
-    with type domain = domain
-     and type error = error
-     and type context = unit
+(* module Transfer :
+ *   Cfg_dataflow.Backward_transfer
+ *     with type domain = domain
+ *      and type error = error
+ *      and type context = unit *)
 
 module Liveness :
-  Cfg_dataflow.Backward_S
+  Cfg_dataflow.S
     with type domain = domain
      and type error = error
      and type context = unit

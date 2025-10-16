@@ -175,6 +175,12 @@ module Polls_before_prtc_transfer = struct
       optimistic_prologue_poll_instr_id : InstructionId.t
     }
 
+  type d = domain
+
+  type input = domain Cfg_dataflow.control
+
+  type output = domain
+
   type error = |
 
   let basic :
@@ -203,12 +209,12 @@ module Polls_before_prtc_transfer = struct
       Ok dom
 
   let terminator :
-      domain ->
-      exn:domain ->
+      domain Cfg_dataflow.control ->
       Cfg.terminator Cfg.instruction ->
       context ->
       (domain, error) result =
-   fun dom ~exn term { future_funcnames; optimistic_prologue_poll_instr_id = _ } ->
+   fun { normal = dom; exceptional = exn } term
+       { future_funcnames; optimistic_prologue_poll_instr_id = _ } ->
     match term.desc with
     | Never -> assert false
     | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
@@ -243,9 +249,13 @@ let potentially_recursive_tailcall :
       (Polls_before_prtc_domain)
       (Polls_before_prtc_transfer)
   in
-  let init : Polls_before_prtc_domain.t = Polls_before_prtc_domain.bot in
+  let init : PTRCAnalysis.init =
+    { normal = Polls_before_prtc_domain.bot;
+      exceptional = Polls_before_prtc_domain.bot
+    }
+  in
   match
-    PTRCAnalysis.run ~init ~map:PTRCAnalysis.Block cfg
+    PTRCAnalysis.run ~init ~map:Cfg_dataflow.Block cfg
       { future_funcnames; optimistic_prologue_poll_instr_id }
   with
   | Ok res -> (
