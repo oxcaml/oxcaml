@@ -2152,7 +2152,11 @@ let rec print_path = function
   | Path.Papply (p1, p2) -> print_path p1 ^ "(" ^ print_path p2 ^ ")"
   | Path.Pextra_ty (p, _) -> print_path p ^ "[extra]"
 
-let quote_value_ident_path loc path =
+let quote_value_ident_path loc env path =
+  (* TODO: This could probably be better. *)
+  (match Env.address_head (Env.find_value_address path env) with
+  | Env.AHunit cu -> Env.require_global_for_quote (Compilation_unit.name cu)
+  | _ | (exception _) -> ());
   match value_for_path_opt loc path with
   | Some ident_val -> ident_val
   | None -> (
@@ -2166,8 +2170,8 @@ let quote_value_ident_path loc path =
     | Path.Pdot _ | Path.Papply _ | Path.Pextra_ty _ ->
       fatal_error ("No global path for identifier " ^ print_path path))
 
-let quote_value_ident_path_as_exp loc path =
-  Exp_desc.ident loc (quote_value_ident_path loc path)
+let quote_value_ident_path_as_exp loc env path =
+  Exp_desc.ident loc (quote_value_ident_path loc env path)
 
 let type_path env ty =
   let desc =
@@ -2816,7 +2820,8 @@ and quote_expression_desc transl stage e =
   List.iter update_env_with_extra e.exp_extra;
   let body =
     match e.exp_desc with
-    | Texp_ident (path, _, _, _, _) -> quote_value_ident_path_as_exp loc path
+    | Texp_ident (path, _, _, _, _) ->
+      quote_value_ident_path_as_exp loc env path
     | Texp_constant const ->
       let const = quote_constant loc const in
       Exp_desc.constant loc const
@@ -3031,7 +3036,7 @@ and quote_expression_desc transl stage e =
         Exp_desc.antiquote loc exp
       else Exp_desc.splice loc (Code.inject (transl exp))
     | Texp_new (path, _, _, _) ->
-      Exp_desc.new_ loc (quote_value_ident_path loc path)
+      Exp_desc.new_ loc (quote_value_ident_path loc env path)
     | Texp_pack m -> Exp_desc.pack loc (quote_module_exp transl stage loc m)
     | Texp_unreachable -> Exp_desc.unreachable
     | Texp_src_pos -> Exp_desc.src_pos
@@ -3075,10 +3080,11 @@ and quote_expression_desc transl stage e =
       let exp = quote_expression transl stage exp in
       Exp_desc.let_exception loc (quote_name ext_const.ext_name) exp
     | Texp_letop rcd ->
-      let let_l = quote_value_ident_path rcd.let_.bop_loc rcd.let_.bop_op_path
+      let let_l =
+        quote_value_ident_path rcd.let_.bop_loc env rcd.let_.bop_op_path
       and ands_l =
         List.map
-          (fun bop -> quote_value_ident_path bop.bop_loc bop.bop_op_path)
+          (fun bop -> quote_value_ident_path bop.bop_loc env bop.bop_op_path)
           rcd.ands
       and defs =
         quote_expression transl stage rcd.let_.bop_exp

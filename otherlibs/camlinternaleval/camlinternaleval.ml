@@ -93,13 +93,16 @@ let eval code =
   Clflags.dont_write_files := true;
   Clflags.shared := true;
   Clflags.dlcode := false;
+  (* TODO: Set a bunch of flags to match the initial compile (like
+     nopervasives) *)
   Location.reset ();
   Env.reset_cache ~preserve_persistent_env:true;
   (* TODO: set commandline flags *)
 
   (* Compilation happens here during partial application, not when thunk is
      called *)
-  let exp = CamlinternalQuote.Code.to_exp code in
+  let code = CamlinternalQuote.Code.Closed.close code in
+  let exp = CamlinternalQuote.Code.Closed.to_exp code in
   let code_string =
     Format.asprintf "let eval = (%a)" CamlinternalQuote.Exp.print exp
   in
