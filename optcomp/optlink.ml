@@ -266,6 +266,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                    [Load_path] (see also [scan_file], above). *)
                 List.filter
                   (fun dep ->
+                    (* CR mshinwell: it's unclear that [Load_path] does anything
+                       along the lines of [realpath], so this equality might not
+                       be as good as we would like *)
                     match Load_path.find dep with
                     | full_path -> not (List.mem full_path full_paths)
                     | exception Not_found ->
