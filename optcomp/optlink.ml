@@ -72,7 +72,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       Library (file_name, infos)
     else raise (Linkenv.Error (Not_an_object_file file_name))
 
-  let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
+  let scan_file ~shared genfns file
+      (full_paths, objfiles, tolink, cached_genfns_imports) =
     match read_file file with
     | Unit (file_name, info, crc) ->
       (* This is a cmx file. It must be linked in any case. *)
@@ -112,7 +113,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         Generic_fns.Tbl.add ~imports:cached_genfns_imports genfns
           info.ui_generic_fns
       in
-      object_file_name :: objfiles, unit :: tolink, cached_genfns_imports
+      ( file_name :: full_paths,
+        object_file_name :: objfiles,
+        unit :: tolink,
+        cached_genfns_imports )
     | Library (file_name, infos) ->
       (* This is an archive file. Each unit contained in it will be linked in
          only if needed. *)
@@ -136,7 +140,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         then objfiles
         else obj_file :: objfiles
       in
-      ( objfiles,
+      (* [file_name] is always returned irrespective of the [objfiles]
+         calculation above and the units calculation below: the aim is to know
+         the full set of files which were provided on the command line. *)
+      ( file_name :: full_paths,
+        objfiles,
         List.fold_right
           (fun info reqd ->
             let li_name = CU.name info.li_name in
@@ -203,11 +211,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let link_shared ~ppf_dump objfiles output_name =
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
         let genfns = Generic_fns.Tbl.make () in
-        let ml_objfiles, units_tolink, _ =
+        let _full_paths, ml_objfiles, units_tolink, _ =
           List.fold_right
             (scan_file ~shared:true genfns)
             objfiles
-            ([], [], Generic_fns.Partition.Set.empty)
+            ([], [], [], Generic_fns.Partition.Set.empty)
         in
         Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs ();
         Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
@@ -228,11 +236,13 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           else objfiles @ [stdexit]
         in
         let genfns = Generic_fns.Tbl.make () in
-        let ml_objfiles, units_tolink, cached_genfns_imports =
+        (* CR mshinwell/xclerc: This tuple should be a record *)
+        let full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
+          (* This covers all files that the user has requested be linked *)
           List.fold_right
             (scan_file ~shared:false genfns)
             objfiles
-            ([], [], Generic_fns.Partition.Set.empty)
+            ([], [], [], Generic_fns.Partition.Set.empty)
         in
         let uses_eval =
           (* This query must come after scan_file has been called on objfiles,
@@ -249,14 +259,38 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           if !Clflags.nopervasives
           then []
           else
-            stdlib
-            :: (if uses_eval then Backend.support_files_for_eval () else [])
+            let for_eval =
+              if not uses_eval
+              then []
+              else
+                let deps = Backend.support_files_for_eval () in
+                (* Avoid double linking errors in the case where the user has
+                   already passed one of the support files on the command line.
+                   The equality used here is the full path as resolved by
+                   [Load_path] (see also [scan_file], above). *)
+                List.filter
+                  (fun dep ->
+                    (* CR mshinwell: it's unclear that [Load_path] does anything
+                       along the lines of [realpath], so this equality might not
+                       be as good as we would like *)
+                    match Load_path.find dep with
+                    | full_path -> not (List.mem full_path full_paths)
+                    | exception Not_found ->
+                      (* An error will be reported by [scan_file], called below,
+                         in this case. (This is likely to be a compiler bug or a
+                         corrupted installation.) *)
+                      true)
+                  deps
+            in
+            stdlib :: for_eval
         in
-        let ml_objfiles, units_tolink, cached_genfns_imports =
+        let _full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
+          (* This is just for any stdlib and eval support files which are
+             needed. *)
           List.fold_right
             (scan_file ~shared:false genfns)
             stdlib_and_support_files_for_eval
-            (ml_objfiles, units_tolink, cached_genfns_imports)
+            ([], ml_objfiles, units_tolink, cached_genfns_imports)
         in
         (if not shared
         then
