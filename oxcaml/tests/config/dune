@@ -1,10 +1,12 @@
 (rule
+ (enabled_if (= %{context_name} "main"))
  (target ocamlc_config.output)
  (deps (:ocamlc %{bin:ocamlc}))
  (action (with-outputs-to %{target}
           (bash "%{ocamlc} -config | cut -d: -f1 | sort"))))
 
 (rule
+ (enabled_if (= %{context_name} "main"))
  (target ocamlopt_config.output)
  (deps (:ocamlopt %{bin:ocamlopt}))
  (action (with-outputs-to %{target}
@@ -23,12 +25,14 @@
  (action (diff ocamlc_config.output ocamlopt_config.output)))
 
 (rule
+ (enabled_if (= %{context_name} "main"))
  (target config_mli_vars.output)
  (deps (source_tree %{workspace_root}/utils/config.mli) extract_mli_vars.sh)
  (action (with-outputs-to %{target}
           (bash "./extract_mli_vars.sh %{workspace_root}/utils/config.mli"))))
 
 (rule
+ (enabled_if (= %{context_name} "main"))
  (target legacy_config_vars_printed_for_compatibility.output)
  (deps config_print_all.expected config_mli_vars.output)
  (action (with-outputs-to %{target}
