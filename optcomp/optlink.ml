@@ -140,6 +140,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         then objfiles
         else obj_file :: objfiles
       in
+      (* [file_name] is always returned irrespective of the [objfiles]
+         calculation above and the units calculation below: the aim is to know
+         the full set of files which were provided on the command line. *)
       ( file_name :: full_paths,
         objfiles,
         List.fold_right
@@ -233,6 +236,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           else objfiles @ [stdexit]
         in
         let genfns = Generic_fns.Tbl.make () in
+        (* CR mshinwell/xclerc: This tuple should be a record *)
         let full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
           (* This covers all files that the user has requested be linked *)
           List.fold_right
