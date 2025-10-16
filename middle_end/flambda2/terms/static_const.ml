@@ -306,16 +306,8 @@ include Container_types.Make (struct
           if c <> 0
           then c
           else
-            (* We explicitly drop the debuginfo part, as this comparison is used
-               to determine whether we can share static constants from different
-               program locations. See testsuite/tests/asmcomp/staticalloc.ml for
-               a check that sharing works properly. *)
-            Misc.Stdlib.List.compare
-              (fun s1 s2 ->
-                Simple.compare
-                  (Simple.With_debuginfo.simple s1)
-                  (Simple.With_debuginfo.simple s2))
-              fields1 fields2
+            Misc.Stdlib.List.compare Simple.With_debuginfo.compare fields1
+              fields2
     | Boxed_float32 or_var1, Boxed_float32 or_var2 ->
       Or_variable.compare Numeric_types.Float32_by_bit_pattern.compare or_var1
         or_var2
