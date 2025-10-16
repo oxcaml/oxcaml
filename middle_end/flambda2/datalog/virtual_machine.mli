@@ -131,12 +131,4 @@ end) : sig
   val create : evaluate:('a -> outcome) -> ('a, nil) instruction -> t
 
   val run : t -> unit
-
-  type 'a iterator
-
-  (** [iterator] is a convenience function for creating a virtual machine that
-      iterates over all the values of an iterator heterogenous list. *)
-  val iterator : 's Iterator.hlist with_names -> 's iterator
-
-  val iter : ('y Constant.hlist -> unit) -> 'y iterator -> unit
 end
