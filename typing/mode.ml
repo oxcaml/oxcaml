@@ -514,7 +514,7 @@ module Lattices = struct
 
       let max = Dynamic
 
-      let ord = Obj.magic
+      let ord = function Static -> 0 | Dynamic -> 1
     end)
 
     let legacy = Dynamic
