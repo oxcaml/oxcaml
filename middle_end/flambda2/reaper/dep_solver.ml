@@ -2870,24 +2870,35 @@ type single_field_source =
   | One of Code_id_or_name.t
   | Many
 
-let _z = [No_source; Many]
-
 let get_single_field_source =
-  let _q_any_source =
+  let q_any_source1 =
     mk_exists_query ["block"; "field"] [] (fun [block; field] [] ->
         [field_sources_top_rel block field])
   in
-  let _q_source =
+  let q_any_source2 =
+    mk_exists_query ["block"; "field"] ["source"]
+      (fun [block; field] [source] ->
+        [ field_sources_rel block field source;
+          Global_flow_graph.any_source_pred source ])
+  in
+  let q_source =
     Datalog.(
       compile_with_parameters ["block"; "field"] [] (fun [block; field] [] ->
-          foreach ["source"] (fun [source] ->
-              where [field_sources_rel block field source] (yield [source]))))
+          foreach ["field_source"; "source"] (fun [field_source; source] ->
+              where
+                [ field_sources_rel block field field_source;
+                  sources_rel field_source source ]
+                (yield [source]))))
   in
-  fun _db block _field -> One block
-(* let field = Field.encode field in if exists_with_parameters q_any_source
-   [block; field] db then Many else Datalog.Cursor.fold_with_parameters q_source
-   [block; field] db ~init:No_source ~f:(fun [source] acc -> match acc with
-   No_source -> One source | One _ | Many -> Many) *)
+  fun db block field ->
+    let field = Field.encode field in
+    if exists_with_parameters q_any_source1 [block; field] db
+       || exists_with_parameters q_any_source2 [block; field] db
+    then Many
+    else
+      Datalog.Cursor.fold_with_parameters q_source [block; field] db
+        ~init:No_source ~f:(fun [source] acc ->
+          match acc with No_source -> One source | One _ | Many -> Many)
 
 let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
     name_prefix =
@@ -2898,6 +2909,11 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
       | Code_of_closure _ -> None
       | Block _ | Value_slot _ | Is_int | Get_tag -> (
         let field_source = get_single_field_source db unboxed_block field in
+        (* Format.eprintf "SOURCE OF %a %a : %a@." Code_id_or_name.print
+           unboxed_block Field.print field (fun ff -> function | No_source ->
+           Format.fprintf ff "No_source" | Many -> Format.fprintf ff "Many" |
+           One x -> Format.fprintf ff "One %a" Code_id_or_name.print x)
+           field_source; *)
         match field_source with
         | No_source -> None
         | One _ | Many -> (
@@ -2992,7 +3008,6 @@ let fixpoint (graph : Global_flow_graph.graph) =
   in
   Hashtbl.iter
     (fun code_or_name () ->
-      (* Format.eprintf "%a@." Code_id_or_name.print code_or_name; *)
       let to_patch =
         match
           Code_id_or_name.Map.find_opt code_or_name
