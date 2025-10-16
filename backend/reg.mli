@@ -140,5 +140,6 @@ module For_testing : sig
 end
 
 module For_printing : sig
-  val create : name:Name.t -> typ:Cmm.machtype_component -> stamp:int -> preassigned:bool -> loc:location -> t
+  val create : name:Name.t -> typ:Cmm.machtype_component -> stamp:int ->
+              preassigned:bool -> loc:location -> t
 end
