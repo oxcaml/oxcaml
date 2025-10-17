@@ -1,18 +1,18 @@
 (let (M = (makeblock 0))
   (makeblock 0 M
     (makeblock 0
-      (function {nlocal = 0} prim[value<intarray>] stub : int
-        (array.length[int] prim))
-      (function {nlocal = 0} prim[value<intarray>] prim[value<int>] stub
-        : int (array.get[int indexed by int] prim prim))
-      (function {nlocal = 0} prim[value<intarray>] prim[value<int>] stub
-        : int (array.unsafe_get[int indexed by int] prim prim))
-      (function {nlocal = 0} prim[value<intarray>] prim[value<int>]
+      (function {nlocal = 0} prim[value<extarray>] stub : int
+        (array.length[ext] prim))
+      (function {nlocal = 0} prim[value<extarray>] prim[value<int>] stub
+        : int (array.get[ext indexed by int] prim prim))
+      (function {nlocal = 0} prim[value<extarray>] prim[value<int>] stub
+        : int (array.unsafe_get[ext indexed by int] prim prim))
+      (function {nlocal = 0} prim[value<extarray>] prim[value<int>]
         prim[value<int>] stub : int
-        (array.set[int indexed by int] prim prim prim))
-      (function {nlocal = 0} prim[value<intarray>] prim[value<int>]
+        (array.set[ext indexed by int] prim prim prim))
+      (function {nlocal = 0} prim[value<extarray>] prim[value<int>]
         prim[value<int>] stub : int
-        (array.unsafe_set[int indexed by int] prim prim prim))
+        (array.unsafe_set[ext indexed by int] prim prim prim))
       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int
         (%int_compare prim prim))
       (function {nlocal = 0} prim[value<int>] prim[value<int>] stub : int

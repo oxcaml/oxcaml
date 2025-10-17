@@ -408,12 +408,12 @@ let makearray_dynamic_scannable_unboxed_product env
     | Pgcscannableproductarray kinds ->
       let rec must_be_scanned (kind : L.scannable_product_element_kind) =
         match kind with
-        | Pint_scannable -> false
+        | Pext_scannable -> false
         | Paddr_scannable -> true
         | Pproduct_scannable kinds -> List.exists must_be_scanned kinds
       in
       List.exists must_be_scanned kinds
-    | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
+    | Pgenarray | Paddrarray | Pextarray | Pfloatarray | Punboxedfloatarray _
     | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ ->
       Misc.fatal_errorf
         "%s: should have been sent to [makearray_dynamic_singleton]"
@@ -437,7 +437,7 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
    * heap and local modes.
    * Additionally, if the initializer is omitted, an uninitialized array will
    * be returned.  Initializers must however be provided when the array kind is
-   * Pgenarray, Paddrarray, Pintarray, Pfloatarray or Pgcscannableproductarray;
+   * Pgenarray, Paddrarray, Pextarray, Pfloatarray or Pgcscannableproductarray;
    * or when a Pgcignorablearray involves an [int].  (See comment below.)
    *)
   let dbg = Debuginfo.from_location loc in
@@ -457,7 +457,7 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
     | Some init -> init
     | None -> (
       match lambda_array_kind with
-      | Pintarray | Pgcignorableproductarray _ ->
+      | Pextarray | Pgcignorableproductarray _ ->
         (* If we get here for [Pgcignorableproductarray] then a tagged immediate
            is involved: see main [match] below. *)
         Misc.fatal_errorf
@@ -477,7 +477,7 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
           Debuginfo.print_compact dbg)
   in
   match lambda_array_kind with
-  | Pgenarray | Paddrarray | Pintarray | Pfloatarray ->
+  | Pgenarray | Paddrarray | Pextarray | Pfloatarray ->
     let init = must_have_initializer () in
     ( env,
       Transformed
@@ -673,7 +673,7 @@ let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
   | Pgenarray_set _ | Paddrarray_set _ ->
     (* Take advantage of various GC-related tricks in [caml_array_blit]. *)
     arrayblit_runtime env args loc
-  | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
+  | Pextarray_set | Pfloatarray_set | Punboxedfloatarray_set _
   | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
   | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
     arrayblit_expanded env ~src_mutability ~dst_array_set_kind args loc

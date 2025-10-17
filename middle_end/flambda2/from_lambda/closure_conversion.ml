@@ -1224,11 +1224,11 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
       | Pbigstring_load_vec _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
       | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-      | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+      | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pext_array_load_vec _
       | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
       | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
       | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
-      | Pfloat_array_set_vec _ | Pint_array_set_vec _
+      | Pfloat_array_set_vec _ | Pext_array_set_vec _
       | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
       | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
       | Punboxed_nativeint_array_set_vec _ | Pctconst _ | Pint_as_pointer _
