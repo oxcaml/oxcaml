@@ -61,6 +61,8 @@ module Mode_axis_pair = struct
     | "immutable" -> monadic Visibility Immutable
     | "read" -> monadic Visibility Read
     | "read_write" -> monadic Visibility Read_write
+    | "static" -> monadic Staticity Static
+    | "dynamic" -> monadic Staticity Dynamic
     | _ -> raise Not_found
 end
 
@@ -114,6 +116,9 @@ module Transled_modifiers = struct
       statefulness :
         Mode.Statefulness.Const.t Comonadic.Atom.t Location.loc option;
       visibility : Mode.Visibility.Const.t Monadic.Atom.t Location.loc option;
+      staticity : Mode.Staticity.Const.t Monadic.Atom.t Location.loc option;
+      (* CR-soon zqian: Create a functor [Mode.Value.Const.Make] to generate
+         different type operators applied on mode constants. *)
       externality : Jkind_axis.Externality.t Location.loc option;
       nullability : Jkind_axis.Nullability.t Location.loc option;
       separability : Jkind_axis.Separability.t Location.loc option
@@ -131,7 +136,8 @@ module Transled_modifiers = struct
       visibility = None;
       externality = None;
       nullability = None;
-      separability = None
+      separability = None;
+      staticity = None
     }
 
   let get (type a) ~(axis : a Axis.t) (t : t) : a Location.loc option =
@@ -145,6 +151,7 @@ module Transled_modifiers = struct
     | Modal (Comonadic Yielding) -> t.yielding
     | Modal (Comonadic Statefulness) -> t.statefulness
     | Modal (Monadic Visibility) -> t.visibility
+    | Modal (Monadic Staticity) -> t.staticity
     | Nonmodal Externality -> t.externality
     | Nonmodal Nullability -> t.nullability
     | Nonmodal Separability -> t.separability
@@ -161,6 +168,7 @@ module Transled_modifiers = struct
     | Modal (Comonadic Yielding) -> { t with yielding = value }
     | Modal (Comonadic Statefulness) -> { t with statefulness = value }
     | Modal (Monadic Visibility) -> { t with visibility = value }
+    | Modal (Monadic Staticity) -> { t with staticity = value }
     | Nonmodal Externality -> { t with externality = value }
     | Nonmodal Nullability -> { t with nullability = value }
     | Nonmodal Separability -> { t with separability = value }
@@ -206,6 +214,7 @@ let transl_mod_bounds annots =
               Some { txt = Per_axis.min (Modal (Comonadic Statefulness)); loc };
             visibility =
               Some { txt = Per_axis.min (Modal (Monadic Visibility)); loc };
+            staticity = None;
             nullability =
               Transled_modifiers.get ~axis:(Nonmodal Nullability) bounds_so_far;
             separability =
@@ -284,6 +293,7 @@ let transl_mod_bounds annots =
   let yielding = modal (Comonadic Yielding) modifiers.yielding in
   let statefulness = modal (Comonadic Statefulness) modifiers.statefulness in
   let visibility = modal (Monadic Visibility) modifiers.visibility in
+  let staticity = modal (Monadic Staticity) modifiers.staticity in
   let externality =
     Option.fold ~some:Location.get_txt ~none:Externality.max
       modifiers.externality
@@ -297,7 +307,7 @@ let transl_mod_bounds annots =
       modifiers.separability
   in
   let monadic =
-    Mode.Crossing.Monadic.create ~uniqueness ~contention ~visibility
+    Mode.Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
   in
   let comonadic =
     Mode.Crossing.Comonadic.create ~regionality ~linearity ~portability
@@ -462,7 +472,8 @@ let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
   let monadic : Modality.atom list =
     [ Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy);
       Atom (Monadic Contention, Join_with Contention.Const.legacy);
-      Atom (Monadic Visibility, Join_with Visibility.Const.legacy) ]
+      Atom (Monadic Visibility, Join_with Visibility.Const.legacy);
+      Atom (Monadic Staticity, Join_with Staticity.Const.legacy) ]
   in
   if mut
   then if for_mutable_variable then monadic else monadic @ comonadic
@@ -498,7 +509,8 @@ let idx_expected_modalities ~(mut : bool) =
           Atom (Comonadic Linearity, Meet_with Linearity.Const.legacy);
           Atom (Comonadic Forkable, Meet_with Forkable.Const.legacy);
           Atom (Comonadic Yielding, Meet_with Yielding.Const.legacy);
-          Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy) ]
+          Atom (Monadic Uniqueness, Join_with Uniqueness.Const.legacy);
+          Atom (Monadic Staticity, Join_with Staticity.Const.legacy) ]
       [@warning "-18"]
     else Mode.Modality.Const.id
   in
