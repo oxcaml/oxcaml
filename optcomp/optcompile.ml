@@ -304,5 +304,5 @@ let native unix
         (fun lib ->
           Load_path.add_dir ~hidden:false
             (Misc.expand_directory Config.standard_library ("+" ^ lib)))
-        extra_libraries_for_eval
+        extra_load_paths_for_eval
   end) : S)
