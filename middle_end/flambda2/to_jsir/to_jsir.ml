@@ -381,12 +381,11 @@ and apply_expr ~env ~res e =
           let arg, res = To_jsir_shared.simple ~env ~res arg in
           let unit = Pc (Int Targetint.zero) in
           "%resume", [Pv stack; Pv f; Pv arg; unit], res
-        | Resume { stack; f; arg; last_fiber } ->
-          let stack, res = To_jsir_shared.simple ~env ~res stack in
+        | Resume { cont; f; arg } ->
+          let cont, res = To_jsir_shared.simple ~env ~res cont in
           let f, res = To_jsir_shared.simple ~env ~res f in
           let arg, res = To_jsir_shared.simple ~env ~res arg in
-          let last_fiber, res = To_jsir_shared.simple ~env ~res last_fiber in
-          "%resume", [Pv stack; Pv f; Pv arg; Pv last_fiber], res
+          "%resume", [Pv cont; Pv f; Pv arg], res
       in
       let prim : Jsir.expr = Prim (Extern prim_name, args) in
       let var = Jsir.Var.fresh () in

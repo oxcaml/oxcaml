@@ -63,10 +63,9 @@ module Effect = struct
           arg : Simple.t
         }
     | Resume of
-        { stack : Simple.t;
+        { cont : Simple.t;
           f : Simple.t;
-          arg : Simple.t;
-          last_fiber : Simple.t
+          arg : Simple.t
         }
 
   let print ppf t =
@@ -83,12 +82,10 @@ module Effect = struct
       fprintf ppf "@[<hov 1>(%tRun_stack%t (stack@ %a)@ (f@ %a)@ (arg@ %a))@]"
         Flambda_colours.effect Flambda_colours.pop Simple.print stack
         Simple.print f Simple.print arg
-    | Resume { stack; f; arg; last_fiber } ->
-      fprintf ppf
-        "@[<hov 1>(%tResume%t (stack@ %a)@ (f@ %a)@ (arg@ %a) (last_fiber@ \
-         %a))@]"
-        Flambda_colours.effect Flambda_colours.pop Simple.print stack
-        Simple.print f Simple.print arg Simple.print last_fiber
+    | Resume { cont; f; arg } ->
+      fprintf ppf "@[<hov 1>(%tResume%t (cont@ %a)@ (f@ %a)@ (arg@ %a))@]"
+        Flambda_colours.effect Flambda_colours.pop Simple.print cont
+        Simple.print f Simple.print arg
 
   let perform ~eff = Perform { eff }
 
@@ -96,7 +93,7 @@ module Effect = struct
 
   let run_stack ~stack ~f ~arg = Run_stack { stack; f; arg }
 
-  let resume ~stack ~f ~arg ~last_fiber = Resume { stack; f; arg; last_fiber }
+  let resume ~cont ~f ~arg = Resume { cont; f; arg }
 
   let free_names t =
     match t with
@@ -108,11 +105,9 @@ module Effect = struct
     | Run_stack { stack; f; arg } ->
       Name_occurrences.union (Simple.free_names stack)
         (Name_occurrences.union (Simple.free_names f) (Simple.free_names arg))
-    | Resume { stack; f; arg; last_fiber } ->
-      Name_occurrences.union (Simple.free_names stack)
-        (Name_occurrences.union (Simple.free_names f)
-           (Name_occurrences.union (Simple.free_names arg)
-              (Simple.free_names last_fiber)))
+    | Resume { cont; f; arg } ->
+      Name_occurrences.union (Simple.free_names cont)
+        (Name_occurrences.union (Simple.free_names f) (Simple.free_names arg))
 
   let apply_renaming t renaming =
     match t with
@@ -133,15 +128,13 @@ module Effect = struct
       if stack == stack' && f == f' && arg == arg'
       then t
       else Run_stack { stack = stack'; f = f'; arg = arg' }
-    | Resume { stack; f; arg; last_fiber } ->
-      let stack' = Simple.apply_renaming stack renaming in
+    | Resume { cont; f; arg } ->
+      let cont' = Simple.apply_renaming cont renaming in
       let f' = Simple.apply_renaming f renaming in
       let arg' = Simple.apply_renaming arg renaming in
-      let last_fiber' = Simple.apply_renaming last_fiber renaming in
-      if stack == stack' && f == f' && arg == arg' && last_fiber == last_fiber'
+      if cont == cont' && f == f' && arg == arg'
       then t
-      else
-        Resume { stack = stack'; f = f'; arg = arg'; last_fiber = last_fiber' }
+      else Resume { cont = cont'; f = f'; arg = arg' }
 
   let ids_for_export t =
     match t with
@@ -158,14 +151,12 @@ module Effect = struct
         (Ids_for_export.union
            (Ids_for_export.from_simple f)
            (Ids_for_export.from_simple arg))
-    | Resume { stack; f; arg; last_fiber } ->
+    | Resume { cont; f; arg } ->
       Ids_for_export.union
-        (Ids_for_export.from_simple stack)
+        (Ids_for_export.from_simple cont)
         (Ids_for_export.union
            (Ids_for_export.from_simple f)
-           (Ids_for_export.union
-              (Ids_for_export.from_simple arg)
-              (Ids_for_export.from_simple last_fiber)))
+           (Ids_for_export.from_simple arg))
 end
 
 type t =

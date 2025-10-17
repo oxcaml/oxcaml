@@ -1349,7 +1349,10 @@ value caml_interprete(code_t prog, asize_t prog_size)
     Instruct(RESUME):
       resume_fn = sp[0];
       resume_arg = sp[1];
-      resume_tail = Ptr_val(sp[2]);
+      resume_tail = Ptr_val(Field(accu, 1));
+      Setup_for_c_call;
+      accu = caml_continuation_use(accu);
+      Restore_after_c_call;
       sp -= 2;
       sp[0] = Val_long(domain_state->trap_sp_off);
       sp[1] = Val_long(0);
@@ -1386,12 +1389,14 @@ do_resume: {
     Instruct(RESUMETERM):
       resume_fn = sp[0];
       resume_arg = sp[1];
-      resume_tail = Ptr_val(sp[2]);
+      resume_tail = Ptr_val(Field(accu, 1));
+      Setup_for_c_call;
+      accu = caml_continuation_use(accu);
+      Restore_after_c_call;
       sp = sp + *pc - 2;
       sp[0] = Val_long(domain_state->trap_sp_off);
       sp[1] = Val_long(extra_args);
       goto do_resume;
-
 
     Instruct(PERFORM): {
       value cont;

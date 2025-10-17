@@ -870,11 +870,10 @@ let rewrite_call_kind env (call_kind : Call_kind.t) =
     Call_kind.effect
       (Call_kind.Effect.run_stack ~stack:(rewrite_simple stack)
          ~f:(rewrite_simple f) ~arg:(rewrite_simple arg))
-  | Effect (Resume { stack; f; arg; last_fiber }) ->
+  | Effect (Resume { cont; f; arg }) ->
     Call_kind.effect
-      (Call_kind.Effect.resume ~stack:(rewrite_simple stack)
-         ~f:(rewrite_simple f) ~arg:(rewrite_simple arg)
-         ~last_fiber:(rewrite_simple last_fiber))
+      (Call_kind.Effect.resume ~cont:(rewrite_simple cont) ~f:(rewrite_simple f)
+         ~arg:(rewrite_simple arg))
 
 let decide_whether_apply_needs_calling_convention_change env apply =
   let call_kind = rewrite_call_kind env (Apply.call_kind apply) in
