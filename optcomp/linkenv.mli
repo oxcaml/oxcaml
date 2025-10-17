@@ -49,6 +49,12 @@ val lib_ccobjs : unit -> filepath list
 
 val reset : unit -> unit
 
+type snapshot
+
+val save_snapshot : unit -> snapshot
+
+val restore_snapshot : snapshot -> unit
+
 val make_globals_map :
   unit_link_info list ->
   (CU.t * Digest.t option * Digest.t option * Symbol.t list) list

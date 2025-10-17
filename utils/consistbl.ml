@@ -32,6 +32,8 @@ end) = struct
 
   let clear = Module_name.Tbl.clear
 
+  let copy = Module_name.Tbl.copy
+
   exception Inconsistency of {
     unit_name : Module_name.t;
     inconsistent_source : string;
