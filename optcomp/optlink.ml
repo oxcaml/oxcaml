@@ -238,7 +238,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         let genfns = Generic_fns.Tbl.make () in
         let original_linkenv = Linkenv.save_snapshot () in
         (* CR mshinwell/xclerc: This tuple should be a record *)
-        let[@inline] scan_user_supplied_files ~objfiles =
+        let[@inline] scan_user_supplied_files ~genfns ~objfiles =
           (* This covers all files that the user has requested be linked *)
           List.fold_right
             (scan_file ~shared:false genfns)
@@ -246,7 +246,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             ([], [], [], Generic_fns.Partition.Set.empty)
         in
         let full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
-          scan_user_supplied_files ~objfiles
+          scan_user_supplied_files ~genfns ~objfiles
         in
         let uses_eval =
           (* This query must come after scan_file has been called on objfiles,
@@ -295,12 +295,18 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
            support files to the start of the command line whether or not they're
            used, but this seems like the sort of thing that might cost someone a
            lot of time one day *)
-        let _full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
+        let ( _full_paths,
+              ml_objfiles,
+              units_tolink,
+              cached_genfns_imports,
+              genfns ) =
           match full_paths_of_eval_support_files_already_provided_by_user with
-          | [] -> full_paths, ml_objfiles, units_tolink, cached_genfns_imports
+          | [] ->
+            full_paths, ml_objfiles, units_tolink, cached_genfns_imports, genfns
           | _ :: _ ->
             assert uses_eval;
             Linkenv.restore_snapshot original_linkenv;
+            let genfns = Generic_fns.Tbl.make () in
             let objfiles =
               (* Remove user-provided occurrences of support libraries *)
               List.filter
@@ -315,7 +321,14 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                     true)
                 objfiles
             in
-            scan_user_supplied_files ~objfiles
+            let _full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
+              scan_user_supplied_files ~genfns ~objfiles
+            in
+            ( _full_paths,
+              ml_objfiles,
+              units_tolink,
+              cached_genfns_imports,
+              genfns )
         in
         let quoted_globals = Linkenv.get_quoted_globals () in
         if uses_eval then Backend.set_load_path_for_eval ();
