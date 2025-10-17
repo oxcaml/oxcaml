@@ -1067,9 +1067,18 @@ CAMLprim value caml_continuation_use (value cont)
   return v;
 }
 
-CAMLprim value caml_continuation_use_and_update_handler_noexc
+void caml_continuation_replace(value cont, struct stack_info* stk)
+{
+  value n = Val_ptr(NULL);
+  int b = atomic_compare_exchange_strong(Op_atomic_val(cont), &n, Val_ptr(stk));
+  CAMLassert(b);
+  (void)b; /* squash unused warning */
+}
+
+CAMLprim value caml_continuation_update_handler_noexc
   (value cont, value hval, value hexn, value heff)
 {
+  CAMLnoalloc;
   value stack;
   struct stack_info* stk;
 
@@ -1077,21 +1086,15 @@ CAMLprim value caml_continuation_use_and_update_handler_noexc
   stk = Ptr_val(stack);
   if (stk == NULL) {
     /* The continuation has already been taken */
-    return stack;
+    return cont;
   }
   while (Stack_parent(stk) != NULL) stk = Stack_parent(stk);
   Stack_handle_value(stk) = hval;
   Stack_handle_exception(stk) = hexn;
   Stack_handle_effect(stk) = heff;
-  return stack;
-}
+  caml_continuation_replace(cont, Ptr_val(stack));
 
-void caml_continuation_replace(value cont, struct stack_info* stk)
-{
-  value n = Val_ptr(NULL);
-  int b = atomic_compare_exchange_strong(Op_atomic_val(cont), &n, Val_ptr(stk));
-  CAMLassert(b);
-  (void)b; /* squash unused warning */
+  return cont;
 }
 
 CAMLprim value caml_drop_continuation (value cont)

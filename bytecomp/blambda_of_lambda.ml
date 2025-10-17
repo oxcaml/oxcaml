@@ -419,7 +419,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | _ :: _ ->
             (* for the floatarray hack *)
             Prim (Ccall "caml_make_array", [block])))
-    | Presume -> context_switch Resume ~arity:4
+    | Presume -> context_switch Resume ~arity:3
     | Prunstack -> context_switch Runstack ~arity:3
     | Preperform -> context_switch Reperform ~arity:3
     | Pmakearray_dynamic (kind, locality, Uninitialized) -> (
