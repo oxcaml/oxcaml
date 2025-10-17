@@ -264,6 +264,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             (Linkenv.Error
                (Metaprogramming_not_supported_by_backend output_name));
         let eval_support_files = Backend.support_files_for_eval () in
+        if uses_eval && not !Clflags.nopervasives
+        then Backend.set_load_path_for_eval ();
         let full_paths_of_eval_support_files_already_provided_by_user =
           if not uses_eval
           then []
@@ -335,7 +337,6 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               genfns )
         in
         let quoted_globals = Linkenv.get_quoted_globals () in
-        if uses_eval then Backend.set_load_path_for_eval ();
         let stdlib_and_support_files_for_eval =
           if !Clflags.nopervasives
           then []
