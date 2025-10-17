@@ -1052,7 +1052,7 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%perform" ->
       if runtime5 then Primitive (Pperform, 1) else Unsupported Pperform
     | "%resume" ->
-      if runtime5 then Primitive (Presume, 4) else Unsupported Presume
+      if runtime5 then Primitive (Presume, 3) else Unsupported Presume
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%tls_get" -> Primitive (Ptls_get, 1)
     | "%poll" -> Primitive (Ppoll, 1)
