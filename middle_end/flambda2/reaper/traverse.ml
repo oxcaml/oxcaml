@@ -130,14 +130,14 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
           let name = Acc.simple_to_name acc ~denv simple in
           Graph.add_constructor_dep (Acc.graph acc)
             ~base:(Code_id_or_name.name function_slot_name)
-            (Value_slot value_slot)
+            (Field.value_slot value_slot)
             ~from:(Code_id_or_name.name name))
         (Set_of_closures.value_slots set_of_closures);
       Function_slot.Lmap.iter
         (fun function_slot name ->
           Graph.add_constructor_dep (Acc.graph acc)
             ~base:(Code_id_or_name.name function_slot_name)
-            (Function_slot function_slot)
+            (Field.function_slot function_slot)
             ~from:(Code_id_or_name.name name))
         names_and_function_slots)
     names_and_function_slots
@@ -255,14 +255,13 @@ and traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         let kind = Flambda_kind.Block_shape.element_kind block_shape i in
         let name = Acc.simple_to_name acc ~denv field in
         default_bp (fun base ->
-            Graph.add_constructor_dep (Acc.graph acc) ~base
-              (Block (i, kind))
+            Graph.add_constructor_dep (Acc.graph acc) ~base (Field.block i kind)
               ~from:(Code_id_or_name.name name)))
       fields;
     default_bp (fun base ->
-        Graph.add_constructor_dep (Acc.graph acc) ~base Is_int
+        Graph.add_constructor_dep (Acc.graph acc) ~base Field.is_int
           ~from:(Code_id_or_name.name denv.all_constants);
-        Graph.add_constructor_dep (Acc.graph acc) ~base Get_tag
+        Graph.add_constructor_dep (Acc.graph acc) ~base Field.get_tag
           ~from:(Code_id_or_name.name denv.all_constants))
   | Unary (Opaque_identity { middle_end_only = true; _ }, arg)
     when reaper_test_opaque ->
@@ -272,12 +271,14 @@ and traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
   | Unary (Project_function_slot { move_from = _; move_to }, block) ->
     let block = Code_id_or_name.name (Acc.simple_to_name acc ~denv block) in
     default_bp (fun to_ ->
-        Graph.add_accessor_dep (Acc.graph acc) ~to_ (Function_slot move_to)
+        Graph.add_accessor_dep (Acc.graph acc) ~to_
+          (Field.function_slot move_to)
           ~base:block)
   | Unary (Project_value_slot { project_from = _; value_slot }, block) ->
     let block = Code_id_or_name.name (Acc.simple_to_name acc ~denv block) in
     default_bp (fun to_ ->
-        Graph.add_accessor_dep (Acc.graph acc) ~to_ (Value_slot value_slot)
+        Graph.add_accessor_dep (Acc.graph acc) ~to_
+          (Field.value_slot value_slot)
           ~base:block)
   | Unary (Block_load { kind; mut; field }, block) -> (
     (* Loads from mutable blocks are also tracked here. This is ok because
@@ -288,7 +289,7 @@ and traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     let block = Code_id_or_name.name (Acc.simple_to_name acc ~denv block) in
     default_bp (fun to_ ->
         Graph.add_accessor_dep (Acc.graph acc) ~to_
-          (Block (Target_ocaml_int.to_int field, kind))
+          (Field.block (Target_ocaml_int.to_int field) kind)
           ~base:block);
     match mut with
     | Immutable | Immutable_unique -> ()
@@ -299,11 +300,11 @@ and traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
   | Unary (Is_int { variant_only = true }, arg) ->
     let name = Code_id_or_name.name (Acc.simple_to_name acc ~denv arg) in
     default_bp (fun to_ ->
-        Graph.add_accessor_dep (Acc.graph acc) ~to_ Is_int ~base:name)
+        Graph.add_accessor_dep (Acc.graph acc) ~to_ Field.is_int ~base:name)
   | Unary (Get_tag, arg) ->
     let name = Code_id_or_name.name (Acc.simple_to_name acc ~denv arg) in
     default_bp (fun to_ ->
-        Graph.add_accessor_dep (Acc.graph acc) ~to_ Get_tag ~base:name)
+        Graph.add_accessor_dep (Acc.graph acc) ~to_ Field.get_tag ~base:name)
   | prim ->
     let () =
       match Flambda_primitive.effects_and_coeffects prim with
@@ -380,16 +381,16 @@ and traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
             in
             Graph.add_constructor_dep (Acc.graph acc)
               ~base:(Code_id_or_name.name name)
-              (Block (i, kind))
+              (Field.block i kind)
               ~from:(Code_id_or_name.name field_name))
           fields;
         Graph.add_constructor_dep (Acc.graph acc)
           ~base:(Code_id_or_name.name name)
-          Is_int
+          Field.is_int
           ~from:(Code_id_or_name.name denv.all_constants);
         Graph.add_constructor_dep (Acc.graph acc)
           ~base:(Code_id_or_name.name name)
-          Get_tag
+          Field.get_tag
           ~from:(Code_id_or_name.name denv.all_constants)
       | Set_of_closures _ -> assert false
       | _ ->
@@ -622,7 +623,7 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       else (
         (let closure = Acc.simple_to_name acc ~denv callee in
          Graph.add_accessor_dep (Acc.graph acc) ~to_:call_widget
-           (Code_of_closure Known_arity_code_pointer)
+           (Field.code_of_closure Known_arity_code_pointer)
            ~base:(Code_id_or_name.name closure));
         match denv.should_preserve_direct_calls with
         | Yes -> add_apply acc
@@ -637,7 +638,7 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       Acc.simple_to_name acc ~denv (Option.get (Apply.callee apply))
     in
     Graph.add_accessor_dep (Acc.graph acc) ~to_:call_widget
-      (Code_of_closure Known_arity_code_pointer)
+      (Field.code_of_closure Known_arity_code_pointer)
       ~base:(Code_id_or_name.name closure)
   | Function { function_call = Indirect_unknown_arity; _ } ->
     let call_widget =
@@ -649,7 +650,7 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       Acc.simple_to_name acc ~denv (Option.get (Apply.callee apply))
     in
     Graph.add_accessor_dep (Acc.graph acc) ~to_:call_widget
-      (Code_of_closure Unknown_arity_code_pointer)
+      (Field.code_of_closure Unknown_arity_code_pointer)
       ~base:(Code_id_or_name.name closure)
   | Method _ | C_call _ | Effect _ -> default_acc acc
 

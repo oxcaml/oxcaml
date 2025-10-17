@@ -25,8 +25,6 @@ let () =
   if debug && List.mem "prov" reaperdbg_flags
   then Datalog.Schedule.enable_provenance_for_debug ()
 
-module Field = Global_flow_graph.Field
-
 type 'a unboxed_fields =
   | Not_unboxed of 'a
   | Unboxed of 'a unboxed_fields Field.Map.t
@@ -37,8 +35,8 @@ let rec pp_unboxed_elt pp_unboxed ppf = function
 
 let print_unboxed_fields = pp_unboxed_elt
 
-let is_local_field (f : Field.t) =
-  match f with
+let is_local_field f =
+  match Field.view f with
   | Value_slot vs ->
     Compilation_unit.is_current (Value_slot.get_compilation_unit vs)
   | Function_slot fs ->
@@ -99,14 +97,16 @@ module Syntax = struct
   let ( let$ ) xs f = compile xs f
 
   let ( ==> ) h c = where h (deduce c)
+
+  let ( !! ) = Term.constant
 end
 
 module Cols = struct
   let n = Code_id_or_name.datalog_column_id
 
-  let f = Global_flow_graph.Field.Encoded.datalog_column_id
+  let f = Field.datalog_column_id
 
-  let cf = Global_flow_graph.CoField.Encoded.datalog_column_id
+  let cf = Cofield.datalog_column_id
 end
 
 let rel1_r ?provenance name schema =
@@ -259,9 +259,9 @@ let reading_field_rel = rel2 "reading_field" Cols.[f; n]
 
 let escaping_field_rel = rel2 "escaping_field" Cols.[f; n]
 
-let filter_field f x =
+let filter1 f x =
   let open! Syntax in
-  filter (fun [x] -> f (Field.decode x)) [x]
+  filter (fun [x] -> f x) [x]
 
 let datalog_schedule =
   let open Global_flow_graph in
@@ -426,7 +426,7 @@ let datalog_schedule =
     [ not (any_usage_pred base);
       any_usage_pred to_;
       accessor_rel to_ relation base;
-      filter_field is_not_local_field relation ]
+      filter1 is_not_local_field relation ]
     ==> field_usages_top_rel base relation
   in
   let field_usages_from_accessor_field_usages_top_local =
@@ -434,7 +434,7 @@ let datalog_schedule =
     [ not (any_usage_pred base);
       any_usage_pred to_;
       accessor_rel to_ relation base;
-      filter_field is_local_field relation ]
+      filter1 is_local_field relation ]
     ==> field_usages_rel base relation to_
   in
   let field_usages_from_accessor_field_usages =
@@ -497,7 +497,7 @@ let datalog_schedule =
     let$ [base; base_use; relation; from; to_] =
       ["base"; "base_use"; "relation"; "from"; "to_"]
     in
-    [ filter_field is_local_field relation;
+    [ filter1 is_local_field relation;
       constructor_rel base relation from;
       usages_rel base base_use;
       field_usages_rel base_use relation to_ ]
@@ -536,14 +536,14 @@ let datalog_schedule =
     let$ [base; relation; from] = ["base"; "relation"; "from"] in
     [ any_usage_pred base;
       constructor_rel base relation from;
-      filter_field is_not_local_field relation ]
+      filter1 is_not_local_field relation ]
     ==> any_usage_pred from
   in
   let escaping_local_field =
     let$ [base; relation; from] = ["base"; "relation"; "from"] in
     [ any_usage_pred base;
       constructor_rel base relation from;
-      filter_field is_local_field relation ]
+      filter1 is_local_field relation ]
     ==> and_
           [ escaping_field_rel relation
               from (*; field_usages_rel base relation from *) ]
@@ -640,7 +640,7 @@ let datalog_schedule =
     [ not (any_source_pred base);
       any_source_pred from;
       rev_constructor_rel from relation base;
-      filter_field is_not_local_field relation ]
+      filter1 is_not_local_field relation ]
     ==> field_sources_top_rel base relation
   in
   let field_sources_from_constructor_field_sources_top_local =
@@ -648,7 +648,7 @@ let datalog_schedule =
     [ not (any_source_pred base);
       any_source_pred from;
       rev_constructor_rel from relation base;
-      filter_field is_local_field relation ]
+      filter1 is_local_field relation ]
     ==> field_sources_rel base relation from
   in
   let field_sources_from_constructor_field_sources =
@@ -747,7 +747,7 @@ let datalog_schedule =
     let$ [base; base_source; relation; to_; from] =
       ["base"; "base_source"; "relation"; "to_"; "from"]
     in
-    [ filter_field is_local_field relation;
+    [ filter1 is_local_field relation;
       rev_accessor_rel base relation to_;
       sources_rel base base_source;
       field_sources_rel base_source relation from ]
@@ -773,14 +773,14 @@ let datalog_schedule =
     let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
     [ any_source_pred base;
       rev_accessor_rel base relation to_;
-      filter_field is_not_local_field relation ]
+      filter1 is_not_local_field relation ]
     ==> any_source_pred to_
   in
   let reading_local_field =
     let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
     [ any_source_pred base;
       rev_accessor_rel base relation to_;
-      filter_field is_local_field relation ]
+      filter1 is_local_field relation ]
     ==> and_
           [ reading_field_rel relation
               to_ (*; field_sources_rel base relation to_*) ]
@@ -902,7 +902,8 @@ let mk_exists_query params existentials f =
         foreach existentials (fun existentials ->
             where (f params existentials) (yield []))))
 
-let is_function_slot : Field.t -> _ = function[@ocaml.warning "-4"]
+let is_function_slot field =
+  match[@ocaml.warning "-4"] Field.view field with
   | Function_slot _ -> true
   | _ -> false
 
@@ -954,20 +955,17 @@ let get_all_usages :
        in
        [ out x;
          rev_accessor_rel x
-           (Term.constant
-              (Field.encode (Code_of_closure Known_arity_code_pointer)))
+           !!(Field.code_of_closure Known_arity_code_pointer)
            apply_witness;
          sources_rel apply_witness call_witness;
-         constructor_rel call_witness
-           (Term.constant (Field.encode Code_id_of_call_witness))
-           code_id;
+         constructor_rel call_witness !!Field.code_id_of_call_witness code_id;
          code_id_my_closure_rel code_id my_closure_of_code_id;
          usages_rel my_closure_of_code_id y ]
        ==> out y),
       let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
       [ out x;
         field_usages_rel x field y;
-        filter_field is_function_slot field;
+        filter1 is_function_slot field;
         usages_rel y z ]
       ==> out z )
   in
@@ -999,11 +997,6 @@ let get_direct_usages :
     let db = Datalog.Schedule.run (Datalog.Schedule.saturate [r]) db in
     Datalog.get_table out_tbl db
 
-let fieldc_map_to_field_map m =
-  Global_flow_graph.Field.Encoded.Map.fold
-    (fun k r acc -> Field.Map.add (Field.decode k) r acc)
-    m Field.Map.empty
-
 type field_usage =
   | Used_as_top
   | Used_as_vars of unit Code_id_or_name.Map.t
@@ -1029,13 +1022,12 @@ let get_one_field : Datalog.database -> Field.t -> usages -> field_usage =
     [in_ x; field_usages_rel x field y; in_field field] ==> out y
   in
   fun db field (Usages s) ->
-    let field = Field.encode field in
     let db = Datalog.set_table in_tbl s db in
     if exists_with_parameters q [field] db
     then Used_as_top
     else
       let db =
-        Datalog.set_table in_field_tbl (Field.Encoded.Map.singleton field ()) db
+        Datalog.set_table in_field_tbl (Field.Map.singleton field ()) db
       in
       let db = Datalog.Schedule.(run (saturate [r]) db) in
       Used_as_vars (Datalog.get_table out_tbl db)
@@ -1052,13 +1044,13 @@ let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
     [ (let$ [x; field] = ["x"; "field"] in
        [ in_ x;
          field_usages_top_rel x field;
-         filter_field (fun x -> Stdlib.not (is_function_slot x)) field ]
+         filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
        ==> out1 field);
       (let$ [x; field; y] = ["x"; "field"; "y"] in
        [ in_ x;
          field_usages_rel x field y;
          not (out1 field);
-         filter_field (fun x -> Stdlib.not (is_function_slot x)) field ]
+         filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
        ==> out2 field y) ]
   in
   fun db (Usages s) ->
@@ -1068,18 +1060,16 @@ let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
         (fun db r -> Datalog.Schedule.(run (saturate [r])) db)
         db rs
     in
-    fieldc_map_to_field_map
-      (Field.Encoded.Map.merge
-         (fun k x y ->
-           match x, y with
-           | None, None -> assert false
-           | Some _, Some _ ->
-             Misc.fatal_errorf "Got two results for field %a" Field.print
-               (Field.decode k)
-           | Some (), None -> Some Used_as_top
-           | None, Some m -> Some (Used_as_vars m))
-         (Datalog.get_table out_tbl1 db)
-         (Datalog.get_table out_tbl2 db))
+    Field.Map.merge
+      (fun k x y ->
+        match x, y with
+        | None, None -> assert false
+        | Some _, Some _ ->
+          Misc.fatal_errorf "Got two results for field %a" Field.print k
+        | Some (), None -> Some Used_as_top
+        | None, Some m -> Some (Used_as_vars m))
+      (Datalog.get_table out_tbl1 db)
+      (Datalog.get_table out_tbl2 db)
 
 let field_of_constructor_is_used =
   rel2 "field_of_constructor_is_used" Cols.[n; f]
@@ -1103,13 +1093,13 @@ let get_fields_usage_of_constructors :
     [ (let$ [x; field] = ["x"; "field"] in
        [ in_ x;
          field_of_constructor_is_used_top x field;
-         filter_field (fun x -> Stdlib.not (is_function_slot x)) field ]
+         filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
        ==> out1 field);
       (let$ [x; field; y] = ["x"; "field"; "y"] in
        [ in_ x;
          field_of_constructor_is_used_as x field y;
          not (out1 field);
-         filter_field (fun x -> Stdlib.not (is_function_slot x)) field ]
+         filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
        ==> out2 field y) ]
   in
   fun db s ->
@@ -1119,18 +1109,16 @@ let get_fields_usage_of_constructors :
         (fun db r -> Datalog.Schedule.(run (saturate [r])) db)
         db rs
     in
-    fieldc_map_to_field_map
-      (Field.Encoded.Map.merge
-         (fun k x y ->
-           match x, y with
-           | None, None -> assert false
-           | Some _, Some _ ->
-             Misc.fatal_errorf "Got two results for field %a" Field.print
-               (Field.decode k)
-           | Some (), None -> Some Used_as_top
-           | None, Some m -> Some (Used_as_vars m))
-         (Datalog.get_table out_tbl1 db)
-         (Datalog.get_table out_tbl2 db))
+    Field.Map.merge
+      (fun k x y ->
+        match x, y with
+        | None, None -> assert false
+        | Some _, Some _ ->
+          Misc.fatal_errorf "Got two results for field %a" Field.print k
+        | Some (), None -> Some Used_as_top
+        | None, Some m -> Some (Used_as_vars m))
+      (Datalog.get_table out_tbl1 db)
+      (Datalog.get_table out_tbl2 db)
 
 type set_of_closures_def =
   | Not_a_set_of_closures
@@ -1144,13 +1132,13 @@ let get_set_of_closures_def :
           foreach ["field"; "y"] (fun [field; y] ->
               where
                 [ Global_flow_graph.constructor_rel x field y;
-                  filter_field is_function_slot field ]
+                  filter1 is_function_slot field ]
                 (yield [field; y]))))
   in
   fun db v ->
     let l =
       Datalog.Cursor.fold_with_parameters q [v] db ~init:[] ~f:(fun [f; y] l ->
-          ( (match[@ocaml.warning "-4"] Field.decode f with
+          ( (match[@ocaml.warning "-4"] Field.view f with
             | Function_slot fs -> fs
             | _ -> assert false),
             y )
@@ -1185,7 +1173,6 @@ let has_use, _field_used =
       exists_with_parameters any_usage_pred_query [x] db
       || exists_with_parameters usages_query [x] db),
     fun db x field ->
-      let field = Field.encode field in
       exists_with_parameters any_usage_pred_query [x] db
       || exists_with_parameters used_field_top_query [x; field] db
       || exists_with_parameters used_field_query [x; field] db )
@@ -1196,9 +1183,7 @@ let field_used =
         [field_of_constructor_is_used x f])
   in
   fun db x field ->
-    exists_with_parameters field_of_constructor_is_used_query
-      [x; Field.encode field]
-      db
+    exists_with_parameters field_of_constructor_is_used_query [x; field] db
 
 let any_source_query =
   let open! Global_flow_graph in
@@ -1220,7 +1205,6 @@ let cofield_has_use =
         [sources_rel x s; cofield_sources_rel s f t])
   in
   fun db x cofield ->
-    let cofield = CoField.encode cofield in
     exists_with_parameters any_source_query [x] db
     || exists_with_parameters cofield_query [x; cofield] db
 
@@ -1240,7 +1224,6 @@ let not_local_field_has_source =
         [sources_rel x s; field_sources_rel s f v])
   in
   fun db x field ->
-    let field = Field.encode field in
     exists_with_parameters any_source_query [x] db
     || exists_with_parameters field_any_source_query [x; field] db
     || exists_with_parameters field_source_query [x; field] db
@@ -1268,24 +1251,15 @@ let to_change_representation = rel1 "to_change_representation" Cols.[n]
 let datalog_rules =
   let open! Syntax in
   let open! Global_flow_graph in
-  let fld f = Term.constant (Field.encode f) in
-  let real_field (i : Field.t) =
-    match[@ocaml.warning "-4"] i with
+  let real_field f =
+    match[@ocaml.warning "-4"] Field.view f with
     | Code_of_closure _ | Apply _ | Code_id_of_call_witness -> false
     | _ -> true
-  in
-  let _is_code_field : Field.t -> _ = function[@ocaml.warning "-4"]
-    | Code_of_closure _ -> true
-    | _ -> false
-  in
-  let _is_apply_field : Field.t -> _ = function[@ocaml.warning "-4"]
-    | Apply _ -> true
-    | _ -> false
   in
   [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
      [ constructor_rel base relation from;
        any_usage_pred base;
-       filter_field is_not_local_field relation ]
+       filter1 is_not_local_field relation ]
      ==> and_
            [ field_of_constructor_is_used base relation;
              field_of_constructor_is_used_top base relation ]);
@@ -1330,7 +1304,7 @@ let datalog_rules =
      in
      [ constructor_rel base relation from;
        sources_rel usage base;
-       filter_field is_local_field relation;
+       filter1 is_local_field relation;
        any_usage_pred base;
        rev_accessor_rel usage relation v;
        usages_rel v u ]
@@ -1342,7 +1316,7 @@ let datalog_rules =
      in
      [ constructor_rel base relation from;
        sources_rel usage base;
-       filter_field is_local_field relation;
+       filter1 is_local_field relation;
        any_usage_pred base;
        (* field_usages_top_rel usage relation *)
        rev_accessor_rel usage relation v;
@@ -1355,8 +1329,8 @@ let datalog_rules =
        Shouldn't that be gated behind a [cannot_change_calling_convetion]? *)
     (* (let$ [base; relation; from; coderel; call_witness] = ["base";
        "relation"; "from"; "coderel"; "call_witness"] in [ constructor_rel base
-       relation from; filter_field is_apply_field relation; constructor_rel base
-       coderel call_witness; any_usage_pred indirect_call_witness; filter_field
+       relation from; filter1 is_apply_field relation; constructor_rel base
+       coderel call_witness; any_usage_pred indirect_call_witness; filter1
        is_code_field coderel ] ==> field_of_constructor_is_used base
        relation); *)
     (* CR ncourant: should this be reenabled? I think this is no longer
@@ -1370,8 +1344,8 @@ let datalog_rules =
        x); *)
     (let$ [x; field; y] = ["x"; "field"; "y"] in
      [ any_usage_pred x;
-       filter_field is_not_local_field field;
-       filter_field real_field field;
+       filter1 is_not_local_field field;
+       filter1 real_field field;
        constructor_rel x field y ]
      ==> cannot_change_representation0 x);
     (* If a block with a local field escapes, and that field is read again from
@@ -1380,7 +1354,7 @@ let datalog_rules =
        at each point. *)
     (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
      [ any_usage_pred x;
-       filter_field is_local_field field;
+       filter1 is_local_field field;
        reading_field_rel field z;
        constructor_rel x field y ]
      ==> cannot_change_representation0 x);
@@ -1391,7 +1365,7 @@ let datalog_rules =
        ["usage"; "field"; "source1"; "source2"; "_v"]
      in
      [ field_usages_rel usage field _v;
-       filter_field is_local_field field;
+       filter1 is_local_field field;
        sources_rel usage source1;
        sources_rel usage source2;
        distinct Cols.n source1 source2 ]
@@ -1400,7 +1374,7 @@ let datalog_rules =
        ["usage"; "field"; "source1"; "source2"]
      in
      [ field_usages_top_rel usage field;
-       filter_field is_local_field field;
+       filter1 is_local_field field;
        sources_rel usage source1;
        sources_rel usage source2;
        distinct Cols.n source1 source2 ]
@@ -1415,7 +1389,7 @@ let datalog_rules =
      [ usages_rel allocation_id alias;
        sources_rel alias alias_source;
        distinct Cols.n alias_source allocation_id;
-       filter_field real_field field;
+       filter1 real_field field;
        field_usages_rel alias field _v ]
      ==> cannot_change_representation0 allocation_id);
     (let$ [allocation_id; alias; alias_source; field] =
@@ -1424,7 +1398,7 @@ let datalog_rules =
      [ usages_rel allocation_id alias;
        sources_rel alias alias_source;
        distinct Cols.n alias_source allocation_id;
-       filter_field real_field field;
+       filter1 real_field field;
        field_usages_top_rel alias field ]
      ==> cannot_change_representation0 allocation_id);
     (let$ [allocation_id; alias; field; _v] =
@@ -1432,13 +1406,13 @@ let datalog_rules =
      in
      [ usages_rel allocation_id alias;
        any_source_pred alias;
-       filter_field real_field field;
+       filter1 real_field field;
        field_usages_rel alias field _v ]
      ==> cannot_change_representation0 allocation_id);
     (let$ [allocation_id; alias; field] = ["allocation_id"; "alias"; "field"] in
      [ usages_rel allocation_id alias;
        any_source_pred alias;
-       filter_field real_field field;
+       filter1 real_field field;
        field_usages_top_rel alias field ]
      ==> cannot_change_representation0 allocation_id);
     (* If the allocation has a source distinct from itself, its representation
@@ -1458,7 +1432,7 @@ let datalog_rules =
      [any_source_pred allocation_id]
      ==> cannot_change_representation0 allocation_id);
     (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
-     [constructor_rel call_witness (fld Code_id_of_call_witness) code_id]
+     [constructor_rel call_witness !!Field.code_id_of_call_witness code_id]
      ==> cannot_change_representation0 call_witness);
     (* Note this rule is here to still allow changing the calling convention of
        symbols /!\ when adding back the local value slots, there should be a few
@@ -1473,7 +1447,7 @@ let datalog_rules =
      [ usages_rel allocation_id alias;
        sources_rel alias alias_source;
        distinct Cols.n alias_source allocation_id;
-       field_usages_rel alias (fld Code_id_of_call_witness) _v ]
+       field_usages_rel alias !!Field.code_id_of_call_witness _v ]
      ==> cannot_change_witness_calling_convention allocation_id);
     (let$ [allocation_id; alias; alias_source] =
        ["allocation_id"; "alias"; "alias_source"]
@@ -1481,17 +1455,17 @@ let datalog_rules =
      [ usages_rel allocation_id alias;
        sources_rel alias alias_source;
        distinct Cols.n alias_source allocation_id;
-       field_usages_top_rel alias (fld Code_id_of_call_witness) ]
+       field_usages_top_rel alias !!Field.code_id_of_call_witness ]
      ==> cannot_change_witness_calling_convention allocation_id);
     (let$ [allocation_id; alias; _v] = ["allocation_id"; "alias"; "_v"] in
      [ usages_rel allocation_id alias;
        any_source_pred alias;
-       field_usages_rel alias (fld Code_id_of_call_witness) _v ]
+       field_usages_rel alias !!Field.code_id_of_call_witness _v ]
      ==> cannot_change_witness_calling_convention allocation_id);
     (let$ [allocation_id; alias] = ["allocation_id"; "alias"] in
      [ usages_rel allocation_id alias;
        any_source_pred alias;
-       field_usages_top_rel alias (fld Code_id_of_call_witness) ]
+       field_usages_top_rel alias !!Field.code_id_of_call_witness ]
      ==> cannot_change_witness_calling_convention allocation_id);
     (let$ [allocation_id; source] = ["allocation_id"; "source"] in
      [sources_rel allocation_id source; distinct Cols.n source allocation_id]
@@ -1509,12 +1483,12 @@ let datalog_rules =
        convention of its code_id cannot be either. From now on,
        [cannot_change_witness_calling_convention] should no longer be used. *)
     (let$ [call_witness; code_id; _v] = ["call_witness"; "code_id"; "_v"] in
-     [ constructor_rel call_witness (fld Code_id_of_call_witness) code_id;
+     [ constructor_rel call_witness !!Field.code_id_of_call_witness code_id;
        usages_rel call_witness _v;
        cannot_change_witness_calling_convention call_witness ]
      ==> cannot_change_calling_convention code_id);
     (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
-     [ constructor_rel call_witness (fld Code_id_of_call_witness) code_id;
+     [ constructor_rel call_witness !!Field.code_id_of_call_witness code_id;
        any_usage_pred call_witness;
        cannot_change_witness_calling_convention call_witness ]
      ==> cannot_change_calling_convention code_id);
@@ -1527,19 +1501,19 @@ let datalog_rules =
        ["call_witness"; "codeid"; "set_of_closures"]
      in
      [ rev_constructor_rel call_witness
-         (fld (Code_of_closure Unknown_arity_code_pointer))
+         !!(Field.code_of_closure Unknown_arity_code_pointer)
          set_of_closures;
        any_usage_pred call_witness;
-       constructor_rel call_witness (fld Code_id_of_call_witness) codeid ]
+       constructor_rel call_witness !!Field.code_id_of_call_witness codeid ]
      ==> cannot_change_calling_convention codeid);
     (let$ [call_witness; codeid; set_of_closures; _v] =
        ["call_witness"; "codeid"; "set_of_closures"; "_v"]
      in
      [ rev_constructor_rel call_witness
-         (fld (Code_of_closure Unknown_arity_code_pointer))
+         !!(Field.code_of_closure Unknown_arity_code_pointer)
          set_of_closures;
        usages_rel call_witness _v;
-       constructor_rel call_witness (fld Code_id_of_call_witness) codeid ]
+       constructor_rel call_witness !!Field.code_id_of_call_witness codeid ]
      ==> cannot_change_calling_convention codeid);
     (* CR-someday ncourant: we completely prevent changing the representation of
        symbols. While allowing them to be unboxed is difficult, due to symbols
@@ -1547,13 +1521,13 @@ let datalog_rules =
        would require rewriting in the types, which is not done yet. *)
     (let$ [x; _source] = ["x"; "_source"] in
      [ sources_rel x _source;
-       filter
-         (fun [x] ->
+       filter1
+         (fun x ->
            Code_id_or_name.pattern_match x
              ~symbol:(fun _ -> true)
              ~var:(fun _ -> false)
              ~code_id:(fun _ -> false))
-         [x] ]
+         x ]
      ==> cannot_change_representation0 x);
     (* If the representation of any closure in a set of closures cannot be
        changed, the representation of all the closures in the set cannot be
@@ -1562,7 +1536,7 @@ let datalog_rules =
      [cannot_change_representation0 x] ==> cannot_change_representation1 x);
     (let$ [x; field; y] = ["x"; "field"; "y"] in
      [ constructor_rel x field y;
-       filter_field is_function_slot field;
+       filter1 is_function_slot field;
        cannot_change_representation0 x ]
      ==> cannot_change_representation1 y);
     (let$ [x] = ["x"] in
@@ -1572,9 +1546,9 @@ let datalog_rules =
        prevent it here. *)
     (let$ [x; field; y] = ["x"; "field"; "y"] in
      [ constructor_rel x field y;
-       filter_field
-         (fun (f : Field.t) ->
-           match f with
+       filter1
+         (fun f ->
+           match Field.view f with
            | Block _ | Is_int | Get_tag -> true
            | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
            | Code_id_of_call_witness ->
@@ -1593,19 +1567,16 @@ let datalog_rules =
     (let$ [x] = ["x"] in
      [any_usage_pred x] ==> cannot_unbox0 x);
     (* (let$ [x; field] = ["x"; "field"] in [ field_of_constructor_is_used x
-       field; filter_field field_cannot_be_destructured field ] ==>
-       cannot_unbox0 x); *)
+       field; filter1 field_cannot_be_destructured field ] ==> cannot_unbox0
+       x); *)
     (* Unboxing a closure requires changing its calling convention, as we must
        pass the value slots as extra arguments. Thus, we prevent unboxing of
        closures if their calling convention cannot be changed. *)
     (let$ [x; call_witness; codeid] = ["x"; "call_witness"; "codeid"] in
      [ constructor_rel x
-         (Term.constant
-            (Field.encode (Code_of_closure Known_arity_code_pointer)))
+         !!(Field.code_of_closure Known_arity_code_pointer)
          call_witness;
-       constructor_rel call_witness
-         (Term.constant (Field.encode Code_id_of_call_witness))
-         codeid;
+       constructor_rel call_witness !!Field.code_id_of_call_witness codeid;
        cannot_change_calling_convention codeid ]
      ==> cannot_unbox0 x);
     (* An allocation that is one of the results of a function can only be
@@ -1615,13 +1586,13 @@ let datalog_rules =
      in
      [ sources_rel alias allocation_id;
        rev_constructor_rel alias relation call_witness;
-       filter_field
-         (fun (f : Field.t) ->
-           match[@ocaml.warning "-4"] f with Apply _ -> true | _ -> false)
+       filter1
+         (fun f ->
+           match[@ocaml.warning "-4"] Field.view f with
+           | Apply _ -> true
+           | _ -> false)
          relation;
-       constructor_rel call_witness
-         (Term.constant (Field.encode Code_id_of_call_witness))
-         codeid;
+       constructor_rel call_witness !!Field.code_id_of_call_witness codeid;
        cannot_change_calling_convention codeid ]
      ==> cannot_unbox0 allocation_id);
     (* Likewise, an allocation passed as a parameter of a function can only be
@@ -1636,9 +1607,7 @@ let datalog_rules =
      in
      [ sources_rel alias allocation_id;
        rev_coconstructor_rel alias relation call_witness;
-       constructor_rel call_witness
-         (Term.constant (Field.encode Code_id_of_call_witness))
-         codeid;
+       constructor_rel call_witness !!Field.code_id_of_call_witness codeid;
        cannot_change_calling_convention codeid ]
      ==> cannot_unbox0 allocation_id);
     (* Cannot unbox parameters of [Indirect_unknown_arity] calls, even if they
@@ -1668,9 +1637,7 @@ let datalog_rules =
     (let$ [x] = ["x"] in
      [cannot_unbox0 x] ==> cannot_unbox x);
     (let$ [x; field; y] = ["x"; "field"; "y"] in
-     [ cannot_unbox0 x;
-       constructor_rel x field y;
-       filter_field is_function_slot field ]
+     [cannot_unbox0 x; constructor_rel x field y; filter1 is_function_slot field]
      ==> cannot_unbox y);
     (* Compute allocations to unbox or to change representation. This requires
        the rules to be executed in order. *)
@@ -1771,7 +1738,7 @@ let classify_field_map fields =
             | `Block_fields _ -> `Could_not_classify
             | `Empty -> k Value_slot.Map.empty Function_slot.Map.empty
           in
-          match field with
+          match Field.view field with
           | Code_of_closure _ | Apply _ | Code_id_of_call_witness ->
             `Could_not_classify
           | Value_slot vs ->
@@ -1857,8 +1824,7 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom db flow_to kind =
             List.mapi
               (fun i kind ->
                 let field =
-                  Global_flow_graph.Field.Block
-                    (i, Flambda_kind.With_subkind.kind kind)
+                  Field.block i (Flambda_kind.With_subkind.kind kind)
                 in
                 match Field.Map.find_opt field fields with
                 | None -> (* maybe poison *) erase kind
@@ -1959,11 +1925,10 @@ module Rewriter = struct
       [ in_ code_id;
         rev_constructor_rel code_id code_id_of_witness witness;
         rev_constructor_rel witness
-          (Term.constant
-             (Field.encode (Field.Code_of_closure Known_arity_code_pointer)))
+          !!(Field.code_of_closure Known_arity_code_pointer)
           closure;
         rev_constructor_rel closure function_slot all_closures;
-        filter_field is_function_slot function_slot ]
+        filter1 is_function_slot function_slot ]
       ==> out closure all_closures
     in
     fun db code_id ->
@@ -2027,7 +1992,8 @@ module Rewriter = struct
     in
     let open! Syntax in
     let open! Global_flow_graph in
-    let is_value_slot : Field.t -> bool = function
+    let is_value_slot f =
+      match Field.view f with
       | Value_slot _ -> true
       | Function_slot _ | Is_int | Get_tag | Code_id_of_call_witness | Block _
       | Code_of_closure _ | Apply _ ->
@@ -2041,12 +2007,12 @@ module Rewriter = struct
          in
          [ out2 fs usage;
            field_usages_rel usage field field_usage;
-           filter_field is_value_slot field ]
+           filter1 is_value_slot field ]
          ==> out1 usage);
         (let$ [fs; usage; field] = ["fs"; "usage"; "field"] in
          [ out2 fs usage;
            field_usages_top_rel usage field;
-           filter_field is_value_slot field ]
+           filter1 is_value_slot field ]
          ==> out1 usage);
         (let$ [fs0; usage; fs; to_; fs_usage] =
            ["fs0"; "usage"; "fs"; "to_"; "fs_usage"]
@@ -2059,16 +2025,12 @@ module Rewriter = struct
         (let$ [fs; usage] = ["fs"; "usage"] in
          [ out2 fs usage;
            field_usages_top_rel usage
-             (Term.constant
-                (Field.encode (Field.Code_of_closure Known_arity_code_pointer)))
-         ]
+             !!(Field.code_of_closure Known_arity_code_pointer) ]
          ==> out_known_arity fs);
         (let$ [fs; usage] = ["fs"; "usage"] in
          [ out2 fs usage;
            field_usages_top_rel usage
-             (Term.constant
-                (Field.encode (Field.Code_of_closure Unknown_arity_code_pointer)))
-         ]
+             !!(Field.code_of_closure Unknown_arity_code_pointer) ]
          ==> out_unknown_arity fs);
         (let$ [fs; code_id; my_closure; usage] =
            ["fs"; "code_id"; "my_closure"; "usage"]
@@ -2116,17 +2078,14 @@ module Rewriter = struct
         let db = Datalog.set_table in_tbl s db in
         let db =
           Datalog.set_table in_fs_tbl
-            (Field.Encoded.Map.singleton
-               (Field.encode (Function_slot current_function_slot))
-               ())
+            (Field.Map.singleton (Field.function_slot current_function_slot) ())
             db
         in
         let db =
           Datalog.set_table in_all_fs_tbl
             (Function_slot.Map.fold
-               (fun fs _ m ->
-                 Field.Encoded.Map.add (Field.encode (Function_slot fs)) () m)
-               code_ids_of_function_slots Field.Encoded.Map.empty)
+               (fun fs _ m -> Field.Map.add (Field.function_slot fs) () m)
+               code_ids_of_function_slots Field.Map.empty)
             db
         in
         let db =
@@ -2136,13 +2095,12 @@ module Rewriter = struct
                  match code_id with
                  | Unknown -> m
                  | Known code_id ->
-                   Field.Encoded.Map.add
-                     (Field.encode (Function_slot fs))
+                   Field.Map.add (Field.function_slot fs)
                      (Code_id_or_name.Map.singleton
                         (Code_id_or_name.code_id code_id)
                         ())
                      m)
-               code_ids_of_function_slots Field.Encoded.Map.empty)
+               code_ids_of_function_slots Field.Map.empty)
             db
         in
         let db =
@@ -2151,9 +2109,8 @@ module Rewriter = struct
                (fun fs (code_id : _ Or_unknown.t) m ->
                  match code_id with
                  | Known _ -> m
-                 | Unknown ->
-                   Field.Encoded.Map.add (Field.encode (Function_slot fs)) () m)
-               code_ids_of_function_slots Field.Encoded.Map.empty)
+                 | Unknown -> Field.Map.add (Field.function_slot fs) () m)
+               code_ids_of_function_slots Field.Map.empty)
             db
         in
         let db = Datalog.Schedule.run (Datalog.Schedule.saturate rs) db in
@@ -2168,11 +2125,10 @@ module Rewriter = struct
           let known_arity = Datalog.get_table out_known_arity_tbl db in
           let unkwown_arity = Datalog.get_table out_unknown_arity_tbl db in
           ( Usages uses_for_value_slots,
-            Field.Encoded.Map.fold
+            Field.Map.fold
               (fun fs uses m ->
                 let known_arity_call, unknown_arity_call =
-                  ( Field.Encoded.Map.mem fs known_arity,
-                    Field.Encoded.Map.mem fs unkwown_arity )
+                  Field.Map.mem fs known_arity, Field.Map.mem fs unkwown_arity
                 in
                 let calls =
                   if unknown_arity_call
@@ -2182,7 +2138,7 @@ module Rewriter = struct
                   else Never_called
                 in
                 let fs =
-                  match[@ocaml.warning "-4"] Field.decode fs with
+                  match[@ocaml.warning "-4"] Field.view fs with
                   | Function_slot fs -> fs
                   | _ -> assert false
                 in
@@ -2549,7 +2505,8 @@ module Rewriter = struct
               Value_slot.Map.mapi
                 (fun value_slot _value_slot_type ->
                   match
-                    get_one_field db (Field.Value_slot value_slot)
+                    get_one_field db
+                      (Field.value_slot value_slot)
                       (Usages usages_for_value_slots)
                   with
                   | Used_as_top -> Any_usage
@@ -2661,7 +2618,7 @@ module Rewriter = struct
                   (Value_slot.Map.mapi
                      (fun value_slot _value_slot_type ->
                        match
-                         Field.Map.find_opt (Value_slot value_slot) fields
+                         Field.Map.find_opt (Field.value_slot value_slot) fields
                        with
                        | Some Used_as_top -> Any_usage
                        | Some (Used_as_vars vs) ->
@@ -2682,7 +2639,7 @@ module Rewriter = struct
       | Any_usage -> result, Any_usage
       | Usages usages -> (
         let field_kind = Flambda2_types.kind flambda_type in
-        let field = Field.Block (Target_ocaml_int.to_int index, field_kind) in
+        let field = Field.block (Target_ocaml_int.to_int index) field_kind in
         match get_one_field result.db field (Usages usages) with
         | Used_as_top -> result, Any_usage
         | Used_as_vars vs ->
@@ -2891,7 +2848,6 @@ let get_single_field_source =
                 (yield [source]))))
   in
   fun db block field ->
-    let field = Field.encode field in
     if exists_with_parameters q_any_source1 [block; field] db
        || exists_with_parameters q_any_source2 [block; field] db
     then Many
@@ -2904,7 +2860,7 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
     name_prefix =
   Field.Map.filter_map
     (fun field field_use ->
-      match field with
+      match Field.view field with
       | Function_slot _ | Code_id_of_call_witness | Apply _ -> assert false
       | Code_of_closure _ -> None
       | Block _ | Value_slot _ | Is_int | Get_tag -> (
@@ -3187,8 +3143,7 @@ let unknown_code_id_actually_directly_called_query =
   mk_exists_query ["set_of_closures"] ["known_arity_call_witness"]
     (fun [set_of_closures] [known_arity_call_witness] ->
       [ rev_accessor_rel set_of_closures
-          (Term.constant
-             (Field.encode (Code_of_closure Known_arity_code_pointer)))
+          !!(Field.code_of_closure Known_arity_code_pointer)
           known_arity_call_witness;
         any_source_pred known_arity_call_witness ])
 
@@ -3200,12 +3155,11 @@ let code_id_actually_directly_called_query =
         (fun [apply_widget; call_witness; codeid] ->
           where
             [ rev_accessor_rel set_of_closures
-                (Term.constant
-                   (Field.encode (Code_of_closure Known_arity_code_pointer)))
+                !!(Field.code_of_closure Known_arity_code_pointer)
                 apply_widget;
               sources_rel apply_widget call_witness;
               constructor_rel call_witness
-                (Term.constant (Field.encode Code_id_of_call_witness))
+                !!Field.code_id_of_call_witness
                 codeid ]
             (yield [codeid])))
 

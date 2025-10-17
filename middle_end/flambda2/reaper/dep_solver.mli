@@ -21,7 +21,7 @@ val fixpoint : Global_flow_graph.graph -> result
 
 type 'a unboxed_fields =
   | Not_unboxed of 'a
-  | Unboxed of 'a unboxed_fields Global_flow_graph.Field.Map.t
+  | Unboxed of 'a unboxed_fields Field.Map.t
 
 val print_unboxed_fields :
   (Format.formatter -> 'a -> unit) ->
@@ -29,15 +29,14 @@ val print_unboxed_fields :
   'a unboxed_fields ->
   unit
 
-type unboxed = Variable.t unboxed_fields Global_flow_graph.Field.Map.t
+type unboxed = Variable.t unboxed_fields Field.Map.t
 
 type changed_representation =
   | Block_representation of
-      (int * Flambda_primitive.Block_access_kind.t) unboxed_fields
-      Global_flow_graph.Field.Map.t
+      (int * Flambda_primitive.Block_access_kind.t) unboxed_fields Field.Map.t
       * int
   | Closure_representation of
-      Value_slot.t unboxed_fields Global_flow_graph.Field.Map.t
+      Value_slot.t unboxed_fields Field.Map.t
       * Function_slot.t Function_slot.Map.t
       * Function_slot.t
 
@@ -52,14 +51,11 @@ val has_use : result -> Code_id_or_name.t -> bool
 
 val has_source : result -> Code_id_or_name.t -> bool
 
-val field_used :
-  result -> Code_id_or_name.t -> Global_flow_graph.Field.t -> bool
+val field_used : result -> Code_id_or_name.t -> Field.t -> bool
 
-val cofield_has_use :
-  result -> Code_id_or_name.t -> Global_flow_graph.CoField.t -> bool
+val cofield_has_use : result -> Code_id_or_name.t -> Cofield.t -> bool
 
-val not_local_field_has_source :
-  result -> Code_id_or_name.t -> Global_flow_graph.Field.t -> bool
+val not_local_field_has_source : result -> Code_id_or_name.t -> Field.t -> bool
 
 (** Color of node when producing the graph as a .dot *)
 val print_color : result -> Code_id_or_name.t -> string
