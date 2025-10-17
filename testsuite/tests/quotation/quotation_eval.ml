@@ -69,7 +69,7 @@ let test_late_compilation_error =
 ;;
 
 let test_warning =
-  Printf.printf "\nTest warnings emittd during eval\n";
+  Printf.printf "\nTest warnings emitted during eval\n";
   (* Unused variable *)
   [%eval: unit] <[ let a = () in $( if false then <[ a ]> else <[ () ]>) ]>;
   Printf.printf "Done\n"

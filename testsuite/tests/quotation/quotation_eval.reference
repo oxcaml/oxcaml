@@ -20,5 +20,5 @@ Output: This quote should fail to compile. If it's started working but you
 aren't running quotes through transl then you may need to find a new way
 to trigger this.
 
-Test warnings emittd during eval
+Test warnings emitted during eval
 Done
