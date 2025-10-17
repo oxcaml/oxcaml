@@ -279,7 +279,8 @@ let bool_of_string_opt = function
 let string_of_int n =
   format_int "%d" n
 
-external int_of_string : string -> int @@ portable = "caml_int_of_string"
+external int_of_string :
+  (string[@local_opt]) -> int @@ portable = "caml_int_of_string"
 
 let int_of_string_opt s =
   (* TODO: provide this directly as a non-raising primitive. *)
