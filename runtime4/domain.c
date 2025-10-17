@@ -154,3 +154,8 @@ CAMLprim value caml_domain_tls_get(value unused)
 {
   return Caml_state->tls_state;
 }
+
+CAMLprim value caml_domain_preempt_with(value eff)
+{
+  caml_failwith("Domains not supported on runtime4");
+}

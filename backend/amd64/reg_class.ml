@@ -86,7 +86,7 @@ module T = struct
           (* rbp is always spilled even without frame pointers *)
           13
         in
-        num_regular_slots + (index * slot_size_in_vals)
+        num_regular_slots + 1 + (index * slot_size_in_vals)
       else
         (* simd slots are below [gc_regs] pointer *)
         let num_simd_slots =

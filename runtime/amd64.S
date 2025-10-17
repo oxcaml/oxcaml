@@ -530,9 +530,18 @@ G(caml_system__code_begin):
 /* Allocation */
 /******************************************************************************/
 
+/* CR aspsmith: these need to be valid tagged ints for now. probably
+   scan_stack_frames should learn about this instead. */
+#define GC_REGS_XMM 1
+#define GC_REGS_YMM 3
+#define GC_REGS_ZMM 5
+
+#define Gc_regs_kind 13*8
+
 /* Loading and saving SIMD registers XMM/YMM/ZMM */
 
-#define SIMD_REGS_OFFSET (13*8) /* gc_regs_bucket starts with 13 int64 regs */
+#define SIMD_REGS_OFFSET (14*8)
+    /* gc_regs_bucket starts with 13 int64 regs, then the simd kind */
 
 #define SAVE_XMM(i) movupd %xmm##i, (i*16 + SIMD_REGS_OFFSET)(%r15);
 #define SAVE_XMM_REGS DO_0_15(SAVE_XMM)
@@ -576,6 +585,7 @@ G(caml_system__code_begin):
         movq    %r10,        10*8(%r15);               \
              /* %r11 is at   11*8(%r15); */            \
         movq    %rbp,        12*8(%r15);               \
+        movq    $GC_REGS_##simd, Gc_regs_kind(%r15);   \
         SAVE_ ## simd ## _REGS
 
 /* Undo SAVE_ALL_REGS. Expects gc_regs bucket in %r15 */
@@ -706,22 +716,45 @@ Make_call_realloc_stack(_avx512, ZMM)
         ENTER_FUNCTION;                              \
 LBL(caml_call_gc ## suffix):                         \
         SAVE_ALL_REGS(simd);                         \
-        movq    %r15, Caml_state(gc_regs);           \
-        TSAN_ENTER_FUNCTION(0);                      \
-        SWITCH_OCAML_TO_C;                           \
-        C_call (GCALL(caml_garbage_collection));     \
-        SWITCH_C_TO_OCAML;                           \
-        TSAN_EXIT_FUNCTION;                          \
-        movq    Caml_state(gc_regs), %r15;           \
-        RESTORE_ALL_REGS(simd);                      \
         LEAVE_FUNCTION;                              \
-        ret;                                         \
-    CFI_ENDPROC                 ;                    \
+        jmp G(caml_do_call_gc);                      \
+    CFI_ENDPROC;                                     \
     ENDFUNCTION(G(caml_call_gc ## suffix))
 
 Make_call_gc(, XMM)
 Make_call_gc(_avx, YMM)
 Make_call_gc(_avx512, ZMM)
+
+FUNCTION(G(caml_do_call_gc))
+CFI_STARTPROC
+        ENTER_FUNCTION
+        movq    %r15, Caml_state(gc_regs)
+        TSAN_ENTER_FUNCTION(0)
+        SWITCH_OCAML_TO_C
+        C_call (GCALL(caml_garbage_collection))
+        SWITCH_C_TO_OCAML
+        TSAN_EXIT_FUNCTION
+    /* CR aspsmith: document this constant */
+        cmpq    $3, Caml_state(preemption)
+        ja      G(caml_preempt)
+        movq    Caml_state(gc_regs), %r15
+LBL(resume_from_preempt):
+        movq    Gc_regs_kind(%r15), %r11
+        cmpq    $GC_REGS_YMM, %r11
+        je      1f
+        cmpq    $GC_REGS_ZMM, %r11
+        je      2f
+        RESTORE_ALL_REGS(XMM)
+        LEAVE_FUNCTION
+        ret
+1:      RESTORE_ALL_REGS(YMM)
+        LEAVE_FUNCTION
+        ret
+2:      RESTORE_ALL_REGS(ZMM)
+        LEAVE_FUNCTION
+        ret
+CFI_ENDPROC
+ENDFUNCTION(G(caml_do_call_gc))
 
 FUNCTION(G(caml_raise_stack_overflow_nat))
 CFI_STARTPROC
@@ -1237,10 +1270,14 @@ ENDFUNCTION(G(caml_callback3_asm))
 /******************************************************************************/
 /* Fibers */
 /*
- * A continuation is a one word object that points to a fiber. A fiber [f] will
- * point to its parent at Handler_parent(Stack_handler(f)). In the following,
- * the [last_fiber] refers to the last fiber in the linked-list formed by the
- * parent pointer.
+ * A continuation is either a two or three word object:
+ *
+ *  - The first field points to the fiber to resume
+ *  - The second field points to the parent fiber
+ *  - The third field, if present, points to the saved gc_regs of a continuation for a preemption
+ * A fiber [f] will point to its parent at Handler_parent(Stack_handler(f)). In
+ * the following, the [last_fiber] refers to the last fiber in the linked-list
+ * formed by the parent pointer.
  */
 /******************************************************************************/
 
@@ -1341,14 +1378,37 @@ CFI_STARTPROC
 CFI_ENDPROC
 ENDFUNCTION(G(caml_reperform))
 
+FUNCTION(G(caml_preempt))
+CFI_STARTPROC
+        movq    Caml_state(young_ptr), %r15
+        SWITCH_OCAML_TO_C
+        C_call  (GCALL(caml_ensure_gc_regs))
+        movq    Caml_state(preemption_effect), %rbx
+        lea     Caml_state(preemption_effect), %rdi
+        movq    $1, %rsi
+        C_call  (GCALL(caml_modify_generational_global_root))
+        SWITCH_C_TO_OCAML
+        movq    %rbx, %rax
+        movq    Caml_state(preemption), %rbx /* %rbx := continuation */
+        movq    $1, Caml_state(preemption)   /* preemption := Val_unit */
+        movq    Caml_state(current_stack), %rsi /* %rsi := old stack */
+        leaq    1(%rsi), %rdi /* %rdi (last_fiber) := Val_ptr(old stack) */
+        movq    %rdi, 0*8(%rbx) /* Store fiber in continuation */
+        movq    $0, 1*8(%rbx) /* set last fiber of continuation to NULL */
+        movq    Caml_state(gc_regs), %r12
+        movq    %r12, 2*8(%rbx) /* save gc_regs in continuation */
+        jmp     LBL(do_perform)
+CFI_ENDPROC
+ENDFUNCTION(G(caml_preempt))
+
 FUNCTION(G(caml_resume))
 CFI_STARTPROC
-    /* %rax -> fiber, %rbx -> fun, %rdi -> arg, %rsi -> last_fiber */
+    /* %rax -> fiber, %rbx -> fun, %rdi -> arg, %rsi -> last_fiber, %rdx -> maybe_gc_regs */
         leaq    -1(%rax), %r10  /* %r10 (new stack) = Ptr_val(%rax) */
         movq    %rdi, %rax      /* %rax := argument to the function in %rbx */
     /*  check if stack null, then already used */
         testq   %r10, %r10
-        jz      1f
+        jz      2f
 #if defined(WITH_THREAD_SANITIZER)
     /* Save non-callee-saved registers %rax, %rsi and %r10 before C call */
         ENTER_FUNCTION
@@ -1382,8 +1442,24 @@ CFI_STARTPROC
         UPDATE_BASE_POINTER(%rdi)
         SWITCH_OCAML_STACKS
         FLUSH_DYNAMIC_CACHE(%r12)
-        jmp     *(%rbx)
-1:      ENTER_FUNCTION
+        testq   %rdx, %rdx /* Do we have a gc_regs? */
+        jnz     1f
+        jmpq    *(%rbx)    /* no, just jump into the continuation */
+1:      /* This continuation represents a preemption, meaning we have to restore
+           its gc_regs before resuming */
+        movq    %rdx, Caml_state(gc_regs)  /* Save gc_regs */
+        movq    %r15, Caml_state(young_ptr)
+        /* Before restoring registers, redo whatever allocation that was
+           interrupted by preemption. This ensures r15 will point to a valid
+           allocation in the (possibly new) young heap. */
+        SWITCH_OCAML_TO_C
+        C_call  (GCALL(caml_redo_preempted_allocation))
+        SWITCH_C_TO_OCAML
+        movq    Caml_state(gc_regs), %r15  /* Restore gc_regs */
+        /* Jump into the second half of caml_do_call_gc, which will restore the
+           registers and `ret` to resume */
+        jmp     LBL(resume_from_preempt)
+2:      ENTER_FUNCTION
         TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller of caml_resume
                                   in the TSan backtrace */
         LEA_VAR(caml_raise_continuation_already_resumed, %rax)

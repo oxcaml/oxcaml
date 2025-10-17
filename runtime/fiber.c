@@ -653,6 +653,17 @@ void caml_scan_stack(
   }
 }
 
+void caml_ensure_gc_regs(void)
+{
+  if (Caml_state->gc_regs_buckets == NULL) {
+    /* Ensure there is at least one gc_regs bucket available before
+       running any OCaml code. See fiber.h for documentation. */
+    value* bucket = caml_stat_alloc(sizeof(value) * Wosize_gc_regs);
+    bucket[0] = 0; /* no next bucket */
+    Caml_state->gc_regs_buckets = bucket;
+  }
+}
+
 void caml_maybe_expand_stack (void)
 {
   struct stack_info* stk = Caml_state->current_stack;
@@ -669,13 +680,7 @@ void caml_maybe_expand_stack (void)
     }
   }
 
-  if (Caml_state->gc_regs_buckets == NULL) {
-    /* Ensure there is at least one gc_regs bucket available before
-       running any OCaml code. See fiber.h for documentation. */
-    value* bucket = caml_stat_alloc(sizeof(value) * Wosize_gc_regs);
-    bucket[0] = 0; /* no next bucket */
-    Caml_state->gc_regs_buckets = bucket;
-  }
+  caml_ensure_gc_regs();
 }
 
 #else /* End NATIVE_CODE, begin BYTE_CODE */

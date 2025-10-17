@@ -1191,6 +1191,7 @@ val resume :
   f:expression ->
   arg:expression ->
   last_fiber:expression ->
+  maybe_gc_regs:expression ->
   expression
 
 val reperform :
