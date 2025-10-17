@@ -238,11 +238,11 @@ struct c_stack_link {
  * and exception raise. In particular:
  *
  *  Presume | Prunstack -> RESUME (& RESUMETERM if a tail call)
- *   RESUME checks that the stack is valid (a NULL stack indicates a
- *   continuation that has already been resumed). The stacks are then switched
- *   with the old stack becoming the parent of the new stack. Care is taken
- *   to setup the exception handler for the new stack. Execution continues
- *   on the new OCaml stack with the passed function and argument.
+ *   RESUME checks that the continuation has not already been resumed. The
+ *   stacks are then switched with the old stack becoming the parent of the new
+ *   stack. Care is taken to setup the exception handler for the new stack.
+ *   Execution continues on the new OCaml stack with the passed function and
+ *   argument.
  *
  *  Pperform -> PERFORM
  *   PERFORM captures the current stack in a continuation object it allocates.
