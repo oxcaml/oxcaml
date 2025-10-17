@@ -13,57 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type closure_entry_point =
-  | Unknown_arity_code_pointer
-  | Known_arity_code_pointer
-
-module Field : sig
-  type return_kind =
-    | Normal of int
-    | Exn
-
-  type t =
-    | Block of int * Flambda_kind.t (* nth field of a block *)
-    | Value_slot of Value_slot.t
-    | Function_slot of Function_slot.t
-    | Code_of_closure of closure_entry_point (* code_id in a set of closurse *)
-    | Is_int (* value checked for [Is_int] *)
-    | Get_tag (* tag of the value is read *)
-    | Apply of return_kind
-    | Code_id_of_call_witness
-  (* Returns of functions: either exn path or nth value for normal returns *)
-
-  val equal : t -> t -> bool
-
-  val print : Format.formatter -> t -> unit
-
-  val kind : t -> Flambda_kind.t
-
-  module Map : Container_types.Map with type key = t
-
-  module Encoded : Datalog.Column.S
-
-  val encode : t -> Encoded.t
-
-  val decode : Encoded.t -> t
-end
-
-module CoField : sig
-  type t = Param of int
-
-  val equal : t -> t -> bool
-
-  val print : Format.formatter -> t -> unit
-
-  module Map : Container_types.Map with type key = t
-
-  module Encoded : Datalog.Column.S
-
-  val encode : t -> Encoded.t
-
-  val decode : Encoded.t -> t
-end
-
 type graph
 
 val to_datalog : graph -> Datalog.database
@@ -80,17 +29,14 @@ val alias_rel : (Code_id_or_name.t, Code_id_or_name.t, _) rel2
 
 val use_rel : (Code_id_or_name.t, Code_id_or_name.t, _) rel2
 
-val accessor_rel :
-  (Code_id_or_name.t, Field.Encoded.t, Code_id_or_name.t, _) rel3
+val accessor_rel : (Code_id_or_name.t, Field.t, Code_id_or_name.t, _) rel3
 
-val constructor_rel :
-  (Code_id_or_name.t, Field.Encoded.t, Code_id_or_name.t, _) rel3
+val constructor_rel : (Code_id_or_name.t, Field.t, Code_id_or_name.t, _) rel3
 
-val coaccessor_rel :
-  (Code_id_or_name.t, CoField.Encoded.t, Code_id_or_name.t, _) rel3
+val coaccessor_rel : (Code_id_or_name.t, Cofield.t, Code_id_or_name.t, _) rel3
 
 val coconstructor_rel :
-  (Code_id_or_name.t, CoField.Encoded.t, Code_id_or_name.t, _) rel3
+  (Code_id_or_name.t, Cofield.t, Code_id_or_name.t, _) rel3
 
 val propagate_rel :
   (Code_id_or_name.t, Code_id_or_name.t, Code_id_or_name.t, _) rel3
@@ -131,10 +77,10 @@ val add_accessor_dep :
   graph -> to_:Code_id_or_name.t -> Field.t -> base:Code_id_or_name.t -> unit
 
 val add_coaccessor_dep :
-  graph -> to_:Code_id_or_name.t -> CoField.t -> base:Code_id_or_name.t -> unit
+  graph -> to_:Code_id_or_name.t -> Cofield.t -> base:Code_id_or_name.t -> unit
 
 val add_coconstructor_dep :
-  graph -> base:Code_id_or_name.t -> CoField.t -> from:Code_id_or_name.t -> unit
+  graph -> base:Code_id_or_name.t -> Cofield.t -> from:Code_id_or_name.t -> unit
 
 val add_code_id_my_closure : graph -> Code_id.t -> Variable.t -> unit
 
