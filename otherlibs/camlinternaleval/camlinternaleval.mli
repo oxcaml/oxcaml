@@ -34,27 +34,21 @@
 val eval : CamlinternalQuote.Code.t -> Obj.t
 
 module type Jit_intf = sig
-  val jit_load
-    :  phrase_name:string
-    -> Format.formatter
-    -> Lambda.program
-    -> (Obj.t, exn) Result.t
+  val jit_load :
+    phrase_name:string ->
+    Format.formatter ->
+    Lambda.program ->
+    (Obj.t, exn) Result.t
 
   val jit_lookup_symbol : string -> Obj.t option
 end
 
-(** Use the given JIT instead of the compiler's one.  This will also suppress
-    reading of bundles from the executable itself.  You must then use
-    [set_bundled_cmis_and_cmxs], below, instead. *)
+(** Use the given JIT instead of the compiler's one.  *)
 val set_jit : (module Jit_intf) -> unit
 
-(** Provide new .cmi and .cmx bundles to use.  Will cause an error if [set_jit]
-    has not been called first.
-    Calling this from an actual quotation during evaluation will result in
-    a deadlock, so don't do that. *)
-(* CR mshinwell: we could actually skip the (de)marshalling here *)
-val set_bundled_cmis_and_cmxs
-   : marshalled_cmi_bundle:string
-  -> marshalled_cmx_bundle:string
-  -> unit
-
+(** Disallow the reading of bundles from the current executable.  Instead,
+    fetch them via the normal mechanisms used by compilerlibs.  This should
+    only be used if the compilerlibs state in the process is already set up
+    with the correct [Load_path] information for .cmi and .cmx resolution
+    (as is the case in mdx, for example). *)
+val use_existing_compilerlibs_state_for_artifacts : unit -> unit

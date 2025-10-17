@@ -29,14 +29,16 @@
 
 (* CR mshinwell: It seems like this file is running into similar issues to the
    Dynlink code, whereby state in compilerlibs needs to be updated, meaning that
-   it could conflict with other use of compilerlibs in an application. *)
+   it could conflict with other use of compilerlibs in an application. That
+   said, we're relying on using the same compilerlibs state for .cmi and .cmx
+   lookups via this module when called from mdx, instead of using bundles. *)
 
 module type Jit_intf = sig
-  val jit_load
-    :  phrase_name:string
-    -> Format.formatter
-    -> Lambda.program
-    -> (Obj.t, exn) Result.t
+  val jit_load :
+    phrase_name:string ->
+    Format.formatter ->
+    Lambda.program ->
+    (Obj.t, exn) Result.t
 
   val jit_lookup_symbol : string -> Obj.t option
 end
@@ -52,11 +54,7 @@ end
 
 let jit = ref (module Default_jit : Jit_intf)
 
-let use_exe_for_bundle_lookups = ref true
-
-let set_jit new_jit =
-  jit := new_jit;
-  use_exe_for_bundle_lookups := false
+let set_jit new_jit = jit := new_jit
 
 module Jit = struct
   let jit_load ~phrase_name fmt prog =
@@ -78,11 +76,13 @@ external bundle_not_available : bundle -> bool = "caml_bundle_not_available"
 
 let find_bundle_in_exe ~ext get_this_exe =
   let bundle = get_this_exe () in
-  if bundle_not_available bundle then
-    failwith ("Executable does not contain ."
-              ^ ext ^ " bundle and [set_jit] has not been called")
-  else
-    bundle
+  if bundle_not_available bundle
+  then
+    failwith
+      ("Executable does not contain ." ^ ext
+     ^ " bundle and [use_existing_compilerlibs_state_for_artifacts]"
+     ^ " has not been called")
+  else bundle
 
 let cmis = ref Compilation_unit.Name.Map.empty
 
@@ -134,20 +134,18 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
   cmis := new_cmis;
   cmxs := new_cmxs
 
+let use_existing_compilerlibs_state_for_artifacts = ref false
+
 let read_bundles_from_exe () =
-  (* The [api_mutex] is already held at this point *)
-  assert !use_exe_for_bundle_lookups;
-  let marshalled_cmi_bundle = find_bundle_in_exe ~ext:"cmi" bundled_cmis_this_exe in
-  let marshalled_cmx_bundle = find_bundle_in_exe ~ext:"cmx" bundled_cmxs_this_exe in
+  assert (not !use_existing_compilerlibs_state_for_artifacts);
+  let marshalled_cmi_bundle =
+    find_bundle_in_exe ~ext:"cmi" bundled_cmis_this_exe
+  in
+  let marshalled_cmx_bundle =
+    find_bundle_in_exe ~ext:"cmx" bundled_cmxs_this_exe
+  in
   let marshalled_cmi_bundle = (marshalled_cmi_bundle :> string) in
   let marshalled_cmx_bundle = (marshalled_cmx_bundle :> string) in
-  read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle
-
-let api_mutex = Mutex.create ()
-
-let set_bundled_cmis_and_cmxs ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
-  if !use_exe_for_bundle_lookups then
-    failwith "Must call [set_jit] before [set_bundled_cmis_and_cmxs]";
   read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle
 
 let counter = ref 0
@@ -156,8 +154,10 @@ let eval code =
   (* TODO: assert Linux x86-64 *)
   let id = !counter in
   incr counter;
-  if id = 0 && !use_exe_for_bundle_lookups then read_bundles_from_exe ();
+  if id = 0 && not !use_existing_compilerlibs_state_for_artifacts
+  then read_bundles_from_exe ();
   (* TODO: reset all the things *)
+  (* CR mshinwell: I think these flags should maybe be snapshotted and restored *)
   Clflags.no_cwd := true;
   Clflags.native_code := true;
   Clflags.dont_write_files := true;
@@ -195,17 +195,18 @@ let eval code =
         true)
       !cmxs
   in
-  if !use_exe_for_bundle_lookups then (* XXX this isn't right, but don't do this with mdx *)
-    (Persistent_env.Persistent_signature.load
-       := fun ~allow_hidden:_ ~unit_name ->
-            Option.map
-              (fun cmi ->
-                { Persistent_env.Persistent_signature.filename =
-                    Compilation_unit.Name.to_string unit_name;
-                  cmi;
-                  visibility = Visible
-                })
-              (Compilation_unit.Name.Map.find_opt unit_name !cmis));
+  (if not !use_existing_compilerlibs_state_for_artifacts
+  then
+    Persistent_env.Persistent_signature.load
+      := fun ~allow_hidden:_ ~unit_name ->
+           Option.map
+             (fun cmi ->
+               { Persistent_env.Persistent_signature.filename =
+                   Compilation_unit.Name.to_string unit_name;
+                 cmi;
+                 visibility = Visible
+               })
+             (Compilation_unit.Name.Map.find_opt unit_name !cmis));
   let env = Compmisc.initial_env () in
   let typed_impl =
     Typemod.type_implementation unit_info compilation_unit env ast
@@ -244,10 +245,15 @@ let eval code =
   let obj = Jit.jit_lookup_symbol linkage_name |> Option.get in
   Obj.field obj 0
 
+let compile_mutex = Mutex.create ()
+
 let eval code =
-  Mutex.protect api_mutex (fun () ->
+  Mutex.protect compile_mutex (fun () ->
       try eval code
       with exn ->
         let backtrace = Printexc.get_raw_backtrace () in
         Location.report_exception Format.std_formatter exn;
         Printexc.raise_with_backtrace exn backtrace)
+
+let use_existing_compilerlibs_state_for_artifacts () =
+  use_existing_compilerlibs_state_for_artifacts := true
