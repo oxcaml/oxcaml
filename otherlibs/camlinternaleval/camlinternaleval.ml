@@ -180,7 +180,8 @@ let compile_mutex = Mutex.create ()
 
 let eval code =
   Mutex.protect compile_mutex (fun () ->
-      try eval code
+      (* TODO: Consider if some warnings are important enough to show. *)
+      try Warnings.without_warnings (fun () -> eval code)
       with exn ->
         let backtrace = Printexc.get_raw_backtrace () in
         Location.report_exception Format.std_formatter exn;
