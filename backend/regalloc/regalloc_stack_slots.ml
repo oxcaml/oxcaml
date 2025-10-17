@@ -336,7 +336,7 @@ let optimize (t : t) (cfg_with_infos : Cfg_with_infos.t) : unit =
                     "changing the slot index of %a (class %a): %d ~> %d\n%!"
                     Printreg.reg reg Stack_class.print stack_class slot_index
                     bucket_index;
-                reg.loc <- Stack (Local bucket_index);
+                Reg.set_loc reg (Stack (Local bucket_index));
                 Stack_class.Tbl.update max_bucket_indices stack_class
                   ~f:(fun curr -> Stdlib.Int.max curr bucket_index);
                 if Reg.Tbl.mem t.stack_slots reg

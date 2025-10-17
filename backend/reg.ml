@@ -56,6 +56,8 @@ type reg = t
 let dummy =
   { name = Name.Anon; stamp = 0; typ = Int; preassigned = false; loc = Unknown; }
 
+let dummy_for_regalloc = { dummy with stamp = -1 }
+
 let currstamp = ref 0
 let all_relocatable_regs = ref ([] : t list)
 
@@ -64,6 +66,12 @@ module For_testing = struct
   let set_state ~stamp ~relocatable_regs =
     currstamp := stamp;
     all_relocatable_regs := relocatable_regs
+  let with_loc t loc = { t with loc }
+end
+
+module For_printing = struct
+  let create ~name ~typ ~stamp ~preassigned ~loc  =
+    {name; typ; stamp; preassigned; loc}
 end
 
 let create_gen ~name ~typ ~loc =
@@ -78,6 +86,14 @@ let create_gen ~name ~typ ~loc =
   r
 
 let create typ = create_gen ~name:Name.Anon ~typ ~loc:Unknown
+
+let create_alias t ~typ =
+  match t.loc with
+  | Unknown ->
+      Misc.fatal_errorf "Reg.create_alias for unknown register %s"
+       (Name.to_string t.name)
+  | Reg _ | Stack _ ->
+     { t with typ }
 
 let create_with_typ r = create_gen ~name:Name.Anon ~typ:r.typ ~loc:Unknown
 
@@ -131,6 +147,8 @@ let is_domainstate t =
   match t.loc with
   | Stack (Domainstate _) -> true
   | Stack (Incoming _ | Outgoing _ | Local _) | Reg _ | Unknown -> false
+
+let set_loc t loc = t.loc <- loc
 
 let clear_relocatable_regs () =
   (* When clear_relocatable_regs is called for the first time, the current
@@ -308,7 +326,7 @@ let compare_loc_fatal_on_unknown ~fatal_message left right =
     | Unknown -> Misc.fatal_error fatal_message
     | Reg _ | Stack _ -> compare_loc left right
 
-let hash_stack_loc = function 
+let hash_stack_loc = function
   | Local x -> 400 + x
   | Incoming x -> 200 + x
   | Outgoing x -> 300 + x
