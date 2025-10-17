@@ -83,7 +83,7 @@ val add_propagate_dep :
 
 val any_usage_pred : Code_id_or_name.t term -> _ atom
 
-val add_use : graph -> Code_id_or_name.t -> unit
+val add_any_usage : graph -> Code_id_or_name.t -> unit
 
 val any_source_pred : Code_id_or_name.t term -> _ atom
 

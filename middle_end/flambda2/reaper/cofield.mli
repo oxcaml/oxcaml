@@ -17,8 +17,6 @@ type view = private Param of int
 
 type t
 
-val create : view -> t
-
 val view : t -> view
 
 val param : int -> t

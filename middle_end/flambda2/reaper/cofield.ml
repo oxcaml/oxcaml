@@ -21,8 +21,6 @@ include Datalog.Column.Make (struct
   let print ppf i = Format.fprintf ppf "Param %d" i
 end)
 
-let create (Param i) = i
-
 let view i = Param i
 
 let param i = i
