@@ -61,6 +61,7 @@ type t
 
 val create : unit -> t
 
+(* Functions about variable kinds *)
 val kind : Name.t -> Flambda_kind.t -> t -> unit
 
 val bound_parameter_kind : Bound_parameter.t -> t -> unit
@@ -69,27 +70,60 @@ val alias_kind : Name.t -> Simple.t -> t -> unit
 
 val kinds : t -> Flambda_kind.t Name.Map.t
 
-val simple_to_name : t -> denv:Env.t -> Simple.t -> Name.t
-
-val alias_dep : denv:Env.t -> Variable.t -> Simple.t -> t -> unit
-
-val root : Variable.t -> t -> unit
-
-val used : denv:Env.t -> Simple.t -> t -> unit
-
-val any_source : denv:Env.t -> Variable.t -> t -> unit
-
-val used_code_id : Code_id.t -> t -> unit
-
-val called : denv:Env.t -> Code_id.t -> t -> unit
-
+(* Fixed arity continuations may not have their arity changed. *)
 val fixed_arity_continuation : t -> Continuation.t -> unit
 
 val fixed_arity_continuations : t -> Continuation.Set.t
 
+(* Continuation information map. *)
 val continuation_info : t -> Continuation.t -> continuation_info -> unit
 
 val get_continuation_info : t -> continuation_info Continuation.Map.t
+
+(* Code *)
+val add_code : Code_id.t -> code_dep -> t -> unit
+
+val find_code : t -> Code_id.t -> code_dep
+
+val code_deps : t -> code_dep Code_id.Map.t
+
+(* Directly adding edges to the graph *)
+val add_alias : t -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
+
+val add_use_dep : t -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
+
+val add_accessor_dep :
+  t -> to_:Code_id_or_name.t -> Field.t -> base:Code_id_or_name.t -> unit
+
+val add_constructor_dep :
+  t -> base:Code_id_or_name.t -> Field.t -> from:Code_id_or_name.t -> unit
+
+val add_coaccessor_dep :
+  t -> to_:Code_id_or_name.t -> Cofield.t -> base:Code_id_or_name.t -> unit
+
+val add_coconstructor_dep :
+  t -> base:Code_id_or_name.t -> Cofield.t -> from:Code_id_or_name.t -> unit
+
+val add_propagate_dep :
+  t ->
+  if_used:Code_id_or_name.t ->
+  to_:Code_id_or_name.t ->
+  from:Code_id_or_name.t ->
+  unit
+
+val add_any_usage : t -> Code_id_or_name.t -> unit
+
+val add_any_source : t -> Code_id_or_name.t -> unit
+
+val add_code_id_my_closure : t -> Code_id.t -> Variable.t -> unit
+
+(* *)
+
+val simple_to_node : t -> denv:Env.t -> Simple.t -> Code_id_or_name.t
+
+val add_cond_any_usage : t -> denv:Env.t -> Simple.t -> unit
+
+val add_cond_any_source : t -> denv:Env.t -> Variable.t -> unit
 
 val add_apply : apply_dep -> t -> unit
 
@@ -130,13 +164,5 @@ val make_unknown_arity_apply_widget :
 
 val add_set_of_closures_dep :
   Name.t -> Code_id.t -> only_full_applications:bool -> t -> unit
-
-val add_code : Code_id.t -> code_dep -> t -> unit
-
-val find_code : t -> Code_id.t -> code_dep
-
-val code_deps : t -> code_dep Code_id.Map.t
-
-val graph : t -> Graph.graph
 
 val deps : t -> all_constants:Name.t -> Graph.graph

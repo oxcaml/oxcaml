@@ -33,8 +33,6 @@ type view = private
 
 type t
 
-val create : view -> t
-
 val view : t -> view
 
 val block : int -> Flambda_kind.t -> t

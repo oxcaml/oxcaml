@@ -182,7 +182,7 @@ let add_opaque_let_dependency t ~to_ ~from =
   in
   Name_occurrences.fold_names bound_to ~f ~init:()
 
-let add_use t (var : Code_id_or_name.t) =
+let add_any_usage t (var : Code_id_or_name.t) =
   t.any_usage_pred <- N.add_or_replace [var] () t.any_usage_pred
 
 let add_any_source t (var : Code_id_or_name.t) =
