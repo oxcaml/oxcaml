@@ -54,7 +54,12 @@ let add_quoted_globals globals =
          (fun globals global -> CU.Name.Set.add global globals)
          !quoted_globals globals
 
-let get_quoted_globals () = !quoted_globals
+let get_quoted_globals () =
+  if not !Clflags.nopervasives
+  then
+    quoted_globals
+      := CU.Name.Set.add (CU.Name.of_string "Stdlib") !quoted_globals;
+  !quoted_globals
 
 (* Consistency check between interfaces and implementations: *)
 

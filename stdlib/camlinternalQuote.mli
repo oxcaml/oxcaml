@@ -652,9 +652,13 @@ and Code : sig
 
     type t
 
+    val to_exp : t -> Exp.t
+
     val close : exp -> t
 
     val open_ : t -> exp
+
+    val print : Format.formatter -> t -> unit
   end
 
   val print : Format.formatter -> t -> unit
