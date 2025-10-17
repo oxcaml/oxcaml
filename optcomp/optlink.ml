@@ -303,6 +303,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           match full_paths_of_eval_support_files_already_provided_by_user with
           | [] ->
             full_paths, ml_objfiles, units_tolink, cached_genfns_imports, genfns
+          | _ :: _ when !Clflags.nopervasives ->
+            (* In this case we won't link any eval support files
+               automatically *)
+            full_paths, ml_objfiles, units_tolink, cached_genfns_imports, genfns
           | _ :: _ ->
             assert uses_eval;
             Linkenv.restore_snapshot original_linkenv;
