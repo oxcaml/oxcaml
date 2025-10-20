@@ -60,12 +60,6 @@ jobs:
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
 
-          - name: metrics_collection
-            config: --enable-middle-end=flambda2
-            os: ubuntu-latest
-            build_ocamlparam: ''
-            ocamlparam: '_,O3=1'
-
           - name: flambda2_frame_pointers_oclassic_polling
             config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
             os: ubuntu-latest
@@ -145,6 +139,7 @@ jobs:
             dwarf_tests_only: true
             oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus1
             oxcaml_llvm_source_branch: lldb
+            collect_metrics: false
 
           - name: llvmize_tests
             config: --enable-middle-end=flambda2 --enable-runtime5 --enable-frame-pointers
@@ -152,6 +147,7 @@ jobs:
             llvmize_tests_only: true
             oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
             oxcaml_llvm_source_branch: llvmize-oxcaml
+            collect_metrics: false
 
     env:
       J: "3"
@@ -250,9 +246,8 @@ jobs:
         make $target \
           || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
 
-        # Install the compiler for metrics_collection configuration to populate _install directory
-        # This is needed for the metrics collection step to analyze installed artifacts
-        if [ "${{ matrix.name }}" = "metrics_collection" ]; then
+        # Optionally install the compiler when metrics need to be collected
+        if [ "$COLLECT_METRICS" = "true" ]; then
           make install
         fi
       env:
@@ -260,6 +255,7 @@ jobs:
         OCAMLPARAM: ${{ matrix.ocamlparam }}
         OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
         USE_RUNTIME: ${{ matrix.use_runtime }}
+        COLLECT_METRICS: ${{ matrix.collect_metrics != false }}
 
     - name: Promote failed tests and capture diffs
       # Compute the diff for an arbitrary job, we expect all to have the same diff
@@ -393,55 +389,37 @@ jobs:
             -validate -param SPLIT_AROUND_LOOPS:on -regalloc $allocator || exit 1; \
         done
 
-    - name: Collect and push metrics
-      if: matrix.name == 'metrics_collection' && github.ref == 'refs/heads/main' && github.event_name == 'push'
-      env:
-        GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }}
+    - name: Collect build metrics
+      if: env.COLLECT_METRICS == 'true'
       run: |
-        # Checkout metrics repository
-        gh repo clone oxcaml/oxcaml-metrics metrics-repo
-
-        # Create data directory if it doesn't exist
-        mkdir -p metrics-repo/data
-
-        # Determine the actual commit being tested (not the merge commit for PRs)
+        set -euo pipefail
+        METRICS_DIR="metrics/${{ matrix.name }}"
+        mkdir -p "$METRICS_DIR"
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           COMMIT_HASH="${{ github.event.pull_request.head.sha }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
         else
           COMMIT_HASH="${{ github.sha }}"
+          PR_NUMBER="N/A"
         fi
-        SHORT_HASH="${COMMIT_HASH:0:8}"
-        DATE=$(date -u +"%Y-%m-%d")
+        CSV_FILE="$METRICS_DIR/metrics.csv"
 
-        # Extract PR number from commit message
-        COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
-        PR_NUMBER=$(echo "$COMMIT_MESSAGE" | grep -oP '\(#\K[0-9]+(?=\))' || echo "N/A")
-
-        # CSV filename
-        CSV_FILE="metrics-repo/data/metrics-${DATE}-${SHORT_HASH}.csv"
-
-        # Use the metrics collection script
         ${{ github.workspace }}/scripts/collect-size-metrics.sh \
           "${{ github.workspace }}/_install" \
           "$CSV_FILE" \
           "$COMMIT_HASH" \
           "$PR_NUMBER"
 
-        echo "Contents of generated metrics file:"
-        cat "$CSV_FILE"
+        echo "Metric file stored at $CSV_FILE"
 
-        # Commit and push metrics
-        cd metrics-repo
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-
-        # Configure git to use gh for authentication
-        git config --local credential.helper ""
-        git config --local credential.https://github.com.helper "!gh auth git-credential"
-
-        git add data/
-        git commit -m "Add metrics for commit ${COMMIT_HASH}"
-        git push
+    - name: Upload build metrics artifact
+      if: env.COLLECT_METRICS == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: metrics-${{ matrix.name }}
+        path: metrics/${{ matrix.name }}/
+        retention-days: 1
+        if-no-files-found: error
 
     - name: Upload core dumps
       uses: actions/upload-artifact@v4
@@ -468,6 +446,25 @@ jobs:
 #       with:
 #         name: _runtest-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
 #         path: ${{ github.workspace }}/_runtest
+
+  aggregate-metrics:
+    name: aggregate metrics
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: metrics-*
+          merge-multiple: true
+          path: .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metrics-combined
+          path: metrics
+          if-no-files-found: warn
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
