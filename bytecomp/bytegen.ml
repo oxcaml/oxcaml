@@ -528,28 +528,16 @@ and comp_expr stack_info env exp sz cont =
       (* Resume itself only pushes 2 words, but perform adds another *)
       check_stack stack_info (sz + nargs + 3);
       comp_args stack_info env args sz (Kresume :: cont))
-  | Context_switch (Runstack, args) ->
+  | Context_switch (With_stack, args) ->
     let nargs = List.length args in
-    assert (nargs = 3);
-    (* Resumeterm and Resume expect a continuation as the first argument, but we
-       have been given a stack. We allocate a continuation in both cases here,
-       storing the stack as its first field and 0 as the second field (the
-       last_fiber field) *)
-    let alloc_continuation rest =
-      Kpush :: Kconst (Const_base (Const_int 0)) :: Kpush :: Kacc 1
-      :: Kmakeblock (2, Runtimetags.cont_tag)
-      :: Kpop 1 :: rest
-    in
-    if is_tailcall cont
-    then (
-      (* Resumeterm itself only pushes 2 words, but perform adds another *)
-      check_stack stack_info 3;
-      comp_args stack_info env args sz
-        (alloc_continuation (Kresumeterm (sz + 2) :: discard_dead_code cont)))
-    else (
-      (* Resume itself only pushes 2 words, but perform adds another *)
-      check_stack stack_info (sz + 5);
-      comp_args stack_info env args sz (alloc_continuation (Kresume :: cont)))
+    assert (nargs = 5);
+    check_stack stack_info 3;
+    comp_args stack_info env args sz (Kwith_stack :: cont)
+  | Context_switch (With_stack_bind, args) ->
+    let nargs = List.length args in
+    assert (nargs = 7);
+    check_stack stack_info 3;
+    comp_args stack_info env args sz (Kwith_stack_bind :: cont)
   | Context_switch (Reperform, args) ->
     let nargs = List.length args - 1 in
     assert (nargs = 2);
