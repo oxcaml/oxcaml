@@ -1276,11 +1276,14 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
   | Specific op -> specific t i op
   | Intop_atomic { op; size; addr } -> atomic t i op ~size ~addr
   | Pause -> call_llvm_intrinsic_no_res t "x86.sse2.pause" []
+  | Dls_get ->
+    let dls_state_ptr = load_domainstate_addr t Domain_dls_state in
+    let dls_state = emit_ins t (I.load ~ptr:dls_state_ptr ~typ:T.i64) in
+    store_into_reg t i.res.(0) dls_state
   | Poll -> () (* CR yusumez: insert poll call *)
   | Stackoffset _ -> () (* Handled separately via [statepoint_id_attr] *)
   | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
-  | Probe_is_enabled _ | Name_for_debugger _ | Dls_get ->
-    not_implemented_basic i
+  | Probe_is_enabled _ | Name_for_debugger _ -> not_implemented_basic i
 
 let emit_basic t (i : Cfg.basic Cfg.instruction) =
   emit_comment t "%a" F.pp_dbg_instr_basic i;
