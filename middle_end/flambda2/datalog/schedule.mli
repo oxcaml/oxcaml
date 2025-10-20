@@ -38,7 +38,7 @@ val deduce : deduction -> (Heterogenous_list.nil, rule) Datalog.program
 
 type t
 
-val saturate : rule list -> t
+val saturate : (Heterogenous_list.nil, rule) Datalog.program list -> t
 
 val fixpoint : t list -> t
 
