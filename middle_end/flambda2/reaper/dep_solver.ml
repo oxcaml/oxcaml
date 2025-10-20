@@ -909,15 +909,16 @@ let datalog_schedule =
             sources_alias;
             rev_alias ] ])
 
-let exists_with_parameters cursor params db =
-  Datalog.Cursor.fold_with_parameters cursor params db ~init:false
-    ~f:(fun [] _ -> true)
-
 let mk_exists_query params existentials f =
-  Datalog.(
-    compile_with_parameters params [] (fun params [] ->
-        foreach existentials (fun existentials ->
-            where (f params existentials) (yield []))))
+  let q =
+    Datalog.(
+      compile_with_parameters params [] (fun params [] ->
+          foreach existentials (fun existentials ->
+              where (f params existentials) (yield []))))
+  in
+  fun params db ->
+    Datalog.Cursor.fold_with_parameters q params db ~init:false ~f:(fun [] _ ->
+        true)
 
 let is_function_slot field =
   match[@ocaml.warning "-4"] Field.view field with
@@ -1042,7 +1043,7 @@ let get_one_field : Datalog.database -> Field.t -> usages -> field_usage =
   in
   fun db field (Usages s) ->
     let db = Datalog.set_table in_tbl s db in
-    if exists_with_parameters q [field] db
+    if q [field] db
     then Used_as_top
     else
       let db =
@@ -1171,7 +1172,7 @@ let any_usage_pred_query =
 
 (* CR pchambart: should rename: mutiple potential top is_used_as_top (should be
    obviously different from has use) *)
-let is_top db x = exists_with_parameters any_usage_pred_query [x] db
+let is_top db x = any_usage_pred_query [x] db
 
 (* CR pchambart: field_used should rename to mean that this is the specific
    field of a given variable. *)
@@ -1188,21 +1189,18 @@ let has_use, _field_used =
     mk_exists_query ["X"; "F"] ["U"; "V"] (fun [x; f] [u; v] ->
         [usages_rel x u; field_usages_rel u f v])
   in
-  ( (fun db x ->
-      exists_with_parameters any_usage_pred_query [x] db
-      || exists_with_parameters usages_query [x] db),
+  ( (fun db x -> any_usage_pred_query [x] db || usages_query [x] db),
     fun db x field ->
-      exists_with_parameters any_usage_pred_query [x] db
-      || exists_with_parameters used_field_top_query [x; field] db
-      || exists_with_parameters used_field_query [x; field] db )
+      any_usage_pred_query [x] db
+      || used_field_top_query [x; field] db
+      || used_field_query [x; field] db )
 
 let field_used =
   let field_of_constructor_is_used_query =
     mk_exists_query ["X"; "F"] [] (fun [x; f] [] ->
         [field_of_constructor_is_used x f])
   in
-  fun db x field ->
-    exists_with_parameters field_of_constructor_is_used_query [x; field] db
+  fun db x field -> field_of_constructor_is_used_query [x; field] db
 
 let any_source_query =
   let open! Global_flow_graph in
@@ -1213,9 +1211,7 @@ let has_source =
   let has_source_query =
     mk_exists_query ["X"] ["Y"] (fun [x] [y] -> [sources_rel x y])
   in
-  fun db x ->
-    exists_with_parameters any_source_query [x] db
-    || exists_with_parameters has_source_query [x] db
+  fun db x -> any_source_query [x] db || has_source_query [x] db
 
 let cofield_has_use =
   let open! Global_flow_graph in
@@ -1223,9 +1219,7 @@ let cofield_has_use =
     mk_exists_query ["X"; "F"] ["S"; "T"] (fun [x; f] [s; t] ->
         [sources_rel x s; cofield_sources_rel s f t])
   in
-  fun db x cofield ->
-    exists_with_parameters any_source_query [x] db
-    || exists_with_parameters cofield_query [x; cofield] db
+  fun db x cofield -> any_source_query [x] db || cofield_query [x; cofield] db
 
 (* CR pchambart: Should rename to remove not local in the name (the notion does
    not exists right now)*)
@@ -1243,9 +1237,9 @@ let not_local_field_has_source =
         [sources_rel x s; field_sources_rel s f v])
   in
   fun db x field ->
-    exists_with_parameters any_source_query [x] db
-    || exists_with_parameters field_any_source_query [x; field] db
-    || exists_with_parameters field_source_query [x; field] db
+    any_source_query [x] db
+    || field_any_source_query [x; field] db
+    || field_source_query [x; field] db
 
 let cannot_change_witness_calling_convention =
   rel1 "cannot_change_witness_calling_convention" Cols.[n]
@@ -2153,10 +2147,7 @@ module Rewriter = struct
             db
         in
         let db = Datalog.Schedule.run (Datalog.Schedule.saturate rs) db in
-        if exists_with_parameters q1 [] db
-           || exists_with_parameters q2 [] db
-           || exists_with_parameters q3 [] db
-           || exists_with_parameters q4 [] db
+        if q1 [] db || q2 [] db || q3 [] db || q4 [] db
         then any ()
         else
           let uses_for_value_slots = Datalog.get_table out1_tbl db in
@@ -2887,8 +2878,7 @@ let get_single_field_source =
                 (yield [source]))))
   in
   fun db block field ->
-    if exists_with_parameters q_any_source1 [block; field] db
-       || exists_with_parameters q_any_source2 [block; field] db
+    if q_any_source1 [block; field] db || q_any_source2 [block; field] db
     then Many
     else
       Datalog.Cursor.fold_with_parameters q_source [block; field] db
@@ -3136,14 +3126,14 @@ let print_color { db; unboxed_fields; changed_representation } v =
     else "ff"
   in
   let green =
-    if exists_with_parameters any_usage_pred_query [v] db
+    if any_usage_pred_query [v] db
     then "22"
     else if has_use db v
     then "88"
     else "ff"
   in
   let blue =
-    if exists_with_parameters any_source_query [v] db
+    if any_source_query [v] db
     then "22"
     else if has_source db v
     then "88"
@@ -3172,9 +3162,7 @@ let cannot_change_calling_convention_query =
 
 let cannot_change_calling_convention uses v =
   (not (Compilation_unit.is_current (Code_id.get_compilation_unit v)))
-  || exists_with_parameters cannot_change_calling_convention_query
-       [Code_id_or_name.code_id v]
-       uses.db
+  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
 
 let unknown_code_id_actually_directly_called_query =
   let open Syntax in
@@ -3203,7 +3191,7 @@ let code_id_actually_directly_called_query =
             (yield [codeid])))
 
 let code_id_actually_directly_called uses v =
-  if exists_with_parameters unknown_code_id_actually_directly_called_query
+  if unknown_code_id_actually_directly_called_query
        [Code_id_or_name.name v]
        uses.db
   then Or_unknown.Unknown
