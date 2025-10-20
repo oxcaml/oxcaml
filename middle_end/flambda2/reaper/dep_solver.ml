@@ -94,7 +94,9 @@ let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
 module Syntax = struct
   include Datalog
 
-  let ( let$ ) xs f = compile xs f
+  let ( let$ ) xs f =
+    let@ xs = variables xs in
+    f xs
 
   let ( ==> ) h c = where h (deduce c)
 
@@ -914,8 +916,10 @@ let datalog_schedule =
 let mk_exists_query params existentials f =
   let open Syntax in
   let q =
-    compile_with_parameters params [] (fun params [] ->
-        foreach existentials (fun existentials -> f params existentials =>? []))
+    query
+      (let@ params = parameters params in
+       let@ existentials = variables existentials in
+       f params existentials =>? [])
   in
   fun params db ->
     Cursor.fold_with_parameters q params db ~init:false ~f:(fun [] _ -> true)
@@ -1148,11 +1152,12 @@ let get_set_of_closures_def :
     Datalog.database -> Code_id_or_name.t -> set_of_closures_def =
   let open Syntax in
   let q =
-    compile_with_parameters ["x"] [] (fun [x] [] ->
-        foreach ["relation"; "y"] (fun [relation; y] ->
-            [ Global_flow_graph.constructor_rel ~base:x ~relation ~from:y;
-              filter1 is_function_slot relation ]
-            =>? [relation; y]))
+    query
+      (let@ [x] = parameters ["x"] in
+       let@ [relation; y] = variables ["relation"; "y"] in
+       [ Global_flow_graph.constructor_rel ~base:x ~relation ~from:y;
+         filter1 is_function_slot relation ]
+       =>? [relation; y])
   in
   fun db v ->
     let l =
@@ -2871,11 +2876,12 @@ let get_single_field_source =
           Global_flow_graph.any_source_pred source ])
   in
   let q_source =
-    compile_with_parameters ["block"; "field"] [] (fun [block; field] [] ->
-        foreach ["field_source"; "source"] (fun [field_source; source] ->
-            [ field_sources_rel block field field_source;
-              sources_rel field_source source ]
-            =>? [source]))
+    query
+      (let@ [block; field] = parameters ["block"; "field"] in
+       let@ [field_source; source] = variables ["field_source"; "source"] in
+       [ field_sources_rel block field field_source;
+         sources_rel field_source source ]
+       =>? [source])
   in
   fun db block field ->
     if q_any_source1 [block; field] db || q_any_source2 [block; field] db
@@ -2971,18 +2977,22 @@ let fixpoint (graph : Global_flow_graph.graph) =
   let has_to_be_unboxed code_or_name = has_to_be_unboxed [code_or_name] db in
   let query_to_unbox =
     let open Syntax in
-    let$ [x; y] = ["x"; "y"] in
-    [to_unbox x; dominated_by_allocation_point x y] =>? [x; y]
+    query
+      (let$ [x; y] = ["x"; "y"] in
+       [to_unbox x; dominated_by_allocation_point x y] =>? [x; y])
   in
   let query_to_change_representation =
     let open Syntax in
-    let$ [x] = ["x"] in
-    [to_change_representation x] =>? [x]
+    query
+      (let$ [x] = ["x"] in
+       [to_change_representation x] =>? [x])
   in
   let query_dominated_by =
     let open Syntax in
-    compile_with_parameters ["x"] [] (fun [x] [] ->
-        foreach ["y"] (fun [y] -> [dominated_by_allocation_point x y] =>? [y]))
+    query
+      (let@ [x] = parameters ["x"] in
+       let@ [y] = variables ["y"] in
+       [dominated_by_allocation_point x y] =>? [y])
   in
   Datalog.Cursor.iter query_to_unbox db ~f:(fun [code_or_name; to_patch] ->
       (* CR-someday ncourant: produce ghost makeblocks/set of closures for
@@ -3152,17 +3162,19 @@ let unknown_code_id_actually_directly_called_query =
 let code_id_actually_directly_called_query =
   let open Syntax in
   let open! Global_flow_graph in
-  compile_with_parameters ["set_of_closures"] [] (fun [set_of_closures] [] ->
-      foreach ["apply_widget"; "call_witness"; "codeid"]
-        (fun [apply_widget; call_witness; codeid] ->
-          [ rev_accessor_rel ~base:set_of_closures
-              ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
-              ~to_:apply_widget;
-            sources_rel apply_widget call_witness;
-            constructor_rel ~base:call_witness
-              ~relation:!!Field.code_id_of_call_witness
-              ~from:codeid ]
-          =>? [codeid]))
+  query
+    (let@ [set_of_closures] = parameters ["set_of_closures"] in
+     let@ [apply_widget; call_witness; codeid] =
+       variables ["apply_widget"; "call_withness"; "codeid"]
+     in
+     [ rev_accessor_rel ~base:set_of_closures
+         ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
+         ~to_:apply_widget;
+       sources_rel apply_widget call_witness;
+       constructor_rel ~base:call_witness
+         ~relation:!!Field.code_id_of_call_witness
+         ~from:codeid ]
+     =>? [codeid])
 
 let code_id_actually_directly_called uses v =
   if unknown_code_id_actually_directly_called_query

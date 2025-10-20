@@ -45,15 +45,16 @@ val print_bindings : Format.formatter -> bindings -> unit
   *)
 type ('p, 'a) program
 
-val map_program : ('p, 'a) program -> ('a -> 'b) -> ('p, 'b) program
+type ('p, 'v) cursor
 
-val compile : 'v String.hlist -> ('v Term.hlist -> (nil, 'a) program) -> 'a
+val compile :
+  'v String.hlist -> ('v Term.hlist -> (nil, 'a) program) -> (nil, 'a) cursor
 
 val compile_with_parameters :
   'p String.hlist ->
   'v String.hlist ->
-  ('p Term.hlist -> 'v Term.hlist -> ('p, 'a) program) ->
-  'a
+  ('p Term.hlist -> 'v Term.hlist -> (nil, 'a) program) ->
+  ('p, 'a) cursor
 
 val foreach :
   'a String.hlist -> ('a Term.hlist -> ('p, 'b) program) -> ('p, 'b) program
@@ -94,6 +95,44 @@ val create_callback_with_bindings :
   'a Term.hlist ->
   callback
 
-val yield : 'v Term.hlist -> ('p, ('p, 'v) Cursor.With_parameters.t) program
+val print_cursor : Format.formatter -> ('p, 'v) cursor -> unit
 
-val execute : callback list -> ('p, ('p, 'v) Cursor.With_parameters.t) program
+val naive_iter :
+  ('p, 'v) cursor ->
+  'p Constant.hlist ->
+  Table.Map.t ->
+  f:('v Constant.hlist -> unit) ->
+  Table.Map.t
+
+val seminaive_iter :
+  ('p, 'v) cursor ->
+  'p Constant.hlist ->
+  previous:Table.Map.t ->
+  diff:Table.Map.t ->
+  current:Table.Map.t ->
+  f:('v Constant.hlist -> unit) ->
+  Table.Map.t
+
+type deduction
+
+val deduction : ('t, 'k, unit) Table.Id.t -> 'k Term.hlist -> deduction
+
+val accumulate : deduction list -> (nil, 'v) program
+
+val yield : 'v Term.hlist -> (nil, 'v) program
+
+val execute : callback list -> (nil, 'v) program
+
+type ('a, 'b, 'c, 'd) binder =
+  ('a Term.hlist -> ('b, 'c) program) -> ('d, 'c) program
+
+val ( let@ ) :
+  ('a, 'b, 'c, 'd) binder ->
+  ('a Term.hlist -> ('b, 'c) program) ->
+  ('d, 'c) program
+
+val variables : 'v String.hlist -> ('v, 'p, 'c, 'p) binder
+
+val parameters : 'p String.hlist -> ('p, nil, 'c, 'p) binder
+
+val query : ('a, 'b) program -> ('a, 'b) cursor

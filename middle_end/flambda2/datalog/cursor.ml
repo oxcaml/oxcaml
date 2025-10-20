@@ -44,18 +44,13 @@ type action =
 
 let bind_iterator var iterator = Bind_iterator (var, iterator)
 
-let unless id cell args =
-  VM_action
-    (Unless
-       (Table.Id.is_trie id, cell, args.values, Table.Id.name id, args.names))
+let unless ~is_trie ~name cell args =
+  VM_action (Unless (is_trie, cell, args.values, name, args.names))
 
 let unless_eq repr cell1 cell2 =
   VM_action (Unless_eq (cell1.value, cell2.value, cell1.name, cell2.name, repr))
 
 let filter f args = VM_action (Filter (f, args.values, args.names))
-
-type binder =
-  | Bind_table : ('t, 'k, 'v) Table.Id.t * 't Channel.sender -> binder
 
 type actions = { mutable rev_actions : action list }
 
@@ -165,59 +160,27 @@ end
 
 module VM = Virtual_machine.Make (Join_iterator)
 
-type binders = { mutable rev_binders : binder list }
-
-let create_binders () = { rev_binders = [] }
-
-let add_binder binders binder =
-  binders.rev_binders <- binder :: binders.rev_binders
-
 type context =
   { levels : levels;
-    actions : actions;
-    binders : binders;
-    naive_binders : binders
+    actions : actions
   }
 
 let create_context () =
-  { levels = create_levels ();
-    actions = create_actions ();
-    binders = create_binders ();
-    naive_binders = create_binders ()
-  }
+  { levels = create_levels (); actions = create_actions () }
 
 let add_new_level context name = add_new_level context.levels name
-
-let add_iterator context id =
-  let handler, iterators, _ = Table.Id.create_iterator id in
-  add_binder context.binders (Bind_table (id, handler));
-  iterators
-
-let add_naive_binder context id =
-  let send_trie, recv_trie =
-    Channel.create (Trie.empty (Table.Id.is_trie id))
-  in
-  add_binder context.naive_binders (Bind_table (id, send_trie));
-  recv_trie
 
 let initial_actions { actions; _ } = actions
 
 type 'v t =
-  { cursor_binders : binder list;
-    cursor_naive_binders : binder list;
-    instruction : (vm_action, nil) VM.instruction;
+  { instruction : (vm_action, nil) VM.instruction;
     callback : ('v Constant.hlist -> unit) ref
   }
 
 type 'a cursor = 'a t
 
-let print ppf { cursor_binders; instruction; _ } =
-  Format.fprintf ppf "@[<hov 1>(%a)@]@ %a"
-    (Format.pp_print_list ~pp_sep:Format.pp_print_space
-       (fun ppf (Bind_table (table_id, _)) -> Table.Id.print ppf table_id))
-    cursor_binders
-    (VM.pp_instruction pp_cursor_action)
-    instruction
+let print ppf { instruction; _ } =
+  VM.pp_instruction pp_cursor_action ppf instruction
 
 let apply_actions actions instruction =
   (* Note: we must preserve the order of [Bind_iterator] actions in order to
@@ -298,7 +261,7 @@ type call =
 let create_call func ~name args = Call { func; name; args }
 
 let create ?(calls = []) ?output context =
-  let { levels; actions; binders; naive_binders } = context in
+  let { levels; actions } = context in
   let (Level_list rev_levels) = levels.rev_levels in
   let callback = ref ignore in
   let make k =
@@ -319,37 +282,14 @@ let create ?(calls = []) ?output context =
     | _ :: _ -> open_rev_vars rev_levels @@ make @@ pop_rev_vars rev_levels
   in
   let instruction = apply_actions actions instruction in
-  { cursor_binders = binders.rev_binders;
-    cursor_naive_binders = naive_binders.rev_binders;
-    instruction;
-    callback
-  }
+  { instruction; callback }
 
-let bind_table (Bind_table (id, handler)) database =
-  let table = Table.Map.get id database in
-  Channel.send handler table;
-  not (Trie.is_empty (Table.Id.is_trie id) table)
+let bind_cursor ?(callback = ignore) cursor = cursor.callback := callback
 
-let bind_table_list binders database =
-  List.iter (fun binder -> ignore @@ bind_table binder database) binders
+let unbind_cursor cursor = cursor.callback := ignore
 
-let bind_cursor cursor ?(callback = ignore) db =
-  bind_table_list cursor.cursor_binders db;
-  bind_table_list cursor.cursor_naive_binders db;
-  cursor.callback := callback
-
-let unbind_table (Bind_table (id, handler)) =
-  Channel.send handler (Trie.empty (Table.Id.is_trie id))
-
-let unbind_table_list binders = List.iter unbind_table binders
-
-let unbind_cursor cursor =
-  cursor.callback := ignore;
-  unbind_table_list cursor.cursor_naive_binders;
-  unbind_table_list cursor.cursor_binders
-
-let with_bound_cursor ?callback cursor db f =
-  bind_cursor ?callback cursor db;
+let with_bound_cursor ?callback cursor f =
+  bind_cursor ?callback cursor;
   Fun.protect ~finally:(fun () -> unbind_cursor cursor) f
 
 let evaluate = function
@@ -369,53 +309,6 @@ let evaluate = function
     then Virtual_machine.Accept
     else Virtual_machine.Skip
 
-let naive_iter cursor db f =
-  with_bound_cursor ~callback:f cursor db @@ fun () ->
+let iter cursor f =
+  with_bound_cursor ~callback:f cursor @@ fun () ->
   VM.run (VM.create ~evaluate cursor.instruction)
-
-let naive_fold cursor db f acc =
-  let acc = ref acc in
-  naive_iter cursor db (fun args -> acc := f args !acc);
-  !acc
-
-(* Seminaive evaluation iterates over all the {b new} tuples in the [diff]
-   database that are not in the [previous] database.
-
-   [current] must be equal to [concat ~earlier:previous ~later:diff]. *)
-let[@inline] seminaive_run cursor ~previous ~diff ~current =
-  with_bound_cursor cursor current @@ fun () ->
-  let rec loop binders =
-    match binders with
-    | [] -> ()
-    | binder :: binders ->
-      if bind_table binder diff
-      then VM.run (VM.create ~evaluate cursor.instruction);
-      if bind_table binder previous then loop binders
-  in
-  loop cursor.cursor_binders
-
-module With_parameters = struct
-  type nonrec ('p, !'v) t =
-    { parameters : 'p Option_sender.hlist;
-      cursor : 'v t
-    }
-
-  let print ppf { cursor; _ } = print ppf cursor
-
-  let without_parameters { parameters = []; cursor } = cursor
-
-  let create ~parameters ?calls ?output context =
-    { cursor = create ?calls ?output context; parameters }
-
-  let naive_fold { parameters; cursor } ps db f acc =
-    Option_sender.send parameters ps;
-    naive_fold cursor db f acc
-
-  let naive_iter { parameters; cursor } ps db f =
-    Option_sender.send parameters ps;
-    naive_iter cursor db f
-
-  let seminaive_run { parameters; cursor } ps ~previous ~diff ~current =
-    Option_sender.send parameters ps;
-    seminaive_run ~previous ~diff ~current cursor
-end
