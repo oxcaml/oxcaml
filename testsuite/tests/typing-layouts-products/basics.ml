@@ -2320,7 +2320,7 @@ Error: Mixed records may contain at most 254 value fields prior to the flat suff
 (****************************************************************)
 (* Test 23: width mismatches against layout any with mod bounds *)
 
-(* This is a regression test for a but that could cause the compiler to crash.
+(* This is a regression test for a bug that could cause the compiler to crash.
 
    [t] doesn't typecheck because the annotation says it's a product of two
    things, but it's a product of three. However, before we notice that, we
