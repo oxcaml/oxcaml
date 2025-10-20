@@ -386,7 +386,7 @@ ocamltoplevel_SOURCES = $(addprefix toplevel/, \
   byte/topmain.mli byte/topmain.ml \
   native/topmain.mli native/topmain.ml)
 
-TOPLEVEL_SHARED_MLIS = topeval.mli trace.mli topmain.mli
+TOPLEVEL_SHARED_MLIS = trace.mli topmain.mli
 TOPLEVEL_SHARED_CMIS = $(TOPLEVEL_SHARED_MLIS:%.mli=%.cmi)
 TOPLEVEL_SHARED_ARTEFACTS = $(TOPLEVEL_SHARED_MLIS) $(TOPLEVEL_SHARED_CMIS)
 
