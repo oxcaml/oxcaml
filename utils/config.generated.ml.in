@@ -107,6 +107,8 @@ let reserved_header_bits =
 
 let no_stack_checks = "@enable_stack_checks@" <> "yes"
 
+let ldata_frametables = "@enable_ldata_frametables@" = "yes"
+
 let multidomain = "@enable_multidomain@" = "yes"
 
 let tsan = @tsan@
