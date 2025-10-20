@@ -56,7 +56,8 @@ type event = Lambda.lambda_event
 type context_switch =
   | Perform
   | Reperform
-  | Runstack
+  | With_stack
+  | With_stack_bind
   | Resume
 
 type comparison = Instruct.comparison =

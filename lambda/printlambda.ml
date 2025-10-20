@@ -520,7 +520,8 @@ let primitive ppf = function
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int) n
         (mixed_block_shape (fun _ _ -> ())) shape
   | Pduprecord (rep, size) -> fprintf ppf "duprecord %a %i" record_rep rep size
-  | Prunstack -> fprintf ppf "runstack"
+  | Pwith_stack -> fprintf ppf "with_stack"
+  | Pwith_stack_bind -> fprintf ppf "with_stack_bind"
   | Pperform -> fprintf ppf "perform"
   | Presume -> fprintf ppf "resume"
   | Preperform -> fprintf ppf "reperform"
@@ -1001,7 +1002,8 @@ let name_of_primitive = function
   | Patomic_lxor_field -> "Patomic_lxor_field"
   | Pcpu_relax -> "Pcpu_relax"
   | Popaque _ -> "Popaque"
-  | Prunstack -> "Prunstack"
+  | Pwith_stack -> "Pwith_stack"
+  | Pwith_stack_bind -> "Pwith_stack_bind"
   | Presume -> "Presume"
   | Pperform -> "Pperform"
   | Preperform -> "Preperform"

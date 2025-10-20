@@ -161,7 +161,8 @@ type primitive =
       array_kind * array_index_kind * unit mixed_block_element * int list
   | Pidx_deepen of unit mixed_block_element * int list
   (* Context switches *)
-  | Prunstack
+  | Pwith_stack
+  | Pwith_stack_bind
   | Pperform
   | Presume
   | Preperform
