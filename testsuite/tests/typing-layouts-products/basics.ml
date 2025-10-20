@@ -2316,3 +2316,64 @@ Lines 1-17, characters 0-3:
 17 |   }
 Error: Mixed records may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
 |}]
+
+(****************************************************************)
+(* Test 23: width mismatches against layout any with mod bounds *)
+
+(* This is a regression test for a but that could cause the compiler to crash.
+
+   [t] doesn't typecheck because the annotation says it's a product of two
+   things, but it's a product of three. However, before we notice that, we
+   notice that the annotation we've given [t] isn't [non_null]. That forces us
+   to do some expansion, and the bit of code that expands assumes we've already
+   checked the width. We had missed the width guard in one of the cases. *)
+type ('a : any mod non_null) s
+
+type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
+[%%expect{|
+type ('a : any mod non_null) s
+Uncaught exception: Invalid_argument("map3")
+
+|}]
+
+(* modal axes have the same problem *)
+type ('a : any mod portable) s
+
+type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
+[%%expect{|
+type ('a : any mod portable) s
+Uncaught exception: Invalid_argument("map3")
+
+|}]
+
+(* If the kind annotation does cross, you get a more sensible error. *)
+type ('a : any mod non_null) s
+
+type t : (value_or_null & bits32) mod non_null =
+  #{ a : int; b : t s; c : int32 }
+[%%expect{|
+type ('a : any mod non_null) s
+Lines 3-4, characters 0-34:
+3 | type t : (value_or_null & bits32) mod non_null =
+4 |   #{ a : int; b : t s; c : int32 }
+Error: The layout of type "t" is value & value & value
+         because it is an unboxed record.
+       But the layout of type "t" must be a sublayout of value & bits32
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* modal axes have the same problem *)
+type ('a : any mod portable) s
+
+type t : (value_or_null & bits32) mod portable =
+  #{ a : int; b : t s; c : int32 }
+[%%expect{|
+type ('a : any mod portable) s
+Lines 3-4, characters 0-34:
+3 | type t : (value_or_null & bits32) mod portable =
+4 |   #{ a : int; b : t s; c : int32 }
+Error: The layout of type "t" is value & value & value
+         because it is an unboxed record.
+       But the layout of type "t" must be a sublayout of value & bits32
+         because of the annotation on the declaration of the type t.
+|}]
