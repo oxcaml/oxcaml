@@ -1662,14 +1662,17 @@ module Debugging_options_impl = struct
 
   let no_gdwarf_may_alter_codegen () =
     Debugging.gdwarf_may_alter_codegen := false;
-    Debugging.gdwarf_may_alter_codegen_experimental := false
+    Debugging.gdwarf_may_alter_codegen_experimental := false;
+    Oxcaml_options_impl.clear Flambda2.Expert.phantom_lets ()
 
   let gdwarf_may_alter_codegen_experimental () =
     Debugging.gdwarf_may_alter_codegen := true;
-    Debugging.gdwarf_may_alter_codegen_experimental := true
+    Debugging.gdwarf_may_alter_codegen_experimental := true;
+    Oxcaml_options_impl.set Flambda2.Expert.phantom_lets ()
 
   let no_gdwarf_may_alter_codegen_experimental () =
-    Debugging.gdwarf_may_alter_codegen_experimental := false
+    Debugging.gdwarf_may_alter_codegen_experimental := false;
+    Oxcaml_options_impl.clear Flambda2.Expert.phantom_lets ()
 
   let gdwarf_max_function_complexity c =
     Debugging.dwarf_max_function_complexity := c
@@ -1851,6 +1854,7 @@ module Extra_params = struct
     | "gdwarf-may-alter-codegen" -> set' Debugging.gdwarf_may_alter_codegen
     | "gdwarf-may-alter-codegen-experimental" ->
         set' Debugging.gdwarf_may_alter_codegen_experimental
+        && set Flambda2.Expert.phantom_lets
     | "gstartup" -> set' Debugging.dwarf_for_startup_file
     | "gdwarf-pedantic" -> set' Clflags.dwarf_pedantic
     | "gdwarf-max-function-complexity" ->
