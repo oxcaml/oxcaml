@@ -93,6 +93,11 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
     then
       let min_name_mode = Bound_pattern.name_mode bound_pattern in
       let defining_expr =
+        (* CR vlaviron: Pierre suggests to not do the simplification here, as
+           that could keep the primitive closer to its original version. It's
+           not clear whether debuggers would actually be able to show more
+           interesting things with the original version though, so for now we
+           keep the simplification. *)
         Named.create_prim
           (P.map_args
              (fun simple -> snd (S.simplify_simple dacc simple ~min_name_mode))
