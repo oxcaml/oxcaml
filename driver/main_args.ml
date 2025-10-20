@@ -325,6 +325,16 @@ let mk_no_probes f =
     "-no-probes", Arg.Unit f, " Ignore [%%probe ..]"
 ;;
 
+let mk_lrodata_frametables f =
+  "-lrodata-frametables", Arg.Unit f,
+  " Emit frametables to .lrodata section (Linux only)"
+;;
+
+let mk_no_lrodata_frametables f =
+  "-no-lrodata-frametables", Arg.Unit f,
+  " Emit frametables to .text or .data section (default on non-Linux)"
+;;
+
 let mk_labels f =
   "-labels", Arg.Unit f, " Use commuting label mode"
 
@@ -1270,6 +1280,8 @@ module type Optcomp_options = sig
   val _save_ir_before : string -> unit
   val _probes : unit -> unit
   val _no_probes : unit -> unit
+  val _lrodata_frametables : unit -> unit
+  val _no_lrodata_frametables : unit -> unit
   val _gdwarf_config_shape_reduce_depth : string -> unit
   val _gdwarf_config_shape_eval_depth : string -> unit
   val _gdwarf_config_max_cms_files_per_unit : string -> unit
@@ -1613,6 +1625,8 @@ struct
     mk_save_ir_before ~native:true F._save_ir_before;
     mk_probes F._probes;
     mk_no_probes F._no_probes;
+    mk_lrodata_frametables F._lrodata_frametables;
+    mk_no_lrodata_frametables F._no_lrodata_frametables;
     mk_i F._i;
     mk_I F._I;
     mk_H F._H;
@@ -2472,6 +2486,8 @@ module Default = struct
     let _v () = Compenv.print_version_and_library "native-code compiler"
     let _no_probes = clear probes
     let _probes = set probes
+    let _lrodata_frametables = set lrodata_frametables
+    let _no_lrodata_frametables = clear lrodata_frametables
     let _gdwarf_config_shape_reduce_depth s =
       gdwarf_config_shape_reduce_depth :=
         parse_int_option ~parameter:"-gdwarf-config-shape-reduce-depth" s

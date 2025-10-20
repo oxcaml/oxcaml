@@ -319,6 +319,10 @@ val runtime5 : bool
 val no_stack_checks : bool
 (** [true] if stack checks are disabled; used only if [runtime5] is [true]. *)
 
+val lrodata_frametables : bool
+(** [true] if frametables should be emitted to .lrodata section instead of
+    .text. *)
+
 val multidomain : bool
 (** Whether creating multiple domains is allowed.
     Requires stack checks and poll insertion. *)

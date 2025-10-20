@@ -347,6 +347,15 @@ let emit_frames a =
   a.efa_align Arch.size_addr;
   frame_descriptors := []
 
+let use_lrodata_frametables () =
+  !Clflags.lrodata_frametables
+  &&
+  match Target_system.derived_system () with
+  | Linux -> true
+  | MinGW_32 | MinGW_64 | Win32 | Win64 | Cygwin | MacOS_like | FreeBSD | NetBSD
+  | OpenBSD | Generic_BSD | Solaris | Dragonfly | GNU | BeOS | Unknown ->
+    false
+
 (* Detection of functions that can be duplicated between a DLL and the main
    program (PR#4690) *)
 

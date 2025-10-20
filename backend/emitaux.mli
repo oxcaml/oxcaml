@@ -68,6 +68,8 @@ type emit_frame_actions =
 
 val emit_frames : emit_frame_actions -> unit
 
+val use_lrodata_frametables : unit -> bool
+
 val is_generic_function : string -> bool
 
 (** Is a binary backend available.  If yes, we don't need

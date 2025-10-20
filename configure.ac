@@ -183,11 +183,16 @@ AC_ARG_ENABLE([stack_checks],
   [AS_HELP_STRING([--enable-stack-checks],
     [Enable stack checks])])
 
+AC_ARG_ENABLE([lrodata-frametables],
+  [AS_HELP_STRING([--enable-lrodata-frametables],
+    [Emit frametables to .lrodata section instead of .text (Linux only; ignored on other platforms)])])
+
 ## Output variables
 
 AC_SUBST([enable_runtime5])
 AC_SUBST([runtime_suffix])
 AC_SUBST([enable_stack_checks])
+AC_SUBST([enable_lrodata_frametables])
 AC_SUBST([enable_oxcaml_dwarf])
 AC_SUBST([enable_syntax_quotations])
 AC_SUBST([CONFIGURE_ARGS])
@@ -1618,6 +1623,12 @@ AS_IF([test x"$enable_stack_checks" = xyes],
   [AS_IF([test x"$arch" != xamd64],
     [enable_stack_checks=yes
      AC_DEFINE([STACK_CHECKS_ENABLED])],
+    [])])
+
+# lrodata frametables are only supported on Linux.
+AS_IF([test x"$enable_lrodata_frametables" = xyes],
+  [AS_IF([test x"$system" != xlinux],
+    [AC_MSG_ERROR([--enable-lrodata-frametables is only supported on Linux systems])],
     [])])
 
 native_cflags=''

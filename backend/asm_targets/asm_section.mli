@@ -43,6 +43,7 @@ type dwarf_section =
 type t =
   | DWARF of dwarf_section
   | Data
+  | Lrodata
   | Read_only_data
   | Eight_byte_literals
   | Sixteen_byte_literals
