@@ -1351,7 +1351,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       resume_arg = sp[1];
       resume_tail = Ptr_val(Field(accu, 1));
       Setup_for_c_call;
-      accu = caml_continuation_use(accu);
+      accu = caml_continuation_use_noexc(accu);
       Restore_after_c_call;
       sp -= 2;
       sp[0] = Val_long(domain_state->trap_sp_off);
@@ -1391,7 +1391,7 @@ do_resume: {
       resume_arg = sp[1];
       resume_tail = Ptr_val(Field(accu, 1));
       Setup_for_c_call;
-      accu = caml_continuation_use(accu);
+      accu = caml_continuation_use_noexc(accu);
       Restore_after_c_call;
       sp = sp + *pc - 2;
       sp[0] = Val_long(domain_state->trap_sp_off);
@@ -1483,6 +1483,48 @@ do_resume: {
       env = accu;
       extra_args += 2;
       goto check_stacks;
+    }
+
+    Instruct(WITH_STACK): {
+      value valuec = accu;
+      value exnc = sp[0];
+      value effc = sp[1];
+      Setup_for_c_call;
+      accu = caml_alloc_stack(valuec, exnc, effc);
+      Restore_after_c_call;
+      CAMLnoalloc;
+      resume_fn = sp[2];
+      resume_arg = sp[3];
+      resume_tail = NULL;
+      sp += 4 /* args */ - 5 /* values to be pushed */;
+      sp[0] = Val_long(domain_state->trap_sp_off);
+      sp[1] = Val_long(0);
+      sp[2] = (value)pc;
+      sp[3] = env;
+      sp[4] = Val_long(extra_args);
+      goto do_resume;
+    }
+
+    Instruct(WITH_STACK_BIND): {
+      value valuec = accu;
+      value exnc = sp[0];
+      value effc = sp[1];
+      value dyn = sp[2];
+      value bind = sp[3];
+      Setup_for_c_call;
+      accu = caml_alloc_stack_bind(valuec, exnc, effc, dyn, bind);
+      Restore_after_c_call;
+      CAMLnoalloc;
+      resume_fn = sp[4];
+      resume_arg = sp[5];
+      resume_tail = NULL;
+      sp += 6 /* args */ - 5 /* values to be pushed */;
+      sp[0] = Val_long(domain_state->trap_sp_off);
+      sp[1] = Val_long(0);
+      sp[2] = (value)pc;
+      sp[3] = env;
+      sp[4] = Val_long(extra_args);
+      goto do_resume;
     }
 
 #ifndef THREADED_CODE

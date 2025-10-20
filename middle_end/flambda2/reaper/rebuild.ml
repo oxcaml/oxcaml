@@ -870,9 +870,16 @@ let rewrite_call_kind env (call_kind : Call_kind.t) =
       (Call_kind.Effect.reperform ~eff:(rewrite_simple eff)
          ~cont:(rewrite_simple cont)
          ~last_fiber:(rewrite_simple last_fiber))
-  | Effect (Run_stack { stack; f; arg }) ->
+  | Effect (With_stack { valuec; exnc; effc; f; arg }) ->
     Call_kind.effect_
-      (Call_kind.Effect.run_stack ~stack:(rewrite_simple stack)
+      (Call_kind.Effect.with_stack ~valuec:(rewrite_simple valuec)
+         ~exnc:(rewrite_simple exnc) ~effc:(rewrite_simple effc)
+         ~f:(rewrite_simple f) ~arg:(rewrite_simple arg))
+  | Effect (With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg }) ->
+    Call_kind.effect_
+      (Call_kind.Effect.with_stack_bind ~valuec:(rewrite_simple valuec)
+         ~exnc:(rewrite_simple exnc) ~effc:(rewrite_simple effc)
+         ~dyn:(rewrite_simple dyn) ~bind:(rewrite_simple bind)
          ~f:(rewrite_simple f) ~arg:(rewrite_simple arg))
   | Effect (Resume { cont; f; arg }) ->
     Call_kind.effect_

@@ -376,12 +376,26 @@ and apply_expr ~env ~res e =
           let cont, res = To_jsir_shared.simple ~env ~res cont in
           let last_fiber, res = To_jsir_shared.simple ~env ~res last_fiber in
           "%reperform", [Pv eff; Pv cont; Pv last_fiber], res
-        | Run_stack { stack; f; arg } ->
-          let stack, res = To_jsir_shared.simple ~env ~res stack in
+        | With_stack { valuec; exnc; effc; f; arg } ->
+          let valuec, res = To_jsir_shared.simple ~env ~res valuec in
+          let exnc, res = To_jsir_shared.simple ~env ~res exnc in
+          let effc, res = To_jsir_shared.simple ~env ~res effc in
           let f, res = To_jsir_shared.simple ~env ~res f in
           let arg, res = To_jsir_shared.simple ~env ~res arg in
           let unit = Pc (Int Targetint.zero) in
-          "%resume", [Pv stack; Pv f; Pv arg; unit], res
+          "%with_stack", [Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg; unit], res
+        | With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg } ->
+          let valuec, res = To_jsir_shared.simple ~env ~res valuec in
+          let exnc, res = To_jsir_shared.simple ~env ~res exnc in
+          let effc, res = To_jsir_shared.simple ~env ~res effc in
+          let dyn, res = To_jsir_shared.simple ~env ~res dyn in
+          let bind, res = To_jsir_shared.simple ~env ~res bind in
+          let f, res = To_jsir_shared.simple ~env ~res f in
+          let arg, res = To_jsir_shared.simple ~env ~res arg in
+          let unit = Pc (Int Targetint.zero) in
+          ( "%with_stack_bind",
+            [Pv valuec; Pv exnc; Pv effc; Pv dyn; Pv bind; Pv f; Pv arg; unit],
+            res )
         | Resume { cont; f; arg } ->
           let cont, res = To_jsir_shared.simple ~env ~res cont in
           let f, res = To_jsir_shared.simple ~env ~res f in

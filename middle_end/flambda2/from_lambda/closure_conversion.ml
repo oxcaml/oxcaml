@@ -1112,8 +1112,13 @@ let close_effect_primitive acc env ~dbg exn_continuation
   | Pperform, [[eff]] ->
     let call_kind = C.effect_ (E.perform ~eff) in
     close call_kind
-  | Prunstack, [[stack]; [f]; [arg]] ->
-    let call_kind = C.effect_ (E.run_stack ~stack ~f ~arg) in
+  | Pwith_stack, [[valuec]; [exnc]; [effc]; [f]; [arg]] ->
+    let call_kind = C.effect_ (E.with_stack ~valuec ~exnc ~effc ~f ~arg) in
+    close call_kind
+  | Pwith_stack_bind, [[valuec]; [exnc]; [effc]; [dyn]; [bind]; [f]; [arg]] ->
+    let call_kind =
+      C.effect_ (E.with_stack_bind ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg)
+    in
     close call_kind
   | Presume, [[cont]; [f]; [arg]] ->
     let call_kind = C.effect_ (E.resume ~cont ~f ~arg) in
@@ -1237,14 +1242,14 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pmakelazyblock _ | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
       | Pmake_unboxed_product _ | Punboxed_product_field _
-      | Parray_element_size_in_bytes _ | Pget_header _ | Prunstack | Pperform
-      | Presume | Preperform | Pmake_idx_field _ | Pmake_idx_mixed_field _
-      | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _ | Pset_idx _ | Pget_ptr _
-      | Pset_ptr _ | Patomic_exchange_field _ | Patomic_compare_exchange_field _
-      | Patomic_compare_set_field _ | Patomic_fetch_add_field
-      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
-      | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ptls_get | Ppoll
-      | Patomic_load_field _ | Patomic_set_field _
+      | Parray_element_size_in_bytes _ | Pget_header _ | Pwith_stack
+      | Pwith_stack_bind | Pperform | Presume | Preperform | Pmake_idx_field _
+      | Pmake_idx_mixed_field _ | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _
+      | Pset_idx _ | Pget_ptr _ | Pset_ptr _ | Patomic_exchange_field _
+      | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
+      | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
+      | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Pdls_get
+      | Ptls_get | Ppoll | Patomic_load_field _ | Patomic_set_field _
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
       | Pscalar _ | Pphys_equal _ | Pcpu_relax ->
@@ -1252,7 +1257,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
         assert false
     in
     k acc [Named.create_simple (Simple.symbol sym)]
-  | (Pperform | Prunstack | Presume | Preperform), args ->
+  | (Pperform | Pwith_stack | Pwith_stack_bind | Presume | Preperform), args ->
     let exn_continuation =
       match exn_continuation with
       | None ->
