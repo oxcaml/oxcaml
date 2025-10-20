@@ -2178,13 +2178,15 @@ module Rewriter = struct
   let rec patterns_for_unboxed_fields ~machine_width ~bind_function_slots db
       ~var fields unboxed_fields acc =
     let open Flambda2_types.Rewriter in
-    Format.eprintf "FIELD_USAGE = %a@.unboxed_fields = %a@."
-      (Field.Map.print (fun ff -> function
-         | Used_as_top -> Format.fprintf ff "Top"
-         | Used_as_vars vs -> Code_id_or_name.Map.print Unit.print ff vs))
-      fields
-      (Field.Map.print (pp_unboxed_elt (fun ff _ -> Format.fprintf ff "_")))
-      unboxed_fields;
+    if debug
+    then
+      Format.eprintf "FIELD_USAGE = %a@.unboxed_fields = %a@."
+        (Field.Map.print (fun ff -> function
+           | Used_as_top -> Format.fprintf ff "Top"
+           | Used_as_vars vs -> Code_id_or_name.Map.print Unit.print ff vs))
+        fields
+        (Field.Map.print (pp_unboxed_elt (fun ff _ -> Format.fprintf ff "_")))
+        unboxed_fields;
     let combined =
       Field.Map.merge
         (fun field field_use unboxed_field ->
@@ -2343,15 +2345,19 @@ module Rewriter = struct
         let[@local] change_representation_of_closures fields value_slots_reprs
             function_slots_reprs =
           let patterns = ref [] in
-          Format.eprintf "OLD type: %a@." Flambda2_types.print flambda_type;
-          Format.eprintf "OLD->NEW function slots: %a@."
-            (Function_slot.Map.print Function_slot.print)
-            function_slots_reprs;
+          if debug
+          then (
+            Format.eprintf "OLD type: %a@." Flambda2_types.print flambda_type;
+            Format.eprintf "OLD->NEW function slots: %a@."
+              (Function_slot.Map.print Function_slot.print)
+              function_slots_reprs);
           let all_function_slots_in_set =
             Function_slot.Map.fold
               (fun function_slot (_, uses) m ->
-                Format.eprintf "OLD function slot: %a@." Function_slot.print
-                  function_slot;
+                if debug
+                then
+                  Format.eprintf "OLD function slot: %a@." Function_slot.print
+                    function_slot;
                 let new_function_slot =
                   Function_slot.Map.find function_slot function_slots_reprs
                 in
@@ -2488,9 +2494,11 @@ module Rewriter = struct
                 (fun clos () ->
                   Code_id_or_name.Map.mem clos result.changed_representation)
                 usages_for_value_slots);
-            Format.eprintf "USAGES_FOR_VALUE_SLOTS is: %a@."
-              (Code_id_or_name.Map.print Unit.print)
-              usages_for_value_slots;
+            if debug
+            then
+              Format.eprintf "USAGES_FOR_VALUE_SLOTS is: %a@."
+                (Code_id_or_name.Map.print Unit.print)
+                usages_for_value_slots;
             let changed_representation =
               Code_id_or_name.Map.bindings
                 (Code_id_or_name.Map.mapi
