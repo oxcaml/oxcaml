@@ -560,8 +560,18 @@ and traverse_apply denv acc apply : rev_expr =
       Acc.used ~denv eff acc;
       Acc.used ~denv cont acc;
       Acc.used ~denv last_fiber acc
-    | Effect (Run_stack { stack; f; arg }) ->
-      Acc.used ~denv stack acc;
+    | Effect (With_stack { valuec; exnc; effc; f; arg }) ->
+      Acc.used ~denv valuec acc;
+      Acc.used ~denv exnc acc;
+      Acc.used ~denv effc acc;
+      Acc.used ~denv f acc;
+      Acc.used ~denv arg acc
+    | Effect (With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg }) ->
+      Acc.used ~denv valuec acc;
+      Acc.used ~denv exnc acc;
+      Acc.used ~denv effc acc;
+      Acc.used ~denv dyn acc;
+      Acc.used ~denv bind acc;
       Acc.used ~denv f acc;
       Acc.used ~denv arg acc
     | Effect (Resume { cont; f; arg }) ->

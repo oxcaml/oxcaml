@@ -5005,13 +5005,46 @@ let perform ~dbg eff =
       [Cconst_symbol (Cmm.global_symbol "caml_perform", dbg); eff; cont],
       dbg )
 
-let run_stack ~dbg ~stack ~f ~arg =
-  (* Rc_normal would be fine here, but this is unlikely to ever be a tail call
-     (usages of this primitive shouldn't be generated in tail position), so we
-     use Rc_nontail for clarity. *)
+let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
   Cop
-    ( Capply (typ_val, Rc_nontail),
-      [Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg); stack; f; arg],
+    ( Capply (typ_val, Rc_normal),
+      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
+        Cop
+          ( Cextcall
+              { func = "caml_alloc_stack";
+                ty = typ_val;
+                alloc = true;
+                builtin = false;
+                returns = true;
+                effects = Arbitrary_effects;
+                coeffects = Has_coeffects;
+                ty_args = [XInt; XInt; XInt]
+              },
+            [valuec; exnc; effc],
+            dbg );
+        f;
+        arg ],
+      dbg )
+
+let with_stack_bind ~dbg ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg =
+  Cop
+    ( Capply (typ_val, Rc_normal),
+      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
+        Cop
+          ( Cextcall
+              { func = "caml_alloc_stack_bind";
+                ty = typ_val;
+                alloc = true;
+                builtin = false;
+                returns = true;
+                effects = Arbitrary_effects;
+                coeffects = Has_coeffects;
+                ty_args = [XInt; XInt; XInt; XInt; XInt]
+              },
+            [valuec; exnc; effc; dyn; bind],
+            dbg );
+        f;
+        arg ],
       dbg )
 
 let resume ~dbg ~cont ~f ~arg =

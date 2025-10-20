@@ -57,8 +57,19 @@ module Effect = struct
           cont : Simple.t;
           last_fiber : Simple.t
         }
-    | Run_stack of
-        { stack : Simple.t;
+    | With_stack of
+        { valuec : Simple.t;
+          exnc : Simple.t;
+          effc : Simple.t;
+          f : Simple.t;
+          arg : Simple.t
+        }
+    | With_stack_bind of
+        { valuec : Simple.t;
+          exnc : Simple.t;
+          effc : Simple.t;
+          dyn : Simple.t;
+          bind : Simple.t;
           f : Simple.t;
           arg : Simple.t
         }
@@ -78,9 +89,18 @@ module Effect = struct
         "@[<hov 1>(%tReperform%t@ (eff@ %a)@ (cont@ %a)@ (last_fiber@ %a))@]"
         Flambda_colours.effect Flambda_colours.pop Simple.print eff Simple.print
         cont Simple.print last_fiber
-    | Run_stack { stack; f; arg } ->
-      fprintf ppf "@[<hov 1>(%tRun_stack%t (stack@ %a)@ (f@ %a)@ (arg@ %a))@]"
-        Flambda_colours.effect Flambda_colours.pop Simple.print stack
+    | With_stack { valuec; exnc; effc; f; arg } ->
+      fprintf ppf
+        "@[<hov 1>(%tWith_stack%t (valuec@ %a)@ (exnc@ %a)@ (effc@ %a)@ (f@ \
+         %a)@ (arg@ %a))@]"
+        Flambda_colours.effect Flambda_colours.pop Simple.print valuec
+        Simple.print exnc Simple.print effc Simple.print f Simple.print arg
+    | With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg } ->
+      fprintf ppf
+        "@[<hov 1>(%tWith_stack_bind%t (valuec@ %a)@ (exnc@ %a)@ (effc@ %a)@ \
+         (dyn@ %a)@ (bind@ %a)@ (f@ %a)@ (arg@ %a))@]"
+        Flambda_colours.effect Flambda_colours.pop Simple.print valuec
+        Simple.print exnc Simple.print effc Simple.print dyn Simple.print bind
         Simple.print f Simple.print arg
     | Resume { cont; f; arg } ->
       fprintf ppf "@[<hov 1>(%tResume%t (cont@ %a)@ (f@ %a)@ (arg@ %a))@]"
@@ -91,7 +111,11 @@ module Effect = struct
 
   let reperform ~eff ~cont ~last_fiber = Reperform { eff; cont; last_fiber }
 
-  let run_stack ~stack ~f ~arg = Run_stack { stack; f; arg }
+  let with_stack ~valuec ~exnc ~effc ~f ~arg =
+    With_stack { valuec; exnc; effc; f; arg }
+
+  let with_stack_bind ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg =
+    With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg }
 
   let resume ~cont ~f ~arg = Resume { cont; f; arg }
 
@@ -102,9 +126,20 @@ module Effect = struct
       Name_occurrences.union (Simple.free_names eff)
         (Name_occurrences.union (Simple.free_names cont)
            (Simple.free_names last_fiber))
-    | Run_stack { stack; f; arg } ->
-      Name_occurrences.union (Simple.free_names stack)
-        (Name_occurrences.union (Simple.free_names f) (Simple.free_names arg))
+    | With_stack { valuec; exnc; effc; f; arg } ->
+      Name_occurrences.union (Simple.free_names valuec)
+        (Name_occurrences.union (Simple.free_names exnc)
+           (Name_occurrences.union (Simple.free_names effc)
+              (Name_occurrences.union (Simple.free_names f)
+                 (Simple.free_names arg))))
+    | With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg } ->
+      Name_occurrences.union (Simple.free_names valuec)
+        (Name_occurrences.union (Simple.free_names exnc)
+           (Name_occurrences.union (Simple.free_names effc)
+              (Name_occurrences.union (Simple.free_names dyn)
+                 (Name_occurrences.union (Simple.free_names bind)
+                    (Name_occurrences.union (Simple.free_names f)
+                       (Simple.free_names arg))))))
     | Resume { cont; f; arg } ->
       Name_occurrences.union (Simple.free_names cont)
         (Name_occurrences.union (Simple.free_names f) (Simple.free_names arg))
@@ -121,13 +156,39 @@ module Effect = struct
       if eff == eff' && cont == cont' && last_fiber == last_fiber'
       then t
       else Reperform { eff = eff'; cont = cont'; last_fiber = last_fiber' }
-    | Run_stack { stack; f; arg } ->
-      let stack' = Simple.apply_renaming stack renaming in
+    | With_stack { valuec; exnc; effc; f; arg } ->
+      let valuec' = Simple.apply_renaming valuec renaming in
+      let exnc' = Simple.apply_renaming exnc renaming in
+      let effc' = Simple.apply_renaming effc renaming in
       let f' = Simple.apply_renaming f renaming in
       let arg' = Simple.apply_renaming arg renaming in
-      if stack == stack' && f == f' && arg == arg'
+      if valuec == valuec' && exnc == exnc' && effc == effc' && f == f'
+         && arg == arg'
       then t
-      else Run_stack { stack = stack'; f = f'; arg = arg' }
+      else
+        With_stack
+          { valuec = valuec'; exnc = exnc'; effc = effc'; f = f'; arg = arg' }
+    | With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg } ->
+      let valuec' = Simple.apply_renaming valuec renaming in
+      let exnc' = Simple.apply_renaming exnc renaming in
+      let effc' = Simple.apply_renaming effc renaming in
+      let dyn' = Simple.apply_renaming dyn renaming in
+      let bind' = Simple.apply_renaming bind renaming in
+      let f' = Simple.apply_renaming f renaming in
+      let arg' = Simple.apply_renaming arg renaming in
+      if valuec == valuec' && exnc == exnc' && effc == effc' && dyn == dyn'
+         && bind == bind' && f == f' && arg == arg'
+      then t
+      else
+        With_stack_bind
+          { valuec = valuec';
+            exnc = exnc';
+            effc = effc';
+            dyn = dyn';
+            bind = bind';
+            f = f';
+            arg = arg'
+          }
     | Resume { cont; f; arg } ->
       let cont' = Simple.apply_renaming cont renaming in
       let f' = Simple.apply_renaming f renaming in
@@ -145,12 +206,30 @@ module Effect = struct
         (Ids_for_export.union
            (Ids_for_export.from_simple cont)
            (Ids_for_export.from_simple last_fiber))
-    | Run_stack { stack; f; arg } ->
+    | With_stack { valuec; exnc; effc; f; arg } ->
       Ids_for_export.union
-        (Ids_for_export.from_simple stack)
+        (Ids_for_export.from_simple valuec)
         (Ids_for_export.union
-           (Ids_for_export.from_simple f)
-           (Ids_for_export.from_simple arg))
+           (Ids_for_export.from_simple exnc)
+           (Ids_for_export.union
+              (Ids_for_export.from_simple effc)
+              (Ids_for_export.union
+                 (Ids_for_export.from_simple f)
+                 (Ids_for_export.from_simple arg))))
+    | With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg } ->
+      Ids_for_export.union
+        (Ids_for_export.from_simple valuec)
+        (Ids_for_export.union
+           (Ids_for_export.from_simple exnc)
+           (Ids_for_export.union
+              (Ids_for_export.from_simple effc)
+              (Ids_for_export.union
+                 (Ids_for_export.from_simple dyn)
+                 (Ids_for_export.union
+                    (Ids_for_export.from_simple bind)
+                    (Ids_for_export.union
+                       (Ids_for_export.from_simple f)
+                       (Ids_for_export.from_simple arg))))))
     | Resume { cont; f; arg } ->
       Ids_for_export.union
         (Ids_for_export.from_simple cont)
