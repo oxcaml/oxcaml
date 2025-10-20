@@ -53,8 +53,19 @@ module Effect : sig
           cont : Simple.t;
           last_fiber : Simple.t
         }
-    | Run_stack of
-        { stack : Simple.t;
+    | With_stack of
+        { valuec : Simple.t;
+          exnc : Simple.t;
+          effc : Simple.t;
+          f : Simple.t;
+          arg : Simple.t
+        }
+    | With_stack_bind of
+        { valuec : Simple.t;
+          exnc : Simple.t;
+          effc : Simple.t;
+          dyn : Simple.t;
+          bind : Simple.t;
           f : Simple.t;
           arg : Simple.t
         }
@@ -70,7 +81,23 @@ module Effect : sig
 
   val reperform : eff:Simple.t -> cont:Simple.t -> last_fiber:Simple.t -> t
 
-  val run_stack : stack:Simple.t -> f:Simple.t -> arg:Simple.t -> t
+  val with_stack :
+    valuec:Simple.t ->
+    exnc:Simple.t ->
+    effc:Simple.t ->
+    f:Simple.t ->
+    arg:Simple.t ->
+    t
+
+  val with_stack_bind :
+    valuec:Simple.t ->
+    exnc:Simple.t ->
+    effc:Simple.t ->
+    dyn:Simple.t ->
+    bind:Simple.t ->
+    f:Simple.t ->
+    arg:Simple.t ->
+    t
 
   val resume : cont:Simple.t -> f:Simple.t -> arg:Simple.t -> t
 end
