@@ -305,10 +305,5 @@ Error: Type variable "'a" is used outside any quotations,
 
 let eta (type a) (x : a expr) : a expr = <[ $x ]>
 [%%expect {|
-Line 1, characters 41-49:
-1 | let eta (type a) (x : a expr) : a expr = <[ $x ]>
-                                             ^^^^^^^^
-Error: This expression has type "<['a]> expr"
-       but an expression was expected of type "a expr"
-       Type "<['a]>" is not compatible with type "a"
+val eta : 'a expr -> 'a expr = <fun>
 |}]

@@ -3864,6 +3864,14 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 mty2 fl2 =
   | res -> res
   | exception Exit -> raise Not_found
 
+(* Checks if a type is a type variable under some quotes or splices *)
+let rec is_flexible ty =
+  match get_desc ty with
+  | Tvar _ -> true
+  | Tquote ty' -> is_flexible ty'
+  | Tsplice ty' -> is_flexible ty'
+  | _ -> false
+
 (* raise Not_found rather than Unify if the module types are incompatible *)
 let unify_package env unify_list lv1 p1 fl1 lv2 p2 fl2 =
   let ntl2 = complete_type_list env fl1 lv2 (Mty_ident p2) fl2
@@ -4241,16 +4249,28 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tquote t1, Tquote t2)
       | (Tsplice t1, Tsplice t2) ->
           unify uenv t1 t2
-      | (Tsplice s1, _) ->
+      | (Tsplice s1, _) when is_flexible s1 ->
           set_type_desc t2' d2;
           let t =
             newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tquote t2')
           in
           unify uenv s1 t
-      | (_, Tsplice s2) ->
+      | (Tquote s1, _) when is_flexible s1 ->
+          set_type_desc t2' d2;
+          let t =
+            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tsplice t2')
+          in
+          unify uenv s1 t
+      | (_, Tsplice s2) when is_flexible s2 ->
           set_type_desc t1' d1;
           let t =
             newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
+          in
+          unify uenv s2 t
+      | (_, Tquote s2) when is_flexible s2 ->
+          set_type_desc t1' d1;
+          let t =
+            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
           in
           unify uenv s2 t
       | (_, _) -> raise_unexplained_for Unify
