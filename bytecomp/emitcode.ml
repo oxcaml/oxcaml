@@ -338,6 +338,8 @@ let emit_instr = function
   | Kresume -> runtime5_only (); out opRESUME
   | Kresumeterm n -> runtime5_only (); out opRESUMETERM; out_int n
   | Kreperformterm n -> runtime5_only (); out opREPERFORMTERM; out_int n
+  | Kwith_stack -> runtime5_only (); out opWITH_STACK
+  | Kwith_stack_bind -> runtime5_only (); out opWITH_STACK_BIND
   | Kstop -> out opSTOP
 
 (* Emission of a list of instructions. Include some peephole optimization. *)

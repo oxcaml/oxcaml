@@ -50,25 +50,13 @@ external cont_set_last_fiber :
 
 external resume : ('a, 'b) cont -> ('c -> 'a) -> 'c -> 'b = "%resume"
 
-module Must_not_enter_gc = struct
-  (* Stacks are represented as tagged pointers, so do not keep the fiber alive.
-     We must not enter the GC between the creation and use of a [stack]. *)
-  type (-'a, +'b) stack [@@immediate]
-
-  external alloc_stack :
-    ('a -> 'b) ->
-    (exn -> 'b) ->
-    ('c t -> ('c, 'b) cont -> last_fiber -> 'b) ->
-    ('a, 'b) stack = "caml_alloc_stack"
-
-  external runstack : ('a, 'b) stack -> ('c -> 'a) -> 'c -> 'b = "%runstack"
-
-  (* Allocate a stack and immediately run [f x] using that stack.
-     We must not enter the GC between [alloc_stack] and [runstack].
-     [with_stack] is marked as [@inline never] to avoid reordering. *)
-  let[@inline never] with_stack valuec exnc effc f x =
-    runstack (alloc_stack valuec exnc effc) f x
-end
+external with_stack :
+  ('a -> 'b) ->
+  (exn -> 'b) ->
+  ('c t -> ('c, 'b) cont -> last_fiber -> 'b) ->
+  ('d -> 'a) ->
+  'd ->
+  'b = "%with_stack"
 
 external update_cont_handler_noexc :
   ('a,'b) cont ->
@@ -109,7 +97,7 @@ module Deep = struct
           f k
       | None -> reperform eff k last_fiber
     in
-    Must_not_enter_gc.with_stack handler.retc handler.exnc effc comp arg
+    with_stack handler.retc handler.exnc effc comp arg
 
   type 'a effect_handler =
     { effc: 'b. 'b t -> (('b,'a) continuation -> 'a) option }
@@ -122,7 +110,7 @@ module Deep = struct
           f k
       | None -> reperform eff k last_fiber
     in
-    Must_not_enter_gc.with_stack (fun x -> x) (fun e -> raise e) effc' comp arg
+    with_stack (fun x -> x) (fun e -> raise e) effc' comp arg
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =
@@ -145,7 +133,7 @@ module Shallow = struct
           raise_notrace (E k)
       | _ -> error ()
     in
-    match Must_not_enter_gc.with_stack error error effc f' () with
+    match with_stack error error effc f' () with
     | exception E k -> k
     | _ -> error ()
 
