@@ -98,6 +98,8 @@ module Syntax = struct
 
   let ( ==> ) h c = where h (deduce c)
 
+  let ( =>? ) h l = where h (yield l)
+
   let ( !! ) = Term.constant
 end
 
@@ -910,15 +912,13 @@ let datalog_schedule =
             rev_alias ] ])
 
 let mk_exists_query params existentials f =
+  let open Syntax in
   let q =
-    Datalog.(
-      compile_with_parameters params [] (fun params [] ->
-          foreach existentials (fun existentials ->
-              where (f params existentials) (yield []))))
+    compile_with_parameters params [] (fun params [] ->
+        foreach existentials (fun existentials -> f params existentials =>? []))
   in
   fun params db ->
-    Datalog.Cursor.fold_with_parameters q params db ~init:false ~f:(fun [] _ ->
-        true)
+    Cursor.fold_with_parameters q params db ~init:false ~f:(fun [] _ -> true)
 
 let is_function_slot field =
   match[@ocaml.warning "-4"] Field.view field with
@@ -1146,18 +1146,17 @@ type set_of_closures_def =
 
 let get_set_of_closures_def :
     Datalog.database -> Code_id_or_name.t -> set_of_closures_def =
+  let open Syntax in
   let q =
-    Datalog.(
-      compile_with_parameters ["x"] [] (fun [x] [] ->
-          foreach ["relation"; "y"] (fun [relation; y] ->
-              where
-                [ Global_flow_graph.constructor_rel ~base:x ~relation ~from:y;
-                  filter1 is_function_slot relation ]
-                (yield [relation; y]))))
+    compile_with_parameters ["x"] [] (fun [x] [] ->
+        foreach ["relation"; "y"] (fun [relation; y] ->
+            [ Global_flow_graph.constructor_rel ~base:x ~relation ~from:y;
+              filter1 is_function_slot relation ]
+            =>? [relation; y]))
   in
   fun db v ->
     let l =
-      Datalog.Cursor.fold_with_parameters q [v] db ~init:[] ~f:(fun [f; y] l ->
+      Cursor.fold_with_parameters q [v] db ~init:[] ~f:(fun [f; y] l ->
           ( (match[@ocaml.warning "-4"] Field.view f with
             | Function_slot fs -> fs
             | _ -> assert false),
@@ -1260,6 +1259,13 @@ let cannot_unbox = rel1 "cannot_unbox" Cols.[n]
 let to_unbox = rel1 "to_unbox" Cols.[n]
 
 let to_change_representation = rel1 "to_change_representation" Cols.[n]
+
+let multiple_allocation_points = rel1 "multiple_allocations_points" Cols.[n]
+
+let dominated_by_allocation_point =
+  rel2 "dominated_by_allocation_point" Cols.[n; n]
+
+let allocation_point_dominator = rel2 "allocation_point_dominator" Cols.[n; n]
 
 let datalog_rules =
   let open! Syntax in
@@ -1681,42 +1687,19 @@ let datalog_rules =
      ==> to_change_representation x);
     (let$ [x; _y] = ["x"; "_y"] in
      [usages_rel x _y; not (cannot_change_representation x); not (to_unbox x)]
-     ==> to_change_representation x) ]
-
-let map_from_allocation_points_to_dominated =
-  (* let open! Syntax in let map_rule = let$ [x; y; z] = ["x"; "y"; "z"] in [
-     sources_rel x y; sources_rel x z; distinct y z ] ==>
-     multiple_allocation_points x in let dominator_rule = let$ [x; y] = ["x";
-     "y"] in [ sources_rel x y; not (multiple_allocation_points x) ] ==>
-     dominator y x in [ map_rule; dominator_rule ] *)
-  let open! Syntax in
-  let any_source_query =
-    compile ["x"] (fun [x] ->
-        where [Global_flow_graph.any_source_pred x] (yield [x]))
-  in
-  let sources_query =
-    compile ["x"; "y"] (fun [x; y] -> where [sources_rel x y] (yield [x; y]))
-  in
-  fun db ->
-    let h = Hashtbl.create 17 in
-    Cursor.iter ~f:(fun [x] -> Hashtbl.replace h x None) any_source_query db;
-    Cursor.iter
-      ~f:(fun [x; y] ->
-        if Hashtbl.mem h x
-        then Hashtbl.replace h x None
-        else Hashtbl.add h x (Some y))
-      sources_query db;
-    Hashtbl.fold
-      (fun id elt acc ->
-        match elt with
-        | None -> acc
-        | Some elt ->
-          Code_id_or_name.Map.update elt
-            (function
-              | None -> Some (Code_id_or_name.Set.singleton id)
-              | Some set -> Some (Code_id_or_name.Set.add id set))
-            acc)
-      h Code_id_or_name.Map.empty
+     ==> to_change_representation x);
+    (let$ [x] = ["x"] in
+     [any_source_pred x] ==> multiple_allocation_points x);
+    (let$ [x; y; z] = ["x"; "y"; "z"] in
+     [sources_rel x y; sources_rel x z; distinct Cols.n y z]
+     ==> multiple_allocation_points x);
+    (* [allocation_point_dominator x y] is the same as
+       [dominated_by_allocation_point y x], which is that [y] is the allocation
+       point dominator of [x]. *)
+    (let$ [x; y] = ["x"; "y"] in
+     [sources_rel x y; not (multiple_allocation_points x)]
+     ==> and_ [allocation_point_dominator x y; dominated_by_allocation_point y x])
+  ]
 
 let rec mapi_unboxed_fields (not_unboxed : 'a -> 'b -> 'c)
     (unboxed : Field.t -> 'a -> 'a) (acc : 'a) (uf : 'b unboxed_fields) :
@@ -2866,6 +2849,7 @@ type single_field_source =
   | Many
 
 let get_single_field_source =
+  let open Syntax in
   let q_any_source1 =
     mk_exists_query ["block"; "field"] [] (fun [block; field] [] ->
         [field_sources_top_rel block field])
@@ -2877,20 +2861,18 @@ let get_single_field_source =
           Global_flow_graph.any_source_pred source ])
   in
   let q_source =
-    Datalog.(
-      compile_with_parameters ["block"; "field"] [] (fun [block; field] [] ->
-          foreach ["field_source"; "source"] (fun [field_source; source] ->
-              where
-                [ field_sources_rel block field field_source;
-                  sources_rel field_source source ]
-                (yield [source]))))
+    compile_with_parameters ["block"; "field"] [] (fun [block; field] [] ->
+        foreach ["field_source"; "source"] (fun [field_source; source] ->
+            [ field_sources_rel block field field_source;
+              sources_rel field_source source ]
+            =>? [source]))
   in
   fun db block field ->
     if q_any_source1 [block; field] db || q_any_source2 [block; field] db
     then Many
     else
-      Datalog.Cursor.fold_with_parameters q_source [block; field] db
-        ~init:No_source ~f:(fun [source] acc ->
+      Cursor.fold_with_parameters q_source [block; field] db ~init:No_source
+        ~f:(fun [source] acc ->
           match acc with No_source -> One source | One _ | Many -> Many)
 
 let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
@@ -2965,71 +2947,51 @@ let fixpoint (graph : Global_flow_graph.graph) =
   in
   if debug then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
   if Sys.getenv_opt "DUMPDB" <> None then Format.eprintf "%a@." Datalog.print db;
-  let dominated_by_allocation_points =
-    map_from_allocation_points_to_dominated db
-  in
-  let allocation_point_dominator =
-    Code_id_or_name.Map.fold
-      (fun alloc_point dominated acc ->
-        Code_id_or_name.Set.fold
-          (fun dom acc -> Code_id_or_name.Map.add dom alloc_point acc)
-          dominated acc)
-      dominated_by_allocation_points Code_id_or_name.Map.empty
-  in
+  (* let allocation_point_dominator = Code_id_or_name.Map.fold (fun alloc_point
+     dominated acc -> Code_id_or_name.Set.fold (fun dom acc ->
+     Code_id_or_name.Map.add dom alloc_point acc) dominated acc)
+     dominated_by_allocation_points Code_id_or_name.Map.empty in *)
   let unboxed : unboxed Code_id_or_name.Map.t ref =
     ref Code_id_or_name.Map.empty
   in
+  let has_to_be_unboxed =
+    mk_exists_query ["x"] ["alloc_point"] (fun [x] [alloc_point] ->
+        [allocation_point_dominator x alloc_point; to_unbox alloc_point])
+  in
+  let has_to_be_unboxed code_or_name = has_to_be_unboxed [code_or_name] db in
   let query_to_unbox =
-    Datalog.(compile ["X"] (fun [x] -> where [to_unbox x] (yield [x])))
+    let open Syntax in
+    let$ [x; y] = ["x"; "y"] in
+    [to_unbox x; dominated_by_allocation_point x y] =>? [x; y]
   in
   let query_to_change_representation =
-    Datalog.(
-      compile ["X"] (fun [x] -> where [to_change_representation x] (yield [x])))
+    let open Syntax in
+    let$ [x] = ["x"] in
+    [to_change_representation x] =>? [x]
   in
-  let to_unbox = Hashtbl.create 17 in
-  let to_change_representation = Hashtbl.create 17 in
-  Datalog.Cursor.iter query_to_unbox db ~f:(fun [u] ->
-      Hashtbl.replace to_unbox u ());
-  Datalog.Cursor.iter query_to_change_representation db ~f:(fun [u] ->
-      Hashtbl.replace to_change_representation u ());
-  let has_to_be_unboxed code_or_name =
-    match
-      Code_id_or_name.Map.find_opt code_or_name allocation_point_dominator
-    with
-    | None -> false
-    | Some alloc_point -> Hashtbl.mem to_unbox alloc_point
+  let query_dominated_by =
+    let open Syntax in
+    compile_with_parameters ["x"] [] (fun [x] [] ->
+        foreach ["y"] (fun [y] -> [dominated_by_allocation_point x y] =>? [y]))
   in
-  Hashtbl.iter
-    (fun code_or_name () ->
-      let to_patch =
-        match
-          Code_id_or_name.Map.find_opt code_or_name
-            dominated_by_allocation_points
-        with
-        | None -> Code_id_or_name.Set.empty
-        | Some x -> x
+  Datalog.Cursor.iter query_to_unbox db ~f:(fun [code_or_name; to_patch] ->
+      (* CR-someday ncourant: produce ghost makeblocks/set of closures for
+         debugging *)
+      let new_name =
+        Flambda_colours.without_colours ~f:(fun () ->
+            Format.asprintf "%a_into_%a" Code_id_or_name.print code_or_name
+              Code_id_or_name.print to_patch)
       in
-      Code_id_or_name.Set.iter
-        (fun to_patch ->
-          (* CR-someday ncourant: produce ghost makeblocks/set of closures for
-             debugging *)
-          let new_name =
-            Flambda_colours.without_colours ~f:(fun () ->
-                Format.asprintf "%a_into_%a" Code_id_or_name.print code_or_name
-                  Code_id_or_name.print to_patch)
-          in
-          let fields =
-            mk_unboxed_fields ~has_to_be_unboxed
-              ~mk:(fun kind name -> Variable.create name kind)
-              db code_or_name
-              (get_fields db
-                 (get_all_usages ~follow_known_arity_calls:true db
-                    (Code_id_or_name.Map.singleton to_patch ())))
-              new_name
-          in
-          unboxed := Code_id_or_name.Map.add to_patch fields !unboxed)
-        to_patch)
-    to_unbox;
+      let fields =
+        mk_unboxed_fields ~has_to_be_unboxed
+          ~mk:(fun kind name -> Variable.create name kind)
+          db code_or_name
+          (get_fields db
+             (get_all_usages ~follow_known_arity_calls:true db
+                (Code_id_or_name.Map.singleton to_patch ())))
+          new_name
+      in
+      unboxed := Code_id_or_name.Map.add to_patch fields !unboxed);
   if debug
   then
     Format.printf "TO UNBOX: %a@."
@@ -3037,23 +2999,19 @@ let fixpoint (graph : Global_flow_graph.graph) =
          (Field.Map.print (pp_unboxed_elt Variable.print)))
       !unboxed;
   let changed_representation = ref Code_id_or_name.Map.empty in
-  Hashtbl.iter
-    (fun code_id_or_name () ->
+  Datalog.Cursor.iter query_to_change_representation db
+    ~f:(fun [code_id_or_name] ->
+      (* This can happen because we change the representation of each function
+         slot of a set of closures at the same time. *)
       if Code_id_or_name.Map.mem code_id_or_name !changed_representation
       then ()
       else
         let add_to_s repr alloc_point =
-          Code_id_or_name.Set.iter
-            (fun c ->
+          Datalog.Cursor.iter_with_parameters query_dominated_by [alloc_point]
+            db ~f:(fun [c] ->
               changed_representation
                 := Code_id_or_name.Map.add c (repr, alloc_point)
                      !changed_representation)
-            (match
-               Code_id_or_name.Map.find_opt alloc_point
-                 dominated_by_allocation_points
-             with
-            | None -> Code_id_or_name.Set.empty
-            | Some s -> s)
         in
         match get_set_of_closures_def db code_id_or_name with
         | Not_a_set_of_closures ->
@@ -3109,8 +3067,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
           in
           List.iter
             (fun (fs, f) -> add_to_s (Closure_representation (repr, fss, fs)) f)
-            l)
-    to_change_representation;
+            l);
   if debug
   then
     Format.eprintf "@.TO_CHG: %a@."
@@ -3188,15 +3145,14 @@ let code_id_actually_directly_called_query =
   compile_with_parameters ["set_of_closures"] [] (fun [set_of_closures] [] ->
       foreach ["apply_widget"; "call_witness"; "codeid"]
         (fun [apply_widget; call_witness; codeid] ->
-          where
-            [ rev_accessor_rel ~base:set_of_closures
-                ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
-                ~to_:apply_widget;
-              sources_rel apply_widget call_witness;
-              constructor_rel ~base:call_witness
-                ~relation:!!Field.code_id_of_call_witness
-                ~from:codeid ]
-            (yield [codeid])))
+          [ rev_accessor_rel ~base:set_of_closures
+              ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
+              ~to_:apply_widget;
+            sources_rel apply_widget call_witness;
+            constructor_rel ~base:call_witness
+              ~relation:!!Field.code_id_of_call_witness
+              ~from:codeid ]
+          =>? [codeid]))
 
 let code_id_actually_directly_called uses v =
   if unknown_code_id_actually_directly_called_query
