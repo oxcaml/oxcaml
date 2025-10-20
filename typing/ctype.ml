@@ -2621,7 +2621,8 @@ let constrain_type_jkind ~fixed env ty jkind =
                        && List.length jkinds = num_components ->
                recur ty's_jkinds jkinds
              | Some ty's_jkinds, None
-                  when Jkind.has_layout_any jkind ->
+                  when Jkind.has_layout_any jkind
+                    && List.length ty's_jkinds = num_components ->
                (* Even though [jkind] has layout any, it still might have
                   mode-crossing restrictions, so we recur, just duplicating
                   the jkind. *)

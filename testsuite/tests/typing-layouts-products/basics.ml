@@ -2332,8 +2332,14 @@ type ('a : any mod non_null) s
 type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
 [%%expect{|
 type ('a : any mod non_null) s
-Uncaught exception: Invalid_argument("map3")
-
+Line 3, characters 0-66:
+3 | type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The kind of t is value_or_null & bits32
+         because of the annotation on the declaration of the type t.
+       But the kind of t must be a subkind of any mod non_null
+         because of the definition of s at line 1, characters 0-30.
 |}]
 
 (* modal axes have the same problem *)
@@ -2342,8 +2348,14 @@ type ('a : any mod portable) s
 type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
 [%%expect{|
 type ('a : any mod portable) s
-Uncaught exception: Invalid_argument("map3")
-
+Line 3, characters 0-66:
+3 | type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The kind of t is value_or_null & bits32
+         because of the annotation on the declaration of the type t.
+       But the kind of t must be a subkind of any mod portable
+         because of the definition of s at line 1, characters 0-30.
 |}]
 
 (* If the kind annotation does cross, you get a more sensible error. *)
