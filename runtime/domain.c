@@ -369,6 +369,8 @@ static void caml_bt_signal(dom_internal* dom)
   caml_plat_lock_blocking(&dom->backup_thread_lock);
   caml_plat_signal(&dom->backup_thread_cond);
   caml_plat_unlock(&dom->backup_thread_lock);
+  if (dom->state != NULL)
+    caml_domain_send_interrupt_hook(dom->state);
 }
 
 static void caml_send_interrupt(dom_internal *target)
@@ -1192,6 +1194,11 @@ static void caml_domain_external_interrupt_hook_default(void)
   return;
 }
 
+static void caml_domain_send_interrupt_hook_default(caml_domain_state* target)
+{
+  return;
+}
+
 CAMLexport void (*caml_domain_initialize_hook)(void) =
    caml_domain_initialize_default;
 
@@ -1206,6 +1213,9 @@ CAMLexport void (*caml_domain_stop_hook)(void) =
 
 CAMLexport void (*caml_domain_external_interrupt_hook)(void) =
    caml_domain_external_interrupt_hook_default;
+
+CAMLexport void (*caml_domain_send_interrupt_hook)(caml_domain_state*) =
+   caml_domain_send_interrupt_hook_default;
 
 CAMLexport _Atomic caml_timing_hook caml_domain_terminated_hook =
   (caml_timing_hook)NULL;

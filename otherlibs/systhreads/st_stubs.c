@@ -288,7 +288,9 @@ static void save_runtime_state(void)
 
 CAMLexport void caml_thread_save_runtime_state(void)
 {
+  /* Same as caml_enter_blocking_section, except actually releasing the lock */
   save_runtime_state();
+  caml_bt_exit_ocaml();
 }
 
 static void restore_runtime_state(caml_thread_t th)
@@ -321,6 +323,8 @@ static void restore_runtime_state(caml_thread_t th)
 
 CAMLexport void caml_thread_restore_runtime_state(void)
 {
+  /* Same as caml_leave_blocking_section, except actually acquiring the lock */
+  caml_bt_enter_ocaml();
   restore_runtime_state(This_thread);
 }
 
@@ -564,6 +568,12 @@ static void caml_thread_reinitialize(void)
   }
 }
 
+static void caml_thread_domain_send_interrupt_hook(caml_domain_state* dom)
+{
+  struct caml_locking_scheme *s = atomic_load(&Locking_scheme(dom->id));
+  if (s->send_interrupt) s->send_interrupt(s->context);
+}
+
 CAMLprim value caml_thread_join(value th);
 
 /* This hook is run when a domain shuts down (see domains.c).
@@ -704,6 +714,7 @@ CAMLprim value caml_thread_initialize(value unit)
   caml_domain_lock_hook = thread_lock_acquire;
   caml_domain_unlock_hook = thread_lock_release;
   caml_domain_stop_hook = caml_thread_domain_stop_hook;
+  caml_domain_send_interrupt_hook = caml_thread_domain_send_interrupt_hook;
   caml_atfork_hook = caml_thread_reinitialize;
 
   threads_initialized = true;

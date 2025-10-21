@@ -91,6 +91,10 @@ struct caml_locking_scheme {
      and expect it held on return */
   int (*can_skip_yield)(void*);
   void (*yield)(void*);
+
+  /* If non-NULL, called without the lock held when the runtime
+     urgently needs to take the lock to service a GC interrupt */
+  void (*send_interrupt)(void*);
 };
 
 /* Switch to a new runtime locking scheme.
