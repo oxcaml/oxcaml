@@ -47,6 +47,13 @@ let set_uncaught_exception_handler (fn @ portable) =
 
 exception Exit
 
+let () = Callback.register "thread_tls_init" Domain.TLS.Private.init
+let () =
+  Callback.register
+    "thread_tls_get_initial_keys"
+    Domain.TLS.Private.get_initial_keys
+let () = Callback.register "thread_tls_set_initial_keys" Domain.TLS.Private.init
+
 let create (fn @ once) arg =
   let tls_keys = Domain.TLS.Private.get_initial_keys () in
   thread_new
