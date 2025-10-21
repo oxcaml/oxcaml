@@ -17,9 +17,7 @@
  (mode    promote)
  (deps    (:listprims ../tools/listprims.exe) translprim.ml)
  (action  (with-stdout-to %{targets}
-            (progn
-              (bash "grep --only-matching --perl-regexp '(?<=\\| \")%[^\"]*(?=\"\\s*->)' %{dep:translprim.ml}")
-              (run %{listprims})))))
+            (run %{listprims} translprim.ml))))
 
 (rule
  (targets runtimedef.ml)
