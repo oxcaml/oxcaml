@@ -1,3 +1,4 @@
+# CYBERSECURITY WARNING: Do not expose secrets to runners without consulting with repo owners
 name: Syntax changes reminder
 
 on:

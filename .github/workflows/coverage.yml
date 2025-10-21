@@ -1,3 +1,4 @@
+# CYBERSECURITY WARNING: Do not expose secrets to runners without consulting with repo owners
 name: coverage-linux
 
 # CR mshinwell: fix build and re-enable.  Something needs to be done
