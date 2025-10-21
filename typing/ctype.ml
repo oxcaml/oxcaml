@@ -2085,37 +2085,18 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
-(* Cancel out all pairs of $ and <[_]>, or <[_]> and $.
-   This ensures type unification works correctly. *)
-let rec quote_splice_cancel ty =
-  (* CR metaprogramming aivaskovic: try to remove type_desc mutation here *)
-  match get_desc ty with
-  | Tquote t -> begin
-      match get_desc t with
-      | Tsplice t' -> t'
-      | Tquote _ -> set_type_desc ty (Tquote (quote_splice_cancel t)); ty
-      | _ -> raise Cannot_expand
-    end
-  | Tsplice t -> begin
-      match get_desc t with
-      | Tquote t' -> t'
-      | Tsplice _ -> set_type_desc t (Tsplice (quote_splice_cancel t)); ty
-      | _ -> raise Cannot_expand
-    end
-  | _ -> raise Cannot_expand
-
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
 let rec try_expand_once env ty =
-  let expand_and_cancel t =
-    match try_expand_once env t with
-    | _ | exception Cannot_expand -> quote_splice_cancel ty
-  in
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
-  | Tsplice t -> expand_and_cancel t
-  | Tquote t -> expand_and_cancel t
+  | Tsplice t ->
+      let t = try_expand_once env t in
+      newty2 ~level:(get_level t) (Tsplice t)
+  | Tquote t ->
+      let t = try_expand_once env t in
+      newty2 ~level:(get_level t) (Tquote t)
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2125,12 +2106,42 @@ let try_expand_safe env ty =
   with Escape _ ->
     Btype.backtrack snap; cleanup_abbrev (); raise Cannot_expand
 
-(* Fully expand the head of a type. *)
-let rec try_expand_head
-    (try_once : Env.t -> type_expr -> type_expr) env ty =
-  let ty' = try_once env ty in
-  try try_expand_head try_once env ty'
+(* Cancel out all pairs of $ and <[_]>, or <[_]> and $. *)
+let rec try_quote_splice_cancel_once ty =
+  match get_desc ty with
+  | Tquote t -> begin
+      match get_desc t with
+      | Tsplice t' -> t'
+      | _ ->
+          let t = try_quote_splice_cancel_once t in
+          newty2 ~level:(get_level t) (Tquote t)
+    end
+  | Tsplice t -> begin
+      match get_desc t with
+      | Tquote t' -> t'
+      | _ ->
+          let t = try_quote_splice_cancel_once t in
+          newty2 ~level:(get_level t) (Tsplice t)
+    end
+  | _ -> raise Cannot_expand
+
+let rec try_quote_splice_cancel ty =
+  let ty' = try_quote_splice_cancel_once ty in
+  try try_quote_splice_cancel ty'
   with Cannot_expand -> ty'
+
+(* Fully expand the head of a type. *)
+let try_expand_head
+    (try_once : Env.t -> type_expr -> type_expr) env ty =
+  let rec loop try_once env ty =
+    let ty' = try_once env ty in
+    try loop try_once env ty'
+    with Cannot_expand ->
+      try try_quote_splice_cancel ty'
+      with Cannot_expand -> ty'
+  in
+  try loop try_once env ty
+  with Cannot_expand -> try_quote_splice_cancel ty
 
 (* Unsafe full expansion, may raise [Unify [Escape _]]. *)
 let expand_head_unif env ty =
@@ -2203,8 +2214,12 @@ let safe_abbrev_opt env ty =
 let rec try_expand_once_opt env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev_opt env ty
-  | Tsplice t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
-  | Tquote t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
+  | Tsplice t ->
+      let t = try_expand_once_opt env t in
+      newty2 ~level:(get_level t) (Tsplice t)
+  | Tquote t ->
+      let t = try_expand_once env t in
+      newty2 ~level:(get_level t) (Tquote t)
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =
@@ -4015,15 +4030,15 @@ let rec unify uenv t1 t2 =
     begin match (get_desc t1, get_desc t2) with
       (Tconstr _, Tvar _) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tvar _, Tquote _) when deep_occur t1 t2 ->
+    | (Tvar _, Tconstr _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tquote _, Tvar _) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tvar _, Tsplice _) when deep_occur t1 t2 ->
+    | (Tvar _, Tquote _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tsplice _, Tvar _) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tvar _, Tconstr _) when deep_occur t1 t2 ->
+    | (Tvar _, Tsplice _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tvar _, _) ->
         if unify1_var uenv t1 t2 then () else unify2 uenv t1 t2
