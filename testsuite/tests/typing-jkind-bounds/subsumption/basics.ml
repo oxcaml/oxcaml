@@ -581,3 +581,34 @@ type 'a t3 : value mod portable =
 [%%expect{|
 type 'a t3 = A | B of unit t3
 |}]
+
+(* out of fuel (reported by alamoreaux) *)
+type 'number t : immutable_data with 'number =
+  [ `Null
+  | `False
+  | `True
+  | `String of string
+  | `Number of 'number
+  | `Object of (string * 'number t) list
+  | `Array of 'number t list
+  ]
+[%%expect{|
+type 'number t =
+    [ `Array of 'number t list
+    | `False
+    | `Null
+    | `Number of 'number
+    | `Object of (string * 'number t) list
+    | `String of string
+    | `True ]
+|}]
+
+(* simplified version of the above that still runs out of fuel (minimized by mdelvecchio) *)
+type 'number t : immutable_data with 'number =
+  [ `Object of (string * 'number t) list
+  | `Array of 'number t list
+  ]
+[%%expect{|
+type 'number t =
+    [ `Array of 'number t list | `Object of (string * 'number t) list ]
+|}]
