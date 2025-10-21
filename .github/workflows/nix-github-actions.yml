@@ -1,6 +1,6 @@
 # CYBERSECURITY WARNING: Do not expose secrets to runners without consulting with repo owners
 
-name: Nix Flake actions
+name: Nix Flake Actions
 
 on:
   pull_request:
