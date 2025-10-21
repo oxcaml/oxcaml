@@ -1,3 +1,4 @@
+# CYBERSECURITY WARNING: Do not expose secrets to runners without consulting with repo owners
 name: build
 on:
   push:
@@ -18,75 +19,75 @@ jobs:
         include:
           - name: flambda2_runtime5
             config: --enable-middle-end=flambda2 --enable-runtime5
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
 
           - name: flambda2_stack_checks
             config: --enable-middle-end=flambda2 --enable-runtime5 --enable-stack-checks
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
 
           - name: flambda2_poll_insertion
             config: --enable-middle-end=flambda2 --enable-runtime5 --enable-poll-insertion
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
 
           - name: flambda2_multidomain
             config: --enable-middle-end=flambda2 --enable-runtime5 --enable-stack-checks --enable-poll-insertion --enable-multidomain
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
 
           - name: flambda2_dev
             config: --enable-middle-end=flambda2 --enable-dev
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
 
           - name: flambda2_dev_runtime5
             config: --enable-middle-end=flambda2 --enable-dev --enable-runtime5
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
 
           - name: flambda2_debug_runtime5
             config: --enable-middle-end=flambda2 --enable-runtime5 --enable-stack-checks
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
             build_ocamlparam: ''
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
 
           - name: flambda2_debug_runtime
             config: --enable-middle-end=flambda2
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
             build_ocamlparam: ''
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
 
           - name: flambda2_o3
             config: --enable-middle-end=flambda2
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
 
           - name: metrics_collection
             config: --enable-middle-end=flambda2
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
 
           - name: flambda2_frame_pointers_oclassic_polling
             config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
             build_ocamlparam: ''
             ocamlparam: '_,Oclassic=1'
             disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml'
 
           - name: flambda2_macos_arm64
             config: --enable-middle-end=flambda2 --disable-warn-error
-            os: macos-latest
+            os: warp-macos-15-arm64-6x
 
           - name: flambda2_macos_arm64_runtime5_regalloc
             config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
-            os: macos-latest
+            os: warp-macos-15-arm64-6x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
 
           - name: flambda2_macos_arm64_debug_runtime5_regalloc
             config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
-            os: macos-latest
+            os: warp-macos-15-arm64-6x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             use_runtime: d
@@ -95,14 +96,14 @@ jobs:
 
           - name: flambda2_ubuntu_arm64_runtime5_regalloc
             config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
-            os: ubuntu-24.04-arm
+            os: warp-ubuntu-latest-arm64-32x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
 
           - name: regalloc
             config: --enable-middle-end=flambda2
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             check_arch: true
@@ -110,79 +111,68 @@ jobs:
 
           - name: irc_frame_pointers
             config: --enable-middle-end=flambda2 --enable-runtime5 --enable-frame-pointers
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
             build_ocamlparam: '_,w=-46,regalloc=irc'
             ocamlparam: '_,w=-46,regalloc=irc'
             check_arch: true
 
           - name: cfg-invariants
             config: --enable-middle-end=flambda2 --enable-runtime5
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
             build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             check_arch: true
 
           - name: vectorizer
             config: --enable-middle-end=flambda2 --enable-runtime5
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
             build_ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             check_arch: true
 
           - name: address_sanitizer
             config: --enable-middle-end=flambda2 --enable-address-sanitizer
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
             cc: clang
 
           - name: address_sanitizer_runtime5
             config: --enable-middle-end=flambda2 --enable-address-sanitizer --enable-runtime5
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
             cc: clang
 
           - name: dwarf_tests
             config: --enable-middle-end=flambda2 --enable-runtime5
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
             dwarf_tests_only: true
             oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus1
             oxcaml_llvm_source_branch: lldb
 
           - name: llvmize_tests
             config: --enable-middle-end=flambda2 --enable-runtime5 --enable-frame-pointers
-            os: ubuntu-latest
+            os: warp-ubuntu-latest-x64-32x
             llvmize_tests_only: true
             oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
             oxcaml_llvm_source_branch: llvmize-oxcaml
 
     env:
-      J: "3"
+      J: "32"
       run_testsuite: "true"
 
     steps:
     - name: Checkout the OxCaml repo
       uses: actions/checkout@master
 
-    # jvanburen: I don't think we actually test this and it takes forever to set up
-    # - name: Install AFL (for Linux workers)
-    #   if: matrix.os == 'ubuntu-latest'
-    #   run: sudo apt-get install afl++
-
-    - name: Install clang
-      if: matrix.os == 'ubuntu-latest' && matrix.cc == 'clang'
+    - name: Install clang (Ubuntu)
+      if: runner.os == 'macOS' && matrix.cc == 'clang'
       run: sudo apt-get install clang
 
-    - name: Install AFL (for macOS workers)
-      # The "afl-fuzz" package is deprecated (2023-10) and can no longer be installed
-      if: matrix.os == 'macos-latest'
-      run: true
-      # run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install afl-fuzz
-
-    - name: Install autoconf and bash (for macOS workers)
-      if: matrix.os == 'macos-latest'
-      run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf bash
+    - name: Install autoconf and bash and parallel (macOS)
+      if: runner.os == 'macOS'
+      run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf bash parallel
       # bash >=4 is needed for tools/gen_ocamlj_rules.sh
 
     - name: Pretend we're running in a container (makes setup-ocaml go faster)
-      if: matrix.os == 'ubuntu-latest'
+      if: runner.os == 'Linux'
       run: sudo touch /.dockerenv
       # makes setup-ocaml skip apt-get, which is slow on first invocation
 
@@ -202,10 +192,6 @@ jobs:
       run: |
         opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
 
-    - name: Install GNU parallel
-      if: matrix.os == 'macos-latest'
-      run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install parallel
-
     - name: Disable any testcases
       run: |
         disable_testcases="${{matrix.disable_testcases}}"
@@ -223,8 +209,8 @@ jobs:
           --prefix=$GITHUB_WORKSPACE/_install \
           ${{ matrix.config }}
 
-    - name: Setup for saving core files (not for macOS)
-      if: matrix.os != 'macos-latest'
+    - name: Setup for saving core files (Linux)
+      if: runner.os == 'Linux'
       run: |
         sudo mkdir /cores
         sudo chmod 777 /cores
@@ -232,7 +218,7 @@ jobs:
         sudo bash -c 'echo "/cores/%e.%p.%t" > /proc/sys/kernel/core_pattern'
 
     - name: Setup for saving core files (macOS)
-      if: matrix.os == 'macos-latest'
+      if: runner.os == 'macOS'
       run: |
         sudo chmod 1777 /cores
         sudo sysctl kern.coredump=1
@@ -278,7 +264,7 @@ jobs:
         fi
 
     - name: Install custom OxCaml LLVM
-      if: matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
+      if: matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
       run: |
         # Determine architecture
         if [[ "${{ runner.arch }}" == "X64" ]]; then
@@ -301,7 +287,7 @@ jobs:
         tar -xzf oxcaml-llvm.tar.gz -C oxcaml-llvm --strip-components=1
 
     - name: Build and test OxCaml DWARF
-      if: matrix.dwarf_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
+      if: matrix.dwarf_tests_only == true && matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
       run: |
         ulimit -c unlimited
         make runtest-dwarf
@@ -324,7 +310,7 @@ jobs:
         fi
 
     - name: Build and test OxCaml Llvmize
-      if: matrix.llvmize_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
+      if: matrix.llvmize_tests_only == true && matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
       run: |
         ulimit -c unlimited
         make runtest-llvmize
@@ -452,7 +438,7 @@ jobs:
 
     - name: Upload DiagnosticReports (macOS only)
       uses: actions/upload-artifact@v4
-      if: failure() && matrix.os == 'macos-latest'
+      if: failure() && runner.os == 'macOS'
       with:
         name: DiagnosticReports-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
         path: /Users/runner/Library/Logs/DiagnosticReports

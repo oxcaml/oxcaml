@@ -1,3 +1,5 @@
+# CYBERSECURITY WARNING: Do not expose secrets to runners without consulting with repo owners
+
 name: ocamlformat
 on:
   push:
@@ -7,16 +9,7 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        ocaml-compiler:
-          - "4.14.0"
-          # this is no longer true, but I can't change it because this specific name of
-          # test is a "required" check. We should change that...
-
+    runs-on: warp-ubuntu-latest-arm64-32x
     steps:
     - name: Checkout the OxCaml repo
       uses: actions/checkout@master
