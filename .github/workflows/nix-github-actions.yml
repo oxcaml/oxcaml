@@ -8,7 +8,7 @@ on:
 
 jobs:
   nix-matrix:
-    runs-on: warp-ubuntu-latest-arm64-32x
+    runs-on: warp-ubuntu-latest-arm64-16x
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
