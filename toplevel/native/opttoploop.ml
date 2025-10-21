@@ -140,9 +140,12 @@ let rec eval_address = function
       global_symbol cu
   | Env.Alocal id ->
       toplevel_value id
-  | Env.Adot(a, _, pos) ->
-      Obj.field (eval_address a) pos
-    (* CR layouts v5: this is not correct if the fields have been reordered. *)
+  | Env.Adot(a, module_repr, pos) ->
+      let module_repr = Lambda.transl_module_representation module_repr in
+      match module_repr with
+      | Module_value_only _ -> Obj.field (eval_address a) pos
+      | Module_mixed _ ->
+        Misc.fatal_error "Opttoploop.eval_address: Can't handle mixed module"
 
 let eval_path find env path =
   match find path env with

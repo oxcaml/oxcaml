@@ -10,29 +10,39 @@
 *)
 
 open Stdlib_upstream_compatible
-external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
+external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
+
+type void : void
+
+external void : unit -> void = "%unbox_unit"
 
 let _ = print_endline "Test: include with module ident"
 
 module M = struct
   let foo = #42.0
   let bar = "hello"
-  let baz = 123
+  let product = #(#1.0, void (), #100L, "test")
 end
 
 module M1 = struct
   include M
+
   let qux = #3.14
 
-  let _ =
-    Printf.printf "%.0f %s %d %.2f\n"
+  let () =
+    let #(a, _v, b, c) = id product in
+    print_endline "Expected: 42.0 hello 1.0 100 test 3.14";
+    Printf.printf
+      "Actual:   %.1f %s %.1f %d %s %.2f\n\n"
       (Float_u.to_float (id foo))
       (id bar)
-      (id baz)
+      (Float_u.to_float a)
+      (Int64_u.to_int b)
+      c
       (Float_u.to_float (id qux))
+  ;;
 end
-
 
 let _ = print_endline "Test: include with inline struct"
 
@@ -40,116 +50,170 @@ module M2 = struct
   include struct
     let foo = #42.0
     let bar = "hello"
-    let baz = 123
+    let product = #(void (), #2L, "inline", #3.0)
   end
+
   let qux = #3.14
 
-  let _ =
-    Printf.printf "%.0f %s %d %.2f\n"
+  let () =
+    let #(_v, a, b, c) = id product in
+    print_endline "Expected: 42.0 hello 2 inline 3.0 3.14";
+    Printf.printf
+      "Actual:   %.1f %s %d %s %.1f %.2f\n\n"
       (Float_u.to_float (id foo))
       (id bar)
-      (id baz)
+      (Int64_u.to_int a)
+      b
+      (Float_u.to_float c)
       (Float_u.to_float (id qux))
+  ;;
 end
 
-
-let _ = print_endline "Test: include with functor"
+let () = print_endline "Test: include with functor"
 
 module Functor (X : sig end) = struct
   let foo = #42.0
   let bar = "hello"
-  let baz = 123
+  let product = #(#4.0, "functor", void (), #5L)
 end
 
 module M3 = struct
-  include Functor(struct end)
+  include Functor (struct end)
+
   let qux = #3.14
 
-  let _ =
-    Printf.printf "%.0f %s %d %.2f\n"
+  let () =
+    let #(a, b, _v, c) = id product in
+    print_endline "Expected: 42.0 hello 4.0 functor 5 3.14";
+    Printf.printf
+      "Actual:   %.1f %s %.1f %s %d %.2f\n\n"
       (Float_u.to_float (id foo))
       (id bar)
-      (id baz)
+      (Float_u.to_float a)
+      b
+      (Int64_u.to_int c)
       (Float_u.to_float (id qux))
+  ;;
 end
 
-
-let _ = print_endline "Test: multiple includes"
+let () = print_endline "Test: multiple includes"
 
 module A = struct
   let a = #1.0
   let b = "from A"
+  let product_a = #(#6L, void (), "A")
 end
 
 module B = struct
   let c = #2.0
   let d = "from B"
+  let product_b = #(void (), #7.0, "B")
 end
 
 module M4 = struct
   include A
   include B
+
   let e = #3.0
 
-  let _ =
-    Printf.printf "%.0f %s %.0f %s %.0f\n"
-      (Float_u.to_float (id a)) (id b) (Float_u.to_float (id c))
-      (id d) (Float_u.to_float (id e))
+  let () =
+    let #(f, _v1, g) = id product_a in
+    let #(_v2, h, i) = id product_b in
+    print_endline "Expected: 1.0 from A 2.0 from B 3.0 6 A 7.0 B";
+    Printf.printf
+      "Actual:   %.1f %s %.1f %s %.1f %d %s %.1f %s\n\n"
+      (Float_u.to_float (id a))
+      (id b)
+      (Float_u.to_float (id c))
+      (id d)
+      (Float_u.to_float (id e))
+      (Int64_u.to_int f)
+      g
+      (Float_u.to_float h)
+      i
+  ;;
 end
 
-
-let _ = print_endline "Test: include shadowing include"
+let () = print_endline "Test: include shadowing include"
 
 module Base = struct
   let x = #10.0
   let y = "original"
   let z = 100
+  let product = #(#8L, "base", void ())
 end
 
 module Override = struct
   let x = #20.0
   let y = "overridden"
+  let product = #(void (), #9L, "override")
 end
 
 module M5 = struct
   include Base
   include Override
 
-  let _ =
-    Printf.printf "%.0f %s %d\n" (Float_u.to_float (id x)) (id y) (id z)
+  let () =
+    let #(_v, a, b) = id product in
+    print_endline "Expected: 20.0 overridden 100 9 override";
+    Printf.printf
+      "Actual:   %.1f %s %d %d %s\n\n"
+      (Float_u.to_float (id x))
+      (id y)
+      (id z)
+      (Int64_u.to_int a)
+      b
+  ;;
 end
 
-
-let _ = print_endline "Test: include shadowing a val"
+let () = print_endline "Test: include shadowing a val"
 
 module M6 = struct
   let a = #5.0
   let b = "before include"
-  let c = #0L
+  let product_1 = #(void (), #10L, "before")
 
   include struct
     let b = "from include"
     let c = #7.0
+    let product_1 = #(#11L, void (), "from_include")
   end
 
-  let _ =
-    Printf.printf "%.0f %s %.0f\n"
-      (Float_u.to_float (id a)) (id b) (Float_u.to_float (id c))
+  let () =
+    let #(d, _v, e) = id product_1 in
+    print_endline "Expected: 5.0 from include 7.0 11 from_include";
+    Printf.printf
+      "Actual:   %.1f %s %.1f %d %s\n\n"
+      (Float_u.to_float (id a))
+      (id b)
+      (Float_u.to_float (id c))
+      (Int64_u.to_int d)
+      e
+  ;;
 end
 
-
-let _ = print_endline "Test: val shadowing an include"
+let () = print_endline "Test: val shadowing an include"
 
 module M7 = struct
   include struct
     let p = #0L
     let q = "from include"
+    let product = #(#12L, "from_include", void ())
   end
 
   let p = #9.0
   let r = "after include"
+  let product = #(void (), #13L, "shadowed")
 
-  let _ =
-    Printf.printf "%s %s %s\n"
-      (Float_u.to_string (id p)) (id q) (id r)
+  let () =
+    let #(_v, a, b) = id product in
+    print_endline "Expected: 9.0 from include after include 13 shadowed";
+    Printf.printf
+      "Actual:   %.1f %s %s %d %s\n"
+      (Float_u.to_float (id p))
+      (id q)
+      (id r)
+      (Int64_u.to_int a)
+      b
+  ;;
 end

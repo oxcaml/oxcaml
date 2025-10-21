@@ -1,34 +1,31 @@
 Test: Basic include functor with unboxed types
-3.
-6.
-9.
-three_stats
+Expected: 3.0 6.0 9.0 three_stats
+Actual:   3.0 6.0 9.0 three_stats
+
 Test: Include functor with shadowing of mixed values
-11.
-overridden_original
-1.
+Expected: 11.0 overridden_original 1.0
+Actual:   11.0 overridden_original 1.0
+
 Test: Multiple include functors with mixed types
-5.
-5
-14.
-7
+Expected: 5.0 5 14.0 7
+Actual:   5.0 5 14.0 7
+
 Test: Include functor that adds unboxed fields to input
-42
-answer
-42.
-42
+Expected: 42 answer 42.0 42
+Actual:   42 answer 42.0 42
+
 Test: Nested include functor applications
-10.
-final
-final_inner
+Expected: 10.0 final final_inner
+Actual:   10.0 final final_inner
+
 Test: Include with type
-9.
+Expected: 9.0
+Actual:   9.0
+
 Test: Value-only input to mixed output
-30
-test_modified
-15.
-15
+Expected: 30 test_modified 15.0 15
+Actual:   30 test_modified 15.0 15
+
 Test: Mixed input with value-only functor
-99.
-24
-data_processed
+Expected: 99.0 24 data_processed
+Actual:   99.0 24 data_processed

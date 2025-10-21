@@ -12,6 +12,7 @@
 open Stdlib_upstream_compatible
 
 type void : void
+
 external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
 external void : unit -> void = "%unbox_unit"
 
@@ -42,8 +43,9 @@ end
 let () =
   let to_string = id M_value_abstr.to_string in
   let #(thirty, bar) = id M_value_abstr.unboxed_tuple in
+  print_endline "Expected: foo bar baz 10 20 30";
   Printf.printf
-    "%s %s %s %d %d %d\n"
+    "Actual:   %s %s %s %d %d %d\n\n"
     (to_string (id M_value_abstr.x))
     (to_string bar)
     (id M_value_abstr.boxed_string)
@@ -67,8 +69,9 @@ end
 
 let () =
   let #(thirty, bar) = id M_value.unboxed_tuple in
+  print_endline "Expected: foo bar baz 10 20 30";
   Printf.printf
-    "%s %s %s %d %d %d\n"
+    "Actual:   %s %s %s %d %d %d\n\n"
     (id M_value.x)
     bar
     (id M_value.boxed_string)
@@ -104,8 +107,9 @@ end
 let () =
   let to_int = id M_unboxed_abstr.to_int in
   let #(foo, seventy) = id M_unboxed_abstr.unboxed_tuple in
+  print_endline "Expected: foo bar 50 60 40 70";
   Printf.printf
-    "%s %s %d %d %d %d\n"
+    "Actual:   %s %s %d %d %d %d\n\n"
     foo
     (id M_unboxed_abstr.boxed_string)
     (id M_unboxed_abstr.boxed_number)
@@ -130,8 +134,9 @@ end
 let () =
   let to_int = id M_unboxed.to_int in
   let #(foo, seventy) = id M_unboxed.unboxed_tuple in
+  print_endline "Expected: foo bar 50 60 40 70";
   Printf.printf
-    "%s %s %d %d %d %d\n"
+    "Actual:   %s %s %d %d %d %d\n\n"
     foo
     (id M_unboxed.boxed_string)
     (id M_unboxed.boxed_number)
@@ -162,8 +167,9 @@ end
 
 let () =
   let #(bar, _void_val, ninety) = id M_void_abstr.unboxed_tuple in
+  print_endline "Expected: foo bar 80 90";
   Printf.printf
-    "%s %s %d %d\n"
+    "Actual:   %s %s %d %d\n\n"
     (id M_void_abstr.boxed_string)
     bar
     (Int64_u.to_int (id M_void_abstr.unboxed_number))
@@ -183,8 +189,9 @@ end
 
 let () =
   let #(bar, _void_val, ninety) = id M_void.unboxed_tuple in
+  print_endline "Expected: foo bar 80 90";
   Printf.printf
-    "%s %s %d %d\n"
+    "Actual:   %s %s %d %d\n"
     (id M_void.boxed_string)
     bar
     (Int64_u.to_int (id M_void.unboxed_number))

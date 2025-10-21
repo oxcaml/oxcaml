@@ -10,9 +10,10 @@
 *)
 
 open Stdlib_upstream_compatible
-external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
-let _ = print_endline "Test: no coercion in or out"
+external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
+
+let () = print_endline "Test: no coercion in or out"
 
 module type Number = sig
   val as_float_u : float#
@@ -31,12 +32,15 @@ end
 
 module Two = Incr (One)
 
-let _ = print_float (Float_u.to_float (id Two.as_float_u))
-let _ = print_endline ""
-let _ = print_endline (id Two.as_string)
+let () =
+  print_endline "Expected: 2.0 1+1";
+  Printf.printf
+    "Actual:   %.1f %s\n\n"
+    (Float_u.to_float (id Two.as_float_u))
+    (id Two.as_string)
+;;
 
-
-let _ = print_endline "Test: coercion in, no coercion out"
+let () = print_endline "Test: coercion in, no coercion out"
 
 module Ten = struct
   let as_int = 10
@@ -47,12 +51,15 @@ end
 
 module Eleven = Incr (Ten)
 
-let _ = print_float (Float_u.to_float (id Eleven.as_float_u))
-let _ = print_endline ""
-let _ = print_endline (id Eleven.as_string)
+let () =
+  print_endline "Expected: 11.0 10+1";
+  Printf.printf
+    "Actual:   %.1f %s\n\n"
+    (Float_u.to_float (id Eleven.as_float_u))
+    (id Eleven.as_string)
+;;
 
-
-let _ = print_endline "Test: coercion out, no coercion in"
+let () = print_endline "Test: coercion out, no coercion in"
 
 module Double (M : Number) : Number = struct
   let undoubled_float = M.as_float_u
@@ -60,14 +67,17 @@ module Double (M : Number) : Number = struct
   let as_float_u = Float_u.add undoubled_float undoubled_float
 end
 
-module Four = Double(Two)
+module Four = Double (Two)
 
-let _ = print_float (Float_u.to_float (id Four.as_float_u))
-let _ = print_endline ""
-let _ = print_endline (id Four.as_string)
+let () =
+  print_endline "Expected: 4.0 (1+1)*2";
+  Printf.printf
+    "Actual:   %.1f %s\n\n"
+    (Float_u.to_float (id Four.as_float_u))
+    (id Four.as_string)
+;;
 
-
-let _ = print_endline "Test: coercion in and out"
+let () = print_endline "Test: coercion in and out"
 
 module Three = struct
   let as_int = 3
@@ -78,12 +88,15 @@ end
 
 module Six = Double (Three)
 
-let _ = print_float (Float_u.to_float (id Six.as_float_u))
-let _ = print_endline ""
-let _ = print_endline (id Six.as_string)
+let () =
+  print_endline "Expected: 6.0 (3)*2";
+  Printf.printf
+    "Actual:   %.1f %s\n\n"
+    (Float_u.to_float (id Six.as_float_u))
+    (id Six.as_string)
+;;
 
-
-let _ = print_endline "Test: generative functor"
+let () = print_endline "Test: generative functor"
 
 module type Counting_sig = sig
   val boxed_one : float
@@ -103,8 +116,88 @@ end
 
 module Counting = MakeCounting ()
 
-let _ =
-  print_float (Float_u.to_float (id Counting.unboxed_one));
-  print_endline "";
-  print_float (Float_u.to_float (id Counting.unboxed_two));
-  print_endline ""
+let () =
+  print_endline "Expected: 1.0 2.0";
+  Printf.printf
+    "Actual:   %.1f %.1f\n\n"
+    (Float_u.to_float (id Counting.unboxed_one))
+    (Float_u.to_float (id Counting.unboxed_two))
+;;
+
+let () = print_endline "Test: functor with mixed products"
+
+module type With_products = sig
+  val simple_product : #(float# * string)
+  val nested_product : #(int64# * #(string * float#))
+  val regular_val : int
+end
+
+module Add_to_products (M : With_products) : With_products = struct
+  let simple_product =
+    let #(f, s) = M.simple_product in
+    #(Float_u.add f #10.0, s ^ "+10")
+  ;;
+
+  let nested_product =
+    let #(i, #(s, f)) = M.nested_product in
+    #(Int64_u.add i #5L, #(s ^ "+5", Float_u.add f #5.0))
+  ;;
+
+  let regular_val = M.regular_val + 1
+end
+
+module Base_products = struct
+  let simple_product = #(#1.5, "1.5")
+  let nested_product = #(#10L, #("ten", #20.0))
+  let regular_val = 100
+end
+
+module Augmented = Add_to_products (Base_products)
+
+let () =
+  let #(f, s) = id Augmented.simple_product in
+  let #(i, #(s2, f2)) = id Augmented.nested_product in
+  print_endline "Expected: 11.5 1.5+10 15 ten+5 25.0 101";
+  Printf.printf
+    "Actual:   %.1f %s %d %s %.1f %d\n\n"
+    (Float_u.to_float f)
+    s
+    (Int64_u.to_int i)
+    s2
+    (Float_u.to_float f2)
+    (id Augmented.regular_val)
+;;
+
+let () = print_endline "Test: functor with void"
+
+type void : void
+
+external void : unit -> void = "%unbox_unit"
+
+module type With_void = sig
+  val void_val : void
+  val float_val : float#
+  val string_val : string
+end
+
+module Transform_with_void (M : With_void) : With_void = struct
+  let void_val = M.void_val
+  let float_val = Float_u.mul M.float_val #2.0
+  let string_val = M.string_val ^ " *2"
+end
+
+module Void_base = struct
+  let string_val = "base"
+  let void_val = void ()
+  let float_val = #3.0
+end
+
+module Void_transformed = Transform_with_void (Void_base)
+
+let () =
+  print_endline "Expected: 6.0 base *2";
+  Printf.printf
+    "Actual:   %.1f %s\n"
+    (Float_u.to_float (id Void_transformed.float_val))
+    (id Void_transformed.string_val)
+;;

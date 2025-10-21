@@ -103,8 +103,12 @@ module MakeEvalPrinter (E: EVAL_BASE) = struct
   let rec eval_address = function
     | Env.Aunit cu -> E.eval_compilation_unit cu
     | Env.Alocal id -> E.eval_ident id
-    | Env.Adot(p, _, pos) -> Obj.field (eval_address p) pos
-      (* CR layouts v5: This is not correct if the fields have been reordered *)
+    | Env.Adot(p, module_repr, pos) ->
+      let module_repr = Lambda.transl_module_representation module_repr in
+      match module_repr with
+      | Module_value_only _ -> Obj.field (eval_address p) pos
+      | Module_mixed _ ->
+        Misc.fatal_error "Topcommon.eval_address: Can't handle mixed module"
 
   let eval_path find env path =
     match find path env with
