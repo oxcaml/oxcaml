@@ -8,7 +8,8 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 jobs:
-  build:
+  check:
+    name: ${{ runner.os }} ${{ runner.arch }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
