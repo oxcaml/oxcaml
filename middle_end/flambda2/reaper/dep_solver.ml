@@ -91,6 +91,8 @@ type result =
 
 let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
 
+let ( % ) tbl xs = Datalog.atom tbl xs
+
 module Syntax = struct
   include Datalog
 
@@ -121,21 +123,23 @@ module Cols = struct
   let cf = Cofield.datalog_column_id
 end
 
+let nrel name schema = Datalog.create_relation ~provenance:false ~name schema
+
 let rel1_r ?provenance name schema =
-  let r = Datalog.create_relation ?provenance ~name schema in
-  r, fun x -> Datalog.atom r [x]
+  let tbl = Datalog.create_relation ?provenance ~name schema in
+  tbl, fun x -> tbl % [x]
 
 let rel1 ?provenance name schema = snd (rel1_r ?provenance name schema)
 
 let rel2_r ?provenance name schema =
-  let r = Datalog.create_relation ?provenance ~name schema in
-  r, fun x y -> Datalog.atom r [x; y]
+  let tbl = Datalog.create_relation ?provenance ~name schema in
+  tbl, fun x y -> tbl % [x; y]
 
 let rel2 ?provenance name schema = snd (rel2_r ?provenance name schema)
 
 let rel3 ?provenance name schema =
-  let r = Datalog.create_relation ?provenance ~name schema in
-  fun x y z -> Datalog.atom r [x; y; z]
+  let tbl = Datalog.create_relation ?provenance ~name schema in
+  fun x y z -> tbl % [x; y; z]
 
 (**
    [usages] and [sources] are dual. They build the same relation
@@ -219,33 +223,30 @@ let cofield_sources_rel = rel3 "cofield_sources" Cols.[n; cf; n]
 
 let cofield_usages_rel = rel3 "cofield_usages" Cols.[n; cf; n]
 
-let rev_alias_rel = rel2 ~provenance:false "rev_alias" Cols.[n; n]
+(* Reverse relations *)
+let rev_alias_rel =
+  let tbl = nrel "rev_alias" Cols.[n; n] in
+  fun ~from ~to_ -> tbl % [from; to_]
 
-let rev_alias_rel ~from ~to_ = rev_alias_rel from to_
+let rev_use_rel =
+  let tbl = nrel "rev_use" Cols.[n; n] in
+  fun ~from ~to_ -> tbl % [from; to_]
 
-let rev_use_rel = rel2 ~provenance:false "rev_use" Cols.[n; n]
+let rev_constructor_rel =
+  let tbl = nrel "rev_constructor" Cols.[n; f; n] in
+  fun ~from relation ~base -> tbl % [from; relation; base]
 
-let rev_use_rel ~from ~to_ = rev_use_rel from to_
-
-let rev_constructor_rel = rel3 ~provenance:false "rev_constructor" Cols.[n; f; n]
-
-let rev_constructor_rel ~from ~relation ~base =
-  rev_constructor_rel from relation base
-
-let rev_accessor_rel = rel3 ~provenance:false "rev_accessor" Cols.[n; f; n]
-
-let rev_accessor_rel ~base ~relation ~to_ = rev_accessor_rel base relation to_
-
-let rev_coaccessor_rel = rel3 ~provenance:false "rev_coaccessor" Cols.[n; cf; n]
-
-let rev_coaccessor_rel ~base ~relation ~to_ =
-  rev_coaccessor_rel base relation to_
+let rev_accessor_rel =
+  let tbl = nrel "rev_accessor" Cols.[n; f; n] in
+  fun ~base relation ~to_ -> tbl % [base; relation; to_]
 
 let rev_coconstructor_rel =
-  rel3 ~provenance:false "rev_coconstructor" Cols.[n; cf; n]
+  let tbl = nrel "rev_coconstructor" Cols.[n; cf; n] in
+  fun ~from relation ~base -> tbl % [from; relation; base]
 
-let rev_coconstructor_rel ~from ~relation ~base =
-  rev_coconstructor_rel from relation base
+let rev_coaccessor_rel =
+  let tbl = nrel "rev_coaccessor" Cols.[n; cf; n] in
+  fun ~base relation ~to_ -> tbl % [base; relation; to_]
 
 (* The program is abstracted as a series of relations concerning the reading and
    writing of fields of values.
@@ -327,23 +328,22 @@ let datalog_schedule =
   in
   let rev_accessor =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [accessor_rel ~to_ ~relation ~base]
-    ==> rev_accessor_rel ~base ~relation ~to_
+    [accessor_rel ~to_ relation ~base] ==> rev_accessor_rel ~base relation ~to_
   in
   let rev_constructor =
     let$ [base; relation; from] = ["base"; "relation"; "from"] in
-    [constructor_rel ~base ~relation ~from]
-    ==> rev_constructor_rel ~from ~relation ~base
+    [constructor_rel ~base relation ~from]
+    ==> rev_constructor_rel ~from relation ~base
   in
   let rev_coaccessor =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [coaccessor_rel ~to_ ~relation ~base]
-    ==> rev_coaccessor_rel ~base ~relation ~to_
+    [coaccessor_rel ~to_ relation ~base]
+    ==> rev_coaccessor_rel ~base relation ~to_
   in
   let rev_coconstructor =
     let$ [base; relation; from] = ["base"; "relation"; "from"] in
-    [coconstructor_rel ~base ~relation ~from]
-    ==> rev_coconstructor_rel ~from ~relation ~base
+    [coconstructor_rel ~base relation ~from]
+    ==> rev_coconstructor_rel ~from relation ~base
   in
   (* propagate
 
@@ -400,14 +400,14 @@ let datalog_schedule =
   let usages_accessor_1 =
     let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
     [ not (any_usage_pred base);
-      accessor_rel ~to_ ~relation ~base;
+      accessor_rel ~to_ relation ~base;
       usages_rel to_ _var ]
     ==> usages_rel base base
   in
   let usages_accessor_2 =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
     [ not (any_usage_pred base);
-      accessor_rel ~to_ ~relation ~base;
+      accessor_rel ~to_ relation ~base;
       any_usage_pred to_ ]
     ==> usages_rel base base
   in
@@ -415,14 +415,14 @@ let datalog_schedule =
     let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
     [ not (any_usage_pred base);
       sources_rel to_ _var;
-      coaccessor_rel ~to_ ~relation ~base ]
+      coaccessor_rel ~to_ relation ~base ]
     ==> usages_rel base base
   in
   let usages_coaccessor_2 =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
     [ not (any_usage_pred base);
       any_source_pred to_;
-      coaccessor_rel ~to_ ~relation ~base ]
+      coaccessor_rel ~to_ relation ~base ]
     ==> usages_rel base base
   in
   let usages_alias =
@@ -454,7 +454,7 @@ let datalog_schedule =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
     [ not (any_usage_pred base);
       any_usage_pred to_;
-      accessor_rel ~to_ ~relation ~base;
+      accessor_rel ~to_ relation ~base;
       filter1 is_not_local_field relation ]
     ==> field_usages_top_rel base relation
   in
@@ -462,7 +462,7 @@ let datalog_schedule =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
     [ not (any_usage_pred base);
       any_usage_pred to_;
-      accessor_rel ~to_ ~relation ~base;
+      accessor_rel ~to_ relation ~base;
       filter1 is_local_field relation ]
     ==> field_usages_rel base relation to_
   in
@@ -471,7 +471,7 @@ let datalog_schedule =
     [ not (any_usage_pred base);
       not (any_usage_pred to_);
       not (field_usages_top_rel base relation);
-      accessor_rel ~to_ ~relation ~base;
+      accessor_rel ~to_ relation ~base;
       usages_rel to_ _var ]
     ==> field_usages_rel base relation to_
   in
@@ -487,7 +487,7 @@ let datalog_schedule =
   let cofield_usages_from_coaccessor1 =
     let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
     [ not (any_usage_pred base);
-      coaccessor_rel ~to_ ~relation ~base;
+      coaccessor_rel ~to_ relation ~base;
       sources_rel to_ _var ]
     ==> cofield_usages_rel base relation to_
   in
@@ -495,7 +495,7 @@ let datalog_schedule =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
     [ not (any_usage_pred base);
       any_source_pred to_;
-      coaccessor_rel ~to_ ~relation ~base ]
+      coaccessor_rel ~to_ relation ~base ]
     ==> cofield_usages_rel base relation to_
   in
   (* constructor-usages
@@ -517,7 +517,7 @@ let datalog_schedule =
     [ not (any_usage_pred from);
       not (field_usages_top_rel base_use relation);
       not (any_usage_pred base);
-      constructor_rel ~base ~relation ~from;
+      constructor_rel ~base relation ~from;
       usages_rel base base_use;
       field_usages_rel base_use relation to_ ]
     ==> alias_rel ~to_ ~from
@@ -527,7 +527,7 @@ let datalog_schedule =
       ["base"; "base_use"; "relation"; "from"; "to_"]
     in
     [ filter1 is_local_field relation;
-      constructor_rel ~base ~relation ~from;
+      constructor_rel ~base relation ~from;
       usages_rel base base_use;
       field_usages_rel base_use relation to_ ]
     ==> alias_rel ~to_ ~from
@@ -544,7 +544,7 @@ let datalog_schedule =
     let$ [base; base_use; relation; from] =
       ["base"; "base_use"; "relation"; "from"]
     in
-    [ constructor_rel ~base ~relation ~from;
+    [ constructor_rel ~base relation ~from;
       not (any_usage_pred base);
       usages_rel base base_use;
       field_usages_top_rel base_use relation ]
@@ -564,14 +564,14 @@ let datalog_schedule =
   let any_usage_from_constructor_any_usage =
     let$ [base; relation; from] = ["base"; "relation"; "from"] in
     [ any_usage_pred base;
-      constructor_rel ~base ~relation ~from;
+      constructor_rel ~base relation ~from;
       filter1 is_not_local_field relation ]
     ==> any_usage_pred from
   in
   let escaping_local_field =
     let$ [base; relation; from] = ["base"; "relation"; "from"] in
     [ any_usage_pred base;
-      constructor_rel ~base ~relation ~from;
+      constructor_rel ~base relation ~from;
       filter1 is_local_field relation ]
     ==> and_
           [ escaping_field_rel relation
@@ -579,7 +579,7 @@ let datalog_schedule =
   in
   let any_usage_from_coaccessor_any_source =
     let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
-    [any_source_pred base; rev_coaccessor_rel ~base ~relation ~to_]
+    [any_source_pred base; rev_coaccessor_rel ~base relation ~to_]
     ==> any_usage_pred to_
   in
   (* sources: see explanation on usage
@@ -617,28 +617,28 @@ let datalog_schedule =
     let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
     [ not (any_source_pred base);
       sources_rel from _var;
-      rev_constructor_rel ~from ~relation ~base ]
+      rev_constructor_rel ~from relation ~base ]
     ==> sources_rel base base
   in
   let sources_constructor_2 =
     let$ [from; relation; base] = ["from"; "relation"; "base"] in
     [ not (any_source_pred base);
       any_source_pred from;
-      rev_constructor_rel ~from ~relation ~base ]
+      rev_constructor_rel ~from relation ~base ]
     ==> sources_rel base base
   in
   let sources_coconstructor_1 =
     let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
     [ not (any_source_pred base);
       usages_rel from _var;
-      rev_coconstructor_rel ~from ~relation ~base ]
+      rev_coconstructor_rel ~from relation ~base ]
     ==> sources_rel base base
   in
   let sources_coconstructor_2 =
     let$ [from; relation; base] = ["from"; "relation"; "base"] in
     [ not (any_source_pred base);
       any_usage_pred from;
-      rev_coconstructor_rel ~from ~relation ~base ]
+      rev_coconstructor_rel ~from relation ~base ]
     ==> sources_rel base base
   in
   let sources_alias =
@@ -668,7 +668,7 @@ let datalog_schedule =
     let$ [from; relation; base] = ["from"; "relation"; "base"] in
     [ not (any_source_pred base);
       any_source_pred from;
-      rev_constructor_rel ~from ~relation ~base;
+      rev_constructor_rel ~from relation ~base;
       filter1 is_not_local_field relation ]
     ==> field_sources_top_rel base relation
   in
@@ -676,7 +676,7 @@ let datalog_schedule =
     let$ [from; relation; base] = ["from"; "relation"; "base"] in
     [ not (any_source_pred base);
       any_source_pred from;
-      rev_constructor_rel ~from ~relation ~base;
+      rev_constructor_rel ~from relation ~base;
       filter1 is_local_field relation ]
     ==> field_sources_rel base relation from
   in
@@ -685,7 +685,7 @@ let datalog_schedule =
     [ not (any_source_pred base);
       not (any_source_pred from);
       not (field_sources_top_rel base relation);
-      rev_constructor_rel ~from ~relation ~base;
+      rev_constructor_rel ~from relation ~base;
       sources_rel from _var ]
     ==> field_sources_rel base relation from
   in
@@ -701,7 +701,7 @@ let datalog_schedule =
   let cofield_sources_from_coconstrucor1 =
     let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
     [ not (any_source_pred base);
-      rev_coconstructor_rel ~from ~relation ~base;
+      rev_coconstructor_rel ~from relation ~base;
       usages_rel from _var ]
     ==> cofield_sources_rel base relation from
   in
@@ -709,7 +709,7 @@ let datalog_schedule =
     let$ [from; relation; base] = ["from"; "relation"; "base"] in
     [ not (any_source_pred base);
       any_usage_pred from;
-      rev_coconstructor_rel ~from ~relation ~base ]
+      rev_coconstructor_rel ~from relation ~base ]
     ==> cofield_sources_rel base relation from
   in
   (* coconstructor-uses XXX
@@ -727,7 +727,7 @@ let datalog_schedule =
       ["base"; "base_use"; "relation"; "from"; "to_"]
     in
     [ not (any_usage_pred base);
-      coconstructor_rel ~base ~relation ~from;
+      coconstructor_rel ~base relation ~from;
       usages_rel base base_use;
       cofield_usages_rel base_use relation to_ ]
     ==> alias_rel ~to_:from ~from:to_
@@ -740,7 +740,7 @@ let datalog_schedule =
    *)
   let any_source_from_coconstructor_any_usage =
     let$ [base; relation; from] = ["base"; "relation"; "from"] in
-    [any_usage_pred base; coconstructor_rel ~base ~relation ~from]
+    [any_usage_pred base; coconstructor_rel ~base relation ~from]
     ==> any_source_pred from
   in
   (* accessor-sources
@@ -767,7 +767,7 @@ let datalog_schedule =
     [ not (any_source_pred to_);
       not (field_sources_top_rel base_source relation);
       not (any_source_pred base);
-      rev_accessor_rel ~base ~relation ~to_;
+      rev_accessor_rel ~base relation ~to_;
       sources_rel base base_source;
       field_sources_rel base_source relation from ]
     ==> alias_rel ~to_ ~from
@@ -777,7 +777,7 @@ let datalog_schedule =
       ["base"; "base_source"; "relation"; "to_"; "from"]
     in
     [ filter1 is_local_field relation;
-      rev_accessor_rel ~base ~relation ~to_;
+      rev_accessor_rel ~base relation ~to_;
       sources_rel base base_source;
       field_sources_rel base_source relation from ]
     ==> alias_rel ~to_ ~from
@@ -786,7 +786,7 @@ let datalog_schedule =
     let$ [base; base_source; relation; to_] =
       ["base"; "base_source"; "relation"; "to_"]
     in
-    [ rev_accessor_rel ~base ~relation ~to_;
+    [ rev_accessor_rel ~base relation ~to_;
       not (any_source_pred base);
       sources_rel base base_source;
       field_sources_top_rel base_source relation ]
@@ -801,14 +801,14 @@ let datalog_schedule =
   let any_source_from_accessor_any_source =
     let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
     [ any_source_pred base;
-      rev_accessor_rel ~base ~relation ~to_;
+      rev_accessor_rel ~base relation ~to_;
       filter1 is_not_local_field relation ]
     ==> any_source_pred to_
   in
   let reading_local_field =
     let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
     [ any_source_pred base;
-      rev_accessor_rel ~base ~relation ~to_;
+      rev_accessor_rel ~base relation ~to_;
       filter1 is_local_field relation ]
     ==> and_
           [ reading_field_rel relation
@@ -833,7 +833,7 @@ let datalog_schedule =
       ["base"; "base_source"; "relation"; "to_"; "from"]
     in
     [ not (any_source_pred base);
-      rev_coaccessor_rel ~base ~relation ~to_;
+      rev_coaccessor_rel ~base relation ~to_;
       sources_rel base base_source;
       cofield_sources_rel base_source relation from ]
     ==> alias_rel ~to_:from ~from:to_
@@ -1142,11 +1142,11 @@ let get_all_usages :
        in
        [ out x;
          rev_accessor_rel ~base:x
-           ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
+           !!(Field.code_of_closure Known_arity_code_pointer)
            ~to_:apply_witness;
          sources_rel apply_witness call_witness;
          constructor_rel ~base:call_witness
-           ~relation:!!Field.code_id_of_call_witness
+           !!Field.code_id_of_call_witness
            ~from:code_id;
          code_id_my_closure_rel ~code_id ~my_closure:my_closure_of_code_id;
          usages_rel my_closure_of_code_id y ]
@@ -1318,7 +1318,7 @@ let get_set_of_closures_def :
     query
       (let^ [x] = ["x"] in
        let$ [relation; y] = ["relation"; "y"] in
-       [ Global_flow_graph.constructor_rel ~base:x ~relation ~from:y;
+       [ Global_flow_graph.constructor_rel ~base:x relation ~from:y;
          filter1 is_function_slot relation ]
        =>? [relation; y])
   in
@@ -1444,7 +1444,7 @@ let datalog_rules =
     | _ -> true
   in
   ~>[ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
-       [ constructor_rel ~base ~relation ~from;
+       [ constructor_rel ~base relation ~from;
          any_usage_pred base;
          filter1 is_not_local_field relation ]
        ==> and_
@@ -1453,7 +1453,7 @@ let datalog_rules =
       (let$ [base; relation; from; usage] =
          ["base"; "relation"; "from"; "usage"]
        in
-       [ constructor_rel ~base ~relation ~from;
+       [ constructor_rel ~base relation ~from;
          usages_rel base usage;
          field_usages_top_rel usage relation ]
        ==> and_
@@ -1462,14 +1462,14 @@ let datalog_rules =
       (let$ [base; relation; from; usage; v] =
          ["base"; "relation"; "from"; "usage"; "v"]
        in
-       [ constructor_rel ~base ~relation ~from;
+       [ constructor_rel ~base relation ~from;
          usages_rel base usage;
          field_usages_rel usage relation v ]
        ==> and_
              [ field_of_constructor_is_used base relation;
                field_of_constructor_is_used_as base relation v ]);
       (let$ [base; relation; from; x] = ["base"; "relation"; "from"; "x"] in
-       [ constructor_rel ~base ~relation ~from;
+       [ constructor_rel ~base relation ~from;
          any_usage_pred base;
          reading_field_rel relation x;
          any_usage_pred x ]
@@ -1479,7 +1479,7 @@ let datalog_rules =
       (let$ [base; relation; from; x; y] =
          ["base"; "relation"; "from"; "x"; "y"]
        in
-       [ constructor_rel ~base ~relation ~from;
+       [ constructor_rel ~base relation ~from;
          any_usage_pred base;
          reading_field_rel relation x;
          usages_rel x y ]
@@ -1489,11 +1489,11 @@ let datalog_rules =
       (let$ [usage; base; relation; from; v; u] =
          ["usage"; "base"; "relation"; "from"; "v"; "u"]
        in
-       [ constructor_rel ~base ~relation ~from;
+       [ constructor_rel ~base relation ~from;
          sources_rel usage base;
          filter1 is_local_field relation;
          any_usage_pred base;
-         rev_accessor_rel ~base:usage ~relation ~to_:v;
+         rev_accessor_rel ~base:usage relation ~to_:v;
          usages_rel v u ]
        ==> and_
              [ field_of_constructor_is_used base relation;
@@ -1501,12 +1501,12 @@ let datalog_rules =
       (let$ [usage; base; relation; from; v] =
          ["usage"; "base"; "relation"; "from"; "v"]
        in
-       [ constructor_rel ~base ~relation ~from;
+       [ constructor_rel ~base relation ~from;
          sources_rel usage base;
          filter1 is_local_field relation;
          any_usage_pred base;
          (* field_usages_top_rel usage relation *)
-         rev_accessor_rel ~base:usage ~relation ~to_:v;
+         rev_accessor_rel ~base:usage relation ~to_:v;
          any_usage_pred v ]
        ==> and_
              [ field_of_constructor_is_used base relation;
@@ -1533,7 +1533,7 @@ let datalog_rules =
        [ any_usage_pred x;
          filter1 is_not_local_field field;
          filter1 real_field field;
-         constructor_rel ~base:x ~relation:field ~from:y ]
+         constructor_rel ~base:x field ~from:y ]
        ==> cannot_change_representation0 x);
       (* If a block with a local field escapes, and that field is read again
          from an [any_source] value, prevent changing the representation. This
@@ -1543,7 +1543,7 @@ let datalog_rules =
        [ any_usage_pred x;
          filter1 is_local_field field;
          reading_field_rel field z;
-         constructor_rel ~base:x ~relation:field ~from:y ]
+         constructor_rel ~base:x field ~from:y ]
        ==> cannot_change_representation0 x);
       (* Likewise, if a block with a local field escapes, and that field is read
          again from a value with several sources, prevent changing the
@@ -1622,7 +1622,7 @@ let datalog_rules =
        ==> cannot_change_representation0 allocation_id);
       (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
        [ constructor_rel ~base:call_witness
-           ~relation:!!Field.code_id_of_call_witness
+           !!Field.code_id_of_call_witness
            ~from:code_id ]
        ==> cannot_change_representation0 call_witness);
       (* Note this rule is here to still allow changing the calling convention
@@ -1675,14 +1675,14 @@ let datalog_rules =
          [cannot_change_witness_calling_convention] should no longer be used. *)
       (let$ [call_witness; code_id; _v] = ["call_witness"; "code_id"; "_v"] in
        [ constructor_rel ~base:call_witness
-           ~relation:!!Field.code_id_of_call_witness
+           !!Field.code_id_of_call_witness
            ~from:code_id;
          usages_rel call_witness _v;
          cannot_change_witness_calling_convention call_witness ]
        ==> cannot_change_calling_convention code_id);
       (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
        [ constructor_rel ~base:call_witness
-           ~relation:!!Field.code_id_of_call_witness
+           !!Field.code_id_of_call_witness
            ~from:code_id;
          any_usage_pred call_witness;
          cannot_change_witness_calling_convention call_witness ]
@@ -1696,22 +1696,22 @@ let datalog_rules =
          ["call_witness"; "codeid"; "set_of_closures"]
        in
        [ rev_constructor_rel ~from:call_witness
-           ~relation:!!(Field.code_of_closure Unknown_arity_code_pointer)
+           !!(Field.code_of_closure Unknown_arity_code_pointer)
            ~base:set_of_closures;
          any_usage_pred call_witness;
          constructor_rel ~base:call_witness
-           ~relation:!!Field.code_id_of_call_witness
+           !!Field.code_id_of_call_witness
            ~from:codeid ]
        ==> cannot_change_calling_convention codeid);
       (let$ [call_witness; codeid; set_of_closures; _v] =
          ["call_witness"; "codeid"; "set_of_closures"; "_v"]
        in
        [ rev_constructor_rel ~from:call_witness
-           ~relation:!!(Field.code_of_closure Unknown_arity_code_pointer)
+           !!(Field.code_of_closure Unknown_arity_code_pointer)
            ~base:set_of_closures;
          usages_rel call_witness _v;
          constructor_rel ~base:call_witness
-           ~relation:!!Field.code_id_of_call_witness
+           !!Field.code_id_of_call_witness
            ~from:codeid ]
        ==> cannot_change_calling_convention codeid);
       (* CR-someday ncourant: we completely prevent changing the representation
@@ -1735,7 +1735,7 @@ let datalog_rules =
       (let$ [x] = ["x"] in
        [cannot_change_representation0 x] ==> cannot_change_representation1 x);
       (let$ [x; field; y] = ["x"; "field"; "y"] in
-       [ constructor_rel ~base:x ~relation:field ~from:y;
+       [ constructor_rel ~base:x field ~from:y;
          filter1 is_function_slot field;
          cannot_change_representation0 x ]
        ==> cannot_change_representation1 y);
@@ -1745,7 +1745,7 @@ let datalog_rules =
          account for now, blocks cannot have their representation changed, so we
          prevent it here. *)
       (let$ [x; field; y] = ["x"; "field"; "y"] in
-       [ constructor_rel ~base:x ~relation:field ~from:y;
+       [ constructor_rel ~base:x field ~from:y;
          filter1
            (fun f ->
              match Field.view f with
@@ -1774,10 +1774,10 @@ let datalog_rules =
          closures if their calling convention cannot be changed. *)
       (let$ [x; call_witness; codeid] = ["x"; "call_witness"; "codeid"] in
        [ constructor_rel ~base:x
-           ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
+           !!(Field.code_of_closure Known_arity_code_pointer)
            ~from:call_witness;
          constructor_rel ~base:call_witness
-           ~relation:!!Field.code_id_of_call_witness
+           !!Field.code_id_of_call_witness
            ~from:codeid;
          cannot_change_calling_convention codeid ]
        ==> cannot_unbox0 x);
@@ -1787,7 +1787,7 @@ let datalog_rules =
          ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
        in
        [ sources_rel alias allocation_id;
-         rev_constructor_rel ~from:alias ~relation ~base:call_witness;
+         rev_constructor_rel ~from:alias relation ~base:call_witness;
          filter1
            (fun f ->
              match[@ocaml.warning "-4"] Field.view f with
@@ -1795,7 +1795,7 @@ let datalog_rules =
              | _ -> false)
            relation;
          constructor_rel ~base:call_witness
-           ~relation:!!Field.code_id_of_call_witness
+           !!Field.code_id_of_call_witness
            ~from:codeid;
          cannot_change_calling_convention codeid ]
        ==> cannot_unbox0 allocation_id);
@@ -1810,9 +1810,9 @@ let datalog_rules =
          ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
        in
        [ sources_rel alias allocation_id;
-         rev_coconstructor_rel ~from:alias ~relation ~base:call_witness;
+         rev_coconstructor_rel ~from:alias relation ~base:call_witness;
          constructor_rel ~base:call_witness
-           ~relation:!!Field.code_id_of_call_witness
+           !!Field.code_id_of_call_witness
            ~from:codeid;
          cannot_change_calling_convention codeid ]
        ==> cannot_unbox0 allocation_id);
@@ -1833,7 +1833,7 @@ let datalog_rules =
          ["alias"; "allocation_id"; "relation"; "to_"]
        in
        [ sources_rel alias allocation_id;
-         rev_constructor_rel ~from:alias ~relation ~base:to_;
+         rev_constructor_rel ~from:alias relation ~base:to_;
          field_of_constructor_is_used to_ relation;
          cannot_change_representation to_;
          cannot_unbox0 to_ ]
@@ -1844,7 +1844,7 @@ let datalog_rules =
        [cannot_unbox0 x] ==> cannot_unbox x);
       (let$ [x; field; y] = ["x"; "field"; "y"] in
        [ cannot_unbox0 x;
-         constructor_rel ~base:x ~relation:field ~from:y;
+         constructor_rel ~base:x field ~from:y;
          filter1 is_function_slot field ]
        ==> cannot_unbox y);
       (* Compute allocations to unbox or to change representation. This requires
@@ -2109,13 +2109,11 @@ module Rewriter = struct
                "all_closures" ]
            in
            [ in_ code_id;
-             rev_constructor_rel ~from:code_id ~relation:code_id_of_witness
-               ~base:witness;
+             rev_constructor_rel ~from:code_id code_id_of_witness ~base:witness;
              rev_constructor_rel ~from:witness
-               ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
+               !!(Field.code_of_closure Known_arity_code_pointer)
                ~base:closure;
-             rev_constructor_rel ~from:closure ~relation:function_slot
-               ~base:all_closures;
+             rev_constructor_rel ~from:closure function_slot ~base:all_closures;
              filter1 is_function_slot function_slot ]
            ==> out closure all_closures) ]
     in
@@ -3321,7 +3319,7 @@ let unknown_code_id_actually_directly_called_query =
   mk_exists_query ["set_of_closures"] ["known_arity_call_witness"]
     (fun [set_of_closures] [known_arity_call_witness] ->
       [ rev_accessor_rel ~base:set_of_closures
-          ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
+          !!(Field.code_of_closure Known_arity_code_pointer)
           ~to_:known_arity_call_witness;
         any_source_pred known_arity_call_witness ])
 
@@ -3334,11 +3332,11 @@ let code_id_actually_directly_called_query =
        ["apply_widget"; "call_withness"; "codeid"]
      in
      [ rev_accessor_rel ~base:set_of_closures
-         ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
+         !!(Field.code_of_closure Known_arity_code_pointer)
          ~to_:apply_widget;
        sources_rel apply_widget call_witness;
        constructor_rel ~base:call_witness
-         ~relation:!!Field.code_id_of_call_witness
+         !!Field.code_id_of_call_witness
          ~from:codeid ]
      =>? [codeid])
 

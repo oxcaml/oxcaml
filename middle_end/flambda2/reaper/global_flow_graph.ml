@@ -111,16 +111,16 @@ let alias_rel ~to_ ~from = Datalog.atom alias_rel [to_; from]
 
 let use_rel ~to_ ~from = Datalog.atom use_rel [to_; from]
 
-let accessor_rel ~to_ ~relation ~base =
+let accessor_rel ~to_ relation ~base =
   Datalog.atom accessor_rel [to_; relation; base]
 
-let constructor_rel ~base ~relation ~from =
+let constructor_rel ~base relation ~from =
   Datalog.atom constructor_rel [base; relation; from]
 
-let coaccessor_rel ~to_ ~relation ~base =
+let coaccessor_rel ~to_ relation ~base =
   Datalog.atom coaccessor_rel [to_; relation; base]
 
-let coconstructor_rel ~base ~relation ~from =
+let coconstructor_rel ~base relation ~from =
   Datalog.atom coconstructor_rel [base; relation; from]
 
 let propagate_rel ~if_used ~to_ ~from =
