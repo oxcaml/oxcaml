@@ -57,7 +57,11 @@ module Modes = struct
       let loc = Location.merge ~ghost:false (List.map (fun m -> m.loc) core_modes) in
       mk ~loc core_modes []
 
-  let append mode mode' =
+  (* NOTE: this function will merge the locations of the provided modes.
+     this could lead to poor error reporting if the modes come from vastly
+     different places in the source code. this is mostly used to combine
+     legacy mode annotations with new mode annotations *)
+  let merge mode mode' =
     match mode, mode' with
     | No_modes, mode' -> mode'
     | mode, No_modes -> mode
@@ -80,7 +84,9 @@ module Modalities = struct
       let loc = Location.merge ~ghost:false (List.map (fun m -> m.loc) core_modalities) in
       mk ~loc core_modalities []
 
-    let append moda moda' =
+  (* NOTE: like [Modes.merge], this function will merge the locations
+     of the provided modalities and should be used with caution. *)
+  let merge moda moda' =
     match moda, moda' with
     | No_modalities, _ -> moda'
     | _, No_modalities -> moda

@@ -59,14 +59,14 @@ end
 module Modes : sig
   val mk : ?loc:loc -> core_modes -> crossings -> modes
 
-  val append : modes -> modes -> modes
+  val merge : modes -> modes -> modes
   val of_core_modes : core_modes -> modes
 end
 
 module Modalities : sig
   val mk : ?loc:loc -> core_modalities -> crossings -> modalities
 
-  val append : modalities -> modalities -> modalities
+  val merge : modalities -> modalities -> modalities
   val of_core_modalities : core_modalities -> modalities
 end
 
