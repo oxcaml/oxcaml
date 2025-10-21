@@ -98,11 +98,19 @@ module Syntax = struct
     let@ xs = variables xs in
     f xs
 
+  let ( let^ ) ps f =
+    let@ ps = parameters ps in
+    f ps
+
   let ( ==> ) h c = where h (deduce c)
 
   let ( =>? ) h l = where h (yield l)
 
   let ( !! ) = Term.constant
+
+  let ( ~! ) = Schedule.saturate
+
+  let ( ~> ) = List.map (fun r -> Schedule.saturate [r])
 end
 
 module Cols = struct
@@ -859,66 +867,63 @@ let datalog_schedule =
     let$ [from; to_] = ["from"; "to_"] in
     [any_source_pred from; rev_use_rel ~from ~to_] ==> any_source_pred to_
   in
-  Datalog.Schedule.(
-    fixpoint
-      [ saturate
-          [ rev_accessor;
-            rev_constructor;
-            rev_coaccessor;
-            rev_coconstructor;
-            rev_use;
-            any_source_use_1;
-            any_source_use_2;
-            alias_from_usage_propagate;
-            any_usage_from_alias_any_usage;
-            any_source_from_alias_any_source;
-            any_usage_from_constructor_any_usage;
-            any_usage_from_coaccessor_any_source;
-            any_usage_from_use_1;
-            any_usage_from_use_2;
-            any_usage_from_accessed_constructor;
-            any_source_from_accessed_constructor;
-            any_source_from_accessor_any_source;
-            any_source_from_coconstructor_any_usage;
-            escaping_local_field;
-            reading_local_field;
-            reading_escaping;
-            rev_alias ];
-        saturate
-          [ alias_from_accessed_constructor_1;
-            alias_from_accessed_constructor_1_local;
-            alias_from_accessed_constructor_2;
-            alias_from_accessed_constructor_2_local;
-            alias_from_coaccessed_coconstructor;
-            alias_from_coaccessed_coconstructor_2;
-            field_usages_from_accessor_field_usages;
-            field_usages_from_accessor_field_usages_top;
-            field_usages_from_accessor_field_usages_top_local;
-            cofield_usages_from_coaccessor1;
-            cofield_usages_from_coaccessor2;
-            field_sources_from_constructor_field_sources;
-            field_sources_from_constructor_field_sources_top;
-            field_sources_from_constructor_field_sources_top_local;
-            cofield_sources_from_coconstrucor1;
-            cofield_sources_from_coconstrucor2;
-            usages_accessor_1;
-            usages_accessor_2;
-            usages_coaccessor_1;
-            usages_coaccessor_2;
-            usages_alias;
-            sources_constructor_1;
-            sources_constructor_2;
-            sources_coconstructor_1;
-            sources_coconstructor_2;
-            sources_alias;
-            rev_alias ] ])
+  Schedule.fixpoint
+    [ ~![ rev_accessor;
+          rev_constructor;
+          rev_coaccessor;
+          rev_coconstructor;
+          rev_use;
+          any_source_use_1;
+          any_source_use_2;
+          alias_from_usage_propagate;
+          any_usage_from_alias_any_usage;
+          any_source_from_alias_any_source;
+          any_usage_from_constructor_any_usage;
+          any_usage_from_coaccessor_any_source;
+          any_usage_from_use_1;
+          any_usage_from_use_2;
+          any_usage_from_accessed_constructor;
+          any_source_from_accessed_constructor;
+          any_source_from_accessor_any_source;
+          any_source_from_coconstructor_any_usage;
+          escaping_local_field;
+          reading_local_field;
+          reading_escaping;
+          rev_alias ];
+      ~![ alias_from_accessed_constructor_1;
+          alias_from_accessed_constructor_1_local;
+          alias_from_accessed_constructor_2;
+          alias_from_accessed_constructor_2_local;
+          alias_from_coaccessed_coconstructor;
+          alias_from_coaccessed_coconstructor_2;
+          field_usages_from_accessor_field_usages;
+          field_usages_from_accessor_field_usages_top;
+          field_usages_from_accessor_field_usages_top_local;
+          cofield_usages_from_coaccessor1;
+          cofield_usages_from_coaccessor2;
+          field_sources_from_constructor_field_sources;
+          field_sources_from_constructor_field_sources_top;
+          field_sources_from_constructor_field_sources_top_local;
+          cofield_sources_from_coconstrucor1;
+          cofield_sources_from_coconstrucor2;
+          usages_accessor_1;
+          usages_accessor_2;
+          usages_coaccessor_1;
+          usages_coaccessor_2;
+          usages_alias;
+          sources_constructor_1;
+          sources_constructor_2;
+          sources_coconstructor_1;
+          sources_coconstructor_2;
+          sources_alias;
+          rev_alias ] ]
 
 let mk_exists_query params existentials f =
   let open Syntax in
   let q =
     query
-      (let@ params = parameters params in
-       let@ existentials = variables existentials in
+      (let^ params = params in
+       let$ existentials = existentials in
        f params existentials =>? [])
   in
   fun params db ->
@@ -993,15 +998,18 @@ let get_all_usages :
         usages_rel y z ]
       ==> out z )
   in
+  let schedule_follow = ~![base; for_closures; function_slots] in
+  let schedule_no_follow = ~![base; function_slots] in
   fun ~follow_known_arity_calls db s ->
-    let db = Datalog.set_table in_tbl s db in
-    let rs =
-      if follow_known_arity_calls
-      then [base; for_closures; function_slots]
-      else [base; function_slots]
+    let db = set_table in_tbl s db in
+    let db =
+      Schedule.run
+        (if follow_known_arity_calls
+        then schedule_follow
+        else schedule_no_follow)
+        db
     in
-    let db = Datalog.Schedule.run (Datalog.Schedule.saturate rs) db in
-    Usages (Datalog.get_table out_tbl db)
+    Usages (get_table out_tbl db)
 
 let get_direct_usages :
     Datalog.database -> unit Code_id_or_name.Map.t -> unit Code_id_or_name.Map.t
@@ -1013,13 +1021,13 @@ let get_direct_usages :
   let open! Syntax in
   let open! Global_flow_graph in
   let r =
-    let$ [x; y] = ["x"; "y"] in
-    [in_ x; usages_rel x y] ==> out y
+    ~![ (let$ [x; y] = ["x"; "y"] in
+         [in_ x; usages_rel x y] ==> out y) ]
   in
   fun db s ->
-    let db = Datalog.set_table in_tbl s db in
-    let db = Datalog.Schedule.run (Datalog.Schedule.saturate [r]) db in
-    Datalog.get_table out_tbl db
+    let db = set_table in_tbl s db in
+    let db = Schedule.run r db in
+    get_table out_tbl db
 
 type field_usage =
   | Used_as_top
@@ -1042,19 +1050,17 @@ let get_one_field : Datalog.database -> Field.t -> usages -> field_usage =
         [in_ x; field_usages_top_rel x field])
   in
   let r =
-    let$ [x; field; y] = ["x"; "field"; "y"] in
-    [in_ x; field_usages_rel x field y; in_field field] ==> out y
+    ~![ (let$ [x; field; y] = ["x"; "field"; "y"] in
+         [in_ x; field_usages_rel x field y; in_field field] ==> out y) ]
   in
   fun db field (Usages s) ->
-    let db = Datalog.set_table in_tbl s db in
+    let db = set_table in_tbl s db in
     if q [field] db
     then Used_as_top
     else
-      let db =
-        Datalog.set_table in_field_tbl (Field.Map.singleton field ()) db
-      in
-      let db = Datalog.Schedule.(run (saturate [r]) db) in
-      Used_as_vars (Datalog.get_table out_tbl db)
+      let db = set_table in_field_tbl (Field.Map.singleton field ()) db in
+      let db = Schedule.run r db in
+      Used_as_vars (get_table out_tbl db)
 
 let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
   (* CR-someday ncourant: likewise here; I find this function particulartly
@@ -1065,25 +1071,21 @@ let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
   let open! Syntax in
   let open! Global_flow_graph in
   let rs =
-    [ (let$ [x; field] = ["x"; "field"] in
-       [ in_ x;
-         field_usages_top_rel x field;
-         filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
-       ==> out1 field);
-      (let$ [x; field; y] = ["x"; "field"; "y"] in
-       [ in_ x;
-         field_usages_rel x field y;
-         not (out1 field);
-         filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
-       ==> out2 field y) ]
+    ~>[ (let$ [x; field] = ["x"; "field"] in
+         [ in_ x;
+           field_usages_top_rel x field;
+           filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+         ==> out1 field);
+        (let$ [x; field; y] = ["x"; "field"; "y"] in
+         [ in_ x;
+           field_usages_rel x field y;
+           not (out1 field);
+           filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+         ==> out2 field y) ]
   in
   fun db (Usages s) ->
-    let db = Datalog.set_table in_tbl s db in
-    let db =
-      List.fold_left
-        (fun db r -> Datalog.Schedule.(run (saturate [r])) db)
-        db rs
-    in
+    let db = set_table in_tbl s db in
+    let db = List.fold_left (fun db r -> Schedule.run r db) db rs in
     Field.Map.merge
       (fun k x y ->
         match x, y with
@@ -1092,8 +1094,7 @@ let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
           Misc.fatal_errorf "Got two results for field %a" Field.print k
         | Some (), None -> Some Used_as_top
         | None, Some m -> Some (Used_as_vars m))
-      (Datalog.get_table out_tbl1 db)
-      (Datalog.get_table out_tbl2 db)
+      (get_table out_tbl1 db) (get_table out_tbl2 db)
 
 let field_of_constructor_is_used =
   rel2 "field_of_constructor_is_used" Cols.[n; f]
@@ -1114,25 +1115,21 @@ let get_fields_usage_of_constructors :
   let open! Syntax in
   let open! Global_flow_graph in
   let rs =
-    [ (let$ [x; field] = ["x"; "field"] in
-       [ in_ x;
-         field_of_constructor_is_used_top x field;
-         filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
-       ==> out1 field);
-      (let$ [x; field; y] = ["x"; "field"; "y"] in
-       [ in_ x;
-         field_of_constructor_is_used_as x field y;
-         not (out1 field);
-         filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
-       ==> out2 field y) ]
+    ~>[ (let$ [x; field] = ["x"; "field"] in
+         [ in_ x;
+           field_of_constructor_is_used_top x field;
+           filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+         ==> out1 field);
+        (let$ [x; field; y] = ["x"; "field"; "y"] in
+         [ in_ x;
+           field_of_constructor_is_used_as x field y;
+           not (out1 field);
+           filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+         ==> out2 field y) ]
   in
   fun db s ->
-    let db = Datalog.set_table in_tbl s db in
-    let db =
-      List.fold_left
-        (fun db r -> Datalog.Schedule.(run (saturate [r])) db)
-        db rs
-    in
+    let db = set_table in_tbl s db in
+    let db = List.fold_left (fun db r -> Schedule.run r db) db rs in
     Field.Map.merge
       (fun k x y ->
         match x, y with
@@ -1141,8 +1138,7 @@ let get_fields_usage_of_constructors :
           Misc.fatal_errorf "Got two results for field %a" Field.print k
         | Some (), None -> Some Used_as_top
         | None, Some m -> Some (Used_as_vars m))
-      (Datalog.get_table out_tbl1 db)
-      (Datalog.get_table out_tbl2 db)
+      (get_table out_tbl1 db) (get_table out_tbl2 db)
 
 type set_of_closures_def =
   | Not_a_set_of_closures
@@ -1153,8 +1149,8 @@ let get_set_of_closures_def :
   let open Syntax in
   let q =
     query
-      (let@ [x] = parameters ["x"] in
-       let@ [relation; y] = variables ["relation"; "y"] in
+      (let^ [x] = ["x"] in
+       let$ [relation; y] = ["relation"; "y"] in
        [ Global_flow_graph.constructor_rel ~base:x ~relation ~from:y;
          filter1 is_function_slot relation ]
        =>? [relation; y])
@@ -1280,431 +1276,435 @@ let datalog_rules =
     | Code_of_closure _ | Apply _ | Code_id_of_call_witness -> false
     | _ -> true
   in
-  [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
-     [ constructor_rel ~base ~relation ~from;
-       any_usage_pred base;
-       filter1 is_not_local_field relation ]
-     ==> and_
-           [ field_of_constructor_is_used base relation;
-             field_of_constructor_is_used_top base relation ]);
-    (let$ [base; relation; from; usage] =
-       ["base"; "relation"; "from"; "usage"]
-     in
-     [ constructor_rel ~base ~relation ~from;
-       usages_rel base usage;
-       field_usages_top_rel usage relation ]
-     ==> and_
-           [ field_of_constructor_is_used base relation;
-             field_of_constructor_is_used_top base relation ]);
-    (let$ [base; relation; from; usage; v] =
-       ["base"; "relation"; "from"; "usage"; "v"]
-     in
-     [ constructor_rel ~base ~relation ~from;
-       usages_rel base usage;
-       field_usages_rel usage relation v ]
-     ==> and_
-           [ field_of_constructor_is_used base relation;
-             field_of_constructor_is_used_as base relation v ]);
-    (let$ [base; relation; from; x] = ["base"; "relation"; "from"; "x"] in
-     [ constructor_rel ~base ~relation ~from;
-       any_usage_pred base;
-       reading_field_rel relation x;
-       any_usage_pred x ]
-     ==> and_
-           [ field_of_constructor_is_used base relation;
-             field_of_constructor_is_used_top base relation ]);
-    (let$ [base; relation; from; x; y] =
-       ["base"; "relation"; "from"; "x"; "y"]
-     in
-     [ constructor_rel ~base ~relation ~from;
-       any_usage_pred base;
-       reading_field_rel relation x;
-       usages_rel x y ]
-     ==> and_
-           [ field_of_constructor_is_used base relation;
-             field_of_constructor_is_used_as base relation x ]);
-    (let$ [usage; base; relation; from; v; u] =
-       ["usage"; "base"; "relation"; "from"; "v"; "u"]
-     in
-     [ constructor_rel ~base ~relation ~from;
-       sources_rel usage base;
-       filter1 is_local_field relation;
-       any_usage_pred base;
-       rev_accessor_rel ~base:usage ~relation ~to_:v;
-       usages_rel v u ]
-     ==> and_
-           [ field_of_constructor_is_used base relation;
-             field_of_constructor_is_used_as base relation v ]);
-    (let$ [usage; base; relation; from; v] =
-       ["usage"; "base"; "relation"; "from"; "v"]
-     in
-     [ constructor_rel ~base ~relation ~from;
-       sources_rel usage base;
-       filter1 is_local_field relation;
-       any_usage_pred base;
-       (* field_usages_top_rel usage relation *)
-       rev_accessor_rel ~base:usage ~relation ~to_:v;
-       any_usage_pred v ]
-     ==> and_
-           [ field_of_constructor_is_used base relation;
-             field_of_constructor_is_used_top base relation ]);
-    (* CR ncourant: this marks any [Apply] field as
-       [field_of_constructor_is_used], as long as the function is called.
-       Shouldn't that be gated behind a [cannot_change_calling_convetion]? *)
-    (* (let$ [base; relation; from; coderel; call_witness] = ["base";
-       "relation"; "from"; "coderel"; "call_witness"] in [ constructor_rel base
-       relation from; filter1 is_apply_field relation; constructor_rel base
-       coderel call_witness; any_usage_pred indirect_call_witness; filter1
-       is_code_field coderel ] ==> field_of_constructor_is_used base
-       relation); *)
-    (* CR ncourant: should this be reenabled? I think this is no longer
-       necessary because we remove unused arguments of continuations, including
-       return continuations. *)
-    (* If any usage is possible, do not change the representation. Note that
-       this rule will change in the future, when local value slots are properly
-       tracked: a closure will only local value slots that has any_use will
-       still be able to have its representation changed. *)
-    (* (let$ [x] = ["x"] in [any_usage_pred x] ==> cannot_change_representation0
-       x); *)
-    (let$ [x; field; y] = ["x"; "field"; "y"] in
-     [ any_usage_pred x;
-       filter1 is_not_local_field field;
-       filter1 real_field field;
-       constructor_rel ~base:x ~relation:field ~from:y ]
-     ==> cannot_change_representation0 x);
-    (* If a block with a local field escapes, and that field is read again from
-       an [any_source] value, prevent changing the representation. This ensures
-       that for a block whose representation is changed, we can know the source
-       at each point. *)
-    (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
-     [ any_usage_pred x;
-       filter1 is_local_field field;
-       reading_field_rel field z;
-       constructor_rel ~base:x ~relation:field ~from:y ]
-     ==> cannot_change_representation0 x);
-    (* Likewise, if a block with a local field escapes, and that field is read
-       again from a value with several sources, prevent changing the
-       representation. *)
-    (let$ [usage; field; source1; source2; _v] =
-       ["usage"; "field"; "source1"; "source2"; "_v"]
-     in
-     [ field_usages_rel usage field _v;
-       filter1 is_local_field field;
-       sources_rel usage source1;
-       sources_rel usage source2;
-       distinct Cols.n source1 source2 ]
-     ==> cannot_change_representation0 source1);
-    (let$ [usage; field; source1; source2] =
-       ["usage"; "field"; "source1"; "source2"]
-     in
-     [ field_usages_top_rel usage field;
-       filter1 is_local_field field;
-       sources_rel usage source1;
-       sources_rel usage source2;
-       distinct Cols.n source1 source2 ]
-     ==> cannot_change_representation0 source1);
-    (* If there exists an alias which has another source, and which uses any
-       real field of our allocation, we cannot change the representation. This
-       currently requires 4 rules due to the absence of disjunction in the
-       datalog engine. *)
-    (let$ [allocation_id; alias; alias_source; field; _v] =
-       ["allocation_id"; "alias"; "alias_source"; "field"; "_v"]
-     in
-     [ usages_rel allocation_id alias;
-       sources_rel alias alias_source;
-       distinct Cols.n alias_source allocation_id;
-       filter1 real_field field;
-       field_usages_rel alias field _v ]
-     ==> cannot_change_representation0 allocation_id);
-    (let$ [allocation_id; alias; alias_source; field] =
-       ["allocation_id"; "alias"; "alias_source"; "field"]
-     in
-     [ usages_rel allocation_id alias;
-       sources_rel alias alias_source;
-       distinct Cols.n alias_source allocation_id;
-       filter1 real_field field;
-       field_usages_top_rel alias field ]
-     ==> cannot_change_representation0 allocation_id);
-    (let$ [allocation_id; alias; field; _v] =
-       ["allocation_id"; "alias"; "field"; "_v"]
-     in
-     [ usages_rel allocation_id alias;
-       any_source_pred alias;
-       filter1 real_field field;
-       field_usages_rel alias field _v ]
-     ==> cannot_change_representation0 allocation_id);
-    (let$ [allocation_id; alias; field] = ["allocation_id"; "alias"; "field"] in
-     [ usages_rel allocation_id alias;
-       any_source_pred alias;
-       filter1 real_field field;
-       field_usages_top_rel alias field ]
-     ==> cannot_change_representation0 allocation_id);
-    (* If the allocation has a source distinct from itself, its representation
-       cannot be changed (in fact, in that case, it shouldn't even be an
-       allocation). *)
-    (let$ [allocation_id; source] = ["allocation_id"; "source"] in
-     [sources_rel allocation_id source; distinct Cols.n source allocation_id]
-     ==> cannot_change_representation0 allocation_id);
-    (* Used but not its own source: either from any source, or it has no source
-       at all and it is dead code. In either case, do not unbox or change the
-       representation. *)
-    (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
-     [ usages_rel allocation_id usage;
-       not (sources_rel allocation_id allocation_id) ]
-     ==> cannot_change_representation0 allocation_id);
-    (let$ [allocation_id] = ["allocation_id"] in
-     [any_source_pred allocation_id]
-     ==> cannot_change_representation0 allocation_id);
-    (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
-     [ constructor_rel ~base:call_witness
-         ~relation:!!Field.code_id_of_call_witness
-         ~from:code_id ]
-     ==> cannot_change_representation0 call_witness);
-    (* Note this rule is here to still allow changing the calling convention of
-       symbols /!\ when adding back the local value slots, there should be a few
-       more rules here *)
-    (* TODO this is wrong: some closures can have their representation changed
-       but not their calling convention *)
-    (let$ [x] = ["x"] in
-     [any_usage_pred x] ==> cannot_change_witness_calling_convention x);
-    (let$ [allocation_id; alias; alias_source; _v] =
-       ["allocation_id"; "alias"; "alias_source"; "_v"]
-     in
-     [ usages_rel allocation_id alias;
-       sources_rel alias alias_source;
-       distinct Cols.n alias_source allocation_id;
-       field_usages_rel alias !!Field.code_id_of_call_witness _v ]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (let$ [allocation_id; alias; alias_source] =
-       ["allocation_id"; "alias"; "alias_source"]
-     in
-     [ usages_rel allocation_id alias;
-       sources_rel alias alias_source;
-       distinct Cols.n alias_source allocation_id;
-       field_usages_top_rel alias !!Field.code_id_of_call_witness ]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (let$ [allocation_id; alias; _v] = ["allocation_id"; "alias"; "_v"] in
-     [ usages_rel allocation_id alias;
-       any_source_pred alias;
-       field_usages_rel alias !!Field.code_id_of_call_witness _v ]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (let$ [allocation_id; alias] = ["allocation_id"; "alias"] in
-     [ usages_rel allocation_id alias;
-       any_source_pred alias;
-       field_usages_top_rel alias !!Field.code_id_of_call_witness ]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (let$ [allocation_id; source] = ["allocation_id"; "source"] in
-     [sources_rel allocation_id source; distinct Cols.n source allocation_id]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (* Used but not its own source: either from any source, or it has no source
-       at all and it is dead code. In either case, do not unbox *)
-    (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
-     [ usages_rel allocation_id usage;
-       not (sources_rel allocation_id allocation_id) ]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (let$ [allocation_id] = ["allocation_id"] in
-     [any_source_pred allocation_id]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (* If the calling convention of a witness cannot be changed, the calling
-       convention of its code_id cannot be either. From now on,
-       [cannot_change_witness_calling_convention] should no longer be used. *)
-    (let$ [call_witness; code_id; _v] = ["call_witness"; "code_id"; "_v"] in
-     [ constructor_rel ~base:call_witness
-         ~relation:!!Field.code_id_of_call_witness
-         ~from:code_id;
-       usages_rel call_witness _v;
-       cannot_change_witness_calling_convention call_witness ]
-     ==> cannot_change_calling_convention code_id);
-    (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
-     [ constructor_rel ~base:call_witness
-         ~relation:!!Field.code_id_of_call_witness
-         ~from:code_id;
-       any_usage_pred call_witness;
-       cannot_change_witness_calling_convention call_witness ]
-     ==> cannot_change_calling_convention code_id);
-    (* CR ncourant: we're preventing changing the calling convention of
-       functions called with Indirect_unknown_arity. We could still allow
-       changing the calling convention, but this would require wrappers for
-       over- and partial applications, as well as untupling. As these wrappers
-       are complex to write correctly, this is not done yet. *)
-    (let$ [call_witness; codeid; set_of_closures] =
-       ["call_witness"; "codeid"; "set_of_closures"]
-     in
-     [ rev_constructor_rel ~from:call_witness
-         ~relation:!!(Field.code_of_closure Unknown_arity_code_pointer)
-         ~base:set_of_closures;
-       any_usage_pred call_witness;
-       constructor_rel ~base:call_witness
-         ~relation:!!Field.code_id_of_call_witness
-         ~from:codeid ]
-     ==> cannot_change_calling_convention codeid);
-    (let$ [call_witness; codeid; set_of_closures; _v] =
-       ["call_witness"; "codeid"; "set_of_closures"; "_v"]
-     in
-     [ rev_constructor_rel ~from:call_witness
-         ~relation:!!(Field.code_of_closure Unknown_arity_code_pointer)
-         ~base:set_of_closures;
-       usages_rel call_witness _v;
-       constructor_rel ~base:call_witness
-         ~relation:!!Field.code_id_of_call_witness
-         ~from:codeid ]
-     ==> cannot_change_calling_convention codeid);
-    (* CR-someday ncourant: we completely prevent changing the representation of
-       symbols. While allowing them to be unboxed is difficult, due to symbols
-       being always values, we could at least change their representation. This
-       would require rewriting in the types, which is not done yet. *)
-    (let$ [x; _source] = ["x"; "_source"] in
-     [ sources_rel x _source;
-       filter1
-         (fun x ->
-           Code_id_or_name.pattern_match x
-             ~symbol:(fun _ -> true)
-             ~var:(fun _ -> false)
-             ~code_id:(fun _ -> false))
-         x ]
-     ==> cannot_change_representation0 x);
-    (* If the representation of any closure in a set of closures cannot be
-       changed, the representation of all the closures in the set cannot be
-       changed. *)
-    (let$ [x] = ["x"] in
-     [cannot_change_representation0 x] ==> cannot_change_representation1 x);
-    (let$ [x; field; y] = ["x"; "field"; "y"] in
-     [ constructor_rel ~base:x ~relation:field ~from:y;
-       filter1 is_function_slot field;
-       cannot_change_representation0 x ]
-     ==> cannot_change_representation1 y);
-    (let$ [x] = ["x"] in
-     [cannot_change_representation1 x] ==> cannot_change_representation x);
-    (* Due to value_kinds rewriting not taking representation changes into
-       account for now, blocks cannot have their representation changed, so we
-       prevent it here. *)
-    (let$ [x; field; y] = ["x"; "field"; "y"] in
-     [ constructor_rel ~base:x ~relation:field ~from:y;
-       filter1
-         (fun f ->
-           match Field.view f with
-           | Block _ | Is_int | Get_tag -> true
-           | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
-           | Code_id_of_call_witness ->
-             false)
-         field ]
-     ==> cannot_change_representation x);
-    (* The use of [cannot_change_representation1] is here to still allow
-       unboxing of blocks, even if we cannot change their representation due to
-       the value_kind limitation. *)
-    (let$ [x] = ["x"] in
-     [cannot_change_representation1 x] ==> cannot_unbox0 x);
-    (* This is repeated from the earlier occurrence in
-       [cannot_change_representation0]. It is here because in the future, when
-       we want to allow the changing of the representation of local value slots,
-       it will remain necessary. *)
-    (let$ [x] = ["x"] in
-     [any_usage_pred x] ==> cannot_unbox0 x);
-    (* (let$ [x; field] = ["x"; "field"] in [ field_of_constructor_is_used x
-       field; filter1 field_cannot_be_destructured field ] ==> cannot_unbox0
-       x); *)
-    (* Unboxing a closure requires changing its calling convention, as we must
-       pass the value slots as extra arguments. Thus, we prevent unboxing of
-       closures if their calling convention cannot be changed. *)
-    (let$ [x; call_witness; codeid] = ["x"; "call_witness"; "codeid"] in
-     [ constructor_rel ~base:x
-         ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
-         ~from:call_witness;
-       constructor_rel ~base:call_witness
-         ~relation:!!Field.code_id_of_call_witness
-         ~from:codeid;
-       cannot_change_calling_convention codeid ]
-     ==> cannot_unbox0 x);
-    (* An allocation that is one of the results of a function can only be
-       unboxed if the function's calling conventation can be changed. *)
-    (let$ [alias; allocation_id; relation; call_witness; codeid] =
-       ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
-     in
-     [ sources_rel alias allocation_id;
-       rev_constructor_rel ~from:alias ~relation ~base:call_witness;
-       filter1
-         (fun f ->
-           match[@ocaml.warning "-4"] Field.view f with
-           | Apply _ -> true
-           | _ -> false)
-         relation;
-       constructor_rel ~base:call_witness
-         ~relation:!!Field.code_id_of_call_witness
-         ~from:codeid;
-       cannot_change_calling_convention codeid ]
-     ==> cannot_unbox0 allocation_id);
-    (* Likewise, an allocation passed as a parameter of a function can only be
-       unboxed if the function's calling convention can be changed. *)
-    (* CR ncourant: note that this can fail to trigger if the alias is
-       any_source but has no use! This is not a problem but makes it necessary
-       to replace unused params in calls with poison values. In the future, we
-       could modify this check to ensure it only triggers if the variable is
-       indeed used, allowing slightly more unboxing. *)
-    (let$ [alias; allocation_id; relation; call_witness; codeid] =
-       ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
-     in
-     [ sources_rel alias allocation_id;
-       rev_coconstructor_rel ~from:alias ~relation ~base:call_witness;
-       constructor_rel ~base:call_witness
-         ~relation:!!Field.code_id_of_call_witness
-         ~from:codeid;
-       cannot_change_calling_convention codeid ]
-     ==> cannot_unbox0 allocation_id);
-    (* Cannot unbox parameters of [Indirect_unknown_arity] calls, even if they
-       do not escape. *)
-    (* (let$ [usage; allocation_id; relation; _v] = ["usage"; "allocation_id";
-       "relation"; "_v"] in [ sources_rel usage allocation_id; coaccessor_rel
-       usage relation _v; filter (fun [f] -> match CoField.decode f with | Param
-       (Unknown_arity_code_pointer, _) -> true | Param
-       (Known_arity_code_pointer, _) -> false) [relation] ] ==> cannot_unbox0
-       allocation_id); *)
-    (* CR ncourant: I'm not sure this is useful? *)
-    (* An allocation that is stored in another can only be unboxed if either the
-       representation of the other allocation can be changed, of it the field it
-       is stored in is never read, as in that case a poison value will be stored
-       instead. *)
-    (let$ [alias; allocation_id; relation; to_] =
-       ["alias"; "allocation_id"; "relation"; "to_"]
-     in
-     [ sources_rel alias allocation_id;
-       rev_constructor_rel ~from:alias ~relation ~base:to_;
-       field_of_constructor_is_used to_ relation;
-       cannot_change_representation to_;
-       cannot_unbox0 to_ ]
-     ==> cannot_unbox0 allocation_id);
-    (* As previously: if any closure of a set of closures cannot be unboxed,
-       then every closure in the set cannot be unboxed. *)
-    (let$ [x] = ["x"] in
-     [cannot_unbox0 x] ==> cannot_unbox x);
-    (let$ [x; field; y] = ["x"; "field"; "y"] in
-     [ cannot_unbox0 x;
-       constructor_rel ~base:x ~relation:field ~from:y;
-       filter1 is_function_slot field ]
-     ==> cannot_unbox y);
-    (* Compute allocations to unbox or to change representation. This requires
-       the rules to be executed in order. *)
-    (let$ [x] = ["x"] in
-     [any_usage_pred x; not (cannot_unbox x)] ==> to_unbox x);
-    (let$ [x; _y] = ["x"; "_y"] in
-     [usages_rel x _y; not (cannot_unbox x)] ==> to_unbox x);
-    (let$ [x] = ["x"] in
-     [any_usage_pred x; not (cannot_change_representation x); not (to_unbox x)]
-     ==> to_change_representation x);
-    (let$ [x; _y] = ["x"; "_y"] in
-     [usages_rel x _y; not (cannot_change_representation x); not (to_unbox x)]
-     ==> to_change_representation x);
-    (let$ [x] = ["x"] in
-     [any_source_pred x] ==> multiple_allocation_points x);
-    (let$ [x; y; z] = ["x"; "y"; "z"] in
-     [sources_rel x y; sources_rel x z; distinct Cols.n y z]
-     ==> multiple_allocation_points x);
-    (* [allocation_point_dominator x y] is the same as
-       [dominated_by_allocation_point y x], which is that [y] is the allocation
-       point dominator of [x]. *)
-    (let$ [x; y] = ["x"; "y"] in
-     [sources_rel x y; not (multiple_allocation_points x)]
-     ==> and_ [allocation_point_dominator x y; dominated_by_allocation_point y x])
-  ]
+  ~>[ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+       [ constructor_rel ~base ~relation ~from;
+         any_usage_pred base;
+         filter1 is_not_local_field relation ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_top base relation ]);
+      (let$ [base; relation; from; usage] =
+         ["base"; "relation"; "from"; "usage"]
+       in
+       [ constructor_rel ~base ~relation ~from;
+         usages_rel base usage;
+         field_usages_top_rel usage relation ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_top base relation ]);
+      (let$ [base; relation; from; usage; v] =
+         ["base"; "relation"; "from"; "usage"; "v"]
+       in
+       [ constructor_rel ~base ~relation ~from;
+         usages_rel base usage;
+         field_usages_rel usage relation v ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_as base relation v ]);
+      (let$ [base; relation; from; x] = ["base"; "relation"; "from"; "x"] in
+       [ constructor_rel ~base ~relation ~from;
+         any_usage_pred base;
+         reading_field_rel relation x;
+         any_usage_pred x ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_top base relation ]);
+      (let$ [base; relation; from; x; y] =
+         ["base"; "relation"; "from"; "x"; "y"]
+       in
+       [ constructor_rel ~base ~relation ~from;
+         any_usage_pred base;
+         reading_field_rel relation x;
+         usages_rel x y ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_as base relation x ]);
+      (let$ [usage; base; relation; from; v; u] =
+         ["usage"; "base"; "relation"; "from"; "v"; "u"]
+       in
+       [ constructor_rel ~base ~relation ~from;
+         sources_rel usage base;
+         filter1 is_local_field relation;
+         any_usage_pred base;
+         rev_accessor_rel ~base:usage ~relation ~to_:v;
+         usages_rel v u ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_as base relation v ]);
+      (let$ [usage; base; relation; from; v] =
+         ["usage"; "base"; "relation"; "from"; "v"]
+       in
+       [ constructor_rel ~base ~relation ~from;
+         sources_rel usage base;
+         filter1 is_local_field relation;
+         any_usage_pred base;
+         (* field_usages_top_rel usage relation *)
+         rev_accessor_rel ~base:usage ~relation ~to_:v;
+         any_usage_pred v ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_top base relation ]);
+      (* CR ncourant: this marks any [Apply] field as
+         [field_of_constructor_is_used], as long as the function is called.
+         Shouldn't that be gated behind a [cannot_change_calling_convetion]? *)
+      (* (let$ [base; relation; from; coderel; call_witness] = ["base";
+         "relation"; "from"; "coderel"; "call_witness"] in [ constructor_rel
+         base relation from; filter1 is_apply_field relation; constructor_rel
+         base coderel call_witness; any_usage_pred indirect_call_witness;
+         filter1 is_code_field coderel ] ==> field_of_constructor_is_used base
+         relation); *)
+      (* CR ncourant: should this be reenabled? I think this is no longer
+         necessary because we remove unused arguments of continuations,
+         including return continuations. *)
+      (* If any usage is possible, do not change the representation. Note that
+         this rule will change in the future, when local value slots are
+         properly tracked: a closure will only local value slots that has
+         any_use will still be able to have its representation changed. *)
+      (* (let$ [x] = ["x"] in [any_usage_pred x] ==>
+         cannot_change_representation0 x); *)
+      (let$ [x; field; y] = ["x"; "field"; "y"] in
+       [ any_usage_pred x;
+         filter1 is_not_local_field field;
+         filter1 real_field field;
+         constructor_rel ~base:x ~relation:field ~from:y ]
+       ==> cannot_change_representation0 x);
+      (* If a block with a local field escapes, and that field is read again
+         from an [any_source] value, prevent changing the representation. This
+         ensures that for a block whose representation is changed, we can know
+         the source at each point. *)
+      (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
+       [ any_usage_pred x;
+         filter1 is_local_field field;
+         reading_field_rel field z;
+         constructor_rel ~base:x ~relation:field ~from:y ]
+       ==> cannot_change_representation0 x);
+      (* Likewise, if a block with a local field escapes, and that field is read
+         again from a value with several sources, prevent changing the
+         representation. *)
+      (let$ [usage; field; source1; source2; _v] =
+         ["usage"; "field"; "source1"; "source2"; "_v"]
+       in
+       [ field_usages_rel usage field _v;
+         filter1 is_local_field field;
+         sources_rel usage source1;
+         sources_rel usage source2;
+         distinct Cols.n source1 source2 ]
+       ==> cannot_change_representation0 source1);
+      (let$ [usage; field; source1; source2] =
+         ["usage"; "field"; "source1"; "source2"]
+       in
+       [ field_usages_top_rel usage field;
+         filter1 is_local_field field;
+         sources_rel usage source1;
+         sources_rel usage source2;
+         distinct Cols.n source1 source2 ]
+       ==> cannot_change_representation0 source1);
+      (* If there exists an alias which has another source, and which uses any
+         real field of our allocation, we cannot change the representation. This
+         currently requires 4 rules due to the absence of disjunction in the
+         datalog engine. *)
+      (let$ [allocation_id; alias; alias_source; field; _v] =
+         ["allocation_id"; "alias"; "alias_source"; "field"; "_v"]
+       in
+       [ usages_rel allocation_id alias;
+         sources_rel alias alias_source;
+         distinct Cols.n alias_source allocation_id;
+         filter1 real_field field;
+         field_usages_rel alias field _v ]
+       ==> cannot_change_representation0 allocation_id);
+      (let$ [allocation_id; alias; alias_source; field] =
+         ["allocation_id"; "alias"; "alias_source"; "field"]
+       in
+       [ usages_rel allocation_id alias;
+         sources_rel alias alias_source;
+         distinct Cols.n alias_source allocation_id;
+         filter1 real_field field;
+         field_usages_top_rel alias field ]
+       ==> cannot_change_representation0 allocation_id);
+      (let$ [allocation_id; alias; field; _v] =
+         ["allocation_id"; "alias"; "field"; "_v"]
+       in
+       [ usages_rel allocation_id alias;
+         any_source_pred alias;
+         filter1 real_field field;
+         field_usages_rel alias field _v ]
+       ==> cannot_change_representation0 allocation_id);
+      (let$ [allocation_id; alias; field] =
+         ["allocation_id"; "alias"; "field"]
+       in
+       [ usages_rel allocation_id alias;
+         any_source_pred alias;
+         filter1 real_field field;
+         field_usages_top_rel alias field ]
+       ==> cannot_change_representation0 allocation_id);
+      (* If the allocation has a source distinct from itself, its representation
+         cannot be changed (in fact, in that case, it shouldn't even be an
+         allocation). *)
+      (let$ [allocation_id; source] = ["allocation_id"; "source"] in
+       [sources_rel allocation_id source; distinct Cols.n source allocation_id]
+       ==> cannot_change_representation0 allocation_id);
+      (* Used but not its own source: either from any source, or it has no
+         source at all and it is dead code. In either case, do not unbox or
+         change the representation. *)
+      (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
+       [ usages_rel allocation_id usage;
+         not (sources_rel allocation_id allocation_id) ]
+       ==> cannot_change_representation0 allocation_id);
+      (let$ [allocation_id] = ["allocation_id"] in
+       [any_source_pred allocation_id]
+       ==> cannot_change_representation0 allocation_id);
+      (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
+       [ constructor_rel ~base:call_witness
+           ~relation:!!Field.code_id_of_call_witness
+           ~from:code_id ]
+       ==> cannot_change_representation0 call_witness);
+      (* Note this rule is here to still allow changing the calling convention
+         of symbols /!\ when adding back the local value slots, there should be
+         a few more rules here *)
+      (* TODO this is wrong: some closures can have their representation changed
+         but not their calling convention *)
+      (let$ [x] = ["x"] in
+       [any_usage_pred x] ==> cannot_change_witness_calling_convention x);
+      (let$ [allocation_id; alias; alias_source; _v] =
+         ["allocation_id"; "alias"; "alias_source"; "_v"]
+       in
+       [ usages_rel allocation_id alias;
+         sources_rel alias alias_source;
+         distinct Cols.n alias_source allocation_id;
+         field_usages_rel alias !!Field.code_id_of_call_witness _v ]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (let$ [allocation_id; alias; alias_source] =
+         ["allocation_id"; "alias"; "alias_source"]
+       in
+       [ usages_rel allocation_id alias;
+         sources_rel alias alias_source;
+         distinct Cols.n alias_source allocation_id;
+         field_usages_top_rel alias !!Field.code_id_of_call_witness ]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (let$ [allocation_id; alias; _v] = ["allocation_id"; "alias"; "_v"] in
+       [ usages_rel allocation_id alias;
+         any_source_pred alias;
+         field_usages_rel alias !!Field.code_id_of_call_witness _v ]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (let$ [allocation_id; alias] = ["allocation_id"; "alias"] in
+       [ usages_rel allocation_id alias;
+         any_source_pred alias;
+         field_usages_top_rel alias !!Field.code_id_of_call_witness ]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (let$ [allocation_id; source] = ["allocation_id"; "source"] in
+       [sources_rel allocation_id source; distinct Cols.n source allocation_id]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (* Used but not its own source: either from any source, or it has no
+         source at all and it is dead code. In either case, do not unbox *)
+      (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
+       [ usages_rel allocation_id usage;
+         not (sources_rel allocation_id allocation_id) ]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (let$ [allocation_id] = ["allocation_id"] in
+       [any_source_pred allocation_id]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (* If the calling convention of a witness cannot be changed, the calling
+         convention of its code_id cannot be either. From now on,
+         [cannot_change_witness_calling_convention] should no longer be used. *)
+      (let$ [call_witness; code_id; _v] = ["call_witness"; "code_id"; "_v"] in
+       [ constructor_rel ~base:call_witness
+           ~relation:!!Field.code_id_of_call_witness
+           ~from:code_id;
+         usages_rel call_witness _v;
+         cannot_change_witness_calling_convention call_witness ]
+       ==> cannot_change_calling_convention code_id);
+      (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
+       [ constructor_rel ~base:call_witness
+           ~relation:!!Field.code_id_of_call_witness
+           ~from:code_id;
+         any_usage_pred call_witness;
+         cannot_change_witness_calling_convention call_witness ]
+       ==> cannot_change_calling_convention code_id);
+      (* CR ncourant: we're preventing changing the calling convention of
+         functions called with Indirect_unknown_arity. We could still allow
+         changing the calling convention, but this would require wrappers for
+         over- and partial applications, as well as untupling. As these wrappers
+         are complex to write correctly, this is not done yet. *)
+      (let$ [call_witness; codeid; set_of_closures] =
+         ["call_witness"; "codeid"; "set_of_closures"]
+       in
+       [ rev_constructor_rel ~from:call_witness
+           ~relation:!!(Field.code_of_closure Unknown_arity_code_pointer)
+           ~base:set_of_closures;
+         any_usage_pred call_witness;
+         constructor_rel ~base:call_witness
+           ~relation:!!Field.code_id_of_call_witness
+           ~from:codeid ]
+       ==> cannot_change_calling_convention codeid);
+      (let$ [call_witness; codeid; set_of_closures; _v] =
+         ["call_witness"; "codeid"; "set_of_closures"; "_v"]
+       in
+       [ rev_constructor_rel ~from:call_witness
+           ~relation:!!(Field.code_of_closure Unknown_arity_code_pointer)
+           ~base:set_of_closures;
+         usages_rel call_witness _v;
+         constructor_rel ~base:call_witness
+           ~relation:!!Field.code_id_of_call_witness
+           ~from:codeid ]
+       ==> cannot_change_calling_convention codeid);
+      (* CR-someday ncourant: we completely prevent changing the representation
+         of symbols. While allowing them to be unboxed is difficult, due to
+         symbols being always values, we could at least change their
+         representation. This would require rewriting in the types, which is not
+         done yet. *)
+      (let$ [x; _source] = ["x"; "_source"] in
+       [ sources_rel x _source;
+         filter1
+           (fun x ->
+             Code_id_or_name.pattern_match x
+               ~symbol:(fun _ -> true)
+               ~var:(fun _ -> false)
+               ~code_id:(fun _ -> false))
+           x ]
+       ==> cannot_change_representation0 x);
+      (* If the representation of any closure in a set of closures cannot be
+         changed, the representation of all the closures in the set cannot be
+         changed. *)
+      (let$ [x] = ["x"] in
+       [cannot_change_representation0 x] ==> cannot_change_representation1 x);
+      (let$ [x; field; y] = ["x"; "field"; "y"] in
+       [ constructor_rel ~base:x ~relation:field ~from:y;
+         filter1 is_function_slot field;
+         cannot_change_representation0 x ]
+       ==> cannot_change_representation1 y);
+      (let$ [x] = ["x"] in
+       [cannot_change_representation1 x] ==> cannot_change_representation x);
+      (* Due to value_kinds rewriting not taking representation changes into
+         account for now, blocks cannot have their representation changed, so we
+         prevent it here. *)
+      (let$ [x; field; y] = ["x"; "field"; "y"] in
+       [ constructor_rel ~base:x ~relation:field ~from:y;
+         filter1
+           (fun f ->
+             match Field.view f with
+             | Block _ | Is_int | Get_tag -> true
+             | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
+             | Code_id_of_call_witness ->
+               false)
+           field ]
+       ==> cannot_change_representation x);
+      (* The use of [cannot_change_representation1] is here to still allow
+         unboxing of blocks, even if we cannot change their representation due
+         to the value_kind limitation. *)
+      (let$ [x] = ["x"] in
+       [cannot_change_representation1 x] ==> cannot_unbox0 x);
+      (* This is repeated from the earlier occurrence in
+         [cannot_change_representation0]. It is here because in the future, when
+         we want to allow the changing of the representation of local value
+         slots, it will remain necessary. *)
+      (let$ [x] = ["x"] in
+       [any_usage_pred x] ==> cannot_unbox0 x);
+      (* (let$ [x; field] = ["x"; "field"] in [ field_of_constructor_is_used x
+         field; filter1 field_cannot_be_destructured field ] ==> cannot_unbox0
+         x); *)
+      (* Unboxing a closure requires changing its calling convention, as we must
+         pass the value slots as extra arguments. Thus, we prevent unboxing of
+         closures if their calling convention cannot be changed. *)
+      (let$ [x; call_witness; codeid] = ["x"; "call_witness"; "codeid"] in
+       [ constructor_rel ~base:x
+           ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
+           ~from:call_witness;
+         constructor_rel ~base:call_witness
+           ~relation:!!Field.code_id_of_call_witness
+           ~from:codeid;
+         cannot_change_calling_convention codeid ]
+       ==> cannot_unbox0 x);
+      (* An allocation that is one of the results of a function can only be
+         unboxed if the function's calling conventation can be changed. *)
+      (let$ [alias; allocation_id; relation; call_witness; codeid] =
+         ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
+       in
+       [ sources_rel alias allocation_id;
+         rev_constructor_rel ~from:alias ~relation ~base:call_witness;
+         filter1
+           (fun f ->
+             match[@ocaml.warning "-4"] Field.view f with
+             | Apply _ -> true
+             | _ -> false)
+           relation;
+         constructor_rel ~base:call_witness
+           ~relation:!!Field.code_id_of_call_witness
+           ~from:codeid;
+         cannot_change_calling_convention codeid ]
+       ==> cannot_unbox0 allocation_id);
+      (* Likewise, an allocation passed as a parameter of a function can only be
+         unboxed if the function's calling convention can be changed. *)
+      (* CR ncourant: note that this can fail to trigger if the alias is
+         any_source but has no use! This is not a problem but makes it necessary
+         to replace unused params in calls with poison values. In the future, we
+         could modify this check to ensure it only triggers if the variable is
+         indeed used, allowing slightly more unboxing. *)
+      (let$ [alias; allocation_id; relation; call_witness; codeid] =
+         ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
+       in
+       [ sources_rel alias allocation_id;
+         rev_coconstructor_rel ~from:alias ~relation ~base:call_witness;
+         constructor_rel ~base:call_witness
+           ~relation:!!Field.code_id_of_call_witness
+           ~from:codeid;
+         cannot_change_calling_convention codeid ]
+       ==> cannot_unbox0 allocation_id);
+      (* Cannot unbox parameters of [Indirect_unknown_arity] calls, even if they
+         do not escape. *)
+      (* (let$ [usage; allocation_id; relation; _v] = ["usage"; "allocation_id";
+         "relation"; "_v"] in [ sources_rel usage allocation_id; coaccessor_rel
+         usage relation _v; filter (fun [f] -> match CoField.decode f with |
+         Param (Unknown_arity_code_pointer, _) -> true | Param
+         (Known_arity_code_pointer, _) -> false) [relation] ] ==> cannot_unbox0
+         allocation_id); *)
+      (* CR ncourant: I'm not sure this is useful? *)
+      (* An allocation that is stored in another can only be unboxed if either
+         the representation of the other allocation can be changed, of it the
+         field it is stored in is never read, as in that case a poison value
+         will be stored instead. *)
+      (let$ [alias; allocation_id; relation; to_] =
+         ["alias"; "allocation_id"; "relation"; "to_"]
+       in
+       [ sources_rel alias allocation_id;
+         rev_constructor_rel ~from:alias ~relation ~base:to_;
+         field_of_constructor_is_used to_ relation;
+         cannot_change_representation to_;
+         cannot_unbox0 to_ ]
+       ==> cannot_unbox0 allocation_id);
+      (* As previously: if any closure of a set of closures cannot be unboxed,
+         then every closure in the set cannot be unboxed. *)
+      (let$ [x] = ["x"] in
+       [cannot_unbox0 x] ==> cannot_unbox x);
+      (let$ [x; field; y] = ["x"; "field"; "y"] in
+       [ cannot_unbox0 x;
+         constructor_rel ~base:x ~relation:field ~from:y;
+         filter1 is_function_slot field ]
+       ==> cannot_unbox y);
+      (* Compute allocations to unbox or to change representation. This requires
+         the rules to be executed in order. *)
+      (let$ [x] = ["x"] in
+       [any_usage_pred x; not (cannot_unbox x)] ==> to_unbox x);
+      (let$ [x; _y] = ["x"; "_y"] in
+       [usages_rel x _y; not (cannot_unbox x)] ==> to_unbox x);
+      (let$ [x] = ["x"] in
+       [any_usage_pred x; not (cannot_change_representation x); not (to_unbox x)]
+       ==> to_change_representation x);
+      (let$ [x; _y] = ["x"; "_y"] in
+       [usages_rel x _y; not (cannot_change_representation x); not (to_unbox x)]
+       ==> to_change_representation x);
+      (let$ [x] = ["x"] in
+       [any_source_pred x] ==> multiple_allocation_points x);
+      (let$ [x; y; z] = ["x"; "y"; "z"] in
+       [sources_rel x y; sources_rel x z; distinct Cols.n y z]
+       ==> multiple_allocation_points x);
+      (* [allocation_point_dominator x y] is the same as
+         [dominated_by_allocation_point y x], which is that [y] is the
+         allocation point dominator of [x]. *)
+      (let$ [x; y] = ["x"; "y"] in
+       [sources_rel x y; not (multiple_allocation_points x)]
+       ==> and_
+             [allocation_point_dominator x y; dominated_by_allocation_point y x])
+    ]
 
 let rec mapi_unboxed_fields (not_unboxed : 'a -> 'b -> 'c)
     (unboxed : Field.t -> 'a -> 'a) (acc : 'a) (uf : 'b unboxed_fields) :
@@ -1928,38 +1928,38 @@ module Rewriter = struct
     let out_tbl, out = rel2_r "out1" Cols.[n; n] in
     let in_tbl, in_ = rel1_r "in_" Cols.[n] in
     let r =
-      let$ [ code_id;
-             code_id_of_witness;
-             witness;
-             closure;
-             function_slot;
-             all_closures ] =
-        [ "code_id";
-          "code_id_of_witness";
-          "witness";
-          "closure";
-          "function_slot";
-          "all_closures" ]
-      in
-      [ in_ code_id;
-        rev_constructor_rel ~from:code_id ~relation:code_id_of_witness
-          ~base:witness;
-        rev_constructor_rel ~from:witness
-          ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
-          ~base:closure;
-        rev_constructor_rel ~from:closure ~relation:function_slot
-          ~base:all_closures;
-        filter1 is_function_slot function_slot ]
-      ==> out closure all_closures
+      ~![ (let$ [ code_id;
+                  code_id_of_witness;
+                  witness;
+                  closure;
+                  function_slot;
+                  all_closures ] =
+             [ "code_id";
+               "code_id_of_witness";
+               "witness";
+               "closure";
+               "function_slot";
+               "all_closures" ]
+           in
+           [ in_ code_id;
+             rev_constructor_rel ~from:code_id ~relation:code_id_of_witness
+               ~base:witness;
+             rev_constructor_rel ~from:witness
+               ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
+               ~base:closure;
+             rev_constructor_rel ~from:closure ~relation:function_slot
+               ~base:all_closures;
+             filter1 is_function_slot function_slot ]
+           ==> out closure all_closures) ]
     in
     fun db code_id ->
       let db =
-        Datalog.set_table in_tbl
+        set_table in_tbl
           (Code_id_or_name.Map.singleton (Code_id_or_name.code_id code_id) ())
           db
       in
-      let db = Datalog.Schedule.run (Datalog.Schedule.saturate [r]) db in
-      List.map snd (Code_id_or_name.Map.bindings (Datalog.get_table out_tbl db))
+      let db = Schedule.run r db in
+      List.map snd (Code_id_or_name.Map.bindings (get_table out_tbl db))
 
   let identify_set_of_closures_with_code_ids db code_ids =
     let code_ids =
@@ -2021,66 +2021,66 @@ module Rewriter = struct
         false
     in
     let rs =
-      [ (let$ [x; y] = ["x"; "y"] in
-         [in_fs x; in_ y] ==> out2 x y);
-        (let$ [fs; usage; field; field_usage] =
-           ["fs"; "usage"; "field"; "field_usage"]
-         in
-         [ out2 fs usage;
-           field_usages_rel usage field field_usage;
-           filter1 is_value_slot field ]
-         ==> out1 usage);
-        (let$ [fs; usage; field] = ["fs"; "usage"; "field"] in
-         [ out2 fs usage;
-           field_usages_top_rel usage field;
-           filter1 is_value_slot field ]
-         ==> out1 usage);
-        (let$ [fs0; usage; fs; to_; fs_usage] =
-           ["fs0"; "usage"; "fs"; "to_"; "fs_usage"]
-         in
-         [ out2 fs0 usage;
-           field_usages_rel usage fs to_;
-           in_all_fs fs;
-           usages_rel to_ fs_usage ]
-         ==> out2 fs fs_usage);
-        (let$ [fs; usage] = ["fs"; "usage"] in
-         [ out2 fs usage;
-           field_usages_top_rel usage
-             !!(Field.code_of_closure Known_arity_code_pointer) ]
-         ==> out_known_arity fs);
-        (let$ [fs; usage; _v] = ["fs"; "usage"; "_v"] in
-         [ out2 fs usage;
-           field_usages_rel usage
-             !!(Field.code_of_closure Known_arity_code_pointer)
-             _v ]
-         ==> out_known_arity fs);
-        (let$ [fs; usage] = ["fs"; "usage"] in
-         [ out2 fs usage;
-           field_usages_top_rel usage
-             !!(Field.code_of_closure Unknown_arity_code_pointer) ]
-         ==> out_unknown_arity fs);
-        (let$ [fs; usage; _v] = ["fs"; "usage"; "_v"] in
-         [ out2 fs usage;
-           field_usages_rel usage
-             !!(Field.code_of_closure Unknown_arity_code_pointer)
-             _v ]
-         ==> out_unknown_arity fs);
-        (let$ [fs; code_id; my_closure; usage] =
-           ["fs"; "code_id"; "my_closure"; "usage"]
-         in
-         [ out_known_arity fs;
-           in_code_id fs code_id;
-           code_id_my_closure_rel ~code_id ~my_closure;
-           usages_rel my_closure usage ]
-         ==> out2 fs usage);
-        (let$ [fs; code_id; my_closure; usage] =
-           ["fs"; "code_id"; "my_closure"; "usage"]
-         in
-         [ out_unknown_arity fs;
-           in_code_id fs code_id;
-           code_id_my_closure_rel ~code_id ~my_closure;
-           usages_rel my_closure usage ]
-         ==> out2 fs usage) ]
+      ~![ (let$ [x; y] = ["x"; "y"] in
+           [in_fs x; in_ y] ==> out2 x y);
+          (let$ [fs; usage; field; field_usage] =
+             ["fs"; "usage"; "field"; "field_usage"]
+           in
+           [ out2 fs usage;
+             field_usages_rel usage field field_usage;
+             filter1 is_value_slot field ]
+           ==> out1 usage);
+          (let$ [fs; usage; field] = ["fs"; "usage"; "field"] in
+           [ out2 fs usage;
+             field_usages_top_rel usage field;
+             filter1 is_value_slot field ]
+           ==> out1 usage);
+          (let$ [fs0; usage; fs; to_; fs_usage] =
+             ["fs0"; "usage"; "fs"; "to_"; "fs_usage"]
+           in
+           [ out2 fs0 usage;
+             field_usages_rel usage fs to_;
+             in_all_fs fs;
+             usages_rel to_ fs_usage ]
+           ==> out2 fs fs_usage);
+          (let$ [fs; usage] = ["fs"; "usage"] in
+           [ out2 fs usage;
+             field_usages_top_rel usage
+               !!(Field.code_of_closure Known_arity_code_pointer) ]
+           ==> out_known_arity fs);
+          (let$ [fs; usage; _v] = ["fs"; "usage"; "_v"] in
+           [ out2 fs usage;
+             field_usages_rel usage
+               !!(Field.code_of_closure Known_arity_code_pointer)
+               _v ]
+           ==> out_known_arity fs);
+          (let$ [fs; usage] = ["fs"; "usage"] in
+           [ out2 fs usage;
+             field_usages_top_rel usage
+               !!(Field.code_of_closure Unknown_arity_code_pointer) ]
+           ==> out_unknown_arity fs);
+          (let$ [fs; usage; _v] = ["fs"; "usage"; "_v"] in
+           [ out2 fs usage;
+             field_usages_rel usage
+               !!(Field.code_of_closure Unknown_arity_code_pointer)
+               _v ]
+           ==> out_unknown_arity fs);
+          (let$ [fs; code_id; my_closure; usage] =
+             ["fs"; "code_id"; "my_closure"; "usage"]
+           in
+           [ out_known_arity fs;
+             in_code_id fs code_id;
+             code_id_my_closure_rel ~code_id ~my_closure;
+             usages_rel my_closure usage ]
+           ==> out2 fs usage);
+          (let$ [fs; code_id; my_closure; usage] =
+             ["fs"; "code_id"; "my_closure"; "usage"]
+           in
+           [ out_unknown_arity fs;
+             in_code_id fs code_id;
+             code_id_my_closure_rel ~code_id ~my_closure;
+             usages_rel my_closure usage ]
+           ==> out2 fs usage) ]
     in
     let q1 =
       mk_exists_query [] ["fs0"; "x"; "fs"] (fun [] [fs0; x; fs] ->
@@ -2108,7 +2108,7 @@ module Rewriter = struct
       match usages with
       | Any_usage -> any ()
       | Usages s ->
-        let db = Datalog.set_table in_tbl s db in
+        let db = set_table in_tbl s db in
         let code_ids_of_function_slots =
           Function_slot.Map.fold
             (fun fs code_id m ->
@@ -2116,17 +2116,17 @@ module Rewriter = struct
             code_ids_of_function_slots Field.Map.empty
         in
         let db =
-          Datalog.set_table in_fs_tbl
+          set_table in_fs_tbl
             (Field.Map.singleton (Field.function_slot current_function_slot) ())
             db
         in
         let db =
-          Datalog.set_table in_all_fs_tbl
+          set_table in_all_fs_tbl
             (Field.Map.map (fun _ -> ()) code_ids_of_function_slots)
             db
         in
         let db =
-          Datalog.set_table in_code_id_tbl
+          set_table in_code_id_tbl
             (Field.Map.filter_map
                (fun _ (code_id : _ Or_unknown.t) ->
                  match code_id with
@@ -2140,21 +2140,21 @@ module Rewriter = struct
             db
         in
         let db =
-          Datalog.set_table in_unknown_code_id_tbl
+          set_table in_unknown_code_id_tbl
             (Field.Map.filter_map
                (fun _ (code_id : _ Or_unknown.t) ->
                  match code_id with Unknown -> Some () | Known _ -> None)
                code_ids_of_function_slots)
             db
         in
-        let db = Datalog.Schedule.run (Datalog.Schedule.saturate rs) db in
+        let db = Schedule.run rs db in
         if q1 [] db || q2 [] db || q3 [] db || q4 [] db
         then any ()
         else
-          let uses_for_value_slots = Datalog.get_table out1_tbl db in
-          let uses_for_function_slots = Datalog.get_table out2_tbl db in
-          let known_arity = Datalog.get_table out_known_arity_tbl db in
-          let unknown_arity = Datalog.get_table out_unknown_arity_tbl db in
+          let uses_for_value_slots = get_table out1_tbl db in
+          let uses_for_function_slots = get_table out2_tbl db in
+          let known_arity = get_table out_known_arity_tbl db in
+          let unknown_arity = get_table out_unknown_arity_tbl db in
           ( Usages uses_for_value_slots,
             Field.Map.fold
               (fun fs uses m ->
@@ -2877,8 +2877,8 @@ let get_single_field_source =
   in
   let q_source =
     query
-      (let@ [block; field] = parameters ["block"; "field"] in
-       let@ [field_source; source] = variables ["field_source"; "source"] in
+      (let^ [block; field] = ["block"; "field"] in
+       let$ [field_source; source] = ["field_source"; "source"] in
        [ field_sources_rel block field field_source;
          sources_rel field_source source ]
        =>? [source])
@@ -2957,8 +2957,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
   let db = Datalog.Schedule.run ~stats datalog_schedule datalog in
   let db =
     List.fold_left
-      (fun db rule ->
-        Datalog.Schedule.run ~stats (Datalog.Schedule.saturate [rule]) db)
+      (fun db rule -> Datalog.Schedule.run ~stats rule db)
       db datalog_rules
   in
   if debug then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
@@ -2990,8 +2989,8 @@ let fixpoint (graph : Global_flow_graph.graph) =
   let query_dominated_by =
     let open Syntax in
     query
-      (let@ [x] = parameters ["x"] in
-       let@ [y] = variables ["y"] in
+      (let^ [x] = ["x"] in
+       let$ [y] = ["y"] in
        [dominated_by_allocation_point x y] =>? [y])
   in
   Datalog.Cursor.iter query_to_unbox db ~f:(fun [code_or_name; to_patch] ->
@@ -3163,9 +3162,9 @@ let code_id_actually_directly_called_query =
   let open Syntax in
   let open! Global_flow_graph in
   query
-    (let@ [set_of_closures] = parameters ["set_of_closures"] in
-     let@ [apply_widget; call_witness; codeid] =
-       variables ["apply_widget"; "call_withness"; "codeid"]
+    (let^ [set_of_closures] = ["set_of_closures"] in
+     let$ [apply_widget; call_witness; codeid] =
+       ["apply_widget"; "call_withness"; "codeid"]
      in
      [ rev_accessor_rel ~base:set_of_closures
          ~relation:!!(Field.code_of_closure Known_arity_code_pointer)
