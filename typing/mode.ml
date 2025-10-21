@@ -48,6 +48,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Crossing -> pp, Crossing
       | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
+      | Allocation_r -> pp, Allocation_l
 
     let right_adjoint :
         type r.
@@ -63,6 +64,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Crossing -> pp, Crossing
       | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
+      | Allocation_l -> pp, Allocation_r
 
     include Magic_allow_disallow (struct
       type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
@@ -77,6 +79,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
+         | Allocation_l -> Allocation_l
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
         fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -87,6 +90,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Captured_by_partial_application -> Captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
+         | Allocation_r -> Allocation_r
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
         fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -100,6 +104,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
+         | Allocation_r -> Allocation_r
+         | Allocation_l -> Allocation_l
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
         fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -113,6 +119,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
+         | Allocation_l -> Allocation_l
+         | Allocation_r -> Allocation_r
     end)
   end
 
@@ -2073,6 +2081,8 @@ module Report = struct
         ( dprintf "has a partial application capturing a value",
           (Location.none, Expression) )
     | Crossing -> Some (dprintf "crosses with something", pp)
+    | Allocation_r -> Some (dprintf "is an allocation", pp)
+    | Allocation_l -> Some (dprintf "is in an allocation containing values", pp)
 
   let print_mode :
       type a. [`Actual | `Expected] -> a C.obj -> formatter -> a -> unit =
@@ -2125,7 +2135,7 @@ module Report = struct
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
     | Adj_captured_by_partial_application ->
       true
-    | Skip | Crossing | Unknown_non_rigid -> false
+    | Allocation_r | Allocation_l | Skip | Crossing | Unknown_non_rigid -> false
 
   let eq_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->

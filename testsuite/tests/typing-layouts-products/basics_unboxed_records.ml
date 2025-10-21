@@ -160,8 +160,9 @@ let f_boxed_record (local_ left) (local_ right) =
 Line 4, characters 2-7:
 4 |   left'
       ^^^^^
-Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+Error: This value is "local" because it is in an allocation containing values
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]

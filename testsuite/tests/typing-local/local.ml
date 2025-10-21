@@ -378,7 +378,11 @@ let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
 Line 1, characters 47-48:
 1 | let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
                                                    ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an allocation
+       which is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let etajoin p (f : ?b:bool -> unit -> int) (local_ g : unit -> int) =
@@ -990,7 +994,10 @@ Line 2, characters 41-42:
 2 | let foo (local_ x) = local_cb (fun () -> x := 17; 42)
                                              ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used inside a function which is expected to be "global".
+       because it is used inside a function which is expected to be "global"
+       because it is an allocation
+       which is expected to be "local" to the parent region or "global"
+       because it is an argument in a tail call.
 |}]
 
 let foo x =
@@ -1628,7 +1635,9 @@ let foo (local_ x) y =
 Line 4, characters 29-30:
 4 |   | Some _, Some b -> escape b
                                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" because it is in an allocation containing values
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo (local_ x) y =
@@ -1641,7 +1650,9 @@ let foo (local_ x) y =
 Line 5, characters 11-12:
 5 |     escape b
                ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" because it is in an allocation containing values
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo p (local_ x) y z =
@@ -1688,7 +1699,9 @@ let foo p (local_ x) y z =
 Line 6, characters 9-10:
 6 |   escape b;;
              ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" because it is in an allocation containing values
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* [as] patterns *)
@@ -2455,7 +2468,11 @@ let f (local_ s : string) =
 Line 2, characters 8-9:
 2 |   GFoo (s, "bar")
             ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an allocation
+       which is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let f =
