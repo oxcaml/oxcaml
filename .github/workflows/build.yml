@@ -383,6 +383,7 @@ jobs:
         if: matrix.name == 'metrics_collection' && github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           # Checkout metrics repository
           gh repo clone oxcaml/oxcaml-metrics metrics-repo
@@ -400,7 +401,6 @@ jobs:
           DATE=$(date -u +"%Y-%m-%d")
 
           # Extract PR number from commit message
-          COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
           PR_NUMBER=$(echo "$COMMIT_MESSAGE" | grep -oP '\(#\K[0-9]+(?=\))' || echo "N/A")
 
           # CSV filename
