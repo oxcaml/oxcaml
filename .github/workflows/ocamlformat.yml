@@ -9,11 +9,13 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 jobs:
   check:
-    name: ${{ runner.os }} ${{ runner.arch }}
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ warp-ubuntu-latest-x64-32x ]
+        include:
+          - name: Linux x64
+            os: warp-ubuntu-latest-x64-32x
     steps:
       - name: Checkout the OxCaml repo
         uses: actions/checkout@master
