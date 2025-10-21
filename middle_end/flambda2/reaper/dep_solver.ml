@@ -2043,10 +2043,22 @@ module Rewriter = struct
            field_usages_top_rel usage
              !!(Field.code_of_closure Known_arity_code_pointer) ]
          ==> out_known_arity fs);
+        (let$ [fs; usage; _v] = ["fs"; "usage"; "_v"] in
+         [ out2 fs usage;
+           field_usages_rel usage
+             !!(Field.code_of_closure Known_arity_code_pointer)
+             _v ]
+         ==> out_known_arity fs);
         (let$ [fs; usage] = ["fs"; "usage"] in
          [ out2 fs usage;
            field_usages_top_rel usage
              !!(Field.code_of_closure Unknown_arity_code_pointer) ]
+         ==> out_unknown_arity fs);
+        (let$ [fs; usage; _v] = ["fs"; "usage"; "_v"] in
+         [ out2 fs usage;
+           field_usages_rel usage
+             !!(Field.code_of_closure Unknown_arity_code_pointer)
+             _v ]
          ==> out_unknown_arity fs);
         (let$ [fs; code_id; my_closure; usage] =
            ["fs"; "code_id"; "my_closure"; "usage"]
@@ -2092,6 +2104,12 @@ module Rewriter = struct
       | Any_usage -> any ()
       | Usages s ->
         let db = Datalog.set_table in_tbl s db in
+        let code_ids_of_function_slots =
+          Function_slot.Map.fold
+            (fun fs code_id m ->
+              Field.Map.add (Field.function_slot fs) code_id m)
+            code_ids_of_function_slots Field.Map.empty
+        in
         let db =
           Datalog.set_table in_fs_tbl
             (Field.Map.singleton (Field.function_slot current_function_slot) ())
@@ -2099,34 +2117,29 @@ module Rewriter = struct
         in
         let db =
           Datalog.set_table in_all_fs_tbl
-            (Function_slot.Map.fold
-               (fun fs _ m -> Field.Map.add (Field.function_slot fs) () m)
-               code_ids_of_function_slots Field.Map.empty)
+            (Field.Map.map (fun _ -> ()) code_ids_of_function_slots)
             db
         in
         let db =
           Datalog.set_table in_code_id_tbl
-            (Function_slot.Map.fold
-               (fun fs (code_id : _ Or_unknown.t) m ->
+            (Field.Map.filter_map
+               (fun _ (code_id : _ Or_unknown.t) ->
                  match code_id with
-                 | Unknown -> m
+                 | Unknown -> None
                  | Known code_id ->
-                   Field.Map.add (Field.function_slot fs)
+                   Some
                      (Code_id_or_name.Map.singleton
                         (Code_id_or_name.code_id code_id)
-                        ())
-                     m)
-               code_ids_of_function_slots Field.Map.empty)
+                        ()))
+               code_ids_of_function_slots)
             db
         in
         let db =
           Datalog.set_table in_unknown_code_id_tbl
-            (Function_slot.Map.fold
-               (fun fs (code_id : _ Or_unknown.t) m ->
-                 match code_id with
-                 | Known _ -> m
-                 | Unknown -> Field.Map.add (Field.function_slot fs) () m)
-               code_ids_of_function_slots Field.Map.empty)
+            (Field.Map.filter_map
+               (fun _ (code_id : _ Or_unknown.t) ->
+                 match code_id with Unknown -> Some () | Known _ -> None)
+               code_ids_of_function_slots)
             db
         in
         let db = Datalog.Schedule.run (Datalog.Schedule.saturate rs) db in
@@ -2136,17 +2149,14 @@ module Rewriter = struct
           let uses_for_value_slots = Datalog.get_table out1_tbl db in
           let uses_for_function_slots = Datalog.get_table out2_tbl db in
           let known_arity = Datalog.get_table out_known_arity_tbl db in
-          let unkwown_arity = Datalog.get_table out_unknown_arity_tbl db in
+          let unknown_arity = Datalog.get_table out_unknown_arity_tbl db in
           ( Usages uses_for_value_slots,
             Field.Map.fold
               (fun fs uses m ->
-                let known_arity_call, unknown_arity_call =
-                  Field.Map.mem fs known_arity, Field.Map.mem fs unkwown_arity
-                in
                 let calls =
-                  if unknown_arity_call
+                  if Field.Map.mem fs unknown_arity
                   then Any_call
-                  else if known_arity_call
+                  else if Field.Map.mem fs known_arity
                   then Only_called_with_known_arity
                   else Never_called
                 in
