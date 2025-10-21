@@ -934,6 +934,166 @@ let is_function_slot field =
   | Function_slot _ -> true
   | _ -> false
 
+module Fixit : sig
+  type (_, _) stmt
+
+  val ( let+ ) : ('a, 'b) stmt -> ('b -> 'c) -> ('a, 'c) stmt
+
+  val ( and+ ) :
+    (Datalog.nil, 'a) stmt ->
+    (Datalog.nil, 'b) stmt ->
+    (Datalog.nil, 'a * 'b) stmt
+
+  val run : ('a, 'b) stmt -> 'a Datalog.Constant.hlist -> Datalog.database -> 'b
+
+  (* Don't try to write to this one ;) *)
+  val empty :
+    ('t, 'k, unit) Datalog.Column.hlist -> ('t, 'k, unit) Datalog.table
+
+  val param :
+    string ->
+    ('a, 'b, unit) Datalog.Column.hlist ->
+    (('a, 'b, unit) Datalog.table -> ('c, 'd) stmt) ->
+    ('a -> 'c, 'd) stmt
+
+  module Table : sig
+    type (_, _) hlist =
+      | [] : (Datalog.nil, Datalog.nil) hlist
+      | ( :: ) :
+          ('t, 'k, unit) Datalog.table * ('ts, 'xs) hlist
+          -> ('t -> 'ts, ('t, 'k, unit) Datalog.table -> 'xs) hlist
+  end
+
+  val return : ('t, 'k, unit) Datalog.table -> (Datalog.nil, 't) stmt
+
+  val fix :
+    ('a, 'b) Table.hlist ->
+    (('a, 'b) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
+    (('a, 'b) Table.hlist -> (Datalog.nil, 'c) stmt) ->
+    (Datalog.nil, 'c) stmt
+
+  val fix' :
+    ('a, 'b) Table.hlist ->
+    (('a, 'b) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
+    (Datalog.nil, 'a Datalog.Constant.hlist) stmt
+end = struct
+  let empty columns =
+    Datalog.create_table ~name:"empty" ~default_value:() columns
+
+  let local name columns = Datalog.create_table ~name ~default_value:() columns
+
+  module Table = struct
+    type ('t, 'k, 'v) t = ('t, 'k, 'v) Datalog.table
+
+    type (_, _) hlist =
+      | [] : (Datalog.nil, Datalog.nil) hlist
+      | ( :: ) :
+          ('t, 'k, unit) t * ('ts, 'xs) hlist
+          -> ('t -> 'ts, ('t, 'k, unit) Datalog.table -> 'xs) hlist
+
+    let rec locals : type a b. (a, b) hlist -> (a, b) hlist = function
+      | [] -> []
+      | table :: tables ->
+        let columns = Datalog.columns table in
+        local "fix" columns :: locals tables
+
+    let rec copy :
+        type a b.
+        (a, b) hlist -> (a, b) hlist -> Datalog.database -> Datalog.database =
+     fun from_tables to_tables db ->
+      match from_tables, to_tables with
+      | [], [] -> db
+      | from_table :: from_tables, to_table :: to_tables ->
+        let db =
+          Datalog.set_table to_table (Datalog.get_table from_table db) db
+        in
+        copy from_tables to_tables db
+
+    let rec get :
+        type a b. (a, b) hlist -> Datalog.database -> a Datalog.Constant.hlist =
+     fun tables db ->
+      match tables with
+      | [] -> []
+      | table :: tables -> Datalog.get_table table db :: get tables db
+  end
+
+  type (_, _) stmt =
+    | Return : ('t, 'k, unit) Datalog.table -> (Datalog.nil, 't) stmt
+    | Run : Datalog.Schedule.t -> (Datalog.nil, unit) stmt
+    | Seq : ('i, unit) stmt * (Datalog.nil, 'o) stmt -> ('i, 'o) stmt
+    | Map : ('i, 'a) stmt * (Datalog.database -> 'a -> 'b) -> ('i, 'b) stmt
+    | Conj :
+        (Datalog.nil, 'a) stmt * (Datalog.nil, 'b) stmt
+        -> (Datalog.nil, 'a * 'b) stmt
+    | Now :
+        ('i, 'o) stmt * (Datalog.database -> Datalog.database)
+        -> ('i, 'o) stmt
+    | Input :
+        ('b, 'o) stmt * (Datalog.database -> 'a -> Datalog.database)
+        -> ('a -> 'b, 'o) stmt
+
+  let return table = Return table
+
+  let rec run :
+      type a b c.
+      (a, b) stmt ->
+      a Datalog.Constant.hlist ->
+      Datalog.database ->
+      (Datalog.database -> b -> c) ->
+      c =
+   fun stmt args db k ->
+    match stmt, args with
+    | Return table, [] -> k db (Datalog.get_table table db)
+    | Run schedule, [] ->
+      let db = Datalog.Schedule.run schedule db in
+      k db ()
+    | Seq (stmt1, stmt2), args ->
+      run stmt1 args db (fun db () -> run stmt2 [] db k)
+    | Map (stmt, later), args ->
+      run stmt args db (fun db value -> k db (later db value))
+    | Conj (stmt1, stmt2), [] ->
+      run stmt1 [] db (fun db value1 ->
+          run stmt2 [] db (fun db value2 -> k db (value1, value2)))
+    | Now (stmt, f), args -> run stmt args (f db) k
+    | Input (stmt, set_input), arg :: args ->
+      let db = set_input db arg in
+      run stmt args db k
+
+  let ( let+ ) stmt f = Map (stmt, fun _ value -> f value)
+
+  let ( and+ ) stmt1 stmt2 = Conj (stmt1, stmt2)
+
+  let run stmt args db = run stmt args db (fun _ out -> out)
+
+  let param name columns f =
+    let table = local name columns in
+    Input (f table, fun db x -> Datalog.set_table table x db)
+
+  let fix :
+      type b c d.
+      (b, c) Table.hlist ->
+      ((b, c) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
+      ((b, c) Table.hlist -> (Datalog.nil, d) stmt) ->
+      (Datalog.nil, d) stmt =
+   fun x f g ->
+    let y = Table.locals x in
+    let schedule = Datalog.Schedule.saturate (f y) in
+    let body = g y in
+    Now (Seq (Run schedule, body), fun db -> Table.copy x y db)
+
+  let fix' :
+      type b c.
+      (b, c) Table.hlist ->
+      ((b, c) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
+      (Datalog.nil, b Datalog.Constant.hlist) stmt =
+   fun x f ->
+    let y = Table.locals x in
+    let schedule = Datalog.Schedule.saturate (f y) in
+    Now
+      ( Map (Run schedule, fun db () -> Table.get y db),
+        fun db -> Table.copy x y db )
+end
+
 type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
 
 (** Computes all usages of a set of variables (input).
@@ -1107,29 +1267,34 @@ let field_of_constructor_is_used_as =
 
 let get_fields_usage_of_constructors :
     Datalog.database -> unit Code_id_or_name.Map.t -> field_usage Field.Map.t =
-  (* CR-someday ncourant: likewise here; I find this function particulartly
-     ugly. *)
-  let out_tbl1, out1 = rel1_r "out1" Cols.[f] in
-  let out_tbl2, out2 = rel2_r "out2" Cols.[f; n] in
-  let in_tbl, in_ = rel1_r "in_" Cols.[n] in
-  let open! Syntax in
-  let open! Global_flow_graph in
-  let rs =
-    ~>[ (let$ [x; field] = ["x"; "field"] in
-         [ in_ x;
-           field_of_constructor_is_used_top x field;
-           filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
-         ==> out1 field);
-        (let$ [x; field; y] = ["x"; "field"; "y"] in
-         [ in_ x;
-           field_of_constructor_is_used_as x field y;
-           not (out1 field);
-           filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
-         ==> out2 field y) ]
-  in
-  fun db s ->
-    let db = set_table in_tbl s db in
-    let db = List.fold_left (fun db r -> Schedule.run r db) db rs in
+  let stmt =
+    let open! Syntax in
+    let open! Fixit in
+    let ( let@ ) (f : ((_, _) Table.hlist -> _) -> _) x = f x in
+    let ( .$[] ) = Datalog.atom (* <3 *) in
+    param "in_" Cols.[n] @@ fun in_ ->
+    let@ [out1] =
+      fix
+        [empty Cols.[f]]
+        (fun [out1] ->
+          [ (let$ [x; field] = ["x"; "field"] in
+             [ in_.$[[x]];
+               field_of_constructor_is_used_top x field;
+               filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+             ==> out1.$[[field]]) ])
+    in
+    let@ [out2] =
+      fix
+        [empty Cols.[f; n]]
+        (fun [out2] ->
+          [ (let$ [x; field; y] = ["x"; "field"; "y"] in
+             [ in_.$[[x]];
+               field_of_constructor_is_used_as x field y;
+               not out1.$[[field]];
+               filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+             ==> out2.$[[field; y]]) ])
+    in
+    let+ out1 = return out1 and+ out2 = return out2 in
     Field.Map.merge
       (fun k x y ->
         match x, y with
@@ -1138,7 +1303,9 @@ let get_fields_usage_of_constructors :
           Misc.fatal_errorf "Got two results for field %a" Field.print k
         | Some (), None -> Some Used_as_top
         | None, Some m -> Some (Used_as_vars m))
-      (get_table out_tbl1 db) (get_table out_tbl2 db)
+      out1 out2
+  in
+  fun db s -> Fixit.run stmt [s] db
 
 type set_of_closures_def =
   | Not_a_set_of_closures
