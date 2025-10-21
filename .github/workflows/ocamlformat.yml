@@ -9,7 +9,10 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 jobs:
   build:
-    runs-on: warp-ubuntu-latest-x64-32x
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ warp-ubuntu-latest-x64-32x ]
     steps:
       - name: Checkout the OxCaml repo
         uses: actions/checkout@master
