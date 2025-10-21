@@ -3865,12 +3865,38 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 mty2 fl2 =
   | exception Exit -> raise Not_found
 
 (* Checks if a type is a type variable under some quotes or splices *)
-let rec is_flexible ty =
+let rec is_flexible_ty ty =
   match get_desc ty with
   | Tvar _ -> true
-  | Tquote ty' -> is_flexible ty'
-  | Tsplice ty' -> is_flexible ty'
+  | Tquote ty' -> is_flexible_ty ty'
+  | Tsplice ty' -> is_flexible_ty ty'
   | _ -> false
+
+(* Checks if a type is an instantiable type under some quotes or splices *)
+let rec is_instantiable_ty env ty =
+  match get_desc ty with
+  | Tconstr (path, [], _) ->
+      is_instantiable env ~for_jkind_eqn:false path
+  | Tquote ty' -> is_instantiable_ty env ty'
+  | Tsplice ty' -> is_instantiable_ty env ty'
+  | _ -> false
+
+(* Checks if a type is equatable under some quotes or splices *)
+let rec is_equatable_ty ty =
+  match get_desc ty with
+  | Tconstr (_, _, _) -> true
+  | Tquote ty' -> is_equatable_ty ty'
+  | Tsplice ty' -> is_equatable_ty ty'
+  | _ -> false
+
+(* Gives the scope at which the type can be instantiated. Returns -1 if
+   the type is not instantiable. *)
+let rec instantiable_scope ty =
+  match get_desc ty with
+  | Tconstr (path, [], _) -> Path.scope path
+  | Tquote ty' -> instantiable_scope ty'
+  | Tsplice ty' -> instantiable_scope ty'
+  | _ -> -1
 
 (* raise Not_found rather than Unify if the module types are incompatible *)
 let unify_package env unify_list lv1 p1 fl1 lv2 p2 fl2 =
@@ -4097,6 +4123,33 @@ and unify3 uenv t1 t1' t2 t2' =
       unify3_var uenv jkind t1' t2 t2'
   | (_, Tvar { jkind }) ->
       unify3_var uenv jkind t2' t1 t1'
+  | (Tquote t1, Tquote t2)
+  | (Tsplice t1, Tsplice t2) ->
+      unify uenv t1 t2
+  | (Tsplice s1, _) when is_flexible_ty s1 ->
+      set_type_desc t2' d2;
+      let t =
+        newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tquote t2')
+      in
+      unify uenv s1 t
+  | (Tquote s1, _) when is_flexible_ty s1 ->
+      set_type_desc t2' d2;
+      let t =
+        newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tsplice t2')
+      in
+      unify uenv s1 t
+  | (_, Tsplice s2) when is_flexible_ty s2 ->
+      set_type_desc t1' d1;
+      let t =
+        newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
+      in
+      unify uenv s2 t
+  | (_, Tquote s2) when is_flexible_ty s2 ->
+      set_type_desc t1' d1;
+      let t =
+        newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
+      in
+      unify uenv s2 t
   | (Tfield _, Tfield _) -> (* special case for GADTs *)
       unify_fields uenv t1' t2'
   | _ ->
@@ -4186,6 +4239,52 @@ and unify3 uenv t1 t1' t2 t2' =
             mcomp_for Unify (get_env uenv) t1' t2';
             record_equation uenv t1' t2'
           )
+      | (Tsplice s1, _)
+        when is_instantiable_ty (get_env uenv) s1
+          && instantiable_scope s1 > instantiable_scope t2'
+          && can_generate_equations uenv ->
+          set_type_desc t2' d2;
+          let t =
+            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tquote t2')
+          in
+          unify uenv s1 t
+      | (Tquote s1, _)
+        when is_instantiable_ty (get_env uenv) s1
+          && instantiable_scope s1 > instantiable_scope t2'
+          && can_generate_equations uenv ->
+          set_type_desc t2' d2;
+          let t =
+            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tsplice t2')
+          in
+          unify uenv s1 t
+      | (_, Tsplice s2)
+        when is_instantiable_ty (get_env uenv) s2
+          && instantiable_scope s2 >= instantiable_scope t1'
+          && can_generate_equations uenv ->
+          set_type_desc t1' d1;
+          let t =
+            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
+          in
+          unify uenv s2 t
+      | (_, Tquote s2)
+        when is_instantiable_ty (get_env uenv) s2
+          && instantiable_scope s2 >= instantiable_scope t1'
+          && can_generate_equations uenv ->
+          set_type_desc t1' d1;
+          let t =
+            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
+          in
+          unify uenv s2 t
+      | (Tquote _, _) | (Tsplice _, _)
+      | (_, Tquote _) | (_, Tsplice _)
+        when in_pattern_mode uenv
+          && (is_equatable_ty t1 || is_equatable_ty t2) ->
+          reify uenv t1';
+          reify uenv t2';
+          if can_generate_equations uenv then (
+            mcomp_for Unify (get_env uenv) t1' t2';
+            record_equation uenv t1' t2'
+          )
       | (Tobject (fi1, nm1), Tobject (fi2, _)) ->
           unify_fields uenv fi1 fi2;
           (* Type [t2'] may have been instantiated by [unify_fields] *)
@@ -4246,33 +4345,6 @@ and unify3 uenv t1 t1' t2 t2' =
           raise_for Unify (Obj (Abstract_row Second))
       | (Tconstr _,  Tnil ) ->
           raise_for Unify (Obj (Abstract_row First))
-      | (Tquote t1, Tquote t2)
-      | (Tsplice t1, Tsplice t2) ->
-          unify uenv t1 t2
-      | (Tsplice s1, _) when is_flexible s1 ->
-          set_type_desc t2' d2;
-          let t =
-            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tquote t2')
-          in
-          unify uenv s1 t
-      | (Tquote s1, _) when is_flexible s1 ->
-          set_type_desc t2' d2;
-          let t =
-            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tsplice t2')
-          in
-          unify uenv s1 t
-      | (_, Tsplice s2) when is_flexible s2 ->
-          set_type_desc t1' d1;
-          let t =
-            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
-          in
-          unify uenv s2 t
-      | (_, Tquote s2) when is_flexible s2 ->
-          set_type_desc t1' d1;
-          let t =
-            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
-          in
-          unify uenv s2 t
       | (_, _) -> raise_unexplained_for Unify
       end;
       (* XXX Commentaires + changer "create_recursion"
