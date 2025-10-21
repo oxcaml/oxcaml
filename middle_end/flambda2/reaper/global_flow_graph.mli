@@ -34,7 +34,7 @@ val add_use_dep :
 
 val accessor_rel :
   to_:Code_id_or_name.t term ->
-  relation:Field.t term ->
+  Field.t term ->
   base:Code_id_or_name.t term ->
   _ atom
 
@@ -43,7 +43,7 @@ val add_accessor_dep :
 
 val constructor_rel :
   base:Code_id_or_name.t term ->
-  relation:Field.t term ->
+  Field.t term ->
   from:Code_id_or_name.t term ->
   _ atom
 
@@ -52,7 +52,7 @@ val add_constructor_dep :
 
 val coaccessor_rel :
   to_:Code_id_or_name.t term ->
-  relation:Cofield.t term ->
+  Cofield.t term ->
   base:Code_id_or_name.t term ->
   _ atom
 
@@ -61,7 +61,7 @@ val add_coaccessor_dep :
 
 val coconstructor_rel :
   base:Code_id_or_name.t term ->
-  relation:Cofield.t term ->
+  Cofield.t term ->
   from:Code_id_or_name.t term ->
   _ atom
 
