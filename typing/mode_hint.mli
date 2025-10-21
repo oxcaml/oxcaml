@@ -81,5 +81,7 @@ type 'd morph =
   | Captured_by_partial_application : (disallowed * 'r) morph
   | Adj_captured_by_partial_application : ('l * disallowed) morph
   | Crossing : ('l * 'r) morph
+  | Allocation_r : (disallowed * 'r) morph
+  | Allocation_l : ('l * disallowed) morph
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]

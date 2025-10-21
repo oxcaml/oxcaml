@@ -30,7 +30,11 @@ let contents_loc_escape (t @ local) = [%atomic.loc t.contents]
 Line 1, characters 38-62:
 1 | let contents_loc_escape (t @ local) = [%atomic.loc t.contents]
                                           ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global"
+       because it is an allocation
+       which is expected to be in the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 

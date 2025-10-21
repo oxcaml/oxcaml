@@ -679,7 +679,7 @@ let register_allocation_mode alloc_mode =
 let register_allocation_value_mode mode =
   let alloc_mode = value_to_alloc_r2g mode in
   register_allocation_mode alloc_mode;
-  let mode = value_r2g ~hint:Unknown_non_rigid mode in
+  let mode = value_r2g ~hint:Allocation_r (Mode.Value.disallow_left mode) in
   alloc_mode, mode
 
 (** Register as allocation the expression constrained by the given
