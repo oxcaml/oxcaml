@@ -181,14 +181,10 @@ CAMLexport void caml_record_signal(int signal_number)
 
 static void caml_enter_blocking_section_default(void)
 {
-  caml_bt_exit_ocaml();
-  caml_release_domain_lock();
 }
 
 static void caml_leave_blocking_section_default(void)
 {
-  caml_acquire_domain_lock();
-  caml_bt_enter_ocaml();
 }
 
 CAMLexport void (*caml_enter_blocking_section_hook)(void) =
@@ -201,6 +197,8 @@ static int check_pending_actions(caml_domain_state * dom_st);
 CAMLexport void caml_enter_blocking_section_no_pending(void)
 {
   caml_enter_blocking_section_hook ();
+  caml_bt_exit_ocaml();
+  caml_release_domain_lock();
 }
 
 CAMLexport void caml_enter_blocking_section(void)
@@ -230,6 +228,9 @@ CAMLexport void caml_leave_blocking_section(void)
   int saved_errno;
   /* Save the value of errno (PR#5982). */
   saved_errno = errno;
+
+  caml_acquire_domain_lock();
+  caml_bt_enter_ocaml();
   caml_leave_blocking_section_hook ();
   Caml_check_caml_state();
 

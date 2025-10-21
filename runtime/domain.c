@@ -362,6 +362,7 @@ void caml_handle_incoming_interrupts(void)
   handle_incoming(domain_self);
 }
 
+/* Signal the backup thread of a given domain. Can be called from any domain. */
 
 static void caml_bt_signal(dom_internal* dom)
 {
@@ -1079,6 +1080,12 @@ struct domain_startup_params {
   uintnat unique_id; /* out */
 };
 
+/* The backup thread mostly waits to be signalled on
+ * backup_thread_cond. If the domain is in a blocking section, and an
+ * interrupt is queued for this domain, the condition variable is
+ * signalled and the backup thread wakes up to process the
+ * interrupt. */
+
 static void* backup_thread_func(void* v)
 {
   dom_internal* di = (dom_internal*)v;
@@ -1094,6 +1101,12 @@ static void* backup_thread_func(void* v)
 
     if (msg == BT_IN_BLOCKING_SECTION && caml_incoming_interrupts_queued()) {
       caml_plat_unlock(&di->backup_thread_lock);
+      /* We must have the domain lock to handle interrupts. If the
+       * domain has finished its blocking section and re-taken the
+       * domain lock before we get here, we will wait here until the
+       * next blocking section, but then (if there are no interrupts
+       * pending) quickly go back around the loop to wait on the
+       * condition variable again. */
       caml_domain_lock_hook();
       caml_handle_incoming_interrupts();
       caml_domain_unlock_hook();

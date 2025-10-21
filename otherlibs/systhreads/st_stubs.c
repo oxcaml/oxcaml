@@ -217,6 +217,7 @@ static void default_reinitialize_after_fork(st_masterlock *m)
      effort. */
   if (st_masterlock_init(m) != 0)
     caml_fatal_error("Unix.fork: failed to reinitialize master lock");
+  st_masterlock_acquire(m);
 }
 
 /* Hook for scanning the stacks of the other threads */
@@ -346,28 +347,23 @@ static void reset_active(void)
   caml_thread_cleanup(Val_unit);
 }
 
-/* Hooks for caml_enter_blocking_section and caml_leave_blocking_section */
+/* Hooks for caml_enter_blocking_section and
+ * caml_leave_blocking_section. The main runtime manages the backup
+ * thread and domain lock here; we just have to manage the thread state. */
 
 static void caml_thread_enter_blocking_section(void)
 {
   /* Save the current runtime state in the thread descriptor
      of the current thread */
   save_runtime_state();
-  /* Tell other threads that the runtime is free */
-  caml_bt_exit_ocaml();
-  caml_release_domain_lock();
 }
 
 static void caml_thread_leave_blocking_section(void)
 {
-  caml_thread_t th = This_thread;
-  /* Wait until the runtime is free */
-  caml_acquire_domain_lock();
-  caml_bt_enter_ocaml();
   /* Update Active_thread to point to the thread descriptor
      corresponding to the thread currently executing and restore the
      runtime state */
-  restore_runtime_state(th);
+  restore_runtime_state(This_thread);
 }
 
 /* Create and setup a new thread info block.
@@ -680,8 +676,8 @@ CAMLprim value caml_thread_initialize(value unit)
     ls->yield = (void (*)(void*))&st_thread_yield;
     Locking_scheme(i) = ls;
 
-    if (i != Caml_state->id)
-      st_masterlock_release(Default_lock(i));
+    if (i == Caml_state->id)
+      st_masterlock_acquire(Default_lock(i));
   }
 
   /* First initialise the systhread chain on this domain */

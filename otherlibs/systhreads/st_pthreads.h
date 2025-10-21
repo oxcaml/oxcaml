@@ -77,7 +77,7 @@ typedef struct {
   custom_condvar is_free;         /* signaled when free */
 } st_masterlock;
 
-/* Returns non-zero on failure */
+/* Initializes but does not lock a masterlock. Returns non-zero on failure */
 static int st_masterlock_init(st_masterlock * m)
 {
   int rc;
@@ -88,8 +88,8 @@ static int st_masterlock_init(st_masterlock * m)
     if (rc != 0) goto out_err2;
     m->init = 1;
   }
-  m->busy = 1;
-  m->last_locked_by = pthread_self();
+  m->busy = 0;
+  m->last_locked_by = pthread_self(); /* Here "initialized by". */
   atomic_store_release(&m->waiters, 0);
   return 0;
 
