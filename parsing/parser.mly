@@ -175,12 +175,12 @@ let mkpat_with_modes ~loc ~pat ~cty ~modes =
     begin match cty, cty' with
     | Some _, None ->
       { pat with
-        ppat_desc = Ppat_constraint (pat', cty, Modes.append modes modes');
+        ppat_desc = Ppat_constraint (pat', cty, Modes.merge modes modes');
         ppat_loc = make_loc loc
       }
     | None, _ ->
       { pat with
-        ppat_desc = Ppat_constraint (pat', cty', Modes.append modes modes');
+        ppat_desc = Ppat_constraint (pat', cty', Modes.merge modes modes');
         ppat_loc = make_loc loc
       }
     | _ ->
@@ -202,7 +202,7 @@ let mkexp_constraint ~loc ~exp ~cty ~modes =
      begin match cty, cty' with
      | cty, None | None, cty ->
         { exp with
-          pexp_desc = Pexp_constraint (exp', cty, Modes.append modes modes');
+          pexp_desc = Pexp_constraint (exp', cty, Modes.merge modes modes');
           pexp_loc = make_loc loc
         }
      | _ ->
@@ -788,7 +788,7 @@ let mkghost_newtype_function_body newtypes body_constraint body ~loc =
     let { ret_type_constraint; mode_annotations; ret_mode_annotations } =
       body_constraint
     in
-    let modes = Modes.append mode_annotations ret_mode_annotations in
+    let modes = Modes.merge mode_annotations ret_mode_annotations in
     let {Location.loc_start; loc_end} = body.pexp_loc in
     let loc = loc_start, loc_end in
     mkexp_opt_type_constraint_with_modes ~ghost:true ~loc ~modes body ret_type_constraint
@@ -2156,7 +2156,7 @@ signature_item:
     let name, modalities' = name_ in
     let mty, modalities = body in
     let modalities =
-      Modalities.append modalities' (Option.value ~default:No_modalities modalities) in
+      Modalities.merge modalities' (Option.value ~default:No_modalities modalities) in
     Md.mk name mty ~attrs ~loc ~docs ~modalities, ext
   }
 ;
@@ -2191,7 +2191,7 @@ module_declaration_body(module_type_with_optional_modal_expr):
     let loc = make_loc $sloc in
     let docs = symbol_docs $sloc in
     let name, modalities' = name_ in
-    let modalities = Modalities.append modalities' modalities in
+    let modalities = Modalities.merge modalities' modalities in
     Md.mk name body ~attrs ~modalities ~loc ~docs, ext
   }
 ;
@@ -2736,7 +2736,7 @@ label_let_pattern:
     cty_modes1 = optional_poly_type_and_modes
       { let lab, pat = x in
         let cty, modes1 = cty_modes1 in
-        let modes = Modes.append modes0 modes1 in
+        let modes = Modes.merge modes0 modes1 in
         let loc = $startpos(modes0), $endpos(cty_modes1) in
         let pat = mkpat_with_modes ~loc ~pat ~cty ~modes in
         lab, pat
@@ -2751,7 +2751,7 @@ let_pattern:
     cty_modes1 = optional_poly_type_and_modes
     {
       let cty, modes1 = cty_modes1 in
-      let modes = Modes.append modes0 modes1 in
+      let modes = Modes.merge modes0 modes1 in
       let loc = $startpos(modes0), $endpos(cty_modes1) in
       mkpat_with_modes ~loc ~pat ~cty ~modes
     }
@@ -2767,7 +2767,7 @@ pattern_with_modes_or_poly:
     modes0 = mode_expr_legacy pat = pattern cty_modes1 = optional_poly_type_and_modes
       {
         let cty, modes1 = cty_modes1 in
-        let modes = Modes.append modes0 modes1 in
+        let modes = Modes.merge modes0 modes1 in
         let loc = $startpos(modes0), $endpos(cty_modes1) in
         mkpat_with_modes ~loc ~pat ~cty:cty ~modes
       }
@@ -3289,13 +3289,13 @@ let_binding_body_no_punning:
           | Pcoerce (ground, coercion) -> Pvc_coercion { ground; coercion}
           ) typ
         in
-        let modes = Modes.append modes0 modes1 in
+        let modes = Modes.merge modes0 modes1 in
         (v, $4, t, modes)
       }
   | let_ident_with_modes COLON strictly_poly_type_with_optional_modes EQUAL seq_expr
       { let v, modes0 = $1 in
         let typ, modes1 = $3 in
-        let modes = Modes.append modes0 modes1 in
+        let modes = Modes.merge modes0 modes1 in
         (v, $5, Some (Pvc_constraint { locally_abstract_univars = []; typ }), modes)
       }
   | let_ident_with_modes COLON TYPE ntys = newtypes DOT cty = core_type  modes1 = empty_modes   EQUAL e = seq_expr
@@ -3319,7 +3319,7 @@ let_binding_body_no_punning:
           wrap_type_annotation ~loc:$sloc ~modes:No_modes ~typloc:$loc(cty) ntys cty e
         in
         let v, modes0 = $1 in
-        let modes = Modes.append modes0 modes1 in
+        let modes = Modes.merge modes0 modes1 in
         let loc = ($startpos($1), $endpos(modes1)) in
         (ghpat_with_modes ~loc ~pat:v ~cty:(Some poly) ~modes:No_modes, exp, None, modes)
        }
@@ -4257,7 +4257,7 @@ generalized_constructor_arguments:
 
 %inline constructor_argument:
   gbl=global_flag cty=atomic_type m1=optional_modality_annot_expr {
-    let modalities = Modalities.append gbl m1 in
+    let modalities = Modalities.merge gbl m1 in
     Type.constructor_arg cty ~modalities ~loc:(make_loc $sloc)
   }
 ;
@@ -4277,7 +4277,7 @@ label_declaration:
     mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_modality_annot_expr attrs=attributes
       { let info = symbol_info $endpos in
         let mut, m0 = $1 in
-        let modalities = Modalities.append m0 m1 in
+        let modalities = Modalities.merge m0 m1 in
         Type.field $2 $4 ~mut ~modalities ~attrs ~loc:(make_loc $sloc) ~info}
 ;
 label_declaration_semi:
@@ -4289,7 +4289,7 @@ label_declaration_semi:
           | None -> symbol_info $endpos
        in
        let mut, m0 = $1 in
-       let modalities = Modalities.append m0 m1 in
+       let modalities = Modalities.merge m0 m1 in
        Type.field $2 $4 ~mut ~modalities ~attrs:(attrs0 @ attrs1) ~loc:(make_loc $sloc) ~info}
 ;
 
@@ -4672,7 +4672,7 @@ mode_annot_expr:
   (* CR modes: currently this does not support crossings, which notably prevents
      crossings from appearing on arrow types. *)
   | m0=optional_mode_expr_legacy ty=ty m1=optional_core_modes_expr {
-    (ty, $loc(ty)), Modes.append m0 m1
+    (ty, $loc(ty)), Modes.merge m0 m1
   }
 ;
 
