@@ -10,63 +10,127 @@
 *)
 
 open Stdlib_upstream_compatible
-external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
+external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
+
+type void : void
+
+external void : unit -> void = "%unbox_unit"
 
 let _ = print_endline "Test: [let open] with module ident"
 
-module M = struct let foo = #42.0 let bar = "hello" end
+module M = struct
+  let foo = #42.0
+  let bar = "hello"
+  let product = #(#1.0, void (), #100L, "test")
+end
 
-let _ =
+let () =
   let open M in
-  print_float (Float_u.to_float (id foo));
-  print_string " ";
-  print_endline (id bar)
-
+  let #(a, _v, b, c) = id product in
+  print_endline "Expected: 42.0 hello 1.0 100 test";
+  Printf.printf
+    "Actual:   %.1f %s %.1f %d %s\n\n"
+    (Float_u.to_float (id foo))
+    (id bar)
+    (Float_u.to_float a)
+    (Int64_u.to_int b)
+    c
+;;
 
 let _ = print_endline "Test: [let open] with inline struct"
 
-let _ =
-  let open struct let foo = #42.0 let bar = "hello" end in
-  print_float (Float_u.to_float (id foo));
-  print_string " ";
-  print_endline (id bar)
-
+let () =
+  let open struct
+    let foo = #42.0
+    let bar = "hello"
+    let product = #(void (), #2L, "inline", #3.0)
+  end in
+  let #(_v, a, b, c) = id product in
+  print_endline "Expected: 42.0 hello 2 inline 3.0";
+  Printf.printf
+    "Actual:   %.1f %s %d %s %.1f\n\n"
+    (Float_u.to_float (id foo))
+    (id bar)
+    (Int64_u.to_int a)
+    b
+    (Float_u.to_float c)
+;;
 
 let _ = print_endline "Test: [let open] with functor"
 
-module Functor (X : sig end) = struct let foo = #42.0 let bar = "hello" end
+module Functor (X : sig end) = struct
+  let foo = #42.0
+  let bar = "hello"
+  let product = #(#4.0, "functor", void (), #5L)
+end
 
-let _ =
-  let open Functor(struct end) in
-  print_float (Float_u.to_float (id foo));
-  print_string " ";
-  print_endline (id bar)
-
+let () =
+  let open Functor (struct end) in
+  let #(a, b, _v, c) = id product in
+  print_endline "Expected: 42.0 hello 4.0 functor 5";
+  Printf.printf
+    "Actual:   %.1f %s %.1f %s %d\n\n"
+    (Float_u.to_float (id foo))
+    (id bar)
+    (Float_u.to_float a)
+    b
+    (Int64_u.to_int c)
+;;
 
 let _ = print_endline "Test: Tests 1-3 with [open] instead of [let open]"
 
 module M_4_1 = struct
   open M
-  let _ = print_float (Float_u.to_float (id foo))
-  let _ = print_string " "
-  let _ = print_endline (id bar)
+
+  let () =
+    let #(a, _v, b, c) = id product in
+    print_endline "Expected: 42.0 hello 1.0 100 test";
+    Printf.printf
+      "Actual:   %.1f %s %.1f %d %s\n\n"
+      (Float_u.to_float (id foo))
+      (id bar)
+      (Float_u.to_float a)
+      (Int64_u.to_int b)
+      c
+  ;;
 end
 
 module M_4_2 = struct
-  open struct let foo = #42.0 let bar = "hello" end
-  let _ = print_float (Float_u.to_float (id foo))
-  let _ = print_string " "
-  let _ = print_endline (id bar)
+  open struct
+    let foo = #42.0
+    let bar = "hello"
+    let product = #(#6L, void (), "open", #7.0)
+  end
+
+  let () =
+    let #(a, _v, b, c) = id product in
+    print_endline "Expected: 42.0 hello 6 open 7.0";
+    Printf.printf
+      "Actual:   %.1f %s %d %s %.1f\n\n"
+      (Float_u.to_float (id foo))
+      (id bar)
+      (Int64_u.to_int a)
+      b
+      (Float_u.to_float c)
+  ;;
 end
 
 module M_4_3 = struct
-  open Functor(struct end)
-  let _ = print_float (Float_u.to_float (id foo))
-  let _ = print_string " "
-  let _ = print_endline (id bar)
-end
+  open Functor (struct end)
 
+  let () =
+    let #(a, b, _v, c) = id product in
+    print_endline "Expected: 42.0 hello 4.0 functor 5";
+    Printf.printf
+      "Actual:   %.1f %s %.1f %s %d\n\n"
+      (Float_u.to_float (id foo))
+      (id bar)
+      (Float_u.to_float a)
+      b
+      (Int64_u.to_int c)
+  ;;
+end
 
 let _ = print_endline "Test: open shadowing open"
 
@@ -74,47 +138,57 @@ module Base = struct
   let x = #10.0
   let y = "original"
   let z = 100
+  let product = #(#8L, "base", void ())
 end
 
 module Override = struct
   let x = #20.0
   let y = "overridden"
+  let product = #(void (), #9L, "override")
 end
 
 module M_5 = struct
   open Base
   open Override
 
-  let _ =
-    print_float (Float_u.to_float (id x));
-    print_string " ";
-    print_string (id y);
-    print_string " ";
-    print_int (id z);
-    print_newline ()
+  let () =
+    let #(_v, a, b) = id product in
+    print_endline "Expected: 20.0 overridden 100 9 override";
+    Printf.printf
+      "Actual:   %.1f %s %d %d %s\n\n"
+      (Float_u.to_float (id x))
+      (id y)
+      (id z)
+      (Int64_u.to_int a)
+      b
+  ;;
 end
-
 
 let _ = print_endline "Test: open shadowing a val"
 
 module M_6 = struct
   let a = #5.0
   let b = "before open"
+  let product_1 = #(void (), #10L, "before")
 
   open struct
     let b = "from open"
     let c = #7.0
+    let product_1 = #(#11L, void (), "from_open")
   end
 
-  let _ =
-    print_float (Float_u.to_float (id a));
-    print_string " ";
-    print_string (id b);
-    print_string " ";
-    print_float (Float_u.to_float (id c));
-    print_newline ()
+  let () =
+    let #(d, _v, e) = id product_1 in
+    print_endline "Expected: 5.0 from open 7.0 11 from_open";
+    Printf.printf
+      "Actual:   %.1f %s %.1f %d %s\n\n"
+      (Float_u.to_float (id a))
+      (id b)
+      (Float_u.to_float (id c))
+      (Int64_u.to_int d)
+      e
+  ;;
 end
-
 
 let _ = print_endline "Test: val shadowing an open"
 
@@ -122,25 +196,31 @@ module M_7 = struct
   open struct
     let p = #8.0
     let q = "from open"
+    let product = #(#12L, "from_open", void ())
   end
 
   let p = #9.0
   let r = "after open"
+  let product = #(void (), #13L, "shadowed")
 
-  let _ =
-    print_float (Float_u.to_float (id p));
-    print_string " ";
-    print_string (id q);
-    print_string " ";
-    print_string (id r);
-    print_newline ()
+  let () =
+    let #(_v, a, b) = id product in
+    print_endline "Expected: 9.0 from open after open 13 shadowed";
+    Printf.printf
+      "Actual:   %.1f %s %s %d %s\n\n"
+      (Float_u.to_float (id p))
+      (id q)
+      (id r)
+      (Int64_u.to_int a)
+      b
+  ;;
 end
 
-let _ =
-  print_endline "Test: opens can't violate the scannable tag size restriction"
+let _ = print_endline "Test: opens can't violate the scannable tag size restriction"
 
 module M_8 = struct
   let f_0 = #42.0
+  let product_0 = #(#14L, void (), "base")
   let a_0 = "a"
   let a_1 = "a"
   let a_2 = "a"
@@ -383,8 +463,10 @@ module M_8 = struct
   let a_239 = "a"
   let a_240 = "a"
   let a_241 = "a"
+
   open struct
     let f_1 = #43.0
+    let product_1 = #(void (), #15L, "open")
     let a_242 = "a"
     let a_243 = "a"
     let a_244 = "a"
@@ -411,11 +493,19 @@ module M_8 = struct
     let a_265 = "a"
   end
 
-  let _ = print_float (Float_u.to_float (id f_0))
-  let _ = print_string " "
-  let _ = print_float (Float_u.to_float (id f_1))
-  let _ = print_string " "
-  let _ = print_string (id a_181)
-  let _ = print_string " "
-  let _ = print_endline (id a_250)
+  let () =
+    let #(a, _v1, b) = id product_0 in
+    let #(_v2, c, d) = id product_1 in
+    print_endline "Expected: 42.0 43.0 [a_181] [a_250] 14 base 15 open";
+    Printf.printf
+      "Actual:   %.1f %.1f %s %s %d %s %d %s\n"
+      (Float_u.to_float (id f_0))
+      (Float_u.to_float (id f_1))
+      (id a_181)
+      (id a_250)
+      (Int64_u.to_int a)
+      b
+      (Int64_u.to_int c)
+      d
+  ;;
 end

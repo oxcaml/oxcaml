@@ -18,9 +18,10 @@ let of_int x = unbox_int64 (int64_of_int x)
 let to_int x = int_of_int64 (box_int64 x)
 
 let mul #(a0, a1, a2) #(b0, b1, b2) =
-  #( of_int (to_int a0 * to_int b0),
-     unbox_float (box_float a1 *. box_float b1),
-     Multiply (a2, b2) )
+  #( of_int (to_int a0 * to_int b0)
+   , unbox_float (box_float a1 *. box_float b1)
+   , Multiply (a2, b2) )
+;;
 
 let rec elt_to_string = function
   | Zero -> "0"
@@ -28,30 +29,35 @@ let rec elt_to_string = function
   | Negative x -> "-" ^ elt_to_string x
   | Add (x, y) -> "(" ^ elt_to_string x ^ " + " ^ elt_to_string y ^ ")"
   | Multiply (x, y) -> elt_to_string x ^ " * " ^ elt_to_string y
+;;
 
 let one = #(#1L, #1.0, One)
 
 let sub #(a0, a1, a2) #(b0, b1, b2) =
-  #( of_int (to_int a0 - to_int b0),
-     unbox_float (box_float a1 -. box_float b1),
-     Add (a2, (Negative b2)) )
+  #( of_int (to_int a0 - to_int b0)
+   , unbox_float (box_float a1 -. box_float b1)
+   , Add (a2, Negative b2) )
+;;
 
 let add #(a0, a1, a2) #(b0, b1, b2) =
-  #( of_int (to_int a0 + to_int b0),
-     unbox_float (box_float a1 +. box_float b1),
-     Add (a2, b2) )
+  #( of_int (to_int a0 + to_int b0)
+   , unbox_float (box_float a1 +. box_float b1)
+   , Add (a2, b2) )
+;;
 
 let zero = #(#0L, #0.0, Zero)
 
 let rec elt_to_int = function
   | Zero -> 0
   | One -> 1
-  | Negative x -> -(elt_to_int x)
+  | Negative x -> -elt_to_int x
   | Add (x, y) -> elt_to_int x + elt_to_int y
   | Multiply (x, y) -> elt_to_int x * elt_to_int y
+;;
 
 let to_string #(a, b, c) =
-  Format.sprintf "%d %.0f %d" (to_int a) (box_float b) (elt_to_int c)
+  Format.sprintf "%d %.1f %d" (to_int a) (box_float b) (elt_to_int c)
+;;
 
 let negative_one = #(-#1L, -#1.0, Negative One)
 let two = #(#2L, #2.0, Add (One, One))

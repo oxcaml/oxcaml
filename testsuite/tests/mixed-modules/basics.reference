@@ -1,10 +1,37 @@
 Test: basic mixed module
-5
-10
-25
+Expected: 5 10 25
+Actual:   5 10 25
+
 Test: shadowing within a module
 10.0 20.0 30.0
+
 Test: pattern aliases
-a 1. a 1.
+Expected: a 1.0 a 1.0
+Actual:   a 1.0 a 1.0
+
 Test: complicated unboxed products
-0 1 2 3 4 5 6 7 8 9 10 11 12 13
+0 1 2 3.0 4 5.0 6 7.0 8.0 9 10 11 12 13
+
+Test: simple mixed products
+Expected: hello 42 3.14 world 1.5 100 a 2 b
+Actual:   hello 42 3.14 world 1.5 100 a 2 b
+
+Test: deeply nested mixed products
+Expected: 1.0 inner 2 outer 3.0 a 4 b 5 c 99
+Actual:   1.0 inner 2 outer 3.0 a 4 b 5 c 99
+
+Test: mixed products with different unboxed types
+Expected: 10 ten 20 1.5 2 3 100 hundred 200.0 regular
+Actual:   10 ten 20 1.5 2 3 100 hundred 200.0 regular
+
+Test: void in mixed module
+Expected: before 42.0 after 99
+Actual:   before 42.0 after 99
+
+Test: void with mixed products
+Expected: a 1.0 2 b 3 100
+Actual:   a 1.0 2 b 3 100
+
+Test: void inside unboxed products
+Expected: 1.0 2 hello 42.0 outer 3.0 inner 4 5 middle 6.0
+Actual:   1.0 2 hello 42.0 outer 3.0 inner 4 5 middle 6.0

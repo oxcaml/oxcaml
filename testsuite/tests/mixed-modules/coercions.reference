@@ -1,10 +1,27 @@
 Test: mixed to mixed
-5
-10
+Expected: 5 10
+Actual:   5 10
+
 Test: mixed to value only
-10
-hello
+Expected: 10 hello
+Actual:   10 hello
+
 Test: nested modules
-1. 0. 0. 0.
+Expected: 1.0 0.0 0.0 0.0
+Actual:   1.0 0.0 0.0 0.0
+
 Test: composed coercions
-1. 2. s
+Expected: 1.0 2.0 s
+Actual:   1.0 2.0 s
+
+Test: coercing modules with mixed products
+Expected: 1.0 one 100
+Actual:   1.0 one 100
+
+Test: coercing modules with nested mixed products
+Expected: 10.0 a 20 boxed
+Actual:   10.0 a 20 boxed
+
+Test: coercing modules with void
+Expected: hello 5.0
+Actual:   hello 5.0

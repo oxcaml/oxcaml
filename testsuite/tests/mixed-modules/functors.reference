@@ -1,15 +1,27 @@
 Test: no coercion in or out
-2.
-1+1
+Expected: 2.0 1+1
+Actual:   2.0 1+1
+
 Test: coercion in, no coercion out
-11.
-10+1
+Expected: 11.0 10+1
+Actual:   11.0 10+1
+
 Test: coercion out, no coercion in
-4.
-(1+1)*2
+Expected: 4.0 (1+1)*2
+Actual:   4.0 (1+1)*2
+
 Test: coercion in and out
-6.
-(3)*2
+Expected: 6.0 (3)*2
+Actual:   6.0 (3)*2
+
 Test: generative functor
-1.
-2.
+Expected: 1.0 2.0
+Actual:   1.0 2.0
+
+Test: functor with mixed products
+Expected: 11.5 1.5+10 15 ten+5 25.0 101
+Actual:   11.5 1.5+10 15 ten+5 25.0 101
+
+Test: functor with void
+Expected: 6.0 base *2
+Actual:   6.0 base *2
