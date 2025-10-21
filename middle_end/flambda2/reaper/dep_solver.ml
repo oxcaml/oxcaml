@@ -976,6 +976,11 @@ module Fixit : sig
     ('a, 'b) Table.hlist ->
     (('a, 'b) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
     (Datalog.nil, 'a Datalog.Constant.hlist) stmt
+
+  val ( let@ ) :
+    ((('a, 'b) Table.hlist -> 'c) -> 'd) -> (('a, 'b) Table.hlist -> 'c) -> 'd
+
+  val ( let@@ ) : ('a -> 'b) -> 'a -> 'b
 end = struct
   let empty columns =
     Datalog.create_table ~name:"empty" ~default_value:() columns
@@ -1092,6 +1097,10 @@ end = struct
     Now
       ( Map (Run schedule, fun db () -> Table.get y db),
         fun db -> Table.copy x y db )
+
+  let ( let@ ) (f : ((_, _) Table.hlist -> _) -> _) x = f x
+
+  let ( let@@ ) f x = f x
 end
 
 type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
@@ -1174,20 +1183,17 @@ let get_all_usages :
 let get_direct_usages :
     Datalog.database -> unit Code_id_or_name.Map.t -> unit Code_id_or_name.Map.t
     =
-  (* CR-someday ncourant: once the datalog API supports something cleaner, use
-     it. *)
-  let out_tbl, out = rel1_r "out" Cols.[n] in
-  let in_tbl, in_ = rel1_r "in_" Cols.[n] in
-  let open! Syntax in
-  let open! Global_flow_graph in
-  let r =
-    ~![ (let$ [x; y] = ["x"; "y"] in
-         [in_ x; usages_rel x y] ==> out y) ]
+  let stmt =
+    let open! Syntax in
+    let open! Fixit in
+    let@@ in_ = param "in_" Cols.[n] in
+    let@ [out] = fix' [empty Cols.[n]] in
+    [ (let$ [x; y] = ["x"; "y"] in
+       [in_ % [x]; usages_rel x y] ==> out % [y]) ]
   in
   fun db s ->
-    let db = set_table in_tbl s db in
-    let db = Schedule.run r db in
-    get_table out_tbl db
+    let [r] = Fixit.run stmt [s] db in
+    r
 
 type field_usage =
   | Used_as_top
@@ -1270,29 +1276,23 @@ let get_fields_usage_of_constructors :
   let stmt =
     let open! Syntax in
     let open! Fixit in
-    let ( let@ ) (f : ((_, _) Table.hlist -> _) -> _) x = f x in
-    let ( .$[] ) = Datalog.atom (* <3 *) in
-    param "in_" Cols.[n] @@ fun in_ ->
+    let@@ in_ = param "in_" Cols.[n] in
     let@ [out1] =
-      fix
-        [empty Cols.[f]]
-        (fun [out1] ->
-          [ (let$ [x; field] = ["x"; "field"] in
-             [ in_.$[[x]];
-               field_of_constructor_is_used_top x field;
-               filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
-             ==> out1.$[[field]]) ])
+      let@ [out1] = fix [empty Cols.[f]] in
+      [ (let$ [x; field] = ["x"; "field"] in
+         [ in_ % [x];
+           field_of_constructor_is_used_top x field;
+           filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+         ==> out1 % [field]) ]
     in
     let@ [out2] =
-      fix
-        [empty Cols.[f; n]]
-        (fun [out2] ->
-          [ (let$ [x; field; y] = ["x"; "field"; "y"] in
-             [ in_.$[[x]];
-               field_of_constructor_is_used_as x field y;
-               not out1.$[[field]];
-               filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
-             ==> out2.$[[field; y]]) ])
+      let@ [out2] = fix [empty Cols.[f; n]] in
+      [ (let$ [x; field; y] = ["x"; "field"; "y"] in
+         [ in_ % [x];
+           field_of_constructor_is_used_as x field y;
+           not (out1 % [field]);
+           filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+         ==> out2 % [field; y]) ]
     in
     let+ out1 = return out1 and+ out2 = return out2 in
     Field.Map.merge
