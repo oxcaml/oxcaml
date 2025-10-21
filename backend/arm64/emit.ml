@@ -2515,13 +2515,13 @@ let end_assembly () =
   D.global data_end_sym;
   D.define_symbol_label ~section:Data data_end_sym;
   D.int64 0L;
-  let use_ldata = Emitaux.use_ldata_frametables () in
+  let use_lrodata = Emitaux.use_lrodata_frametables () in
   let frametable_section =
-    if use_ldata
-    then Asm_targets.Asm_section.Ldata
+    if use_lrodata
+    then Asm_targets.Asm_section.Lrodata
     else Asm_targets.Asm_section.Data
   in
-  if use_ldata then D.switch_to_section Asm_targets.Asm_section.Ldata;
+  if use_lrodata then D.switch_to_section Asm_targets.Asm_section.Lrodata;
   D.align ~fill_x86_bin_emitter:Zero ~bytes:8;
   (* #7887 *)
   let frametable = Cmm_helpers.make_symbol "frametable" in

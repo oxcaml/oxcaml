@@ -3073,14 +3073,14 @@ let end_assembly () =
   (* PR#6329 *)
   emit_global_label ~section:Data "data_end";
   D.int64 0L;
-  let use_ldata = Emitaux.use_ldata_frametables () in
+  let use_lrodata = Emitaux.use_lrodata_frametables () in
   let frametable_section =
-    if use_ldata
-    then Asm_targets.Asm_section.Ldata
+    if use_lrodata
+    then Asm_targets.Asm_section.Lrodata
     else Asm_targets.Asm_section.Text
   in
-  if use_ldata
-  then D.switch_to_section Asm_targets.Asm_section.Ldata
+  if use_lrodata
+  then D.switch_to_section Asm_targets.Asm_section.Lrodata
   else D.text ();
   (* We align to 8 bytes before the frame table. Perhaps somewhat
      counterintuitively, we use [~fill_x86_bin_emitter:Zero] even though we may

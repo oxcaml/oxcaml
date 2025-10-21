@@ -347,8 +347,8 @@ let emit_frames a =
   a.efa_align Arch.size_addr;
   frame_descriptors := []
 
-let use_ldata_frametables () =
-  Config.ldata_frametables
+let use_lrodata_frametables () =
+  Config.lrodata_frametables
   &&
   match Target_system.derived_system () with
   | Linux -> true
