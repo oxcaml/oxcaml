@@ -52,6 +52,10 @@ CAMLexport atomic_uintnat caml_pending_signals[NSIG_WORDS];
 
 static caml_plat_mutex signal_install_mutex = CAML_PLAT_MUTEX_INITIALIZER;
 
+/* Only used in signals_nat.c, but defined here to avoid link errors
+   on bytecode builds */
+uintnat caml_enable_segv_handler = 1;
+
 /* Check whether there is an unblocked pending signal.
    This is relatively expensive, so only call it once we're sure there's
    at least one pending signal. */
