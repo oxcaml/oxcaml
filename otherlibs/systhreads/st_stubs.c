@@ -675,10 +675,9 @@ CAMLprim value caml_thread_initialize(value unit)
     ls->can_skip_yield = (int (*)(void*))&default_can_skip_yield;
     ls->yield = (void (*)(void*))&st_thread_yield;
     Locking_scheme(i) = ls;
-
-    if (i == Caml_state->id)
-      st_masterlock_acquire(Default_lock(i));
   }
+
+  st_masterlock_acquire(Default_lock(Caml_state->id));
 
   /* First initialise the systhread chain on this domain */
   caml_thread_domain_initialize_hook();
