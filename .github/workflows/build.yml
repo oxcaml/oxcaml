@@ -162,8 +162,8 @@ jobs:
     - name: Checkout the OxCaml repo
       uses: actions/checkout@master
 
-    - name: Install clang (Ubuntu)
-      if: runner.os == 'macOS' && matrix.cc == 'clang'
+    - name: Install clang (Linux)
+      if: runner.os == 'Linux' && matrix.cc == 'clang'
       run: sudo apt-get install clang
 
     - name: Install autoconf and bash and parallel (macOS)
