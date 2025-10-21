@@ -155,7 +155,7 @@ jobs:
             oxcaml_llvm_source_branch: llvmize-oxcaml
 
     env:
-      J: "16"
+      J: "8"
       run_testsuite: "true"
 
     steps:
