@@ -13,7 +13,8 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@v20
+      - uses: cachix/install-nix-action@v30
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - id: set-matrix
         name: Generate Nix Matrix
         run: |
@@ -35,7 +36,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@v20
+      - uses: cachix/install-nix-action@v30
       - uses: DeterminateSystems/magic-nix-cache-action@v13
       - run: nix build -L '.#${{ matrix.attr }}'
 
