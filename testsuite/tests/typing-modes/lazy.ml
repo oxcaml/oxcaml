@@ -25,7 +25,7 @@ let foo (local_ x) =
 Line 2, characters 18-19:
 2 |     lazy (let _ = x in ())
                       ^
-Error: The value "x" is "local" but is expected to be "global"
+Error: The value "x" is in the parent region but is expected to be "global"
        because it is used inside a lazy expression
        which is expected to be "global"
        because lazy expressions always need to be allocated on the heap.

@@ -378,7 +378,7 @@ let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
 Line 1, characters 47-48:
 1 | let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
                                                    ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let etajoin p (f : ?b:bool -> unit -> int) (local_ g : unit -> int) =
@@ -551,7 +551,7 @@ let leak_id =
 Line 2, characters 24-25:
 2 |   use_locally (fun x -> x) 42
                             ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let leak_ref =
@@ -562,7 +562,7 @@ let leak_ref =
 Line 3, characters 43-44:
 3 |   use_locally (fun x -> r.contents <- Some x; x) 42
                                                ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let leak_ref_2 =
@@ -583,7 +583,7 @@ let leak_ref_3 =
 Line 3, characters 64-65:
 3 |   use_locally' (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
                                                                     ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 
@@ -600,7 +600,7 @@ let do_leak_exn =
 Line 2, characters 66-67:
 2 |   use_locally (fun x -> let _exn = local_ raise (Invalid_argument x) in "bluh") "blah"
                                                                       ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 (* handled exceptions are known to be global *)
@@ -677,7 +677,7 @@ Line 3, characters 10-11:
 3 |   (module M : S)
               ^
 Error: Signature mismatch:
-       Got "local"
+       Got in the parent region
        but expected "global"
        because it is a module and thus needs to be allocated on the heap.
 |}]
@@ -691,7 +691,7 @@ let foo (local_ x) =
 Line 2, characters 30-31:
 2 |   let _ = lazy (print_string !x) in
                                   ^
-Error: The value "x" is "local" but is expected to be "global"
+Error: The value "x" is in the parent region but is expected to be "global"
        because it is used inside a lazy expression
        which is expected to be "global"
        because lazy expressions always need to be allocated on the heap.
@@ -709,7 +709,7 @@ let foo (local_ x) =
 Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
-Error: The value "x" is "local" but is expected to be "global"
+Error: The value "x" is in the parent region but is expected to be "global"
        because it is used inside a functor which is expected to be "global"
        because modules always need to be allocated on the heap.
 |}]
@@ -726,7 +726,7 @@ let foo (local_ x) =
 Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
-Error: The value "x" is "local" but is expected to be "global"
+Error: The value "x" is in the parent region but is expected to be "global"
        because it is used inside a functor which is expected to be "global"
        because modules always need to be allocated on the heap.
 |}]
@@ -743,7 +743,7 @@ let foo (local_ x) =
 Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
-Error: The value "x" is "local" but is expected to be "global"
+Error: The value "x" is in the parent region but is expected to be "global"
        because it is used inside a functor which is expected to be "global"
        because modules always need to be allocated on the heap.
 |}]
@@ -760,7 +760,7 @@ let foo (local_ x) =
 Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
-Error: The value "x" is "local" but is expected to be "global"
+Error: The value "x" is in the parent region but is expected to be "global"
        because it is used inside a functor which is expected to be "global"
        because modules always need to be allocated on the heap.
 |}]
@@ -777,7 +777,7 @@ let foo (local_ x) =
 Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
-Error: The value "x" is "local" but is expected to be "global"
+Error: The value "x" is in the parent region but is expected to be "global"
        because it is used inside a functor which is expected to be "global"
        because modules always need to be allocated on the heap.
 |}]
@@ -852,7 +852,7 @@ let foo (local_ x) =
 Line 4, characters 10-11:
 4 |       let y = x in
               ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -962,7 +962,7 @@ let foo (local_ x) =
 Line 3, characters 14-15:
 3 |   let rec g = x :: g in
                   ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 (* Cannot pass local values to tail calls *)
@@ -989,7 +989,7 @@ val local_cb : local_ (unit -> 'a) -> 'a = <fun>
 Line 2, characters 41-42:
 2 | let foo (local_ x) = local_cb (fun () -> x := 17; 42)
                                              ^
-Error: The value "x" is "local" but is expected to be "global"
+Error: The value "x" is in the parent region but is expected to be "global"
        because it is used inside a function which is expected to be "global".
 |}]
 
@@ -1284,7 +1284,7 @@ let foo (local_ mut) =
 Line 2, characters 12-15:
 2 |   let _ = { mut } in
                 ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 let foo () =
   let mut = local_ ref 5 in
@@ -1303,7 +1303,7 @@ let foo (local_ gbl) =
 Line 2, characters 12-15:
 2 |   let _ = { gbl } in
                 ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1416,7 +1416,7 @@ let foo (local_ mut) =
 Line 2, characters 13-16:
 2 |   let _ = #{ mut } in
                  ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 let foo () =
   let mut = local_ ref 5 in
@@ -1435,7 +1435,7 @@ let foo (local_ gbl) =
 Line 2, characters 13-16:
 2 |   let _ = #{ gbl } in
                  ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1485,7 +1485,7 @@ let foo (local_ gbl) =
 Line 2, characters 13-16:
 2 |   let _ = #{ gbl } in
                  ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1663,7 +1663,7 @@ let foo p (local_ x) y (local_ z) =
 Line 5, characters 9-10:
 5 |   escape b;;
              ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo p (local_ x) y z =
@@ -1675,7 +1675,7 @@ let foo p (local_ x) y z =
 Line 5, characters 9-10:
 5 |   escape a;;
              ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo p (local_ x) y z =
@@ -1709,7 +1709,7 @@ let foo (local_ x) =
 Line 4, characters 26-27:
 4 |   | Some _ as y -> escape y
                               ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -1722,7 +1722,7 @@ val foo : local_ int -> unit = <fun>
 Line 3, characters 21-22:
 3 |   | 0 as y -> escape y
                          ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -1735,7 +1735,7 @@ val foo : local_ char -> unit = <fun>
 Line 3, characters 28-29:
 3 |   | 'a'..'e' as y -> escape y
                                 ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -1746,7 +1746,7 @@ let foo (local_ x) =
 Line 3, characters 23-24:
 3 |   | 1.1 as y -> escape y
                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -1765,7 +1765,7 @@ let foo (local_ x) =
 Line 3, characters 28-29:
 3 |   | (`Foo _) as y -> escape y
                                 ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -1775,7 +1775,7 @@ let foo (local_ x) =
 Line 3, characters 35-36:
 3 |   | (None | Some _) as y -> escape y
                                        ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo (local_ x) =
@@ -1785,7 +1785,7 @@ let foo (local_ x) =
 Line 3, characters 33-34:
 3 |   | (Some _|None) as y -> escape y
                                      ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 type foo = [`Foo | `Bar]
@@ -1808,7 +1808,7 @@ type foo = [ `Bar of int | `Foo ]
 Line 5, characters 24-25:
 5 |   | #foo as y -> escape y
                             ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 (* Primitives *)
@@ -2455,7 +2455,7 @@ let f (local_ s : string) =
 Line 2, characters 8-9:
 2 |   GFoo (s, "bar")
             ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let f =
@@ -2513,7 +2513,7 @@ let f (local_ x : gfoo) =
 Line 3, characters 24-26:
 3 |   | GFoo (_, s') -> ref s'
                             ^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 (* Test of array.*)
@@ -2528,7 +2528,7 @@ let f (local_ x : string) = ref [: x; "foo" :]
 Line 1, characters 35-36:
 1 | let f (local_ x : string) = ref [: x; "foo" :]
                                        ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 (* constructing local iarray from local elements is fine *)
@@ -2552,7 +2552,7 @@ let f (local_ a : string iarray) =
 Line 3, characters 22-23:
 3 |   | [: x; _ :] -> ref x
                           ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 (* a test that was passing type check *)

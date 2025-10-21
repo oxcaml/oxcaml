@@ -966,7 +966,7 @@ let f_internal_utuple_does_not_mode_cross_local_1
 Line 2, characters 57-58:
 2 |   : local_ #(int * string) -> #(int * string) = fun x -> x
                                                              ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let f_external_utuple_mode_crosses_local_2
@@ -982,7 +982,7 @@ let f_internal_utuple_does_not_mode_cross_local_2
 Line 2, characters 77-78:
 2 |   : local_ #(int * #(bool * string)) -> #(int * #(bool * string)) = fun x -> x
                                                                                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 type t = #(int * int)
@@ -1002,7 +1002,7 @@ type t = #(string * int)
 Line 3, characters 67-68:
 3 |   : local_ #(int * #(t * bool)) -> #(int * #(t * bool)) = fun x -> x
                                                                        ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 (* Unboxed records version of the same test *)
@@ -1024,7 +1024,7 @@ type local_nocross1 = #{ i : int; s : string; }
 Line 3, characters 55-56:
 3 |   : local_ local_nocross1 -> local_nocross1 = fun x -> x
                                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 type local_cross2_inner = #{ b : bool; i : int }
@@ -1048,7 +1048,7 @@ type local_nocross2 = #{ i : int; inner : local_nocross2_inner; }
 Line 4, characters 55-56:
 4 |   : local_ local_nocross2 -> local_nocross2 = fun x -> x
                                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 type t = #{ i1 : int; i2 : int }
@@ -1076,7 +1076,7 @@ type local_nocross3 = #{ i : int; inner : local_nocross3_inner; }
 Line 5, characters 55-56:
 5 |   : local_ local_nocross3 -> local_nocross3 = fun x -> x
                                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 (****************************************************)
@@ -1098,7 +1098,7 @@ type t : float64 & value
 Line 3, characters 29-30:
 3 |   : local_ t -> t = fun x -> x
                                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 type t : immediate & ((float64 mod global) & immediate)
@@ -1119,7 +1119,7 @@ type t : value & (value & float64)
 Line 3, characters 29-30:
 3 |   : local_ t -> t = fun x -> x
                                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 (*********************)

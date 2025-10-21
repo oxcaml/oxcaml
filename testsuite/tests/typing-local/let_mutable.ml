@@ -362,7 +362,7 @@ let disallowed_6_2 =
 Line 6, characters 11-12:
 6 |       x <- z
                ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 (* 6.3: The mode system doesn't distinguish higher levels of regionality from
@@ -379,7 +379,7 @@ let disallowed_6_3 =
 Line 6, characters 11-12:
 6 |       x <- y
                ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 (* Test 11: binding a mutable variable shouldn't be simplified away *)

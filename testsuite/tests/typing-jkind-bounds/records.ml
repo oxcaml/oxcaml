@@ -395,7 +395,7 @@ let foo (t : t @ local) = use_global t [@nontail]
 Line 1, characters 37-38:
 1 | let foo (t : t @ local) = use_global t [@nontail]
                                          ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -420,7 +420,7 @@ let foo (t : t @ local) = use_global t [@nontail]
 Line 1, characters 37-38:
 1 | let foo (t : t @ local) = use_global t [@nontail]
                                          ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -454,7 +454,7 @@ let foo (t : int t @ local) = use_global t [@nontail]
 Line 1, characters 41-42:
 1 | let foo (t : int t @ local) = use_global t [@nontail]
                                              ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -497,7 +497,7 @@ let foo (t : _ t @ local) = use_global t [@nontail]
 Line 1, characters 39-40:
 1 | let foo (t : _ t @ local) = use_global t [@nontail]
                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -530,7 +530,7 @@ let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
 Line 1, characters 59-60:
 1 | let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
                                                                ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
@@ -563,7 +563,7 @@ let foo (t : _ t @ local) = use_global t [@nontail]
 Line 1, characters 39-40:
 1 | let foo (t : _ t @ local) = use_global t [@nontail]
                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t

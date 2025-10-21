@@ -2080,10 +2080,7 @@ module Report = struct
     let mode_printer = Misc.Style.as_inline_code (C.print obj) in
     match side, obj, x with
     | `Actual, Regionality, Regional ->
-      (* In the special case where the actual mode is regional (and thus the
-         expected is global), it's more user friendly to say "local" than
-         "regional" or "local to the parent region" etc. *)
-      mode_printer ppf C.Regionality.Local
+      fprintf ppf "in the parent region"
       (* CR-someday zqian: treat the following cases generally. *)
     | `Expected, Contention_op, Shared ->
       (* When "shared" is expected, we tell the user that either shared or

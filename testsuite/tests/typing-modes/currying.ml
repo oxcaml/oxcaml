@@ -294,7 +294,7 @@ let bug3 () =
 Line 3, characters 63-64:
 3 |     fun ~a -> fun[@curry] ~b -> fun[@curry] ~c -> print_string a
                                                                    ^
-Error: The value "a" is "local" but is expected to be "global"
+Error: The value "a" is in the parent region but is expected to be "global"
        because it is used inside a function which is expected to be "global".
 |}]
 let overapp ~(local_ a) ~b = (); fun ~c ~d -> ()

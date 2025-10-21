@@ -66,7 +66,7 @@ let string_escape_expected_l : local_ _ -> _ pair = fun x -> Pair (x, "hello")
 Line 1, characters 67-68:
 1 | let string_escape_expected_l : local_ _ -> _ pair = fun x -> Pair (x, "hello")
                                                                        ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let string_escape_expected_r : local_ _ -> _ pair = fun x -> Pair ("hello", x)
@@ -75,7 +75,7 @@ let string_escape_expected_r : local_ _ -> _ pair = fun x -> Pair ("hello", x)
 Line 1, characters 76-77:
 1 | let string_escape_expected_r : local_ _ -> _ pair = fun x -> Pair ("hello", x)
                                                                                 ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 
@@ -86,7 +86,7 @@ let int_escape_expected_l : local_ _ -> _ pair = fun x -> Pair (x, 5)
 Line 1, characters 64-65:
 1 | let int_escape_expected_l : local_ _ -> _ pair = fun x -> Pair (x, 5)
                                                                     ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let int_escape_expected_r : local_ _ -> _ pair = fun x -> Pair (5, x)
@@ -97,7 +97,7 @@ val int_escape_expected_r : local_ int -> int pair = <fun>
 Line 1, characters 67-68:
 1 | let int_escape_expected_r : local_ _ -> _ pair = fun x -> Pair (5, x)
                                                                        ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let escape : 'a -> unit = fun _ -> ()
@@ -117,7 +117,7 @@ val pattern_l : local_ int pair -> unit = <fun>
 Line 3, characters 26-27:
 3 |   | Pair (y, 0) -> escape y
                               ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 let pattern_r (local_ x) =
@@ -131,5 +131,5 @@ val pattern_r : local_ int pair -> unit = <fun>
 Line 3, characters 26-27:
 3 |   | Pair (0, y) -> escape y
                               ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]

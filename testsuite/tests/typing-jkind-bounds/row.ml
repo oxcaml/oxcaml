@@ -59,7 +59,7 @@ let don't_cross_locality (x : int t @ local) = use_global x [@nontail]
 Line 1, characters 58-59:
 1 | let don't_cross_locality (x : int t @ local) = use_global x [@nontail]
                                                               ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 

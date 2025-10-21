@@ -299,7 +299,7 @@ let f4 (local_ x) =
 Line 2, characters 16-17:
 2 |     List.length x
                     ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global".
 |}]
 
 (* Allocations that are not supported for stack *)
