@@ -14,8 +14,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: X64 Linux
-            os: warp-ubuntu-latest-x64-16x
+          - name: x86_64-linux
+            os: warp-ubuntu-latest-x64-32x
     steps:
       - name: Checkout the OxCaml repo
         uses: actions/checkout@master
