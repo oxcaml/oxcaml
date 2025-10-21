@@ -956,6 +956,15 @@ module Fixit : sig
     (('a, 'b, unit) Datalog.table -> ('c, 'd) stmt) ->
     ('a -> 'c, 'd) stmt
 
+  val param0 :
+    string -> ((Datalog.nil, 'b) stmt -> ('c, 'd) stmt) -> ('b -> 'c, 'd) stmt
+
+  val local0 :
+    ('a, 'b, unit) Datalog.Column.hlist ->
+    ('c, 'a) stmt ->
+    (('a, 'b, unit) Datalog.table -> (Datalog.nil, 'd) stmt) ->
+    ('c, 'd) stmt
+
   module Table : sig
     type (_, _) hlist =
       | [] : (Datalog.nil, Datalog.nil) hlist
@@ -1024,8 +1033,10 @@ end = struct
 
   type (_, _) stmt =
     | Return : ('t, 'k, unit) Datalog.table -> (Datalog.nil, 't) stmt
+    | Value : 'a option ref -> (Datalog.nil, 'a) stmt
     | Run : Datalog.Schedule.t -> (Datalog.nil, unit) stmt
     | Seq : ('i, unit) stmt * (Datalog.nil, 'o) stmt -> ('i, 'o) stmt
+    | Call : ('a -> Datalog.nil, 'b) stmt * ('i, 'a) stmt -> ('i, 'b) stmt
     | Map : ('i, 'a) stmt * (Datalog.database -> 'a -> 'b) -> ('i, 'b) stmt
     | Conj :
         (Datalog.nil, 'a) stmt * (Datalog.nil, 'b) stmt
@@ -1049,6 +1060,9 @@ end = struct
    fun stmt args db k ->
     match stmt, args with
     | Return table, [] -> k db (Datalog.get_table table db)
+    | Value v, [] -> k db (Option.get !v)
+    | Call (stmt_f, stmt_arg), args ->
+      run stmt_arg args db (fun db arg -> run stmt_f [arg] db k)
     | Run schedule, [] ->
       let db = Datalog.Schedule.run schedule db in
       k db ()
@@ -1070,9 +1084,25 @@ end = struct
 
   let run stmt args db = run stmt args db (fun _ out -> out)
 
+  let param0 _name f =
+    let cell = ref None in
+    Map
+      ( Input
+          ( f (Value cell),
+            fun db x ->
+              cell := Some x;
+              db ),
+        fun _db value ->
+          cell := None;
+          value )
+
   let param name columns f =
     let table = local name columns in
     Input (f table, fun db x -> Datalog.set_table table x db)
+
+  let local0 columns body f =
+    let table = local "local" columns in
+    Call (Input (f table, fun db x -> Datalog.set_table table x db), body)
 
   let fix :
       type b c d.
