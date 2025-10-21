@@ -26,14 +26,11 @@ module M1 = struct
   let qux = #3.14
 
   let _ =
-    print_float (Float_u.to_float (id foo));
-    print_string " ";
-    print_string (id bar);
-    print_string " ";
-    print_int (id baz);
-    print_string " ";
-    print_float (Float_u.to_float (id qux));
-    print_newline ()
+    Printf.printf "%.0f %s %d %.2f\n"
+      (Float_u.to_float (id foo))
+      (id bar)
+      (id baz)
+      (Float_u.to_float (id qux))
 end
 
 
@@ -48,14 +45,11 @@ module M2 = struct
   let qux = #3.14
 
   let _ =
-    print_float (Float_u.to_float (id foo));
-    print_string " ";
-    print_string (id bar);
-    print_string " ";
-    print_int (id baz);
-    print_string " ";
-    print_float (Float_u.to_float (id qux));
-    print_newline ()
+    Printf.printf "%.0f %s %d %.2f\n"
+      (Float_u.to_float (id foo))
+      (id bar)
+      (id baz)
+      (Float_u.to_float (id qux))
 end
 
 
@@ -72,14 +66,11 @@ module M3 = struct
   let qux = #3.14
 
   let _ =
-    print_float (Float_u.to_float (id foo));
-    print_string " ";
-    print_string (id bar);
-    print_string " ";
-    print_int (id baz);
-    print_string " ";
-    print_float (Float_u.to_float (id qux));
-    print_newline ()
+    Printf.printf "%.0f %s %d %.2f\n"
+      (Float_u.to_float (id foo))
+      (id bar)
+      (id baz)
+      (Float_u.to_float (id qux))
 end
 
 
@@ -101,16 +92,9 @@ module M4 = struct
   let e = #3.0
 
   let _ =
-    print_float (Float_u.to_float (id a));
-    print_string " ";
-    print_string (id b);
-    print_string " ";
-    print_float (Float_u.to_float (id c));
-    print_string " ";
-    print_string (id d);
-    print_string " ";
-    print_float (Float_u.to_float (id e));
-    print_newline ()
+    Printf.printf "%.0f %s %.0f %s %.0f\n"
+      (Float_u.to_float (id a)) (id b) (Float_u.to_float (id c))
+      (id d) (Float_u.to_float (id e))
 end
 
 
@@ -132,12 +116,7 @@ module M5 = struct
   include Override
 
   let _ =
-    print_float (Float_u.to_float (id x));
-    print_string " ";
-    print_string (id y);
-    print_string " ";
-    print_int (id z);
-    print_newline ()
+    Printf.printf "%.0f %s %d\n" (Float_u.to_float (id x)) (id y) (id z)
 end
 
 
@@ -154,12 +133,8 @@ module M6 = struct
   end
 
   let _ =
-    print_float (Float_u.to_float (id a));
-    print_string " ";
-    print_string (id b);
-    print_string " ";
-    print_float (Float_u.to_float (id c));
-    print_newline ()
+    Printf.printf "%.0f %s %.0f\n"
+      (Float_u.to_float (id a)) (id b) (Float_u.to_float (id c))
 end
 
 
@@ -175,10 +150,6 @@ module M7 = struct
   let r = "after include"
 
   let _ =
-    print_float (Float_u.to_float (id p));
-    print_string " ";
-    print_string (id q);
-    print_string " ";
-    print_string (id r);
-    print_newline ()
+    Printf.printf "%s %s %s\n"
+      (Float_u.to_string (id p)) (id q) (id r)
 end
