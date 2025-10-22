@@ -121,7 +121,7 @@ let () =
     M_mixed_2.pow #(#2L, #2.0, "a", Mixed_monoid.void ()) 5
   in
   print_endline "Expected: 32 32.0 aaaaa";
-  Printf.printf "Actual:   %s %.1f %s\n\n"
+  Printf.printf "Actual:   %s %.1f %s\n"
     (Int64.to_string (to_int64 a)) (to_float b) c
 ;;
 

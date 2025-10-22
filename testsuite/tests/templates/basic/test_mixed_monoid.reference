@@ -5,7 +5,6 @@ Actual:   16 81.0 xxxx
 Test: Mixed monoid with utils_2
 Expected: 32 32.0 aaaaa
 Actual:   32 32.0 aaaaa
-
 Expected: 1 1.0 (empty string)
 Actual:   1 1.0 (empty string)
 

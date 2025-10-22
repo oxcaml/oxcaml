@@ -131,7 +131,7 @@ let () = print_endline "Test: functor with mixed products"
 
 module type With_products = sig
   val simple_product : #(float# * string)
-  val nested_product : #(int64# * #(string * float#))
+  val nested_product : #(int64# * #(string * float# * string))
   val x : int
 end
 
@@ -141,15 +141,15 @@ module Add_to_products (M : With_products) : With_products = struct
     #(Float_u.add f #10.0, s ^ "+10")
 
   let nested_product =
-    let #(i, #(s, f)) = M.nested_product in
-    #(Int64_u.add i #5L, #(s ^ "+5", Float_u.add f #5.0))
+    let #(i, #(s, f, s2)) = M.nested_product in
+    #(Int64_u.add i #5L, #(s ^ "+5", Float_u.add f #5.0, s2 ^ "+5"))
 
   let x = M.x + 1
 end
 
 module Base_products = struct
   let simple_product = #(#1.5, "1.5")
-  let nested_product = #(#10L, #("ten", #20.0))
+  let nested_product = #(#10L, #("ten", #20.0, "twenty"))
   let x = 100
 end
 
@@ -157,15 +157,16 @@ module Augmented = Add_to_products (Base_products)
 
 let () =
   let #(f, s) = id Augmented.simple_product in
-  let #(i, #(s2, f2)) = id Augmented.nested_product in
-  print_endline "Expected: 11.5 1.5+10 15 ten+5 25.0 101";
+  let #(i, #(s2, f2, s3)) = id Augmented.nested_product in
+  print_endline "Expected: 11.5 1.5+10 15 ten+5 25.0 twenty+5 101";
   Printf.printf
-    "Actual:   %.1f %s %d %s %.1f %d\n\n"
+    "Actual:   %.1f %s %d %s %.1f %s %d\n\n"
     (Float_u.to_float f)
     s
     (Int64_u.to_int i)
     s2
     (Float_u.to_float f2)
+    s3
     (id Augmented.x)
 
 
