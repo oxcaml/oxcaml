@@ -30,7 +30,6 @@
 #include "caml/fail.h"
 #include "caml/io.h"
 #include "caml/memory.h"
-#include "caml/callback.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/printexc.h"
@@ -790,10 +789,7 @@ CAMLexport int caml_c_thread_register(void)
   /* Create the tick thread if not already done.  */
   if (caml_tick_thread_enabled) start_tick_thread();
   /* Initialize TLS */
-  caml_callback(*caml_named_value("thread_tls_init"), Val_unit);
-  caml_callback(*caml_named_value("thread_tls_set_initial_keys"),
-                caml_callback(*caml_named_value("thread_tls_get_initial_keys"),
-                              Val_unit));
+  caml_callback(*caml_named_value("caml_domain_tls_init"), Val_unit);
   /* Exit the run-time system */
   caml_enter_blocking_section();
   return 1;
