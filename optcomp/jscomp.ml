@@ -14,10 +14,10 @@ module Make (Flambda2 : Optcomp_intf.Flambda2) = Optcompile.Make (struct
   let js_of_oxcaml args =
     let prog =
       match Sys.ocaml_release with
-      | { extra = Some (Plus, "ox"); _ } ->
-        (match Sys.getenv_opt "JS_OF_OXCAML" with
-         | Some path -> path
-         | None -> Filename.concat Config.bindir "js_of_oxcaml")
+      | { extra = Some (Plus, "ox"); _ } -> (
+        match Sys.getenv_opt "JS_OF_OXCAML" with
+        | Some path -> path
+        | None -> Filename.concat Config.bindir "js_of_oxcaml")
       | _ ->
         (* Use jsox from our PATH when we're bootstrapping *)
         "js_of_oxcaml"

@@ -1,11 +1,15 @@
-[@@@ocaml.warning "+a-40-41-42"]
-
-open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
-module DLL = Oxcaml_utils.Doubly_linked_list
+open! Int_replace_polymorphic_compare
 module R = Reg
 module RAS = Reg_availability_set
 module RD = Reg_with_debug_info
-module V = Backend_var
+
+module RD_quotient_set =
+  Reg_with_debug_info.Set_distinguishing_names_and_locations
+
+let dprintf fmt =
+  if !Dwarf_flags.ddebug_available_regs
+  then Format.eprintf fmt
+  else Format.ifprintf Format.err_formatter fmt
 
 (* If permitted to do so by the command line flags, this pass will extend live
    ranges for otherwise dead but available registers across allocations, polls
@@ -13,13 +17,12 @@ module V = Backend_var
    to be seen in the debugger, for example when the last use of some variable is
    just before a call, and the debugger is standing in the callee. It may
    however affect the semantics of e.g. finalizers. *)
-let extend_live () = false
-(* CR sspies: This used to be set by [-gdwarf-may-alter-codegen]. But the
-   computation is currently broken, so we've disabled the flag. Fix the
-   compuation and re-enable the flag. *)
+(* CR mshinwell: We've seen a bug when enabling this, so it should be assumed
+   codegen is broken when enabled. *)
+let extend_live () = !Dwarf_flags.gdwarf_may_alter_codegen_experimental
 
-(* CR xclerc for xclerc: consider passing this value through the context. *)
-let all_regs_that_might_be_named = ref Reg.Set.empty
+(* CR mshinwell: The old "all_regs_that_might_be_named" (see git history) seems
+   broken, I think a backwards dataflow pass may be necessary to compute this *)
 
 let check_invariants :
     type a.
@@ -33,8 +36,11 @@ let check_invariants :
   | Ok avail_before ->
     (* Every register that is live across an instruction should also be
        available before the instruction. *)
-    let live = R.Set.inter instr.live !all_regs_that_might_be_named in
-    if not (R.Set.subset live (RD.Set.forget_debug_info avail_before))
+    let live = instr.live in
+    if not
+         (R.Set.subset live
+            (RD.Set_distinguishing_names_and_locations.forget_debug_info
+               avail_before))
     then
       Misc.fatal_errorf
         "Named live registers not a subset of available registers: live={%a}  \
@@ -42,11 +48,15 @@ let check_invariants :
         Printreg.regset live
         (RAS.print ~print_reg:Printreg.reg)
         (RAS.Ok avail_before) Printreg.regset
-        (R.Set.diff live (RD.Set.forget_debug_info avail_before))
+        (R.Set.diff live
+           (RD.Set_distinguishing_names_and_locations.forget_debug_info
+              avail_before))
         print_instr instr;
     (* Every register that is an input to an instruction should be available. *)
-    let args = R.inter_set_array !all_regs_that_might_be_named instr.arg in
-    let avail_before_fdi = RD.Set.forget_debug_info avail_before in
+    let args = R.set_of_array instr.arg in
+    let avail_before_fdi =
+      RD.Set_distinguishing_names_and_locations.forget_debug_info avail_before
+    in
     if not (R.Set.subset args avail_before_fdi)
     then
       Misc.fatal_errorf
@@ -56,55 +66,39 @@ let check_invariants :
         (RAS.Ok avail_before) Printreg.regset avail_before_fdi Printreg.regset
         args print_instr instr
 
-(* CR xclerc for xclerc: double check the whole `Domain` module. *)
 module Domain = struct
-  (** CR gyorsh:
+  type t = { avail_before : RAS.t } [@@unboxed]
 
-      - Why is `option` needed? `RAS` already has `Unreachable` and it looks like
-        it means the same as `None`. It would simplify the domain.
-      - `subset` doesn't take into account conflicting values removed by `inter`,
-        so we can end up in a weird situation that  two distinct abstract values A
-        and B satisfy both `less_equal A  B = true` and `less_equal B A = true`.
-        For example if both A and B contain the same reg with different debug info.
-        I'm not sure if it breaks soundness. Instead, they should be incomparable.
-        We can make  `less_equal` consistent with `join` like this:
-        ```
-        module Domain = struct
-          type t = RAS.t
-          let join = RAS.inter
-          let less_equal x y = RAS.equal (join y x) y
-       end
-       ```
-       but probably want a more efficient implementation of `less_equal` that doesn't
-       allocate *)
-  type t = { avail_before : Reg_availability_set.t option } [@@unboxed]
+  let bot = { avail_before = Unreachable }
 
-  let bot = { avail_before = Some Unreachable }
+  let ras_print = RAS.print ~print_reg:Printreg.reg
 
-  let join ({ avail_before = left_avail } as left)
-      ({ avail_before = right_avail } as right) : t =
-    match left_avail, right_avail with
-    | None, None -> left
-    | None, Some _ -> right
-    | Some _, None -> left
-    | Some left_ras, Some right_ras ->
-      { avail_before = Some (RAS.inter left_ras right_ras) }
+  let join ({ avail_before = left_avail } : t)
+      ({ avail_before = right_avail } : t) : t =
+    let res =
+      { avail_before =
+          RAS.inter_removing_conflicting_debug_info left_avail right_avail
+      }
+    in
+    dprintf "JOIN: %a\n%a\n->%a\n%!" ras_print left_avail ras_print right_avail
+      ras_print res.avail_before;
+    res
 
-  let less_equal { avail_before = left_avail } { avail_before = right_avail } :
-      bool =
-    match left_avail, right_avail with
-    | None, None -> true
-    | None, Some _ -> true
-    | Some _, None -> false
-    | Some left_ras, Some right_ras -> RAS.subset right_ras left_ras
+  let less_equal x y =
+    let res =
+      match join y x with
+      | { avail_before = joined } ->
+        let { avail_before = y } = y in
+        RAS.equal joined y
+    in
+    dprintf "LESS_EQUAL: %a\n%a\n->%b\n%!" ras_print x.avail_before ras_print
+      y.avail_before res;
+    res
 end
 
 (* [Transfer] calculates, given the registers "available before" an instruction
    [instr], the registers that are available both "across" and immediately after
    [instr]. This is a forwards dataflow analysis.
-
-   Registers not in [all_regs_that_might_be_named] are ignored, to improve
-   performance.
 
    "available before" can be thought of, at the assembly level, as the set of
    registers available when the program counter is equal to the address of the
@@ -138,12 +132,12 @@ module Transfer = struct
 
   let[@inline] common :
       type a.
-      avail_before:RD.Set.t ->
+      avail_before:RD_quotient_set.t ->
       destroyed_at:(a -> Reg.t array) ->
       is_interesting_constructor:(a -> bool) ->
       is_end_region:(a -> bool) ->
       a Cfg.instruction ->
-      RAS.t option * RAS.t =
+      RAS.t * RAS.t =
    fun ~avail_before ~destroyed_at ~is_interesting_constructor ~is_end_region
        instr ->
     (* We split the calculation of registers that become unavailable after a
@@ -152,7 +146,7 @@ module Transfer = struct
        the operation writing out its results. *)
     let made_unavailable_1 =
       let regs_clobbered = Array.append (destroyed_at instr.desc) instr.res in
-      RD.Set.made_unavailable_by_clobber avail_before ~regs_clobbered
+      RD_quotient_set.made_unavailable_by_clobber avail_before ~regs_clobbered
     in
     (* Second: the cases of (a) allocations, (b) other polling points, (c) OCaml
        to OCaml function calls and (d) end-region operations. In these cases,
@@ -165,106 +159,138 @@ module Transfer = struct
     let made_unavailable_2 =
       match is_interesting_constructor instr.desc with
       | true ->
-        RD.Set.filter
+        (* CR gyorsh/mshinwell: There are some tricky corner cases here. I just
+           wanted to write down a comment about it, nothing to fix here.
+
+           Machtypes associated with Reg.t may be wrong at this point due to
+           aliasing with hardregs and elided moves, even for instructions that
+           need a frametable entry. The only guarantee we have for these program
+           points is that for every physical location that may have a value that
+           is live across, there is a register in the live set that has the
+           correct type, and hence the location will be updated. It's possible
+           that there is another Reg.t in the live set for which the location is
+           the same but the type is different, and it's not the one that we put
+           in avail_before. This could lead to dropping debug info associated
+           with a register. For registers that are not in the live set and whose
+           type is not a pointer, they may still be containing values (that are
+           not live across) and we shouldn't try to inspect them. *)
+        RD_quotient_set.filter
           (fun reg ->
             let holds_immediate = RD.holds_non_pointer reg in
             let on_stack = RD.assigned_to_stack reg in
-            let live_across = Reg.Set.mem (RD.reg reg) instr.live in
+            let live_across =
+              (* Note that this can't check register stamps, since a no-op move
+                 might have been elided, and the stamps might not match between
+                 the live set and a [Reg.t] we have which is actually in it. *)
+              Reg.Set.exists
+                (fun live_reg ->
+                  Reg.same_loc_fatal_on_unknown
+                    ~fatal_message:
+                      "Found Unknown register location, but we should now be \
+                       post-register allocation"
+                    live_reg (RD.reg reg))
+                instr.live
+            in
             let remains_available =
               live_across || (holds_immediate && on_stack)
-            in
-            let reg_is_of_type_addr =
-              match (RD.reg reg).typ with
-              | Addr -> true
-              | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2
-                ->
-                false
             in
             if remains_available
                || (not (extend_live ()))
                || is_end_region instr.desc
                || (not (RD.assigned_to_stack reg))
-               || RD.Set.mem reg made_unavailable_1
-               || reg_is_of_type_addr
+               || RD_quotient_set.mem reg made_unavailable_1
+               || Reg.is_of_type_addr (RD.reg reg)
             then not remains_available
             else (
               instr.live <- Reg.Set.add (RD.reg reg) instr.live;
               false))
           avail_before
-      | false -> RD.Set.empty
+      | false -> RD_quotient_set.empty
     in
-    let made_unavailable = RD.Set.union made_unavailable_1 made_unavailable_2 in
-    let avail_across = RD.Set.diff avail_before made_unavailable in
+    let made_unavailable =
+      RD_quotient_set.union made_unavailable_1 made_unavailable_2
+    in
+    let avail_across = RD_quotient_set.diff avail_before made_unavailable in
     let avail_after =
-      (* If a result register will never be named, we can forget about it for
-         the purposes of this analysis. *)
-      let res = Reg.inter_set_array !all_regs_that_might_be_named instr.res in
-      RD.Set.union (RD.Set.without_debug_info res) avail_across
+      let res = Reg.set_of_array instr.res in
+      RD_quotient_set.union
+        (RD_quotient_set.without_debug_info res)
+        avail_across
     in
-    Some (ok avail_across), ok avail_after
+    dprintf "...avail_before %a\n%!" RD_quotient_set.print avail_before;
+    dprintf "...avail_across %a\n%!" RD_quotient_set.print avail_across;
+    dprintf "...avail_after %a\n%!" RD_quotient_set.print avail_after;
+    ok avail_across, ok avail_after
 
   let basic ({ avail_before } : domain) (instr : Cfg.basic Cfg.instruction) () :
       domain =
-    assert (Option.is_some avail_before);
+    dprintf "Instruction: (id=%a) %a\n%!" InstructionId.print instr.id
+      Cfg.print_basic instr;
     instr.available_before <- avail_before;
-    let avail_before = Option.get avail_before in
     if !Dwarf_flags.ddebug_invariants
     then check_invariants instr ~print_instr:Cfg.print_basic ~avail_before;
+    (* CR gyorsh/mshinwell: There is something subtle here about the handling of
+       Name_for_debugger in Cfg_availability : the field regs is part of the
+       operation description (not instruction argument or result), and it starts
+       with pseudo-registers. We rely on the mutability of Reg.loc to update
+       these regs to physical locations. Right? If so, there is nothing that
+       forces these registers to be updated throughout the backend, or preserve
+       sharing of Reg.t. For example, register allocation can introduce new
+       temporaries in the split phase and substitute them into instructions,
+       leaving old temporaries in Name_for_debugger only. This could be another
+       source of missing debug info. *)
     let avail_across, avail_after =
       match avail_before with
-      | Unreachable -> None, unreachable
+      | Unreachable -> unreachable, unreachable
       | Ok avail_before -> (
         match instr.desc with
-        | Op
-            (Name_for_debugger
-              { ident; which_parameter; provenance; is_assignment; regs }) ->
-          (* First forget about any existing debug info to do with [ident] if
-             the naming corresponds to an assignment operation. *)
-          let forgetting_ident : RD.Set.t =
-            if not is_assignment
-            then avail_before
-            else
-              RD.Set.map
-                (fun reg ->
-                  match RD.debug_info reg with
-                  | None -> reg
-                  | Some debug_info ->
-                    if V.same (RD.Debug_info.holds_value_of debug_info) ident
-                    then RD.clear_debug_info reg
-                    else reg)
-                avail_before
-          in
-          let avail_after = ref forgetting_ident in
+        | Op (Name_for_debugger { ident; which_parameter; provenance; regs }) ->
+          let avail_after = ref avail_before (* forgetting_ident *) in
           let num_parts_of_value = Array.length regs in
           (* Add debug info about [ident], but only for registers that are known
-             to be available. *)
+             to be available. ([Name_for_debugger] is not intended to be used in
+             advance.) *)
           for part_of_value = 0 to num_parts_of_value - 1 do
             let reg = regs.(part_of_value) in
-            (* CR sspies: In the previous version of this PR, this conditional
-               has prevented DWARF information from being generated for local
-               variables. It currently seems to work reasonably well even with
-               this conditional, but further investigation is needed. *)
-            if RD.Set.mem_reg forgetting_ident reg
+            (* Registers that still have unknown locations should not be used in
+               the Cfg at this point (they would cause fatal errors in the
+               emitter). As such we ignore them explicitly here
+               ([mem_reg_by_loc] would cause a fatal error otherwise).
+
+               Registers in [Name_for_debugger] operations that are still in
+               use, but which have been substituted since the original
+               construction of such operations, should have been renamed by
+               [Regalloc_substitution.apply_basic_instruction_in_place]. *)
+            if (not (Reg.is_unknown reg))
+               && RD_quotient_set.mem_reg_by_loc avail_before reg
             then
               let regd =
                 RD.create ~reg ~holds_value_of:ident ~part_of_value
                   ~num_parts_of_value ~which_parameter ~provenance
               in
               avail_after
-                := RD.Set.add regd (RD.Set.filter_reg !avail_after reg)
+                := RD_quotient_set.add regd
+                     (RD_quotient_set.filter_reg_by_loc !avail_after reg)
           done;
-          Some (ok avail_before), ok !avail_after
+          dprintf "...ident = %a\n%!" Ident.print_with_scope ident;
+          dprintf "...regd = %a\n%!" Ident.print_with_scope ident;
+          dprintf "...avail_before %a\n%!" RD_quotient_set.print avail_before;
+          dprintf "...avail_across %a\n%!" RD_quotient_set.print avail_before;
+          dprintf "...avail_after %a\n%!" RD_quotient_set.print !avail_after;
+          ok avail_before, ok !avail_after
         | Op (Move | Reload | Spill) ->
           (* Moves are special: they enable us to propagate names. No-op moves
              need to be handled specially---in this case, we may learn that a
              given hard register holds the value of multiple pseudoregisters
-             (all of which have the same value). This makes us match up properly
-             with [Cfg_liveness]. *)
+             (all of which have the same value). *)
           let move_to_same_location =
             let move_to_same_location = ref true in
             for i = 0 to Array.length instr.arg - 1 do
               let arg = instr.arg.(i) in
               let res = instr.res.(i) in
+              (* CR mshinwell: check this [move_to_same_location] logic is
+                 correct, including the next comment (xclerc also wondered about
+                 the latter iirc) *)
               (* Note that the register classes must be the same, so we don't
                  need to check that. *)
               if not (Reg.equal_location arg.loc res.loc)
@@ -272,51 +298,60 @@ module Transfer = struct
             done;
             !move_to_same_location
           in
+          dprintf "...move_to_same_location %b\n%!" move_to_same_location;
           let made_unavailable =
             if move_to_same_location
-            then RD.Set.empty
+            then RD_quotient_set.empty
             else
-              RD.Set.made_unavailable_by_clobber avail_before
+              RD_quotient_set.made_unavailable_by_clobber avail_before
                 ~regs_clobbered:instr.res
           in
+          dprintf "...made_unavailable %a\n%!" RD_quotient_set.print
+            made_unavailable;
           let results =
             Array.map2
               (fun arg_reg result_reg ->
-                (* We have to use [find_reg_with_same_location_exn] and not just
-                   [find_reg_exn] because the register allocator can elide
-                   moves, meaning that [arg_reg] might have one register stamp
-                   at [instr] but a different register stamp on the previous
-                   occurrence (from which we would have computed
-                   [avail_before]). All that we need here, though, is the debug
-                   info from any register with the same location. *)
+                (* We just need to find any register in [avail_before] with the
+                   same location. The debug info on the registers doesn't
+                   matter. *)
                 match
-                  RD.Set.find_reg_with_same_location_exn avail_before arg_reg
+                  RD_quotient_set.find_reg_with_same_location_exn avail_before
+                    arg_reg
                 with
-                | exception Not_found -> None
+                | exception Not_found ->
+                  (* We need this to keep availability sets correct even in the
+                     absence of debug info *)
+                  RD.create_without_debug_info ~reg:result_reg
                 | arg_reg ->
-                  (* CR mshinwell/xclerc: it seems maybe possible for two
-                     distinct variables to end up coalesced into the same hard
-                     register / stack slot. In this case, maybe the choice of
-                     register in [find_reg_with_same_location_exn] could make a
-                     difference to what the user sees in the debugger? *)
                   if Option.is_some (RD.debug_info arg_reg)
                   then
-                    Some
-                      (RD.create_copying_debug_info ~reg:result_reg
-                         ~debug_info_from:arg_reg)
-                  else None)
+                    (* Propagate the debug info, i.e. what the register is known
+                       to hold *)
+                    RD.create_copying_debug_info ~reg:result_reg
+                      ~debug_info_from:arg_reg
+                  else
+                    (* Same comment as in the [Not_found] case above *)
+                    RD.create_without_debug_info ~reg:result_reg
+                (* None *))
               instr.arg instr.res
           in
-          let avail_across = RD.Set.diff avail_before made_unavailable in
+          dprintf "...results (%a)\n%!"
+            (Format.pp_print_list
+               ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+               (fun ppf reg -> (RD.print ~print_reg:Printreg.reg) ppf reg))
+            (Array.to_list results);
+          let avail_across =
+            RD_quotient_set.diff avail_before made_unavailable
+          in
+          dprintf "...avail_before %a\n%!" RD_quotient_set.print avail_before;
+          dprintf "...avail_across %a\n%!" RD_quotient_set.print avail_across;
           let avail_after =
             Array.fold_left
-              (fun avail_after reg_opt ->
-                match reg_opt with
-                | None -> avail_after
-                | Some reg -> RD.Set.add reg avail_after)
+              (fun avail_after reg -> RD_quotient_set.add reg avail_after)
               avail_across results
           in
-          Some (ok avail_across), ok avail_after
+          dprintf "...avail_after %a\n%!" RD_quotient_set.print avail_after;
+          ok avail_across, ok avail_after
         | Op
             ( Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
             | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
@@ -332,27 +367,24 @@ module Transfer = struct
             ~is_end_region:is_op_end_region instr)
     in
     instr.available_across <- avail_across;
-    { avail_before = Some avail_after }
+    { avail_before = avail_after }
 
   let terminator ({ avail_before } : domain)
       (term : Cfg.terminator Cfg.instruction) () : image =
-    assert (Option.is_some avail_before);
+    dprintf "Instruction: (id=%a) %a\n%!" InstructionId.print term.id
+      Cfg.print_terminator term;
     term.available_before <- avail_before;
-    let avail_before = Option.get avail_before in
     if !Dwarf_flags.ddebug_invariants
     then check_invariants term ~print_instr:Cfg.print_terminator ~avail_before;
     let avail_across, avail_after =
       match avail_before with
-      | Unreachable -> None, unreachable
+      | Unreachable -> unreachable, unreachable
       | Ok avail_before -> (
         match term.desc with
         | Never -> assert false
-        | Tailcall_self _ ->
-          (* CR xclerc for xclerc: TODO *)
-          None, unreachable
         | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
         | Switch _ | Call _ | Prim _ | Return | Raise _ | Tailcall_func _
-        | Call_no_return _ ->
+        | Call_no_return _ | Tailcall_self _ ->
           common ~avail_before ~destroyed_at:Proc.destroyed_at_terminator
             ~is_interesting_constructor:
               Cfg.(
@@ -368,52 +400,26 @@ module Transfer = struct
             term)
     in
     term.available_across <- avail_across;
-    let avail_before_handler =
+    let avail_before_exn_handler =
       match avail_after with
       | Unreachable -> unreachable
       | Ok avail_at_raise ->
         let without_exn_bucket =
-          RD.Set.filter_reg avail_at_raise Proc.loc_exn_bucket
+          RD_quotient_set.filter_reg_by_loc avail_at_raise Proc.loc_exn_bucket
         in
         let with_anonymous_exn_bucket =
-          RD.Set.add
+          RD_quotient_set.add
             (RD.create_without_debug_info ~reg:Proc.loc_exn_bucket)
             without_exn_bucket
         in
         ok with_anonymous_exn_bucket
     in
-    { normal = { avail_before = Some avail_after };
-      exceptional = { avail_before = Some avail_before_handler }
+    { normal = { avail_before = avail_after };
+      exceptional = { avail_before = avail_before_exn_handler }
     }
 end
 
 module Analysis = Cfg_dataflow.Forward (Domain) (Transfer)
-
-let get_name_for_debugger_regs (b : Cfg.basic) =
-  match b with
-  | Op (Name_for_debugger { regs; _ }) -> Some regs
-  | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
-  | Op
-      ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-      | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _
-      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-      | Stackoffset _ | Load _
-      | Store (_, _, _)
-      | Intop _
-      | Intop_imm (_, _)
-      | Intop_atomic _
-      | Floatop (_, _)
-      | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-      | Specific _ | Alloc _ ) ->
-    None
-
-let compute_all_regs_that_might_be_named : Cfg.t -> Reg.Set.t =
- fun cfg ->
-  Cfg.fold_blocks cfg ~init:Reg.Set.empty ~f:(fun _label block acc ->
-      DLL.fold_left block.body ~init:acc ~f:(fun acc instr ->
-          match get_name_for_debugger_regs instr.Cfg.desc with
-          | Some regs -> Reg.add_set_array acc regs
-          | None -> acc))
 
 let run : Cfg_with_layout.t -> Cfg_with_layout.t =
  fun cfg_with_layout ->
@@ -421,11 +427,14 @@ let run : Cfg_with_layout.t -> Cfg_with_layout.t =
   then (
     let cfg = Cfg_with_layout.cfg cfg_with_layout in
     let fun_args = R.set_of_array cfg.fun_args in
-    let avail_before = RAS.Ok (RD.Set.without_debug_info fun_args) in
-    all_regs_that_might_be_named := compute_all_regs_that_might_be_named cfg;
-    let init : Domain.t = { Domain.avail_before = Some avail_before } in
+    let fun_name = Cfg.fun_name cfg in
+    dprintf "Function %s\n%!" fun_name;
+    let avail_before = RAS.Ok (RD_quotient_set.without_debug_info fun_args) in
+    let init : Domain.t = { Domain.avail_before } in
     match Analysis.run cfg ~init ~handlers_are_entry_points:false () with
     | Error () ->
       Misc.fatal_errorf "Cfg_available_regs.run: dataflow analysis failed"
-    | Ok (_ : Domain.t Label.Tbl.t) -> ());
+    | Ok (_ : Domain.t Label.Tbl.t) ->
+      (* CR mshinwell: consider adding command-line flag to save cfg as .dot *)
+      ());
   cfg_with_layout

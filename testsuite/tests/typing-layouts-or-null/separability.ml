@@ -727,7 +727,7 @@ type a : value = #{ a : t_maybesep_val }
 Line 1, characters 0-40:
 1 | type a : value = #{ a : t_maybesep_val }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "a" is immediate with t_maybesep_val
+Error: The kind of type "a" is immediate mod dynamic with t_maybesep_val
          because it is an unboxed record.
        But the kind of type "a" must be a subkind of value
          because of the annotation on the declaration of the type a.

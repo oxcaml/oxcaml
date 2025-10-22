@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI agents when working with code in this repository.
 
 # OxCaml Compiler Development Guide
 
@@ -74,3 +74,4 @@ Configuration is needed after changing `.in` files or the autoconf script.
 - ALWAYS prefer editing existing files
 - NEVER proactively create documentation files (*.md) or README files
 - NEVER stage or commit changes unless explicitly requested
+- If you decide partway to undo a large chunk of your work, strongly prefer to `git stash` your changes instead of just undoing them.

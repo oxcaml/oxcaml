@@ -127,12 +127,9 @@ module Id = struct
     send_trie, { values = iterator; names = get_names iterator 0 }, recv_value
 end
 
-module VM = Virtual_machine.Make (Trie.Iterator)
-
 let iter id f table =
-  let send_input, it, recv_output = Id.create_iterator id in
-  Channel.send send_input table;
-  VM.iter (fun keys -> f keys (Channel.recv recv_output)) (VM.iterator it)
+  let is_trie = Id.is_trie id in
+  Trie.iter is_trie f table
 
 let print id ?(pp_sep = Format.pp_print_cut) pp_row ppf table =
   let first = ref true in

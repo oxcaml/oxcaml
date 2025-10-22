@@ -25,6 +25,8 @@ val link :
   cached_genfns_imports:Generic_fns.Partition.Set.t ->
   genfns:Generic_fns.Tbl.t ->
   units_tolink:Linkenv.unit_link_info list ->
+  uses_eval:bool ->
+  quoted_globals:Compilation_unit.Name.Set.t ->
   ppf_dump:Format.formatter ->
   unit
 

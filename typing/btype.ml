@@ -313,6 +313,8 @@ let fold_type_expr f init ty =
   | Tvariant row        ->
       let result = fold_row f init row in
       f result (row_more row)
+  | Tquote ty           -> f init ty
+  | Tsplice ty          -> f init ty
   | Tfield (_, _, ty1, ty2) ->
       let result = f init ty1 in
       f result ty2
@@ -496,6 +498,8 @@ let rec copy_type_desc ?(keep_names=false) f = function
                         -> Tobject (f ty, ref (Some(p, List.map f tl)))
   | Tobject (ty, _)     -> Tobject (f ty, ref None)
   | Tvariant _          -> assert false (* too ambiguous *)
+  | Tquote ty           -> Tquote (f ty)
+  | Tsplice ty          -> Tsplice (f ty)
   | Tfield (p, k, ty1, ty2) ->
       Tfield (p, field_kind_internal_repr k, f ty1, f ty2)
       (* the kind is kept shared, with indirections removed for performance *)

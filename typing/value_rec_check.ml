@@ -259,6 +259,9 @@ let classify_expression : Typedtree.expression -> sd =
           (* other cases compile to a lazy block holding a function *)
           Static
       end
+    | Texp_eval _ ->
+      (* CR metaprogramming mshinwell: Make sure this is correct *)
+      Static
 
     | Texp_new _
     | Texp_instvar _
@@ -273,7 +276,10 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_assert _
     | Texp_try _
     | Texp_override _
-    | Texp_letop _ ->
+    | Texp_letop _
+    (* CR metaprogramming aivaskovic: verify for quotations and splices *)
+    | Texp_quotation _
+    | Texp_antiquotation _ ->
         Dynamic
   and classify_value_bindings rec_flag env bindings =
     (* We use a non-recursive classification, classifying each
@@ -1086,6 +1092,14 @@ let rec expression : Typedtree.expression -> term_judg =
         expression exp2
       ]
     | Texp_hole _ -> empty
+    | Texp_quotation e ->
+        (* The quoted code may be spliced into a dereferencing context. *)
+        expression e << Dereference
+    | Texp_antiquotation e ->
+        expression e << Dereference
+    | Texp_eval _ ->
+      (* CR metaprogramming mshinwell: Make sure this is correct *)
+      empty
 
 (* Function bodies.
     G |-{body} b : m

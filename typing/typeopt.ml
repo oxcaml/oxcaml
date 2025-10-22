@@ -192,8 +192,8 @@ let classify ~classify_product env ty sort : _ classification =
              Maybe we should emit a warning. *)
           Any
       end
-  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _ ->
-      Addr
+  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _
+  | Tquote _ | Tsplice _-> Addr
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _ ->
       assert false
   end
@@ -406,16 +406,15 @@ let value_kind_of_value_jkind env jkind =
      the principality check, as we're just trying to compute optimizations. *)
   let context = Ctype.mk_jkind_context_always_principal env in
   let externality_upper_bound =
-    Jkind.get_externality_upper_bound ~context jkind in
-  match layout, externality_upper_bound with
-  | Base Value, External -> Pintval
-  | Base Value, External64 ->
-    if !Clflags.native_code && Sys.word_size = 64 then Pintval else Pgenval
-  | Base Value, Internal -> Pgenval
-  | Any, _
-  | Product _, _
+    Jkind.get_externality_upper_bound ~context jkind
+  in
+  match layout with
+  | Base Value ->
+    value_kind_of_value_with_externality externality_upper_bound
+  | Any
+  | Product _
   | Base (Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 |
-          Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) , _ ->
+          Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
     Misc.fatal_error "expected a layout of value"
 
 (* [value_kind] has a pre-condition that it is only called on values.  With the
@@ -751,7 +750,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           end
         | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
-        | Tof_kind _ -> unknown ()
+        | Tquote _ | Tsplice _ | Tof_kind _ -> unknown ()
     in
     let (_, num_nodes_visited), kinds =
       Array.fold_left_map (fun (i, num_nodes_visited) field ->
@@ -1025,11 +1024,9 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       && Language_extension.(is_at_least Small_numbers Stable) then
       Lambda.Punboxed_or_untagged_integer Untagged_int
     else error const
-  | Base Bits8 when Language_extension.(is_at_least Layouts Stable) &&
-                    Language_extension.(is_at_least Small_numbers Stable) ->
+  | Base Bits8 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_or_untagged_integer Untagged_int8
-  | Base Bits16 when Language_extension.(is_at_least Layouts Stable) &&
-                     Language_extension.(is_at_least Small_numbers Stable) ->
+  | Base Bits16 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_or_untagged_integer Untagged_int16
   | Base Bits32 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_or_untagged_integer Unboxed_int32

@@ -297,6 +297,7 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
+  | Eval_format
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -576,7 +577,7 @@ let mode_lazy expected_mode =
   let mode_crossing =
     Crossing.create ~linearity:true ~portability:true
       ~regionality:false ~uniqueness:false ~contention:false ~statefulness:false
-      ~visibility:false ~forkable:false ~yielding:false
+      ~visibility:false ~forkable:false ~yielding:false ~staticity:false
   in
   let closure_mode =
     expected_mode |> as_single_mode |> Crossing.apply_right mode_crossing
@@ -3278,6 +3279,7 @@ and type_pat_aux
         { p with pat_extra = (Tpat_type (path, lid), loc, sp.ppat_attributes)
         :: p.pat_extra }
   | Ppat_open (lid,p) ->
+      Env.check_no_open_quotations sp.ppat_loc !!penv Env.Open_qt;
       let path, new_env =
         !type_open Asttypes.Fresh !!penv sp.ppat_loc lid in
       Pattern_env.set_env penv new_env;
@@ -4360,7 +4362,10 @@ let rec is_nonexpansive exp =
   | Texp_function _
   | Texp_probe_is_enabled _
   | Texp_src_pos
-  | Texp_array (_, _, [], _) -> true
+  | Texp_quotation _
+  | Texp_array (_, _, [], _)
+    (* CR metaprogramming mshinwell: Make sure this is correct for Texp_eval *)
+  | Texp_eval _ -> true
   | Texp_let(_rec_flag, pat_exp_list, body) ->
       List.for_all (fun vb -> is_nonexpansive vb.vb_expr) pat_exp_list &&
       is_nonexpansive body
@@ -4484,6 +4489,7 @@ let rec is_nonexpansive exp =
   | Texp_override _
   | Texp_letexception _
   | Texp_letop _
+  | Texp_antiquotation _
   | Texp_extension_constructor _ ->
     false
   | Texp_exclave e -> is_nonexpansive e
@@ -4940,7 +4946,10 @@ let check_partial_application ~statement exp =
             | Texp_lazy _ | Texp_object _ | Texp_pack _ | Texp_unreachable
             | Texp_extension_constructor _ | Texp_ifthenelse (_, _, None)
             | Texp_probe _ | Texp_probe_is_enabled _ | Texp_src_pos
-            | Texp_function _ ->
+            | Texp_function _ | Texp_quotation _ | Texp_antiquotation _
+            | Texp_eval _ ->
+                (* CR metaprogramming mshinwell: make sure this is correct for
+                   Texp_eval *)
                 check_statement ()
             | Texp_match (_, _, cases, _) ->
                 List.iter (fun {c_rhs; _} -> check c_rhs) cases
@@ -6961,6 +6970,7 @@ and type_expect_
         exp_env = env;
       }
   | Pexp_object s ->
+      Env.check_no_open_quotations loc env Object_qt;
       submode ~loc ~env Value.legacy expected_mode;
       let desc, meths = !type_object env loc s in
       rue {
@@ -7049,6 +7059,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_open (od, e) ->
+      Env.check_no_open_quotations loc env Open_qt;
       let tv = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
       let (od, newenv) = !type_open_decl env od in
       let exp = type_expect newenv expected_mode e ty_expected_explained in
@@ -7258,6 +7269,40 @@ and type_expect_
       | _ ->
           raise (Error (loc, env, Invalid_atomic_loc_payload))
       end
+  | Pexp_extension ({ txt = ("eval" | "ocaml.eval"); _ }, payload) ->
+    (* CR metaprogramming mshinwell: This match clause needs code review *)
+    begin match Builtin_attributes.get_eval_payload payload with
+    | Error () -> raise (Error (loc, env, Eval_format))
+    | Ok typ ->
+      let _ =
+        (* Check that the type is valid in a quote too. *)
+        let env' = Env.enter_quotation env in
+        Typetexp.transl_simple_type env' ~new_var_jkind:Any ~closed:true
+          Alloc.Const.legacy typ in
+      let typ =
+        Typetexp.transl_simple_type env ~new_var_jkind:Any ~closed:true
+          Alloc.Const.legacy typ
+      in
+      let sort =
+        match type_sort ~why:Function_result ~fixed:false env typ.ctyp_type with
+        | Ok sort -> sort
+        | Error err ->
+            raise (Error (loc, env, Function_type_not_rep (typ.ctyp_type, err)))
+      in
+      let eval_type = newty
+        (Tarrow
+          ((Nolabel, Alloc.legacy, Alloc.legacy)
+          , newmono (Predef.type_code (newgenty (Tquote typ.ctyp_type)))
+          , typ.ctyp_type
+          , commu_ok))
+      in
+      rue {
+        exp_desc = Texp_eval (typ, sort);
+        exp_loc = loc; exp_extra = [];
+        exp_type = eval_type;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env }
+    end
   | Pexp_extension ext ->
     raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
@@ -7379,6 +7424,33 @@ and type_expect_
             exp_type = exp2.exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
+  | Pexp_quote exp ->
+      submode ~loc ~env ~reason:Other Value.legacy expected_mode;
+      let jkind = Jkind.Builtin.value ~why:Quotation_result in
+      let new_env = Env.enter_quotation env in
+      let ty = newgenvar jkind in
+      let quoted_ty = newgenty (Tquote ty) in
+      let to_unify = Predef.type_code quoted_ty in
+      with_explanation (fun () ->
+        unify_exp_types loc env to_unify (generic_instance ty_expected));
+      let arg = type_expect new_env mode_legacy exp (mk_expected ty) in
+      re {
+        exp_desc = Texp_quotation arg;
+        exp_loc = loc; exp_extra = [];
+        exp_type = instance ty_expected;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env }
+  | Pexp_splice exp ->
+      submode ~loc ~env ~reason:Other Value.legacy expected_mode;
+      let new_env = Env.enter_splice ~loc env in
+      let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
+      let arg = type_expect new_env mode_legacy exp (mk_expected ty) in
+      re {
+        exp_desc = Texp_antiquotation arg;
+        exp_loc = loc; exp_extra = [];
+        exp_type = instance ty_expected;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env }
   | Pexp_hole ->
       begin match overwrite with
       | Assigning(typ, fields_mode) ->
@@ -11762,6 +11834,11 @@ let report_error ~loc env =
   | Unexpected_hole ->
       Location.errorf ~loc
         "wildcard \"_\" not expected."
+  | Eval_format ->
+      Location.errorf ~loc
+        "The eval extension takes a single type as its argument, for \
+         example %a."
+        Style.inline_code "[%eval: int]"
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env_error env

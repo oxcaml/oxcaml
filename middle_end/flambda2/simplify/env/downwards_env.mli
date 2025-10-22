@@ -238,6 +238,11 @@ val replay_history : t -> Replay_history.t
 
 val with_replay_history : (Replay_history.t * bool) option -> t -> t
 
+val with_join_analysis :
+  Apply_cont_rewrite_id.t Join_analysis.t option -> t -> t
+
+val join_analysis : t -> Apply_cont_rewrite_id.t Join_analysis.t option
+
 val map_specialization_cost :
   f:(Specialization_cost.t -> Specialization_cost.t) -> t -> t
 

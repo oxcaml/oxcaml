@@ -29,7 +29,6 @@ type error =
   | Illegal_renaming of CU.Name.t * string * CU.Name.t
   | Forward_reference of string * CU.Name.t
   | Wrong_for_pack of string * CU.t
-  | Linking_error
   | Assembler_error of string
   | File_not_found of string
 
@@ -125,7 +124,11 @@ end) : S = struct
         let main_module_block_size, code =
           Translmod.transl_package components coercion
         in
-        let code = Simplif.simplify_lambda code in
+        let code =
+          Simplif.simplify_lambda code
+            ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
+            ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
+        in
         let main_module_block_format : Lambda.main_module_block_format =
           Mb_struct { mb_size = main_module_block_size }
         in
@@ -204,6 +207,7 @@ end) : S = struct
             ~crc_with_unit:(Some (ui.ui_unit, Env.crc_of_unit modname))
           :: filter (Linkenv.extract_crc_interfaces ());
         ui_imports_cmx = filter (Linkenv.extract_crc_implementations ());
+        ui_quoted_globals = [] (* CR jrickard: Metaprogramming support. *);
         ui_format = format;
         ui_generic_fns =
           { curry_fun =
@@ -293,7 +297,6 @@ let report_error ppf = function
     fprintf ppf "File %a not found" Style.inline_code file
   | Assembler_error file ->
     fprintf ppf "Error while assembling %a" Style.inline_code file
-  | Linking_error -> fprintf ppf "Error during partial linking"
 
 let () =
   Location.register_error_of_exn (function

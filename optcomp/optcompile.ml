@@ -92,7 +92,12 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
     |> Profile.(record generate) (fun (program : Lambda.program) ->
            Builtin_attributes.warn_unused ();
-           let code = Simplif.simplify_lambda program.Lambda.code in
+           let code =
+             Simplif.simplify_lambda program.Lambda.code
+               ~restrict_to_upstream_dwarf:
+                 !Dwarf_flags.restrict_to_upstream_dwarf
+               ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
+           in
            { program with Lambda.code }
            |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.program
            |> Compiler_hooks.execute_and_pipe Compiler_hooks.Lambda
@@ -170,12 +175,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         ~hook_typed_tree:(fun (impl : Typedtree.implementation) ->
           Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
         info ~backend
-    | Emit compile_implementation_linear ->
-      (* Emit assembly directly from Linear IR *)
-      compile_implementation_linear
-        (Unit_info.prefix info.target)
-        ~progname:(Unit_info.original_source_file info.target)
-        ~ppf_dump:info.ppf_dump
+    | Emit emit -> emit info (* Emit assembly directly from Linear IR *)
     | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
       (match !Clflags.as_argument_for with
       | Some _ ->
@@ -244,6 +244,8 @@ let native unix
   (module Make (struct
     let backend = Compile_common.Native
 
+    let supports_metaprogramming = true
+
     let ext_asm = Config.ext_asm
 
     let ext_obj = Config.ext_obj
@@ -279,4 +281,21 @@ let native unix
         ~pipeline:
           (Direct_to_cmm (lambda_to_cmm ~machine_width ~keep_symbol_tables))
         ~sourcefile ~prefixname ~ppf_dump program
+
+    let extra_load_paths_for_eval = ["unix"; "compiler-libs"; "ocaml-jit"]
+
+    let extra_libraries_for_eval =
+      [ "unix/unix";
+        "compiler-libs/ocamlcommon";
+        "compiler-libs/ocamloptcomp";
+        "ocaml-jit/jit";
+        "camlinternaleval" ]
+
+    let support_files_for_eval () =
+      List.iter
+        (fun lib ->
+          Load_path.add_dir ~hidden:false
+            (Misc.expand_directory Config.standard_library ("+" ^ lib)))
+        extra_load_paths_for_eval;
+      List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval
   end) : S)

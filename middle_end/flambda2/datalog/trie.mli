@@ -46,6 +46,16 @@ val union : ('t, 'k, 'v) is_trie -> ('v -> 'v -> 'v option) -> 't -> 't -> 't
 
 val find_opt : ('t, 'k, 'v) is_trie -> 'k Constant.hlist -> 't -> 'v option
 
+val iter :
+  ('t, 'k, 'v) is_trie -> ('k Constant.hlist -> 'v -> unit) -> 't -> unit
+
+val fold :
+  ('t, 'k, 'v) is_trie ->
+  ('k Constant.hlist -> 'v -> 'a -> 'a) ->
+  't ->
+  'a ->
+  'a
+
 module Iterator : sig
   include Leapfrog.Iterator
 

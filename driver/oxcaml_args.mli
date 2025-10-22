@@ -26,6 +26,7 @@ module type Oxcaml_options = sig
   val davail : unit -> unit
   val dranges : unit -> unit
   val ddebug_invariants : unit -> unit
+  val ddebug_available_regs : unit -> unit
   val ddwarf_types : unit -> unit
   val ddwarf_metrics : unit -> unit
   val dcfg : unit -> unit
@@ -161,6 +162,8 @@ module type Debugging_options = sig
   val no_dwarf_for_startup_file : unit -> unit
   val gdwarf_may_alter_codegen : unit -> unit
   val no_gdwarf_may_alter_codegen : unit -> unit
+  val gdwarf_may_alter_codegen_experimental : unit -> unit
+  val no_gdwarf_may_alter_codegen_experimental : unit -> unit
   val gdwarf_max_function_complexity : int -> unit
   val gdwarf_compression : string -> unit
   val gdwarf_fission : string -> unit

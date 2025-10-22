@@ -270,6 +270,22 @@ let newmono ty = newty (Tpoly(ty, []))
 
 let none = newty (Ttuple [])                (* Clearly ill-formed type *)
 
+(**** Control variable stage in inference *)
+
+let rec update_variable_stage stage_offset ty name jkind =
+  if stage_offset = 0 then ()
+  else if stage_offset < 0 then begin
+    let v = newvar2 ?name (get_level ty) jkind in
+    let ty' = newty2 ~level:(get_level ty) (Tquote v) in
+    link_type ty ty';
+    update_variable_stage (stage_offset + 1) v name jkind
+  end else begin
+    let v = newvar2 ?name (get_level ty) jkind in
+    let ty' = newty2 ~level:(get_level ty) (Tsplice v) in
+    link_type ty ty';
+    update_variable_stage (stage_offset - 1) v name jkind
+  end
+
 (**** information for [Typecore.unify_pat_*] ****)
 
 module Pattern_env : sig
@@ -806,6 +822,12 @@ let duplicate_class_type ty =
                          (*  Type level manipulation  *)
                          (*****************************)
 
+let rec lower_all ty =
+  if get_level ty > !current_level then begin
+    set_level ty !current_level;
+    iter_type_expr lower_all ty
+  end
+
 (*
    It would be a bit more efficient to remove abbreviation expansions
    rather than generalizing them: these expansions will usually not be
@@ -813,22 +835,30 @@ let duplicate_class_type ty =
    [expand_abbrev] (via [subst]) requires these expansions to be
    preserved. Does it worth duplicating this code ?
 *)
-let rec generalize ty =
+let rec generalize stage_offset ty =
   let level = get_level ty in
   if (level > !current_level) && (level <> generic_level) then begin
     set_level ty generic_level;
     (* recur into abbrev for the speed *)
     begin match get_desc ty with
-      Tconstr (_, _, abbrev) ->
-        iter_abbrev generalize !abbrev
-    | _ -> ()
+    | Tvar name -> update_variable_stage stage_offset ty name.name name.jkind
+    | Tvariant row ->
+        if stage_offset <> 0 && is_Tvar (row_more row) then
+          lower_all ty
+        else
+          iter_type_expr (generalize stage_offset) ty
+    | Tquote ty' -> generalize (stage_offset + 1) ty'
+    | Tsplice ty' -> generalize (stage_offset - 1) ty'
+    | Tconstr (_, _, abbrev) ->
+        iter_abbrev (generalize stage_offset) !abbrev;
+        iter_type_expr (generalize stage_offset) ty
+    | _ -> iter_type_expr (generalize stage_offset) ty
     end;
-    iter_type_expr generalize ty
   end
 
 let generalize ty =
   simple_abbrevs := Mnil;
-  generalize ty
+  generalize 0 ty
 
 (* Generalize the structure and lower the variables *)
 
@@ -1307,7 +1337,7 @@ let rec copy ?partial ?keep_names copy_scope ty =
                   Tsubst (ty, None) -> ty
                   (* TODO: is this case possible?
                      possibly an interaction with (copy more) below? *)
-                | Tconstr _ | Tnil | Tof_kind _ ->
+                | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _ ->
                     copy more
                 | Tvar _ | Tunivar _ ->
                     if keep then more else newty mored
@@ -2055,12 +2085,37 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
+(* Cancel out all pairs of $ and <[_]>, or <[_]> and $.
+   This ensures type unification works correctly. *)
+let rec quote_splice_cancel ty =
+  (* CR metaprogramming aivaskovic: try to remove type_desc mutation here *)
+  match get_desc ty with
+  | Tquote t -> begin
+      match get_desc t with
+      | Tsplice t' -> t'
+      | Tquote _ -> set_type_desc ty (Tquote (quote_splice_cancel t)); ty
+      | _ -> raise Cannot_expand
+    end
+  | Tsplice t -> begin
+      match get_desc t with
+      | Tquote t' -> t'
+      | Tsplice _ -> set_type_desc t (Tsplice (quote_splice_cancel t)); ty
+      | _ -> raise Cannot_expand
+    end
+  | _ -> raise Cannot_expand
+
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
-let try_expand_once env ty =
+let rec try_expand_once env ty =
+  let expand_and_cancel t =
+    match try_expand_once env t with
+    | _ | exception Cannot_expand -> quote_splice_cancel ty
+  in
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
+  | Tsplice t -> expand_and_cancel t
+  | Tquote t -> expand_and_cancel t
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2121,6 +2176,8 @@ let rec extract_concrete_typedecl env ty =
           end
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
+  | Tquote ty -> extract_concrete_typedecl env ty
+  | Tsplice ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
@@ -2143,9 +2200,11 @@ let safe_abbrev_opt env ty =
     Btype.backtrack snap;
     false
 
-let try_expand_once_opt env ty =
+let rec try_expand_once_opt env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev_opt env ty
+  | Tsplice t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
+  | Tquote t -> ignore (try_expand_once_opt env t); quote_splice_cancel ty
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =
@@ -2249,7 +2308,8 @@ let contained_without_boxing env ty =
     List.map snd labeled_tys
   | Tpoly (ty, _) -> [ty]
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
-  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _ -> []
+  | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
+  | Tquote _ | Tsplice _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
@@ -2362,12 +2422,12 @@ let rec estimate_type_jkind ~expand_component env ty =
     end
   | Tobject _ -> Jkind.for_object
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
+  | Tquote _ -> Jkind.Builtin.value ~why:Tquote
+  | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
-     if tvariant_not_immediate row
-     then Jkind.for_non_float ~why:Polymorphic_variant
-     else Jkind.Builtin.immediate ~why:Immediate_polymorphic_variant
+     Jkind.for_boxed_row row
   | Tunivar { jkind } -> Jkind.disallow_right jkind
   | Tpoly (ty, _) ->
     let context = mk_jkind_context_check_principal_ref env in
@@ -2561,7 +2621,8 @@ let constrain_type_jkind ~fixed env ty jkind =
                        && List.length jkinds = num_components ->
                recur ty's_jkinds jkinds
              | Some ty's_jkinds, None
-                  when Jkind.has_layout_any jkind ->
+                  when Jkind.has_layout_any jkind
+                    && List.length ty's_jkinds = num_components ->
                (* Even though [jkind] has layout any, it still might have
                   mode-crossing restrictions, so we recur, just duplicating
                   the jkind. *)
@@ -2667,15 +2728,8 @@ let check_type_externality env ty ext =
   | Error _ -> false
 
 let is_always_gc_ignorable env ty =
-  let ext : Jkind_axis.Externality.t =
-    (* We check that we're compiling to (64-bit) native code before counting
-       External64 types as gc_ignorable, because bytecode is intended to be
-       platform independent. *)
-    if !Clflags.native_code && Sys.word_size = 64
-    then External64
-    else External
-  in
-  check_type_externality env ty ext
+  check_type_externality
+    env ty (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
 
 let check_type_nullability env ty null =
   let upper_bound =
@@ -3444,6 +3498,18 @@ let rec mcomp type_pairs env t1 t2 =
         | (Tunivar {jkind=jkind1}, Tunivar {jkind=jkind2}, _, _) ->
             (try unify_univar t1' t2' jkind1 jkind2 !univar_pairs
              with Cannot_unify_universal_variables -> raise Incompatible)
+        | (Tquote t1, Tquote t2, _, _) ->
+            mcomp type_pairs env t1 t2
+        | (Tsplice t1, Tsplice t2, _, _) ->
+            mcomp type_pairs env t1 t2
+        | (Tsplice t1, _, _, _) ->
+            mcomp type_pairs env t1 t2'
+        | (_, Tsplice t2, _, _) ->
+            mcomp type_pairs env t1' t2
+        | (Tquote t1, _, _, _) ->
+            mcomp type_pairs env t1 t2'
+        | (_, Tquote t2, _, _) ->
+            mcomp type_pairs env t1' t2
         | (_, _, _, _) ->
             raise Incompatible
       end
@@ -3914,9 +3980,17 @@ let rec unify uenv t1 t2 =
   try
     type_changed := true;
     begin match (get_desc t1, get_desc t2) with
-      (Tvar _, Tconstr _) when deep_occur t1 t2 ->
+      (Tconstr _, Tvar _) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tconstr _, Tvar _) when deep_occur t2 t1 ->
+    | (Tvar _, Tquote _) when deep_occur t1 t2 ->
+        unify2 uenv t1 t2
+    | (Tquote _, Tvar _) when deep_occur t2 t1 ->
+        unify2 uenv t1 t2
+    | (Tvar _, Tsplice _) when deep_occur t1 t2 ->
+        unify2 uenv t1 t2
+    | (Tsplice _, Tvar _) when deep_occur t2 t1 ->
+        unify2 uenv t1 t2
+    | (Tvar _, Tconstr _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tvar _, _) ->
         if unify1_var uenv t1 t2 then () else unify2 uenv t1 t2
@@ -4165,6 +4239,21 @@ and unify3 uenv t1 t1' t2 t2' =
           raise_for Unify (Obj (Abstract_row Second))
       | (Tconstr _,  Tnil ) ->
           raise_for Unify (Obj (Abstract_row First))
+      | (Tquote t1, Tquote t2)
+      | (Tsplice t1, Tsplice t2) ->
+          unify uenv t1 t2
+      | (Tsplice s1, _) ->
+          set_type_desc t2' d2;
+          let t =
+            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tquote t2')
+          in
+          unify uenv s1 t
+      | (_, Tsplice s2) ->
+          set_type_desc t1' d1;
+          let t =
+            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
+          in
+          unify uenv s2 t
       | (_, _) -> raise_unexplained_for Unify
       end;
       (* XXX Commentaires + changer "create_recursion"
@@ -5118,6 +5207,7 @@ let mode_crossing_structure_memaddr =
     ~forkable:true
     ~yielding:true
     ~statefulness:true
+    ~staticity:false
 
 (** The mode crossing of a functor. *)
 let mode_crossing_functor =
@@ -5131,6 +5221,7 @@ let mode_crossing_functor =
     ~forkable:false
     ~yielding:false
     ~statefulness:false
+    ~staticity:false
 
 (** The mode crossing of any module. *)
 let mode_crossing_module = Mode.Crossing.max
@@ -5293,6 +5384,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                 (moregen inst_nongen variance type_pairs env)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Moregen t1' t2' k1 k2 !univar_pairs
+          | (Tquote t1, Tquote t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
+          | (Tsplice t1, Tsplice t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
           | (_, _) ->
               raise_unexplained_for Moregen
         end
@@ -5748,6 +5843,10 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
                 (eqtype rename type_pairs subst env ~do_jkind_check)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Equality t1' t2' k1 k2 !univar_pairs
+          | (Tquote t1, Tquote t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
+          | (Tsplice t1, Tsplice t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
               raise_unexplained_for Equality
         end
@@ -6451,6 +6550,14 @@ let rec build_subtype env (visited : transient_expr list)
       let c = max_change c1 c2 in
       if c > Unchanged then (newty (Tfield(s, field_public, t1', t2')), c)
       else (t, Unchanged)
+  | Tquote t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tquote t1'), c)
+      else (t, Unchanged)
+  | Tsplice t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tsplice t1'), c)
+      else (t, Unchanged)
   | Tnil ->
       if posi then
         let v = newvar (Jkind.Builtin.value ~why:Tnil) in
@@ -6642,6 +6749,10 @@ let rec subtype_rec env trace t1 t2 cstrs =
         with Not_found ->
           (trace, t1, t2, !univar_pairs)::cstrs
         end
+    | (Tquote t1, Tquote t2) ->
+         subtype_rec env trace t1 t2 cstrs
+    | (Tsplice t1, Tsplice t2) ->
+         subtype_rec env trace t1 t2 cstrs
     | (_, _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
   end

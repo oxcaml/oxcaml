@@ -87,11 +87,13 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       Library (file_name, infos)
     else raise (Linkenv.Error (Not_an_object_file file_name))
 
-  let scan_file ~shared genfns file (objfiles, tolink, cached_genfns_imports) =
+  let scan_file ~shared genfns file
+      (full_paths, objfiles, tolink, cached_genfns_imports) =
     match read_file file with
     | Unit (file_name, info, crc) ->
       (* This is a cmx file. It must be linked in any case. *)
       Linkenv.remove_required info.ui_unit;
+      Linkenv.add_quoted_globals info.ui_quoted_globals;
       List.iter
         (fun import -> Linkenv.add_required (file_name, None) import)
         info.ui_imports_cmx;
@@ -104,7 +106,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               dynu_crc = crc;
               dynu_defines = info.ui_defines;
               dynu_imports_cmi = info.ui_imports_cmi |> Array.of_list;
-              dynu_imports_cmx = info.ui_imports_cmx |> Array.of_list
+              dynu_imports_cmx = info.ui_imports_cmx |> Array.of_list;
+              dynu_quoted_globals = info.ui_quoted_globals |> Array.of_list
             }
       in
       let unit =
@@ -125,7 +128,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         Generic_fns.Tbl.add ~imports:cached_genfns_imports genfns
           info.ui_generic_fns
       in
-      object_file_name :: objfiles, unit :: tolink, cached_genfns_imports
+      ( file_name :: full_paths,
+        object_file_name :: objfiles,
+        unit :: tolink,
+        cached_genfns_imports )
     | Library (file_name, infos) ->
       (* This is an archive file. Each unit contained in it will be linked in
          only if needed. *)
@@ -149,7 +155,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         then objfiles
         else obj_file :: objfiles
       in
-      ( objfiles,
+      (* [file_name] is always returned irrespective of the [objfiles]
+         calculation above and the units calculation below: the aim is to know
+         the full set of files which were provided on the command line. *)
+      ( file_name :: full_paths,
+        objfiles,
         List.fold_right
           (fun info reqd ->
             let li_name = CU.name info.li_name in
@@ -167,6 +177,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                     if Misc.Bitmap.get bits i then Some tbl.(i) else None)
                 |> List.filter_map Fun.id
               in
+              let quoted_globals =
+                imports_list infos.lib_quoted_globals info.li_quoted_globals
+              in
+              Linkenv.add_quoted_globals quoted_globals;
               let dynunit : Cmxs_format.dynunit option =
                 if not shared
                 then None
@@ -180,7 +194,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                         |> Array.of_list;
                       dynu_imports_cmx =
                         imports_list infos.lib_imports_cmx info.li_imports_cmx
-                        |> Array.of_list
+                        |> Array.of_list;
+                      dynu_quoted_globals = quoted_globals |> Array.of_list
                     }
               in
               let unit =
@@ -211,11 +226,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let link_shared ~ppf_dump objfiles output_name =
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
         let genfns = Generic_fns.Tbl.make () in
-        let ml_objfiles, units_tolink, _ =
+        let _full_paths, ml_objfiles, units_tolink, _ =
           List.fold_right
             (scan_file ~shared:true genfns)
             objfiles
-            ([], [], Generic_fns.Partition.Set.empty)
+            ([], [], [], Generic_fns.Partition.Set.empty)
         in
         let lib_ccobjs = Linkenv.lib_ccobjs () in
         let lib_ccopts = Linkenv.lib_ccopts () in
@@ -241,18 +256,72 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         let stdlib = "stdlib" ^ Backend.ext_flambda_lib in
         let stdexit = "std_exit" ^ Backend.ext_flambda_obj in
         let objfiles =
-          if !Clflags.nopervasives
+          (* stdlib is added below as part of [early_pervasives], if required *)
+          if !Clflags.nopervasives || !Clflags.output_c_object
           then objfiles
-          else if !Clflags.output_c_object
-          then stdlib :: objfiles
-          else stdlib :: (objfiles @ [stdexit])
+          else objfiles @ [stdexit]
+          (* CR jvanburen: this is the previous code, there is no
+             [early_pervasives] below, so if we run into issues, maybe revert?:
+             {[ if !Clflags.nopervasives then objfiles else if
+             !Clflags.output_c_object then stdlib :: objfiles else stdlib ::
+             (objfiles @ [stdexit]) ]} *)
         in
         let genfns = Generic_fns.Tbl.make () in
-        let ml_objfiles, units_tolink, cached_genfns_imports =
+        (* CR mshinwell/xclerc: This tuple should be a record *)
+        let full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
+          (* This covers all files that the user has requested be linked *)
           List.fold_right
             (scan_file ~shared:false genfns)
             objfiles
-            ([], [], Generic_fns.Partition.Set.empty)
+            ([], [], [], Generic_fns.Partition.Set.empty)
+        in
+        let uses_eval =
+          (* This query must come after scan_file has been called on objfiles,
+             otherwise is_required will always return false. *)
+          Linkenv.is_required (Compilation_unit.of_string "Camlinternaleval")
+        in
+        let quoted_globals = Linkenv.get_quoted_globals () in
+        if uses_eval && not Backend.supports_metaprogramming
+        then
+          raise
+            (Linkenv.Error
+               (Metaprogramming_not_supported_by_backend output_name));
+        let stdlib_and_support_files_for_eval =
+          if !Clflags.nopervasives
+          then []
+          else
+            let for_eval =
+              if not uses_eval
+              then []
+              else
+                let deps = Backend.support_files_for_eval () in
+                (* Avoid double linking errors in the case where the user has
+                   already passed one of the support files on the command line.
+                   The equality used here is the full path as resolved by
+                   [Load_path] (see also [scan_file], above). *)
+                List.filter
+                  (fun dep ->
+                    (* CR mshinwell: it's unclear that [Load_path] does anything
+                       along the lines of [realpath], so this equality might not
+                       be as good as we would like *)
+                    match Load_path.find dep with
+                    | full_path -> not (List.mem full_path full_paths)
+                    | exception Not_found ->
+                      (* An error will be reported by [scan_file], called below,
+                         in this case. (This is likely to be a compiler bug or a
+                         corrupted installation.) *)
+                      true)
+                  deps
+            in
+            stdlib :: for_eval
+        in
+        let _full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
+          (* This is just for any stdlib and eval support files which are
+             needed. *)
+          List.fold_right
+            (scan_file ~shared:false genfns)
+            stdlib_and_support_files_for_eval
+            ([], ml_objfiles, units_tolink, cached_genfns_imports)
         in
         (if not shared
         then
@@ -274,7 +343,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           Clflags.all_ccopts := lib_ccopts @ !Clflags.all_ccopts);
         (* put user's opts first *)
         Backend.link ml_objfiles output_name ~ppf_dump ~genfns ~units_tolink
-          ~cached_genfns_imports)
+          ~uses_eval ~quoted_globals ~cached_genfns_imports)
 
   (* Exported version for Asmlibrarian / Asmpackager *)
   let check_consistency file_name u crc =

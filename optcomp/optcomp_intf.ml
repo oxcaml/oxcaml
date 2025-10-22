@@ -25,6 +25,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
+
 open Format
 open Cmx_format
 open Compilenv
@@ -69,6 +70,8 @@ end
 module type Backend = sig
   val backend : Compile_common.opt_backend
 
+  val supports_metaprogramming : bool
+
   val link_shared :
     string list ->
     string ->
@@ -83,6 +86,8 @@ module type Backend = sig
     cached_genfns_imports:Generic_fns.Partition.Set.t ->
     genfns:Generic_fns.Tbl.t ->
     units_tolink:Linkenv.unit_link_info list ->
+    uses_eval:bool ->
+    quoted_globals:Compilation_unit.Name.Set.t ->
     ppf_dump:Format.formatter ->
     unit
 
@@ -90,7 +95,8 @@ module type Backend = sig
 
   val create_archive : string -> string list -> unit
 
-  (* CR jvanburen: maybe pass the unit info instead of sourcefile/prefixname? *)
+  (* CR-someday jvanburen: maybe pass the unit info instead of
+     sourcefile/prefixname? *)
   val compile_implementation :
     keep_symbol_tables:bool ->
     sourcefile:string option ->
@@ -100,6 +106,9 @@ module type Backend = sig
     unit
 
   val emit : emit option
+
+  (** This function may have the side effect of updating the load path. *)
+  val support_files_for_eval : unit -> string list
 
   include File_extensions
 end

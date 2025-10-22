@@ -264,7 +264,9 @@ let iter_on_occurrences
       | Texp_probe_is_enabled _ | Texp_exclave _
       (* CR-someday let_mutable: maybe iterate on mutvar? *)
       | Texp_mutvar _ | Texp_setmutvar _
-      | Texp_open _ | Texp_src_pos | Texp_overwrite _ | Texp_hole _ -> ());
+      | Texp_open _ | Texp_src_pos | Texp_overwrite _
+      | Texp_hole _  | Texp_quotation _ | Texp_antiquotation _
+      | Texp_eval _ -> ());
       default_iterator.expr sub e);
 
   (* Remark: some types get iterated over twice due to how constraints are
@@ -284,8 +286,8 @@ let iter_on_occurrences
           f ~namespace:Module ctyp_env path lid
       | Ttyp_var _ | Ttyp_arrow _ | Ttyp_tuple _ | Ttyp_object _
       | Ttyp_unboxed_tuple _
-      | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ | Ttyp_of_kind _
-      | Ttyp_call_pos -> ());
+      | Ttyp_quote _ | Ttyp_splice _ | Ttyp_of_kind _
+      | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ | Ttyp_call_pos -> ());
       default_iterator.typ sub ct);
 
   pat =

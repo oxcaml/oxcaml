@@ -472,6 +472,15 @@ module type S = sig
     val read_write : lr
   end
 
+  (* CR-soon zqian: rewrite other axes into this shape as well. *)
+  module Staticity : sig
+    type const =
+      | Static
+      | Dynamic
+
+    include Common_axis_neg with type Const.t = const
+  end
+
   type 'a comonadic_with =
     { areality : 'a;
       linearity : Linearity.Const.t;
@@ -484,7 +493,8 @@ module type S = sig
   type monadic =
     { uniqueness : Uniqueness.Const.t;
       contention : Contention.Const.t;
-      visibility : Visibility.Const.t
+      visibility : Visibility.Const.t;
+      staticity : Staticity.Const.t
     }
 
   module Axis : sig
@@ -502,6 +512,7 @@ module type S = sig
       | Uniqueness : (monadic, Uniqueness.Const.t) t
       | Visibility : (monadic, Visibility.Const.t) t
       | Contention : (monadic, Contention.Const.t) t
+      | Staticity : (monadic, Staticity.Const.t) t
 
     val print : Format.formatter -> ('p, 'r) t -> unit
 
@@ -559,7 +570,7 @@ module type S = sig
       include Axis with type 'a t := 'a t
     end
 
-    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) modes =
+    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes =
       { areality : 'a;
         linearity : 'b;
         uniqueness : 'c;
@@ -568,7 +579,8 @@ module type S = sig
         forkable : 'f;
         yielding : 'g;
         statefulness : 'h;
-        visibility : 'i
+        visibility : 'i;
+        staticity : 'j
       }
 
     module Const : sig
@@ -583,7 +595,8 @@ module type S = sig
               Forkable.Const.t,
               Yielding.Const.t,
               Statefulness.Const.t,
-              Visibility.Const.t )
+              Visibility.Const.t,
+              Staticity.Const.t )
             modes
 
       module Option : sig
@@ -598,7 +611,8 @@ module type S = sig
             Forkable.Const.t option,
             Yielding.Const.t option,
             Statefulness.Const.t option,
-            Visibility.Const.t option )
+            Visibility.Const.t option,
+            Staticity.Const.t option )
           modes
 
         val none : t
@@ -685,8 +699,10 @@ module type S = sig
 
     val zap_to_legacy : lr -> Const.t
 
-    val comonadic_to_monadic :
-      ?hint:('l * 'r) Hint.morph -> ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
+    val comonadic_to_monadic_min :
+      ?hint:('r * disallowed) neg Hint.morph ->
+      ('l * 'r) Comonadic.t ->
+      ('r * disallowed) Monadic.t
 
     val monadic_to_comonadic_max :
       ('r * disallowed) Monadic.t -> (disallowed * 'r) Comonadic.t
@@ -964,6 +980,7 @@ module type S = sig
         uniqueness:Uniqueness.Const.t Atom.t ->
         contention:Contention.Const.t Atom.t ->
         visibility:Visibility.Const.t Atom.t ->
+        staticity:Staticity.Const.t Atom.t ->
         t
     end
 
@@ -1029,10 +1046,14 @@ module type S = sig
       yielding:bool ->
       statefulness:bool ->
       visibility:bool ->
+      staticity:bool ->
       t
 
     (** Project a mode crossing (of all axes) onto the specified axis. *)
     val proj : 'a Axis.t -> t -> 'a
+
+    (** Set the specified axis to the specified crossing. *)
+    val set : 'a Axis.t -> 'a -> t -> t
 
     include Lattice with type t := t
 

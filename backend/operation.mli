@@ -157,7 +157,6 @@ type t =
       { ident : Ident.t;
         which_parameter : int option;
         provenance : Backend_var.Provenance.t option;
-        is_assignment : bool;
         regs : Reg.t array
       }
   | Dls_get

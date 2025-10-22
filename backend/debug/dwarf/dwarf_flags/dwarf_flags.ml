@@ -157,6 +157,10 @@ let default_ddebug_invariants = false
 
 let ddebug_invariants = ref default_ddebug_invariants
 
+let default_ddebug_available_regs = false
+
+let ddebug_available_regs = ref default_ddebug_available_regs
+
 let default_ddwarf_types = false
 
 let ddwarf_types = ref default_ddwarf_types
@@ -174,6 +178,8 @@ let default_gdwarf_self_tail_calls = true
 let gdwarf_self_tail_calls = ref default_gdwarf_self_tail_calls
 
 let gdwarf_may_alter_codegen = ref false
+
+let gdwarf_may_alter_codegen_experimental = ref false
 
 let dwarf_inlined_frames = ref false
 

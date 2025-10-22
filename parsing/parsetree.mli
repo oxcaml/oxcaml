@@ -204,6 +204,8 @@ and core_type_desc =
          *)
   | Ptyp_package of package_type  (** [(module S)]. *)
   | Ptyp_open of Longident.t loc * core_type (** [M.(T)] *)
+  | Ptyp_quote of core_type (** [<[T]>] *)
+  | Ptyp_splice of core_type (** [$T] *)
   | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
   | Ptyp_extension of extension  (** [[%id]]. *)
 
@@ -527,6 +529,8 @@ and expression_desc =
           - [CLAUSES] is a series of [comprehension_clause].
     *)
   | Pexp_overwrite of expression * expression (** overwrite_ exp with exp *)
+  | Pexp_quote of expression (** runtime metaprogramming quotations <[E]> *)
+  | Pexp_splice of expression (** runtime metaprogramming splicing $(E) *)
   | Pexp_hole (** _ *)
 
 and case =

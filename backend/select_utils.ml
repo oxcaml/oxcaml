@@ -596,11 +596,9 @@ end
 
 let make_stack_offset stack_ofs = Cfg.Op (Stackoffset stack_ofs)
 
-let make_name_for_debugger ~ident ~which_parameter ~provenance ~is_assignment
-    ~regs =
+let make_name_for_debugger ~ident ~which_parameter ~provenance ~regs =
   Cfg.Op
-    (Operation.Name_for_debugger
-       { ident; which_parameter; provenance; is_assignment; regs })
+    (Operation.Name_for_debugger { ident; which_parameter; provenance; regs })
 
 let make_const_int x = Operation.Const_int x
 
@@ -675,12 +673,7 @@ let maybe_emit_naming_op env sub_cfg ~bound_name regs =
       let bound_name = Backend_var.With_provenance.var bound_name in
       let naming_op =
         Operation.Name_for_debugger
-          { ident = bound_name;
-            provenance;
-            which_parameter = None;
-            is_assignment = false;
-            regs
-          }
+          { ident = bound_name; provenance; which_parameter = None; regs }
       in
       insert_debug env sub_cfg (Cfg.Op naming_op) Debuginfo.none [||] [||]
 

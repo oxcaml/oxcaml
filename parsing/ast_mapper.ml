@@ -193,6 +193,10 @@ module T = struct
           (List.map (map_tuple (map_loc sub) (sub.typ sub)) l)
     | Ptyp_open (mod_ident, t) ->
         open_ ~loc ~attrs (map_loc sub mod_ident) (sub.typ sub t)
+    | Ptyp_quote t ->
+        quote ~loc ~attrs (sub.typ sub t)
+    | Ptyp_splice t ->
+        splice ~loc ~attrs (sub.typ sub t)
     | Ptyp_of_kind jkind ->
         of_kind ~loc ~attrs (sub.jkind_annotation sub jkind)
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
@@ -629,6 +633,8 @@ module E = struct
     | Pexp_stack e -> stack ~loc ~attrs (sub.expr sub e)
     | Pexp_comprehension c -> comprehension ~loc ~attrs (map_cexp sub c)
     | Pexp_overwrite (e1, e2) -> overwrite ~loc ~attrs (sub.expr sub e1) (sub.expr sub e2)
+    | Pexp_quote e -> quote ~loc ~attrs e
+    | Pexp_splice e -> splice ~loc ~attrs e
     | Pexp_hole -> hole ~loc ~attrs ()
 
   let map_binding_op sub {pbop_op; pbop_pat; pbop_exp; pbop_loc} =

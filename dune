@@ -295,6 +295,7 @@
   translmod
   translobj
   translprim
+  translquote
   ;; bytecomp/
   debug_event
   meta
@@ -318,7 +319,32 @@
   cmj_format
   outcometree
   parsetree
-  debug_event))
+  debug_event
+  ; See note below about camlinternalQuote
+  (:include
+   %{project_root}/duneconf/camlinternalquote_if_missing_from_stdlib)))
+
+; Our system compiler doesn't have CamlInternalQuote in its stdlib, so
+; we need to compile it as an additional target, but only for the first
+; stage build.  See also duneconf/dune.
+
+(rule
+ (targets camlinternalQuote.ml)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy#
+   %{project_root}/stdlib/camlinternalQuote.ml
+   %{project_root}/camlinternalQuote.ml)))
+
+(rule
+ (targets camlinternalQuote.mli)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy#
+   %{project_root}/stdlib/camlinternalQuote.mli
+   %{project_root}/camlinternalQuote.mli)))
 
 (library
  (name ocamlbytecomp)
@@ -481,6 +507,7 @@
   ;; asmcomp/
   asmgen
   asmlink
+  cm_bundle
   ;; backend/
   afl_instrument
   arch

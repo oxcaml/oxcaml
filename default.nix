@@ -5,7 +5,7 @@
   bytecodePrograms ? true,
   dev ? false,
   flambdaInvariants ? false,
-  framePointers ? false,
+  framePointers ? addressSanitizer,
   multidomain ? false,
   pollInsertion ? false,
   runtime5 ? false,
@@ -248,4 +248,7 @@ stdenv.mkDerivation rec {
   passthru = {
     inherit ocamlPackages;
   };
+
+  meta =
+    { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
 }
