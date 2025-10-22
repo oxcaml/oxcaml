@@ -37,7 +37,7 @@ Expected: 5.0 (doubled) (+1.5) = 11.5
 Actual:   5.0 (doubled) (+1.5) = 11.5
 Expected: 20 (*2) (+3) = 43
 Actual:   20 (*2) (+3) = 43
-Expected: 1 [+100] [*2] [+3] = 207
+Expected: 1 [+100] [*2] [+3] = 205
 Actual:   1 [+100] [*2] [+3] = 205
 
 Test: subtype by forgetting abstract types

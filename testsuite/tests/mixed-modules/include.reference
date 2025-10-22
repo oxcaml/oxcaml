@@ -1,6 +1,6 @@
 Test: include with module ident
-Expected: 42.0 hello 1.0 100 test 3.14
-Actual:   42.0 hello 1.0 100 test 3.14
+Expected: before 99 2.5 pre 42.0 hello 1.0 100 test after 3.14 7 post
+Actual:   before 99 2.5 pre 42.0 hello 1.0 100 test after 3.14 7 post
 
 Test: include with inline struct
 Expected: 42.0 hello 2 inline 3.0 3.14

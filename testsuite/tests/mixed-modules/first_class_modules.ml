@@ -345,7 +345,7 @@ end : S1)
 module M8_F_Result = M8.F ((val test_input : S1))
 
 let () =
-  print_endline "Expected: 1 [+100] [*2] [+3] = 207";
+  print_endline "Expected: 1 [+100] [*2] [+3] = 205";
   Printf.printf
     "Actual:   %s = %d\n\n"
     (id M8_F_Result.boxed_string)

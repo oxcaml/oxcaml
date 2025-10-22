@@ -24,19 +24,36 @@ module M = struct
 end
 
 module M1 = struct
+  let pre_val = "before"
+  let pre_unboxed = #99L
+  let pre_product = #(void (), #2.5, "pre")
+
   include M
-  let qux = #3.14
+
+  let post_val = "after"
+  let post_unboxed = #3.14
+  let post_product = #(#7L, void (), "post")
 
   let () =
-    let #(a, _v, b, c) = id product in
-    print_endline "Expected: 42.0 hello 1.0 100 test 3.14";
-    Printf.printf "Actual:   %.1f %s %.1f %d %s %.2f\n\n"
+    let #(a, _v1, b, c) = id product in
+    let #(_v2, d, e) = id pre_product in
+    let #(f, _v3, g) = id post_product in
+    print_endline "Expected: before 99 2.5 pre 42.0 hello 1.0 100 test after 3.14 7 post";
+    Printf.printf "Actual:   %s %d %.1f %s %.1f %s %.1f %d %s %s %.2f %d %s\n\n"
+      (id pre_val)
+      (Int64_u.to_int (id pre_unboxed))
+      (Float_u.to_float d)
+      e
       (Float_u.to_float (id foo))
       (id bar)
       (Float_u.to_float a)
       (Int64_u.to_int b)
       c
-      (Float_u.to_float (id qux))
+      (id post_val)
+      (Float_u.to_float (id post_unboxed))
+      (Int64_u.to_int f)
+      g
+  ;;
 end
 
 
