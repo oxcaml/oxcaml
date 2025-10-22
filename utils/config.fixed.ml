@@ -75,6 +75,7 @@ let target_os_type =
 let asm = boot_cannot_call "the assembler"
 let asm_cfi_supported = false
 let asm_size_type_directives = false
+let asm_dwarf_version = None
 let with_frame_pointers = false
 let with_address_sanitizer = false
 let reserved_header_bits = 0
