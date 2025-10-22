@@ -635,7 +635,9 @@ let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
 Line 1, characters 48-49:
 1 | let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
                                                     ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "x" of the record at Line 1, characters 46-54
+       which is expected to be "local".
 |}]
 
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
@@ -856,7 +858,8 @@ Line 1, characters 23-36:
 Error: This value is "local"
        because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "global"
-       because it is an allocation
+       because it is an element of the tuple at Line 1, characters 23-39
+       which is expected to be "global" because it is an allocation
        which is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.

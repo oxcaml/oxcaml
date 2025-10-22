@@ -13,7 +13,9 @@ type r = { mutable s : string; }
 Line 2, characters 31-32:
 2 | let foo (local_ s) = exclave_ {s}
                                    ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "s" of the record at Line 2, characters 30-33
+       which is expected to be "local".
 |}]
 
 (* you can override those implied modalities *)
@@ -90,7 +92,10 @@ let foo (local_ r) = ref r.s
 Line 1, characters 25-28:
 1 | let foo (local_ r) = ref r.s
                              ^^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region
+       because it is the field "s" of the record at Line 1, characters 25-26
+       which is in the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo (local_ r) =
@@ -111,7 +116,9 @@ let foo (local_ s') = exclave_ {s'}
 Line 1, characters 32-34:
 1 | let foo (local_ s') = exclave_ {s'}
                                     ^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "s'" of the record at Line 1, characters 31-35
+       which is expected to be "local".
 |}]
 
 (* mutable defaults to mutable(legacy = nonportable), so currently we can't construct a
@@ -143,7 +150,10 @@ let foo (r @ unique) = (r.s : _ @ unique)
 Line 1, characters 24-27:
 1 | let foo (r @ unique) = (r.s : _ @ unique)
                             ^^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "s" of the record at Line 1, characters 24-25
+       which is "unique".
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 module M : sig

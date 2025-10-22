@@ -69,7 +69,9 @@ let (foo @ portable) (g @ nonportable) =
 Line 2, characters 23-24:
 2 |     raise (Nonportable g)
                            ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is contained (via constructor "Nonportable") by the value at Line 2, characters 10-25
+       which is expected to be "portable".
 |}]
 
 let (foo @ portable) () =

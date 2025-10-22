@@ -102,7 +102,9 @@ let _ = with_global_effect (fun k -> let _ = Mk1 k in ())
 Line 1, characters 49-50:
 1 | let _ = with_global_effect (fun k -> let _ = Mk1 k in ())
                                                      ^
-Error: This value is "yielding" but is expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding"
+       because it is contained (via constructor "Mk1") by the value at Line 1, characters 45-50
+       which is expected to be "yielding".
 |}]
 
 (* [global yielding] works: *)
@@ -119,7 +121,9 @@ let _ = with_global_effect (fun k -> let _ = Mk3 k in ())
 Line 1, characters 49-50:
 1 | let _ = with_global_effect (fun k -> let _ = Mk3 k in ())
                                                      ^
-Error: This value is "yielding" but is expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding"
+       because it is contained (via constructor "Mk3") by the value at Line 1, characters 45-50
+       which is expected to be "yielding".
 |}]
 
 let _ = with_global_effect (fun k -> let _ = Mk4 k in ())
