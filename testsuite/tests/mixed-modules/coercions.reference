@@ -25,3 +25,7 @@ Actual:   10.0 a 20 boxed
 Test: coercing modules with void
 Expected: hello 5.0
 Actual:   hello 5.0
+
+Test: coercion of a functor application
+Expected: 10 7.5 prefix_test 100 2.5 hello 200
+Actual:   10 7.5 prefix_test 100 2.5 hello 200
