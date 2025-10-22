@@ -788,8 +788,6 @@ CAMLexport int caml_c_thread_register(void)
   st_thread_set_id(Ident(th->descr));
   /* Create the tick thread if not already done.  */
   if (caml_tick_thread_enabled) start_tick_thread();
-  /* Initialize TLS */
-  caml_callback(*caml_named_value("caml_domain_tls_init"), Val_unit);
   /* Exit the run-time system */
   caml_enter_blocking_section();
   return 1;

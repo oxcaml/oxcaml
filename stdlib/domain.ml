@@ -494,6 +494,17 @@ module TLS0 = struct
     : tls_state -> unit @@ portable = "caml_domain_tls_set"
   [@@noalloc]
 
+  let get_tls_state =
+    if runtime5 ()
+    then get_tls_state
+    else fun [@inline] () ->
+      let state = get_tls_state () in
+      if Obj.is_block (Obj.repr state) then state
+      else (
+        let state = Obj_opt.fresh () in
+        set_tls_state state;
+        state)
+
   type 'a key = 'a DLS.key
 
   let key_counter = Atomic.make 0
