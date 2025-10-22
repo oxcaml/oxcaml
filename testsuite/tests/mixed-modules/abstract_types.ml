@@ -11,10 +11,11 @@
 
 open Stdlib_upstream_compatible
 
-type void : void
 
 external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
+type void : void
 external void : unit -> void = "%unbox_unit"
+
 
 let () = print_endline "Test: abstract type : value"
 
@@ -52,7 +53,7 @@ let () =
     (id M_value_abstr.boxed_number)
     (Int64_u.to_int (id M_value_abstr.unboxed_number))
     (Int64_u.to_int thirty)
-;;
+
 
 let () = print_endline "Test: abstract type : value with type t := string"
 
@@ -78,7 +79,7 @@ let () =
     (id M_value.boxed_number)
     (Int64_u.to_int (id M_value.unboxed_number))
     (Int64_u.to_int thirty)
-;;
+
 
 let () = print_endline "Test: abstract type : float64"
 
@@ -116,7 +117,7 @@ let () =
     (Int64_u.to_int (id M_unboxed_abstr.unboxed_number))
     (to_int (id M_unboxed_abstr.x))
     (to_int seventy)
-;;
+
 
 let () = print_endline "Test: abstract type : float64 with type t := float#"
 
@@ -143,7 +144,7 @@ let () =
     (Int64_u.to_int (id M_unboxed.unboxed_number))
     (to_int (id M_unboxed.x))
     (to_int seventy)
-;;
+
 
 let () = print_endline "Test: abstract type : void"
 
@@ -174,7 +175,7 @@ let () =
     bar
     (Int64_u.to_int (id M_void_abstr.unboxed_number))
     (Int64_u.to_int ninety)
-;;
+
 
 let () = print_endline "Test: abstract type : void with type t := void"
 
@@ -196,4 +197,3 @@ let () =
     bar
     (Int64_u.to_int (id M_void.unboxed_number))
     (Int64_u.to_int ninety)
-;;

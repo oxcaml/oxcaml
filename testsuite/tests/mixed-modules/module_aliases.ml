@@ -22,9 +22,8 @@ module M_1 : sig
     val x : float#
     val s : string
   end
-end = (
-  (
-  struct
+end =
+  ((struct
     let y = #(#20.0, "world!", #30.0)
 
     module N = struct
@@ -74,7 +73,6 @@ let () =
     (Float_u.to_float f3)
     (id M_1.C.s)
     world
-;;
 
 let _ = print_endline "Test: Coercion with aliases, modules, and vals"
 
@@ -125,4 +123,3 @@ let () =
     (Float_u.to_float (id M_2.Inner.Inner_inner.inner_inner_1))
     (Float_u.to_float (id M_2.Other_inner.inner_inner_3))
     (Float_u.to_float (id M_2.foo_3))
-;;
