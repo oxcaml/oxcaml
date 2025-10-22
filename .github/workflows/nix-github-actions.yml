@@ -3,8 +3,13 @@
 name: Nix Flake Actions
 
 on:
-  pull_request:
   push:
+    branches:
+      - main
+      - '*microbranch'
+    tags:
+      - '*'
+  pull_request:
 
 jobs:
   nix-matrix:
