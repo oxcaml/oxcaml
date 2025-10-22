@@ -101,7 +101,8 @@ module M_3 =
 
 let () =
   let #(a, b) = M_3.append #(#6.0, "hello ") #(#7.0, "world") in
-  Printf.printf "%.1f\n%.1f\n%.1f\n%.1f\n%s\n"
+  print_endline "Expected: 625.0 1024.0 1.0 42.0 hello world";
+  Printf.printf "Actual:   %.1f %.1f %.1f %.1f %s\n"
     (to_float (M.pow #5.0 4))
     (to_float (M_2.pow #2.0 10))
     (to_float M_2.one)
