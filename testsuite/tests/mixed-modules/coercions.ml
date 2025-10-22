@@ -29,8 +29,7 @@ end
 module Coerced_module_1 : sig
   val bar : int64#
   val qux : int
-end =
-  Module_1
+end = Module_1
 
 let () =
   print_endline "Expected: 5 10";
@@ -45,39 +44,34 @@ let () = print_endline "Test: mixed to value only"
 module Coerced_module_2 : sig
   val qux : int
   val foo : string
-end =
-  Module_1
+end = Module_1
 
 let () =
   print_endline "Expected: 10 hello";
   Printf.printf "Actual:   %d %s\n\n" (id Coerced_module_2.qux) (id Coerced_module_2.foo)
 
-n
+
 let () = print_endline "Test: nested modules"
 
 module Module_3 = struct
   module Numbers = struct
     let smallest_float_u = #0.0
-
     module Zero = struct
       let as_float_u = #0.0
       let as_float = 0.0
       let as_string = "0"
       let as_int64_u = #0L
     end
-
     module One = struct
       let as_string = "1"
       let as_float = 1.0
     end
-
     module Two = struct
       let as_float = 2.0
       let as_string = "2"
       let as_int64_u = #2L
       let as_float_u = #2.0
     end
-
     let biggest_float_u = #2.0
   end
 end
@@ -87,16 +81,13 @@ module Coerced_module_3 : sig
     module One : sig
       val as_float : float
     end
-
     module Zero : sig
       val as_float_u : float#
       val as_float : float
     end
-
     val smallest_float_u : float#
   end
-end =
-  Module_3
+end = Module_3
 
 let () =
   print_endline "Expected: 1.0 0.0 0.0 0.0";
@@ -142,7 +133,7 @@ module M = struct
   end
 end
 
-module N : S' = (M : S)
+module N = ((M : S) : S')
 
 let () =
   print_endline "Expected: 1.0 2.0 s";
@@ -165,8 +156,7 @@ end
 module Coerced_products : sig
   val simple : #(float# * string)
   val x : int
-end =
-  With_products
+end = With_products
 
 let () =
   let #(f, s) = id Coerced_products.simple in
@@ -189,8 +179,7 @@ end
 module Coerced_complex : sig
   val level1 : #(float# * #(string * int64#))
   val boxed : string
-end =
-  Complex_products
+end = Complex_products
 
 let () =
   let #(f, #(s, i)) = id Coerced_complex.level1 in
@@ -216,12 +205,63 @@ module Coerced_void : sig
   val float_val : float#
   val void_val : void
   val string_val : string
-end =
-  With_void
+end = With_void
 
 let () =
   print_endline "Expected: hello 5.0";
   Printf.printf
-    "Actual:   %s %.1f\n"
+    "Actual:   %s %.1f\n\n"
     (id Coerced_void.string_val)
     (Float_u.to_float (id Coerced_void.float_val))
+
+
+let () = print_endline "Test: coercion of a functor application"
+
+module type Input = sig
+  val x : int
+  val y : float#
+  val z : string
+  val v : void
+end
+
+module type Output = sig
+  val v : void
+  val extra : int64#
+  val product : #(float# * void * string * int64#)
+  val prefixed_z : string
+  val tripled_y : float#
+  val doubled_x : int
+end
+
+module Make_processor (I : Input) = struct
+  let tripled_y = Float_u.mul I.y #3.0
+  let v = I.v
+  let unused_product = #("hidden", #(42, #1.0))
+  let prefixed_z = "prefix_" ^ I.z
+  let product = #(I.y, void (), "hello", #200L)
+  let extra = #100L
+  let doubled_x = I.x * 2
+  let unused = #99.0
+end
+
+module Input_data = struct
+  let x = 5
+  let y = #2.5
+  let z = "test"
+  let v = void ()
+end
+
+module Processed : Output = Make_processor(Input_data)
+
+let () =
+  let #(f, _v, s, i) = id Processed.product in
+  print_endline "Expected: 10 7.5 prefix_test 100 2.5 hello 200";
+  Printf.printf
+    "Actual:   %d %.1f %s %d %.1f %s %d\n"
+    (id Processed.doubled_x)
+    (Float_u.to_float (id Processed.tripled_y))
+    (id Processed.prefixed_z)
+    (Int64_u.to_int (id Processed.extra))
+    (Float_u.to_float f)
+    s
+    (Int64_u.to_int i)

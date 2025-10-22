@@ -1,4 +1,4 @@
-Test: Based on pr11186.ml
+Test: Based on pr11186.ml (tests [wrap_id_pos_list])
 Expected: 10.0 20.0 30.0 Hello world!
 Actual:   10.0 20.0 30.0 Hello world!
 
