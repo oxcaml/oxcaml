@@ -12,9 +12,7 @@
 open Stdlib_upstream_compatible
 
 external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-
 type void : void
-
 external void : unit -> void = "%unbox_unit"
 
 let _ = print_endline "Test: [let open] with module ident"

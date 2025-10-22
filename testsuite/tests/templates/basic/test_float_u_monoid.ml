@@ -99,14 +99,11 @@ module M_2 =
 module M_3 =
   Float_u_with_monoid(Monoid)(String_monoid) [@jane.non_erasable.instances]
 
-let _ = print_float (to_float (M.pow #5.0 4))
-let _ = print_endline ""
-let _ = print_float (to_float (M_2.pow #2.0 10))
-let _ = print_endline ""
-let _ = print_float (to_float M_2.one)
-let _ = print_endline ""
-let _ =
+let () =
   let #(a, b) = M_3.append #(#6.0, "hello ") #(#7.0, "world") in
-  print_float (to_float (a));
-  print_endline "";
-  print_endline b
+  Printf.printf "%.1f\n%.1f\n%.1f\n%.1f\n%s\n"
+    (to_float (M.pow #5.0 4))
+    (to_float (M_2.pow #2.0 10))
+    (to_float M_2.one)
+    (to_float a)
+    b

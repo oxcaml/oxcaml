@@ -11,7 +11,10 @@
 
 open Stdlib_upstream_compatible
 
-external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
+external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
+type void : void
+external void : unit -> void = "%unbox_unit"
+
 
 let () = print_endline "Test: mixed to mixed"
 
@@ -35,7 +38,7 @@ let () =
     "Actual:   %d %d\n\n"
     (Int64_u.to_int (id Coerced_module_1.bar))
     (id Coerced_module_1.qux)
-;;
+
 
 let () = print_endline "Test: mixed to value only"
 
@@ -48,8 +51,8 @@ end =
 let () =
   print_endline "Expected: 10 hello";
   Printf.printf "Actual:   %d %s\n\n" (id Coerced_module_2.qux) (id Coerced_module_2.foo)
-;;
 
+n
 let () = print_endline "Test: nested modules"
 
 module Module_3 = struct
@@ -103,7 +106,7 @@ let () =
     (id Coerced_module_3.Numbers.Zero.as_float)
     (Float_u.to_float (id Coerced_module_3.Numbers.Zero.as_float_u))
     (Float_u.to_float (id Coerced_module_3.Numbers.smallest_float_u))
-;;
+
 
 let () = print_endline "Test: composed coercions"
 
@@ -148,20 +151,20 @@ let () =
     (Float_u.to_float (id N.K.x))
     (Float_u.to_float (id N.K.y))
     (id N.K.s)
-;;
+
 
 let () = print_endline "Test: coercing modules with mixed products"
 
 module With_products = struct
   let simple = #(#1.0, "one")
   let nested = #(#2L, #("two", #3.0))
-  let regular = 100
+  let x = 100
   let another_unboxed = #4l
 end
 
 module Coerced_products : sig
   val simple : #(float# * string)
-  val regular : int
+  val x : int
 end =
   With_products
 
@@ -172,8 +175,8 @@ let () =
     "Actual:   %.1f %s %d\n\n"
     (Float_u.to_float f)
     s
-    (id Coerced_products.regular)
-;;
+    (id Coerced_products.x)
+
 
 let () = print_endline "Test: coercing modules with nested mixed products"
 
@@ -198,13 +201,9 @@ let () =
     s
     (Int64_u.to_int i)
     (id Coerced_complex.boxed)
-;;
+
 
 let () = print_endline "Test: coercing modules with void"
-
-type void : void
-
-external void : unit -> void = "%unbox_unit"
 
 module With_void = struct
   let void_val = void ()
@@ -214,9 +213,9 @@ module With_void = struct
 end
 
 module Coerced_void : sig
+  val float_val : float#
   val void_val : void
   val string_val : string
-  val float_val : float#
 end =
   With_void
 
@@ -226,4 +225,3 @@ let () =
     "Actual:   %s %.1f\n"
     (id Coerced_void.string_val)
     (Float_u.to_float (id Coerced_void.float_val))
-;;

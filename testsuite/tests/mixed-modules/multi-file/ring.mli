@@ -1,4 +1,4 @@
-type t : bits64 & float64 & value
+type t : bits64 & float64 & void & value
 
 val zero : t
 val one : t

@@ -12,6 +12,9 @@
 open Stdlib_upstream_compatible
 
 external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
+type void : void
+external void : unit -> void = "%unbox_unit"
+
 
 let () = print_endline "Test: no coercion in or out"
 
@@ -38,7 +41,7 @@ let () =
     "Actual:   %.1f %s\n\n"
     (Float_u.to_float (id Two.as_float_u))
     (id Two.as_string)
-;;
+
 
 let () = print_endline "Test: coercion in, no coercion out"
 
@@ -57,7 +60,7 @@ let () =
     "Actual:   %.1f %s\n\n"
     (Float_u.to_float (id Eleven.as_float_u))
     (id Eleven.as_string)
-;;
+
 
 let () = print_endline "Test: coercion out, no coercion in"
 
@@ -75,7 +78,7 @@ let () =
     "Actual:   %.1f %s\n\n"
     (Float_u.to_float (id Four.as_float_u))
     (id Four.as_string)
-;;
+
 
 let () = print_endline "Test: coercion in and out"
 
@@ -94,7 +97,7 @@ let () =
     "Actual:   %.1f %s\n\n"
     (Float_u.to_float (id Six.as_float_u))
     (id Six.as_string)
-;;
+
 
 let () = print_endline "Test: generative functor"
 
@@ -122,34 +125,32 @@ let () =
     "Actual:   %.1f %.1f\n\n"
     (Float_u.to_float (id Counting.unboxed_one))
     (Float_u.to_float (id Counting.unboxed_two))
-;;
+
 
 let () = print_endline "Test: functor with mixed products"
 
 module type With_products = sig
   val simple_product : #(float# * string)
   val nested_product : #(int64# * #(string * float#))
-  val regular_val : int
+  val x : int
 end
 
 module Add_to_products (M : With_products) : With_products = struct
   let simple_product =
     let #(f, s) = M.simple_product in
     #(Float_u.add f #10.0, s ^ "+10")
-  ;;
 
   let nested_product =
     let #(i, #(s, f)) = M.nested_product in
     #(Int64_u.add i #5L, #(s ^ "+5", Float_u.add f #5.0))
-  ;;
 
-  let regular_val = M.regular_val + 1
+  let x = M.x + 1
 end
 
 module Base_products = struct
   let simple_product = #(#1.5, "1.5")
   let nested_product = #(#10L, #("ten", #20.0))
-  let regular_val = 100
+  let x = 100
 end
 
 module Augmented = Add_to_products (Base_products)
@@ -165,14 +166,10 @@ let () =
     (Int64_u.to_int i)
     s2
     (Float_u.to_float f2)
-    (id Augmented.regular_val)
-;;
+    (id Augmented.x)
+
 
 let () = print_endline "Test: functor with void"
-
-type void : void
-
-external void : unit -> void = "%unbox_unit"
 
 module type With_void = sig
   val void_val : void
@@ -200,4 +197,3 @@ let () =
     "Actual:   %.1f %s\n"
     (Float_u.to_float (id Void_transformed.float_val))
     (id Void_transformed.string_val)
-;;
