@@ -671,6 +671,7 @@
   dwarf_state
   dwarf_variables_and_parameters
   dwarf_type
+  dwarf_shape
   ;; optcomp/
   linkenv
   optcompile
