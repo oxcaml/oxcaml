@@ -12,8 +12,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Parsetree
-
 let extract_primitives structure =
   let primitives = ref [] in
   let iterator =

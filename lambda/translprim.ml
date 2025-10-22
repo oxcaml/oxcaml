@@ -1120,6 +1120,9 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
          | None ->
            match Scalar.Operation.With_percent_prefix.of_string s with
            | exception Not_found ->
+             (* If another set of generated primitives is added,
+                `tools/listprims.ml` needs to be modified to keep
+                `primitives.txt` accurate. *)
              raise (Error (loc, Unknown_builtin_primitive s))
            | intrinsic ->
              let arity = Scalar.Operation.arity intrinsic in
