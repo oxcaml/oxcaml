@@ -25,22 +25,20 @@ end
 
 module M1 = struct
   include M
-
   let qux = #3.14
 
   let () =
     let #(a, _v, b, c) = id product in
     print_endline "Expected: 42.0 hello 1.0 100 test 3.14";
-    Printf.printf
-      "Actual:   %.1f %s %.1f %d %s %.2f\n\n"
+    Printf.printf "Actual:   %.1f %s %.1f %d %s %.2f\n\n"
       (Float_u.to_float (id foo))
       (id bar)
       (Float_u.to_float a)
       (Int64_u.to_int b)
       c
       (Float_u.to_float (id qux))
-  ;;
 end
+
 
 let _ = print_endline "Test: include with inline struct"
 
@@ -50,7 +48,6 @@ module M2 = struct
     let bar = "hello"
     let product = #(void (), #2L, "inline", #3.0)
   end
-
   let qux = #3.14
 
   let () =
@@ -66,6 +63,7 @@ module M2 = struct
       (Float_u.to_float (id qux))
   ;;
 end
+
 
 let () = print_endline "Test: include with functor"
 
@@ -93,6 +91,7 @@ module M3 = struct
       (Float_u.to_float (id qux))
   ;;
 end
+
 
 let () = print_endline "Test: multiple includes"
 
@@ -132,6 +131,7 @@ module M4 = struct
   ;;
 end
 
+
 let () = print_endline "Test: include shadowing include"
 
 module Base = struct
@@ -164,6 +164,7 @@ module M5 = struct
   ;;
 end
 
+
 let () = print_endline "Test: include shadowing a val"
 
 module M6 = struct
@@ -189,6 +190,7 @@ module M6 = struct
       e
   ;;
 end
+
 
 let () = print_endline "Test: val shadowing an include"
 

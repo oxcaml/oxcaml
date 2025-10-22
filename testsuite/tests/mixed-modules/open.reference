@@ -33,5 +33,5 @@ Expected: 9.0 from open after open 13 shadowed
 Actual:   9.0 from open after open 13 shadowed
 
 Test: opens can't violate the scannable tag size restriction
-Expected: 42.0 43.0 [a_181] [a_250] 14 base 15 open
-Actual:   42.0 43.0 [a_181] [a_250] 14 base 15 open
+Expected: 42.0 43.0 [a_181] [a_250]
+Actual:   42.0 43.0 [a_181] [a_250]
