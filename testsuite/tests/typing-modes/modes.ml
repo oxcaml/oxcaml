@@ -72,7 +72,7 @@ Line 1, characters 22-36:
 1 | let foo a b @ local = local_ "hello"
                           ^^^^^^^^^^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       but is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -83,7 +83,7 @@ Line 1, characters 29-43:
 1 | let foo = fun a b @ local -> local_ "hello"
                                  ^^^^^^^^^^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       but is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -105,7 +105,7 @@ Line 1, characters 22-31:
 1 | let foo a b @ local = local_ 42
                           ^^^^^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       but is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -116,7 +116,7 @@ Line 1, characters 29-38:
 1 | let foo = fun a b @ local -> local_ 42
                                  ^^^^^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       but is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -137,7 +137,7 @@ Line 1, characters 22-31:
 1 | let foo a b @ local = local_ 42
                           ^^^^^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       but is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -148,7 +148,7 @@ Line 1, characters 29-38:
 1 | let foo = fun a b @ local -> local_ 42
                                  ^^^^^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       but is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]

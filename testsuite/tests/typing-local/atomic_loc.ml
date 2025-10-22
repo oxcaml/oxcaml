@@ -30,7 +30,7 @@ let contents_loc_escape (t @ local) = [%atomic.loc t.contents]
 Line 1, characters 38-62:
 1 | let contents_loc_escape (t @ local) = [%atomic.loc t.contents]
                                           ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 
@@ -41,5 +41,5 @@ let contents_can't_escape_by_mode_crossing
 Line 3, characters 11-35:
 3 | = fun t -> [%atomic.loc t.contents]
                ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]

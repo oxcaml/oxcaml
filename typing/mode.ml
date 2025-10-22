@@ -2080,7 +2080,7 @@ module Report = struct
     let mode_printer = Misc.Style.as_inline_code (C.print obj) in
     match side, obj, x with
     | `Actual, Regionality, Regional ->
-      fprintf ppf "in the parent region"
+      fprintf ppf "%a to the parent region" mode_printer C.Regionality.Local
       (* CR-someday zqian: treat the following cases generally. *)
     | `Expected, Contention_op, Shared ->
       (* When "shared" is expected, we tell the user that either shared or
@@ -2091,7 +2091,8 @@ module Report = struct
       fprintf ppf "%a or %a" mode_printer C.Visibility.Read mode_printer
         C.Visibility.Read_write
     | `Expected, Regionality, Regional ->
-      fprintf ppf "in the parent region or %a" mode_printer C.Regionality.Global
+      fprintf ppf "%a to the parent region or %a" mode_printer
+        C.Regionality.Local mode_printer C.Regionality.Global
     | _ -> mode_printer ppf x
    [@@ocaml.warning "-4"]
 

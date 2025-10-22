@@ -129,7 +129,7 @@ let cross_local (x : cross_local @ local) : _ @ global = x
 Line 1, characters 57-58:
 1 | let cross_local (x : cross_local @ local) : _ @ global = x
                                                              ^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let cross_many (x : cross_many @ once) : _ @ many = x

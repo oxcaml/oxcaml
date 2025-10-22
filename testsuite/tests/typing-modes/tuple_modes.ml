@@ -26,7 +26,7 @@ Line 5, characters 4-5:
 5 |     x
         ^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       but is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -42,7 +42,7 @@ Line 5, characters 4-5:
 5 |     x
         ^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       but is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -68,7 +68,7 @@ let f e0 (e1 @ local) =
 Line 3, characters 42-44:
 3 |     | x0, x1 -> use_global x0; use_global x1; ()
                                               ^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let f e0 (e1 @ local) =
@@ -78,7 +78,7 @@ let f e0 (e1 @ local) =
 Line 3, characters 45-47:
 3 |     | #(x0, x1) -> use_global x0; use_global x1; ()
                                                  ^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let f e0 (e1 @ local) =
@@ -100,7 +100,7 @@ let f e0 (e1 @ local) =
 Line 4, characters 30-31:
 4 |     | x -> use_global_product x; ()
                                   ^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 
@@ -132,7 +132,7 @@ Line 4, characters 44-46:
 4 |     | x -> use_local x; let (x0, x1) = x in x0
                                                 ^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       but is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -154,7 +154,7 @@ let f b e0 (e1 @ local) (e @ local)=
 Line 3, characters 27-29:
 3 |     | x0, x1 -> use_global x0; use_local x1; ()
                                ^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let f b e0 (e1 @ local) (e @ local)=
@@ -164,7 +164,7 @@ let f b e0 (e1 @ local) (e @ local)=
 Line 3, characters 30-32:
 3 |     | #(x0, x1) -> use_global x0; use_local x1; ()
                                   ^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let f b e0 (e1 @ local) e2 e3 =
@@ -188,7 +188,7 @@ let f b e0 (e1 @ local) e2 e3 =
 Line 3, characters 42-44:
 3 |     | x0, x1 -> use_global x0; use_global x1; ()
                                               ^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let f b e0 (e1 @ local) e2 e3 =
@@ -198,7 +198,7 @@ let f b e0 (e1 @ local) e2 e3 =
 Line 3, characters 45-47:
 3 |     | #(x0, x1) -> use_global x0; use_global x1; ()
                                                  ^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (* An unboxed tuple is not an allocation, but a regular tuple is *)
@@ -219,7 +219,7 @@ Line 4, characters 2-4:
 4 |   a'
       ^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       but is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]

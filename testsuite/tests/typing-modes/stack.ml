@@ -222,7 +222,7 @@ Line 1, characters 11-24:
                ^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global"
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -241,7 +241,7 @@ Line 3, characters 4-5:
         ^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global"
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is the function in a tail call.
 |}]
 
@@ -253,7 +253,7 @@ Line 2, characters 4-23:
         ^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global"
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is the function in a tail call.
 |}]
 
@@ -289,7 +289,7 @@ Line 3, characters 6-24:
           ^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global"
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is an argument in a tail call.
 |}]
 
@@ -299,7 +299,7 @@ let f4 (local_ x) =
 Line 2, characters 16-17:
 2 |     List.length x
                     ^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (* Allocations that are not supported for stack *)
@@ -403,7 +403,7 @@ Line 3, characters 2-5:
       ^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global"
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]

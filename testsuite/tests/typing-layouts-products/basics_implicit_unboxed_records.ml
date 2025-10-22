@@ -136,7 +136,7 @@ Line 4, characters 2-7:
 4 |   left'
       ^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       but is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
