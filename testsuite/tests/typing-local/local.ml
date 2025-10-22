@@ -566,7 +566,9 @@ let leak_ref =
 Line 3, characters 43-44:
 3 |   use_locally (fun x -> r.contents <- Some x; x) 42
                                                ^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global"
+       because it is contained (via constructor "Some") by the value at Line 3, characters 38-44
+       which is expected to be "global".
 |}]
 
 let leak_ref_2 =
@@ -587,7 +589,9 @@ let leak_ref_3 =
 Line 3, characters 64-65:
 3 |   use_locally' (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
                                                                     ^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global"
+       because it is contained (via constructor "Some") by the value at Line 3, characters 59-65
+       which is expected to be "global".
 |}]
 
 
@@ -604,7 +608,9 @@ let do_leak_exn =
 Line 2, characters 66-67:
 2 |   use_locally (fun x -> let _exn = local_ raise (Invalid_argument x) in "bluh") "blah"
                                                                       ^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global"
+       because it is contained (via constructor "Invalid_argument") by the value at Line 2, characters 48-68
+       which is expected to be "global".
 |}]
 
 (* handled exceptions are known to be global *)
@@ -966,7 +972,9 @@ let foo (local_ x) =
 Line 3, characters 14-15:
 3 |   let rec g = x :: g in
                   ^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global"
+       because it is contained (via constructor "::") by the value at Line 3, characters 14-20
+       which is expected to be "global".
 |}]
 
 (* Cannot pass local values to tail calls *)
@@ -1209,7 +1217,9 @@ Line 3, characters 2-7:
 3 |   x.imm
       ^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is the field "imm" of the record at Line 3, characters 2-3
+       which is "local".
+       However, the highlighted expression is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -1246,7 +1256,9 @@ Line 3, characters 2-5:
 3 |   imm
       ^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is the field "imm" of the record at Line 2, characters 6-13
+       which is "local".
+       However, the highlighted expression is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -1291,7 +1303,9 @@ let foo (local_ mut) =
 Line 2, characters 12-15:
 2 |   let _ = { mut } in
                 ^^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global"
+       because it is the field "mut" of the record at Line 2, characters 10-17
+       which is expected to be "local".
 |}]
 let foo () =
   let mut = local_ ref 5 in
@@ -1301,7 +1315,9 @@ let foo () =
 Line 3, characters 12-15:
 3 |   let _ = { mut } in
                 ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "mut" of the record at Line 3, characters 10-17
+       which is expected to be "local".
 |}]
 let foo (local_ gbl) =
   let _ = { gbl } in
@@ -1310,7 +1326,9 @@ let foo (local_ gbl) =
 Line 2, characters 12-15:
 2 |   let _ = { gbl } in
                 ^^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global"
+       because it is the field "gbl" of the record at Line 2, characters 10-17
+       which is expected to be "local".
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1320,7 +1338,9 @@ let foo () =
 Line 3, characters 12-15:
 3 |   let _ = { gbl } in
                 ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "gbl" of the record at Line 3, characters 10-17
+       which is expected to be "local".
 |}]
 
 (* Implicit records version of the same test *)
@@ -1337,7 +1357,9 @@ Line 3, characters 2-8:
 3 |   x.#imm
       ^^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is the field "imm" of the record at Line 3, characters 2-3
+       which is "local".
+       However, the highlighted expression is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -1374,7 +1396,9 @@ Line 3, characters 2-5:
 3 |   imm
       ^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is the field "imm" of the record at Line 2, characters 6-14
+       which is "local".
+       However, the highlighted expression is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -1423,7 +1447,9 @@ let foo (local_ mut) =
 Line 2, characters 13-16:
 2 |   let _ = #{ mut } in
                  ^^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global"
+       because it is the field "mut" of the record at Line 2, characters 10-18
+       which is expected to be "local".
 |}]
 let foo () =
   let mut = local_ ref 5 in
@@ -1433,7 +1459,9 @@ let foo () =
 Line 3, characters 13-16:
 3 |   let _ = #{ mut } in
                  ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "mut" of the record at Line 3, characters 10-18
+       which is expected to be "local".
 |}]
 let foo (local_ gbl) =
   let _ = #{ gbl } in
@@ -1442,7 +1470,9 @@ let foo (local_ gbl) =
 Line 2, characters 13-16:
 2 |   let _ = #{ gbl } in
                  ^^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global"
+       because it is the field "gbl" of the record at Line 2, characters 10-18
+       which is expected to be "local".
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1452,7 +1482,9 @@ let foo () =
 Line 3, characters 13-16:
 3 |   let _ = #{ gbl } in
                  ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "gbl" of the record at Line 3, characters 10-18
+       which is expected to be "local".
 |}]
 
 (* Unboxed records version of the same test *)
@@ -1492,7 +1524,9 @@ let foo (local_ gbl) =
 Line 2, characters 13-16:
 2 |   let _ = #{ gbl } in
                  ^^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global"
+       because it is the field "gbl" of the record at Line 2, characters 10-18
+       which is expected to be "local".
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1502,7 +1536,9 @@ let foo () =
 Line 3, characters 13-16:
 3 |   let _ = #{ gbl } in
                  ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is the field "gbl" of the record at Line 3, characters 10-18
+       which is expected to be "local".
 |}]
 
 (* Global fields are preserved in module inclusion *)
@@ -1635,7 +1671,9 @@ let foo (local_ x) y =
 Line 4, characters 29-30:
 4 |   | Some _, Some b -> escape b
                                  ^
-Error: This value is "local" because it is in an allocation containing values
+Error: This value is "local"
+       because it is contained (via constructor "Some") by the value at Line 4, characters 12-18
+       which is "local" because it is in an allocation containing values
        which is in the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
@@ -2469,7 +2507,8 @@ Line 2, characters 8-9:
 2 |   GFoo (s, "bar")
             ^
 Error: This value is in the parent region but is expected to be "global"
-       because it is an allocation
+       because it is contained (via constructor "GFoo") by the value at Line 2, characters 2-17
+       which is expected to be "global" because it is an allocation
        which is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
@@ -2482,7 +2521,9 @@ let f =
 Line 3, characters 8-9:
 3 |   GFoo (s, "bar")
             ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is contained (via constructor "GFoo") by the value at Line 3, characters 2-17
+       which is expected to be "global".
 |}]
 
 (* s' extracted from x as global *)
@@ -2516,7 +2557,9 @@ Line 4, characters 20-22:
 4 |   | GFoo (_, s') -> s'
                         ^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is contained (via constructor "GFoo") by the value at Line 4, characters 4-16
+       which is "local".
+       However, the highlighted expression is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -2530,7 +2573,10 @@ let f (local_ x : gfoo) =
 Line 3, characters 24-26:
 3 |   | GFoo (_, s') -> ref s'
                             ^^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region
+       because it is contained (via constructor "GFoo") by the value at Line 3, characters 4-16
+       which is in the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* Test of array.*)
@@ -2545,7 +2591,9 @@ let f (local_ x : string) = ref [: x; "foo" :]
 Line 1, characters 35-36:
 1 | let f (local_ x : string) = ref [: x; "foo" :]
                                        ^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region but is expected to be "global"
+       because it is an element of the array at Line 1, characters 32-46
+       which is expected to be "global".
 |}]
 
 (* constructing local iarray from local elements is fine *)
@@ -2569,7 +2617,10 @@ let f (local_ a : string iarray) =
 Line 3, characters 22-23:
 3 |   | [: x; _ :] -> ref x
                           ^
-Error: This value is in the parent region but is expected to be "global".
+Error: This value is in the parent region
+       because it is an element of the array at Line 3, characters 4-14
+       which is in the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* a test that was passing type check *)
@@ -2582,7 +2633,9 @@ Line 3, characters 14-16:
 3 |   | [:s':] -> s'
                   ^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is an element of the array at Line 3, characters 4-10
+       which is "local".
+       However, the highlighted expression is expected to be in the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -2613,7 +2666,9 @@ let f (local_ x : string) = exclave_ [| x |]
 Line 1, characters 40-41:
 1 | let f (local_ x : string) = exclave_ [| x |]
                                             ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is an element of the array at Line 1, characters 37-44
+       which is expected to be "local".
 |}]
 
 (* constructing local array from global elements is allowed *)

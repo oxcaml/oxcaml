@@ -37,7 +37,10 @@ let foo (t : int ref t @ contended) = use_uncontended t.contended
 Line 1, characters 54-65:
 1 | let foo (t : int ref t @ contended) = use_uncontended t.contended
                                                           ^^^^^^^^^^^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+       because it is the field "contended" of the record at Line 1, characters 54-55
+       which is "uncontended".
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 let foo (t : int ref t @ contended) = cross_contended t

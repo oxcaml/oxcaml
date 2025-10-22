@@ -840,7 +840,11 @@ module type S = sig
       val is_id : t -> bool
 
       (** Apply a modality on mode. *)
-      val apply : t -> ('l * 'r) Value.t -> ('l * 'r) Value.t
+      val apply :
+        ?is_contained_by:Hint.is_contained_by ->
+        t ->
+        ('l * 'r) Value.t ->
+        ('l * 'r) Value.t
 
       (** [concat ~then t] returns the modality that is [then_] after [t]. *)
       val concat : then_:t -> t -> t

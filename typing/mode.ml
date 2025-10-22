@@ -42,13 +42,27 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
      fun pp t ->
       match t with
       | Skip -> pp, Skip
-      | Is_closed_by co -> (Location.none, co.closure), Close_over co
+      | Is_closed_by (Monadic, co) ->
+        (Location.none, co.closure), Close_over (Monadic, co)
+      | Is_closed_by (Comonadic, co) ->
+        (Location.none, co.closure), Close_over (Comonadic, co)
       | Captured_by_partial_application ->
         (Location.none, Expression), Adj_captured_by_partial_application
       | Crossing -> pp, Crossing
       | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_r -> pp, Allocation_l
+      | Contains_r (Comonadic, { containing; contained }) ->
+        ( contained,
+          Is_contained_by (Comonadic, { containing; container = fst pp }) )
+      | Contains_l (Monadic, { containing; contained }) ->
+        contained, Is_contained_by (Monadic, { containing; container = fst pp })
+      | Is_contained_by (Comonadic, { containing; container }) ->
+        ( (container, Expression),
+          Contains_l (Comonadic, { containing; contained = pp }) )
+      | Is_contained_by (Monadic, { containing; container }) ->
+        ( (container, Expression),
+          Contains_r (Monadic, { containing; contained = pp }) )
 
     let right_adjoint :
         type r.
@@ -58,13 +72,25 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
      fun pp t ->
       match t with
       | Skip -> pp, Skip
-      | Close_over co -> co.closed, Is_closed_by co
+      | Close_over (Monadic, co) -> co.closed, Is_closed_by (Monadic, co)
+      | Close_over (Comonadic, co) -> co.closed, Is_closed_by (Comonadic, co)
       | Adj_captured_by_partial_application ->
         (Location.none, Expression), Captured_by_partial_application
       | Crossing -> pp, Crossing
       | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_l -> pp, Allocation_r
+      | Contains_l (Comonadic, { containing; contained }) ->
+        ( contained,
+          Is_contained_by (Comonadic, { containing; container = fst pp }) )
+      | Contains_r (Monadic, { containing; contained }) ->
+        contained, Is_contained_by (Monadic, { containing; container = fst pp })
+      | Is_contained_by (Comonadic, { containing; container }) ->
+        ( (container, Expression),
+          Contains_r (Comonadic, { containing; contained = pp }) )
+      | Is_contained_by (Monadic, { containing; container }) ->
+        ( (container, Expression),
+          Contains_l (Monadic, { containing; contained = pp }) )
 
     include Magic_allow_disallow (struct
       type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
@@ -74,31 +100,43 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          match h with
          | Skip -> Skip
          | Unknown -> Unknown
-         | Close_over x -> Close_over x
+         | Close_over (Monadic, x) -> Close_over (Monadic, x)
+         | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
          | Adj_captured_by_partial_application ->
            Adj_captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
          | Allocation_l -> Allocation_l
+         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
+         | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
+         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
+         | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
         fun (type l r) (h : (l * allowed) t) : (l * r) t ->
          match h with
          | Skip -> Skip
          | Unknown -> Unknown
-         | Is_closed_by x -> Is_closed_by x
+         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
+         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
          | Captured_by_partial_application -> Captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
          | Allocation_r -> Allocation_r
+         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
+         | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
+         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
+         | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
         fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
          match h with
          | Skip -> Skip
          | Unknown -> Unknown
-         | Close_over x -> Close_over x
-         | Is_closed_by x -> Is_closed_by x
+         | Close_over (Monadic, x) -> Close_over (Monadic, x)
+         | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
+         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
+         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
          | Captured_by_partial_application -> Captured_by_partial_application
          | Adj_captured_by_partial_application ->
            Adj_captured_by_partial_application
@@ -106,14 +144,22 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Unknown_non_rigid -> Unknown_non_rigid
          | Allocation_r -> Allocation_r
          | Allocation_l -> Allocation_l
+         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
+         | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
+         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
+         | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
+         | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
+         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
         fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
          match h with
          | Skip -> Skip
          | Unknown -> Unknown
-         | Close_over x -> Close_over x
-         | Is_closed_by x -> Is_closed_by x
+         | Close_over (Monadic, x) -> Close_over (Monadic, x)
+         | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
+         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
+         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
          | Captured_by_partial_application -> Captured_by_partial_application
          | Adj_captured_by_partial_application ->
            Adj_captured_by_partial_application
@@ -121,6 +167,12 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Unknown_non_rigid -> Unknown_non_rigid
          | Allocation_l -> Allocation_l
          | Allocation_r -> Allocation_r
+         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
+         | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
+         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
+         | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
+         | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
+         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
     end)
   end
 
@@ -2023,7 +2075,7 @@ module Report = struct
       | _ -> pp_print_string ppf "it is a module and thus needs");
       pp_print_string ppf " to be allocated on the heap"
 
-  let print_lock_item ppf = function
+  let print_lock_item ppf : lock_item -> _ = function
     | Module -> fprintf ppf "module"
     | Class -> fprintf ppf "class"
     | Value -> fprintf ppf "value"
@@ -2053,6 +2105,42 @@ module Report = struct
            then fprintf ppf "the %t (at %a)" print_desc Location.print_loc loc
            else fprintf ppf "the %t at %a" print_desc Location.print_loc loc)
 
+  let print_contains : contains -> ((formatter -> unit) * pinpoint) option =
+   fun { containing; contained } ->
+    print_pinpoint contained
+    |> Option.map (fun print_pp ->
+           let pr =
+             match containing with
+             | Tuple -> dprintf "is a tuple that contains %t" print_pp
+             | Record s ->
+               dprintf "is a record whose field %a is %t" Misc.Style.inline_code
+                 s print_pp
+             | Array -> dprintf "is an array that contains %t" print_pp
+             | Constructor s ->
+               dprintf "contains (via constructor %a) %t" Misc.Style.inline_code
+                 s print_pp
+           in
+           pr, contained)
+
+  let print_is_contained_by : is_contained_by -> (formatter -> unit) * pinpoint
+      =
+   fun { containing; container } ->
+    let pr =
+      match containing with
+      | Tuple ->
+        dprintf "is an element of the tuple at %a" Location.print_loc container
+      | Record s ->
+        dprintf "is the field %a of the record at %a" Misc.Style.inline_code s
+          Location.print_loc container
+      | Array ->
+        dprintf "is an element of the array at %a" Location.print_loc container
+      | Constructor s ->
+        dprintf "is contained (via constructor %a) by the value at %a"
+          Misc.Style.inline_code s Location.print_loc container
+    in
+    let pp = container, Expression in
+    pr, pp
+
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and gives the source pinpoint. *)
   let print_morph :
@@ -2061,14 +2149,14 @@ module Report = struct
    fun pp -> function
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
     | Unknown | Unknown_non_rigid -> None
-    | Close_over { closed = pp; polarity = Comonadic; _ } ->
+    | Close_over (Comonadic, { closed = pp; _ }) ->
       print_pinpoint pp
       |> Option.map (fun print_pp -> dprintf "closes over %t" print_pp, pp)
-    | Close_over { closed = pp; polarity = Monadic; _ } ->
+    | Close_over (Monadic, { closed = pp; _ }) ->
       print_pinpoint ~parens:false pp
       |> Option.map (fun print_pp ->
              dprintf "contains a usage (of %t)" print_pp, pp)
-    | Is_closed_by { closure; _ } ->
+    | Is_closed_by (_, { closure; _ }) ->
       let pp = Location.none, closure in
       print_pinpoint pp
       |> Option.map (fun print_pp -> dprintf "is used inside %t" print_pp, pp)
@@ -2083,6 +2171,10 @@ module Report = struct
     | Crossing -> Some (dprintf "crosses with something", pp)
     | Allocation_r -> Some (dprintf "is an allocation", pp)
     | Allocation_l -> Some (dprintf "is in an allocation containing values", pp)
+    | Contains_l (_, contains) -> print_contains contains
+    | Contains_r (_, contains) -> print_contains contains
+    | Is_contained_by (_, is_contained_by) ->
+      Some (print_is_contained_by is_contained_by)
 
   let print_mode :
       type a. [`Actual | `Expected] -> a C.obj -> formatter -> a -> unit =
@@ -2132,6 +2224,7 @@ module Report = struct
   let is_rigid : type l r. (l * r) morph -> bool = function
     | Unknown -> true
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
+    | Contains_l _ | Contains_r _ | Is_contained_by _
     | Adj_captured_by_partial_application ->
       true
     | Allocation_r | Allocation_l | Skip | Crossing | Unknown_non_rigid -> false
@@ -3888,10 +3981,19 @@ module Modality = struct
         match then_, t with
         | Join_const c0, Join_const c1 -> Join_const (Mode.Const.join c0 c1)
 
-      let apply : type l r. t -> (l * r) Mode.t -> (l * r) Mode.t =
-       fun t x ->
-        match t with
-        | Join_const c -> Mode.join_const ~hint:Unknown_non_rigid c x
+      let apply :
+          type l r. ?is_contained_by:_ -> t -> (l * r) Mode.t -> (l * r) Mode.t
+          =
+       fun ?is_contained_by t x ->
+        let hint =
+          Option.map
+            (fun x -> Hint.Is_contained_by (Monadic, x))
+            is_contained_by
+          |> Option.value ~default:Hint.Unknown_non_rigid
+          (* CR-soon zqian: should not default to [Unknown_non_rigid], since the actual
+             morph hint is could be rigid. *)
+        in
+        match t with Join_const c -> Mode.join_const ~hint c x
 
       let proj ax (Join_const c) : _ Atom.t = Join_with (Axis.proj ax c)
 
@@ -4027,10 +4129,19 @@ module Modality = struct
         match then_, t with
         | Meet_const c0, Meet_const c1 -> Meet_const (Mode.Const.meet c0 c1)
 
-      let apply : type l r. t -> (l * r) Mode.t -> (l * r) Mode.t =
-       fun t x ->
-        match t with
-        | Meet_const c -> Mode.meet_const ~hint:Unknown_non_rigid c x
+      let apply :
+          type l r. ?is_contained_by:_ -> t -> (l * r) Mode.t -> (l * r) Mode.t
+          =
+       fun ?is_contained_by t x ->
+        let hint =
+          Option.map
+            (fun x -> Hint.Is_contained_by (Comonadic, x))
+            is_contained_by
+          |> Option.value ~default:Hint.Unknown_non_rigid
+          (* CR-soon zqian: should not default to [Unknown_non_rigid], since the actual
+             morph hint is could be rigid. *)
+        in
+        match t with Meet_const c -> Mode.meet_const ~hint c x
 
       let proj ax (Meet_const c) : _ Atom.t = Meet_with (Axis.proj ax c)
 
@@ -4210,9 +4321,9 @@ module Modality = struct
 
     let equate = equate_from_submode' sub
 
-    let apply t { monadic; comonadic } =
-      let monadic = Monadic.apply t.monadic monadic in
-      let comonadic = Comonadic.apply t.comonadic comonadic in
+    let apply ?is_contained_by t { monadic; comonadic } =
+      let monadic = Monadic.apply ?is_contained_by t.monadic monadic in
+      let comonadic = Comonadic.apply ?is_contained_by t.comonadic comonadic in
       { monadic; comonadic }
 
     let concat ~then_ t =

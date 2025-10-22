@@ -49,15 +49,33 @@ type pinpoint_desc =
 (** A pinpoint is a location in the source code, accompanied by additional description *)
 type pinpoint = Location.t * pinpoint_desc
 
-type polarity =
-  | Monadic
-  | Comonadic
+type ('d0, 'd1) polarity =
+  | Monadic : ('l * 'r, 'r * 'l) polarity
+  | Comonadic : ('l * 'r, 'l * 'r) polarity
+  constraint 'd0 = _ * _ constraint 'd1 = _ * _
+[@@warning "-62"]
 
 type closure_details =
   { closure : pinpoint_desc;
     (* CR-soon zqian: add location to [closure]. *)
-    closed : pinpoint;
-    polarity : polarity
+    closed : pinpoint
+  }
+
+type containing =
+  | Tuple
+  | Record of string
+  | Array
+  | Constructor of string
+(* CR-soon zqian: add a field recording modalities. *)
+
+type contains =
+  { containing : containing;
+    contained : pinpoint
+  }
+
+type is_contained_by =
+  { containing : containing;
+    container : Location.t
   }
 
 (** Hint for morphisms. When acompanied by a destination [pinpoint], [morph]
@@ -68,12 +86,15 @@ type 'd morph =
   | Unknown_non_rigid : ('l * 'r) morph
       (** Similiar to [Unknown], but in the special case where the morph doesn't change the
     bound, it can be skipped. *)
-  (* CR-soon zqian: usages of [Unknown_non_rigid] should be replaced with
-     corresponding proper hints *)
+  (* CR-soon zqian: try to remove [Unknown] and [Unknown_non_rigid] *)
   | Skip : ('l * 'r) morph
       (** The morphism doesn't change the bound and should be skipped in printing. *)
-  | Close_over : closure_details -> ('l * disallowed) morph
-  | Is_closed_by : closure_details -> (disallowed * 'r) morph
+  | Close_over :
+      ('d, 'l * disallowed) polarity * closure_details
+      -> ('l * disallowed) morph
+  | Is_closed_by :
+      ('d, disallowed * 'r) polarity * closure_details
+      -> (disallowed * 'r) morph
   (* CR-soon zqian: currently [Close_over] and [Is_closed_by] both store both
      the source and destination pinpoints. Once we make [pinpoint] mandatory for
      submode calls, each constructor only needs to store the info of its source
@@ -83,5 +104,8 @@ type 'd morph =
   | Crossing : ('l * 'r) morph
   | Allocation_r : (disallowed * 'r) morph
   | Allocation_l : ('l * disallowed) morph
+  | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph
+  | Is_contained_by : ('l * 'r, 'd) polarity * is_contained_by -> 'd morph
+  | Contains_r : (disallowed * 'r, 'd) polarity * contains -> 'd morph
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]

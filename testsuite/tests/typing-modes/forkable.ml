@@ -115,7 +115,9 @@ let _ = with_global_unforkable (fun k -> let _ = Mk0 k in ())
 Line 1, characters 53-54:
 1 | let _ = with_global_unforkable (fun k -> let _ = Mk0 k in ())
                                                          ^
-Error: This value is "unforkable" but is expected to be "forkable".
+Error: This value is "unforkable" but is expected to be "forkable"
+       because it is contained (via constructor "Mk0") by the value at Line 1, characters 49-54
+       which is expected to be "unforkable".
 |}]
 
 (* [global unforkable] works: *)
@@ -132,7 +134,9 @@ let _ = with_global_unforkable (fun k -> let _ = Mk11 k in ())
 Line 1, characters 54-55:
 1 | let _ = with_global_unforkable (fun k -> let _ = Mk11 k in ())
                                                           ^
-Error: This value is "unforkable" but is expected to be "forkable".
+Error: This value is "unforkable" but is expected to be "forkable"
+       because it is contained (via constructor "Mk11") by the value at Line 1, characters 49-55
+       which is expected to be "unforkable".
 |}]
 
 let _ = with_global_unforkable (fun k -> let _ = Mk12 k in ())
