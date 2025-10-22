@@ -91,37 +91,44 @@
 external to_float : float# -> float = "%float_of_float#"
 external to_int64 : int64# -> int64 = "%box_int64"
 
-module M_mixed = (Unboxed_product_monoid_utils (Unboxed_product_monoid)) (Mixed_monoid)
+module M_mixed =
+  Unboxed_product_monoid_utils (Unboxed_product_monoid) (Mixed_monoid)
 [@jane.non_erasable.instances]
 
 module M_mixed_2 =
-  (Unboxed_product_monoid_utils_2 (Unboxed_product_monoid)) (Mixed_monoid)
+  Unboxed_product_monoid_utils_2 (Unboxed_product_monoid) (Mixed_monoid)
 [@jane.non_erasable.instances]
 
-module M_with_string = (Mixed_with_monoid (Monoid)) (String_monoid)
+module M_with_string =
+  Mixed_with_monoid (Monoid) (String_monoid)
 [@jane.non_erasable.instances]
 
 let () = print_endline "Test: Mixed monoid with utils"
 
 let () =
-  let #(a, b, c, _void) = M_mixed.pow #(#2L, #3.0, "x", Mixed_monoid.void ()) 4 in
+  let #(a, b, c, _void) =
+    M_mixed.pow #(#2L, #3.0, "x", Mixed_monoid.void ()) 4
+  in
   print_endline "Expected: 16 81.0 xxxx";
-  Printf.printf "Actual:   %s %.1f %s\n\n" (Int64.to_string (to_int64 a)) (to_float b) c
+  Printf.printf "Actual:   %s %.1f %s\n\n"
+    (Int64.to_string (to_int64 a)) (to_float b) c
 ;;
 
 let () = print_endline "Test: Mixed monoid with utils_2"
 
 let () =
-  let #(a, b, c, _void) = M_mixed_2.pow #(#2L, #2.0, "a", Mixed_monoid.void ()) 5 in
+  let #(a, b, c, _void) =
+    M_mixed_2.pow #(#2L, #2.0, "a", Mixed_monoid.void ()) 5
+  in
   print_endline "Expected: 32 32.0 aaaaa";
-  Printf.printf "Actual:   %s %.1f %s\n\n" (Int64.to_string (to_int64 a)) (to_float b) c
+  Printf.printf "Actual:   %s %.1f %s\n\n"
+    (Int64.to_string (to_int64 a)) (to_float b) c
 ;;
 
 let () =
   let #(a, b, c, _void) = M_mixed_2.one in
   print_endline "Expected: 1 1.0 (empty string)";
-  Printf.printf
-    "Actual:   %s %.1f %s\n\n"
+  Printf.printf "Actual:   %s %.1f %s\n\n"
     (Int64.to_string (to_int64 a))
     (to_float b)
     (if c = "" then "(empty string)" else c)
@@ -130,7 +137,13 @@ let () =
 let () = print_endline "Test: Mixed with string monoid"
 
 let () =
-  let #(a, b, c) = M_with_string.append #(#2.0, "hello ", #3L) #(#4.0, "world", #5L) in
+  let #(a, b, c) =
+    M_with_string.append
+      #(#2.0, "hello ", #2L) #(#4.0, "world", #4L)
+  in
   print_endline "Expected: 8.0 hello world 8";
-  Printf.printf "Actual:   %.1f %s %s\n" (to_float a) b (Int64.to_string (to_int64 c))
+  Printf.printf "Actual:   %.1f %s %s\n"
+    (to_float a)
+    b
+    (Int64.to_string (to_int64 c))
 ;;

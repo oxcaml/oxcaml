@@ -15,5 +15,5 @@ let empty = #(#0.0, Monoid.empty, #0L)
 let append #(a, b, c) #(d, e, f) =
   #( unbox_float (box_float a *. box_float d)
    , Monoid.append b e
-   , of_int (to_int c + to_int f) )
+   , of_int (to_int c * to_int f) )
 ;;
