@@ -939,12 +939,19 @@ module Fixit : sig
 
   val ( let+ ) : ('a, 'b) stmt -> ('b -> 'c) -> ('a, 'c) stmt
 
+  val ( let++ ) :
+    ('a, 'b Datalog.Constant.hlist) stmt ->
+    ('b Datalog.Constant.hlist -> 'c) ->
+    ('a, 'c) stmt
+
   val ( and+ ) :
     (Datalog.nil, 'a) stmt ->
     (Datalog.nil, 'b) stmt ->
     (Datalog.nil, 'a * 'b) stmt
 
-  val run : ('a, 'b) stmt -> 'a Datalog.Constant.hlist -> Datalog.database -> 'b
+  val run : ('a, 'b) stmt -> Datalog.database -> 'a Datalog.Constant.hlist -> 'b
+
+  val run1 : ('a -> Datalog.nil, 'b) stmt -> Datalog.database -> 'a -> 'b
 
   (* Don't try to write to this one ;) *)
   val empty :
@@ -956,8 +963,17 @@ module Fixit : sig
     (('a, 'b, unit) Datalog.table -> ('c, 'd) stmt) ->
     ('a -> 'c, 'd) stmt
 
+  val paramc :
+    string ->
+    ('a, 'b, unit) Datalog.Column.hlist ->
+    ('e -> 'a) ->
+    (('a, 'b, unit) Datalog.table -> ('c, 'd) stmt) ->
+    ('e -> 'c, 'd) stmt
+
   val param0 :
-    string -> ((Datalog.nil, 'b) stmt -> ('c, 'd) stmt) -> ('b -> 'c, 'd) stmt
+    ('a -> 'b) ->
+    ((Datalog.nil, 'b) stmt -> ('c, 'd) stmt) ->
+    ('a -> 'c, 'd) stmt
 
   val local0 :
     ('a, 'b, unit) Datalog.Column.hlist ->
@@ -981,15 +997,39 @@ module Fixit : sig
     (('a, 'b) Table.hlist -> (Datalog.nil, 'c) stmt) ->
     (Datalog.nil, 'c) stmt
 
+  val seq :
+    ('a, 'b) Table.hlist ->
+    (('a, 'b) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
+    (('a, 'b) Table.hlist -> (Datalog.nil, 'c) stmt) ->
+    (Datalog.nil, 'c) stmt
+
+  val fix1 :
+    ('t, 'k, unit) Datalog.table ->
+    (('t, 'k, unit) Datalog.table ->
+    (Datalog.nil, Datalog.rule) Datalog.program list) ->
+    (('t, 'k, unit) Datalog.table -> (Datalog.nil, 'c) stmt) ->
+    (Datalog.nil, 'c) stmt
+
   val fix' :
     ('a, 'b) Table.hlist ->
     (('a, 'b) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
     (Datalog.nil, 'a Datalog.Constant.hlist) stmt
 
-  val ( let@ ) :
+  val seq' :
+    ('a, 'b) Table.hlist ->
+    (('a, 'b) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
+    (Datalog.nil, 'a Datalog.Constant.hlist) stmt
+
+  val fix1' :
+    ('t, 'k, unit) Datalog.table ->
+    (('t, 'k, unit) Datalog.table ->
+    (Datalog.nil, Datalog.rule) Datalog.program list) ->
+    (Datalog.nil, 't) stmt
+
+  val ( let@@ ) :
     ((('a, 'b) Table.hlist -> 'c) -> 'd) -> (('a, 'b) Table.hlist -> 'c) -> 'd
 
-  val ( let@@ ) : ('a -> 'b) -> 'a -> 'b
+  val ( let@ ) : ('a -> 'b) -> 'a -> 'b
 end = struct
   let empty columns =
     Datalog.create_table ~name:"empty" ~default_value:() columns
@@ -1080,17 +1120,21 @@ end = struct
 
   let ( let+ ) stmt f = Map (stmt, fun _ value -> f value)
 
+  let ( let++ ) = ( let+ )
+
   let ( and+ ) stmt1 stmt2 = Conj (stmt1, stmt2)
 
-  let run stmt args db = run stmt args db (fun _ out -> out)
+  let run stmt db args = run stmt args db (fun _ out -> out)
 
-  let param0 _name f =
+  let run1 stmt db arg = run stmt db [arg]
+
+  let param0 g f =
     let cell = ref None in
     Map
       ( Input
           ( f (Value cell),
             fun db x ->
-              cell := Some x;
+              cell := Some (g x);
               db ),
         fun _db value ->
           cell := None;
@@ -1099,6 +1143,10 @@ end = struct
   let param name columns f =
     let table = local name columns in
     Input (f table, fun db x -> Datalog.set_table table x db)
+
+  let paramc name columns g f =
+    let table = local name columns in
+    Input (f table, fun db x -> Datalog.set_table table (g x) db)
 
   let local0 columns body f =
     let table = local "local" columns in
@@ -1116,6 +1164,31 @@ end = struct
     let body = g y in
     Now (Seq (Run schedule, body), fun db -> Table.copy x y db)
 
+  let seq :
+      type b c d.
+      (b, c) Table.hlist ->
+      ((b, c) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
+      ((b, c) Table.hlist -> (Datalog.nil, d) stmt) ->
+      (Datalog.nil, d) stmt =
+   fun x f g ->
+    let y = Table.locals x in
+    let rules = f y in
+    let body = g y in
+    let go =
+      List.fold_right
+        (fun r acc -> Seq (Run (Datalog.Schedule.saturate [r]), acc))
+        rules body
+    in
+    Now (go, fun db -> Table.copy x y db)
+
+  let fix1 x f g =
+    let y = local "fix" (Datalog.columns x) in
+    let schedule = Datalog.Schedule.saturate (f y) in
+    let body = g y in
+    Now
+      ( Seq (Run schedule, body),
+        fun db -> Datalog.set_table y (Datalog.get_table x db) db )
+
   let fix' :
       type b c.
       (b, c) Table.hlist ->
@@ -1128,10 +1201,73 @@ end = struct
       ( Map (Run schedule, fun db () -> Table.get y db),
         fun db -> Table.copy x y db )
 
-  let ( let@ ) (f : ((_, _) Table.hlist -> _) -> _) x = f x
+  let seq' :
+      type b c.
+      (b, c) Table.hlist ->
+      ((b, c) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
+      (Datalog.nil, b Datalog.Constant.hlist) stmt =
+   fun x f ->
+    let y = Table.locals x in
+    let rules = f y in
+    let go =
+      Option.get
+        (List.fold_right
+           (fun r acc ->
+             let r = Run (Datalog.Schedule.saturate [r]) in
+             match acc with None -> Some r | Some acc -> Some (Seq (r, acc)))
+           rules None)
+    in
+    Now (Map (go, fun db () -> Table.get y db), fun db -> Table.copy x y db)
 
-  let ( let@@ ) f x = f x
+  let fix1' x f =
+    let y = local "fix" (Datalog.columns x) in
+    let schedule = Datalog.Schedule.saturate (f y) in
+    Now
+      ( Map (Run schedule, fun db () -> Datalog.get_table y db),
+        fun db -> Datalog.set_table y (Datalog.get_table x db) db )
+
+  let ( let@@ ) (f : ((_, _) Table.hlist -> _) -> _) x = f x
+
+  let ( let@ ) f x = f x
 end
+
+module One : sig
+  type t
+
+  include Datalog.Column.S with type t := t
+
+  val top : t
+
+  val flag :
+    (unit Map.t, t -> Datalog.nil, unit) Datalog.table ->
+    [> `Atom of Datalog.atom]
+
+  val to_bool : unit Map.t -> bool
+
+  val of_bool : bool -> unit Map.t
+
+  val cols : (unit Map.t, t -> Datalog.nil, unit) Datalog.Column.hlist
+end = struct
+  include Datalog.Column.Make (struct
+    let name = "one"
+
+    let print ppf _ = Format.fprintf ppf "T"
+  end)
+
+  let top = 0
+
+  let flag tbl = Datalog.atom tbl [Datalog.Term.constant top]
+
+  let to_bool m = not (Map.is_empty m)
+
+  let of_bool b = if b then Map.singleton top () else Map.empty
+
+  let cols =
+    let open! Datalog.Column in
+    [datalog_column_id]
+end
+
+let () = ignore (One.top, Fixit.fix, Fixit.seq, Fixit.fix1, Fixit.return)
 
 type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
 
@@ -1161,15 +1297,17 @@ let get_all_usages :
     Datalog.database ->
     unit Code_id_or_name.Map.t ->
     usages =
-  (* CR-someday ncourant: once the datalog API supports something cleaner, use
-     it. *)
-  let out_tbl, out = rel1_r "out" Cols.[n] in
-  let in_tbl, in_ = rel1_r "in_" Cols.[n] in
   let open! Syntax in
   let open! Global_flow_graph in
-  let base, for_closures, function_slots =
-    ( (let$ [x; y] = ["x"; "y"] in
-       [in_ x; usages_rel x y] ==> out y),
+  let open! Fixit in
+  let stmt =
+    let@ follow_known_arity_calls =
+      paramc "follow_known_arity_calls" One.cols One.of_bool
+    in
+    let@ in_ = param "in_" Cols.[n] in
+    let@ out = fix1' (empty Cols.[n]) in
+    [ (let$ [x; y] = ["x"; "y"] in
+       [in_ % [x]; usages_rel x y] ==> out % [y]);
       (let$ [x; apply_witness; call_witness; code_id; my_closure_of_code_id; y]
            =
          [ "x";
@@ -1179,7 +1317,8 @@ let get_all_usages :
            "my_closure_of_code_id";
            "y" ]
        in
-       [ out x;
+       [ One.flag follow_known_arity_calls;
+         out % [x];
          rev_accessor_rel ~base:x
            !!(Field.code_of_closure Known_arity_code_pointer)
            ~to_:apply_witness;
@@ -1189,41 +1328,27 @@ let get_all_usages :
            ~from:code_id;
          code_id_my_closure_rel ~code_id ~my_closure:my_closure_of_code_id;
          usages_rel my_closure_of_code_id y ]
-       ==> out y),
-      let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
-      [ out x;
-        field_usages_rel x field y;
-        filter1 is_function_slot field;
-        usages_rel y z ]
-      ==> out z )
+       ==> out % [y]);
+      (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
+       [ out % [x];
+         field_usages_rel x field y;
+         filter1 is_function_slot field;
+         usages_rel y z ]
+       ==> out % [z]) ]
   in
-  let schedule_follow = ~![base; for_closures; function_slots] in
-  let schedule_no_follow = ~![base; function_slots] in
   fun ~follow_known_arity_calls db s ->
-    let db = set_table in_tbl s db in
-    let db =
-      Schedule.run
-        (if follow_known_arity_calls
-        then schedule_follow
-        else schedule_no_follow)
-        db
-    in
-    Usages (get_table out_tbl db)
+    Usages (run stmt db [follow_known_arity_calls; s])
 
 let get_direct_usages :
     Datalog.database -> unit Code_id_or_name.Map.t -> unit Code_id_or_name.Map.t
     =
-  let stmt =
-    let open! Syntax in
-    let open! Fixit in
-    let@@ in_ = param "in_" Cols.[n] in
-    let@ [out] = fix' [empty Cols.[n]] in
-    [ (let$ [x; y] = ["x"; "y"] in
-       [in_ % [x]; usages_rel x y] ==> out % [y]) ]
-  in
-  fun db s ->
-    let [r] = Fixit.run stmt [s] db in
-    r
+  let open! Syntax in
+  let open! Fixit in
+  run1
+    (let@ in_ = param "in_" Cols.[n] in
+     let@ out = fix1' (empty Cols.[n]) in
+     [ (let$ [x; y] = ["x"; "y"] in
+        [in_ % [x]; usages_rel x y] ==> out % [y]) ])
 
 type field_usage =
   | Used_as_top
@@ -1236,61 +1361,63 @@ type field_usage =
 let get_one_field : Datalog.database -> Field.t -> usages -> field_usage =
   (* CR-someday ncourant: likewise here; I find this function particulartly
      ugly. *)
-  let out_tbl, out = rel1_r "out" Cols.[n] in
-  let in_tbl, in_ = rel1_r "in_" Cols.[n] in
-  let in_field_tbl, in_field = rel1_r "in_field" Cols.[f] in
   let open! Syntax in
   let open! Global_flow_graph in
-  let q =
-    mk_exists_query ["field"] ["x"] (fun [field] [x] ->
-        [in_ x; field_usages_top_rel x field])
+  let open! Fixit in
+  let stmt =
+    let@ in_ = param "in_" Cols.[n] in
+    let@ in_field =
+      paramc "in_field" Cols.[f] (fun field -> Field.Map.singleton field ())
+    in
+    let++ [used_as_top; used_as_vars] =
+      let@@ [used_as_top; used_as_vars] =
+        seq' [empty One.cols; empty Cols.[n]]
+      in
+      [ (let$ [x; field] = ["x"; "field"] in
+         [in_ % [x]; in_field % [field]; field_usages_top_rel x field]
+         ==> One.flag used_as_top);
+        (let$ [x; field; y] = ["x"; "field"; "y"] in
+         [ not (One.flag used_as_top);
+           in_ % [x];
+           in_field % [field];
+           field_usages_rel x field y ]
+         ==> used_as_vars % [y]) ]
+    in
+    if One.to_bool used_as_top then Used_as_top else Used_as_vars used_as_vars
   in
-  let r =
-    ~![ (let$ [x; field; y] = ["x"; "field"; "y"] in
-         [in_ x; field_usages_rel x field y; in_field field] ==> out y) ]
-  in
-  fun db field (Usages s) ->
-    let db = set_table in_tbl s db in
-    if q [field] db
-    then Used_as_top
-    else
-      let db = set_table in_field_tbl (Field.Map.singleton field ()) db in
-      let db = Schedule.run r db in
-      Used_as_vars (get_table out_tbl db)
+  fun db field (Usages s) -> run stmt db [s; field]
 
 let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
   (* CR-someday ncourant: likewise here; I find this function particulartly
      ugly. *)
-  let out_tbl1, out1 = rel1_r "out1" Cols.[f] in
-  let out_tbl2, out2 = rel2_r "out2" Cols.[f; n] in
-  let in_tbl, in_ = rel1_r "in_" Cols.[n] in
   let open! Syntax in
   let open! Global_flow_graph in
-  let rs =
-    ~>[ (let$ [x; field] = ["x"; "field"] in
-         [ in_ x;
-           field_usages_top_rel x field;
-           filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
-         ==> out1 field);
-        (let$ [x; field; y] = ["x"; "field"; "y"] in
-         [ in_ x;
-           field_usages_rel x field y;
-           not (out1 field);
-           filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
-         ==> out2 field y) ]
-  in
-  fun db (Usages s) ->
-    let db = set_table in_tbl s db in
-    let db = List.fold_left (fun db r -> Schedule.run r db) db rs in
-    Field.Map.merge
-      (fun k x y ->
-        match x, y with
-        | None, None -> assert false
-        | Some _, Some _ ->
-          Misc.fatal_errorf "Got two results for field %a" Field.print k
-        | Some (), None -> Some Used_as_top
-        | None, Some m -> Some (Used_as_vars m))
-      (get_table out_tbl1 db) (get_table out_tbl2 db)
+  let open! Fixit in
+  run1
+    (let@ in_ = paramc "in_" Cols.[n] (fun (Usages s) -> s) in
+     let++ [out1; out2] =
+       let@@ [out1; out2] = seq' [empty Cols.[f]; empty Cols.[f; n]] in
+       [ (let$ [x; field] = ["x"; "field"] in
+          [ in_ % [x];
+            field_usages_top_rel x field;
+            filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+          ==> out1 % [field]);
+         (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ in_ % [x];
+            field_usages_rel x field y;
+            not (out1 % [field]);
+            filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+          ==> out2 % [field; y]) ]
+     in
+     Field.Map.merge
+       (fun k x y ->
+         match x, y with
+         | None, None -> assert false
+         | Some _, Some _ ->
+           Misc.fatal_errorf "Got two results for field %a" Field.print k
+         | Some (), None -> Some Used_as_top
+         | None, Some m -> Some (Used_as_vars m))
+       out1 out2)
 
 let field_of_constructor_is_used =
   rel2 "field_of_constructor_is_used" Cols.[n; f]
@@ -1303,39 +1430,33 @@ let field_of_constructor_is_used_as =
 
 let get_fields_usage_of_constructors :
     Datalog.database -> unit Code_id_or_name.Map.t -> field_usage Field.Map.t =
-  let stmt =
-    let open! Syntax in
-    let open! Fixit in
-    let@@ in_ = param "in_" Cols.[n] in
-    let@ [out1] =
-      let@ [out1] = fix [empty Cols.[f]] in
-      [ (let$ [x; field] = ["x"; "field"] in
-         [ in_ % [x];
-           field_of_constructor_is_used_top x field;
-           filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
-         ==> out1 % [field]) ]
-    in
-    let@ [out2] =
-      let@ [out2] = fix [empty Cols.[f; n]] in
-      [ (let$ [x; field; y] = ["x"; "field"; "y"] in
-         [ in_ % [x];
-           field_of_constructor_is_used_as x field y;
-           not (out1 % [field]);
-           filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
-         ==> out2 % [field; y]) ]
-    in
-    let+ out1 = return out1 and+ out2 = return out2 in
-    Field.Map.merge
-      (fun k x y ->
-        match x, y with
-        | None, None -> assert false
-        | Some _, Some _ ->
-          Misc.fatal_errorf "Got two results for field %a" Field.print k
-        | Some (), None -> Some Used_as_top
-        | None, Some m -> Some (Used_as_vars m))
-      out1 out2
-  in
-  fun db s -> Fixit.run stmt [s] db
+  let open! Syntax in
+  let open! Fixit in
+  run1
+    (let@ in_ = param "in_" Cols.[n] in
+     let++ [out1; out2] =
+       let@@ [out1; out2] = seq' [empty Cols.[f]; empty Cols.[f; n]] in
+       [ (let$ [x; field] = ["x"; "field"] in
+          [ in_ % [x];
+            field_of_constructor_is_used_top x field;
+            filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+          ==> out1 % [field]);
+         (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ in_ % [x];
+            field_of_constructor_is_used_as x field y;
+            not (out1 % [field]);
+            filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+          ==> out2 % [field; y]) ]
+     in
+     Field.Map.merge
+       (fun k x y ->
+         match x, y with
+         | None, None -> assert false
+         | Some _, Some _ ->
+           Misc.fatal_errorf "Got two results for field %a" Field.print k
+         | Some (), None -> Some Used_as_top
+         | None, Some m -> Some (Used_as_vars m))
+       out1 out2)
 
 type set_of_closures_def =
   | Not_a_set_of_closures
@@ -2122,39 +2243,31 @@ module Rewriter = struct
   let identify_set_of_closures_with_one_code_id :
       Datalog.database -> Code_id.t -> unit Code_id_or_name.Map.t list =
     let open Syntax in
-    let out_tbl, out = rel2_r "out1" Cols.[n; n] in
-    let in_tbl, in_ = rel1_r "in_" Cols.[n] in
-    let r =
-      ~![ (let$ [ code_id;
-                  code_id_of_witness;
-                  witness;
-                  closure;
-                  function_slot;
-                  all_closures ] =
-             [ "code_id";
-               "code_id_of_witness";
-               "witness";
-               "closure";
-               "function_slot";
-               "all_closures" ]
-           in
-           [ in_ code_id;
-             rev_constructor_rel ~from:code_id code_id_of_witness ~base:witness;
-             rev_constructor_rel ~from:witness
-               !!(Field.code_of_closure Known_arity_code_pointer)
-               ~base:closure;
-             rev_constructor_rel ~from:closure function_slot ~base:all_closures;
-             filter1 is_function_slot function_slot ]
-           ==> out closure all_closures) ]
-    in
-    fun db code_id ->
-      let db =
-        set_table in_tbl
-          (Code_id_or_name.Map.singleton (Code_id_or_name.code_id code_id) ())
-          db
-      in
-      let db = Schedule.run r db in
-      List.map snd (Code_id_or_name.Map.bindings (get_table out_tbl db))
+    let open! Fixit in
+    run1
+      (let@ in_ =
+         paramc "in_"
+           Cols.[n]
+           (fun code_id ->
+             Code_id_or_name.Map.singleton (Code_id_or_name.code_id code_id) ())
+       in
+       let+ out =
+         let@ out = fix1' (empty Cols.[n; n]) in
+         [ (let$ [code_id; witness; closure; function_slot; all_closures] =
+              ["code_id"; "witness"; "closure"; "function_slot"; "all_closures"]
+            in
+            [ in_ % [code_id];
+              rev_constructor_rel ~from:code_id
+                !!Field.code_id_of_call_witness
+                ~base:witness;
+              rev_constructor_rel ~from:witness
+                !!(Field.code_of_closure Known_arity_code_pointer)
+                ~base:closure;
+              rev_constructor_rel ~from:closure function_slot ~base:all_closures;
+              filter1 is_function_slot function_slot ]
+            ==> out % [closure; all_closures]) ]
+       in
+       List.map snd (Code_id_or_name.Map.bindings out))
 
   let identify_set_of_closures_with_code_ids db code_ids =
     let code_ids =
@@ -2191,23 +2304,6 @@ module Rewriter = struct
       t0 * (t0 * use_of_function_slot) Function_slot.Map.t =
     (* CR-someday ncourant: once the datalog API supports something cleaner, use
        it. *)
-    let out1_tbl, out1 = rel1_r "out1" Cols.[n] in
-    let out2_tbl, out2 = rel2_r "out2" Cols.[f; n] in
-    let out_known_arity_tbl, out_known_arity =
-      rel1_r "out_known_arity" Cols.[f]
-    in
-    let out_unknown_arity_tbl, out_unknown_arity =
-      rel1_r "out_unknown_arity" Cols.[f]
-    in
-    let in_tbl, in_ = rel1_r "in_" Cols.[n] in
-    let in_fs_tbl, in_fs = rel1_r "in_fs" Cols.[f] in
-    let in_all_fs_tbl, in_all_fs = rel1_r "in_all_fs" Cols.[f] in
-    let in_code_id_tbl, in_code_id = rel2_r "in_code_id" Cols.[f; n] in
-    let in_unknown_code_id_tbl, in_unknown_code_id =
-      rel1_r "in_unknown_code_id" Cols.[f]
-    in
-    let open! Syntax in
-    let open! Global_flow_graph in
     let is_value_slot f =
       match Field.view f with
       | Value_slot _ -> true
@@ -2215,86 +2311,158 @@ module Rewriter = struct
       | Code_of_closure _ | Apply _ ->
         false
     in
-    let rs =
-      ~![ (let$ [x; y] = ["x"; "y"] in
-           [in_fs x; in_ y] ==> out2 x y);
+    let open! Syntax in
+    let open! Global_flow_graph in
+    let open! Fixit in
+    let stmt =
+      let@ in_ = param "in_" Cols.[n] in
+      let@ in_fs =
+        paramc "in_fs"
+          Cols.[f]
+          (fun fs -> Field.Map.singleton (Field.function_slot fs) ())
+      in
+      let@ mk_any = param0 (fun mk_any -> mk_any) in
+      let@ code_ids_of_function_slots =
+        param0 (fun code_ids_of_function_slots ->
+            Function_slot.Map.fold
+              (fun fs code_id m ->
+                Field.Map.add (Field.function_slot fs) code_id m)
+              code_ids_of_function_slots Field.Map.empty)
+      in
+      let@ in_all_fs =
+        local0
+          Cols.[f]
+          (let+ code_ids_of_function_slots = code_ids_of_function_slots in
+           Field.Map.map (fun _ -> ()) code_ids_of_function_slots)
+      in
+      let@ in_code_id =
+        local0
+          Cols.[f; n]
+          (let+ code_ids_of_function_slots = code_ids_of_function_slots in
+           Field.Map.filter_map
+             (fun _ (code_id : _ Or_unknown.t) ->
+               match code_id with
+               | Unknown -> None
+               | Known code_id ->
+                 Some
+                   (Code_id_or_name.Map.singleton
+                      (Code_id_or_name.code_id code_id)
+                      ()))
+             code_ids_of_function_slots)
+      in
+      let@ in_unknown_code_id =
+        local0
+          Cols.[f]
+          (let+ code_ids_of_function_slots = code_ids_of_function_slots in
+           Field.Map.filter_map
+             (fun _ (code_id : _ Or_unknown.t) ->
+               match code_id with Unknown -> Some () | Known _ -> None)
+             code_ids_of_function_slots)
+      in
+      let+ ([out1; out2; known_arity; unknown_arity; any] :
+             _ Datalog.Constant.hlist) =
+        let@@ [out1; out2; known_arity; unknown_arity; any] =
+          fix'
+            [ empty Cols.[n];
+              empty Cols.[f; n];
+              empty Cols.[f];
+              empty Cols.[f];
+              empty One.cols ]
+        in
+        [ (let$ [x; y] = ["x"; "y"] in
+           [in_fs % [x]; in_ % [y]] ==> out2 % [x; y]);
           (let$ [fs; usage; field; field_usage] =
              ["fs"; "usage"; "field"; "field_usage"]
            in
-           [ out2 fs usage;
+           [ out2 % [fs; usage];
              field_usages_rel usage field field_usage;
              filter1 is_value_slot field ]
-           ==> out1 usage);
+           ==> out1 % [usage]);
           (let$ [fs; usage; field] = ["fs"; "usage"; "field"] in
-           [ out2 fs usage;
+           [ out2 % [fs; usage];
              field_usages_top_rel usage field;
              filter1 is_value_slot field ]
-           ==> out1 usage);
+           ==> out1 % [usage]);
           (let$ [fs0; usage; fs; to_; fs_usage] =
              ["fs0"; "usage"; "fs"; "to_"; "fs_usage"]
            in
-           [ out2 fs0 usage;
+           [ out2 % [fs0; usage];
              field_usages_rel usage fs to_;
-             in_all_fs fs;
+             in_all_fs % [fs];
              usages_rel to_ fs_usage ]
-           ==> out2 fs fs_usage);
+           ==> out2 % [fs; fs_usage]);
           (let$ [fs; usage] = ["fs"; "usage"] in
-           [ out2 fs usage;
+           [ out2 % [fs; usage];
              field_usages_top_rel usage
                !!(Field.code_of_closure Known_arity_code_pointer) ]
-           ==> out_known_arity fs);
+           ==> known_arity % [fs]);
           (let$ [fs; usage; _v] = ["fs"; "usage"; "_v"] in
-           [ out2 fs usage;
+           [ out2 % [fs; usage];
              field_usages_rel usage
                !!(Field.code_of_closure Known_arity_code_pointer)
                _v ]
-           ==> out_known_arity fs);
+           ==> known_arity % [fs]);
           (let$ [fs; usage] = ["fs"; "usage"] in
-           [ out2 fs usage;
+           [ out2 % [fs; usage];
              field_usages_top_rel usage
                !!(Field.code_of_closure Unknown_arity_code_pointer) ]
-           ==> out_unknown_arity fs);
+           ==> unknown_arity % [fs]);
           (let$ [fs; usage; _v] = ["fs"; "usage"; "_v"] in
-           [ out2 fs usage;
+           [ out2 % [fs; usage];
              field_usages_rel usage
                !!(Field.code_of_closure Unknown_arity_code_pointer)
                _v ]
-           ==> out_unknown_arity fs);
+           ==> unknown_arity % [fs]);
           (let$ [fs; code_id; my_closure; usage] =
              ["fs"; "code_id"; "my_closure"; "usage"]
            in
-           [ out_known_arity fs;
-             in_code_id fs code_id;
+           [ known_arity % [fs];
+             in_code_id % [fs; code_id];
              code_id_my_closure_rel ~code_id ~my_closure;
              usages_rel my_closure usage ]
-           ==> out2 fs usage);
+           ==> out2 % [fs; usage]);
           (let$ [fs; code_id; my_closure; usage] =
              ["fs"; "code_id"; "my_closure"; "usage"]
            in
-           [ out_unknown_arity fs;
-             in_code_id fs code_id;
+           [ unknown_arity % [fs];
+             in_code_id % [fs; code_id];
              code_id_my_closure_rel ~code_id ~my_closure;
              usages_rel my_closure usage ]
-           ==> out2 fs usage) ]
-    in
-    let q1 =
-      mk_exists_query [] ["fs0"; "x"; "fs"] (fun [] [fs0; x; fs] ->
-          [out2 fs0 x; field_usages_top_rel x fs; in_all_fs fs])
-    in
-    let q2 =
-      mk_exists_query [] ["fs0"; "x"] (fun [] [fs0; x] ->
-          [out2 fs0 x; any_usage_pred x])
-    in
-    let q3 =
-      mk_exists_query [] ["fs"] (fun [] [fs] ->
-          [out_known_arity fs; in_unknown_code_id fs])
-    in
-    let q4 =
-      mk_exists_query [] ["fs"] (fun [] [fs] ->
-          [out_unknown_arity fs; in_unknown_code_id fs])
+           ==> out2 % [fs; usage]);
+          (let$ [fs0; x; fs] = ["fs0"; "x"; "fs"] in
+           [out2 % [fs0; x]; field_usages_top_rel x fs; in_all_fs % [fs]]
+           ==> One.flag any);
+          (let$ [fs0; x] = ["fs0"; "x"] in
+           [out2 % [fs0; x]; any_usage_pred x] ==> One.flag any);
+          (let$ [fs] = ["fs"] in
+           [known_arity % [fs]; in_unknown_code_id % [fs]] ==> One.flag any);
+          (let$ [fs] = ["fs"] in
+           [unknown_arity % [fs]; in_unknown_code_id % [fs]] ==> One.flag any)
+        ]
+      and+ mk_any = mk_any in
+      if One.to_bool any
+      then mk_any ()
+      else
+        ( Usages out1,
+          Field.Map.fold
+            (fun fs uses m ->
+              let calls =
+                if Field.Map.mem fs unknown_arity
+                then Any_call
+                else if Field.Map.mem fs known_arity
+                then Only_called_with_known_arity
+                else Never_called
+              in
+              let fs =
+                match[@ocaml.warning "-4"] Field.view fs with
+                | Function_slot fs -> fs
+                | _ -> assert false
+              in
+              Function_slot.Map.add fs (Usages uses, calls) m)
+            out2 Function_slot.Map.empty )
     in
     fun db usages current_function_slot code_ids_of_function_slots ->
-      let[@local] any () =
+      let any () =
         ( Any_usage,
           Function_slot.Map.map
             (fun _ -> Any_usage, Any_call)
@@ -2303,70 +2471,8 @@ module Rewriter = struct
       match usages with
       | Any_usage -> any ()
       | Usages s ->
-        let db = set_table in_tbl s db in
-        let code_ids_of_function_slots =
-          Function_slot.Map.fold
-            (fun fs code_id m ->
-              Field.Map.add (Field.function_slot fs) code_id m)
-            code_ids_of_function_slots Field.Map.empty
-        in
-        let db =
-          set_table in_fs_tbl
-            (Field.Map.singleton (Field.function_slot current_function_slot) ())
-            db
-        in
-        let db =
-          set_table in_all_fs_tbl
-            (Field.Map.map (fun _ -> ()) code_ids_of_function_slots)
-            db
-        in
-        let db =
-          set_table in_code_id_tbl
-            (Field.Map.filter_map
-               (fun _ (code_id : _ Or_unknown.t) ->
-                 match code_id with
-                 | Unknown -> None
-                 | Known code_id ->
-                   Some
-                     (Code_id_or_name.Map.singleton
-                        (Code_id_or_name.code_id code_id)
-                        ()))
-               code_ids_of_function_slots)
-            db
-        in
-        let db =
-          set_table in_unknown_code_id_tbl
-            (Field.Map.filter_map
-               (fun _ (code_id : _ Or_unknown.t) ->
-                 match code_id with Unknown -> Some () | Known _ -> None)
-               code_ids_of_function_slots)
-            db
-        in
-        let db = Schedule.run rs db in
-        if q1 [] db || q2 [] db || q3 [] db || q4 [] db
-        then any ()
-        else
-          let uses_for_value_slots = get_table out1_tbl db in
-          let uses_for_function_slots = get_table out2_tbl db in
-          let known_arity = get_table out_known_arity_tbl db in
-          let unknown_arity = get_table out_unknown_arity_tbl db in
-          ( Usages uses_for_value_slots,
-            Field.Map.fold
-              (fun fs uses m ->
-                let calls =
-                  if Field.Map.mem fs unknown_arity
-                  then Any_call
-                  else if Field.Map.mem fs known_arity
-                  then Only_called_with_known_arity
-                  else Never_called
-                in
-                let fs =
-                  match[@ocaml.warning "-4"] Field.view fs with
-                  | Function_slot fs -> fs
-                  | _ -> assert false
-                in
-                Function_slot.Map.add fs (Usages uses, calls) m)
-              uses_for_function_slots Function_slot.Map.empty )
+        Fixit.run stmt db
+          [s; current_function_slot; any; code_ids_of_function_slots]
 
   let rec patterns_for_unboxed_fields ~machine_width ~bind_function_slots db
       ~var fields unboxed_fields acc =
