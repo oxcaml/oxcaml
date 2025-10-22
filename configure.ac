@@ -422,6 +422,7 @@ AC_SUBST([as_compress_debug_sections_flag])
 AC_SUBST([cc_compress_debug_sections_flag])
 AC_SUBST([objcopy_compress_debug_sections_flag])
 AC_SUBST([asm_size_type_directives])
+AC_SUBST([asm_dwarf_version])
 AC_SUBST([sharedlib_cflags])
 AC_SUBST([rpath])
 AC_SUBST([mkdll])
@@ -2111,6 +2112,16 @@ AS_IF([test x"$enable_assembler_suitable_for_dissector" != "x" && \
 AS_IF([test -z "$AS"], [AS="$default_as"])
 
 AS_IF([test -z "$ASPP"], [ASPP="$default_aspp"])
+
+AS_CASE([$ocaml_cc_vendor],
+  [clang-*],
+    [AC_MSG_CHECKING([DWARF version of $AS])
+    m4_normalize([asm_dwarf_version="$(\
+      $AS -### -g -c -x c /dev/null -o /dev/null 2>&1
+        | sed -ne "s/.*dwarf-version=\([0-9]*\).*/Some \1/p")"])
+    AC_MSG_RESULT([$asm_dwarf_version])
+    test -n "$asm_dwarf_version" || asm_dwarf_version='None'],
+  [asm_dwarf_version='None'])
 
 # Utilities
 AC_CHECK_PROG([rlwrap],[rlwrap],[rlwrap])
