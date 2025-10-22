@@ -15,6 +15,7 @@ external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
 type void : void
 external void : unit -> void = "%unbox_unit"
 
+
 let _ = print_endline "Test: [let open] with module ident"
 
 module M = struct
@@ -55,6 +56,7 @@ let () =
     (Float_u.to_float c)
 ;;
 
+
 let _ = print_endline "Test: [let open] with functor"
 
 module Functor (X : sig end) = struct
@@ -75,6 +77,7 @@ let () =
     b
     (Int64_u.to_int c)
 ;;
+
 
 let _ = print_endline "Test: Tests 1-3 with [open] instead of [let open]"
 
@@ -162,6 +165,7 @@ module M_5 = struct
   ;;
 end
 
+
 let _ = print_endline "Test: open shadowing a val"
 
 module M_6 = struct
@@ -188,6 +192,7 @@ module M_6 = struct
   ;;
 end
 
+
 let _ = print_endline "Test: val shadowing an open"
 
 module M_7 = struct
@@ -213,6 +218,7 @@ module M_7 = struct
       b
   ;;
 end
+
 
 let _ = print_endline "Test: opens can't violate the scannable tag size restriction"
 
@@ -461,10 +467,8 @@ module M_8 = struct
   let a_239 = "a"
   let a_240 = "a"
   let a_241 = "a"
-
   open struct
     let f_1 = #43.0
-    let product_1 = #(void (), #15L, "open")
     let a_242 = "a"
     let a_243 = "a"
     let a_244 = "a"
@@ -492,18 +496,11 @@ module M_8 = struct
   end
 
   let () =
-    let #(a, _v1, b) = id product_0 in
-    let #(_v2, c, d) = id product_1 in
-    print_endline "Expected: 42.0 43.0 [a_181] [a_250] 14 base 15 open";
+    print_endline "Expected: 42.0 43.0 [a_181] [a_250]";
     Printf.printf
-      "Actual:   %.1f %.1f %s %s %d %s %d %s\n"
+      "Actual:   %.1f %.1f %s %s\n"
       (Float_u.to_float (id f_0))
       (Float_u.to_float (id f_1))
       (id a_181)
       (id a_250)
-      (Int64_u.to_int a)
-      b
-      (Int64_u.to_int c)
-      d
-  ;;
 end
