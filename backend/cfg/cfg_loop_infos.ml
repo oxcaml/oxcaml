@@ -136,6 +136,11 @@ type t =
 
 let build : Cfg.t -> Cfg_dominators.t -> t =
  fun cfg doms ->
+  if cfg.allowed_to_be_irreducible
+  then
+    fatal
+      "cannot compute loop infos since the CFG is not guaranteed to be \
+       reducible";
   let back_edges = compute_back_edges cfg doms in
   let loops = compute_loops_of_back_edges cfg back_edges in
   let header_map = compute_header_map loops in

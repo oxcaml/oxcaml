@@ -1465,7 +1465,8 @@ let prepare_fun_info t (cfg : Cfg.t) =
         fun_num_stack_slots = _ (* only available after regalloc *);
         fun_poll = _ (* not needed after poll insertion *);
         next_instruction_id = _;
-        fun_ret_type
+        fun_ret_type;
+        allowed_to_be_irreducible = _
       } =
     cfg
   in
