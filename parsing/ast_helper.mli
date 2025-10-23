@@ -59,15 +59,25 @@ end
 module Modes : sig
   val mk : ?loc:loc -> core_modes -> crossings -> modes
 
+  (* NOTE: this function will merge the locations of the provided modes.
+    this could lead to poor error reporting if the modes come from vastly
+    different places in the source code. this is mostly used to combine
+    legacy mode annotations with new mode annotations *)
   val merge : modes -> modes -> modes
-  val of_core_modes : core_modes -> modes
+
+  (* if no loc, merges the locations of provided core_modes *)
+  val of_core_modes : ?loc:loc -> core_modes -> modes
 end
 
 module Modalities : sig
   val mk : ?loc:loc -> core_modalities -> crossings -> modalities
 
+  (* NOTE: like [Modes.merge], this function will merge the locations
+  of the provided modalities and should be used with caution. *)
   val merge : modalities -> modalities -> modalities
-  val of_core_modalities : core_modalities -> modalities
+
+  (* if no loc, merges the locations of provided core_modalities *)
+  val of_core_modalities : ?loc:loc -> core_modalities -> modalities
 end
 
 (** {1 Attributes} *)

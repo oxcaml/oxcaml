@@ -4649,7 +4649,9 @@ mode_annot_expr:
 ;
 
 %inline core_modes_expr:
-  | at_mode_expr { Modes.of_core_modes $1 }
+  | at_mode_expr
+    { let loc = make_loc $sloc in
+      Modes.of_core_modes ~loc $1 }
 ;
 
 %inline optional_core_modes_expr:
@@ -4697,13 +4699,16 @@ optional_modality_annot_expr:
 ;
 
 %inline core_modalities_expr:
-  | atat_modalities_expr { Modalities.of_core_modalities $1 }
+  | atat_modalities_expr
+    { let loc = make_loc $sloc in
+      Modalities.of_core_modalities ~loc $1 }
 ;
 
 optional_core_modalities_expr:
   | { No_modalities }
   | atat_modalities_expr
-    { Modalities.of_core_modalities $1 }
+    { let loc = make_loc $sloc in
+      Modalities.of_core_modalities ~loc $1 }
 ;
 
 %inline stack(expr):
