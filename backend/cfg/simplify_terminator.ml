@@ -79,7 +79,10 @@ let simplify_switch (block : C.basic_block) labels =
   | _ -> ()
 
 (* CR-soon xclerc for xclerc: extend to other constants. *)
-type known_value = Const_int of nativeint
+type known_value =
+  | Const_int of nativeint
+  | Const_float32 of int32
+  | Const_float of int64
 
 (* Iterates over the passed instructions, and updates `known_values` so that it
    contains a map from registers to known values after the instructions have
@@ -98,6 +101,8 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
   Dll.iter instrs ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
       match instr.desc with
       | Op (Const_int c) -> replace instr.res.(0) (Const_int c)
+      | Op (Const_float32 c) -> replace instr.res.(0) (Const_float32 c)
+      | Op (Const_float c) -> replace instr.res.(0) (Const_float c)
       | Op Move -> (
         (* CR xclerc for xclerc: double check the "magic" / conversions behind
            moves in `Emit` will not result in invalid tracking here. *)
@@ -134,7 +139,7 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
    statically known. *)
 let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     (term : Cfg.terminator Cfg.instruction) : Label.t option =
-  let get_known_value ~(arg_idx : int) : known_value option =
+  let[@inline] get_known_value ~(arg_idx : int) : known_value option =
     if arg_idx >= 0 && arg_idx < Array.length term.arg
     then
       Reg.UsingLocEquality.Tbl.find_opt known_values
@@ -143,49 +148,118 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
       Misc.fatal_errorf "invalid argument index (%d) for instruction %a" arg_idx
         InstructionId.format term.id
   in
+  let[@inline] apply_constructor :
+      type a b.
+      known_value option ->
+      extract:(known_value -> a option) ->
+      f:(a -> b option) ->
+      b option =
+   fun value ~extract ~f ->
+    let res = Option.map f (Option.bind value extract) in
+    Option.join res
+  in
+  let[@inline] apply_constructors :
+      type a b.
+      known_value option ->
+      known_value option ->
+      extract:(known_value -> a option) ->
+      f:(a -> a -> b option) ->
+      b option =
+   fun left right ~extract ~f ->
+    let left = Option.bind left extract in
+    let right = Option.bind right extract in
+    match left, right with
+    | None, None | None, Some _ | Some _, None -> None
+    | Some left, Some right -> f left right
+  in
+  let[@inline] const_int = function
+    | Const_int const -> Some const
+    | Const_float32 _ -> None
+    | Const_float _ -> None
+  in
+  let[@inline] const_float32 = function
+    | Const_int _ -> None
+    | Const_float32 const -> Some const
+    | Const_float _ -> None
+  in
+  let[@inline] const_float = function
+    | Const_int _ -> None
+    | Const_float32 _ -> None
+    | Const_float const -> Some const
+  in
   match term.desc with
-  | Parity_test { ifso; ifnot } -> (
-    match get_known_value ~arg_idx:0 with
-    | None -> None
-    | Some (Const_int const) ->
-      if Nativeint.equal (Nativeint.logand const 1n) 0n
-      then Some ifso
-      else Some ifnot)
-  | Truth_test { ifso; ifnot } -> (
-    match get_known_value ~arg_idx:0 with
-    | None -> None
-    | Some (Const_int const) ->
-      if not (Nativeint.equal const 0n) then Some ifso else Some ifnot)
-  | Int_test { lt; eq; gt; is_signed; imm } -> (
+  | Parity_test { ifso; ifnot } ->
+    apply_constructor (get_known_value ~arg_idx:0) ~extract:const_int
+      ~f:(fun const ->
+        if Nativeint.equal (Nativeint.logand const 1n) 0n
+        then Some ifso
+        else Some ifnot)
+  | Truth_test { ifso; ifnot } ->
+    apply_constructor (get_known_value ~arg_idx:0) ~extract:const_int
+      ~f:(fun const ->
+        if not (Nativeint.equal const 0n) then Some ifso else Some ifnot)
+  | Int_test { lt; eq; gt; is_signed; imm } ->
     let left_arg = get_known_value ~arg_idx:0 in
     let right_arg =
       match imm with
       | Some const -> Some (Const_int (Nativeint.of_int const))
       | None -> get_known_value ~arg_idx:1
     in
-    match left_arg, right_arg with
-    | None, None | None, Some _ | Some _, None -> None
-    | Some (Const_int left_const), Some (Const_int right_const) ->
-      let result =
-        match is_signed with
-        | Signed -> Nativeint.compare left_const right_const
-        | Unsigned -> Nativeint.unsigned_compare left_const right_const
-      in
-      if result < 0 then Some lt else if result > 0 then Some gt else Some eq)
-  | Switch labels -> (
-    match get_known_value ~arg_idx:0 with
-    | None -> None
-    | Some (Const_int const) ->
-      if Nativeint.compare const (Nativeint.of_int Int.max_int) <= 0
-      then
-        let idx = Nativeint.to_int const in
-        if idx >= 0 && idx < Array.length labels
-        then Some (Array.unsafe_get labels idx)
-        else None
-      else None)
+    apply_constructors left_arg right_arg ~extract:const_int
+      ~f:(fun left_const right_const ->
+        let result =
+          match is_signed with
+          | Signed -> Nativeint.compare left_const right_const
+          | Unsigned -> Nativeint.unsigned_compare left_const right_const
+        in
+        if result < 0 then Some lt else if result > 0 then Some gt else Some eq)
+  | Float_test { width; lt : Label.t; eq : Label.t; gt : Label.t; uo } -> (
+    let apply_float_constructors :
+        type a.
+        known_value option ->
+        known_value option ->
+        extract:(known_value -> a option) ->
+        convert:(a -> float) ->
+        Label.t option =
+     fun left right ~extract ~convert ->
+      apply_constructors left right ~extract
+        ~f:(fun (left_const : a) (right_const : a) ->
+          let left_const = convert left_const in
+          let right_const = convert right_const in
+          if Float.is_nan left_const || Float.is_nan right_const
+          then Some uo
+          else
+            let result = Float.compare left_const right_const in
+            if result < 0
+            then Some lt
+            else if result > 0
+            then Some gt
+            else Some eq)
+    in
+    match width with
+    | Float32 ->
+      apply_float_constructors
+        (get_known_value ~arg_idx:0)
+        (get_known_value ~arg_idx:1)
+        ~extract:const_float32 ~convert:Int32.float_of_bits
+    | Float64 ->
+      apply_float_constructors
+        (get_known_value ~arg_idx:0)
+        (get_known_value ~arg_idx:1)
+        ~extract:const_float ~convert:Int64.float_of_bits)
+  | Switch labels ->
+    apply_constructor (get_known_value ~arg_idx:0) ~extract:const_int
+      ~f:(fun const ->
+        if Nativeint.compare const (Nativeint.of_int Int.max_int) <= 0
+        then
+          let idx = Nativeint.to_int const in
+          if idx >= 0 && idx < Array.length labels
+          then Some (Array.unsafe_get labels idx)
+          else None
+        else None)
   | Never -> assert false
-  | Always _ | Float_test _ | Return | Raise _ | Tailcall_self _
-  | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
+  | Always _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
+  | Call_no_return _ | Call _ | Prim _ ->
     None
 
 let block_known_values (block : C.basic_block) ~(is_after_regalloc : bool) :
