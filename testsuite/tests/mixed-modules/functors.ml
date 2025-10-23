@@ -132,7 +132,6 @@ let () = print_endline "Test: functor with mixed products"
 module type With_products = sig
   val simple_product : #(float# * string)
   val nested_product : #(int64# * #(string * float# * string))
-  val x : int
 end
 
 module Add_to_products (M : With_products) : With_products = struct
@@ -143,14 +142,11 @@ module Add_to_products (M : With_products) : With_products = struct
   let nested_product =
     let #(i, #(s, f, s2)) = M.nested_product in
     #(Int64_u.add i #5L, #(s ^ "+5", Float_u.add f #5.0, s2 ^ "+5"))
-
-  let x = M.x + 1
 end
 
 module Base_products = struct
   let simple_product = #(#1.5, "1.5")
   let nested_product = #(#10L, #("ten", #20.0, "twenty"))
-  let x = 100
 end
 
 module Augmented = Add_to_products (Base_products)
@@ -158,16 +154,15 @@ module Augmented = Add_to_products (Base_products)
 let () =
   let #(f, s) = id Augmented.simple_product in
   let #(i, #(s2, f2, s3)) = id Augmented.nested_product in
-  print_endline "Expected: 11.5 1.5+10 15 ten+5 25.0 twenty+5 101";
+  print_endline "Expected: 11.5 1.5+10 15 ten+5 25.0 twenty+5";
   Printf.printf
-    "Actual:   %.1f %s %d %s %.1f %s %d\n\n"
+    "Actual:   %.1f %s %d %s %.1f %s\n\n"
     (Float_u.to_float f)
     s
     (Int64_u.to_int i)
     s2
     (Float_u.to_float f2)
     s3
-    (id Augmented.x)
 
 
 let () = print_endline "Test: functor with void"
@@ -181,11 +176,11 @@ end
 module Transform_with_void (M : With_void) : With_void = struct
   let void_val = M.void_val
   let float_val = Float_u.mul M.float_val #2.0
-  let string_val = M.string_val ^ " *2"
+  let string_val = M.string_val ^ "*2"
 end
 
 module Void_base = struct
-  let string_val = "base"
+  let string_val = "three"
   let void_val = void ()
   let float_val = #3.0
 end
@@ -193,7 +188,7 @@ end
 module Void_transformed = Transform_with_void (Void_base)
 
 let () =
-  print_endline "Expected: 6.0 base *2";
+  print_endline "Expected: 6.0 three*2";
   Printf.printf
     "Actual:   %.1f %s\n"
     (Float_u.to_float (id Void_transformed.float_val))

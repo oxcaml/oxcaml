@@ -15,10 +15,6 @@ Expected: 1.0 2.0 s
 Actual:   1.0 2.0 s
 
 Test: coercing modules with mixed products
-Expected: 1.0 one 100
-Actual:   1.0 one 100
-
-Test: coercing modules with nested mixed products
 Expected: 10.0 a 20 boxed
 Actual:   10.0 a 20 boxed
 

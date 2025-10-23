@@ -3,11 +3,13 @@ Expected: 5 10 25
 Actual:   5 10 25
 
 Test: shadowing within a module
-10.0 20.0 30.0
+Expected: 10.0 20.0 30.0
+Actual:   10.0 20.0 30.0
 
 Test: pattern aliases
 Expected: a 1.0 a 1.0
 Actual:   a 1.0 a 1.0
 
 Test: complicated unboxed products
-0 1 2 3 4 5 6 7 8 9 10 11 12 13
+Expected: 0 1 2 3 4 5 6 7 8 9 10 11 12 13
+Actual:   0 1 2 3 4 5 6 7 8 9 10 11 12 13

@@ -168,7 +168,8 @@ end
 
 let () =
   print_endline "Expected: 9.0";
-  Printf.printf "Actual:   %.1f\n\n" (Float_u.to_float ((id W.extract) (id W.example)))
+  Printf.printf "Actual:   %.1f\n\n"
+    (Float_u.to_float ((id W.extract) (id W.example)))
 
 
 let () = print_endline "Test: Value-only input to mixed output"
