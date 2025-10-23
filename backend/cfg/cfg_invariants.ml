@@ -309,6 +309,12 @@ let check_block t label (block : Cfg.basic_block) =
   check_stack_offset t label block;
   ()
 
+let check_reducibility t cfg_with_layout =
+  let cfg_with_infos = Cfg_with_infos.make cfg_with_layout in
+  match Cfg_reducibility.is_cfg_with_infos_reducible cfg_with_infos with
+  | true -> ()
+  | false -> report t "CFG is not reducible"
+
 let run ppf cfg_with_layout =
   let cfg = CL.cfg cfg_with_layout in
   let layout = CL.layout cfg_with_layout in
@@ -323,4 +329,5 @@ let run ppf cfg_with_layout =
   check_layout t layout;
   Cfg.iter_blocks ~f:(check_block t) cfg;
   check_tailrec_position t;
+  check_reducibility t cfg_with_layout;
   t.result
