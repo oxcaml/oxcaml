@@ -60,6 +60,14 @@ type closure_details =
     polarity : polarity
   }
 
+type allocation_desc =
+  | Unknown
+  | Optional_argument
+  | Partial_application
+  | Float_projection
+
+type allocation = allocation_desc Location.loc
+
 (** Hint for morphisms. When acompanied by a destination [pinpoint], [morph]
    gives a source [pinpoint] and explains the relation between them. See
    [Mode.Report.print_morph] for what each non-trivial constructor means. *)
@@ -81,7 +89,9 @@ type 'd morph =
   | Captured_by_partial_application : (disallowed * 'r) morph
   | Adj_captured_by_partial_application : ('l * disallowed) morph
   | Crossing : ('l * 'r) morph
-  | Allocation_r : (disallowed * 'r) morph
-  | Allocation_l : ('l * disallowed) morph
+  (* CR-soon zqian: the location on [Allocation_*] should probably be removed
+     once we introduce "containing" hints, since the locations would be duplicative. *)
+  | Allocation_r : allocation -> (disallowed * 'r) morph
+  | Allocation_l : allocation -> ('l * disallowed) morph
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]

@@ -161,7 +161,7 @@ Line 4, characters 2-7:
 4 |   left'
       ^^^^^
 Error: This value is "local"
-       because it is from an allocation containing a value
+       because it is from the allocation (at Line 2, characters 10-25) containing a value
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.

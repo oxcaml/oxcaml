@@ -48,7 +48,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Crossing -> pp, Crossing
       | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
-      | Allocation_r -> pp, Allocation_l
+      | Allocation_r loc -> pp, Allocation_l loc
 
     let right_adjoint :
         type r.
@@ -64,7 +64,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Crossing -> pp, Crossing
       | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
-      | Allocation_l -> pp, Allocation_r
+      | Allocation_l loc -> pp, Allocation_r loc
 
     include Magic_allow_disallow (struct
       type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
@@ -79,7 +79,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
-         | Allocation_l -> Allocation_l
+         | Allocation_l loc -> Allocation_l loc
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
         fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -90,7 +90,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Captured_by_partial_application -> Captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
-         | Allocation_r -> Allocation_r
+         | Allocation_r loc -> Allocation_r loc
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
         fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -104,8 +104,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
-         | Allocation_r -> Allocation_r
-         | Allocation_l -> Allocation_l
+         | Allocation_r loc -> Allocation_r loc
+         | Allocation_l loc -> Allocation_l loc
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
         fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -119,8 +119,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
-         | Allocation_l -> Allocation_l
-         | Allocation_r -> Allocation_r
+         | Allocation_l loc -> Allocation_l loc
+         | Allocation_r loc -> Allocation_r loc
     end)
   end
 
@@ -2053,6 +2053,13 @@ module Report = struct
            then fprintf ppf "the %t (at %a)" print_desc Location.print_loc loc
            else fprintf ppf "the %t at %a" print_desc Location.print_loc loc)
 
+  let print_allocation_desc : allocation_desc -> formatter -> unit = function
+    | Unknown -> dprintf "the allocation"
+    | Optional_argument -> dprintf "the allocation of the optional argument"
+    | Partial_application ->
+      dprintf "the allocation for the partial application"
+    | Float_projection -> dprintf "the allocation for float projection"
+
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and gives the source pinpoint. *)
   let print_morph :
@@ -2082,9 +2089,18 @@ module Report = struct
           (Location.none, Expression) )
     | Crossing -> Some (dprintf "crosses with something", pp)
     (* CR-soon zqian: the "from" and "containing" below should be explicit and clear morph hints. *)
-    | Allocation_r -> Some (dprintf "is from an allocation", pp)
-    | Allocation_l ->
-      Some (dprintf "is from an allocation containing a value", pp)
+    | Allocation_r { loc; txt } ->
+      Some
+        ( dprintf "is from %t at %a"
+            (print_allocation_desc txt)
+            Location.print_loc loc,
+          pp )
+    | Allocation_l { loc; txt } ->
+      Some
+        ( dprintf "is from %t (at %a) containing a value"
+            (print_allocation_desc txt)
+            Location.print_loc loc,
+          pp )
 
   let print_mode :
       type a. [`Actual | `Expected] -> a C.obj -> formatter -> a -> unit =
@@ -2137,7 +2153,8 @@ module Report = struct
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
     | Adj_captured_by_partial_application ->
       true
-    | Allocation_r | Allocation_l | Skip | Crossing | Unknown_non_rigid -> false
+    | Allocation_r _ | Allocation_l _ | Skip | Crossing | Unknown_non_rigid ->
+      false
 
   let eq_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
