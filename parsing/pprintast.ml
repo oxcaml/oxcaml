@@ -396,7 +396,7 @@ let optional_atat_core_modalities f m =
   | [] -> ()
   | m -> pp f "%@%@@ %a" core_modalities m
 
-let optional_modality_annot ?(pre = fun _ () -> ()) ?(post = fun _ () -> ()) f m =
+let optional_moda_annot ?(pre = fun _ () -> ()) ?(post = fun _ () -> ()) f m =
   match m with
   | No_modalities -> ()
   | Modalities { modalities; crossings; _ } ->
@@ -407,13 +407,14 @@ let optional_modality_annot ?(pre = fun _ () -> ()) ?(post = fun _ () -> ()) f m
 
 let optional_space_modality_annot f m =
   let pre f () = Format.fprintf f "@ " in
-  optional_modality_annot ~pre f m
+  optional_moda_annot ~pre f m
 
 let optional_modality_annot_newline f m =
-  optional_modality_annot ~post:pp_print_newline f m
+  optional_moda_annot ~post:pp_print_newline f m
 
-(** For a list of modes, we either return [Some core_modes] if they are purely old modes,
-    (including empty modes) or [None] to trigger printing everything in the new syntax *)
+(** For a list of modes, we either return [Some core_modes] if they are purely
+    old modes, (including empty modes) or [None] to trigger printing everything
+    in the new syntax *)
 let core_modes_in_old_syntax modes =
   match modes with
   | No_modes -> Some []
@@ -422,9 +423,9 @@ let core_modes_in_old_syntax modes =
     if (List.for_all (fun {txt = Mode txt; _} -> txt = "local") modes)
       then Some modes else None
 
-(** For a list of modalities, we either return [Some core_modalities] if they are
-    purely old modalities, (including empty) or [None] to trigger printing everything
-    in the new syntax *)
+(** For a list of modalities, we either return [Some core_modalities] if they
+    are purely old modalities, (including empty) or [None] to trigger printing
+    everything in the new syntax *)
 let print_modality_in_old_syntax modalities =
   match modalities with
   | No_modalities -> Some []
