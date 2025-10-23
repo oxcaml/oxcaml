@@ -805,18 +805,18 @@ module M : sig end @@ stateless
 module F (X : S @ portable) = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
+Line 1, characters 16-26:
 1 | module F (X : S @ portable) = struct
-                      ^^^^^^^^
+                    ^^^^^^^^^^
 Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module F (_ : S @ portable) = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
+Line 1, characters 16-26:
 1 | module F (_ : S @ portable) = struct
-                      ^^^^^^^^
+                    ^^^^^^^^^^
 Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
@@ -828,18 +828,18 @@ module M' : S @@ stateless
 module F (M : S @ portable) : S @ portable = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
+Line 1, characters 16-26:
 1 | module F (M : S @ portable) : S @ portable = struct
-                      ^^^^^^^^
+                    ^^^^^^^^^^
 Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module F (M : S @ portable) @ portable = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
+Line 1, characters 16-26:
 1 | module F (M : S @ portable) @ portable = struct
-                      ^^^^^^^^
+                    ^^^^^^^^^^
 Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
@@ -869,18 +869,18 @@ module M : S @@ stateless
 
 module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
 [%%expect{|
-Line 1, characters 37-45:
+Line 1, characters 35-45:
 1 | module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
-                                         ^^^^^^^^
+                                       ^^^^^^^^^^
 Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 
 module type S' = () -> S @ portable -> S @ portable -> S @ portable
 [%%expect{|
-Line 1, characters 27-35:
+Line 1, characters 25-35:
 1 | module type S' = () -> S @ portable -> S @ portable -> S @ portable
-                               ^^^^^^^^
+                             ^^^^^^^^^^
 Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
