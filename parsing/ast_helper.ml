@@ -50,17 +50,16 @@ module Modes = struct
     | [], [] -> No_modes
     | _, _ -> Modes { modes; crossings; loc }
 
-  let of_core_modes core_modes =
-    match core_modes with
-    | [] -> No_modes
-    | _ :: _ ->
-      let loc = Location.merge ~ghost:false (List.map (fun m -> m.loc) core_modes) in
+  let of_core_modes ?loc core_modes =
+    match loc, core_modes with
+    | _, [] -> No_modes
+    | Some loc, _ :: _ -> mk ~loc core_modes []
+    | None, _ :: _ ->
+      let loc =
+        Location.merge ~ghost:false (List.map (fun m -> m.loc) core_modes)
+      in
       mk ~loc core_modes []
 
-  (* NOTE: this function will merge the locations of the provided modes.
-     this could lead to poor error reporting if the modes come from vastly
-     different places in the source code. this is mostly used to combine
-     legacy mode annotations with new mode annotations *)
   let merge mode mode' =
     match mode, mode' with
     | No_modes, mode' -> mode'
@@ -77,13 +76,6 @@ module Modalities = struct
     | [], [] -> No_modalities
     | _, _ -> Modalities { modalities; crossings; loc }
 
-  let of_core_modalities core_modalities =
-    match core_modalities with
-    | [] -> No_modalities
-    | _ :: _ ->
-      let loc = Location.merge ~ghost:false (List.map (fun m -> m.loc) core_modalities) in
-      mk ~loc core_modalities []
-
   (* NOTE: like [Modes.merge], this function will merge the locations
      of the provided modalities and should be used with caution. *)
   let merge moda moda' =
@@ -94,6 +86,16 @@ module Modalities = struct
       Modalities { modalities = m'; crossings = c'; loc = l' } ->
       let loc = Location.merge ~ghost:false [l; l'] in
       mk ~loc (m @ m') (c @ c')
+
+  let of_core_modalities ?loc core_modalities =
+    match loc, core_modalities with
+    | _, [] -> No_modalities
+    | Some loc, _ :: _ -> mk ~loc core_modalities []
+    | None, _ :: _ ->
+      let loc =
+        Location.merge ~ghost:false (List.map (fun m -> m.loc) core_modalities)
+      in
+      mk ~loc core_modalities []
 end
 
 module Attr = struct
