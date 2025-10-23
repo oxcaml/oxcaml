@@ -624,7 +624,8 @@ let ocaml_ignored_flags =
     "-fno-avx";
     "-dllvmir";
     "-keep-llvmir";
-    "-llvm-path";
+    "-llvm-backend";
+    "-no-llvm-backend";
     "-ddwarf-types";
     "-ocamlcfg";
     "-cfg-prologue-validate";
@@ -721,7 +722,8 @@ let ocaml_ignored_parametrized_flags =
     "-gdwarf-config-max-shape-reduce-steps-per-variable";
     "-gdwarf-config-max-evaluation-steps-per-variable";
     "-gdwarf-config-shape-reduce-fuel";
-    "-gdwarf-fidelity"
+    "-gdwarf-fidelity";
+    "-llvm-path"
   ]
 
 let ocaml_warnings_spec ~error =
