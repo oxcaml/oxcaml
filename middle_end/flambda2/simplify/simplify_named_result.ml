@@ -22,10 +22,16 @@ type t =
 
 let with_dacc ~dacc t = { t with dacc }
 
-let create dacc bindings_to_place =
+let create dacc binding_to_place =
   (* If [original_defining_expr] was simplified to a new term then the benefit
      of doing so is counted in [simplify_named]. *)
-  { dacc; bindings_to_place; was_lifted_set_of_closures = false }
+  { dacc;
+    bindings_to_place = [binding_to_place];
+    was_lifted_set_of_closures = false
+  }
+
+let create_empty dacc =
+  { dacc; bindings_to_place = []; was_lifted_set_of_closures = false }
 
 let create_have_lifted_set_of_closures dacc bound_vars_to_symbols
     ~original_defining_expr =
