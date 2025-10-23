@@ -37,17 +37,7 @@ let rec pp_unboxed_elt pp_unboxed ppf = function
 
 let print_unboxed_fields = pp_unboxed_elt
 
-let is_local_field f =
-  match Field.view f with
-  | Value_slot vs ->
-    Compilation_unit.is_current (Value_slot.get_compilation_unit vs)
-  | Function_slot fs ->
-    Compilation_unit.is_current (Function_slot.get_compilation_unit fs)
-  | Block _ | Code_of_closure _ | Apply _ | Code_id_of_call_witness | Is_int
-  | Get_tag ->
-    false
-
-let is_not_local_field f = not (is_local_field f)
+let is_not_local_field f = not (Field.is_local f)
 
 (* CR-someday ncourant: track fields that are known to be constant, here and in
    changed_representation, to avoid having them be represented. This is a bit
@@ -477,7 +467,7 @@ let datalog_schedule =
     [ ~~(any_usage_pred base);
       any_usage_pred to_;
       accessor_rel ~to_ relation ~base;
-      filter1 is_local_field relation ]
+      filter1 Field.is_local relation ]
     ==> field_usages_rel base relation to_
   in
   let field_usages_from_accessor_field_usages =
@@ -540,7 +530,7 @@ let datalog_schedule =
     let$ [base; base_use; relation; from; to_] =
       ["base"; "base_use"; "relation"; "from"; "to_"]
     in
-    [ filter1 is_local_field relation;
+    [ filter1 Field.is_local relation;
       constructor_rel ~base relation ~from;
       usages_rel base base_use;
       field_usages_rel base_use relation to_ ]
@@ -586,7 +576,7 @@ let datalog_schedule =
     let$ [base; relation; from] = ["base"; "relation"; "from"] in
     [ any_usage_pred base;
       constructor_rel ~base relation ~from;
-      filter1 is_local_field relation ]
+      filter1 Field.is_local relation ]
     ==> and_
           [ escaping_field_rel relation
               from (*; field_usages_rel base relation from *) ]
@@ -691,7 +681,7 @@ let datalog_schedule =
     [ ~~(any_source_pred base);
       any_source_pred from;
       rev_constructor_rel ~from relation ~base;
-      filter1 is_local_field relation ]
+      filter1 Field.is_local relation ]
     ==> field_sources_rel base relation from
   in
   let field_sources_from_constructor_field_sources =
@@ -790,7 +780,7 @@ let datalog_schedule =
     let$ [base; base_source; relation; to_; from] =
       ["base"; "base_source"; "relation"; "to_"; "from"]
     in
-    [ filter1 is_local_field relation;
+    [ filter1 Field.is_local relation;
       rev_accessor_rel ~base relation ~to_;
       sources_rel base base_source;
       field_sources_rel base_source relation from ]
@@ -823,7 +813,7 @@ let datalog_schedule =
     let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
     [ any_source_pred base;
       rev_accessor_rel ~base relation ~to_;
-      filter1 is_local_field relation ]
+      filter1 Field.is_local relation ]
     ==> and_
           [ reading_field_rel relation
               to_ (*; field_sources_rel base relation to_*) ]
@@ -1612,7 +1602,7 @@ let datalog_rules =
        in
        [ constructor_rel ~base relation ~from;
          sources_rel usage base;
-         filter1 is_local_field relation;
+         filter1 Field.is_local relation;
          any_usage_pred base;
          rev_accessor_rel ~base:usage relation ~to_:v;
          usages_rel v u ]
@@ -1624,7 +1614,7 @@ let datalog_rules =
        in
        [ constructor_rel ~base relation ~from;
          sources_rel usage base;
-         filter1 is_local_field relation;
+         filter1 Field.is_local relation;
          any_usage_pred base;
          (* field_usages_top_rel usage relation *)
          rev_accessor_rel ~base:usage relation ~to_:v;
@@ -1662,7 +1652,7 @@ let datalog_rules =
          the source at each point. *)
       (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
        [ any_usage_pred x;
-         filter1 is_local_field field;
+         filter1 Field.is_local field;
          reading_field_rel field z;
          constructor_rel ~base:x field ~from:y ]
        ==> cannot_change_representation0 x);
@@ -1673,7 +1663,7 @@ let datalog_rules =
          ["usage"; "field"; "source1"; "source2"; "_v"]
        in
        [ field_usages_rel usage field _v;
-         filter1 is_local_field field;
+         filter1 Field.is_local field;
          sources_rel usage source1;
          sources_rel usage source2;
          distinct Cols.n source1 source2 ]
@@ -1682,7 +1672,7 @@ let datalog_rules =
          ["usage"; "field"; "source1"; "source2"]
        in
        [ field_usages_top_rel usage field;
-         filter1 is_local_field field;
+         filter1 Field.is_local field;
          sources_rel usage source1;
          sources_rel usage source2;
          distinct Cols.n source1 source2 ]
