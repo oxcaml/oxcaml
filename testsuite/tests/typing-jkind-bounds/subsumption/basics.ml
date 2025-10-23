@@ -348,3 +348,38 @@ Error: Signature mismatch:
        But the kind of the first must be a subkind of immutable_data with 'a
          because of the definition of t at line 2, characters 2-36.
 |}]
+
+module Foo : sig
+  type ('a, 'b) u : value mod portable with 'b
+
+  type ('a
+       , 'b
+       , 'c)
+         t :
+         value mod portable with 'a with 'b with ('b, 'c) u with ('a * 'b, 'c) u
+end = struct
+  type ('a, 'b) u : value mod portable with 'b
+
+  type ('a
+       , 'b
+       , 'c)
+         t :
+         value mod portable with 'a with 'b with ('b, 'c) u with ('a * 'b, 'c) u
+end
+
+[%%expect{|
+module Foo :
+  sig
+    type ('a, 'b) u : value mod portable with 'b
+    type ('a, 'b, 'c) t
+      : value
+          mod portable
+          with 'a
+
+          with 'b
+
+          with ('a * 'b, 'c) u
+
+          with ('b, 'c) u
+  end
+|}]
