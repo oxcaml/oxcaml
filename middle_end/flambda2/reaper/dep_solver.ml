@@ -13,6 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Global_flow_graph.Relations
+
 let reaperdbg_env = Sys.getenv_opt "REAPERDBG"
 
 let reaperdbg_flags =
@@ -104,16 +106,30 @@ module Syntax = struct
     let@ ps = parameters ps in
     f ps
 
+  let ( let^$ ) (ps, xs) f =
+    let@ ps = parameters ps in
+    let@ xs = variables xs in
+    f (ps, xs)
+
   let ( ==> ) h c = where h (deduce c)
 
   let ( =>? ) h l = where h (yield l)
+
+  let ( ?? ) h = where h (yield [])
 
   let ( !! ) = Term.constant
 
   let ( ~! ) = Schedule.saturate
 
   let ( ~> ) = List.map (fun r -> Schedule.saturate [r])
+
+  let ( ~~ ) = not
 end
+
+open Syntax
+
+(* Don't shadow [not] *)
+let not = Stdlib.not
 
 module Cols = struct
   let n = Code_id_or_name.datalog_column_id
@@ -174,7 +190,7 @@ let usages_rel = rel2 "usages" Cols.[n; n]
 let field_usages_rel = rel3 "field_usages" Cols.[n; f; n]
 
 (** [any_usage x] x is used in an uncontrolled way *)
-let _any_usage_pred = Global_flow_graph.any_usage_pred
+let any_usage_pred = any_usage_pred
 
 (** [field_usages_top x f] the field f of x is used in an uncontroled way.
     It could be for instance, a value escaping the current compilation unit,
@@ -202,7 +218,7 @@ let sources_rel = rel2 "sources" Cols.[n; n]
     It can be produced for instance by an argument from an escaping function
     or the result of non axiomatized primitives and external symbols.
     Right now functions coming from other files are considered unknown *)
-let _any_source_pred = Global_flow_graph.any_source_pred
+let any_source_pred = any_source_pred
 
 (** [field_sources x f y] y is a source of the field f of x,
     and there is an actual source for y.
@@ -287,13 +303,11 @@ let reading_field_rel = rel2 "reading_field" Cols.[f; n]
 
 let escaping_field_rel = rel2 "escaping_field" Cols.[f; n]
 
-let filter1 f x =
-  let open! Syntax in
-  filter (fun [x] -> f x) [x]
+let filter1 f x = filter (fun [x] -> f x) [x]
+
+let filter1_not f x = filter1 (fun x -> not (f x)) x
 
 let datalog_schedule =
-  let open Global_flow_graph in
-  let open! Syntax in
   (* Reverse relations, because datalog does not implement a more efficient
      representation yet. Datalog iterates on the first key of a relation first.
      those reversed relations allows to select a different key. *)
@@ -399,36 +413,36 @@ let datalog_schedule =
   in
   let usages_accessor_1 =
     let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [ not (any_usage_pred base);
+    [ ~~(any_usage_pred base);
       accessor_rel ~to_ relation ~base;
       usages_rel to_ _var ]
     ==> usages_rel base base
   in
   let usages_accessor_2 =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [ not (any_usage_pred base);
+    [ ~~(any_usage_pred base);
       accessor_rel ~to_ relation ~base;
       any_usage_pred to_ ]
     ==> usages_rel base base
   in
   let usages_coaccessor_1 =
     let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [ not (any_usage_pred base);
+    [ ~~(any_usage_pred base);
       sources_rel to_ _var;
       coaccessor_rel ~to_ relation ~base ]
     ==> usages_rel base base
   in
   let usages_coaccessor_2 =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [ not (any_usage_pred base);
+    [ ~~(any_usage_pred base);
       any_source_pred to_;
       coaccessor_rel ~to_ relation ~base ]
     ==> usages_rel base base
   in
   let usages_alias =
     let$ [to_; from; usage] = ["to_"; "from"; "usage"] in
-    [ not (any_usage_pred from);
-      not (any_usage_pred to_);
+    [ ~~(any_usage_pred from);
+      ~~(any_usage_pred to_);
       usages_rel to_ usage;
       alias_rel ~to_ ~from ]
     ==> usages_rel from usage
@@ -452,7 +466,7 @@ let datalog_schedule =
    *)
   let field_usages_from_accessor_field_usages_top =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [ not (any_usage_pred base);
+    [ ~~(any_usage_pred base);
       any_usage_pred to_;
       accessor_rel ~to_ relation ~base;
       filter1 is_not_local_field relation ]
@@ -460,7 +474,7 @@ let datalog_schedule =
   in
   let field_usages_from_accessor_field_usages_top_local =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [ not (any_usage_pred base);
+    [ ~~(any_usage_pred base);
       any_usage_pred to_;
       accessor_rel ~to_ relation ~base;
       filter1 is_local_field relation ]
@@ -468,9 +482,9 @@ let datalog_schedule =
   in
   let field_usages_from_accessor_field_usages =
     let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [ not (any_usage_pred base);
-      not (any_usage_pred to_);
-      not (field_usages_top_rel base relation);
+    [ ~~(any_usage_pred base);
+      ~~(any_usage_pred to_);
+      ~~(field_usages_top_rel base relation);
       accessor_rel ~to_ relation ~base;
       usages_rel to_ _var ]
     ==> field_usages_rel base relation to_
@@ -486,14 +500,14 @@ let datalog_schedule =
    *)
   let cofield_usages_from_coaccessor1 =
     let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [ not (any_usage_pred base);
+    [ ~~(any_usage_pred base);
       coaccessor_rel ~to_ relation ~base;
       sources_rel to_ _var ]
     ==> cofield_usages_rel base relation to_
   in
   let cofield_usages_from_coaccessor2 =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [ not (any_usage_pred base);
+    [ ~~(any_usage_pred base);
       any_source_pred to_;
       coaccessor_rel ~to_ relation ~base ]
     ==> cofield_usages_rel base relation to_
@@ -514,9 +528,9 @@ let datalog_schedule =
     let$ [base; base_use; relation; from; to_] =
       ["base"; "base_use"; "relation"; "from"; "to_"]
     in
-    [ not (any_usage_pred from);
-      not (field_usages_top_rel base_use relation);
-      not (any_usage_pred base);
+    [ ~~(any_usage_pred from);
+      ~~(field_usages_top_rel base_use relation);
+      ~~(any_usage_pred base);
       constructor_rel ~base relation ~from;
       usages_rel base base_use;
       field_usages_rel base_use relation to_ ]
@@ -545,7 +559,7 @@ let datalog_schedule =
       ["base"; "base_use"; "relation"; "from"]
     in
     [ constructor_rel ~base relation ~from;
-      not (any_usage_pred base);
+      ~~(any_usage_pred base);
       usages_rel base base_use;
       field_usages_top_rel base_use relation ]
     ==> any_usage_pred from
@@ -615,36 +629,36 @@ let datalog_schedule =
   in
   let sources_constructor_1 =
     let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [ not (any_source_pred base);
+    [ ~~(any_source_pred base);
       sources_rel from _var;
       rev_constructor_rel ~from relation ~base ]
     ==> sources_rel base base
   in
   let sources_constructor_2 =
     let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [ not (any_source_pred base);
+    [ ~~(any_source_pred base);
       any_source_pred from;
       rev_constructor_rel ~from relation ~base ]
     ==> sources_rel base base
   in
   let sources_coconstructor_1 =
     let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [ not (any_source_pred base);
+    [ ~~(any_source_pred base);
       usages_rel from _var;
       rev_coconstructor_rel ~from relation ~base ]
     ==> sources_rel base base
   in
   let sources_coconstructor_2 =
     let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [ not (any_source_pred base);
+    [ ~~(any_source_pred base);
       any_usage_pred from;
       rev_coconstructor_rel ~from relation ~base ]
     ==> sources_rel base base
   in
   let sources_alias =
     let$ [from; to_; source] = ["from"; "to_"; "source"] in
-    [ not (any_source_pred from);
-      not (any_source_pred to_);
+    [ ~~(any_source_pred from);
+      ~~(any_source_pred to_);
       sources_rel from source;
       rev_alias_rel ~from ~to_ ]
     ==> sources_rel to_ source
@@ -666,7 +680,7 @@ let datalog_schedule =
    *)
   let field_sources_from_constructor_field_sources_top =
     let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [ not (any_source_pred base);
+    [ ~~(any_source_pred base);
       any_source_pred from;
       rev_constructor_rel ~from relation ~base;
       filter1 is_not_local_field relation ]
@@ -674,7 +688,7 @@ let datalog_schedule =
   in
   let field_sources_from_constructor_field_sources_top_local =
     let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [ not (any_source_pred base);
+    [ ~~(any_source_pred base);
       any_source_pred from;
       rev_constructor_rel ~from relation ~base;
       filter1 is_local_field relation ]
@@ -682,9 +696,9 @@ let datalog_schedule =
   in
   let field_sources_from_constructor_field_sources =
     let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [ not (any_source_pred base);
-      not (any_source_pred from);
-      not (field_sources_top_rel base relation);
+    [ ~~(any_source_pred base);
+      ~~(any_source_pred from);
+      ~~(field_sources_top_rel base relation);
       rev_constructor_rel ~from relation ~base;
       sources_rel from _var ]
     ==> field_sources_rel base relation from
@@ -700,14 +714,14 @@ let datalog_schedule =
    *)
   let cofield_sources_from_coconstrucor1 =
     let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [ not (any_source_pred base);
+    [ ~~(any_source_pred base);
       rev_coconstructor_rel ~from relation ~base;
       usages_rel from _var ]
     ==> cofield_sources_rel base relation from
   in
   let cofield_sources_from_coconstrucor2 =
     let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [ not (any_source_pred base);
+    [ ~~(any_source_pred base);
       any_usage_pred from;
       rev_coconstructor_rel ~from relation ~base ]
     ==> cofield_sources_rel base relation from
@@ -726,7 +740,7 @@ let datalog_schedule =
     let$ [base; base_use; relation; from; to_] =
       ["base"; "base_use"; "relation"; "from"; "to_"]
     in
-    [ not (any_usage_pred base);
+    [ ~~(any_usage_pred base);
       coconstructor_rel ~base relation ~from;
       usages_rel base base_use;
       cofield_usages_rel base_use relation to_ ]
@@ -764,9 +778,9 @@ let datalog_schedule =
     let$ [base; base_source; relation; to_; from] =
       ["base"; "base_source"; "relation"; "to_"; "from"]
     in
-    [ not (any_source_pred to_);
-      not (field_sources_top_rel base_source relation);
-      not (any_source_pred base);
+    [ ~~(any_source_pred to_);
+      ~~(field_sources_top_rel base_source relation);
+      ~~(any_source_pred base);
       rev_accessor_rel ~base relation ~to_;
       sources_rel base base_source;
       field_sources_rel base_source relation from ]
@@ -787,7 +801,7 @@ let datalog_schedule =
       ["base"; "base_source"; "relation"; "to_"]
     in
     [ rev_accessor_rel ~base relation ~to_;
-      not (any_source_pred base);
+      ~~(any_source_pred base);
       sources_rel base base_source;
       field_sources_top_rel base_source relation ]
     ==> any_source_pred to_
@@ -832,7 +846,7 @@ let datalog_schedule =
     let$ [base; base_source; relation; to_; from] =
       ["base"; "base_source"; "relation"; "to_"; "from"]
     in
-    [ not (any_source_pred base);
+    [ ~~(any_source_pred base);
       rev_coaccessor_rel ~base relation ~to_;
       sources_rel base base_source;
       cofield_sources_rel base_source relation from ]
@@ -919,20 +933,13 @@ let datalog_schedule =
           rev_alias ] ]
 
 let mk_exists_query params existentials f =
-  let open Syntax in
   let q =
     query
-      (let^ params = params in
-       let$ existentials = existentials in
-       f params existentials =>? [])
+      (let^$ params, existentials = params, existentials in
+       ??(f params existentials))
   in
   fun params db ->
     Cursor.fold_with_parameters q params db ~init:false ~f:(fun [] _ -> true)
-
-let is_function_slot field =
-  match[@ocaml.warning "-4"] Field.view field with
-  | Function_slot _ -> true
-  | _ -> false
 
 module Fixit : sig
   type (_, _, _) stmt
@@ -1284,8 +1291,6 @@ let get_all_usages :
     Datalog.database ->
     unit Code_id_or_name.Map.t ->
     usages =
-  let open! Syntax in
-  let open! Global_flow_graph in
   let open! Fixit in
   let stmt =
     let@ follow_known_arity_calls =
@@ -1319,7 +1324,7 @@ let get_all_usages :
       (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
        [ out % [x];
          field_usages_rel x field y;
-         filter1 is_function_slot field;
+         filter1 Field.is_function_slot field;
          usages_rel y z ]
        ==> out % [z]) ]
   in
@@ -1329,7 +1334,6 @@ let get_all_usages :
 let get_direct_usages :
     Datalog.database -> unit Code_id_or_name.Map.t -> unit Code_id_or_name.Map.t
     =
-  let open! Syntax in
   let open! Fixit in
   run
     (let@ in_ = param "in_" Cols.[n] in
@@ -1348,37 +1352,31 @@ type field_usage =
 let get_one_field : Datalog.database -> Field.t -> usages -> field_usage =
   (* CR-someday ncourant: likewise here; I find this function particulartly
      ugly. *)
-  let open! Syntax in
-  let open! Global_flow_graph in
   let open! Fixit in
-  let stmt =
-    let@ in_ = param "in_" Cols.[n] in
-    let@ in_field =
-      paramc "in_field" Cols.[f] (fun field -> Field.Map.singleton field ())
-    in
-    let++ [used_as_top; used_as_vars] =
-      let@@ [used_as_top; used_as_vars] =
-        seq' [empty One.cols; empty Cols.[n]]
-      in
-      [ (let$ [x; field] = ["x"; "field"] in
-         [in_ % [x]; in_field % [field]; field_usages_top_rel x field]
-         ==> One.flag used_as_top);
-        (let$ [x; field; y] = ["x"; "field"; "y"] in
-         [ not (One.flag used_as_top);
-           in_ % [x];
-           in_field % [field];
-           field_usages_rel x field y ]
-         ==> used_as_vars % [y]) ]
-    in
-    if One.to_bool used_as_top then Used_as_top else Used_as_vars used_as_vars
-  in
-  fun db field (Usages s) -> run stmt db s field
+  run
+    (let@ in_field =
+       paramc "in_field" Cols.[f] (fun field -> Field.Map.singleton field ())
+     in
+     let@ in_ = paramc "in_" Cols.[n] (fun (Usages s) -> s) in
+     let++ [used_as_top; used_as_vars] =
+       let@@ [used_as_top; used_as_vars] =
+         seq' [empty One.cols; empty Cols.[n]]
+       in
+       [ (let$ [x; field] = ["x"; "field"] in
+          [in_ % [x]; in_field % [field]; field_usages_top_rel x field]
+          ==> One.flag used_as_top);
+         (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ ~~(One.flag used_as_top);
+            in_ % [x];
+            in_field % [field];
+            field_usages_rel x field y ]
+          ==> used_as_vars % [y]) ]
+     in
+     if One.to_bool used_as_top then Used_as_top else Used_as_vars used_as_vars)
 
 let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
   (* CR-someday ncourant: likewise here; I find this function particulartly
      ugly. *)
-  let open! Syntax in
-  let open! Global_flow_graph in
   let open! Fixit in
   run
     (let@ in_ = paramc "in_" Cols.[n] (fun (Usages s) -> s) in
@@ -1387,13 +1385,13 @@ let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
        [ (let$ [x; field] = ["x"; "field"] in
           [ in_ % [x];
             field_usages_top_rel x field;
-            filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+            filter1_not Field.is_function_slot field ]
           ==> out1 % [field]);
          (let$ [x; field; y] = ["x"; "field"; "y"] in
           [ in_ % [x];
             field_usages_rel x field y;
-            not (out1 % [field]);
-            filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+            ~~(out1 % [field]);
+            filter1_not Field.is_function_slot field ]
           ==> out2 % [field; y]) ]
      in
      Field.Map.merge
@@ -1417,7 +1415,6 @@ let field_of_constructor_is_used_as =
 
 let get_fields_usage_of_constructors :
     Datalog.database -> unit Code_id_or_name.Map.t -> field_usage Field.Map.t =
-  let open! Syntax in
   let open! Fixit in
   run
     (let@ in_ = param "in_" Cols.[n] in
@@ -1426,13 +1423,13 @@ let get_fields_usage_of_constructors :
        [ (let$ [x; field] = ["x"; "field"] in
           [ in_ % [x];
             field_of_constructor_is_used_top x field;
-            filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+            filter1_not Field.is_function_slot field ]
           ==> out1 % [field]);
          (let$ [x; field; y] = ["x"; "field"; "y"] in
           [ in_ % [x];
             field_of_constructor_is_used_as x field y;
-            not (out1 % [field]);
-            filter1 (fun x -> Stdlib.not (is_function_slot x)) field ]
+            ~~(out1 % [field]);
+            filter1_not Field.is_function_slot field ]
           ==> out2 % [field; y]) ]
      in
      Field.Map.merge
@@ -1451,28 +1448,21 @@ type set_of_closures_def =
 
 let get_set_of_closures_def :
     Datalog.database -> Code_id_or_name.t -> set_of_closures_def =
-  let open Syntax in
   let q =
     query
-      (let^ [x] = ["x"] in
-       let$ [relation; y] = ["relation"; "y"] in
-       [ Global_flow_graph.constructor_rel ~base:x relation ~from:y;
-         filter1 is_function_slot relation ]
+      (let^$ [x], [relation; y] = ["x"], ["relation"; "y"] in
+       [ constructor_rel ~base:x relation ~from:y;
+         filter1 Field.is_function_slot relation ]
        =>? [relation; y])
   in
   fun db v ->
     let l =
       Cursor.fold_with_parameters q [v] db ~init:[] ~f:(fun [f; y] l ->
-          ( (match[@ocaml.warning "-4"] Field.view f with
-            | Function_slot fs -> fs
-            | _ -> assert false),
-            y )
-          :: l)
+          (Field.must_be_function_slot f, y) :: l)
     in
     match l with [] -> Not_a_set_of_closures | _ :: _ -> Set_of_closures l
 
 let any_usage_pred_query =
-  let open! Global_flow_graph in
   mk_exists_query ["X"] [] (fun [x] [] -> [any_usage_pred x])
 
 (* CR pchambart: should rename: mutiple potential top is_used_as_top (should be
@@ -1482,7 +1472,6 @@ let is_top db x = any_usage_pred_query [x] db
 (* CR pchambart: field_used should rename to mean that this is the specific
    field of a given variable. *)
 let has_use, _field_used =
-  let open! Global_flow_graph in
   let usages_query =
     mk_exists_query ["X"] ["Y"] (fun [x] [y] -> [usages_rel x y])
   in
@@ -1508,18 +1497,15 @@ let field_used =
   fun db x field -> field_of_constructor_is_used_query [x; field] db
 
 let any_source_query =
-  let open! Global_flow_graph in
   mk_exists_query ["X"] [] (fun [x] [] -> [any_source_pred x])
 
 let has_source =
-  let open! Global_flow_graph in
   let has_source_query =
     mk_exists_query ["X"] ["Y"] (fun [x] [y] -> [sources_rel x y])
   in
   fun db x -> any_source_query [x] db || has_source_query [x] db
 
 let cofield_has_use =
-  let open! Global_flow_graph in
   let cofield_query =
     mk_exists_query ["X"; "F"] ["S"; "T"] (fun [x; f] [s; t] ->
         [sources_rel x s; cofield_sources_rel s f t])
@@ -1529,7 +1515,6 @@ let cofield_has_use =
 (* CR pchambart: Should rename to remove not local in the name (the notion does
    not exists right now)*)
 let not_local_field_has_source =
-  let open! Global_flow_graph in
   let any_source_query =
     mk_exists_query ["X"] [] (fun [x] [] -> [any_source_pred x])
   in
@@ -1574,8 +1559,6 @@ let dominated_by_allocation_point =
 let allocation_point_dominator = rel2 "allocation_point_dominator" Cols.[n; n]
 
 let datalog_rules =
-  let open! Syntax in
-  let open! Global_flow_graph in
   let real_field f =
     match[@ocaml.warning "-4"] Field.view f with
     | Code_of_closure _ | Apply _ | Code_id_of_call_witness -> false
@@ -1753,7 +1736,7 @@ let datalog_rules =
          change the representation. *)
       (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
        [ usages_rel allocation_id usage;
-         not (sources_rel allocation_id allocation_id) ]
+         ~~(sources_rel allocation_id allocation_id) ]
        ==> cannot_change_representation0 allocation_id);
       (let$ [allocation_id] = ["allocation_id"] in
        [any_source_pred allocation_id]
@@ -1803,7 +1786,7 @@ let datalog_rules =
          source at all and it is dead code. In either case, do not unbox *)
       (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
        [ usages_rel allocation_id usage;
-         not (sources_rel allocation_id allocation_id) ]
+         ~~(sources_rel allocation_id allocation_id) ]
        ==> cannot_change_witness_calling_convention allocation_id);
       (let$ [allocation_id] = ["allocation_id"] in
        [any_source_pred allocation_id]
@@ -1874,7 +1857,7 @@ let datalog_rules =
        [cannot_change_representation0 x] ==> cannot_change_representation1 x);
       (let$ [x; field; y] = ["x"; "field"; "y"] in
        [ constructor_rel ~base:x field ~from:y;
-         filter1 is_function_slot field;
+         filter1 Field.is_function_slot field;
          cannot_change_representation0 x ]
        ==> cannot_change_representation1 y);
       (let$ [x] = ["x"] in
@@ -1983,19 +1966,19 @@ let datalog_rules =
       (let$ [x; field; y] = ["x"; "field"; "y"] in
        [ cannot_unbox0 x;
          constructor_rel ~base:x field ~from:y;
-         filter1 is_function_slot field ]
+         filter1 Field.is_function_slot field ]
        ==> cannot_unbox y);
       (* Compute allocations to unbox or to change representation. This requires
          the rules to be executed in order. *)
       (let$ [x] = ["x"] in
-       [any_usage_pred x; not (cannot_unbox x)] ==> to_unbox x);
+       [any_usage_pred x; ~~(cannot_unbox x)] ==> to_unbox x);
       (let$ [x; _y] = ["x"; "_y"] in
-       [usages_rel x _y; not (cannot_unbox x)] ==> to_unbox x);
+       [usages_rel x _y; ~~(cannot_unbox x)] ==> to_unbox x);
       (let$ [x] = ["x"] in
-       [any_usage_pred x; not (cannot_change_representation x); not (to_unbox x)]
+       [any_usage_pred x; ~~(cannot_change_representation x); ~~(to_unbox x)]
        ==> to_change_representation x);
       (let$ [x; _y] = ["x"; "_y"] in
-       [usages_rel x _y; not (cannot_change_representation x); not (to_unbox x)]
+       [usages_rel x _y; ~~(cannot_change_representation x); ~~(to_unbox x)]
        ==> to_change_representation x);
       (let$ [x] = ["x"] in
        [any_source_pred x] ==> multiple_allocation_points x);
@@ -2006,7 +1989,7 @@ let datalog_rules =
          [dominated_by_allocation_point y x], which is that [y] is the
          allocation point dominator of [x]. *)
       (let$ [x; y] = ["x"; "y"] in
-       [sources_rel x y; not (multiple_allocation_points x)]
+       [sources_rel x y; ~~(multiple_allocation_points x)]
        ==> and_
              [allocation_point_dominator x y; dominated_by_allocation_point y x])
     ]
@@ -2229,7 +2212,6 @@ module Rewriter = struct
 
   let identify_set_of_closures_with_one_code_id :
       Datalog.database -> Code_id.t -> unit Code_id_or_name.Map.t list =
-    let open Syntax in
     let open! Fixit in
     run
       (let@ in_ =
@@ -2251,7 +2233,7 @@ module Rewriter = struct
                 !!(Field.code_of_closure Known_arity_code_pointer)
                 ~base:closure;
               rev_constructor_rel ~from:closure function_slot ~base:all_closures;
-              filter1 is_function_slot function_slot ]
+              filter1 Field.is_function_slot function_slot ]
             ==> out % [closure; all_closures]) ]
        in
        List.map snd (Code_id_or_name.Map.bindings out))
@@ -2289,17 +2271,6 @@ module Rewriter = struct
       Function_slot.t ->
       Code_id.t Or_unknown.t Function_slot.Map.t ->
       t0 * (t0 * use_of_function_slot) Function_slot.Map.t =
-    (* CR-someday ncourant: once the datalog API supports something cleaner, use
-       it. *)
-    let is_value_slot f =
-      match Field.view f with
-      | Value_slot _ -> true
-      | Function_slot _ | Is_int | Get_tag | Code_id_of_call_witness | Block _
-      | Code_of_closure _ | Apply _ ->
-        false
-    in
-    let open! Syntax in
-    let open! Global_flow_graph in
     let open! Fixit in
     let stmt =
       let@ in_ = param "in_" Cols.[n] in
@@ -2363,12 +2334,12 @@ module Rewriter = struct
            in
            [ out2 % [fs; usage];
              field_usages_rel usage field field_usage;
-             filter1 is_value_slot field ]
+             filter1 Field.is_value_slot field ]
            ==> out1 % [usage]);
           (let$ [fs; usage; field] = ["fs"; "usage"; "field"] in
            [ out2 % [fs; usage];
              field_usages_top_rel usage field;
-             filter1 is_value_slot field ]
+             filter1 Field.is_value_slot field ]
            ==> out1 % [usage]);
           (let$ [fs0; usage; fs; to_; fs_usage] =
              ["fs0"; "usage"; "fs"; "to_"; "fs_usage"]
@@ -2440,12 +2411,9 @@ module Rewriter = struct
                 then Only_called_with_known_arity
                 else Never_called
               in
-              let fs =
-                match[@ocaml.warning "-4"] Field.view fs with
-                | Function_slot fs -> fs
-                | _ -> assert false
-              in
-              Function_slot.Map.add fs (Usages uses, calls) m)
+              Function_slot.Map.add
+                (Field.must_be_function_slot fs)
+                (Usages uses, calls) m)
             out2 Function_slot.Map.empty )
     in
     fun db usages current_function_slot code_ids_of_function_slots ->
@@ -3151,7 +3119,6 @@ type single_field_source =
   | Many
 
 let get_single_field_source =
-  let open Syntax in
   let q_any_source1 =
     mk_exists_query ["block"; "field"] [] (fun [block; field] [] ->
         [field_sources_top_rel block field])
@@ -3159,8 +3126,7 @@ let get_single_field_source =
   let q_any_source2 =
     mk_exists_query ["block"; "field"] ["source"]
       (fun [block; field] [source] ->
-        [ field_sources_rel block field source;
-          Global_flow_graph.any_source_pred source ])
+        [field_sources_rel block field source; any_source_pred source])
   in
   let q_source =
     query
@@ -3238,6 +3204,25 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
             else default ())))
     fields
 
+let has_to_be_unboxed =
+  mk_exists_query ["x"] ["alloc_point"] (fun [x] [alloc_point] ->
+      [allocation_point_dominator x alloc_point; to_unbox alloc_point])
+
+let query_to_unbox =
+  query
+    (let$ [x; y] = ["x"; "y"] in
+     [to_unbox x; dominated_by_allocation_point x y] =>? [x; y])
+
+let query_to_change_representation =
+  query
+    (let$ [x] = ["x"] in
+     [to_change_representation x] =>? [x])
+
+let query_dominated_by =
+  query
+    (let^$ [x], [y] = ["x"], ["y"] in
+     [dominated_by_allocation_point x y] =>? [y])
+
 let fixpoint (graph : Global_flow_graph.graph) =
   let datalog = Global_flow_graph.to_datalog graph in
   let stats = Datalog.Schedule.create_stats datalog in
@@ -3249,61 +3234,34 @@ let fixpoint (graph : Global_flow_graph.graph) =
   in
   if debug then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
   if Sys.getenv_opt "DUMPDB" <> None then Format.eprintf "%a@." Datalog.print db;
-  (* let allocation_point_dominator = Code_id_or_name.Map.fold (fun alloc_point
-     dominated acc -> Code_id_or_name.Set.fold (fun dom acc ->
-     Code_id_or_name.Map.add dom alloc_point acc) dominated acc)
-     dominated_by_allocation_points Code_id_or_name.Map.empty in *)
-  let unboxed : unboxed Code_id_or_name.Map.t ref =
-    ref Code_id_or_name.Map.empty
-  in
-  let has_to_be_unboxed =
-    mk_exists_query ["x"] ["alloc_point"] (fun [x] [alloc_point] ->
-        [allocation_point_dominator x alloc_point; to_unbox alloc_point])
-  in
   let has_to_be_unboxed code_or_name = has_to_be_unboxed [code_or_name] db in
-  let query_to_unbox =
-    let open Syntax in
-    query
-      (let$ [x; y] = ["x"; "y"] in
-       [to_unbox x; dominated_by_allocation_point x y] =>? [x; y])
+  let unboxed =
+    Datalog.Cursor.fold query_to_unbox db ~init:Code_id_or_name.Map.empty
+      ~f:(fun [code_or_name; to_patch] unboxed ->
+        (* CR-someday ncourant: produce ghost makeblocks/set of closures for
+           debugging *)
+        let new_name =
+          Flambda_colours.without_colours ~f:(fun () ->
+              Format.asprintf "%a_into_%a" Code_id_or_name.print code_or_name
+                Code_id_or_name.print to_patch)
+        in
+        let fields =
+          mk_unboxed_fields ~has_to_be_unboxed
+            ~mk:(fun kind name -> Variable.create name kind)
+            db code_or_name
+            (get_fields db
+               (get_all_usages ~follow_known_arity_calls:true db
+                  (Code_id_or_name.Map.singleton to_patch ())))
+            new_name
+        in
+        Code_id_or_name.Map.add to_patch fields unboxed)
   in
-  let query_to_change_representation =
-    let open Syntax in
-    query
-      (let$ [x] = ["x"] in
-       [to_change_representation x] =>? [x])
-  in
-  let query_dominated_by =
-    let open Syntax in
-    query
-      (let^ [x] = ["x"] in
-       let$ [y] = ["y"] in
-       [dominated_by_allocation_point x y] =>? [y])
-  in
-  Datalog.Cursor.iter query_to_unbox db ~f:(fun [code_or_name; to_patch] ->
-      (* CR-someday ncourant: produce ghost makeblocks/set of closures for
-         debugging *)
-      let new_name =
-        Flambda_colours.without_colours ~f:(fun () ->
-            Format.asprintf "%a_into_%a" Code_id_or_name.print code_or_name
-              Code_id_or_name.print to_patch)
-      in
-      let fields =
-        mk_unboxed_fields ~has_to_be_unboxed
-          ~mk:(fun kind name -> Variable.create name kind)
-          db code_or_name
-          (get_fields db
-             (get_all_usages ~follow_known_arity_calls:true db
-                (Code_id_or_name.Map.singleton to_patch ())))
-          new_name
-      in
-      unboxed := Code_id_or_name.Map.add to_patch fields !unboxed);
   if debug
   then
     Format.printf "TO UNBOX: %a@."
       (Code_id_or_name.Map.print
          (Field.Map.print (pp_unboxed_elt Variable.print)))
-      !unboxed;
+      unboxed;
   let changed_representation = ref Code_id_or_name.Map.empty in
   Datalog.Cursor.iter query_to_change_representation db
     ~f:(fun [code_id_or_name] ->
@@ -3383,7 +3341,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
       !changed_representation;
   let no_unbox = Sys.getenv_opt "NOUNBOX" <> None in
   { db;
-    unboxed_fields = (if no_unbox then Code_id_or_name.Map.empty else !unboxed);
+    unboxed_fields = (if no_unbox then Code_id_or_name.Map.empty else unboxed);
     changed_representation =
       (if no_unbox then Code_id_or_name.Map.empty else !changed_representation)
   }
@@ -3436,8 +3394,6 @@ let cannot_change_calling_convention uses v =
   || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
 
 let unknown_code_id_actually_directly_called_query =
-  let open Syntax in
-  let open! Global_flow_graph in
   mk_exists_query ["set_of_closures"] ["known_arity_call_witness"]
     (fun [set_of_closures] [known_arity_call_witness] ->
       [ rev_accessor_rel ~base:set_of_closures
@@ -3446,12 +3402,9 @@ let unknown_code_id_actually_directly_called_query =
         any_source_pred known_arity_call_witness ])
 
 let code_id_actually_directly_called_query =
-  let open Syntax in
-  let open! Global_flow_graph in
   query
-    (let^ [set_of_closures] = ["set_of_closures"] in
-     let$ [apply_widget; call_witness; codeid] =
-       ["apply_widget"; "call_withness"; "codeid"]
+    (let^$ [set_of_closures], [apply_widget; call_witness; codeid] =
+       ["set_of_closures"], ["apply_widget"; "call_withness"; "codeid"]
      in
      [ rev_accessor_rel ~base:set_of_closures
          !!(Field.code_of_closure Known_arity_code_pointer)

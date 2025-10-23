@@ -54,3 +54,9 @@ val code_id_of_call_witness : t
 include Datalog.Column.S with type t := t
 
 val kind : t -> Flambda_kind.t
+
+val is_value_slot : t -> bool
+
+val is_function_slot : t -> bool
+
+val must_be_function_slot : t -> Function_slot.t
