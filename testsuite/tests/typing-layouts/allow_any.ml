@@ -301,7 +301,7 @@ Error: Signature mismatch:
 |}]
 
 module A : sig
-  type t : value mod external_ global portable many uncontended unique unyielding
+  type t : value mod external_ global portable many uncontended unyielding
 end = struct
   type t = int
 end
@@ -313,7 +313,7 @@ module B = struct
   let a t = t.a
 end
 [%%expect{|
-module A : sig type t : value mod global many portable external_ unique end
+module A : sig type t : value mod global many portable external_ end
 module B :
   sig
     type t : value mod contended portable = { a : A.t; }

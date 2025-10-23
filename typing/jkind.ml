@@ -1918,6 +1918,7 @@ module Const = struct
       |> function
       | None -> None
       | Some modes ->
+        (* CR dkalinichenko: reuse logic from [Typemode]. *)
         (* Handle all the mode implications *)
         let modes =
           match List.mem "global" modes, List.mem "unyielding" modes with
@@ -1940,9 +1941,7 @@ module Const = struct
           (* Likewise for [global] and [aliased]. *)
           match List.mem "global" modes, List.mem "aliased" modes with
           | true, true -> List.filter (fun m -> m <> "aliased") modes
-          | true, false ->
-            modes @ ["unique"]
-            (* This case is not very meaningful but permitted. *)
+          | true, false -> assert false (* this case should not happen *)
           | _, _ -> modes
         in
         let modes =
@@ -2808,6 +2807,7 @@ let for_object =
            objects also cross uniqueness. *)
       ~contention:(Crossing.Per_axis.max (Crossing.Axis.Monadic Contention))
       ~visibility:(Crossing.Per_axis.max (Crossing.Axis.Monadic Visibility))
+      ~staticity:(Crossing.Per_axis.max (Crossing.Axis.Monadic Staticity))
   in
   fresh_jkind
     { layout = Sort (Base Value);

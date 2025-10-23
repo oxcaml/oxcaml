@@ -17,8 +17,8 @@ let print_annot_axis (type a) (annot_type : a annot_type) ppf (ax : a) =
 
 type forbidden_modality_kind =
   | Global_and_unique
-      (** [@@ global unique] must be forbidden, with [global] implying [aliased].
-      Otherwise, borrowing would be unsound:
+      (** [@@ global unique] must be forbidden, with [global] implying
+          [aliased]. Otherwise, borrowing would be unsound:
 
   {v
       type 'a t = { x : 'a @@ global unique }
@@ -270,6 +270,10 @@ let transl_mod_bounds annots =
       ( Transled_modifiers.get ~axis:(Modal (Monadic Uniqueness)) modifiers,
         Transled_modifiers.get ~axis:(Modal (Comonadic Areality)) modifiers )
     with
+    | ( Some
+          { txt = Modality (Join_with Uniqueness.Const.Unique); loc = uniq_loc },
+        Some { txt = Modality (Meet_with Global); _ } ) ->
+      raise (Error (uniq_loc, Forbidden_modality Global_and_unique))
     | None, Some { txt = Modality (Meet_with Global); _ } ->
       let set = Transled_modifiers.set ~axis:(Modal (Monadic Uniqueness)) in
       set modifiers
@@ -278,7 +282,6 @@ let transl_mod_bounds annots =
              loc = Location.none
            })
     | _, _ -> modifiers
-    (* [mod global unique] is not very meaningful but permitted. *)
   in
   (* Likewise, [immutable] => [contended], [read] => [shared]. *)
   let modifiers =
@@ -563,16 +566,19 @@ let idx_expected_modalities ~(mut : bool) =
    [global] must imply [aliased] for soundness of borrowing. *)
 let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
   match[@warning "-18"] ax, a with
-  | Comonadic Areality, Meet_with a -> (
-    match a with
-    | Global ->
-      [ Atom (Comonadic Forkable, Meet_with Forkable.Const.Forkable);
-        Atom (Comonadic Yielding, Meet_with Yielding.Const.Unyielding);
-        Atom (Monadic Uniqueness, Join_with Uniqueness.Const.Aliased) ]
-    | Local ->
-      [ Atom (Comonadic Forkable, Meet_with Forkable.Const.Unforkable);
-        Atom (Comonadic Yielding, Meet_with Yielding.Const.Yielding) ]
-    | Regional -> assert false)
+  | Comonadic Areality, Meet_with a ->
+    let f, y, u =
+      match a with
+      | Global ->
+        ( Forkable.Const.Forkable,
+          Yielding.Const.Unyielding,
+          [Uniqueness.Const.Aliased] )
+      | Local -> Forkable.Const.Unforkable, Yielding.Const.Yielding, []
+      | Regional -> assert false
+    in
+    [ Modality.Atom (Comonadic Forkable, Meet_with f);
+      Atom (Comonadic Yielding, Meet_with y) ]
+    @ List.map (fun x -> Modality.Atom (Monadic Uniqueness, Join_with x)) u
   | Monadic Visibility, Join_with a ->
     let b : Contention.Const.t =
       match a with
@@ -645,14 +651,14 @@ let sort_dedup_modalities ~warn l =
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map fst
 
 let enforce_forbidden_modalities m =
-  match Modality.Const.proj (Comonadic Areality) m with
-  | Meet_with Global -> (
-    match Modality.Const.proj (Monadic Uniqueness) m with
-    | Modality.Monadic.Atom.Join_with Mode.Uniqueness.Const.Unique ->
-      raise (Error (Location.none, Forbidden_modality Global_and_unique))
-    | _ -> m)
-  | Meet_with Local -> m
-  | Meet_with Regional -> assert false
+  match
+    ( Modality.Const.proj (Comonadic Areality) m,
+      Modality.Const.proj (Monadic Uniqueness) m )
+  with
+  | ( Meet_with Global,
+      Modality.Monadic.Atom.Join_with Mode.Uniqueness.Const.Unique ) ->
+    raise (Error (Location.none, Forbidden_modality Global_and_unique))
+  | _ -> m
 
 let transl_modalities ~maturity mut modalities =
   let mut_modalities =
