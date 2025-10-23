@@ -118,7 +118,7 @@ type t =
         (* Whether rewrites are allowed to make the CFG irreducible (if the CFG
            is irreducible, the information about loops cannot be trusted). *)
     mutable register_locations_are_set : bool
-        (* Whether register allocation are set the locations of the `Reg.t`
+        (* Whether register allocation has set the locations of the `Reg.t`
            values. *)
   }
 
