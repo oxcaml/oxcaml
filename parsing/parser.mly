@@ -2155,8 +2155,8 @@ signature_item:
     let docs = symbol_docs $sloc in
     let name, modalities' = name_ in
     let mty, modalities = body in
-    let modalities =
-      Modalities.merge modalities' (Option.value ~default:No_modalities modalities) in
+    let modalities = Option.value ~default:No_modalities modalities in
+    let modalities = Modalities.merge modalities' modalities in
     Md.mk name mty ~attrs ~loc ~docs ~modalities, ext
   }
 ;
@@ -2434,7 +2434,9 @@ value:
       { ($4, $3, Cfk_concrete ($1, $6)), $2 }
   | override_flag attributes mutable_flag mkrhs(label) type_constraint
     EQUAL seq_expr
-      { let e = mkexp_type_constraint_with_modes ~loc:$sloc ~modes:No_modes $7 $5 in
+      { let e =
+          mkexp_type_constraint_with_modes ~loc:$sloc ~modes:No_modes $7 $5
+        in
         ($4, $3, Cfk_concrete ($1, e)), $2
       }
 ;
@@ -2997,7 +2999,8 @@ simple_expr:
   | LPAREN MODULE ext_attributes module_expr RPAREN
       { Pexp_pack $4, $3 }
   | LPAREN MODULE ext_attributes module_expr COLON package_type RPAREN
-      { Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $4), Some $6, No_modes), $3 }
+      { let e = ghexp ~loc:$sloc (Pexp_pack $4) in
+        Pexp_constraint (e, Some $6, No_modes), $3 }
   | LPAREN MODULE ext_attributes module_expr COLON error
       { unclosed "(" $loc($1) ")" $loc($6) }
   | OBJECT ext_attributes class_structure END
@@ -3204,9 +3207,10 @@ block_access:
       { unclosed "[" $loc($3) "]" $loc($5) }
   | od=open_dot_declaration DOT LPAREN MODULE ext_attributes module_expr COLON
     package_type RPAREN
-      { let modexp =
+      { let e = ghexp ~loc:$sloc (Pexp_pack $6) in
+        let modexp =
           mkexp_attrs ~loc:($startpos($3), $endpos)
-            (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), Some $8, No_modes)) $5 in
+            (Pexp_constraint (e, Some $8, No_modes)) $5 in
         Pexp_open(od, modexp) }
   | mod_longident DOT
     LPAREN MODULE ext_attributes module_expr COLON error
