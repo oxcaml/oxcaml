@@ -143,3 +143,24 @@ let kind t =
   | Is_int | Get_tag -> Flambda_kind.naked_immediate
   | (Code_of_closure _ | Apply _ | Code_id_of_call_witness) as view ->
     Misc.fatal_errorf "[field_kind] for virtual field %a" print_view view
+
+let is_value_slot t =
+  match view t with
+  | Value_slot _ -> true
+  | Block _ | Function_slot _ | Is_int | Get_tag | Code_of_closure _ | Apply _
+  | Code_id_of_call_witness ->
+    false
+
+let is_function_slot t =
+  match view t with
+  | Function_slot _ -> true
+  | Block _ | Value_slot _ | Is_int | Get_tag | Code_of_closure _ | Apply _
+  | Code_id_of_call_witness ->
+    false
+
+let must_be_function_slot t =
+  match view t with
+  | Function_slot fs -> fs
+  | ( Block _ | Value_slot _ | Is_int | Get_tag | Code_of_closure _ | Apply _
+    | Code_id_of_call_witness ) as view ->
+    Misc.fatal_errorf "[must_be_function_slot] got %a instead" print_view view

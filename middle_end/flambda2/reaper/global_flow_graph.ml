@@ -96,42 +96,44 @@ let to_datalog graph =
   @@ Datalog.set_table code_id_my_closure_rel graph.code_id_my_closure_rel
   @@ Datalog.empty
 
-type 'a atom = [> `Atom of Datalog.atom] as 'a
+module Relations = struct
+  type 'a atom = [> `Atom of Datalog.atom] as 'a
 
-type 'a term = 'a Datalog.Term.t
+  type 'a term = 'a Datalog.Term.t
 
-(* Naming:
- * to_ = from; (alias)
- * to_ = [...] from (use)
- * to_ = base.relation (accessor)
- * base = Make_block { from_ } (constructor)
- * *)
+  (* Naming:
+   * to_ = from; (alias)
+   * to_ = [...] from (use)
+   * to_ = base.relation (accessor)
+   * base = Make_block { from_ } (constructor)
+   * *)
 
-let alias_rel ~to_ ~from = Datalog.atom alias_rel [to_; from]
+  let alias_rel ~to_ ~from = Datalog.atom alias_rel [to_; from]
 
-let use_rel ~to_ ~from = Datalog.atom use_rel [to_; from]
+  let use_rel ~to_ ~from = Datalog.atom use_rel [to_; from]
 
-let accessor_rel ~to_ relation ~base =
-  Datalog.atom accessor_rel [to_; relation; base]
+  let accessor_rel ~to_ relation ~base =
+    Datalog.atom accessor_rel [to_; relation; base]
 
-let constructor_rel ~base relation ~from =
-  Datalog.atom constructor_rel [base; relation; from]
+  let constructor_rel ~base relation ~from =
+    Datalog.atom constructor_rel [base; relation; from]
 
-let coaccessor_rel ~to_ relation ~base =
-  Datalog.atom coaccessor_rel [to_; relation; base]
+  let coaccessor_rel ~to_ relation ~base =
+    Datalog.atom coaccessor_rel [to_; relation; base]
 
-let coconstructor_rel ~base relation ~from =
-  Datalog.atom coconstructor_rel [base; relation; from]
+  let coconstructor_rel ~base relation ~from =
+    Datalog.atom coconstructor_rel [base; relation; from]
 
-let propagate_rel ~if_used ~to_ ~from =
-  Datalog.atom propagate_rel [if_used; to_; from]
+  let propagate_rel ~if_used ~to_ ~from =
+    Datalog.atom propagate_rel [if_used; to_; from]
 
-let any_usage_pred var = Datalog.atom any_usage_pred [var]
+  let any_usage_pred var = Datalog.atom any_usage_pred [var]
 
-let any_source_pred var = Datalog.atom any_source_pred [var]
+  let any_source_pred var = Datalog.atom any_source_pred [var]
 
-let code_id_my_closure_rel ~code_id ~my_closure =
-  Datalog.atom code_id_my_closure_rel [code_id; my_closure]
+  let code_id_my_closure_rel ~code_id ~my_closure =
+    Datalog.atom code_id_my_closure_rel [code_id; my_closure]
+end
 
 let create () =
   { alias_rel = NN.empty;
