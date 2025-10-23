@@ -489,6 +489,7 @@ let postlude :
     Utils.dedent ());
   update_live_fields cfg_with_layout (Cfg_with_infos.liveness cfg_with_infos);
   f ();
+  (Cfg_with_layout.cfg cfg_with_layout).register_locations_are_set <- true;
   if debug && Lazy.force invariants
   then (
     Utils.log "postcondition";

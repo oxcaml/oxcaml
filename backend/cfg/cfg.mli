@@ -114,9 +114,12 @@ type t =
     fun_ret_type : Cmm.machtype;
         (** Function return type. As in [fun_args], this value is not used when starting
             from Linear. *)
-    mutable allowed_to_be_irreducible : bool
+    mutable allowed_to_be_irreducible : bool;
         (* Whether rewrites are allowed to make the CFG irreducible (if the CFG
            is irreducible, the information about loops cannot be trusted). *)
+    mutable register_locations_are_set : bool
+        (* Whether register allocation are set the locations of the `Reg.t`
+           values. *)
   }
 
 val create :

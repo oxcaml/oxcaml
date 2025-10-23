@@ -78,89 +78,127 @@ let simplify_switch (block : C.basic_block) labels =
     block.terminator <- { block.terminator with desc }
   | _ -> ()
 
-(* Compute the destination of a terminator, knowing that [reg] is equal to
-   [const], returning [None] if the destination is not statically known. *)
-let evaluate_terminator ~(reg : Reg.t) ~(const : nativeint)
+(* CR-soon xclerc for xclerc: extend to other constants. *)
+type known_value = Const_int of nativeint
+
+(* Iterates over the passed instructions, and updates `known_values` so that it
+   contains a map from registers to known values after the instructions have
+   been executed. Currently only tracks constant values and moves between
+   registers. *)
+let collect_known_values (instrs : Cfg.basic_instruction_list) :
+    known_value Reg.UsingLocEquality.Tbl.t =
+  let known_values = Reg.UsingLocEquality.Tbl.create 17 in
+  let replace reg value =
+    if not (Reg.is_unknown reg)
+    then Reg.UsingLocEquality.Tbl.replace known_values reg value
+    else Misc.fatal_errorf "unexpected unknown location (%a)" Printreg.reg reg
+  in
+  let find_opt reg = Reg.UsingLocEquality.Tbl.find_opt known_values reg in
+  let remove reg = Reg.UsingLocEquality.Tbl.remove known_values reg in
+  Dll.iter instrs ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+      match instr.desc with
+      | Op (Const_int c) -> replace instr.res.(0) (Const_int c)
+      | Op Move -> (
+        (* CR xclerc for xclerc: double check the "magic" / conversions behind
+           moves in `Emit` will not result in invalid tracking here. *)
+        match find_opt instr.arg.(0) with
+        | Some value
+          when Cmm.equal_machtype_component instr.res.(0).typ instr.arg.(0).typ
+          ->
+          replace instr.res.(0) value
+        | Some _ | None -> remove instr.res.(0))
+      | Op
+          ( Spill | Reload | Const_float32 _ | Const_float _ | Const_symbol _
+          | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
+          | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _
+          | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+          | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
+          | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ | Tls_get )
+      | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+      | Stack_check _ ->
+        Array.iter
+          (fun reg -> Reg.UsingLocEquality.Tbl.remove known_values reg)
+          instr.res;
+        let destroyed_regs = Proc.destroyed_at_basic instr.desc in
+        Reg.UsingLocEquality.Tbl.filter_map_inplace
+          (fun reg known_value ->
+            let is_destroyed =
+              Array.exists (fun r -> Reg.same_loc r reg) destroyed_regs
+            in
+            if is_destroyed then None else Some known_value)
+          known_values);
+  known_values
+
+(* Compute the destination of a terminator, using [known_values] to determine
+   the values of some registers, returning [None] if the destination is not
+   statically known. *)
+let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     (term : Cfg.terminator Cfg.instruction) : Label.t option =
-  let same_reg ~arg_idx =
-    arg_idx >= 0
-    && arg_idx < Array.length term.arg
-    && Reg.same reg (Array.unsafe_get term.arg arg_idx)
+  let get_known_value ~(arg_idx : int) : known_value option =
+    if arg_idx >= 0 && arg_idx < Array.length term.arg
+    then
+      Reg.UsingLocEquality.Tbl.find_opt known_values
+        (Array.unsafe_get term.arg arg_idx)
+    else
+      Misc.fatal_errorf "invalid argument index (%d) for instruction %a" arg_idx
+        InstructionId.format term.id
   in
   match term.desc with
-  | Parity_test { ifso; ifnot } ->
-    if same_reg ~arg_idx:0
-    then
+  | Parity_test { ifso; ifnot } -> (
+    match get_known_value ~arg_idx:0 with
+    | None -> None
+    | Some (Const_int const) ->
       if Nativeint.equal (Nativeint.logand const 1n) 0n
       then Some ifso
-      else Some ifnot
-    else None
-  | Truth_test { ifso; ifnot } ->
-    if same_reg ~arg_idx:0
-    then if not (Nativeint.equal const 0n) then Some ifso else Some ifnot
-    else None
-  | Int_test { lt; eq; gt; is_signed; imm } -> (
-    match imm with
+      else Some ifnot)
+  | Truth_test { ifso; ifnot } -> (
+    match get_known_value ~arg_idx:0 with
     | None -> None
-    | Some const' ->
-      if same_reg ~arg_idx:0
+    | Some (Const_int const) ->
+      if not (Nativeint.equal const 0n) then Some ifso else Some ifnot)
+  | Int_test { lt; eq; gt; is_signed; imm } -> (
+    let left_arg = get_known_value ~arg_idx:0 in
+    let right_arg =
+      match imm with
+      | Some const -> Some (Const_int (Nativeint.of_int const))
+      | None -> get_known_value ~arg_idx:1
+    in
+    match left_arg, right_arg with
+    | None, None | None, Some _ | Some _, None -> None
+    | Some (Const_int left_const), Some (Const_int right_const) ->
+      let result =
+        match is_signed with
+        | Signed -> Nativeint.compare left_const right_const
+        | Unsigned -> Nativeint.unsigned_compare left_const right_const
+      in
+      if result < 0 then Some lt else if result > 0 then Some gt else Some eq)
+  | Switch labels -> (
+    match get_known_value ~arg_idx:0 with
+    | None -> None
+    | Some (Const_int const) ->
+      if Nativeint.compare const (Nativeint.of_int Int.max_int) <= 0
       then
-        let const' = Nativeint.of_int const' in
-        let result =
-          match is_signed with
-          | Signed -> Nativeint.compare const const'
-          | Unsigned -> Nativeint.unsigned_compare const const'
-        in
-        if result < 0 then Some lt else if result > 0 then Some gt else Some eq
+        let idx = Nativeint.to_int const in
+        if idx >= 0 && idx < Array.length labels
+        then Some (Array.unsafe_get labels idx)
+        else None
       else None)
-  | Switch labels ->
-    if same_reg ~arg_idx:0
-       && Nativeint.compare const (Nativeint.of_int Int.max_int) <= 0
-    then
-      let idx = Nativeint.to_int const in
-      if idx >= 0 && idx < Array.length labels
-      then Some (Array.unsafe_get labels idx)
-      else None
-    else None
   | Never -> assert false
   | Always _ | Float_test _ | Return | Raise _ | Tailcall_self _
   | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
     None
 
-let is_last_instruction_const_int (body : C.basic C.instruction Dll.t) :
-    (nativeint * Reg.t) option =
-  match Dll.last body with
-  | None -> None
-  | Some { desc = Op (Const_int const); res = [| reg |]; _ } -> Some (const, reg)
-  | Some
-      { desc =
-          ( Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
-          | Stack_check _
-          | Op
-              ( Const_int _ | Move | Spill | Reload | Opaque | Begin_region
-              | End_region | Dls_get | Tls_get | Poll | Pause | Const_float _
-              | Const_float32 _ | Const_symbol _ | Const_vec128 _
-              | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
-              | Store (_, _, _)
-              | Intop _
-              | Intop_imm (_, _)
-              | Intop_atomic _
-              | Floatop (_, _)
-              | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-              | Specific _ | Name_for_debugger _ | Alloc _ ) );
-        _
-      } ->
-    None
-
-let block_const_int (block : C.basic_block) : bool =
-  match is_last_instruction_const_int block.body with
-  | None -> false
-  | Some (const, reg) -> (
-    match evaluate_terminator ~reg ~const block.terminator with
+let block_known_values (block : C.basic_block) ~(is_after_regalloc : bool) :
+    bool =
+  if !Oxcaml_flags.cfg_value_propagation && is_after_regalloc
+  then (
+    let known_values = collect_known_values block.body in
+    match evaluate_terminator known_values block.terminator with
     | None -> false
     | Some succ ->
       block.terminator <- { block.terminator with desc = Always succ };
       true)
+  else false
 
 (* CR-someday gyorsh: merge (Lbranch | Lcondbranch | Lcondbranch3)+ into a
    single terminator when the argments are the same. Enables reordering of
@@ -175,54 +213,51 @@ let block_const_int (block : C.basic_block) : bool =
    the same layout. Also, how do we map execution counts about branches onto
    this terminator? *)
 let block (cfg : C.t) (block : C.basic_block) : bool =
+  let is_after_regalloc = cfg.register_locations_are_set in
   match block.terminator.desc with
-  | Always successor_label -> (
-    match
-      ( Label.equal block.start cfg.entry_label,
-        is_last_instruction_const_int block.body )
-    with
-    | true, None -> false
-    | false, None ->
-      (* If we jump to a block that is empty, we can copy the terminator from
-         the successor to the current block. There might be size considerations,
-         so we currently do so only for "tests" and return. The optimization is
-         disabled because of a CFG invariant expecting "the tailrec block to be
-         the entry block or the only successor of the entry block". *)
-      let successor_block = Cfg.get_block_exn cfg successor_label in
-      if Dll.is_empty successor_block.body && cfg.allowed_to_be_irreducible
-      then
-        match successor_block.terminator.desc with
-        | Parity_test _ | Truth_test _ | Int_test _ | Float_test _ | Return ->
-          block.terminator
-            <- { block.terminator with
-                 desc = successor_block.terminator.desc;
-                 arg = Array.copy successor_block.terminator.arg;
-                 res = Array.copy successor_block.terminator.res;
-                 dbg = successor_block.terminator.dbg;
-                 live = successor_block.terminator.live
-               };
-          true
-        | Never | Always _ | Switch _ | Raise _ | Tailcall_self _
-        | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
-          false
-      else false
-    | _, Some (const, reg) ->
-      (* If we have an Iconst_int instruction at the end of the block followed
-         by a jump to an empty block whose terminator is a condition over the
-         Iconst_value, then we can evaluate the condition at compile-time and
-         short-circuit the empty block. *)
-      let successor_block = C.get_block_exn cfg successor_label in
-      if Dll.is_empty successor_block.body
-      then (
-        let new_successor =
-          evaluate_terminator ~reg ~const successor_block.terminator
-        in
-        match new_successor with
-        | None -> false
-        | Some succ ->
-          block.terminator <- { block.terminator with desc = Always succ };
-          true)
-      else false)
+  | Always successor_label ->
+    (* If we have a jump to an empty block whose terminator is a condition, we
+       can try and evaluate the condition at compile-time and short-circuit the
+       empty block if we know the value(s) involved in the condition. *)
+    let successor_block = C.get_block_exn cfg successor_label in
+    if Dll.is_empty successor_block.body
+    then
+      let new_successor =
+        if is_after_regalloc
+        then
+          let known_values = collect_known_values block.body in
+          evaluate_terminator known_values successor_block.terminator
+        else None
+      in
+      match new_successor with
+      | Some succ ->
+        block.terminator <- { block.terminator with desc = Always succ };
+        true
+      | None -> (
+        if Label.equal block.start cfg.entry_label
+           || not cfg.allowed_to_be_irreducible
+        then false
+        else
+          (* If we jump to a block that is empty, we can copy the terminator
+             from the successor to the current block. There might be size
+             considerations, so we currently do so only for "tests" and return.
+             The optimization is disabled because of a CFG invariant expecting
+             "the tailrec block to be the entry block or the only successor of
+             the entry block". *)
+          match successor_block.terminator.desc with
+          | Parity_test _ | Truth_test _ | Int_test _ | Float_test _ | Return ->
+            block.terminator
+              <- { block.terminator with
+                   desc = successor_block.terminator.desc;
+                   arg = Array.copy successor_block.terminator.arg;
+                   res = Array.copy successor_block.terminator.res;
+                   dbg = successor_block.terminator.dbg
+                 };
+            true
+          | Never | Always _ | Switch _ | Raise _ | Tailcall_self _
+          | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
+            false)
+    else false
   | Never ->
     Misc.fatal_errorf "Cannot simplify terminator: Never (in block %a)"
       Label.format block.start
@@ -233,9 +268,9 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       let l = Label.Set.min_elt labels in
       block.terminator <- { block.terminator with desc = Always l };
       false)
-    else block_const_int block
+    else block_known_values block ~is_after_regalloc
   | Switch labels ->
-    let shortcircuit = block_const_int block in
+    let shortcircuit = block_known_values block ~is_after_regalloc in
     if shortcircuit
     then true
     else (

@@ -1473,7 +1473,8 @@ let prepare_fun_info t (cfg : Cfg.t) =
         fun_poll = _ (* not needed after poll insertion *);
         next_instruction_id = _;
         fun_ret_type;
-        allowed_to_be_irreducible = _
+        allowed_to_be_irreducible = _;
+        register_locations_are_set = _
       } =
     cfg
   in

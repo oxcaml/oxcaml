@@ -98,7 +98,8 @@ type t =
     fun_poll : Lambda.poll_attribute;
     next_instruction_id : InstructionId.sequence;
     fun_ret_type : Cmm.machtype;
-    mutable allowed_to_be_irreducible : bool
+    mutable allowed_to_be_irreducible : bool;
+    mutable register_locations_are_set : bool
   }
 
 let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
@@ -117,7 +118,8 @@ let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
     fun_poll;
     next_instruction_id;
     fun_ret_type;
-    allowed_to_be_irreducible
+    allowed_to_be_irreducible;
+    register_locations_are_set = false
   }
 
 let mem_block t label = Label.Tbl.mem t.blocks label
