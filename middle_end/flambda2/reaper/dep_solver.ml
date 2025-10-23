@@ -13,6 +13,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* Disable [not-principal] warning in this file. We often write code that looks
+   like [let@ [x; y] = a in b] where the list constructor is an [hlist], and [a]
+   is used to determine the type of that [hlist]. Unfortunately, due to how
+   [let@] is expansed, this is not principal. *)
+[@@@ocaml.warning "-not-principal"]
+
 open Global_flow_graph.Relations
 
 let reaperdbg_env = Sys.getenv_opt "REAPERDBG"
@@ -936,11 +942,6 @@ module Fixit : sig
 
   val ( let+ ) : ('a, 'b, 'c) stmt -> ('a -> 'd) -> ('d, 'b, 'c) stmt
 
-  val ( let++ ) :
-    ('a Datalog.Constant.hlist, 'b, 'c) stmt ->
-    ('a Datalog.Constant.hlist -> 'd) ->
-    ('d, 'b, 'c) stmt
-
   val ( and+ ) :
     ('a, 'b, 'b) stmt -> ('c, 'b, 'b) stmt -> ('a * 'c, 'b, 'b) stmt
 
@@ -1018,9 +1019,6 @@ module Fixit : sig
     (('t, 'k, unit) Datalog.table ->
     (Datalog.nil, Datalog.rule) Datalog.program list) ->
     ('t, 'c, 'c) stmt
-
-  val ( let@@ ) :
-    ((('a, 'b) Table.hlist -> 'c) -> 'd) -> (('a, 'b) Table.hlist -> 'c) -> 'd
 
   val ( let@ ) : ('a -> 'b) -> 'a -> 'b
 end = struct
@@ -1132,8 +1130,6 @@ end = struct
 
   let ( let+ ) stmt f = Map (stmt, fun _ value -> f value)
 
-  let ( let++ ) = ( let+ )
-
   let ( and+ ) stmt1 stmt2 = Conj (stmt1, stmt2)
 
   let param0 g f =
@@ -1209,8 +1205,6 @@ end = struct
     Now
       ( Map (Run schedule, fun db () -> Datalog.get_table y db),
         fun db -> Datalog.set_table y (Datalog.get_table x db) db )
-
-  let ( let@@ ) (f : ((_, _) Table.hlist -> _) -> _) x = f x
 
   let ( let@ ) f x = f x
 end
@@ -1348,8 +1342,8 @@ let get_one_field : Datalog.database -> Field.t -> usages -> field_usage =
        paramc "in_field" Cols.[f] (fun field -> Field.Map.singleton field ())
      in
      let@ in_ = paramc "in_" Cols.[n] (fun (Usages s) -> s) in
-     let++ [used_as_top; used_as_vars] =
-       let@@ [used_as_top; used_as_vars] =
+     let+ [used_as_top; used_as_vars] =
+       let@ [used_as_top; used_as_vars] =
          seq' [empty One.cols; empty Cols.[n]]
        in
        [ (let$ [x; field] = ["x"; "field"] in
@@ -1370,8 +1364,8 @@ let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
   let open! Fixit in
   run
     (let@ in_ = paramc "in_" Cols.[n] (fun (Usages s) -> s) in
-     let++ [out1; out2] =
-       let@@ [out1; out2] = seq' [empty Cols.[f]; empty Cols.[f; n]] in
+     let+ [out1; out2] =
+       let@ [out1; out2] = seq' [empty Cols.[f]; empty Cols.[f; n]] in
        [ (let$ [x; field] = ["x"; "field"] in
           [ in_ % [x];
             field_usages_top_rel x field;
@@ -1408,8 +1402,8 @@ let get_fields_usage_of_constructors :
   let open! Fixit in
   run
     (let@ in_ = param "in_" Cols.[n] in
-     let++ [out1; out2] =
-       let@@ [out1; out2] = seq' [empty Cols.[f]; empty Cols.[f; n]] in
+     let+ [out1; out2] =
+       let@ [out1; out2] = seq' [empty Cols.[f]; empty Cols.[f; n]] in
        [ (let$ [x; field] = ["x"; "field"] in
           [ in_ % [x];
             field_of_constructor_is_used_top x field;
@@ -2309,7 +2303,7 @@ module Rewriter = struct
       in
       let+ ([out1; out2; known_arity; unknown_arity; any] :
              _ Datalog.Constant.hlist) =
-        let@@ [out1; out2; known_arity; unknown_arity; any] =
+        let@ [out1; out2; known_arity; unknown_arity; any] =
           fix'
             [ empty Cols.[n];
               empty Cols.[f; n];
