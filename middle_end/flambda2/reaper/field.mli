@@ -60,3 +60,5 @@ val is_value_slot : t -> bool
 val is_function_slot : t -> bool
 
 val must_be_function_slot : t -> Function_slot.t
+
+val is_local : t -> bool
