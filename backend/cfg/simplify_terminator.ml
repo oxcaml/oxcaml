@@ -177,9 +177,36 @@ let block_const_int (block : C.basic_block) : bool =
 let block (cfg : C.t) (block : C.basic_block) : bool =
   match block.terminator.desc with
   | Always successor_label -> (
-    match is_last_instruction_const_int block.body with
-    | None -> false
-    | Some (const, reg) ->
+    match
+      ( Label.equal block.start cfg.entry_label,
+        is_last_instruction_const_int block.body )
+    with
+    | true, None -> false
+    | false, None ->
+      (* If we jump to a block that is empty, we can copy the terminator from
+         the successor to the current block. There might be size considerations,
+         so we currently do so only for "tests" and return. The optimization is
+         disabled because of a CFG invariant expecting "the tailrec block to be
+         the entry block or the only successor of the entry block". *)
+      let successor_block = Cfg.get_block_exn cfg successor_label in
+      if Dll.is_empty successor_block.body && cfg.allowed_to_be_irreducible
+      then
+        match successor_block.terminator.desc with
+        | Parity_test _ | Truth_test _ | Int_test _ | Float_test _ | Return ->
+          block.terminator
+            <- { block.terminator with
+                 desc = successor_block.terminator.desc;
+                 arg = Array.copy successor_block.terminator.arg;
+                 res = Array.copy successor_block.terminator.res;
+                 dbg = successor_block.terminator.dbg;
+                 live = successor_block.terminator.live
+               };
+          true
+        | Never | Always _ | Switch _ | Raise _ | Tailcall_self _
+        | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
+          false
+      else false
+    | _, Some (const, reg) ->
       (* If we have an Iconst_int instruction at the end of the block followed
          by a jump to an empty block whose terminator is a condition over the
          Iconst_value, then we can evaluate the condition at compile-time and

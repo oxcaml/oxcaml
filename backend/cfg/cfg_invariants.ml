@@ -310,10 +310,13 @@ let check_block t label (block : Cfg.basic_block) =
   ()
 
 let check_reducibility t cfg_with_layout =
-  let cfg_with_infos = Cfg_with_infos.make cfg_with_layout in
-  match Cfg_reducibility.is_cfg_with_infos_reducible cfg_with_infos with
+  match t.cfg.allowed_to_be_irreducible with
   | true -> ()
-  | false -> report t "CFG is not reducible"
+  | false -> (
+    let cfg_with_infos = Cfg_with_infos.make cfg_with_layout in
+    match Cfg_reducibility.is_cfg_with_infos_reducible cfg_with_infos with
+    | true -> ()
+    | false -> report t "CFG is not reducible")
 
 let run ppf cfg_with_layout =
   let cfg = CL.cfg cfg_with_layout in
