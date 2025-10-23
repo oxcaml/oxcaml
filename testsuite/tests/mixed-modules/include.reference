@@ -19,9 +19,9 @@ Expected: 20.0 overridden 100 9 override
 Actual:   20.0 overridden 100 9 override
 
 Test: include shadowing a val
-Expected: 5.0 from include 7.0 11 from_include
-Actual:   5.0 from include 7.0 11 from_include
+Expected: 5.0 from_include 7.0 11 from_include
+Actual:   5.0 from_include 7.0 11 from_include
 
 Test: val shadowing an include
-Expected: 9.0 from include after include 13 shadowed
-Actual:   9.0 from include after include 13 shadowed
+Expected: 9.0 from_include after_include 13 shadowed
+Actual:   9.0 from_include after_include 13 shadowed

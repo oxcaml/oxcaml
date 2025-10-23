@@ -24,38 +24,36 @@ module M = struct
   let product = #(#1.0, void (), #100L, "test")
 end
 
-module M_1 = struct
-  let pre_val = "before"
-  let pre_unboxed = #99L
-  let pre_product = #(void (), #2.5, "pre")
+let () =
+  let pre_val = "before" in
+  let pre_unboxed = #99L in
+  let pre_product = #(void (), #2.5, "pre") in
 
-  open M
+  let open M in
 
-  let post_val = "after"
-  let post_unboxed = #3.14
-  let post_product = #(#7L, void (), "post")
+  let post_val = "after" in
+  let post_unboxed = #3.14 in
+  let post_product = #(#7L, void (), "post") in
 
-  let () =
-    let #(a, _v1, b, c) = id product in
-    let #(_v2, d, e) = id pre_product in
-    let #(f, _v3, g) = id post_product in
-    print_endline "Expected: before 99 2.5 pre 42.0 hello 1.0 100 test after 3.14 7 post";
-    Printf.printf "Actual:   %s %d %.1f %s %.1f %s %.1f %d %s %s %.2f %d %s\n\n"
-      (id pre_val)
-      (Int64_u.to_int (id pre_unboxed))
-      (Float_u.to_float d)
-      e
-      (Float_u.to_float (id foo))
-      (id bar)
-      (Float_u.to_float a)
-      (Int64_u.to_int b)
-      c
-      (id post_val)
-      (Float_u.to_float (id post_unboxed))
-      (Int64_u.to_int f)
-      g
-  ;;
-end
+  let #(a, _v1, b, c) = id product in
+  let #(_v2, d, e) = id pre_product in
+  let #(f, _v3, g) = id post_product in
+  print_endline "Expected: before 99 2.5 pre 42.0 hello 1.0 100 test after 3.14 7 post";
+  Printf.printf "Actual:   %s %d %.1f %s %.1f %s %.1f %d %s %s %.2f %d %s\n\n"
+    (id pre_val)
+    (Int64_u.to_int (id pre_unboxed))
+    (Float_u.to_float d)
+    e
+    (Float_u.to_float (id foo))
+    (id bar)
+    (Float_u.to_float a)
+    (Int64_u.to_int b)
+    c
+    (id post_val)
+    (Float_u.to_float (id post_unboxed))
+    (Int64_u.to_int f)
+    g
+
 
 let _ = print_endline "Test: [let open] with inline struct"
 
@@ -63,10 +61,10 @@ let () =
   let open struct
     let foo = #42.0
     let bar = "hello"
-    let product = #(void (), #2L, "inline", #3.0)
+    let product = #(void (), #2L, "abc", #3.0)
   end in
   let #(_v, a, b, c) = id product in
-  print_endline "Expected: 42.0 hello 2 inline 3.0";
+  print_endline "Expected: 42.0 hello 2 abc 3.0";
   Printf.printf
     "Actual:   %.1f %s %d %s %.1f\n\n"
     (Float_u.to_float (id foo))
@@ -102,18 +100,35 @@ let () =
 let _ = print_endline "Test: Tests 1-3 with [open] instead of [let open]"
 
 module M_4_1 = struct
+  let pre_val = "before"
+  let pre_unboxed = #99L
+  let pre_product = #(void (), #2.5, "pre")
+
   open M
 
+  let post_val = "after"
+  let post_unboxed = #3.14
+  let post_product = #(#7L, void (), "post")
+
   let () =
-    let #(a, _v, b, c) = id product in
-    print_endline "Expected: 42.0 hello 1.0 100 test";
-    Printf.printf
-      "Actual:   %.1f %s %.1f %d %s\n\n"
+    let #(a, _v1, b, c) = id product in
+    let #(_v2, d, e) = id pre_product in
+    let #(f, _v3, g) = id post_product in
+    print_endline "Expected: before 99 2.5 pre 42.0 hello 1.0 100 test after 3.14 7 post";
+    Printf.printf "Actual:   %s %d %.1f %s %.1f %s %.1f %d %s %s %.2f %d %s\n"
+      (id pre_val)
+      (Int64_u.to_int (id pre_unboxed))
+      (Float_u.to_float d)
+      e
       (Float_u.to_float (id foo))
       (id bar)
       (Float_u.to_float a)
       (Int64_u.to_int b)
       c
+      (id post_val)
+      (Float_u.to_float (id post_unboxed))
+      (Int64_u.to_int f)
+      g
   ;;
 end
 
@@ -121,14 +136,14 @@ module M_4_2 = struct
   open struct
     let foo = #42.0
     let bar = "hello"
-    let product = #(#6L, void (), "open", #7.0)
+    let product = #(#2L, void (), "abc", #3.0)
   end
 
   let () =
     let #(a, _v, b, c) = id product in
-    print_endline "Expected: 42.0 hello 6 open 7.0";
+    print_endline "Expected: 42.0 hello 2 abc 3.0";
     Printf.printf
-      "Actual:   %.1f %s %d %s %.1f\n\n"
+      "Actual:   %.1f %s %d %s %.1f\n"
       (Float_u.to_float (id foo))
       (id bar)
       (Int64_u.to_int a)
@@ -190,18 +205,18 @@ let _ = print_endline "Test: open shadowing a val"
 
 module M_6 = struct
   let a = #5.0
-  let b = "before open"
+  let b = "before_open"
   let product_1 = #(void (), #10L, "before")
 
   open struct
-    let b = "from open"
+    let b = "from_open"
     let c = #7.0
     let product_1 = #(#11L, void (), "from_open")
   end
 
   let () =
     let #(d, _v, e) = id product_1 in
-    print_endline "Expected: 5.0 from open 7.0 11 from_open";
+    print_endline "Expected: 5.0 from_open 7.0 11 from_open";
     Printf.printf
       "Actual:   %.1f %s %.1f %d %s\n\n"
       (Float_u.to_float (id a))
@@ -218,17 +233,17 @@ let _ = print_endline "Test: val shadowing an open"
 module M_7 = struct
   open struct
     let p = #8.0
-    let q = "from open"
+    let q = "from_open"
     let product = #(#12L, "from_open", void ())
   end
 
   let p = #9.0
-  let r = "after open"
+  let r = "after_open"
   let product = #(void (), #13L, "shadowed")
 
   let () =
     let #(_v, a, b) = id product in
-    print_endline "Expected: 9.0 from open after open 13 shadowed";
+    print_endline "Expected: 9.0 from_open after_open 13 shadowed";
     Printf.printf
       "Actual:   %.1f %s %s %d %s\n\n"
       (Float_u.to_float (id p))

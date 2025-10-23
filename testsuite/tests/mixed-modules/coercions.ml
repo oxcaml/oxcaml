@@ -147,49 +147,25 @@ let () =
 let () = print_endline "Test: coercing modules with mixed products"
 
 module With_products = struct
-  let simple = #(#1.0, "one")
-  let nested = #(#2L, #("two", #3.0))
-  let x = 100
-  let another_unboxed = #4l
-end
-
-module Coerced_products : sig
-  val simple : #(float# * string)
-  val x : int
-end = With_products
-
-let () =
-  let #(f, s) = id Coerced_products.simple in
-  print_endline "Expected: 1.0 one 100";
-  Printf.printf
-    "Actual:   %.1f %s %d\n\n"
-    (Float_u.to_float f)
-    s
-    (id Coerced_products.x)
-
-
-let () = print_endline "Test: coercing modules with nested mixed products"
-
-module Complex_products = struct
-  let level1 = #(#10.0, #("a", #20L))
-  let level2 = #(#(#30L, "b"), #40.0)
+  let prod1 = #(#10.0, #("a", void (), #20L))
+  let prod2 = #(#(#30L, "b"), #40.0)
   let boxed = "boxed"
 end
 
-module Coerced_complex : sig
-  val level1 : #(float# * #(string * int64#))
+module Coerced_products : sig
+  val prod1 : #(float# * #(string * void * int64#))
   val boxed : string
-end = Complex_products
+end = With_products
 
 let () =
-  let #(f, #(s, i)) = id Coerced_complex.level1 in
+  let #(f, #(s, _v, i)) = id Coerced_products.prod1 in
   print_endline "Expected: 10.0 a 20 boxed";
   Printf.printf
     "Actual:   %.1f %s %d %s\n\n"
     (Float_u.to_float f)
     s
     (Int64_u.to_int i)
-    (id Coerced_complex.boxed)
+    (id Coerced_products.boxed)
 
 
 let () = print_endline "Test: coercing modules with void"
@@ -198,6 +174,7 @@ module With_void = struct
   let void_val = void ()
   let float_val = #5.0
   let string_val = "hello"
+  let void_val_2 = void ()
   let another_float = #10.0
 end
 

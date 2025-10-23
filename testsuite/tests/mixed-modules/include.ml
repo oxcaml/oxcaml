@@ -186,18 +186,18 @@ let () = print_endline "Test: include shadowing a val"
 
 module M6 = struct
   let a = #5.0
-  let b = "before include"
+  let b = "before_include"
   let product_1 = #(void (), #10L, "before")
 
   include struct
-    let b = "from include"
+    let b = "from_include"
     let c = #7.0
     let product_1 = #(#11L, void (), "from_include")
   end
 
   let () =
     let #(d, _v, e) = id product_1 in
-    print_endline "Expected: 5.0 from include 7.0 11 from_include";
+    print_endline "Expected: 5.0 from_include 7.0 11 from_include";
     Printf.printf
       "Actual:   %.1f %s %.1f %d %s\n\n"
       (Float_u.to_float (id a))
@@ -214,17 +214,17 @@ let () = print_endline "Test: val shadowing an include"
 module M7 = struct
   include struct
     let p = #0L
-    let q = "from include"
+    let q = "from_include"
     let product = #(#12L, "from_include", void ())
   end
 
   let p = #9.0
-  let r = "after include"
+  let r = "after_include"
   let product = #(void (), #13L, "shadowed")
 
   let () =
     let #(_v, a, b) = id product in
-    print_endline "Expected: 9.0 from include after include 13 shadowed";
+    print_endline "Expected: 9.0 from_include after_include 13 shadowed";
     Printf.printf
       "Actual:   %.1f %s %s %d %s\n"
       (Float_u.to_float (id p))

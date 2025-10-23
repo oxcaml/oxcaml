@@ -38,12 +38,13 @@ let () =
 
 
 let () = print_endline "Test: shadowing within a module"
+let () = print_endline "Expected: 10.0 20.0 30.0"
 
 module Shadow = struct
   let foo = "a"
   let x = #10.0
 
-  let i_1 = Printf.printf "%.1f " (Float_u.to_float (id x)); 1
+  let i_1 = Printf.printf "Actual:   %.1f " (Float_u.to_float (id x)); 1
 
   let x = #20.0
   let baz = "y"
@@ -114,8 +115,9 @@ let () =
   in
   let m = id Complicated_unboxed_products.qux in
   let n = id Complicated_unboxed_products.zil in
+  print_endline "Expected: 0 1 2 3 4 5 6 7 8 9 10 11 12 13";
   Printf.printf
-    "%s %d %s %.0f %s %.0f %d %.0f %.0f %s %s %s %s %d\n"
+    "Actual:   %s %d %s %.0f %s %.0f %d %.0f %.0f %s %s %s %s %d\n"
     a
     (Int32_u.to_int b)
     c
