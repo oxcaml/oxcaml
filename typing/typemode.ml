@@ -361,7 +361,8 @@ let transl_mode_annots (modes : Parsetree.modes) : Alloc.Const.Option.t =
   in
   List.fold_left step Alloc.Const.Option.none annots |> default_mode_annots
 
-let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) : Parsetree.modes =
+let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) :
+    Parsetree.core_modes =
   let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
   (* Untranslate [areality], [forkable], and [yielding]. *)
   let areality = print_to_string_opt Mode.Locality.Const.print modes.areality in
@@ -412,21 +413,18 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) : Parsetree.modes =
   let linearity =
     print_to_string_opt Mode.Linearity.Const.print modes.linearity
   in
-  let modes =
-    List.filter_map
-      (fun x ->
-        Option.map (fun s -> { txt = Parsetree.Mode s; loc = Location.none }) x)
-      [ areality;
-        uniqueness;
-        linearity;
-        portability;
-        contention;
-        forkable;
-        yielding;
-        statefulness;
-        visibility ]
-  in
-  Ast_helper.Modes.of_core_modes modes
+  List.filter_map
+    (fun x ->
+      Option.map (fun s -> { txt = Parsetree.Mode s; loc = Location.none }) x)
+    [ areality;
+      uniqueness;
+      linearity;
+      portability;
+      contention;
+      forkable;
+      yielding;
+      statefulness;
+      visibility ]
 
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
   Language_extension.assert_enabled ~loc Mode maturity;
@@ -637,15 +635,12 @@ let let_mutable_modalities =
 let atomic_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:false
 
-let untransl_modalities mut t : Parsetree.modalities =
-  let core_modalities =
-    t
-    |> least_modalities_implying mut
-    |> List.map (fun x -> x, Location.none)
-    |> sort_dedup_modalities ~warn:false
-    |> List.map untransl_modality
-  in
-  Ast_helper.Modalities.of_core_modalities core_modalities
+let untransl_modalities mut t : Parsetree.core_modalities =
+  t
+  |> least_modalities_implying mut
+  |> List.map (fun x -> x, Location.none)
+  |> sort_dedup_modalities ~warn:false
+  |> List.map untransl_modality
 
 let transl_alloc_mode modes =
   let opt = transl_mode_annots modes in

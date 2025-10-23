@@ -259,8 +259,9 @@ let type_kind sub tk = match tk with
 
 let constructor_argument sub {ca_loc; ca_type; ca_modalities} =
   let loc = sub.location sub ca_loc in
-  let modalities = Typemode.untransl_modalities Immutable ca_modalities in
-  { pca_loc = loc; pca_type = sub.typ sub ca_type; pca_modalities = modalities }
+  let core_modalities = Typemode.untransl_modalities Immutable ca_modalities in
+  let pca_modalities = Modalities.of_core_modalities core_modalities in
+  { pca_loc = loc; pca_type = sub.typ sub ca_type; pca_modalities }
 
 let constructor_arguments sub = function
    | Cstr_tuple l -> Pcstr_tuple (List.map (constructor_argument sub) l)
@@ -291,6 +292,7 @@ let label_declaration sub ld =
   let modalities =
     Typemode.untransl_modalities ld.ld_mutable ld.ld_modalities
   in
+  let modalities = Modalities.of_core_modalities modalities in
   Type.field ~loc ~attrs ~mut ~modalities
     (map_loc sub ld.ld_name)
     (sub.typ sub ld.ld_type)
@@ -427,7 +429,10 @@ let exp_extra sub (extra, loc, attrs) sexp =
         Pexp_newtype (label_loc, jkind, sexp)
     | Texp_stack -> Pexp_stack sexp
     | Texp_mode modes ->
-        Pexp_constraint (sexp, None, Typemode.untransl_mode_annots modes)
+        let modes =
+          Modes.of_core_modes (Typemode.untransl_mode_annots modes)
+        in
+        Pexp_constraint (sexp, None, modes)
   in
   Exp.mk ~loc ~attrs desc
 
@@ -791,7 +796,8 @@ let module_type_declaration sub mtd =
 
 let signature sub {sig_items; sig_modalities; sig_sloc} =
   let psg_items = List.map (sub.signature_item sub) sig_items in
-  let psg_modalities = Typemode.untransl_modalities Immutable sig_modalities in
+  let core_modalities = Typemode.untransl_modalities Immutable sig_modalities in
+  let psg_modalities = Modalities.of_core_modalities core_modalities in
   let psg_loc = sub.location sub sig_sloc in
   {psg_items; psg_modalities; psg_loc}
 
@@ -822,7 +828,8 @@ let signature_item sub item =
     | Tsig_open od ->
         Psig_open (sub.open_description sub od)
     | Tsig_include (incl, moda) ->
-        let pmoda = Typemode.untransl_modalities Immutable moda in
+        let modalities = Typemode.untransl_modalities Immutable moda in
+        let pmoda = Modalities.of_core_modalities modalities in
         Psig_include (sub.include_description sub incl, pmoda)
     | Tsig_class list ->
         Psig_class (List.map (sub.class_description sub) list)
