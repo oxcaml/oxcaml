@@ -411,6 +411,15 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue_validate"
        Cfg_prologue.validate
+  ++ (fun (cfg_with_infos : Cfg_with_infos.t) ->
+       (* After this point, we no longer rely on loop infos if stack checks are
+          disabled. We can thus perform rewrites that will make the CFG
+          irreducible. *)
+       if not !Oxcaml_flags.cfg_stack_checks
+       then (
+         Cfg_with_infos.invalidate_loop_infos cfg_with_infos;
+         (Cfg_with_infos.cfg cfg_with_infos).allowed_to_be_irreducible <- true);
+       cfg_with_infos)
   ++ Cfg_with_infos.cfg_with_layout
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_prologue"
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
@@ -426,7 +435,12 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ (fun (cfg_with_layout : Cfg_with_layout.t) ->
        match !Oxcaml_flags.cfg_stack_checks with
        | false -> cfg_with_layout
-       | true -> Cfg_stack_checks.cfg cfg_with_layout)
+       | true ->
+         let cfg_with_layout = Cfg_stack_checks.cfg cfg_with_layout in
+         (* After this point, we no longer rely on loop infos. *)
+         (Cfg_with_layout.cfg cfg_with_layout).allowed_to_be_irreducible <- true;
+         cfg_with_layout_profile ~accumulate:true "cfg_simplify"
+           Regalloc_utils.simplify_cfg cfg_with_layout)
   ++ cfg_with_layout_profile ~accumulate:true "save_cfg" save_cfg
   ++ cfg_with_layout_profile ~accumulate:true "cfg_reorder_blocks"
        (reorder_blocks_random ppf_dump)
