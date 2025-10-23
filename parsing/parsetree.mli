@@ -152,8 +152,8 @@ and core_type_desc =
             - [?l:(T1 @ M1) -> (T2 @ M2)] when [lbl] is
                                      {{!arg_label.Optional}[Optional]}.
          *)
-        (* CR modes: crossings should be supported on arrow types, and this documentation
-           should be updated once that is the case *)
+        (* CR modes: crossings should be supported on arrow types, and this
+           documentation should be updated once that is the case *)
   | Ptyp_tuple of (string option * core_type) list
       (** [Ptyp_tuple(tl)] represents a product type:
           - [T1 * ... * Tn]       when [tl] is [(None,T1);...;(None,Tn)]
@@ -669,8 +669,8 @@ and function_constraint =
        [let f x : (int -> int) @ local = ...].
        This field constrains the mode of function's body.
     *)
-    (* CR modes: this documentation should be updated once crossings on arrow types
-       are supported *)
+    (* CR modes: this documentation should be updated once crossings on arrow
+       types are supported *)
     ret_type_constraint : type_constraint option;
     (** The type constraint placed on a function's body. *)
   }
@@ -1117,7 +1117,7 @@ and module_type_desc =
   | Pmty_ident of Longident.t loc  (** [Pmty_ident(S)] represents [S] *)
   | Pmty_signature of signature  (** [sig ... end] *)
   | Pmty_functor of functor_parameter * module_type * modes
-      (** [functor(X : MT1 @ modes mod crossings) -> MT2 @ modes mod crossings] *)
+      (** [functor(X : MT1 @ modes) -> MT2 @ modes] *)
   | Pmty_with of module_type * with_constraint list  (** [MT with ...] *)
   | Pmty_typeof of module_expr  (** [module type of ME] *)
   | Pmty_extension of extension  (** [[%id]] *)
@@ -1129,8 +1129,8 @@ and functor_parameter =
   | Unit  (** [()] *)
   | Named of string option loc * module_type * modes
       (** [Named(name, MT)] represents:
-            - [(X : MT @ modes mod crossings)] when [name] is [Some X],
-            - [(_ : MT @ modes mod crossings)] when [name] is [None] *)
+            - [(X : MT @ modes)] when [name] is [Some X],
+            - [(_ : MT @ modes)] when [name] is [None] *)
 
 and signature =
   {
@@ -1281,8 +1281,8 @@ and module_expr_desc =
   | Pmod_apply of module_expr * module_expr  (** [ME1(ME2)] *)
   | Pmod_apply_unit of module_expr (** [ME1()] *)
   | Pmod_constraint of module_expr * module_type option * modes
-      (** - [(ME : MT @ modes mod crossings)]
-          - [(ME @ modes mod crossings)]
+      (** - [(ME : MT @ modes)]
+          - [(ME @ modes)]
           - [(ME : MT)]
           as well as other cases where only one of modes and crossings appears
       *)

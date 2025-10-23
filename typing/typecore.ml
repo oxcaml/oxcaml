@@ -7960,7 +7960,8 @@ and type_function
               match pat.ppat_desc with
               | Ppat_constraint (_, Some sty, _) ->
                   let gloc = { default.pexp_loc with loc_ghost = true } in
-                  Ast_helper.(Exp.constraint_ default (Some sty) ~loc:gloc No_modes)
+                  Ast_helper.(
+                    Exp.constraint_ default (Some sty) ~loc:gloc No_modes)
               | _ -> default
             in
             (* Defaults are always global. They can be moved out of the
@@ -8111,13 +8112,15 @@ and type_function
         | Modes {crossings = _ :: _; _} ->
             Misc.fatal_error "crossings on arrows not yet implemented"
         | No_modes ->
-            (* if the return mode annotation is absent we do not constrain the body mode,
-              and we use the mode of the whole function to interpret the return type *)
+            (* if the return mode annotation is absent we do not constrain the
+               body mode, and we use the mode of the whole function to interpret
+               the return type *)
             (* CR zqian: We should infer from [mode], instead of using directly. *)
             mode
         | Modes {crossings = []; _} ->
-            (* otherwise, if the return mode annotation is present, we use that
-               to interpret the return type annotation (currying mode behavior) *)
+            (* otherwise, if the return mode annotation is present, we use
+               that to interpret the return type annotation (currying mode
+               behavior) *)
             ret_mode
       in
       match body with
