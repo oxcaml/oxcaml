@@ -160,7 +160,8 @@ let f_boxed_record (local_ left) (local_ right) =
 Line 4, characters 2-7:
 4 |   left'
       ^^^^^
-Error: This value is "local" because it is in an allocation containing values
+Error: This value is "local"
+       because it is from an allocation containing a value
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.

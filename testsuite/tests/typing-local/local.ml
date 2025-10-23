@@ -379,7 +379,7 @@ Line 1, characters 47-48:
 1 | let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
                                                    ^
 Error: This value is "local" to the parent region but is expected to be "global"
-       because it is an allocation
+       because it is from an allocation
        which is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
@@ -995,7 +995,7 @@ Line 2, characters 41-42:
                                              ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
        because it is used inside a function which is expected to be "global"
-       because it is an allocation
+       because it is from an allocation
        which is expected to be "local" to the parent region or "global"
        because it is an argument in a tail call.
 |}]
@@ -1635,7 +1635,8 @@ let foo (local_ x) y =
 Line 4, characters 29-30:
 4 |   | Some _, Some b -> escape b
                                  ^
-Error: This value is "local" because it is in an allocation containing values
+Error: This value is "local"
+       because it is from an allocation containing a value
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
@@ -1650,7 +1651,8 @@ let foo (local_ x) y =
 Line 5, characters 11-12:
 5 |     escape b
                ^
-Error: This value is "local" because it is in an allocation containing values
+Error: This value is "local"
+       because it is from an allocation containing a value
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
@@ -1699,7 +1701,8 @@ let foo p (local_ x) y z =
 Line 6, characters 9-10:
 6 |   escape b;;
              ^
-Error: This value is "local" because it is in an allocation containing values
+Error: This value is "local"
+       because it is from an allocation containing a value
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
@@ -2469,7 +2472,7 @@ Line 2, characters 8-9:
 2 |   GFoo (s, "bar")
             ^
 Error: This value is "local" to the parent region but is expected to be "global"
-       because it is an allocation
+       because it is from an allocation
        which is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.

@@ -14,7 +14,8 @@ let string_escape_l (local_ y) = let Pair (x, _) = Pair (y, "hello") in x
 Line 1, characters 72-73:
 1 | let string_escape_l (local_ y) = let Pair (x, _) = Pair (y, "hello") in x
                                                                             ^
-Error: This value is "local" because it is in an allocation containing values
+Error: This value is "local"
+       because it is from an allocation containing a value
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
@@ -27,7 +28,8 @@ let string_escape_r (local_ y) = let Pair (x, _) = Pair ("hello", y) in x
 Line 1, characters 72-73:
 1 | let string_escape_r (local_ y) = let Pair (x, _) = Pair ("hello", y) in x
                                                                             ^
-Error: This value is "local" because it is in an allocation containing values
+Error: This value is "local"
+       because it is from an allocation containing a value
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
@@ -42,7 +44,8 @@ val int_escape_l : local_ int -> int = <fun>
 Line 1, characters 63-64:
 1 | let int_escape_l (local_ y) = let Pair (x, _) = Pair (y, 5) in x
                                                                    ^
-Error: This value is "local" because it is in an allocation containing values
+Error: This value is "local"
+       because it is from an allocation containing a value
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
@@ -57,7 +60,8 @@ val int_escape_r : local_ int -> int = <fun>
 Line 1, characters 63-64:
 1 | let int_escape_r (local_ y) = let Pair (x, _) = Pair (5, y) in x
                                                                    ^
-Error: This value is "local" because it is in an allocation containing values
+Error: This value is "local"
+       because it is from an allocation containing a value
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.

@@ -2081,8 +2081,10 @@ module Report = struct
         ( dprintf "has a partial application capturing a value",
           (Location.none, Expression) )
     | Crossing -> Some (dprintf "crosses with something", pp)
-    | Allocation_r -> Some (dprintf "is an allocation", pp)
-    | Allocation_l -> Some (dprintf "is in an allocation containing values", pp)
+    (* CR-soon zqian: the "from" and "containing" below should be explicit and clear morph hints. *)
+    | Allocation_r -> Some (dprintf "is from an allocation", pp)
+    | Allocation_l ->
+      Some (dprintf "is from an allocation containing a value", pp)
 
   let print_mode :
       type a. [`Actual | `Expected] -> a C.obj -> formatter -> a -> unit =
