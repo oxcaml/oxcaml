@@ -573,6 +573,8 @@ L158:
   store ptr addrspace(1) %40, ptr %12
   %41 = load ptr addrspace(1), ptr %16
   store ptr addrspace(1) %41, ptr %13
+  br label %L162
+L162:
   %42 = load i64, ptr %13
   %43 = trunc i64 %42 to i1
   br i1 %43, label %L164, label %L166
@@ -612,9 +614,7 @@ L166:
   store ptr addrspace(1) %65, ptr %12
   %66 = load ptr addrspace(1), ptr %23
   store ptr addrspace(1) %66, ptr %13
-  %67 = load i64, ptr %13
-  %68 = trunc i64 %67 to i1
-  br i1 %68, label %L164, label %L166
+  br label %L162
 }
 
 define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlAlloc__make_ref_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
