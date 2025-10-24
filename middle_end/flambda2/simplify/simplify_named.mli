@@ -16,13 +16,10 @@
 
 (** Simplification of the right-hand sides of [Let] bindings. *)
 
-type t = private
-  | Simplified of Simplify_named_result.t Or_invalid.t * Removed_operations.t
-  | Rewritten of (Flambda.Expr.t -> Flambda.Expr.t)
-
 val simplify_named :
   Downwards_acc.t ->
   Bound_pattern.t ->
   Flambda.Named.t ->
   simplify_function_body:Simplify_common.simplify_function_body ->
-  t
+  (Simplify_named_result.t Or_invalid.t * Removed_operations.t)
+  Simplified_named.or_rewritten

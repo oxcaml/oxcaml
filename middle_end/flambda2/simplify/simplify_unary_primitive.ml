@@ -782,7 +782,7 @@ let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
           dbg
       in
       let result_pat = Bound_pattern.singleton result_var in
-      let rewriting body =
+      let wrap ~body =
         Expr.create_let
           (Let.create contents_pat unbox_expr ~free_names_of_body:Unknown
              ~body:
@@ -790,7 +790,7 @@ let simplify_obj_dup dbg dacc ~original_term ~arg ~arg_ty ~result_var =
                   (Let.create result_pat box_expr ~free_names_of_body:Unknown
                      ~body)))
       in
-      SPR.create_rewrite rewriting
+      SPR.create_rewritten wrap
     | contents ->
       let boxer =
         match boxable_number with

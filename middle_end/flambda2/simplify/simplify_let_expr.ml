@@ -447,7 +447,7 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
     Simplify_named.simplify_named dacc bound_pattern defining_expr
       ~simplify_function_body
   with
-  | Rewritten f -> simplify_expr dacc (f body) ~down_to_up
+  | Rewritten f -> simplify_expr dacc (f ~body) ~down_to_up
   | Simplified (simplify_named_result, removed_operations) -> (
     (* We must make sure that if [Invalid] is going to be produced, [uacc]
        doesn't contain any extraneous data for e.g. lifted constants that will
