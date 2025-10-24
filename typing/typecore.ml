@@ -8700,7 +8700,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       unify_exp env {texp with exp_type = ty_fun} ty_expected;
       if args = [] then texp else begin
       let alloc_mode, mode_subcomponent =
-        register_allocation ~loc:sarg.pexp_loc ~desc:Partial_application mode
+        register_allocation ~loc:sarg.pexp_loc ~desc:Function_coercion mode
       in
       submode ~loc:sarg.pexp_loc ~env ~reason:Other
         exp_mode mode_subcomponent;

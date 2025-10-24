@@ -2056,8 +2056,7 @@ module Report = struct
   let print_allocation_desc : allocation_desc -> formatter -> unit = function
     | Unknown -> dprintf "the allocation"
     | Optional_argument -> dprintf "the allocation of the optional argument"
-    | Partial_application ->
-      dprintf "the allocation for the partial application"
+    | Function_coercion -> dprintf "the allocation for coercing the function"
     | Float_projection -> dprintf "the allocation for float projection"
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the

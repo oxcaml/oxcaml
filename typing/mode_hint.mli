@@ -63,7 +63,7 @@ type closure_details =
 type allocation_desc =
   | Unknown
   | Optional_argument
-  | Partial_application
+  | Function_coercion
   | Float_projection
 
 type allocation = allocation_desc Location.loc
