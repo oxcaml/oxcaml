@@ -756,7 +756,7 @@ let phys_equal _env dbg op x y =
   | Neq -> C.neq ~dbg x y
 
 let requires_sign_extended_operands : P.binary_int_arith_op -> bool = function
-  | Div | Mod ->
+  | Div (Signed | Unsigned) | Mod (Signed | Unsigned) ->
     (* Note that it would be wrong to apply [C.low_bits] to operands for div and
        mod.
 
@@ -825,8 +825,14 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Add -> wrap C.add_int_caml
     | Sub -> wrap C.sub_int_caml
     | Mul -> wrap C.mul_int_caml
-    | Div -> wrap C.div_int_caml
-    | Mod -> wrap C.mod_int_caml
+    | Div signedness ->
+      wrap
+        (C.div_int_caml
+           ~signed:(match signedness with Signed -> true | Unsigned -> false))
+    | Mod signedness ->
+      wrap
+        (C.mod_int_caml
+           ~signed:(match signedness with Signed -> true | Unsigned -> false))
     | And -> wrap C.and_int_caml
     | Or -> wrap C.or_int_caml
     | Xor -> wrap C.xor_int_caml)
@@ -842,8 +848,16 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Add -> wrap C.add_int
     | Sub -> wrap C.sub_int
     | Mul -> wrap C.mul_int
-    | Div -> wrap (C.div_int ~dividend_cannot_be_min_int)
-    | Mod -> wrap (C.mod_int ~dividend_cannot_be_min_int)
+    | Div signedness ->
+      wrap
+        (C.div_int
+           ~signed:(match signedness with Signed -> true | Unsigned -> false)
+           ~dividend_cannot_be_min_int)
+    | Mod signedness ->
+      wrap
+        (C.mod_int
+           ~signed:(match signedness with Signed -> true | Unsigned -> false)
+           ~dividend_cannot_be_min_int)
     | And -> wrap C.and_int
     | Or -> wrap C.or_int
     | Xor -> wrap C.xor_int)
