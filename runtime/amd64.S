@@ -183,7 +183,7 @@
 /* OCaml values */
 /******************************************************************************/
 
-#define WOSIZE_HD(src, dst) \
+#define WOSIZE_VAL(src, dst) \
   movq -8(src), dst; \
   shrq $10, dst
 
@@ -745,6 +745,7 @@ CFI_STARTPROC
     /* CR aspsmith: document this constant */
         cmpq    $3, Caml_state(preemption)
         ja      G(caml_preempt)
+LBL(preempt_unhandled):
         movq    Caml_state(gc_regs), %r15
 LBL(resume_from_preempt):
         movq    Gc_regs_kind(%r15), %r11
@@ -1345,7 +1346,12 @@ LBL(112):
         subq    $1, %r10       /* r10 := Ptr_val(r10) */
         movq    Caml_state(current_stack), %rsi
         SWITCH_OCAML_STACKS
-    /* No parent stack. Raise Effect.Unhandled. */
+    /* No parent stack. If this is a preemption effect (wosize of the
+       continuation is 3, meaning we have a gc_regs present) then just continue
+       execution. Otherwise, raise Effect.Unhandled. */
+        WOSIZE_VAL(%rbx, %rcx)
+        cmpq    $3, %rcx
+        je      LBL(preempt_unhandled)
         ENTER_FUNCTION
 #if defined(WITH_THREAD_SANITIZER)
         /* We must let the TSan runtime know that we switched back to the
@@ -1414,7 +1420,7 @@ CFI_STARTPROC
     /* %rax -> continuation, %rbx -> fun, %rdi -> arg */
         movq   %rdi, %r12 /* %r12 := arg */
         movq   8(%rax),  %r13  /* %r13 := last_fiber */
-        WOSIZE_HD(%rax, %rcx)
+        WOSIZE_VAL(%rax, %rcx)
         cmpq   $3, %rcx /* Wosize_hd(%rax) == 3 ? */
         je     1f
         pushq  $0; CFI_ADJUST(8) /* no gc_regs, push NULL */
