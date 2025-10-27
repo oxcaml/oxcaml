@@ -32,3 +32,23 @@
 
 (** Evaluate a quoted OCaml expression at runtime. *)
 val eval : CamlinternalQuote.Code.t -> Obj.t
+
+module type Jit_intf = sig
+  val jit_load :
+    phrase_name:string ->
+    Format.formatter ->
+    Lambda.program ->
+    (Obj.t, exn) Result.t
+
+  val jit_lookup_symbol : string -> Obj.t option
+end
+
+(** Use the given JIT instead of the compiler's one.  *)
+val set_jit : (module Jit_intf) -> unit
+
+(** Disallow the reading of bundles from the current executable.  Instead,
+    fetch them via the normal mechanisms used by compilerlibs.  This should
+    only be used if the compilerlibs state in the process is already set up
+    with the correct [Load_path] information for .cmi and .cmx resolution
+    (as is the case in mdx, for example). *)
+val use_existing_compilerlibs_state_for_artifacts : unit -> unit
