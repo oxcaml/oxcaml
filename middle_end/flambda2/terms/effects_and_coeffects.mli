@@ -15,7 +15,7 @@
 (* Effects, coeffects and placements *)
 
 (** A triple of an effect, a coeffect, and a placement. *)
-type t = Effects.t * Coeffects.t * Placement.t
+type t = Effects.t * Coeffects.t * Placement.t * Validity.t
 
 (** Print *)
 val print : Format.formatter -> t -> unit

@@ -966,8 +966,8 @@ type flush_mode =
 
 let can_be_removed effs =
   match (effs : Effects_and_coeffects.t) with
-  | Arbitrary_effects, _, _ -> false
-  | (Only_generative_effects _ | No_effects), _, _ -> true
+  | Arbitrary_effects, _, _, _ -> false
+  | (Only_generative_effects _ | No_effects), _, _, _ -> true
 
 let pop_symbol_inits symbol_inits v =
   match Backend_var.Map.find v symbol_inits with
