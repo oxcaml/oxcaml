@@ -433,13 +433,16 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               "Array kind %s should have been ruled out by the frontend for \
                %%makearray_dynamic_uninit"
               (Printlambda.array_kind kind)
-          | Punboxedoruntaggedintarray
-              (Untagged_int8 | Untagged_int16 | Untagged_int) ->
-            Misc.unboxed_small_int_arrays_are_not_implemented ()
           | Punboxedfloatarray Unboxed_float32 ->
             Lconst (Const_base (Const_float32 "0.0"))
           | Punboxedfloatarray Unboxed_float64 ->
             Lconst (Const_base (Const_float "0.0"))
+          | Punboxedoruntaggedintarray Untagged_int ->
+            Lconst (Const_base (Const_int 0))
+          | Punboxedoruntaggedintarray Untagged_int8 ->
+            Lconst (Const_base (Const_int8 0))
+          | Punboxedoruntaggedintarray Untagged_int16 ->
+            Lconst (Const_base (Const_int16 0))
           | Punboxedoruntaggedintarray Unboxed_int32 ->
             Lconst (Const_base (Const_int32 0l))
           | Punboxedoruntaggedintarray Unboxed_int64 ->
@@ -452,13 +455,16 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
                 (ign : Lambda.ignorable_product_element_kind) : Lambda.lambda =
               match ign with
               | Pint_ignorable -> Lconst (Const_base (Const_int 0))
-              | Punboxedoruntaggedint_ignorable
-                  (Untagged_int8 | Untagged_int16 | Untagged_int) ->
-                Misc.unboxed_small_int_arrays_are_not_implemented ()
               | Punboxedfloat_ignorable Unboxed_float32 ->
                 Lconst (Const_base (Const_float32 "0.0"))
               | Punboxedfloat_ignorable Unboxed_float64 ->
                 Lconst (Const_base (Const_float "0.0"))
+              | Punboxedoruntaggedint_ignorable Untagged_int ->
+                Lconst (Const_base (Const_int 0))
+              | Punboxedoruntaggedint_ignorable Untagged_int8 ->
+                Lconst (Const_base (Const_int8 0))
+              | Punboxedoruntaggedint_ignorable Untagged_int16 ->
+                Lconst (Const_base (Const_int16 0))
               | Punboxedoruntaggedint_ignorable Unboxed_int32 ->
                 Lconst (Const_base (Const_int32 0l))
               | Punboxedoruntaggedint_ignorable Unboxed_int64 ->
