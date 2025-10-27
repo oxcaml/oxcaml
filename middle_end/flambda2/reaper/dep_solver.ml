@@ -1496,8 +1496,6 @@ let cofield_has_use =
   in
   fun db x cofield -> any_source_query [x] db || cofield_query [x; cofield] db
 
-(* CR pchambart: Should rename to remove not local in the name (the notion does
-   not exists right now)*)
 let not_local_field_has_source =
   let any_source_query =
     mk_exists_query ["X"] [] (fun [x] [] -> [any_source_pred x])
@@ -1730,11 +1728,6 @@ let datalog_rules =
            !!Field.code_id_of_call_witness
            ~from:code_id ]
        ==> cannot_change_representation0 call_witness);
-      (* Note this rule is here to still allow changing the calling convention
-         of symbols /!\ when adding back the local value slots, there should be
-         a few more rules here *)
-      (* TODO this is wrong: some closures can have their representation changed
-         but not their calling convention *)
       (let$ [x] = ["x"] in
        [any_usage_pred x] ==> cannot_change_witness_calling_convention x);
       (let$ [allocation_id; alias; alias_source; _v] =
@@ -1819,21 +1812,6 @@ let datalog_rules =
            !!Field.code_id_of_call_witness
            ~from:codeid ]
        ==> cannot_change_calling_convention codeid);
-      (* CR-someday ncourant: we completely prevent changing the representation
-         of symbols. While allowing them to be unboxed is difficult, due to
-         symbols being always values, we could at least change their
-         representation. This would require rewriting in the types, which is not
-         done yet. *)
-      (let$ [x; _source] = ["x"; "_source"] in
-       [ sources_rel x _source;
-         filter1
-           (fun x ->
-             Code_id_or_name.pattern_match x
-               ~symbol:(fun _ -> true)
-               ~var:(fun _ -> false)
-               ~code_id:(fun _ -> false))
-           x ]
-       ==> cannot_change_representation0 x);
       (* If the representation of any closure in a set of closures cannot be
          changed, the representation of all the closures in the set cannot be
          changed. *)
@@ -1943,6 +1921,18 @@ let datalog_rules =
          cannot_change_representation to_;
          cannot_unbox0 to_ ]
        ==> cannot_unbox0 allocation_id);
+      (* CR-someday ncourant: allowing a symbol to be unboxed is difficult, due
+         to symbols being always values; thus we prevent it. *)
+      (let$ [x; _source] = ["x"; "_source"] in
+       [ sources_rel x _source;
+         filter1
+           (fun x ->
+             Code_id_or_name.pattern_match x
+               ~symbol:(fun _ -> true)
+               ~var:(fun _ -> false)
+               ~code_id:(fun _ -> false))
+           x ]
+       ==> cannot_unbox0 x);
       (* As previously: if any closure of a set of closures cannot be unboxed,
          then every closure in the set cannot be unboxed. *)
       (let$ [x] = ["x"] in
