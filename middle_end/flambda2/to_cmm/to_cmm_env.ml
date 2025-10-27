@@ -818,6 +818,26 @@ let pop_if_in_top_stage ?consider_inlining_effectful_expressions env var =
       Some { env with stages }
     else None
 
+type substitution =
+  | Not_possible
+  | Possible of t
+
+let can_substitute_wrt_effects ?consider_inlining_effectful_expressions env var
+    binding =
+  match To_cmm_effects.classify_by_effects_and_coeffects binding.effs with
+  | Pure | Generative_immutable -> Possible env
+  | Effect | Coeffect_only -> (
+    match
+      pop_if_in_top_stage ?consider_inlining_effectful_expressions env var
+    with
+    | None -> Not_possible
+    | Some env -> Possible env)
+
+let can_substitute ?consider_inlining_effectful_expressions env var binding =
+  (* TODO: also check ordering of control flow dependencies *)
+  can_substitute_wrt_effects ?consider_inlining_effectful_expressions env var
+    binding
+
 let inline_variable ?consider_inlining_effectful_expressions env res var =
   let var = resolve_alias env var in
   match Variable.Map.find var env.bindings with
@@ -838,27 +858,25 @@ let inline_variable ?consider_inlining_effectful_expressions env res var =
     | Must_inline_and_duplicate -> split_and_inline env res var binding
     | Must_inline_once -> (
       let env = remove_binding env var in
-      match To_cmm_effects.classify_by_effects_and_coeffects binding.effs with
-      | Pure | Generative_immutable -> will_inline_complex env res binding
-      | Effect | Coeffect_only -> (
-        match
-          pop_if_in_top_stage ?consider_inlining_effectful_expressions env var
-        with
-        | None -> split_and_inline env res var binding
-        | Some env -> will_inline_complex env res binding))
+      match
+        can_substitute ?consider_inlining_effectful_expressions env var binding
+      with
+      | Not_possible ->
+        (* Even though the whole binding cannot be substituted (because other
+           expressions have been substituted in the defining expr, e.g. as
+           arguments), the top-level primitive application of the complex
+           binding can be substituted, and thus we need to split the binding and
+           substitute only the application of the primitive. *)
+        split_and_inline env res var binding
+      | Possible env -> will_inline_complex env res binding)
     | May_inline_once -> (
-      match To_cmm_effects.classify_by_effects_and_coeffects binding.effs with
-      | Pure | Generative_immutable ->
+      match
+        can_substitute ?consider_inlining_effectful_expressions env var binding
+      with
+      | Not_possible -> will_not_inline_simple env res binding
+      | Possible env ->
         let env = remove_binding env var in
-        will_inline_simple env res binding
-      | Effect | Coeffect_only -> (
-        match
-          pop_if_in_top_stage ?consider_inlining_effectful_expressions env var
-        with
-        | None -> will_not_inline_simple env res binding
-        | Some env ->
-          let env = remove_binding env var in
-          will_inline_simple env res binding)))
+        will_inline_simple env res binding))
 
 (* Handling of aliases between variables *)
 
