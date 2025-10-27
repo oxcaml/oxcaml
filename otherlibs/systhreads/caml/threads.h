@@ -92,8 +92,8 @@ struct caml_locking_scheme {
   int (*can_skip_yield)(void*);
   void (*yield)(void*);
 
-  /* If non-NULL, called without the lock held when the runtime
-     urgently needs to take the lock to service a GC interrupt */
+  /* If non-NULL, called without the lock held when the runtime urgently
+     needs to take the lock to service an interrupt, such as for GC */
   void (*send_interrupt)(void*);
 };
 
