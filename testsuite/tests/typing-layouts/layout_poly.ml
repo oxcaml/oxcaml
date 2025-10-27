@@ -751,9 +751,9 @@ external[@layout_poly] restricted : ('a : any mod separable portable contended).
   'a t -> int = "%array_length"
 
 [%%expect{|
-type ('a : any mod contended portable separable) t = 'a array
+type ('a : any mod portable contended separable) t = 'a array
 external restricted :
-  ('a : any mod contended portable separable). 'a t -> int = "%array_length"
+  ('a : any mod portable contended separable). 'a t -> int = "%array_length"
   [@@layout_poly]
 |}]
 
@@ -773,7 +773,7 @@ Error:
        The kind of 'a -> 'b is value mod aliased immutable non_float
          because it's a function type.
        But the kind of 'a -> 'b must be a subkind of
-           value_or_null mod contended portable separable
+           value_or_null mod portable contended separable
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).

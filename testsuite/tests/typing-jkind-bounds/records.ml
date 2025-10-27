@@ -127,7 +127,7 @@ type 'a t : value mod non_null = { x : 'a }
 [%%expect {|
 type t = { x : unit -> unit; }
 type 'a t = { x : 'a -> 'a; }
-type ('a : value mod contended portable, 'b : value mod portable) t = {
+type ('a : value mod portable contended, 'b : value mod portable) t = {
   x : 'a;
   y : 'b;
 }
