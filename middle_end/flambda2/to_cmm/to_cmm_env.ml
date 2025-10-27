@@ -142,7 +142,7 @@ type 'kind binding =
 
 type any_binding = Binding : _ binding -> any_binding [@@unboxed]
 
-type stage =
+type effect_stage =
   | Effect of Variable.t
   | Coeffect_only of Variable.Set.t
 
@@ -180,7 +180,7 @@ type t =
     (* All bindings currently in env. *)
     inline_once_aliases : Variable.t Variable.Map.t;
     (* Maps for `Must_inline_once` variable that end up aliased. *)
-    stages : stage list;
+    effect_stages : effect_stage list;
     (* Stages of let-bindings, most recent at the head. *)
     symbol_inits : Symbol_inits.t
         (* Symbol initialization expressions, indexed by the variable used as
@@ -258,8 +258,8 @@ let print_stages ppf stages =
     stages
 
 let print ppf t =
-  Format.fprintf ppf "@[<hov 1>(@[<hov 1>(stages %a)@]@ )@]" print_stages
-    t.stages
+  Format.fprintf ppf "@[<hov 1>(@[<hov 1>(effect_stages %a)@]@ )@]" print_stages
+    t.effect_stages
 
 (* Creation *)
 
@@ -274,7 +274,7 @@ let create offsets functions_info ~trans_prim ~return_continuation
     functions_info;
     trans_prim;
     inlined_debuginfo = Inlined_debuginfo.none;
-    stages = [];
+    effect_stages = [];
     bindings = Variable.Map.empty;
     inline_once_aliases = Variable.Map.empty;
     vars_extra = Variable.Map.empty;
@@ -663,18 +663,19 @@ let rec add_binding_to_env ?extra env res var (Binding binding as b) =
        However, that allows to sink down allocations that only occur in one
        branch (when they are used linearly), which can help a lot. *)
     | Pure | Generative_immutable -> env, res
-    | Effect -> { env with stages = Effect var :: env.stages }, res
+    | Effect ->
+      { env with effect_stages = Effect var :: env.effect_stages }, res
     | Coeffect_only ->
-      let stages =
-        match env.stages with
+      let effect_stages =
+        match env.effect_stages with
         | Coeffect_only vars :: stages ->
           (* Multiple coeffect-only bindings may be accumulated in the same
              stage. *)
           Coeffect_only (Variable.Set.add var vars) :: stages
         | [] | Effect _ :: _ ->
-          Coeffect_only (Variable.Set.singleton var) :: env.stages
+          Coeffect_only (Variable.Set.singleton var) :: env.effect_stages
       in
-      { env with stages }, res)
+      { env with effect_stages }, res)
 
 (* CR gbury: find a better name for this function *)
 and split_in_env env res var binding =
@@ -782,7 +783,7 @@ let split_and_inline env res var binding =
   will_inline_complex env res split_binding
 
 let pop_if_in_top_stage ?consider_inlining_effectful_expressions env var =
-  match env.stages with
+  match env.effect_stages with
   | [] -> None
   | Effect var_from_stage :: prev_stages ->
     (* In this case [var_from_stage] corresponds to an effectful binding forming
@@ -800,7 +801,7 @@ let pop_if_in_top_stage ?consider_inlining_effectful_expressions env var =
     in
     if Variable.equal var var_from_stage
        && consider_inlining_effectful_expressions
-    then Some { env with stages = prev_stages }
+    then Some { env with effect_stages = prev_stages }
     else None
   | Coeffect_only vars_from_stage :: prev_stages ->
     (* Here we see if [var] has a coeffect-only defining expression on the most
@@ -810,12 +811,12 @@ let pop_if_in_top_stage ?consider_inlining_effectful_expressions env var =
     if Variable.Set.mem var vars_from_stage
     then
       let new_vars_in_stage = Variable.Set.remove var vars_from_stage in
-      let stages =
+      let effect_stages =
         if Variable.Set.is_empty new_vars_in_stage
         then prev_stages
         else Coeffect_only new_vars_in_stage :: prev_stages
       in
-      Some { env with stages }
+      Some { env with effect_stages }
     else None
 
 type substitution =
@@ -1110,7 +1111,7 @@ let flush_delayed_lets ~mode env res =
   let flush = flush_bindings !bindings_to_flush env.symbol_inits in
   let env =
     { env with
-      stages = [];
+      effect_stages = [];
       bindings = bindings_to_keep;
       symbol_inits = Backend_var.Map.empty
     }
