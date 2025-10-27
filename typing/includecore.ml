@@ -157,6 +157,7 @@ let value_descriptions ~loc env name
   | Ok () -> ()
   | Error e -> raise (Dont_match (Zero_alloc e))
   end;
+  if not (Crossing.le vd1.val_crossing.lower vd2.val_crossing.lower) then failwith "explodify";
   let crossing = Ctype.crossing_of_ty env vd2.val_type in
   let modalities = vd1.val_modalities, vd2.val_modalities in
   let modes =

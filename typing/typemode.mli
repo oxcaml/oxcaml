@@ -28,6 +28,8 @@ val atomic_mutable_modalities : Mode.Modality.Const.t
 
 val transl_modalities_crossing : Parsetree.modalities -> Mode.Crossing_bound.t
 
+val transl_modes_crossing : Parsetree.modes -> Mode.Crossing_bound.t
+
 val untransl_modality : Mode.Modality.atom -> Parsetree.modality Location.loc
 
 (** Un-interpret modalities back to parsetree. Takes the mutability and

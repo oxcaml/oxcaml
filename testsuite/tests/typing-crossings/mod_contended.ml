@@ -4,7 +4,7 @@
 
 let empty_collections () =
   let mtl1 : int ref list = [] in
-  let mtl2: int ref list = (let x = [] in x) in
+  let mtl2 : int ref list = (let x = [] in x) in
   let mtia : int ref iarray = [: :] in
   let _ @ portable = fun () -> ((mtl1, mtl2, mtia) : _ @ uncontended) in
   ()

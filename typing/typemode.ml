@@ -357,11 +357,7 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
 
 let transl_mode_annots (modes : Parsetree.modes) : Alloc.Const.Option.t =
   let annots =
-    match modes with
-    | No_modes -> []
-    | Modes { crossings = _ :: _; _ } ->
-      Misc.fatal_error "crossings as mode annotations are not yet implemented"
-    | Modes { modes; _ } -> modes
+    match modes with No_modes -> [] | Modes { modes; _ } -> modes
   in
   let step modes_so_far { txt = Parsetree.Mode txt; loc } =
     Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
@@ -622,9 +618,7 @@ let transl_modalities ~maturity mut (modalities : Parsetree.modalities) =
   let modalities =
     match modalities with
     | No_modalities -> []
-    | Modalities { crossings = _ :: _; _ } ->
-      Misc.fatal_error "crossings as modalities are not yet implemented"
-    | Modalities { modalities; crossings = []; _ } ->
+    | Modalities { modalities; _ } ->
       List.map (transl_modality ~maturity) modalities
   in
   (* axes listed in the order of implication. *)
@@ -655,6 +649,13 @@ let transl_modalities_crossing (modalities : Parsetree.modalities) =
   match modalities with
   | No_modalities -> Mode.Crossing_bound.default
   | Modalities { crossings; _ } ->
+    let crossing, _ = transl_mod_crossing_modifiers crossings in
+    ({ upper = Some crossing; lower = crossing } : Mode.Crossing_bound.t)
+
+let transl_modes_crossing (modes : Parsetree.modes) =
+  match modes with
+  | No_modes -> Mode.Crossing_bound.default
+  | Modes { crossings; _ } ->
     let crossing, _ = transl_mod_crossing_modifiers crossings in
     ({ upper = Some crossing; lower = crossing } : Mode.Crossing_bound.t)
 
