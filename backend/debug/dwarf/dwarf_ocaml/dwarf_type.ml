@@ -1402,9 +1402,17 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
        such that it is easier to change this code if in the future we want to
        change how the names of types are handled. *)
     (match type_shape.desc with
-    | Leaf ->
+    | Leaf | Unknown_type ->
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
+    | At_layout (sh, _) ->
+      let reference' =
+        type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die sh
+          type_layout ~rec_env
+      in
+      (* CR sspies: This typedef is only needed if the name is [Some]. Reduce
+         the number of typedefs here. *)
+      create_typedef_die ~reference ~parent_proto_die ?name reference'
     | Constr _ ->
       create_base_layout_type ~reference type_layout ?name ~parent_proto_die
         ~fallback_value_die ()
@@ -1769,7 +1777,10 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   in
   let known_value = [Known (type_shape, Sort.Value)] in
   match type_shape.desc, type_layout with
-  | Leaf, _ -> unknown_base_layouts type_layout
+  | Leaf, _  | Unknown_type, _ -> unknown_base_layouts type_layout
+  | At_layout (shape, _), _ -> flatten_shape shape type_layout
+    (* We simply drop these for now. The [flatten_shape] function will be deleted
+       when revisiting the layouts. *)
   | Tuple _, Base Value ->
     known_value (* boxed tuples are only a single base layout wide *)
   | Tuple _, _ ->
