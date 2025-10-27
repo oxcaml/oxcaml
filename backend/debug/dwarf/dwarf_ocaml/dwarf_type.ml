@@ -1777,10 +1777,11 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
   in
   let known_value = [Known (type_shape, Sort.Value)] in
   match type_shape.desc, type_layout with
-  | Leaf, _  | Unknown_type, _ -> unknown_base_layouts type_layout
-  | At_layout (shape, _), _ -> flatten_shape shape type_layout
-    (* We simply drop these for now. The [flatten_shape] function will be deleted
-       when revisiting the layouts. *)
+  | Leaf, _ | Unknown_type, _ -> unknown_base_layouts type_layout
+  | At_layout (shape, _), _ ->
+    flatten_shape shape type_layout
+    (* We simply drop these for now. The [flatten_shape] function will be
+       deleted when revisiting the layouts. *)
   | Tuple _, Base Value ->
     known_value (* boxed tuples are only a single base layout wide *)
   | Tuple _, _ ->
