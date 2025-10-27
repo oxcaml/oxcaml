@@ -517,7 +517,7 @@ and comp_expr stack_info env exp sz cont =
       (Kmake_faux_mixedblock (total_len, tag) :: cont)
   | Context_switch (Resume, args) ->
     let nargs = List.length args - 1 in
-    assert (nargs = 3);
+    assert (nargs = 2);
     if is_tailcall cont
     then (
       (* Resumeterm itself only pushes 2 words, but perform adds another *)
@@ -528,21 +528,16 @@ and comp_expr stack_info env exp sz cont =
       (* Resume itself only pushes 2 words, but perform adds another *)
       check_stack stack_info (sz + nargs + 3);
       comp_args stack_info env args sz (Kresume :: cont))
-  | Context_switch (Runstack, args) ->
+  | Context_switch (With_stack, args) ->
     let nargs = List.length args in
-    assert (nargs = 3);
-    if is_tailcall cont
-    then (
-      (* Resumeterm itself only pushes 2 words, but perform adds another *)
-      check_stack stack_info 3;
-      Kconst Lambda.const_unit :: Kpush
-      :: comp_args stack_info env args (sz + 1)
-           (Kresumeterm (sz + nargs) :: discard_dead_code cont))
-    else (
-      (* Resume itself only pushes 2 words, but perform adds another *)
-      check_stack stack_info (sz + nargs + 3);
-      Kconst Lambda.const_unit :: Kpush
-      :: comp_args stack_info env args (sz + 1) (Kresume :: cont))
+    assert (nargs = 5);
+    check_stack stack_info 3;
+    comp_args stack_info env args sz (Kwith_stack :: cont)
+  | Context_switch (With_stack_bind, args) ->
+    let nargs = List.length args in
+    assert (nargs = 7);
+    check_stack stack_info 3;
+    comp_args stack_info env args sz (Kwith_stack_bind :: cont)
   | Context_switch (Reperform, args) ->
     let nargs = List.length args - 1 in
     assert (nargs = 2);
