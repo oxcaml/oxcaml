@@ -1075,11 +1075,13 @@ let apply_mode_annots ~loc ~env (m : Alloc.Const.Option.t) mode =
 
 (** Takes the mutability, the type and the modalities of a field, and expected
     mode of the record (adjusted for allocation), check that the construction
-    would be allowed. This applies to mutable arrays similarly. *)
+    would be allowed. This applies to mutable arrays similarly.
+    If mutable, this updates the crossing bound of the expected mode too. *)
 let check_construct_mutability ~loc ~env mutability ?ty ?modalities block_mode =
   match mutability with
   | Immutable -> ()
   | Mutable { mode = m0; _ } ->
+      set_max_crossing block_mode;
       let m0 = m0 |> mutable_mode |> Value.disallow_right in
       let m0 = match ty with
       | Some ty -> cross_left env ty ?modalities m0
@@ -6431,7 +6433,6 @@ and type_expect_
           exp_env = env }
       end
   | Pexp_record(lid_sexp_list, opt_sexp) ->
-      set_max_crossing_temp expected_mode;
       type_expect_record ~overwrite Legacy lid_sexp_list opt_sexp
   | Pexp_record_unboxed_product(lid_sexp_list, opt_sexp) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
@@ -6556,7 +6557,6 @@ and type_expect_
       let mutability =
         match mut with
         | Mutable ->
-            set_max_crossing expected_mode;
             Mutable {
               mode = Value.Comonadic.legacy;
               (* CR aspsmith: Revisit once we support atomic arrays *)

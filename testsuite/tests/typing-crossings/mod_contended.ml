@@ -23,6 +23,17 @@ Line 3, characters 32-33:
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
+let array_fails () =
+  let x : int array = [| |] in
+  let _ @ portable = fun () -> (x : _ @ uncontended) in
+  ()
+[%%expect {|
+Line 3, characters 32-33:
+3 |   let _ @ portable = fun () -> (x : _ @ uncontended) in
+                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
 let info_propagates () =
   let x : int ref = (let x = ref 5222 in x) in
   let y = x in
@@ -231,4 +242,34 @@ let let_mutable () =
   ()
 [%%expect{|
 val let_mutable : unit -> unit = <fun>
+|}]
+
+type boxed_rec = { a : int ref option; b : int }
+type boxed_rec_mut = { mutable a : int ref option; b : int }
+
+let immut_records () =
+  let imm : boxed_rec = { a = None; b = 6 } in
+  let mut : boxed_rec_mut = { a = None; b = 8 } in
+  let imm2 = mut.a <- Some (ref 42); { imm with b = 7 } in
+  let _ @ portable = fun () -> ((imm, imm2, mut) : _ @ uncontended) in
+  ()
+[%%expect{|
+type boxed_rec = { a : int ref option; b : int; }
+type boxed_rec_mut = { mutable a : int ref option; b : int; }
+Line 8, characters 44-47:
+8 |   let _ @ portable = fun () -> ((imm, imm2, mut) : _ @ uncontended) in
+                                                ^^^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let record_update_bad () =
+  let r : boxed_rec = { a = None; b = 6 } in
+  let x = { r with a = Some (ref 31998) } in
+  let _ @ portable = fun () -> (x : _ @ uncontended) in
+  ()
+[%%expect{|
+Line 4, characters 32-33:
+4 |   let _ @ portable = fun () -> (x : _ @ uncontended) in
+                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
