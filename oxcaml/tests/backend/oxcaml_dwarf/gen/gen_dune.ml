@@ -33,7 +33,7 @@ let () =
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
  (foreign_archives simd_stubs))
 
 (rule
