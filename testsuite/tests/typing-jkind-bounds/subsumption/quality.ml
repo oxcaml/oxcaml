@@ -155,15 +155,15 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t : value mod portable end
        is not included in
-         sig type t : value mod contended portable with M.t end
+         sig type t : value mod portable contended with M.t end
        Type declarations do not match:
          type t : value mod portable
        is not included in
-         type t : value mod contended portable with M.t
+         type t : value mod portable contended with M.t
        The kind of the first is value mod portable
          because of the definition of t at line 13, characters 2-29.
        But the kind of the first must be a subkind of
-           value mod contended portable with M.t
+           value mod portable contended with M.t
          because of the definition of t at line 11, characters 2-48.
 |}]
 
@@ -195,15 +195,15 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t : value mod portable end
        is not included in
-         sig type t : value mod contended portable with M.u end
+         sig type t : value mod portable contended with M.u end
        Type declarations do not match:
          type t : value mod portable
        is not included in
-         type t : value mod contended portable with M.u
+         type t : value mod portable contended with M.u
        The kind of the first is value mod portable
          because of the definition of t at line 15, characters 2-29.
        But the kind of the first must be a subkind of
-           value mod contended portable with M.u
+           value mod portable contended with M.u
          because of the definition of t at line 13, characters 2-48.
 |}]
 

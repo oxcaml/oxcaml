@@ -295,15 +295,15 @@ Error: Signature mismatch:
        Modules do not match:
          sig type 'a t : value mod contended with 'a end
        is not included in
-         sig type 'a t : value mod contended portable with 'a end
+         sig type 'a t : value mod portable contended with 'a end
        Type declarations do not match:
          type 'a t : value mod contended with 'a
        is not included in
-         type 'a t : value mod contended portable with 'a
+         type 'a t : value mod portable contended with 'a
        The kind of the first is value mod contended with 'a
          because of the definition of t at line 4, characters 2-41.
        But the kind of the first must be a subkind of
-           value mod contended portable with 'a
+           value mod portable contended with 'a
          because of the definition of t at line 2, characters 2-50.
 |}]
 

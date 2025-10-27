@@ -124,7 +124,7 @@ end = struct
   type 'a t : immediate with 'a @@ aliased many contended global portable
 end
 [%%expect {|
-module M : sig type 'a t : value mod global many contended portable end
+module M : sig type 'a t : value mod global many portable contended end
 |}]
 
 module M : sig
@@ -426,7 +426,7 @@ end
 [%%expect {|
 module type X =
   sig
-    type t : value mod contended portable with t
+    type t : value mod portable contended with t
     val create : int -> t
     val set : t -> int -> unit
     val get : t -> int

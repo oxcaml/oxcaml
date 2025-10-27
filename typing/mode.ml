@@ -4565,6 +4565,8 @@ module Crossing = struct
       | Comonadic ax -> Axis.print ppf ax
   end
 
+  type atom = Atom : 'a Axis.t * 'a -> atom
+
   module Per_axis = struct
     open Axis
 
@@ -4696,6 +4698,17 @@ module Crossing = struct
       { monadic = (Monadic.set [@inlined hint]) ax a monadic; comonadic }
     | Comonadic ax ->
       { monadic; comonadic = (Comonadic.set [@inlined hint]) ax a comonadic }
+
+  let diff t0 t1 =
+    List.filter_map
+      (fun value_ax : atom option ->
+        let (Axis.P ax) =
+          value_ax |> Modality.Axis.of_value |> Axis.of_modality
+        in
+        let a0 = proj ax t0 in
+        let a1 = proj ax t1 in
+        if a0 = a1 then None else Some (Atom (ax, a1)))
+      Value.Axis.all
 
   let create ~regionality ~linearity ~uniqueness ~portability ~contention
       ~forkable ~yielding ~statefulness ~visibility ~staticity =
