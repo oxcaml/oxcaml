@@ -295,7 +295,7 @@ let transl_mod_crossing_modifiers (crossings : Parsetree.crossings) =
   let visibility = modal (Monadic Visibility) modifiers.visibility in
   let staticity = modal (Monadic Staticity) modifiers.staticity in
   let monadic =
-    Mode.Crossing.Monadic.create ~uniqueness ~contention ~visibility
+    Mode.Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
   in
   let comonadic =
     Mode.Crossing.Comonadic.create ~regionality ~linearity ~portability
@@ -318,15 +318,7 @@ let transl_mod_bounds (crossings : Parsetree.crossings) =
     Option.fold ~some:Location.get_txt ~none:Separability.max
       modifiers.separability
   in
-  let monadic =
-    Mode.Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
-  in
-  let comonadic =
-    Mode.Crossing.Comonadic.create ~regionality ~linearity ~portability
-      ~forkable ~yielding ~statefulness
-  in
-  let crossing : Crossing.t = { monadic; comonadic } in
-  create crossing ~externality ~nullability ~separability
+  Types.Jkind_mod_bounds.create crossing ~externality ~nullability ~separability
 
 let default_mode_annots (annots : Alloc.Const.Option.t) =
   (* [forkable] has a different default depending on whether [areality]

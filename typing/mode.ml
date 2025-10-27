@@ -4727,7 +4727,7 @@ module Crossing_bound = struct
     let lower =
       Crossing.create ~uniqueness:false ~contention:true ~visibility:false
         ~regionality:false ~linearity:false ~portability:false ~forkable:false
-        ~yielding:false ~statefulness:false
+        ~yielding:false ~statefulness:false ~staticity:false
     in
     { upper = None; lower }
 
