@@ -20,7 +20,9 @@ let merge_cma ~target ~archives =
   Clflags.custom_runtime := false;
   Clflags.no_auto_link := false;
   Clflags.ccobjs := [];
+  Clflags.js_stubs := [];
   Clflags.all_ccopts := [];
+  Clflags.all_jsopts := [];
   Clflags.dllibs := [];
   List.iter
     (fun archive -> Load_path.add_dir ~hidden:false (Filename.dirname archive))

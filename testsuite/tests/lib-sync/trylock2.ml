@@ -2,6 +2,7 @@
  runtime5;
  { bytecode; }
  { native; }
+ { javascript; }
 *)
 
 (* Test Mutex.try_lock *)

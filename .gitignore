@@ -22,8 +22,9 @@
 *.lib
 *.dll
 *.la
-*.cm[ioxats]
+*.cm[ioxatsj]
 *.cmx[as]
+*.cmj[oxa]
 *.cmti
 *.cmsi
 *.annot
@@ -43,6 +44,7 @@ META
 .#*
 *#
 *.orig
+*.bak
 *.rej
 *.pyc
 .gdbinit
@@ -410,3 +412,4 @@ ocaml/primitives.new
 
 dune.runtime_selection
 /otherlibs/dune
+*.code-workspace

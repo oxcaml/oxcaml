@@ -1,5 +1,7 @@
 (* TEST
  modules = "stubs.c";
+  { native; }
+  { bytecode; }
 *)
 
 external setlocale : string -> unit = "ml_setlocale"

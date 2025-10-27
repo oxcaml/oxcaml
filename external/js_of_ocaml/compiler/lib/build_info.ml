@@ -21,22 +21,16 @@ open! Stdlib
 
 type kind =
   [ `Runtime
-  | `Exe
-  | `Cmo
-  | `Cma
-  | `Cmj
+  | `Cmjo
   | `Cmja
   | `Unknown
   ]
 
-let all = [ `Runtime; `Exe; `Cmo; `Cma; `Cmj; `Cmja; `Unknown ]
+let all : kind list = [ `Runtime; `Cmjo; `Cmja; `Unknown ]
 
 let string_of_kind = function
   | `Runtime -> "runtime"
-  | `Exe -> "exe"
-  | `Cmo -> "cmo"
-  | `Cma -> "cma"
-  | `Cmj -> "cmj"
+  | `Cmjo -> "cmjo"
   | `Cmja -> "cmja"
   | `Unknown -> "unknown"
 

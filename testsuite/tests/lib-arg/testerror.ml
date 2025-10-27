@@ -1,5 +1,6 @@
 (* TEST
- native;
+  { native; }
+  { javascript; }
 *)
 
 (** Test that the right message errors are emitted by Arg *)

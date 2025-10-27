@@ -1,5 +1,7 @@
 (* TEST
  modules = "test_local_bug_.c";
+  { native; }
+  { bytecode; }
 *)
 
 module M : sig end = struct

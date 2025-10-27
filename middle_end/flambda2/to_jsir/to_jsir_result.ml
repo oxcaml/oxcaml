@@ -26,7 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open! Jsoo_imports.Import
+open! Jsoo_imports
 
 (** Blocks with the continuation potentially not yet defined.
 
@@ -77,9 +77,16 @@ let add_instr_exn t instr =
   { t with current_blocks = top_current_block :: rest_current_blocks }
 
 let maybe_add_debuginfo_exn t dbg ~pos =
-  match Parse_info.t_of_debuginfo dbg ~pos with
-  | None -> t
-  | Some parse_info -> add_instr_exn t (Event parse_info)
+  if Debuginfo.is_none dbg
+  then t
+  else
+    let loc = Debuginfo.to_location dbg in
+    let parse_info =
+      match pos with
+      | `Start -> Parse_info.t_of_pos loc.loc_start
+      | `End -> Parse_info.t_of_pos loc.loc_end
+    in
+    add_instr_exn t (Event parse_info)
 
 let with_debuginfo_exn t dbg ~f =
   let t = maybe_add_debuginfo_exn t dbg ~pos:`Start in
@@ -176,11 +183,6 @@ let global_data_var t =
     let var = Jsir.Var.fresh () in
     { t with global_data_var = Some var }, var
 
-type program =
-  { program : Jsir.program;
-    imported_compilation_units : Compilation_unit.Set.t
-  }
-
 let to_program_exn
     { complete_blocks;
       current_blocks;
@@ -213,7 +215,7 @@ let to_program_exn
       Jsir.Addr.Map.add Jsir.Addr.zero { entry_block with body } complete_blocks
   in
   let free_pc = (Jsir.Addr.Map.max_binding complete_blocks |> fst) + 1 in
-  let program =
+  let program : Jsir.program =
     { Jsir.start = Jsir.Addr.zero; blocks = complete_blocks; free_pc }
   in
-  { program; imported_compilation_units }
+  { Js_backend.program; imported_compilation_units }

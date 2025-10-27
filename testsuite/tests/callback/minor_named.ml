@@ -1,6 +1,8 @@
 (* TEST
  modules = "minor_named_.c";
  flags = "-alert -unsafe_multidomain";
+  { native; }
+  { bytecode; }
 *)
 
 (* Tests Callback.register and caml_named_value on a young object *)

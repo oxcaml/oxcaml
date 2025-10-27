@@ -5,6 +5,7 @@ type global_module_name = private
   { head : string
   ; args : Obj.t
   }
+[@@ocaml.warning "-unused-field"]
 
 type full = private
   | With_prefix of

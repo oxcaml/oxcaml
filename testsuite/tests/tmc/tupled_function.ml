@@ -3,6 +3,8 @@
    bytecode;
  }{
    native;
+ }{
+   javascript;
  }
 *)
 type 'a t =

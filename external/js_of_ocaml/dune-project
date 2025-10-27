@@ -1,7 +1,7 @@
 (lang dune 3.17)
 (using menhir 3.0)
 (name js_of_ocaml)
-(generate_opam_files false)
+(generate_opam_files true)
 (subst disabled)
 (executables_implicit_empty_intf true)
 
@@ -19,7 +19,6 @@
   "Js_of_ocaml is a compiler from OCaml bytecode to JavaScript. It makes it possible to run pure OCaml programs in JavaScript environment like browsers and Node.js")
  (depends
   (ocaml (and (>= 4.13) (< 5.4)))
-  time_now
   (num :with-test)
   (ppx_expect (and (>= v0.16.1) :with-test))
   (ppxlib (>= 0.15))

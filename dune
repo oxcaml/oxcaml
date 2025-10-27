@@ -388,24 +388,6 @@
  (libraries ocamlbytecomp ocamlcommon)
  (modules main_native))
 
-(library
- (name ocamljcomp)
- (wrapped false)
- (flags
-  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (ocamlopt_flags
-  (:include %{project_root}/ocamlopt_flags.sexp))
- (libraries ocamlcommon flambda2)
- (modules jsmaindriver jscompile jslibrarian))
-
-(executable
- (name boot_ocamlj)
- (modes native)
- (flags
-  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (libraries ocamljcomp ocamlcommon flambda2)
- (modules boot_ocamlj))
-
 ; Disabled since there can be only one (data_only_dirs) declaration
 ;(data_only_dirs yacc)
 
@@ -470,12 +452,6 @@
  (section bin)
  (package ocaml))
 
-(install
- (files
-  (boot_ocamlj.exe as ocamlj.opt))
- (section bin)
- (package ocaml))
-
 ; For the moment we don't install optmain.{cmo,cmx,o} and opttopstart.{cmx,o}.
 ; When built with Dune, these have the "dune exe" module prefixes, so won't
 ; be named as a client would expect.  There should also be a patch upstream
@@ -532,8 +508,6 @@
   asmgen
   asmlink
   cm_bundle
-  linkenv
-  optlink
   ;; backend/
   afl_instrument
   arch
@@ -672,6 +646,7 @@
   dwarf_variables_and_parameters
   dwarf_type
   ;; optcomp/
+  jscomp
   linkenv
   optcompile
   optlibrarian
@@ -692,6 +667,7 @@
   ocamlcommon
   oxcaml_common
   oxcaml_utils
+  jsoo_imports
   flambda2_identifiers
   flambda2_cmx
   compiler_owee
@@ -794,6 +770,7 @@
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.a}
    %{dep:oxcaml_common.a}
    %{dep:utils/oxcaml_utils.a}
+   %{dep:middle_end/jsoo_imports/jsoo_imports.a}
    %{dep:middle_end/flambda2/import/flambda2_import.a}
    %{dep:middle_end/flambda2/ui/flambda2_ui.a}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.a}
@@ -819,6 +796,7 @@
    %{dep:external/gc-timings/gc_timings.a}
    %{dep:ocamloptcomp.a}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.a}
+   %{dep:middle_end/flambda2/to_jsir/flambda2_to_jsir.a}
    %{dep:middle_end/flambda2/flambda2.a})))
 
 (rule
@@ -833,6 +811,7 @@
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cma}
    %{dep:oxcaml_common.cma}
    %{dep:utils/oxcaml_utils.cma}
+   %{dep:middle_end/jsoo_imports/jsoo_imports.cma}
    %{dep:middle_end/flambda2/import/flambda2_import.cma}
    %{dep:middle_end/flambda2/ui/flambda2_ui.cma}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.cma}
@@ -858,6 +837,7 @@
    %{dep:external/gc-timings/gc_timings.cma}
    %{dep:ocamloptcomp.cma}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.cma}
+   %{dep:middle_end/flambda2/to_jsir/flambda2_to_jsir.cma}
    %{dep:middle_end/flambda2/flambda2.cma})))
 
 (rule
@@ -872,6 +852,7 @@
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cmxa}
    %{dep:oxcaml_common.cmxa}
    %{dep:utils/oxcaml_utils.cmxa}
+   %{dep:middle_end/jsoo_imports/jsoo_imports.cmxa}
    %{dep:middle_end/flambda2/import/flambda2_import.cmxa}
    %{dep:middle_end/flambda2/ui/flambda2_ui.cmxa}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.cmxa}
@@ -897,6 +878,7 @@
    %{dep:external/gc-timings/gc_timings.cmxa}
    %{dep:ocamloptcomp.cmxa}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.cmxa}
+   %{dep:middle_end/flambda2/to_jsir/flambda2_to_jsir.cmxa}
    %{dep:middle_end/flambda2/flambda2.cmxa})))
 
 (install
@@ -1006,3 +988,118 @@
   otherlibs/dynlink/dynlink.cmxa
   middle_end/flambda2/from_lambda/flambda2_from_lambda.cma
   middle_end/flambda2/from_lambda/flambda2_from_lambda.cmxa))
+
+
+; generate the dune rules for compiling stdlib with ocamlj:
+
+(subdir stdlib-js
+  (dynamic_include ../stdlib-js.inc))
+
+(rule
+ (target stdlib-js.inc)
+ (deps
+  (:gen_ocamlj_rules %{workspace_root}/tools/gen_ocamlj_rules.sh)
+  (source_tree stdlib))
+ (enabled_if (= %{context_name} "runtime_stdlib"))
+ (action (with-stdout-to %{target} (run bash %{gen_ocamlj_rules} stdlib))))
+
+(rule
+ (target stdlib-js.inc)
+ (enabled_if (<> %{context_name} "runtime_stdlib"))
+ (action (write-file %{target} "")))
+
+(install
+  (files (glob_files (stdlib-js/*.cmj* with_prefix .)))
+  (section lib)
+  (package ocaml_runtime_stdlib))
+
+; generate the dune rules for compiling otherlibs with ocamlj:
+(subdir otherlibs
+  ;; stdlib_upstream_compatible:
+  (subdir stdlib_upstream_compatible-js
+    (dynamic_include ../stdlib_upstream_compatible-js.inc))
+
+  (rule
+    (target stdlib_upstream_compatible-js.inc)
+    (deps
+      (:gen_ocamlj_rules %{workspace_root}/tools/gen_ocamlj_rules.sh)
+      (source_tree stdlib_upstream_compatible))
+    (enabled_if (= %{context_name} "main"))
+    (action (with-stdout-to %{target} (run bash %{gen_ocamlj_rules} stdlib_upstream_compatible))))
+
+  (rule
+    (target stdlib_upstream_compatible-js.inc)
+    (enabled_if (<> %{context_name} "main"))
+    (action (write-file %{target} "")))
+
+  (install
+    (files (glob_files (stdlib_upstream_compatible-js/*.cmj* with_prefix stdlib_upstream_compatible)))
+    (section lib)
+    (package ocaml))
+
+  ;; stdlib_stable:
+  (subdir stdlib_stable-js
+    (dynamic_include ../stdlib_stable-js.inc))
+
+  (rule
+    (target stdlib_stable-js.inc)
+    (deps
+      (:gen_ocamlj_rules %{workspace_root}/tools/gen_ocamlj_rules.sh)
+      (source_tree stdlib_stable))
+    (enabled_if (= %{context_name} "main"))
+    (action (with-stdout-to %{target} (run bash %{gen_ocamlj_rules} stdlib_stable))))
+
+  (rule
+    (target stdlib_stable-js.inc)
+    (enabled_if (<> %{context_name} "main"))
+    (action (write-file %{target} "")))
+
+  (install
+    (files (glob_files (stdlib_stable-js/*.cmj* with_prefix stdlib_stable)))
+    (section lib)
+    (package ocaml))
+
+  ;; stdlib_beta:
+  (subdir stdlib_beta-js
+    (dynamic_include ../stdlib_beta-js.inc))
+
+  (rule
+    (target stdlib_beta-js.inc)
+    (deps
+      (:gen_ocamlj_rules %{workspace_root}/tools/gen_ocamlj_rules.sh)
+      (source_tree stdlib_beta))
+    (enabled_if (= %{context_name} "main"))
+    (action (with-stdout-to %{target} (run bash %{gen_ocamlj_rules} stdlib_beta))))
+
+  (rule
+    (target stdlib_beta-js.inc)
+    (enabled_if (<> %{context_name} "main"))
+    (action (write-file %{target} "")))
+
+  (install
+    (files (glob_files (stdlib_beta-js/*.cmj* with_prefix stdlib_beta)))
+    (section lib)
+    (package ocaml))
+
+  ;; stdlib_alpha:
+  (subdir stdlib_alpha-js
+    (dynamic_include ../stdlib_alpha-js.inc))
+
+  (rule
+    (target stdlib_alpha-js.inc)
+    (deps
+      (:gen_ocamlj_rules %{workspace_root}/tools/gen_ocamlj_rules.sh)
+      (source_tree stdlib_alpha))
+    (enabled_if (= %{context_name} "main"))
+    (action (with-stdout-to %{target} (run bash %{gen_ocamlj_rules} stdlib_alpha))))
+
+  (rule
+    (target stdlib_alpha-js.inc)
+    (enabled_if (<> %{context_name} "main"))
+    (action (write-file %{target} "")))
+
+  (install
+    (files (glob_files (stdlib_alpha-js/*.cmj* with_prefix stdlib_alpha)))
+    (section lib)
+    (package ocaml))
+)

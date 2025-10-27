@@ -3,6 +3,8 @@
    native;
  }{
    bytecode;
+ }{
+   javascript;
  }
 *)
 

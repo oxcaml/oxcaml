@@ -10,17 +10,26 @@
    flags = "-extension comprehensions -extension layouts_alpha";
    bytecode;
  }{
+   flags = "-extension comprehensions -extension layouts_alpha";
+   javascript;
+ }{
    flags = "-extension comprehensions -extension layouts_beta";
    native;
  }{
    flags = "-extension comprehensions -extension layouts_beta";
    bytecode;
  }{
+   flags = "-extension comprehensions -extension layouts_beta";
+   javascript;
+ }{
    flags = "-extension comprehensions";
    native;
  }{
    flags = "-extension comprehensions";
    bytecode;
+ }{
+   flags = "-extension comprehensions";
+   javascript;
  }
 *)
 (* Test for literals, patterns, and comprehension (when that's

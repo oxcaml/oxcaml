@@ -8,4 +8,10 @@ let () = (
 
 (* TEST
  exit_status = "2";
+{native;}
+{bytecode;}
+{
+  reference="${test_source_directory}/assert_location.js.reference";
+  javascript;
+}
 *)

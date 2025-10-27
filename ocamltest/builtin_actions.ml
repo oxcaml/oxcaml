@@ -384,6 +384,56 @@ let copy =
   make ~name:"copy" ~description:"Copy a file"
     ~does_something:false copy_action
 
+let libraries_are_javascript_compatible =
+  Actions.make
+  ~name:"libraries-are-javascript-compatible"
+  ~description:"Require all used libraries be Javascript compatible."
+  ~does_something:false
+  (fun _log env ->
+    let libraries = Environments.safe_lookup Ocaml_variables.libraries env in
+    (* Parse the libraries string - they are space-separated *)
+    let libs = String.words libraries in
+    (* Check if any library is incompatible with JavaScript
+       Allow stdlib_*, testing, and lib; skip for everything else *)
+    let is_javascript_compatible = function
+      | "" | "testing" | "lib" -> true
+      | lib -> String.starts_with ~prefix:"stdlib_" lib
+    in
+    let result =
+      let reason = "Test uses JavaScript-compatible libraries" in
+      if List.for_all is_javascript_compatible libs
+      then Result.predicate_satisfied_with_reason reason
+      else Result.predicate_not_satisfied_with_reason reason
+    in
+    result, env)
+
+
+let javascript_supports_effects =
+  Actions.make
+    ~name:"javascript-supports-effects"
+    ~description:"Skip tests requiring effect handlers when running on JavaScript backend"
+    ~does_something:false
+    (fun _log env ->
+      let test_file = Actions_helpers.testfile env in
+      let test_dir = Actions_helpers.test_source_directory env in
+      let reason = "JavaScript backend supports effect handlers" in
+      let contains_effects path =
+        let sep = Filename.dir_sep.[0] in
+        String.split_on_char sep path
+        |> List.exists (String.equal "effects")
+      in
+      let supports_effects =
+        not (contains_effects test_file || contains_effects test_dir)
+      in
+      let result =
+        if supports_effects then
+          Result.predicate_satisfied_with_reason reason
+        else
+          Result.predicate_not_satisfied_with_reason reason
+      in
+      result, env)
+
+
 let initialize_test_exit_status_variables _log env =
   Environments.add_bindings
   [
@@ -435,4 +485,5 @@ let init () =
     probes;
     tsan;
     no_tsan;
+    libraries_are_javascript_compatible;
   ]

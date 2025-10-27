@@ -65,17 +65,12 @@ let f (runtime_files, bytecode, target_env) =
     List.concat_map bytecode ~f:(fun f ->
         let ic = open_in_bin f in
         let prims =
-          match Parse_bytecode.from_channel ic with
-          | `Cmo x -> x.Cmo_format.cu_primitives
-          | `Cma x ->
-              List.concat_map
-                ~f:(fun x -> x.Cmo_format.cu_primitives)
-                x.Cmo_format.lib_units
-          | `Exe ->
-              let toc = Parse_bytecode.Toc.read ic in
-              Parse_bytecode.read_primitives toc ic
+          Fun.protect
+            (fun () ->
+              (* CR jvanburen: fix this once by reading .cmj files. *)
+              failwith "Unimplemented")
+            ~finally:(fun () -> close_in ic)
         in
-        close_in ic;
         List.map ~f:(fun p -> p, f) prims)
   in
   let _percent_prim, needed =

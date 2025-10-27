@@ -5,10 +5,11 @@ export ARCH
 
 boot_ocamlc = main_native.exe
 boot_ocamlopt = boot_ocamlopt.exe
-boot_ocamlj = boot_ocamlj.exe
 boot_ocamlmklib = tools/ocamlmklib.exe
 boot_ocamldep = tools/ocamldep.exe
 boot_ocamlobjinfo = tools/objinfo.exe
+boot_js_of_ocaml = external/js_of_ocaml/compiler/bin-js_of_ocaml/js_of_ocaml.exe
+boot_jsoo_minify = external/js_of_ocaml/compiler/bin-jsoo_minify/jsoo_minify.exe
 ocamldir = .
 toplevels_installed = top opttop
 
@@ -38,8 +39,10 @@ ci-coverage: boot-runtest coverage
 
 .PHONY: minimizer
 minimizer: runtime-stdlib
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	cp chamelon/dune.ox chamelon/dune
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_main) @chamelon/all
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 .PHONY: hacking-externals
 hacking-externals: _build/_bootinstall
@@ -59,9 +62,11 @@ test-tools: runtime-stdlib
 ARCHES=amd64 arm64
 .PHONY: check_all_arches
 check_all_arches: _build/_bootinstall
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	for arch in $(ARCHES); do \
 	  ARCH=$$arch RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) ocamloptcomp.cma; \
 	done
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 # Compare the OxCaml installation tree against the upstream one.
 
@@ -92,7 +97,6 @@ _compare/config.status: ocaml/config.status
 promote:
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) promote $(ws_main)
 
-.PHONY: fmt
 fmt: $(dune_config_targets)
 	$(if $(filter 1,$(V)),,@)bash scripts/fmt.sh
 
@@ -159,12 +163,14 @@ build_and_test_upstream: build_upstream
 
 .PHONY: coverage
 coverage: boot-runtest
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::group::$@"
 	rm -rf _coverage
 	bisect-ppx-report html --tree -o _coverage \
 	  --coverage-path=_build/default \
 		--source-path=. \
 	  --source-path=_build/default
 	@echo Coverage report generated in _coverage/index.html
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || echo "::endgroup::"
 
 .PHONY: debug
 .NOTPARALLEL: debug

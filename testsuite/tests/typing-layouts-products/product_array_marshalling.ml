@@ -8,6 +8,8 @@
    exit_status = "2";
    setup-ocamlopt.byte-build-env;
    ocamlopt.byte;
+ } {
+   javascript;
  }
 *)
 

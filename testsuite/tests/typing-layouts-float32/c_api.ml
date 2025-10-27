@@ -1,5 +1,5 @@
 (* TEST
- modules = "stubs.c";
+ modules = "stubs.c stubs.js";
  reference = "${test_source_directory}/c_api.reference";
  flambda2;
  {
@@ -9,17 +9,26 @@
    flags = "-extension small_numbers";
    bytecode;
  }{
+   flags = "-extension small_numbers";
+   javascript;
+ }{
    flags = "-extension layouts_alpha";
    native;
  }{
    flags = "-extension layouts_alpha";
    bytecode;
  }{
+   flags = "-extension layouts_alpha";
+   javascript;
+ }{
    flags = "-extension layouts_beta";
    native;
  }{
    flags = "-extension layouts_beta";
    bytecode;
+ }{
+   flags = "-extension layouts_beta";
+   javascript;
  }
 *)
 

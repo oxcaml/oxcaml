@@ -264,12 +264,7 @@ let native unix
       Asmlink.link_shared unix target objfiles ~genfns ~units_tolink ~ppf_dump
 
     let emit : Optcomp_intf.emit option =
-      Some
-        (fun info ->
-          Asmgen.compile_implementation_linear unix
-            (Unit_info.prefix info.target)
-            ~progname:(Unit_info.original_source_file info.target)
-            ~ppf_dump:info.ppf_dump)
+      Some (Asmgen.compile_implementation_linear unix)
 
     let link_partial target objfiles =
       let exitcode = Ccomp.call_linker Ccomp.Partial target objfiles "" in

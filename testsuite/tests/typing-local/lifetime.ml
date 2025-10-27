@@ -1,4 +1,7 @@
-(* TEST *)
+(* TEST
+{native;}
+{bytecode;}
+*)
 
 let final = ref false
 let rtrue = ref true

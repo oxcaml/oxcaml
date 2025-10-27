@@ -1,6 +1,7 @@
 (* TEST
  flambda2;
- native;
+  { native; }
+  { javascript; }
 *)
 
 module M : sig

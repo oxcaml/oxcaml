@@ -6,17 +6,28 @@
  }{
    bytecode;
  }{
+   reference="${test_source_directory}/unboxed_nativeints.js.reference";
+   javascript;
+ }{
    flags = "-extension layouts_alpha";
    native;
  }{
    flags = "-extension layouts_alpha";
    bytecode;
  }{
+   flags = "-extension layouts_alpha";
+   reference="${test_source_directory}/unboxed_nativeints.js.reference";
+   javascript;
+ }{
    flags = "-extension layouts_beta";
    native;
  }{
    flags = "-extension layouts_beta";
    bytecode;
+ }{
+   flags = "-extension layouts_beta";
+   reference="${test_source_directory}/unboxed_nativeints.js.reference";
+   javascript;
  }
 *)
 

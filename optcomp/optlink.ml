@@ -33,6 +33,21 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   let link_partial = Backend.link_partial
 
+  let tool_name = Filename.basename Sys.argv.(0)
+
+  let fatal msg = Misc.fatal_errorf "%s: %s" tool_name msg
+
+  let ensure_js_support files =
+    List.iter
+      (fun file ->
+        if not (Filename.check_suffix file ".js")
+        then
+          fatal
+            (Printf.sprintf
+               "unsupported foreign object %s when targeting js_of_ocaml" file))
+      files;
+    files
+
   module String = Misc.Stdlib.String
   module CU = Compilation_unit
 
@@ -217,8 +232,19 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             objfiles
             ([], [], [], Generic_fns.Partition.Set.empty)
         in
-        Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs ();
-        Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
+        let lib_ccobjs = Linkenv.lib_ccobjs () in
+        let lib_ccopts = Linkenv.lib_ccopts () in
+        (match Clflags.backend_target () with
+        | Some Clflags.Backend.Js_of_ocaml ->
+          let js = ensure_js_support lib_ccobjs in
+          Clflags.js_stubs := !Clflags.js_stubs @ js;
+          if lib_ccopts <> []
+          then
+            fatal
+              "stored -ccopt flags are not supported when targeting js_of_ocaml"
+        | Some Clflags.Backend.Native | None ->
+          Clflags.ccobjs := !Clflags.ccobjs @ lib_ccobjs;
+          Clflags.all_ccopts := lib_ccopts @ !Clflags.all_ccopts);
         Backend.link_shared ml_objfiles output_name ~ppf_dump ~genfns
           ~units_tolink)
 
@@ -234,6 +260,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           if !Clflags.nopervasives || !Clflags.output_c_object
           then objfiles
           else objfiles @ [stdexit]
+          (* CR jvanburen: this is the previous code, there is no
+             [early_pervasives] below, so if we run into issues, maybe revert?:
+             {[ if !Clflags.nopervasives then objfiles else if
+             !Clflags.output_c_object then stdlib :: objfiles else stdlib ::
+             (objfiles @ [stdexit]) ]} *)
         in
         let genfns = Generic_fns.Tbl.make () in
         (* CR mshinwell/xclerc: This tuple should be a record *)
@@ -297,8 +328,19 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           match Linkenv.extract_missing_globals () with
           | [] -> ()
           | mg -> raise (Linkenv.Error (Missing_implementations mg)));
-        Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs ();
-        Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
+        let lib_ccobjs = Linkenv.lib_ccobjs () in
+        let lib_ccopts = Linkenv.lib_ccopts () in
+        (match Clflags.backend_target () with
+        | Some Clflags.Backend.Js_of_ocaml ->
+          let js = ensure_js_support lib_ccobjs in
+          Clflags.js_stubs := !Clflags.js_stubs @ js;
+          if lib_ccopts <> []
+          then
+            fatal
+              "stored -ccopt flags are not supported when targeting js_of_ocaml"
+        | Some Clflags.Backend.Native | None ->
+          Clflags.ccobjs := !Clflags.ccobjs @ lib_ccobjs;
+          Clflags.all_ccopts := lib_ccopts @ !Clflags.all_ccopts);
         (* put user's opts first *)
         Backend.link ml_objfiles output_name ~ppf_dump ~genfns ~units_tolink
           ~uses_eval ~quoted_globals ~cached_genfns_imports)

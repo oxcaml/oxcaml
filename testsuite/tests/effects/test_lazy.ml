@@ -4,6 +4,7 @@
    multidomain;
    { bytecode; }
    { native; }
+   { javascript; }
 *)
 
 open Effect

@@ -1,5 +1,6 @@
 (* TEST
  readonly_files = "generate_mixed_blocks_code.ml";
+ modules = "stubs.c stubs.js";
  (* Generate the bytecode/native code versions of
     [generate_mixed_blocks_code.ml]. This doesn't actually run the test;
     it just updates the generated test program (which is separately

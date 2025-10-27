@@ -1,5 +1,7 @@
 (* TEST
  modules = "stub_test.c";
+  { native; }
+  { bytecode; }
 *)
 
 external failwith_from_ocaml : string -> 'a = "caml_failwith_value"

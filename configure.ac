@@ -192,6 +192,7 @@ AC_SUBST([enable_oxcaml_dwarf])
 AC_SUBST([enable_syntax_quotations])
 AC_SUBST([CONFIGURE_ARGS])
 AC_SUBST([native_compiler])
+AC_SUBST([javascript_compiler])
 AC_SUBST([default_build_target])
 AC_SUBST([VERSION], [AC_PACKAGE_VERSION])
 AC_SUBST([OCAML_DEVELOPMENT_VERSION], [OCAML__DEVELOPMENT_VERSION])
@@ -217,8 +218,8 @@ AC_SUBST([AST_INTF_MAGIC_NUMBER], [AST_INTF__MAGIC_NUMBER])
 AC_SUBST([CMXS_MAGIC_NUMBER], [CMXS__MAGIC_NUMBER])
 AC_SUBST([CMT_MAGIC_NUMBER], [CMT__MAGIC_NUMBER])
 AC_SUBST([CMS_MAGIC_NUMBER], [CMS__MAGIC_NUMBER])
-AC_SUBST([CMJ_MAGIC_NUMBER], [CMJ__MAGIC_NUMBER])
-AC_SUBST([CMJA_MAGIC_NUMBER], [CMJA__MAGIC_NUMBER])
+AC_SUBST([JSIR_MAGIC_NUMBER], [JSIR__MAGIC_NUMBER])
+# cmja files are JavaScript files, not binary archives with magic numbers
 AC_SUBST([CFG_MAGIC_NUMBER], [CFG__MAGIC_NUMBER])
 AC_SUBST([LINEAR_MAGIC_NUMBER], [LINEAR__MAGIC_NUMBER])
 AC_SUBST([CC])
@@ -1442,6 +1443,7 @@ AS_CASE([$host],
 # Configure native dynlink
 
 natdynlink=false
+javascript_compiler=true
 
 AS_IF([test x"$supports_shared_libraries" = 'xtrue'],
   [AS_CASE(["$host"],

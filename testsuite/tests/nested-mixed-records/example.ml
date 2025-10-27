@@ -3,6 +3,11 @@
    native;
 *)
 
+(* TEST
+   flambda2;
+   javascript;
+*)
+
 (* Example from the pull request (#3687). *)
 
 type sub = #{ a : int32#; b : string; c : float#; }

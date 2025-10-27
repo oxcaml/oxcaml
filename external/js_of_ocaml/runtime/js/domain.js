@@ -7,6 +7,7 @@ var caml_domain_dls = [0];
 //Version: >= 5
 function caml_domain_dls_set(a) {
   caml_domain_dls = a;
+  return 0;
 }
 
 //Provides: caml_domain_dls_compare_and_set
@@ -23,6 +24,22 @@ function caml_domain_dls_compare_and_set(old, n) {
 //Version: >= 5
 function caml_domain_dls_get(unit) {
   return caml_domain_dls;
+}
+
+//Provides: caml_domain_tls
+var caml_domain_tls = [0];
+
+//Provides: caml_domain_tls_set
+//Requires: caml_domain_tls
+function caml_domain_tls_set(a) {
+  caml_domain_tls = a;
+  return 0;
+}
+
+//Provides: caml_domain_tls_get
+//Requires: caml_domain_tls
+function caml_domain_tls_get(unit) {
+  return caml_domain_tls;
 }
 
 //Provides: caml_atomic_load
@@ -214,6 +231,16 @@ function caml_atomic_cas_field(ref, field, o, n) {
     return 1;
   }
   return 0;
+}
+
+//Provides: caml_atomic_compare_exchange_field
+//Version: >= 5
+function caml_atomic_compare_exchange_field(ref, field, o, n) {
+  var old = ref[field + 1];
+  if (old === o) {
+    ref[field + 1] = n;
+  }
+  return old;
 }
 
 //Provides: caml_atomic_set_field

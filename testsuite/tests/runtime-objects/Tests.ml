@@ -1,4 +1,8 @@
-(* TEST *)
+(* TEST
+ {native;}
+ {bytecode;}
+ (* javascript doesn't support marshaling closures *)
+ *)
 
 (* Marshaling (cf. PR#5436) *)
 

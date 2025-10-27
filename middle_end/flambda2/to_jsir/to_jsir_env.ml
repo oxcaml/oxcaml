@@ -26,7 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open! Jsoo_imports.Import
+open! Jsoo_imports
 
 type exn_handler =
   { addr : Jsir.Addr.t;
@@ -52,7 +52,8 @@ type t =
     function_slots : Jsir.Var.t Function_slot.Map.t;
     value_slots : Jsir.Var.t Value_slot.Map.t;
     traps : Continuation.t list;
-    my_closure : Variable.t option
+    my_closure : Variable.t option;
+    pending_module_block : Jsir.Var.t option
   }
 
 let create ~module_symbol ~return_continuation ~exn_continuation =
@@ -67,7 +68,8 @@ let create ~module_symbol ~return_continuation ~exn_continuation =
     function_slots = Function_slot.Map.empty;
     value_slots = Value_slot.Map.empty;
     traps = [];
-    my_closure = None
+    my_closure = None;
+    pending_module_block = None
   }
 
 let module_symbol t = t.module_symbol
@@ -90,12 +92,6 @@ let add_exn_handler t cont ~addr ~exn_param ~extra_args =
 
 let add_var t fvar jvar = { t with vars = Variable.Map.add fvar jvar t.vars }
 
-let symbol_to_native_strings symbol =
-  ( Symbol.compilation_unit symbol
-    |> Compilation_unit.name |> Compilation_unit.Name.to_string
-    |> Jsir.Native_string.of_string,
-    Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string )
-
 let symbol_is_for_compilation_unit symbol =
   let compilation_unit = Symbol.compilation_unit symbol in
   Symbol.equal (Symbol.for_compilation_unit compilation_unit) symbol
@@ -108,15 +104,15 @@ let register_symbol' ~res symbol var =
        [get_symbol_for_global_data]) *)
     res
   | false ->
-    let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
+    let symbol_name =
+      Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string
+    in
     To_jsir_result.add_instr_exn res
       (Let
          ( Jsir.Var.fresh (),
            Prim
              ( Extern "caml_register_symbol",
-               [ Pc (NativeString compilation_unit_name);
-                 Pc (NativeString symbol_name);
-                 Pv var ] ) ))
+               [Pc (NativeString symbol_name); Pv var] ) ))
 
 let add_symbol_without_registering t symbol jvar =
   { t with symbols = Symbol.Map.add symbol jvar t.symbols }
@@ -124,6 +120,15 @@ let add_symbol_without_registering t symbol jvar =
 let add_symbol t ~res symbol jvar =
   let t = add_symbol_without_registering t symbol jvar in
   t, register_symbol' ~res symbol jvar
+
+let set_pending_module_block t var = { t with pending_module_block = Some var }
+
+let take_pending_module_block t =
+  match t.pending_module_block with
+  | None -> t, None
+  | Some var -> { t with pending_module_block = None }, Some var
+
+let clear_pending_module_block t = { t with pending_module_block = None }
 
 let add_code_id t code_id ~addr ~params ~closure =
   let code_ids = Code_id.Map.add code_id { addr; params; closure } t.code_ids in
@@ -175,19 +180,16 @@ let get_external_symbol ~res symbol =
       let compilation_unit = Symbol.compilation_unit symbol in
       let res = To_jsir_result.import_compilation_unit res compilation_unit in
       let compilation_unit_name =
-        Compilation_unit.name_as_string compilation_unit
+        Compilation_unit.full_path_as_string compilation_unit
       in
       get_symbol_from_global_data ~symbol_name:compilation_unit_name ~res
     | false ->
-      let compilation_unit_name, symbol_name =
-        symbol_to_native_strings symbol
+      let symbol_name =
+        Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string
       in
       let var = Jsir.Var.fresh () in
       let expr : Jsir.expr =
-        Prim
-          ( Extern "caml_get_symbol",
-            [ Pc (NativeString compilation_unit_name);
-              Pc (NativeString symbol_name) ] )
+        Prim (Extern "caml_get_symbol", [Pc (NativeString symbol_name)])
       in
       var, To_jsir_result.add_instr_exn res (Let (var, expr)))
 

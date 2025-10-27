@@ -130,14 +130,19 @@ end) : S = struct
               })
             descr_list
         in
+        let lib_ccobjs, lib_ccopts =
+          match Clflags.backend_target () with
+          | Some Clflags.Backend.Js_of_ocaml -> !Clflags.js_stubs, []
+          | _ -> !Clflags.ccobjs, !Clflags.all_ccopts
+        in
         let infos =
           { lib_units = units;
             lib_imports_cmi = cmis;
             lib_imports_cmx = cmxs;
             lib_quoted_globals = quoted_globals;
             lib_generic_fns = Generic_fns.Tbl.entries genfns;
-            lib_ccobjs = !Clflags.ccobjs;
-            lib_ccopts = !Clflags.all_ccopts
+            lib_ccobjs;
+            lib_ccopts
           }
         in
         output_value outchan infos;
