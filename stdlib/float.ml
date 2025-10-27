@@ -21,16 +21,16 @@ open! Stdlib
 
 [@@@ocaml.nolabels]
 
-external neg : (float[@local_opt]) -> (float[@local_opt]) @@ portable = "%negfloat"
-external add : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) @@ portable = "%addfloat"
-external sub : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) @@ portable = "%subfloat"
-external mul : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) @@ portable = "%mulfloat"
-external div : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) @@ portable = "%divfloat"
-external rem : float -> float -> float @@ portable = "caml_fmod_float" "fmod"
+external neg : (float[@local_opt]) -> (float[@local_opt]) @@ stateless = "%negfloat"
+external add : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) @@ stateless = "%addfloat"
+external sub : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) @@ stateless = "%subfloat"
+external mul : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) @@ stateless = "%mulfloat"
+external div : (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt]) @@ stateless = "%divfloat"
+external rem : float -> float -> float @@ stateless = "caml_fmod_float" "fmod"
   [@@unboxed] [@@noalloc]
-external fma : float -> float -> float -> float @@ portable = "caml_fma_float" "caml_fma"
+external fma : float -> float -> float -> float @@ stateless = "caml_fma_float" "caml_fma"
   [@@unboxed] [@@noalloc]
-external abs : (float[@local_opt]) -> (float[@local_opt]) @@ portable = "%absfloat"
+external abs : (float[@local_opt]) -> (float[@local_opt]) @@ stateless = "%absfloat"
 
 let zero = 0.
 let one = 1.
@@ -39,7 +39,7 @@ let infinity = Stdlib.infinity
 let neg_infinity = Stdlib.neg_infinity
 let nan = Stdlib.nan
 let quiet_nan = nan
-external float_of_bits : int64 -> float @@ portable
+external float_of_bits : int64 -> float @@ stateless
   = "caml_int64_float_of_bits" "caml_int64_float_of_bits_unboxed"
   [@@unboxed] [@@noalloc]
 let signaling_nan = float_of_bits 0x7F_F0_00_00_00_00_00_01L
@@ -51,9 +51,9 @@ let pi = 0x1.921fb54442d18p+1
 let max_float = Stdlib.max_float
 let min_float = Stdlib.min_float
 let epsilon = Stdlib.epsilon_float
-external of_int : int -> (float[@local_opt]) @@ portable = "%floatofint"
-external to_int : float -> int @@ portable = "%intoffloat"
-external of_string : string -> float @@ portable = "caml_float_of_string"
+external of_int : int -> (float[@local_opt]) @@ stateless = "%floatofint"
+external to_int : float -> int @@ stateless = "%intoffloat"
+external of_string : string -> float @@ stateless = "caml_float_of_string"
 let of_string_opt = Stdlib.float_of_string_opt
 let to_string = Stdlib.string_of_float
 type fpclass = Stdlib.fpclass =
@@ -62,84 +62,84 @@ type fpclass = Stdlib.fpclass =
   | FP_zero
   | FP_infinite
   | FP_nan
-external classify_float : (float [@unboxed]) -> fpclass @@ portable =
+external classify_float : (float [@unboxed]) -> fpclass @@ stateless =
   "caml_classify_float" "caml_classify_float_unboxed" [@@noalloc]
-external pow : float -> float -> float @@ portable = "caml_power_float" "pow"
+external pow : float -> float -> float @@ stateless = "caml_power_float" "pow"
   [@@unboxed] [@@noalloc]
-external sqrt : float -> float @@ portable = "caml_sqrt_float" "sqrt"
+external sqrt : float -> float @@ stateless = "caml_sqrt_float" "sqrt"
   [@@unboxed] [@@noalloc]
-external cbrt : float -> float @@ portable = "caml_cbrt_float" "caml_cbrt"
+external cbrt : float -> float @@ stateless = "caml_cbrt_float" "caml_cbrt"
   [@@unboxed] [@@noalloc]
-external exp : float -> float @@ portable = "caml_exp_float" "exp" [@@unboxed] [@@noalloc]
-external exp2 : float -> float @@ portable = "caml_exp2_float" "caml_exp2"
+external exp : float -> float @@ stateless = "caml_exp_float" "exp" [@@unboxed] [@@noalloc]
+external exp2 : float -> float @@ stateless = "caml_exp2_float" "caml_exp2"
   [@@unboxed] [@@noalloc]
-external log : float -> float @@ portable = "caml_log_float" "log" [@@unboxed] [@@noalloc]
-external log10 : float -> float @@ portable = "caml_log10_float" "log10"
+external log : float -> float @@ stateless = "caml_log_float" "log" [@@unboxed] [@@noalloc]
+external log10 : float -> float @@ stateless = "caml_log10_float" "log10"
   [@@unboxed] [@@noalloc]
-external log2 : float -> float @@ portable = "caml_log2_float" "caml_log2"
+external log2 : float -> float @@ stateless = "caml_log2_float" "caml_log2"
   [@@unboxed] [@@noalloc]
-external expm1 : float -> float @@ portable = "caml_expm1_float" "caml_expm1"
+external expm1 : float -> float @@ stateless = "caml_expm1_float" "caml_expm1"
   [@@unboxed] [@@noalloc]
-external log1p : float -> float @@ portable = "caml_log1p_float" "caml_log1p"
+external log1p : float -> float @@ stateless = "caml_log1p_float" "caml_log1p"
   [@@unboxed] [@@noalloc]
-external cos : float -> float @@ portable = "caml_cos_float" "cos" [@@unboxed] [@@noalloc]
-external sin : float -> float @@ portable = "caml_sin_float" "sin" [@@unboxed] [@@noalloc]
-external tan : float -> float @@ portable = "caml_tan_float" "tan" [@@unboxed] [@@noalloc]
-external acos : float -> float @@ portable = "caml_acos_float" "acos"
+external cos : float -> float @@ stateless = "caml_cos_float" "cos" [@@unboxed] [@@noalloc]
+external sin : float -> float @@ stateless = "caml_sin_float" "sin" [@@unboxed] [@@noalloc]
+external tan : float -> float @@ stateless = "caml_tan_float" "tan" [@@unboxed] [@@noalloc]
+external acos : float -> float @@ stateless = "caml_acos_float" "acos"
   [@@unboxed] [@@noalloc]
-external asin : float -> float @@ portable = "caml_asin_float" "asin"
+external asin : float -> float @@ stateless = "caml_asin_float" "asin"
   [@@unboxed] [@@noalloc]
-external atan : float -> float @@ portable = "caml_atan_float" "atan"
+external atan : float -> float @@ stateless = "caml_atan_float" "atan"
   [@@unboxed] [@@noalloc]
-external atan2 : float -> float -> float @@ portable = "caml_atan2_float" "atan2"
+external atan2 : float -> float -> float @@ stateless = "caml_atan2_float" "atan2"
   [@@unboxed] [@@noalloc]
-external hypot : float -> float -> float @@ portable
+external hypot : float -> float -> float @@ stateless
                = "caml_hypot_float" "caml_hypot" [@@unboxed] [@@noalloc]
-external cosh : float -> float @@ portable = "caml_cosh_float" "cosh"
+external cosh : float -> float @@ stateless = "caml_cosh_float" "cosh"
   [@@unboxed] [@@noalloc]
-external sinh : float -> float @@ portable = "caml_sinh_float" "sinh"
+external sinh : float -> float @@ stateless = "caml_sinh_float" "sinh"
   [@@unboxed] [@@noalloc]
-external tanh : float -> float @@ portable = "caml_tanh_float" "tanh"
+external tanh : float -> float @@ stateless = "caml_tanh_float" "tanh"
   [@@unboxed] [@@noalloc]
-external acosh : float -> float @@ portable = "caml_acosh_float" "caml_acosh"
+external acosh : float -> float @@ stateless = "caml_acosh_float" "caml_acosh"
   [@@unboxed] [@@noalloc]
-external asinh : float -> float @@ portable = "caml_asinh_float" "caml_asinh"
+external asinh : float -> float @@ stateless = "caml_asinh_float" "caml_asinh"
   [@@unboxed] [@@noalloc]
-external atanh : float -> float @@ portable = "caml_atanh_float" "caml_atanh"
+external atanh : float -> float @@ stateless = "caml_atanh_float" "caml_atanh"
   [@@unboxed] [@@noalloc]
-external erf : float -> float @@ portable = "caml_erf_float" "caml_erf"
+external erf : float -> float @@ stateless = "caml_erf_float" "caml_erf"
   [@@unboxed] [@@noalloc]
-external erfc : float -> float @@ portable = "caml_erfc_float" "caml_erfc"
+external erfc : float -> float @@ stateless = "caml_erfc_float" "caml_erfc"
   [@@unboxed] [@@noalloc]
-external trunc : float -> float @@ portable = "caml_trunc_float" "caml_trunc"
+external trunc : float -> float @@ stateless = "caml_trunc_float" "caml_trunc"
   [@@unboxed] [@@noalloc]
-external round : float -> float @@ portable = "caml_round_float" "caml_round"
+external round : float -> float @@ stateless = "caml_round_float" "caml_round"
   [@@unboxed] [@@noalloc]
-external ceil : float -> float @@ portable = "caml_ceil_float" "ceil"
+external ceil : float -> float @@ stateless = "caml_ceil_float" "ceil"
   [@@unboxed] [@@noalloc]
-external floor : float -> float @@ portable = "caml_floor_float" "floor"
+external floor : float -> float @@ stateless = "caml_floor_float" "floor"
 [@@unboxed] [@@noalloc]
 
 let is_integer x = x = trunc x && is_finite x
 
-external next_after : float -> float -> float @@ portable
+external next_after : float -> float -> float @@ stateless
   = "caml_nextafter_float" "caml_nextafter" [@@unboxed] [@@noalloc]
 
 let succ x = next_after x infinity
 let pred x = next_after x neg_infinity
 
-external copy_sign : float -> float -> float @@ portable
+external copy_sign : float -> float -> float @@ stateless
                   = "caml_copysign_float" "caml_copysign"
                   [@@unboxed] [@@noalloc]
-external sign_bit : (float [@unboxed]) -> bool @@ portable
+external sign_bit : (float [@unboxed]) -> bool @@ stateless
   = "caml_signbit_float" "caml_signbit" [@@noalloc]
 
-external frexp : float -> float * int @@ portable = "caml_frexp_float"
-external ldexp : (float [@unboxed]) -> (int [@untagged]) -> (float [@unboxed]) @@ portable =
+external frexp : float -> float * int @@ stateless = "caml_frexp_float"
+external ldexp : (float [@unboxed]) -> (int [@untagged]) -> (float [@unboxed]) @@ stateless =
   "caml_ldexp_float" "caml_ldexp_float_unboxed" [@@noalloc]
-external modf : float -> float * float @@ portable = "caml_modf_float"
+external modf : float -> float * float @@ stateless = "caml_modf_float"
 type t = float
-external compare : float -> float -> int @@ portable = "%compare"
+external compare : float -> float -> int @@ stateless = "%compare"
 let equal x y = compare x y = 0
 
 let[@inline] min (x: float) (y: float) =
@@ -175,7 +175,7 @@ let[@inline] min_max_num (x: float) (y: float) =
    it to be marked as [@@noalloc].
  *)
 external seeded_hash_param :
-  int -> int -> int -> float -> int @@ portable = "caml_hash_exn" [@@noalloc]
+  int -> int -> int -> float -> int @@ stateless = "caml_hash_exn" [@@noalloc]
 let seeded_hash seed x = seeded_hash_param 10 100 seed x
 let hash x = seeded_hash_param 10 100 0 x
 
@@ -183,17 +183,17 @@ module Array = struct
 
   type t = floatarray
 
-  external length : t -> int @@ portable = "%floatarray_length"
-  external get : t -> int -> float @@ portable = "%floatarray_safe_get"
-  external set : t -> int -> float -> unit @@ portable = "%floatarray_safe_set"
-  external create : int -> t @@ portable = "caml_floatarray_create"
-  external unsafe_get : t -> int -> float @@ portable = "%floatarray_unsafe_get"
-  external unsafe_set : t -> int -> float -> unit @@ portable = "%floatarray_unsafe_set"
+  external length : t -> int @@ stateless = "%floatarray_length"
+  external get : t -> int -> float @@ stateless = "%floatarray_safe_get"
+  external set : t -> int -> float -> unit @@ stateless = "%floatarray_safe_set"
+  external create : int -> t @@ stateless = "caml_floatarray_create"
+  external unsafe_get : t -> int -> float @@ stateless = "%floatarray_unsafe_get"
+  external unsafe_set : t -> int -> float -> unit @@ stateless = "%floatarray_unsafe_set"
 
   let unsafe_fill a ofs len v =
     for i = ofs to ofs + len - 1 do unsafe_set a i v done
 
-  external unsafe_blit: t -> int -> t -> int -> int -> unit @@ portable =
+  external unsafe_blit: t -> int -> t -> int -> int -> unit @@ stateless =
     "caml_floatarray_blit" [@@noalloc]
 
   let check a ofs len msg =

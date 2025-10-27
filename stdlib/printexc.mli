@@ -156,7 +156,7 @@ type raw_backtrace_entry = private int
 val raw_backtrace_entries : raw_backtrace -> raw_backtrace_entry array
 (** @since 4.12 *)
 
-val get_raw_backtrace: unit -> raw_backtrace
+val get_raw_backtrace: unit -> raw_backtrace @@ stateless
 (** [Printexc.get_raw_backtrace ()] returns the same exception
     backtrace that [Printexc.print_backtrace] would print, but in
     a raw format. Same restriction usage than {!print_backtrace}.
@@ -179,7 +179,7 @@ val raw_backtrace_to_string: raw_backtrace -> string
 *)
 
 external raise_with_backtrace: ('a : value_or_null)
-  . exn -> raw_backtrace -> 'a @ portable unique
+  . exn -> raw_backtrace -> 'a @ portable unique @@ stateless
   = "%raise_with_backtrace"
 (** Reraise the exception using the given raw_backtrace for the
     origin of the exception

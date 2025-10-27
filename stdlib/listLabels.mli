@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -136,7 +136,7 @@ val flatten : ('a : value_or_null). 'a list list -> 'a list
 
 (** {1 Comparison} *)
 
-val equal : ('a : value_or_null). 
+val equal : ('a : value_or_null).
   eq:('a -> 'a -> bool) -> 'a list -> 'a list -> bool
 (** [equal eq [a1; ...; an] [b1; ..; bm]] holds when
     the two input lists have the same length, and for each
@@ -151,7 +151,7 @@ val equal : ('a : value_or_null).
     @since 4.12
 *)
 
-val compare : ('a : value_or_null). 
+val compare : ('a : value_or_null).
   cmp:('a -> 'a -> int) -> 'a list -> 'a list -> int
 (** [compare cmp [a1; ...; an] [b1; ...; bm]] performs
     a lexicographic comparison of the two input lists,
@@ -228,13 +228,13 @@ val fold_left_map :
     @since 4.11
 *)
 
-val fold_left : ('acc : value_or_null) ('a : value_or_null). 
+val fold_left : ('acc : value_or_null) ('a : value_or_null).
   f:('acc -> 'a -> 'acc) -> init:'acc -> 'a list -> 'acc
 (** [fold_left ~f ~init [b1; ...; bn]] is
    [f (... (f (f init b1) b2) ...) bn].
  *)
 
-val fold_right : ('a : value_or_null) ('acc : value_or_null). 
+val fold_right : ('a : value_or_null) ('acc : value_or_null).
   f:('a -> 'acc -> 'acc) -> 'a list -> init:'acc -> 'acc
 (** [fold_right ~f [a1; ...; an] ~init] is
    [f a1 (f a2 (... (f an init) ...))]. Not tail-recursive.
@@ -321,7 +321,7 @@ val mem : ('a : value_or_null). 'a -> set:'a list -> bool
    to an element of [set].
  *)
 
-val memq : ('a : value_or_null). 'a -> set:'a list -> bool
+val memq : ('a : value_or_null). 'a -> set:'a list -> bool @@ portable stateful
 (** Same as {!mem}, but uses physical equality instead of structural
    equality to compare list elements.
  *)
@@ -386,7 +386,7 @@ val filteri : ('a : value_or_null). f:(int -> 'a -> bool) -> 'a list -> 'a list
    @since 4.11
 *)
 
-val partition : ('a : value_or_null). 
+val partition : ('a : value_or_null).
   f:('a -> bool) -> 'a list -> 'a list * 'a list
 (** [partition ~f l] returns a pair of lists [(l1, l2)], where
    [l1] is the list of all the elements of [l] that
@@ -395,7 +395,7 @@ val partition : ('a : value_or_null).
    The order of the elements in the input list is preserved.
  *)
 
-val partition_map : 
+val partition_map :
   ('a : value_or_null) ('b : value_or_null) ('c : value_or_null)
   . f:('a -> ('b, 'c) Either.t) -> 'a list -> 'b list * 'c list
 (** [partition_map f l] returns a pair of lists [(l1, l2)] such that,
@@ -437,39 +437,39 @@ val assoc_opt : ('a : value_or_null) ('b : value_or_null)
     @since 4.05
  *)
 
-val assq : ('a : value_or_null) ('b : value_or_null). 'a -> ('a * 'b) list -> 'b
+val assq : ('a : value_or_null) ('b : value_or_null). 'a -> ('a * 'b) list -> 'b @@ portable stateful
 (** Same as {!assoc}, but uses physical equality instead of
    structural equality to compare keys.
  *)
 
-val assq_opt : ('a : value_or_null) ('b : value_or_null). 
-  'a -> ('a * 'b) list -> 'b option
+val assq_opt : ('a : value_or_null) ('b : value_or_null).
+  'a -> ('a * 'b) list -> 'b option @@ portable stateful
 (** Same as {!assoc_opt}, but uses physical equality instead of
    structural equality to compare keys.
    @since 4.05
  *)
 
-val mem_assoc : ('a : value_or_null) ('b : value_or_null). 
+val mem_assoc : ('a : value_or_null) ('b : value_or_null).
   'a -> map:('a * 'b) list -> bool
 (** Same as {!assoc}, but simply return [true] if a binding exists,
    and [false] if no bindings exist for the given key.
  *)
 
-val mem_assq : ('a : value_or_null) ('b : value_or_null). 
-  'a -> map:('a * 'b) list -> bool
+val mem_assq : ('a : value_or_null) ('b : value_or_null).
+  'a -> map:('a * 'b) list -> bool @@ portable stateful
 (** Same as {!mem_assoc}, but uses physical equality instead of
    structural equality to compare keys.
  *)
 
-val remove_assoc : ('a : value_or_null) ('b : value_or_null). 
+val remove_assoc : ('a : value_or_null) ('b : value_or_null).
   'a -> ('a * 'b) list -> ('a * 'b) list
 (** [remove_assoc a l] returns the list of
    pairs [l] without the first pair with key [a], if any.
    Not tail-recursive.
  *)
 
-val remove_assq : ('a : value_or_null) ('b : value_or_null). 
-  'a -> ('a * 'b) list -> ('a * 'b) list
+val remove_assq : ('a : value_or_null) ('b : value_or_null).
+  'a -> ('a * 'b) list -> ('a * 'b) list @@ portable stateful
 (** Same as {!remove_assoc}, but uses physical equality instead
    of structural equality to compare keys. Not tail-recursive.
  *)
@@ -485,7 +485,7 @@ val split : ('a : value_or_null) ('b : value_or_null)
    Not tail-recursive.
  *)
 
-val combine : ('a : value_or_null) ('b : value_or_null). 
+val combine : ('a : value_or_null) ('b : value_or_null).
   'a list -> 'b list -> ('a * 'b) list
 (** Transform a pair of lists into a list of pairs:
    [combine [a1; ...; an] [b1; ...; bn]] is
@@ -514,7 +514,7 @@ val sort : ('a : value_or_null). cmp:('a -> 'a -> int) -> 'a list -> 'a list
    heap space and logarithmic stack space.
  *)
 
-val stable_sort : ('a : value_or_null). 
+val stable_sort : ('a : value_or_null).
   cmp:('a -> 'a -> int) -> 'a list -> 'a list
 (** Same as {!sort}, but the sorting algorithm is guaranteed to
    be stable (i.e. elements that compare equal are kept in their
@@ -524,19 +524,19 @@ val stable_sort : ('a : value_or_null).
    heap space and logarithmic stack space.
  *)
 
-val fast_sort : ('a : value_or_null). 
+val fast_sort : ('a : value_or_null).
   cmp:('a -> 'a -> int) -> 'a list -> 'a list
 (** Same as {!sort} or {!stable_sort}, whichever is
     faster on typical input.
  *)
 
-val sort_uniq : ('a : value_or_null). 
+val sort_uniq : ('a : value_or_null).
   cmp:('a -> 'a -> int) -> 'a list -> 'a list
 (** Same as {!sort}, but also remove duplicates.
     @since 4.02 (4.03 in ListLabels)
  *)
 
-val merge : ('a : value_or_null). 
+val merge : ('a : value_or_null).
   cmp:('a -> 'a -> int) -> 'a list -> 'a list -> 'a list
 (** Merge two lists:
     Assuming that [l1] and [l2] are sorted according to the

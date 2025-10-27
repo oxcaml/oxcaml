@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 (** Extensible buffers.
 
@@ -109,7 +109,7 @@ val reset : t -> unit
    For long-lived buffers that may have grown a lot, [reset] allows
    faster reclamation of the space used by the buffer. *)
 
-val output_buffer : out_channel -> t -> unit
+val output_buffer : out_channel -> t -> unit @@ portable stateful
 (** [output_buffer oc b] writes the current contents of buffer [b]
    on the output channel [oc]. *)
 
@@ -189,7 +189,7 @@ val add_buffer : t -> t -> unit
 (** [add_buffer b1 b2] appends the current contents of buffer [b2]
    at the end of buffer [b1].  [b2] is not modified. *)
 
-val add_channel : t -> in_channel -> int -> unit
+val add_channel : t -> in_channel -> int -> unit @@ portable stateful
 (** [add_channel b ic n] reads at most [n] characters from the
    input channel [ic] and stores them at the end of buffer [b].
    @raise End_of_file if the channel contains fewer than [n]

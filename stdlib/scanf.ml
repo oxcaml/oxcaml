@@ -38,7 +38,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f) format6 =
 (* The run-time library for scanners. *)
 
 (* Scanning buffers. *)
-module type SCANNING = sig @@ portable
+module type SCANNING = sig @@ stateless
 
   type in_channel
 
@@ -46,7 +46,7 @@ module type SCANNING = sig @@ portable
 
   type file_name = string
 
-  val stdin : in_channel @@ nonportable
+  val stdin : in_channel @@ stateful
   (* The scanning buffer reading from [Stdlib.stdin]. *)
 
   val next_char : scanbuf -> char
@@ -123,10 +123,10 @@ module type SCANNING = sig @@ portable
   (* [Scanning.name_of_input ib] returns the name of the character
      source for input buffer [ib]. *)
 
-  val open_in : file_name -> in_channel @@ nonportable
-  val open_in_bin : file_name -> in_channel @@ nonportable
-  val from_file : file_name -> in_channel @@ nonportable
-  val from_file_bin : file_name -> in_channel @@ nonportable
+  val open_in : file_name -> in_channel @@ stateful
+  val open_in_bin : file_name -> in_channel @@ stateful
+  val from_file : file_name -> in_channel @@ stateful
+  val from_file_bin : file_name -> in_channel @@ stateful
   val from_string : string -> in_channel
   val from_function : (unit -> char) -> in_channel
   val from_channel : Stdlib.in_channel -> in_channel
@@ -552,13 +552,13 @@ let token_float ib = float_of_string (Scanning.token ib)
    since those modules are not available to [Scanf].
    However, we can bind and use the corresponding primitives that are
    available in the runtime. *)
-external nativeint_of_string : string -> nativeint @@ portable
+external nativeint_of_string : string -> nativeint @@ stateless
   = "caml_nativeint_of_string"
 
-external int32_of_string : string -> int32 @@ portable
+external int32_of_string : string -> int32 @@ stateless
   = "caml_int32_of_string"
 
-external int64_of_string : string -> int64 @@ portable
+external int64_of_string : string -> int64 @@ stateless
   = "caml_int64_of_string"
 
 
