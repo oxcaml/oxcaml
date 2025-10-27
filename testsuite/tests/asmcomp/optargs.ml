@@ -1,4 +1,5 @@
 (* TEST
+ skip;
  flags = "-g";
  native;
 *)

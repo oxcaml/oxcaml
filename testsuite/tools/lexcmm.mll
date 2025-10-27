@@ -41,7 +41,6 @@ let keyword_table =
     "byte", BYTE;
     "case", CASE;
     "catch", CATCH;
-    "checkbound", CHECKBOUND;
     "data", DATA;
     "exit", EXIT;
     "extcall", EXTCALL;
@@ -56,6 +55,7 @@ let keyword_table =
     "int", INT;
     "int32", INT32;
     "intoffloat", INTOFFLOAT;
+    "intofvalue", INTOFVALUE;
     "string", KSTRING;
     "let", LET;
     "letmut", LETMUT;
@@ -64,8 +64,8 @@ let keyword_table =
     "mulh", MULH;
     "or", OR;
     "proj", PROJ;
-    "raise_regular", RAISE Lambda.Raise_regular;
-    "raise_reraise", RAISE Lambda.Raise_reraise;
+    "raise", RAISE Lambda.Raise_regular;
+    "reraise", RAISE Lambda.Raise_reraise;
     "raise_notrace", RAISE Lambda.Raise_notrace;
     "seq", SEQ;
     "signed", SIGNED;
@@ -76,6 +76,7 @@ let keyword_table =
     "unit", UNIT;
     "unsigned", UNSIGNED;
     "val", VAL;
+    "valueofint", VALUEOFINT;
     "while", WHILE;
     "with", WITH;
     "xor", XOR;
@@ -159,21 +160,19 @@ rule token = parse
   | "==f" { EQF }
   | "==" { EQI }
   | ">=f" { GEF }
-  | ">=u" { GEU }
-  | ">=" { GEI }
+  | ">=s" { GEI }
+  | ">u" { UGTI }
   | ">f" { GTF }
-  | ">u" { GTU }
-  | ">" { GTI }
+  | ">s" { GTI }
   | "[" { LBRACKET }
   | "<=f" { LEF }
-  | "<=" { LEI }
-  | "<=u" { LEU }
+  | "<=s" { LEI }
   | "(" { LPAREN }
   | "<<" { LSL }
   | ">>u" { LSR }
+  | "<u" { LTI }
   | "<f" { LTF }
-  | "<" { LTI }
-  | "<u" { LTU }
+  | "<s" { LTI }
   | "*f" { MULF }
   | "*" { STAR }
   | "!=f" { NEF }
@@ -186,6 +185,10 @@ rule token = parse
   | ")" { RPAREN }
   | "-f" { SUBF }
   | "-" { SUBI }
+  | ">=u" { UGEI }
+  | ">u" { UGTI }
+  | "<=u" { ULEI }
+  | "<u" { ULTI }
   | '-'? (['0'-'9']+ | "0x" ['0'-'9' 'a'-'f' 'A'-'F']+
                      | "0o" ['0'-'7']+ | "0b" ['0'-'1']+)
       { INTCONST(int_of_string(Lexing.lexeme lexbuf)) }
