@@ -40,7 +40,7 @@ let fail1 (x1 : 'a @ local) : 'a t1 = { x1 }
 Line 1, characters 40-42:
 1 | let fail1 (x1 : 'a @ local) : 'a t1 = { x1 }
                                             ^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let fail3 (x3 : 'a @ local) : 'a t3 = { x3 }
@@ -49,7 +49,7 @@ let fail3 (x3 : 'a @ local) : 'a t3 = { x3 }
 Line 1, characters 40-42:
 1 | let fail3 (x3 : 'a @ local) : 'a t3 = { x3 }
                                             ^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 
