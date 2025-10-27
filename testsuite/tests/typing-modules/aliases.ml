@@ -15,17 +15,17 @@ module C = Char
 - : char = 'B'
 module C' :
   sig
-    external code : char -> int @@ portable = "%identity"
-    val chr : int -> char @@ portable
-    val escaped : char -> string @@ portable
-    val lowercase_ascii : char -> char @@ portable
-    val uppercase_ascii : char -> char @@ portable
+    external code : char -> int @@ stateless = "%identity"
+    val chr : int -> char @@ stateless
+    val escaped : char -> string @@ stateless
+    val lowercase_ascii : char -> char @@ stateless
+    val uppercase_ascii : char -> char @@ stateless
     type t = char
-    val compare : t -> t -> int @@ portable
-    val equal : t -> t -> bool @@ portable
-    val seeded_hash : int -> t -> int @@ portable
-    val hash : t -> int @@ portable
-    external unsafe_chr : int -> char @@ portable = "%identity"
+    val compare : t -> t -> int @@ stateless
+    val equal : t -> t -> bool @@ stateless
+    val seeded_hash : int -> t -> int @@ stateless
+    val hash : t -> int @@ stateless
+    external unsafe_chr : int -> char @@ stateless = "%identity"
   end
 - : char = 'B'
 module C3 :
@@ -59,31 +59,31 @@ C4.chr 66;;
 module F :
   functor (X : sig end) ->
     sig
-      external code : char -> int @@ portable = "%identity"
-      val chr : int -> char @@ portable
-      val escaped : char -> string @@ portable
-      val lowercase_ascii : char -> char @@ portable
-      val uppercase_ascii : char -> char @@ portable
+      external code : char -> int @@ stateless = "%identity"
+      val chr : int -> char @@ stateless
+      val escaped : char -> string @@ stateless
+      val lowercase_ascii : char -> char @@ stateless
+      val uppercase_ascii : char -> char @@ stateless
       type t = char
-      val compare : t -> t -> int @@ portable
-      val equal : t -> t -> bool @@ portable
-      val seeded_hash : int -> t -> int @@ portable
-      val hash : t -> int @@ portable
-      external unsafe_chr : int -> char @@ portable = "%identity"
+      val compare : t -> t -> int @@ stateless
+      val equal : t -> t -> bool @@ stateless
+      val seeded_hash : int -> t -> int @@ stateless
+      val hash : t -> int @@ stateless
+      external unsafe_chr : int -> char @@ stateless = "%identity"
     end
 module C4 :
   sig
-    external code : char -> int @@ portable = "%identity"
-    val chr : int -> char @@ portable
-    val escaped : char -> string @@ portable
-    val lowercase_ascii : char -> char @@ portable
-    val uppercase_ascii : char -> char @@ portable
+    external code : char -> int @@ stateless = "%identity"
+    val chr : int -> char @@ stateless
+    val escaped : char -> string @@ stateless
+    val lowercase_ascii : char -> char @@ stateless
+    val uppercase_ascii : char -> char @@ stateless
     type t = char
-    val compare : t -> t -> int @@ portable
-    val equal : t -> t -> bool @@ portable
-    val seeded_hash : int -> t -> int @@ portable
-    val hash : t -> int @@ portable
-    external unsafe_chr : int -> char @@ portable = "%identity"
+    val compare : t -> t -> int @@ stateless
+    val equal : t -> t -> bool @@ stateless
+    val seeded_hash : int -> t -> int @@ stateless
+    val hash : t -> int @@ stateless
+    external unsafe_chr : int -> char @@ stateless = "%identity"
   end
 - : char = 'B'
 |}];;
@@ -220,24 +220,24 @@ include C;;
 module type Complex =
   sig
     type t = Complex.t = { re : float; im : float; }
-    val zero : t @@ portable
-    val one : t @@ portable
-    val i : t @@ portable
-    val neg : t -> t @@ portable
-    val conj : t -> t @@ portable
-    val add : t -> t -> t @@ portable
-    val sub : t -> t -> t @@ portable
-    val mul : t -> t -> t @@ portable
-    val inv : t -> t @@ portable
-    val div : t -> t -> t @@ portable
-    val sqrt : t -> t @@ portable
-    val norm2 : t -> float @@ portable
-    val norm : t -> float @@ portable
-    val arg : t -> float @@ portable
-    val polar : float -> float -> t @@ portable
-    val exp : t -> t @@ portable
-    val log : t -> t @@ portable
-    val pow : t -> t -> t @@ portable
+    val zero : t @@ stateless
+    val one : t @@ stateless
+    val i : t @@ stateless
+    val neg : t -> t @@ stateless
+    val conj : t -> t @@ stateless
+    val add : t -> t -> t @@ stateless
+    val sub : t -> t -> t @@ stateless
+    val mul : t -> t -> t @@ stateless
+    val inv : t -> t @@ stateless
+    val div : t -> t -> t @@ stateless
+    val sqrt : t -> t @@ stateless
+    val norm2 : t -> float @@ stateless
+    val norm : t -> float @@ stateless
+    val arg : t -> float @@ stateless
+    val polar : float -> float -> t @@ stateless
+    val exp : t -> t @@ stateless
+    val log : t -> t @@ stateless
+    val pow : t -> t -> t @@ stateless
   end
 module M : sig module C : Complex end
 module C = Complex
