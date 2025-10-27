@@ -194,7 +194,12 @@ type t4 = A | B;;
 <[A]>;;
 [%%expect {|
 type t4 = A | B
-- : <[t4]> expr = <[A]>
+Line 194, characters 2-3:
+194 | <[A]>;;
+        ^
+Error: Constructor "A" used at Line 194, characters 2-3
+       cannot be used in this context;
+       "A" is not defined inside a quotation (<[ ... ]>).
 |}];;
 
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
