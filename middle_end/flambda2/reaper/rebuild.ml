@@ -1528,13 +1528,34 @@ let rec default_defining_expr_for_rebuilding_let env res
           | Set_of_closures m ->
             if Function_slot.Lmap.exists
                  (fun _ sym ->
-                   assert (
-                     not
-                       (Option.is_some
-                          (DS.get_changed_representation env.uses
-                             (Code_id_or_name.symbol sym))));
-                   is_symbol_used env sym)
+                   Option.is_some
+                     (DS.get_changed_representation env.uses
+                        (Code_id_or_name.symbol sym)))
                  m
+            then
+              let m =
+                Function_slot.Lmap.of_list
+                  (List.map
+                     (fun (fs, sym) ->
+                       let repr =
+                         Option.get
+                           (DS.get_changed_representation env.uses
+                              (Code_id_or_name.symbol sym))
+                       in
+                       match repr with
+                       | DS.Block_representation _ ->
+                         Misc.fatal_errorf
+                           "Block representation for set of closures %a"
+                           Symbol.print sym
+                       | DS.Closure_representation (_, fs_map, cur_fs) ->
+                         assert (Function_slot.equal fs cur_fs);
+                         Function_slot.Map.find fs fs_map, sym)
+                     (Function_slot.Lmap.bindings m))
+              in
+              Some (Bound_static.Pattern.set_of_closures m, e)
+            else if Function_slot.Lmap.exists
+                      (fun _ sym -> is_symbol_used env sym)
+                      m
             then Some arg
             else None)
         (List.combine (Bound_static.to_list bound_static) group)
