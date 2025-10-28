@@ -146,6 +146,7 @@ value swap_gil(value unused)
   s->reinitialize_after_fork = runtime_reinitialize;
   s->can_skip_yield = NULL;
   s->yield = runtime_yield;
+  s->send_interrupt = NULL;
   caml_switch_runtime_locking_scheme(s);
   return Val_unit;
 }
