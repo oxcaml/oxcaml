@@ -1,0 +1,12 @@
+* thread #1, stop reason = breakpoint 1.1
+    frame #N: <ADDRESS> test_anon_modules_dwarf.exe`__OM23Test_anon_modules_dwarfF7f_start_10_code(param=0 : ocaml_value)
+* thread #1, stop reason = breakpoint 2.1
+    frame #N: <ADDRESS> test_anon_modules_dwarf.exe`__OM23Test_anon_modules_dwarfF16test_anon_module_11_code(param=<unavailable>)
+anonymous module
+* thread #1, stop reason = breakpoint 3.1
+    frame #N: <ADDRESS> test_anon_modules_dwarf.exe`__OM23Test_anon_modules_dwarfF30test_anon_module_with_function_12_code(param=<unavailable>)
+anonymous module with function
+* thread #1, stop reason = breakpoint 4.1
+    frame #N: <ADDRESS> test_anon_modules_dwarf.exe`__OM23Test_anon_modules_dwarfF18test_named_vs_anon_14_code(param=<unavailable>)
+* thread #1, stop reason = breakpoint 5.1
+    frame #N: <ADDRESS> test_anon_modules_dwarf.exe`__OM23Test_anon_modules_dwarfF23test_nested_anon_module_17_code(param=<unavailable>)

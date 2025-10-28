@@ -6,6 +6,7 @@
  program = "question.cmxs";
  ocamlopt.byte;
  check-ocamlopt.byte-output;
+ legacy-ocaml-name-mangling;
  {
    ocamlobjinfo;
 

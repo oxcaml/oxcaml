@@ -107,3 +107,5 @@ let poll_insertion = @poll_insertion@
 let naked_pointers = false
 
 let tsan = @tsan@
+
+let legacy_ocaml_name_mangling = {@QS@|@name_mangling_version@|@QS@} = "LegacyOCaml"

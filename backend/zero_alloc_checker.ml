@@ -2201,8 +2201,24 @@ end = struct
     else Witnesses.empty
 
   let is_caml_internal s =
-    String.starts_with s ~prefix:"caml_apply"
-    || String.starts_with s ~prefix:"camlCamlinternal"
+    (* [runlength_mangling_caml_internal] finds camlInternal in the runlength
+       name mangling scheme. *)
+    let rec runlength_mangling_caml_internal ~from:i s =
+      if i < 0 || i >= String.length s
+      then false
+      else
+        match String.get s i with
+        | '0' .. '9' -> runlength_mangling_caml_internal ~from:(i + 1) s
+        | _ -> String.begins_with s ~from:i ~prefix:"Camlinternal"
+    in
+    let caml_internal () =
+      match Config.name_mangling_version with
+      | LegacyOCaml -> String.starts_with s ~prefix:"camlCamlinternal"
+      | RunLengthEncoding ->
+        String.starts_with s ~prefix:"_O"
+        && runlength_mangling_caml_internal ~from:2 s
+    in
+    String.starts_with s ~prefix:"caml_apply" || caml_internal ()
 
   (* [find_callee] returns the value associated with the callee. *)
   let find_callee t callee ~desc dbg (k : Witness.kind) =
