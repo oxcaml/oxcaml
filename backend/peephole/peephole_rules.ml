@@ -196,6 +196,35 @@ let fold_intop_imm (cell : Cfg.basic Cfg.instruction DLL.cell) =
     else None
   | _ -> None
 
+let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
+  (* CR-someday xclerc for xclerc: it is not clear we want these rewrites to
+     happen here. Indeed, it is probably better to avoid these useless
+     operations when generating CMM, but this is currently blocked on an
+     upcoming refactoring there and it is simple enough to do here. *)
+  match U.get_cells cell 1 with
+  | [cell] -> (
+    let instr = DLL.value cell in
+    match instr.desc with
+    | Op (Intop_imm (op, imm)) ->
+      let to_remove =
+        match op, imm with
+        | Iadd, 0 | Isub, 0 | Ior, 0 | Ixor, 0 | Ilsl, 0 | Ilsr, 0 | Iasr, 0 ->
+          true
+        | _ -> false
+      in
+      if to_remove
+      then (
+        let continue =
+          match DLL.prev cell with
+          | None -> DLL.next cell
+          | Some _ as prev -> prev
+        in
+        DLL.delete_curr cell;
+        continue)
+      else None
+    | _ -> None)
+  | _ -> None
+
 let apply cell =
   let[@inline always] if_none_do f o =
     match o with Some _ -> o | None -> f cell
@@ -204,3 +233,4 @@ let apply cell =
   |> if_none_do remove_overwritten_mov
   |> if_none_do remove_useless_mov
   |> if_none_do fold_intop_imm
+  |> if_none_do remove_intop_neutral_element
