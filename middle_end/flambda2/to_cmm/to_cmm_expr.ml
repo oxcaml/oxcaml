@@ -808,8 +808,44 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
       | None ->
         (* Cannot translate - just skip the phantom let *)
         expr env res body))
+  | ( Singleton bound_var,
+      Prim (Unary (Block_load { kind = _; mut = _; field }, arg), _dbg) ) -> (
+    (* Translate Block_load to Cphantom_read_field *)
+    match Simple.must_be_var arg with
+    | Some (var, _coercion) ->
+      let To_cmm_env.{ expr = { cmm; _ }; _ } =
+        C.simple ~dbg:Debuginfo.none env res (Simple.var var)
+      in
+      (match cmm with
+      | Cvar backend_var ->
+        let var = Bound_var.var bound_var in
+        let debug_uid = Bound_var.debug_uid bound_var in
+        let env, backend_var_with_prov =
+          To_cmm_env.add_phantom_let_binding env var ~debug_uid
+        in
+        let field_int =
+          Targetint_32_64.to_int_checked
+            (Target_system.Machine_width.Sixty_four)
+            (Target_ocaml_int.to_targetint
+               (Target_system.Machine_width.Sixty_four)
+               field)
+        in
+        let defining_expr =
+          Some (Cmm.Cphantom_read_field { var = backend_var; field = field_int })
+        in
+        let wrap, env, res =
+          Env.flush_delayed_lets ~mode:Flush_everything env res
+        in
+        let body_cmm, free_vars, symbol_inits, res = expr env res body in
+        let cmm =
+          C.make_phantom_let backend_var_with_prov defining_expr body_cmm
+        in
+        let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
+        cmm, free_vars, symbol_inits, res
+      | _ -> expr env res body)
+    | None -> expr env res body)
   | _ ->
-    (* For now, only handle Make_block case *)
+    (* For other cases, skip the phantom let *)
     expr env res body
 
 and let_expr env res let_expr =
