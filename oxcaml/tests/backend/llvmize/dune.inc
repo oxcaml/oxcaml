@@ -803,3 +803,27 @@
  (action
   (diff csel_ir.output csel_ir.output.corrected)))
 
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (targets dls_get.output.corrected)
+ (deps dls_get.ml)
+ (action
+  (progn
+   (run %{bin:ocamlopt.opt} dls_get.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -dump-into-file -dcmm -dcfg -stop-after llvmize)
+   (with-outputs-to dls_get.output.corrected (pipe-outputs (run cat dls_get.ll) (run ./filter.sh))))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{env:OXCAML_CLANG=} "")))
+ (alias runtest-llvmize)
+ (deps dls_get.output dls_get.output.corrected)
+ (action
+  (diff dls_get.output dls_get.output.corrected)))
+

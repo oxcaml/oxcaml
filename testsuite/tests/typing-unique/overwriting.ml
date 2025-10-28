@@ -89,7 +89,7 @@ let disallowed_by_locality (local_ unique_ r) (local_ x) =
 Line 2, characters 22-23:
 2 |   overwrite_ r with { x }
                           ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let gc_soundness_bug (unique_ r) (local_ x) =
@@ -107,7 +107,7 @@ let disallowed_by_locality (unique_ r) (local_ x) =
 Line 2, characters 22-23:
 2 |   overwrite_ r with { x }
                           ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let gc_soundness_no_bug (local_ unique_ r) x =
@@ -144,7 +144,7 @@ Line 3, characters 13-14:
                  ^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global".
+       However, the highlighted expression is expected to be "local" to the parent region or "global".
 |}]
 
 let returning_regional () x =
@@ -178,7 +178,7 @@ let disallowed_by_regionality (local_ unique_ r) x =
 Line 3, characters 16-17:
 3 |   let ref = ref r in
                     ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let gc_soundness_no_bug (unique_ r) x =

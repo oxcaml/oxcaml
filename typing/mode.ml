@@ -48,6 +48,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Crossing -> pp, Crossing
       | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
+      | Allocation_r loc -> pp, Allocation_l loc
 
     let right_adjoint :
         type r.
@@ -63,6 +64,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Crossing -> pp, Crossing
       | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
+      | Allocation_l loc -> pp, Allocation_r loc
 
     include Magic_allow_disallow (struct
       type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
@@ -77,6 +79,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
+         | Allocation_l loc -> Allocation_l loc
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
         fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -87,6 +90,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Captured_by_partial_application -> Captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
+         | Allocation_r loc -> Allocation_r loc
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
         fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -100,6 +104,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
+         | Allocation_r loc -> Allocation_r loc
+         | Allocation_l loc -> Allocation_l loc
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
         fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -113,6 +119,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
            Adj_captured_by_partial_application
          | Crossing -> Crossing
          | Unknown_non_rigid -> Unknown_non_rigid
+         | Allocation_l loc -> Allocation_l loc
+         | Allocation_r loc -> Allocation_r loc
     end)
   end
 
@@ -2045,6 +2053,12 @@ module Report = struct
            then fprintf ppf "the %t (at %a)" print_desc Location.print_loc loc
            else fprintf ppf "the %t at %a" print_desc Location.print_loc loc)
 
+  let print_allocation_desc : allocation_desc -> formatter -> unit = function
+    | Unknown -> dprintf "the allocation"
+    | Optional_argument -> dprintf "the allocation of the optional argument"
+    | Function_coercion -> dprintf "the allocation for coercing the function"
+    | Float_projection -> dprintf "the allocation for float projection"
+
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and gives the source pinpoint. *)
   let print_morph :
@@ -2073,6 +2087,19 @@ module Report = struct
         ( dprintf "has a partial application capturing a value",
           (Location.none, Expression) )
     | Crossing -> Some (dprintf "crosses with something", pp)
+    (* CR-soon zqian: the "from" and "containing" below should be explicit and clear morph hints. *)
+    | Allocation_r { loc; txt } ->
+      Some
+        ( dprintf "is from %t at %a"
+            (print_allocation_desc txt)
+            Location.print_loc loc,
+          pp )
+    | Allocation_l { loc; txt } ->
+      Some
+        ( dprintf "is from %t (at %a) containing a value"
+            (print_allocation_desc txt)
+            Location.print_loc loc,
+          pp )
 
   let print_mode :
       type a. [`Actual | `Expected] -> a C.obj -> formatter -> a -> unit =
@@ -2080,10 +2107,7 @@ module Report = struct
     let mode_printer = Misc.Style.as_inline_code (C.print obj) in
     match side, obj, x with
     | `Actual, Regionality, Regional ->
-      (* In the special case where the actual mode is regional (and thus the
-         expected is global), it's more user friendly to say "local" than
-         "regional" or "local to the parent region" etc. *)
-      mode_printer ppf C.Regionality.Local
+      fprintf ppf "%a to the parent region" mode_printer C.Regionality.Local
       (* CR-someday zqian: treat the following cases generally. *)
     | `Expected, Contention_op, Shared ->
       (* When "shared" is expected, we tell the user that either shared or
@@ -2094,7 +2118,8 @@ module Report = struct
       fprintf ppf "%a or %a" mode_printer C.Visibility.Read mode_printer
         C.Visibility.Read_write
     | `Expected, Regionality, Regional ->
-      fprintf ppf "in the parent region or %a" mode_printer C.Regionality.Global
+      fprintf ppf "%a to the parent region or %a" mode_printer
+        C.Regionality.Local mode_printer C.Regionality.Global
     | _ -> mode_printer ppf x
    [@@ocaml.warning "-4"]
 
@@ -2127,7 +2152,8 @@ module Report = struct
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
     | Adj_captured_by_partial_application ->
       true
-    | Skip | Crossing | Unknown_non_rigid -> false
+    | Allocation_r _ | Allocation_l _ | Skip | Crossing | Unknown_non_rigid ->
+      false
 
   let eq_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->

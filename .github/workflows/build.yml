@@ -406,28 +406,20 @@ jobs:
           # CSV filename
           CSV_FILE="metrics-repo/data/metrics-${DATE}-${SHORT_HASH}.csv"
 
-          # Use the metrics collection script
-          ${{ github.workspace }}/scripts/collect-size-metrics.sh \
+          # Determine the actual commit being tested (not the merge commit for PRs)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            COMMIT_HASH="${{ github.event.pull_request.head.sha }}"
+          else
+            COMMIT_HASH="${{ github.sha }}"
+          fi
+
+          # Use the metrics collection script (CSV filename and PR number computed internally)
+          python3 ${{ github.workspace }}/scripts/collect-size-metrics.py \
             "${{ github.workspace }}/_install" \
-            "$CSV_FILE" \
+            "metrics-repo/data" \
             "$COMMIT_HASH" \
-            "$PR_NUMBER"
-
-          echo "Contents of generated metrics file:"
-          cat "$CSV_FILE"
-
-          # Commit and push metrics
-          cd metrics-repo
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Configure git to use gh for authentication
-          git config --local credential.helper ""
-          git config --local credential.https://github.com.helper "!gh auth git-credential"
-
-          git add data/
-          git commit -m "Add metrics for commit ${COMMIT_HASH}"
-          git push
+            "$COMMIT_MESSAGE" \
+            --verbose
 
       - name: Upload core dumps
         uses: actions/upload-artifact@v4

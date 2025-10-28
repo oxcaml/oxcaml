@@ -280,4 +280,5 @@ let () =
   print_test_run_no_main "switch";
   print_test ~extra_subst:[] ~buf ~run:(Some "csel")
     ~tasks:([C "csel_stub"] @ ocaml_llvm_and_output_ir "csel");
+  print_test_ir_only "dls_get";
   ()
