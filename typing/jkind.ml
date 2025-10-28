@@ -604,10 +604,6 @@ module With_bounds = struct
     | No_with_bounds -> []
     | With_bounds tys -> tys |> With_bounds_types.to_seq |> List.of_seq
 
-  let length : type d. d with_bounds -> int = function
-    | No_with_bounds -> 0
-    | With_bounds tys -> tys |> With_bounds_types.length
-
   open Allowance
 
   include Magic_allow_disallow (struct
@@ -830,7 +826,7 @@ module Layout_and_axes = struct
      of this function for these axes is undefined; do *not* look at the results for these
      axes.
   *)
-  let rec normalize :
+  let normalize :
       type layout l r1 r2.
       context:_ ->
       mode:r2 normalize_mode ->
@@ -1236,31 +1232,13 @@ module Layout_and_axes = struct
           (Axis_set.complement skip_axes)
           (With_bounds.to_list t.with_bounds)
       in
-      if With_bounds.length with_bounds <= 10
-      then { t with mod_bounds; with_bounds }, fuel_status
-      else
-        (* If there are more than 10 with-bounds, we do Ignore_best
-           normalization (which will result in 0 with-bounds). This is an
-           optimization unnecessary for correctness. In practice, this
-           optimization doesn't seem to hinder inference much. We were unable to
-           find real-world use-cases where more than 10 with-bounds were
-           necessary.
-
-           With-bounds can get very large in number if there is a complex
-           recursive type that references many abstract types. For example,
-           we've observed a real-world instance of inferring ~350 with-bounds.
-           This is problematic if the type is then used a large number of times
-           across the file (a "usage" can also mean a usage of a value with the
-           given type). This is because at each usage we check the kind of the
-           type, but before checking the kind, we must substitute types into the
-           with-bounds. This subsitution involves copying the with-bounds, which
-           can become expensive when done many times. In the example with 350
-           with-bounds, this copying was done hundreds of times, which took up
-           the majority of run-time. *)
-        let result, _ =
-          normalize ~context ~mode:Ignore_best ~skip_axes ?map_type_info t
-        in
-        result, Ran_out_of_fuel
+      let normalized_t : (layout, l * r2) layout_and_axes =
+        match mode, fuel_status with
+        | Require_best, Ran_out_of_fuel -> t |> disallow_right
+        | Require_best, Sufficient_fuel -> { t with mod_bounds; with_bounds }
+        | Ignore_best, _ -> { t with mod_bounds; with_bounds }
+      in
+      normalized_t, fuel_status
 end
 
 (*********************************)
