@@ -17,91 +17,77 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: runtime5
+          - name: runtime5 (x86_64-linux)
             config: --enable-runtime5
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
 
-          - name: runtime5 stack-checks
+          - name: runtime5 stack-checks (x86_64-linux)
             config: --enable-runtime5 --enable-stack-checks
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
 
-          - name: runtime5 poll-insertion
+          - name: runtime5 poll-insertion (x86_64-linux)
             config: --enable-runtime5 --enable-poll-insertion
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
 
-          - name: runtime5 multidomain
+          - name: runtime5 multidomain (x86_64-linux)
             config: --enable-runtime5 --enable-stack-checks --enable-poll-insertion --enable-multidomain
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
 
-          - name: runtime4 dev
+          - name: runtime4 dev (x86_64-linux)
             config: --disable-runtime5 --enable-dev
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
 
-          - name: runtime5 dev
+          - name: runtime5 dev (x86_64-linux)
             config: --enable-runtime5 --enable-dev
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
 
-          - name: runtime5 debug stack-checks
+          - name: runtime5 debug stack-checks (x86_64-linux)
             config: --enable-runtime5 --enable-stack-checks
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
 
-          - name: runtime5 debug
+          - name: runtime5 debug (x86_64-linux)
             config: --enable-runtime5
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
 
-          - name: runtime4 -O3
+          - name: runtime4 O3 (x86_64-linux)
             config: --disable-runtime5
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
 
-          - name: runtime4 -O3 metrics
+          - name: runtime4 O3 metrics (x86_64-linux)
             config: --disable-runtime5
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
             collect_metrics: true
 
-          - name: runtime4 -Oclassic frame-pointers poll-insertion flambda-invariants
+          - name: runtime4 Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
             config: --disable-runtime5 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,Oclassic=1'
             disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml'
 
-          - name: runtime4
+          - name: runtime4 (aarch64-darwin)
             config: --disable-runtime5 --disable-warn-error
-            system: aarch64-darwin
             os: warp-macos-15-arm64-6x
 
-          - name: runtime5 regalloc
+          - name: runtime5 regalloc (aarch64-darwin)
             config: --enable-runtime5 --disable-warn-error
-            system: aarch64-darwin
             os: warp-macos-15-arm64-6x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
 
-          - name: runtime5 debug regalloc
+          - name: runtime5 debug regalloc (aarch64-darwin)
             config: --enable-runtime5 --disable-warn-error
-            system: aarch64-darwin
             os: warp-macos-15-arm64-6x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
@@ -109,70 +95,61 @@ jobs:
             ocamlrunparam: "v=0,V=1"
             run_regalloc_tool: true
 
-          - name: runtime5 regalloc
+          - name: runtime5 regalloc (aarch64-linux)
             config: --enable-runtime5 --disable-warn-error
-            system: aarch64-linux
             os: warp-ubuntu-latest-arm64-8x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
 
-          - name: runtime4 regalloc
+          - name: runtime4 regalloc (x86_64-linux)
             config: --disable-runtime5
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             check_arch: true
             run_regalloc_tool: true
 
-          - name: runtime5 frame-pointers irc
+          - name: runtime5 frame-pointers irc (x86_64-linux)
             config: --enable-runtime5 --enable-frame-pointers
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,w=-46,regalloc=irc'
             ocamlparam: '_,w=-46,regalloc=irc'
             check_arch: true
 
-          - name: runtime5 cfg-invariants
+          - name: runtime5 cfg-invariants (x86_64-linux)
             config: --enable-runtime5
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             check_arch: true
 
-          - name: runtime5 vectorizer
+          - name: runtime5 vectorizer (x86_64-linux)
             config: --enable-runtime5
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             check_arch: true
 
-          - name: runtime4 asan
-            config: --enable-address-sanitizer
-            system: x86_64-linux
+          - name: runtime4 address-sanitizer (x86_64-linux)
+            config: --disable-runtime5 --enable-address-sanitizer
             os: warp-ubuntu-latest-x64-8x
             cc: clang
 
-          - name: runtime5 asan
-            config: --enable-address-sanitizer --enable-runtime5
-            system: x86_64-linux
+          - name: runtime5 address-sanitizer (x86_64-linux)
+            config: --enable-runtime5 --enable-address-sanitizer
             os: warp-ubuntu-latest-x64-8x
             cc: clang
 
-          - name: runtime5 dwarf-tests
+          - name: runtime5 dwarf-tests (x86_64-linux)
             config: --enable-runtime5
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             dwarf_tests_only: true
             oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus1
             oxcaml_llvm_source_branch: lldb
 
-          - name: runtime5 frame-pointers llvmize-tests
+          - name: runtime5 frame-pointers llvmize-tests (x86_64-linux)
             config: --enable-runtime5 --enable-frame-pointers
-            system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             llvmize_tests_only: true
             oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
@@ -261,7 +238,7 @@ jobs:
 
           # Install the compiler for metrics_collection configuration to populate _install directory
           # This is needed for the metrics collection step to analyze installed artifacts
-          if [ "${{ matrix.name }}" = "metrics_collection" ]; then
+          if [ "${{ matrix.collect_metrics }}" = "true" ]; then
             make install
           fi
         env:
@@ -272,7 +249,7 @@ jobs:
 
       - name: Promote failed tests and capture diffs
         # Compute the diff for an arbitrary job, we expect all to have the same diff
-        if: failure() && matrix.name == 'flambda2_o3'
+        if: failure() && matrix.name == 'runtime5'
         continue-on-error: true
         run: |
           export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
@@ -403,7 +380,7 @@ jobs:
           done
 
       - name: Collect and push metrics
-        if: matrix.name == 'metrics_collection' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: matrix.collect_metrics == true && github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
