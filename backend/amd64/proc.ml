@@ -104,13 +104,13 @@ let hard_float_reg =
   v
 
 let hard_vec128_reg =
-  Array.map (fun r -> {r with Reg.typ = Vec128}) hard_float_reg
+  Array.map (Reg.create_alias ~typ:Vec128) hard_float_reg
 let hard_vec256_reg =
-  Array.map (fun r -> {r with Reg.typ = Vec256}) hard_float_reg
+  Array.map (Reg.create_alias ~typ:Vec256) hard_float_reg
 let hard_vec512_reg =
-  Array.map (fun r -> {r with Reg.typ = Vec512}) hard_float_reg
+  Array.map (Reg.create_alias ~typ:Vec512) hard_float_reg
 let hard_float32_reg =
-  Array.map (fun r -> {r with Reg.typ = Float32}) hard_float_reg
+  Array.map (Reg.create_alias ~typ:Float32) hard_float_reg
 
 let add_hard_vec256_regs list ~f =
   if Arch.Extension.enabled_vec256 ()
@@ -133,9 +133,10 @@ let phys_reg ty n =
        for the LLVM backend. However, this breaks an invariant the IRC register
        allocator relies on. It is safe to guard it with this flag since the LLVM
        backend doesn't get that far. *)
+    let r = hard_int_reg.(n) in
     if !Clflags.llvm_backend
-    then { hard_int_reg.(n) with typ = ty }
-    else hard_int_reg.(n)
+    then Reg.create_alias ~typ:ty r
+    else r
   | Float -> hard_float_reg.(n - 100)
   | Float32 -> hard_float32_reg.(n - 100)
   | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)
