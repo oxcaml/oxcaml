@@ -608,11 +608,6 @@ module With_bounds = struct
     | No_with_bounds -> 0
     | With_bounds tys -> tys |> With_bounds_types.length
 
-  let fold (type d) f (t : d with_bounds) init =
-    match t with
-    | No_with_bounds -> init
-    | With_bounds tys -> With_bounds_types.fold f tys init
-
   open Allowance
 
   include Magic_allow_disallow (struct
@@ -835,12 +830,16 @@ module Layout_and_axes = struct
      of this function for these axes is undefined; do *not* look at the results for these
      axes.
   *)
-  let normalize (type layout l r1 r2) ~context ~(mode : r2 normalize_mode)
-      ~skip_axes
-      ?(map_type_info :
-         (type_expr -> With_bounds_type_info.t -> With_bounds_type_info.t)
-         option) (t : (layout, l * r1) layout_and_axes) :
+  let rec normalize :
+      type layout l r1 r2.
+      context:_ ->
+      mode:r2 normalize_mode ->
+      skip_axes:_ ->
+      ?map_type_info:
+        (type_expr -> With_bounds_type_info.t -> With_bounds_type_info.t) ->
+      (layout, l * r1) layout_and_axes ->
       (layout, l * r2) layout_and_axes * Fuel_status.t =
+   fun ~context ~mode ~skip_axes ?map_type_info t ->
     (* handle a few common cases first, before doing anything else *)
     (* DEBUGGING
        Format.printf "@[normalize: %a@;  relevant_axes: %a@]@;"
@@ -1240,11 +1239,12 @@ module Layout_and_axes = struct
       if With_bounds.length with_bounds <= 10
       then { t with mod_bounds; with_bounds }, fuel_status
       else
-        (* If there are more than 10 with-bounds, we assume they're all max and
-           drop them. This is an optimization unnecessary for correctness. In
-           practice, this optimization doesn't seem to hinder inference much. We
-           were unable to find real-world use-cases where more than 10
-           with-bounds were necessary.
+        (* If there are more than 10 with-bounds, we do Ignore_best
+           normalization (which will result in 0 with-bounds). This is an
+           optimization unnecessary for correctness. In practice, this
+           optimization doesn't seem to hinder inference much. We were unable to
+           find real-world use-cases where more than 10 with-bounds were
+           necessary.
 
            With-bounds can get very large in number if there is a complex
            recursive type that references many abstract types. For example,
@@ -1257,15 +1257,10 @@ module Layout_and_axes = struct
            can become expensive when done many times. In the example with 350
            with-bounds, this copying was done hundreds of times, which took up
            the majority of run-time. *)
-        let relevant_axes_in_with_bounds =
-          With_bounds.fold
-            (fun _ { relevant_axes } acc -> Axis_set.union acc relevant_axes)
-            with_bounds Axis_set.empty
+        let result, _ =
+          normalize ~context ~mode:Ignore_best ~skip_axes ?map_type_info t
         in
-        let mod_bounds =
-          Mod_bounds.set_max_in_set mod_bounds relevant_axes_in_with_bounds
-        in
-        { t with mod_bounds; with_bounds = No_with_bounds }, Ran_out_of_fuel
+        result, Ran_out_of_fuel
 end
 
 (*********************************)
