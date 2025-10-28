@@ -10319,7 +10319,9 @@ and type_generic_array
   let to_unify = type_ ty in
   with_explanation explanation (fun () ->
     unify_exp_types loc env to_unify (generic_instance ty_expected));
-  check_construct_mutability ~loc ~env mutability ~ty array_mode;
+  (* CR modes: make sure that this is actually sound to do *)
+  if sargl <> [] then
+    check_construct_mutability ~loc ~env mutability ~ty array_mode;
   let argument_mode = expect_mode_cross env ty argument_mode in
   let argl =
     List.map
