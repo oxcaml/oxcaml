@@ -22,9 +22,9 @@ def collect_metrics(install_dir: str, output_dir: str, commit_hash: str,
               file=sys.stderr)
         sys.exit(1)
 
-    # Extract PR number from commit message
-    pr_match = re.search(r'\(#(\d+)\)', commit_message)
-    pr_number = pr_match.group(1) if pr_match else "N/A"
+    # Extract PR number from commit message (use last match if multiple)
+    pr_matches = re.findall(r'\(#(\d+)\)', commit_message)
+    pr_number = pr_matches[-1] if pr_matches else "N/A"
 
     # Generate timestamp and compute output path
     now = datetime.now(timezone.utc)
