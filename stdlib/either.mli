@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 (** Either type.
 
@@ -83,19 +83,19 @@ val find_right : ('a : value_or_null) ('b : value_or_null)
   . ('a, 'b) t -> 'b option
 (** [find_right (Right v)] is [Some v], [find_right (Left _)] is [None] *)
 
-val map_left : ('a1 : value_or_null) ('a2 : value_or_null) 
+val map_left : ('a1 : value_or_null) ('a2 : value_or_null)
   ('b : value_or_null).
   ('a1 -> 'a2) -> ('a1, 'b) t -> ('a2, 'b) t
 (** [map_left f e] is [Left (f v)] if [e] is [Left v]
     and [e] if [e] is [Right _]. *)
 
-val map_right : ('a : value_or_null) ('b1 : value_or_null) 
+val map_right : ('a : value_or_null) ('b1 : value_or_null)
   ('b2 : value_or_null).
   ('b1 -> 'b2) -> ('a, 'b1) t -> ('a, 'b2) t
 (** [map_right f e] is [Right (f v)] if [e] is [Right v]
     and [e] if [e] is [Left _]. *)
 
-val map : ('a1 : value_or_null) ('a2 : value_or_null) 
+val map : ('a1 : value_or_null) ('a2 : value_or_null)
   ('b1 : value_or_null) ('b2 : value_or_null)
   . left:('a1 -> 'a2) -> right:('b1 -> 'b2) -> ('a1, 'b1) t -> ('a2, 'b2) t
 (** [map ~left ~right (Left v)] is [Left (left v)],

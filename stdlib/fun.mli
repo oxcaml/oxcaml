@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -32,7 +32,7 @@ val const : ('a : value_or_null) ('b : value_or_null)
 (** [const c] is a function that always returns the value [c]. For any
     argument [x], [(const c) x] is [c]. *)
 
-val compose : ('a : value_or_null) ('b : value_or_null) 
+val compose : ('a : value_or_null) ('b : value_or_null)
   ('c : value_or_null).
   ('b -> 'c) -> ('a -> 'b) -> 'a -> 'c
 (** [compose f g] is a function composition of applying [g] then [f].
@@ -40,7 +40,7 @@ val compose : ('a : value_or_null) ('b : value_or_null)
 
     @since 5.2 *)
 
-val flip : ('a : value_or_null) ('b : value_or_null) 
+val flip : ('a : value_or_null) ('b : value_or_null)
   ('c : value_or_null).
   ('a -> 'b -> 'c) -> ('b -> 'a -> 'c)
 (** [flip f] reverses the argument order of the binary function

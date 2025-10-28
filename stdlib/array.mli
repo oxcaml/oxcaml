@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -261,7 +261,7 @@ val mem : 'a -> 'a array -> bool
     [compare a x = 0]).
     @since 4.03 *)
 
-val memq : 'a -> 'a array -> bool
+val memq : 'a -> 'a array -> bool @@ portable stateful
 (** Same as {!mem}, but uses physical equality
    instead of structural equality to compare array elements.
    @since 4.03 *)

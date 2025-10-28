@@ -687,7 +687,7 @@ module Hashtbl : sig
 
 end
 
-module Map : sig
+module Map : sig @@ stateless
   (** Association tables over ordered types.
 
      This module implements applicative association tables, also known as
@@ -1051,7 +1051,7 @@ module Map : sig
 
 end
 
-module Set : sig
+module Set : sig @@ stateless
   (** Sets over ordered types.
 
      This module implements the set data structure, given a total ordering

@@ -1,4 +1,4 @@
-@@ portable
+@@ stateless
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -67,7 +67,7 @@ external exchange
 external compare_and_set
   : ('a : value_or_null).
   'a t @ local -> 'a -> 'a -> bool
-  = "%atomic_cas"
+  @@ portable stateful = "%atomic_cas"
 
 (** [compare_exchange r seen v] sets the new value of [r] to [v] only if its
     current value is physically equal to [seen] -- the comparison and the set
@@ -75,7 +75,7 @@ external compare_and_set
 external compare_exchange
   : ('a : value_or_null).
   'a t @ local -> 'a -> 'a -> 'a
-  = "%atomic_compare_exchange"
+  @@ portable stateful = "%atomic_compare_exchange"
 
 (** [fetch_and_add r n] atomically increments the value of [r] by [n], and
     returns the current value (before the increment). *)
@@ -132,10 +132,14 @@ module Loc : sig
     'a t @ local -> 'a -> 'a = "%atomic_exchange_loc"
 
   external compare_and_set : ('a : value_or_null).
-    'a t @ local -> 'a -> 'a -> bool = "%atomic_cas_loc"
+    'a t @ local -> 'a -> 'a -> bool
+      @@ portable stateful
+      = "%atomic_cas_loc"
 
   external compare_exchange : ('a : value_or_null).
-    'a t @ local -> 'a -> 'a -> 'a = "%atomic_compare_exchange_loc"
+    'a t @ local -> 'a -> 'a -> 'a
+      @@ portable stateful
+      = "%atomic_compare_exchange_loc"
 
   external fetch_and_add
     : int t @ local -> int -> int = "%atomic_fetch_add_loc"
@@ -157,7 +161,7 @@ module Loc : sig
 
   val incr : int t @ local -> unit
   val decr : int t @ local -> unit
-end
+end @@ portable stateful
 
 (** {1:examples Examples}
 

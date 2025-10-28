@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 (** Formatted input functions. *)
 
@@ -103,7 +103,7 @@ open! Stdlib
 
 (** {1 Formatted input channel} *)
 
-module (Scanning @@ nonportable) : sig @@ portable
+module (Scanning @@ stateful) : sig @@ stateless
 
 type in_channel
 (** The notion of input channel for the {!Scanf} module:
@@ -129,7 +129,7 @@ type scanbuf = in_channel
     character yet to be read.
 *)
 
-val stdin : in_channel @@ nonportable
+val stdin : in_channel @@ stateful
 (** The standard input notion for the {!Scanf} module.
     [Scanning.stdin] is the {!Scanning.in_channel} formatted input channel
     attached to {!Stdlib.stdin}.
@@ -147,7 +147,7 @@ type file_name = string
     @since 4.00
 *)
 
-val open_in : file_name -> in_channel @@ nonportable
+val open_in : file_name -> in_channel @@ stateful
 (** [Scanning.open_in fname] returns a {!Scanning.in_channel} formatted input
     channel for bufferized reading in text mode from file [fname].
 
@@ -159,7 +159,7 @@ val open_in : file_name -> in_channel @@ nonportable
     @since 3.12
 *)
 
-val open_in_bin : file_name -> in_channel @@ nonportable
+val open_in_bin : file_name -> in_channel @@ stateful
 (** [Scanning.open_in_bin fname] returns a {!Scanning.in_channel} formatted
     input channel for bufferized reading in binary mode from file [fname].
     @since 3.12
@@ -171,10 +171,10 @@ val close_in : in_channel -> unit
   @since 3.12
 *)
 
-val from_file : file_name -> in_channel @@ nonportable
+val from_file : file_name -> in_channel @@ stateful
 (** An alias for {!Scanning.open_in} above. *)
 
-val from_file_bin : string -> in_channel @@ nonportable
+val from_file_bin : string -> in_channel @@ stateful
 (** An alias for {!Scanning.open_in_bin} above. *)
 
 val from_string : string -> in_channel
@@ -499,12 +499,12 @@ val sscanf_opt : string -> ('a, 'b, 'c, 'd) scanner_opt
 
     @since 5.0 *)
 
-val scanf : ('a, 'b, 'c, 'd) scanner @@ nonportable
+val scanf : ('a, 'b, 'c, 'd) scanner @@ stateful
 (** Same as {!Scanf.bscanf}, but reads from the predefined formatted input
     channel {!Scanf.Scanning.stdin} that is connected to {!Stdlib.stdin}.
 *)
 
-val scanf_opt : ('a, 'b, 'c, 'd) scanner_opt @@ nonportable
+val scanf_opt : ('a, 'b, 'c, 'd) scanner_opt @@ stateful
 (** Same as {!Scanf.scanf}, but returns [None] in case of scanning failure.
 
     @since 5.0 *)

@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -277,7 +277,7 @@ val iter2 : ('a : value_or_null) ('b : value_or_null).
 
     @since 4.14 *)
 
-val fold_left2 : ('acc : value_or_null) ('a : value_or_null) 
+val fold_left2 : ('acc : value_or_null) ('a : value_or_null)
   ('b : value_or_null).
   ('acc -> 'a -> 'b -> 'acc) -> 'acc -> 'a t -> 'b t -> 'acc
 (** [fold_left2 f _ xs ys] invokes [f _ x y] successively
@@ -696,7 +696,7 @@ val product : ('a : value_or_null) ('b : value_or_null).
 
     @since 4.14 *)
 
-val map_product : ('a : value_or_null) ('b : value_or_null) 
+val map_product : ('a : value_or_null) ('b : value_or_null)
   ('c : value_or_null).
   ('a -> 'b -> 'c) -> 'a t -> 'b t -> 'c t
 (** The sequence [map_product f xs ys] is the image through [f]
@@ -739,7 +739,7 @@ val split : ('a : value_or_null) ('b : value_or_null)
 
     @since 4.14 *)
 
-val partition_map : ('a : value_or_null) ('b : value_or_null) 
+val partition_map : ('a : value_or_null) ('b : value_or_null)
   ('c : value_or_null).
   ('a -> ('b, 'c) Either.t) -> 'a t -> 'b t * 'c t
 (** [partition_map f xs] returns a pair of sequences [(ys, zs)], where:

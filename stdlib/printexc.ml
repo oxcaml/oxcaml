@@ -121,10 +121,10 @@ let to_array bt = Array.copy (unsafe_iarray_to_array bt)
 let raw_backtrace_entries bt = to_array bt
 
 external get_raw_backtrace:
-  unit -> raw_backtrace @@ portable = "caml_get_exception_raw_backtrace"
+  unit -> raw_backtrace @@ stateless = "caml_get_exception_raw_backtrace"
 
 external raise_with_backtrace: ('a : value_or_null).
-  exn -> raw_backtrace -> 'a @ portable unique @@ portable
+  exn -> raw_backtrace -> 'a @ portable unique @@ stateless
   = "%raise_with_backtrace"
 
 (* Disable warning 37: values are constructed in the runtime *)
