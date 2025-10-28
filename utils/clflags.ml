@@ -69,8 +69,8 @@ let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
 and include_dirs = ref ([] : string list)  (* -I *)
 and hidden_include_dirs = ref ([] : string list) (* -H *)
-and include_paths_files = ref ([] : string list) (* -I-paths *)
-and hidden_include_paths_files = ref ([] : string list) (* -H-paths *)
+and include_manifests = ref ([] : string list) (* -I-manifest *)
+and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
 and no_std_include = ref false          (* -nostdlib *)
 and no_cwd = ref false                  (* -nocwd *)
 and print_types = ref false             (* -i *)
@@ -828,7 +828,7 @@ module Register_allocator = struct
     match left, right with
     | Cfg, Cfg | Irc, Irc | Ls, Ls | Gi, Gi -> true
     | (Cfg | Irc | Ls | Gi), _ -> false
-  
+
   let to_string = function
     | Cfg -> "cfg"
     | Irc -> "irc"
@@ -838,7 +838,7 @@ module Register_allocator = struct
   let assoc_list = List.map (fun regalloc -> to_string regalloc, regalloc) all
 
   let of_string s = List.assoc_opt (String.lowercase_ascii s) assoc_list
-  
+
   let format ppf regalloc =
     Format.fprintf ppf "%s" (to_string regalloc)
 end
