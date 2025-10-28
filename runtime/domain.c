@@ -762,7 +762,6 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->major_slice_epoch = 0;
   domain_state->requested_external_interrupt = 0;
   domain_root_register(&domain_state->preemption, Val_unit);
-  domain_root_register(&domain_state->preemption_effect, Val_unit);
 
   domain_state->parser_trace = 0;
 
@@ -1795,18 +1794,15 @@ void caml_interrupt_self(void)
   interrupt_domain_local(Caml_state);
 }
 
-CAMLprim value caml_domain_preempt_with(value eff)
-{
-  CAMLparam1(eff);
+CAMLprim value caml_domain_preempt_self(void) {
+  CAMLparam0();
   CAMLnoalloc;
-  domain_root_set(&caml_state->preemption, Val_long(1));
-  domain_root_set(&Caml_state->preemption_effect, eff);
+  domain_root_set(&Caml_state->preemption, Val_long(1));
   caml_interrupt_self();
   CAMLreturn(Val_unit);
 }
 
-void caml_domain_setup_preemption(void)
-{
+void caml_domain_setup_preemption(void) {
   CAMLparam0();
   value cont = caml_alloc_3(Cont_tag, Val_long(0), Val_long(0), Val_long(0));
   domain_root_set(&Caml_state->preemption, cont);

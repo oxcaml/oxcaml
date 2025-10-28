@@ -2,6 +2,7 @@
    include unix;
    hasunix;
    runtime5;
+   poll_insertion;
    flags += "-alert -unsafe_multidomain -w -21";
    { native; }
 *)
@@ -9,12 +10,9 @@
 open Effect
 open Effect.Deep
 
-type _ Effect.t +=
-  | Tick : unit Effect.t
-  | Nested : int -> int Effect.t
+external preempt_self : unit -> unit = "caml_domain_preempt_self"
 
-let preempt_self () =
-  preempt_with Tick
+type _ Effect.t += Nested : int -> int Effect.t
 
 let with_preemption_setup ?(interval = 0.1) ?(repeating = false) f =
   let it_interval = if repeating then interval else 0. in
@@ -49,8 +47,7 @@ let test_basic () =
        while not !preempted do
          if Sys.time () -. start_at > 5.
          then failwith "Didn't get preempted after 5s!";
-         x := !x + 1;
-         Sys.poll_actions ()
+         x := !x + 1
        done;
        assert (!x > 0);
        print_endline "  Basic preemption: PASSED")
@@ -89,8 +86,7 @@ let test_delayed_resume () =
          (* Prevent overflow *)
          if !h > 1000 then begin
            a := 1; b := 2; c := 3; d := 4; e := 5; f := 6; g := 7; h := 8
-         end;
-         Sys.poll_actions ()
+         end
        done;
 
        (* Values should be preserved across preemption *)
@@ -123,8 +119,7 @@ let test_nested_computation () =
          if Sys.time () -. start_at > 5.
          then failwith "Didn't get preempted after 5s!";
          result := compute_nested 100 !result;
-         if !result > 100000 then result := 0;
-         Sys.poll_actions ()
+         if !result > 100000 then result := 0
        done;
        !result));
 
@@ -145,8 +140,7 @@ let test_multiple_preemptions () =
        while !count < 5 do
          if Sys.time () -. start_at > 10.
          then failwith "Multiple preemptions timed out!";
-         incr iters;
-         Sys.poll_actions ()
+         incr iters
        done;
        !count));
 
@@ -205,8 +199,7 @@ let test_many_live_registers () =
          r0 := !r0 + 1; r1 := !r1 + 1; r2 := !r2 + 1; r3 := !r3 + 1;
          r4 := !r4 + 1; r5 := !r5 + 1; r6 := !r6 + 1; r7 := !r7 + 1;
          r8 := !r8 + 1; r9 := !r9 + 1; r10 := !r10 + 1; r11 := !r11 + 1;
-         r12 := !r12 + 1; r13 := !r13 + 1; r14 := !r14 + 1; r15 := !r15 + 1;
-         Sys.poll_actions ()
+         r12 := !r12 + 1; r13 := !r13 + 1; r14 := !r14 + 1; r15 := !r15 + 1
        done;
 
        (* Verify all values *)
@@ -264,8 +257,7 @@ let test_gc_register_values () =
          let (_, r3) = obj3 in incr r3;
          let (_, r4) = obj4 in incr r4;
          let (_, r5) = obj5 in incr r5;
-         let (_, r6) = obj6 in incr r6;
-         Sys.poll_actions ()
+         let (_, r6) = obj6 in incr r6
        done;
 
        (* Return all objects to keep them live until the end *)

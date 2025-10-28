@@ -33,12 +33,12 @@ exception Continuation_already_resumed
 (** Exception raised when a continuation is continued or discontinued more
     than once. *)
 
+type _ t += Tick : unit t
+
 external perform : 'a t -> 'a = "%perform"
 (** [perform e] performs an effect [e].
 
     @raise Unhandled if there is no handler for [e]. *)
-
-val preempt_with : 'a t -> unit
 
 module Deep : sig
   (** Deep handlers *)
