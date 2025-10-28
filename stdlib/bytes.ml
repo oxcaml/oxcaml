@@ -26,21 +26,42 @@ open! Stdlib
    These functions have a "duplicated" comment above their definition.
 *)
 
-external length : bytes @ immutable -> int @@ stateless = "%bytes_length"
-external string_length : string -> int @@ stateless = "%string_length"
-external get : bytes -> int -> char @@ stateless = "%bytes_safe_get"
-external set : bytes -> int -> char -> unit @@ stateless = "%bytes_safe_set"
-external create : int -> bytes @@ stateless = "caml_create_bytes"
-external unsafe_get : bytes -> int -> char @@ stateless = "%bytes_unsafe_get"
-external unsafe_set : bytes -> int -> char -> unit @@ stateless = "%bytes_unsafe_set"
-external unsafe_fill : bytes -> int -> int -> char -> unit @@ stateless
+external length : bytes @ immutable -> int
+  @@ stateless
+  = "%bytes_length"
+external string_length : string -> int
+  @@ stateless
+  = "%string_length"
+external get : bytes -> int -> char
+  @@ stateless
+  = "%bytes_safe_get"
+external set : bytes -> int -> char -> unit
+  @@ stateless
+  = "%bytes_safe_set"
+external create : int -> bytes
+  @@ stateless
+  = "caml_create_bytes"
+external unsafe_get : bytes -> int -> char
+  @@ stateless
+  = "%bytes_unsafe_get"
+external unsafe_set : bytes -> int -> char -> unit
+  @@ stateless
+  = "%bytes_unsafe_set"
+external unsafe_fill : bytes -> int -> int -> char -> unit
+  @@ stateless
                      = "caml_fill_bytes" [@@noalloc]
-external unsafe_to_string : bytes -> string @@ stateless = "%bytes_to_string"
-external unsafe_of_string : string -> bytes @@ stateless = "%bytes_of_string"
+external unsafe_to_string : bytes -> string
+  @@ stateless
+  = "%bytes_to_string"
+external unsafe_of_string : string -> bytes
+  @@ stateless
+  = "%bytes_of_string"
 
-external unsafe_blit : bytes -> int -> bytes -> int -> int -> unit @@ stateless
+external unsafe_blit : bytes -> int -> bytes -> int -> int -> unit
+  @@ stateless
                      = "caml_blit_bytes" [@@noalloc]
-external unsafe_blit_string : string -> int -> bytes -> int -> int -> unit @@ stateless
+external unsafe_blit_string : string -> int -> bytes -> int -> int -> unit
+  @@ stateless
                      = "caml_blit_string" [@@noalloc]
 
 let make n c =
@@ -150,8 +171,12 @@ let cat s1 s2 =
   r
 
 
-external char_code: char -> int @@ stateless = "%identity"
-external char_chr: int -> char @@ stateless = "%identity"
+external char_code: char -> int
+  @@ stateless
+  = "%identity"
+external char_chr: int -> char
+  @@ stateless
+  = "%identity"
 
 let is_space = function
   | ' ' | '\012' | '\n' | '\r' | '\t' -> true
@@ -396,7 +421,9 @@ let rcontains_from s i c =
 type t = bytes
 
 let compare (x: t) (y: t) = Stdlib.compare x y
-external equal : t -> t -> bool @@ stateless = "caml_bytes_equal" [@@noalloc]
+external equal : t -> t -> bool
+  @@ stateless
+  = "caml_bytes_equal" [@@noalloc]
 
 (* duplicated in string.ml *)
 let split_on_char sep s =
@@ -453,23 +480,52 @@ let of_seq i =
 
 (* The get_ functions are all duplicated in string.ml *)
 
-external unsafe_get_uint8 : bytes -> int -> int @@ stateless = "%bytes_unsafe_get"
-external unsafe_get_uint16_ne : bytes -> int -> int @@ stateless = "%caml_bytes_get16u"
-external get_uint8 : bytes -> int -> int @@ stateless = "%bytes_safe_get"
-external get_uint16_ne : bytes -> int -> int @@ stateless = "%caml_bytes_get16"
-external get_int32_ne : bytes -> int -> int32 @@ stateless = "%caml_bytes_get32"
-external get_int64_ne : bytes -> int -> int64 @@ stateless = "%caml_bytes_get64"
+external unsafe_get_uint8 : bytes -> int -> int
+  @@ stateless
+  = "%bytes_unsafe_get"
+external unsafe_get_uint16_ne : bytes -> int -> int
+  @@ stateless
+  = "%caml_bytes_get16u"
+external get_uint8 : bytes -> int -> int
+  @@ stateless
+  = "%bytes_safe_get"
+external get_uint16_ne : bytes -> int -> int
+  @@ stateless
+  = "%caml_bytes_get16"
+external get_int32_ne : bytes -> int -> int32
+  @@ stateless
+  = "%caml_bytes_get32"
+external get_int64_ne : bytes -> int -> int64
+  @@ stateless
+  = "%caml_bytes_get64"
 
-external unsafe_set_uint8 : bytes -> int -> int -> unit @@ stateless = "%bytes_unsafe_set"
-external unsafe_set_uint16_ne : bytes -> int -> int -> unit @@ stateless
+external unsafe_set_uint8 : bytes -> int -> int -> unit
+  @@ stateless
+  = "%bytes_unsafe_set"
+external unsafe_set_uint16_ne : bytes -> int -> int -> unit
+  @@ stateless
                               = "%caml_bytes_set16u"
-external set_int8 : bytes -> int -> int -> unit @@ stateless = "%bytes_safe_set"
-external set_int16_ne : bytes -> int -> int -> unit @@ stateless = "%caml_bytes_set16"
-external set_int32_ne : bytes -> int -> int32 -> unit @@ stateless = "%caml_bytes_set32"
-external set_int64_ne : bytes -> int -> int64 -> unit @@ stateless = "%caml_bytes_set64"
-external swap16 : int -> int @@ stateless = "%bswap16"
-external swap32 : int32 -> int32 @@ stateless = "%bswap_int32"
-external swap64 : int64 -> int64 @@ stateless = "%bswap_int64"
+external set_int8 : bytes -> int -> int -> unit
+  @@ stateless
+  = "%bytes_safe_set"
+external set_int16_ne : bytes -> int -> int -> unit
+  @@ stateless
+  = "%caml_bytes_set16"
+external set_int32_ne : bytes -> int -> int32 -> unit
+  @@ stateless
+  = "%caml_bytes_set32"
+external set_int64_ne : bytes -> int -> int64 -> unit
+  @@ stateless
+  = "%caml_bytes_set64"
+external swap16 : int -> int
+  @@ stateless
+  = "%bswap16"
+external swap32 : int32 -> int32
+  @@ stateless
+  = "%bswap_int32"
+external swap64 : int64 -> int64
+  @@ stateless
+  = "%bswap_int64"
 
 let unsafe_get_uint16_le b i =
   if Sys.big_endian

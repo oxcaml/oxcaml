@@ -132,10 +132,14 @@ module Loc : sig
     'a t @ local -> 'a -> 'a = "%atomic_exchange_loc"
 
   external compare_and_set : ('a : value_or_null).
-    'a t @ local -> 'a -> 'a -> bool @@ portable stateful = "%atomic_cas_loc"
+    'a t @ local -> 'a -> 'a -> bool
+      @@ portable stateful
+      = "%atomic_cas_loc"
 
   external compare_exchange : ('a : value_or_null).
-    'a t @ local -> 'a -> 'a -> 'a @@ portable stateful = "%atomic_compare_exchange_loc"
+    'a t @ local -> 'a -> 'a -> 'a
+      @@ portable stateful
+      = "%atomic_compare_exchange_loc"
 
   external fetch_and_add
     : int t @ local -> int -> int = "%atomic_fetch_add_loc"

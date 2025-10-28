@@ -28,11 +28,18 @@ type t = string
    These functions have a "duplicated" comment above their definition.
 *)
 
-external length : (t[@local_opt]) -> int @@ stateless = "%string_length"
-external get : (t[@local_opt]) -> int -> char @@ stateless = "%string_safe_get"
+external length : (t[@local_opt]) -> int
+  @@ stateless
+  = "%string_length"
+external get : (t[@local_opt]) -> int -> char
+  @@ stateless
+  = "%string_safe_get"
 external unsafe_get :
-  (t[@local_opt]) -> int -> char @@ stateless = "%string_unsafe_get"
-external unsafe_blit : string -> int ->  bytes -> int -> int -> unit @@ stateless
+  (t[@local_opt]) -> int -> char
+    @@ stateless
+    = "%string_unsafe_get"
+external unsafe_blit : string -> int ->  bytes -> int -> int -> unit
+  @@ stateless
                      = "caml_blit_string" [@@noalloc]
 
 module B = Bytes
@@ -70,7 +77,8 @@ let rec unsafe_blits dst pos sep seplen = function
 
 let concat sep = function
     [] -> ""
-  | l -> let seplen = length sep in bts @@
+  | l -> let seplen = length sep in bts
+    @@
           unsafe_blits
             (B.create (sum_lengths 0 seplen l))
             0 sep seplen l
@@ -227,7 +235,9 @@ let ends_with ~suffix s =
   in diff >= 0 && aux 0
 
 external seeded_hash :
-  int -> (t[@local_opt]) -> int @@ stateless = "caml_string_hash" [@@noalloc]
+  int -> (t[@local_opt]) -> int
+    @@ stateless
+    = "caml_string_hash" [@@noalloc]
 let hash x = seeded_hash 0 x
 
 (* duplicated in bytes.ml *)
@@ -243,9 +253,13 @@ let split_on_char sep s =
   sub s 0 !j :: !r
 
 external compare :
-  (t[@local_opt]) -> (t[@local_opt]) -> int @@ stateless = "%compare"
+  (t[@local_opt]) -> (t[@local_opt]) -> int
+    @@ stateless
+    = "%compare"
 external equal :
-  (t[@local_opt]) -> (t[@local_opt]) -> bool @@ stateless =
+  (t[@local_opt]) -> (t[@local_opt]) -> bool
+    @@ stateless
+    =
   "caml_string_equal" [@@noalloc]
 
 (** {1 Iterators} *)
@@ -269,10 +283,18 @@ let is_valid_utf_16le s = B.is_valid_utf_16le (bos s)
 
 (** {6 Binary encoding/decoding of integers} *)
 
-external get_uint8 : string -> int -> int @@ stateless = "%string_safe_get"
-external get_uint16_ne : string -> int -> int @@ stateless = "%caml_string_get16"
-external get_int32_ne : string -> int -> int32 @@ stateless = "%caml_string_get32"
-external get_int64_ne : string -> int -> int64 @@ stateless = "%caml_string_get64"
+external get_uint8 : string -> int -> int
+  @@ stateless
+  = "%string_safe_get"
+external get_uint16_ne : string -> int -> int
+  @@ stateless
+  = "%caml_string_get16"
+external get_int32_ne : string -> int -> int32
+  @@ stateless
+  = "%caml_string_get32"
+external get_int64_ne : string -> int -> int64
+  @@ stateless
+  = "%caml_string_get64"
 
 let get_int8 s i = B.get_int8 (bos s) i
 let get_uint16_le s i = B.get_uint16_le (bos s) i

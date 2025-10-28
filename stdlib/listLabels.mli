@@ -321,7 +321,8 @@ val mem : ('a : value_or_null). 'a -> set:'a list -> bool
    to an element of [set].
  *)
 
-val memq : ('a : value_or_null). 'a -> set:'a list -> bool @@ portable stateful
+val memq : ('a : value_or_null). 'a -> set:'a list -> bool
+  @@ portable stateful
 (** Same as {!mem}, but uses physical equality instead of structural
    equality to compare list elements.
  *)
@@ -437,13 +438,15 @@ val assoc_opt : ('a : value_or_null) ('b : value_or_null)
     @since 4.05
  *)
 
-val assq : ('a : value_or_null) ('b : value_or_null). 'a -> ('a * 'b) list -> 'b @@ portable stateful
+val assq : ('a : value_or_null) ('b : value_or_null). 'a -> ('a * 'b) list -> 'b
+  @@ portable stateful
 (** Same as {!assoc}, but uses physical equality instead of
    structural equality to compare keys.
  *)
 
 val assq_opt : ('a : value_or_null) ('b : value_or_null).
-  'a -> ('a * 'b) list -> 'b option @@ portable stateful
+  'a -> ('a * 'b) list -> 'b option
+    @@ portable stateful
 (** Same as {!assoc_opt}, but uses physical equality instead of
    structural equality to compare keys.
    @since 4.05
@@ -456,7 +459,8 @@ val mem_assoc : ('a : value_or_null) ('b : value_or_null).
  *)
 
 val mem_assq : ('a : value_or_null) ('b : value_or_null).
-  'a -> map:('a * 'b) list -> bool @@ portable stateful
+  'a -> map:('a * 'b) list -> bool
+    @@ portable stateful
 (** Same as {!mem_assoc}, but uses physical equality instead of
    structural equality to compare keys.
  *)
@@ -469,7 +473,8 @@ val remove_assoc : ('a : value_or_null) ('b : value_or_null).
  *)
 
 val remove_assq : ('a : value_or_null) ('b : value_or_null).
-  'a -> ('a * 'b) list -> ('a * 'b) list @@ portable stateful
+  'a -> ('a * 'b) list -> ('a * 'b) list
+    @@ portable stateful
 (** Same as {!remove_assoc}, but uses physical equality instead
    of structural equality to compare keys. Not tail-recursive.
  *)

@@ -20,28 +20,87 @@ open! Stdlib
 
 (* Module [Nativeint]: processor-native integers *)
 
-external neg: (nativeint[@local_opt]) -> (nativeint[@local_opt]) @@ stateless = "%nativeint_neg"
-external add: (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt]) @@ stateless = "%nativeint_add"
-external sub: (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt]) @@ stateless = "%nativeint_sub"
-external mul: (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt]) @@ stateless = "%nativeint_mul"
-external div: (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt]) @@ stateless = "%nativeint_div"
-external rem: (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt]) @@ stateless = "%nativeint_mod"
-external logand: (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt]) @@ stateless = "%nativeint_and"
-external logor: (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt]) @@ stateless = "%nativeint_or"
-external logxor: (nativeint[@local_opt]) -> (nativeint[@local_opt]) -> (nativeint[@local_opt]) @@ stateless = "%nativeint_xor"
-external shift_left: (nativeint[@local_opt]) -> int -> (nativeint[@local_opt]) @@ stateless = "%nativeint_lsl"
-external shift_right: (nativeint[@local_opt]) -> int -> (nativeint[@local_opt]) @@ stateless = "%nativeint_asr"
-external shift_right_logical: (nativeint[@local_opt]) -> int -> (nativeint[@local_opt]) @@ stateless = "%nativeint_lsr"
-external of_int: int -> (nativeint[@local_opt]) @@ stateless = "%nativeint_of_int"
-external to_int: (nativeint[@local_opt]) -> int @@ stateless = "%nativeint_to_int"
-external of_float : float -> nativeint @@ stateless
+external neg: (nativeint[@local_opt]) -> (nativeint[@local_opt])
+  @@ stateless
+  = "%nativeint_neg"
+external add
+  : (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+  @@ stateless
+  = "%nativeint_add"
+external sub
+  : (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+  @@ stateless
+  = "%nativeint_sub"
+external mul
+  : (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+  @@ stateless
+  = "%nativeint_mul"
+external div
+  : (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+  @@ stateless
+  = "%nativeint_div"
+external rem
+  : (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+  @@ stateless
+  = "%nativeint_mod"
+external logand
+  : (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+  @@ stateless
+  = "%nativeint_and"
+external logor
+  : (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+  @@ stateless
+  = "%nativeint_or"
+external logxor
+  : (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt])
+  @@ stateless
+  = "%nativeint_xor"
+external shift_left: (nativeint[@local_opt]) -> int -> (nativeint[@local_opt])
+  @@ stateless
+  = "%nativeint_lsl"
+external shift_right: (nativeint[@local_opt]) -> int -> (nativeint[@local_opt])
+  @@ stateless
+  = "%nativeint_asr"
+external shift_right_logical
+  : (nativeint[@local_opt]) -> int -> (nativeint[@local_opt])
+  @@ stateless
+  = "%nativeint_lsr"
+external of_int: int -> (nativeint[@local_opt])
+  @@ stateless
+  = "%nativeint_of_int"
+external to_int: (nativeint[@local_opt]) -> int
+  @@ stateless
+  = "%nativeint_to_int"
+external of_float : float -> nativeint
+  @@ stateless
   = "caml_nativeint_of_float" "caml_nativeint_of_float_unboxed"
   [@@unboxed] [@@noalloc]
-external to_float : nativeint -> float @@ stateless
+external to_float : nativeint -> float
+  @@ stateless
   = "caml_nativeint_to_float" "caml_nativeint_to_float_unboxed"
   [@@unboxed] [@@noalloc]
-external of_int32: int32 -> nativeint @@ stateless = "%nativeint_of_int32"
-external to_int32: nativeint -> int32 @@ stateless = "%nativeint_to_int32"
+external of_int32: int32 -> nativeint
+  @@ stateless
+  = "%nativeint_of_int32"
+external to_int32: nativeint -> int32
+  @@ stateless
+  = "%nativeint_to_int32"
 
 let zero = 0n
 let one = 1n
@@ -62,10 +121,13 @@ let unsigned_to_int =
     else
       None
 
-external format : string -> nativeint -> string @@ stateless = "caml_nativeint_format"
+external format : string -> nativeint -> string
+  @@ stateless
+  = "caml_nativeint_format"
 let[@inline available] to_string n = format "%d" n
 
-external of_string: string -> (nativeint[@unboxed]) @@ stateless
+external of_string: string -> (nativeint[@unboxed])
+  @@ stateless
   = "caml_nativeint_of_string" "caml_nativeint_of_string_unboxed"
 
 let[@inline available] of_string_opt s =
@@ -104,6 +166,8 @@ let[@inline available] unsigned_rem n d =
    it to be marked as [@@noalloc].
  *)
 external seeded_hash_param :
-  int -> int -> int -> nativeint -> int @@ stateless = "caml_hash_exn" [@@noalloc]
+  int -> int -> int -> nativeint -> int
+    @@ stateless
+    = "caml_hash_exn" [@@noalloc]
 let seeded_hash seed x = seeded_hash_param 10 100 seed x
 let hash x = seeded_hash_param 10 100 0 x

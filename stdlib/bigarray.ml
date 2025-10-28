@@ -136,10 +136,12 @@ module Genarray = struct
     | Fortran_layout -> floop arr (Array.make dlen 1) f (pred dlen) dims; arr
 
   external num_dims
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> int
+      @@ stateless
     = "caml_ba_num_dims"
   external nth_dim
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> int -> int @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> int -> int
+      @@ stateless
     = "caml_ba_dim"
   let dims a =
     let n = num_dims a in
@@ -148,27 +150,34 @@ module Genarray = struct
     d
 
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind
+      @@ stateless
     = "caml_ba_kind"
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout
+      @@ stateless
     = "caml_ba_layout"
-  external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ stateless
+  external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
+    @@ stateless
      = "caml_ba_change_layout"
 
   let size_in_bytes arr =
     (kind_size_in_bytes (kind arr)) * (Array.fold_left ( * ) 1 (dims arr))
 
-  external sub_left: ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t @@ stateless
+  external sub_left: ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t
+    @@ stateless
      = "caml_ba_sub"
   external sub_right: ('a, 'b, fortran_layout) t -> int -> int ->
-                          ('a, 'b, fortran_layout) t @@ stateless
+                          ('a, 'b, fortran_layout) t
+                            @@ stateless
      = "caml_ba_sub"
   external slice_left: ('a, 'b, c_layout) t -> (int array[@local_opt]) ->
-                          ('a, 'b, c_layout) t @@ stateless
+                          ('a, 'b, c_layout) t
+                            @@ stateless
      = "caml_ba_slice"
   external slice_right: ('a, 'b, fortran_layout) t -> (int array[@local_opt]) ->
-                          ('a, 'b, fortran_layout) t @@ stateless
+                          ('a, 'b, fortran_layout) t
+                            @@ stateless
      = "caml_ba_slice"
   external blit
      : (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt]) ->
@@ -176,7 +185,8 @@ module Genarray = struct
      @@ stateless
      = "caml_ba_blit"
   external fill
-     : (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
+     : (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+       @@ stateless
      = "caml_ba_fill"
 end
 
@@ -187,13 +197,16 @@ module Array0 = struct
   let get arr = Genarray.get arr [||]
   let set arr value = Genarray.set arr [||] value
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind
+      @@ stateless
     = "caml_ba_kind"
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout
+      @@ stateless
     = "caml_ba_layout"
 
-  external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ stateless
+  external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
+    @@ stateless
     = "caml_ba_change_layout"
 
   let size_in_bytes arr = kind_size_in_bytes (kind arr)
@@ -204,7 +217,8 @@ module Array0 = struct
     @@ stateless
     = "caml_ba_blit"
   external fill
-    : (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+      @@ stateless
     = "caml_ba_fill"
 
   let of_value kind layout v =
@@ -234,22 +248,28 @@ module Array1 = struct
     : (('a, 'b, 'c) t[@local_opt]) -> int -> ('a[@local_opt]) -> unit
     @@ stateless
     = "%caml_ba_unsafe_set_1"
-  external dim: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+  external dim: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int
+    @@ stateless
     = "%caml_ba_dim_1"
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind
+      @@ stateless
     = "caml_ba_kind"
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout
+      @@ stateless
     = "caml_ba_layout"
 
-  external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ stateless
+  external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
+    @@ stateless
     = "caml_ba_change_layout"
 
   let size_in_bytes arr =
     (kind_size_in_bytes (kind arr)) * (dim arr)
 
-  external sub: ('a, 'b, 'c) t -> int -> int -> ('a, 'b, 'c) t @@ stateless = "caml_ba_sub"
+  external sub: ('a, 'b, 'c) t -> int -> int -> ('a, 'b, 'c) t
+    @@ stateless
+    = "caml_ba_sub"
   let slice (type t) (a : (_, _, t) Genarray.t) n =
     match layout a with
     | C_layout -> (Genarray.slice_left a [|n|] : (_, _, t) Genarray.t)
@@ -260,7 +280,8 @@ module Array1 = struct
     @@ stateless
     = "caml_ba_blit"
   external fill
-    : (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+      @@ stateless
     = "caml_ba_fill"
   let c_init arr dim f =
     for i = 0 to pred dim do unsafe_set arr i (f i) done
@@ -302,27 +323,34 @@ module Array2 = struct
     : (('a, 'b, 'c) t[@local_opt]) -> int -> int -> ('a[@local_opt]) -> unit
     @@ stateless
     = "%caml_ba_unsafe_set_2"
-  external dim1: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+  external dim1: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int
+    @@ stateless
     = "%caml_ba_dim_1"
-  external dim2: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+  external dim2: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int
+    @@ stateless
     = "%caml_ba_dim_2"
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind
+      @@ stateless
     = "caml_ba_kind"
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout
+      @@ stateless
     = "caml_ba_layout"
 
-  external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ stateless
+  external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
+    @@ stateless
     = "caml_ba_change_layout"
 
   let size_in_bytes arr =
     (kind_size_in_bytes (kind arr)) * (dim1 arr) * (dim2 arr)
 
-  external sub_left: ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t @@ stateless
+  external sub_left: ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t
+    @@ stateless
      = "caml_ba_sub"
   external sub_right:
-    ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t @@ stateless
+    ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
+      @@ stateless
      = "caml_ba_sub"
   let slice_left a n = Genarray.slice_left a [|n|]
   let slice_right a n = Genarray.slice_right a [|n|]
@@ -332,7 +360,8 @@ module Array2 = struct
     @@ stateless
     = "caml_ba_blit"
   external fill
-    : (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+      @@ stateless
     = "caml_ba_fill"
   let c_init arr dim1 dim2 f =
     for i = 0 to pred dim1 do
@@ -395,29 +424,37 @@ module Array3 = struct
        unit
      @@ stateless
      = "%caml_ba_unsafe_set_3"
-  external dim1: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+  external dim1: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int
+    @@ stateless
     = "%caml_ba_dim_1"
-  external dim2: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+  external dim2: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int
+    @@ stateless
     = "%caml_ba_dim_2"
-  external dim3: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+  external dim3: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int
+    @@ stateless
     = "%caml_ba_dim_3"
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind
+      @@ stateless
     = "caml_ba_kind"
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout
+      @@ stateless
     = "caml_ba_layout"
 
-  external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ stateless
+  external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
+    @@ stateless
     = "caml_ba_change_layout"
 
   let size_in_bytes arr =
     (kind_size_in_bytes (kind arr)) * (dim1 arr) * (dim2 arr) * (dim3 arr)
 
-  external sub_left: ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t @@ stateless
+  external sub_left: ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t
+    @@ stateless
      = "caml_ba_sub"
   external sub_right:
-     ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t @@ stateless
+     ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
+       @@ stateless
      = "caml_ba_sub"
   let slice_left_1 a n m = Genarray.slice_left a [|n; m|]
   let slice_right_1 a n m = Genarray.slice_right a [|n; m|]
@@ -429,7 +466,8 @@ module Array3 = struct
     @@ stateless
     = "caml_ba_blit"
   external fill
-    : (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
+    : (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+      @@ stateless
     = "caml_ba_fill"
   let c_init arr dim1 dim2 dim3 f =
     for i = 0 to pred dim1 do
