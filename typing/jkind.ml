@@ -1235,8 +1235,8 @@ module Layout_and_axes = struct
       let normalized_t : (layout, l * r2) layout_and_axes =
         match mode, fuel_status with
         | Require_best, Ran_out_of_fuel -> t |> disallow_right
-        | Require_best, Sufficient_fuel -> { t with mod_bounds; with_bounds }
-        | Ignore_best, _ -> { t with mod_bounds; with_bounds }
+        | Require_best, Sufficient_fuel | Ignore_best, _ ->
+          { t with mod_bounds; with_bounds }
       in
       normalized_t, fuel_status
 end
