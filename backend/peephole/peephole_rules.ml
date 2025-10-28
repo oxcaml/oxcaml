@@ -205,7 +205,12 @@ let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
   | [cell] -> (
     let instr = DLL.value cell in
     match instr.desc with
-    | Op (Intop_imm (op, imm)) ->
+    | Op (Intop_imm (op, imm))
+      when Array.length instr.arg = 1
+           && Array.length instr.res = 1
+           && U.are_equal_regs
+                (Array.unsafe_get instr.arg 0)
+                (Array.unsafe_get instr.res 0) ->
       let to_remove =
         match op, imm with
         | Iadd, 0 | Isub, 0 | Ior, 0 | Ixor, 0 | Ilsl, 0 | Ilsr, 0 | Iasr, 0 ->
