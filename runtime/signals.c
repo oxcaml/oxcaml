@@ -131,6 +131,9 @@ CAMLexport value caml_process_pending_signals_exn(void)
         if (curr == 0) goto next_word;
         if ((curr & mask) == 0) goto next_bit;
       }
+      if (signo == SIGALRM) {
+        return Val_long(-1);
+      }
       exn = caml_execute_signal_exn(signo);
       if (Is_exception_result(exn)) return exn;
       /* curr probably changed during the evaluation of the signal handler;
@@ -424,7 +427,7 @@ value caml_do_pending_actions_exn(void)
   check_async_exn(exn, "signal handler");
   if (Is_exception_result(exn)) goto exception;
   /* Check for a pending preemption */
-  if (Caml_state->preemption == Val_long(1)) {
+  if (exn == /* CR aspsmith: extract constant */ Val_long(-1)) {
     caml_domain_setup_preemption();
   }
 

@@ -1128,6 +1128,22 @@ static const value * cache_named_exception(const value * _Atomic * cache,
   return exn;
 }
 
+static const value * cache_named_effect(const value * _Atomic * cache,
+                                        const char * name)
+{
+  const value * exn;
+  exn = atomic_load_acquire(cache);
+  if (exn == NULL) {
+    exn = caml_named_value(name);
+    if (exn == NULL) {
+      fprintf(stderr, "Fatal error: effect %s\n", name);
+      exit(2);
+    }
+    atomic_store_release(cache, exn);
+  }
+  return exn;
+}
+
 CAMLexport void caml_raise_continuation_already_resumed(void)
 {
   const value * exn =
@@ -1151,6 +1167,15 @@ value caml_make_unhandled_effect_exn (value effect)
 CAMLexport void caml_raise_unhandled_effect (value effect)
 {
   caml_raise(caml_make_unhandled_effect_exn(effect));
+}
+
+static const value * _Atomic caml_tick_effect = NULL;
+
+CAMLexport value caml_get_tick_effect(void) {
+  CAMLparam0();
+  const value *eff =
+    cache_named_effect(&caml_tick_effect, "Effect.Tick");
+  CAMLreturn(*eff);
 }
 
 /**** Dynamic Binding ****/
