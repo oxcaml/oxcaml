@@ -2155,15 +2155,6 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j, 'k) t11 = {
   j : 'j;
   k : 'k;
 }
-Lines 14-15, characters 0-50:
-14 | type ('a : immutable_data) u : immutable_data =
-15 |   ('a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a) t11
-Error: The kind of type "('a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a) t11" is
-           value mod non_float
-         because of the definition of t11 at lines 1-13, characters 0-3.
-       But the kind of type "('a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a) t11" must be a subkind of
-         immutable_data
-         because of the definition of u at lines 14-15, characters 0-50.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
+type ('a : immutable_data) u =
+    ('a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a, 'a) t11
 |}]
