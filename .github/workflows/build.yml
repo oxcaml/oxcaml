@@ -468,7 +468,7 @@ jobs:
       if: failure()
       with:
         name: _runtest-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-        path: ${{ github.workspace }}/_runtest
+        path: _runtest/testsuite/_ocamltest/tests/lib-systhreads/
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
