@@ -10,44 +10,44 @@ on:
   pull_request:
 jobs:
   build:
-    name: ${{ matrix.name }} (${{ matrix.system }})
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: r5
+          - name: runtime5
             config: --enable-runtime5
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
 
-          - name: r5 stack-checks
+          - name: runtime5 stack-checks
             config: --enable-runtime5 --enable-stack-checks
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
 
-          - name: r5 poll-insertion
+          - name: runtime5 poll-insertion
             config: --enable-runtime5 --enable-poll-insertion
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
 
-          - name: r5 multidomain
+          - name: runtime5 multidomain
             config: --enable-runtime5 --enable-stack-checks --enable-poll-insertion --enable-multidomain
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
 
-          - name: r4 dev
+          - name: runtime4 dev
             config: --disable-runtime5 --enable-dev
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
 
-          - name: r5 dev
+          - name: runtime5 dev
             config: --enable-runtime5 --enable-dev
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
 
-          - name: r5 debug stack-checks
+          - name: runtime5 debug stack-checks
             config: --enable-runtime5 --enable-stack-checks
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
@@ -55,7 +55,7 @@ jobs:
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
 
-          - name: r5 debug
+          - name: runtime5 debug
             config: --enable-runtime5
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
@@ -63,14 +63,14 @@ jobs:
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
 
-          - name: r4 -O3
+          - name: runtime4 -O3
             config: --disable-runtime5
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
 
-          - name: r4 -O3 metrics
+          - name: runtime4 -O3 metrics
             config: --disable-runtime5
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
@@ -78,7 +78,7 @@ jobs:
             ocamlparam: '_,O3=1'
             collect_metrics: true
 
-          - name: r4 fp -Oclassic polling invariants
+          - name: runtime4 -Oclassic frame-pointers poll-insertion flambda-invariants
             config: --disable-runtime5 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
@@ -86,12 +86,12 @@ jobs:
             ocamlparam: '_,Oclassic=1'
             disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml'
 
-          - name: r4
+          - name: runtime4
             config: --disable-runtime5 --disable-warn-error
             system: aarch64-darwin
             os: warp-macos-15-arm64-6x
 
-          - name: r5 regalloc
+          - name: runtime5 regalloc
             config: --enable-runtime5 --disable-warn-error
             system: aarch64-darwin
             os: warp-macos-15-arm64-6x
@@ -99,7 +99,7 @@ jobs:
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
 
-          - name: r5 debug regalloc
+          - name: runtime5 debug regalloc
             config: --enable-runtime5 --disable-warn-error
             system: aarch64-darwin
             os: warp-macos-15-arm64-6x
@@ -109,7 +109,7 @@ jobs:
             ocamlrunparam: "v=0,V=1"
             run_regalloc_tool: true
 
-          - name: r5 regalloc
+          - name: runtime5 regalloc
             config: --enable-runtime5 --disable-warn-error
             system: aarch64-linux
             os: warp-ubuntu-latest-arm64-8x
@@ -117,7 +117,7 @@ jobs:
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
 
-          - name: r4 regalloc
+          - name: runtime4 regalloc
             config: --disable-runtime5
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
@@ -126,7 +126,7 @@ jobs:
             check_arch: true
             run_regalloc_tool: true
 
-          - name: r5 fp irc
+          - name: runtime5 frame-pointers irc
             config: --enable-runtime5 --enable-frame-pointers
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
@@ -134,7 +134,7 @@ jobs:
             ocamlparam: '_,w=-46,regalloc=irc'
             check_arch: true
 
-          - name: r5 cfg-invariants
+          - name: runtime5 cfg-invariants
             config: --enable-runtime5
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
@@ -142,7 +142,7 @@ jobs:
             ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             check_arch: true
 
-          - name: r5 vectorizer
+          - name: runtime5 vectorizer
             config: --enable-runtime5
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
@@ -150,19 +150,19 @@ jobs:
             ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             check_arch: true
 
-          - name: r4 asan
+          - name: runtime4 asan
             config: --enable-address-sanitizer
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             cc: clang
 
-          - name: r5 asan
+          - name: runtime5 asan
             config: --enable-address-sanitizer --enable-runtime5
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
             cc: clang
 
-          - name: r5 dwarf-tests
+          - name: runtime5 dwarf-tests
             config: --enable-runtime5
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
@@ -170,7 +170,7 @@ jobs:
             oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus1
             oxcaml_llvm_source_branch: lldb
 
-          - name: r5 fp llvmize-tests
+          - name: runtime5 frame-pointers llvmize-tests
             config: --enable-runtime5 --enable-frame-pointers
             system: x86_64-linux
             os: warp-ubuntu-latest-x64-8x
@@ -209,7 +209,6 @@ jobs:
             default: https://github.com/ocaml/opam-repository.git
           opam-disable-sandboxing: true
           opam-pin: false
-          cache-prefix: ${{ matrix.system }}-v1
 
       - name: Set up Opam environment
         # this command adds the opam environment to the PATH.
