@@ -41,11 +41,8 @@ let make_instr desc arg res dbg ~phantom_available_before =
     stack_offset = Cfg.invalid_stack_offset;
     id = next_instr_id ();
     irc_work_list = Unknown_list;
-    ls_order = 0;
-    (* CR mshinwell/xclerc: should this be [None]? *)
-    available_before =
-      Some (Reg_availability_set.Ok Reg_with_debug_info.Set.empty);
-    available_across = None;
+    available_before = Unreachable;
+    available_across = Unreachable;
     phantom_available_before
   }
 

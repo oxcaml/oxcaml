@@ -57,30 +57,6 @@
 /* Max computation time before rescheduling, in milliseconds */
 #define Thread_timeout 50
 
-/* Currently, the caml_switch_runtime_locking_scheme mechanism is incompatible
-   with multi-domain programs. To give a reasonable-looking error if both are
-   used at once, we track which (if either) of the features has been used */
-static enum {
-  /* State at startup: neither feature has been used.
-     The domain lock remains held by the first systhread of domain 0,
-     and the st_masterlock is used to provide mutual exclusion of threads.
-     No backup thread has started. */
-  LOCKMODE_STARTUP,
-
-  /* State if caml_switch_runtime_locking_scheme is used.
-     The domain lock remains held by the first systhread of domain 0,
-     and a custom locking scheme is used to provide mutual exclusion of threads.
-     No backup thread has started, nor may one ever start. */
-  LOCKMODE_CUSTOM_SCHEME,
-
-  /* State if multiple domains are used.
-     The domain lock is held by whichever systhread is running, or by the backup
-     thread of the current domain. The st_masterlock is also held by the running
-     systhread. This is the standard OCaml 5 locking mode.
-     caml_switch_runtime_locking_scheme may not be used. */
-  LOCKMODE_DOMAINS
-} domain_lockmode = LOCKMODE_STARTUP;
-
 /* OS-specific code */
 #ifdef _WIN32
 #include "st_win32.h"
@@ -117,6 +93,7 @@ struct caml_thread_struct {
   value descr;              /* The heap-allocated descriptor (root) */
   struct caml_thread_struct * next; /* Doubly-linked list of running threads */
   struct caml_thread_struct * prev;
+  value tls_state;    /* saved TLS value */
   int domain_id;      /* The id of the domain to which this thread belongs */
   struct stack_info* current_stack;      /* saved Caml_state->current_stack */
   struct c_stack_link* c_stack;          /* saved Caml_state->c_stack */
@@ -171,9 +148,10 @@ static struct caml_thread_table* thread_table;
 #define Default_lock(dom_id) (&thread_table[dom_id].default_lock)
 #define Default_locking_scheme(dom_id) (&thread_table[dom_id].default_locking_scheme)
 
-static void thread_lock_acquire(int dom_id)
+static void thread_lock_acquire(void)
 {
   struct caml_locking_scheme* s;
+  int dom_id = Caml_state->id;
 
   /* The locking scheme may be changed by the thread that currently
      holds it. This means that it may change while we're waiting to
@@ -190,12 +168,12 @@ static void thread_lock_acquire(int dom_id)
   }
 }
 
-static void thread_lock_release(int dom_id)
+static void thread_lock_release(void)
 {
   /* There is no tricky case here like in acquire, as only the holder
      of the lock can change it. (Here, that's us) */
   struct caml_locking_scheme *s;
-  s = atomic_load(&Locking_scheme(dom_id));
+  s = atomic_load(&Locking_scheme(Caml_state->id));
   s->unlock(s->context);
 }
 
@@ -240,6 +218,7 @@ static void default_reinitialize_after_fork(st_masterlock *m)
      effort. */
   if (st_masterlock_init(m) != 0)
     caml_fatal_error("Unix.fork: failed to reinitialize master lock");
+  st_masterlock_acquire(m);
 }
 
 /* Hook for scanning the stacks of the other threads */
@@ -260,6 +239,7 @@ static void caml_thread_scan_roots(
   if (active != NULL) {
     do {
       (*action)(fdata, th->descr, &th->descr);
+      (*action)(fdata, th->tls_state, &th->tls_state);
       (*action)(fdata, th->backtrace_last_exn, &th->backtrace_last_exn);
       /* Don't rescan the stack of the current thread, it was done already */
       if (th != active) {
@@ -288,6 +268,7 @@ static void save_runtime_state(void)
   CAMLassert(th != NULL);
   th->current_stack = Caml_state->current_stack;
   th->current_stack->local_sp = Caml_state->local_sp;
+  th->tls_state = Caml_state->tls_state;
   th->c_stack = Caml_state->c_stack;
   th->gc_regs = Caml_state->gc_regs;
   th->gc_regs_buckets = Caml_state->gc_regs_buckets;
@@ -307,7 +288,9 @@ static void save_runtime_state(void)
 
 CAMLexport void caml_thread_save_runtime_state(void)
 {
+  /* Same as caml_enter_blocking_section, except actually releasing the lock */
   save_runtime_state();
+  caml_bt_exit_ocaml();
 }
 
 static void restore_runtime_state(caml_thread_t th)
@@ -325,6 +308,8 @@ static void restore_runtime_state(caml_thread_t th)
   Caml_state->backtrace_pos = th->backtrace_pos;
   Caml_state->backtrace_buffer = th->backtrace_buffer;
   caml_modify_generational_global_root
+    (&Caml_state->tls_state, th->tls_state);
+  caml_modify_generational_global_root
     (&Caml_state->backtrace_last_exn, th->backtrace_last_exn);
 #ifndef NATIVE_CODE
   Caml_state->trap_sp_off = th->trap_sp_off;
@@ -338,6 +323,8 @@ static void restore_runtime_state(caml_thread_t th)
 
 CAMLexport void caml_thread_restore_runtime_state(void)
 {
+  /* Same as caml_leave_blocking_section, except actually acquiring the lock */
+  caml_bt_enter_ocaml();
   restore_runtime_state(This_thread);
 }
 
@@ -346,15 +333,11 @@ CAMLexport void caml_switch_runtime_locking_scheme(struct caml_locking_scheme* n
 {
   struct caml_locking_scheme* old;
   int dom_id = Caml_state->id;
-  if (domain_lockmode == LOCKMODE_DOMAINS)
-    caml_fatal_error("Switching locking scheme is unsupported in multicore programs");
-  CAMLassert (!caml_domain_is_multicore());
   save_runtime_state();
-  domain_lockmode = LOCKMODE_CUSTOM_SCHEME;
   old = atomic_exchange(&Locking_scheme(dom_id), new);
   /* We hold 'old', but it is no longer the runtime lock */
   old->unlock(old->context);
-  thread_lock_acquire(dom_id);
+  thread_lock_acquire();
   restore_runtime_state(This_thread);
 }
 
@@ -373,26 +356,23 @@ static void reset_active(void)
   caml_thread_cleanup(Val_unit);
 }
 
-/* Hooks for caml_enter_blocking_section and caml_leave_blocking_section */
+/* Hooks for caml_enter_blocking_section and
+ * caml_leave_blocking_section. The main runtime manages the backup
+ * thread and domain lock here; we just have to manage the thread state. */
 
 static void caml_thread_enter_blocking_section(void)
 {
   /* Save the current runtime state in the thread descriptor
      of the current thread */
   save_runtime_state();
-  /* Tell other threads that the runtime is free */
-  thread_lock_release(Caml_state->id);
 }
 
 static void caml_thread_leave_blocking_section(void)
 {
-  caml_thread_t th = This_thread;
-  /* Wait until the runtime is free */
-  thread_lock_acquire(th->domain_id);
   /* Update Active_thread to point to the thread descriptor
      corresponding to the thread currently executing and restore the
      runtime state */
-  restore_runtime_state(th);
+  restore_runtime_state(This_thread);
 }
 
 /* Create and setup a new thread info block.
@@ -408,6 +388,7 @@ static caml_thread_t caml_thread_new_info(caml_thread_t parent)
   if (th == NULL) return NULL;
 
   th->descr = Val_unit;
+  th->tls_state = Atom(0); /* Empty array */
   th->next = NULL;
   th->prev = NULL;
 
@@ -461,6 +442,7 @@ void caml_thread_free_info(caml_thread_t th)
      c_stack: stack-allocated
      local_roots: stack-allocated
      backtrace_last_exn: heap-allocated
+     tls_state: heap-allocated
      gc_regs:
        must be empty for a terminated thread
        (we assume that the C call stack must be empty at
@@ -565,9 +547,9 @@ static void caml_thread_reinitialize(void)
   Active_thread->next = Active_thread;
   Active_thread->prev = Active_thread;
 
-  /* Within the child, the domain_lock needs to be reset and acquired. */
+  /* Even though the default_domain_lock is not in use, call reset_domain_lock
+     in case we later want to use the backup-thread lock/cond */
   caml_reset_domain_lock();
-  caml_acquire_domain_lock();
 
   /* The lock needs to be initialized again. This process will also be
      the effective owner of the lock. So there is no need to run
@@ -584,6 +566,12 @@ static void caml_thread_reinitialize(void)
        chan = chan->next) {
     caml_plat_mutex_init(&chan->mutex);
   }
+}
+
+static void caml_thread_domain_send_interrupt_hook(caml_domain_state* dom)
+{
+  struct caml_locking_scheme *s = atomic_load(&Locking_scheme(dom->id));
+  if (s->send_interrupt) s->send_interrupt(s->context);
 }
 
 CAMLprim value caml_thread_join(value th);
@@ -619,42 +607,7 @@ static atomic_bool threads_initialized = false;
 
 CAMLprim value caml_thread_use_domains(value unit)
 {
-  if (domain_lockmode == LOCKMODE_DOMAINS)
-    return Val_unit;
-
-  if (domain_lockmode == LOCKMODE_CUSTOM_SCHEME)
-    caml_failwith("Thread.use_domains cannot be used with a non-default runtime locking scheme.");
-
-  CAMLassert(domain_lockmode == LOCKMODE_STARTUP);
-  CAMLassert(!caml_domain_is_multicore());
-
-  if (threads_initialized && !This_thread->is_main)
-    caml_failwith("Thread.use_domains: first use must be from the main thread.");
-
-  /* We are on the main thread, so we hold the domain_lock,
-     so we can switch lockmode */
-  domain_lockmode = LOCKMODE_DOMAINS;
-
   return Val_unit;
-}
-
-static void caml_thread_domain_spawn_hook(void)
-{
-  if (domain_lockmode == LOCKMODE_DOMAINS)
-    return;
-
-  if (domain_lockmode == LOCKMODE_CUSTOM_SCHEME)
-    caml_failwith("Domain.spawn cannot be used with a non-default runtime locking scheme.");
-
-  CAMLassert(domain_lockmode == LOCKMODE_STARTUP);
-  CAMLassert(!caml_domain_is_multicore());
-
-  if (threads_initialized && !This_thread->is_main)
-    caml_failwith("Domain.spawn: first use must be from the main thread.");
-
-  /* We are on the main thread, so we hold the domain_lock,
-     so we can switch lockmode */
-  domain_lockmode = LOCKMODE_DOMAINS;
 }
 
 /* FIXME: this should return an encoded exception for use in
@@ -668,21 +621,6 @@ static void caml_thread_domain_initialize_hook(void)
   /* OS-specific initialization */
   st_initialize();
 
-  st_masterlock *default_lock = Default_lock(Caml_state->id);
-  int ret = st_masterlock_init(default_lock);
-  sync_check_error(ret, "caml_thread_domain_initialize_hook");
-  struct caml_locking_scheme *ls = Default_locking_scheme(Caml_state->id);
-  ls->context = default_lock;
-  ls->lock = (void (*)(void*))&st_masterlock_acquire;
-  ls->unlock = (void (*)(void*))&st_masterlock_release;
-  ls->thread_start = NULL;
-  ls->thread_stop = NULL;
-  ls->reinitialize_after_fork = (void (*)(void*))&default_reinitialize_after_fork;
-  ls->can_skip_yield = (int (*)(void*))&default_can_skip_yield;
-  ls->yield = (void (*)(void*))&st_thread_yield;
-
-  Locking_scheme(Caml_state->id) = ls;
-
   new_thread =
     (caml_thread_t) caml_stat_alloc(sizeof(struct caml_thread_struct));
 
@@ -690,7 +628,10 @@ static void caml_thread_domain_initialize_hook(void)
   new_thread->descr = caml_thread_new_descriptor(Val_unit);
   new_thread->next = new_thread;
   new_thread->prev = new_thread;
+  /* Initialize [backtrace_last_exn] and [tls_state] as they are accessed
+     by the GC via [caml_thread_scan_roots] */
   new_thread->backtrace_last_exn = Val_unit;
+  new_thread->tls_state = Atom(0); /* empty array */
   new_thread->memprof = caml_memprof_main_thread(Caml_state);
   new_thread->dynamic = Caml_state->dynamic_bindings;
   CAMLassert(new_thread->dynamic);
@@ -739,18 +680,41 @@ CAMLprim value caml_thread_initialize(value unit)
   if (thread_table == NULL)
     caml_fatal_error("caml_thread_initialize: failed to allocate thread"
                      " table");
+  for (uintnat i = 0; i < caml_params->max_domains; i++) {
+    st_masterlock *default_lock = Default_lock(i);
+    if (st_masterlock_init(default_lock)) {
+      caml_fatal_error("caml_thread_initialize: failed to initialize domain locks");
+    }
+    struct caml_locking_scheme *ls = Default_locking_scheme(i);
+    ls->context = default_lock;
+    ls->lock = (void (*)(void*))&st_masterlock_acquire;
+    ls->unlock = (void (*)(void*))&st_masterlock_release;
+    ls->thread_start = NULL;
+    ls->thread_stop = NULL;
+    ls->reinitialize_after_fork = (void (*)(void*))&default_reinitialize_after_fork;
+    ls->can_skip_yield = (int (*)(void*))&default_can_skip_yield;
+    ls->yield = (void (*)(void*))&st_thread_yield;
+    Locking_scheme(i) = ls;
+  }
+
+  st_masterlock_acquire(Default_lock(Caml_state->id));
 
   /* First initialise the systhread chain on this domain */
   caml_thread_domain_initialize_hook();
+
+  /* Switch to the systhreads locking system */
+  caml_domain_unlock_hook();
 
   prev_scan_roots_hook = atomic_exchange(&caml_scan_roots_hook,
                                          caml_thread_scan_roots);
   caml_enter_blocking_section_hook = caml_thread_enter_blocking_section;
   caml_leave_blocking_section_hook = caml_thread_leave_blocking_section;
   caml_domain_external_interrupt_hook = caml_thread_interrupt_hook;
-  caml_domain_spawn_hook = caml_thread_domain_spawn_hook;
   caml_domain_initialize_hook = caml_thread_domain_initialize_hook;
+  caml_domain_lock_hook = thread_lock_acquire;
+  caml_domain_unlock_hook = thread_lock_release;
   caml_domain_stop_hook = caml_thread_domain_stop_hook;
+  caml_domain_send_interrupt_hook = caml_thread_domain_send_interrupt_hook;
   caml_atfork_hook = caml_thread_reinitialize;
 
   threads_initialized = true;
@@ -803,7 +767,8 @@ static void thread_detach_from_runtime(void)
   /* Forget the now-freed thread info */
   This_thread = NULL;
   /* Release domain lock */
-  thread_lock_release(Caml_state->id);
+  caml_bt_exit_ocaml();
+  caml_release_domain_lock();
 }
 
 /* Register current thread */
@@ -830,7 +795,7 @@ static void * caml_thread_start(void * v)
   if (s -> thread_start != NULL)
     s->thread_start(s->context, Thread_type_caml);
 
-  thread_lock_acquire(dom_id);
+  caml_acquire_domain_lock();
 
   thread_init_current(th);
 
@@ -947,7 +912,7 @@ CAMLexport int caml_c_thread_register(void)
 
   /* Acquire lock of domain */
   caml_init_domain_self(Dom_c_threads);
-  thread_lock_acquire(Dom_c_threads);
+  caml_acquire_domain_lock();
 
   /* Create tick thread if not already done */
   st_retcode err = start_tick_thread();
@@ -968,7 +933,7 @@ CAMLexport int caml_c_thread_register(void)
 
 out_err:
   /* Note: we cannot raise an exception here. */
-  thread_lock_release(Dom_c_threads);
+  caml_release_domain_lock();
   return 0;
 }
 
@@ -1040,7 +1005,7 @@ static void thread_yield(void)
   if (atomic_load(&Locking_scheme(Caml_state->id)) != s) {
     // The lock we own is no longer the runtime lock
     s->unlock(s->context);
-    thread_lock_acquire(Caml_state->id);
+    thread_lock_acquire();
   }
   restore_runtime_state(This_thread);
 

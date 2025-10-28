@@ -42,7 +42,8 @@
  (targets parser.ml)
  (deps ../../parser.ml)
  (action
-  (with-stdout-to %{targets}
+  (with-stdout-to
+   %{targets}
    (progn
     (echo "module MenhirLib = CamlinternalMenhirLib")
     (cat %{deps})))))
@@ -51,7 +52,8 @@
  (targets parser.mli)
  (deps ../../parser.mli)
  (action
-  (with-stdout-to %{targets}
+  (with-stdout-to
+   %{targets}
    (progn
     (echo "module MenhirLib = CamlinternalMenhirLib")
     (cat %{deps})))))
@@ -566,7 +568,15 @@
 (rule
  (targets dynlink.cma)
  (action
-  (run %{ocamlc} -g -a -ccopt %{read:natdynlinkops} -o dynlink.cma %{deps}))
+  (run
+   %{ocamlc}
+   -g
+   -a
+   -ccopt
+   %{read:../../natdynlinkops}
+   -o
+   dynlink.cma
+   %{deps}))
  (deps
   ; NOTE: Be sure to keep these arguments in dependency order!
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Runtimetags.cmo
@@ -576,11 +586,11 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Build_path_prefix_map.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Config.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Misc.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Warnings.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Arg_helper.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Identifiable.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Numbers.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Clflags.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Warnings.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Profile.cmo
   ; .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Profile_counters_functions.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Debug.cmo
@@ -662,7 +672,7 @@
    -g
    -a
    -ccopt
-   %{read:natdynlinkops}
+   %{read:../../natdynlinkops}
    -o
    dynlink.cmxa
    %{deps}))
@@ -675,11 +685,11 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Build_path_prefix_map.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Config.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Misc.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Warnings.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Arg_helper.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Identifiable.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Numbers.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Clflags.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Warnings.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Profile.cmx
   ; .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Profile_counters_functions.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Debug.cmx

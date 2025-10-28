@@ -68,8 +68,8 @@ type instruction =
     dbg : Debuginfo.t;
     fdo : Fdo_info.t;
     live : Reg.Set.t;
-    available_before : Reg_availability_set.t option;
-    available_across : Reg_availability_set.t option;
+    available_before : Reg_availability_set.t;
+    available_across : Reg_availability_set.t;
     phantom_available_before : Backend_var.Set.t option
   }
 
@@ -137,8 +137,8 @@ val instr_cons :
   Reg.t array ->
   Reg.t array ->
   instruction ->
-  available_before:Reg_availability_set.t option ->
-  available_across:Reg_availability_set.t option ->
+  available_before:Reg_availability_set.t ->
+  available_across:Reg_availability_set.t ->
   phantom_available_before:Backend_var.Set.t option ->
   instruction
 

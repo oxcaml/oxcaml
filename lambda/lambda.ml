@@ -352,6 +352,8 @@ type primitive =
   | Pcpu_relax
   | Pget_idx of layout * Asttypes.mutable_flag
   | Pset_idx of layout * modify_mode
+  | Pget_ptr of layout * Asttypes.mutable_flag
+  | Pset_ptr of layout * modify_mode
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
@@ -759,6 +761,15 @@ type loop_attribute =
   | Never_loop (* [@loop never] *)
   | Default_loop (* no [@loop] attribute *)
 
+type regalloc_attribute =
+  | Default_regalloc
+  | Regalloc of Clflags.Register_allocator.t
+
+type regalloc_param_attribute =
+  | Default_regalloc_params
+  | Regalloc_params of string list
+(* [@regalloc_param] attributes - can have multiple with string payloads *)
+
 type curried_function_kind = { nlocal : int } [@@unboxed]
 
 type function_kind = Curried of curried_function_kind | Tupled
@@ -811,6 +822,9 @@ type function_attribute = {
   zero_alloc : zero_alloc_attribute;
   poll: poll_attribute;
   loop: loop_attribute;
+  regalloc: regalloc_attribute;
+  regalloc_param: regalloc_param_attribute;
+  cold: bool;
   is_a_functor: bool;
   is_opaque: bool;
   stub: bool;
@@ -1082,6 +1096,9 @@ let default_function_attribute = {
   zero_alloc = Default_zero_alloc ;
   poll = Default_poll;
   loop = Default_loop;
+  regalloc = Default_regalloc;
+  regalloc_param = Default_regalloc_params;
+  cold = false;
   is_a_functor = false;
   is_opaque = false;
   stub = false;
@@ -2041,6 +2058,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _
   | Pget_idx _ | Pset_idx _
+  | Pget_ptr _ | Pset_ptr _
   | Ppeek _ | Ppoke _ ->
     None
   | Pmake_idx_field _
@@ -2202,15 +2220,21 @@ let primitive_can_raise prim =
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
   | Pidx_deepen _
   | Pget_idx _ | Pset_idx _
+  | Pget_ptr _ | Pset_ptr _
   | Ppeek _ | Ppoke _ ->
     false
 
 let constant_layout: constant -> layout = function
-  | Const_int _ | Const_char _ -> non_null_value Pintval
+  | Const_int _ | Const_int8 _ | Const_int16 _ | Const_char _ ->
+    non_null_value Pintval
   | Const_string _ -> non_null_value Pgenval
   | Const_int32 _ -> non_null_value (Pboxedintval Boxed_int32)
   | Const_int64 _ -> non_null_value (Pboxedintval Boxed_int64)
   | Const_nativeint _ -> non_null_value (Pboxedintval Boxed_nativeint)
+  | Const_untagged_int _ -> Punboxed_or_untagged_integer Untagged_int
+  | Const_untagged_int8 _ | Const_untagged_char _ ->
+    Punboxed_or_untagged_integer Untagged_int8
+  | Const_untagged_int16 _ -> Punboxed_or_untagged_integer Untagged_int16
   | Const_unboxed_int32 _ -> Punboxed_or_untagged_integer Unboxed_int32
   | Const_unboxed_int64 _ -> Punboxed_or_untagged_integer Unboxed_int64
   | Const_unboxed_nativeint _ -> Punboxed_or_untagged_integer Unboxed_nativeint
@@ -2258,6 +2282,14 @@ let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_or_untagged_integer Unboxed_nativeint ->
     layout_boxed_int Boxed_nativeint
   | Same_as_ocaml_repr s -> layout_of_const_sort s
+
+let extern_repr_involves_unboxed_products extern_repr =
+  match extern_repr with
+  | Same_as_ocaml_repr (Product _) -> true
+  | Same_as_ocaml_repr (Base _)
+  | Unboxed_vector _ | Unboxed_float _
+  | Unboxed_or_untagged_integer _ ->
+    false
 
 let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)
@@ -2329,6 +2361,35 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_vector Unboxed_vec512 -> Vec512
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
 
+let value_kind_of_value_with_externality ext =
+  let open Jkind_axis.Externality in
+  if le ext (upper_bound_if_is_always_gc_ignorable ()) then Pintval else Pgenval
+
+let rec layout_of_mixed_block_element_for_idx_set
+  ext (mbe : _ mixed_block_element)
+  : layout =
+  match mbe with
+  | Product mbes ->
+    (* Propagate known externality to components *)
+    Punboxed_product
+      (Array.to_list
+        (Array.map (layout_of_mixed_block_element_for_idx_set ext) mbes))
+  | Value ({ raw_kind = Pgenval; _ } as value_kind) ->
+    let raw_kind = value_kind_of_value_with_externality ext in
+    Pvalue { value_kind with raw_kind }
+  | Value value_kind -> Pvalue value_kind
+  | Float64 | Float_boxed _ -> Punboxed_float Unboxed_float64
+  | Float32 -> Punboxed_float Unboxed_float32
+  | Bits64 -> Punboxed_or_untagged_integer Unboxed_int64
+  | Bits32 -> Punboxed_or_untagged_integer Unboxed_int32
+  | Bits16 -> Punboxed_or_untagged_integer Untagged_int16
+  | Bits8 -> Punboxed_or_untagged_integer Untagged_int8
+  | Word -> Punboxed_or_untagged_integer Unboxed_nativeint
+  | Vec128 -> Punboxed_vector Unboxed_vec128
+  | Vec256 -> Punboxed_vector Unboxed_vec256
+  | Vec512 -> Punboxed_vector Unboxed_vec512
+  | Untagged_immediate -> Punboxed_or_untagged_integer Untagged_int
+
 let rec mixed_block_element_leaves (el : _ mixed_block_element)
   : _ mixed_block_element list =
   match el with
@@ -2355,7 +2416,7 @@ let will_be_reordered (mbe : _ mixed_block_element) =
   acc.last_value_after_flat
 
 let primitive_result_layout (p : primitive) =
-  assert !Clflags.native_code;
+  assert (!Clflags.native_code || Clflags.is_flambda2 ());
   match p with
   | Pphys_equal (Eq | Noteq) -> layout_int
   | Pscalar op ->
@@ -2548,6 +2609,8 @@ let primitive_result_layout (p : primitive) =
   | Ppoke _ -> layout_unit
   | Pget_idx (layout, _) -> layout
   | Pset_idx _ -> layout_unit
+  | Pget_ptr (layout, _) -> layout
+  | Pset_ptr _ -> layout_unit
 
 let compute_expr_layout free_vars_kind lam =
   let rec compute_expr_layout kinds = function

@@ -1438,10 +1438,11 @@ let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
   | Error error ->
     Error { source = At_instruction error; res_instr; res_block; desc; cfg }
 
-let run desc cfg =
+let run desc cfg_with_infos =
+  let cfg = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   match desc with
-  | None -> cfg
+  | None -> cfg_with_infos
   | Some desc -> (
     match test desc cfg with
-    | Ok cfg -> cfg
+    | Ok _ -> cfg_with_infos
     | Error error -> Regalloc_utils.fatal "%a%!" Error.dump error)

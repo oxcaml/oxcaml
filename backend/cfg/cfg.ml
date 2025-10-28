@@ -49,6 +49,10 @@ type basic_block =
 type codegen_option =
   | Reduce_code_size
   | No_CSE
+  | Use_linscan_regalloc
+  | Use_regalloc of Clflags.Register_allocator.t
+  | Use_regalloc_param of string list
+  | Cold
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;
@@ -75,7 +79,11 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
     | Check_zero_alloc { strict; loc; custom_error_msg } ->
       Check_zero_alloc { strict; loc; custom_error_msg }
       :: of_cmm_codegen_option tl
-    | Use_linscan_regalloc -> of_cmm_codegen_option tl)
+    | Use_linscan_regalloc -> Use_linscan_regalloc :: of_cmm_codegen_option tl
+    | Use_regalloc regalloc -> Use_regalloc regalloc :: of_cmm_codegen_option tl
+    | Use_regalloc_param params ->
+      Use_regalloc_param params :: of_cmm_codegen_option tl
+    | Cold -> Cold :: of_cmm_codegen_option tl)
 
 type phantom_defining_expr =
   | Cphantom_const_int of Targetint.t
@@ -440,8 +448,8 @@ let print_basic' ?print_reg ppf (instruction : basic instruction) =
       dbg = Debuginfo.none;
       fdo = None;
       live = Reg.Set.empty;
-      available_before = None;
-      available_across = None;
+      available_before = instruction.available_before;
+      available_across = instruction.available_across;
       phantom_available_before = instruction.phantom_available_before
     }
   in
@@ -594,8 +602,10 @@ let string_of_irc_work_list = function
 
 let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     ?(fdo = Fdo_info.none) ?(live = Reg.Set.empty) ~stack_offset ~id
-    ?(irc_work_list = Unknown_list) ?(ls_order = 0) ?(available_before = None)
-    ?(available_across = None) ?(phantom_available_before = None) () =
+    ?(irc_work_list = Unknown_list)
+    ?(available_before = Reg_availability_set.Unreachable)
+    ?(available_across = Reg_availability_set.Unreachable)
+    ?(phantom_available_before = None) () =
   { desc;
     arg;
     res;
@@ -605,14 +615,13 @@ let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     stack_offset;
     id;
     irc_work_list;
-    ls_order;
     available_before;
     available_across;
     phantom_available_before
   }
 
 let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
-    ?(res = [||]) ?(irc_work_list = Unknown_list) ?(ls_order = -1) () =
+    ?(res = [||]) ?(irc_work_list = Unknown_list) () =
   { desc;
     arg;
     res;
@@ -622,7 +631,6 @@ let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
     stack_offset = copy.stack_offset;
     id;
     irc_work_list;
-    ls_order;
     available_before = copy.available_before;
     available_across = copy.available_across;
     phantom_available_before = copy.phantom_available_before
@@ -759,13 +767,13 @@ let remove_trap_instructions t removed_trap_handlers =
       else (
         update_block lbl_handler ~stack_offset;
         update_basic_next (DLL.Cursor.next cursor)
-          ~stack_offset:(stack_offset + Proc.trap_size_in_bytes))
+          ~stack_offset:(stack_offset + Proc.trap_size_in_bytes ()))
     | Poptrap { lbl_handler } ->
       if Label.Set.mem lbl_handler removed_trap_handlers
       then update_basic_next (DLL.Cursor.delete_and_next cursor) ~stack_offset
       else
         update_basic_next (DLL.Cursor.next cursor)
-          ~stack_offset:(stack_offset - Proc.trap_size_in_bytes)
+          ~stack_offset:(stack_offset - Proc.trap_size_in_bytes ())
     | Op (Stackoffset n) ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset:(stack_offset + n)
     | Op

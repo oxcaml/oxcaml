@@ -60,6 +60,8 @@ type address = Persistent_env.address =
 
 type t
 
+type stage
+
 val empty: t
 
 (* This environment is lazy so that it may depend on the enabled extensions,
@@ -131,10 +133,10 @@ val find_constructor_address: Path.t -> t -> address
 val shape_of_path:
   namespace:Shape.Sig_component_kind.t -> t -> Path.t -> Shape.t
 
-(* CR sspies: The function [find_uid_of_path] is only temporary and will be
-   removed in a subsequent PR that removes the paths from type shapes. For now,
-   it is here to reduce code duplication. *)
-val find_uid_of_path : t -> Path.t -> Uid.t option
+val shape_of_path_opt:
+  namespace:Shape.Sig_component_kind.t -> t -> Path.t -> Shape.t option
+
+val shape_for_constr: t -> Path.t -> args:Shape.t list -> Shape.t option
 
 val add_functor_arg: Ident.t -> t -> t
 val is_functor_arg: Path.t -> t -> bool
@@ -223,6 +225,12 @@ type structure_components_reason =
   | Project
   | Open
 
+type no_open_quotations_context =
+  | Object_qt
+  | Struct_qt
+  | Sig_qt
+  | Open_qt
+
 type lookup_error =
   | Unbound_value of Longident.t * unbound_value_hint
   | Unbound_type of Longident.t
@@ -253,14 +261,14 @@ type lookup_error =
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_escaping of Mode.Hint.lock_item * Longident.t * escaping_context
   | Once_value_used_in of Mode.Hint.lock_item * Longident.t * shared_context
-  | Value_used_in_closure of Mode.Hint.lock_item * Longident.t *
-      Mode.Value.Comonadic.error
   | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of
       [`Escape of escaping_context | `Shared of shared_context | `Closure]
+  | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
+  | No_constructor_in_stage of Longident.t * Location.t * int
 
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
@@ -521,11 +529,19 @@ val add_escape_lock : escaping_context -> t -> t
     `unique` variables beyond the lock can still be accessed, but will be
     relaxed to `shared` *)
 val add_share_lock : shared_context -> t -> t
-val add_closure_lock : Mode.Hint.closure_context
+(* CR-soon zqian: require [pinpoint] instead of [pinpoint_desc] to include
+   location of the closure. *)
+val add_closure_lock : Mode.Hint.pinpoint_desc
   -> ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
+val enter_quotation : t -> t
+val enter_splice : loc:Location.t -> t -> t
+
+val check_no_open_quotations :
+  Location.t -> t -> no_open_quotations_context -> unit
+val stage : t -> stage
 
 (* Initialize the cache of in-core module interfaces. *)
 val reset_cache: preserve_persistent_env:bool -> unit
@@ -565,6 +581,13 @@ val imports: unit -> Import_info.t list
 
 (* may raise Persistent_env.Consistbl.Inconsistency *)
 val import_crcs: source:string -> Import_info.t array -> unit
+
+(* Require that the provided compilation unit will be available at quotation
+   compile time. *)
+val require_global_for_quote: Compilation_unit.Name.t -> unit
+
+(* Return the set of compilation units referenced by quotes *)
+val quoted_globals: unit -> Compilation_unit.Name.t list
 
 (* Return the set of imports represented as runtime parameters (see
    [Persistent_env.runtime_parameter_bindings] for details) *)
@@ -615,6 +638,8 @@ type error =
   | Illegal_value_name of Location.t * string
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t; }
+  | Toplevel_splice of Location.t
+  | Unsupported_inside_quotation of Location.t * no_open_quotations_context
 
 exception Error of error
 
@@ -707,3 +732,8 @@ type address_head =
 val address_head : address -> address_head
 
 val sharedness_hint : Format.formatter -> shared_context -> unit
+
+val print_stage : Format.formatter -> stage -> unit
+
+val print_with_quote_promote :
+  Format.formatter -> (string * stage * stage) -> unit

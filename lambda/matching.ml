@@ -794,7 +794,6 @@ end = struct
                   respecting the row count property. *)
               ({ arg1 with
                  pat_desc = Tpat_or (arg1, arg2, None);
-                 pat_loc = Location.none
                }
               :: ps
               )
@@ -1237,7 +1236,10 @@ let can_group discr pat =
   match (discr.pat_desc, (Simple.head pat).pat_desc) with
   | Any, Any
   | Constant (Const_int _), Constant (Const_int _)
+  | Constant (Const_int8 _), Constant (Const_int8 _)
+  | Constant (Const_int16 _), Constant (Const_int16 _)
   | Constant (Const_char _), Constant (Const_char _)
+  | Constant (Const_untagged_char _), Constant (Const_untagged_char _)
   | Constant (Const_string _), Constant (Const_string _)
   | Constant (Const_float _), Constant (Const_float _)
   | Constant (Const_float32 _), Constant (Const_float32 _)
@@ -1246,6 +1248,9 @@ let can_group discr pat =
   | Constant (Const_int32 _), Constant (Const_int32 _)
   | Constant (Const_int64 _), Constant (Const_int64 _)
   | Constant (Const_nativeint _), Constant (Const_nativeint _)
+  | Constant (Const_untagged_int _), Constant (Const_untagged_int _)
+  | Constant (Const_untagged_int8 _), Constant (Const_untagged_int8 _)
+  | Constant (Const_untagged_int16 _), Constant (Const_untagged_int16 _)
   | Constant (Const_unboxed_int32 _), Constant (Const_unboxed_int32 _)
   | Constant (Const_unboxed_int64 _), Constant (Const_unboxed_int64 _)
   | Constant (Const_unboxed_nativeint _), Constant (Const_unboxed_nativeint _)->
@@ -1272,9 +1277,12 @@ let can_group discr pat =
       | Constant
           ( Const_int _ | Const_char _ | Const_string _ | Const_float _
           | Const_float32 _ | Const_unboxed_float _ | Const_unboxed_float32 _
+          | Const_int8 _ | Const_int16 _
           | Const_int32 _ | Const_int64 _ | Const_nativeint _
+          | Const_untagged_char _
+          | Const_untagged_int8 _ | Const_untagged_int16 _
           | Const_unboxed_int32 _ | Const_unboxed_int64 _
-          | Const_unboxed_nativeint _ )
+          | Const_untagged_int _ | Const_unboxed_nativeint _ )
       | Construct _ | Tuple _ | Unboxed_tuple _ | Record _
       | Record_unboxed_product _ | Array _ | Variant _ | Lazy ) ) ->
       false
@@ -2083,7 +2091,10 @@ let get_mod_field modname field =
      match Env.find_value_by_name (Longident.Lident field) env with
      | exception Not_found ->
          fatal_errorf "Primitive %s.%s not found." modname field
-     | path, _ -> transl_value_path Loc_unknown env path
+     | path, _ ->
+         (* Loc_unknown is appropriate here: this references a compiler-internal
+            primitive with no corresponding user source location. *)
+         transl_value_path Scoped_location.Loc_unknown env path
     )
 
 let code_force_lazy_block = get_mod_field "CamlinternalLazy" "force_lazy_block"
@@ -2736,12 +2747,12 @@ module SArg = struct
 
   type layout = Lambda.layout
 
-  let make_prim p args = Lprim (p, args, Loc_unknown)
+  let make_prim loc p args = Lprim (p, args, loc)
 
-  let make_offset arg n =
+  let make_offset loc arg n =
     match n with
     | 0 -> arg
-    | _ -> Lambda.add int arg (tagged_immediate n) ~loc:Loc_unknown
+    | _ -> Lambda.add int arg (tagged_immediate n) ~loc
 
   let bind arg body =
     let newvar, newvar_duid, newarg =
@@ -2757,15 +2768,15 @@ module SArg = struct
     bind_with_layout Alias
                      (newvar, newvar_duid, Lambda.layout_int) arg (body newarg)
 
-  let make_const i = Lconst (Const_base (Const_int i))
+  let make_const _loc i = Lconst (Const_base (Const_int i))
 
-  let make_isout h arg = Lprim (Pisout, [ h; arg ], Loc_unknown)
+  let make_isout loc h arg = Lprim (Pisout, [ h; arg ], loc)
 
-  let make_isin h arg = Lprim (Pnot, [ make_isout h arg ], Loc_unknown)
+  let make_isin loc h arg = Lprim (Pnot, [ make_isout loc h arg ], loc)
 
-  let make_is_nonzero arg =
-    if !Clflags.native_code
-    then icmp Cne int arg (tagged_immediate 0) ~loc:Loc_unknown
+  let make_is_nonzero loc arg =
+    if !Clflags.native_code || Clflags.is_flambda2 ()
+    then icmp Cne int arg (tagged_immediate 0) ~loc
     else arg
 
   let arg_as_test arg = arg
@@ -2805,7 +2816,7 @@ module SArg = struct
         },
         loc, kind ))
 
-  let make_catch kind handler = 
+  let make_catch kind handler =
     make_catch_delayed kind handler
 
   let make_exit i = make_exit i
@@ -3138,6 +3149,28 @@ let combine_constant value_kind loc arg cst partial ctx def
             const_lambda_list
         in
         call_switcher value_kind loc fail arg min_int max_int int_lambda_list
+    | Const_int8 _ ->
+        let int_lambda_list =
+          List.map
+            (function
+              | Const_int8 n, l -> (n, l)
+              | _ -> assert false)
+            const_lambda_list
+        in
+        let max_excl = 1 lsl 7 in
+        call_switcher value_kind loc fail arg
+          (-max_excl) (max_excl - 1) int_lambda_list
+    | Const_int16 _ ->
+        let int_lambda_list =
+          List.map
+            (function
+              | Const_int16 n, l -> (n, l)
+              | _ -> assert false)
+            const_lambda_list
+        in
+        let max_excl = 1 lsl 15 in
+        call_switcher value_kind loc fail arg
+          (-max_excl) (max_excl - 1) int_lambda_list
     | Const_char _ ->
         let int_lambda_list =
           List.map
@@ -3181,6 +3214,14 @@ let combine_constant value_kind loc arg cst partial ctx def
     | Const_nativeint _ ->
         make_scalar_test_sequence
           (Scalar.integral (Value (Boxable (Nativeint Any_locality_mode))))
+    | Const_untagged_char _ ->
+        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int8)))
+    | Const_untagged_int _ ->
+        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int)))
+    | Const_untagged_int8 _ ->
+        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int8)))
+    | Const_untagged_int16 _ ->
+        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int16)))
     | Const_unboxed_int32 _ ->
         make_scalar_test_sequence
           (Scalar.integral (Naked (Boxable (Int32 Any_locality_mode))))
@@ -3246,7 +3287,7 @@ let transl_match_on_option value_kind arg loc ~if_some ~if_none =
   (* Keeping the Pisint test would make the bytecode
       slightly worse, but it lets the native compiler generate
       better code -- see #10681. *)
-  if !Clflags.native_code then
+  if !Clflags.native_code || Clflags.is_flambda2 () then
     Lifthenelse(Lprim (Pisint { variant_only = true }, [ arg ], loc),
                 if_none, if_some, value_kind)
   else
@@ -3413,9 +3454,12 @@ let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx 
       in
       (lambda1, Jumps.union local_jumps total1)
 
-let make_test_sequence_variant_constant value_kind fail arg int_lambda_list =
-  let _, (cases, actions) = as_interval fail min_int max_int int_lambda_list in
-  Switcher.test_sequence value_kind arg cases actions
+let make_test_sequence_variant_constant
+      value_kind loc fail arg int_lambda_list =
+  let _, (cases, actions) =
+    as_interval fail min_int max_int int_lambda_list
+  in
+  Switcher.test_sequence loc value_kind arg cases actions
 
 let call_switcher_variant_constant kind loc fail arg int_lambda_list =
   call_switcher kind loc fail arg min_int max_int int_lambda_list
@@ -3476,7 +3520,7 @@ let combine_variant value_kind loc row arg pat_barrier partial ctx def
             test_int_or_block arg act1 act2
         | _, [] -> (
             let lam =
-              make_test_sequence_variant_constant value_kind fail arg consts
+              make_test_sequence_variant_constant value_kind loc fail arg consts
             in
             (* PR#11587: Switcher.test_sequence expects integer inputs, so
                if the type allows pointers we must filter them away. *)
@@ -4035,6 +4079,9 @@ type failer_kind =
 let failure_handler ~scopes loc ~failer () =
   match failer with
   | Reraise_noloc exn_lam ->
+    (* Loc_unknown is intentional: we must not include location
+       information in the reraise to avoid showing this silent reraise
+       in exception backtraces. See comment at for_trywith below. *)
     Lprim (Praise Raise_reraise, [ exn_lam ], Scoped_location.Loc_unknown)
   | Raise_match_failure ->
     let sloc = Scoped_location.of_location ~scopes loc in
@@ -4498,11 +4545,12 @@ let for_optional_arg_default
   let default_arg_layout =
     Typeopt.layout pat.pat_env pat.pat_loc default_arg_sort pat.pat_type
   in
+  let sloc = Scoped_location.of_location ~scopes loc in
   let supplied_or_default =
     transl_match_on_option
       default_arg_layout
       (Lvar param)
-      Loc_unknown
+      sloc
       ~if_none:default_arg
       ~if_some:
         (Lprim
@@ -4514,7 +4562,7 @@ let for_optional_arg_default
               that could degrade performance of programs not using uniqueness *)
            (Pfield (0, Pointer, Reads_agree),
             [ Lvar param ],
-            Loc_unknown))
+            sloc))
   in
   for_let ~scopes ~arg_sort:default_arg_sort ~return_layout
     loc supplied_or_default Immutable pat body

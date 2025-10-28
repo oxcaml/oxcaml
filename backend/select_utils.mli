@@ -199,7 +199,6 @@ val make_name_for_debugger :
   ident:Ident.t ->
   which_parameter:int option ->
   provenance:Backend_var.Provenance.t option ->
-  is_assignment:bool ->
   regs:Reg.t array ->
   Cfg.basic
 

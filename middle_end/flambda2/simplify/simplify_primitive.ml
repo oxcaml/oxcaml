@@ -57,8 +57,9 @@ let try_cse dacc dbg ~original_prim ~min_name_mode ~result_var : cse_result =
             ~operation:(Removed_operations.prim original_prim)
             Cost_metrics.zero
         in
+        let machine_width = DE.machine_width (DA.denv dacc) in
         let simplified_named =
-          Simplified_named.create named
+          Simplified_named.create ~machine_width named
           |> Simplified_named.update_cost_metrics cost_metrics
         in
         Simplify_primitive_result.create_simplified simplified_named

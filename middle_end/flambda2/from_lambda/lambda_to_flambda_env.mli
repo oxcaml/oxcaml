@@ -30,12 +30,15 @@ end
 
 val create :
   current_unit:Compilation_unit.t ->
+  machine_width:Target_system.Machine_width.t ->
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   my_region:Region_stack_element.t option ->
   t
 
 val current_unit : t -> Compilation_unit.t
+
+val machine_width : t -> Target_system.Machine_width.t
 
 val ident_stamp_upon_starting : t -> int
 

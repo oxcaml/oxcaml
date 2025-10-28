@@ -522,14 +522,11 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [index] ->
         let index =
           match ik with
-          | Ptagged_int_index -> comp_expr index
+          (* [int8#]/[int16#] are already tagged ints on bytecode *)
           | Punboxed_or_untagged_integer_index
-              (Untagged_int8 | Untagged_int16 | Untagged_int) ->
-            (* [int8#]/[int16#] are already tagged ints on bytecode, so this
-               case is likely implemented by [comp_expr index]. But this should
-               be unreachable as the frontend doesn't support these indices. *)
-            Misc.fatal_error
-              "Array block indices with small int indices not expected"
+              (Untagged_int8 | Untagged_int16 | Untagged_int)
+          | Ptagged_int_index ->
+            comp_expr index
             (* CR mshinwell: this is probably ok for now, but it seems like
                these conversions could silently overflow *)
           | Punboxed_or_untagged_integer_index Unboxed_int64 ->
@@ -618,7 +615,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pstringrefs -> binary (Ccall "caml_string_get")
     | Pbytesrefs -> binary (Ccall "caml_bytes_get")
     | Pbytessets -> ternary (Ccall "caml_bytes_set")
-    | Pstringrefu | Pbytesrefu -> binary Getbyteschar
+    | Pstringrefu -> binary Getstringchar
+    | Pbytesrefu -> binary Getbyteschar
     | Pbytessetu -> ternary Setbyteschar
     | Pstring_load_16 { index_kind; _ } ->
       binary (indexing_primitive index_kind "caml_string_get16")
@@ -834,7 +832,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Punboxedfloatarray_set _ | Pgcscannableproductarray_set _
       | Pgcignorableproductarray_set _ ->
         n_ary (Ccall "caml_array_blit") ~arity:5)
-    | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ ->
+    | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ | Pget_ptr _ | Pset_ptr _ ->
       Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"
         Printlambda.primitive primitive
     | Pmakelazyblock Lazy_tag ->

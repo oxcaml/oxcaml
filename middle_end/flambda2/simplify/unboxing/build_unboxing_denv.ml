@@ -54,6 +54,7 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
     let shape =
       T.immutable_block ~is_unique:false tag ~shape ~fields:field_types
         (Alloc_mode.For_types.unknown ())
+        ~machine_width:(DE.machine_width denv)
     in
     let denv = add_equation_on_var denv param_var shape in
     List.fold_left
@@ -180,7 +181,9 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
         fields_by_tag
     in
     let shape =
-      T.variant ~const_ctors ~non_const_ctors (Alloc_mode.For_types.unknown ())
+      T.variant ~machine_width:(DE.machine_width denv) ~const_ctors
+        ~non_const_ctors
+        (Alloc_mode.For_types.unknown ())
     in
     let denv = add_equation_on_var denv param_var shape in
     (* Recurse on the fields *)

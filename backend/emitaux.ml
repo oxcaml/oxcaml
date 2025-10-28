@@ -431,6 +431,8 @@ module Dwarf_helpers = struct
 
   let sourcefile_for_dwarf = ref None
 
+  let ppf_dump = ref Format.err_formatter
+
   let begin_dwarf ~code_begin ~code_end ~file_emitter =
     match !sourcefile_for_dwarf with
     | None -> ()
@@ -452,12 +454,13 @@ module Dwarf_helpers = struct
              (Dwarf.create ~sourcefile ~unit_name ~asm_directives
                 ~get_file_id:get_file_num ~code_begin ~code_end)
 
-  let reset_dwarf () =
+  let reset_dwarf ppf =
     dwarf := None;
-    sourcefile_for_dwarf := None
+    sourcefile_for_dwarf := None;
+    ppf_dump := ppf
 
-  let init ~disable_dwarf ~sourcefile =
-    reset_dwarf ();
+  let init ~ppf_dump ~disable_dwarf ~sourcefile =
+    reset_dwarf ppf_dump;
     let can_emit_dwarf =
       !Clflags.debug
       && ((not !Dwarf_flags.restrict_to_upstream_dwarf)
@@ -491,7 +494,8 @@ module Dwarf_helpers = struct
     | None -> None
     | Some dwarf ->
       let fun_end_label = Cmm.new_label () in
-      Some (Dwarf.dwarf_for_fundecl dwarf fundecl ~fun_end_label)
+      let ppf_dump = !ppf_dump in
+      Some (Dwarf.dwarf_for_fundecl dwarf fundecl ~fun_end_label ~ppf_dump)
 end
 
 let report_error ppf = function
@@ -566,6 +570,8 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
     if insert_stack_check
     then
       let fun_body =
+        (* CR mshinwell: These availability sets aren't taking into account any
+           potential clobbers by the stack check. *)
         Linear.instr_cons
           (Lstackcheck { max_frame_size_bytes = max_frame_size })
           [||] [||] ~available_before:fundecl.fun_body.available_before

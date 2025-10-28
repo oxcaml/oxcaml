@@ -234,10 +234,10 @@ Error: This expression has type "r#" but an expression was expected of type "r2#
 
 (* Mutable fields imply modalities *)
 type r = { i : int ; mutable s : string }
-type u = r# = #{ i : int ; s : string @@ global many aliased unyielding }
+type u = r# = #{ i : int ; s : string @@ global many aliased unyielding dynamic }
 [%%expect{|
 type r = { i : int; mutable s : string; }
-type u = r# = #{ i : int; s : string @@ global many aliased; }
+type u = r# = #{ i : int; s : string @@ global many aliased dynamic; }
 |}]
 
 (*******************)

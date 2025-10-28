@@ -368,25 +368,32 @@ module Const = struct
 
   let naked_vec512 i = create (Naked_vec512 i)
 
-  let const_true = tagged_immediate Target_ocaml_int.bool_true
+  let const_true machine_width =
+    tagged_immediate (Target_ocaml_int.bool_true machine_width)
 
-  let const_false = tagged_immediate Target_ocaml_int.bool_false
+  let const_false machine_width =
+    tagged_immediate (Target_ocaml_int.bool_false machine_width)
 
-  let untagged_const_true = naked_immediate Target_ocaml_int.bool_true
+  let untagged_const_true machine_width =
+    naked_immediate (Target_ocaml_int.bool_true machine_width)
 
-  let untagged_const_false = naked_immediate Target_ocaml_int.bool_false
+  let untagged_const_false machine_width =
+    naked_immediate (Target_ocaml_int.bool_false machine_width)
 
-  let untagged_const_zero = naked_immediate Target_ocaml_int.zero
+  let untagged_const_zero machine_width =
+    naked_immediate (Target_ocaml_int.zero machine_width)
 
   let untagged_const_int i = naked_immediate i
 
   let const_int i = tagged_immediate i
 
-  let const_zero = tagged_immediate Target_ocaml_int.zero
+  let const_zero machine_width =
+    tagged_immediate (Target_ocaml_int.zero machine_width)
 
-  let const_one = tagged_immediate Target_ocaml_int.one
+  let const_one machine_width =
+    tagged_immediate (Target_ocaml_int.one machine_width)
 
-  let const_unit = const_zero
+  let const_unit machine_width = const_zero machine_width
 
   let const_null = create Null
 
@@ -538,6 +545,8 @@ module Symbol = struct
     create_wrapped data
 
   let compilation_unit t = Symbol0.compilation_unit (find_data t)
+
+  let for_compilation_unit t = Symbol0.for_compilation_unit t |> create_wrapped
 
   let linkage_name t = Symbol0.linkage_name (find_data t)
 

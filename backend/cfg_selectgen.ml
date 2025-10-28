@@ -206,7 +206,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     then
       let naming_op =
         SU.make_name_for_debugger ~ident:(VP.var v) ~which_parameter:None
-          ~provenance ~is_assignment:false ~regs:r1
+          ~provenance ~regs:r1
       in
       SU.insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]);
     env
@@ -895,12 +895,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             let bound_name = VP.var bound_name in
             let naming_op =
               Operation.Name_for_debugger
-                { ident = bound_name;
-                  provenance;
-                  which_parameter = None;
-                  is_assignment = false;
-                  regs
-                }
+                { ident = bound_name; provenance; which_parameter = None; regs }
             in
             insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]
       in
@@ -1129,7 +1124,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                       { ident = var;
                         provenance;
                         which_parameter = None;
-                        is_assignment = false;
                         regs = r
                       }
                   in
@@ -1411,7 +1405,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                       { ident = var;
                         provenance;
                         which_parameter = None;
-                        is_assignment = false;
                         regs = r
                       }
                   in
@@ -1472,6 +1465,34 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     emit_tail env sub_cfg exp;
     sub_cfg
 
+  let insert_param_name_for_debugger block fun_args loc_arg num_regs_per_arg =
+    let loc_arg_index = ref 0 in
+    List.iteri
+      (fun param_index (var, _ty) ->
+        let provenance = VP.provenance var in
+        let var = VP.var var in
+        let num_regs_for_arg = num_regs_per_arg.(param_index) in
+        let hard_regs_for_arg =
+          Array.init num_regs_for_arg (fun index ->
+              loc_arg.(!loc_arg_index + index))
+        in
+        loc_arg_index := !loc_arg_index + num_regs_for_arg;
+        if Option.is_some provenance
+        then
+          let naming_op =
+            Operation.Name_for_debugger
+              { ident = var;
+                provenance;
+                which_parameter = Some param_index;
+                regs = hard_regs_for_arg
+              }
+          in
+          DLL.add_end block.Cfg.body
+            (Sub_cfg.make_instr (Cfg.Op naming_op) hard_regs_for_arg [||]
+               (* CR mshinwell: is [None] correct? *)
+               Debuginfo.none ~phantom_available_before:None))
+      fun_args
+
   (* Sequentialization of a function definition *)
 
   let emit_fundecl ~future_funcnames f =
@@ -1501,31 +1522,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         f.Cmm.fun_args rargs env
     in
     let body = Sub_cfg.make_empty () in
-    let loc_arg_index = ref 0 in
-    List.iteri
-      (fun param_index (var, _ty) ->
-        let provenance = VP.provenance var in
-        let var = VP.var var in
-        let num_regs_for_arg = num_regs_per_arg.(param_index) in
-        let hard_regs_for_arg =
-          Array.init num_regs_for_arg (fun index ->
-              loc_arg.(!loc_arg_index + index))
-        in
-        loc_arg_index := !loc_arg_index + num_regs_for_arg;
-        if Option.is_some provenance
-        then
-          let naming_op =
-            Operation.Name_for_debugger
-              { ident = var;
-                provenance;
-                which_parameter = Some param_index;
-                is_assignment = false;
-                regs = hard_regs_for_arg
-              }
-          in
-          insert_debug env body (Op naming_op) Debuginfo.none hard_regs_for_arg
-            [||])
-      f.Cmm.fun_args;
     SU.insert_moves env body loc_arg rarg;
     let prologue_poll_instr_id =
       insert_op_debug_returning_id env body Operation.Poll Debuginfo.none [||]
@@ -1551,6 +1547,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (Sub_cfg.make_instr (Cfg.Always tailrec_label) [||] [||] Debuginfo.none
            ~phantom_available_before:None)
     in
+    insert_param_name_for_debugger entry_block f.Cmm.fun_args loc_arg
+      num_regs_per_arg;
     Cfg.add_block_exn cfg entry_block;
     DLL.add_end layout entry_block.start;
     let tailrec_block =
@@ -1559,27 +1557,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
            (Cfg.Always (Sub_cfg.start_label body))
            [||] [||] Debuginfo.none ~phantom_available_before:None)
     in
+    insert_param_name_for_debugger tailrec_block f.Cmm.fun_args loc_arg
+      num_regs_per_arg;
     Cfg.add_block_exn cfg tailrec_block;
     DLL.add_end layout tailrec_block.start;
-    let delete_prologue_poll =
-      (* CR mshinwell/xclerc: find a neater way of doing this rather than making
-         a special case for the [optimistic_prologue_poll_instr_id]. *)
-      not
-        (Cfg_polling.requires_prologue_poll ~future_funcnames
-           ~fun_name:f.Cmm.fun_name.sym_name
-           ~optimistic_prologue_poll_instr_id:prologue_poll_instr_id cfg)
-    in
-    let found_prologue_poll = ref false in
     Sub_cfg.iter_basic_blocks body ~f:(fun (block : Cfg.basic_block) ->
-        if delete_prologue_poll && not !found_prologue_poll
-        then
-          DLL.filter_left block.body
-            ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
-              let is_prologue_poll =
-                InstructionId.equal instr.id prologue_poll_instr_id
-              in
-              if is_prologue_poll then found_prologue_poll := true;
-              not is_prologue_poll);
         if not (Cfg.is_never_terminator block.terminator.desc)
         then (
           block.can_raise <- Cfg.can_raise_terminator block.terminator.desc;
@@ -1591,13 +1573,33 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           Cfg.add_block_exn cfg block;
           DLL.add_end layout block.start)
         else assert (DLL.is_empty block.body));
-    if delete_prologue_poll && not !found_prologue_poll
-    then Misc.fatal_error "Did not find [Poll] instruction to delete";
     (* note: `Cfgize.Stack_offset_and_exn.update_cfg` may add edges to the
        graph, and should hence be executed before
        `Cfg.register_predecessors_for_all_blocks`. *)
     SU.Stack_offset_and_exn.update_cfg cfg;
     Cfg.register_predecessors_for_all_blocks cfg;
+    (* Delete prologue_poll instruction if not needed *)
+    let delete_prologue_poll =
+      (* CR mshinwell/xclerc: find a neater way of doing this rather than making
+         a special case for the [optimistic_prologue_poll_instr_id]. *)
+      not
+        (Cfg_polling.requires_prologue_poll ~future_funcnames
+           ~fun_name:f.Cmm.fun_name.sym_name
+           ~optimistic_prologue_poll_instr_id:prologue_poll_instr_id cfg)
+    in
+    let found_prologue_poll = ref false in
+    Cfg.iter_blocks cfg ~f:(fun _label (block : Cfg.basic_block) ->
+        if delete_prologue_poll && not !found_prologue_poll
+        then
+          DLL.filter_left block.body
+            ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+              let is_prologue_poll =
+                InstructionId.equal instr.id prologue_poll_instr_id
+              in
+              if is_prologue_poll then found_prologue_poll := true;
+              not is_prologue_poll));
+    if delete_prologue_poll && not !found_prologue_poll
+    then Misc.fatal_error "Did not find [Poll] instruction to delete";
     let fun_contains_calls =
       Sub_cfg.exists_basic_blocks body ~f:Cfg.basic_block_contains_calls
     in

@@ -218,9 +218,14 @@ let rewrite_gen :
           let new_instr = Move.make_instr move ~id ~copy:instr ~from ~to_ in
           match direction with
           | Load_before_cell cell -> DLL.insert_before cell new_instr
-          | Store_after_cell cell -> DLL.insert_after cell new_instr
+          | Store_after_cell cell ->
+            (* See comment before Insert_skipping_name_for_debugger *)
+            Insert_skipping_name_for_debugger.insert_after cell new_instr
+              ~reg:from
           | Load_after_list list -> DLL.add_end list new_instr
-          | Store_before_list list -> DLL.add_begin list new_instr);
+          | Store_before_list list ->
+            (* See comment before Insert_skipping_name_for_debugger *)
+            Insert_skipping_name_for_debugger.add_begin list new_instr ~reg:from);
         temp)
       else reg
     in
@@ -356,6 +361,27 @@ let compute_critical_edges : Cfg.t -> Cfg_edge.Set.t =
               else critical_edges)
             successor_labels critical_edges))
 
+(* A destruction edge is an edge following a destruction point. We are inserting
+   blocks on such edges to work around a bug in the split processing phase where
+   such an edge points to a block with another predecessor and that predecessor
+   has not spilled the temporaries destroyed at the destruction point. *)
+let compute_destruction_edges : Cfg.t -> Cfg_edge.Set.t =
+ fun cfg ->
+  Cfg.fold_blocks cfg ~init:Cfg_edge.Set.empty
+    ~f:(fun label block critical_edges ->
+      match Regalloc_split_utils.destruction_point_at_end block with
+      | None | Some Destruction_only_on_exceptional_path -> critical_edges
+      | Some Destruction_on_all_paths ->
+        let successor_labels : Label.Set.t =
+          Cfg.successor_labels ~normal:true ~exn:false block
+        in
+        Label.Set.fold
+          (fun successor_label critical_edges ->
+            Cfg_edge.Set.add
+              { Cfg_edge.src = label; dst = successor_label }
+              critical_edges)
+          successor_labels critical_edges)
+
 let prelude :
     (module Utils) ->
     on_fatal_callback:(unit -> unit) ->
@@ -364,17 +390,36 @@ let prelude :
  fun (module Utils) ~on_fatal_callback cfg_with_infos ->
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   on_fatal ~f:on_fatal_callback;
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  (* Extract function-specific regalloc params from codegen_options *)
+  let params =
+    List.concat_map cfg.fun_codegen_options ~f:(function
+      | Cfg.Use_regalloc_param params -> params
+      | Cfg.Reduce_code_size | Cfg.No_CSE | Cfg.Use_linscan_regalloc
+      | Cfg.Use_regalloc _ | Cfg.Cold | Cfg.Assume_zero_alloc _
+      | Cfg.Check_zero_alloc _ ->
+        [])
+  in
+  set_function_specific_params params;
   if debug
-  then Utils.log "run (%S)" (Cfg_with_layout.cfg cfg_with_layout).fun_name;
+  then (
+    Utils.log "run (%S)" cfg.fun_name;
+    match params with
+    | [] -> ()
+    | params ->
+      Utils.log "function_specific_params: %s" (String.concat ", " params));
   Reg.reinit_relocatable_regs ();
   if debug && Lazy.force invariants
   then (
     Utils.log "precondition";
     Regalloc_invariants.precondition cfg_with_layout);
-  let cfg = Cfg_with_layout.cfg cfg_with_layout in
   (* We identify critical edges, and pre-emptively insert block so that the
      register allocator will not have to change the shape of the CFG. *)
-  let critical_edges = compute_critical_edges cfg in
+  let critical_edges =
+    Cfg_edge.Set.union
+      (compute_critical_edges cfg)
+      (compute_destruction_edges cfg)
+  in
   if not (Cfg_edge.Set.is_empty critical_edges)
   then (
     let next_instruction_id () =

@@ -59,6 +59,10 @@ let memory_access : Arch.specific_operation -> Memory_access.t option =
     Misc.fatal_errorf
       "Unexpected simd instruction with memory operands before vectorization"
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32 -> None
+  | Illvm_intrinsic intr ->
+    Misc.fatal_errorf
+      "Vectorize_specific: Unexpected llvm_intrinsic %s: not using LLVM backend"
+      intr
 
 let is_seed_store :
     Arch.specific_operation -> Vectorize_utils.Width_in_bits.t option =
@@ -69,3 +73,8 @@ let is_seed_store :
   | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32 | Isimd _ | Isimd_mem _
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32 ->
     None
+  | Illvm_intrinsic intr ->
+    Misc.fatal_errorf
+      "Vectorize_specific.is_seed_store: Unexpected llvm_intrinsic %s: not \
+       using LLVM backend"
+      intr

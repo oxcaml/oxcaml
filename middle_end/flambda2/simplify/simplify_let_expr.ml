@@ -95,10 +95,12 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               with
               | None -> binding
               | Some dbg ->
+                let machine_width = UE.machine_width (UA.uenv uacc) in
                 Keep_binding
                   { kept_binding with
                     simplified_defining_expr =
-                      Simplified_named.create (Named.create_prim prim dbg)
+                      Simplified_named.create ~machine_width
+                        (Named.create_prim prim dbg)
                   }))
           | Simple _ | Set_of_closures _ | Rec_info _ -> binding))
       bindings
@@ -115,9 +117,9 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
     | Set_of_closures _ ->
       Bound_pattern.fold_all_bound_vars bound_vars
         ~init:Name_mode.Or_absent.absent ~f:(fun greatest_name_mode bound_var ->
-          Name_occurrences.greatest_name_mode_var free_names_of_body
-            (VB.var bound_var)
-          |> Name_mode.Or_absent.join_in_terms greatest_name_mode)
+          Name_mode.Or_absent.join_in_terms greatest_name_mode
+            (Name_occurrences.greatest_name_mode_var free_names_of_body
+               (VB.var bound_var)))
     | Static _ -> assert false
     (* see below *)
   in
@@ -141,13 +143,10 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
             | None -> true
             | Some c -> c > 0
           in
-          let { Simplified_named.named = defining_expr;
-                free_names = _;
-                cost_metrics = _
-              } =
-            simplified_defining_expr
+          let defining_expr =
+            Simplified_named.to_named
+              simplified_defining_expr.Simplified_named.named
           in
-          let defining_expr = Simplified_named.to_named defining_expr in
           if mismatched_modes
           then
             Misc.fatal_errorf
@@ -175,9 +174,12 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               in
               not is_used, is_used
           in
-          if is_end_region_for_used_region
-             || (not is_end_region_for_unused_region)
-                && not (Named.at_most_generative_effects defining_expr)
+          let must_be_kept_for_its_effects =
+            is_end_region_for_used_region
+            || (not is_end_region_for_unused_region)
+               && not (Named.at_most_generative_effects defining_expr)
+          in
+          if must_be_kept_for_its_effects
           then (
             if not (Name_mode.is_normal declared_name_mode)
             then
@@ -250,6 +252,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               ~operation:(Removed_operations.prim original_prim)
               uacc
           in
+          let machine_width = UE.machine_width (UA.uenv uacc) in
           let new_bindings =
             match prim_rewrite with
             | Remove_prim -> (
@@ -277,7 +280,8 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
             | Invalid k ->
               let prim : P.t = Nullary (Invalid k) in
               let simplified_defining_expr =
-                Simplified_named.create (Named.create_prim prim dbg)
+                Simplified_named.create ~machine_width
+                  (Named.create_prim prim dbg)
               in
               [ Expr_builder.Keep_binding
                   { binding with simplified_defining_expr } ]
@@ -286,7 +290,8 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               let var' = Bound_var.var bv in
               assert (Variable.equal var var');
               let simplified_defining_expr =
-                Simplified_named.create (Named.create_simple bound_to)
+                Simplified_named.create ~machine_width
+                  (Named.create_simple bound_to)
               in
               [ Expr_builder.Keep_binding
                   { binding with simplified_defining_expr } ]
@@ -438,73 +443,77 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
   let dacc, prior_lifted_constants = DA.get_and_clear_lifted_constants dacc in
   (* Simplify the defining expression. *)
   let defining_expr = L.defining_expr let_expr in
-  let simplify_named_result, removed_operations =
+  match
     Simplify_named.simplify_named dacc bound_pattern defining_expr
       ~simplify_function_body
-  in
-  (* We must make sure that if [Invalid] is going to be produced, [uacc] doesn't
-     contain any extraneous data for e.g. lifted constants that will never be
-     placed, since this can lead to errors when loading .cmx files or similar.
-     To avoid this we don't traverse [body]. *)
-  match simplify_named_result with
-  | Invalid ->
-    down_to_up original_dacc ~rebuild:(fun uacc ~after_rebuild ->
-        let uacc = UA.notify_removed ~operation:removed_operations uacc in
-        EB.rebuild_invalid uacc
-          (Defining_expr_of_let (bound_pattern, defining_expr))
-          ~after_rebuild)
-  | Ok simplify_named_result ->
-    let dacc = Simplify_named_result.dacc simplify_named_result in
-    (* First accumulate variable, symbol and code ID usage information. *)
-    (* CR-someday gbury/pchambart : in the case of an invalid, we currently
-       over-approximate the uses. In case of an invalid, we might want to
-       instead flush the uses of the current control flow branch (but this would
-       require a more precise stack). *)
-    (* We currently over-approximate the use of variables in symbols: both in
-       the lifted constants, and in the bound constants, which we consider to be
-       always used, leading to the free_names in their defining expressions to
-       be considered as used unconditionally. *)
-    let closure_info = DE.closure_info (DA.denv dacc) in
-    (* Next remember any lifted constants that were generated during the
-       simplification of the defining expression and sort them, since they may
-       be mutually recursive. Then add back in to [dacc] the
-       [prior_lifted_constants] remembered above. This results in the
-       definitions and types for all these constants being available at a
-       subsequent [Let_cont]. At such a point, [dacc] will be queried to
-       retrieve all of the constants, which are then manually transferred into
-       the computed [dacc] at the join point for subsequent simplification of
-       the continuation handler(s).
+  with
+  | Rewritten f -> simplify_expr dacc (f ~body) ~down_to_up
+  | Simplified (simplify_named_result, removed_operations) -> (
+    (* We must make sure that if [Invalid] is going to be produced, [uacc]
+       doesn't contain any extraneous data for e.g. lifted constants that will
+       never be placed, since this can lead to errors when loading .cmx files or
+       similar. To avoid this we don't traverse [body]. *)
+    match simplify_named_result with
+    | Invalid ->
+      down_to_up original_dacc ~rebuild:(fun uacc ~after_rebuild ->
+          let uacc = UA.notify_removed ~operation:removed_operations uacc in
+          EB.rebuild_invalid uacc
+            (Defining_expr_of_let (bound_pattern, defining_expr))
+            ~after_rebuild)
+    | Ok simplify_named_result ->
+      let dacc = Simplify_named_result.dacc simplify_named_result in
+      (* First accumulate variable, symbol and code ID usage information. *)
+      (* CR-someday gbury/pchambart : in the case of an invalid, we currently
+         over-approximate the uses. In case of an invalid, we might want to
+         instead flush the uses of the current control flow branch (but this
+         would require a more precise stack). *)
+      (* We currently over-approximate the use of variables in symbols: both in
+         the lifted constants, and in the bound constants, which we consider to
+         be always used, leading to the free_names in their defining expressions
+         to be considered as used unconditionally. *)
+      let closure_info = DE.closure_info (DA.denv dacc) in
+      (* Next remember any lifted constants that were generated during the
+         simplification of the defining expression and sort them, since they may
+         be mutually recursive. Then add back in to [dacc] the
+         [prior_lifted_constants] remembered above. This results in the
+         definitions and types for all these constants being available at a
+         subsequent [Let_cont]. At such a point, [dacc] will be queried to
+         retrieve all of the constants, which are then manually transferred into
+         the computed [dacc] at the join point for subsequent simplification of
+         the continuation handler(s).
 
-       Note that no lifted constants are ever placed during the simplification
-       of the defining expression. (Not even in the case of a [Set_of_closures]
-       binding, since "let symbol" is disallowed under a lambda.) *)
-    let lifted_constants_from_defining_expr = DA.get_lifted_constants dacc in
-    let dacc =
-      DA.add_to_lifted_constant_accumulator dacc prior_lifted_constants
-    in
-    let rewrite_id = Named_rewrite_id.create () in
-    let dacc =
-      DA.map_flow_acc dacc
-        ~f:
-          (update_data_flow dacc closure_info ~rewrite_id
-             ~lifted_constants_from_defining_expr simplify_named_result)
-    in
-    let at_unit_toplevel = DE.at_unit_toplevel (DA.denv dacc) in
-    (* Simplify the body of the let-expression and make the new [Let] bindings
-       around the simplified body. [Simplify_named] will already have prepared
-       [dacc] with the necessary bindings for the simplification of the body. *)
-    let down_to_up dacc ~rebuild:rebuild_body =
-      let rebuild uacc ~after_rebuild =
-        let after_rebuild body uacc =
-          rebuild_let simplify_named_result removed_operations
-            ~lifted_constants_from_defining_expr ~at_unit_toplevel ~closure_info
-            ~body uacc ~after_rebuild ~rewrite_id
-        in
-        rebuild_body uacc ~after_rebuild
+         Note that no lifted constants are ever placed during the simplification
+         of the defining expression. (Not even in the case of a
+         [Set_of_closures] binding, since "let symbol" is disallowed under a
+         lambda.) *)
+      let lifted_constants_from_defining_expr = DA.get_lifted_constants dacc in
+      let dacc =
+        DA.add_to_lifted_constant_accumulator dacc prior_lifted_constants
       in
-      down_to_up dacc ~rebuild
-    in
-    simplify_expr dacc body ~down_to_up
+      let rewrite_id = Named_rewrite_id.create () in
+      let dacc =
+        DA.map_flow_acc dacc
+          ~f:
+            (update_data_flow dacc closure_info ~rewrite_id
+               ~lifted_constants_from_defining_expr simplify_named_result)
+      in
+      let at_unit_toplevel = DE.at_unit_toplevel (DA.denv dacc) in
+      (* Simplify the body of the let-expression and make the new [Let] bindings
+         around the simplified body. [Simplify_named] will already have prepared
+         [dacc] with the necessary bindings for the simplification of the
+         body. *)
+      let down_to_up dacc ~rebuild:rebuild_body =
+        let rebuild uacc ~after_rebuild =
+          let after_rebuild body uacc =
+            rebuild_let simplify_named_result removed_operations
+              ~lifted_constants_from_defining_expr ~at_unit_toplevel
+              ~closure_info ~body uacc ~after_rebuild ~rewrite_id
+          in
+          rebuild_body uacc ~after_rebuild
+        in
+        down_to_up dacc ~rebuild
+      in
+      simplify_expr dacc body ~down_to_up)
 
 let simplify_let ~simplify_expr ~simplify_function_body dacc let_expr
     ~down_to_up =

@@ -21,10 +21,10 @@ end = struct
                 b
                 (to_string x)
              )
-  [@@cold] [@@inline never] [@@local never] [@@specialise never]
+  [@@cold]
   ;;
 
-  let[@cold] [@inline never] [@local never] [@specialise never] int64_to_int_failure x =
+  let[@cold] int64_to_int_failure x =
     convert_failure
       (Stdlib.Int64.add
          (globalize_int64 x)

@@ -173,18 +173,26 @@ let value_descriptions ~loc env name
      match vd2.val_kind with
      | Val_prim p2 -> begin
          let locality = [ Mode.Locality.global; Mode.Locality.local ] in
+         let forkable = [ Mode.Forkable.forkable; Mode.Forkable.unforkable ] in
          let yielding = [ Mode.Yielding.unyielding; Mode.Yielding.yielding ] in
          List.iter (fun loc ->
+          List.iter (fun fork ->
            List.iter (fun yield ->
              let ty1, _, _, _ = Ctype.instance_prim p1 vd1.val_type in
-             let ty2, mode_l2, mode_y2, _ = Ctype.instance_prim p2 vd2.val_type in
+             let ty2, mode_l2, mode_fy2, _ =
+               Ctype.instance_prim p2 vd2.val_type
+             in
+             let mode_f2 = Option.map fst mode_fy2 in
+             let mode_y2 = Option.map snd mode_fy2 in
              Option.iter (Mode.Locality.equate_exn loc) mode_l2;
+             Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
              try
                Ctype.moregeneral env true ty1 ty2
              with Ctype.Moregen err ->
                raise (Dont_match (Type err))
            ) yielding
+          ) forkable
          ) locality;
          match primitive_descriptions p1 p2 with
          | None -> Tcoerce_none
@@ -333,10 +341,10 @@ type type_mismatch =
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
 let report_modality_sub_error first second ppf e =
+  let Modality.Error (ax, {left; right}) = e in
   let print_modality id ppf m =
-    Printtyp.modality ~id:(fun ppf -> Format.pp_print_string ppf id) ppf m
+    Printtyp.modality ~id:(fun ppf -> Format.pp_print_string ppf id) ax ppf m
   in
-  let Modality.Error {left; right} = e in
   Format.fprintf ppf "%s is %a and %s is %a."
     (String.capitalize_ascii second)
     (print_modality "empty") right
@@ -344,15 +352,16 @@ let report_modality_sub_error first second ppf e =
     (print_modality "not") left
 
 let report_mode_sub_error got expected ppf e =
-  let Mode.Value.Error(ax, {left; right}) = Mode.Value.to_simple_error e in
-  match ax with
-  | Comonadic Areality -> Format.fprintf ppf "This escapes its region."
-  | _ ->
-    Format.fprintf ppf "%s %a but %s %a."
-      (String.capitalize_ascii got)
-      (Misc.Style.as_inline_code (Value.Const.print_axis ax)) left
-      expected
-      (Misc.Style.as_inline_code (Value.Const.print_axis ax)) right
+  let {left; right} : _ Mode.simple_error =
+    Mode.Value.print_error (Location.none, Unknown) e
+  in
+  Format.fprintf ppf "%s " (String.capitalize_ascii got);
+  begin match left ppf with
+  | Mode -> Format.fprintf ppf "@ but %s " expected
+  | Mode_with_hint -> Format.fprintf ppf ".@\nHowever, %s " expected
+  end;
+  ignore (right ppf);
+  Format.pp_print_string ppf "."
 
 let report_modality_equate_error first second ppf
   ((equate_step, sub_error) : Modality.equate_error) =
@@ -640,7 +649,7 @@ let report_unsafe_mode_crossing_mismatch first second ppf e =
       (choose_other ord first second)
   | Bounds_not_equal (first_umc, second_umc) ->
     (* CR layouts v2.8: It'd be nice to specifically highlight the offending axis,
-       rather than printing all axes here. *)
+       rather than printing all axes here. Internal ticket 5094. *)
     pr "Both specify [%@%@unsafe_allow_any_mode_crossing], but their \
         bounds are not equal@,\
         @[%s has:@ %a@]@ \

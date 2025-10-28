@@ -847,7 +847,7 @@ Error: Signature mismatch:
          sig module N = X.N @@ stateless end
        At position "module type S = <here>"
        Modalities on N do not match:
-       The second is portable and the first is not.
+       The second is stateless and the first is not.
 |}];;
 
 module type S = sig

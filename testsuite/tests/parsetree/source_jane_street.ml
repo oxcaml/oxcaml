@@ -1,6 +1,7 @@
 (* TEST
    flags = "-extension-universe alpha";
    include stdlib_upstream_compatible;
+   include stdlib_stable;
    expect;
 *)
 
@@ -107,7 +108,7 @@ type t = ..
 type t += K : ('a : float64). 'a ignore -> t
 |}]
 
-(* CR layouts v2.8: re-enable this *)
+(* CR layouts v2.8: re-enable this. Internal ticket 5118. *)
 (*
 module M : sig
   kind_abbrev_ k = immediate
@@ -822,7 +823,7 @@ Line 1, characters 10-24:
 1 | let f x = stack_ (ref x)
               ^^^^^^^^^^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       but is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -853,8 +854,12 @@ Line 1, characters 23-36:
 1 | let make_tuple x y z = stack_ (x, y), z
                            ^^^^^^^^^^^^^
 Error: This value is "local"
-       because it is a stack expression.
-       However, it is expected to be "global".
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global"
+       because it is from the allocation at Line 1, characters 23-39
+       which is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 type u = A of unit | C of int | B of int * int | D
@@ -1032,31 +1037,51 @@ val matches : int * int = (1, 2)
 (* Unboxed literals *)
 
 module Float_u = Stdlib_upstream_compatible.Float_u
+module Int8_u = Stdlib_stable.Int8_u
+module Int16_u = Stdlib_stable.Int16_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int_u = Stdlib_stable.Int_u
+module Char_u = Stdlib_stable.Char_u
 
 [%%expect{|
 module Float_u = Stdlib_upstream_compatible.Float_u
+module Int8_u = Stdlib_stable.Int8_u
+module Int16_u = Stdlib_stable.Int16_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int_u = Stdlib_stable.Int_u
+module Char_u = Stdlib_stable.Char_u
 |}]
 
 let test_float s f =
   Format.printf "%s: %f\n" s (Float_u.to_float f); Format.print_flush ()
+let test_int8 s f =
+  Format.printf "%s: %d\n" s (Int8_u.to_int f); Format.print_flush ()
+let test_int16 s f =
+  Format.printf "%s: %d\n" s (Int16_u.to_int f); Format.print_flush ()
 let test_int32 s f =
   Format.printf "%s: %ld\n" s (Int32_u.to_int32 f); Format.print_flush ()
 let test_int64 s f =
   Format.printf "%s: %Ld\n" s (Int64_u.to_int64 f); Format.print_flush ()
+let test_int s f =
+  Format.printf "%s: %d\n" s (Int_u.to_int f); Format.print_flush ()
 let test_nativeint s f =
   Format.printf "%s: %s\n" s (Nativeint_u.to_string f); Format.print_flush ()
+let test_char s f =
+  Format.printf "%s: %C\n" s (Char_u.to_char f); Format.print_flush ()
 
 [%%expect{|
 val test_float : string -> Float_u.t -> unit = <fun>
+val test_int8 : string -> int8# -> unit = <fun>
+val test_int16 : string -> int16# -> unit = <fun>
 val test_int32 : string -> Int32_u.t -> unit = <fun>
 val test_int64 : string -> Int64_u.t -> unit = <fun>
+val test_int : string -> int# -> unit = <fun>
 val test_nativeint : string -> Nativeint_u.t -> unit = <fun>
+val test_char : string -> char# -> unit = <fun>
 |}]
 
 (* Expressions *)
@@ -1075,13 +1100,22 @@ let x = test_float "one_twenty_seven_point_two_five_in_floating_hex" (#0x7f.4)
 let x = test_float "five_point_three_seven_five_in_floating_hexponent" (#0xa.cp-1)
 
 let x = test_nativeint "zero" (#0n)
+let x = test_int "zero" (#0m)
+let x = test_int8 "positive_one" (+#1s)
+let x = test_int8 "positive_one" (+ #1s)
+let x = test_int16 "positive_one" (+#1S)
+let x = test_int16 "positive_one" (+ #1S)
 let x = test_int32 "positive_one" (+#1l)
 let x = test_int32 "positive_one" (+ #1l)
 let x = test_int64 "negative_one" (-#1L)
 let x = test_int64 "negative_one" (- #1L)
 let x = test_nativeint "two_fifty_five_in_hex" (#0xFFn)
+let x = test_int "ten_in_binary" (#0b1010m)
+let x = test_int8 "one_hundred_in_octal" (#0o144s)
+let x = test_int16 "two_hundred_in_hex" (#0xC8S)
 let x = test_int32 "twenty_five_in_octal" (#0o31l)
 let x = test_int64 "forty_two_in_binary" (#0b101010L)
+let x = test_char "untagged char" (#'c')
 
 [%%expect{|
 e: 2.718282
@@ -1110,6 +1144,16 @@ five_point_three_seven_five_in_floating_hexponent: 5.375000
 val x : unit = ()
 zero: 0
 val x : unit = ()
+zero: 0
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
 positive_one: 1
 val x : unit = ()
 positive_one: 1
@@ -1120,9 +1164,17 @@ negative_one: -1
 val x : unit = ()
 two_fifty_five_in_hex: 255
 val x : unit = ()
+ten_in_binary: 10
+val x : unit = ()
+one_hundred_in_octal: 100
+val x : unit = ()
+two_hundred_in_hex: 200
+val x : unit = ()
 twenty_five_in_octal: 25
 val x : unit = ()
 forty_two_in_binary: 42
+val x : unit = ()
+untagged char: 'c'
 val x : unit = ()
 |}]
 
@@ -1234,10 +1286,14 @@ let idx_r_r () = (.foo.#foo)
 let idx_array x = (.(x))
 let idx_array_L x = (.L(x))
 let idx_array_l x = (.l(x))
+let idx_array_S x = (.S(x))
+let idx_array_s x = (.s(x))
 let idx_array_n x = (.n(x))
 let idx_iarray x = (.:(x))
 let idx_iarray_L x = (.:L(x))
 let idx_iarray_l x = (.:l(x))
+let idx_iarray_S x = (.:S(x))
+let idx_iarray_s x = (.:s(x))
 let idx_iarray_n x = (.:n(x))
 let idx_imm x = (.idx_imm(x))
 let idx_mut x = (.idx_mut(x))
@@ -1253,6 +1309,11 @@ val idx_array_L :
 val idx_array_l :
   ('a : value_or_null mod non_float). int32# -> ('a array, 'a) idx_mut =
   <fun>
+val idx_array_S :
+  ('a : value_or_null mod non_float). int16# -> ('a array, 'a) idx_mut =
+  <fun>
+val idx_array_s :
+  ('a : value_or_null mod non_float). int8# -> ('a array, 'a) idx_mut = <fun>
 val idx_array_n :
   ('a : value_or_null mod non_float). nativeint# -> ('a array, 'a) idx_mut =
   <fun>
@@ -1263,6 +1324,12 @@ val idx_iarray_L :
   <fun>
 val idx_iarray_l :
   ('a : value_or_null mod non_float). int32# -> ('a iarray, 'a) idx_imm =
+  <fun>
+val idx_iarray_S :
+  ('a : value_or_null mod non_float). int16# -> ('a iarray, 'a) idx_imm =
+  <fun>
+val idx_iarray_s :
+  ('a : value_or_null mod non_float). int8# -> ('a iarray, 'a) idx_imm =
   <fun>
 val idx_iarray_n :
   ('a : value_or_null mod non_float). nativeint# -> ('a iarray, 'a) idx_imm =
@@ -1290,7 +1357,7 @@ type 'a contended_with_int : immutable_data with 'a @@ contended
 type 'a abstract
 type existential_abstract : immutable_data with (type : value mod portable) abstract =
   | Mk : ('a : value mod portable) abstract -> existential_abstract
-(* CR layouts v2.8: This should be accepted *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 type 'a abstract
 Lines 2-3, characters 0-67:
@@ -1321,7 +1388,7 @@ end = struct
 end
 
 (* CR layouts v2.8: Expect this output to change once modal kinds are
-   supported. *)
+   supported. Internal ticket 5118. *)
 
 [%%expect{|
 Line 9, characters 16-27:
@@ -1370,15 +1437,31 @@ module type S2 = sig type t1 = M.t1 type t2 = M.t2 type t3 = M.t3 end
 
 type t1 = float32
 type t2 = float32#
+type t3 = int8
+type t4 = int8#
+type t5 = int16
+type t6 = int16#
 
 let x = 3.14s
 let x () = #3.14s
+let y = 42s
+let y () = #42s
+let z = 42S
+let z () = #42S
 
 [%%expect{|
 type t1 = float32
 type t2 = float32#
+type t3 = int8
+type t4 = int8#
+type t5 = int16
+type t6 = int16#
 val x : float32 = 3.1400001s
 val x : unit -> float32# = <fun>
+val y : int8 = 42s
+val y : unit -> int8# = <fun>
+val z : int16 = 42S
+val z : unit -> int16# = <fun>
 |}]
 
 (********)
@@ -1535,3 +1618,8 @@ let triangle_10 = let mutable x = 0 in
 [%%expect{|
 val triangle_10 : int = 55
 |}]
+
+(*********************)
+(* quotations syntax *)
+
+(* Test will only be added once quotations work end-to-end. *)

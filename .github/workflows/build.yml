@@ -60,6 +60,12 @@ jobs:
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
 
+          - name: metrics_collection
+            config: --enable-middle-end=flambda2
+            os: ubuntu-latest
+            build_ocamlparam: ''
+            ocamlparam: '_,O3=1'
+
           - name: flambda2_frame_pointers_oclassic_polling
             config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
             os: ubuntu-latest
@@ -137,14 +143,14 @@ jobs:
             config: --enable-middle-end=flambda2 --enable-runtime5
             os: ubuntu-latest
             dwarf_tests_only: true
-            oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus0
+            oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus1
             oxcaml_llvm_source_branch: lldb
 
           - name: llvmize_tests
-            config: --enable-middle-end=flambda2 --enable-runtime5
+            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-frame-pointers
             os: ubuntu-latest
             llvmize_tests_only: true
-            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus0
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
             oxcaml_llvm_source_branch: llvmize-oxcaml
 
     env:
@@ -154,12 +160,11 @@ jobs:
     steps:
     - name: Checkout the OxCaml repo
       uses: actions/checkout@master
-      with:
-        path: 'oxcaml'
 
-    - name: Install AFL (for Linux workers)
-      if: matrix.os == 'ubuntu-latest'
-      run: sudo apt-get install afl++
+    # jvanburen: I don't think we actually test this and it takes forever to set up
+    # - name: Install AFL (for Linux workers)
+    #   if: matrix.os == 'ubuntu-latest'
+    #   run: sudo apt-get install afl++
 
     - name: Install clang
       if: matrix.os == 'ubuntu-latest' && matrix.cc == 'clang'
@@ -171,81 +176,37 @@ jobs:
       run: true
       # run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install afl-fuzz
 
-    - name: Install autoconf (for macOS workers)
+    - name: Install autoconf and bash (for macOS workers)
       if: matrix.os == 'macos-latest'
-      run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf
+      run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf bash
+      # bash >=4 is needed for tools/gen_ocamlj_rules.sh
 
-      # NB. The "rev" number in the cache key below must be updated each time
-      # the patch file is changed!
-    - name: Cache OCaml 4.14, dune and menhir
-      uses: actions/cache@v4
-      id: cache
+    - name: Pretend we're running in a container (makes setup-ocaml go faster)
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo touch /.dockerenv
+      # makes setup-ocaml skip apt-get, which is slow on first invocation
+
+    - name: Set up Opam
+      uses: ocaml/setup-ocaml@v3
       with:
-        path: ${{ github.workspace }}/ocaml-414/_install
-        key: ${{ matrix.os }}-cache-ocaml-414-dune-3153-menhir-20231231-rev13
+        ocaml-compiler: oxcaml-ci-deps.5.2.0
+        opam-repositories: |
+          local: file://${{ github.workspace }}/tools/ci/local-opam
+          default: https://github.com/ocaml/opam-repository.git
+        opam-disable-sandboxing: true
+        opam-pin: false
+        cache-prefix: ${{ matrix.os }}-v1
 
-    - name: Checkout OCaml 4.14
-      uses: actions/checkout@master
-      if: steps.cache.outputs.cache-hit != 'true'
-      with:
-        repository: 'ocaml/ocaml'
-        path: 'ocaml-414'
-        ref: '4.14'
-
-    - name: Build OCaml 4.14
-      if: steps.cache.outputs.cache-hit != 'true'
-      working-directory: ocaml-414
+    - name: Set up Opam environment
+      # this command adds the opam environment to the PATH.
       run: |
-        ./configure --prefix=$GITHUB_WORKSPACE/ocaml-414/_install
-        make -j $J world.opt
-        make install
-        # Remove unneeded parts to shrink cache file
-        rm -rf $GITHUB_WORKSPACE/ocaml-414/_install/{lib/ocaml/expunge,bin/*.byte}
-
-    - name: Checkout dune github repo
-      uses: actions/checkout@master
-      if: steps.cache.outputs.cache-hit != 'true'
-      with:
-        repository: 'ocaml/dune'
-        ref: '3.15.3'
-        path: 'dune'
-
-    - name: Build dune
-      working-directory: dune
-      if: steps.cache.outputs.cache-hit != 'true'
-      run: |
-        PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH make release
-        cp _boot/dune.exe $GITHUB_WORKSPACE/ocaml-414/_install/bin/dune
-
-    # CR mshinwell: This should use git@gitlab.inria.fr:fpottier/menhir.git
-    - name: Checkout menhir github repo
-      uses: actions/checkout@master
-      if: steps.cache.outputs.cache-hit != 'true'
-      with:
-        repository: 'LexiFi/menhir'
-        ref: '20231231'
-        path: 'menhir'
-
-    - name: Build menhir
-      working-directory: menhir
-      if: steps.cache.outputs.cache-hit != 'true'
-      run: |
-        PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH dune build
-        cp _build/install/default/bin/menhir $GITHUB_WORKSPACE/ocaml-414/_install/bin/menhir
-        # Our dune rule uses `menhirLib.mli`, which we can't simply `cp`
-        # because it's a symbolic link to a relative path.
-        export SOURCE_DIR=_build/install/default/lib/menhirLib
-        export TARGET_DIR=$GITHUB_WORKSPACE/ocaml-414/_install/lib/menhirLib
-        mkdir -p $TARGET_DIR
-        cat $SOURCE_DIR/menhirLib.mli > $TARGET_DIR/menhirLib.mli
-        cat $SOURCE_DIR/menhirLib.ml > $TARGET_DIR/menhirLib.ml
+        opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
 
     - name: Install GNU parallel
       if: matrix.os == 'macos-latest'
       run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install parallel
 
     - name: Disable any testcases
-      working-directory: oxcaml
       run: |
         disable_testcases="${{matrix.disable_testcases}}"
         if [ -n "$disable_testcases" ]; then
@@ -253,7 +214,6 @@ jobs:
         fi
 
     - name: Configure OxCaml
-      working-directory: oxcaml
       run: |
         if [[ -n "${{matrix.cc}}" ]]; then
           export CC="${{matrix.cc}}"
@@ -261,7 +221,6 @@ jobs:
         autoconf
         ./configure \
           --prefix=$GITHUB_WORKSPACE/_install \
-          --with-dune=$GITHUB_WORKSPACE/ocaml-414/_install/bin/dune \
           ${{ matrix.config }}
 
     - name: Setup for saving core files (not for macOS)
@@ -278,23 +237,45 @@ jobs:
         sudo chmod 1777 /cores
         sudo sysctl kern.coredump=1
         /usr/libexec/PlistBuddy -c "Add :com.apple.security.get-task-allow bool true" /tmp/core.entitlements
-        codesign -s - -f --entitlements /tmp/core.entitlements $GITHUB_WORKSPACE/ocaml-414/_install/bin/ocamlc.opt
-        codesign -s - -f --entitlements /tmp/core.entitlements $GITHUB_WORKSPACE/ocaml-414/_install/bin/ocamlopt.opt
+        # Find opam's OCaml installation
+        OCAML_BIN=$(opam var bin)
+        codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlc.opt
+        codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlopt.opt
 
     - name: Build, install and test OxCaml
-      working-directory: oxcaml
       if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
       run: |
         if [ "$run_testsuite" = true ]; then target=ci; else target=compiler; fi
-        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
         ulimit -c unlimited
         make $target \
           || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+
+        # Install the compiler for metrics_collection configuration to populate _install directory
+        # This is needed for the metrics collection step to analyze installed artifacts
+        if [ "${{ matrix.name }}" = "metrics_collection" ]; then
+          make install
+        fi
       env:
         BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
         OCAMLPARAM: ${{ matrix.ocamlparam }}
         OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
         USE_RUNTIME: ${{ matrix.use_runtime }}
+
+    - name: Promote failed tests and capture diffs
+      # Compute the diff for an arbitrary job, we expect all to have the same diff
+      if: failure() && matrix.name == 'flambda2_o3'
+      continue-on-error: true
+      run: |
+        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
+        make promote-failed
+        if ! git diff --quiet; then
+          git diff > $GITHUB_WORKSPACE/test-diffs.patch
+          echo "Test output differences detected and saved to artifact"
+          echo "DIFF_CREATED=true" >> $GITHUB_ENV
+        else
+          echo "No test output differences found"
+          echo "DIFF_CREATED=false" >> $GITHUB_ENV
+        fi
 
     - name: Install custom OxCaml LLVM
       if: matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
@@ -320,33 +301,83 @@ jobs:
         tar -xzf oxcaml-llvm.tar.gz -C oxcaml-llvm --strip-components=1
 
     - name: Build and test OxCaml DWARF
-      working-directory: oxcaml
       if: matrix.dwarf_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
       run: |
-        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
         ulimit -c unlimited
         make runtest-dwarf
       env:
         OXCAML_LLDB: ${{ github.workspace }}/oxcaml-llvm/bin/lldb
 
-    - name: Build and test OxCaml Llvmize
-      working-directory: oxcaml
-      if: matrix.llvmize_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
+    - name: Promote failed DWARF tests and capture diffs
+      if: failure() && matrix.dwarf_tests_only == true
+      continue-on-error: true
       run: |
         export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
+        make promote
+        if ! git diff --quiet; then
+          git diff > $GITHUB_WORKSPACE/test-diffs.patch
+          echo "Test output differences detected and saved to artifact"
+          echo "DIFF_CREATED=true" >> $GITHUB_ENV
+        else
+          echo "No test output differences found"
+          echo "DIFF_CREATED=false" >> $GITHUB_ENV
+        fi
+
+    - name: Build and test OxCaml Llvmize
+      if: matrix.llvmize_tests_only == true && matrix.oxcaml_llvm_tag != '' && contains(matrix.os, 'ubuntu')
+      run: |
         ulimit -c unlimited
         make runtest-llvmize
       env:
         OXCAML_CLANG: ${{ github.workspace }}/oxcaml-llvm/bin/clang
 
-    - name: Check other architectures
-      working-directory: oxcaml
-      if: matrix.check_arch == true
+    - name: Promote failed llvmize tests and capture diffs
+      if: failure() && matrix.llvmize_tests_only == true
+      continue-on-error: true
       run: |
-        PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH make check_all_arches
+        export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
+        make promote
+        if ! git diff --quiet; then
+          git diff > $GITHUB_WORKSPACE/test-diffs.patch
+          echo "Test output differences detected and saved to artifact"
+          echo "DIFF_CREATED=true" >> $GITHUB_ENV
+        else
+          echo "No test output differences found"
+          echo "DIFF_CREATED=false" >> $GITHUB_ENV
+        fi
+
+    - name: Upload test diffs
+      if: failure() && env.DIFF_CREATED == 'true'
+      uses: actions/upload-artifact@v4
+      continue-on-error: true
+      with:
+        name: test-diffs-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
+        path: ${{ github.workspace }}/test-diffs.patch
+
+    - name: Print diff artifact URL
+      if: failure() && env.DIFF_CREATED == 'true'
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        ARTIFACT_NAME="test-diffs-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}"
+        # Wait a moment for artifact to be registered
+        sleep 5
+        # Get artifact URL from GitHub API
+        ARTIFACT_URL=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+          --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\") | .archive_download_url")
+        if [ -n "$ARTIFACT_URL" ]; then
+          COMMAND="./tools/apply-diff.sh $ARTIFACT_URL"
+          echo "$COMMAND"
+        else
+          echo "Artifact uploaded but URL not yet available. Check: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        fi
+
+    - name: Check other architectures
+      if: matrix.check_arch == true
+      run: make check_all_arches
 
     - name: Run register allocation on artifacts
-      working-directory: oxcaml
       if: matrix.run_regalloc_tool == true
       run: |
         for allocator in irc ls gi; do \
@@ -355,38 +386,88 @@ jobs:
         done
         for allocator in irc ls gi; do \
           ./_build/main/tools/regalloc/regalloc.exe _build \
+            -validate -insert-prologue -regalloc $allocator || exit 1; \
+        done
+        for allocator in irc ls gi; do \
+          ./_build/main/tools/regalloc/regalloc.exe _build \
             -validate -param SPLIT_AROUND_LOOPS:on -regalloc $allocator || exit 1; \
         done
 
-    - uses: actions/upload-artifact@v4
-      if: ${{ failure() }}
+    - name: Collect and push metrics
+      if: matrix.name == 'metrics_collection' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+      env:
+        GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }}
+        COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+      run: |
+        # Checkout metrics repository
+        gh repo clone oxcaml/oxcaml-metrics metrics-repo
+
+        # Create data directory if it doesn't exist
+        mkdir -p metrics-repo/data
+
+        # Determine the actual commit being tested (not the merge commit for PRs)
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          COMMIT_HASH="${{ github.event.pull_request.head.sha }}"
+        else
+          COMMIT_HASH="${{ github.sha }}"
+        fi
+        SHORT_HASH="${COMMIT_HASH:0:8}"
+        DATE=$(date -u +"%Y-%m-%d")
+
+        # Extract PR number from commit message
+        PR_NUMBER=$(echo "$COMMIT_MESSAGE" | grep -oP '\(#\K[0-9]+(?=\))' || echo "N/A")
+
+        # CSV filename
+        CSV_FILE="metrics-repo/data/metrics-${DATE}-${SHORT_HASH}.csv"
+
+        # Use the metrics collection script
+        ${{ github.workspace }}/scripts/collect-size-metrics.sh \
+          "${{ github.workspace }}/_install" \
+          "$CSV_FILE" \
+          "$COMMIT_HASH" \
+          "$PR_NUMBER"
+
+        echo "Contents of generated metrics file:"
+        cat "$CSV_FILE"
+
+        # Commit and push metrics
+        cd metrics-repo
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        # Configure git to use gh for authentication
+        git config --local credential.helper ""
+        git config --local credential.https://github.com.helper "!gh auth git-credential"
+
+        git add data/
+        git commit -m "Add metrics for commit ${COMMIT_HASH}"
+        git push
+
+    - name: Upload core dumps
+      uses: actions/upload-artifact@v4
+      if: failure()
       with:
         name: cores-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
         path: /cores
 
-#     - uses: actions/upload-artifact@v4
-#       if: ${{ failure() }}
-#       with:
-#         name: ocaml-414-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-#         path: ${{ github.workspace }}/ocaml-414/_install
-
-    - uses: actions/upload-artifact@v4
-      if: ${{ failure() }} && matrix.os == 'macos-latest'
+    - name: Upload DiagnosticReports (macOS only)
+      uses: actions/upload-artifact@v4
+      if: failure() && matrix.os == 'macos-latest'
       with:
         name: DiagnosticReports-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
         path: /Users/runner/Library/Logs/DiagnosticReports
 
 #     - uses: actions/upload-artifact@v4
-#       if: ${{ failure() }}
+#       if: failure()
 #       with:
 #         name: _build-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-#         path: ${{ github.workspace }}/oxcaml/_build
+#         path: ${{ github.workspace }}/_build
 #
 #     - uses: actions/upload-artifact@v4
-#       if: ${{ failure() }}
+#       if: failure()
 #       with:
 #         name: _runtest-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
-#         path: ${{ github.workspace }}/oxcaml/_runtest
+#         path: ${{ github.workspace }}/_runtest
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}

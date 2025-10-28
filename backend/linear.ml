@@ -66,8 +66,8 @@ type instruction =
     dbg : Debuginfo.t;
     fdo : Fdo_info.t;
     live : Reg.Set.t;
-    available_before : Reg_availability_set.t option;
-    available_across : Reg_availability_set.t option;
+    available_before : Reg_availability_set.t;
+    available_across : Reg_availability_set.t;
     phantom_available_before : Backend_var.Set.t option
   }
 
@@ -158,8 +158,8 @@ let rec end_instr =
     dbg = Debuginfo.none;
     fdo = Fdo_info.none;
     live = Reg.Set.empty;
-    available_before = Some Unreachable;
-    available_across = None;
+    available_before = Unreachable;
+    available_across = Unreachable;
     phantom_available_before = None
   }
 
@@ -179,4 +179,4 @@ let instr_cons d a r n ~available_before ~available_across
     phantom_available_before
   }
 
-let traps_to_bytes traps = Proc.trap_size_in_bytes * traps
+let traps_to_bytes traps = Proc.trap_size_in_bytes () * traps

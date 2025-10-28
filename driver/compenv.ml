@@ -137,6 +137,16 @@ let int_option_setter ppf name option s =
     Printf.ksprintf (print_error ppf)
       "non-integer parameter %s for %S" s name
 
+let int_option_with_none ppf name option s =
+  if String.equal s "none"
+  then option := None
+  else
+    try
+      option := Some (int_of_string s)
+    with _ ->
+      Printf.ksprintf (print_error ppf)
+        "non-integer parameter %s for %S (expected integer or 'none')" s name
+
 (*
 let float_setter ppf name option s =
   try
@@ -359,6 +369,32 @@ let read_one_param ppf position name v =
     Int_arg_helper.parse v
       "Bad syntax in OCAMLPARAM for 'inline-max-depth'"
       inline_max_depth
+  | "gdwarf-config-shape-reduce-depth" ->
+    int_option_with_none ppf "gdwarf-config-shape-reduce-depth"
+      gdwarf_config_shape_reduce_depth v
+  | "gdwarf-config-shape-eval-depth" ->
+    int_option_with_none ppf "gdwarf-config-shape-eval-depth"
+      gdwarf_config_shape_eval_depth v
+  | "gdwarf-config-max-cms-files-per-unit" ->
+    int_option_with_none ppf "gdwarf-config-max-cms-files-per-unit"
+      gdwarf_config_max_cms_files_per_unit v
+  | "gdwarf-config-max-cms-files-per-variable" ->
+    int_option_with_none ppf "gdwarf-config-max-cms-files-per-variable"
+      gdwarf_config_max_cms_files_per_variable v
+  | "gdwarf-config-max-type-to-shape-depth" ->
+    int_option_with_none ppf "gdwarf-config-max-type-to-shape-depth"
+      gdwarf_config_max_type_to_shape_depth v
+  | "gdwarf-config-max-shape-reduce-steps-per-variable" ->
+    int_option_with_none ppf
+      "gdwarf-config-max-shape-reduce-steps-per-variable"
+      gdwarf_config_max_shape_reduce_steps_per_variable v
+  | "gdwarf-config-max-evaluation-steps-per-variable" ->
+    int_option_with_none ppf
+      "gdwarf-config-max-evaluation-steps-per-variable"
+      gdwarf_config_max_evaluation_steps_per_variable v
+  | "gdwarf-config-shape-reduce-fuel" ->
+    int_option_with_none ppf "gdwarf-config-shape-reduce-fuel"
+      gdwarf_config_shape_reduce_fuel v
   | "Oclassic" -> if check_bool ppf "Oclassic" v then Clflags.set_oclassic ()
   | "O2" -> if check_bool ppf "O2" v then Clflags.set_o2 ()
   | "O3" -> if check_bool ppf "O3" v then Clflags.set_o3 ()

@@ -198,6 +198,10 @@ let check =
   check
     ~validate:(fun (before, after) ->
       try
+        let before, after =
+          ( Cfg_with_infos.cfg_with_layout before,
+            Cfg_with_infos.cfg_with_layout after )
+        in
         let desc =
           try
             Misc.protect_refs
@@ -229,9 +233,11 @@ let check =
       with Break_test -> ())
     ~save:(fun (before, after) ->
       (* CR azewierzejew for azewierzejew: Fix how the files are saved. *)
-      Cfg_with_layout.save_as_dot ~filename:"/tmp/before.dot" before
+      Cfg_with_layout.save_as_dot ~filename:"/tmp/before.dot"
+        (Cfg_with_infos.cfg_with_layout before)
         "test-cfg-before";
-      Cfg_with_layout.save_as_dot ~filename:"/tmp/after.dot" after
+      Cfg_with_layout.save_as_dot ~filename:"/tmp/after.dot"
+        (Cfg_with_infos.cfg_with_layout after)
         "test-cfg-after";
       Format.printf "The failing cfgs were put in /tmp/[before|after].dot\n")
 

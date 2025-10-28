@@ -70,6 +70,8 @@ let fmt_constant f x =
   | Pconst_unboxed_integer (i,m) ->
       fprintf f "PConst_unboxed_int (%s,%c)" i m;
   | Pconst_char (c) -> fprintf f "PConst_char %02x" (Char.code c);
+  | Pconst_untagged_char (c) ->
+      fprintf f "PConst_untagged_char %02x" (Char.code c);
   | Pconst_string (s, strloc, None) ->
       fprintf f "PConst_string(%S,%a,None)" s fmt_location strloc ;
   | Pconst_string (s, strloc, Some delim) ->
@@ -124,6 +126,8 @@ let fmt_index_kind f = function
   | Index_int -> fprintf f "Index_int"
   | Index_unboxed_int64 -> fprintf f "Index_unboxed_int64"
   | Index_unboxed_int32 -> fprintf f "Index_unboxed_int32"
+  | Index_unboxed_int16 -> fprintf f "Index_unboxed_int16"
+  | Index_unboxed_int8 -> fprintf f "Index_unboxed_int8"
   | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
 ;;
 
@@ -246,6 +250,12 @@ let rec core_type i ppf x =
       list i package_with ppf l;
   | Ptyp_open (mod_ident, t) ->
       line i ppf "Ptyp_open \"%a\"\n" fmt_longident_loc mod_ident;
+      core_type i ppf t
+  | Ptyp_quote t ->
+      line i ppf "Ptyp_quote\n";
+      core_type i ppf t
+  | Ptyp_splice t ->
+      line i ppf "Ptyp_splice\n";
       core_type i ppf t
   | Ptyp_of_kind jkind ->
       line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i+1)) jkind
@@ -493,6 +503,12 @@ and expression i ppf x =
       line i ppf "Pexp_overwrite\n";
       expression i ppf e1;
       expression i ppf e2
+  | Pexp_quote e ->
+      line i ppf "Pexp_quote\n";
+      expression i ppf e
+  | Pexp_splice e ->
+      line i ppf "Pexp_splice\n";
+      expression i ppf e
   | Pexp_hole ->
       line i ppf "Pexp_hole"
   )
@@ -558,23 +574,23 @@ and jkind_annotation_opt i ppf jkind =
 and jkind_annotation i ppf (jkind : jkind_annotation) =
   line i ppf "jkind %a\n" fmt_location jkind.pjkind_loc;
   match jkind.pjkind_desc with
-  | Default -> line i ppf "Default\n"
-  | Abbreviation jkind ->
-      line i ppf "Abbreviation \"%s\"\n" jkind
-  | Mod (jkind, m) ->
-      line i ppf "Mod\n";
+  | Pjk_default -> line i ppf "Pjk_default\n"
+  | Pjk_abbreviation jkind ->
+      line i ppf "Pjk_abbreviation \"%s\"\n" jkind
+  | Pjk_mod (jkind, m) ->
+      line i ppf "Pjk_mod\n";
       jkind_annotation (i+1) ppf jkind;
       modes (i+1) ppf m
-  | With (jkind, type_, modalities) ->
-      line i ppf "With\n";
+  | Pjk_with (jkind, type_, modalities) ->
+      line i ppf "Pjk_with\n";
       jkind_annotation (i+1) ppf jkind;
       core_type (i+1) ppf type_;
       list i modality ppf modalities
-  | Kind_of type_ ->
-      line i ppf "Kind_of\n";
+  | Pjk_kind_of type_ ->
+      line i ppf "Pjk_kind_of\n";
       core_type (i+1) ppf type_
-  | Product jkinds ->
-      line i ppf "Product\n";
+  | Pjk_product jkinds ->
+      line i ppf "Pjk_product\n";
       list i jkind_annotation ppf jkinds
 
 and function_param i ppf { pparam_desc = desc; pparam_loc = loc } =

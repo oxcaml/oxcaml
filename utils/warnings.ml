@@ -111,7 +111,9 @@ type t =
   | Inlining_impossible of string           (* 55 *)
   | Unreachable_case                        (* 56 *)
   | Ambiguous_var_in_pattern_guard of string list (* 57 *)
-  | No_cmx_file of string                   (* 58 *)
+  | No_cmx_file of
+      { missing_extension : string;
+        module_name : string }              (* 58 *)
   | Flambda_assignment_to_non_mutable_value (* 59 *)
   | Unused_module of string                 (* 60 *)
   | Unboxable_type_in_prim_decl of string   (* 61 *)
@@ -143,6 +145,7 @@ type t =
       overriden_by : string;
     } (* 213 *)
   | Atomic_float_record_boxed               (* 214 *)
+  | Implied_attribute of { implying: string; implied : string} (* 215 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -235,6 +238,7 @@ let number = function
   | Mod_by_top _ -> 211
   | Modal_axis_specified_twice _ -> 213
   | Atomic_float_record_boxed -> 214
+  | Implied_attribute _ -> 215
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -625,6 +629,10 @@ let descriptions = [
     names = ["atomic-float-record-boxed"];
     description = "Record contains atomic float fields, preventing the flat\n\
                    float record optimization.";
+    since = since 4 14 };
+  { number = 215;
+    names = ["implied-attribute"];
+    description = "An attribute is unused because it is implied by another.";
     since = since 4 14 };
 ]
 
@@ -1174,10 +1182,11 @@ let message = function
          Only the first match will be used to evaluate the guard expression.\n\
          %a"
         vars_explanation Misc.print_see_manual ref_manual
-  | No_cmx_file name ->
+  | No_cmx_file { missing_extension; module_name } ->
       Printf.sprintf
-        "no cmx file was found in path for module %s, \
-         and its interface was not compiled with -opaque" name
+        "no %s file was found in path for module %s, \
+         and its interface was not compiled with -opaque"
+        missing_extension module_name
   | Flambda_assignment_to_non_mutable_value ->
       "A potential assignment to a non-mutable value was detected \n\
         in this source file.  Such assignments may generate incorrect code \n\
@@ -1306,6 +1315,10 @@ let message = function
        float fields, which prevents the float record optimization. The\n\
        fields of this record will be boxed instead of being\n\
        represented as a flat float array."
+  | Implied_attribute { implying; implied } ->
+    Printf.sprintf
+      "attribute [@%s] is unused because it is implied by [@%s]"
+      implied implying
 ;;
 
 let nerrors = ref 0

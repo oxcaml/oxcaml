@@ -68,3 +68,56 @@
        (= %{architecture} "amd64")))
  (deps test_ocamldep.expected test_ocamldep.output)
  (action (diff test_ocamldep.expected test_ocamldep.output)))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")
+       (= %{architecture} "amd64")))
+ (target f1.exe)
+ (deps f1.ml)
+ (action (with-accepted-exit-codes 0
+         (run %{bin:ocamlopt.opt} -O3 %{deps} -o f1.exe))))
+
+(rule
+ (target f1.output)
+ (deps f1.exe)
+ (action (with-outputs-to %{target}
+         (with-accepted-exit-codes 2
+         (with-outputs-to %{target} (run %{deps}))))))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")
+       (= %{architecture} "amd64")))
+ (deps f1.expected f1.output)
+ (action (diff f1.expected f1.output)))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")
+       (= %{architecture} "amd64")))
+ (target f2.exe)
+ (deps f2.ml)
+ (action (with-accepted-exit-codes 0
+         (run %{bin:ocamlopt.opt} -O3 %{deps} -o f2.exe))))
+
+(rule
+ (target f2.output)
+ (deps f2.exe)
+ (action (with-outputs-to %{target}
+         (with-accepted-exit-codes 2
+         (with-outputs-to %{target} (run %{deps}))))))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")
+       (= %{architecture} "amd64")))
+ (deps f2.expected f2.output)
+ (action (diff f2.expected f2.output)))
+

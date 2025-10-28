@@ -19,7 +19,7 @@ open Compile_common
 let tool_name = "ocamlc"
 
 let with_info =
-  Compile_common.with_info ~native:false ~tool_name
+  Compile_common.with_info ~backend:Byte ~tool_name
 
 let interface ~source_file ~output_prefix =
   with_info ~source_file ~output_prefix ~dump_ext:"cmi"
@@ -49,7 +49,7 @@ let raw_lambda_to_bytecode i raw_lambda ~as_arg_for =
        |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
           (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
-       |> Simplif.simplify_lambda
+       |> Simplif.simplify_lambda_for_bytecode
        |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
        |> Blambda_of_lambda.blambda_of_lambda
             ~compilation_unit:(Some i.module_name)

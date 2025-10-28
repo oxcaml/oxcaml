@@ -124,7 +124,10 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+       because it closes over the value "best_bytes" (at Line 3, characters 24-34)
+       which is "nonportable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* Closing over reading mutable field gives nonportable *)
@@ -137,7 +140,10 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+       because it contains a usage (of the value "r" at Line 3, characters 25-26)
+       which is expected to be "shared" or "uncontended".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* Closing over reading mutable field from shared value is nonportable *)
@@ -149,7 +155,10 @@ let foo (r @ shared) =
 Line 3, characters 23-26:
 3 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+       because it contains a usage (of the value "r" at Line 2, characters 25-26)
+       which is expected to be "shared" or "uncontended".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* Closing over reading immutable field is OK *)
@@ -231,7 +240,10 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+       because it contains a usage (of the value "r" at Line 3, characters 27-28)
+       which is expected to be "uncontended".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* Closing over read gives nonportable *)
@@ -244,7 +256,10 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+       because it contains a usage (of the value "r" at Line 3, characters 27-28)
+       which is expected to be "uncontended".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* Closing over Array.length doesn't force nonportable; but that needs a
@@ -282,7 +297,10 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+       because it closes over the value "r" (at Line 3, characters 25-26)
+       which is "nonportable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* closing over nonportable gives nonportable *)
@@ -318,7 +336,7 @@ Error: This function when partially applied returns a value which is "nonportabl
    race), since a is never used *)
 
 let foo : ('a @ contended portable -> (string -> string) @ portable) @ nonportable contended = fun a b -> best_bytes ()
-(* CR layouts v2.8: arrows should cross contention. *)
+(* CR layouts v2.8: arrows should cross contention. Internal ticket 5121. *)
 [%%expect{|
 Line 1, characters 4-119:
 1 | let foo : ('a @ contended portable -> (string -> string) @ portable) @ nonportable contended = fun a b -> best_bytes ()

@@ -1,10 +1,10 @@
 {
-  nixpkgs ? import <nixpkgs> { },
+  pkgs ? import <nixpkgs> { },
   src ? ./.,
   addressSanitizer ? false,
   dev ? false,
   flambdaInvariants ? false,
-  framePointers ? false,
+  framePointers ? addressSanitizer,
   multidomain ? false,
   ocamltest ? true,
   pollInsertion ? false,
@@ -13,13 +13,13 @@
   warnError ? true,
   oxcamlClang ? false,
   oxcamlLldb ? false,
+  syntaxQuotations ? false,
 }:
 let
-  pkgs = nixpkgs.pkgs or nixpkgs;
   inherit (pkgs) lib fetchpatch;
 
   # Select stdenv based on whether asan is enabled
-  myStdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
+  stdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
 
   # Build configure flags based on features
   configureFlags =
@@ -28,6 +28,7 @@ let
     in
     [
       "--cache-file=/dev/null"
+      "--with-objcopy=${pkgs.llvm}/bin/llvm-objcopy"
       (mkFlag addressSanitizer "address-sanitizer")
       (mkFlag dev "dev")
       (mkFlag flambdaInvariants "flambda-invariants")
@@ -38,25 +39,24 @@ let
       (mkFlag stackChecks "stack-checks")
       (mkFlag warnError "warn-error")
       (mkFlag ocamltest "ocamltest")
+      (mkFlag syntaxQuotations "syntax-quotations")
     ];
 
   upstream = pkgs.ocaml-ng.ocamlPackages_4_14;
 
-  ocaml = (upstream.ocaml.override { stdenv = myStdenv; }).overrideAttrs {
+  ocaml = (upstream.ocaml.override { inherit stdenv; }).overrideAttrs {
     # This patch is from oxcaml PR 3960, which fixes an issue in the upstream
     # compiler that we use to bootstrap ourselves on ARM64
-    patches = [ ./arm64-issue-debug-upstream.patch ];
+    patches = [ ./tools/ci/local-opam/packages/ocaml-base-compiler/ocaml-base-compiler.4.14.2+oxcaml/files/ocaml-base-compiler.4.14.2+oxcaml.patch ];
   };
 
-  dune = upstream.dune_3.overrideAttrs (
-    new: old: {
-      version = "3.15.2";
-      src = pkgs.fetchurl {
-        url = "https://github.com/ocaml/dune/releases/download/${new.version}/dune-${new.version}.tbz";
-        sha256 = "sha256-+VmYBULKhZCbPz+Om+ZcK4o3XzpOO9g8etegfy4HeTM=";
-      };
-    }
-  );
+  dune = upstream.dune_3.overrideAttrs rec {
+    version = "3.19.1";
+    src = pkgs.fetchurl {
+      url = "https://github.com/ocaml/dune/releases/download/${version}/dune-${version}.tbz";
+      hash = "sha256-oQOG+YDNqUF9FGVGa+1Q3SrvnJO50GoPf+7tsKFUEVg=";
+    };
+  };
 
   menhirLib = upstream.menhirLib.overrideAttrs (
     new: old: rec {
@@ -165,7 +165,7 @@ let
     };
   };
 in
-myStdenv.mkDerivation {
+stdenv.mkDerivation {
   pname = "oxcaml";
   version = "5.2.0+ox";
   inherit src configureFlags;
@@ -174,22 +174,32 @@ myStdenv.mkDerivation {
   OXCAML_CLANG = if oxcamlClang then "${clang}/bin/clang" else null;
 
   enableParallelBuilding = true;
+  separateDebugInfo = !dev;
 
-  nativeBuildInputs =
-    [
-      pkgs.autoconf
-      menhir
-      ocaml
-      dune
-      pkgs.pkg-config
-      pkgs.rsync
-      pkgs.which
-      pkgs.parallel
-      gfortran # Required for Bigarray Fortran tests
-      upstream.ocamlformat_0_24_1 # required for make fmt
-    ]
-    ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
-    ++ lib.optional oxcamlLldb pkgs.python312;
+  # Disable _multioutConfig hook which adds --libdir=$out/lib into
+  # configureFlags when separateDebugInfo is enabled, breaking OCaml's configure
+  # step, which expects --libdir to be $out/lib/ocaml
+  setOutputFlags = false;
+
+  nativeBuildInputs = [
+    pkgs.autoconf
+    menhir
+    ocaml
+    dune
+    pkgs.pkg-config
+    pkgs.rsync
+    pkgs.which
+    pkgs.parallel
+    gfortran # Required for Bigarray Fortran tests
+    upstream.ocamlformat_0_24_1 # required for make fmt
+    pkgs.removeReferencesTo
+  ]
+  ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
+  ++ lib.optional oxcamlLldb pkgs.python312;
+
+  buildInputs = [
+    pkgs.llvm # llvm-objcopy is used for debuginfo
+  ];
 
   preConfigure = ''
     rm -rf _build _install _runtest
@@ -219,18 +229,19 @@ myStdenv.mkDerivation {
       rm -f $out/lib/ocaml/expunge
     '';
 
+  postFixup = ''
+    remove-references-to -t ${dune} $out/lib/ocaml/Makefile.config
+  '';
+
   shellHook = ''
-    export out="$(pwd)/_install"
-    configureFlags+=" --prefix=$out"
-    export PS1="$name$ "
+    prefix="$(pwd)/_install"
 
     cat >&2 << EOF
-    OxCaml Development Environment
-    ==============================
-
-    Configure Flags: $configureFlags
+    OxCaml $version Development Environment
+    ===============================''${version//?/=}
 
     Available commands:
+      configurePhase           - Pre-build setup
       make boot-compiler       - Quick build (recommended for development)
       make boot-_install       - Quick install (recommended for development)
       make fmt                 - Auto-format code
@@ -240,4 +251,8 @@ myStdenv.mkDerivation {
       make test-one TEST=...   - Run a single test
     EOF
   '';
+
+  meta =
+    { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
+
 }

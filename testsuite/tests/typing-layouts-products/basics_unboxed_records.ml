@@ -161,7 +161,9 @@ Line 4, characters 2-7:
 4 |   left'
       ^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is from the allocation (at Line 2, characters 10-25) containing a value
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -778,4 +780,4 @@ Error: The kind of type "q" is
          because of the annotation on the declaration of the type q.
 |}]
 (* CR layouts v2.8: That error message is incomprehensible without
-   with-bounds. *)
+   with-bounds. Internal ticket 5096. *)

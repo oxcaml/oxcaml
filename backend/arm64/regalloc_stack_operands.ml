@@ -45,6 +45,9 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     ->
     (* no rewrite *)
     May_still_have_spilled_registers
+  | Op (Specific (Illvm_intrinsic _)) ->
+    (* should not happen *)
+    fatal "unexpected instruction"
 
 let terminator (map : spilled_map) (term : Cfg.terminator Cfg.instruction) =
   match term.desc with

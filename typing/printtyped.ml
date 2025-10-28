@@ -68,6 +68,8 @@ let fmt_constant f x =
   match x with
   | Const_int (i) -> fprintf f "Const_int %d" i
   | Const_char (c) -> fprintf f "Const_char %02x" (Char.code c)
+  | Const_untagged_char (c) ->
+      fprintf f "Const_untagged_char %02x" (Char.code c)
   | Const_string (s, strloc, None) ->
       fprintf f "Const_string(%S,%a,None)" s fmt_location strloc
   | Const_string (s, strloc, Some delim) ->
@@ -76,9 +78,14 @@ let fmt_constant f x =
   | Const_float32 (s) -> fprintf f "Const_float32 %s" s;
   | Const_unboxed_float (s) -> fprintf f "Const_unboxed_float %s" s
   | Const_unboxed_float32 (s) -> fprintf f "Const_unboxed_float32 %s" s
+  | Const_int8 (i) -> fprintf f "Const_int8 %d" i
+  | Const_int16 (i) -> fprintf f "Const_int16 %d" i
   | Const_int32 (i) -> fprintf f "Const_int32 %ld" i
   | Const_int64 (i) -> fprintf f "Const_int64 %Ld" i
   | Const_nativeint (i) -> fprintf f "Const_nativeint %nd" i
+  | Const_untagged_int (i) -> fprintf f "Const_untagged_int %d" i
+  | Const_untagged_int8 (i) -> fprintf f "Const_untagged_int8 %d" i
+  | Const_untagged_int16 (i) -> fprintf f "Const_untagged_int16 %d" i
   | Const_unboxed_int32 (i) -> fprintf f "Const_unboxed_int32 %ld" i
   | Const_unboxed_int64 (i) -> fprintf f "Const_unboxed_int64 %Ld" i
   | Const_unboxed_nativeint (i) -> fprintf f "Const_unboxed_nativeint %nd" i
@@ -135,6 +142,8 @@ let fmt_index_kind f = function
   | Index_int -> fprintf f "Index_int"
   | Index_unboxed_int64 -> fprintf f "Index_unboxed_int64"
   | Index_unboxed_int32 -> fprintf f "Index_unboxed_int32"
+  | Index_unboxed_int16 -> fprintf f "Index_unboxed_int16"
+  | Index_unboxed_int8 -> fprintf f "Index_unboxed_int8"
   | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
 
 let line i f s (*...*) =
@@ -315,6 +324,12 @@ let rec core_type i ppf x =
       list i package_with ppf l;
   | Ttyp_open (path, _mod_ident, t) ->
       line i ppf "Ttyp_open %a\n" fmt_path path;
+      core_type i ppf t
+  | Ttyp_quote t ->
+      line i ppf "Ttyp_quote\n";
+      core_type i ppf t
+  | Ttyp_splice t ->
+      line i ppf "Ttyp_splice\n";
       core_type i ppf t
   | Ttyp_of_kind jkind ->
       line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
@@ -699,6 +714,15 @@ and expression i ppf x =
     expression i ppf e2
   | Texp_hole _ ->
     line i ppf "Texp_hole"
+  | Texp_quotation e ->
+    line i ppf "Texp_quotation";
+      expression i ppf e
+  | Texp_antiquotation e ->
+    line i ppf "Texp_antiquotation";
+    expression i ppf e
+  | Texp_eval (typ, _) ->
+    line i ppf "Texp_eval";
+    core_type i ppf typ;
 
 and value_description i ppf x =
   line i ppf "value_description %a %a\n" fmt_ident x.val_id fmt_location

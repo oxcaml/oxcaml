@@ -8,6 +8,8 @@ val on_fatal : f:(unit -> unit) -> unit
 
 val fatal : ('a, Format.formatter, unit, 'b) format4 -> 'a
 
+val set_function_specific_params : string list -> unit
+
 val find_param_value : string -> string option
 
 val debug : bool
@@ -95,6 +97,16 @@ module Move : sig
     Instruction.t
 
   val to_string : t -> string
+end
+
+module DLL = Oxcaml_utils.Doubly_linked_list
+
+module Insert_skipping_name_for_debugger : sig
+  val insert_after :
+    Instruction.t DLL.cell -> Instruction.t -> reg:Reg.t -> unit
+
+  val add_begin :
+    Cfg.basic_instruction_list -> Instruction.t -> reg:Reg.t -> unit
 end
 
 val same_reg_class : Reg.t -> Reg.t -> bool

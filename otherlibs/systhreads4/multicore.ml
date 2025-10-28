@@ -98,12 +98,12 @@ end
 
 type 'a spawn_result =
   | Spawned
-  | Failed of 'a * exn @@ aliased * Printexc.raw_backtrace @@ aliased
+  | Failed of 'a * exn @@ aliased many * Printexc.raw_backtrace @@ aliased many
 
 type 'a request_inner : value mod contended portable  =
-  { action : 'a @ unique portable -> unit @@ portable
-  ; argument : 'a @@ portable
-  ; mutable result : 'a spawn_result @@ portable
+  { action : 'a @ contended once portable unique -> unit @@ portable
+  ; argument : 'a @@ contended portable
+  ; mutable result : 'a spawn_result @@ contended portable
   ; mutable ready : bool
   ; mutex : Mutex.t
   ; condition : Condition.t
@@ -151,13 +151,11 @@ let () =
   (* We must set the value for the initial domain, because [current_domain]
      might be called before the manager thread for the initial domain has
      started. *)
-  Domain.Safe.DLS.access (fun access -> Domain.Safe.DLS.set access domain_key 0)
+  Domain.Safe.DLS.set domain_key 0
 ;;
 
 let current_domain () =
-  let i = Domain.Safe.DLS.access
-    (fun access : int -> Domain.Safe.DLS.get access domain_key)
-  in
+  let i = Domain.Safe.DLS.get domain_key in
   if 0 <= i
   then i
   else
@@ -210,8 +208,8 @@ let () =
   done
 ;;
 
-external magic_unique__portable
-  : 'a @ portable -> 'a @ portable unique @@ portable
+external magic_unique__contended_portable
+  : 'a @ contended portable -> 'a @ contended portable unique @@ portable
   = "%identity"
 
 (** Run some function on a new thread. *)
@@ -226,7 +224,7 @@ let thread (Request { action; argument; _ })=
       wakeup_manager t
   in
   (* SAFETY: We know each value is only popped from the request stack once *)
-  match action (magic_unique__portable argument) with
+  match action (magic_unique__contended_portable argument) with
   | () -> decr ()
   | exception exn ->
     let bt = Printexc.get_raw_backtrace () in
@@ -278,36 +276,33 @@ let rec manager_loop t =
 
 let manager (t : t) =
   Await_atomic_bitset.set idle_domains t.index false;
-  Domain.Safe.DLS.access
-    (fun access -> Domain.Safe.DLS.set access domain_key t.index);
+  Domain.Safe.DLS.set domain_key t.index;
   manager_loop t
 ;;
 
 let create_initial_manager =
   let need_manager = Atomic.make true in
   fun () ->
-    if Atomic.Contended.get need_manager &&
-       Atomic.Contended.exchange need_manager false
+    if Atomic.get need_manager &&
+       Atomic.exchange need_manager false
     then ignore (Thread.Portable.create manager (get 0))
 
 let spawn_on ~domain:i f a =
   if i < 0 || max_domains () <= i
   then invalid_arg "Multicore.spawn_on: invalid domain index";
   create_initial_manager ();
-  let f =
-    let open struct
-      (* CR-someday vkarvonen: Perhaps at some point we might have a nice way
-         to pass a function through a data structure such that it is statically
-         known to be used only once without having to use a mutable box to do
-         so. *)
-      external magic_many
-        :  'a @ once portable
-        -> 'a @ many portable
-        @@ portable
-        = "%identity"
-    end in
-    magic_many f
-  in
+  let open struct
+    (* CR-someday vkarvonen: Perhaps at some point we might have a nice way to
+       pass a function through a data structure such that it is statically known
+       to be used only once without having to use a mutable box to do so. *)
+    external magic_many__contended_portable
+      :  'a @ contended once portable
+      -> 'a @ contended many portable
+      @@ portable
+      = "%identity"
+  end in
+  let f = magic_many__contended_portable f in
+  let a = magic_many__contended_portable a in
   let t = get i in
   let threads_before_incr = Atomic.fetch_and_add t.threads 1 in
   let mutex = Mutex.create () in
@@ -344,7 +339,7 @@ let spawn_on ~domain:i f a =
   Mutex.unlock mutex;
   (* SAFETY: We know that if we got an error here, the thread failed to spawn
      and hence no longer has a reference to [a] *)
-  magic_unique__portable request_inner.result
+  magic_unique__contended_portable request_inner.result
 ;;
 
 let spawn f =

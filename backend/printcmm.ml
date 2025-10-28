@@ -458,6 +458,11 @@ let codegen_option = function
   | Reduce_code_size -> "reduce_code_size"
   | No_CSE -> "no_cse"
   | Use_linscan_regalloc -> "linscan"
+  | Use_regalloc regalloc -> Clflags.Register_allocator.to_string regalloc
+  | Use_regalloc_param params ->
+    Printf.sprintf "regalloc_param[%s]"
+      (String.concat ";" (List.map (Printf.sprintf "%S") params))
+  | Cold -> "cold"
   | Assume_zero_alloc { strict; never_returns_normally; never_raises; loc = _ }
     ->
     Printf.sprintf "assume_zero_alloc_%s%s%s"

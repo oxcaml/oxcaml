@@ -100,6 +100,8 @@ let ar_supports_response_files = @ar_supports_response_files@
 
 let runtime5 = "@enable_runtime5@" = "yes"
 
+let syntax_quotations = "@enable_syntax_quotations@" = "yes"
+
 let reserved_header_bits =
   if runtime5 then @reserved_header_bits@ else @profinfo_width@
 

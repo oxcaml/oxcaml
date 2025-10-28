@@ -378,7 +378,7 @@ module Fold_prims = struct
     | exception Not_found -> env
     | fields -> f ~block fields
 
-  let apply_prim ~dom ~blocks_to_unbox env rewrite_id var
+  let apply_prim ~machine_width ~dom ~blocks_to_unbox env rewrite_id var
       (prim : T.Mutable_prim.t) =
     match prim with
     | Is_int block ->
@@ -388,7 +388,7 @@ module Fold_prims = struct
           (* We only consider for unboxing vluaes which are aliases to a single
              makeblock. In particular, for variants, this means that we only
              consider for unboxing variant values which are blocks. *)
-          let bound_to = Simple.untagged_const_bool false in
+          let bound_to = Simple.untagged_const_bool machine_width false in
           let rewrite =
             Named_rewrite.prim_rewrite
               (Named_rewrite.Prim_rewrite.replace_by_binding ~var ~bound_to)
@@ -402,7 +402,7 @@ module Fold_prims = struct
           ignore block;
           (* ensure that only the canonical alias of block is in scope *)
           let bound_to =
-            Simple.untagged_const_int (Tag.to_targetint_31_63 tag)
+            Simple.untagged_const_int (Tag.to_targetint_31_63 machine_width tag)
           in
           let rewrite =
             Named_rewrite.prim_rewrite
@@ -520,7 +520,8 @@ module Fold_prims = struct
       in
       Numeric_types.Int.Map.disjoint_union i1 shifted_i2
 
-  let compute_rewrites ~(blocks_to_unbox : block_to_unbox Simple.Map.t)
+  let compute_rewrites ~machine_width
+      ~(blocks_to_unbox : block_to_unbox Simple.Map.t)
       ~continuations_with_live_block ~dom ~(source_info : T.Acc.t) =
     let rewrites = ref Named_rewrite_id.Map.empty in
     let extra_params_and_args =
@@ -535,8 +536,8 @@ module Fold_prims = struct
               (fun env
                    T.Mutable_let_prim.
                      { named_rewrite_id; bound_var; prim; original_prim = _ } ->
-                apply_prim ~dom ~blocks_to_unbox env named_rewrite_id bound_var
-                  prim)
+                apply_prim ~machine_width ~dom ~blocks_to_unbox env
+                  named_rewrite_id bound_var prim)
               env
               (List.rev elt.mutable_let_prims_rev)
           in
@@ -570,7 +571,7 @@ end
 
 let create ~(dom : Dominator_graph.alias_map) ~(dom_graph : Dominator_graph.t)
     ~(source_info : T.Acc.t) ~(control_flow_graph : Control_flow_graph.t)
-    ~required_names ~return_continuation ~exn_continuation : t =
+    ~required_names ~return_continuation ~exn_continuation ~machine_width : t =
   let escaping =
     escaping ~dom ~dom_graph ~source_info ~required_names ~return_continuation
       ~exn_continuation
@@ -602,8 +603,8 @@ let create ~(dom : Dominator_graph.alias_map) ~(dom_graph : Dominator_graph.t)
       "Toplevel continuation cannot have needed extra argument for block: %a@."
       Simple.Set.print toplevel_used;
   let extra_params_and_args, rewrites =
-    Fold_prims.compute_rewrites ~dom ~source_info ~continuations_with_live_block
-      ~blocks_to_unbox
+    Fold_prims.compute_rewrites ~machine_width ~dom ~source_info
+      ~continuations_with_live_block ~blocks_to_unbox
   in
   { extra_params_and_args;
     blocks_to_unbox;

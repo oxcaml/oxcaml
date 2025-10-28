@@ -1399,7 +1399,7 @@ end
 
 (* The following is for system use only. Do not call directly. *)
 
-val valid_float_lexem : string -> string @@ nonportable
+val valid_float_lexem : string -> string
 
 val unsafe_really_input : in_channel -> bytes -> int -> int -> unit @@ nonportable
 
@@ -1469,6 +1469,7 @@ module Parsing        = Parsing
 module Printexc       = Printexc
 module Printf         = Printf
 module Queue          = Queue
+module Quote          = Quote
 module Random         = Random
 module Result         = Result
 module Scanf          = Scanf

@@ -79,17 +79,17 @@ let update_exn_continuation_extra_args uacc ~exn_cont_use_id apply =
          (Apply.exn_continuation apply))
 
 (* generate the projection of the i-th field of a n-tuple *)
-let project_tuple ~dbg ~size ~field tuple =
+let project_tuple ~machine_width ~dbg ~size ~field tuple =
   let module BAK = P.Block_access_kind in
   let bak : BAK.t =
     Values
       { field_kind = Any_value;
         tag = Known Tag.Scannable.zero;
-        size = Known (Target_ocaml_int.of_int size)
+        size = Known (Target_ocaml_int.of_int machine_width size)
       }
   in
   let mutability : Mutability.t = Immutable in
-  let field = Target_ocaml_int.of_int field in
+  let field = Target_ocaml_int.of_int machine_width field in
   let prim =
     P.Unary (Block_load { kind = bak; mut = mutability; field }, tuple)
   in
@@ -394,7 +394,7 @@ let patch_unused_exn_bucket uacc apply_cont =
       else
         (* The raise argument must be present, if it is unused, we replace it by
            a dummy value to avoid keeping a useless value alive *)
-        let dummy_value = Simple.const_zero in
+        let dummy_value = Simple.const_zero (UE.machine_width (UA.uenv uacc)) in
         AC.update_args ~args:(dummy_value :: other_args) apply_cont
   else apply_cont
 

@@ -14,6 +14,7 @@
 (**************************************************************************)
 
 val run :
+  machine_width:Target_system.Machine_width.t ->
   cmx_loader:Flambda_cmx.loader ->
   all_code:Exported_code.t ->
   Flambda_unit.t ->

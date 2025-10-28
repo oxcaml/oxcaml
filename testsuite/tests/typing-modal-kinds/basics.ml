@@ -26,7 +26,6 @@ end = struct
   let hide x = x
 end
 
-(* CR layouts v2.8: Change this to be layout bits64, not kind bits64 *)
 module Hidden_int64_u : sig
   type t : bits64 mod global many aliased
   val hide : int64# -> t
@@ -415,7 +414,7 @@ Line 1, characters 56-57:
 
 let int_unshare = let x : int = 5 in ignore x; unique x
 
-(* CR layouts v2.8: this should succeed *)
+(* CR layouts v2.8: this should succeed. Internal ticket 5124. *)
 [%%expect{|
 Line 1, characters 54-55:
 1 | let int_unshare = let x : int = 5 in ignore x; unique x
@@ -457,7 +456,6 @@ Line 1, characters 58-59:
 let hidden_string_unshare =
   let x : Hidden_string.t = Hidden_string.hide "hello" in ignore x; unique x
 
-(* CR layouts v2.8: Why is this error message different?? *)
 [%%expect{|
 Line 2, characters 75-76:
 2 |   let x : Hidden_string.t = Hidden_string.hide "hello" in ignore x; unique x
@@ -468,7 +466,7 @@ Error: This value is "aliased" but is expected to be "unique".
 let hidden_int_unshare =
   let x : Hidden_int.t = Hidden_int.hide 42 in ignore x; unique x
 
-(* CR layouts v2.8: this should succeed *)
+(* CR layouts v2.8: this should succeed. Internal ticket 5124 *)
 [%%expect{|
 Line 2, characters 64-65:
 2 |   let x : Hidden_int.t = Hidden_int.hide 42 in ignore x; unique x
@@ -510,7 +508,7 @@ Line 4, characters 12-13:
 
 let float_unshare = let x : float = 3.14 in ignore x; unique x
 
-(* CR layouts v2.8: this should succeed *)
+(* CR layouts v2.8: this should succeed. Internal ticket 5124. *)
 [%%expect{|
 Line 1, characters 61-62:
 1 | let float_unshare = let x : float = 3.14 in ignore x; unique x
@@ -523,7 +521,7 @@ Line 1, characters 51-52:
 |}]
 
 (* CR layouts v2.8: The following should pass, even in principal mode, because the
-argument kind is known to cross mode. *)
+argument kind is known to cross mode. Internal ticket 5124. *)
 
 let float_u_unshare () = let x : float# = #3.14 in Float_u.ignore x; Float_u.unique x
 
@@ -540,7 +538,7 @@ Line 1, characters 66-67:
 
 let int64_u_unshare () = let x : int64# = #314L in Int64_u.ignore x; Int64_u.unique x
 
-(* CR layouts v2.8: this should succeed in principal mode, too *)
+(* CR layouts v2.8: this should succeed in principal mode, too. Internal ticket 5124 *)
 [%%expect{|
 Line 1, characters 84-85:
 1 | let int64_u_unshare () = let x : int64# = #314L in Int64_u.ignore x; Int64_u.unique x
@@ -582,7 +580,6 @@ let hidden_int64_u_unshare () =
   let x : Hidden_int64_u.t = Hidden_int64_u.hide #314L in
   Int64_u.ignore x; Int64_u.unique x
 
-(* CR layouts v2.8: This should fail when we use layout bits64 with hidden_int64 *)
 [%%expect{|
 Line 3, characters 35-36:
 3 |   Int64_u.ignore x; Int64_u.unique x
@@ -624,7 +621,7 @@ Line 2, characters 45-46:
 
 let function_unshare = let x : int -> int = fun y -> y in ignore x; unique x
 
-(* CR layouts v2.8: this should succeed *)
+(* CR layouts v2.8: this should succeed. Internal ticket 5124 *)
 [%%expect{|
 Line 1, characters 75-76:
 1 | let function_unshare = let x : int -> int = fun y -> y in ignore x; unique x
@@ -891,7 +888,7 @@ Error: This type "int t" should be an instance of type
        But the kind of int t must be a subkind of value mod contended
          because of the definition of require_contended at line 1, characters 0-49.
 |}]
-(* CR layouts v2.8: fix principal mode *)
+(* CR layouts v2.8: fix principal mode. Internal ticket 5111 *)
 
 type t2 = int ref t require_contended
 
@@ -934,7 +931,8 @@ Line 1, characters 10-19:
               ^^^^^^^^^
 Error: This type "int t ref" should be an instance of type
          "('a : value mod contended)"
-       The kind of int t ref is mutable_data with int t @@ unyielding many.
+       The kind of int t ref is
+           mutable_data with int t @@ forkable unyielding many.
        But the kind of int t ref must be a subkind of value mod contended
          because of the definition of require_contended at line 1, characters 0-49.
 

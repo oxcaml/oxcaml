@@ -1244,6 +1244,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           local = Never_local;
           zero_alloc = Default_zero_alloc;
           loop = Never_loop;
+          regalloc = Default_regalloc;
+          regalloc_param = Default_regalloc_params;
+          cold = false;
           is_a_functor = false;
           is_opaque = false;
           stub = false;
@@ -1327,6 +1330,20 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
   | Texp_hole _ ->
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
+  | Texp_quotation exp ->
+      Translquote.transl_quote (transl_exp ~scopes sort) exp e.exp_loc
+  (* TODO: update scopes *)
+  | Texp_antiquotation exp ->
+      fatal_errorf
+        "@[Cannot unquote expression outside of a quotation context:@ \
+         %a@]"
+        Pprintast.expression (Untypeast.untype_expression exp)
+  | Texp_eval (_, _sort) ->
+    let loc = of_location ~scopes e.exp_loc in
+    Lprim (Pfield (0, Pointer, Reads_agree), [
+      Lprim
+        (Pgetglobal (Compilation_unit.of_string "Camlinternaleval"), [], loc);
+    ], loc)
 
 and pure_module m =
   match m.mod_desc with
@@ -1662,7 +1679,7 @@ and add_type_shapes_of_pattern ~env pattern =
     List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
       let type_name = Format.asprintf "%a" Printtyp.type_expr type_expr in
       Type_shape.add_to_type_shapes var_uid type_expr var_sort ~name:type_name
-        (Env.find_uid_of_path env))
+        (Env.shape_for_constr env))
     var_list
 
 (** [add_type_shapes_of_cases] iterates through a given list of cases and
@@ -2273,10 +2290,16 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
 and transl_atomic_loc ~scopes arg arg_sort lbl =
   let arg = transl_exp ~scopes arg_sort arg in
   begin match lbl.lbl_repres with
-  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
+  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
+  | Record_float | Record_ufloat
+    ->
       (* Atomic fields not allowed here *)
-      assert false
-  | _ -> ()
+      Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
+  | Record_boxed _
+  | Record_inlined (_, _, ( Variant_boxed _
+                          | Variant_extensible
+                          | Variant_with_null))
+    -> ()
   end;
   let field_offset = field_offset_for_label lbl in
   let lbl = Lconst (Const_base (Const_int field_offset)) in
@@ -2380,7 +2403,6 @@ and transl_idx ~scopes loc env ba uas =
     end
   | Baccess_array { mut = _; index_kind; index; base_ty; elt_ty; elt_sort } ->
     let index_sort, index_kind = match index_kind with
-      (* CR layouts v8: support small ints *)
       | Index_int ->
         Jkind.Sort.Const.value, Ptagged_int_index
       | Index_unboxed_int64 ->
@@ -2389,6 +2411,12 @@ and transl_idx ~scopes loc env ba uas =
       | Index_unboxed_int32 ->
         Jkind.Sort.Const.bits32,
         Punboxed_or_untagged_integer_index Unboxed_int32
+      | Index_unboxed_int16 ->
+        Jkind.Sort.Const.bits16,
+        Punboxed_or_untagged_integer_index Untagged_int16
+      | Index_unboxed_int8 ->
+        Jkind.Sort.Const.bits8,
+        Punboxed_or_untagged_integer_index Untagged_int8
       | Index_unboxed_nativeint ->
         Jkind.Sort.Const.word,
         Punboxed_or_untagged_integer_index Unboxed_nativeint

@@ -67,11 +67,17 @@ val default_ddebug_invariants : bool
 
 val ddebug_invariants : bool ref
 
+val default_ddebug_available_regs : bool
+
+val ddebug_available_regs : bool ref
+
 val default_ddwarf_types : bool
 
 val ddwarf_types : bool ref
 
 val gdwarf_may_alter_codegen : bool ref
+
+val gdwarf_may_alter_codegen_experimental : bool ref
 
 (** Setting this to [true] will emit sufficient DWARF to get inlined frame
     information, but won't emit information e.g. about local variables (unless
@@ -86,6 +92,8 @@ val debug_avail_sets : bool ref
 val default_gdwarf_compression : string
 
 val gdwarf_compression : string ref
+
+val ddwarf_metrics : bool ref
 
 (** Get the DWARF compression flag to pass to the C toolchain.
     Returns a flag of the form " -gz=<compression>" (note the leading space).

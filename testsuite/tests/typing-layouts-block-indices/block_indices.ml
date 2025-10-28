@@ -1,32 +1,30 @@
 (* TEST
  reference = "${test_source_directory}/block_indices.reference";
  flambda2;
- include stdlib_beta;
  include stdlib_stable;
  include stdlib_upstream_compatible;
  {
    ocamlc_byte_exit_status = "2";
    setup-ocamlc.byte-build-env;
-   flags = "";
+   flags = "-extension-universe no_extensions";
    compiler_reference = "${test_source_directory}/block_indices_disabled.compilers.reference";
    ocamlc.byte;
    check-ocamlc.byte-output;
  } {
-   flags = "-extension layouts_alpha";
    bytecode;
  }{
-   flags = "-extension layouts_alpha";
    native;
  } {
-   flags = "-extension layouts_alpha -Oclassic";
+   flags = "-Oclassic";
    native;
  } {
-   flags = "-extension layouts_alpha -O3";
+   flags = "-O3";
    native;
  }
 *)
 
-open Stdlib_beta
+(* Coupled with block_indices_using_ptr_primitives.ml *)
+
 open Stdlib_stable
 open Stdlib_upstream_compatible
 
@@ -304,6 +302,10 @@ let () =
   print_endline s;
   let s = Idx_mut.unsafe_get a (.l(#3l)) in
   print_endline s;
+  let s = Idx_mut.unsafe_get a (.S(#3S)) in
+  print_endline s;
+  let s = Idx_mut.unsafe_get a (.s(#3s)) in
+  print_endline s;
   let s = Idx_mut.unsafe_get a (.n(#3n)) in
   print_endline s;
   print_newline ()
@@ -327,6 +329,14 @@ let () =
   let #{ i; j } = Idx_mut.unsafe_get a (.l(#3l)) in
   let i2 = Idx_mut.unsafe_get a (.l(#3l).#i) in
   let j2 = Idx_mut.unsafe_get a (.l(#3l).#j) in
+  Printf.printf "%d %d %d %d\n" i i2 j j2;
+  let #{ i; j } = Idx_mut.unsafe_get a (.S(#3S)) in
+  let i2 = Idx_mut.unsafe_get a (.S(#3S).#i) in
+  let j2 = Idx_mut.unsafe_get a (.S(#3S).#j) in
+  Printf.printf "%d %d %d %d\n" i i2 j j2;
+  let #{ i; j } = Idx_mut.unsafe_get a (.s(#3s)) in
+  let i2 = Idx_mut.unsafe_get a (.s(#3s).#i) in
+  let j2 = Idx_mut.unsafe_get a (.s(#3s).#j) in
   Printf.printf "%d %d %d %d\n" i i2 j j2;
   let #{ i; j } = Idx_mut.unsafe_get a (.n(#3n)) in
   let i2 = Idx_mut.unsafe_get a (.n(#3n).#i) in
@@ -361,6 +371,18 @@ let () =
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
+  let #{ i; j } = Idx_mut.unsafe_get a (.S(#3S)) in
+  let i2 = Idx_mut.unsafe_get a (.S(#3S).#i) in
+  let j2 = Idx_mut.unsafe_get a (.S(#3S).#j) in
+  Printf.printf "%f %f %f %f\n"
+    (Float_u.to_float i) (Float_u.to_float i2)
+    (Float_u.to_float j) (Float_u.to_float j2);
+  let #{ i; j } = Idx_mut.unsafe_get a (.s(#3s)) in
+  let i2 = Idx_mut.unsafe_get a (.s(#3s).#i) in
+  let j2 = Idx_mut.unsafe_get a (.s(#3s).#j) in
+  Printf.printf "%f %f %f %f\n"
+    (Float_u.to_float i) (Float_u.to_float i2)
+    (Float_u.to_float j) (Float_u.to_float j2);
   let #{ i; j } = Idx_mut.unsafe_get a (.n(#3n)) in
   let i2 = Idx_mut.unsafe_get a (.n(#3n).#i) in
   let j2 = Idx_mut.unsafe_get a (.n(#3n).#j) in
@@ -391,6 +413,18 @@ let () =
   let #{ i; j } = Idx_mut.unsafe_get a (.l(#3l)) in
   let i2 = Idx_mut.unsafe_get a (.l(#3l).#i) in
   let j2 = Idx_mut.unsafe_get a (.l(#3l).#j) in
+  Printf.printf "%f %f %f %f\n"
+    (Float_u.to_float i) (Float_u.to_float i2)
+    (Float_u.to_float j) (Float_u.to_float j2);
+  let #{ i; j } = Idx_mut.unsafe_get a (.S(#3S)) in
+  let i2 = Idx_mut.unsafe_get a (.S(#3S).#i) in
+  let j2 = Idx_mut.unsafe_get a (.S(#3S).#j) in
+  Printf.printf "%f %f %f %f\n"
+    (Float_u.to_float i) (Float_u.to_float i2)
+    (Float_u.to_float j) (Float_u.to_float j2);
+  let #{ i; j } = Idx_mut.unsafe_get a (.s(#3s)) in
+  let i2 = Idx_mut.unsafe_get a (.s(#3s).#i) in
+  let j2 = Idx_mut.unsafe_get a (.s(#3s).#j) in
   Printf.printf "%f %f %f %f\n"
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);

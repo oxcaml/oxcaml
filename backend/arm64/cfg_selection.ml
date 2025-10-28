@@ -268,8 +268,13 @@ let pseudoregs_for_operation op arg res =
   | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
   | Name_for_debugger _ | Alloc _ ->
     raise Use_default_exn
+  | Specific (Illvm_intrinsic intr) ->
+    Misc.fatal_errorf
+      "Cfg_selection.pseudoregs_for_operation: Unexpected llvm_intrinsic %s: \
+       not using LLVM backend"
+      intr
 
-let insert_op_debug env sub_cfg op dbg rs rd :
+let insert_op_debug' env sub_cfg op dbg rs rd :
     Cfg_selectgen_target_intf.insert_op_debug_result =
   try
     let rsrc, rdst = pseudoregs_for_operation op rs rd in
@@ -278,3 +283,9 @@ let insert_op_debug env sub_cfg op dbg rs rd :
     Select_utils.insert_moves env sub_cfg rdst rd;
     Regs rd
   with Use_default_exn -> Use_default
+
+let insert_op_debug env sub_cfg op dbg rs rd :
+    Cfg_selectgen_target_intf.insert_op_debug_result =
+  if !Clflags.llvm_backend
+  then Use_default
+  else insert_op_debug' env sub_cfg op dbg rs rd

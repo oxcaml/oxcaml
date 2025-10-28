@@ -67,6 +67,8 @@ val check_coherence:
 (* for fixed types *)
 val is_fixed_type : Parsetree.type_declaration -> bool
 
+val mixed_block_element : Env.t -> type_expr -> _ jkind -> mixed_block_element
+
 type native_repr_kind = Unboxed | Untagged
 
 (* Records reason for a jkind representability requirement in errors. *)
@@ -178,6 +180,8 @@ type error =
   | No_unboxed_version of Path.t
   | Atomic_field_must_be_mutable of string
   | Constructor_submode_failed of Mode.Value.error
+  | Atomic_field_in_mixed_block
+  | Non_value_atomic_field
 
 exception Error of Location.t * error
 

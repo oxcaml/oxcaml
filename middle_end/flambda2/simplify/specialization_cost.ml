@@ -58,10 +58,13 @@ let update_cost ~f = function
   | Can_specialize cost -> Can_specialize (f cost)
   | Cannot_specialize _ as res -> res
 
-let add_prim prim t =
-  let size = Code_size.to_int (Code_size.prim prim) in
+let add_prim ~machine_width prim t =
+  let size = Code_size.to_int (Code_size.prim ~machine_width prim) in
   update_cost t ~f:(fun { size_of_primitives = s } ->
       { size_of_primitives = size + s })
 
 let add_set_of_closures _soc _t =
+  Cannot_specialize { reason = Contains_set_of_closures }
+
+let add_lifted_set_of_closures _soc _t =
   Cannot_specialize { reason = Contains_set_of_closures }

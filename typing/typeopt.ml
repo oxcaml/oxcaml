@@ -88,21 +88,10 @@ let is_base_type env ty base_ty_path =
   | Tconstr(p, _, _) -> Path.same p base_ty_path
   | _ -> false
 
-let is_always_gc_ignorable env ty =
-  let ext : Jkind_axis.Externality.t =
-    (* We check that we're compiling to (64-bit) native code before counting
-       External64 types as gc_ignorable, because bytecode is intended to be
-       platform independent. *)
-    if !Clflags.native_code && Sys.word_size = 64
-    then External64
-    else External
-  in
-  Ctype.check_type_externality env ty ext
-
 let maybe_pointer_type env ty =
   let ty = scrape_ty env ty in
   let immediate_or_pointer =
-    match is_always_gc_ignorable env ty with
+    match Ctype.is_always_gc_ignorable env ty with
     | true -> Immediate
     | false -> Pointer
   in
@@ -119,7 +108,7 @@ let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
    and this function should be removed at some point. To do that, there
    needs to be a way to store sort vars on [Tconstr]s. That means
    either introducing a [Tpoly_constr], allow type parameters with
-   sort info, or do something else. *)
+   sort info, or do something else. Internal ticket 5093. *)
 (* CR layouts v3.0: have a better error message
    for nullable jkinds.*)
 let type_sort ~why env loc ty =
@@ -152,7 +141,7 @@ let classify ~classify_product env ty sort : _ classification =
   | Base Value -> begin
   (* CR or_null: [immediate_or_null] arrays can be intarrays once that is
      supported by the middle-end *)
-  if is_always_gc_ignorable env ty
+  if Ctype.is_always_gc_ignorable env ty
     && Ctype.check_type_nullability env ty Non_null
   then Int
   else match get_desc ty with
@@ -203,8 +192,8 @@ let classify ~classify_product env ty sort : _ classification =
              Maybe we should emit a warning. *)
           Any
       end
-  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _ ->
-      Addr
+  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _
+  | Tquote _ | Tsplice _-> Addr
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _ ->
       assert false
   end
@@ -269,7 +258,7 @@ let array_kind_of_elt ~elt_sort env loc ty =
   in
   let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
   let classify_product ty sorts =
-    if is_always_gc_ignorable env ty then
+    if Ctype.is_always_gc_ignorable env ty then
       Pgcignorableproductarray (ignorable_product_array_kind loc sorts)
     else
       Pgcscannableproductarray
@@ -417,16 +406,15 @@ let value_kind_of_value_jkind env jkind =
      the principality check, as we're just trying to compute optimizations. *)
   let context = Ctype.mk_jkind_context_always_principal env in
   let externality_upper_bound =
-    Jkind.get_externality_upper_bound ~context jkind in
-  match layout, externality_upper_bound with
-  | Base Value, External -> Pintval
-  | Base Value, External64 ->
-    if !Clflags.native_code && Sys.word_size = 64 then Pintval else Pgenval
-  | Base Value, Internal -> Pgenval
-  | Any, _
-  | Product _, _
+    Jkind.get_externality_upper_bound ~context jkind
+  in
+  match layout with
+  | Base Value ->
+    value_kind_of_value_with_externality externality_upper_bound
+  | Any
+  | Product _
   | Base (Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 |
-          Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) , _ ->
+          Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
     Misc.fatal_error "expected a layout of value"
 
 (* [value_kind] has a pre-condition that it is only called on values.  With the
@@ -638,7 +626,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
          by the parameters of the declaration. The code below loses this
          connection and will continue processing with e.g. ['a : value]
          instead of [string] when looking at a [string list]. This should
-         probably just call a [type_jkind] function. *)
+         probably just call a [type_jkind] function. Internal ticket 5101. *)
       let decl =
         try Env.find_type p env with Not_found -> raise Missing_cmi_fallback
       in
@@ -762,7 +750,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           end
         | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
-        | Tof_kind _ -> unknown ()
+        | Tquote _ | Tsplice _ | Tof_kind _ -> unknown ()
     in
     let (_, num_nodes_visited), kinds =
       Array.fold_left_map (fun (i, num_nodes_visited) field ->
@@ -1036,11 +1024,9 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       && Language_extension.(is_at_least Small_numbers Stable) then
       Lambda.Punboxed_or_untagged_integer Untagged_int
     else error const
-  | Base Bits8 when Language_extension.(is_at_least Layouts Stable) &&
-                    Language_extension.(is_at_least Small_numbers Stable) ->
+  | Base Bits8 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_or_untagged_integer Untagged_int8
-  | Base Bits16 when Language_extension.(is_at_least Layouts Stable) &&
-                     Language_extension.(is_at_least Small_numbers Stable) ->
+  | Base Bits16 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_or_untagged_integer Untagged_int16
   | Base Bits32 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_or_untagged_integer Unboxed_int32

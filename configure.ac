@@ -29,8 +29,6 @@ AC_INIT([OxCaml],
 # argv
 CONFIGURE_ARGS="$*"
 
-DUNE_MAX_VERSION=[3.15]
-
 AC_MSG_NOTICE([Configuring OxCaml version AC_PACKAGE_VERSION])
 
 m4_include([build-aux/ax_compare_version.m4])
@@ -51,11 +49,6 @@ dune_version=`$dune --version | sed -e 's/^\([[0-9]]\.[[0-9]]\).*/\1/'`
 
 AS_IF([test x"$dune_version" = "x"],
   [AC_MSG_ERROR([unable to execute dune at $dune])])
-
-dnl If dune is too new, keep going but warn at the end
-AX_COMPARE_VERSION([$dune_version], [le], [$DUNE_MAX_VERSION],
-  [dune_version_good=true],
-  [dune_version_good=false])
 
 AC_MSG_NOTICE([Using dune executable: $dune])
 
@@ -196,6 +189,7 @@ AC_SUBST([enable_runtime5])
 AC_SUBST([runtime_suffix])
 AC_SUBST([enable_stack_checks])
 AC_SUBST([enable_oxcaml_dwarf])
+AC_SUBST([enable_syntax_quotations])
 AC_SUBST([CONFIGURE_ARGS])
 AC_SUBST([native_compiler])
 AC_SUBST([default_build_target])
@@ -223,6 +217,8 @@ AC_SUBST([AST_INTF_MAGIC_NUMBER], [AST_INTF__MAGIC_NUMBER])
 AC_SUBST([CMXS_MAGIC_NUMBER], [CMXS__MAGIC_NUMBER])
 AC_SUBST([CMT_MAGIC_NUMBER], [CMT__MAGIC_NUMBER])
 AC_SUBST([CMS_MAGIC_NUMBER], [CMS__MAGIC_NUMBER])
+AC_SUBST([CMJ_MAGIC_NUMBER], [CMJ__MAGIC_NUMBER])
+AC_SUBST([CMJA_MAGIC_NUMBER], [CMJA__MAGIC_NUMBER])
 AC_SUBST([CFG_MAGIC_NUMBER], [CFG__MAGIC_NUMBER])
 AC_SUBST([LINEAR_MAGIC_NUMBER], [LINEAR__MAGIC_NUMBER])
 AC_SUBST([CC])
@@ -404,6 +400,7 @@ AC_CONFIG_FILES([otherlibs/stdlib_beta/META])
 AC_CONFIG_FILES([otherlibs/stdlib_alpha/META])
 AC_CONFIG_FILES([otherlibs/dynlink/META])
 AC_CONFIG_FILES([otherlibs/runtime_events/META])
+AC_CONFIG_FILES([otherlibs/camlinternaleval/META])
 AC_CONFIG_FILES([stdlib/META])
 
 # Definitions related to the version of OCaml
@@ -644,6 +641,12 @@ AC_ARG_ENABLE([oxcaml-dwarf],
     [enable OxCaml DWARF by default @<:@default=no@:>@])],
   [],
   [enable_oxcaml_dwarf=no])
+
+AC_ARG_ENABLE([syntax-quotations],
+  [AS_HELP_STRING([--enable-syntax-quotations],
+    [enable support for quotation syntax by default @<:@default=no@:>@])],
+  [],
+  [enable_syntax_quotations=no])
 
 AC_ARG_WITH([target-bindir],
   [AS_HELP_STRING([--with-target-bindir],
@@ -2898,7 +2901,7 @@ AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
 
 # Ensure compatibility: oxcaml-dwarf-on-compiler requires function-sections to be disabled
 AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
-  [AS_IF([test x"$enable_function_sections" != "xno"],
+  [AS_IF([test x"$function_sections" = "xtrue"],
     [AC_MSG_ERROR([--enable-oxcaml-dwarf-on-compiler requires --disable-function-sections to be passed])])])
 
 # Configure assembly emission flag for compiler
@@ -3222,6 +3225,3 @@ ${mkdll_ldflags}"
 ])
 
 AC_OUTPUT
-
-AS_IF([test x"$dune_version_good" = "xfalse"],
-  [AC_MSG_WARN([dune $dune_version found; only dune up to $DUNE_MAX_VERSION known to work])])

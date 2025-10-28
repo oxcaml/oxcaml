@@ -24,7 +24,7 @@
   @since 4.12 *)
 
 (** An atomic (mutable) reference to a value of type ['a]. *)
-type (!'a : value_or_null) t : mutable_data with 'a =
+type (!'a : value_or_null) t : sync_data with 'a =
   { mutable contents : 'a [@atomic] }
 
 (** Create an atomic reference. *)
@@ -49,7 +49,7 @@ external make_contended
   = "caml_atomic_make_contended"
 
 (** Get the current value of the atomic reference. *)
-val get : ('a : value_or_null). 'a t @ local -> 'a
+external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load"
 
 (** Set a new value for the atomic reference. *)
 external set : ('a : value_or_null). 'a t @ local -> 'a -> unit = "%atomic_set"
@@ -79,65 +79,34 @@ external compare_exchange
 
 (** [fetch_and_add r n] atomically increments the value of [r] by [n], and
     returns the current value (before the increment). *)
-val fetch_and_add : int t @ contended local -> int -> int
+external fetch_and_add : int t @ local -> int -> int = "%atomic_fetch_add"
 
 (** [add r i] atomically adds [i] onto [r]. *)
-val add : int t @ contended local -> int -> unit
+external add : int t @ local -> int -> unit =  "%atomic_add"
 
 (** [sub r i] atomically subtracts [i] onto [r]. *)
-val sub : int t @ contended local -> int -> unit
+external sub : int t @ local -> int -> unit =  "%atomic_sub"
 
 (** [logand r i] atomically bitwise-ands [i] onto [r]. *)
-val logand : int t @ contended local -> int -> unit
+external logand : int t @ local -> int -> unit =  "%atomic_land"
 
 (** [logor r i] atomically bitwise-ors [i] onto [r]. *)
-val logor : int t @ contended local -> int -> unit
+external logor : int t @ local -> int -> unit =  "%atomic_lor"
 
 (** [logxor r i] atomically bitwise-xors [i] onto [r]. *)
-val logxor : int t @ contended local -> int -> unit
+external logxor : int t @ local -> int -> unit =  "%atomic_lxor"
 
 (** [incr r] atomically increments the value of [r] by [1]. *)
-val incr : int t @ contended local -> unit
+val incr : int t @ local -> unit
 
 (** [decr r] atomically decrements the value of [r] by [1]. *)
-val decr : int t @ contended local -> unit
+val decr : int t @ local -> unit
 
-(** Operations that act over contended atomics. This imposes some extra mode
-    constraints for safety. *)
-module Contended : sig
-  (** Like {!get}, but can be called on an atomic that came from another domain. *)
-  external get
-    : ('a : value_or_null mod portable).
-    'a t @ contended local -> 'a @ contended
-    = "%atomic_load"
-
-  (** Like {!set}, but can be called on an atomic that came from another domain. *)
-  external set
-    : ('a : value_or_null mod contended).
-    'a t @ contended local -> 'a @ portable -> unit
-    = "%atomic_set"
-
-  (** Like {!exchange}, but can be called on an atomic that came from another
-      domain. *)
-  external exchange
-    : ('a : value_or_null mod contended portable).
-    'a t @ contended local -> 'a -> 'a
-    = "%atomic_exchange"
-
-  (** Like {!compare_and_set}, but can be called on an atomic that came from
-      another domain. *)
-  external compare_and_set
-    : ('a : value_or_null mod contended).
-    'a t @ contended local -> 'a -> 'a @ portable -> bool
-    = "%atomic_cas"
-
-  (** Like {!compare_exchange}, but can be called on an atomic that came from
-      another domain. *)
-  external compare_exchange
-    : ('a : value_or_null mod contended portable).
-    'a t @ contended local -> 'a -> 'a -> 'a
-    = "%atomic_compare_exchange"
-end
+(** Like {!get}, but can be called on an atomic from another domain. *)
+external get_contended
+  : ('a : value_or_null).
+  'a t @ contended local -> 'a @ contended
+  = "%atomic_load"
 
 (** Atomic "locations", such as record fields. *)
 module Loc : sig
@@ -149,9 +118,12 @@ module Loc : sig
 
       The API below mirrors the API to access {{!t}atomic references},
       see the documentation above for more information. *)
-  type ('a : value_or_null) t : mutable_data with 'a = 'a atomic_loc
+  type ('a : value_or_null) t : sync_data with 'a = 'a atomic_loc
 
   external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load_loc"
+
+  external get_contended : ('a : value_or_null).
+    'a t @ contended local -> 'a @ contended = "%atomic_load_loc"
 
   external set : ('a : value_or_null).
     'a t @ local -> 'a -> unit = "%atomic_set_loc"
@@ -166,42 +138,25 @@ module Loc : sig
     'a t @ local -> 'a -> 'a -> 'a = "%atomic_compare_exchange_loc"
 
   external fetch_and_add
-    : int t @ contended local -> int -> int = "%atomic_fetch_add_loc"
+    : int t @ local -> int -> int = "%atomic_fetch_add_loc"
 
   external add
-    : int t @ contended local -> int -> unit = "%atomic_add_loc"
+    : int t @ local -> int -> unit = "%atomic_add_loc"
 
   external sub
-    : int t @ contended local -> int -> unit = "%atomic_sub_loc"
+    : int t @ local -> int -> unit = "%atomic_sub_loc"
 
   external logand
-    : int t @ contended local -> int -> unit = "%atomic_land_loc"
+    : int t @ local -> int -> unit = "%atomic_land_loc"
 
   external logor
-    : int t @ contended local -> int -> unit = "%atomic_lor_loc"
+    : int t @ local -> int -> unit = "%atomic_lor_loc"
 
   external logxor
-    : int t @ contended local -> int -> unit = "%atomic_lxor_loc"
+    : int t @ local -> int -> unit = "%atomic_lxor_loc"
 
-  val incr : int t @ contended local -> unit
-  val decr : int t @ contended local -> unit
-
-  module Contended : sig
-    external get : ('a : value_or_null mod portable).
-      'a t @ contended local -> 'a @ contended = "%atomic_load_loc"
-
-    external set : ('a : value_or_null mod contended).
-      'a t @ contended local -> 'a @ portable -> unit = "%atomic_set_loc"
-
-    external exchange : ('a : value_or_null mod contended portable).
-      'a t @ contended local -> 'a -> 'a = "%atomic_exchange_loc"
-
-    external compare_and_set : ('a : value_or_null mod contended).
-      'a t @ contended local -> 'a -> 'a @ portable -> bool = "%atomic_cas_loc"
-
-    external compare_exchange : ('a : value_or_null mod contended portable).
-      'a t @ contended local -> 'a -> 'a -> 'a = "%atomic_compare_exchange_loc"
-  end
+  val incr : int t @ local -> unit
+  val decr : int t @ local -> unit
 end
 
 (** {1:examples Examples}

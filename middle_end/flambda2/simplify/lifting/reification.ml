@@ -134,7 +134,8 @@ let lift dacc ty ~bound_to static_const : _ Or_invalid.t * DA.t =
     DA.map_denv dacc ~f:(fun denv ->
         DE.add_equation_on_variable denv bound_to var_ty)
   in
-  Ok (Simplified_named.create term), dacc
+  let machine_width = DE.machine_width (DA.denv dacc) in
+  Ok (Simplified_named.create ~machine_width term), dacc
 
 let try_to_reify dacc dbg (term : Simplified_named.t) ~bound_to
     ~kind_of_bound_to ~allow_lifting : _ Or_invalid.t * DA.t =
@@ -175,6 +176,8 @@ let try_to_reify dacc dbg (term : Simplified_named.t) ~bound_to
       let denv = DE.add_equation_on_variable denv bound_to ty in
       DA.with_denv dacc denv
     in
-    Ok (Simplified_named.create (Named.create_simple simple)), dacc
+    let machine_width = DE.machine_width (DA.denv dacc) in
+    ( Ok (Simplified_named.create ~machine_width (Named.create_simple simple)),
+      dacc )
   | Cannot_reify -> Ok term, dacc
   | Invalid -> Invalid, dacc

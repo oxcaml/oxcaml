@@ -38,7 +38,8 @@ val equal : t -> t -> bool
 
 val print : Format.formatter -> t -> unit
 
-val prim : Flambda_primitive.t -> t
+val prim :
+  machine_width:Target_system.Machine_width.t -> Flambda_primitive.t -> t
 
 val simple : Simple.t -> t
 

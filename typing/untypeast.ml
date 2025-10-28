@@ -124,8 +124,11 @@ let rec extract_letop_patterns n pat =
 
 let constant = function
   | Const_char c -> Pconst_char c
+  | Const_untagged_char c -> Pconst_untagged_char c
   | Const_string (s,loc,d) -> Pconst_string (s,loc,d)
   | Const_int i -> Pconst_integer (Int.to_string i, None)
+  | Const_int8 i -> Pconst_integer (Int.to_string i, Some 's')
+  | Const_int16 i -> Pconst_integer (Int.to_string i, Some 'S')
   | Const_int32 i -> Pconst_integer (Int32.to_string i, Some 'l')
   | Const_int64 i -> Pconst_integer (Int64.to_string i, Some 'L')
   | Const_nativeint i -> Pconst_integer (Nativeint.to_string i, Some 'n')
@@ -133,6 +136,9 @@ let constant = function
   | Const_float32 f -> Pconst_float (f, Some 's')
   | Const_unboxed_float f -> Pconst_unboxed_float (f, None)
   | Const_unboxed_float32 f -> Pconst_unboxed_float (f, Some 's')
+  | Const_untagged_int i -> Pconst_unboxed_integer (Int.to_string i, 'm')
+  | Const_untagged_int8 i -> Pconst_unboxed_integer (Int.to_string i, 's')
+  | Const_untagged_int16 i -> Pconst_unboxed_integer (Int.to_string i, 'S')
   | Const_unboxed_int32 i -> Pconst_unboxed_integer (Int32.to_string i, 'l')
   | Const_unboxed_int64 i -> Pconst_unboxed_integer (Int64.to_string i, 'L')
   | Const_unboxed_nativeint i -> Pconst_unboxed_integer (Nativeint.to_string i, 'n')
@@ -750,6 +756,10 @@ let expression sub exp =
     | Texp_overwrite (exp1, exp2) ->
         Pexp_overwrite(sub.expr sub exp1, sub.expr sub exp2)
     | Texp_hole _ -> Pexp_hole
+    | Texp_quotation exp -> Pexp_quote (sub.expr sub exp)
+    | Texp_antiquotation exp -> Pexp_splice (sub.expr sub exp)
+    | Texp_eval (typ, _) ->
+        Pexp_extension ({ txt = "ocaml.eval"; loc}, PTyp (sub.typ sub typ))
   in
   List.fold_right (exp_extra sub) exp.exp_extra
     (Exp.mk ~loc ~attrs desc)
@@ -1038,6 +1048,8 @@ let core_type sub ct =
         Ptyp_poly (bound_vars, sub.typ sub ct)
     | Ttyp_package pack -> Ptyp_package (sub.package_type sub pack)
     | Ttyp_open (_path, mod_ident, t) -> Ptyp_open (mod_ident, sub.typ sub t)
+    | Ttyp_quote t -> Ptyp_quote (sub.typ sub t)
+    | Ttyp_splice t -> Ptyp_splice (sub.typ sub t)
     | Ttyp_of_kind jkind -> Ptyp_of_kind jkind
     | Ttyp_call_pos ->
         Ptyp_extension call_pos_extension

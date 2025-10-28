@@ -146,8 +146,11 @@ DOMAIN_STATE(int, id)
 
 DOMAIN_STATE(int, unique_id)
 
-DOMAIN_STATE(value, dls_root)
+DOMAIN_STATE(value, dls_state)
 /* Domain-local state */
+
+DOMAIN_STATE(value, tls_state)
+/* Thread-local state */
 
 /* How much external memory is currenty held by the minor heap. */
 DOMAIN_STATE(uintnat, minor_dependent_bsz)

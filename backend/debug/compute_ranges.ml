@@ -311,18 +311,18 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
     |> handle case_2b Close_subrange
     |> handle case_2c Close_subrange_one_byte_after
 
-  let actions_at_instruction ~(insn : L.instruction)
+  let actions_at_instruction ~ppf_dump ~(insn : L.instruction)
       ~(prev_insn : L.instruction option) ~known_available_after_prev_insn =
     let available_before = S.available_before insn in
     let available_across = S.available_across insn in
     if !Oxcaml_flags.dranges
     then
-      Format.eprintf "canonicalised available_before:@ %a\n"
+      Format.fprintf ppf_dump "canonicalised available_before:@ %a\n"
         (Misc.Stdlib.Option.print KS.print)
         available_before;
     if !Oxcaml_flags.dranges
     then
-      Format.eprintf "canonicalised available_across:@ %a\n"
+      Format.fprintf ppf_dump "canonicalised available_across:@ %a\n"
         (Misc.Stdlib.Option.print KS.print)
         available_across;
     match available_before, available_across with
@@ -337,9 +337,11 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
   let rec process_instruction t (fundecl : L.fundecl) ~fun_contains_calls
       ~fun_num_stack_slots ~(first_insn : L.instruction) ~(insn : L.instruction)
       ~(prev_insn : L.instruction option) ~currently_open_subranges
-      ~subrange_state =
+      ~subrange_state ~ppf_dump =
     if !Oxcaml_flags.dranges
-    then Format.eprintf "process_instruction:@ %a\n" Printlinear.instr insn;
+    then
+      Format.fprintf ppf_dump "process_instruction:@ %a\n" Printlinear.instr
+        insn;
     let used_label = ref None in
     let get_label () =
       match !used_label with
@@ -370,13 +372,14 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
       (* If the range is later discarded, the inserted label may actually be
          useless, but this doesn't matter. It does not generate any code. *)
       if !Oxcaml_flags.dranges
-      then Format.eprintf "opening subrange for %a\n%!" S.Key.print key;
+      then Format.fprintf ppf_dump "opening subrange for %a\n%!" S.Key.print key;
       let label, label_insn = get_label () in
       KM.add key (label, start_pos_offset, label_insn) currently_open_subranges
     in
     let close_subrange key ~end_pos_offset ~currently_open_subranges =
       if !Oxcaml_flags.dranges
-      then Format.eprintf "closing subrange for key %a\n" S.Key.print key;
+      then
+        Format.fprintf ppf_dump "closing subrange for key %a\n" S.Key.print key;
       match KM.find key currently_open_subranges with
       | exception Not_found ->
         Misc.fatal_errorf
@@ -424,21 +427,22 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
         let known_available_after_prev_insn =
           KM.bindings currently_open_subranges |> List.map fst |> KS.of_list
         in
-        actions_at_instruction ~insn ~prev_insn ~known_available_after_prev_insn
+        actions_at_instruction ~ppf_dump ~insn ~prev_insn
+          ~known_available_after_prev_insn
     in
     (* Apply actions *)
     let no_actions = List.compare_length_with actions 0 = 0 in
     if !Oxcaml_flags.dranges && no_actions
-    then Format.eprintf "no actions to apply\n%!";
+    then Format.fprintf ppf_dump "no actions to apply\n%!";
     if !Oxcaml_flags.dranges && not no_actions
-    then Format.eprintf "applying actions:\n%!";
+    then Format.fprintf ppf_dump "applying actions:\n%!";
     let currently_open_subranges =
       List.fold_left
         (fun currently_open_subranges (key, (action : action)) ->
           if !Oxcaml_flags.dranges
           then
-            Format.eprintf "  --> action for key %a: %a\n" S.Key.print key
-              print_action action;
+            Format.fprintf ppf_dump "  --> action for key %a: %a\n" S.Key.print
+              key print_action action;
           match action with
           | Open_one_byte_subrange ->
             let currently_open_subranges =
@@ -456,13 +460,13 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
         currently_open_subranges actions
     in
     if !Oxcaml_flags.dranges && not no_actions
-    then Format.eprintf "finished applying actions.\n%!";
+    then Format.fprintf ppf_dump "finished applying actions.\n%!";
     (* Close all subranges if at last instruction *)
     let currently_open_subranges =
       match insn.desc with
       | Lend ->
         if !Oxcaml_flags.dranges
-        then Format.eprintf "closing subranges for last insn\n%!";
+        then Format.fprintf ppf_dump "closing subranges for last insn\n%!";
         let currently_open_subranges =
           KM.fold
             (fun key _ currently_open_subranges ->
@@ -526,29 +530,29 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
       in
       process_instruction t fundecl ~fun_contains_calls ~fun_num_stack_slots
         ~first_insn ~insn:insn.next ~prev_insn:(Some insn)
-        ~currently_open_subranges ~subrange_state
+        ~currently_open_subranges ~subrange_state ~ppf_dump
 
   let process_instructions t fundecl ~fun_contains_calls ~fun_num_stack_slots
-      ~first_insn =
+      ~first_insn ~ppf_dump =
     let subrange_state = Subrange_state.create () in
     process_instruction t fundecl ~fun_contains_calls ~fun_num_stack_slots
       ~first_insn ~insn:first_insn ~prev_insn:None
-      ~currently_open_subranges:KM.empty ~subrange_state
+      ~currently_open_subranges:KM.empty ~subrange_state ~ppf_dump
 
   let all_indexes t =
     S.Index.Set.of_list (List.map fst (S.Index.Tbl.to_list t.ranges))
 
   let empty = { ranges = S.Index.Tbl.create 1 }
 
-  let create (fundecl : L.fundecl) =
+  let create ~ppf_dump (fundecl : L.fundecl) =
     if !Oxcaml_flags.dranges
-    then Format.eprintf "Compute_ranges for %s\n" fundecl.fun_name;
+    then Format.fprintf ppf_dump "Compute_ranges for %s\n" fundecl.fun_name;
     let t = { ranges = S.Index.Tbl.create 42 } in
     let first_insn =
       process_instructions t fundecl
         ~fun_contains_calls:fundecl.fun_contains_calls
         ~fun_num_stack_slots:fundecl.fun_num_stack_slots
-        ~first_insn:fundecl.fun_body
+        ~first_insn:fundecl.fun_body ~ppf_dump
     in
     let fundecl : L.fundecl = { fundecl with fun_body = first_insn } in
     t, fundecl

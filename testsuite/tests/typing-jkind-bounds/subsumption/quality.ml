@@ -214,7 +214,7 @@ end = struct
   type a = [`a of string | `b]
   type t
 end
-(* CR layouts v2.8: this is fine to accept *)
+(* CR layouts v2.8: this is fine to accept. Internal ticket 4294. *)
 [%%expect {|
 Lines 4-7, characters 6-3:
 4 | ......struct
@@ -227,15 +227,16 @@ Error: Signature mismatch:
        is not included in
          sig
            type a = [ `a of string | `b ]
-           type t : value mod global with a
+           type t : value mod forkable unyielding
          end
        Type declarations do not match:
          type t
        is not included in
-         type t : value mod global with a
+         type t : value mod forkable unyielding
        The kind of the first is value
          because of the definition of t at line 6, characters 2-8.
-       But the kind of the first must be a subkind of value mod global with a
+       But the kind of the first must be a subkind of
+           value mod forkable unyielding
          because of the definition of t at line 3, characters 2-34.
 |}]
 
@@ -357,7 +358,7 @@ end = struct
   type a = < value : string >
   type t
 end
-(* CR layouts v2.8: this is fine to accept *)
+(* CR layouts v2.8: this is fine to accept. Internal ticket 5125. *)
 [%%expect {|
 Lines 4-7, characters 6-3:
 4 | ......struct
@@ -396,7 +397,7 @@ module M : sig
 end = struct
   type t
 end
-(* CR layouts v2.8: This should not be accepted *)
+(* CR layouts v2.8: This should not be accepted. Internal ticket 4973 *)
 [%%expect {|
 type gadt = Foo : int -> gadt
 module M : sig type t end
@@ -516,7 +517,7 @@ end = struct
   type t
 end
 (* CR layouts v2.8: this should be accepted because module types should be best
-   (once we start giving them proper kinds) *)
+   (once we start giving them proper kinds). Internal ticket 5126 *)
 [%%expect {|
 module type S = sig val nonportable_f : int -> int end
 type s = (module S)

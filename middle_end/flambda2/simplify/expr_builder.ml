@@ -172,7 +172,7 @@ let create_coerced_singleton_let uacc var defining_expr
 let make_new_let_bindings uacc ~bindings_outermost_first ~body =
   (* The name occurrences component of [uacc] is expected to be in the state
      described in the comment at the top of [Simplify_let.rebuild_let]. *)
-  let delete_binding uacc ~original_defining_expr =
+  let notify_removed uacc ~original_defining_expr =
     match (original_defining_expr : Named.t option) with
     | Some (Prim (prim, _dbg)) ->
       UA.notify_removed ~operation:(Removed_operations.prim prim) uacc
@@ -184,7 +184,7 @@ let make_new_let_bindings uacc ~bindings_outermost_first ~body =
     ~f:(fun (expr, uacc) binding ->
       match (binding : binding_to_place) with
       | Delete_binding { original_defining_expr } ->
-        expr, delete_binding uacc ~original_defining_expr
+        expr, notify_removed uacc ~original_defining_expr
       | Keep_binding
           { let_bound; simplified_defining_expr; original_defining_expr = _ } ->
         let { Simplified_named.named = defining_expr;
@@ -412,9 +412,10 @@ let create_let_symbols uacc lifted_constant ~body =
             | Project_value_slot { project_from; value_slot } ->
               Unary (Project_value_slot { project_from; value_slot }, symbol)
           in
+          let machine_width = UE.machine_width (UA.uenv uacc) in
           ( Named.create_prim prim Debuginfo.none,
             coercion_from_proj_to_var,
-            Code_size.prim prim )
+            Code_size.prim ~machine_width prim )
       in
       (* It's possible that this might create duplicates of the same projection
          operation, but it's unlikely there will be a significant number, and
@@ -578,7 +579,8 @@ let no_rewrite_apply_cont uenv apply_cont =
 let rewrite_apply_cont0 uacc rewrite ~ctx id apply_cont :
     rewrite_apply_cont_result =
   let args = Apply_cont.args apply_cont in
-  match Apply_cont_rewrite.make_rewrite rewrite ~ctx id args with
+  let machine_width = UE.machine_width (UA.uenv uacc) in
+  match Apply_cont_rewrite.make_rewrite rewrite ~machine_width ~ctx id args with
   | Invalid -> Invalid { message = "" }
   | Ok (extra_lets, args) -> (
     let apply_cont = Apply_cont.update_args apply_cont ~args in

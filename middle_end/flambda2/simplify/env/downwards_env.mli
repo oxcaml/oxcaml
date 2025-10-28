@@ -32,6 +32,7 @@ val print : Format.formatter -> t -> unit
     unit. *)
 val create :
   round:int ->
+  machine_width:Target_system.Machine_width.t ->
   resolver:resolver ->
   get_imported_names:get_imported_names ->
   get_imported_code:get_imported_code ->
@@ -43,6 +44,8 @@ val create :
   t
 
 val all_code : t -> Code.t Code_id.Map.t
+
+val machine_width : t -> Target_system.Machine_width.t
 
 val resolver :
   t -> Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
@@ -238,6 +241,11 @@ val must_inline : t -> bool
 val replay_history : t -> Replay_history.t
 
 val with_replay_history : (Replay_history.t * bool) option -> t -> t
+
+val with_join_analysis :
+  Apply_cont_rewrite_id.t Join_analysis.t option -> t -> t
+
+val join_analysis : t -> Apply_cont_rewrite_id.t Join_analysis.t option
 
 val map_specialization_cost :
   f:(Specialization_cost.t -> Specialization_cost.t) -> t -> t

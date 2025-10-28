@@ -181,32 +181,35 @@ Error: Signature mismatch:
        Modules do not match:
          sig type 'a t : mutable_data with 'a end
        is not included in
-         sig type 'a t : mutable_data with 'a @@ unyielding many end
+         sig type 'a t : mutable_data with 'a @@ forkable unyielding many end
        Type declarations do not match:
          type 'a t : mutable_data with 'a
        is not included in
-         type 'a t : mutable_data with 'a @@ unyielding many
+         type 'a t : mutable_data with 'a @@ forkable unyielding many
        The kind of the first is mutable_data with 'a
          because of the definition of t at line 4, characters 2-34.
        But the kind of the first must be a subkind of
-           mutable_data with 'a @@ unyielding many
+           mutable_data with 'a @@ forkable unyielding many
          because of the definition of t at line 2, characters 2-40.
 
        The first mode-crosses less than the second along:
          linearity: mod many with 'a ≰ mod many
+         forkable: mod forkable with 'a ≰ mod forkable
          yielding: mod unyielding with 'a ≰ mod unyielding
 |}]
 
 module M : sig
   type 'a t : immutable_data with 'a ref
 end = struct
-  type 'a t : mutable_data with 'a @@ many unyielding
+  type 'a t : mutable_data with 'a @@ many unyielding forkable
 end
 [%%expect {|
-module M : sig type 'a t : mutable_data with 'a @@ unyielding many end
+module M :
+  sig type 'a t : mutable_data with 'a @@ forkable unyielding many end
 |}]
 
-(* CR layouts v2.8: 'a u's kind should get normalized to just immutable_data *)
+(* CR layouts v2.8: 'a u's kind should get normalized to just immutable_data.
+   Internal ticket 4770. *)
 module M = struct
   type ('a : immutable_data) u : immutable_data with 'a
   type 'a t : immutable_data = 'a u
@@ -255,7 +258,6 @@ type q = { x : v; }
 type u
 type t = private u
 type v : immutable_data with u = { value : t }
-(* CR layouts v2.8: this should be accepted *)
 [%%expect {|
 type u
 type t = private u
@@ -275,17 +277,9 @@ type t = [ `bar | `foo ]
 
 type t
 type u : immutable_data with t = [`foo of t]
-(* CR layouts v2.8: This should be accepted *)
 [%%expect {|
 type t
-Line 2, characters 0-44:
-2 | type u : immutable_data with t = [`foo of t]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[ `foo of t ]" is value mod non_float
-         because it's a polymorphic variant type.
-       But the kind of type "[ `foo of t ]" must be a subkind of
-           immutable_data with t
-         because of the definition of u at line 2, characters 0-44.
+type u = [ `foo of t ]
 |}]
 
 type (_, _) eq = Eq : ('a, 'a) eq
@@ -353,4 +347,39 @@ Error: Signature mismatch:
          because of the definition of t at line 2, characters 2-36.
        But the kind of the first must be a subkind of immutable_data with 'a
          because of the definition of t at line 2, characters 2-36.
+|}]
+
+module Foo : sig
+  type ('a, 'b) u : value mod portable with 'b
+
+  type ('a
+       , 'b
+       , 'c)
+         t :
+         value mod portable with 'a with 'b with ('b, 'c) u with ('a * 'b, 'c) u
+end = struct
+  type ('a, 'b) u : value mod portable with 'b
+
+  type ('a
+       , 'b
+       , 'c)
+         t :
+         value mod portable with 'a with 'b with ('b, 'c) u with ('a * 'b, 'c) u
+end
+
+[%%expect{|
+module Foo :
+  sig
+    type ('a, 'b) u : value mod portable with 'b
+    type ('a, 'b, 'c) t
+      : value
+          mod portable
+          with 'a
+
+          with 'b
+
+          with ('a * 'b, 'c) u
+
+          with ('b, 'c) u
+  end
 |}]

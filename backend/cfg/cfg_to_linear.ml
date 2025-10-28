@@ -54,7 +54,14 @@ let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
         phantom_available_before ) =
     match like with
     | None ->
-      [||], [||], Debuginfo.none, Reg.Set.empty, Fdo_info.none, None, None, None
+      ( [||],
+        [||],
+        Debuginfo.none,
+        Reg.Set.empty,
+        Fdo_info.none,
+        Reg_availability_set.Unreachable,
+        Reg_availability_set.Unreachable,
+        None )
     | Some
         { arg;
           res;
@@ -476,9 +483,15 @@ let run cfg_with_layout =
           let body =
             if need_starting_label cfg_with_layout block ~prev_block
             then
-              to_linear_instr
-                (make_Llabel cfg_with_layout block.start)
-                ~next:body
+              let instr =
+                to_linear_instr
+                  (make_Llabel cfg_with_layout block.start)
+                  ~next:body
+              in
+              { instr with
+                available_before = body.available_before;
+                available_across = body.available_across
+              }
             else body
           in
           adjust_stack_offset body block ~prev_block

@@ -143,12 +143,12 @@ CAMLprim value caml_int_of_string(value s)
 
 CAMLprim value caml_int16_of_string(value s)
 {
-    return Val_long((int16_t)parse_intnat(s, 16, INT16_ERRMSG));
+    return Val_int16(parse_intnat(s, 16, INT16_ERRMSG));
 }
 
 CAMLprim value caml_int8_of_string(value s)
 {
-    return Val_long((int8_t)parse_intnat(s, 8, INT8_ERRMSG));
+    return Val_int8(parse_intnat(s, 8, INT8_ERRMSG));
 }
 
 #define FORMAT_BUFFER_SIZE 32

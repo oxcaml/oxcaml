@@ -408,10 +408,28 @@ let beta_reduce params body args =
 
 (* Simplification of lets *)
 
-let simplify_lets lam =
-
-  (* Disable optimisations for bytecode compilation with -g flag *)
+let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
+  (* Disable optimisations for bytecode compilation with -g flag, and in
+     certain cases for DWARF generation *)
+  (* CR mshinwell: Evaluate the impact of simply removing [Alias] from
+     [Lambda], given what Flambda 2 does. *)
+  let dwarf_wants_to_prevent_substitutions =
+    !Clflags.native_code
+    && !Clflags.debug
+    && not restrict_to_upstream_dwarf
+    && gdwarf_may_alter_codegen
+  in
   let optimize = !Clflags.native_code || not !Clflags.debug in
+  let optimize_except_alias_bindings =
+    (* This doesn't yet include Alias bindings of variables to variables
+       because of what is described in this CR.  Other used-once Alias
+       bindings will not be substituted out when we want to preserve them
+       for DWARF.  (They will only be let-bound again by Flambda 2
+       anyway, even if substituted - it's just a matter of placement.) *)
+    (* CR mshinwell: Fix bug whereby Alias bindings of variables to variables
+      are being generated (probably by Matching) with the wrong layout. *)
+    optimize && not dwarf_wants_to_prevent_substitutions
+  in
 
   (* First pass: count the occurrences of all let-bound identifiers *)
 
@@ -636,7 +654,8 @@ let simplify_lets lam =
   | Llet(Alias, kind, v, duid, l1, l2) ->
       begin match count_var v with
         0 -> simplif l2
-      | 1 when optimize -> Hashtbl.add subst v (simplif l1); simplif l2
+      | 1 when optimize_except_alias_bindings ->
+          Hashtbl.add subst v (simplif l1); simplif l2
       | _ -> Llet(Alias, kind, v, duid, simplif l1, simplif l2)
       end
   | Llet(StrictOpt, kind, v, duid, l1, l2) ->
@@ -1132,17 +1151,22 @@ let simplify_local_functions lam =
    + emission of tailcall annotations, if needed
 *)
 
-let simplify_lambda lam =
+let simplify_lambda lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   let lam =
     lam
-    |> (if !Clflags.native_code || not !Clflags.debug
+    |> (if !Clflags.native_code || Clflags.is_flambda2() || not !Clflags.debug
         then simplify_local_functions else Fun.id
        )
     |> simplify_exits
-    |> simplify_lets
+    |> simplify_lets ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen
     |> Tmc.rewrite
   in
   if !Clflags.annotations
      || Warnings.is_active (Warnings.Wrong_tailcall_expectation true)
   then emit_tail_infos true lam;
   lam
+
+let simplify_lambda_for_bytecode lam =
+  simplify_lambda lam
+    ~restrict_to_upstream_dwarf:true
+    ~gdwarf_may_alter_codegen:false

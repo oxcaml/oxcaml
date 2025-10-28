@@ -540,6 +540,9 @@ type codegen_option =
   | Reduce_code_size
   | No_CSE
   | Use_linscan_regalloc
+  | Use_regalloc of Clflags.Register_allocator.t
+  | Use_regalloc_param of string list
+  | Cold
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;
@@ -656,5 +659,9 @@ val equal_integer_comparison : integer_comparison -> integer_comparison -> bool
 val caml_flambda2_invalid : string
 
 val is_val : machtype_component -> bool
+
+val is_int : machtype_component -> bool
+
+val is_addr : machtype_component -> bool
 
 val is_exn_handler : ccatch_flag -> bool

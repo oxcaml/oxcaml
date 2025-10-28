@@ -1,0 +1,17 @@
+(test
+ (name main)
+ (modules main test_nats test test_big_ints test_ratios test_nums test_io)
+ (libraries num)
+ (modes
+  js
+  (best exe))
+ (flags
+  (:standard -linkall -w -3-7-33-35-37 -safe-string -no-strict-sequence)))
+
+(rule
+ (target main.expected)
+ (deps main.exe)
+ (action
+  (with-stdout-to
+   %{target}
+   (run ./main.exe))))

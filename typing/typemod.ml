@@ -1093,7 +1093,8 @@ module Merge = struct
              repeated later -- and with better handling for errors -- we just
              drop any error here. *)
           ignore
-            (* CR layouts v2.8: Does this type_jkind need to be instantiated? *)
+            (* CR layouts v2.8: Does this type_jkind need to be instantiated?
+               Internal ticket 5095. *)
             (Ctype.constrain_decl_jkind env tdecl sig_decl.type_jkind);
           check_type_decl sig_env sg_for_env loc id None tdecl sig_decl;
           let tdecl = { tdecl with type_manifest = None } in
@@ -1845,6 +1846,7 @@ and transl_modtype_aux env smty =
       mkmty (Tmty_alias (path, lid)) (Mty_alias path) env loc
         smty.pmty_attributes
   | Pmty_signature ssg ->
+      Env.check_no_open_quotations loc env Env.Sig_qt;
       let sg = transl_signature env ssg in
       mkmty (Tmty_signature sg) (Mty_signature sg.sig_type) env loc
         smty.pmty_attributes
@@ -2904,6 +2906,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       type_module_path_aux ~alias ~hold_locks sttn env path mode_with_locks lid
         smod
   | Pmod_structure sstr ->
+      Env.check_no_open_quotations smod.pmod_loc env Env.Struct_qt;
       let (str, sg, mode, names, shape, _finalenv) =
         type_structure funct_body anchor env ?expected_mode sstr in
       let md =
@@ -4056,7 +4059,7 @@ let () =
 let gen_annot target annots =
   let annot = Unit_info.annot target in
   Cmt2annot.gen_annot (Some (Unit_info.Artifact.filename annot))
-    ~sourcefile:(Unit_info.Artifact.source_file annot)
+    ~sourcefile:(Unit_info.Artifact.original_source_file annot)
     ~use_summaries:false
     annots
 
@@ -4172,6 +4175,7 @@ let type_implementation target modulename initial_env ast =
             simple_sg
         in
         Typecore.force_delayed_checks ();
+        Mode.erase_hints ();
         Typecore.optimise_allocations ();
         let shape = Shape_reduce.local_reduce Env.empty shape in
         Printtyp.wrap_printing_env ~error:false initial_env
@@ -4246,6 +4250,7 @@ let type_implementation target modulename initial_env ast =
             check_argument_type_if_given initial_env source_intf dclsig arg_type
           in
           Typecore.force_delayed_checks ();
+          Mode.erase_hints ();
           Typecore.optimise_allocations ();
           (* It is important to run these checks after the inclusion test above,
              so that value declarations which are not used internally but
@@ -4285,6 +4290,7 @@ let type_implementation target modulename initial_env ast =
             check_argument_type_if_given initial_env sourcefile simple_sg arg_type
           in
           Typecore.force_delayed_checks ();
+          Mode.erase_hints ();
           Typecore.optimise_allocations ();
           (* See comment above. Here the target signature contains all
              the values being exported. We can still capture unused

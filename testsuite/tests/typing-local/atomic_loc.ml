@@ -30,7 +30,11 @@ let contents_loc_escape (t @ local) = [%atomic.loc t.contents]
 Line 1, characters 38-62:
 1 | let contents_loc_escape (t @ local) = [%atomic.loc t.contents]
                                           ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is from the allocation at Line 1, characters 38-62
+       which is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 
@@ -41,5 +45,5 @@ let contents_can't_escape_by_mode_crossing
 Line 3, characters 11-35:
 3 | = fun t -> [%atomic.loc t.contents]
                ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]

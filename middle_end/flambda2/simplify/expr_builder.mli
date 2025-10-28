@@ -41,7 +41,8 @@ type binding_to_place =
         original_defining_expr : Named.t option
       }
   | Delete_binding of { original_defining_expr : Named.t option }
-      (** Create [Let] binding(s) around a given body. (The type of this function
+
+(** Create [Let] binding(s) around a given body. (The type of this function
     prevents it from being used to create "let symbol" bindings; use the other
     functions in this module instead.) Bindings will be elided if they are
     unused.

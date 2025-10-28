@@ -150,6 +150,9 @@ DECLARE_SIGNAL_HANDLER(segv_handler)
 void caml_init_nat_signals(void)
 {
   struct sigaction act, oldact;
+  extern uintnat caml_enable_segv_handler;
+  if (!caml_enable_segv_handler)
+    return;
   SET_SIGACT(act, segv_handler);
   act.sa_flags |= SA_ONSTACK;
   sigemptyset(&act.sa_mask);

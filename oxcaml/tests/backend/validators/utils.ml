@@ -30,9 +30,8 @@ module Instruction = struct
       irc_work_list = Unknown_list;
       live = Reg.Set.empty;
       stack_offset = 0;
-      ls_order = -1;
-      available_before = None;
-      available_across = None;
+      available_before = Unreachable;
+      available_across = Unreachable;
       phantom_available_before = None
     }
 end
@@ -91,7 +90,7 @@ module Cfg_desc = struct
 
   let make ~remove_regalloc ~remove_locs
       ({ fun_args; blocks; fun_contains_calls; fun_ret_type } : t) :
-      Cfg_with_layout.t =
+      Cfg_with_infos.t =
     let cfg =
       Cfg.create ~fun_name:"foo" ~fun_args:(Array.copy fun_args)
         ~fun_dbg:Debuginfo.none ~fun_codegen_options:[] ~fun_contains_calls
@@ -119,6 +118,7 @@ module Cfg_desc = struct
                suc.is_trap_handler <- true))
       cfg.blocks;
     let cfg_layout = Cfg_with_layout.create ~layout:(DLL.make_empty ()) cfg in
+    let cfg_with_infos = Cfg_with_infos.make cfg_layout in
     (if not remove_locs
     then
       (* If we leave in the locations we want to have the actual stack slot
@@ -136,7 +136,7 @@ module Cfg_desc = struct
       in
       Cfg_with_layout.iter_instructions ~instruction:update_stack_slots
         ~terminator:update_stack_slots cfg_layout);
-    cfg_layout
+    cfg_with_infos
 
   let make_pre_regalloc t = make ~remove_regalloc:true ~remove_locs:true t
 
@@ -150,7 +150,7 @@ let entry_label =
       fun_contains_calls = false;
       fun_ret_type = Cmm.typ_void
     }
-  |> Cfg_with_layout.cfg |> Cfg.entry_label
+  |> Cfg_with_infos.cfg |> Cfg.entry_label
 
 let label_add lbl k = Label.of_int_unsafe (Label.to_int lbl + k)
 

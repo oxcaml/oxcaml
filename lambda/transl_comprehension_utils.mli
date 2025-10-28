@@ -62,6 +62,12 @@ module Lambda_utils : sig
 
     val unboxed_float32 : float -> lambda
 
+    val untagged_int : int -> lambda
+
+    val untagged_int8 : int -> lambda
+
+    val untagged_int16 : int -> lambda
+
     val unboxed_int32 : Int32.t -> lambda
 
     val unboxed_int64 : Int64.t -> lambda

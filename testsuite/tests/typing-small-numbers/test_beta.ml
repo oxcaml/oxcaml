@@ -1,5 +1,4 @@
 (* TEST
- include stdlib_stable;
  flags = "-extension small_numbers";
  expect;
 *)
@@ -189,6 +188,11 @@ Line 1:
 Error: float32 literal patterns are not supported.
 |}];;
 
+type t = char#;;
+[%%expect{|
+type t = char#
+|}];;
+
 type t = int8;;
 [%%expect{|
 type t = int8
@@ -199,13 +203,17 @@ type t = int16;;
 type t = int16
 |}];;
 
-let i8 = Stdlib_stable.Int8.minus_one;;
+let c () = #'a';;
 [%%expect{|
-val i8 : int8 = -1
+val c : unit -> char# = <fun>
+|}]
+
+let i8 = -1s;;
+[%%expect{|
+val i8 : int8 = -1s
 |}];;
 
-let i16 = Stdlib_stable.Int16.minus_one;;
+let i16 = -1S;;
 [%%expect{|
-val i16 : int16 = -1
+val i16 : int16 = -1S
 |}];;
-

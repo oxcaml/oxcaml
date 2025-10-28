@@ -71,11 +71,11 @@ let print ppf { condition_dbg; scrutinee; arms } =
 
 let create ~condition_dbg ~scrutinee ~arms = { condition_dbg; scrutinee; arms }
 
-let if_then_else ~condition_dbg ~scrutinee ~if_true ~if_false =
+let if_then_else ~machine_width ~condition_dbg ~scrutinee ~if_true ~if_false =
   let arms =
     Target_ocaml_int.Map.of_list
-      [ Target_ocaml_int.bool_true, if_true;
-        Target_ocaml_int.bool_false, if_false ]
+      [ Target_ocaml_int.bool_true machine_width, if_true;
+        Target_ocaml_int.bool_false machine_width, if_false ]
   in
   create ~condition_dbg ~scrutinee ~arms
 

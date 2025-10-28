@@ -178,10 +178,11 @@ let prepare_error err =
   | Malformed_instance_identifier loc ->
       Location.errorf ~loc
         "Syntax error: Unexpected in module instance"
-  | Quotation_reserved (loc, symb) ->
+  | Unspliceable loc ->
       Location.errorf ~loc
-        "Syntax error: `%s` is reserved for use in runtime metaprogramming."
-        symb
+        "Syntax error: expression cannot be spliced.\n\
+         @{<hint>Hint@}: consider putting parentheses around the \
+         expression."
   | Let_mutable_not_allowed_at_structure_level loc ->
       Location.errorf ~loc
         "Syntax error: Mutable let bindings are not allowed \
@@ -199,10 +200,12 @@ let prepare_error err =
   | Block_access_bad_paren loc ->
       Location.errorf ~loc
         "Syntax error: A parenthesis here can only follow one of: \n  \
-         %a, %a, %a, %a, %a, %a, %a, %a, %a, %a."
+         %a, %a, %a, %a, %a, %a, %a, %a, %a, %a, %a, %a,\n  \
+         %a, %a."
         Style.inline_code "." Style.inline_code ".L" Style.inline_code ".l"
-        Style.inline_code ".n" Style.inline_code ".:" Style.inline_code ".:L"
-        Style.inline_code ".:l" Style.inline_code ".:n"
+        Style.inline_code ".S" Style.inline_code ".s" Style.inline_code ".n"
+        Style.inline_code ".:" Style.inline_code ".:L" Style.inline_code ".:l"
+        Style.inline_code ".:S" Style.inline_code ".:s" Style.inline_code ".:n"
         Style.inline_code ".idx_imm" Style.inline_code ".idx_mut"
 
 let () =

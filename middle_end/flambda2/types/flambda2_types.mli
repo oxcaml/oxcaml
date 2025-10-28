@@ -132,7 +132,9 @@ module Typing_env : sig
     val create : Pre_serializable.t -> reachable_names:Name_occurrences.t -> t
 
     val create_from_closure_conversion_approx :
-      'a Value_approximation.t Symbol.Map.t -> t
+      machine_width:Target_system.Machine_width.t ->
+      'a Value_approximation.t Symbol.Map.t ->
+      t
 
     val predefined_exceptions : Symbol.Set.t -> t
 
@@ -155,9 +157,12 @@ module Typing_env : sig
   val print : Format.formatter -> t -> unit
 
   val create :
+    machine_width:Target_system.Machine_width.t ->
     resolver:(Compilation_unit.t -> Serializable.t option) ->
     get_imported_names:(unit -> Name.Set.t) ->
     t
+
+  val machine_width : t -> Target_system.Machine_width.t
 
   val closure_env : t -> t
 
@@ -267,6 +272,27 @@ val meet : Typing_env.t -> t -> t -> (t * Typing_env.t) Or_bottom.t
 
 val meet_shape : Typing_env.t -> t -> shape:t -> Typing_env.t Or_bottom.t
 
+module Join_analysis : sig
+  type 'a t
+
+  val print : Format.formatter -> 'a t -> unit
+
+  module Variable_refined_at_join : sig
+    type 'a t
+
+    val fold_values_at_uses :
+      ('a -> Reg_width_const.t Or_unknown.t -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  end
+
+  type 'a simple_refined_at_join =
+    | Not_refined_at_join
+    | Invariant_in_all_uses of Simple.t
+    | Variable_refined_at_these_uses of 'a Variable_refined_at_join.t
+
+  val simple_refined_at_join :
+    'a t -> Typing_env.t -> Simple.t -> 'a simple_refined_at_join
+end
+
 val cut_and_n_way_join :
   Typing_env.t ->
   (Typing_env.t * Apply_cont_rewrite_id.t * Continuation_use_kind.t) list ->
@@ -274,7 +300,7 @@ val cut_and_n_way_join :
   cut_after:Scope.t ->
   extra_lifted_consts_in_use_envs:Symbol.Set.t ->
   extra_allowed_names:Name_occurrences.t ->
-  Typing_env.t
+  Typing_env.t * Apply_cont_rewrite_id.t Join_analysis.t option
 
 module Function_type : sig
   type t
@@ -317,7 +343,10 @@ val bottom : Flambda_kind.t -> t
 val unknown : Flambda_kind.t -> t
 
 val unknown_with_subkind :
-  ?alloc_mode:Alloc_mode.For_types.t -> Flambda_kind.With_subkind.t -> t
+  ?alloc_mode:Alloc_mode.For_types.t ->
+  machine_width:Target_system.Machine_width.t ->
+  Flambda_kind.With_subkind.t ->
+  t
 
 (** Create an bottom type with the same kind as the given type. *)
 val bottom_like : t -> t
@@ -331,7 +360,7 @@ val any_tagged_immediate : t
 
 val any_tagged_immediate_or_null : t
 
-val any_tagged_bool : t
+val any_tagged_bool : machine_width:Target_system.Machine_width.t -> t
 
 val any_boxed_float32 : t
 
@@ -345,7 +374,7 @@ val any_boxed_nativeint : t
 
 val any_naked_immediate : t
 
-val any_naked_bool : t
+val any_naked_bool : machine_width:Target_system.Machine_width.t -> t
 
 val any_naked_float32 : t
 
@@ -454,9 +483,11 @@ val boxed_float32_alias_to :
 
 val boxed_float_alias_to : naked_float:Variable.t -> Alloc_mode.For_types.t -> t
 
-val tagged_int8_alias_to : naked_int8:Variable.t -> t
+val tagged_int8_alias_to :
+  naked_int8:Variable.t -> machine_width:Target_system.Machine_width.t -> t
 
-val tagged_int16_alias_to : naked_int16:Variable.t -> t
+val tagged_int16_alias_to :
+  naked_int16:Variable.t -> machine_width:Target_system.Machine_width.t -> t
 
 val boxed_int32_alias_to : naked_int32:Variable.t -> Alloc_mode.For_types.t -> t
 
@@ -498,6 +529,7 @@ val any_block : t
 
 (** The type of an immutable block with a known tag, size and field types. *)
 val immutable_block :
+  machine_width:Target_system.Machine_width.t ->
   is_unique:bool ->
   Tag.t ->
   shape:Flambda_kind.Block_shape.t ->
@@ -509,6 +541,7 @@ val immutable_block :
     The type of the [n - 1]th field is taken to be an [Equals] to the given
     variable. *)
 val immutable_block_with_size_at_least :
+  machine_width:Target_system.Machine_width.t ->
   tag:Tag.t Or_unknown.t ->
   n:Target_ocaml_int.t ->
   shape:Flambda_kind.Block_shape.t ->
@@ -518,14 +551,17 @@ val immutable_block_with_size_at_least :
 val mutable_block : Alloc_mode.For_types.t -> t
 
 val variant :
+  machine_width:Target_system.Machine_width.t ->
   const_ctors:t ->
   non_const_ctors:(Flambda_kind.Block_shape.t * t list) Tag.Scannable.Map.t ->
   Alloc_mode.For_types.t ->
   t
 
-val this_immutable_string : string -> t
+val this_immutable_string :
+  string -> machine_width:Target_system.Machine_width.t -> t
 
-val mutable_string : size:int -> t
+val mutable_string :
+  size:int -> machine_width:Target_system.Machine_width.t -> t
 
 val exactly_this_closure :
   Function_slot.t ->
@@ -568,6 +604,7 @@ val immutable_array :
   element_kind:Flambda_kind.With_subkind.t Or_unknown_or_bottom.t ->
   fields:flambda_type list ->
   Alloc_mode.For_types.t ->
+  machine_width:Target_system.Machine_width.t ->
   flambda_type
 
 (** Construct a type equal to the type of the given name. (The name must be
@@ -578,7 +615,10 @@ val alias_type_of : Flambda_kind.t -> Simple.t -> t
 val kind : t -> Flambda_kind.t
 
 (** For each of the kinds in an arity, create an "unknown" type. *)
-val unknown_types_from_arity : [`Unarized] Flambda_arity.t -> t list
+val unknown_types_from_arity :
+  machine_width:Target_system.Machine_width.t ->
+  [`Unarized] Flambda_arity.t ->
+  t list
 
 (** Whether the given type says that a term of that type can never be
     constructed (in other words, it is [Invalid]). *)

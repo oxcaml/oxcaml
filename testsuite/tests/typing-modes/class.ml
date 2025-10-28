@@ -172,7 +172,11 @@ let u =
 Line 3, characters 17-20:
 3 |     portable_use foo
                      ^^^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+       because it closes over the class "cla" (at Line 2, characters 21-24)
+       which is "nonportable"
+       because classes are always at the legacy modes.
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 module type SC = sig

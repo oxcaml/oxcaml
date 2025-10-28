@@ -16,6 +16,9 @@
 
 [@@@ocaml.warning "+a-40-41-42"]
 
+(* CR gyorsh/mshinwell: This pass needs fixing for register availability set
+   propagation *)
+
 open! Int_replace_polymorphic_compare
 open Linear
 
@@ -94,7 +97,8 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Some l ->
         instr_cons
           (Lcondbranch (Iinttest_imm (Ceq, n), l))
-          arg [||] next ~available_before:None ~available_across:None
+          arg [||] next ~available_before:Reg_availability_set.Unreachable
+          ~available_across:Reg_availability_set.Unreachable
           ~phantom_available_before:None
     in
     let rec fixup did_fix pc instr =
@@ -124,9 +128,12 @@ module Make (T : Branch_relaxation_intf.S) = struct
             let llabel = Llabel { label = lbl2; section_name = None } in
             let cont =
               instr_cons (Lbranch lbl) [||] [||]
-                (instr_cons llabel [||] [||] instr.next ~available_before:None
-                   ~available_across:None ~phantom_available_before:None)
-                ~available_before:None ~available_across:None
+                (instr_cons llabel [||] [||] instr.next
+                   ~available_before:Reg_availability_set.Unreachable
+                   ~available_across:Reg_availability_set.Unreachable
+                   ~phantom_available_before:None)
+                ~available_before:Reg_availability_set.Unreachable
+                ~available_across:Reg_availability_set.Unreachable
                 ~phantom_available_before:None
             in
             instr.desc <- Lcondbranch (Operation.invert_test test, lbl2);

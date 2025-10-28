@@ -40,9 +40,9 @@ let create_exn tag =
   then Misc.fatal_error (Printf.sprintf "Tag.create_exn %d" tag)
   else tag
 
-let create_from_targetint ti =
-  let min_tag = Target_ocaml_int.of_int min_tag in
-  let max_tag = Target_ocaml_int.of_int max_tag in
+let create_from_targetint machine_width ti =
+  let min_tag = Target_ocaml_int.of_int machine_width min_tag in
+  let max_tag = Target_ocaml_int.of_int machine_width max_tag in
   if Target_ocaml_int.compare ti min_tag >= 0
      && Target_ocaml_int.compare ti max_tag <= 0
   then Some (Target_ocaml_int.to_int ti)
@@ -50,7 +50,8 @@ let create_from_targetint ti =
 
 let to_int t = t
 
-let to_targetint_31_63 t = Target_ocaml_int.of_int (to_int t)
+let to_targetint_31_63 machine_width t =
+  Target_ocaml_int.of_int machine_width (to_int t)
 
 let zero = 0
 
@@ -88,7 +89,8 @@ module Scannable = struct
 
   let to_int t = t
 
-  let to_targetint t = Targetint_32_64.of_int (to_int t)
+  let to_targetint machine_width t =
+    Targetint_32_64.of_int machine_width (to_int t)
 
   let to_tag t = t
 

@@ -276,20 +276,18 @@ let const_int64_args =
     ~type_name:"int64"
 
 let int64_of_int8 i =
-  (* CR mslater: (SIMD) replace once we have unboxed int8 *)
-  if i < 0 || i > 0xff
-  then bad_immediate "Int8 constant not in range [0x0,0xff]: 0x%016x" i;
-  Int64.of_int i
+  if i < -0x80 || i > 0x7f
+  then bad_immediate "Int8 constant not in range [0x0,0xff]: 0x%x" i;
+  Int64.of_int i |> Int64.logand 0xffL
 
 let int64_of_int16 i =
-  (* CR mslater: (SIMD) replace once we have unboxed int16 *)
-  if i < 0 || i > 0xffff
-  then bad_immediate "Int16 constant not in range [0x0,0xffff]: 0x%016x" i;
-  Int64.of_int i
+  if i < -0x8000 || i > 0x7fff
+  then bad_immediate "Int16 constant not in range [0x0,0xffff]: 0x%x" i;
+  Int64.of_int i |> Int64.logand 0xffffL
 
 let int64_of_int32 i =
   if i < Int32.to_int Int32.min_int || i > Int32.to_int Int32.max_int
-  then bad_immediate "Int32 constant not in range [0x0,0xffffffff]: 0x%016x" i;
+  then bad_immediate "Int32 constant not in range [0x0,0xffffffff]: 0x%x" i;
   Int64.of_int i |> Int64.logand 0xffffffffL
 
 let int64_of_float32 f =
@@ -963,7 +961,8 @@ let transl_builtin name args dbg typ_res =
   | "caml_int32_unsigned_to_int_trunc_unboxed_to_untagged" ->
     Some (zero_extend ~bits:32 ~dbg (one_arg name args))
   | "caml_csel_value" | "caml_csel_int_untagged" | "caml_csel_int64_unboxed"
-  | "caml_csel_int32_unboxed" | "caml_csel_nativeint_unboxed" ->
+  | "caml_csel_int32_unboxed" | "caml_csel_int16_untagged"
+  | "caml_csel_int8_untagged" | "caml_csel_nativeint_unboxed" ->
     (* Unboxed float variant of csel intrinsic is not currently supported. It
        can be emitted on arm64 using FCSEL, but there appears to be no
        corresponding instruction on amd64 for xmm registers. *)

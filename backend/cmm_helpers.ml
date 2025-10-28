@@ -2128,7 +2128,6 @@ let send_function_name arity result (mode : Cmx_format.alloc_mode) =
 
 let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
     =
-  let cache = array_indexing log2_size_addr cache pos dbg in
   Compilenv.need_send_fun
     (List.map Extended_machtype.change_tagged_int_to_val args_type)
     (Extended_machtype.change_tagged_int_to_val result)
@@ -2142,7 +2141,7 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
             (Extended_machtype.change_tagged_int_to_val result)
             mode,
           dbg )
-      :: obj :: tag :: cache :: args,
+      :: obj :: tag :: cache :: pos :: args,
       dbg )
 
 (* Allocation *)
@@ -2987,17 +2986,17 @@ module SArgBlocks = struct
 
   (* CR mshinwell: GPR#2294 will fix the Debuginfo here *)
 
-  let make_const i = Cconst_int (i, Debuginfo.none)
+  let make_const dbg i = Cconst_int (i, dbg)
 
-  let make_prim p args = Cop (p, args, Debuginfo.none)
+  let make_prim dbg p args = Cop (p, args, dbg)
 
-  let make_offset arg n = add_const arg n Debuginfo.none
+  let make_offset dbg arg n = add_const arg n dbg
 
-  let make_isout h arg = Cop (Ccmpi Cult, [h; arg], Debuginfo.none)
+  let make_isout dbg h arg = Cop (Ccmpi Cult, [h; arg], dbg)
 
-  let make_isin h arg = Cop (Ccmpi Cuge, [h; arg], Debuginfo.none)
+  let make_isin dbg h arg = Cop (Ccmpi Cuge, [h; arg], dbg)
 
-  let make_is_nonzero arg = arg
+  let make_is_nonzero _dbg arg = arg
 
   let arg_as_test arg = arg
 
@@ -3436,13 +3435,22 @@ let send_function (arity, result, mode) =
   let cconst_int i = Cconst_int (i, dbg ()) in
   let args, clos', body = apply_function_body (typ_val :: arity) result mode in
   let cache = V.create_local "cache"
+  and pos = V.create_local "pos"
   and obj = List.hd args
   and tag = V.create_local "tag" in
   let clos =
-    let cache = Cvar cache and obj = Cvar obj and tag = Cvar tag in
+    let cache = Cvar cache
+    and obj = Cvar obj
+    and tag = Cvar tag
+    and pos = Cvar pos in
     let meths = V.create_local "meths" and cached = V.create_local "cached" in
     let real = V.create_local "real" in
     let mask = get_field_gen Asttypes.Mutable (Cvar meths) 1 (dbg ()) in
+    let cache_ptr = V.create_local "cache_ptr" in
+    let cache_ptr_cvar = Cvar cache_ptr in
+    let cache_ptr_expr =
+      array_indexing ~typ:Addr log2_size_addr cache pos (dbg ())
+    in
     let cached_pos = Cvar cached in
     let tag_pos =
       Cop
@@ -3456,32 +3464,37 @@ let send_function (arity, result, mode) =
       ( VP.create meths,
         Cop (mk_load_mut Word_val, [obj], dbg ()),
         Clet
-          ( VP.create cached,
-            Cop
-              (Cand, [Cop (mk_load_mut Word_int, [cache], dbg ()); mask], dbg ()),
+          ( VP.create cache_ptr,
+            cache_ptr_expr,
             Clet
-              ( VP.create real,
-                Cifthenelse
-                  ( Cop (Ccmpi Cne, [tag'; tag], dbg ()),
-                    dbg (),
-                    cache_public_method (Cvar meths) tag cache (dbg ()),
-                    dbg (),
-                    cached_pos,
-                    dbg () ),
+              ( VP.create cached,
                 Cop
-                  ( mk_load_mut Word_val,
-                    [ Cop
-                        ( Cadda,
-                          [ Cop (Cadda, [Cvar real; Cvar meths], dbg ());
-                            cconst_int ((2 * size_addr) - 1) ],
-                          dbg () ) ],
-                    dbg () ) ) ) )
+                  ( Cand,
+                    [Cop (mk_load_mut Word_int, [cache_ptr_cvar], dbg ()); mask],
+                    dbg () ),
+                Clet
+                  ( VP.create real,
+                    Cifthenelse
+                      ( Cop (Ccmpi Cne, [tag'; tag], dbg ()),
+                        dbg (),
+                        cache_public_method (Cvar meths) tag cache_ptr_cvar
+                          (dbg ()),
+                        dbg (),
+                        cached_pos,
+                        dbg () ),
+                    Cop
+                      ( mk_load_mut Word_val,
+                        [ Cop
+                            ( Cadda,
+                              [ Cop (Cadda, [Cvar real; Cvar meths], dbg ());
+                                cconst_int ((2 * size_addr) - 1) ],
+                              dbg () ) ],
+                        dbg () ) ) ) ) )
   in
   let body = Clet (VP.create clos', clos, body) in
-  let cache = cache in
   let fun_name = send_function_name arity result mode in
   let fun_args =
-    [obj, typ_val; tag, typ_int; cache, typ_addr]
+    [obj, typ_val; tag, typ_int; cache, typ_val; pos, typ_int]
     @ List.combine (List.tl args) arity
   in
   let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in

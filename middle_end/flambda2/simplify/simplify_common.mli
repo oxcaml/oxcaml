@@ -109,7 +109,12 @@ val update_exn_continuation_extra_args :
 (** Create a projection from a tuple (assumed to be a [size]-tuple of OCaml
     values). *)
 val project_tuple :
-  dbg:Debuginfo.t -> size:int -> field:int -> Simple.t -> Named.t
+  machine_width:Target_system.Machine_width.t ->
+  dbg:Debuginfo.t ->
+  size:int ->
+  field:int ->
+  Simple.t ->
+  Named.t
 
 (** Split a direct over-application into a full application followed by the
     application of the leftover arguments. *)

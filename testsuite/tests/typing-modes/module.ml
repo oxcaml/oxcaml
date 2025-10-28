@@ -42,7 +42,12 @@ let u =
 Line 10, characters 17-20:
 10 |     portable_use foo
                       ^^^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+       because it closes over the module "F" (at Line 7, characters 23-24)
+       which is "nonportable"
+       because it closes over the value "foo" (at Line 15, characters 12-15)
+       which is "nonportable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 let u =
@@ -278,7 +283,7 @@ Line 4, characters 19-23:
                        ^^^^
 Error: Modules do not match: sig end (* in a structure at local *)
      is not included in Empty (* in a structure at global *)
-     This escapes its region.
+     Got "local" but expected "global".
 |}]
 
 let _ =
@@ -301,7 +306,7 @@ Error: This application of the functor "F" is ill-typed.
             N : sig end (* in a structure at local *)
           is not included in
             Empty (* in a structure at global *)
-          This escapes its region.
+          Got "local" but expected "global".
 |}]
 
 (* [include] should rebase modalities relative to the current structure *)
@@ -515,6 +520,6 @@ module type S = sig
     @@ portable
 end
 [%%expect{|
-Uncaught exception: File "typing/env.ml", line 2124, characters 13-19: Assertion failed
+Uncaught exception: File "typing/env.ml", line 2154, characters 13-19: Assertion failed
 
 |}]

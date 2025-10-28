@@ -103,9 +103,10 @@ module S = struct
       mutable live : Reg.Set.t;
       mutable stack_offset : int;
       mutable irc_work_list : irc_work_list;
-      mutable ls_order : int;
-      mutable available_before : Reg_availability_set.t option;
-      mutable available_across : Reg_availability_set.t option;
+      mutable available_before : Reg_availability_set.t;
+      mutable available_across : Reg_availability_set.t;
+          (** The availability sets will be set to [Unreachable] prior to the
+              availability analysis having run. *)
       mutable phantom_available_before : Backend_var.Set.t option
     }
 

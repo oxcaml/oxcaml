@@ -58,7 +58,8 @@ and simple_or_prim =
   | Simple of Simple.t
   | Prim of expr_primitive
 
-val simple_untagged_int : int -> simple_or_prim
+val simple_untagged_int :
+  machine_width:Target_system.Machine_width.t -> int -> simple_or_prim
 
 val simple_i64 : Int64.t -> simple_or_prim
 

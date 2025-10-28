@@ -167,10 +167,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 (fun x -> Oval_char (O.obj x : char))) );
       ( Pident(Ident.create_local "print_int8"),
         Simple (Predef.type_int8,
-                (fun x -> Oval_int (O.obj x : int))) );
+                (fun x -> Oval_int8 (O.obj x : int))) );
       ( Pident(Ident.create_local "print_int16"),
         Simple (Predef.type_int16,
-                (fun x -> Oval_int (O.obj x : int))) );
+                (fun x -> Oval_int16 (O.obj x : int))) );
       ( Pident(Ident.create_local "print_int32"),
         Simple (Predef.type_int32,
                 (fun x -> Oval_int32 (O.obj x : int32))) );
@@ -415,6 +415,11 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                  in
                  Oval_lazy v
                end
+
+          | Tconstr (path, [_], _)
+            when Path.same path Predef.path_code ->
+            Oval_code (O.obj obj : CamlinternalQuote.Code.t)
+
           | Tconstr(path, ty_list, _) -> begin
               try
                 let decl = Env.find_type path env in
@@ -595,7 +600,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 find (row_fields row)
           | Tobject (_, _) ->
               Oval_stuff "<obj>"
-          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _  ->
+          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _
+          | Tquote _ | Tsplice _ | Tof_kind _ ->
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->
               tree_of_val (depth - 1) obj ty
