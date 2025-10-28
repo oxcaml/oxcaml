@@ -499,7 +499,7 @@ val hash : t @ local -> int
     @since 5.0 *)
 
 external seeded_hash :
-  int -> (t[@local_opt]) -> int @@ portable = "caml_string_hash" [@@noalloc]
+  int -> (t[@local_opt]) -> int = "caml_string_hash" [@@noalloc]
 (** A seeded hash function for strings, with the same output value as
     {!Hashtbl.seeded_hash}. This function allows this module to be passed as
     argument to the functor {!Hashtbl.MakeSeeded}.
