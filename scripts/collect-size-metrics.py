@@ -9,11 +9,8 @@ from pathlib import Path
 
 
 def collect_metrics(install_dir: str, output_dir: str, commit_hash: str,
-                    commit_message: str, verbose: bool = False) -> str:
-    """Collect file size metrics and write to CSV.
-
-    Returns the path to the generated CSV file.
-    """
+                    commit_message: str, verbose: bool = False) -> None:
+    """Collect file size metrics and write to CSV."""
     install_path = Path(install_dir)
 
     # Validate input directory exists
@@ -64,8 +61,6 @@ def collect_metrics(install_dir: str, output_dir: str, commit_hash: str,
         print("\nContents of generated metrics file:")
         with csv_path.open("r") as csv_file:
             print(csv_file.read())
-
-    return str(csv_path)
 
 
 def main() -> None:
