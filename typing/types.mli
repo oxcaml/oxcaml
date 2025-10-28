@@ -412,7 +412,6 @@ module With_bounds_types : sig
   val for_all : (type_expr -> info -> bool) -> t -> bool
   val map_with_key : (type_expr -> info -> type_expr * info) -> t -> t
   val length : t -> int
-  val fold : (type_expr -> info -> 'a -> 'a) -> t -> 'a -> 'a
 end
 
 val is_commu_ok: commutable -> bool
