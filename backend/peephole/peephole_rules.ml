@@ -211,6 +211,8 @@ let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
            && U.are_equal_regs
                 (Array.unsafe_get instr.arg 0)
                 (Array.unsafe_get instr.res 0) ->
+      (* CR-soon xclerc for xclerc: when the source and the destination are not
+         the same, we should downgrade the operation to a mere move. *)
       let to_remove =
         match op, imm with
         | Iadd, 0 | Isub, 0 | Ior, 0 | Ixor, 0 | Ilsl, 0 | Ilsr, 0 | Iasr, 0 ->
