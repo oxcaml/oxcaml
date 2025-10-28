@@ -1212,7 +1212,10 @@ let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
   match modalities with
   | No_modalities -> default_modalities
   | Modalities {crossings = []; _} ->
-    Typemode.transl_modalities ~maturity:Stable Immutable modalities
+    let modalities, _ =
+      Typemode.transl_modalities ~maturity:Stable Immutable modalities
+    in
+    modalities
   | Modalities {crossings = _ :: _; _} ->
       Misc.fatal_error "crossings as modalities are not yet implemented"
 
@@ -1432,7 +1435,7 @@ and approx_sig_items env ssg=
                 | Modalities { crossings = _ :: _; _ } ->
                     Misc.fatal_error "crossings on includes are not supported"
                 | Modalities { crossings = []; _ } ->
-                  let modalities =
+                  let modalities, _ =
                     Typemode.transl_modalities ~maturity:Stable Immutable moda
                   in
                   let recursive =
@@ -2012,7 +2015,11 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         let modalities =
           match sdesc.pval_modalities with
           | No_modalities -> sig_modalities
-          | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
+          | l ->
+              let modalities, _ =
+                Typemode.transl_modalities ~maturity:Stable Immutable l
+              in
+              modalities
         in
         let modalities = Mode.Modality.of_const modalities in
         let (tdesc, newenv) =
@@ -2415,8 +2422,8 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
          in
          let mmode =
            Option.map (fun smmode ->
-            smmode
-            |> Typemode.transl_mode_annots
+            let mmode, _ = Typemode.transl_mode_annots smmode in
+            mmode
             (* CR zqian: mode annotations on rec modules default to legacy for
             now. We can remove this workaround once [module type of] doesn't
             require zapping. *)
@@ -2975,9 +2982,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
   | Pmod_constraint(sarg, smty, smode) ->
       (* Only hold locks if coercion *)
       let hold_locks = Option.is_some smty in
-      let mode = smode
-        |> Typemode.transl_mode_annots
-        |> new_mode_var_from_annots
+      let mode, _ = Typemode.transl_mode_annots smode in
+      let mode = new_mode_var_from_annots mode
       in
       let arg, arg_shape =
         type_module_maybe_hold_locks ~alias ~hold_locks true funct_body
@@ -3492,12 +3498,8 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
             Modes { modes = List.map modality_to_mode modalities;
                     crossings = crossings;
                     loc = loc } in
-        let mode =
-          modes
-          |> Typemode.transl_alloc_mode
-          |> Alloc.of_const
-          |> alloc_as_value
-        in
+        let mode, _ = Typemode.transl_alloc_mode modes in
+        let mode = mode |> Alloc.of_const |> alloc_as_value in
         let modalities = infer_modalities ~loc ~env ~md_mode ~mode in
         let (desc, newenv) =
           Typedecl.transl_value_decl env ~modalities loc sdesc

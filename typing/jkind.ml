@@ -2153,7 +2153,7 @@ module Const = struct
       | Right_jkind _ -> raise ~loc:type_.ptyp_loc With_on_right
       | Left_jkind (transl_type, _) ->
         let type_ = transl_type type_ in
-        let modality =
+        let modality, _ =
           Typemode.transl_modalities ~maturity:Stable Immutable modalities
         in
         { layout = base.layout;

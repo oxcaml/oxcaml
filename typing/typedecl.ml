@@ -499,7 +499,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
               }
               | Unboxed_product -> raise(Error(loc, Unboxed_mutable_label))
          in
-         let modalities =
+         let modalities, _ =
           Typemode.transl_modalities ~maturity:Stable mut modalities
          in
          let arg = Ast_helper.Typ.force_poly arg in
@@ -540,7 +540,7 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc =
       transl_simple_type ~new_var_jkind env ?univars ~closed
         Mode.Alloc.Const.legacy arg.pca_type
     in
-    let gf =
+    let gf, _ =
       Typemode.transl_modalities ~maturity:Stable Immutable arg.pca_modalities
     in
     {ca_modalities = gf; ca_type = cty; ca_loc = arg.pca_loc}
@@ -3838,7 +3838,14 @@ let transl_value_decl env loc ~modalities valdecl =
   end;
   (* it's okay to reach into [valdecl] here instead of [~modalities], since
     modules do not have default crossings (meaning annotations are all we need) *)
-  let crossing = Typemode.transl_modalities_crossing valdecl.pval_modalities in
+  let _, cross_opt =
+    Typemode.transl_modalities ~maturity:Stable Immutable valdecl.pval_modalities
+  in
+  let crossing =
+    match cross_opt with
+    | Some crossing -> Mode.Crossing_bound.of_crossing crossing
+    | None -> Mode.Crossing_bound.default
+  in
   let ty = cty.ctyp_type in
   let v =
   match valdecl.pval_prim with

@@ -1104,5 +1104,9 @@ module type S = sig
     val set_max : t -> unit
 
     val join_lower : t -> Crossing.t -> unit
+
+    val join : t -> t -> unit
+
+    val of_crossing : Crossing.t -> t
   end
 end

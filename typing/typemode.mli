@@ -1,15 +1,13 @@
-(* CR modes: transl should probably take a [Parsetree.core_modes], with the
-   [Parsetree.crossings] part translated separately, and similar for
-   the modality transl functions below too *)
-
 (** Interpret mode syntax as mode annotation, where axes can be left unspecified *)
-val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t
+val transl_mode_annots :
+  Parsetree.modes -> Mode.Alloc.Const.Option.t * Mode.Crossing.t option
 
 val untransl_mode_annots : Mode.Alloc.Const.Option.t -> Parsetree.core_modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
     legacy if unspecified *)
-val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t
+val transl_alloc_mode :
+  Parsetree.modes -> Mode.Alloc.Const.t * Mode.Crossing.t option
 
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and
@@ -19,16 +17,12 @@ val transl_modalities :
   maturity:Language_extension.maturity ->
   Types.mutability ->
   Parsetree.modalities ->
-  Mode.Modality.Const.t
+  Mode.Modality.Const.t * Mode.Crossing.t option
 
 val let_mutable_modalities : Mode.Modality.Const.t
 
 (** The (default) modalities for an atomic mutable field *)
 val atomic_mutable_modalities : Mode.Modality.Const.t
-
-val transl_modalities_crossing : Parsetree.modalities -> Mode.Crossing_bound.t
-
-val transl_modes_crossing : Parsetree.modes -> Mode.Crossing_bound.t
 
 val untransl_modality : Mode.Modality.atom -> Parsetree.modality Location.loc
 

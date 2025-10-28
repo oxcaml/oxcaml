@@ -4733,9 +4733,18 @@ module Crossing_bound = struct
 
   let newvar_below upper = { (newvar ()) with upper = Some upper }
 
-  (* CR modes: this should raise an error if this would bring [lower] above the
-     stated upper bound. But annot information needs to be tracked first *)
-  let set_max t = t.lower <- Crossing.max
+  let join_lower t crossing =
+    t.lower <- Crossing.join t.lower crossing;
+    match t.upper with
+    | None -> ()
+    | Some upper -> if not (Crossing.le t.lower upper) then failwith "explode"
 
-  let join_lower t lower = t.lower <- Crossing.join t.lower lower
+  let join t { lower; upper } =
+    match upper with
+    | None -> join_lower t lower
+    | Some upper -> join_lower t upper
+
+  let set_max t = join_lower t Crossing.max
+
+  let of_crossing crossing = { upper = Some crossing; lower = crossing }
 end

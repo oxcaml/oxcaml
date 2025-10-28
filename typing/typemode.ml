@@ -355,9 +355,13 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   in
   { annots with forkable; yielding; contention; portability }
 
-let transl_mode_annots (modes : Parsetree.modes) : Alloc.Const.Option.t =
-  let annots =
-    match modes with No_modes -> [] | Modes { modes; _ } -> modes
+let transl_mode_annots (modes : Parsetree.modes) =
+  let annots, crossing =
+    match modes with
+    | No_modes -> [], None
+    | Modes { modes; crossings } ->
+      let crossing, _ = transl_mod_crossing_modifiers crossings in
+      modes, Some crossing
   in
   let step modes_so_far { txt = Parsetree.Mode txt; loc } =
     Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
@@ -369,7 +373,8 @@ let transl_mode_annots (modes : Parsetree.modes) : Alloc.Const.Option.t =
     then raise (Error (loc, Duplicated_axis (Mode, ax)))
     else Alloc.Const.Option.set ax (Some a) modes_so_far
   in
-  List.fold_left step Alloc.Const.Option.none annots |> default_mode_annots
+  ( List.fold_left step Alloc.Const.Option.none annots |> default_mode_annots,
+    crossing )
 
 let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) :
     Parsetree.core_modes =
@@ -615,11 +620,12 @@ let sort_dedup_modalities ~warn l =
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map fst
 
 let transl_modalities ~maturity mut (modalities : Parsetree.modalities) =
-  let modalities =
+  let modalities, crossing =
     match modalities with
-    | No_modalities -> []
-    | Modalities { modalities; _ } ->
-      List.map (transl_modality ~maturity) modalities
+    | No_modalities -> [], None
+    | Modalities { modalities; crossings } ->
+      let crossing, _ = transl_mod_crossing_modifiers crossings in
+      List.map (transl_modality ~maturity) modalities, Some crossing
   in
   (* axes listed in the order of implication. *)
   let modalities = sort_dedup_modalities ~warn:true modalities in
@@ -631,33 +637,20 @@ let transl_modalities ~maturity mut (modalities : Parsetree.modalities) =
   (* - mut_modalities is applied before explicit modalities.
      - explicit modalities can override mut_modalities.
      - For the same axis, later modalities overrides earlier modalities. *)
-  List.fold_left
-    (fun m (Atom (ax, a) as t) ->
-      let m = Const.set ax a m in
-      List.fold_left
-        (fun m (Atom (ax, a)) -> Const.set ax a m)
-        m (implied_modalities t))
-    mut_modalities modalities
+  ( List.fold_left
+      (fun m (Atom (ax, a) as t) ->
+        let m = Const.set ax a m in
+        List.fold_left
+          (fun m (Atom (ax, a)) -> Const.set ax a m)
+          m (implied_modalities t))
+      mut_modalities modalities,
+    crossing )
 
 let let_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:true
 
 let atomic_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:false
-
-let transl_modalities_crossing (modalities : Parsetree.modalities) =
-  match modalities with
-  | No_modalities -> Mode.Crossing_bound.default
-  | Modalities { crossings; _ } ->
-    let crossing, _ = transl_mod_crossing_modifiers crossings in
-    ({ upper = Some crossing; lower = crossing } : Mode.Crossing_bound.t)
-
-let transl_modes_crossing (modes : Parsetree.modes) =
-  match modes with
-  | No_modes -> Mode.Crossing_bound.default
-  | Modes { crossings; _ } ->
-    let crossing, _ = transl_mod_crossing_modifiers crossings in
-    ({ upper = Some crossing; lower = crossing } : Mode.Crossing_bound.t)
 
 let untransl_modalities mut t : Parsetree.core_modalities =
   t
@@ -667,8 +660,8 @@ let untransl_modalities mut t : Parsetree.core_modalities =
   |> List.map untransl_modality
 
 let transl_alloc_mode modes =
-  let opt = transl_mode_annots modes in
-  Alloc.Const.Option.value opt ~default:Alloc.Const.legacy
+  let opt, crossing = transl_mode_annots modes in
+  Alloc.Const.Option.value opt ~default:Alloc.Const.legacy, crossing
 
 (* Error reporting *)
 

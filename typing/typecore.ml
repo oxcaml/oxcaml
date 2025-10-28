@@ -1047,7 +1047,13 @@ let expect_mode_cross env ty (expected_mode : expected_mode) =
 (* CR modes: the API for interacting with [Crossing_bound.t]s should be
    improved, and this should be refactored accordingly *)
 let expect_mode_join_crossing (expected_mode : expected_mode) (crossing : Crossing_bound.t) =
-  Crossing_bound.join_lower expected_mode.crossing crossing.lower
+  Crossing_bound.join expected_mode.crossing crossing
+
+let replace_crossing (expected_mode : expected_mode) crossing_opt =
+  match crossing_opt with
+  | None -> expected_mode
+  | Some crossing ->
+      { expected_mode with crossing = Crossing_bound.newvar_below crossing }
 
 (** The expected mode for objects *)
 let mode_object = expect_mode_cross_jkind Env.empty Jkind.for_object mode_legacy
@@ -1058,7 +1064,8 @@ let mode_annots_from_pat pat =
     | Ppat_constraint (_, _, modes) -> modes
     | _ -> No_modes
   in
-  Typemode.transl_mode_annots modes
+  let m, _ = Typemode.transl_mode_annots modes in
+  m
 
 let apply_mode_annots ~loc ~env (m : Alloc.Const.Option.t) mode =
   let error axis =
@@ -2795,7 +2802,7 @@ and type_pat_aux
     let ty_elt, arg_sort =
       solve_Ppat_array ~refine:false loc penv mutability expected_ty
     in
-    let modalities =
+    let modalities, _ =
       Typemode.transl_modalities ~maturity:Stable mutability No_modalities
     in
     check_project_mutability ~loc ~env:!!penv Array_elements mutability
@@ -3313,7 +3320,7 @@ and type_pat_aux
       begin match sty with
       | Some sty ->
         let cty, ty, expected_ty' =
-          let type_modes = Typemode.transl_alloc_mode ms in
+          let type_modes, _ = Typemode.transl_alloc_mode ms in
           solve_Ppat_constraint tps loc !!penv type_modes sty expected_ty
         in
         let p =
@@ -4662,7 +4669,7 @@ let rec approx_type env sty =
       (* CR layouts v5: value requirement here to be relaxed *)
       if is_optional p then newvar Predef.option_argument_jkind
       else begin
-        let arg_mode = Typemode.transl_alloc_mode arg_mode in
+        let arg_mode, _ = Typemode.transl_alloc_mode arg_mode in
         let arg_ty =
           (* Polymorphic types will only unify with types that match all of their
            polymorphic parts, so we need to fully translate the type here
@@ -4675,7 +4682,7 @@ let rec approx_type env sty =
         newty (Tarrow ((p,marg,mret), arg_ty.ctyp_type, ret, commu_ok))
       end
   | Ptyp_arrow (p, arg_sty, sty, arg_mode, _) ->
-      let arg_mode = Typemode.transl_alloc_mode arg_mode in
+      let arg_mode, _ = Typemode.transl_alloc_mode arg_mode in
       let p = Typetexp.transl_label p (Some arg_sty) in
       let arg =
         if is_optional p
@@ -4704,7 +4711,7 @@ let type_pattern_approx env spat ty_expected =
       let inferred_ty =
         match sty with
         | {ptyp_desc=Ptyp_poly _} ->
-          let arg_type_mode = Typemode.transl_alloc_mode arg_type_mode in
+          let arg_type_mode, _ = Typemode.transl_alloc_mode arg_type_mode in
           let inferred_ty =
             Typetexp.transl_simple_type ~new_var_jkind:Any env ~closed:false
               arg_type_mode sty
@@ -6779,12 +6786,15 @@ and type_expect_
   | Pexp_constraint (sarg, None, modes) ->
       (* CR modes: the stored crossings in [modes] should be extracted and
          used as a [Crossing_bound.t] upper bound *)
-      let modes = Typemode.transl_mode_annots modes in
+      let modes, crossing = Typemode.transl_mode_annots modes in
       let expected_mode = type_expect_mode ~loc ~env ~modes expected_mode in
-      let exp = type_expect env expected_mode sarg (mk_expected ty_expected ?explanation) in
+      let exp_mode_new_crossing = replace_crossing expected_mode crossing in
+      let exp = type_expect env exp_mode_new_crossing
+                  sarg (mk_expected ty_expected ?explanation) in
+      expect_mode_join_crossing expected_mode exp_mode_new_crossing.crossing;
       { exp with exp_loc = loc }
   | Pexp_constraint (sarg, Some sty, modes) ->
-      let modes = Typemode.transl_mode_annots modes in
+      let modes, crossing = Typemode.transl_mode_annots modes in
       let (ty, extra_cty) =
         let alloc_mode =
           Mode.Alloc.Const.Option.value modes ~default:Mode.Alloc.Const.legacy
@@ -6797,7 +6807,10 @@ and type_expect_
         Builtin_attributes.error_message_attr sexp.pexp_attributes in
       let explanation = Option.map (fun msg -> Error_message_attr msg)
                           error_message_attr_opt in
-      let arg = type_argument ~overwrite ?explanation env expected_mode sarg ty (instance ty) in
+      let exp_mode_new_crossing = replace_crossing expected_mode crossing in
+      let arg = type_argument ~overwrite ?explanation env
+                  exp_mode_new_crossing sarg ty (instance ty) in
+      expect_mode_join_crossing expected_mode exp_mode_new_crossing.crossing;
       rue {
         exp_desc = arg.exp_desc;
         exp_loc = arg.exp_loc;
@@ -8026,7 +8039,9 @@ and type_function
           (* if this is the last parameter before the equal sign, then [ret_mode_annotation]
             applies to the RHS of the equal sign. This is before [split_function_ty] which
             enters new region. *)
-          let annots = Typemode.transl_mode_annots body_constraint.ret_mode_annotations in
+          let annots, _ =
+            Typemode.transl_mode_annots body_constraint.ret_mode_annotations
+          in
           annots
         | _ :: _ -> Alloc.Const.Option.none
       in
@@ -8215,8 +8230,8 @@ and type_function
       let { ret_type_constraint; mode_annotations; ret_mode_annotations } =
         body_constraint
       in
-      let mode = Typemode.transl_mode_annots mode_annotations in
-      let ret_mode = Typemode.transl_mode_annots ret_mode_annotations in
+      let mode, _ = Typemode.transl_mode_annots mode_annotations in
+      let ret_mode, _ = Typemode.transl_mode_annots ret_mode_annotations in
       let type_mode =
         match ret_mode_annotations with
         | Modes {crossings = _ :: _; _} ->
@@ -10311,7 +10326,7 @@ and type_generic_array
     if Types.is_mutable mutability then Predef.type_array
     else Predef.type_iarray
   in
-  let modalities =
+  let modalities, _ =
     Typemode.transl_modalities ~maturity:Stable mutability No_modalities in
   let argument_mode = mode_modality modalities array_mode in
   let jkind, elt_sort = Jkind.for_array_element_sort () in
