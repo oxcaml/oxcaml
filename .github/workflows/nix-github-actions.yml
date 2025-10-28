@@ -24,8 +24,8 @@ jobs:
         name: Generate Nix Matrix
         run: |
           set -Eeuo pipefail
-          matrix="$(nix eval --json '.#githubActions.matrix')"
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo -n 'matrix=' >> "$GITHUB_OUTPUT"
+          nix eval --json '.#githubActions.matrix' | tee -a "$GITHUB_OUTPUT"
 
   nix-build:
     name: ${{ matrix.name }} (${{ matrix.system }})
