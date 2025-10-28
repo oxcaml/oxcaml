@@ -857,7 +857,7 @@ module Layout_and_axes = struct
       when Mod_bounds.is_max_within_set t.mod_bounds
              (Axis_set.complement skip_axes) ->
       { t with with_bounds = No_with_bounds }, Sufficient_fuel
-    | _ -> (
+    | _ ->
       (* Sadly, it seems hard (impossible?) to be sure to expand all types
          here without using a fuel parameter to stop infinite regress. Here
          is a nasty case:
@@ -1237,9 +1237,9 @@ module Layout_and_axes = struct
           (Axis_set.complement skip_axes)
           (With_bounds.to_list t.with_bounds)
       in
-      match With_bounds.length with_bounds > 10 with
-      | false -> { t with mod_bounds; with_bounds }, fuel_status
-      | true ->
+      if With_bounds.length with_bounds <= 10
+      then { t with mod_bounds; with_bounds }, fuel_status
+      else
         (* If there are more than 10 with-bounds, we assume they're all max and
            drop them. This is an optimization unnecessary for correctness. In
            practice, this optimization doesn't seem to hinder inference much. We
@@ -1265,7 +1265,7 @@ module Layout_and_axes = struct
         let mod_bounds =
           Mod_bounds.set_max_in_set mod_bounds relevant_axes_in_with_bounds
         in
-        { t with mod_bounds; with_bounds = No_with_bounds }, Ran_out_of_fuel)
+        { t with mod_bounds; with_bounds = No_with_bounds }, Ran_out_of_fuel
 end
 
 (*********************************)
