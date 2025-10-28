@@ -23,9 +23,10 @@ type t =
     entries : Dwarf_4_range_list_entry.t list
   }
 
-(* Same note as in location_list.ml. *)
-let sort entries =
-  List.sort Dwarf_4_range_list_entry.compare_ascending_vma entries
+(* Don't sort range list entries. With base address selection entries (used with
+   function sections), each base address selection entry must immediately
+   precede its corresponding range entry, so sorting would break the output. *)
+let sort entries = entries
 
 let create ~range_list_entries =
   { name = Asm_label.create (DWARF Debug_ranges);
