@@ -63,8 +63,8 @@ jobs:
           - name: metrics_collection
             config: --enable-middle-end=flambda2
             os: ubuntu-latest
-            build_ocamlparam: ''
-            ocamlparam: '_,O3=1'
+            build_ocamlparam: '_,dump-dir=_profile_csv,dump-into-csv=1,profile=1'
+            ocamlparam: '_,O3=1,dump-dir=_profile_csv,dump-into-csv=1,profile=1'
 
           - name: flambda2_frame_pointers_oclassic_polling
             config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
