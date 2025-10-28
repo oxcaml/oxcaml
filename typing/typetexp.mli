@@ -135,7 +135,29 @@ val transl_type_param:
    the level defaults to the current level. The jkind_lr is the jkind to
    use if no annotation is provided. *)
 
-val get_type_param_jkind: Path.t -> Parsetree.core_type -> jkind_lr
+module Default_jkind_bound : sig
+  (** [t] is used to define what jkind bound an unannotated type parameter
+      should get. *)
+  type t =
+    | Legacy
+      (** The parameter should get the legacy bound (value) for backwards-
+          compatibility. *)
+    | Any
+      (** The parameter should get the loosest bound (any) because backwards-
+          compatibility is a non-issue on the given declaration. *)
+
+  (** Create a fresh jkind that represents the given bound. *)
+  val fresh_jkind : path:Path.t -> t -> _ jkind
+end
+
+(** [default_bound] defines the jkind bound that is given if the parameter has
+    no explicit jkind annotation.  *)
+val get_type_param_jkind :
+  Path.t ->
+  Parsetree.core_type ->
+  default_bound:Default_jkind_bound.t ->
+  jkind_lr
+
 val get_type_param_name: Parsetree.core_type -> string option
 
 exception Already_bound
