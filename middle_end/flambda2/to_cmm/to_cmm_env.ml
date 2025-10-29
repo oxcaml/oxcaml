@@ -146,6 +146,10 @@ type effect_stage =
   | Effect of Variable.t
   | Coeffect_only of Variable.Set.t
 
+type validity_stage =
+  | Control_flow_point of Variable.t
+  | Depend_on_control_flow of Variable.Set.t
+
 type t =
   { (* Global information.
 
@@ -181,6 +185,8 @@ type t =
     inline_once_aliases : Variable.t Variable.Map.t;
     (* Maps for `Must_inline_once` variable that end up aliased. *)
     effect_stages : effect_stage list;
+    (* Stages of let-bindings, most recent at the head. *)
+    validity_stages : validity_stage list;
     (* Stages of let-bindings, most recent at the head. *)
     symbol_inits : Symbol_inits.t
         (* Symbol initialization expressions, indexed by the variable used as
@@ -244,22 +250,39 @@ let [@ocamlformat "disable"] print_binding (type a) ppf
     Backend_var.With_provenance.print cmm_var
     print_bound_expr bound_expr
 
-let _print_any_binding ppf (Binding binding) = print_binding ppf binding
+let print_any_binding ppf (Binding binding) = print_binding ppf binding
 
-let print_stage ppf = function
+let print_effect_stage ppf = function
   | Effect v -> Format.fprintf ppf "(Effect %a)" Variable.print v
   | Coeffect_only s ->
     Format.fprintf ppf "(Coeffect_only %a)" Variable.Set.print s
 
-let print_stages ppf stages =
+let print_effect_stages ppf stages =
   let pp_sep ppf () = Format.fprintf ppf "@," in
   Format.fprintf ppf "(@[<v>%a@])"
-    (Format.pp_print_list ~pp_sep print_stage)
+    (Format.pp_print_list ~pp_sep print_effect_stage)
     stages
 
+let print_validity_stage ppf = function
+  | Control_flow_point v ->
+    Format.fprintf ppf "(Control_flow %a)" Variable.print v
+  | Depend_on_control_flow s ->
+    Format.fprintf ppf "(Depend_on_control_flow %a)" Variable.Set.print s
+
+let print_validity_stages ppf stages =
+  let pp_sep ppf () = Format.fprintf ppf "@," in
+  Format.fprintf ppf "(@[<v>%a@])"
+    (Format.pp_print_list ~pp_sep print_validity_stage)
+    stages
+
+let print_bindings fmt map = Variable.Map.print print_any_binding fmt map
+
 let print ppf t =
-  Format.fprintf ppf "@[<hov 1>(@[<hov 1>(effect_stages %a)@]@ )@]" print_stages
-    t.effect_stages
+  Format.fprintf ppf
+    "@[<hov 1>(@[<hov 1>(bindings %a)@]@ @[<hov 1>(effect_stages %a)@]@ @[<hov \
+     1>(validity_stages %a)@])@]"
+    print_bindings t.bindings print_effect_stages t.effect_stages
+    print_validity_stages t.validity_stages
 
 (* Creation *)
 
@@ -275,6 +298,7 @@ let create offsets functions_info ~trans_prim ~return_continuation
     trans_prim;
     inlined_debuginfo = Inlined_debuginfo.none;
     effect_stages = [];
+    validity_stages = [];
     bindings = Variable.Map.empty;
     inline_once_aliases = Variable.Map.empty;
     vars_extra = Variable.Map.empty;
@@ -607,6 +631,18 @@ let split_complex_binding ~env ~res (binding : complex binding) =
            the primitive application to substitute it."
           Flambda_primitive.Without_args.print prim Ece.print prim_effects
     in
+    let () =
+      match Ece.validity prim_effects with
+      | Always_valid | Valid_after_some_branch -> ()
+      | Control_flow_point ->
+        (* primitives should never have implicit control flow points, this is
+           more of an internal sanity check *)
+        Misc.fatal_errorf
+          "Primitive %a was marked as `must_inline` but it contains (implicit) \
+           control flow points. This woud lead to errors when moving it down \
+           across expressions whose validity may depend on it."
+          Flambda_primitive.Without_args.print prim Ece.print prim_effects
+    in
     let split_binding =
       { order = binding.order;
         effs = prim_effects;
@@ -634,6 +670,15 @@ let rec add_binding_to_env ?extra env res var (Binding binding as b) =
     in
     { env with bindings; vars; vars_extra }
   in
+  let env, res = add_to_effect_stages env res var (Binding binding) in
+  let env, res = add_to_validity_stages env res var (Binding binding) in
+  if Flambda_features.debug_flambda2 ()
+  then
+    Format.eprintf "@[<v 2>add_binding:@ var: %a@ binding: %a@ env: %a@\n@."
+      Variable.print var print_binding binding print env;
+  env, res
+
+and add_to_effect_stages env res var (Binding binding) =
   let classification =
     To_cmm_effects.classify_by_effects_and_coeffects binding.effs
   in
@@ -676,6 +721,37 @@ let rec add_binding_to_env ?extra env res var (Binding binding as b) =
           Coeffect_only (Variable.Set.singleton var) :: env.effect_stages
       in
       { env with effect_stages }, res)
+
+and add_to_validity_stages env res var (Binding binding) =
+  let inline : _ inline = binding.inline in
+  match inline with
+  | Must_inline_and_duplicate -> (
+    match Ece.validity binding.effs with
+    | Validity.Always_valid | Validity.Valid_after_some_branch -> env, res
+    | Validity.Control_flow_point ->
+      (* assuming that no primitive (or top-level operation) marked as
+         must_inline contains a control flow point, this means we must split the
+         binding because one of the arguments contains a control flow point *)
+      let env, res, _ = split_in_env env res var (binding : complex binding) in
+      env, res)
+  | May_inline_once | Must_inline_once | Do_not_inline -> (
+    match Ece.validity binding.effs with
+    | Validity.Always_valid -> env, res
+    | Validity.Valid_after_some_branch ->
+      let validity_stages =
+        match env.validity_stages with
+        | Depend_on_control_flow vars :: stages ->
+          Depend_on_control_flow (Variable.Set.add var vars) :: stages
+        | [] | Control_flow_point _ :: _ ->
+          Depend_on_control_flow (Variable.Set.singleton var)
+          :: env.validity_stages
+      in
+      { env with validity_stages }, res
+    | Validity.Control_flow_point ->
+      ( { env with
+          validity_stages = Control_flow_point var :: env.validity_stages
+        },
+        res ))
 
 (* CR gbury: find a better name for this function *)
 and split_in_env env res var binding =
@@ -753,7 +829,11 @@ let bind_variable_to_primitive = bind_variable_with_decision
 (* Variable lookup (for potential inlining) *)
 
 let will_inline_simple env res
-    { effs; bound_expr = Simple { cmm_expr; free_vars }; _ } =
+    { effs; bound_expr = Simple { cmm_expr; free_vars }; cmm_var; _ } =
+  if Flambda_features.debug_flambda2 ()
+  then
+    Format.eprintf "inline_simple: %a@." Backend_var.With_provenance.print
+      cmm_var;
   { env; res; expr = { cmm = cmm_expr; free_vars; effs } }
 
 let will_inline_complex env res { effs; bound_expr; _ } =
@@ -770,7 +850,23 @@ let will_inline_complex env res { effs; bound_expr; _ } =
     let cmm_expr, res = rebuild_prim ~dbg ~env ~res prim cmm_args in
     { env; res; expr = { cmm = cmm_expr; free_vars; effs } }
 
-let will_not_inline_simple env res { cmm_var; bound_expr = Simple _; _ } =
+let will_not_inline_simple env res v
+    ({ cmm_var; bound_expr = Simple _; _ } as b) =
+  if Flambda_features.debug_flambda2 ()
+  then
+    Format.eprintf "not_inline_simple: %a@." Backend_var.With_provenance.print
+      cmm_var;
+  (* replace the binding "inline" field with a `Do_not_inline` to ensure that it
+     is effectively flushed at the next flush, even if it is a branching
+     point. *)
+  let env =
+    { env with
+      bindings =
+        Variable.Map.add v
+          (Binding { b with inline = Do_not_inline })
+          env.bindings
+    }
+  in
   let var = Backend_var.With_provenance.var cmm_var in
   let free_vars = Backend_var.Set.singleton var in
   { env;
@@ -782,7 +878,8 @@ let split_and_inline env res var binding =
   let env, res, split_binding = split_in_env env res var binding in
   will_inline_complex env res split_binding
 
-let pop_if_in_top_stage ?consider_inlining_effectful_expressions env var =
+let pop_if_in_top_effect_stage ?consider_inlining_effectful_expressions env var
+    =
   match env.effect_stages with
   | [] -> None
   | Effect var_from_stage :: prev_stages ->
@@ -819,6 +916,25 @@ let pop_if_in_top_stage ?consider_inlining_effectful_expressions env var =
       Some { env with effect_stages }
     else None
 
+let pop_if_in_top_validity_stage env var =
+  match env.validity_stages with
+  | [] -> None
+  | Control_flow_point var_from_stage :: prev_stages ->
+    if Variable.equal var var_from_stage
+    then Some { env with validity_stages = prev_stages }
+    else None
+  | Depend_on_control_flow vars_from_stage :: prev_stages ->
+    if Variable.Set.mem var vars_from_stage
+    then
+      let new_vars_in_stage = Variable.Set.remove var vars_from_stage in
+      let validity_stages =
+        if Variable.Set.is_empty new_vars_in_stage
+        then prev_stages
+        else Depend_on_control_flow new_vars_in_stage :: prev_stages
+      in
+      Some { env with validity_stages }
+    else None
+
 type substitution =
   | Not_possible
   | Possible of t
@@ -829,15 +945,26 @@ let can_substitute_wrt_effects ?consider_inlining_effectful_expressions env var
   | Pure | Generative_immutable -> Possible env
   | Effect | Coeffect_only -> (
     match
-      pop_if_in_top_stage ?consider_inlining_effectful_expressions env var
+      pop_if_in_top_effect_stage ?consider_inlining_effectful_expressions env
+        var
     with
     | None -> Not_possible
     | Some env -> Possible env)
 
+let can_substitute_wrt_validity env var binding =
+  match Ece.validity binding.effs with
+  | Validity.Always_valid -> Possible env
+  | Validity.Valid_after_some_branch | Validity.Control_flow_point -> (
+    match pop_if_in_top_validity_stage env var with
+    | None -> Not_possible
+    | Some env -> Possible env)
+
 let can_substitute ?consider_inlining_effectful_expressions env var binding =
-  (* TODO: also check ordering of control flow dependencies *)
-  can_substitute_wrt_effects ?consider_inlining_effectful_expressions env var
-    binding
+  match can_substitute_wrt_validity env var binding with
+  | Not_possible -> Not_possible
+  | Possible env ->
+    can_substitute_wrt_effects ?consider_inlining_effectful_expressions env var
+      binding
 
 let inline_variable ?consider_inlining_effectful_expressions env res var =
   let var = resolve_alias env var in
@@ -855,7 +982,7 @@ let inline_variable ?consider_inlining_effectful_expressions env res var =
     )
   | Binding binding -> (
     match binding.inline with
-    | Do_not_inline -> will_not_inline_simple env res binding
+    | Do_not_inline -> will_not_inline_simple env res var binding
     | Must_inline_and_duplicate -> split_and_inline env res var binding
     | Must_inline_once -> (
       let env = remove_binding env var in
@@ -866,15 +993,15 @@ let inline_variable ?consider_inlining_effectful_expressions env res var =
         (* Even though the whole binding cannot be substituted (because other
            expressions have been substituted in the defining expr, e.g. as
            arguments), the top-level primitive application of the complex
-           binding can be substituted, and thus we need to split the binding and
-           substitute only the application of the primitive. *)
+           binding can and must be substituted, and thus we need to split the
+           binding and substitute only the application of the primitive. *)
         split_and_inline env res var binding
       | Possible env -> will_inline_complex env res binding)
     | May_inline_once -> (
       match
         can_substitute ?consider_inlining_effectful_expressions env var binding
       with
-      | Not_possible -> will_not_inline_simple env res binding
+      | Not_possible -> will_not_inline_simple env res var binding
       | Possible env ->
         let env = remove_binding env var in
         will_inline_simple env res binding))
@@ -1033,9 +1160,13 @@ let flush_delayed_lets ~mode env res =
      loops. CR gbury: this is now done by creating a binding with the inline
      status `Must_inline_and_duplicate`, so the caller of `to_cmm_env` has to
      make that decision of whether to substitute inside loops. *)
+  if Flambda_features.debug_flambda2 ()
+  then Format.eprintf "** Flushing (start) ***@\nenv: %a@\n@." print env;
   let res = ref res in
   let bindings_to_flush = ref M.empty in
   let flush (Binding b as binding) =
+    if Flambda_features.debug_flambda2 ()
+    then Format.eprintf "flushing binding %a@." print_binding b;
     if M.mem b.order !bindings_to_flush
     then
       Misc.fatal_errorf "Duplicate order for bindings when flushing: %a = %a"
@@ -1067,16 +1198,23 @@ let flush_delayed_lets ~mode env res =
           | Branching_point | Entering_loop -> Some split_binding)
         | Must_inline_once -> (
           match
-            mode, To_cmm_effects.classify_by_effects_and_coeffects b.effs
+            ( mode,
+              To_cmm_effects.classify_by_effects_and_coeffects b.effs,
+              Ece.validity b.effs )
           with
           (* when not entering a loop, and with pure/generative effects at most,
              we can wait to split the binding, so that we can have a chance to
              try and push the arguments down the branch (otherwise, when we
              split, the arguments of the splittable binding would be flushed
              before the branch in control flow). *)
-          | Branching_point, (Pure | Generative_immutable) -> Some binding
+          | ( Branching_point,
+              (Pure | Generative_immutable),
+              (Always_valid | Valid_after_some_branch) ) ->
+            Some binding
           | ( (Branching_point | Entering_loop | Flush_everything),
-              (Pure | Generative_immutable | Coeffect_only | Effect) ) -> (
+              (Pure | Generative_immutable | Coeffect_only | Effect),
+              (Always_valid | Valid_after_some_branch | Control_flow_point) )
+            -> (
             let r, split_res = split_complex_binding ~env ~res:!res b in
             res := r;
             let split_binding =
@@ -1092,28 +1230,66 @@ let flush_delayed_lets ~mode env res =
               None
             | Branching_point | Entering_loop -> Some split_binding))
         | May_inline_once -> (
-          match To_cmm_effects.classify_by_effects_and_coeffects b.effs with
+          match
+            ( To_cmm_effects.classify_by_effects_and_coeffects b.effs,
+              Ece.validity b.effs )
+          with
           (* Unless entering a loop, we do not flush pure/generative_immutable
              bindings that can be inlined, ensuring that the corresponding
              expressions are sunk down as far as possible, including past
-             control flow branching points. *)
-          | Pure | Generative_immutable -> (
+             control flow branching points.
+
+             Note that his allows expressions that are `Valid_after_some_branch`
+             to be moved down across control flow points. This is safe because
+             once an operation/expression becomes valid (after a control flow
+             point), it can never lose that validity. At worst a load that was
+             **before** a length check may be moved down after it, transforming
+             a segfault into a raise at execution, which seems okay. *)
+          | ( (Pure | Generative_immutable),
+              (Always_valid | Valid_after_some_branch) ) -> (
             match mode with
             | Flush_everything | Entering_loop ->
               flush binding;
               None
             | Branching_point -> Some binding)
-          | Coeffect_only | Effect ->
+          | ( (Pure | Generative_immutable | Coeffect_only | Effect),
+              (Always_valid | Valid_after_some_branch | Control_flow_point) ) ->
             flush binding;
             None))
       env.bindings
   in
   let flush = flush_bindings !bindings_to_flush env.symbol_inits in
+  let validity_stages =
+    let control_flow_dep_variables =
+      Variable.Map.fold
+        (fun var (Binding binding) acc ->
+          match Ece.validity binding.effs with
+          | Validity.Always_valid -> acc
+          | Validity.Valid_after_some_branch -> (
+            match binding.inline with
+            | Must_inline_and_duplicate -> acc
+            | Must_inline_once | May_inline_once -> Variable.Set.add var acc
+            | Do_not_inline ->
+              Misc.fatal_errorf "Non_inlinable binding must be flushed")
+          | Validity.Control_flow_point ->
+            Misc.fatal_errorf
+              "Expressions that include a control flow points (potentially \
+               implicitly, such as function calls) should always be flushed to \
+               avoid crossing another control flow point.")
+        bindings_to_keep Variable.Set.empty
+    in
+    if Variable.Set.is_empty control_flow_dep_variables
+    then []
+    else [Depend_on_control_flow control_flow_dep_variables]
+  in
   let env =
     { env with
       effect_stages = [];
+      validity_stages;
       bindings = bindings_to_keep;
       symbol_inits = Backend_var.Map.empty
     }
   in
+  if Flambda_features.debug_flambda2 ()
+  then Format.eprintf "/// Flushing (end) ///@\nenv: %a@\n@." print env;
   flush, env, !res

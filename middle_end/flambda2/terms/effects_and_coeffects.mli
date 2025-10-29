@@ -43,3 +43,6 @@ val read : t
 
 (** Join two effects, coeffects and placements. *)
 val join : t -> t -> t
+
+(** Projection *)
+val validity : t -> Validity.t
