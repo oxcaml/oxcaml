@@ -369,10 +369,13 @@ let flush_all () =
         iter l
   in iter (out_channels_list ())
 
-external unsafe_output : out_channel -> bytes @ local -> int -> int -> unit @@ portable
-                       = "caml_ml_output_bytes"
-external unsafe_output_string : out_channel -> string @ local -> int -> int -> unit @@ portable
-                              = "caml_ml_output"
+external unsafe_output : out_channel -> bytes @ local -> int -> int -> unit
+  @@ portable
+  = "caml_ml_output_bytes"
+
+external unsafe_output_string :
+  out_channel -> string @ local -> int -> int -> unit @@ portable
+  = "caml_ml_output"
 
 external output_char : out_channel -> char -> unit @@ portable = "caml_ml_output_char"
 
