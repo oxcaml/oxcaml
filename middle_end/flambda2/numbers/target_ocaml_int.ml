@@ -505,8 +505,9 @@ let div_unsigned t1 t2 =
   | Int31 _, (Int32 _ | Int63 _)
   | Int32 _, (Int31 _ | Int63 _)
   | Int63 _, (Int31 _ | Int32 _) ->
-    Misc.fatal_errorf "Target_ocaml_int.div: incompatible types %a and %a" print
-      t1 print t2
+    Misc.fatal_errorf
+      "Target_ocaml_int.div_unsigned: incompatible types %a and %a" print t1
+      print t2
 
 let mod_ t1 t2 =
   match t1, t2 with
@@ -527,8 +528,9 @@ let mod_unsigned t1 t2 =
   | Int31 _, (Int32 _ | Int63 _)
   | Int32 _, (Int31 _ | Int63 _)
   | Int63 _, (Int31 _ | Int32 _) ->
-    Misc.fatal_errorf "Target_ocaml_int.mod_: incompatible types %a and %a"
-      print t1 print t2
+    Misc.fatal_errorf
+      "Target_ocaml_int.mod_unsigned: incompatible types %a and %a" print t1
+      print t2
 
 let and_ t1 t2 =
   match t1, t2 with
