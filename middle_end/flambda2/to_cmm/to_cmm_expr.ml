@@ -746,10 +746,24 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
       Let.print let_expr
 
 and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
+  let make_phantom_let env res bound_var defining_expr ~body =
+    let var = Bound_var.var bound_var in
+    let debug_uid = Bound_var.debug_uid bound_var in
+    let env, backend_var_with_prov =
+      To_cmm_env.add_phantom_let_binding env var ~debug_uid
+    in
+    let wrap, env, res =
+      Env.flush_delayed_lets ~mode:Flush_everything env res
+    in
+    let body_cmm, free_vars, symbol_inits, res = expr env res body in
+    let cmm =
+      C.make_phantom_let backend_var_with_prov defining_expr body_cmm
+    in
+    let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
+    cmm, free_vars, symbol_inits, res
+  in
   match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
   | Singleton bound_var, Simple simple ->
-    (* Translate Simple to Cphantom_var, Cphantom_const_int, or
-       Cphantom_const_symbol *)
     Simple.pattern_match' simple
       ~var:(fun var ~coercion:_ ->
         let To_cmm_env.{ expr = { cmm; _ }; _ } =
@@ -757,85 +771,45 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
         in
         match cmm with
         | Cvar backend_var ->
-          let var = Bound_var.var bound_var in
-          let debug_uid = Bound_var.debug_uid bound_var in
-          let env, backend_var_with_prov =
-            To_cmm_env.add_phantom_let_binding env var ~debug_uid
-          in
-          let defining_expr = Some (Cmm.Cphantom_var backend_var) in
-          let wrap, env, res =
-            Env.flush_delayed_lets ~mode:Flush_everything env res
-          in
-          let body_cmm, free_vars, symbol_inits, res = expr env res body in
-          let cmm =
-            C.make_phantom_let backend_var_with_prov defining_expr body_cmm
-          in
-          let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
-          cmm, free_vars, symbol_inits, res
+          make_phantom_let env res bound_var
+            (Some (Cmm.Cphantom_var backend_var))
+            ~body
         | _ -> expr env res body)
       ~symbol:(fun sym ~coercion:_ ->
-        let var = Bound_var.var bound_var in
-        let debug_uid = Bound_var.debug_uid bound_var in
-        let env, backend_var_with_prov =
-          To_cmm_env.add_phantom_let_binding env var ~debug_uid
-        in
         let sym_name = Symbol.linkage_name_as_string sym in
-        let defining_expr = Some (Cmm.Cphantom_const_symbol sym_name) in
-        let wrap, env, res =
-          Env.flush_delayed_lets ~mode:Flush_everything env res
-        in
-        let body_cmm, free_vars, symbol_inits, res = expr env res body in
-        let cmm =
-          C.make_phantom_let backend_var_with_prov defining_expr body_cmm
-        in
-        let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
-        cmm, free_vars, symbol_inits, res)
+        make_phantom_let env res bound_var
+          (Some (Cmm.Cphantom_const_symbol sym_name))
+          ~body)
       ~const:(fun const ->
         match Reg_width_const.descr const with
         | Tagged_immediate i ->
-          let var = Bound_var.var bound_var in
-          let debug_uid = Bound_var.debug_uid bound_var in
-          let env, backend_var_with_prov =
-            To_cmm_env.add_phantom_let_binding env var ~debug_uid
-          in
           let machine_width = Target_system.Machine_width.Sixty_four in
           let targetint_32_64 = Target_ocaml_int.to_targetint machine_width i in
           let targetint =
             Targetint.of_int64 (Targetint_32_64.to_int64 targetint_32_64)
           in
-          let defining_expr = Some (Cmm.Cphantom_const_int targetint) in
-          let wrap, env, res =
-            Env.flush_delayed_lets ~mode:Flush_everything env res
-          in
-          let body_cmm, free_vars, symbol_inits, res = expr env res body in
-          let cmm =
-            C.make_phantom_let backend_var_with_prov defining_expr body_cmm
-          in
-          let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
-          cmm, free_vars, symbol_inits, res
+          make_phantom_let env res bound_var
+            (Some (Cmm.Cphantom_const_int targetint))
+            ~body
         | _ -> expr env res body)
   | ( Singleton bound_var,
       Prim (Variadic (Make_block (block_kind, _mut, _alloc_mode), args), _dbg) )
-    -> (
-    (* Translate Make_block to Cphantom_block *)
-    (* Extract tag from block_kind *)
+    ->
     let tag_opt =
       match (block_kind : P.Block_kind.t) with
       | Values (tag, _) -> Some (Tag.Scannable.to_int tag)
       | Naked_floats -> Some (Tag.to_int Tag.double_array_tag)
       | Mixed (tag, _) -> Some (Tag.Scannable.to_int tag)
     in
-    match tag_opt with
+    (match tag_opt with
     | None -> expr env res body
-    | Some tag -> (
+    | Some tag ->
       let rec translate_args args =
         match args with
         | [] -> Some []
         | arg :: rest -> (
           match Simple.must_be_var arg with
           | Some (var, _coercion) -> (
-            (* Look up the variable in the environment to see if it's bound to
-               Cvar *)
             let To_cmm_env.{ expr = { cmm; _ }; _ } =
               C.simple ~dbg:Debuginfo.none env res (Simple.var var)
             in
@@ -844,40 +818,17 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
               match translate_args rest with
               | Some rest_vars -> Some (backend_var :: rest_vars)
               | None -> None)
-            | _ ->
-              (* XXX we need to do better here. For example if the variable we
-                 want is bound to the result of a function application, we'll
-                 hit this case... *)
-              None)
+            | _ -> None)
           | None -> None)
       in
       match translate_args args with
-      | Some var_args ->
-        let var = Bound_var.var bound_var in
-        let debug_uid = Bound_var.debug_uid bound_var in
-        (* Add the phantom let binding to the environment so it can be
-           referenced *)
-        let env, backend_var_with_prov =
-          To_cmm_env.add_phantom_let_binding env var ~debug_uid
-        in
-        let defining_expr =
-          Some (Cmm.Cphantom_block { tag; fields = var_args })
-        in
-        let wrap, env, res =
-          Env.flush_delayed_lets ~mode:Flush_everything env res
-        in
-        let body_cmm, free_vars, symbol_inits, res = expr env res body in
-        let cmm =
-          C.make_phantom_let backend_var_with_prov defining_expr body_cmm
-        in
-        let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
-        cmm, free_vars, symbol_inits, res
-      | None ->
-        (* Cannot translate - just skip the phantom let *)
-        expr env res body))
+      | Some fields ->
+        make_phantom_let env res bound_var
+          (Some (Cmm.Cphantom_block { tag; fields }))
+          ~body
+      | None -> expr env res body)
   | ( Singleton bound_var,
       Prim (Unary (Block_load { kind = _; mut = _; field }, arg), _dbg) ) -> (
-    (* Translate Block_load to Cphantom_read_field *)
     match Simple.must_be_var arg with
     | Some (var, _coercion) ->
       let To_cmm_env.{ expr = { cmm; _ }; _ } =
@@ -885,11 +836,6 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
       in
       (match cmm with
       | Cvar backend_var ->
-        let var = Bound_var.var bound_var in
-        let debug_uid = Bound_var.debug_uid bound_var in
-        let env, backend_var_with_prov =
-          To_cmm_env.add_phantom_let_binding env var ~debug_uid
-        in
         let field_int =
           Targetint_32_64.to_int_checked
             (Target_system.Machine_width.Sixty_four)
@@ -897,23 +843,12 @@ and let_expr_phantom env res let_expr (bound_pattern : Bound_pattern.t) ~body =
                (Target_system.Machine_width.Sixty_four)
                field)
         in
-        let defining_expr =
-          Some (Cmm.Cphantom_read_field { var = backend_var; field = field_int })
-        in
-        let wrap, env, res =
-          Env.flush_delayed_lets ~mode:Flush_everything env res
-        in
-        let body_cmm, free_vars, symbol_inits, res = expr env res body in
-        let cmm =
-          C.make_phantom_let backend_var_with_prov defining_expr body_cmm
-        in
-        let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
-        cmm, free_vars, symbol_inits, res
+        make_phantom_let env res bound_var
+          (Some (Cmm.Cphantom_read_field { var = backend_var; field = field_int }))
+          ~body
       | _ -> expr env res body)
     | None -> expr env res body)
-  | _ ->
-    (* For other cases, skip the phantom let *)
-    expr env res body
+  | _ -> expr env res body
 
 and let_expr env res let_expr =
   Let.pattern_match' let_expr
