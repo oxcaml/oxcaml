@@ -2130,7 +2130,7 @@ let emit_instr ~first ~fallthrough i =
     I.cqo ();
     I.idiv (arg i 1)
   | Lop (Intop (Idiv { signed = false } | Imod { signed = false })) ->
-    I.cqo ();
+    I.xor (Reg64 RDX) (Reg64 RDX);
     I.div (arg i 1)
   | Lop (Int128op Iadd128) ->
     I.add (arg i 2) (res i 0);
