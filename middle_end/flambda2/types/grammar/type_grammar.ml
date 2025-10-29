@@ -2860,16 +2860,28 @@ let rec project_variables_out ~to_project ~expand t =
     if ty == ty' then t else Region ty'
 
 and project_head_of_kind_value ~to_project ~expand head =
-  let { non_null; is_null = _ } = head in
-  match non_null with
-  | Unknown | Bottom -> head
-  | Ok non_null ->
-    let non_null' =
-      project_head_of_kind_value_non_null ~to_project ~expand non_null
-    in
-    if non_null == non_null'
-    then head
-    else { non_null = Ok non_null'; is_null = head.is_null }
+  let { non_null; is_null } = head in
+  let is_null' =
+    match is_null with
+    | Not_null -> Not_null
+    | Maybe_null { is_null = is_null_var } ->
+      let is_null_var' = project_relation ~to_project ~expand is_null_var in
+      if is_null_var == is_null_var'
+      then is_null
+      else Maybe_null { is_null = is_null_var' }
+  in
+  let non_null' : _ Or_unknown_or_bottom.t =
+    match non_null with
+    | Unknown | Bottom -> non_null
+    | Ok non_null_head ->
+      let non_null_head' =
+        project_head_of_kind_value_non_null ~to_project ~expand non_null_head
+      in
+      if non_null_head == non_null_head' then non_null else Ok non_null_head'
+  in
+  if is_null == is_null' && non_null == non_null'
+  then head
+  else { non_null = non_null'; is_null = is_null' }
 
 and project_relation ~to_project ~expand relation =
   match relation with
