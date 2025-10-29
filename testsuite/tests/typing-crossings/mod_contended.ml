@@ -6,7 +6,8 @@ let empty_collections () =
   let mtl1 : int ref list = [] in
   let mtl2: int ref list = (let x = [] in x) in
   let mtia : int ref iarray = [: :] in
-  let _ @ portable = fun () -> ((mtl1, mtl2, mtia) : _ @ uncontended) in
+  let mtar : int array = [| |] in
+  let _ @ portable = fun () -> ((mtl1, mtl2, mtia, mtar) : _ @ uncontended) in
   ()
 [%%expect {|
 val empty_collections : unit -> unit = <fun>
@@ -23,11 +24,11 @@ Line 3, characters 32-33:
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
-let array_fails () =
-  let x : int array = [| |] in
+let nonempty_array () =
+  let x = [| 42 |] in
   let _ @ portable = fun () -> (x : _ @ uncontended) in
   ()
-[%%expect {|
+[%%expect{|
 Line 3, characters 32-33:
 3 |   let _ @ portable = fun () -> (x : _ @ uncontended) in
                                     ^

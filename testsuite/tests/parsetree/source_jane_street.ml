@@ -631,7 +631,7 @@ let f ~(x1 @ many)
   local_
   let x9 @ local = "hi" in
   let x10 : string @ global = "hi" in
-  let local_ x11 : int array @ contended = [| |] in
+  let local_ x11 : int array @ contended = [| 42 |] in
   (* This next line actually doesn't pass the round-trip test: the parser
      does not accept [local_] and [type] on the same let. This seems annoying
      to fix, and we're getting rid of [local_] someday anyway. *)
