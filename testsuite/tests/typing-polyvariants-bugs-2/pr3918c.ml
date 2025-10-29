@@ -33,11 +33,6 @@ let f (x : 'a vlist) = (x : 'b vlist)
  ocamlc.byte;
  script = "rm -f pr3918a.cmi";
  script;
- {
-   module = "pr3918c.ml";
-   ocamlc_byte_exit_status = "2";
-   ocamlc.byte;
- }{
-   check-ocamlc.byte-output;
- }
+ module = "pr3918c.ml";
+ ocamlc.byte;
 *)
