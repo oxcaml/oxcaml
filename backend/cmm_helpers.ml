@@ -4375,9 +4375,43 @@ let cexit id args trap_actions = Cmm.Cexit (Cmm.Lbl id, args, trap_actions)
 let trap_return arg trap_actions =
   Cmm.Cexit (Cmm.Return_lbl, [arg], trap_actions)
 
-let create_ccatch ~rec_flag ~handlers ~body =
-  let rec_flag = if rec_flag then Cmm.Recursive else Cmm.Normal in
-  Cmm.Ccatch (rec_flag, handlers, body)
+let create_ccatch ~(rec_flag : bool) ~(handlers : Cmm.static_handler list)
+    ~(body : Cmm.expression) =
+  match[@ocaml.warning "-4"] rec_flag, body, handlers with
+  | ( true,
+      Cexit (Lbl exit_label, [Cconst_int (init, _dbg1)], []),
+      [ { Cmm.label = handler_label;
+          params = [(handler_param, [| Int |])];
+          body =
+            Cifthenelse
+              ( Cop
+                  ( Ccmpi Cne,
+                    [Cvar index_test; Cconst_int (bound, _dbg2)],
+                    _dbg3 ),
+                _dbg4,
+                Cexit
+                  ( Lbl handler_exit_label,
+                    [ Cop
+                        ( Caddi,
+                          [Cvar index_update; Cconst_int ((2 | -2), _dbg5)],
+                          _dbg6 ) ],
+                    [] ),
+                _dbg7,
+                (Cconst_int (1, _dbg8) as unit),
+                _dbg9 );
+          dbg = _;
+          is_cold = _
+        } ] )
+    when init land 1 = 1
+         && bound land 1 = 1
+         && Static_label.equal exit_label handler_label
+         && Static_label.equal exit_label handler_exit_label
+         && Ident.equal (VP.var handler_param) index_test
+         && Ident.equal (VP.var handler_param) index_update ->
+    unit
+  | _ ->
+    let rec_flag = if rec_flag then Cmm.Recursive else Cmm.Normal in
+    Cmm.Ccatch (rec_flag, handlers, body)
 
 let unary op ~dbg x = Cop (op, [x], dbg)
 
