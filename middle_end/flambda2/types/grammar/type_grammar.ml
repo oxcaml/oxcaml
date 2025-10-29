@@ -358,12 +358,18 @@ let rec free_names0 ~follow_value_slots t =
   | Region ty ->
     type_descr_free_names ~free_names_head:free_names_head_of_kind_region ty
 
-and free_names_head_of_kind_value0 ~follow_value_slots { non_null; is_null = _ }
-    =
+and free_names_head_of_kind_value0 ~follow_value_slots { non_null; is_null } =
+  let free_names_is_null =
+    match is_null with
+    | Not_null -> Name_occurrences.empty
+    | Maybe_null { is_null } -> free_names_relation ~follow_value_slots is_null
+  in
   match non_null with
-  | Unknown | Bottom -> Name_occurrences.empty
+  | Unknown | Bottom -> free_names_is_null
   | Ok non_null ->
-    free_names_head_of_kind_value_non_null ~follow_value_slots non_null
+    Name_occurrences.union_list
+      [ free_names_is_null;
+        free_names_head_of_kind_value_non_null ~follow_value_slots non_null ]
 
 and free_names_relation ~follow_value_slots:_ relation =
   match relation with
