@@ -923,7 +923,7 @@ module Layout_and_axes = struct
                 skippable_axes : Axis_set.t
               }  (** continue, with a new [t] *)
 
-        let initial_fuel_per_ty = 10
+        let initial_fuel_per_ty = 2
 
         let starting =
           { tuple_fuel = initial_fuel_per_ty;
