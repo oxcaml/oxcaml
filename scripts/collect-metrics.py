@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Script to collect file size metrics from _install directory."""
+"""Script to collect compiler metrics (sizes, profile data, counters)."""
 
 import argparse
 import csv
@@ -189,7 +189,7 @@ def collect_metrics(
     profile_data: ProfileData,
     verbose: bool = False,
 ) -> None:
-    """Collect file size metrics and write to CSV."""
+    """Collect compiler metrics (sizes, profile data, counters) and write to CSV."""
     install_path = Path(install_dir)
 
     # Extract PR number from commit message (use last match if multiple)
@@ -320,7 +320,7 @@ def load_profile_data(build_dir: str, verbose: bool = False) -> ProfileData:
 def main() -> None:
     """Parse arguments and run metrics collection."""
     parser = argparse.ArgumentParser(
-        description="Collect file size metrics from install directory"
+        description="Collect compiler metrics (sizes, profile data, counters)"
     )
     parser.add_argument(
         "--install-directory", required=True, help="Path to install directory"
