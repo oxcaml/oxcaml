@@ -2081,7 +2081,7 @@ let emit_instr ~first ~fallthrough i =
     I.cqo ();
     I.idiv (arg i 1)
   | Lop (Intop (Idiv { signed = false } | Imod { signed = false })) ->
-    I.cqo ();
+    I.xor (Reg64 RDX) (Reg64 RDX);
     I.div (arg i 1)
   | Lop (Intop ((Ilsl | Ilsr | Iasr) as op)) ->
     (* We have i.arg.(0) = i.res.(0) and i.arg.(1) = %rcx *)
