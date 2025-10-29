@@ -237,7 +237,7 @@ type r = { i : int ; mutable s : string }
 type u = r# = #{ i : int ; s : string @@ global many aliased unyielding dynamic }
 [%%expect{|
 type r = { i : int; mutable s : string; }
-type u = r# = #{ i : int; s : string @@ global many aliased dynamic; }
+type u = r# = #{ i : int; s : string @@ global many dynamic; }
 |}]
 
 (*******************)

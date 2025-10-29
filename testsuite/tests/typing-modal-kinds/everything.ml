@@ -296,7 +296,7 @@ type t : value & float64 mod everything
 [%%expect{|
 type t
   : value_or_null mod everything mod non_null separable
-    & float64 mod global aliased many stateless immutable external_
+    & float64 mod global many stateless immutable external_
 |}]
 
 type t : value & (immediate & bits64) & float32 mod everything
@@ -304,6 +304,6 @@ type t : value & (immediate & bits64) & float32 mod everything
 type t
   : value_or_null mod everything mod non_null separable
     & (value_or_null mod everything mod non_null separable
-      & bits64 mod global aliased many stateless immutable external_)
-    & float32 mod global aliased many stateless immutable external_
+      & bits64 mod global many stateless immutable external_)
+    & float32 mod global many stateless immutable external_
 |}]
