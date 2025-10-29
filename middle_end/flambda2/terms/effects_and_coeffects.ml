@@ -30,6 +30,9 @@ let compare (e1, c1, d1, v1) (e2, c2, d2, v2) =
     | res -> res)
   | res -> res
 
+(* projections *)
+let validity ((_, _, _, v) : t) = v
+
 (* Some useful constants *)
 let pure : t = No_effects, No_coeffects, Strict, Valid_after_some_branch
 
