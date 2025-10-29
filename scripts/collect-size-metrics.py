@@ -58,10 +58,10 @@ def parse_pass_name(pass_name: str) -> Optional[str]:
 
 def parse_value_with_unit(value_str: str) -> Optional[float]:
     """Parse value with unit (s, B, kB, MB, GB) and convert to base unit."""
-    if not value_str or value_str.strip() == "":
-        return None
-
     value_str = value_str.strip()
+
+    if not value_str:
+        return None
 
     # Time: always in seconds (e.g., "1.878s")
     if value_str.endswith("s"):
@@ -93,11 +93,12 @@ def parse_counters(counters_str: str) -> Counters:
     """Parse counter string format: [name = value; name = value; ...]"""
     counters: Counters = {}
 
-    if not counters_str or counters_str.strip() == "":
+    counters_str = counters_str.strip()
+
+    if not counters_str:
         return counters
 
     # Remove brackets and split by semicolons
-    counters_str = counters_str.strip()
     if not (counters_str.startswith("[") and counters_str.endswith("]")):
         # Non-empty string without proper square brackets - invalid format
         return counters
@@ -163,7 +164,7 @@ def aggregate_profile_metrics(profile_data_by_file: ProfileData) -> AggregatedMe
             # Extract pass name
             raw_pass_name = record.get("pass name", "")
             pass_name = parse_pass_name(raw_pass_name)
-            if not pass_name:
+            if pass_name is None:
                 continue
 
             # Process each metric column
