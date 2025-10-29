@@ -212,8 +212,8 @@ external classify_float : (float [@unboxed]) -> fpclass @@ portable =
 
 (* String and byte sequence operations -- more in modules String and Bytes *)
 
-external string_length : string -> int @@ portable = "%string_length"
-external bytes_length : bytes -> int @@ portable = "%bytes_length"
+external string_length : string @ local -> int @@ portable = "%string_length"
+external bytes_length : bytes @ local -> int @@ portable = "%bytes_length"
 external bytes_create : int -> bytes @@ portable = "caml_create_bytes"
 external string_blit : string -> int -> bytes -> int -> int -> unit @@ portable
                      = "caml_blit_string" [@@noalloc]
@@ -369,9 +369,9 @@ let flush_all () =
         iter l
   in iter (out_channels_list ())
 
-external unsafe_output : out_channel -> bytes -> int -> int -> unit @@ portable
+external unsafe_output : out_channel -> bytes @ local -> int -> int -> unit @@ portable
                        = "caml_ml_output_bytes"
-external unsafe_output_string : out_channel -> string -> int -> int -> unit @@ portable
+external unsafe_output_string : out_channel -> string @ local -> int -> int -> unit @@ portable
                               = "caml_ml_output"
 
 external output_char : out_channel -> char -> unit @@ portable = "caml_ml_output_char"
