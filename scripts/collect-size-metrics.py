@@ -44,7 +44,7 @@ def parse_pass_name(pass_name: str) -> Optional[str]:
         return None
 
     # Split on '//' to separate file path from pass hierarchy
-    parts = pass_name.split("//", 1)
+    parts = pass_name.split(sep="//", maxsplit=1)
     if len(parts) < 2:
         # This is the top-level: file=path/
         # Check that it ends with '/' to validate the format
@@ -98,14 +98,17 @@ def parse_counters(counters_str: str) -> Counters:
 
     # Remove brackets and split by semicolons
     counters_str = counters_str.strip()
-    if counters_str.startswith("[") and counters_str.endswith("]"):
-        counters_str = counters_str[1:-1]
+    if not (counters_str.startswith("[") and counters_str.endswith("]")):
+        # Non-empty string without proper square brackets - invalid format
+        return counters
+
+    counters_str = counters_str[1:-1]
 
     # Parse each counter
-    for part in counters_str.split(";"):
+    for part in counters_str.split(sep=";"):
         part = part.strip()
         if "=" in part:
-            name, value = part.split("=", 1)
+            name, value = part.split(sep="=", maxsplit=1)
             name = name.strip()
             value = value.strip()
             try:
