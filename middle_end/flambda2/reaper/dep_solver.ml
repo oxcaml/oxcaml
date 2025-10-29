@@ -2788,6 +2788,14 @@ module Rewriter = struct
     let open Flambda2_types.Rewriter in
     let db = result.db in
     let[@local] forget_type () =
+      if debug_types
+         && (not (Flambda2_types.is_unknown typing_env flambda_type))
+         && Flambda_colours.without_colours ~f:(fun () ->
+                Format.asprintf "%a" Flambda2_types.print flambda_type)
+            <> "(Val? ⊤)"
+      then
+        Format.eprintf "Forgetting: %a@.Usages = %a@." Flambda2_types.print
+          flambda_type print_t0 usages;
       Rule.rewrite Pattern.any (Expr.unknown (Flambda2_types.kind flambda_type))
     in
     if debug_types then Format.eprintf "REWRITE usages = %a@." print_t0 usages;
@@ -2927,14 +2935,19 @@ module Rewriter = struct
             function_slots_metadata_and_uses =
           let all_patterns = ref [] in
           let all_value_slots_in_set =
-            Value_slot.Map.mapi
+            Value_slot.Map.filter_map
               (fun value_slot metadata ->
-                let v = Var.create () in
-                all_patterns
-                  := Pattern.value_slot value_slot
-                       (Pattern.var v (result, metadata))
-                     :: !all_patterns;
-                Expr.var v)
+                match metadata with
+                | No_usages -> None
+                | No_source -> assert false
+                | Single_source _ | Many_sources_any_usage
+                | Many_sources_usages _ ->
+                  let v = Var.create () in
+                  all_patterns
+                    := Pattern.value_slot value_slot
+                         (Pattern.var v (result, metadata))
+                       :: !all_patterns;
+                  Some (Expr.var v))
               value_slots_metadata
           in
           let all_closure_types_in_set =
@@ -3165,7 +3178,9 @@ module Rewriter = struct
               identify_set_of_closures_with_code_ids db code_ids
             in
             match set_of_closures with
-            | None -> forget_type ()
+            | None ->
+              Format.eprintf "COULD NOT IDENTIFY@.";
+              forget_type ()
             | Some set_of_closures ->
               if Function_slot.Map.exists
                    (fun _ clos ->
@@ -3297,6 +3312,8 @@ let rewrite_typing_env result ~unit_symbol:_ vars_to_keep typing_env =
       let sym = Code_id_or_name.symbol sym in
       if not (has_source db sym)
       then result, Rewriter.No_source
+      else if not (has_use db sym)
+      then result, Rewriter.No_usages
       else
         match get_allocation_point db sym with
         | Some alloc_point -> result, Rewriter.Single_source alloc_point
@@ -3309,11 +3326,14 @@ let rewrite_typing_env result ~unit_symbol:_ vars_to_keep typing_env =
                 (get_direct_usages db (Code_id_or_name.Map.singleton sym ())) )
   in
   let variable_metadata var =
+    Format.eprintf "Variable metadata %a ??@." Variable.print var;
     let kind = Variable.kind var in
     let var = Code_id_or_name.var var in
     let metadata =
       if not (has_source db var)
       then result, Rewriter.No_source
+      else if not (has_use db var)
+      then result, Rewriter.No_usages
       else
         match get_allocation_point db var with
         | Some alloc_point -> result, Rewriter.Single_source alloc_point
@@ -3397,6 +3417,8 @@ let rewrite_result_types result ~old_typing_env func_params func_results
       let metadata =
         if not (has_source db var)
         then result, Rewriter.No_source
+        else if not (has_use db var)
+        then result, Rewriter.No_usages
         else
           match get_allocation_point db var with
           | Some alloc_point -> result, Rewriter.Single_source alloc_point
