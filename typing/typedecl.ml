@@ -3838,6 +3838,9 @@ let transl_value_decl env loc ~modalities valdecl =
   end;
   (* it's okay to reach into [valdecl] here instead of [~modalities], since
     modules do not have default crossings (meaning annotations are all we need) *)
+  (* CR modes: the maturity and mutability do not make sense here and were made
+     up in order to make this call. this indicates that this is the wrong
+     abstraction for translating into crossings. *)
   let _, cross_opt =
     Typemode.transl_modalities ~maturity:Stable Immutable valdecl.pval_modalities
   in
