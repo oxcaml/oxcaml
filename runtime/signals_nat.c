@@ -36,6 +36,50 @@
 #include "caml/signals.h"
 #include "caml/stack.h"
 
+/* Get allocation info for the current frame, for re-doing allocations after GC
+   or resuming preemption.
+
+   Returns the allocation size in words (wosize, without header).
+   Sets *nallocs_out and *alloc_len_out if they are non-NULL.
+   Returns -1 if this is a poll (nallocs == 0). */
+Caml_inline intnat current_frame_alloc_wosize(unsigned char** alloc_len_out,
+                                         int* nallocs_out)
+{
+  frame_descr* d;
+  caml_domain_state * dom_st = Caml_state;
+  caml_frame_descrs fds = caml_get_frame_descrs();
+  struct stack_info* stack = dom_st->current_stack;
+
+  char * sp = (char*)stack->sp;
+  sp = First_frame(sp);
+  uintnat retaddr = Saved_return_address(sp);
+
+  /* Find the frame descriptor for the current allocation */
+  d = caml_find_frame_descr(fds, retaddr);
+  CAMLassert(d && !frame_return_to_C(d) && frame_has_allocs(d));
+
+  /* Compute the total allocation size at this point,
+     including allocations combined by Comballoc */
+  unsigned char* alloc_len = frame_end_of_live_ofs(d);
+  int nallocs = *alloc_len++;
+
+  if (nallocs == 0) {
+    return -1; /* This is a poll */
+  }
+
+  intnat allocsz = 0;
+  for (int i = 0; i < nallocs; i++) {
+    allocsz += Whsize_wosize(Wosize_encoded_alloc_len(alloc_len[i]));
+  }
+  /* We have computed whsize (including header) but need wosize (without) */
+  allocsz -= 1;
+
+  if (alloc_len_out != NULL) *alloc_len_out = alloc_len;
+  if (nallocs_out != NULL) *nallocs_out = nallocs;
+
+  return allocsz;
+}
+
 /* This routine is the common entry point for garbage collection
    and signal handling.  It can trigger a callback to OCaml code.
    With system threads, this callback can cause a context switch.
@@ -47,49 +91,40 @@
 
 void caml_garbage_collection(void)
 {
-  frame_descr* d;
   caml_domain_state * dom_st = Caml_state;
-  caml_frame_descrs fds = caml_get_frame_descrs();
-  struct stack_info* stack = dom_st->current_stack;
-
-  char * sp = (char*)stack->sp;
-  sp = First_frame(sp);
-  uintnat retaddr = Saved_return_address(sp);
 
   /* Synchronise for the case when [young_limit] was used to interrupt
      us. */
   atomic_thread_fence(memory_order_acquire);
 
-  { /* Find the frame descriptor for the current allocation */
-    d = caml_find_frame_descr(fds, retaddr);
-    /* Must be an allocation frame */
-    CAMLassert(d && !frame_return_to_C(d) && frame_has_allocs(d));
+  unsigned char* alloc_len;
+  int nallocs;
+  intnat allocsz = current_frame_alloc_wosize(&alloc_len, &nallocs);
+
+  if (allocsz == -1) {
+    /* This is a poll */
+    caml_process_pending_actions();
+    return;
   }
 
-  { /* Compute the total allocation size at this point,
-       including allocations combined by Comballoc */
-    unsigned char* alloc_len = frame_end_of_live_ofs(d);
-    int i, nallocs = *alloc_len++;
-    intnat allocsz = 0;
+  caml_alloc_small_dispatch(dom_st, allocsz, CAML_DO_TRACK | CAML_FROM_CAML,
+                            nallocs, alloc_len);
+}
 
-    if (nallocs == 0) {
-      /* This is a poll */
-      caml_process_pending_actions();
-      return;
-    }
-    else
-    {
-      for (i = 0; i < nallocs; i++) {
-        allocsz += Whsize_wosize(Wosize_encoded_alloc_len(alloc_len[i]));
-      }
-      /* We have computed whsize (including header)
-         but need wosize (without) */
-      allocsz -= 1;
-    }
+/* Redo the allocation that was interrupted by preemption. */
+void caml_redo_preempted_allocation(void)
+{
+  caml_domain_state * dom_st = Caml_state;
 
-    caml_alloc_small_dispatch(dom_st, allocsz, CAML_DO_TRACK | CAML_FROM_CAML,
-                              nallocs, alloc_len);
+  intnat allocsz = current_frame_alloc_wosize(NULL, NULL);
+
+  if (allocsz == -1) {
+    /* This is a poll - no allocation to redo */
+    return;
   }
+
+  /* Redo the allocation by subtracting from young_ptr (convert words to bytes) */
+  dom_st->young_ptr -= Whsize_wosize(allocsz) * sizeof(value);
 }
 
 #ifdef STACK_GUARD_PAGES
