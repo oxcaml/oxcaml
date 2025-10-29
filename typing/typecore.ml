@@ -6002,7 +6002,9 @@ and type_expect_
                              Longident.Lident txt -> { txt; loc = lid.loc }
                            | _ -> assert false)
         | Val_mut (_m0, _) -> begin
-            set_max_crossing_temp expected_mode;
+            (* this shouldn't ever be inferred to be mod contended originally,
+               but this is defensive *)
+            set_max_crossing expected_mode;
             match path with
             | Path.Pident id ->
               let modalities = Typemode.let_mutable_modalities in
@@ -6087,7 +6089,7 @@ and type_expect_
       in
       check_let_mutable mutable_flag env ?restriction spat_sexp_list;
       if mutable_flag = (Mutable : mutable_flag)
-        then set_max_crossing_temp expected_mode;
+        then set_max_crossing expected_mode;
       let existential_context : existential_restriction =
         if rec_flag = Recursive then In_rec
         else if List.compare_length_with spat_sexp_list 1 > 0 then In_group
@@ -7046,7 +7048,7 @@ and type_expect_
         exp_env = env;
       }
   | Pexp_lazy e ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing expected_mode;
       let expected_mode, closure_mode = mode_lazy expected_mode in
       let ty = newgenvar (Jkind.Builtin.value ~why:Lazy_expression) in
       let to_unify = Predef.type_lazy_t ty in
@@ -7461,7 +7463,7 @@ and type_expect_
       {exp with exp_extra}
   | Pexp_comprehension comp ->
       Language_extension.assert_enabled ~loc Comprehensions ();
-      set_max_crossing_temp expected_mode;
+      set_max_crossing expected_mode;
       type_comprehension_expr
         ~loc
         ~env
@@ -7531,7 +7533,7 @@ and type_expect_
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
   | Pexp_quote exp ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing expected_mode;
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       let jkind = Jkind.Builtin.value ~why:Quotation_result in
       let new_env = Env.enter_quotation env in
@@ -7548,7 +7550,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_splice exp ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing expected_mode;
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       let new_env = Env.enter_splice ~loc env in
       let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
