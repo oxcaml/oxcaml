@@ -174,7 +174,7 @@ module Transled_modifiers = struct
     | Nonmodal Separability -> { t with separability = value }
 end
 
-let transl_mod_bounds (crossings : Parsetree.crossings) =
+let transl_mod_crossing_modifiers (crossings : Parsetree.crossings) =
   let step bounds_so_far { txt = Parsetree.Crossing txt; loc } =
     match Modifier_axis_pair.of_string txt with
     | P (type a) ((axis, mode) : a Axis.t * a) ->
@@ -294,6 +294,18 @@ let transl_mod_bounds (crossings : Parsetree.crossings) =
   let statefulness = modal (Comonadic Statefulness) modifiers.statefulness in
   let visibility = modal (Monadic Visibility) modifiers.visibility in
   let staticity = modal (Monadic Staticity) modifiers.staticity in
+  let monadic =
+    Mode.Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
+  in
+  let comonadic =
+    Mode.Crossing.Comonadic.create ~regionality ~linearity ~portability
+      ~forkable ~yielding ~statefulness
+  in
+  let crossing : Crossing.t = { monadic; comonadic } in
+  crossing, modifiers
+
+let transl_mod_bounds (crossings : Parsetree.crossings) =
+  let crossing, modifiers = transl_mod_crossing_modifiers crossings in
   let externality =
     Option.fold ~some:Location.get_txt ~none:Externality.max
       modifiers.externality
@@ -306,15 +318,7 @@ let transl_mod_bounds (crossings : Parsetree.crossings) =
     Option.fold ~some:Location.get_txt ~none:Separability.max
       modifiers.separability
   in
-  let monadic =
-    Mode.Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
-  in
-  let comonadic =
-    Mode.Crossing.Comonadic.create ~regionality ~linearity ~portability
-      ~forkable ~yielding ~statefulness
-  in
-  let crossing : Crossing.t = { monadic; comonadic } in
-  create crossing ~externality ~nullability ~separability
+  Types.Jkind_mod_bounds.create crossing ~externality ~nullability ~separability
 
 let default_mode_annots (annots : Alloc.Const.Option.t) =
   (* [forkable] has a different default depending on whether [areality]
@@ -646,6 +650,13 @@ let let_mutable_modalities =
 
 let atomic_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:false
+
+let transl_modalities_crossing (modalities : Parsetree.modalities) =
+  match modalities with
+  | No_modalities -> Mode.Crossing_bound.default
+  | Modalities { crossings; _ } ->
+    let crossing, _ = transl_mod_crossing_modifiers crossings in
+    ({ upper = Some crossing; lower = crossing } : Mode.Crossing_bound.t)
 
 let untransl_modalities mut t : Parsetree.core_modalities =
   t

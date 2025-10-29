@@ -356,6 +356,9 @@ let name_expression ~loc ~attrs sort exp =
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
       val_modalities = Mode.Modality.id;
+      (* CR modes: this might not be the most desirable behavior for top-level
+         crossing behavior. at the very least, it's a safe default *)
+      val_crossing = Mode.Crossing_bound.default;
       val_uid = Uid.internal_not_actually_unique; }
   in
   let sg = [Sig_value(id, vd, Exported)] in

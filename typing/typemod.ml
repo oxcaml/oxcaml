@@ -3457,6 +3457,9 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
               in
               let (first_loc, _, _) = List.hd id_info in
               Signature_names.check_value names first_loc id;
+              (* CR modes: maybe this call or its impl should change?
+                 the call to [infer_modalities] might open up the door for
+                 crossing-related unsoundness, if not handled carefully... *)
               let vd, mode =  Env.find_value_no_locks_exn id newenv in
               let vd = Subst.Lazy.force_value_description vd in
               let modalities =
