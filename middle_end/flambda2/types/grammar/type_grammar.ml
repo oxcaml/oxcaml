@@ -1415,10 +1415,17 @@ let rec ids_for_export t =
   | Region ty ->
     TD.ids_for_export ~ids_for_export_head:ids_for_export_head_of_kind_region ty
 
-and ids_for_export_head_of_kind_value { non_null; is_null = _ } =
+and ids_for_export_head_of_kind_value { non_null; is_null } =
+  let ids_for_export =
+    match is_null with
+    | Not_null -> Ids_for_export.empty
+    | Maybe_null { is_null } -> ids_for_export_relation is_null
+  in
   match non_null with
-  | Unknown | Bottom -> Ids_for_export.empty
-  | Ok non_null -> ids_for_export_head_of_kind_value_non_null non_null
+  | Unknown | Bottom -> ids_for_export
+  | Ok non_null ->
+    Ids_for_export.union_list
+      [ids_for_export; ids_for_export_head_of_kind_value_non_null non_null]
 
 and ids_for_export_relation relation =
   match relation with
