@@ -10,10 +10,11 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 # Type aliases for clarity
-CsvRow = Dict[str, Any]
+CsvRow = Dict[str, Any]  # column -> value
 ProfileFile = List[CsvRow]
 ProfileData = List[ProfileFile]
-AggregatedMetrics = Dict[str, Dict[str, float]]
+AggregatedMetrics = Dict[str, Dict[str, float]]  # kind -> (pass -> value)
+Counters = Dict[str, int]  # name -> value
 
 # Counter names we're interested in tracking
 COUNTERS_OF_INTEREST = ["reload", "spill"]
@@ -69,7 +70,7 @@ def parse_value_with_unit(value_str: str) -> Optional[float]:
     for unit, multiplier in multipliers.items():
         if value_str.endswith(unit):
             try:
-                value = float(value_str[:-len(unit)])
+                value = float(value_str[: -len(unit)])
                 return value * multiplier
             except ValueError:
                 return None
@@ -77,9 +78,9 @@ def parse_value_with_unit(value_str: str) -> Optional[float]:
     return None
 
 
-def parse_counters(counters_str: str) -> Dict[str, int]:
+def parse_counters(counters_str: str) -> Counters:
     """Parse counter string format: [name = value; name = value; ...]"""
-    counters = {}
+    counters: Counters = {}
 
     if not counters_str or counters_str.strip() == "":
         return counters
@@ -105,14 +106,14 @@ def parse_counters(counters_str: str) -> Dict[str, int]:
     return counters
 
 
-def aggregate_counters(profile_data_by_file: ProfileData) -> Dict[str, int]:
+def aggregate_counters(profile_data_by_file: ProfileData) -> Counters:
     """Aggregate counters: keep latest per file, then sum across files."""
     total_counters = {counter: 0 for counter in COUNTERS_OF_INTEREST}
 
     # For each profile file
     for file_records in profile_data_by_file:
         # Get latest occurrence of each counter in this file
-        file_counters = {}
+        file_counters: Counters = {}
         for record in file_records:
             counters_str = record.get("counters", "")
             counters = parse_counters(counters_str)
@@ -129,9 +130,7 @@ def aggregate_counters(profile_data_by_file: ProfileData) -> Dict[str, int]:
     return total_counters
 
 
-def aggregate_profile_metrics(
-    profile_data_by_file: ProfileData
-) -> AggregatedMetrics:
+def aggregate_profile_metrics(profile_data_by_file: ProfileData) -> AggregatedMetrics:
     """Aggregate time/memory/heap metrics by pass name, summing values."""
     # Metrics to aggregate: column name -> output kind name
     metric_columns = {
@@ -142,7 +141,7 @@ def aggregate_profile_metrics(
     }
 
     # Initialize aggregation dictionaries
-    aggregated = {kind: {} for kind in metric_columns.values()}
+    aggregated: AggregatedMetrics = {kind: {} for kind in metric_columns.values()}
 
     # Process each profile file
     for file_records in profile_data_by_file:
@@ -166,20 +165,26 @@ def aggregate_profile_metrics(
     return aggregated
 
 
-def collect_metrics(install_dir: str, output_dir: str, commit_hash: str,
-                    commit_message: str, profile_data: ProfileData,
-                    verbose: bool = False) -> None:
+def collect_metrics(
+    install_dir: str,
+    output_dir: str,
+    commit_hash: str,
+    commit_message: str,
+    profile_data: ProfileData,
+    verbose: bool = False,
+) -> None:
     """Collect file size metrics and write to CSV."""
     install_path = Path(install_dir)
 
     # Validate input directory exists
     if not install_path.is_dir():
-        print(f"Error: Install directory '{install_dir}' does not exist",
-              file=sys.stderr)
+        print(
+            f"Error: Install directory '{install_dir}' does not exist", file=sys.stderr
+        )
         sys.exit(1)
 
     # Extract PR number from commit message (use last match if multiple)
-    pr_matches = re.findall(r'\(#(\d+)\)', commit_message)
+    pr_matches = re.findall(r"\(#(\d+)\)", commit_message)
     pr_number = pr_matches[-1] if pr_matches else "N/A"
 
     # Generate timestamp and compute output path
@@ -195,8 +200,19 @@ def collect_metrics(install_dir: str, output_dir: str, commit_hash: str,
 
     # Extensions to track
     extensions = [
-        "exe", "opt", "a", "cmxa", "cma", "cmi",
-        "cmx", "cmo", "cms", "cmsi", "cmt", "cmti", "o"
+        "exe",
+        "opt",
+        "a",
+        "cmxa",
+        "cma",
+        "cmi",
+        "cmx",
+        "cmo",
+        "cms",
+        "cmsi",
+        "cmt",
+        "cmti",
+        "o",
     ]
 
     # Aggregate counter data from profile
@@ -212,8 +228,7 @@ def collect_metrics(install_dir: str, output_dir: str, commit_hash: str,
         # Collect size metrics for each extension
         for ext in extensions:
             files = list(install_path.rglob(f"*.{ext}"))
-            total_size = sum(file.stat().st_size for file in files
-                           if file.is_file())
+            total_size = sum(file.stat().st_size for file in files if file.is_file())
 
             # Write size metric to CSV
             csv_file.write(
@@ -251,8 +266,7 @@ def find_profile_csv_files(build_dir: str) -> List[Path]:
     build_path = Path(build_dir)
 
     if not build_path.is_dir():
-        print(f"Warning: Build directory '{build_dir}' does not exist",
-              file=sys.stderr)
+        print(f"Warning: Build directory '{build_dir}' does not exist", file=sys.stderr)
         return []
 
     # Find all files matching the pattern */_profile_csv/profile.*.csv
@@ -263,7 +277,7 @@ def find_profile_csv_files(build_dir: str) -> List[Path]:
 
 def parse_profile_csv(profile_path: Path) -> ProfileFile:
     """Parse a single profile CSV file and return list of records."""
-    records = []
+    records: ProfileFile = []
 
     try:
         with profile_path.open("r") as csv_file:
@@ -271,8 +285,7 @@ def parse_profile_csv(profile_path: Path) -> ProfileFile:
             for row in reader:
                 records.append(row)
     except Exception as e:
-        print(f"Warning: Failed to parse {profile_path}: {e}",
-              file=sys.stderr)
+        print(f"Warning: Failed to parse {profile_path}: {e}", file=sys.stderr)
 
     return records
 
@@ -286,7 +299,7 @@ def load_profile_data(build_dir: str, verbose: bool = False) -> ProfileData:
         for pf in profile_files:
             print(f"  {pf}")
 
-    profile_data_by_file = []
+    profile_data_by_file: ProfileData = []
     total_records = 0
     for profile_file in profile_files:
         records = parse_profile_csv(profile_file)
@@ -304,18 +317,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Collect file size metrics from install directory"
     )
-    parser.add_argument("--install-directory", required=True,
-                        help="Path to install directory")
-    parser.add_argument("--output-directory", required=True,
-                        help="Output directory for CSV file")
-    parser.add_argument("--commit-hash", required=True,
-                        help="Git commit hash")
-    parser.add_argument("--commit-message", required=True,
-                        help="Git commit message")
-    parser.add_argument("--build-directory", required=True,
-                        help="Path to build directory")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Print contents of generated CSV file")
+    parser.add_argument(
+        "--install-directory", required=True, help="Path to install directory"
+    )
+    parser.add_argument(
+        "--output-directory", required=True, help="Output directory for CSV file"
+    )
+    parser.add_argument("--commit-hash", required=True, help="Git commit hash")
+    parser.add_argument("--commit-message", required=True, help="Git commit message")
+    parser.add_argument(
+        "--build-directory", required=True, help="Path to build directory"
+    )
+    parser.add_argument(
+        "--verbose", action="store_true", help="Print contents of generated CSV file"
+    )
 
     args = parser.parse_args()
 
@@ -328,7 +343,7 @@ def main() -> None:
         args.commit_hash,
         args.commit_message,
         profile_data,
-        args.verbose
+        args.verbose,
     )
 
 
