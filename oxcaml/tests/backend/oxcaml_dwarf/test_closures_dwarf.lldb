@@ -1,0 +1,30 @@
+(lldb) b Test_closures_dwarf.f_start
+(lldb) run
+(lldb) b Test_closures_dwarf.f_inline_closure_map
+(lldb) c
+(lldb) c
+(lldb) b Test_closures_dwarf.f_inline_closure_filter
+(lldb) c
+(lldb) c
+(lldb) b Test_closures_dwarf.f_named_closure_with_capture
+(lldb) c
+(lldb) c
+(lldb) b Test_closures_dwarf.f_closure_with_env
+(lldb) c
+(lldb) c
+(lldb) b Test_closures_dwarf.f_higher_order
+(lldb) c
+(lldb) c
+(lldb) b Test_closures_dwarf.f_partial_application
+(lldb) c
+(lldb) c
+(lldb) b Test_closures_dwarf.f_curried_function
+(lldb) c
+(lldb) c
+(lldb) b Test_closures_dwarf.f_compose
+(lldb) c
+(lldb) c
+(lldb) b Test_closures_dwarf.f_closure_factory
+(lldb) c
+(lldb) c
+(lldb) quit
