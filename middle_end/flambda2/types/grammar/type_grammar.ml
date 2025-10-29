@@ -2118,17 +2118,32 @@ let rec remove_unused_value_slots_and_shortcut_aliases t ~used_value_slots
 
 and remove_unused_value_slots_and_shortcut_aliases_head_of_kind_value head
     ~used_value_slots ~canonicalise =
-  let { non_null; is_null = _ } = head in
-  match non_null with
-  | Unknown | Bottom -> head
-  | Ok non_null ->
-    let non_null' =
-      remove_unused_value_slots_and_shortcut_aliases_head_of_kind_value_non_null
-        non_null ~used_value_slots ~canonicalise
-    in
-    if non_null == non_null'
-    then head
-    else { non_null = Ok non_null'; is_null = head.is_null }
+  let { non_null; is_null } = head in
+  let is_null' =
+    match is_null with
+    | Not_null -> Not_null
+    | Maybe_null { is_null = is_null_var } ->
+      let is_null_var' =
+        remove_unused_value_slots_and_shortcut_aliases_relation is_null_var
+          ~used_value_slots ~canonicalise
+      in
+      if is_null_var == is_null_var'
+      then is_null
+      else Maybe_null { is_null = is_null_var' }
+  in
+  let non_null' : _ Or_unknown_or_bottom.t =
+    match non_null with
+    | Unknown | Bottom -> non_null
+    | Ok non_null_head ->
+      let non_null_head' =
+        remove_unused_value_slots_and_shortcut_aliases_head_of_kind_value_non_null
+          non_null_head ~used_value_slots ~canonicalise
+      in
+      if non_null_head == non_null_head' then non_null else Ok non_null_head'
+  in
+  if non_null == non_null' && is_null == is_null'
+  then head
+  else { non_null = non_null'; is_null = is_null' }
 
 and remove_unused_value_slots_and_shortcut_aliases_relation relation
     ~used_value_slots:_ ~canonicalise =
