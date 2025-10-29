@@ -123,3 +123,5 @@ let (bar @ portable) f =
 
 let () = bar foo (* prints "foo" *)
 ```
+
+Exceptions also cross statefulness and visibility with identical restrictions.

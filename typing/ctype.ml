@@ -7530,16 +7530,32 @@ let exn_constructor_crossing env lid ~args locks =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Constructor
       None ((Mode.Value.(disallow_right min)), locks)
   in
-  (* Exceptions cross portability and contention, so we project those axes. *)
+  (* Exceptions cross contention and visibility on the monadic side, and
+     portability and statefulness on the comonadic side, so we project those
+     axes. *)
+  let monadic_mode = vmode.mode.monadic in
   let monadic =
-    vmode.mode.monadic
-    |> Mode.Value.Monadic.proj Contention
-    |> Mode.Value.Monadic.min_with Contention
+    [ monadic_mode
+      |> Mode.Value.Monadic.proj Contention
+      |> Mode.Value.Monadic.min_with Contention;
+      monadic_mode
+      |> Mode.Value.Monadic.proj Visibility
+      |> Mode.Value.Monadic.min_with Visibility
+    ]
+    |> Mode.Value.Monadic.join
+  in
+  let comonadic_source =
+    Mode.Value.monadic_to_comonadic_max monadic_mode
   in
   let comonadic =
-    Mode.Value.monadic_to_comonadic_max vmode.mode.monadic
-    |> Mode.Value.Comonadic.proj Portability
-    |> Mode.Value.Comonadic.max_with Portability
+    [ comonadic_source
+      |> Mode.Value.Comonadic.proj Portability
+      |> Mode.Value.Comonadic.max_with Portability;
+      comonadic_source
+      |> Mode.Value.Comonadic.proj Statefulness
+      |> Mode.Value.Comonadic.max_with Statefulness
+    ]
+    |> Mode.Value.Comonadic.meet
   in
   let mode_crossing =
     List.map (
