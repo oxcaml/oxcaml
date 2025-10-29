@@ -652,13 +652,13 @@ let actual_submode ~loc ~env ?reason (actual_mode : Env.actual_mode)
 let escape ~loc ~env ~reason m =
   submode ~loc ~env ~reason m mode_legacy
 
-let set_max_crossing expected_mode =
-  Crossing_bound.set_max expected_mode.crossing
+let set_max_crossing ~loc expected_mode =
+  Crossing_bound.set_max ~loc expected_mode.crossing
 
 (* CR modes: track down calls to this function to find places where crossing
    information should be tracked in more fine-grained ways *)
-let set_max_crossing_temp expected_mode =
-  Crossing_bound.set_max expected_mode.crossing
+let set_max_crossing_temp ~loc expected_mode =
+  Crossing_bound.set_max ~loc expected_mode.crossing
 
 type expected_pat_mode =
   { mode : Value.l;
@@ -1088,7 +1088,7 @@ let check_construct_mutability ~loc ~env mutability ?ty ?modalities block_mode =
   match mutability with
   | Immutable -> ()
   | Mutable { mode = m0; _ } ->
-      set_max_crossing block_mode;
+      set_max_crossing ~loc block_mode;
       let m0 = m0 |> mutable_mode |> Value.disallow_right in
       let m0 = match ty with
       | Some ty -> cross_left env ty ?modalities m0
@@ -2809,7 +2809,7 @@ and type_pat_aux
       alloc_mode.mode;
     (* CR modes: this crossing information should be threaded along properly
        instead of bailing out (after defensively maxing it out) *)
-    Crossing_bound.set_max alloc_mode.crossing;
+    Crossing_bound.set_max ~loc alloc_mode.crossing;
     let alloc_mode = Modality.Const.apply modalities alloc_mode.mode in
     let alloc_mode = simple_pat_mode alloc_mode Crossing_bound.default in
     let pl =
@@ -2929,7 +2929,7 @@ and type_pat_aux
         check_project_mutability ~loc ~env:!!penv (Record_field label.lbl_name)
           label.lbl_mut alloc_mode.mode;
         (* CR modes: like above, this shouldn't just bail out *)
-        Crossing_bound.set_max alloc_mode.crossing;
+        Crossing_bound.set_max ~loc alloc_mode.crossing;
         let mode = Modality.Const.apply label.lbl_modalities alloc_mode.mode in
         let alloc_mode = simple_pat_mode mode Crossing_bound.default in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg
@@ -3187,7 +3187,7 @@ and type_pat_aux
       let args =
         List.map2
           (fun p (arg : Types.constructor_argument) ->
-             Crossing_bound.set_max alloc_mode.crossing;
+             Crossing_bound.set_max ~loc alloc_mode.crossing;
              let alloc_mode =
               Modality.Const.apply arg.ca_modalities alloc_mode.mode
              in
@@ -5995,11 +5995,11 @@ and type_expect_
       let path, (actual_mode : Env.actual_mode), desc, kind =
         type_ident env ~recarg lid
       in
-      expect_mode_join_crossing expected_mode desc.val_crossing;
+      expect_mode_join_crossing ~loc expected_mode desc.val_crossing;
       let exp_desc =
         match desc.val_kind with
         | Val_ivar (_, cl_num) ->
-            set_max_crossing expected_mode;
+            set_max_crossing ~loc expected_mode;
             let (self_path, _) =
               Env.find_value_by_name
                 (Longident.Lident ("self-" ^ cl_num)) env
@@ -6009,7 +6009,7 @@ and type_expect_
                              Longident.Lident txt -> { txt; loc = lid.loc }
                            | _ -> assert false)
         | Val_mut (_m0, _) -> begin
-            set_max_crossing_temp expected_mode;
+            set_max_crossing_temp ~loc expected_mode;
             match path with
             | Path.Pident id ->
               let modalities = Typemode.let_mutable_modalities in
@@ -6021,7 +6021,7 @@ and type_expect_
                 bad mutable variable identifier"
           end
         | Val_self (_, _, _, cl_num) ->
-            set_max_crossing expected_mode;
+            set_max_crossing ~loc expected_mode;
             let (path, _) =
               Env.find_value_by_name (Longident.Lident ("self-" ^ cl_num)) env
             in
@@ -6094,7 +6094,7 @@ and type_expect_
       in
       check_let_mutable mutable_flag env ?restriction spat_sexp_list;
       if mutable_flag = (Mutable : mutable_flag)
-        then set_max_crossing_temp expected_mode;
+        then set_max_crossing ~loc expected_mode;
       let existential_context : existential_restriction =
         if rec_flag = Recursive then In_rec
         else if List.compare_length_with spat_sexp_list 1 > 0 then In_group
@@ -6178,13 +6178,13 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_function (params, body_constraint, body) ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing_temp ~loc expected_mode;
       type_n_ary_function ~loc ~env ~expected_mode ~ty_expected ~explanation
         ~attributes:sexp.pexp_attributes (params, body_constraint, body)
   | Pexp_apply
       ({ pexp_desc = Pexp_extension({txt = "extension.escape"}, PStr []) },
        [Nolabel, sbody]) ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing_temp ~loc expected_mode;
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       let exp =
         type_expect ~recarg env mode_legacy sbody
@@ -6194,7 +6194,7 @@ and type_expect_
   | Pexp_apply
       ({ pexp_desc = Pexp_extension({ txt }, PStr []) },
        [Nolabel, sbody]) when is_exclave_extension_node txt ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing_temp ~loc expected_mode;
       if (txt = "extension.exclave") && not (Language_extension.is_enabled Mode) then
           raise (Typetexp.Error (loc, Env.empty, Unsupported_extension Mode));
       begin
@@ -6229,7 +6229,7 @@ and type_expect_
   | Pexp_apply(sfunct, sargs) ->
       (* See Note [Type-checking applications] *)
       assert (sargs <> []);
-      set_max_crossing_temp expected_mode;
+      set_max_crossing_temp ~loc expected_mode;
       let pm = position_and_mode env expected_mode sexp in
       let funct_mode =
         match pm.apply_position with
@@ -6445,7 +6445,7 @@ and type_expect_
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
   | Pexp_field(srecord, lid) ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing_temp ~loc expected_mode;
       let (record, record_sort, rmode, label, _) =
         type_label_access Legacy env srecord Env.Projection lid
       in
@@ -6501,7 +6501,7 @@ and type_expect_
         exp_env = env }
   | Pexp_unboxed_field(srecord, lid) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      set_max_crossing_temp expected_mode;
+      set_max_crossing_temp ~loc expected_mode;
       let (record, record_sort, rmode, label, _) =
         type_label_access Unboxed_product env srecord Env.Projection lid
       in
@@ -6586,7 +6586,7 @@ and type_expect_
     Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
     (* Compute the expected base type, to use for disambiguation of the record
        and unboxed record fields *)
-    set_max_crossing_temp expected_mode;
+    set_max_crossing_temp ~loc expected_mode;
     let expected_base_ty ty_expected =
       match get_desc (expand_head env ty_expected) with
       | Tconstr(p, [arg1; _], _)
@@ -6791,7 +6791,7 @@ and type_expect_
       let exp_mode_new_crossing = replace_crossing expected_mode crossing in
       let exp = type_expect env exp_mode_new_crossing
                   sarg (mk_expected ty_expected ?explanation) in
-      expect_mode_join_crossing expected_mode exp_mode_new_crossing.crossing;
+      expect_mode_join_crossing ~loc expected_mode exp_mode_new_crossing.crossing;
       { exp with exp_loc = loc }
   | Pexp_constraint (sarg, Some sty, modes) ->
       let modes, crossing = Typemode.transl_mode_annots modes in
@@ -6810,7 +6810,7 @@ and type_expect_
       let exp_mode_new_crossing = replace_crossing expected_mode crossing in
       let arg = type_argument ~overwrite ?explanation env
                   exp_mode_new_crossing sarg ty (instance ty) in
-      expect_mode_join_crossing expected_mode exp_mode_new_crossing.crossing;
+      expect_mode_join_crossing ~loc expected_mode exp_mode_new_crossing.crossing;
       rue {
         exp_desc = arg.exp_desc;
         exp_loc = arg.exp_loc;
@@ -6842,7 +6842,7 @@ and type_expect_
         exp_extra = (exp_extra, loc, sexp.pexp_attributes) :: arg.exp_extra;
       }
   | Pexp_send (e, {txt=met}) ->
-      set_max_crossing expected_mode;
+      set_max_crossing ~loc expected_mode;
       submode ~loc ~env Mode.Value.legacy expected_mode;
       let pm = position_and_mode env expected_mode sexp in
       let (obj,meth,typ) =
@@ -6875,7 +6875,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_new cl ->
-      set_max_crossing expected_mode;
+      set_max_crossing ~loc expected_mode;
       submode ~loc ~env Value.legacy expected_mode;
       let (cl_path, cl_decl, cl_mode) =
         Env.lookup_class ~loc:cl.loc cl.txt env
@@ -6922,7 +6922,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_override lst ->
-      set_max_crossing expected_mode;
+      set_max_crossing ~loc expected_mode;
       submode ~loc ~env Value.legacy expected_mode;
       let _ =
        List.fold_right
@@ -7059,7 +7059,7 @@ and type_expect_
         exp_env = env;
       }
   | Pexp_lazy e ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing_temp ~loc expected_mode;
       let expected_mode, closure_mode = mode_lazy expected_mode in
       let ty = newgenvar (Jkind.Builtin.value ~why:Lazy_expression) in
       let to_unify = Predef.type_lazy_t ty in
@@ -7075,7 +7075,7 @@ and type_expect_
         exp_env = env;
       }
   | Pexp_object s ->
-      set_max_crossing expected_mode;
+      set_max_crossing ~loc expected_mode;
       Env.check_no_open_quotations loc env Object_qt;
       submode ~loc ~env Value.legacy expected_mode;
       let desc, meths = !type_object env loc s in
@@ -7087,7 +7087,7 @@ and type_expect_
         exp_env = env;
       }
   | Pexp_poly(sbody, sty) ->
-      set_max_crossing expected_mode;
+      set_max_crossing ~loc expected_mode;
       let ty, cty =
         with_local_level_if_principal
           ~post:(fun (ty,_) -> generalize_structure ty)
@@ -7137,11 +7137,11 @@ and type_expect_
       re { exp with exp_extra =
              (Texp_poly cty, loc, sexp.pexp_attributes) :: exp.exp_extra }
   | Pexp_newtype(name, jkind, sbody) ->
-    set_max_crossing_temp expected_mode;
+    set_max_crossing_temp ~loc expected_mode;
     type_newtype_expr ~loc ~env ~expected_mode ~rue ~attributes:sexp.pexp_attributes
       name jkind sbody
   | Pexp_pack m ->
-      set_max_crossing expected_mode;
+      set_max_crossing ~loc expected_mode;
       let (p, fl) =
         match get_desc (Ctype.expand_head env (instance ty_expected)) with
           Tpackage (p, fl) ->
@@ -7184,7 +7184,7 @@ and type_expect_
         exp_env = env;
       }
   | Pexp_letop{ let_ = slet; ands = sands; body = sbody } ->
-      set_max_crossing expected_mode;
+      set_max_crossing ~loc expected_mode;
       submode ~loc ~env Value.legacy expected_mode;
       let rec loop spat_acc ty_acc ty_acc_sort sands =
         match sands with
@@ -7281,7 +7281,7 @@ and type_expect_
   | Pexp_extension ({ txt = ("ocaml.extension_constructor"
                              |"extension_constructor"); _ },
                     payload) ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing_temp ~loc expected_mode;
       begin match payload with
       | PStr [ { pstr_desc =
                    Pstr_eval ({ pexp_desc = Pexp_construct (lid, None); _ }, _)
@@ -7306,7 +7306,7 @@ and type_expect_
           raise (Error (loc, env, Invalid_extension_constructor_payload))
       end
   | Pexp_extension ({ txt = ("probe" | "ocaml.probe"); _ }, payload) ->
-    set_max_crossing_temp expected_mode;
+    set_max_crossing_temp ~loc expected_mode;
     begin match Builtin_attributes.get_tracing_probe_payload payload with
     | Error () -> raise (Error (loc, env, Probe_format))
     | Ok { name; name_loc; enabled_at_init; arg; } ->
@@ -7323,7 +7323,7 @@ and type_expect_
     end
   | Pexp_extension ({ txt = ("probe_is_enabled"
                             |"ocaml.probe_is_enabled"); _ }, payload) ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing_temp ~loc expected_mode;
       begin match payload with
       | PStr ([{ pstr_desc =
                    Pstr_eval
@@ -7345,12 +7345,12 @@ and type_expect_
       | _ -> raise (Error (loc, env, Probe_is_enabled_format))
     end
   | Pexp_extension ({ txt = "src_pos"; _ }, _) ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing_temp ~loc expected_mode;
       rue (src_pos loc sexp.pexp_attributes env)
   | Pexp_extension ({ txt = ("ocaml.atomic.loc"
                              |"atomic.loc"); _ },
                     payload) ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing_temp ~loc expected_mode;
       begin match payload with
       | PStr [ { pstr_desc =
                   Pstr_eval (
@@ -7474,7 +7474,7 @@ and type_expect_
       {exp with exp_extra}
   | Pexp_comprehension comp ->
       Language_extension.assert_enabled ~loc Comprehensions ();
-      set_max_crossing_temp expected_mode;
+      set_max_crossing ~loc expected_mode;
       type_comprehension_expr
         ~loc
         ~env
@@ -7482,7 +7482,7 @@ and type_expect_
         ~attributes:sexp.pexp_attributes
         comp
   | Pexp_overwrite (exp1, exp2) ->
-      set_max_crossing expected_mode;
+      set_max_crossing ~loc expected_mode;
       if not (Language_extension.is_enabled Overwriting) then
         raise (Typetexp.Error (loc, env, Unsupported_extension Overwriting));
       if not (can_be_overwritten exp2.pexp_desc) then
@@ -7544,7 +7544,7 @@ and type_expect_
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
   | Pexp_quote exp ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing ~loc expected_mode;
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       let jkind = Jkind.Builtin.value ~why:Quotation_result in
       let new_env = Env.enter_quotation env in
@@ -7561,7 +7561,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_splice exp ->
-      set_max_crossing_temp expected_mode;
+      set_max_crossing ~loc expected_mode;
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       let new_env = Env.enter_splice ~loc env in
       let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
@@ -7573,7 +7573,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_hole ->
-      set_max_crossing expected_mode;
+      set_max_crossing ~loc expected_mode;
       begin match overwrite with
       | Assigning(typ, fields_mode) ->
         assert (Language_extension.is_enabled Overwriting);

@@ -2270,12 +2270,6 @@ end
 
 exception Submode_error_simple_context of Hint.pinpoint * Error.packed
 
-let () =
-  Location.register_error_of_exn (function
-    | Submode_error_simple_context (pp, err) ->
-      Some (Error.print_packed_simple_context pp err)
-    | _ -> None)
-
 module type Common_axis_pos = sig
   module Const : Lattice
 
@@ -4712,6 +4706,8 @@ module Crossing = struct
     Format.(pp_print_list ~pp_sep:pp_print_space pp_print_string ppf l)
 end
 
+exception Crossing_error_simple of Location.t * Crossing.t * Crossing.t
+
 module Crossing_bound = struct
   type t =
     { upper : Crossing.t option;
@@ -4733,18 +4729,37 @@ module Crossing_bound = struct
 
   let newvar_below upper = { (newvar ()) with upper = Some upper }
 
-  let join_lower t crossing =
+  let join_lower ~loc t crossing =
     t.lower <- Crossing.join t.lower crossing;
     match t.upper with
     | None -> ()
-    | Some upper -> if not (Crossing.le t.lower upper) then failwith "explode"
+    | Some upper ->
+      if not (Crossing.le t.lower upper)
+      then raise (Crossing_error_simple (loc, upper, t.lower))
 
-  let join t { lower; upper } =
+  let join ~loc t { lower; upper } =
     match upper with
-    | None -> join_lower t lower
-    | Some upper -> join_lower t upper
+    | None -> join_lower ~loc t lower
+    | Some upper -> join_lower ~loc t upper
 
-  let set_max t = join_lower t Crossing.max
+  let set_max ~loc t = join_lower ~loc t Crossing.max
 
   let of_crossing crossing = { upper = Some crossing; lower = crossing }
 end
+
+let () =
+  Location.register_error_of_exn (function
+    | Submode_error_simple_context (pp, err) ->
+      Some (Error.print_packed_simple_context pp err)
+    | Crossing_error_simple (loc, lower, upper) ->
+      let print ppf () =
+        Format.dprintf "This is \"mod " ppf;
+        Crossing.Per_axis.print (Monadic Contention) ppf
+          (Crossing.proj (Monadic Contention) upper);
+        Format.dprintf "\" but it is expected to be \"mod " ppf;
+        Crossing.Per_axis.print (Monadic Contention) ppf
+          (Crossing.proj (Monadic Contention) lower);
+        Format.pp_print_string ppf "\"."
+      in
+      Some (Location.error_of_printer ~loc print ())
+    | _ -> None)

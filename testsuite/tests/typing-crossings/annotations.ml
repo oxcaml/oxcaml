@@ -5,8 +5,10 @@
 let not_mod_contended () =
   let x mod contended = [ ref 42 ] in ()
 [%%expect {|
-Uncaught exception: Failure("explode")
-
+Line 2, characters 26-32:
+2 |   let x mod contended = [ ref 42 ] in ()
+                              ^^^^^^
+Error: This value is "mod uncontended" but it is expected to be "mod contended".
 |}]
 
 let is_mod_contended () =
@@ -27,8 +29,11 @@ Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let nested () =
-  let _ = [ ([] : int ref list mod contended); [ ref 42 ]; ([] : _ mod contended) ] in
+  let _ mod contended = [ ([] : int ref list mod contended); [ ref 42 ]; ([] : _ mod contended) ] in
   ()
 [%%expect {|
-val nested : unit -> unit = <fun>
+Line 2, characters 63-69:
+2 |   let _ mod contended = [ ([] : int ref list mod contended); [ ref 42 ]; ([] : _ mod contended) ] in
+                                                                   ^^^^^^
+Error: This value is "mod uncontended" but it is expected to be "mod contended".
 |}]

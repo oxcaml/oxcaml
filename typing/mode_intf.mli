@@ -1101,11 +1101,11 @@ module type S = sig
 
     val newvar_below : Crossing.t -> t
 
-    val set_max : t -> unit
+    val join_lower : loc:Location.t -> t -> Crossing.t -> unit
 
-    val join_lower : t -> Crossing.t -> unit
+    val join : loc:Location.t -> t -> t -> unit
 
-    val join : t -> t -> unit
+    val set_max : loc:Location.t -> t -> unit
 
     val of_crossing : Crossing.t -> t
   end
