@@ -1164,7 +1164,7 @@ module Layout_and_axes = struct
                 Axis_set.diff relevant_axes_for_ty skippable_axes
               in
               match quality, mode with
-              | Best, _ | Not_best, Ignore_best ->
+              | Best, _ | Not_best, Ignore_best -> (
                 (* The relevant axes are the intersection of the relevant axes within our
                    branch of the with-bounds tree, and the relevant axes on this
                    particular with-bound *)
@@ -1178,20 +1178,25 @@ module Layout_and_axes = struct
                   loop new_ctl bounds_so_far relevant_axes_for_ty
                     (With_bounds.to_list b_with_bounds)
                 in
-                (* CR layouts v2.8: we use [new_ctl] here, not [ctl], to avoid big
-                   quadratic stack growth for very widely recursive types. This is
-                   sad, since it prevents us from mode crossing a record with 20
-                   lists with different payloads, but less sad than a stack
-                   overflow of the compiler during type declaration checking.
+                match fuel_result1, mode with
+                | Ran_out_of_fuel, Ignore_best | Sufficient_fuel, _ ->
+                  (* CR layouts v2.8: we use [new_ctl] here, not [ctl], to avoid big
+                     quadratic stack growth for very widely recursive types. This is
+                     sad, since it prevents us from mode crossing a record with 20
+                     lists with different payloads, but less sad than a stack
+                     overflow of the compiler during type declaration checking.
 
-                   Ideally, this whole problem goes away once we rethink fuel.
-                *)
-                let bounds, bs', fuel_result2 =
-                  loop new_ctl bounds_so_far relevant_axes bs
-                in
-                ( bounds,
-                  With_bounds.join nested_with_bounds bs',
-                  Fuel_status.both fuel_result1 fuel_result2 )
+                     Ideally, this whole problem goes away once we rethink fuel.
+                  *)
+                  let bounds, bs', fuel_result2 =
+                    loop new_ctl bounds_so_far relevant_axes bs
+                  in
+                  ( bounds,
+                    With_bounds.join nested_with_bounds bs',
+                    Fuel_status.both fuel_result1 fuel_result2 )
+                | Ran_out_of_fuel, Require_best ->
+                  (* See Note [Ran out of fuel when requiring best]. *)
+                  Mod_bounds.max, No_with_bounds, Ran_out_of_fuel)
               | Not_best, Require_best ->
                 (* CR layouts v2.8: The type annotation on the next line is
                    necessary only because [loop] is
@@ -1208,10 +1213,15 @@ module Layout_and_axes = struct
             match
               Loop_control.check ~relevant_axes:relevant_axes_for_ty ctl ty
             with
-            | Stop ctl_after_stop ->
-              (* out of fuel, so assume [ty] has the worst possible bounds. *)
-              found_jkind_for_ty ctl_after_stop Mod_bounds.max No_with_bounds
-                Not_best Axis_set.empty [@nontail]
+            | Stop ctl_after_stop -> (
+              match mode with
+              | Ignore_best ->
+                (* out of fuel, so assume [ty] has the worst possible bounds. *)
+                found_jkind_for_ty ctl_after_stop Mod_bounds.max No_with_bounds
+                  Not_best Axis_set.empty [@nontail]
+              | Require_best ->
+                (* See Note [Ran out of fuel when requiring best]. *)
+                Mod_bounds.max, No_with_bounds, Ran_out_of_fuel)
             | Skip -> loop ctl bounds_so_far relevant_axes bs (* skip [b] *)
             | Continue { ctl = ctl_after_unpacking_b; skippable_axes } -> (
               match context.jkind_of_type ty with
@@ -1234,9 +1244,18 @@ module Layout_and_axes = struct
       in
       let normalized_t : (layout, l * r2) layout_and_axes =
         match mode, fuel_status with
-        | Require_best, Ran_out_of_fuel -> t |> disallow_right
         | Require_best, Sufficient_fuel | Ignore_best, _ ->
           { t with mod_bounds; with_bounds }
+        | Require_best, Ran_out_of_fuel ->
+          (* Note [Ran out of fuel when requiring best]
+             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+             If we run out of fuel when in Require_best mode, we have a few
+             options for what to do:
+             1. Once we run out of fuel,
+
+             TODO: finish writing this
+          *)
+          t |> disallow_right
       in
       normalized_t, fuel_status
 end
