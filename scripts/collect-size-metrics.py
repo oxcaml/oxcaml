@@ -23,6 +23,17 @@ COUNTERS_OF_INTEREST = ["reload", "spill"]
 TOP_LEVEL_PASS_NAME = "."
 
 
+def print_warning(message: str) -> None:
+    """Print a warning message to stderr."""
+    print(f"Warning: {message}", file=sys.stderr)
+
+
+def fatal(message: str) -> None:
+    """Print an error message to stderr and exit with code 1."""
+    print(f"Error: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
 def parse_pass_name(pass_name: str) -> Optional[str]:
     """Extract hierarchical pass name from 'file=path//pass/name' format.
 
@@ -176,13 +187,6 @@ def collect_metrics(
     """Collect file size metrics and write to CSV."""
     install_path = Path(install_dir)
 
-    # Validate input directory exists
-    if not install_path.is_dir():
-        print(
-            f"Error: Install directory '{install_dir}' does not exist", file=sys.stderr
-        )
-        sys.exit(1)
-
     # Extract PR number from commit message (use last match if multiple)
     pr_matches = re.findall(r"\(#(\d+)\)", commit_message)
     pr_number = pr_matches[-1] if pr_matches else "N/A"
@@ -265,10 +269,6 @@ def find_profile_csv_files(build_dir: str) -> List[Path]:
     """Find all profile CSV files under _build directory."""
     build_path = Path(build_dir)
 
-    if not build_path.is_dir():
-        print(f"Warning: Build directory '{build_dir}' does not exist", file=sys.stderr)
-        return []
-
     # Find all files matching the pattern */_profile_csv/profile.*.csv
     profile_files = list(build_path.rglob("_profile_csv/profile.*.csv"))
 
@@ -285,7 +285,7 @@ def parse_profile_csv(profile_path: Path) -> ProfileFile:
             for row in reader:
                 records.append(row)
     except Exception as e:
-        print(f"Warning: Failed to parse {profile_path}: {e}", file=sys.stderr)
+        print_warning(f"Failed to parse {profile_path}: {e}")
 
     return records
 
@@ -333,6 +333,13 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    # Validate that required directories exist
+    if not Path(args.install_directory).is_dir():
+        fatal(f"Install directory '{args.install_directory}' does not exist")
+
+    if not Path(args.build_directory).is_dir():
+        fatal(f"Build directory '{args.build_directory}' does not exist")
 
     # Load profile data
     profile_data = load_profile_data(args.build_directory, args.verbose)
