@@ -703,16 +703,28 @@ let rec apply_renaming t renaming =
       if ty == ty' then t else Region ty'
 
 and apply_renaming_head_of_kind_value head renaming =
-  let { non_null; is_null = _ } = head in
-  match non_null with
-  | Unknown | Bottom -> head
-  | Ok non_null ->
-    let non_null' =
-      apply_renaming_head_of_kind_value_non_null non_null renaming
-    in
-    if non_null == non_null'
-    then head
-    else { non_null = Ok non_null'; is_null = head.is_null }
+  let { non_null; is_null } = head in
+  let is_null' =
+    match is_null with
+    | Not_null -> Not_null
+    | Maybe_null { is_null = is_null_var } ->
+      let is_null_var' = apply_renaming_relation is_null_var renaming in
+      if is_null_var == is_null_var'
+      then is_null
+      else Maybe_null { is_null = is_null_var' }
+  in
+  let non_null' : _ Or_unknown_or_bottom.t =
+    match non_null with
+    | Unknown | Bottom -> non_null
+    | Ok non_null_head ->
+      let non_null_head' =
+        apply_renaming_head_of_kind_value_non_null non_null_head renaming
+      in
+      if non_null_head == non_null_head' then non_null else Ok non_null_head'
+  in
+  if non_null == non_null' && is_null == is_null'
+  then head
+  else { non_null = non_null'; is_null = is_null' }
 
 and apply_renaming_relation relation renaming =
   match relation with
