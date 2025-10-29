@@ -2055,22 +2055,41 @@ and n_way_join_expanded_head env kind (expandeds : ET.t Join_env.join_arg list)
 and n_way_join_head_of_kind_value env
     (heads : TG.head_of_kind_value Join_env.join_arg list) :
     TG.head_of_kind_value n_way_join_result =
-  let is_null : TG.is_null =
-    match heads with
-    | [] -> Not_null
-    | (_, head1) :: heads -> (
-      (* CR bclement: preserve [is_null] relation *)
-      match head1.is_null with
-      | Maybe_null _ -> Maybe_null { is_null = None }
-      | Not_null ->
-        if List.for_all
-             (fun (_, (head2 : TG.head_of_kind_value)) ->
-               match head2.is_null with
-               | Not_null -> true
-               | Maybe_null _ -> false)
-             heads
-        then Not_null
-        else Maybe_null { is_null = None })
+  let (is_null : TG.is_null), env =
+    let machine_width = Join_env.machine_width env in
+    let exception Cannot_track in
+    match
+      List.map
+        (fun ((id, head) : TG.head_of_kind_value Join_env.join_arg) ->
+          match head.is_null with
+          | Not_null -> id, Simple.const_false machine_width
+          | Maybe_null { is_null = None } -> raise_notrace Cannot_track
+          | Maybe_null { is_null = Some is_null } -> id, Simple.var is_null)
+        heads
+    with
+    | exception Cannot_track -> Maybe_null { is_null = None }, env
+    | is_null_simples -> (
+      (* Note: we ideally would use [n_way_join_relation_simples] here, but we
+         need to store a [Not_null] constructor if the join is [false]. *)
+      match n_way_join_simples env K.naked_immediate is_null_simples with
+      | Bottom, env -> Maybe_null { is_null = None }, env
+      | Ok simple, env ->
+        let is_null =
+          Simple.pattern_match' simple
+            ~const:(fun const : TG.is_null ->
+              if Reg_width_const.equal const
+                   (Reg_width_const.const_false machine_width)
+              then Not_null
+              else
+                (* We rely on the fact that, if we find [true] here, all the
+                   [non_null] fields must be [Bottom] already. *)
+                Maybe_null { is_null = None })
+            ~symbol:(fun _ ->
+              Misc.fatal_error "Unexpected symbol in join of naked immediates")
+            ~var:(fun var ~coercion:_ : TG.is_null ->
+              Maybe_null { is_null = Some var })
+        in
+        is_null, env)
   in
   let non_null : _ Or_unknown_or_bottom.t * _ =
     let exception Unknown_result in
