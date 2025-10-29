@@ -1249,11 +1249,38 @@ module Layout_and_axes = struct
         | Require_best, Ran_out_of_fuel ->
           (* Note [Ran out of fuel when requiring best]
              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-             If we run out of fuel when in Require_best mode, we have a few
-             options for what to do:
-             1. Once we run out of fuel,
+             If we run out of fuel when in Require_best mode, and thus are
+             unable to expand some type ['a u] ('a here is standing in for an
+             arbitrary set of arguments), here's some reasonable strategies to
+             handle this:
 
-             TODO: finish writing this
+             1. Continue expanding remaining with-bounds and then add
+                ['a u] to the with-bounds when done.
+             2. Restart normalization from the beginning (or at least go back to
+                the first occurrence of [u]) and blacklist [u]. That is, we
+                never try to expand [u] - every time we see it, we simply add it
+                to the output jkind's with-bounds.
+             3. Just return the original jkind that we were given.
+
+             Option 1 can result in a very large number of with-bounds in the
+             output jkind because we may try to expand [u] a number of times
+             that is exponential on the amount of fuel. As a result,
+             normalization using this strategy can result in more complex
+             jkinds, which can hurt performace. Thus, option 1 is undesirable.
+
+             Option 2 seems to be a good solution to the problem with option 1,
+             but it seems inefficient. But it seems possible that in practice
+             this backtracking wouldn't be expensive because maybe it's rare to
+             need to backtrack more than once.
+
+             Option 3 is easy to implement and avoids the issue with option 1,
+             so we choose this.
+
+             Implementation note: Inside [loop], whenever we detect that we ran
+             out of fuel (when in require-best mode), we bail out of the loop
+             since there's no point in continuing. Instead, we return arbitrary
+             mod- and with-bounds, because down here we detect the case and
+             simply return [t].
           *)
           t |> disallow_right
       in
