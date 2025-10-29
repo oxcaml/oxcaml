@@ -71,14 +71,15 @@ def parse_value_with_unit(value_str: str) -> Optional[float]:
             return None
 
     # Memory/heap: B, kB, MB, GB
-    multipliers = {
-        "GB": 1024**3,
-        "MB": 1024**2,
-        "kB": 1024,
-        "B": 1,
-    }
+    # Check longer suffixes first to avoid "GB" matching "B", etc.
+    multipliers = [
+        ("GB", 1024**3),
+        ("MB", 1024**2),
+        ("kB", 1024),
+        ("B", 1),
+    ]
 
-    for unit, multiplier in multipliers.items():
+    for unit, multiplier in multipliers:
         if value_str.endswith(unit):
             try:
                 value = float(value_str[: -len(unit)])
