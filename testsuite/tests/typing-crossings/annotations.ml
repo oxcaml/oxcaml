@@ -8,7 +8,7 @@ let not_mod_contended () =
 Line 2, characters 26-32:
 2 |   let x mod contended = [ ref 42 ] in ()
                               ^^^^^^
-Error: This value is "mod uncontended" but it is expected to be "mod contended".
+Error: This is "mod uncontended" but it is expected to be "mod contended".
 |}]
 
 let is_mod_contended () =
@@ -35,5 +35,5 @@ let nested () =
 Line 2, characters 63-69:
 2 |   let _ mod contended = [ ([] : int ref list mod contended); [ ref 42 ]; ([] : _ mod contended) ] in
                                                                    ^^^^^^
-Error: This value is "mod uncontended" but it is expected to be "mod contended".
+Error: This is "mod uncontended" but it is expected to be "mod contended".
 |}]
