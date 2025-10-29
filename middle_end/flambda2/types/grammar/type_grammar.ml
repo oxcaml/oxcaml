@@ -44,8 +44,7 @@ end
 
 type is_null =
   | Not_null
-  | Maybe_null
-  | Is_null of Variable.t
+  | Maybe_null of { is_null : Variable.t option }
 
 (* The grammar of Flambda types. *)
 type t =
@@ -1078,7 +1077,7 @@ let rec print ppf t =
 
 and print_head_of_kind_value ppf { non_null; is_null } =
   let null_string =
-    match is_null with Maybe_null | Is_null _ -> "?" | Not_null -> "!"
+    match is_null with Maybe_null _ -> "?" | Not_null -> "!"
   in
   Format.fprintf ppf "@[<hov 1>(Val%s@ %a)@]" null_string
     (Or_unknown_or_bottom.print print_head_of_kind_value_non_null)
@@ -3967,7 +3966,9 @@ let box_vec512 (t : t) alloc_mode : t =
   | Naked_vec128 _ | Naked_vec256 _ | Rec_info _ | Region _ ->
     Misc.fatal_errorf "Type of wrong kind for [box_vec512]: %a" print t
 
-let null : t = Value (TD.create { non_null = Bottom; is_null = Maybe_null })
+let null : t =
+  Value
+    (TD.create { non_null = Bottom; is_null = Maybe_null { is_null = None } })
 
 let any_non_null_value : t =
   Value (TD.create { non_null = Unknown; is_null = Not_null })
@@ -4148,7 +4149,7 @@ let create_from_head_region head = Region (TD.create head)
 module Head_of_kind_value = struct
   type t = head_of_kind_value
 
-  let null = { non_null = Bottom; is_null = Maybe_null }
+  let null = { non_null = Bottom; is_null = Maybe_null { is_null = None } }
 
   let mk_non_null non_null = { non_null = Ok non_null; is_null = Not_null }
 
@@ -4342,7 +4343,7 @@ let rec must_be_singleton t ~machine_width : RWC.t option =
     match TD.descr ty with
     | Unknown | Bottom
     (* CR vlaviron: Recover null aliases *)
-    | Ok (No_alias { is_null = Maybe_null | Is_null _; _ })
+    | Ok (No_alias { is_null = Maybe_null _; _ })
     | Ok
         (No_alias
           { is_null = Not_null;

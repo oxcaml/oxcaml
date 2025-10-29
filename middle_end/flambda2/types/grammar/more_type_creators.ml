@@ -92,7 +92,9 @@ let any_tagged_immediate_non_null =
 
 let any_tagged_immediate_or_null =
   TG.create_from_head_value
-    { non_null = Ok any_tagged_immediate_non_null; is_null = Maybe_null }
+    { non_null = Ok any_tagged_immediate_non_null;
+      is_null = Maybe_null { is_null = None }
+    }
 
 let these_tagged_immediates0 imms =
   match Target_ocaml_int.Set.get_singleton imms with
@@ -558,7 +560,7 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
     in
     let is_null : TG.is_null =
       match Flambda_kind.With_subkind.nullable kind with
-      | Nullable -> Maybe_null
+      | Nullable -> Maybe_null { is_null = None }
       | Non_nullable -> Not_null
     in
     TG.create_from_head_value { non_null; is_null }

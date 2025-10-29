@@ -1233,7 +1233,7 @@ end = struct
             ~const:(fun const -> VA.Value_const const)
             ~var:(fun _ ~coercion:_ -> VA.Value_unknown)
             ~symbol:(fun symbol ~coercion:_ -> VA.Value_symbol symbol)
-        | Ok (No_alias { is_null = Maybe_null | Is_null _; _ })
+        | Ok (No_alias { is_null = Maybe_null _; _ })
         | Ok (No_alias { non_null = Unknown | Bottom; _ }) ->
           VA.Value_unknown
         | Ok (No_alias { is_null = Not_null; non_null = Ok head }) -> (

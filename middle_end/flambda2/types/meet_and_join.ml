@@ -676,19 +676,16 @@ and meet_head_of_kind_value env
   let meet_b env (is_null1 : TG.is_null) (is_null2 : TG.is_null) =
     match is_null1, is_null2 with
     | Not_null, Not_null -> Bottom Both_inputs
-    | Maybe_null, Maybe_null -> Ok (Both_inputs, env)
-    | Maybe_null, Is_null _ ->
+    | Not_null, Maybe_null _ ->
       (* We rely on the inverse relations for reductions. *)
       Ok (Right_input, env)
-    | Is_null _, Maybe_null ->
+    | Maybe_null _, Not_null ->
       (* We rely on the inverse relations for reductions. *)
       Ok (Left_input, env)
-    | Not_null, (Maybe_null | Is_null _) -> Bottom Left_input
-    | (Maybe_null | Is_null _), Not_null -> Bottom Right_input
-    | Is_null is_null1, Is_null is_null2 ->
+    | Maybe_null { is_null = is_null1 }, Maybe_null { is_null = is_null2 } ->
       map_result
-        ~f:(fun _ : TG.is_null -> Is_null is_null1)
-        (meet_relation env (Some is_null1) (Some is_null2))
+        ~f:(fun is_null : TG.is_null -> Maybe_null { is_null })
+        (meet_relation env is_null1 is_null2)
   in
   let bottom_a () = Or_unknown_or_bottom.Bottom in
   let bottom_b () : TG.is_null = Not_null in
@@ -1846,14 +1843,14 @@ and join_head_of_kind_value env (head1 : TG.head_of_kind_value)
   in
   let is_null : TG.is_null =
     match head1.is_null, head2.is_null with
-    | Is_null var1, Is_null var2 when Variable.equal var1 var2 ->
-      (* CR bclement: Look for a shared alias. *)
-      Is_null var1
-    | (Maybe_null | Is_null _), _ | _, (Maybe_null | Is_null _) -> Maybe_null
+    | Maybe_null { is_null = is_null1 }, Maybe_null { is_null = is_null2 } ->
+      Maybe_null { is_null = join_relation env is_null1 is_null2 }
+    | Maybe_null _, Not_null | Not_null, Maybe_null _ ->
+      Maybe_null { is_null = None }
     | Not_null, Not_null -> Not_null
   in
   match[@warning "-4"] non_null, is_null with
-  | Unknown, Maybe_null -> Unknown
+  | Unknown, Maybe_null { is_null = None } -> Unknown
   | _, _ -> Known { non_null; is_null }
 
 and join_relation _env var1 var2 =

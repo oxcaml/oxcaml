@@ -65,7 +65,7 @@ let gen_value_to_gen prove_gen env t : _ generic_proof =
   match expand_head env t with
   | Value Unknown -> Unknown
   | Value Bottom -> Invalid
-  | Value (Ok { is_null = Maybe_null | Is_null _; non_null = _ })
+  | Value (Ok { is_null = Maybe_null _; non_null = _ })
   | Value (Ok { is_null = Not_null; non_null = Unknown }) ->
     Unknown
   | Value (Ok { is_null = Not_null; non_null = Bottom }) -> Invalid
@@ -78,7 +78,7 @@ let gen_value_to_gen prove_gen env t : _ generic_proof =
 let gen_value_to_proof prove_gen env t : _ proof_of_property =
   match expand_head env t with
   | Value (Unknown | Bottom)
-  | Value (Ok { is_null = Maybe_null | Is_null _; non_null = _ })
+  | Value (Ok { is_null = Maybe_null _; non_null = _ })
   | Value (Ok { is_null = Not_null; non_null = Unknown | Bottom }) ->
     Unknown
   | Value (Ok { is_null = Not_null; non_null = Ok head }) ->
@@ -160,18 +160,14 @@ let prove_is_not_a_pointer_generic_value env t =
   match expand_head env t with
   | Value Unknown -> Unknown
   | Value Bottom -> Invalid
-  | Value (Ok { is_null = Maybe_null | Is_null _; non_null = Bottom }) ->
-    Proved true
+  | Value (Ok { is_null = Maybe_null _; non_null = Bottom }) -> Proved true
   | Value (Ok { is_null = Not_null; non_null = Bottom }) -> Invalid
-  | Value
-      (Ok { is_null = Maybe_null | Is_null _ | Not_null; non_null = Unknown })
-    ->
+  | Value (Ok { is_null = Maybe_null _ | Not_null; non_null = Unknown }) ->
     Unknown
   | Value (Ok { is_null; non_null = Ok head }) -> (
     match prove_is_int_generic_value ~variant_only:false env head, is_null with
-    | Proved true, (Maybe_null | Is_null _ | Not_null) -> Proved true
-    | (Proved false | Unknown), (Maybe_null | Is_null _) | Unknown, Not_null ->
-      Unknown
+    | Proved true, (Maybe_null _ | Not_null) -> Proved true
+    | (Proved false | Unknown), Maybe_null _ | Unknown, Not_null -> Unknown
     | Proved false, Not_null -> Proved false
     | Invalid, _ -> Invalid (* Ought to be impossible. *))
   | _ -> wrong_kind "Value" t Invalid
@@ -223,9 +219,7 @@ let prove_is_null_generic env t : _ generic_proof =
   | Value (Ok { non_null = Bottom; is_null = Not_null }) -> Invalid
   | Value (Ok { non_null = _; is_null = Not_null }) -> Proved false
   | Value (Ok { non_null = Bottom; is_null = _ }) -> Proved true
-  | Value (Ok { non_null = Unknown | Ok _; is_null = Maybe_null | Is_null _ })
-    ->
-    Unknown
+  | Value (Ok { non_null = Unknown | Ok _; is_null = Maybe_null _ }) -> Unknown
   | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
   | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
@@ -1250,12 +1244,11 @@ let prove_physical_equality env t1 t2 =
     | Value (Unknown | Bottom), _ | _, Value (Unknown | Bottom) -> Unknown
     | Value (Ok head1), Value (Ok head2) -> (
       match head1, head2 with
-      | ( { is_null = Maybe_null | Is_null _; non_null = Bottom },
-          { is_null = Maybe_null | Is_null _; non_null = Bottom } ) ->
+      | ( { is_null = Maybe_null _; non_null = Bottom },
+          { is_null = Maybe_null _; non_null = Bottom } ) ->
         (* Null is physically equal to Null *)
         Proved true
-      | { is_null = Maybe_null | Is_null _; _ }, _
-      | _, { is_null = Maybe_null | Is_null _; _ } ->
+      | { is_null = Maybe_null _; _ }, _ | _, { is_null = Maybe_null _; _ } ->
         Unknown
       | { is_null = Not_null; non_null = Unknown | Bottom }, _
       | _, { is_null = Not_null; non_null = Unknown | Bottom } ->

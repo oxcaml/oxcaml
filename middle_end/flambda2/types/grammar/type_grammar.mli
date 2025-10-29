@@ -31,8 +31,7 @@ end
 
 type is_null =
   | Not_null
-  | Maybe_null
-  | Is_null of Variable.t
+  | Maybe_null of { is_null : Variable.t option }
 
 type t = private
   | Value of head_of_kind_value Type_descr.t

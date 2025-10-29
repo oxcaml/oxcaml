@@ -32,7 +32,9 @@ module Typing_env = struct
           ~var:(fun var ->
             let scrutinee_ty =
               Type_grammar.create_from_head_value
-                { is_null = Is_null var; non_null = Unknown }
+                { is_null = Maybe_null { is_null = Some var };
+                  non_null = Unknown
+                }
             in
             add_equation_on_simple t scrutinee scrutinee_ty))
 

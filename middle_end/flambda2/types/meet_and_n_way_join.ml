@@ -818,19 +818,16 @@ and meet_head_of_kind_value env
   let meet_b env (is_null1 : TG.is_null) (is_null2 : TG.is_null) =
     match is_null1, is_null2 with
     | Not_null, Not_null -> Bottom Both_inputs
-    | Maybe_null, Maybe_null -> Ok (Both_inputs, env)
-    | Maybe_null, Is_null _ ->
+    | Not_null, Maybe_null _ ->
       (* We rely on the inverse relations for reductions. *)
       Ok (Right_input, env)
-    | Is_null _, Maybe_null ->
+    | Maybe_null _, Not_null ->
       (* We rely on the inverse relations for reductions. *)
       Ok (Left_input, env)
-    | Not_null, (Maybe_null | Is_null _) -> Bottom Left_input
-    | (Maybe_null | Is_null _), Not_null -> Bottom Right_input
-    | Is_null is_null1, Is_null is_null2 ->
+    | Maybe_null { is_null = is_null1 }, Maybe_null { is_null = is_null2 } ->
       map_result
-        ~f:(fun _ : TG.is_null -> Is_null is_null1)
-        (meet_relation env (Some is_null1) (Some is_null2))
+        ~f:(fun is_null : TG.is_null -> Maybe_null { is_null })
+        (meet_relation env is_null1 is_null2)
   in
   let bottom_a () = Or_unknown_or_bottom.Bottom in
   let bottom_b () : TG.is_null = Not_null in
@@ -2068,16 +2065,16 @@ and n_way_join_head_of_kind_value env
     | (_, head1) :: heads -> (
       (* CR bclement: preserve [is_null] relation *)
       match head1.is_null with
-      | Maybe_null | Is_null _ -> Maybe_null
+      | Maybe_null _ -> Maybe_null { is_null = None }
       | Not_null ->
         if List.for_all
              (fun (_, (head2 : TG.head_of_kind_value)) ->
                match head2.is_null with
                | Not_null -> true
-               | Maybe_null | Is_null _ -> false)
+               | Maybe_null _ -> false)
              heads
         then Not_null
-        else Maybe_null)
+        else Maybe_null { is_null = None })
   in
   let non_null : _ Or_unknown_or_bottom.t * _ =
     let exception Unknown_result in
@@ -2101,7 +2098,7 @@ and n_way_join_head_of_kind_value env
     with Unknown_result -> Unknown, env
   in
   match[@warning "-4"] non_null, is_null with
-  | (Unknown, env), Maybe_null -> Unknown, env
+  | (Unknown, env), Maybe_null { is_null = None } -> Unknown, env
   | (non_null, env), _ -> Known { non_null; is_null }, env
 
 and n_way_join_head_of_kind_value_non_null env
