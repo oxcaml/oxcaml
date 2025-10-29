@@ -414,10 +414,11 @@ jobs:
 
         # Use the metrics collection script (CSV filename and PR number computed internally)
         python3 ${{ github.workspace }}/scripts/collect-size-metrics.py \
-          "${{ github.workspace }}/_install" \
-          "metrics-repo/data" \
-          "$COMMIT_HASH" \
-          "$COMMIT_MESSAGE" \
+          --install-directory "${{ github.workspace }}/_install" \
+          --output-directory "metrics-repo/data" \
+          --commit-hash "$COMMIT_HASH" \
+          --commit-message "$COMMIT_MESSAGE" \
+          --build-directory "${{ github.workspace }}/_build" \
           --verbose
 
         # Commit and push metrics

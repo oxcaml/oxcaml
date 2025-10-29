@@ -2,14 +2,173 @@
 """Script to collect file size metrics from _install directory."""
 
 import argparse
+import csv
 import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import List, Dict, Any, Optional
+
+# Type aliases for clarity
+CsvRow = Dict[str, Any]
+ProfileFile = List[CsvRow]
+ProfileData = List[ProfileFile]
+AggregatedMetrics = Dict[str, Dict[str, float]]
+
+# Counter names we're interested in tracking
+COUNTERS_OF_INTEREST = ["reload", "spill"]
+
+# Special name for top-level pass (file=path/ without // separator)
+TOP_LEVEL_PASS_NAME = "."
+
+
+def parse_pass_name(pass_name: str) -> Optional[str]:
+    """Extract hierarchical pass name from 'file=path//pass/name' format.
+
+    If the format is 'file=path/' (no '//' separator), this represents the
+    top-level pass for that file, and we return TOP_LEVEL_PASS_NAME.
+    """
+    if not pass_name or not pass_name.startswith("file="):
+        return None
+
+    # Split on '//' to separate file path from pass hierarchy
+    parts = pass_name.split("//", 1)
+    if len(parts) < 2:
+        # This is the top-level: file=path/
+        # Check that it ends with '/' to validate the format
+        if parts[0].endswith("/"):
+            return TOP_LEVEL_PASS_NAME
+        return None
+
+    # Return the hierarchical pass name
+    return parts[1]
+
+
+def parse_value_with_unit(value_str: str) -> Optional[float]:
+    """Parse value with unit (s, B, kB, MB, GB) and convert to base unit."""
+    if not value_str or value_str.strip() == "":
+        return None
+
+    value_str = value_str.strip()
+
+    # Time: always in seconds (e.g., "1.878s")
+    if value_str.endswith("s"):
+        try:
+            return float(value_str[:-1])
+        except ValueError:
+            return None
+
+    # Memory/heap: B, kB, MB, GB
+    multipliers = {
+        "GB": 1024**3,
+        "MB": 1024**2,
+        "kB": 1024,
+        "B": 1,
+    }
+
+    for unit, multiplier in multipliers.items():
+        if value_str.endswith(unit):
+            try:
+                value = float(value_str[:-len(unit)])
+                return value * multiplier
+            except ValueError:
+                return None
+
+    return None
+
+
+def parse_counters(counters_str: str) -> Dict[str, int]:
+    """Parse counter string format: [name = value; name = value; ...]"""
+    counters = {}
+
+    if not counters_str or counters_str.strip() == "":
+        return counters
+
+    # Remove brackets and split by semicolons
+    counters_str = counters_str.strip()
+    if counters_str.startswith("[") and counters_str.endswith("]"):
+        counters_str = counters_str[1:-1]
+
+    # Parse each counter
+    for part in counters_str.split(";"):
+        part = part.strip()
+        if "=" in part:
+            name, value = part.split("=", 1)
+            name = name.strip()
+            value = value.strip()
+            try:
+                counters[name] = int(value)
+            except ValueError:
+                # Skip if value is not an integer
+                continue
+
+    return counters
+
+
+def aggregate_counters(profile_data_by_file: ProfileData) -> Dict[str, int]:
+    """Aggregate counters: keep latest per file, then sum across files."""
+    total_counters = {counter: 0 for counter in COUNTERS_OF_INTEREST}
+
+    # For each profile file
+    for file_records in profile_data_by_file:
+        # Get latest occurrence of each counter in this file
+        file_counters = {}
+        for record in file_records:
+            counters_str = record.get("counters", "")
+            counters = parse_counters(counters_str)
+
+            # Update with latest values for counters of interest
+            for counter_name in COUNTERS_OF_INTEREST:
+                if counter_name in counters:
+                    file_counters[counter_name] = counters[counter_name]
+
+        # Sum the latest values from this file
+        for counter_name, value in file_counters.items():
+            total_counters[counter_name] += value
+
+    return total_counters
+
+
+def aggregate_profile_metrics(
+    profile_data_by_file: ProfileData
+) -> AggregatedMetrics:
+    """Aggregate time/memory/heap metrics by pass name, summing values."""
+    # Metrics to aggregate: column name -> output kind name
+    metric_columns = {
+        "time": "time_in_seconds",
+        "alloc": "alloc_in_bytes",
+        "top-heap": "top_heap_in_bytes",
+        "absolute-top-heap": "absolute_top_heap_in_bytes",
+    }
+
+    # Initialize aggregation dictionaries
+    aggregated = {kind: {} for kind in metric_columns.values()}
+
+    # Process each profile file
+    for file_records in profile_data_by_file:
+        for record in file_records:
+            # Extract pass name
+            raw_pass_name = record.get("pass name", "")
+            pass_name = parse_pass_name(raw_pass_name)
+            if not pass_name:
+                continue
+
+            # Process each metric column
+            for column, kind in metric_columns.items():
+                value_str = record.get(column, "")
+                value = parse_value_with_unit(value_str)
+
+                if value is not None:
+                    if pass_name not in aggregated[kind]:
+                        aggregated[kind][pass_name] = 0.0
+                    aggregated[kind][pass_name] += value
+
+    return aggregated
 
 
 def collect_metrics(install_dir: str, output_dir: str, commit_hash: str,
-                    commit_message: str, verbose: bool = False) -> None:
+                    commit_message: str, profile_data: ProfileData,
+                    verbose: bool = False) -> None:
     """Collect file size metrics and write to CSV."""
     install_path = Path(install_dir)
 
@@ -40,18 +199,42 @@ def collect_metrics(install_dir: str, output_dir: str, commit_hash: str,
         "cmx", "cmo", "cms", "cmsi", "cmt", "cmti", "o"
     ]
 
+    # Aggregate counter data from profile
+    counter_metrics = aggregate_counters(profile_data)
+
+    # Aggregate profile metrics (time, memory, heap)
+    profile_metrics = aggregate_profile_metrics(profile_data)
+
     with csv_path.open("w") as csv_file:
         # Write CSV header
-        csv_file.write("timestamp,commit_hash,pr_number,extension,total_size_bytes\n")
+        csv_file.write("timestamp,commit_hash,pr_number,kind,name,value\n")
 
-        # Collect metrics for each extension
+        # Collect size metrics for each extension
         for ext in extensions:
             files = list(install_path.rglob(f"*.{ext}"))
             total_size = sum(file.stat().st_size for file in files
                            if file.is_file())
 
-            # Write to CSV
-            csv_file.write(f"{timestamp},{commit_hash},{pr_number},{ext},{total_size}\n")
+            # Write size metric to CSV
+            csv_file.write(
+                f"{timestamp},{commit_hash},{pr_number},"
+                f"size_in_bytes,{ext},{total_size}\n"
+            )
+
+        # Write counter metrics to CSV
+        for counter_name, counter_value in sorted(counter_metrics.items()):
+            csv_file.write(
+                f"{timestamp},{commit_hash},{pr_number},"
+                f"counter,{counter_name},{counter_value}\n"
+            )
+
+        # Write profile metrics to CSV
+        for kind in sorted(profile_metrics.keys()):
+            for pass_name, value in sorted(profile_metrics[kind].items()):
+                csv_file.write(
+                    f"{timestamp},{commit_hash},{pr_number},"
+                    f"{kind},{pass_name},{value}\n"
+                )
 
     print(f"Generated metrics file: {csv_path}")
     print(f"Metrics collected for commit: {commit_hash}")
@@ -63,25 +246,88 @@ def collect_metrics(install_dir: str, output_dir: str, commit_hash: str,
             print(csv_file.read())
 
 
+def find_profile_csv_files(build_dir: str) -> List[Path]:
+    """Find all profile CSV files under _build directory."""
+    build_path = Path(build_dir)
+
+    if not build_path.is_dir():
+        print(f"Warning: Build directory '{build_dir}' does not exist",
+              file=sys.stderr)
+        return []
+
+    # Find all files matching the pattern */_profile_csv/profile.*.csv
+    profile_files = list(build_path.rglob("_profile_csv/profile.*.csv"))
+
+    return profile_files
+
+
+def parse_profile_csv(profile_path: Path) -> ProfileFile:
+    """Parse a single profile CSV file and return list of records."""
+    records = []
+
+    try:
+        with profile_path.open("r") as csv_file:
+            reader = csv.DictReader(csv_file)
+            for row in reader:
+                records.append(row)
+    except Exception as e:
+        print(f"Warning: Failed to parse {profile_path}: {e}",
+              file=sys.stderr)
+
+    return records
+
+
+def load_profile_data(build_dir: str, verbose: bool = False) -> ProfileData:
+    """Load all profile CSV data, grouped by file."""
+    profile_files = find_profile_csv_files(build_dir)
+
+    if verbose:
+        print(f"\nFound {len(profile_files)} profile CSV files:")
+        for pf in profile_files:
+            print(f"  {pf}")
+
+    profile_data_by_file = []
+    total_records = 0
+    for profile_file in profile_files:
+        records = parse_profile_csv(profile_file)
+        profile_data_by_file.append(records)
+        total_records += len(records)
+
+    if verbose:
+        print(f"\nLoaded {total_records} profile records total")
+
+    return profile_data_by_file
+
+
 def main() -> None:
     """Parse arguments and run metrics collection."""
     parser = argparse.ArgumentParser(
         description="Collect file size metrics from install directory"
     )
-    parser.add_argument("install_directory", help="Path to install directory")
-    parser.add_argument("output_directory", help="Output directory for CSV file")
-    parser.add_argument("commit_hash", help="Git commit hash")
-    parser.add_argument("commit_message", help="Git commit message")
+    parser.add_argument("--install-directory", required=True,
+                        help="Path to install directory")
+    parser.add_argument("--output-directory", required=True,
+                        help="Output directory for CSV file")
+    parser.add_argument("--commit-hash", required=True,
+                        help="Git commit hash")
+    parser.add_argument("--commit-message", required=True,
+                        help="Git commit message")
+    parser.add_argument("--build-directory", required=True,
+                        help="Path to build directory")
     parser.add_argument("--verbose", action="store_true",
                         help="Print contents of generated CSV file")
 
     args = parser.parse_args()
+
+    # Load profile data
+    profile_data = load_profile_data(args.build_directory, args.verbose)
 
     collect_metrics(
         args.install_directory,
         args.output_directory,
         args.commit_hash,
         args.commit_message,
+        profile_data,
         args.verbose
     )
 
