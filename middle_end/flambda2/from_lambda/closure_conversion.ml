@@ -3846,16 +3846,10 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       let field_kinds = K.Mixed_block_shape.field_kinds kind_shape in
       let block_shape = K.Scannable_block_shape.Mixed_record kind_shape in
       let block_access pos : P.Block_access_kind.t =
-        let field_kind : P.Mixed_block_access_field_kind.t =
-          match flattened_reordered_shape.(pos) with
-          | Value _ -> Value_prefix Any_value
-          | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-            | Vec256 | Vec512 | Word | Untagged_immediate ) as
-            mixed_block_element ->
-            Flat_suffix
-              (K.Flat_suffix_element.from_singleton_mixed_block_element
-                 mixed_block_element)
-          | Float_boxed _ -> Flat_suffix K.Flat_suffix_element.naked_float
+        let field_kind =
+          Lambda_to_flambda_primitives_helpers.block_access_for_element
+            ~for_block_load:true
+            flattened_reordered_shape.(pos)
         in
         Mixed
           { tag = Known Tag.Scannable.zero;
