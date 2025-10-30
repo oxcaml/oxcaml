@@ -3045,11 +3045,16 @@ let unit_name_of_filename fn =
       else None
   | _ -> None
 
-let persistent_structures_of_dir dir =
-  Load_path.Dir.basenames dir
+let persistent_structures_of_basenames basenames =
+  basenames
   |> List.to_seq
   |> Seq.filter_map unit_name_of_filename
   |> String.Set.of_seq
+
+
+let persistent_structures_of_dir dir =
+  Load_path.Dir.basenames dir
+  |> persistent_structures_of_basenames
 
 (* Save a signature to a file *)
 let save_signature_with_transform cmi_transform ~alerts sg modname kind

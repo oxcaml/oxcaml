@@ -28,7 +28,6 @@ module Dir : sig
   val hidden : t -> bool
 
   val create : hidden:bool -> string -> t
-  val create_raw : hidden:bool -> string -> entry list -> t
 
   val find : t -> string -> string option
   val find_normalized : t -> string -> string option
@@ -79,38 +78,6 @@ end = struct
     let files = Array.to_list (readdir_compat path)
       |> List.map (fun basename -> { basename; path = Filename.concat path basename }) in
     { path; files; hidden }
-
-  let create_raw ~hidden path entires =
-    { path; files = entires; hidden }
-
-  (* let read_path_list_file' path_list_file_path =
-    let ic = open_in path_list_file_path in
-    Misc.try_finally
-      (fun () ->
-        let rec loop acc =
-          try
-            let line = input_line ic in
-            let (basename, path) = Misc.Stdlib.String.split_first_exn ~split_on:' ' line in
-            loop ({ basename; path } :: acc)
-          with End_of_file -> acc
-        in
-        loop [])
-      ~always:(fun () -> close_in ic)
-
-  let read_path_list_file path_list_file_path =
-    let files = read_path_list_file' path_list_file_path in
-    List.map (fun { basename; path } ->
-      let path = if Filename.is_relative path then
-        (* Paths are relative to parent directory of path list file *)
-        Filename.concat (Filename.dirname path_list_file_path) path
-      else
-        path
-      in
-      { basename; path }) files
-
-  let create_from_path_list_file ~hidden ~path_list_file =
-    let files = read_path_list_file path_list_file in
-    { path = path_list_file; files; hidden } *)
 end
 
 type visibility = Visible | Hidden
@@ -129,6 +96,9 @@ module Path_cache : sig
 
   (* Add path to cache. If path with same basename is already in cache, skip adding. *)
   val add : Dir.t -> unit
+
+  (* Like [prepent_add], but only adds a single file to the cache. *)
+  val prepend_add_single : hidden:bool -> string -> string -> unit
 
   (* Search for a basename in cache. Ignore case if [uncap] is true *)
   val find : uncap:bool -> string -> string * visibility
@@ -150,16 +120,19 @@ end = struct
     STbl.clear !visible_files;
     STbl.clear !visible_files_uncap
 
+  let prepend_add_single ~hidden basename path =
+    if hidden then begin
+      STbl.replace !hidden_files basename path;
+      STbl.replace !hidden_files_uncap (Misc.normalized_unit_filename basename) path
+    end else begin
+      STbl.replace !visible_files basename path;
+      STbl.replace !visible_files_uncap (String.uncapitalize_ascii basename) path
+    end
+
   let prepend_add dir =
-    List.iter (fun ({ basename = base; path = fn } : Dir.entry) ->
-        if Dir.hidden dir then begin
-          STbl.replace !hidden_files base fn;
-          STbl.replace !hidden_files_uncap (Misc.normalized_unit_filename base) fn
-        end else begin
-          STbl.replace !visible_files base fn;
-          STbl.replace !visible_files_uncap (String.uncapitalize_ascii base) fn
-        end
-      ) (Dir.files dir)
+    List.iter (fun ({ basename; path } : Dir.entry) ->
+      prepend_add_single ~hidden:(Dir.hidden dir) basename path
+    ) (Dir.files dir)
 
   let add dir =
     let update base fn visible_files hidden_files =
@@ -190,7 +163,9 @@ type auto_include_callback =
   (Dir.t -> string -> string option) -> string -> string
 
 let visible_dirs = s_ref []
+let visible_filenames = s_ref []
 let hidden_dirs = s_ref []
+let hidden_filenames = s_ref []
 let no_auto_include _ _ = raise Not_found
 let auto_include_callback = ref no_auto_include
 
@@ -199,9 +174,20 @@ let reset () =
   Path_cache.reset ();
   hidden_dirs := [];
   visible_dirs := [];
+  hidden_filenames := [];
+  visible_filenames := [];
   auto_include_callback := no_auto_include
 
-let get_visible () = List.rev !visible_dirs
+
+type dirs_and_files =
+  { dirs : Dir.t list
+  ; basenames : string list
+  }
+
+let get_visible () =
+  { dirs = List.rev !visible_dirs
+  ; basenames = !visible_filenames
+  }
 
 let get_path_list () =
   Misc.rev_map_end Dir.path !visible_dirs (List.rev_map Dir.path !hidden_dirs)
@@ -217,124 +203,103 @@ let get_paths () =
 let get_visible_path_list () = List.rev_map Dir.path !visible_dirs
 let get_hidden_path_list () = List.rev_map Dir.path !hidden_dirs
 
-(* let read_path_list_file' path_list_file_path =
-    let ic = open_in path_list_file_path in
-    Misc.try_finally
-      (fun () ->
-        let rec loop acc =
-          try
-            let line = input_line ic in
-            let (basename, path) = Misc.Stdlib.String.split_first_exn ~split_on:' ' line in
-            loop ({ basename; path } :: acc)
-          with End_of_file -> acc
-        in
-        loop [])
-      ~always:(fun () -> close_in ic)
-
-  let read_path_list_file path_list_file_path =
-    let files = read_path_list_file' path_list_file_path in
-    List.map (fun { basename; path } ->
-      let path = if Filename.is_relative path then
-        (* Paths are relative to parent directory of path list file *)
-        Filename.concat (Filename.dirname path_list_file_path) path
-      else
-        path
-      in
-      { basename; path }) files
-
-  let create_from_path_list_file ~hidden ~path_list_file =
-    let files = read_path_list_file path_list_file in
-    { path = path_list_file; files; hidden } *)
-
 module Manifest = struct
-  let root = lazy (Sys.getenv "DUNE_OXCAML_LOAD_PATH")
+  module Reader : sig
+    type t
 
-  let path_from_root path =
-    let root = Lazy.force root in
-    Filename.concat root path
+    val create : unit -> t
 
-  let fold_lines ~init ~f path =
-    let ic = open_in path in
-    Misc.try_finally
-      (fun () ->
-        let rec loop acc =
-          try
-            let line = String.trim (input_line ic) in
-            match line with
-            | "" -> loop acc
-            | line -> loop (f acc line)
-          with End_of_file -> acc
-        in
-        loop init)
-      ~always:(fun () -> close_in ic)
+    val iter_manifest : t -> f:(filename:string -> location:[`Cwd_relative of string] -> unit) -> [`Root_relative of string] -> unit
+  end = struct
+    type t = {
+      visited: Misc.Stdlib.String.Set.t ref
+    }
 
-  let used = ref Misc.Stdlib.String.Set.empty
+    let create () = {
+      visited = ref Misc.Stdlib.String.Set.empty
+    }
 
-  let visit ~default ~f path =
-    if Misc.Stdlib.String.Set.mem path !used then
-      default
-    else (
-      used := Misc.Stdlib.String.Set.add path !used;
-      f ())
+    let root = lazy (Sys.getenv "OXCAML_LOAD_PATH_ROOT")
 
-  let rec go_file (acc : string list) (path : string) : string list =
-    visit ~default:acc ~f:(fun () -> path :: acc) path
-  and go_manifest (acc : string list) (path : string) : string list =
-    visit ~default:acc ~f:(fun () ->
-      fold_lines path ~init:acc ~f:(fun acc line ->
-        let (kind, rest) = Misc.Stdlib.String.split_first_exn ~split_on:' ' line in
-        match kind with
-        | "file" ->
-          let file_path = path_from_root rest in
-          go_file acc file_path
-        | "manifest" ->
-          let manifest_path = path_from_root rest in
-          go_manifest acc manifest_path
-        | _ -> raise (Not_found)
-        )) path
-  and go path =
-    go_manifest [] (path_from_root path)
+    let path_from_root (`Root_relative path) =
+      let root = Lazy.force root in
+      `Cwd_relative (Filename.concat root path)
 
-  let build_paths_list_from_manifest_file hidden where_to_add path =
-    let files = go path in
-    let by_dir = Misc.Stdlib.String.Tbl.create 42 in
-    List.iter (fun file ->
-      let dir = Filename.dirname file in
-      let basename = Filename.basename file in
-      let entry = {
-        Dir.basename;
-        path = file
-      } in
-      if Misc.Stdlib.String.Tbl.mem by_dir dir then
-        Misc.Stdlib.String.Tbl.replace by_dir dir (entry :: (Misc.Stdlib.String.Tbl.find by_dir dir))
-      else
-        Misc.Stdlib.String.Tbl.add by_dir dir [entry]
 
-    ) files;
-    Misc.Stdlib.String.Tbl.iter (fun dir entries ->
-      let d = Dir.create_raw ~hidden dir entries in
-      where_to_add := d :: !where_to_add) by_dir
+    let visit { visited } ~f (`Root_relative path) =
+      if Misc.Stdlib.String.Set.mem path !visited then
+        ()
+      else (
+        visited := Misc.Stdlib.String.Set.add path !visited;
+        f (path_from_root (`Root_relative path)))
+
+    let iter_lines ~f (`Cwd_relative path) =
+      let ic = open_in path in
+      Misc.try_finally
+        (fun () ->
+          let rec loop () =
+            try
+              let line = String.trim (input_line ic) in
+              match line with
+              | "" -> loop ()
+              | line ->
+                f line;
+                loop ()
+            with End_of_file -> ()
+          in
+          loop ())
+        ~always:(fun () -> close_in ic)
+
+    let parse_line line =
+      (* CR aodintsov: Better parsing/escaping. *)
+      match String.split_on_char ' ' line with
+      | "file" :: filename :: location :: [] ->
+        let location = `Root_relative location in
+        `File (filename, location)
+      | "manifest" :: _ :: location :: [] ->
+        let location = `Root_relative location in
+        `Manifest location
+      | _ ->
+        (* CR aodintsov: Fix errors. *)
+        raise Not_found
+
+    let rec iter_manifest t ~f path =
+      visit t path ~f:(fun path ->
+        iter_lines path ~f:(fun line ->
+          match parse_line line with
+          | `File (filename, location) ->
+            visit t location ~f:(fun location -> f ~filename ~location)
+          | `Manifest location ->
+            iter_manifest t ~f location))
+  end
 end
 
-let init ~auto_include ~visible ~hidden =
+let init_manifests () =
+  let manifest_reader = Manifest.Reader.create () in
+  List.iter (fun manifest ->
+    let manifest = `Root_relative manifest in
+    Manifest.Reader.iter_manifest manifest_reader manifest ~f:(fun ~filename ~location:(`Cwd_relative location) ->
+      let basename = Filename.basename filename in
+      visible_filenames := basename :: !visible_filenames;
+      Path_cache.prepend_add_single ~hidden:false basename location
+    )) !Clflags.include_manifests;
+
+  List.iter (fun manifest ->
+    let manifest = `Root_relative manifest in
+    Manifest.Reader.iter_manifest manifest_reader manifest ~f:(fun ~filename ~location:(`Cwd_relative location) ->
+      let basename = Filename.basename filename in
+      visible_filenames := basename :: !visible_filenames;
+      Path_cache.prepend_add_single ~hidden:false basename location
+    )) !Clflags.hidden_include_manifests
+
+
+let init  ~auto_include ~visible ~hidden =
   reset ();
   visible_dirs := List.rev_map (Dir.create ~hidden:false) visible;
   hidden_dirs := List.rev_map (Dir.create ~hidden:true) hidden;
-  List.iter (fun manifest -> Manifest.build_paths_list_from_manifest_file false visible_dirs manifest) !Clflags.include_manifests;
-  List.iter (fun manifest -> Manifest.build_paths_list_from_manifest_file true hidden_dirs manifest) !Clflags.hidden_include_manifests;
-
-  (* List.iter (fun path_list_file ->
-    visible_dirs :=
-      Dir.create_from_path_list_file ~hidden:false ~path_list_file ::
-        !visible_dirs;
-  ) !Clflags.include_manifests;
-  List.iter (fun path_list_file ->
-    hidden_dirs :=
-      Dir.create_from_path_list_file ~hidden:true ~path_list_file ::
-        !hidden_dirs;
-  ) !Clflags.hidden_include_paths_files; *)
   List.iter Path_cache.prepend_add !hidden_dirs;
   List.iter Path_cache.prepend_add !visible_dirs;
+  init_manifests ();
   auto_include_callback := auto_include
 
 let remove_dir dir =
