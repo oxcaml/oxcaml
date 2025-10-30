@@ -454,11 +454,13 @@ val add_local_constraint: Path.t -> type_declaration -> t -> t
    contents of the module is accessed. *)
 val add_persistent_structure : Ident.t -> t -> t
 
-val persistent_structures_of_basenames : string list -> Misc.Stdlib.String.Set.t
 
- (* Returns the set of persistent structures found in the given
+(* Returns the set of persistent structures found in the given
    directory. *)
 val persistent_structures_of_dir : Load_path.Dir.t -> Misc.Stdlib.String.Set.t
+
+(* Convert given set of basenames to the set of persistent structures. *)
+val persistent_structures_of_basenames : string list -> Misc.Stdlib.String.Set.t
 
 (* [filter_non_loaded_persistent f env] removes all the persistent
    structures that are not yet loaded and for which [f] returns
