@@ -202,37 +202,90 @@ let get_visible_path_list () = List.rev_map Dir.path !visible_dirs
 let get_hidden_path_list () = List.rev_map Dir.path !hidden_dirs
 
 module Manifest_reader : sig
+  module Path : sig
+    type load_root_relative
+    type cwd_relative
+
+    type 'a t
+
+    val of_string : string -> load_root_relative t
+    val to_string : cwd_relative t -> string
+  end
+
   type t
 
   val create : unit -> t
 
-  val iter_manifest :
-    t -> f:(filename:string -> location:[ `Cwd_relative of string ] -> unit) -> [`Root_relative of string] -> unit
+  val iter_manifest
+    : t -> f:(filename:string -> location:Path.cwd_relative Path.t -> unit) -> manifest_path:Path.load_root_relative Path.t -> unit
 end = struct
+  module Path : sig
+    type load_root_relative
+    type cwd_relative
+
+    type 'a t
+
+    val of_string : string -> load_root_relative t
+    val to_string : cwd_relative t -> string
+    val make_cwd_relative : load_root_relative t -> cwd_relative t
+
+    module Hash_set : sig
+      type path = load_root_relative t
+      type t
+
+      val create : unit -> t
+
+      val mem : t -> path -> bool
+      val add : t -> path -> unit
+    end
+  end = struct
+    type load_root_relative = [ `Load_root_relative ]
+    type cwd_relative = [ `Cwd_relative ]
+
+    type _ t =
+      | Cwd_relative : string -> cwd_relative t
+      | Load_root_relative : string -> load_root_relative t
+
+    let of_string path = Load_root_relative path
+    let to_string (Cwd_relative path) = path
+
+    let root = lazy (Sys.getenv "OXCAML_MANIFEST_LOAD_PATH_ROOT")
+
+    let make_cwd_relative (Load_root_relative path) =
+      let root = Lazy.force root in
+      Cwd_relative (Filename.concat root path)
+
+    module Hash_set = struct
+      type path = load_root_relative t
+      type t = unit Misc.Stdlib.String.Tbl.t
+
+      let create () = Misc.Stdlib.String.Tbl.create 42
+
+      let mem t (Load_root_relative path) =
+        Misc.Stdlib.String.Tbl.mem t path
+
+      let add t (Load_root_relative path) =
+        Misc.Stdlib.String.Tbl.add t path ()
+    end
+  end
+
   type t = {
-    visited: Misc.Stdlib.String.Set.t ref
+    visited: Path.Hash_set.t
   }
 
   let create () = {
-    visited = ref Misc.Stdlib.String.Set.empty
+    visited = Path.Hash_set.create ()
   }
 
-  (* CR aodintsov: Probably need a better name. *)
-  let root = lazy (Sys.getenv "OXCAML_LOAD_PATH_ROOT")
-
-  let path_from_root (`Root_relative path) =
-    let root = Lazy.force root in
-    `Cwd_relative (Filename.concat root path)
-
-  let visit { visited } ~f (`Root_relative path) =
-    if Misc.Stdlib.String.Set.mem path !visited then
+  let visit { visited } ~f path =
+    if Path.Hash_set.mem visited path then
       ()
     else (
-      visited := Misc.Stdlib.String.Set.add path !visited;
-      f (path_from_root (`Root_relative path)))
+      Path.Hash_set.add visited path;
+      f (Path.make_cwd_relative path))
 
-  let iter_lines ~f (`Cwd_relative path) =
-    let ic = open_in path in
+  let iter_lines ~f path =
+    let ic = open_in (Path.to_string path) in
     Misc.try_finally
       (fun () ->
         let rec loop () =
@@ -248,44 +301,45 @@ end = struct
         loop ())
       ~always:(fun () -> close_in ic)
 
+  exception Parse_error of string
+
   let parse_line line =
     (* CR aodintsov: Better parsing/escaping. *)
     match String.split_on_char ' ' line with
     | "file" :: filename :: location :: [] ->
-      let location = `Root_relative location in
+      let location = Path.of_string location in
       `File (filename, location)
     | "manifest" :: _ :: location :: [] ->
-      let location = `Root_relative location in
+      let location = Path.of_string location in
       `Manifest location
     | _ ->
-      (* CR aodintsov: Fix errors. *)
-      raise Not_found
+      raise (Parse_error ("Cannot parse manifest file line: " ^ line))
 
-  let rec iter_manifest t ~f path =
-    visit t path ~f:(fun path ->
-      iter_lines path ~f:(fun line ->
+  let rec iter_manifest t ~f ~manifest_path =
+    visit t manifest_path ~f:(fun manifest_path ->
+      iter_lines manifest_path ~f:(fun line ->
         match parse_line line with
         | `File (filename, location) ->
           visit t location ~f:(fun location -> f ~filename ~location)
-        | `Manifest location ->
-          iter_manifest t ~f location))
+        | `Manifest manifest_path ->
+          iter_manifest t ~f ~manifest_path))
 end
 
 let init_manifests () =
   let manifest_reader = Manifest_reader.create () in
-  List.iter (fun manifest ->
-    let manifest = `Root_relative manifest in
-    Manifest_reader.iter_manifest manifest_reader manifest ~f:(fun ~filename ~location:(`Cwd_relative location) ->
+  List.iter (fun manifest_path ->
+    let manifest_path = Manifest_reader.Path.of_string manifest_path in
+    Manifest_reader.iter_manifest manifest_reader ~manifest_path ~f:(fun ~filename ~location ->
       let basename = Filename.basename filename in
       visible_basenames := basename :: !visible_basenames;
-      Path_cache.prepend_add_single ~hidden:false basename location
+      Path_cache.prepend_add_single ~hidden:false basename (Manifest_reader.Path.to_string location)
     )) !Clflags.include_manifests;
 
-  List.iter (fun manifest ->
-    let manifest = `Root_relative manifest in
-    Manifest_reader.iter_manifest manifest_reader manifest ~f:(fun ~filename ~location:(`Cwd_relative location) ->
+  List.iter (fun manifest_path ->
+    let manifest_path = Manifest_reader.Path.of_string manifest_path in
+    Manifest_reader.iter_manifest manifest_reader ~manifest_path ~f:(fun ~filename ~location ->
       let basename = Filename.basename filename in
-      Path_cache.prepend_add_single ~hidden:true basename location
+      Path_cache.prepend_add_single ~hidden:true basename (Manifest_reader.Path.to_string location)
     )) !Clflags.hidden_include_manifests
 
 
