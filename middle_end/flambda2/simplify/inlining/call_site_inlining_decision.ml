@@ -183,7 +183,8 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
         | Max_inlining_depth_exceeded | Recursion_depth_exceeded
         | Never_inlined_attribute | Attribute_always
         | Replay_history_says_must_inline | Begin_unrolling _
-        | Continue_unrolling | Definition_says_inline _ ->
+        | Continue_unrolling | Definition_says_inline _ | Jsir_inlining_disabled
+          ->
           (* These can't be returned by the speculative inlining cases below. *)
           if Flambda_features.check_light_invariants ()
           then
