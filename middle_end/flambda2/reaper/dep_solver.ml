@@ -1401,7 +1401,7 @@ let field_of_constructor_is_used_top =
   rel2 "field_of_constructor_is_used_top" Cols.[n; f]
 
 let field_of_constructor_is_used_as =
-  rel3 "field_of_constructor_is_used" Cols.[n; f; n]
+  rel3 "field_of_constructor_is_used_as" Cols.[n; f; n]
 
 let get_one_field_usage_of_constructors :
     Datalog.database -> unit Code_id_or_name.Map.t -> Field.t -> field_usage =
@@ -1587,6 +1587,16 @@ let datalog_rules =
        [ constructor_rel ~base relation ~from;
          usages_rel base usage;
          field_usages_top_rel usage relation ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_top base relation ]);
+      (let$ [base; relation; from; usage; v] =
+         ["base"; "relation"; "from"; "usage"; "v"]
+       in
+       [ constructor_rel ~base relation ~from;
+         usages_rel base usage;
+         field_usages_rel usage relation v;
+         any_usage_pred v ]
        ==> and_
              [ field_of_constructor_is_used base relation;
                field_of_constructor_is_used_top base relation ]);
@@ -3326,7 +3336,7 @@ let rewrite_typing_env result ~unit_symbol:_ vars_to_keep typing_env =
                 (get_direct_usages db (Code_id_or_name.Map.singleton sym ())) )
   in
   let variable_metadata var =
-    Format.eprintf "Variable metadata %a ??@." Variable.print var;
+    let () = Misc.fatal_errorf "Variable metadata %a ??@." Variable.print var in
     let kind = Variable.kind var in
     let var = Code_id_or_name.var var in
     let metadata =
