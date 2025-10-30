@@ -2081,7 +2081,7 @@ and n_way_join_expanded_head env kind (expandeds : ET.t Join_env.join_arg list)
 and n_way_join_head_of_kind_value env
     (heads : TG.head_of_kind_value Join_env.join_arg list) :
     TG.head_of_kind_value n_way_join_result =
-  let (is_null : TG.is_null), env =
+  let is_null, env =
     let machine_width = Join_env.machine_width env in
     let exception Cannot_track in
     match
@@ -2093,12 +2093,12 @@ and n_way_join_head_of_kind_value env
           | Maybe_null { is_null = Some is_null } -> id, Simple.var is_null)
         heads
     with
-    | exception Cannot_track -> Maybe_null { is_null = None }, env
+    | exception Cannot_track -> TG.Maybe_null { is_null = None }, env
     | is_null_simples -> (
       (* Note: we ideally would use [n_way_join_relation_simples] here, but we
          need to store a [Not_null] constructor if the join is [false]. *)
       match n_way_join_simples env K.naked_immediate is_null_simples with
-      | Bottom, env -> Maybe_null { is_null = None }, env
+      | Bottom, env -> TG.Maybe_null { is_null = None }, env
       | Ok simple, env ->
         let is_null =
           Simple.pattern_match' simple
