@@ -676,12 +676,8 @@ and meet_head_of_kind_value env
   let meet_b env (is_null1 : TG.is_null) (is_null2 : TG.is_null) =
     match is_null1, is_null2 with
     | Not_null, Not_null -> Bottom Both_inputs
-    | Not_null, Maybe_null _ ->
-      (* We rely on the inverse relations for reductions. *)
-      Ok (Right_input, env)
-    | Maybe_null _, Not_null ->
-      (* We rely on the inverse relations for reductions. *)
-      Ok (Left_input, env)
+    | Not_null, Maybe_null _ -> Bottom Left_input
+    | Maybe_null _, Not_null -> Bottom Right_input
     | Maybe_null { is_null = is_null1 }, Maybe_null { is_null = is_null2 } ->
       map_result
         ~f:(fun is_null : TG.is_null -> Maybe_null { is_null })
