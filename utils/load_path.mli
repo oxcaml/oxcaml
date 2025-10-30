@@ -105,6 +105,11 @@ val prepend_dir : Dir.t -> unit
 (** [prepend_dir d] adds [d] to the start of the load path (i.e. at highest
     priority. *)
 
-val get_visible : unit -> Dir.t list
+type dirs_and_files =
+  { dirs : Dir.t list
+  ; basenames : string list
+  }
+
+val get_visible : unit -> dirs_and_files
 (** Same as [get_paths ()], except that it returns a [Dir.t list], and doesn't
     include the -H paths. *)
