@@ -1,4 +1,4 @@
-let f x y p' =
+let[@inline never] f x y p' =
   let p = x, y in
   let a = fst p in
   let b = snd p in
@@ -9,3 +9,7 @@ let f x y p' =
   let m = a * 2 in
   let m' = b + 3 in
   m, m', d, s, foo
+
+let () =
+  let _ = f 42 72 (3, 4) in
+  ()
