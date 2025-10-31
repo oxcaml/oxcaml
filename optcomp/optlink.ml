@@ -24,7 +24,8 @@ module type S = sig
 
   val link_partial : string -> string list -> unit
 
-  val check_consistency : string -> Cmx_format.unit_infos -> Digest.t -> unit
+  val check_consistency :
+    Linkenv.t -> string -> Cmx_format.unit_infos -> Digest.t -> Linkenv.t
 end
 
 module Make (Backend : Optcomp_intf.Backend) : S = struct
@@ -51,6 +52,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     | Unit of string * unit_infos * Digest.t
     | Library of string * library_infos
 
+  (* CR mshinwell: This should not be raising errors from [Linkenv] *)
   let read_file obj_name =
     let file_name =
       try Load_path.find obj_name
@@ -73,14 +75,14 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     else raise (Linkenv.Error (Not_an_object_file file_name))
 
   let scan_file ~shared genfns file
-      (full_paths, objfiles, tolink, cached_genfns_imports) =
+      (linkenv, full_paths, objfiles, tolink, cached_genfns_imports) =
     match read_file file with
     | Unit (file_name, info, crc) ->
       (* This is a cmx file. It must be linked in any case. *)
-      Linkenv.remove_required info.ui_unit;
-      Linkenv.add_quoted_globals info.ui_quoted_globals;
+      Linkenv.remove_required linkenv info.ui_unit;
+      let linkenv = Linkenv.add_quoted_globals linkenv info.ui_quoted_globals in
       List.iter
-        (fun import -> Linkenv.add_required (file_name, None) import)
+        (fun import -> Linkenv.add_required linkenv (file_name, None) import)
         info.ui_imports_cmx;
       let dynunit : Cmxs_format.dynunit option =
         if not shared
@@ -106,27 +108,34 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       let object_file_name =
         Filename.chop_suffix file_name Backend.ext_flambda_obj ^ Backend.ext_obj
       in
-      Linkenv.check_consistency ~unit
-        (Array.of_list info.ui_imports_cmi)
-        (Array.of_list info.ui_imports_cmx);
+      let linkenv =
+        Linkenv.check_consistency linkenv ~unit
+          (Array.of_list info.ui_imports_cmi)
+          (Array.of_list info.ui_imports_cmx)
+      in
       let cached_genfns_imports =
         Generic_fns.Tbl.add ~imports:cached_genfns_imports genfns
           info.ui_generic_fns
       in
-      ( file_name :: full_paths,
+      ( linkenv,
+        file_name :: full_paths,
         object_file_name :: objfiles,
         unit :: tolink,
         cached_genfns_imports )
     | Library (file_name, infos) ->
       (* This is an archive file. Each unit contained in it will be linked in
          only if needed. *)
-      Linkenv.add_ccobjs (Filename.dirname file_name) infos;
+      let linkenv =
+        Linkenv.add_ccobjs linkenv (Filename.dirname file_name) infos
+      in
       let cached_genfns_imports =
         Generic_fns.Tbl.add ~imports:cached_genfns_imports genfns
           infos.lib_generic_fns
       in
-      Linkenv.check_cmi_consistency file_name infos.lib_imports_cmi;
-      Linkenv.check_cmx_consistency file_name infos.lib_imports_cmx;
+      Linkenv.check_cmi_consistency linkenv file_name infos.lib_imports_cmi;
+      let linkenv =
+        Linkenv.check_cmx_consistency linkenv file_name infos.lib_imports_cmx
+      in
       let objfiles =
         let obj_file =
           Filename.chop_suffix file_name Backend.ext_flambda_lib
@@ -140,23 +149,20 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         then objfiles
         else obj_file :: objfiles
       in
-      (* [file_name] is always returned irrespective of the [objfiles]
-         calculation above and the units calculation below: the aim is to know
-         the full set of files which were provided on the command line. *)
-      ( file_name :: full_paths,
-        objfiles,
+      let linkenv, tolink =
         List.fold_right
-          (fun info reqd ->
+          (fun info (linkenv, reqd) ->
             let li_name = CU.name info.li_name in
             if info.li_force_link || !Clflags.link_everything
-               || Linkenv.is_required info.li_name
+               || Linkenv.is_required linkenv info.li_name
             then (
-              Linkenv.remove_required info.li_name;
+              Linkenv.remove_required linkenv info.li_name;
               let req_by = file_name, Some li_name in
-              info.li_imports_cmx
-              |> Misc.Bitmap.iter (fun i ->
-                     let import = infos.lib_imports_cmx.(i) in
-                     Linkenv.add_required req_by import);
+              Misc.Bitmap.iter
+                (fun i ->
+                  let import = infos.lib_imports_cmx.(i) in
+                  Linkenv.add_required linkenv req_by import)
+                info.li_imports_cmx;
               let imports_list tbl bits =
                 List.init (Array.length tbl) (fun i ->
                     if Misc.Bitmap.get bits i then Some tbl.(i) else None)
@@ -165,7 +171,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               let quoted_globals =
                 imports_list infos.lib_quoted_globals info.li_quoted_globals
               in
-              Linkenv.add_quoted_globals quoted_globals;
+              let linkenv = Linkenv.add_quoted_globals linkenv quoted_globals in
               let dynunit : Cmxs_format.dynunit option =
                 if not shared
                 then None
@@ -191,11 +197,15 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                   dynunit
                 }
               in
-              Linkenv.check_consistency ~unit [||] [||];
-              unit :: reqd)
-            else reqd)
-          infos.lib_units tolink,
-        cached_genfns_imports )
+              let linkenv = Linkenv.check_consistency linkenv ~unit [||] [||] in
+              linkenv, unit :: reqd)
+            else linkenv, reqd)
+          infos.lib_units (linkenv, tolink)
+      in
+      (* [file_name] is always returned irrespective of the [objfiles]
+         calculation above and the units calculation below: the aim is to know
+         the full set of files which were provided on the command line. *)
+      linkenv, file_name :: full_paths, objfiles, tolink, cached_genfns_imports
 
   (* Second pass: generate the startup file and link it with everything else *)
 
@@ -210,15 +220,16 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   let link_shared ~ppf_dump objfiles output_name =
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
+        let linkenv = Linkenv.create () in
         let genfns = Generic_fns.Tbl.make () in
-        let _full_paths, ml_objfiles, units_tolink, _ =
+        let linkenv, _full_paths, ml_objfiles, units_tolink, _ =
           List.fold_right
             (scan_file ~shared:true genfns)
             objfiles
-            ([], [], [], Generic_fns.Partition.Set.empty)
+            (linkenv, [], [], [], Generic_fns.Partition.Set.empty)
         in
-        Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs ();
-        Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
+        Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs linkenv;
+        Clflags.all_ccopts := Linkenv.lib_ccopts linkenv @ !Clflags.all_ccopts;
         Backend.link_shared ml_objfiles output_name ~ppf_dump ~genfns
           ~units_tolink)
 
@@ -227,6 +238,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let link ~ppf_dump objfiles output_name =
     let shared = false in
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
+        let linkenv = Linkenv.create () in
         let stdlib = "stdlib" ^ Backend.ext_flambda_lib in
         let stdexit = "std_exit" ^ Backend.ext_flambda_obj in
         let objfiles =
@@ -237,19 +249,24 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         in
         let genfns = Generic_fns.Tbl.make () in
         (* CR mshinwell/xclerc: This tuple should be a record *)
-        let full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
+        let ( linkenv,
+              full_paths,
+              ml_objfiles,
+              units_tolink,
+              cached_genfns_imports ) =
           (* This covers all files that the user has requested be linked *)
           List.fold_right
             (scan_file ~shared:false genfns)
             objfiles
-            ([], [], [], Generic_fns.Partition.Set.empty)
+            (linkenv, [], [], [], Generic_fns.Partition.Set.empty)
         in
         let uses_eval =
           (* This query must come after scan_file has been called on objfiles,
              otherwise is_required will always return false. *)
-          Linkenv.is_required (Compilation_unit.of_string "Camlinternaleval")
+          Linkenv.is_required linkenv
+            (Compilation_unit.of_string "Camlinternaleval")
         in
-        let quoted_globals = Linkenv.get_quoted_globals () in
+        let linkenv, quoted_globals = Linkenv.get_quoted_globals linkenv in
         if uses_eval && not Backend.supports_metaprogramming
         then
           raise
@@ -284,27 +301,31 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             in
             stdlib :: for_eval
         in
-        let _full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
+        let ( linkenv,
+              _full_paths,
+              ml_objfiles,
+              units_tolink,
+              cached_genfns_imports ) =
           (* This is just for any stdlib and eval support files which are
              needed. *)
           List.fold_right
             (scan_file ~shared:false genfns)
             stdlib_and_support_files_for_eval
-            ([], ml_objfiles, units_tolink, cached_genfns_imports)
+            (linkenv, [], ml_objfiles, units_tolink, cached_genfns_imports)
         in
         (if not shared
         then
-          match Linkenv.extract_missing_globals () with
+          match Linkenv.extract_missing_globals linkenv with
           | [] -> ()
           | mg -> raise (Linkenv.Error (Missing_implementations mg)));
-        Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs ();
-        Clflags.all_ccopts := Linkenv.lib_ccopts () @ !Clflags.all_ccopts;
+        Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs linkenv;
+        Clflags.all_ccopts := Linkenv.lib_ccopts linkenv @ !Clflags.all_ccopts;
         (* put user's opts first *)
-        Backend.link ml_objfiles output_name ~ppf_dump ~genfns ~units_tolink
-          ~uses_eval ~quoted_globals ~cached_genfns_imports)
+        Backend.link linkenv ml_objfiles output_name ~ppf_dump ~genfns
+          ~units_tolink ~uses_eval ~quoted_globals ~cached_genfns_imports)
 
   (* Exported version for Asmlibrarian / Asmpackager *)
-  let check_consistency file_name u crc =
+  let check_consistency linkenv file_name u crc =
     let unit =
       { file_name;
         name = u.ui_unit;
@@ -313,7 +334,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         dynunit = None
       }
     in
-    Linkenv.check_consistency ~unit
+    Linkenv.check_consistency linkenv ~unit
       (Array.of_list u.ui_imports_cmi)
       (Array.of_list u.ui_imports_cmx)
 end

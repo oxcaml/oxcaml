@@ -20,6 +20,7 @@ open Format
 
 val link :
   (module Compiler_owee.Unix_intf.S) ->
+  Linkenv.t ->
   string list ->
   string ->
   cached_genfns_imports:Generic_fns.Partition.Set.t ->

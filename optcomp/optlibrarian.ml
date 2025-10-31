@@ -61,12 +61,15 @@ end) : S = struct
         let objfile_list, descr_list =
           List.split (List.map read_info file_list)
         in
-        List.iter2
-          (fun file_name (unit, crc) ->
-            Backend.check_consistency file_name unit crc)
-          file_list descr_list;
-        let cmis = Linkenv.extract_crc_interfaces () in
-        let cmxs = Linkenv.extract_crc_implementations () in
+        let linkenv = Linkenv.create () in
+        let linkenv =
+          List.fold_left2
+            (fun linkenv file_name (unit, crc) ->
+              Backend.check_consistency linkenv file_name unit crc)
+            linkenv file_list descr_list
+        in
+        let cmis = Linkenv.extract_crc_interfaces linkenv in
+        let cmxs = Linkenv.extract_crc_implementations linkenv in
         (* CR mshinwell: see comment in compilenv.ml let cmxs =
            Compilenv.ensure_sharing_between_cmi_and_cmx_imports cmis cmxs in *)
         let cmis = Array.of_list cmis in
