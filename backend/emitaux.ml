@@ -348,7 +348,7 @@ let emit_frames a =
   frame_descriptors := []
 
 let use_lrodata_frametables () =
-  Config.lrodata_frametables
+  !Clflags.lrodata_frametables
   &&
   match Target_system.derived_system () with
   | Linux -> true
