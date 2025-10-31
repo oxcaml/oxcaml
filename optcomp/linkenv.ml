@@ -58,13 +58,18 @@ type t =
   }
 
 let create () =
+  let quoted_globals =
+    if !Clflags.nopervasives
+    then CU.Name.Set.empty
+    else CU.Name.Set.singleton (CU.Name.of_string "Stdlib")
+  in
   { crc_interfaces = Cmi_consistbl.create ();
     crc_implementations = Cmx_consistbl.create ();
     implementations = [];
     cmx_required = [];
     interfaces = CU.Name.Tbl.create 100;
     implementations_defined = CU.Tbl.create 100;
-    quoted_globals = CU.Name.Set.empty;
+    quoted_globals;
     lib_ccobjs = [];
     lib_ccopts = [];
     missing_globals = Hashtbl.create 17
@@ -80,17 +85,7 @@ let add_quoted_globals t globals =
         t.quoted_globals globals
   }
 
-let get_quoted_globals t =
-  let t =
-    if not !Clflags.nopervasives
-    then
-      { t with
-        quoted_globals =
-          CU.Name.Set.add (CU.Name.of_string "Stdlib") t.quoted_globals
-      }
-    else t
-  in
-  t, t.quoted_globals
+let get_quoted_globals t = t, t.quoted_globals
 
 (* Consistency check between interfaces and implementations: *)
 
@@ -167,8 +162,6 @@ let extract_crc_implementations t =
 
 (* Add C objects and options and "custom" info from a library descriptor. See
    bytecomp/bytelink.ml for comments on the order of C objects. *)
-
-let check_consistency = check_consistency
 
 let add_ccobjs t origin (l : Cmx_format.library_infos) =
   if not !Clflags.no_auto_link
