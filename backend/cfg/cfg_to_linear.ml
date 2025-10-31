@@ -30,9 +30,28 @@ module CL = Cfg_with_layout
 module L = Linear
 module DLL = Oxcaml_utils.Doubly_linked_list
 
+let phantom_defining_expr_to_linear (expr : Cfg.phantom_defining_expr) =
+  match expr with
+  | Cphantom_const_int i -> L.lphantom_const_int i
+  | Cphantom_const_symbol s -> L.lphantom_const_symbol s
+  | Cphantom_var v -> L.lphantom_var v
+  | Cphantom_offset_var { var; offset_in_words } ->
+    L.lphantom_offset_var ~var ~offset_in_words
+  | Cphantom_read_field { var; field } -> L.lphantom_read_field ~var ~field
+  | Cphantom_read_symbol_field { sym; field } ->
+    L.lphantom_read_symbol_field ~sym ~field
+  | Cphantom_block { tag; fields } -> L.lphantom_block ~tag ~fields
+
 let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
     L.instruction =
-  let arg, res, dbg, live, fdo, available_before, available_across =
+  let ( arg,
+        res,
+        dbg,
+        live,
+        fdo,
+        available_before,
+        available_across,
+        phantom_available_before ) =
     match like with
     | None ->
       ( [||],
@@ -41,17 +60,39 @@ let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
         Reg.Set.empty,
         Fdo_info.none,
         Reg_availability_set.Unreachable,
-        Reg_availability_set.Unreachable )
-    | Some like ->
-      ( like.arg,
-        like.res,
-        like.dbg,
-        like.live,
-        like.fdo,
-        like.available_before,
-        like.available_across )
+        Reg_availability_set.Unreachable,
+        None )
+    | Some
+        { arg;
+          res;
+          dbg;
+          live;
+          fdo;
+          available_before;
+          available_across;
+          phantom_available_before;
+          _
+        } ->
+      ( arg,
+        res,
+        dbg,
+        live,
+        fdo,
+        available_before,
+        available_across,
+        phantom_available_before )
   in
-  { desc; next; arg; res; dbg; live; fdo; available_before; available_across }
+  { desc;
+    next;
+    arg;
+    res;
+    dbg;
+    live;
+    fdo;
+    available_before;
+    available_across;
+    phantom_available_before
+  }
 
 let basic_to_linear (i : _ Cfg.instruction) ~next =
   let desc = Cfg_to_linear_desc.from_basic i.desc in
@@ -479,5 +520,10 @@ let run cfg_with_layout =
     fun_num_stack_slots;
     fun_frame_required;
     fun_prologue_required;
-    fun_section_name
+    fun_section_name;
+    fun_phantom_lets =
+      Backend_var.Map.map
+        (fun (provenance, defining_expr) ->
+          provenance, phantom_defining_expr_to_linear defining_expr)
+        (Cfg.fun_phantom_lets cfg)
   }

@@ -92,6 +92,8 @@ let bind name arg fn =
     let id = V.create_local name in
     Clet (VP.create id, arg, fn (Cvar id))
 
+let make_phantom_let var def body = Cphantom_let (var, def, body)
+
 let bind_list name args fn =
   let rec aux bound_args = function
     | [] -> fn bound_args
@@ -425,6 +427,7 @@ let rec map_tail1 e ~f =
   match e with
   | Clet (id, exp, body) -> Clet (id, exp, map_tail1 body ~f)
   | Cphantom_let (id, exp, body) -> Cphantom_let (id, exp, map_tail1 body ~f)
+  | Cname_for_debugger (var, body) -> Cname_for_debugger (var, map_tail1 body ~f)
   | Csequence (e1, e2) -> Csequence (e1, map_tail1 e2 ~f)
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
@@ -4343,8 +4346,8 @@ let letin v ~defining_expr ~body =
     defining_expr
   | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-  | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
-  | Cswitch _ | Ccatch _ | Cexit _ ->
+  | Clet _ | Cphantom_let _ | Cname_for_debugger _ | Ctuple _ | Cop _
+  | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ ->
     Clet (v, defining_expr, body)
 
 let sequence x y =
@@ -4691,8 +4694,8 @@ let cmm_arith_size (e : Cmm.expression) =
   | Cconst_vec512 _ ->
     Some 0
   | Cop _ -> Some (cmm_arith_size0 e)
-  | Clet _ | Cphantom_let _ | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _
-  | Ccatch _ | Cexit _ ->
+  | Clet _ | Cphantom_let _ | Cname_for_debugger _ | Ctuple _ | Csequence _
+  | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ ->
     None
 
 (* Atomics *)
