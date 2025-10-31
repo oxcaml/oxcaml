@@ -110,16 +110,6 @@ let vec_kind = function
 let convert_block_access_field_kind i_or_p : P.Block_access_field_kind.t =
   match i_or_p with L.Immediate -> Immediate | L.Pointer -> Any_value
 
-let convert_block_access_field_kind_from_value_kind
-    ({ raw_kind; nullable = _ } : L.value_kind) : P.Block_access_field_kind.t =
-  match raw_kind with
-  | Pintval -> Immediate
-  | Pvariant { consts = _; non_consts } -> (
-    match non_consts with [] -> Immediate | _ :: _ -> Any_value)
-  | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
-  | Pboxedvectorval _ ->
-    Any_value
-
 let convert_init_or_assign (i_or_a : L.initialization_or_assignment) :
     P.Init_or_assign.t =
   match i_or_a with
@@ -2426,18 +2416,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         check_non_negative_imm imm "Pmixedfield";
         let mutability = convert_field_read_semantics sem in
         let block_access : P.Block_access_kind.t =
-          let field_kind : P.Mixed_block_access_field_kind.t =
-            match flattened_reordered_shape.(new_index) with
-            | Value value_kind ->
-              Value_prefix
-                (convert_block_access_field_kind_from_value_kind value_kind)
-            | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-              | Vec256 | Vec512 | Word | Untagged_immediate ) as
-              mixed_block_element ->
-              Flat_suffix
-                (K.Flat_suffix_element.from_singleton_mixed_block_element
-                   mixed_block_element)
-            | Float_boxed _ -> Flat_suffix K.Flat_suffix_element.naked_float
+          let field_kind =
+            H.block_access_for_element ~for_block_load:false
+              flattened_reordered_shape.(new_index)
           in
           Mixed
             { tag = Unknown; field_kind; shape = kind_shape; size = Unknown }
@@ -2518,19 +2499,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           let block_access : P.Block_access_kind.t =
             Mixed
               { field_kind =
-                  (match flattened_reordered_shape.(new_index) with
-                  | Value value_kind ->
-                    Value_prefix
-                      (convert_block_access_field_kind_from_value_kind
-                         value_kind)
-                  | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                    | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ) as
-                    mixed_block_element ->
-                    Flat_suffix
-                      (K.Flat_suffix_element.from_singleton_mixed_block_element
-                         mixed_block_element)
-                  | Float_boxed _ ->
-                    Flat_suffix K.Flat_suffix_element.naked_float);
+                  H.block_access_for_element ~for_block_load:false
+                    flattened_reordered_shape.(new_index);
                 shape = kind_shape;
                 tag = Unknown;
                 size = Unknown

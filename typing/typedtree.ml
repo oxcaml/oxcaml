@@ -595,8 +595,12 @@ and value_binding =
 
 and module_coercion =
     Tcoerce_none
-  | Tcoerce_structure of (int * module_coercion) list *
-                         (Ident.t * int * module_coercion) list
+  | Tcoerce_structure of
+      { input_repr : Types.module_representation
+      ; output_repr : Types.module_representation
+      ; pos_cc_list : (int * module_coercion) list
+      ; id_pos_list : (Ident.t * int * module_coercion) list
+      }
   | Tcoerce_functor of module_coercion * module_coercion
   | Tcoerce_primitive of primitive_coercion
   | Tcoerce_alias of Env.t * Path.t * module_coercion
@@ -696,6 +700,7 @@ and 'a open_infos =
     {
      open_expr: 'a;
      open_bound_items: Types.signature;
+     open_bound_repr: Types.module_representation;
      open_override: override_flag;
      open_env: Env.t;
      open_loc: Location.t;
@@ -708,13 +713,16 @@ and open_declaration = module_expr open_infos
 
 and include_kind =
   | Tincl_structure
-  | Tincl_functor of (Ident.t * module_coercion) list
-  | Tincl_gen_functor of (Ident.t * module_coercion) list
+  | Tincl_functor of
+      (Ident.t * module_coercion) list * Types.module_representation
+  | Tincl_gen_functor of
+      (Ident.t * module_coercion) list * Types.module_representation
 
 and 'a include_infos =
     {
      incl_mod: 'a;
      incl_type: Types.signature;
+     incl_repr: Types.module_representation;
      incl_loc: Location.t;
      incl_kind: include_kind;
      incl_attributes: attribute list;
@@ -1116,11 +1124,11 @@ let rec iter_bound_idents
   : type k . _ -> k general_pattern -> _
   = fun f pat ->
   match pat.pat_desc with
-  | Tpat_var (id, s, uid, _sort, _mode) ->
-     f (id,s,pat.pat_type, uid)
-  | Tpat_alias(p, id, s, uid, _sort, _mode, ty) ->
+  | Tpat_var (id, s, uid, sort, _mode) ->
+      f (id, s, pat.pat_type, sort, uid)
+  | Tpat_alias(p, id, s, uid, sort, _mode, ty) ->
       iter_bound_idents f p;
-      f (id, s, ty, uid)
+      f (id, s, ty, sort, uid)
   | Tpat_or(p1, _, _) ->
       (* Invariant : both arguments bind the same variables *)
       iter_bound_idents f p1
@@ -1251,7 +1259,7 @@ let let_bound_idents_with_modes_sorts_and_checks bindings =
     ) Ident.Map.empty bindings
   in
   List.rev_map
-    (fun (id, _, _, _) ->
+    (fun (id, _, _, _, _) ->
        let zero_alloc =
          Option.value (Ident.Map.find_opt id checks) ~default:Zero_alloc.default
        in
@@ -1260,8 +1268,11 @@ let let_bound_idents_with_modes_sorts_and_checks bindings =
 
 let let_bound_idents_full bindings =
   List.rev (rev_let_bound_idents_full bindings)
+let let_bound_idents_with_sorts pat =
+  List.rev_map (fun (id,_,_,sort,_) -> (id, sort))
+    (rev_let_bound_idents_full pat)
 let let_bound_idents pat =
-  List.rev_map (fun (id,_,_,_) -> id) (rev_let_bound_idents_full pat)
+  List.rev_map (fun (id,_,_,_,_) -> id) (rev_let_bound_idents_full pat)
 
 let alpha_var env id = List.assoc id env
 
@@ -1346,7 +1357,7 @@ let loc_of_decl ~uid =
   | Value_binding vb ->
     let bound_idents = let_bound_idents_full [vb] in
     let name = ListLabels.find_map
-      ~f:(fun (_, name, _, uid') -> if uid = uid' then Some name else None)
+      ~f:(fun (_, name, _, _, uid') -> if uid = uid' then Some name else None)
       bound_idents in
     (match name with
     | Some name -> name
