@@ -77,9 +77,19 @@ module Typing_env_extension : sig
 
   val add_or_replace_equation : t -> Name.t -> flambda_type -> t
 
-  val add_is_null_relation : t -> Name.t -> scrutinee:Simple.t -> t
+  val add_is_null_relation :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Name.t ->
+    scrutinee:Simple.t ->
+    t
 
-  val add_is_int_relation : t -> Name.t -> scrutinee:Simple.t -> t
+  val add_is_int_relation :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Name.t ->
+    scrutinee:Simple.t ->
+    t
 
   val add_get_tag_relation : t -> Name.t -> scrutinee:Simple.t -> t
 
