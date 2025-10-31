@@ -1,4 +1,4 @@
-# WARNING: DO NOT give workflows write permission to any source code repo.
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
 # If you want this functionality, ask for help from a subset of:
 # @jvanburen @glittershark @mshinwell
 name: ocamlformat
@@ -9,42 +9,38 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 jobs:
-  build:
+  check:
+    name: check (${{ matrix.system }})
     runs-on: ${{ matrix.os }}
-
     strategy:
       matrix:
-        os: [ubuntu-latest]
-        ocaml-compiler:
-          - "4.14.0"
-          # this is no longer true, but I can't change it because this specific name of
-          # test is a "required" check. We should change that...
-
+        include:
+          - system: x86_64-linux
+            os: warp-ubuntu-latest-x64-32x
     steps:
-    - name: Checkout the OxCaml repo
-      uses: actions/checkout@master
+      - name: Checkout the OxCaml repo
+        uses: actions/checkout@master
 
-    - name: Checkout the parent branch
-      run: git fetch origin HEAD --deepen 1
+      - name: Checkout the parent branch
+        run: git fetch origin HEAD --deepen 1
 
-    - name: Pretend we're running in a container (makes setup-ocaml go faster)
-      run: sudo touch /.dockerenv
-      # makes setup-ocaml skip apt-get, which is slow on first invocation
+      - name: Pretend we're running in a container (makes setup-ocaml go faster)
+        run: sudo touch /.dockerenv
+        # makes setup-ocaml skip apt-get, which is slow on first invocation
 
-    - name: Set up Opam
-      uses: ocaml/setup-ocaml@v3
-      with:
-        ocaml-compiler: oxcaml-ci-deps.5.2.0
-        opam-repositories: |
-          local: file://${{ github.workspace }}/tools/ci/local-opam
-          default: https://github.com/ocaml/opam-repository.git
-        opam-disable-sandboxing: true
-        opam-pin: false
-        cache-prefix: ${{ matrix.os }}-v1
+      - name: Set up Opam
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: oxcaml-ci-deps.5.2.0
+          opam-repositories: |
+            local: file://${{ github.workspace }}/tools/ci/local-opam
+            default: https://github.com/ocaml/opam-repository.git
+          opam-disable-sandboxing: true
+          opam-pin: false
 
-    - name: 'Check for the "skip 80ch" PR tag'
-      if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
-      run: echo SKIP_80CH=y >> "$GITHUB_ENV"
+      - name: 'Check for the "skip 80ch" PR tag'
+        if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
+        run: echo SKIP_80CH=y >> "$GITHUB_ENV"
 
-    - name: Check OCaml Formatting
-      run: opam exec -- bash tools/ci/actions/check-fmt.sh
+      - name: Check OCaml Formatting
+        run: opam exec -- bash tools/ci/actions/check-fmt.sh

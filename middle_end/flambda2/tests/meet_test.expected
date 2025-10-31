@@ -182,6 +182,7 @@ env:
       ([0m[38;5;111;1mvariant/9N[0m :
         (Val!
          (Variant
+          (get_tag naked/10N)
           (blocks (alloc_mode Heap)
            (known
             {(tag_1 => (Known 1), ((Val ([0m[38;5;160;1m=[0m [0m[38;5;111;1my/6N[0m)))

@@ -1,4 +1,4 @@
-# WARNING: DO NOT give workflows write permission to any source code repo.
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
 # If you want this functionality, ask for help from a subset of:
 # @jvanburen @glittershark @mshinwell
 name: Syntax changes reminder
