@@ -291,6 +291,7 @@ let select_store' ~is_assign addr (exp : Cmm.expression) :
   | Cvar _
   | Clet (_, _, _)
   | Cphantom_let (_, _, _)
+  | Cname_for_debugger _
   | Ctuple _
   | Cop (_, _, _)
   | Csequence (_, _)
