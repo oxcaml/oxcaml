@@ -167,7 +167,7 @@ let match_clauses_in_order ~default ~matches clauses expr =
     | Cphantom_let (phantom_var, defining_expr, expr) ->
       let env = Env.register_phantom_let env ~phantom_var ~defining_expr in
       match_one_pattern env pat expr
-    | Cname_for_debugger expr -> match_one_pattern env pat expr
+    | Cname_for_debugger (_, body) -> match_one_pattern env pat body
     | _ -> (
       match pat, expr with
       | Any v, expr -> Some (Env.add env v expr)
@@ -300,7 +300,8 @@ module Cmm_comparator = struct
       V.equal (VP.var v1) (VP.var v2)
       && Option.equal equal_phantom_defining_expr def1 def2
       && equivalent body1 body2
-    | Cname_for_debugger e1, Cname_for_debugger e2 -> equivalent e1 e2
+    | Cname_for_debugger (v1, e1), Cname_for_debugger (v2, e2) ->
+      V.equal (VP.var v1) (VP.var v2) && equivalent e1 e2
     | Ctuple t1, Ctuple t2 -> List.equal equivalent t1 t2
     | Cop (op1, args1, _), Cop (op2, args2, _) ->
       equal_operation op1 op2 && List.equal equivalent args1 args2

@@ -373,8 +373,8 @@ let rec expr ppf = function
   | Cphantom_let (var, def, body) ->
     fprintf ppf "@[<2>(let?@ @[<2>%a@ %a@]@ %a)@]" VP.print var
       phantom_defining_expr_opt def sequence body
-  | Cname_for_debugger body ->
-    fprintf ppf "@[<2>(name_for_debugger@ %a)@]" expr body
+  | Cname_for_debugger (var, body) ->
+    fprintf ppf "@[<2>(name_for_debugger@ %a@ %a)@]" VP.print var expr body
   | Ctuple el ->
     let tuple ppf el =
       let first = ref true in

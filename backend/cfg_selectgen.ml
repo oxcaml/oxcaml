@@ -74,7 +74,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ctuple el -> List.for_all is_simple_expr el
     | Clet (_id, arg, body) -> is_simple_expr arg && is_simple_expr body
     | Cphantom_let (_var, _defining_expr, body) -> is_simple_expr body
-    | Cname_for_debugger body -> is_simple_expr body
+    | Cname_for_debugger (_, body) -> is_simple_expr body
     | Csequence (e1, e2) -> is_simple_expr e1 && is_simple_expr e2
     | Cop (op, args, _) -> (
       match op with
@@ -125,7 +125,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ctuple el -> EC.join_list_map el effects_of
     | Clet (_id, arg, body) -> EC.join (effects_of arg) (effects_of body)
     | Cphantom_let (_var, _defining_expr, body) -> effects_of body
-    | Cname_for_debugger body -> effects_of body
+    | Cname_for_debugger (_, body) -> effects_of body
     | Csequence (e1, e2) -> EC.join (effects_of e1) (effects_of e2)
     | Cifthenelse (cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
       EC.join (effects_of cond) (EC.join (effects_of ifso) (effects_of ifnot))
@@ -790,8 +790,20 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       accumulate_phantom_let var defining_expr;
       let env = SU.env_add_phantom_let var env in
       emit_expr env sub_cfg body ~bound_name
-    | Cname_for_debugger body ->
-      emit_expr env sub_cfg body ~bound_name
+    | Cname_for_debugger (var, body) -> (
+      match emit_expr env sub_cfg body ~bound_name with
+      | Never_returns -> Never_returns
+      | Ok regs ->
+        let provenance = VP.provenance var in
+        if Option.is_some provenance
+        then (
+          let ident = VP.var var in
+          let naming_op =
+            Operation.Name_for_debugger
+              { ident; provenance; which_parameter = None; regs }
+          in
+          insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]);
+        Ok regs)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list -> (
       match emit_parts_list env sub_cfg exp_list with
@@ -844,7 +856,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       accumulate_phantom_let var defining_expr;
       let env = SU.env_add_phantom_let var env in
       emit_tail env sub_cfg body
-    | Cname_for_debugger body ->
+    | Cname_for_debugger (_, body) ->
       emit_tail env sub_cfg body
     | Cop ((Capply (ty, Rc_normal) as op), args, dbg) ->
       emit_tail_apply env sub_cfg ty op args dbg
