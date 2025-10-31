@@ -20,7 +20,8 @@ open Format
 module type S = sig
   val link : ppf_dump:formatter -> string list -> string -> unit
 
-  val link_shared : ppf_dump:formatter -> string list -> string -> unit
+  val link_shared :
+    ppf_dump:formatter -> Linkenv.t -> string list -> string -> unit
 
   val link_partial : string -> string list -> unit
 
@@ -210,7 +211,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let not_output_to_dev_null output_name =
     not (String.equal output_name "/dev/null")
 
-  let link_shared ~ppf_dump objfiles output_name =
+  let link_shared ~ppf_dump linkenv objfiles output_name =
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
         let linkenv = Linkenv.create () in
         let genfns = Generic_fns.Tbl.make () in
