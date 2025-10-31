@@ -84,6 +84,7 @@ let shift32 make_op arg count dbg =
     | Cvar _
     | Clet (_, _, _)
     | Cphantom_let (_, _, _)
+    | Cname_for_debugger _
     | Ctuple _
     | Cop (_, _, _)
     | Csequence (_, _)
@@ -986,6 +987,7 @@ let transl_builtin name args dbg typ_res =
         | Cvar _
         | Clet (_, _, _)
         | Cphantom_let (_, _, _)
+        | Cname_for_debugger _
         | Ctuple _
         | Cop (_, _, _)
         | Csequence (_, _)
