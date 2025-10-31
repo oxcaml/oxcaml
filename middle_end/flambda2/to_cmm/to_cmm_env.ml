@@ -757,22 +757,34 @@ let bind_variable_to_primitive = bind_variable_with_decision
 (* Variable lookup (for potential inlining) *)
 
 let will_inline_simple env res
-    { effs; bound_expr = Simple { cmm_expr; free_vars }; _ } =
-  { env; res; expr = { cmm = cmm_expr; free_vars; effs } }
+    { effs; bound_expr = Simple { cmm_expr; free_vars }; cmm_var; _ } =
+  let cmm =
+    match Backend_var.With_provenance.provenance cmm_var with
+    | None -> cmm_expr
+    | Some _ -> Cmm.Cname_for_debugger (cmm_var, cmm_expr)
+  in
+  { env; res; expr = { cmm; free_vars; effs } }
 
-let will_inline_complex env res { effs; bound_expr; _ } =
-  match bound_expr with
-  | Split { cmm_expr; free_vars } ->
-    { env; res; expr = { cmm = cmm_expr; free_vars; effs } }
-  | Splittable_prim { dbg; prim; args } ->
-    let free_vars, cmm_args =
-      List.fold_left_map
-        (fun free_vars { cmm = cmm_arg; effs = _; free_vars = arg_free_vars } ->
-          Backend_var.Set.union free_vars arg_free_vars, cmm_arg)
-        Backend_var.Set.empty args
-    in
-    let cmm_expr, res = rebuild_prim ~dbg ~env ~res prim cmm_args in
-    { env; res; expr = { cmm = cmm_expr; free_vars; effs } }
+let will_inline_complex env res { effs; bound_expr; cmm_var; _ } =
+  let cmm_expr, free_vars, res =
+    match bound_expr with
+    | Split { cmm_expr; free_vars } -> cmm_expr, free_vars, res
+    | Splittable_prim { dbg; prim; args } ->
+      let free_vars, cmm_args =
+        List.fold_left_map
+          (fun free_vars { cmm = cmm_arg; effs = _; free_vars = arg_free_vars } ->
+            Backend_var.Set.union free_vars arg_free_vars, cmm_arg)
+          Backend_var.Set.empty args
+      in
+      let cmm_expr, res = rebuild_prim ~dbg ~env ~res prim cmm_args in
+      cmm_expr, free_vars, res
+  in
+  let cmm =
+    match Backend_var.With_provenance.provenance cmm_var with
+    | None -> cmm_expr
+    | Some _ -> Cmm.Cname_for_debugger (cmm_var, cmm_expr)
+  in
+  { env; res; expr = { cmm; free_vars; effs } }
 
 let will_not_inline_simple env res { cmm_var; bound_expr = Simple _; _ } =
   let var = Backend_var.With_provenance.var cmm_var in
