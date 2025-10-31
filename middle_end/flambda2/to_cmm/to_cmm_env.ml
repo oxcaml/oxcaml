@@ -759,6 +759,8 @@ let bind_variable_to_primitive = bind_variable_with_decision
 let will_inline_simple env res
     { effs; bound_expr = Simple { cmm_expr; free_vars }; cmm_var; _ } =
   let cmm =
+    (* Wrap with Cname_for_debugger if the variable is user-visible.
+       We can test user-visibleness by checking whether the provenance is [Some]. *)
     match Backend_var.With_provenance.provenance cmm_var with
     | None -> cmm_expr
     | Some _ -> Cmm.Cname_for_debugger (cmm_var, cmm_expr)

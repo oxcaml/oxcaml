@@ -325,6 +325,8 @@ let size_expr env exp =
     | Cop (op, _, _) -> size_machtype (oper_result_type op)
     | Clet (id, arg, body) ->
       size (V.Map.add (VP.var id) (size localenv arg) localenv) body
+    | Cphantom_let (_id, _defining_expr, body) -> size localenv body
+    | Cname_for_debugger (_var, body) -> size localenv body
     | Csequence (_e1, e2) -> size localenv e2
     | _ -> Misc.fatal_error "Selection.size_expr"
   in
