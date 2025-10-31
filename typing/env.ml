@@ -1902,11 +1902,25 @@ let find_modtype_expansion_lazy path env =
 let find_modtype_expansion path env =
   Subst.Lazy.force_modtype (find_modtype_expansion_lazy path env)
 
+let is_parameter_module_ident id =
+  match Ident.to_global id with
+  | Some global -> Persistent_env.is_parameter_import !persistent_env global
+  | None -> false
+
 let rec is_functor_arg path env =
   match path with
     Pident id ->
       begin try Ident.find_same id env.functor_args; true
-      with Not_found -> false
+      with Not_found ->
+        (* CR-someday lmaurer: This forbids making true aliases to parameters or
+           their submodules, since allowing this makes it impossible to perform
+           substitution safely without transparent ascription. It is a bit
+           brutal, however. One alternative would be to implement a very
+           restricted version of transparent ascription just for argument
+           modules: have a special path for an argument module used as its
+           parameter type. Then we could lift this restriction and use that path
+           when substituting an argument in [Signature_with_global_bindings]. *)
+        is_parameter_module_ident id
       end
   | Pdot (p, _) | Pextra_ty (p, _) -> is_functor_arg p env
   | Papply _ -> true
