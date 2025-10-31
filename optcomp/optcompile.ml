@@ -42,7 +42,8 @@ module type S = sig
 
   val link : ppf_dump:Format.formatter -> string list -> string -> unit
 
-  val link_shared : ppf_dump:Format.formatter -> string list -> string -> unit
+  val link_shared :
+    ppf_dump:Format.formatter -> Linkenv.t -> string list -> string -> unit
 
   val create_archive : string list -> string -> unit
 

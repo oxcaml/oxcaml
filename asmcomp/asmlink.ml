@@ -73,7 +73,7 @@ let emit_ocamlrunparam ~ppf_dump =
            { sym_name = "caml_ocamlrunparam"; sym_global = Global };
          Cmm.Cstring (!Clflags.ocamlrunparam ^ "\000") ])
 
-let make_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units
+let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     cached_gen =
   Location.input_name := "caml_startup";
   (* set name of "current" input *)
@@ -102,7 +102,7 @@ let make_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     (fun i name -> compile_phrase (Cmm_helpers.predef_exception i name))
     Runtimedef.builtin_exceptions;
   compile_phrase (Cmm_helpers.global_table name_list);
-  let globals_map = Linkenv.make_globals_map units in
+  let globals_map = Linkenv.make_globals_map linkenv units in
   compile_phrase (Cmm_helpers.globals_map globals_map);
   compile_phrase
     (Cmm_helpers.data_segment_table (startup_comp_unit :: name_list));
@@ -314,7 +314,7 @@ let call_linker file_list_rev startup_file output_name =
 
 (* Main entry point *)
 
-let link unix ml_objfiles output_name ~cached_genfns_imports ~genfns
+let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns
     ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump : unit =
   if !Oxcaml_flags.internal_assembler
   then Emitaux.binary_backend_available := true;
@@ -340,10 +340,10 @@ let link unix ml_objfiles output_name ~cached_genfns_imports ~genfns
   Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:startup
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
-      make_startup_file unix ~ppf_dump
+      make_startup_file linkenv unix ~ppf_dump
         ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns units_tolink
         cached_genfns_imports);
-  Emitaux.reduce_heap_size ~reset:(fun () -> Linkenv.reset ());
+  Emitaux.reduce_heap_size ~reset:(fun () -> ());
   Misc.try_finally
     (fun () -> call_linker ml_objfiles startup_obj output_name)
     ~always:(fun () -> remove_file startup_obj)

@@ -63,6 +63,7 @@ module type Backend = sig
     unit
 
   val link :
+    Linkenv.t ->
     string list ->
     string ->
     cached_genfns_imports:Generic_fns.Partition.Set.t ->

@@ -77,6 +77,8 @@ module Compiler = (val Optcompile.native
 
 (* Load in-core a .cmxs file *)
 
+let linkenv = Linkenv.create ()
+
 let load_file ppf name0 =
   let name =
     try Some (Load_path.find name0)
@@ -90,7 +92,7 @@ let load_file ppf name0 =
          || Filename.check_suffix name Compiler.ext_flambda_lib
       then
         let cmxs = Filename.temp_file "caml" ".cmxs" in
-        Compiler.link_shared ~ppf_dump:ppf [name] cmxs;
+        Compiler.link_shared ~ppf_dump:ppf linkenv [name] cmxs;
         cmxs,true
       else
         name,false

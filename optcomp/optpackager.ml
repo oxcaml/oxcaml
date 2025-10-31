@@ -51,7 +51,7 @@ end) : S = struct
       pm_kind : pack_member_kind
     }
 
-  let read_member_info pack_path file =
+  let read_member_info linkenv pack_path file =
     let for_pack_prefix = CU.to_prefix pack_path in
     let unit_info = Unit_info.Artifact.from_filename ~for_pack_prefix file in
     let name = Unit_info.Artifact.modname unit_info |> CU.name in
@@ -64,7 +64,7 @@ end) : S = struct
         then raise (Error (Illegal_renaming (name, file, CU.name info.ui_unit)));
         if not (CU.is_parent pack_path ~child:info.ui_unit)
         then raise (Error (Wrong_for_pack (file, pack_path)));
-        Backend.check_consistency file info crc;
+        Backend.check_consistency linkenv file info crc;
         Compilenv.cache_unit_info info;
         PM_impl info
     in
@@ -160,7 +160,7 @@ end) : S = struct
               (objtemp :: objfiles));
         main_module_block_size)
 
-  let build_package_cmx members cmxfile ~main_module_block_size =
+  let build_package_cmx linkenv members cmxfile ~main_module_block_size =
     let unit_names = List.map (fun m -> m.pm_name) members in
     let filter lst =
       List.filter
@@ -205,8 +205,8 @@ end) : S = struct
         ui_imports_cmi =
           Import_info.create modname
             ~crc_with_unit:(Some (ui.ui_unit, Env.crc_of_unit modname))
-          :: filter (Linkenv.extract_crc_interfaces ());
-        ui_imports_cmx = filter (Linkenv.extract_crc_implementations ());
+          :: filter (Linkenv.extract_crc_interfaces linkenv);
+        ui_imports_cmx = filter (Linkenv.extract_crc_implementations linkenv);
         ui_quoted_globals = [] (* CR jrickard: Metaprogramming support. *);
         ui_format = format;
         ui_generic_fns =
@@ -228,12 +228,13 @@ end) : S = struct
 
   let package_object_files ~ppf_dump files target targetcmx coercion =
     let pack_path = Unit_info.Artifact.modname target in
-    let members = map_left_right (read_member_info pack_path) files in
+    let linkenv = Linkenv.create () in
+    let members = map_left_right (read_member_info linkenv pack_path) files in
     check_units members;
     let main_module_block_size =
       make_package_object ~ppf_dump members target coercion
     in
-    build_package_cmx members targetcmx ~main_module_block_size
+    build_package_cmx linkenv members targetcmx ~main_module_block_size
 
   (* The entry point *)
 
