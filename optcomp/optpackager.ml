@@ -55,20 +55,20 @@ end) : S = struct
     let for_pack_prefix = CU.to_prefix pack_path in
     let unit_info = Unit_info.Artifact.from_filename ~for_pack_prefix file in
     let name = Unit_info.Artifact.modname unit_info |> CU.name in
-    let linkenv, kind =
+    let kind =
       if Unit_info.is_cmi unit_info
-      then linkenv, PM_intf
+      then PM_intf
       else
         let info, crc = Compilenv.read_unit_info file in
         if not (CU.Name.equal (CU.name info.ui_unit) name)
         then raise (Error (Illegal_renaming (name, file, CU.name info.ui_unit)));
         if not (CU.is_parent pack_path ~child:info.ui_unit)
         then raise (Error (Wrong_for_pack (file, pack_path)));
-        let linkenv = Backend.check_consistency linkenv file info crc in
+        Backend.check_consistency linkenv file info crc;
         Compilenv.cache_unit_info info;
-        linkenv, PM_impl info
+        PM_impl info
     in
-    linkenv, { pm_file = file; pm_name = name; pm_kind = kind }
+    { pm_file = file; pm_name = name; pm_kind = kind }
 
   (* Check absence of forward references *)
 
@@ -229,13 +229,7 @@ end) : S = struct
   let package_object_files ~ppf_dump files target targetcmx coercion =
     let pack_path = Unit_info.Artifact.modname target in
     let linkenv = Linkenv.create () in
-    let members, linkenv =
-      List.fold_right
-        (fun file (members, linkenv) ->
-          let linkenv, member = read_member_info linkenv pack_path file in
-          member :: members, linkenv)
-        files ([], linkenv)
-    in
+    let members = map_left_right (read_member_info linkenv pack_path) files in
     check_units members;
     let main_module_block_size =
       make_package_object ~ppf_dump members target coercion

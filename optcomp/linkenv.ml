@@ -47,13 +47,13 @@ exception Error of error
 type t =
   { crc_interfaces : Cmi_consistbl.t;
     crc_implementations : Cmx_consistbl.t;
-    implementations : CU.t list;
-    cmx_required : CU.t list;
+    mutable implementations : CU.t list;
+    mutable cmx_required : CU.t list;
     interfaces : unit CU.Name.Tbl.t;
     implementations_defined : string CU.Tbl.t;
-    quoted_globals : CU.Name.Set.t;
-    lib_ccobjs : filepath list;
-    lib_ccopts : string list;
+    mutable quoted_globals : CU.Name.Set.t;
+    mutable lib_ccobjs : filepath list;
+    mutable lib_ccopts : string list;
     missing_globals : (CU.t, (string * CU.Name.t option) list ref) Hashtbl.t
   }
 
@@ -78,14 +78,12 @@ let create () =
 (* Globals for quotations *)
 
 let add_quoted_globals t globals =
-  { t with
-    quoted_globals =
-      List.fold_left
-        (fun globals global -> CU.Name.Set.add global globals)
-        t.quoted_globals globals
-  }
+  t.quoted_globals
+    <- List.fold_left
+         (fun globals global -> CU.Name.Set.add global globals)
+         t.quoted_globals globals
 
-let get_quoted_globals t = t, t.quoted_globals
+let get_quoted_globals t = t.quoted_globals
 
 (* Consistency check between interfaces and implementations: *)
 
@@ -109,20 +107,18 @@ let check_cmi_consistency t file_name cmis =
 
 let check_cmx_consistency t file_name cmxs =
   try
-    let implementations = ref t.implementations in
     Array.iter
       (fun import ->
         let name = Import_info.cu import in
         let crco = Import_info.crc import in
-        implementations := name :: !implementations;
+        t.implementations <- name :: t.implementations;
         match crco with
         | None ->
           if List.mem name t.cmx_required
           then raise (Error (Missing_cmx (file_name, name)))
         | Some crc ->
           Cmx_consistbl.check t.crc_implementations name () crc file_name)
-      cmxs;
-    { t with implementations = !implementations }
+      cmxs
   with
   | Cmx_consistbl.Inconsistency
       { unit_name = name; inconsistent_source = user; original_source = auth }
@@ -131,21 +127,16 @@ let check_cmx_consistency t file_name cmxs =
 
 let check_consistency t ~unit cmis cmxs =
   check_cmi_consistency t unit.file_name cmis;
-  let t = check_cmx_consistency t unit.file_name cmxs in
+  check_cmx_consistency t unit.file_name cmxs;
   let ui_unit = CU.name unit.name in
   (try
      let source = CU.Tbl.find t.implementations_defined unit.name in
      raise (Error (Multiple_definition (ui_unit, unit.file_name, source)))
    with Not_found -> ());
-  let implementations = unit.name :: t.implementations in
+  t.implementations <- unit.name :: t.implementations;
   Cmx_consistbl.check t.crc_implementations unit.name () unit.crc unit.file_name;
   CU.Tbl.replace t.implementations_defined unit.name unit.file_name;
-  let cmx_required =
-    if CU.is_packed unit.name
-    then unit.name :: t.cmx_required
-    else t.cmx_required
-  in
-  { t with cmx_required; implementations }
+  if CU.is_packed unit.name then t.cmx_required <- unit.name :: t.cmx_required
 
 let extract_crc_interfaces t =
   CU.Name.Tbl.fold
@@ -165,14 +156,12 @@ let extract_crc_implementations t =
 
 let add_ccobjs t origin (l : Cmx_format.library_infos) =
   if not !Clflags.no_auto_link
-  then
-    let lib_ccobjs = l.lib_ccobjs @ t.lib_ccobjs in
+  then (
+    t.lib_ccobjs <- l.lib_ccobjs @ t.lib_ccobjs;
     let replace_origin =
       Misc.replace_substring ~before:"$CAMLORIGIN" ~after:origin
     in
-    let lib_ccopts = List.map replace_origin l.lib_ccopts @ t.lib_ccopts in
-    { t with lib_ccobjs; lib_ccopts }
-  else t
+    t.lib_ccopts <- List.map replace_origin l.lib_ccopts @ t.lib_ccopts)
 
 let is_required t name =
   try

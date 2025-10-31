@@ -39,6 +39,7 @@ type unit_link_info =
     dynunit : Cmxs_format.dynunit option
   }
 
+(** Values of type [t] are mutable structures. *)
 type t
 
 val create : unit -> t
@@ -56,7 +57,7 @@ val make_globals_map :
   unit_link_info list ->
   (CU.t * Digest.t option * Digest.t option * Symbol.t list) list
 
-val add_ccobjs : t -> filepath -> Cmx_format.library_infos -> t
+val add_ccobjs : t -> filepath -> Cmx_format.library_infos -> unit
 
 val is_required : t -> Compilation_unit.t -> bool
 
@@ -64,18 +65,18 @@ val add_required : t -> filepath * CU.Name.t option -> Import_info.t -> unit
 
 val remove_required : t -> CU.t -> unit
 
-val add_quoted_globals : t -> CU.Name.t list -> t
+val add_quoted_globals : t -> CU.Name.t list -> unit
 
-val get_quoted_globals : t -> t * CU.Name.Set.t
+val get_quoted_globals : t -> CU.Name.Set.t
 
 val extract_missing_globals : t -> (CU.t * filepath list) list
 
 val check_cmi_consistency : t -> filepath -> Import_info.t array -> unit
 
-val check_cmx_consistency : t -> filepath -> Import_info.t array -> t
+val check_cmx_consistency : t -> filepath -> Import_info.t array -> unit
 
 val check_consistency :
-  t -> unit:unit_link_info -> Import_info.t array -> Import_info.t array -> t
+  t -> unit:unit_link_info -> Import_info.t array -> Import_info.t array -> unit
 
 type error =
   | File_not_found of filepath

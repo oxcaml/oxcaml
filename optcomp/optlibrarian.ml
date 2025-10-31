@@ -62,12 +62,10 @@ end) : S = struct
           List.split (List.map read_info file_list)
         in
         let linkenv = Linkenv.create () in
-        let linkenv =
-          List.fold_left2
-            (fun linkenv file_name (unit, crc) ->
-              Backend.check_consistency linkenv file_name unit crc)
-            linkenv file_list descr_list
-        in
+        List.iter2
+          (fun file_name (unit, crc) ->
+            Backend.check_consistency linkenv file_name unit crc)
+          file_list descr_list;
         let cmis = Linkenv.extract_crc_interfaces linkenv in
         let cmxs = Linkenv.extract_crc_implementations linkenv in
         (* CR mshinwell: see comment in compilenv.ml let cmxs =
