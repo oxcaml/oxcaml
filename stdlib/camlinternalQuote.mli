@@ -26,8 +26,6 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* CR metaprogramming aivaskovic: This file has not been code reviewed *)
-
 type 'a lam
 
 module Loc : sig
