@@ -42,3 +42,5 @@ let add_path_for mdl dir =
 let emacs = ref false
 
 let machine_readable = ref false
+
+let quiet = ref false
