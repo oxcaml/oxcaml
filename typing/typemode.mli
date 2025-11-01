@@ -1,7 +1,9 @@
+(* CR zeisbach: with the addition of crossings in modes, maybe it is cleaner if
+   this and the other (un)transl were to take in core_modes/modalities *)
 (** Interpret mode syntax as mode annotation, where axes can be left unspecified *)
 val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t
 
-val untransl_mode_annots : Mode.Alloc.Const.Option.t -> Parsetree.modes
+val untransl_mode_annots : Mode.Alloc.Const.Option.t -> Parsetree.core_modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
     legacy if unspecified *)
@@ -28,9 +30,9 @@ val untransl_modality : Mode.Modality.atom -> Parsetree.modality Location.loc
     attributes on the field and remove mutable-implied modalities accordingly.
     *)
 val untransl_modalities :
-  Types.mutability -> Mode.Modality.Const.t -> Parsetree.modalities
+  Types.mutability -> Mode.Modality.Const.t -> Parsetree.core_modalities
 
 (** Interpret a mod-bounds. *)
-val transl_mod_bounds : Parsetree.modes -> Types.Jkind_mod_bounds.t
+val transl_mod_bounds : Parsetree.crossings -> Types.Jkind_mod_bounds.t
 
 val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t

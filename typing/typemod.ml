@@ -1201,31 +1201,20 @@ and apply_modalities_module_type env modalities = function
       Mty_signature sg
   | (Mty_functor _ | Mty_alias _) as mty -> mty
 
-let loc_of_modes (modes : Parsetree.mode loc list) : Location.t option =
-  (* CR zqian: [Parsetree.modes] should be a record with a field that is
-  the location of the whole modes string. *)
-  let rec loc_end_of_modes (head : Parsetree.mode loc) = function
-    | [] -> head.loc.loc_end
-    | head' :: rest -> loc_end_of_modes head' rest
-  in
-  match modes with
-  | [] -> None
-  | head :: rest ->
-    let loc_start = head.loc.loc_start in
-    let loc_end = loc_end_of_modes head rest in
-    Some {loc_start; loc_end; loc_ghost=false}
-
 let check_unsupported_modal_module ~env reason modes =
-  match loc_of_modes modes with
-  | None -> ()
-  | Some loc -> raise(Error(loc, env, Unsupported_modal_module reason))
+  match modes with
+  | No_modes -> ()
+  | Modes {loc; _} ->
+      raise(Error(loc, env, Unsupported_modal_module reason))
 
 let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
   modalities =
   match modalities with
-  | [] -> default_modalities
-  | _ :: _ ->
+  | No_modalities -> default_modalities
+  | Modalities {crossings = []; _} ->
     Typemode.transl_modalities ~maturity:Stable Immutable modalities
+  | Modalities {crossings = _ :: _; _} ->
+      Misc.fatal_error "crossings as modalities are not yet implemented"
 
 let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
   let modalities = transl_modalities ~default_modalities pmd_modalities in
@@ -1439,8 +1428,10 @@ and approx_sig_items env ssg=
               let sg = extract_sig env loc mty in
               let sg =
                 match moda with
-                | [] -> sg
-                | _ ->
+                | No_modalities -> sg
+                | Modalities { crossings = _ :: _; _ } ->
+                    Misc.fatal_error "crossings on includes are not supported"
+                | Modalities { crossings = []; _ } ->
                   let modalities =
                     Typemode.transl_modalities ~maturity:Stable Immutable moda
                   in
@@ -2020,7 +2011,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
     | Psig_value sdesc ->
         let modalities =
           match sdesc.pval_modalities with
-          | [] -> sig_modalities
+          | No_modalities -> sig_modalities
           | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
         in
         let modalities = Mode.Modality.of_const modalities in
@@ -3491,7 +3482,13 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         sense. We convert them to modes. *)
         (* CR zqian: remove this hack *)
         let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
-        let modes = List.map modality_to_mode sdesc.pval_modalities in
+        let modes =
+          match sdesc.pval_modalities with
+          | No_modalities -> No_modes
+          | Modalities {modalities; crossings; loc} ->
+            Modes { modes = List.map modality_to_mode modalities;
+                    crossings = crossings;
+                    loc = loc } in
         let mode =
           modes
           |> Typemode.transl_alloc_mode
@@ -3638,7 +3635,8 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
             ~sig_modalities:Mode.Modality.Const.id
             (List.map (fun (name, smty, smode, _smodl, attrs, loc) ->
                  ({pmd_name=name; pmd_type=smty;
-                   pmd_attributes=attrs; pmd_loc=loc; pmd_modalities=[]}
+                   pmd_attributes=attrs; pmd_loc=loc;
+                   pmd_modalities=No_modalities}
                   , Some smode)) sbind
             ) in
         List.iter

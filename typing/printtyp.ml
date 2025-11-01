@@ -1428,7 +1428,7 @@ let tree_of_modality_old (t: Parsetree.modality loc) =
   | _ -> None
 
 let tree_of_modalities mut t =
-  let t = Typemode.untransl_modalities mut t in
+let t = Typemode.untransl_modalities mut t in
   match all_or_none tree_of_modality_old t with
   | Some l -> l
   | None -> List.map tree_of_modality_new t

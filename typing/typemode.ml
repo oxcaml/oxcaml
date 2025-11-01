@@ -174,8 +174,8 @@ module Transled_modifiers = struct
     | Nonmodal Separability -> { t with separability = value }
 end
 
-let transl_mod_bounds annots =
-  let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
+let transl_mod_bounds (crossings : Parsetree.crossings) =
+  let step bounds_so_far { txt = Parsetree.Crossing txt; loc } =
     match Modifier_axis_pair.of_string txt with
     | P (type a) ((axis, mode) : a Axis.t * a) ->
       let is_top = Per_axis.(le axis (max axis) mode) in
@@ -223,7 +223,7 @@ let transl_mod_bounds annots =
       | _ -> raise (Error (loc, Unrecognized_modifier (Modifier, txt))))
   in
   let empty_modifiers = Transled_modifiers.empty in
-  let modifiers = List.fold_left step empty_modifiers annots in
+  let modifiers = List.fold_left step empty_modifiers crossings in
   (* Since [unforkable] is the default mode in presence of [local],
      the [global] modifier must also apply [forkable] unless specified. *)
   let modifiers =
@@ -351,7 +351,14 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   in
   { annots with forkable; yielding; contention; portability }
 
-let transl_mode_annots annots : Alloc.Const.Option.t =
+let transl_mode_annots (modes : Parsetree.modes) : Alloc.Const.Option.t =
+  let annots =
+    match modes with
+    | No_modes -> []
+    | Modes { crossings = _ :: _; _ } ->
+      Misc.fatal_error "crossings as mode annotations are not yet implemented"
+    | Modes { modes; _ } -> modes
+  in
   let step modes_so_far { txt = Parsetree.Mode txt; loc } =
     Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
     let (P (ax, a)) =
@@ -364,7 +371,8 @@ let transl_mode_annots annots : Alloc.Const.Option.t =
   in
   List.fold_left step Alloc.Const.Option.none annots |> default_mode_annots
 
-let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
+let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) :
+    Parsetree.core_modes =
   let print_to_string_opt print a = Option.map (Format.asprintf "%a" print) a in
   (* Untranslate [areality], [forkable], and [yielding]. *)
   let areality = print_to_string_opt Mode.Locality.Const.print modes.areality in
@@ -606,14 +614,21 @@ let sort_dedup_modalities ~warn l =
   in
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map fst
 
-let transl_modalities ~maturity mut modalities =
+let transl_modalities ~maturity mut (modalities : Parsetree.modalities) =
+  let modalities =
+    match modalities with
+    | No_modalities -> []
+    | Modalities { crossings = _ :: _; _ } ->
+      Misc.fatal_error "crossings as modalities are not yet implemented"
+    | Modalities { modalities; crossings = []; _ } ->
+      List.map (transl_modality ~maturity) modalities
+  in
+  (* axes listed in the order of implication. *)
+  let modalities = sort_dedup_modalities ~warn:true modalities in
   let mut_modalities =
     mutable_implied_modalities (Types.is_mutable mut)
       ~for_mutable_variable:false
   in
-  let modalities = List.map (transl_modality ~maturity) modalities in
-  (* axes listed in the order of implication. *)
-  let modalities = sort_dedup_modalities ~warn:true modalities in
   let open Modality in
   (* - mut_modalities is applied before explicit modalities.
      - explicit modalities can override mut_modalities.
@@ -632,7 +647,7 @@ let let_mutable_modalities =
 let atomic_mutable_modalities =
   mutable_implied_modalities true ~for_mutable_variable:false
 
-let untransl_modalities mut t =
+let untransl_modalities mut t : Parsetree.core_modalities =
   t
   |> least_modalities_implying mut
   |> List.map (fun x -> x, Location.none)
