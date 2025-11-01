@@ -599,6 +599,7 @@
   cfg_available_regs
   cfg_edge
   cfg_intf
+  cfg_reducibility
   cfg_to_linear
   cfg_with_layout
   cfg_with_infos
