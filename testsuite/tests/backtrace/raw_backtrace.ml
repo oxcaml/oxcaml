@@ -40,7 +40,7 @@ let backtrace args =
     let trace = Printexc.get_raw_backtrace () in
     Some (exn, trace)
 
-let run args =
+let[@inline never] run args =
   match backtrace args with
     | None -> print_string "No exception\n"
     | Some (exn, trace) ->
