@@ -24,14 +24,16 @@ type effects_and_coeffects_classification =
 let classify_by_effects_and_coeffects effs =
   (* See the comments on type [classification] in the .mli. *)
   match (effs : Effects_and_coeffects.t) with
-  | Only_generative_effects Immutable, No_coeffects, _ -> Generative_immutable
-  | Arbitrary_effects, (Has_coeffects | No_coeffects), _
+  | Only_generative_effects Immutable, No_coeffects, _, _ ->
+    Generative_immutable
+  | Arbitrary_effects, (Has_coeffects | No_coeffects), _, _
   | ( Only_generative_effects (Mutable | Immutable | Immutable_unique),
       (Has_coeffects | No_coeffects),
+      _,
       _ ) ->
     Effect
-  | No_effects, Has_coeffects, _ -> Coeffect_only
-  | No_effects, No_coeffects, _ -> Pure
+  | No_effects, Has_coeffects, _, _ -> Coeffect_only
+  | No_effects, No_coeffects, _, _ -> Pure
 
 type let_binding_classification =
   | Drop_defining_expr
@@ -68,14 +70,14 @@ let classify_let_binding var
        the context. Currently this is very restricted, see comments in
        [To_cmm_primitive]. *)
     match effects_and_coeffects_of_defining_expr with
-    | _, _, Delay -> Must_inline_once
-    | _, _, Strict -> May_inline_once)
+    | _, _, Delay, _ -> Must_inline_once
+    | _, _, Strict, _ -> May_inline_once)
   | More_than_one -> (
     (* Note: expressions in loops are counted as having two occurrences to
        ensure that they fall into this case *)
     match effects_and_coeffects_of_defining_expr with
-    | _, _, Delay -> Must_inline_and_duplicate
-    | _, _, Strict -> Regular)
+    | _, _, Delay, _ -> Must_inline_and_duplicate
+    | _, _, Strict, _ -> Regular)
 
 type continuation_handler_classification =
   | Regular
