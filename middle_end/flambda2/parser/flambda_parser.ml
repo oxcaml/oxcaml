@@ -1339,7 +1339,7 @@ module Tables = struct
 # 1340 "flambda_parser_in.ml"
         ) = 
 # 486 "flambda_parser.mly"
-            ( (Immediates : array_kind) )
+            ( (Externals : array_kind) )
 # 1344 "flambda_parser_in.ml"
          in
         {
@@ -2378,7 +2378,7 @@ module Tables = struct
     (
     let array_load_kind : array_load_kind =
       match ak with
-      | Immediates -> Immediates
+      | Externals -> Externals
       | Values -> Values
       | Naked_floats -> Naked_floats
       | Naked_float32s -> Naked_float32s
@@ -12242,7 +12242,7 @@ module Tables = struct
     (
       let array_set_kind : array_set_kind =
         match ak with
-        | Immediates -> Immediates
+        | Externals -> Externals
         | Values -> Values ia
         | Naked_floats -> Naked_floats
         | Naked_float32s -> Naked_float32s

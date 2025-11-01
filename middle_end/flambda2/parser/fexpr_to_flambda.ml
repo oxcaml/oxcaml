@@ -502,7 +502,7 @@ let binop (binop : Fexpr.binop) : Flambda_primitive.binary_primitive =
 
 let array_kind : 'a -> Fexpr.array_kind -> Flambda_primitive.Array_kind.t =
  fun _env -> function
-  | Immediates -> Immediates
+  | Externals -> Externals
   | Naked_floats -> Naked_floats
   | Values -> Values
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
@@ -513,7 +513,7 @@ let array_kind : 'a -> Fexpr.array_kind -> Flambda_primitive.Array_kind.t =
 let array_set_kind :
     'a -> Fexpr.array_set_kind -> Flambda_primitive.Array_set_kind.t =
  fun env -> function
-  | Immediates -> Immediates
+  | Externals -> Externals
   | Naked_floats -> Naked_floats
   | Values ia -> Values (init_or_assign env ia)
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
