@@ -859,10 +859,10 @@ val stderr : out_channel
 val print_char : char -> unit
 (** Print a character on standard output. *)
 
-val print_string : string -> unit
+val print_string : string @ local -> unit
 (** Print a string on standard output. *)
 
-val print_bytes : bytes -> unit
+val print_bytes : bytes @ local -> unit
 (** Print a byte sequence on standard output.
    @since 4.02 *)
 
@@ -875,7 +875,7 @@ val print_float : float -> unit
     The conversion of the number to a string uses {!string_of_float} and
     can involve a loss of precision. *)
 
-val print_endline : string -> unit
+val print_endline : string @ local -> unit
 (** Print a string, followed by a newline character, on
    standard output and flush standard output. *)
 
@@ -890,10 +890,10 @@ val print_newline : unit -> unit
 val prerr_char : char -> unit
 (** Print a character on standard error. *)
 
-val prerr_string : string -> unit
+val prerr_string : string @ local -> unit
 (** Print a string on standard error. *)
 
-val prerr_bytes : bytes -> unit
+val prerr_bytes : bytes @ local -> unit
 (** Print a byte sequence on standard error.
    @since 4.02 *)
 
@@ -906,7 +906,7 @@ val prerr_float : float -> unit
     The conversion of the number to a string uses {!string_of_float} and
     can involve a loss of precision. *)
 
-val prerr_endline : string -> unit
+val prerr_endline : string @ local -> unit
 (** Print a string, followed by a newline character on standard
    error and flush standard error. *)
 
