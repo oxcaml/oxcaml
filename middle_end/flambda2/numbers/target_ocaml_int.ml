@@ -119,7 +119,11 @@ module Int32_base = struct
 
   let mod_ = Int32.rem
 
+  let mod_unsigned = Int32.unsigned_rem
+
   let div = Int32.div
+
+  let div_unsigned = Int32.unsigned_div
 
   let and_ = Int32.logand
 
@@ -235,7 +239,11 @@ module Int64_base = struct
 
   let mod_ = Int64.rem
 
+  let mod_unsigned = Int64.unsigned_rem
+
   let div = Int64.div
+
+  let div_unsigned = Int64.unsigned_div
 
   let and_ = Int64.logand
 
@@ -489,6 +497,18 @@ let div t1 t2 =
     Misc.fatal_errorf "Target_ocaml_int.div: incompatible types %a and %a" print
       t1 print t2
 
+let div_unsigned t1 t2 =
+  match t1, t2 with
+  | Int31 x1, Int31 x2 -> Int31 (Int31.div_unsigned x1 x2)
+  | Int32 x1, Int32 x2 -> Int32 (Int32.unsigned_div x1 x2)
+  | Int63 x1, Int63 x2 -> Int63 (Int63.div_unsigned x1 x2)
+  | Int31 _, (Int32 _ | Int63 _)
+  | Int32 _, (Int31 _ | Int63 _)
+  | Int63 _, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf
+      "Target_ocaml_int.div_unsigned: incompatible types %a and %a" print t1
+      print t2
+
 let mod_ t1 t2 =
   match t1, t2 with
   | Int31 x1, Int31 x2 -> Int31 (Int31.mod_ x1 x2)
@@ -499,6 +519,18 @@ let mod_ t1 t2 =
   | Int63 _, (Int31 _ | Int32 _) ->
     Misc.fatal_errorf "Target_ocaml_int.mod_: incompatible types %a and %a"
       print t1 print t2
+
+let mod_unsigned t1 t2 =
+  match t1, t2 with
+  | Int31 x1, Int31 x2 -> Int31 (Int31.mod_unsigned x1 x2)
+  | Int32 x1, Int32 x2 -> Int32 (Int32.unsigned_rem x1 x2)
+  | Int63 x1, Int63 x2 -> Int63 (Int63.mod_unsigned x1 x2)
+  | Int31 _, (Int32 _ | Int63 _)
+  | Int32 _, (Int31 _ | Int63 _)
+  | Int63 _, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf
+      "Target_ocaml_int.mod_unsigned: incompatible types %a and %a" print t1
+      print t2
 
 let and_ t1 t2 =
   match t1, t2 with

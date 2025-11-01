@@ -48,8 +48,8 @@ type integer_operation =
   | Isub
   | Imul
   | Imulh of { signed : bool }
-  | Idiv
-  | Imod
+  | Idiv of { signed : bool }
+  | Imod of { signed : bool }
   | Iand
   | Ior
   | Ixor

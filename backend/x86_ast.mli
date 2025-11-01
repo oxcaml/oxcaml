@@ -130,6 +130,7 @@ type instruction =
   | DEC of arg
   | HLT
   | IDIV of arg
+  | DIV of arg
   | IMUL of arg * arg option
   | MUL of arg
   | INC of arg
