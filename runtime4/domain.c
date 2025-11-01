@@ -132,6 +132,11 @@ CAMLprim value caml_ml_domain_id(void)
   caml_failwith("Domains not supported on runtime4");
 }
 
+CAMLprim value caml_ml_domain_index(void)
+{
+  caml_failwith("Domains not supported on runtime4");
+}
+
 CAMLprim value caml_domain_dls_set(void)
 {
   caml_failwith("Domains not supported on runtime4");
