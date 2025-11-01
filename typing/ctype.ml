@@ -254,7 +254,7 @@ let new_scoped_ty scope desc = newty3 ~level:!current_level ~scope desc
 let newvar ?name jkind =
   newty2 ~level:!current_level (Tvar { name; jkind })
 let new_rep_var ?name ~why () =
-  let jkind, sort = Jkind.of_new_sort_var ~why in
+  let jkind, sort = Jkind.of_new_sort_var ~why ~level:!current_level in
   newvar ?name jkind, sort
 let newvar2 ?name level jkind = newty2 ~level (Tvar { name; jkind })
 let new_global_var ?name jkind =
@@ -1179,7 +1179,8 @@ let limited_generalize ty0 ty =
   List.iter (generalize_parents ~is_root:true) !roots;
   TypeHash.iter
     (fun ty _ ->
-       if get_level ty <> generic_level then set_level ty !current_level)
+       if get_level ty <> generic_level then
+         set_level ty !current_level)
     graph
 
 let limited_generalize_class_type rv cty =
@@ -1821,7 +1822,7 @@ let instance_prim_layout (desc : Primitive.description) ty =
     let sort = match !new_sort with
     | Some sort -> sort
     | None ->
-      let sort = Jkind.Sort.new_var () in
+      let sort = Jkind.Sort.new_var ~level:!current_level in
       new_sort := Some sort;
       sort
     in
@@ -2704,8 +2705,8 @@ let constrain_type_jkind ~fixed env ty jkind =
   loop ~fuel:100 ~expanded:false ty ~is_open:false
     (estimate_type_jkind env ty) (Jkind.disallow_left jkind)
 
-let type_sort ~why ~fixed env ty =
-  let jkind, sort = Jkind.of_new_sort_var ~why in
+let type_sort ~why ~fixed ~level env ty =
+  let jkind, sort = Jkind.of_new_sort_var ~level ~why in
   match constrain_type_jkind ~fixed env ty jkind with
   | Ok _ -> Ok sort
   | Error _ as e -> e
@@ -7412,7 +7413,7 @@ type global_state =
 let global_state : global_state =
   { current_level;
     nongen_level;
-    global_level;
+    global_level
   }
 
 let print_global_state fmt global_state =
