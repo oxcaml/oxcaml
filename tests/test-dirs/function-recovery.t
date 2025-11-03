@@ -10,7 +10,7 @@
     "value": "[
     structure_item (test.ml[1,0+0]..test.ml[3,104+28])
       Tstr_module
-      ERROR_locate_from_inside_function_literal_used_as_non_function/284
+      ERROR_locate_from_inside_function_literal_used_as_non_function/277
         module_expr (test.ml[1,0+72]..test.ml[3,104+28])
           Tmod_structure
           [
@@ -19,7 +19,7 @@
               [
                 <def>
                   pattern (test.ml[2,79+6]..test.ml[2,79+13])
-                    Tpat_var \"problem/282\"
+                    Tpat_var \"problem/275\"
                     sort value
                     value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#5[aliased,contended,immutable .. unique,uncontended,read_write])
                   expression (test.ml[2,79+16]..test.ml[2,79+24])
@@ -49,7 +49,7 @@
                               expression (_none_[0,0+-1]..[0,0+-1]) ghost
                                 Pexp_constant PConst_int (1,None)
                           ]
-                        Texp_ident \"*type-error*/283\"
+                        Texp_ident \"*type-error*/276\"
               ]
           ]
   ]
@@ -69,7 +69,7 @@
       [
         <def>
           pattern (type.ml[1,0+4]..type.ml[1,0+5])
-            Tpat_var \"f/282\"
+            Tpat_var \"f/275\"
             sort value
             value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#2[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#3[aliased,contended,immutable .. unique,uncontended,read_write])
           expression (type.ml[1,0+8]..type.ml[1,0+61])
@@ -87,10 +87,10 @@
                       Ttyp_constr \"list/11!\"
                       [
                         core_type (type.ml[1,0+28]..type.ml[1,0+29])
-                          Ttyp_constr \"t/284\"
+                          Ttyp_constr \"t/277\"
                           []
                       ]
-                  Tpat_var \"foo/285\"
+                  Tpat_var \"foo/278\"
                   sort value
                   value_mode map_comonadic(local_to_regional)(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#7[aliased,contended,immutable .. unique,uncontended,read_write])
             ]
@@ -103,7 +103,7 @@
                       extra
                         Tpat_extra_constraint
                         core_type (type.ml[1,0+48]..type.ml[1,0+49])
-                          Ttyp_constr \"t/284\"
+                          Ttyp_constr \"t/277\"
                           []
                       Tpat_any
                     expression (type.ml[1,0+53]..type.ml[1,0+55])
@@ -116,7 +116,7 @@
                             expression (_none_[0,0+-1]..[0,0+-1]) ghost
                               Pexp_constant PConst_int (1,None)
                         ]
-                      Texp_ident \"*type-error*/286\"
+                      Texp_ident \"*type-error*/279\"
                 ]
                 expression (type.ml[1,0+59]..type.ml[1,0+61])
                   attribute \"merlin.loc\"
@@ -195,7 +195,7 @@
                     "ghost": false,
                     "attrs": [],
                     "kind": "pattern (test.ml[1,0+4]..test.ml[1,0+5])
-    Tpat_var \"f/282\"
+    Tpat_var \"f/275\"
     sort value
     value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#2[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#3[aliased,contended,immutable .. unique,uncontended,read_write])
   ",
@@ -228,7 +228,7 @@
                         "ghost": false,
                         "attrs": [],
                         "kind": "pattern (test.ml[1,0+6]..test.ml[1,0+9])
-    Tpat_var \"x/284\"
+    Tpat_var \"x/277\"
     sort '_representable_layout_1
     value_mode map_comonadic(local_to_regional)(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write)(modevar#7[aliased,contended,immutable .. unique,uncontended,read_write])
   ",
@@ -460,7 +460,7 @@
     Tpat_construct \"Some\"
     [
       pattern (test.ml[4,57+9]..test.ml[4,57+12])
-        Tpat_var \"_aa/285\"
+        Tpat_var \"_aa/278\"
         sort value
         value_mode global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write
     ]
@@ -480,7 +480,7 @@
                                         "ghost": false,
                                         "attrs": [],
                                         "kind": "pattern (test.ml[4,57+9]..test.ml[4,57+12])
-    Tpat_var \"_aa/285\"
+    Tpat_var \"_aa/278\"
     sort value
     value_mode global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write
   ",
