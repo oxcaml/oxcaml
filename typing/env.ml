@@ -307,7 +307,8 @@ module TycompTbl =
           | exception Not_found -> rest
           | opened ->
               List.map
-                (fun desc -> Pdot (root, name), desc, mk_callback rest name desc using)
+                (fun desc -> Pdot (root, name), desc,
+                  mk_callback rest name desc using)
                 opened
               @ rest
 
