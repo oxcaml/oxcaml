@@ -213,7 +213,6 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   let link_shared ~ppf_dump linkenv objfiles output_name =
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
-        let linkenv = Linkenv.create () in
         let genfns = Generic_fns.Tbl.make () in
         let _full_paths, ml_objfiles, units_tolink, _ =
           List.fold_right
