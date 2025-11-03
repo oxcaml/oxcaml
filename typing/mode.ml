@@ -2437,6 +2437,8 @@ module Comonadic_gen (Obj : Obj) = struct
   let of_const : type l r. ?hint:(l * r) pos Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
 
+  let to_const_exn m = Solver.to_const_exn obj m
+
   let unhint = Solver.Unhint.unhint
 
   let hint ?hint = Solver.Unhint.hint obj ?hint
@@ -2536,6 +2538,8 @@ module Monadic_gen (Obj : Obj) = struct
 
   let of_const : type l r. ?hint:(l * r) neg Hint.const -> const -> (l * r) t =
    fun ?hint a -> Solver.of_const ?hint obj a
+
+  let to_const_exn m = Solver.to_const_exn obj m
 
   let unhint = Solver.Unhint.unhint
 
@@ -3211,6 +3215,12 @@ module Value_with (Areality : Areality) = struct
     let comonadic = Comonadic.of_const ?hint:hint_comonadic comonadic in
     let monadic = Monadic.of_const ?hint:hint_monadic monadic in
     { comonadic; monadic }
+
+  let to_const_exn m =
+    let { comonadic; monadic } = m in
+    let comonadic = Comonadic.to_const_exn comonadic in
+    let monadic = Monadic.to_const_exn monadic in
+    { comonadic; monadic } |> merge
 
   let unhint { monadic; comonadic } =
     let comonadic = Comonadic.unhint comonadic in

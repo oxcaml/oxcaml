@@ -191,8 +191,8 @@ let with_additional_action =
           | None -> raise(Error (loc, Unconstrained_jkind_variable))
         in
         (* CR-someday zqian: preserve the hints *)
-        (* modes should have been zapped already; doesn't hurt to zap again *)
-        let prepare_mode mode = Mode.Alloc.(zap_to_legacy mode |> of_const) in
+        (* modes should have been zapped already *)
+        let prepare_mode mode = Mode.Alloc.(mode |> to_const_exn |> of_const) in
         let prepare_modality modality =
           Mode.Modality.(zap_to_id modality |> of_const)
         in
