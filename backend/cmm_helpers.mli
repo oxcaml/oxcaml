@@ -944,6 +944,26 @@ val float32_ge : dbg:Debuginfo.t -> expression -> expression -> expression
 
 val beginregion : dbg:Debuginfo.t -> expression
 
+(** Bit windowing operations *)
+
+val make_bitwindow :
+  dbg:Debuginfo.t ->
+  src:int ->
+  len:int ->
+  dst:int ->
+  sign_extend:int ->
+  low_bits:nativeint ->
+  expression ->
+  expression
+
+val shift_to_bitwindow :
+  Cmm.operation -> expression -> int -> Cmm.operation option
+
+val compose_bitwindow :
+  inner:Cmm.operation -> outer:Cmm.operation -> Cmm.operation option
+
+val bitwindow_of_shift : Cmm.operation -> Cmm.operation option
+
 val endregion : dbg:Debuginfo.t -> expression -> expression
 
 val probe :

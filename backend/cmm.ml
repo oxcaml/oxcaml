@@ -433,6 +433,13 @@ type operation =
   | Clsl
   | Clsr
   | Casr
+  | Cbitwindow of
+      { src : int;
+        dst : int;
+        len : int;
+        sign_extend : int;
+        low_bits : nativeint
+      }
   | Cbswap of { bitwidth : bswap_bitwidth }
   | Ccsel of machtype
   | Cclz of { arg_is_non_zero : bool }
@@ -644,8 +651,8 @@ let iter_shallow_tail f = function
   | Cvar _ | Ctuple _
   | Cop
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Cand | Cor | Cxor
-        | Clsl | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque
-        | Cbeginregion | Cendregion | Cdls_get | Cpoll | Cpause
+        | Clsl | Clsr | Casr | Cbitwindow _ | Cpopcnt | Caddv | Cadda | Cpackf32
+        | Copaque | Cbeginregion | Cendregion | Cdls_get | Cpoll | Cpause
         | Capply (_, _)
         | Cextcall _ | Cload _
         | Cstore (_, _)
@@ -678,8 +685,9 @@ let map_shallow_tail f = function
     | Cvar _ | Ctuple _
     | Cop
         ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Cand | Cor | Cxor
-          | Clsl | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque
-          | Cbeginregion | Cendregion | Cdls_get | Cpoll | Cpause
+          | Clsl | Clsr | Casr | Cbitwindow _ | Cpopcnt | Caddv | Cadda
+          | Cpackf32 | Copaque | Cbeginregion | Cendregion | Cdls_get | Cpoll
+          | Cpause
           | Capply (_, _)
           | Cextcall _ | Cload _
           | Cstore (_, _)
