@@ -2108,7 +2108,7 @@ module Const = struct
       (l * r) Context_with_transl.t -> Parsetree.jkind_annotation -> (l * r) t =
    fun context jkind ->
     match jkind.pjkind_desc with
-    | Pjk_abbreviation name ->
+    | Pjk_abbreviation (name, nts) ->
       (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
       (match name with
       | "any" -> Builtin.any.jkind

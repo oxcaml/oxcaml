@@ -575,8 +575,11 @@ and jkind_annotation i ppf (jkind : jkind_annotation) =
   line i ppf "jkind %a\n" fmt_location jkind.pjkind_loc;
   match jkind.pjkind_desc with
   | Pjk_default -> line i ppf "Pjk_default\n"
-  | Pjk_abbreviation jkind ->
-      line i ppf "Pjk_abbreviation \"%s\"\n" jkind
+  (* CR zeisbach: do we want to print this out in a different way?
+     like ["value non_pointer"] vs ["value" "non_pointer"] or something else? *)
+  | Pjk_abbreviation (jkind, nts) ->
+      line i ppf "Pjk_abbreviation \"%a\"\n"
+        (pp_print_list ~pp_sep:pp_print_space pp_print_string) (jkind :: nts)
   | Pjk_mod (jkind, m) ->
       line i ppf "Pjk_mod\n";
       jkind_annotation (i+1) ppf jkind;

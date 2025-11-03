@@ -1339,7 +1339,8 @@ and module_binding =
 
 and jkind_annotation_desc =
   | Pjk_default
-  | Pjk_abbreviation of string
+  (* CR zeisbach: is there any meaningful comment I can add here? *)
+  | Pjk_abbreviation of string * string list
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
      full kind annotations. We may want to narrow this type some.
      Internal ticket 5085. *)
