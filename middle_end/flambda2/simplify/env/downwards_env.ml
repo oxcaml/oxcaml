@@ -148,7 +148,7 @@ let print ppf
       p "closure_info" Closure_info.print closure_info;
       p "all_code" (Code_id.Map.print Code.print) all_code;
       p "loopify_state" Loopify_state.print loopify_state;
-      p "binding_histories" Replay_history.print replay_history;
+      p "replay_history" Replay_history.print replay_history;
       p "specialization_cost" Specialization_cost.print specialization_cost;
       p "join_analysis"
         (Format.pp_print_option Join_analysis.print ~none:(fun ppf () ->
