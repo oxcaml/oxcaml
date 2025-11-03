@@ -1454,6 +1454,16 @@ let enter_orpat_variables loc env  p1_vs p2_vs =
           raise (Error (loc, env, err)) in
   unify_vars p1_vs p2_vs
 
+(* Create two instances with identical variables but independent structure.
+   NB: [generic_instance] can only be used if the variables of the
+   original type are not at [generic_level], but in the [cty_type] of
+   [build_as_type_extra], they are at at [generic_level].
+   If we used [generic_instance] we would lose the sharing between variables
+   in the returned types. *)
+let instance_unshared ty =
+  let ty = with_local_level ~post:generalize_structure (fun () -> instance ty) in
+  (instance ty, instance ty)
+
 let rec build_as_type_and_mode (env : Env.t) p ~mode =
   build_as_type_and_mode_extra env p p.pat_extra ~mode
 
@@ -1468,17 +1478,10 @@ and build_as_type_and_mode_extra env p ~mode : _ -> _ * _ = function
       (* Otherwise we combine the inferred type for the pattern with
          then non-ground constraint in a non-ambivalent way *)
       let as_ty, as_mode = build_as_type_and_mode_extra env p rest ~mode in
-      (* [generic_instance] can only be used if the variables of the original
-         type ([cty.ctyp_type] here) are not at [generic_level], which they are
-         here.
-         If we used [generic_instance] we would lose the sharing between
-         [instance ty] and [ty].  *)
-      let ty =
-        with_local_level ~post:generalize_structure (fun () -> instance ty)
-      in
+      let ty1, ty2 = instance_unshared ty in
       (* This call to unify may only fail due to missing GADT equations *)
-      unify_pat_types p.pat_loc env (instance as_ty) (instance ty);
-      ty, as_mode
+      unify_pat_types p.pat_loc env (instance as_ty) ty1;
+      ty2, as_mode
 
 and build_as_type_aux (env : Env.t) p ~mode =
   let build_as_type env p = fst (build_as_type_and_mode env p ~mode) in
@@ -1536,6 +1539,15 @@ and build_as_type_aux (env : Env.t) p ~mode =
         let ty_args, ty_res, _ =
           instance_constructor Keep_existentials_flexible cstr
         in
+        (* [p] is a valid result of type inference, so the levels inside its
+           types are correct (higher than the scopes). [tyl] is obtained
+           from [pl], which is part of [p], so that all the locally abstract
+           types it contains come from [p].
+           [ty_args] is an instance of the constructor type such that its
+           variables, includinding existentials, are mapped to variables at
+           a level higher than any locally abstract type in [pl], hence [tyl].
+           This means that [tyl] is an instance of [ty_args],
+           and unification should not fail *)
         List.iter2
           (fun (p,ty) {Types.ca_type=arg; _} ->
              unify_pat env {p with pat_type = ty} arg)
@@ -1593,9 +1605,21 @@ and build_as_type_aux (env : Env.t) p ~mode =
 
 (* Constraint solving during typing of patterns *)
 
+(* To avoid false-positives of the escape check for existentials,
+   we need to raise levels above the highest scope inside the pattern
+   (more-or-less the depth of the nests of or-patterns).
+   Instead of actually nesting [with_local_level_generalize],
+   we start with a high enough level, namely [generic_level - 10].
+   [build_as_type] does not nest [with_local_level_generalize],
+   hence -10 is enough.
+   We could also have used [generic_level] rather than [generic_level - 10],
+   but this requires much care inside [build_as_type], in particular
+   [instance_unshared] would have to be modified.
+ *)
 let solve_Ppat_alias ~mode env pat =
   with_local_level ~post:(fun (ty_var, _) -> generalize ty_var)
-    (fun () -> build_as_type_and_mode ~mode env pat)
+    (fun () -> with_level ~level:(generic_level - 10)
+      (fun () -> build_as_type_and_mode ~mode env pat))
 
 (* Extracts the first element from a list matching a label. Roughly:
      pat <- List.assoc_opt label patl;
