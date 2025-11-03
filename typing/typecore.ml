@@ -5402,7 +5402,7 @@ let split_function_ty
     | true ->
         let env =
           Env.add_closure_lock
-            Function
+            (loc, Function)
             mode.comonadic
             env
         in
@@ -6972,7 +6972,7 @@ and type_expect_
       let to_unify = Predef.type_lazy_t ty in
       with_explanation (fun () ->
         unify_exp_types loc env to_unify (generic_instance ty_expected));
-      let env = Env.add_closure_lock Lazy closure_mode.comonadic env in
+      let env = Env.add_closure_lock (loc, Lazy) closure_mode.comonadic env in
       let arg = type_expect env expected_mode e (mk_expected ty) in
       re {
         exp_desc = Texp_lazy arg;

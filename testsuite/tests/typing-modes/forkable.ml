@@ -70,7 +70,8 @@ Line 2, characters 43-44:
 2 |   let closure @ local forkable = fun () -> k () in
                                                ^
 Error: The value "k" is "unforkable" but is expected to be "forkable"
-       because it is used inside a function which is expected to be "forkable".
+       because it is used inside the function (at Line 2, characters 33-47)
+       which is expected to be "forkable".
 |}]
 
 type 'a t0 = Mk0 of 'a @@ global

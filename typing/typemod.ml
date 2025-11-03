@@ -2927,7 +2927,9 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
   | Pmod_functor(arg_opt, sbody) ->
       let _, mode = register_allocation () in
       Option.iter (fun x -> Value.submode mode x |> ignore) expected_mode;
-      let newenv = Env.add_closure_lock Functor mode.comonadic env in
+      let newenv =
+        Env.add_closure_lock (smod.pmod_loc, Functor) mode.comonadic env
+      in
       let t_arg, ty_arg, newenv, funct_shape_param, funct_body =
         match arg_opt with
         | Unit ->
