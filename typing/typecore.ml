@@ -1461,7 +1461,9 @@ let enter_orpat_variables loc env  p1_vs p2_vs =
    If we used [generic_instance] we would lose the sharing between variables
    in the returned types. *)
 let instance_unshared ty =
-  let ty = with_local_level ~post:generalize_structure (fun () -> instance ty) in
+  let ty =
+    with_local_level ~post:generalize_structure (fun () -> instance ty)
+  in
   (instance ty, instance ty)
 
 let rec build_as_type_and_mode (env : Env.t) p ~mode =
