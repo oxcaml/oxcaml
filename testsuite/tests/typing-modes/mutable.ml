@@ -90,7 +90,10 @@ let foo (local_ r) = ref r.s
 Line 1, characters 25-28:
 1 | let foo (local_ r) = ref r.s
                              ^^^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+       because it is the field "s" of the record at Line 1, characters 25-26
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo (local_ r) =

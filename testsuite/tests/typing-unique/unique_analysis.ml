@@ -184,7 +184,10 @@ let or_patterns1 : unique_ float list -> float list -> float =
 Line 3, characters 37-38:
 3 |   | z :: _, _ | _, z :: _ -> unique_ z
                                          ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       because it is contained (via constructor "::") in the value at Line 3, characters 19-25
+       which is "aliased".
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let or_patterns2 : float list -> unique_ float list -> float =
@@ -195,7 +198,10 @@ let or_patterns2 : float list -> unique_ float list -> float =
 Line 3, characters 37-38:
 3 |   | z :: _, _ | _, z :: _ -> unique_ z
                                          ^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       because it is contained (via constructor "::") in the value at Line 3, characters 4-10
+       which is "aliased".
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let or_patterns3 p =

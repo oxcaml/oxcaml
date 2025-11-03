@@ -566,7 +566,9 @@ let leak_ref =
 Line 3, characters 43-44:
 3 |   use_locally (fun x -> r.contents <- Some x; x) 42
                                                ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is contained (via constructor "Some") in the value at Line 3, characters 38-44
+       which is expected to be "global".
 |}]
 
 let leak_ref_2 =
@@ -588,7 +590,9 @@ let leak_ref_3 =
 Line 3, characters 64-65:
 3 |   use_locally' (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
                                                                     ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is contained (via constructor "Some") in the value at Line 3, characters 59-65
+       which is expected to be "global".
 |}]
 
 
@@ -605,7 +609,9 @@ let do_leak_exn =
 Line 2, characters 66-67:
 2 |   use_locally (fun x -> let _exn = local_ raise (Invalid_argument x) in "bluh") "blah"
                                                                       ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is contained (via constructor "Invalid_argument") in the value at Line 2, characters 48-68
+       which is expected to be "global".
 |}]
 
 (* handled exceptions are known to be global *)
@@ -972,7 +978,9 @@ let foo (local_ x) =
 Line 3, characters 14-15:
 3 |   let rec g = x :: g in
                   ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is contained (via constructor "::") in the value at Line 3, characters 14-20
+       which is expected to be "global".
 |}]
 
 (* Cannot pass local values to tail calls *)
@@ -1216,7 +1224,9 @@ Line 3, characters 2-7:
 3 |   x.imm
       ^^^^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+       because it is the field "imm" of the record at Line 3, characters 2-3
+       which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -1253,7 +1263,9 @@ Line 3, characters 2-5:
 3 |   imm
       ^^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+       because it is the field "imm" of the record at Line 2, characters 6-13
+       which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -1344,7 +1356,9 @@ Line 3, characters 2-8:
 3 |   x.#imm
       ^^^^^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+       because it is the field "imm" of the record at Line 3, characters 2-3
+       which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -1381,7 +1395,9 @@ Line 3, characters 2-5:
 3 |   imm
       ^^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+       because it is the field "imm" of the record at Line 2, characters 6-14
+       which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -1643,7 +1659,13 @@ Line 4, characters 29-30:
 4 |   | Some _, Some b -> escape b
                                  ^
 Error: This value is "local"
+       because it is contained (via constructor "Some") in the value at Line 4, characters 12-18
+       which is "local"
+       because it is an element of the tuple at Line 3, characters 8-10
+       which is "local"
        because it is from the allocation (at Line 2, characters 11-15) containing a value
+       which is "local" to the parent region
+       because it is a tuple that contains the expression at Line 2, characters 11-12
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
@@ -1659,7 +1681,11 @@ Line 5, characters 11-12:
 5 |     escape b
                ^
 Error: This value is "local"
+       because it is an element of the tuple at Line 4, characters 15-17
+       which is "local"
        because it is from the allocation (at Line 2, characters 8-12) containing a value
+       which is "local" to the parent region
+       because it is a tuple that contains the expression at Line 2, characters 8-9
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
@@ -1683,7 +1709,10 @@ let foo p (local_ x) y (local_ z) =
 Line 5, characters 9-10:
 5 |   escape b;;
              ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+       because it is an element of the tuple at Line 3, characters 24-25
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo p (local_ x) y z =
@@ -1709,7 +1738,11 @@ Line 6, characters 9-10:
 6 |   escape b;;
              ^
 Error: This value is "local"
+       because it is an element of the tuple at Line 5, characters 13-15
+       which is "local"
        because it is from the allocation (at Line 3, characters 14-18) containing a value
+       which is "local" to the parent region
+       because it is a tuple that contains the expression at Line 3, characters 14-15
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
@@ -2483,6 +2516,8 @@ Line 2, characters 8-9:
 2 |   GFoo (s, "bar")
             ^
 Error: This value is "local" to the parent region but is expected to be "global"
+       because it is contained (via constructor "GFoo") in the value at Line 2, characters 2-17
+       which is expected to be "global"
        because it is from the allocation at Line 2, characters 2-17
        which is expected to be "local" to the parent region or "global"
        because it is a function return value.
@@ -2496,7 +2531,9 @@ let f =
 Line 3, characters 8-9:
 3 |   GFoo (s, "bar")
             ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" but is expected to be "global"
+       because it is contained (via constructor "GFoo") in the value at Line 3, characters 2-17
+       which is expected to be "global".
 |}]
 
 (* s' extracted from x as global *)
@@ -2530,7 +2567,9 @@ Line 4, characters 20-22:
 4 |   | GFoo (_, s') -> s'
                         ^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+       because it is contained (via constructor "GFoo") in the value at Line 4, characters 4-16
+       which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -2544,7 +2583,10 @@ let f (local_ x : gfoo) =
 Line 3, characters 24-26:
 3 |   | GFoo (_, s') -> ref s'
                             ^^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+       because it is contained (via constructor "GFoo") in the value at Line 3, characters 4-16
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* Test of array.*)
@@ -2559,7 +2601,9 @@ let f (local_ x : string) = ref [: x; "foo" :]
 Line 1, characters 35-36:
 1 | let f (local_ x : string) = ref [: x; "foo" :]
                                        ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an element of the array at Line 1, characters 32-46
+       which is expected to be "global".
 |}]
 
 (* constructing local iarray from local elements is fine *)
@@ -2583,7 +2627,10 @@ let f (local_ a : string iarray) =
 Line 3, characters 22-23:
 3 |   | [: x; _ :] -> ref x
                           ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+       because it is an element of the array at Line 3, characters 4-14
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 (* a test that was passing type check *)
@@ -2596,7 +2643,9 @@ Line 3, characters 14-16:
 3 |   | [:s':] -> s'
                   ^^
 Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+       because it is an element of the array at Line 3, characters 4-10
+       which is "local".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]

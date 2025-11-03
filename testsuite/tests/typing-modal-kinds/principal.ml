@@ -15,6 +15,8 @@ Line 1, characters 72-73:
 1 | let string_escape_l (local_ y) = let Pair (x, _) = Pair (y, "hello") in x
                                                                             ^
 Error: This value is "local"
+       because it is contained (via constructor "Pair") in the value at Line 1, characters 37-48
+       which is "local"
        because it is from the allocation (at Line 1, characters 51-68) containing a value
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
@@ -29,6 +31,8 @@ Line 1, characters 72-73:
 1 | let string_escape_r (local_ y) = let Pair (x, _) = Pair ("hello", y) in x
                                                                             ^
 Error: This value is "local"
+       because it is contained (via constructor "Pair") in the value at Line 1, characters 37-48
+       which is "local"
        because it is from the allocation (at Line 1, characters 51-68) containing a value
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
@@ -45,6 +49,8 @@ Line 1, characters 63-64:
 1 | let int_escape_l (local_ y) = let Pair (x, _) = Pair (y, 5) in x
                                                                    ^
 Error: This value is "local"
+       because it is contained (via constructor "Pair") in the value at Line 1, characters 34-45
+       which is "local"
        because it is from the allocation (at Line 1, characters 48-59) containing a value
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
@@ -61,6 +67,8 @@ Line 1, characters 63-64:
 1 | let int_escape_r (local_ y) = let Pair (x, _) = Pair (5, y) in x
                                                                    ^
 Error: This value is "local"
+       because it is contained (via constructor "Pair") in the value at Line 1, characters 34-45
+       which is "local"
        because it is from the allocation (at Line 1, characters 48-59) containing a value
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
@@ -74,7 +82,9 @@ let string_escape_expected_l : local_ _ -> _ pair = fun x -> Pair (x, "hello")
 Line 1, characters 67-68:
 1 | let string_escape_expected_l : local_ _ -> _ pair = fun x -> Pair (x, "hello")
                                                                        ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is contained (via constructor "Pair") in the value at Line 1, characters 61-78
+       which is expected to be "global".
 |}]
 
 let string_escape_expected_r : local_ _ -> _ pair = fun x -> Pair ("hello", x)
@@ -83,7 +93,9 @@ let string_escape_expected_r : local_ _ -> _ pair = fun x -> Pair ("hello", x)
 Line 1, characters 76-77:
 1 | let string_escape_expected_r : local_ _ -> _ pair = fun x -> Pair ("hello", x)
                                                                                 ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is contained (via constructor "Pair") in the value at Line 1, characters 61-78
+       which is expected to be "global".
 |}]
 
 
@@ -94,7 +106,9 @@ let int_escape_expected_l : local_ _ -> _ pair = fun x -> Pair (x, 5)
 Line 1, characters 64-65:
 1 | let int_escape_expected_l : local_ _ -> _ pair = fun x -> Pair (x, 5)
                                                                     ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is contained (via constructor "Pair") in the value at Line 1, characters 58-69
+       which is expected to be "global".
 |}]
 
 let int_escape_expected_r : local_ _ -> _ pair = fun x -> Pair (5, x)
@@ -105,7 +119,9 @@ val int_escape_expected_r : int @ local -> int pair = <fun>
 Line 1, characters 67-68:
 1 | let int_escape_expected_r : local_ _ -> _ pair = fun x -> Pair (5, x)
                                                                        ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is contained (via constructor "Pair") in the value at Line 1, characters 58-69
+       which is expected to be "global".
 |}]
 
 let escape : 'a -> unit = fun _ -> ()
@@ -125,7 +141,10 @@ val pattern_l : int pair @ local -> unit = <fun>
 Line 3, characters 26-27:
 3 |   | Pair (y, 0) -> escape y
                               ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+       because it is contained (via constructor "Pair") in the value at Line 3, characters 4-15
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let pattern_r (local_ x) =
@@ -139,5 +158,8 @@ val pattern_r : int pair @ local -> unit = <fun>
 Line 3, characters 26-27:
 3 |   | Pair (0, y) -> escape y
                               ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+       because it is contained (via constructor "Pair") in the value at Line 3, characters 4-15
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
