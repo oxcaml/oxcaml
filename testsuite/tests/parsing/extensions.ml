@@ -24,7 +24,7 @@ let [%foo: include S with type t = t ]
   : [%foo: val x : t  val y : t]
   = [%foo: type t = t ]
 
-[%%foo _ ~_ ?_ _]
+[%%foo _ ~_ ~_:_ ?_ ?_:_ _]
 
 (* TEST
  flags = "-dparsetree";
