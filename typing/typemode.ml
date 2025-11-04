@@ -234,7 +234,7 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
     [Atom (Comonadic Portability, Meet_with b)]
   | _ -> []
 
-let enforce_forbidden_modalities annot_type m =
+let enforce_forbidden_modalities ~loc annot_type m =
   match
     ( Modality.Const.proj (Comonadic Areality) m,
       Modality.Const.proj (Monadic Uniqueness) m )
@@ -242,10 +242,15 @@ let enforce_forbidden_modalities annot_type m =
   | ( Meet_with Global,
       Modality.Monadic.Atom.Join_with Mode.Uniqueness.Const.Unique ) ->
     raise
-      (Error (Location.none, Forbidden_modality (annot_type, Global_and_unique)))
+      (Error (loc, Forbidden_modality (annot_type, Global_and_unique)))
   | _ -> ()
 
 let transl_mod_bounds annots =
+  let bounds_loc =
+    match List.map (fun { loc; _ } -> loc) annots with
+    | [] -> Location.none
+    | _ :: _ as locs -> Location.merge locs
+  in
   let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
     match Modifier_axis_pair.of_string txt with
     | P (type a) ((axis, mode) : a Axis.t * a) ->
@@ -331,7 +336,7 @@ let transl_mod_bounds annots =
     in
     List.fold_left add Const.id Value.Axis.all
   in
-  enforce_forbidden_modalities Modifier modality;
+  enforce_forbidden_modalities Modifier ~loc:bounds_loc modality;
   let open Types.Jkind_mod_bounds in
   let externality =
     Option.fold ~some:Location.get_txt ~none:Externality.max
@@ -656,6 +661,11 @@ let sort_dedup_modalities ~warn l =
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map fst
 
 let transl_modalities ~maturity mut modalities =
+  let modalities_loc =
+    match List.map (fun { loc; _ } -> loc) modalities with
+    | [] -> Location.none
+    | _ :: _ as locs -> Location.merge locs
+  in
   let mut_modalities =
     mutable_implied_modalities (Types.is_mutable mut)
       ~for_mutable_variable:false
@@ -676,7 +686,7 @@ let transl_modalities ~maturity mut modalities =
           m (implied_modalities t))
       mut_modalities modalities
   in
-  enforce_forbidden_modalities Modality modalities;
+  enforce_forbidden_modalities Modality ~loc:modalities_loc modalities;
   modalities
 
 let let_mutable_modalities =
