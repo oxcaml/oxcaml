@@ -322,13 +322,13 @@ BUILTIN(caml_int32x4_low_to_int32);
 BUILTIN(caml_int32x4_const1);
 BUILTIN(caml_int32x4_const4);
 
-BUILTIN(caml_int16x8_low_of_int);
-BUILTIN(caml_int16x8_low_to_int);
+BUILTIN(caml_int16x8_low_of_int16);
+BUILTIN(caml_int16x8_low_to_int16);
 BUILTIN(caml_int16x8_const1);
 BUILTIN(caml_int16x8_const8);
 
-BUILTIN(caml_int8x16_low_of_int);
-BUILTIN(caml_int8x16_low_to_int);
+BUILTIN(caml_int8x16_low_of_int8);
+BUILTIN(caml_int8x16_low_to_int8);
 BUILTIN(caml_int8x16_const1);
 BUILTIN(caml_int8x16_const16);
 
