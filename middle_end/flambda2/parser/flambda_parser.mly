@@ -135,6 +135,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_FLOAT [@symbol "float"]
 %token KWD_GENERIC [@symbol "generic"]
 %token KWD_HCF   [@symbol "halt_and_catch_fire"]
+%token KWD_GC_IGNORABLE [@symbol "gc_ignorable"]
 %token KWD_HEAP_OR_LOCAL [@symbol "heap_or_local"]
 %token KWD_HINT  [@symbol "hint"]
 %token KWD_ID    [@symbol "id"]
@@ -485,6 +486,7 @@ array_kind:
   | { (Values : array_kind) }
   | KWD_IMM { (Immediates : array_kind) }
   | KWD_FLOAT { (Naked_floats : array_kind) }
+  | KWD_GC_IGNORABLE { (Gc_ignorable_values : array_kind) }
 
 array_kind_for_length:
   | kind = array_kind { Array_kind kind }
@@ -604,6 +606,7 @@ binop_app:
     let array_load_kind : array_load_kind =
       match ak with
       | Immediates -> Immediates
+      | Gc_ignorable_values -> Gc_ignorable_values
       | Values -> Values
       | Naked_floats -> Naked_floats
       | Naked_float32s -> Naked_float32s
@@ -641,6 +644,7 @@ ternop_app:
       let array_set_kind : array_set_kind =
         match ak with
         | Immediates -> Immediates
+        | Gc_ignorable_values -> Gc_ignorable_values
         | Values -> Values ia
         | Naked_floats -> Naked_floats
         | Naked_float32s -> Naked_float32s

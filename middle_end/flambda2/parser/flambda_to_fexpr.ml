@@ -637,6 +637,7 @@ let binop env (op : Flambda_primitive.binary_primitive) : Fexpr.binop =
 let fexpr_of_array_kind : Flambda_primitive.Array_kind.t -> Fexpr.array_kind =
   function
   | Immediates -> Immediates
+  | Gc_ignorable_values -> Gc_ignorable_values
   | Naked_floats -> Naked_floats
   | Values -> Values
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
@@ -649,6 +650,7 @@ let fexpr_of_array_set_kind env
     =
   match array_set_kind with
   | Immediates -> Immediates
+  | Gc_ignorable_values -> Gc_ignorable_values
   | Naked_floats -> Naked_floats
   | Values ia -> Values (init_or_assign env ia)
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
