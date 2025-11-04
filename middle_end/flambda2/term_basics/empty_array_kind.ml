@@ -58,7 +58,7 @@ let of_element_kind t =
 
 let of_lambda array_kind =
   match (array_kind : Lambda.array_kind) with
-  | Pgenarray | Paddrarray | Pintarray | Pfloatarray
+  | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray Unboxed_float64 ->
     Values_or_immediates_or_naked_floats
   | Punboxedfloatarray Unboxed_float32 -> Naked_float32s
