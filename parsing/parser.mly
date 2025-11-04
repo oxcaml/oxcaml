@@ -2976,8 +2976,6 @@ simple_expr:
       }
   | constant { mkexp ~loc:$sloc (Pexp_constant $1) }
   | comprehension_expr { $1 }
-  | UNDERSCORE
-    { mkexp ~loc:$sloc Pexp_hole }
 ;
 %inline simple_expr_attrs:
   | BEGIN ext = ext attrs = attributes e = seq_expr END
@@ -3227,6 +3225,8 @@ block_access:
       { Pexp_quote $2 }
   | LESSLBRACKET seq_expr error
       { unclosed "<[" $loc($1) "]>" $loc($3) }
+  | UNDERSCORE
+      { Pexp_hole }
 ;
 labeled_simple_expr:
     simple_expr %prec below_HASH
