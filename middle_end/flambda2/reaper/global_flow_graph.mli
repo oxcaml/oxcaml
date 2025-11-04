@@ -22,49 +22,48 @@ module Relations : sig
 
   type 'a term = 'a Datalog.Term.t
 
-  val alias_rel :
+  val alias :
     to_:Code_id_or_name.t term -> from:Code_id_or_name.t term -> _ atom
 
-  val use_rel :
-    to_:Code_id_or_name.t term -> from:Code_id_or_name.t term -> _ atom
+  val use : to_:Code_id_or_name.t term -> from:Code_id_or_name.t term -> _ atom
 
-  val accessor_rel :
+  val accessor :
     to_:Code_id_or_name.t term ->
     Field.t term ->
     base:Code_id_or_name.t term ->
     _ atom
 
-  val constructor_rel :
+  val constructor :
     base:Code_id_or_name.t term ->
     Field.t term ->
     from:Code_id_or_name.t term ->
     _ atom
 
-  val coaccessor_rel :
+  val coaccessor :
     to_:Code_id_or_name.t term ->
     Cofield.t term ->
     base:Code_id_or_name.t term ->
     _ atom
 
-  val coconstructor_rel :
+  val coconstructor :
     base:Code_id_or_name.t term ->
     Cofield.t term ->
     from:Code_id_or_name.t term ->
     _ atom
 
-  val propagate_rel :
+  val propagate :
     if_used:Code_id_or_name.t term ->
     to_:Code_id_or_name.t term ->
     from:Code_id_or_name.t term ->
     _ atom
 
-  val any_usage_pred : Code_id_or_name.t term -> _ atom
+  val any_usage : Code_id_or_name.t term -> _ atom
 
-  val any_source_pred : Code_id_or_name.t term -> _ atom
+  val any_source : Code_id_or_name.t term -> _ atom
 
   (* An entry (code_id, v) in this relation means that [v] is the "my_closure"
      variable of the code associated to [code_id]. *)
-  val code_id_my_closure_rel :
+  val code_id_my_closure :
     code_id:Code_id_or_name.t term ->
     my_closure:Code_id_or_name.t term ->
     _ atom
