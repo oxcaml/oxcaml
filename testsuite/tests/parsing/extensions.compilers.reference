@@ -320,6 +320,26 @@
               ]
           ]
     ]
+  structure_item (extensions.ml[27,631+0]..[27,631+17])
+    Pstr_extension "foo"
+    [
+      structure_item (extensions.ml[27,631+7]..[27,631+16])
+        Pstr_eval
+        expression (extensions.ml[27,631+7]..[27,631+16])
+          Pexp_apply
+          expression (extensions.ml[27,631+7]..[27,631+8])
+            Pexp_hole          [
+            <arg>
+            Labelled "_"
+              expression (extensions.ml[27,631+9]..[27,631+11])
+                Pexp_hole            <arg>
+            Optional "_"
+              expression (extensions.ml[27,631+12]..[27,631+14])
+                Pexp_hole            <arg>
+            Nolabel
+              expression (extensions.ml[27,631+15]..[27,631+16])
+                Pexp_hole          ]
+    ]
 ]
 
 File "extensions.ml", line 9, characters 3-6:
