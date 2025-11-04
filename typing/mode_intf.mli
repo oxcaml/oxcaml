@@ -166,7 +166,8 @@ module type Common = sig
 
   (** Similiar to [submode], but crashes the compiler if errors. Use this
     function if the submode is guaranteed to succeed. *)
-  val submode_exn : (allowed * 'r) t -> ('l * allowed) t -> unit
+  val submode_exn :
+    ?pp:Mode_hint.pinpoint -> (allowed * 'r) t -> ('l * allowed) t -> unit
 
   val equate_exn : lr -> lr -> unit
 
