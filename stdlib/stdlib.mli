@@ -1001,10 +1001,10 @@ val flush_all : unit -> unit
 val output_char : out_channel -> char -> unit
 (** Write the character on the given output channel. *)
 
-val output_string : out_channel -> string -> unit
+val output_string : out_channel -> string @ local -> unit
 (** Write the string on the given output channel. *)
 
-val output_bytes : out_channel -> bytes -> unit
+val output_bytes : out_channel -> bytes @ local -> unit
 (** Write the byte sequence on the given output channel.
    @since 4.02 *)
 
