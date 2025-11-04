@@ -85,6 +85,7 @@ and ignorable_product_element_kind = function
 let array_kind = function
   | Pgenarray -> "gen"
   | Paddrarray -> "addr"
+  | Pgcignorableaddrarray -> "gcignorableaddr"
   | Pintarray -> "int"
   | Pfloatarray -> "float"
   | Punboxedfloatarray f -> unboxed_float f
@@ -107,6 +108,7 @@ let array_ref_kind ppf k =
   match k with
   | Pgenarray_ref mode -> fprintf ppf "gen%a" pp_mode mode
   | Paddrarray_ref -> fprintf ppf "addr"
+  | Pgcignorableaddrarray_ref -> fprintf ppf "gcignorableaddr"
   | Pintarray_ref -> fprintf ppf "int"
   | Pfloatarray_ref mode -> fprintf ppf "float%a" pp_mode mode
   | Punboxedfloatarray_ref Unboxed_float64 -> fprintf ppf "unboxed_float"
@@ -134,6 +136,7 @@ let array_set_kind ppf k =
   match k with
   | Pgenarray_set mode -> fprintf ppf "gen%a" pp_mode mode
   | Paddrarray_set mode -> fprintf ppf "addr%a" pp_mode mode
+  | Pgcignorableaddrarray_set -> fprintf ppf "gcignorableaddr"
   | Pintarray_set -> fprintf ppf "int"
   | Pfloatarray_set -> fprintf ppf "float"
   | Punboxedfloatarray_set Unboxed_float64 -> fprintf ppf "unboxed_float"

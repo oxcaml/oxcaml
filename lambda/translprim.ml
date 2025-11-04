@@ -49,7 +49,8 @@ let unboxed_product_iarray_check loc kind mut =
     (Immutable | Immutable_unique) ->
     raise (Error (loc, Product_iarrays_unsupported))
   | _, Mutable
-  | (Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
+  | (Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray
+    | Pfloatarray | Punboxedfloatarray _
     | Punboxedoruntaggedintarray _ | Punboxedvectorarray _), _  ->
     ()
 
@@ -63,7 +64,7 @@ let unboxed_product_uninitialized_array_check loc array_kind =
   | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
   | Punboxedvectorarray _ ->
     ()
-  | Pgenarray | Paddrarray | Pintarray | Pfloatarray
+  | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     raise (Error (loc, Invalid_array_kind_for_uninitialized_makearray_dynamic))
 
@@ -1174,6 +1175,8 @@ and glb_scannable_kind kind1 kind2 =
       |      |
     addr  float
       |
+ gcignorableaddr
+      |
     int
 
    For product kinds, we take the product of this lattice.
@@ -1245,14 +1248,22 @@ let glb_array_type loc t1 t2 =
     Misc.fatal_error "unexpected Pgcscannableproductarray kind in glb"
 
   (* No GLB; only used in the [Obj.magic] case *)
-  | Pfloatarray, (Paddrarray | Pintarray)
-  | (Paddrarray | Pintarray), Pfloatarray -> t1
+  | Pfloatarray, (Paddrarray | Pgcignorableaddrarray | Pintarray)
+  | (Paddrarray | Pgcignorableaddrarray | Pintarray), Pfloatarray -> t1
 
   (* Compute the correct GLB *)
-  | Pgenarray, ((Pgenarray | Paddrarray | Pintarray | Pfloatarray) as x)
-  | ((Paddrarray | Pintarray | Pfloatarray) as x), Pgenarray -> x
+  | Pgenarray,
+    ((Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray)
+      as x)
+  | ((Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray) as x),
+    Pgenarray -> x
   | Paddrarray, Paddrarray -> Paddrarray
+  | Paddrarray, Pgcignorableaddrarray
+  | Pgcignorableaddrarray, Paddrarray -> Pgcignorableaddrarray
   | Paddrarray, Pintarray | Pintarray, Paddrarray -> Pintarray
+  | Pgcignorableaddrarray, Pgcignorableaddrarray -> Pgcignorableaddrarray
+  | Pgcignorableaddrarray, Pintarray
+  | Pintarray, Pgcignorableaddrarray -> Pintarray
   | Pintarray, Pintarray -> Pintarray
   | Pfloatarray, Pfloatarray -> Pfloatarray
 
@@ -1319,22 +1330,31 @@ let glb_array_ref_type loc t1 t2 =
     Misc.fatal_error "unexpected Pgcscannableproductarray kind in glb"
 
   (* No GLB; only used in the [Obj.magic] case *)
-  | Pfloatarray_ref _, (Paddrarray | Pintarray)
-  | (Paddrarray_ref | Pintarray_ref), Pfloatarray -> t1
+  | Pfloatarray_ref _, (Paddrarray | Pgcignorableaddrarray | Pintarray)
+  | (Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref), Pfloatarray ->
+    t1
 
   (* Compute the correct GLB *)
 
   (* Pgenarray >= _ *)
   | (Pgenarray_ref _ as x), Pgenarray -> x
   | Pgenarray_ref _, Pintarray -> Pintarray_ref
+  | Pgenarray_ref _, Pgcignorableaddrarray -> Pgcignorableaddrarray_ref
   | Pgenarray_ref _, Paddrarray -> Paddrarray_ref
   | Pgenarray_ref mode, Pfloatarray -> Pfloatarray_ref mode
-  | (Paddrarray_ref | Pintarray_ref | Pfloatarray_ref _ as x), Pgenarray -> x
+  | (Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
+     | Pfloatarray_ref _ as x), Pgenarray -> x
 
   (* Paddrarray > Pintarray *)
   | Paddrarray_ref, Paddrarray -> Paddrarray_ref
+  | Paddrarray_ref, Pgcignorableaddrarray -> Pgcignorableaddrarray_ref
   | Paddrarray_ref, Pintarray -> Pintarray_ref
+  | Pgcignorableaddrarray_ref, Paddrarray -> Pgcignorableaddrarray_ref
+  | Pgcignorableaddrarray_ref, Pgcignorableaddrarray ->
+    Pgcignorableaddrarray_ref
+  | Pgcignorableaddrarray_ref, Pintarray -> Pintarray_ref
   | Pintarray_ref, Paddrarray -> Pintarray_ref
+  | Pintarray_ref, Pgcignorableaddrarray -> Pintarray_ref
 
   (* Pintarray is a minimum *)
   | Pintarray_ref, Pintarray -> Pintarray_ref
@@ -1406,22 +1426,31 @@ let glb_array_set_type loc t1 t2 =
     Misc.fatal_error "unexpected Pgcscannableproductarray_set kind in glb"
 
   (* No GLB; only used in the [Obj.magic] case *)
-  | Pfloatarray_set, (Paddrarray | Pintarray)
-  | (Paddrarray_set _ | Pintarray_set), Pfloatarray -> t1
+  | Pfloatarray_set, (Paddrarray | Pgcignorableaddrarray | Pintarray)
+  | (Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set),
+      Pfloatarray -> t1
 
   (* Compute the correct GLB *)
 
   (* Pgenarray >= _ *)
   | (Pgenarray_set _ as x), Pgenarray -> x
   | Pgenarray_set _, Pintarray -> Pintarray_set
+  | Pgenarray_set _, Pgcignorableaddrarray -> Pgcignorableaddrarray_set
   | Pgenarray_set mode, Paddrarray -> Paddrarray_set mode
   | Pgenarray_set _, Pfloatarray -> Pfloatarray_set
-  | (Paddrarray_set _ | Pintarray_set | Pfloatarray_set as x), Pgenarray -> x
+  | (Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set
+     | Pfloatarray_set as x), Pgenarray -> x
 
   (* Paddrarray > Pintarray *)
   | (Paddrarray_set _ as x), Paddrarray -> x
+  | (Paddrarray_set _ as x), Pgcignorableaddrarray -> x
   | Paddrarray_set _, Pintarray -> Pintarray_set
+  | Pgcignorableaddrarray_set, Paddrarray -> Pgcignorableaddrarray_set
+  | Pgcignorableaddrarray_set, Pgcignorableaddrarray ->
+    Pgcignorableaddrarray_set
+  | Pgcignorableaddrarray_set, Pintarray -> Pintarray_set
   | Pintarray_set, Paddrarray -> Pintarray_set
+  | Pintarray_set, Pgcignorableaddrarray -> Pintarray_set
 
   (* Pintarray is a minimum *)
   | Pintarray_set, Pintarray -> Pintarray_set
@@ -2322,11 +2351,13 @@ let lambda_primitive_needs_event_after = function
   | Psequor | Psequand | Pnot
   | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu
   | Pbytessetu
-  | Pmakearray ((Pintarray | Paddrarray | Pfloatarray | Punboxedfloatarray _
+  | Pmakearray ((Pintarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
+                 | Punboxedfloatarray _
       | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
       | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
   | Pmakearray_dynamic
-      ((Pintarray | Paddrarray | Pfloatarray | Punboxedfloatarray _
+      ((Pintarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
+        | Punboxedfloatarray _
        | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
        | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
   | Parrayblit _

@@ -148,6 +148,7 @@ let convert_array_kind (kind : L.array_kind) : converted_array_kind =
     check_float_array_optimisation_enabled "Pgenarray";
     Float_array_opt_dynamic
   | Paddrarray -> Array_kind Values
+  | Pgcignorableaddrarray -> Array_kind Values
   | Pintarray -> Array_kind Immediates
   | Pfloatarray | Punboxedfloatarray Unboxed_float64 -> Array_kind Naked_floats
   | Punboxedfloatarray Unboxed_float32 -> Array_kind Naked_float32s
@@ -231,6 +232,7 @@ let convert_array_ref_kind (kind : L.array_ref_kind) : converted_array_ref_kind
        check_float_array_optimisation_enabled (); *)
     Float_array_opt_dynamic_ref mode
   | Paddrarray_ref -> Array_ref_kind (No_float_array_opt Values)
+  | Pgcignorableaddrarray_ref -> Array_ref_kind (No_float_array_opt Values)
   | Pintarray_ref -> Array_ref_kind (No_float_array_opt Immediates)
   | Pfloatarray_ref mode -> Array_ref_kind (Naked_floats_to_be_boxed mode)
   | Punboxedfloatarray_ref Unboxed_float64 ->
@@ -376,6 +378,9 @@ let convert_array_set_kind (kind : L.array_set_kind) : converted_array_set_kind
     Array_set_kind
       (No_float_array_opt
          (Values (Assignment (Alloc_mode.For_assignments.from_lambda mode))))
+  | Pgcignorableaddrarray_set ->
+    Array_set_kind
+      (No_float_array_opt (Values (Assignment Alloc_mode.For_assignments.heap)))
   | Pintarray_set -> Array_set_kind (No_float_array_opt Immediates)
   | Pfloatarray_set -> Array_set_kind Naked_floats_to_be_unboxed
   | Punboxedfloatarray_set Unboxed_float64 ->
@@ -496,6 +501,7 @@ let convert_array_kind_to_duplicate_array_kind (kind : L.array_kind) :
     check_float_array_optimisation_enabled "Pgenarray";
     Float_array_opt_dynamic
   | Paddrarray -> Duplicate_array_kind Values
+  | Pgcignorableaddrarray -> Duplicate_array_kind Values
   | Pintarray -> Duplicate_array_kind Immediates
   | Pfloatarray | Punboxedfloatarray Unboxed_float64 ->
     Duplicate_array_kind (Naked_floats { length = None })
@@ -1928,7 +1934,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Punboxedoruntaggedintarray
             (Untagged_int8 | Untagged_int16 | Untagged_int) ->
           Misc.unboxed_small_int_arrays_are_not_implemented ()
-        | Pgenarray | Paddrarray | Pintarray
+        | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray
         | Punboxedfloatarray (Unboxed_float64 | Unboxed_float32)
         | Punboxedoruntaggedintarray
             (Unboxed_int32 | Unboxed_int64 | Unboxed_nativeint)
@@ -3023,15 +3029,15 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Punboxed_float32_array_load_vec _ | Punboxed_int32_array_load_vec _
       | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
       | Parrayrefu
-          ( ( Pgenarray_ref _ | Paddrarray_ref | Pintarray_ref
-            | Pfloatarray_ref _ | Punboxedfloatarray_ref _
+          ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
+            | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
             | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
             _,
             _ )
       | Parrayrefs
-          ( ( Pgenarray_ref _ | Paddrarray_ref | Pintarray_ref
-            | Pfloatarray_ref _ | Punboxedfloatarray_ref _
+          ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
+            | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
             | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
             _,
@@ -3050,14 +3056,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | ( ( Psetfield_computed _ | Pbytessetu | Pbytessets
       | Parraysetu
-          ( ( Pgenarray_set _ | Paddrarray_set _ | Pintarray_set
-            | Pfloatarray_set | Punboxedfloatarray_set _
+          ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
+            | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
             | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
             _ )
       | Parraysets
-          ( ( Pgenarray_set _ | Paddrarray_set _ | Pintarray_set
-            | Pfloatarray_set | Punboxedfloatarray_set _
+          ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
+            | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
             | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
             _ )
