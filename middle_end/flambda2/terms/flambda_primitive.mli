@@ -52,6 +52,8 @@ end
 module Array_kind : sig
   type t =
     | Immediates  (** An array consisting only of immediate values. *)
+    | Gc_ignorable_values
+        (** An array consisting of [value]-kind elements that the GC may ignore. *)
     | Values
         (** An array consisting of elements of kind [value]. With the float
             array optimisation enabled, such elements must never be [float]s. *)
@@ -100,6 +102,8 @@ end
 module Array_load_kind : sig
   type t =
     | Immediates  (** An array consisting only of immediate values. *)
+    | Gc_ignorable_values
+        (** An array consisting of [value]-kind elements that the GC may ignore. *)
     | Values
         (** An array consisting of elements of kind [value]. With the float
             array optimisation enabled, such elements must never be [float]s. *)
@@ -122,6 +126,8 @@ end
 module Array_set_kind : sig
   type t =
     | Immediates  (** An array consisting only of immediate values. *)
+    | Gc_ignorable_values
+        (** An array of [value]-kind elements that the GC may ignore. *)
     | Values of Init_or_assign.t
         (** An array consisting of elements of kind [value]. With the float
         array optimisation enabled, such elements must never be [float]s. *)

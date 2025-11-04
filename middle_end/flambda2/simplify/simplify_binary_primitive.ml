@@ -1000,7 +1000,7 @@ let simplify_array_load (array_kind : P.Array_kind.t)
   let result_kind =
     match array_load_kind with
     | Immediates -> (* CR mshinwell: use the subkind *) K.value
-    | Values -> K.value
+    | Gc_ignorable_values | Values -> K.value
     | Naked_floats -> K.naked_float
     | Naked_float32s -> K.naked_float32
     | Naked_int32s -> K.naked_int32
