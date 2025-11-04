@@ -305,17 +305,13 @@ module Layout = struct
            to end up less than a sort (so, no [any]), but it seems easier to keep
            this case lined up with the inverse case, which definitely cannot use
            [to_product_sort]. *)
-        match
-          Sort.decompose_into_product ~level s2 (List.length ts1)
-        with
+        match Sort.decompose_into_product ~level s2 (List.length ts1) with
         | None -> Not_le
         | Some ss2 ->
           Misc.Le_result.combine_list
             (List.map2 (fun t1 s2 -> sub t1 (Sort s2)) ts1 ss2))
       | Sort s1, Product ts2 -> (
-        match
-          Sort.decompose_into_product ~level s1 (List.length ts2)
-        with
+        match Sort.decompose_into_product ~level s1 (List.length ts2) with
         | None -> Not_le
         | Some ss1 ->
           Misc.Le_result.combine_list
@@ -3833,8 +3829,8 @@ let sub_or_error ~type_equal ~context ~level t1 t2 =
       (Violation.of_ ~context
          (Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
-let sub_jkind_l ~type_equal ~context ~level
-      ?(allow_any_crossing = false) sub super =
+let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) sub
+    super =
   (* This function implements the "SUB" judgement from kind-inference.md. *)
   let open Misc.Stdlib.Monad.Result.Syntax in
   let require_le sub_result =

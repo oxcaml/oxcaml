@@ -220,16 +220,25 @@ module Violation : sig
   (** Prints a violation and the thing that had an unexpected jkind
       ([offender], which you supply an arbitrary printer for). *)
   val report_with_offender :
-    offender:(Format.formatter -> unit) -> level:int -> Format.formatter -> t -> unit
+    offender:(Format.formatter -> unit) ->
+    level:int ->
+    Format.formatter ->
+    t ->
+    unit
 
   (** Like [report_with_offender], but additionally prints that the issue is
       that a representable jkind was expected. *)
   val report_with_offender_sort :
-    offender:(Format.formatter -> unit) -> level:int -> Format.formatter -> t -> unit
+    offender:(Format.formatter -> unit) ->
+    level:int ->
+    Format.formatter ->
+    t ->
+    unit
 
   (** Simpler version of [report_with_offender] for when the thing that had an
       unexpected jkind is available as a string. *)
-  val report_with_name : name:string -> level:int -> Format.formatter -> t -> unit
+  val report_with_name :
+    name:string -> level:int -> Format.formatter -> t -> unit
 end
 
 (******************************)
