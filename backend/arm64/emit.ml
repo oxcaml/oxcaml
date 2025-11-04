@@ -1056,7 +1056,7 @@ let num_call_gc_points instr =
           | Ibswap _ | Isignext _ | Isimd _ ))
     | Lop
         ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
-        | Dls_get | Const_int _ | Const_float32 _ | Const_float _
+        | Dls_get | Tls_get | Const_int _ | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _
@@ -1128,8 +1128,9 @@ module BR = Branch_relaxation.Make (struct
       | Lcondbranch3 _ -> Some Bcc
       | Lop
           ( Specific _ | Move | Spill | Reload | Opaque | Begin_region | Pause
-          | End_region | Dls_get | Const_int _ | Const_float32 _ | Const_float _
-          | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
+          | End_region | Dls_get | Tls_get | Const_int _ | Const_float32 _
+          | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
+          | Load _
           | Store (_, _, _)
           | Intop _
           | Intop_imm (_, _)
@@ -1304,6 +1305,7 @@ module BR = Branch_relaxation.Make (struct
     | Lcall_op (Lprobe _) | Lop (Probe_is_enabled _) ->
       fatal_error "Probes not supported."
     | Lop Dls_get -> 1
+    | Lop Tls_get -> 1
     | Lreloadretaddr -> 0
     | Lreturn -> epilogue_size ()
     | Llabel _ -> 0
@@ -2144,6 +2146,12 @@ let emit_instr i =
            DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
         |]
     else Misc.fatal_error "Dls is not supported in runtime4."
+  | Lop Tls_get ->
+    let offset = Domainstate.(idx_of_field Domain_tls_state) * 8 in
+    DSL.ins I.LDR
+      [| DSL.emit_reg i.res.(0);
+         DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
+      |]
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in

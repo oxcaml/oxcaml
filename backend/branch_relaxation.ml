@@ -74,7 +74,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
         || opt_branch_overflows map pc lbl2 max_branch_offset
       | Lop
           ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
-          | Dls_get | Const_int _ | Const_float32 _ | Const_float _
+          | Dls_get | Tls_get | Const_int _ | Const_float32 _ | Const_float _
           | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
           | Stackoffset _ | Load _
           | Store (_, _, _)
@@ -151,7 +151,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
           | Lraise _ | Lstackcheck _
           | Lop
               ( Move | Spill | Reload | Opaque | Pause | Begin_region
-              | End_region | Dls_get | Const_int _ | Const_float32 _
+              | End_region | Dls_get | Tls_get | Const_int _ | Const_float32 _
               | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
               | Const_vec512 _ | Stackoffset _ | Load _
               | Store (_, _, _)

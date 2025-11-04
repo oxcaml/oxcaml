@@ -1065,6 +1065,7 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%resume" ->
       if runtime5 then Primitive (Presume, 4) else Unsupported Presume
     | "%dls_get" -> Primitive (Pdls_get, 1)
+    | "%tls_get" -> Primitive (Ptls_get, 1)
     | "%poll" -> Primitive (Ppoll, 1)
     | "%unbox_nativeint" ->
       static_cast ~src:(i nativeint) ~dst:(naked (i nativeint))
@@ -2335,6 +2336,7 @@ let lambda_primitive_needs_event_after = function
   | Patomic_load_field _ | Patomic_set_field _
   | Pcpu_relax | Pctconst _ | Pint_as_pointer _ | Popaque _
   | Pdls_get
+  | Ptls_get
   | Pobj_magic _ | Punbox_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
   (* These don't allocate in bytecode; they're just identity functions: *)

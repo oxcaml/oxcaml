@@ -326,6 +326,7 @@ let compute_static_size lam =
     | Patomic_fetch_add_field
     | Popaque _
     | Pdls_get
+    | Ptls_get
     | Ppeek _
     | Ppoke _
     | Pscalar _

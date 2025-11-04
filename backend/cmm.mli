@@ -440,6 +440,7 @@ type operation =
   | Ctuple_field of int * machtype array
     (* the [machtype array] refers to the whole tuple *)
   | Cdls_get
+  | Ctls_get
   | Cpoll
   | Cpause
 
