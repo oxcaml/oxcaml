@@ -165,6 +165,7 @@
   consistbl
   strongly_connected_components
   targetint
+  manifests
   load_path
   int_replace_polymorphic_compare
   domainstate

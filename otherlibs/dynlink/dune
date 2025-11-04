@@ -91,6 +91,7 @@
   consistbl
   terminfo
   warnings
+  manifests
   load_path
   int_replace_polymorphic_compare
   location
@@ -222,6 +223,8 @@
 (copy_files ../../utils/terminfo.ml)
 
 (copy_files ../../utils/warnings.ml)
+
+(copy_files ../../utils/manifests.ml)
 
 (copy_files ../../utils/load_path.ml)
 
@@ -384,6 +387,8 @@
 (copy_files ../../utils/terminfo.mli)
 
 (copy_files ../../utils/warnings.mli)
+
+(copy_files ../../utils/manifests.mli)
 
 (copy_files ../../utils/load_path.mli)
 
