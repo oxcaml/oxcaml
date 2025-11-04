@@ -537,7 +537,7 @@ let translate_raise ~dbg_with_inlined:dbg env res apply exn_handler args =
       C.simple_list ~dbg env res extra
     in
     let free_vars = Backend_var.Set.union exn_free_vars extra_free_vars in
-    let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+    let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     let cmm = C.raise_prim raise_kind exn ~extra_args:extra dbg in
     let cmm, free_vars, symbol_inits =
       wrap cmm free_vars Env.Symbol_inits.empty
@@ -550,7 +550,7 @@ let translate_raise ~dbg_with_inlined:dbg env res apply exn_handler args =
 let translate_jump_to_continuation ~dbg_with_inlined:dbg env res apply types
     cont args =
   if List.compare_lengths types args = 0
-  then
+  then (
     let trap_actions =
       match Apply_cont.trap_action apply with
       | None -> []
@@ -563,11 +563,13 @@ let translate_jump_to_continuation ~dbg_with_inlined:dbg env res apply types
     in
     let args = C.remove_skipped_args args types in
     let args, free_vars, env, res, _ = C.simple_list ~dbg env res args in
-    let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+    if Flambda_features.debug_flambda2 ()
+    then Format.eprintf "flushing (call to %a)@." Static_label.print cont;
+    let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     let cmm, free_vars, symbol_inits =
       wrap (C.cexit cont args trap_actions) free_vars Env.Symbol_inits.empty
     in
-    cmm, free_vars, symbol_inits, res
+    cmm, free_vars, symbol_inits, res)
   else
     Misc.fatal_errorf "Types (%a) do not match arguments of@ %a"
       (Format.pp_print_list ~pp_sep:Format.pp_print_space
@@ -584,7 +586,7 @@ let translate_jump_to_return_continuation ~dbg_with_inlined:dbg env res apply
       C.simple_list ~dbg env res args
     in
     let return_value = C.make_tuple return_values in
-    let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+    let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     match Apply_cont.trap_action apply with
     | None ->
       let cmm, free_vars, symbol_inits =
@@ -611,7 +613,7 @@ let translate_jump_to_return_continuation ~dbg_with_inlined:dbg env res apply
 (* Invalid expressions *)
 let invalid env res ~message =
   let wrap, _empty_env, res =
-    Env.flush_delayed_lets ~mode:Branching_point env res
+    Env.flush_delayed_lets ~mode:Flush_everything env res
   in
   let cmm_invalid, res = C.invalid res ~message in
   let cmm, free_vars, symbol_inits =
@@ -988,7 +990,7 @@ and apply_expr env res apply =
   match Apply.continuation apply with
   | Never_returns ->
     (* Case 1 *)
-    let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+    let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     let cmm, free_vars, symbol_inits =
       wrap call free_vars Env.Symbol_inits.empty
     in
@@ -1003,7 +1005,7 @@ and apply_expr env res apply =
       if List.compare_lengths apply_result_arity param_types = 0
       then
         let wrap, _, res =
-          Env.flush_delayed_lets ~mode:Branching_point env res
+          Env.flush_delayed_lets ~mode:Flush_everything env res
         in
         let cmm, free_vars, symbol_inits =
           wrap call free_vars Env.Symbol_inits.empty
@@ -1016,7 +1018,9 @@ and apply_expr env res apply =
           param_types Apply.print apply
     | Jump { param_types = _; cont } ->
       (* Case 2 *)
-      let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+      let wrap, _, res =
+        Env.flush_delayed_lets ~mode:Flush_everything env res
+      in
       let cmm, free_vars, symbol_inits =
         wrap (C.cexit cont [call] []) free_vars Env.Symbol_inits.empty
       in
@@ -1198,6 +1202,8 @@ and switch env res switch =
         else untagged_scrutinee_cmm, false)
     | _ -> untagged_scrutinee_cmm, false
   in
+  if Flambda_features.debug_flambda2 ()
+  then Format.eprintf "flushing (switch)@.";
   let wrap, env, res = Env.flush_delayed_lets ~mode:Branching_point env res in
   let prepare_discriminant ~must_tag d =
     let machine_width = Target_system.Machine_width.Sixty_four in
