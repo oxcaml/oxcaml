@@ -331,7 +331,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         [||]
       else
         destroy_neon_reg7
-  | Op (Intop (Iadd  | Isub | Imul | Idiv|Imod|Iand|Ior|Ixor|Ilsl
+  | Op (Intop (Iadd  | Isub | Imul | Idiv _ | Imod _ |Iand|Ior|Ixor|Ilsl
               |Ilsr|Iasr|Imulh _|Iclz _|Ictz _|Icomp _))
   | Op (Specific _
         | Move | Spill | Reload
@@ -480,7 +480,7 @@ let operation_supported : Cmm.operation -> bool = function
   | Cpackf32
   | Cclz _ | Cctz _ | Cbswap _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
   | Ccmpi _ | Caddv | Cadda
   | Cnegf Float64 | Cabsf Float64 | Caddf Float64

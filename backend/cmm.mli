@@ -393,8 +393,8 @@ type operation =
   | Csubi
   | Cmuli
   | Cmulhi of { signed : bool }
-  | Cdivi
-  | Cmodi
+  | Cdivi of { signed : bool }
+  | Cmodi of { signed : bool }
   | Cand
   | Cor
   | Cxor
