@@ -27,8 +27,9 @@ jobs:
             config: --enable-runtime5 --enable-stack-checks
             os: warp-ubuntu-latest-x64-8x
 
+          # CR mshinwell: update name to reflect lrodata frametable setting
           - name: runtime5 poll-insertion (x86_64-linux)
-            config: --enable-runtime5 --enable-poll-insertion
+            config: --enable-runtime5 --enable-poll-insertion --enable-lrodata-frametables
             os: warp-ubuntu-latest-x64-8x
 
           - name: runtime5 multidomain (x86_64-linux)
