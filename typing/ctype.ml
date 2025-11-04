@@ -2570,7 +2570,8 @@ let constrain_type_jkind ~fixed env ty jkind =
         *)
        let jkind_inter =
          Jkind.intersection_or_error ~type_equal ~context
-           ~reason:Tyvar_refinement_intersection ty's_jkind jkind
+           ~reason:Tyvar_refinement_intersection ~level:!current_level
+           ty's_jkind jkind
        in
        Result.map (set_var_jkind ty) jkind_inter
 
@@ -2582,7 +2583,8 @@ let constrain_type_jkind ~fixed env ty jkind =
 
     | _ ->
        match
-         Jkind.sub_or_intersect ~type_equal ~context ty's_jkind jkind
+         Jkind.sub_or_intersect ~type_equal ~context ~level:!current_level
+           ty's_jkind jkind
        with
        | Sub -> Ok ()
        | Disjoint sub_failure_reasons ->
@@ -2705,8 +2707,8 @@ let constrain_type_jkind ~fixed env ty jkind =
   loop ~fuel:100 ~expanded:false ty ~is_open:false
     (estimate_type_jkind env ty) (Jkind.disallow_left jkind)
 
-let type_sort ~why ~fixed ~level env ty =
-  let jkind, sort = Jkind.of_new_sort_var ~level ~why in
+let type_sort ~why ~fixed env ty =
+  let jkind, sort = Jkind.of_new_sort_var ~level:!current_level ~why in
   match constrain_type_jkind ~fixed env ty jkind with
   | Ok _ -> Ok sort
   | Error _ as e -> e
@@ -3732,7 +3734,9 @@ let add_jkind_equation ~reason uenv destination jkind1 =
      abstract, we can improve type checking by assigning destination that
      jkind. *)
   let env = get_env uenv in
-  match intersect_type_jkind ~reason env destination jkind1 with
+  match
+    intersect_type_jkind ~reason ~level:!current_level env destination jkind1
+  with
   | Error err -> raise_for Unify (Bad_jkind (destination,err))
   | Ok jkind -> begin
       match get_desc destination with
@@ -7413,7 +7417,7 @@ type global_state =
 let global_state : global_state =
   { current_level;
     nongen_level;
-    global_level
+    global_level;
   }
 
 let print_global_state fmt global_state =
@@ -7495,14 +7499,20 @@ let check_decl_jkind env decl jkind =
       Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
     | _ -> decl.type_jkind
   in
-  match Jkind.sub_jkind_l ~type_equal ~context decl_jkind jkind with
+  match
+    Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level
+      decl_jkind jkind
+  with
   | Ok () -> Ok ()
   | Error _ as err ->
     match decl.type_manifest with
     | None -> err
     | Some ty ->
       let ty_jkind = type_jkind env ty in
-      match Jkind.sub_jkind_l ~type_equal ~context ty_jkind jkind with
+      match
+        Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level ty_jkind
+          jkind
+      with
       | Ok () -> Ok ()
       | Error _ as err -> err
 
@@ -7518,7 +7528,8 @@ let constrain_decl_jkind env decl jkind =
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
     match
-      Jkind.sub_or_error ~type_equal ~context decl.type_jkind jkind
+      Jkind.sub_or_error ~type_equal ~context ~level:!current_level
+        decl.type_jkind jkind
     with
     | Ok () as ok -> ok
     | Error _ as err ->

@@ -1640,7 +1640,8 @@ let report_error env ppf =
     fprintf ppf "@[%s types must have layout value.@ %a@]"
       s (Jkind.Violation.report_with_offender
            ~offender:(fun ppf ->
-               Style.as_inline_code Printtyp.type_expr ppf typ)) err
+               Style.as_inline_code Printtyp.type_expr ppf typ)
+           ~level:(get_current_level ())) err
   | Non_sort {vloc; typ; err} ->
     let s =
       match vloc with
@@ -1650,12 +1651,14 @@ let report_error env ppf =
     fprintf ppf "@[%s types must have a representable layout.@ %a@]"
       s (Jkind.Violation.report_with_offender
            ~offender:(fun ppf ->
-               Style.as_inline_code Printtyp.type_expr ppf typ)) err
+               Style.as_inline_code Printtyp.type_expr ppf typ)
+           ~level:(get_current_level ())) err
   | Bad_jkind_annot(ty, violation) ->
     fprintf ppf "@[<b 2>Bad layout annotation:@ %a@]"
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf ->
-             Style.as_inline_code Printtyp.type_expr ppf ty)) violation
+             Style.as_inline_code Printtyp.type_expr ppf ty)
+         ~level:(get_current_level ())) violation
   | Did_you_mean_unboxed lid ->
     fprintf ppf "@[%a isn't a class type.@ \
                  Did you mean the unboxed type %a?@]"

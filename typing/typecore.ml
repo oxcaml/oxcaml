@@ -2947,7 +2947,6 @@ and type_pat_aux
             let sort =
               match
                 Ctype.type_sort ~why:Jkind.History.Mutable_var_assignment
-                  ~level:(get_current_level ())
                   ~fixed:false !!penv ty
               with
               | Ok sort -> sort
@@ -4154,8 +4153,9 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
         | Tarrow ((l, mode_arg, mode_ret), ty_arg, ty_res, _)
           when labels_match ~param:l ~arg:lbl ->
             let sort_arg =
-              match type_sort ~why:Function_argument ~fixed:false
-                      ~level:(get_current_level ()) env ty_arg with
+              match
+                type_sort ~why:Function_argument ~fixed:false env ty_arg
+              with
               | Ok sort -> sort
               | Error err -> raise(Error(funct.exp_loc, env,
                                          Function_type_not_rep (ty_arg,err)))
@@ -4226,8 +4226,7 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs ret
           end
         in
         let sort_arg =
-          match type_sort ~why:Function_argument ~fixed:false
-                  ~level:(get_current_level ()) env ty_arg with
+          match type_sort ~why:Function_argument ~fixed:false env ty_arg with
           | Ok sort -> sort
           | Error err -> raise(Error(sarg1.pexp_loc, env,
                                      Function_type_not_rep(ty_arg, err)))
@@ -4325,8 +4324,7 @@ let type_omitted_parameters expected_mode env loc ty_ret mode_ret args =
          | Omitted { mode_fun; ty_arg; mode_arg; level; sort_arg } ->
              let arrow_desc = (lbl, mode_arg, mode_ret) in
              let sort_ret =
-               match type_sort ~why:Function_result ~fixed:false
-                       ~level:(get_current_level ()) env ty_ret with
+               match type_sort ~why:Function_result ~fixed:false env ty_ret with
                | Ok sort -> sort
                | Error err ->
                  raise (Error (loc, env, Function_type_not_rep (ty_ret, err)))
@@ -5443,9 +5441,7 @@ let split_function_ty
   let arg_value_mode = alloc_to_value_l2r arg_mode in
   let expected_pat_mode = simple_pat_mode arg_value_mode in
   let type_sort ~why ty =
-    match
-      Ctype.type_sort ~why ~fixed:false ~level:(get_current_level ()) env ty
-    with
+    match Ctype.type_sort ~why ~fixed:false env ty with
     | Ok sort -> sort
     | Error err -> raise (Error (loc_fun, env, Function_type_not_rep (ty, err)))
   in
@@ -5729,7 +5725,8 @@ and type_expect_
         | None, None ->
           newvar
             (Jkind.of_new_sort ~why:Record_projection
-               ~level:(Ctype.get_current_level ())), None
+               ~level:(Ctype.get_current_level ())),
+          None
         | Some _, None -> ty_expected, expected_opath
         | Some(_, _, true), Some _ -> ty_expected, expected_opath
         | (None | Some (_, _, false)), Some (_, p', _) ->
@@ -5888,8 +5885,8 @@ and type_expect_
             let ubr = Unique_barrier.not_computed () in
             let sort =
               match
-                Ctype.type_sort ~why:Record_functional_update ~fixed:false
-                  ~level:(get_current_level ()) env exp.exp_type
+                Ctype.type_sort ~why:Record_functional_update ~fixed:false env
+                  exp.exp_type
               with
               | Ok sort -> sort
               | Error err ->
@@ -6469,9 +6466,10 @@ and type_expect_
         type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
         if expected_type = None
-        then newvar
-               (Jkind.of_new_sort ~why:Record_assignment
-                  ~level:(Ctype.get_current_level ()))
+        then
+          newvar
+            (Jkind.of_new_sort ~why:Record_assignment
+               ~level:(Ctype.get_current_level ()))
         else record.exp_type
       in
       let (label_loc, label, newval) =
@@ -8761,9 +8759,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       Regionality.submode_exn
         (Value.proj_comonadic Areality eta_mode) Regionality.regional;
       let type_sort ~why ty =
-        match
-          type_sort ~why ~fixed:false ~level:(get_current_level ()) env ty
-        with
+        match type_sort ~why ~fixed:false env ty with
         | Ok sort -> sort
         | Error err ->
           raise(Error(sarg.pexp_loc, env, Function_type_not_rep (ty, err)))
@@ -8945,9 +8941,7 @@ and type_application env app_loc expected_mode position_and_mode
       in
       let ret_mode = Alloc.disallow_right ret_mode in
       let type_sort ~why ty =
-        match
-          Ctype.type_sort ~why ~fixed:false ~level:(get_current_level ()) env ty
-        with
+        match Ctype.type_sort ~why ~fixed:false env ty with
         | Ok sort -> sort
         | Error err -> raise (Error (app_loc, env, Function_type_not_rep (ty, err)))
       in
@@ -11276,7 +11270,8 @@ let report_error ~loc env =
   | Non_value_object (err, explanation) ->
     Location.error_of_printer ~loc (fun ppf () ->
       fprintf ppf "Object types must have layout value.@ %a"
-        (Jkind.Violation.report_with_name ~name:"the type of this expression")
+        (Jkind.Violation.report_with_name ~name:"the type of this expression"
+           ~level:(Ctype.get_current_level ()))
         err;
       report_type_expected_explanation_opt explanation ppf)
       ()
@@ -11284,7 +11279,9 @@ let report_error ~loc env =
     Location.error_of_printer ~loc (fun ppf () ->
       fprintf ppf "Variables bound in a \"let rec\" must have layout value.@ %a"
         (fun v -> Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty) v) err)
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~level:(Ctype.get_current_level ()) v)
+        err)
       ()
   | Undefined_method (ty, me, valid_methods) ->
       Location.error_of_printer ~loc (fun ppf () ->
@@ -11840,22 +11837,26 @@ let report_error ~loc env =
       Location.errorf ~loc
         "@[Function arguments and returns must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) violation
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~level:(get_current_level ())) violation
   | Record_projection_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Records being projected from must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) violation
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~level:(get_current_level ())) violation
   | Record_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Record expressions must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) violation
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~level:(get_current_level ())) violation
   | Mutable_var_not_rep (ty, violation) ->
       Location.errorf ~loc
         "@[Mutable variables must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) violation
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~level:(get_current_level ())) violation
   | Invalid_label_for_src_pos arg_label ->
       Location.errorf ~loc
         "A position argument must not be %s."

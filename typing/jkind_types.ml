@@ -290,7 +290,7 @@ module Sort = struct
     v.contents <- t_op;
     Option.iter
       (t_iter ~f:(fun u ->
-           let new_level = max v.level u.level in
+           let new_level = min v.level u.level in
            v.level <- new_level;
            u.level <- new_level))
       t_op

@@ -636,7 +636,6 @@ val mk_jkind_context_always_principal : Env.t -> Jkind.jkind_context
 val type_sort :
   why:Jkind.History.concrete_creation_reason ->
   fixed:bool ->
-  level:int ->
   Env.t -> type_expr -> (Jkind.sort, Jkind.Violation.t) result
 
 
