@@ -110,8 +110,6 @@ type 'd morph =
   | Captured_by_partial_application : (disallowed * 'r) morph
   | Adj_captured_by_partial_application : ('l * disallowed) morph
   | Crossing : ('l * 'r) morph
-  (* CR-soon zqian: the location on [Allocation_*] should probably be removed
-     once we introduce "containing" hints, since the locations would be duplicative. *)
   | Allocation_r : allocation -> (disallowed * 'r) morph
   | Allocation_l : allocation -> ('l * disallowed) morph
   | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph

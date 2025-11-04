@@ -2103,11 +2103,35 @@ module Report = struct
            then fprintf ppf "the %t (at %a)" print_desc Location.print_loc loc
            else fprintf ppf "the %t at %a" print_desc Location.print_loc loc)
 
-  let print_allocation_desc : allocation_desc -> formatter -> unit = function
-    | Unknown -> dprintf "the allocation"
-    | Optional_argument -> dprintf "the allocation of the optional argument"
-    | Function_coercion -> dprintf "the allocation for coercing the function"
-    | Float_projection -> dprintf "the allocation for float projection"
+  let print_allocation_l : allocation -> formatter -> unit =
+   fun { txt; loc } ->
+    match txt with
+    | Unknown -> dprintf "is allocated at %a with content" Location.print_loc loc
+    | Optional_argument ->
+      dprintf
+        "is an optional argument wrapper (and thus allocated) of the value at \
+         %a"
+        Location.print_loc loc
+    | Function_coercion ->
+      dprintf
+        "is a partial application of the function at %a on omittable parameters"
+        Location.print_loc loc
+    | Float_projection ->
+      dprintf "is projected (at %a) from a float record (and thus allocated)"
+        Location.print_loc loc
+
+  let print_allocation_r : allocation -> formatter -> unit =
+   fun { txt; _ } ->
+    match txt with
+    | Unknown -> dprintf "is an allocation"
+    | Optional_argument ->
+      dprintf
+        "is to be put in an optional argument wrapper (and thus an allocation)"
+    | Function_coercion ->
+      dprintf
+        "is to omit some parameters by partial application (and thus an allocation)"
+    | Float_projection ->
+      dprintf "is a float-record projection (and thus an allocation)"
 
   let print_contains : contains -> ((formatter -> unit) * pinpoint) option =
    fun { containing; contained } ->
@@ -2172,19 +2196,8 @@ module Report = struct
         ( dprintf "has a partial application capturing a value",
           (Location.none, Expression) )
     | Crossing -> Some (dprintf "crosses with something", pp)
-    (* CR-soon zqian: the "from" and "containing" below should be explicit and clear morph hints. *)
-    | Allocation_r { loc; txt } ->
-      Some
-        ( dprintf "is from %t at %a"
-            (print_allocation_desc txt)
-            Location.print_loc loc,
-          pp )
-    | Allocation_l { loc; txt } ->
-      Some
-        ( dprintf "is from %t (at %a) containing a value"
-            (print_allocation_desc txt)
-            Location.print_loc loc,
-          pp )
+    | Allocation_r alloc -> Some (print_allocation_r alloc, pp)
+    | Allocation_l alloc -> Some (print_allocation_l alloc, pp)
     | Contains_l (_, contains) -> print_contains contains
     | Contains_r (_, contains) -> print_contains contains
     | Is_contained_by (_, is_contained_by) ->

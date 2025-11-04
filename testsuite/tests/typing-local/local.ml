@@ -379,7 +379,7 @@ Line 1, characters 47-48:
 1 | let eta (local_ f : ?a:bool -> unit -> int) = (f : unit -> int)
                                                    ^
 Error: This value is "local" to the parent region but is expected to be "global"
-       because it is from the allocation for coercing the function at Line 1, characters 47-48
+       because it is to omit some parameters by partial application (and thus an allocation)
        which is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
@@ -1009,8 +1009,7 @@ Line 2, characters 41-42:
                                              ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
        because it is used inside the function (at Line 2, characters 30-53)
-       which is expected to be "global"
-       because it is from the allocation at Line 2, characters 30-53
+       which is expected to be "global" because it is an allocation
        which is expected to be "local" to the parent region or "global"
        because it is an argument in a tail call.
 |}]
@@ -1663,7 +1662,7 @@ Error: This value is "local"
        which is "local"
        because it is an element of the tuple at Line 3, characters 8-10
        which is "local"
-       because it is from the allocation (at Line 2, characters 11-15) containing a value
+       because it is allocated at Line 2, characters 11-15 with content
        which is "local" to the parent region
        because it is a tuple that contains the expression (at Line 2, characters 11-12)
        which is "local" to the parent region.
@@ -1683,7 +1682,7 @@ Line 5, characters 11-12:
 Error: This value is "local"
        because it is an element of the tuple at Line 4, characters 15-17
        which is "local"
-       because it is from the allocation (at Line 2, characters 8-12) containing a value
+       because it is allocated at Line 2, characters 8-12 with content
        which is "local" to the parent region
        because it is a tuple that contains the expression (at Line 2, characters 8-9)
        which is "local" to the parent region.
@@ -1740,7 +1739,7 @@ Line 6, characters 9-10:
 Error: This value is "local"
        because it is an element of the tuple at Line 5, characters 13-15
        which is "local"
-       because it is from the allocation (at Line 3, characters 14-18) containing a value
+       because it is allocated at Line 3, characters 14-18 with content
        which is "local" to the parent region
        because it is a tuple that contains the expression (at Line 3, characters 14-15)
        which is "local" to the parent region.
@@ -2513,8 +2512,7 @@ Line 2, characters 8-9:
             ^
 Error: This value is "local" to the parent region but is expected to be "global"
        because it is contained (via constructor "GFoo") in the value at Line 2, characters 2-17
-       which is expected to be "global"
-       because it is from the allocation at Line 2, characters 2-17
+       which is expected to be "global" because it is an allocation
        which is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
