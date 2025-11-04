@@ -857,8 +857,7 @@ Error: This value is "local"
        because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "global"
        because it is an element of the tuple at Line 1, characters 23-39
-       which is expected to be "global"
-       because it is from the allocation at Line 1, characters 23-39
+       which is expected to be "global" because it is an allocation
        which is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.

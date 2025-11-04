@@ -98,7 +98,7 @@ Line 4, characters 22-23:
 4 |     | x -> use_global x; ()
                           ^
 Error: This value is "local"
-       because it is from the allocation (at Line 2, characters 10-16) containing a value
+       because it is allocated at Line 2, characters 10-16 with content
        which is "local" to the parent region
        because it is a tuple that contains the expression at Line 2, characters 14-16
        which is "local" to the parent region.
@@ -150,7 +150,7 @@ Line 4, characters 44-46:
 Error: This value is "local"
        because it is an element of the tuple at Line 4, characters 39-40
        which is "local"
-       because it is from the allocation (at Line 2, characters 10-16) containing a value
+       because it is allocated at Line 2, characters 10-16 with content
        which is "local" to the parent region
        because it is a tuple that contains the expression at Line 2, characters 14-16
        which is "local" to the parent region.
@@ -249,7 +249,7 @@ Line 4, characters 2-4:
 Error: This value is "local"
        because it is an element of the tuple at Line 3, characters 16-17
        which is "local"
-       because it is from the allocation (at Line 2, characters 10-16) containing a value
+       because it is allocated at Line 2, characters 10-16 with content
        which is "local" to the parent region
        because it is a tuple that contains the expression at Line 2, characters 11-12
        which is "local" to the parent region.
