@@ -5903,9 +5903,14 @@ and type_expect_
       in
       let overwrites =
         assign_label_children (List.length lbl_a_list)
-          (fun _loc ty mode -> (* only change mode here, see type_label_exp *)
+          (fun loc ty mode -> (* only change mode here, see type_label_exp *)
              List.map (fun (_, label, _) ->
-               let mode = Modality.Const.apply label.lbl_modalities mode in
+               let mode =
+                actual_mode_modality
+                  ~is_contained_by:
+                    { containing = Record label.lbl_name; container = loc }
+                  label.lbl_modalities mode
+               in
                Overwrite_label(ty, mode))
                lbl_a_list)
           overwrite
@@ -9419,7 +9424,11 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
       (fun loc ty mode ->
          let ty_args, _, _ = unify_as_construct ty in
          List.map (fun ty_arg ->
-           let mode = Modality.Const.apply ty_arg.Types.ca_modalities mode in
+           let mode =
+            actual_mode_modality ~is_contained_by:
+              { containing = Constructor constr.cstr_name; container = loc }
+              ty_arg.Types.ca_modalities mode
+           in
            match recarg with
            | Required -> Overwriting(loc, ty_arg.Types.ca_type, mode)
            | Allowed | Rejected -> Assigning(ty_arg.Types.ca_type, mode)

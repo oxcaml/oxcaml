@@ -363,7 +363,10 @@ let update : moded_record @ unique once -> moded_record @ many =
 Line 3, characters 39-40:
 3 |     overwrite_ mr with { a = None; b = _ }
                                            ^
-Error: This value is "once" but is expected to be "many"
+Error: This value is "once"
+       because it is the field "b" of the record at Line 3, characters 15-17
+       which is "once".
+       However, the highlighted expression is expected to be "many"
        because it is the field "b" of the record at Line 3, characters 23-42
        which is expected to be "many".
 |}]
