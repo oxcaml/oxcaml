@@ -230,6 +230,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Static_cast (Scalar_of_v128 (Int16x8 | Int8x16)))
   | Op (Static_cast (Scalar_of_v256 (Int16x16 | Int8x32)))
   | Op (Static_cast (Scalar_of_v512 (Int16x32 | Int8x64))) ->
+    (* CR-someday mslater: int8#/int16# shouldn't require sign extension *)
     May_still_have_spilled_registers
   | Op
       (Static_cast
