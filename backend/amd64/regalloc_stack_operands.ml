@@ -216,6 +216,10 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Static_cast (V512_of_scalar Float64x8 | Scalar_of_v512 Float64x8))
   | Op (Static_cast (V512_of_scalar Float32x16 | Scalar_of_v512 Float32x16)) ->
     unary_operation_argument_or_result_on_stack map instr
+  | Op (Static_cast (V128_of_scalar Float16x8 | Scalar_of_v128 Float16x8))
+  | Op (Static_cast (V256_of_scalar Float16x16 | Scalar_of_v256 Float16x16))
+  | Op (Static_cast (V512_of_scalar Float16x32 | Scalar_of_v512 Float16x32)) ->
+    Misc.fatal_error "float16 scalar type not supported"
   | Op (Reinterpret_cast (Float_of_int64 | Float32_of_int32))
   | Op (Static_cast (V128_of_scalar (Int64x2 | Int32x4 | Int16x8 | Int8x16)))
   | Op (Static_cast (V256_of_scalar (Int64x4 | Int32x8 | Int16x16 | Int8x32)))

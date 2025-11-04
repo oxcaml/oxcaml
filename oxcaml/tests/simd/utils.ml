@@ -54,7 +54,19 @@ let eqf' lv l =
   let fail = lv <> l && not (Float.is_nan lv && Float.is_nan l) in
   if fail then Printf.printf "expected = %f <> %f = actual\n" l lv;
   if fail then failure ();
-  (* if fail then abort (); *)
+  ()
+
+let eqf32' lv l =
+  let fail =
+    lv <> l
+    && not (Stdlib_stable.Float32.is_nan lv && Stdlib_stable.Float32.is_nan l)
+  in
+  if fail
+  then
+    Printf.printf "expected = %f <> %f = actual\n"
+      (Stdlib_stable.Float32.to_float l)
+      (Stdlib_stable.Float32.to_float lv);
+  if fail then failure ();
   ()
 
 external int64x2_of_int64s : int64 -> int64 -> int64x2

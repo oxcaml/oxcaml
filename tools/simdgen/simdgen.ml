@@ -234,7 +234,9 @@ let parse_enc mnemonic enc =
     let prefix =
       let comps = String.split_on_char '.' prefix |> List.tl in
       let comps =
-        match comps with ("NDS" | "NDD") :: comps -> comps | _ -> comps
+        match comps with
+        | ("NDS" | "NDD" | "DDS") :: comps -> comps
+        | _ -> comps
       in
       let vex_l, comps =
         match comps with
@@ -328,6 +330,8 @@ let print_one bind instr =
     | BMI2 -> "BMI2"
     | AVX -> "AVX"
     | AVX2 -> "AVX2"
+    | F16C -> "F16C"
+    | FMA -> "FMA"
   in
   let print_temp : temp -> string = function
     | R8 -> "R8"
@@ -465,6 +469,8 @@ let parse_ext = function
   | "BMI2" -> Some [| BMI2 |]
   | "AVX" -> Some [| AVX |]
   | "AVX2" -> Some [| AVX2 |]
+  | "F16C" -> Some [| F16C |]
+  | "FMA" -> Some [| FMA |]
   | _ -> None
 
 let amd64 () =

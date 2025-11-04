@@ -1602,6 +1602,11 @@ let emit_static_cast (cast : Cmm.static_cast) i =
     if distinct then movss (argX i 0) (res i 0)
   | V128_of_scalar Float32x4 | V256_of_scalar Float32x8 ->
     if distinct then movss (arg i 0) (resX i 0)
+  | Scalar_of_v128 Float16x8
+  | V128_of_scalar Float16x8
+  | Scalar_of_v256 Float16x16
+  | V256_of_scalar Float16x16 ->
+    Misc.fatal_error "float16 scalar type not supported"
   | Scalar_of_v128 Int16x8 | Scalar_of_v256 Int16x16 ->
     (* CR-someday mslater: int16# shouldn't require sign extension *)
     (* [movw] and [movzx] cannot operate on vector registers. We must sign

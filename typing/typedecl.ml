@@ -3496,6 +3496,8 @@ let native_repr_of_type env kind ty sort_or_poly =
     Some (Unboxed_vector Boxed_vec128)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int64x2 ->
     Some (Unboxed_vector Boxed_vec128)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float16x8 ->
+    Some (Unboxed_vector Boxed_vec128)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float32x4 ->
     Some (Unboxed_vector Boxed_vec128)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float64x2 ->
@@ -3508,6 +3510,8 @@ let native_repr_of_type env kind ty sort_or_poly =
     Some (Unboxed_vector Boxed_vec256)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int64x4 ->
     Some (Unboxed_vector Boxed_vec256)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float16x16 ->
+    Some (Unboxed_vector Boxed_vec256)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float32x8 ->
     Some (Unboxed_vector Boxed_vec256)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float64x4 ->
@@ -3519,6 +3523,8 @@ let native_repr_of_type env kind ty sort_or_poly =
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int32x16 ->
     Some (Unboxed_vector Boxed_vec512)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int64x8 ->
+    Some (Unboxed_vector Boxed_vec512)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float16x32 ->
     Some (Unboxed_vector Boxed_vec512)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float32x16 ->
     Some (Unboxed_vector Boxed_vec512)

@@ -284,6 +284,7 @@ type vec128_type =
   | Int16x8
   | Int32x4
   | Int64x2
+  | Float16x8
   | Float32x4
   | Float64x2
 
@@ -292,6 +293,7 @@ type vec256_type =
   | Int16x16
   | Int32x8
   | Int64x4
+  | Float16x16
   | Float32x8
   | Float64x4
 
@@ -300,6 +302,7 @@ type vec512_type =
   | Int16x32
   | Int32x16
   | Int64x8
+  | Float16x32
   | Float32x16
   | Float64x8
 
@@ -793,9 +796,12 @@ let equal_vec128_type v1 v2 =
   | Int16x8, Int16x8 -> true
   | Int32x4, Int32x4 -> true
   | Int64x2, Int64x2 -> true
+  | Float16x8, Float16x8 -> true
   | Float32x4, Float32x4 -> true
   | Float64x2, Float64x2 -> true
-  | (Int8x16 | Int16x8 | Int32x4 | Int64x2 | Float32x4 | Float64x2), _ -> false
+  | ( (Int8x16 | Int16x8 | Int32x4 | Int64x2 | Float16x8 | Float32x4 | Float64x2),
+      _ ) ->
+    false
 
 let equal_vec256_type v1 v2 =
   match v1, v2 with
@@ -803,9 +809,13 @@ let equal_vec256_type v1 v2 =
   | Int16x16, Int16x16 -> true
   | Int32x8, Int32x8 -> true
   | Int64x4, Int64x4 -> true
+  | Float16x16, Float16x16 -> true
   | Float32x8, Float32x8 -> true
   | Float64x4, Float64x4 -> true
-  | (Int8x32 | Int16x16 | Int32x8 | Int64x4 | Float32x8 | Float64x4), _ -> false
+  | ( ( Int8x32 | Int16x16 | Int32x8 | Int64x4 | Float16x16 | Float32x8
+      | Float64x4 ),
+      _ ) ->
+    false
 
 let equal_vec512_type v1 v2 =
   match v1, v2 with
@@ -813,9 +823,12 @@ let equal_vec512_type v1 v2 =
   | Int16x32, Int16x32 -> true
   | Int32x16, Int32x16 -> true
   | Int64x8, Int64x8 -> true
+  | Float16x32, Float16x32 -> true
   | Float32x16, Float32x16 -> true
   | Float64x8, Float64x8 -> true
-  | (Int8x64 | Int16x32 | Int32x16 | Int64x8 | Float32x16 | Float64x8), _ ->
+  | ( ( Int8x64 | Int16x32 | Int32x16 | Int64x8 | Float16x32 | Float32x16
+      | Float64x8 ),
+      _ ) ->
     false
 
 let equal_float_width left right =
