@@ -996,7 +996,7 @@ let transl_declaration env sdecl (id, uid) =
                    Constructor_uniform_value, sorts)
                 (Array.of_list cstrs)
             ),
-            Jkind.for_non_float ~why:Boxed_variant
+          Jkind.for_non_float ~why:Boxed_variant
         in
           Ttype_variant tcstrs, Type_variant (cstrs, rep, None), jkind
       | Ptype_record lbls ->
@@ -1029,7 +1029,8 @@ let transl_declaration env sdecl (id, uid) =
              are replaced and made to correspond to each other in
              [update_decl_jkind]. *)
           let jkind =
-            Jkind.Builtin.product_of_sorts ~why:Unboxed_record ~level:(Ctype.get_current_level ())
+            Jkind.Builtin.product_of_sorts ~why:Unboxed_record
+              ~level:(Ctype.get_current_level ())
               (List.length lbls)
           in
           Ttype_record_unboxed_product lbls,
