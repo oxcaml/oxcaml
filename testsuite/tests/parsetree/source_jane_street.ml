@@ -1256,6 +1256,17 @@ result: 7
 - : unit = ()
 |}]
 
+(* Ranges of `char#` are allowed. *)
+let x =
+  match #'c' with
+  | #'a'..#'z' -> 10
+  | _ -> 20
+;;
+
+[%%expect{|
+val x : int = 10
+|}]
+
 (*******************)
 (* Unboxed records *)
 

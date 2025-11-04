@@ -126,11 +126,12 @@ Literals are prefixed with `#`:
 #'\xff'  : char#
 ```
 
-Untagged char literals can be used in patterns, but not in ranges:
+Like regular char literals, untagged char literals can be used in patterns and
+in ranges:
 ```
 match x with
-| #'a' -> f ()       (* allowed *)
-| #'a'..#'z' -> g () (* not allowed *)
+| #'a' -> f ()
+| #'a'..#'z' -> g ()
 ```
 
 ### Operations
