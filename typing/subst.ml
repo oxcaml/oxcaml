@@ -130,7 +130,7 @@ end = struct
         const_jkind
         ~quality
         ~annotation:(Some { pjkind_loc = Location.none;
-                            (* CR zeisbach: this should probably extract *)
+                            (* CR zeisbach: do builtins need more? *)
                             pjkind_desc = Pjk_abbreviation (builtin.name, [])})
         ~why:Jkind.History.Imported)
 
