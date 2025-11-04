@@ -2422,7 +2422,7 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let meet l = Solver.meet obj l
 
-  let submode_exn m0 m1 = submode m0 m1 |> Result.get_ok
+  let submode_exn ?pp m0 m1 = submode ?pp m0 m1 |> Result.get_ok
 
   let equate a b = try_with_log (equate_from_submode (submode_log ?pp:None) a b)
 
@@ -2522,7 +2522,7 @@ module Monadic_gen (Obj : Obj) = struct
 
   let meet l = Solver.join obj l
 
-  let submode_exn m0 m1 = submode m0 m1 |> Result.get_ok
+  let submode_exn ?pp m0 m1 = submode ?pp m0 m1 |> Result.get_ok
 
   let equate a b = try_with_log (equate_from_submode (submode_log ?pp:None) a b)
 
@@ -3569,8 +3569,8 @@ module Value_with (Areality : Areality) = struct
 
   let equate a b = try_with_log (equate_from_submode (submode_log ?pp:None) a b)
 
-  let submode_exn m0 m1 =
-    match submode m0 m1 with
+  let submode_exn ?pp m0 m1 =
+    match submode ?pp m0 m1 with
     | Ok () -> ()
     | Error _ -> invalid_arg "submode_exn"
 
