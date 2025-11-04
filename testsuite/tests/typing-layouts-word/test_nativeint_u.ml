@@ -5,6 +5,7 @@
 (* External declarations for unsigned comparison primitives *)
 external unsigned_lt : nativeint# -> nativeint# -> bool = "%nativeint#_unsigned_lessthan"
 external unsigned_gt : nativeint# -> nativeint# -> bool = "%nativeint#_unsigned_greaterthan"
+external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
@@ -372,18 +373,64 @@ let () =
 
   (* Test the unsigned_lt primitive directly *)
   assert (unsigned_lt zero minus_one = true);
+  assert (unsigned_lt zero (id minus_one) = true);
+  assert (unsigned_lt (id zero) minus_one = true);
+  assert (unsigned_lt (id zero) (id minus_one) = true);
+
   assert (unsigned_lt minus_one zero = false);
+  assert (unsigned_lt minus_one (id zero) = false);
+  assert (unsigned_lt (id minus_one) zero = false);
+  assert (unsigned_lt (id minus_one) (id zero) = false);
+
   assert (unsigned_lt max_int min_int = true);
+  assert (unsigned_lt max_int (id min_int) = true);
+  assert (unsigned_lt (id max_int) min_int = true);
+  assert (unsigned_lt (id max_int) (id min_int) = true);
+
   assert (unsigned_lt min_int max_int = false);
+  assert (unsigned_lt min_int (id max_int) = false);
+  assert (unsigned_lt (id min_int) max_int = false);
+  assert (unsigned_lt (id min_int) (id max_int) = false);
+
   assert (unsigned_lt pos_million neg_million = true);
+  assert (unsigned_lt pos_million (id neg_million) = true);
+  assert (unsigned_lt (id pos_million) neg_million = true);
+  assert (unsigned_lt (id pos_million) (id neg_million) = true);
+
   assert (unsigned_lt neg_million pos_million = false);
+  assert (unsigned_lt neg_million (id pos_million) = false);
+  assert (unsigned_lt (id neg_million) pos_million = false);
+  assert (unsigned_lt (id neg_million) (id pos_million) = false);
 
   (* Test unsigned greater than using primitive comparisons *)
   assert (unsigned_gt minus_one zero = true);
+  assert (unsigned_gt minus_one (id zero) = true);
+  assert (unsigned_gt (id minus_one) zero = true);
+  assert (unsigned_gt (id minus_one) (id zero) = true);
+
   assert (unsigned_gt zero minus_one = false);
+  assert (unsigned_gt zero (id minus_one) = false);
+  assert (unsigned_gt (id zero) minus_one = false);
+  assert (unsigned_gt (id zero) (id minus_one) = false);
+
   assert (unsigned_gt min_int max_int = true);
+  assert (unsigned_gt min_int (id max_int) = true);
+  assert (unsigned_gt (id min_int) max_int = true);
+  assert (unsigned_gt (id min_int) (id max_int) = true);
+
   assert (unsigned_gt max_int min_int = false);
+  assert (unsigned_gt max_int (id min_int) = false);
+  assert (unsigned_gt (id max_int) min_int = false);
+  assert (unsigned_gt (id max_int) (id min_int) = false);
+
   assert (unsigned_gt neg_million pos_million = true);
+  assert (unsigned_gt neg_million (id pos_million) = true);
+  assert (unsigned_gt (id neg_million) pos_million = true);
+  assert (unsigned_gt (id neg_million) (id pos_million) = true);
+
   assert (unsigned_gt pos_million neg_million = false);
+  assert (unsigned_gt pos_million (id neg_million) = false);
+  assert (unsigned_gt (id pos_million) neg_million = false);
+  assert (unsigned_gt (id pos_million) (id neg_million) = false);
 
   ()

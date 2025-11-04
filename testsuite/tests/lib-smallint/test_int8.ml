@@ -6,6 +6,7 @@
 (* External declarations for unsigned comparison primitives *)
 external unsigned_lt : int8 -> int8 -> bool = "%int8_unsigned_lessthan"
 external unsigned_gt : int8 -> int8 -> bool = "%int8_unsigned_greaterthan"
+external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 let () =
   Test_smallint.run
@@ -51,14 +52,52 @@ let () =
 
   (* Test the unsigned_lt primitive directly *)
   assert (unsigned_lt I.zero I.minus_one = true); (* 0 < 255 *)
+  assert (unsigned_lt I.zero (id I.minus_one) = true);
+  assert (unsigned_lt (id I.zero) I.minus_one = true);
+  assert (unsigned_lt (id I.zero) (id I.minus_one) = true);
+
   assert (unsigned_lt I.minus_one I.zero = false); (* 255 not < 0 *)
+  assert (unsigned_lt I.minus_one (id I.zero) = false);
+  assert (unsigned_lt (id I.minus_one) I.zero = false);
+  assert (unsigned_lt (id I.minus_one) (id I.zero) = false);
+
   assert (unsigned_lt I.max_int I.min_int = true); (* 127 < 128 *)
+  assert (unsigned_lt I.max_int (id I.min_int) = true);
+  assert (unsigned_lt (id I.max_int) I.min_int = true);
+  assert (unsigned_lt (id I.max_int) (id I.min_int) = true);
+
   assert (unsigned_lt I.min_int I.max_int = false); (* 128 not < 127 *)
+  assert (unsigned_lt I.min_int (id I.max_int) = false);
+  assert (unsigned_lt (id I.min_int) I.max_int = false);
+  assert (unsigned_lt (id I.min_int) (id I.max_int) = false);
+
   assert (unsigned_lt neg_2 two = false); (* 254 not < 2 *)
+  assert (unsigned_lt neg_2 (id two) = false);
+  assert (unsigned_lt (id neg_2) two = false);
+  assert (unsigned_lt (id neg_2) (id two) = false);
+
   assert (unsigned_lt two neg_2 = true); (* 2 < 254 *)
+  assert (unsigned_lt two (id neg_2) = true);
+  assert (unsigned_lt (id two) neg_2 = true);
+  assert (unsigned_lt (id two) (id neg_2) = true);
 
   (* Test unsigned greater than using primitive comparisons *)
   assert (unsigned_gt I.minus_one I.zero = true); (* 255 > 0 *)
+  assert (unsigned_gt I.minus_one (id I.zero) = true);
+  assert (unsigned_gt (id I.minus_one) I.zero = true);
+  assert (unsigned_gt (id I.minus_one) (id I.zero) = true);
+
   assert (unsigned_gt I.zero I.minus_one = false); (* 0 not > 255 *)
+  assert (unsigned_gt I.zero (id I.minus_one) = false);
+  assert (unsigned_gt (id I.zero) I.minus_one = false);
+  assert (unsigned_gt (id I.zero) (id I.minus_one) = false);
+
   assert (unsigned_gt I.min_int I.max_int = true); (* 128 > 127 *)
+  assert (unsigned_gt I.min_int (id I.max_int) = true);
+  assert (unsigned_gt (id I.min_int) I.max_int = true);
+  assert (unsigned_gt (id I.min_int) (id I.max_int) = true);
+
   assert (unsigned_gt I.max_int I.min_int = false); (* 127 not > 128 *)
+  assert (unsigned_gt I.max_int (id I.min_int) = false);
+  assert (unsigned_gt (id I.max_int) I.min_int = false);
+  assert (unsigned_gt (id I.max_int) (id I.min_int) = false);
