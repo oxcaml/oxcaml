@@ -2787,7 +2787,9 @@ let for_object =
   (* The crossing of objects are based on the fact that they are
      produced/defined/allocated at legacy, which applies to only the
      comonadic axes. *)
-  let comonadic = Crossing.Comonadic.legacy in
+  let comonadic =
+    Crossing.Comonadic.always_constructed_at Value.Comonadic.Const.legacy
+  in
   let monadic = Crossing.Monadic.max in
   fresh_jkind
     { layout = Sort (Base Value);

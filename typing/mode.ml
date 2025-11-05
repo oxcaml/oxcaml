@@ -4434,7 +4434,7 @@ module Crossing = struct
 
     let min = Modality (Join_const Mode.Const.max)
 
-    let legacy = Modality (Join_const Mode.Const.legacy)
+    let legacy = max
 
     let join (Modality (Join_const c0)) (Modality (Join_const c1)) =
       Modality (Join_const (Mode.Const.meet c0 c1))
@@ -4494,6 +4494,8 @@ module Crossing = struct
              yielding
            })
 
+    let always_constructed_at c = Modality (Meet_const c)
+
     let proj (type a) (ax : a Mode.Axis.t) (Modality (Meet_const c)) : a Atom.t
         =
       Modality (Meet_with ((Axis.proj [@inlined hint]) ax c))
@@ -4521,7 +4523,7 @@ module Crossing = struct
 
     let min = Modality (Meet_const Mode.Const.min)
 
-    let legacy = Modality (Meet_const Mode.Const.legacy)
+    let legacy = max
 
     let join (Modality (Meet_const c0)) (Modality (Meet_const c1)) =
       Modality (Meet_const (Mode.Const.join c0 c1))
@@ -4668,7 +4670,7 @@ module Crossing = struct
 
   let min = { monadic = Monadic.min; comonadic = Comonadic.min }
 
-  let legacy = max (* legacy behavior is no mode crossing *)
+  let legacy = { monadic = Monadic.legacy; comonadic = Comonadic.legacy }
 
   let join t0 t1 =
     { monadic = Monadic.join t0.monadic t1.monadic;

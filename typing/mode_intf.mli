@@ -1009,6 +1009,9 @@ module type S = sig
         yielding:Yielding.Const.t Atom.t ->
         statefulness:Statefulness.Const.t Atom.t ->
         t
+
+      (** Create the mode crossing for a type whose values are always constructed at the given mode. *)
+      val always_constructed_at : Value.Comonadic.Const.t -> t
     end
 
     (** The mode crossing capability on all axes, split into monadic and
