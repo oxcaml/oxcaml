@@ -175,16 +175,18 @@ let mk_H f =
   "<dir>  Add <dir> to the list of \"hidden\" include directories\n\
  \     (Like -I, but the program can not directly reference these dependencies)"
 
-(* CR aodintsov: Where should I put these docs? *)
 let mk_I_manifest f =
-  "-I-manifest", Arg.String f, "<file>  Get paths that compiler can reference from\n\
-  \    given manifest file. This option is alternative to -I flag, but specified\n\
-  \    available files directly instead of adding whole directories to the search path.\n\
-  \    Each line of manifest file should be in format 'file|manifest <visible_path>\n\
-  \    <actual_path>' where 'file' means that this line describes actual file,\n\
-  \    'manifest' means that compiler should read that manifest file recursively,\n\
-  \    <visible_path> is path as interpreted by compiler, <actual_path> is where this\n\
-  \    file is in the filesystem (relative to $OXCAML_LOAD_PATH_ROOT)."
+  "-I-manifest", Arg.String f, "<file>  Get paths that the compiler can reference from\n\
+  \    a given manifest file. This option is an alternative to the -I flag, but\n\
+  \    specifies available files directly instead of adding whole directories to the\n\
+  \    search path. Each line of the manifest file should be in the format\n\
+  \    'file|manifest <visible_path> <actual_path>', where 'file' means that the line\n\
+  \    describes a file that the compiler can reference, 'manifest' means that the\n\
+  \    compiler should read the specified manifest file recursively, <visible_path> is\n\
+  \    the path as interpreted by the compiler, <actual_path> is where this file is\n\
+  \    in the filesystem (relative to [$OXCAML_MANIFEST_LOAD_PATH_ROOT]). The manifest\n\
+  \    file passed to the [-I-manifest] flag should itself be relative to\n\
+  \    [$OXCAML_MANIFEST_LOAD_PATH_ROOT]."
 
 let mk_H_manifest f =
   "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given paths\n\
