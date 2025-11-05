@@ -459,7 +459,7 @@ val add_persistent_structure : Ident.t -> t -> t
    directory. *)
 val persistent_structures_of_dir : Load_path.Dir.t -> Misc.Stdlib.String.Set.t
 
-(* Convert given set of basenames to the set of persistent structures. *)
+(* Convert the given list of basenames to the set of persistent structures. *)
 val persistent_structures_of_basenames : string list -> Misc.Stdlib.String.Set.t
 
 (* [filter_non_loaded_persistent f env] removes all the persistent
