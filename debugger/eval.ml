@@ -92,7 +92,7 @@ let value_path event env path =
 
 let rec expression event env = function
   | E_ident lid -> begin
-      match Env.find_value_by_name_lazy lid env with
+      match Env.find_value_by_name lid env with
       | (p, valdesc) ->
           let v =
             match valdesc.val_kind with

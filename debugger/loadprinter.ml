@@ -101,7 +101,7 @@ let match_printer_type desc make_printer_type =
   end
 
 let find_printer_type lid =
-  match Env.find_value_by_name_lazy lid Env.empty with
+  match Env.find_value_by_name lid Env.empty with
   | (path, desc) -> begin
       match match_printer_type desc Topprinters.printer_type_new with
       | ty_arg -> (ty_arg, path, false)
