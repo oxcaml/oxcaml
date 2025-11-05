@@ -2108,7 +2108,11 @@ module Const = struct
       (l * r) Context_with_transl.t -> Parsetree.jkind_annotation -> (l * r) t =
    fun context jkind ->
     match jkind.pjkind_desc with
-    | Pjk_abbreviation (name, nts) ->
+    (* CR zeisbach: this is temporary, because the logic to implement this
+       relies on some data definitions and functions in another PR *)
+    | Pjk_abbreviation (_, _ :: _) ->
+      raise ~loc:jkind.pjkind_loc Unimplemented_syntax
+    | Pjk_abbreviation (name, []) ->
       (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
       (match name with
       | "any" -> Builtin.any.jkind
@@ -2358,7 +2362,7 @@ end
 let mk_annot name =
   Some
     Parsetree.
-      { pjkind_loc = Location.none; pjkind_desc = Pjk_abbreviation name }
+      { pjkind_loc = Location.none; pjkind_desc = Pjk_abbreviation (name, []) }
 
 let mark_best (type l r) (t : (l * r) Types.jkind) =
   { (disallow_right t) with quality = Best }
