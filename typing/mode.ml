@@ -42,7 +42,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
      fun pp t ->
       match t with
       | Skip -> pp, Skip
-      | Is_closed_by co -> (Location.none, co.closure), Close_over co
+      | Is_closed_by co -> co.closure, Close_over co
       | Captured_by_partial_application ->
         (Location.none, Expression), Adj_captured_by_partial_application
       | Crossing -> pp, Crossing
@@ -2074,8 +2074,7 @@ module Report = struct
       print_pinpoint ~parens:false pp
       |> Option.map (fun print_pp ->
              dprintf "contains a usage (of %t)" print_pp, pp)
-    | Is_closed_by { closure; _ } ->
-      let pp = Location.none, closure in
+    | Is_closed_by { closure = pp; _ } ->
       print_pinpoint pp
       |> Option.map (fun print_pp -> dprintf "is used inside %t" print_pp, pp)
     | Captured_by_partial_application ->

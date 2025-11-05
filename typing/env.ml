@@ -159,7 +159,7 @@ type shared_context =
 type lock =
   | Escape_lock of escaping_context
   | Share_lock of shared_context
-  | Closure_lock of Mode.Hint.pinpoint_desc * Mode.Value.Comonadic.r
+  | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
   | Region_lock
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
@@ -292,22 +292,23 @@ module TycompTbl =
           (fun () ->
              match rest with
              | [] -> f name None
-             | (hidden, _) :: _ -> f name (Some (desc, hidden)))
+             | (_, hidden, _) :: _ -> f name (Some (desc, hidden)))
 
     let rec find_all ~mark name tbl =
-      List.map (fun (_id, desc) -> desc, nothing)
+      List.map (fun (id, desc) -> Pident id, desc, nothing)
         (Ident.find_all name tbl.current) @
       match tbl.layer with
       | Nothing -> []
       | Lock {next; _} -> find_all ~mark name next
-      | Open {using; next; components; root = _} ->
+      | Open {using; next; components; root} ->
           let rest = find_all ~mark name next in
           let using = if mark then using else None in
           match NameMap.find name components with
           | exception Not_found -> rest
           | opened ->
               List.map
-                (fun desc -> desc, mk_callback rest name desc using)
+                (fun desc -> Pdot (root, name), desc,
+                  mk_callback rest name desc using)
                 opened
               @ rest
 
@@ -315,20 +316,20 @@ module TycompTbl =
       { current = Ident.empty; layer = Lock {lock; next} }
 
     let rec find_all_and_locks ~mark name tbl acc =
-      List.map (fun (_id, desc) -> (desc, (acc, nothing)))
+      List.map (fun (id, desc) -> (Pident id, desc, (acc, nothing)))
         (Ident.find_all name tbl.current) @
       match tbl.layer with
       | Nothing -> []
       | Lock {lock;next} ->
           find_all_and_locks ~mark name next (lock :: acc)
-      | Open {using; next; components; locks; root = _} ->
+      | Open {using; next; components; locks; root} ->
           let rest = find_all_and_locks ~mark name next acc in
           let using = if mark then using else None in
           match NameMap.find name components with
           | exception Not_found -> rest
           | opened ->
               List.map
-                (fun desc -> desc,
+                (fun desc -> Pdot (root, name), desc,
                   (locks @ acc, mk_callback rest name desc using))
                 opened
               @ rest
@@ -3622,7 +3623,7 @@ let lookup_ident_cltype ~errors ~use ~loc s env =
       may_lookup_error errors loc env (Unbound_cltype (Lident s))
 
 let find_all_labels (type rep) ~(record_form : rep record_form) ~mark s env
-  : (rep gen_label_description * (unit -> unit)) list =
+  : (_ * rep gen_label_description * (unit -> unit)) list =
   match record_form with
   | Legacy -> TycompTbl.find_all ~mark s env.labels
   | Unboxed_product -> TycompTbl.find_all ~mark s env.unboxed_labels
@@ -3635,7 +3636,7 @@ let lookup_all_ident_labels (type rep) ~(record_form : rep record_form) ~errors
       (Unbound_label (Lident s, P record_form, usage))
   | lbls -> begin
       List.map
-        (fun (lbl, use_fn) ->
+        (fun (_, lbl, use_fn) ->
            let use_fn () =
              use_label ~use ~loc usage env lbl;
              use_fn ()
@@ -3648,11 +3649,8 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
   let cstrs = TycompTbl.find_all_and_locks ~mark:use s env.constrs in
   let cstrs_filtered =
     List.filter
-      (fun (cstr_data, (locks, _)) ->
-         let path =
-           (Path.Pident
-              (Ident.create_predef cstr_data.cda_description.cstr_name))
-         in does_not_cross_quotation path locks = Ok ())
+      (fun (path, _, (locks, _)) ->
+         does_not_cross_quotation path locks |> Result.is_ok)
       cstrs
   in
   match cstrs_filtered with
@@ -3665,7 +3663,7 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
     end
   | cstrs ->
       List.map
-        (fun (cda, (locks, use_fn)) ->
+        (fun (_path, cda, (locks, use_fn)) ->
            let use_fn () =
              use_constructor ~use ~loc usage env cda;
              use_fn ()

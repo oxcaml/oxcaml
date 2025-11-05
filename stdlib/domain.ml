@@ -488,7 +488,7 @@ module TLS0 = struct
   type tls_state = Obj_opt.t array
 
   external get_tls_state
-    : unit -> tls_state @@ portable = "caml_domain_tls_get"
+    : unit -> tls_state @@ portable = "%tls_get"
   [@@noalloc]
   external set_tls_state
     : tls_state -> unit @@ portable = "caml_domain_tls_set"

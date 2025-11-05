@@ -3015,23 +3015,35 @@ and type_pat_aux
         pat_attributes = sp.ppat_attributes;
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
-  | Ppat_interval (Pconst_char c1, Pconst_char c2) ->
-      let open Ast_helper.Pat in
-      let gloc = Location.ghostify loc in
-      let rec loop c1 c2 =
-        if c1 = c2 then constant ~loc:gloc (Pconst_char c1)
-        else
-          or_ ~loc:gloc
-            (constant ~loc:gloc (Pconst_char c1))
-            (loop (Char.chr(Char.code c1 + 1)) c2)
-      in
-      let p = if c1 <= c2 then loop c1 c2 else loop c2 c1 in
-      let p = {p with ppat_loc=loc} in
-      type_pat tps category p expected_ty
-        Jkind.Sort.(of_const Const.for_predef_value)
+  | Ppat_interval (l, r) ->
+      let expand_interval lo hi ~make =
+        let open Ast_helper.Pat in
+        let gloc = Location.ghostify loc in
+        let rec loop lo hi =
+          if lo = hi then constant ~loc:gloc (make lo)
+          else
+            or_ ~loc:gloc
+              (constant ~loc:gloc (make lo))
+              (loop (lo + 1) hi)
+        in
+        let p = if lo <= hi then loop lo hi else loop hi lo in
+        let p = {p with ppat_loc=loc} in
+        type_pat tps category p expected_ty
+          Jkind.Sort.(of_const Const.for_predef_value)
         (* TODO: record 'extra' to remember about interval *)
-  | Ppat_interval _ ->
-      raise (Error (loc, !!penv, Invalid_interval))
+      in
+      begin match
+        constant_or_raise !!penv loc l, constant_or_raise !!penv loc r
+      with
+      | Const_char c1, Const_char c2 ->
+        expand_interval (Char.code c1) (Char.code c2)
+          ~make:(fun i -> Pconst_char (Char.chr i))
+      | Const_untagged_char c1, Const_untagged_char c2 ->
+        expand_interval (Char.code c1) (Char.code c2)
+          ~make:(fun i -> Pconst_untagged_char (Char.chr i))
+      | _ ->
+        raise (Error (loc, !!penv, Invalid_interval))
+      end
   | Ppat_tuple (spl, closed) ->
       type_tuple_pat spl closed
   | Ppat_unboxed_tuple (spl, oc) ->
@@ -5402,7 +5414,7 @@ let split_function_ty
     | true ->
         let env =
           Env.add_closure_lock
-            Function
+            (loc, Function)
             mode.comonadic
             env
         in
@@ -6972,7 +6984,7 @@ and type_expect_
       let to_unify = Predef.type_lazy_t ty in
       with_explanation (fun () ->
         unify_exp_types loc env to_unify (generic_instance ty_expected));
-      let env = Env.add_closure_lock Lazy closure_mode.comonadic env in
+      let env = Env.add_closure_lock (loc, Lazy) closure_mode.comonadic env in
       let arg = type_expect env expected_mode e (mk_expected ty) in
       re {
         exp_desc = Texp_lazy arg;
@@ -11421,7 +11433,8 @@ let report_error ~loc env =
         reason_str
   | Invalid_interval ->
       Location.errorf ~loc
-        "@[Only character intervals are supported in patterns.@]"
+        "@[Only character intervals and untagged character intervals \
+         are supported in patterns.@]"
   | Invalid_for_loop_index ->
       Location.errorf ~loc
         "@[Invalid for-loop index: only variables and %a are allowed.@]"

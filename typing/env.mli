@@ -531,7 +531,7 @@ val add_escape_lock : escaping_context -> t -> t
 val add_share_lock : shared_context -> t -> t
 (* CR-soon zqian: require [pinpoint] instead of [pinpoint_desc] to include
    location of the closure. *)
-val add_closure_lock : Mode.Hint.pinpoint_desc
+val add_closure_lock : Mode.Hint.pinpoint
   -> ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t

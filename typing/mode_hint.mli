@@ -54,8 +54,7 @@ type polarity =
   | Comonadic
 
 type closure_details =
-  { closure : pinpoint_desc;
-    (* CR-soon zqian: add location to [closure]. *)
+  { closure : pinpoint;
     closed : pinpoint;
     polarity : polarity
   }

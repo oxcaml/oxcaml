@@ -322,6 +322,7 @@ let operation d = function
   | Cendregion -> "endregion"
   | Ctuple_field (field, _ty) -> to_string "tuple_field %i" field
   | Cdls_get -> "dls_get"
+  | Ctls_get -> "tls_get"
   | Cpoll -> "poll"
   | Cpause -> "pause"
 

@@ -1242,7 +1242,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pset_ptr _ | Patomic_exchange_field _ | Patomic_compare_exchange_field _
       | Patomic_compare_set_field _ | Patomic_fetch_add_field
       | Patomic_add_field | Patomic_sub_field | Patomic_land_field
-      | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ppoll
+      | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ptls_get | Ppoll
       | Patomic_load_field _ | Patomic_set_field _
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _

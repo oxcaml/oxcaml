@@ -3794,7 +3794,7 @@ simple_pattern_not_ident:
   mkpat(
     UNDERSCORE
       { Ppat_any }
-  | signed_value_constant DOTDOT signed_value_constant
+  | signed_constant DOTDOT signed_constant
       { Ppat_interval ($1, $3) }
   | mkrhs(constr_longident)
       { Ppat_construct($1, None) }

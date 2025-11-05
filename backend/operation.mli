@@ -160,6 +160,7 @@ type t =
         regs : Reg.t array
       }
   | Dls_get
+  | Tls_get
   | Poll
   | Pause
   | Alloc of

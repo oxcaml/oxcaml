@@ -4992,6 +4992,8 @@ let block_header x y = block_header x y
 
 let dls_get ~dbg = Cop (Cdls_get, [], dbg)
 
+let tls_get ~dbg = Cop (Ctls_get, [], dbg)
+
 let perform ~dbg eff =
   let cont =
     make_alloc dbg ~tag:Runtimetags.cont_tag

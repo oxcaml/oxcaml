@@ -304,6 +304,7 @@ type t =
         regs : Reg.t array
       }
   | Dls_get
+  | Tls_get
   | Poll
   | Pause
   | Alloc of
@@ -347,6 +348,7 @@ let is_pure = function
   | Specific s -> Arch.operation_is_pure s
   | Name_for_debugger _ -> false
   | Dls_get -> true
+  | Tls_get -> true
   | Poll -> false
   | Pause -> false
   | Alloc _ -> false
@@ -430,6 +432,7 @@ let dump ppf op =
   | End_region -> Format.fprintf ppf "endregion"
   | Name_for_debugger _ -> Format.fprintf ppf "name_for_debugger"
   | Dls_get -> Format.fprintf ppf "dls_get"
+  | Tls_get -> Format.fprintf ppf "tls_get"
   | Poll -> Format.fprintf ppf "poll"
   | Pause -> Format.fprintf ppf "pause"
   | Alloc { bytes; dbginfo = _; mode = Heap } ->

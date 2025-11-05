@@ -15,6 +15,32 @@
 
 #define CAML_INTERNALS
 
+#define _GNU_SOURCE /* helps to find pthread_setname_np() */
+#include "caml/config.h"
+
+#if defined(_WIN32)
+#  include <windows.h>
+#  include <processthreadsapi.h>
+#  include "caml/osdeps.h"
+
+#  if defined(HAS_SETTHREADDESCRIPTION) && \
+      !defined(HAS_DECL_SETTHREADDESCRIPTION)
+WINBASEAPI HRESULT WINAPI
+SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
+#  endif
+
+#elif defined(HAS_PRCTL)
+#  include <sys/prctl.h>
+#elif defined(HAS_PTHREAD_SETNAME_NP) || defined(HAS_PTHREAD_SET_NAME_NP)
+#  include <pthread.h>
+
+#  if defined(HAS_PTHREAD_NP_H)
+#    include <pthread_np.h>
+#  endif
+#endif
+
+#include "caml/misc.h"
+
 #ifndef CAML_NAME_SPACE
 #define CAML_NAME_SPACE
 #endif
@@ -1127,4 +1153,43 @@ static st_retcode caml_threadstatus_wait (value wrapper)
     caml_leave_blocking_section();
   End_roots();
   return retcode;
+}
+
+/* Set the current thread's name. */
+CAMLprim value caml_set_current_thread_name(value name)
+{
+#if defined(_WIN32)
+
+#  if defined(HAS_SETTHREADDESCRIPTION)
+  wchar_t *thread_name = caml_stat_strdup_to_utf16(String_val(name));
+  SetThreadDescription(GetCurrentThread(), thread_name);
+  caml_stat_free(thread_name);
+#  endif
+
+#  if defined(HAS_PTHREAD_SETNAME_NP)
+  // We are using both methods.
+  // See: https://github.com/ocaml/ocaml/pull/13504#discussion_r1786358928
+  pthread_setname_np(pthread_self(), String_val(name));
+#  endif
+
+#elif defined(HAS_PRCTL)
+  prctl(PR_SET_NAME, String_val(name));
+#elif defined(HAS_PTHREAD_SETNAME_NP)
+#  if defined(__APPLE__)
+  pthread_setname_np(String_val(name));
+#  elif defined(__NetBSD__)
+  pthread_setname_np(pthread_self(), "%s", String_val(name));
+#  else
+  pthread_setname_np(pthread_self(), String_val(name));
+#  endif
+#elif defined(HAS_PTHREAD_SET_NAME_NP)
+  pthread_set_name_np(pthread_self(), String_val(name));
+#else
+  if (caml_runtime_warnings_active()) {
+    fprintf(stderr, "set thread name not implemented\n");
+    fflush(stderr);
+  }
+#endif
+
+  return Val_unit;
 }

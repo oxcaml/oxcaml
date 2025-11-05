@@ -44,48 +44,60 @@ type error =
 
 exception Error of error
 
+type t =
+  { crc_interfaces : Cmi_consistbl.t;
+    crc_implementations : Cmx_consistbl.t;
+    mutable implementations : CU.t list;
+    mutable cmx_required : CU.t list;
+    interfaces : unit CU.Name.Tbl.t;
+    implementations_defined : string CU.Tbl.t;
+    mutable quoted_globals : CU.Name.Set.t;
+    mutable lib_ccobjs : filepath list;
+    mutable lib_ccopts : string list;
+    missing_globals : (CU.t, (string * CU.Name.t option) list ref) Hashtbl.t
+  }
+
+let create () =
+  let quoted_globals =
+    if !Clflags.nopervasives
+    then CU.Name.Set.empty
+    else CU.Name.Set.singleton (CU.Name.of_string "Stdlib")
+  in
+  { crc_interfaces = Cmi_consistbl.create ();
+    crc_implementations = Cmx_consistbl.create ();
+    implementations = [];
+    cmx_required = [];
+    interfaces = CU.Name.Tbl.create 100;
+    implementations_defined = CU.Tbl.create 100;
+    quoted_globals;
+    lib_ccobjs = [];
+    lib_ccopts = [];
+    missing_globals = Hashtbl.create 17
+  }
+
 (* Globals for quotations *)
 
-let quoted_globals = ref CU.Name.Set.empty
-
-let add_quoted_globals globals =
-  quoted_globals
-    := List.fold_left
+let add_quoted_globals t globals =
+  t.quoted_globals
+    <- List.fold_left
          (fun globals global -> CU.Name.Set.add global globals)
-         !quoted_globals globals
+         t.quoted_globals globals
 
-let get_quoted_globals () =
-  if not !Clflags.nopervasives
-  then
-    quoted_globals
-      := CU.Name.Set.add (CU.Name.of_string "Stdlib") !quoted_globals;
-  !quoted_globals
+let get_quoted_globals t = t.quoted_globals
 
 (* Consistency check between interfaces and implementations: *)
 
-let crc_interfaces = Cmi_consistbl.create ()
-
-let interfaces = CU.Name.Tbl.create 100
-
-let crc_implementations = Cmx_consistbl.create ()
-
-let implementations = ref ([] : CU.t list)
-
-let implementations_defined = CU.Tbl.create 100
-
-let cmx_required = ref ([] : CU.t list)
-
-let check_cmi_consistency file_name cmis =
+let check_cmi_consistency t file_name cmis =
   try
     Array.iter
       (fun import ->
         let name = Import_info.name import in
         let info = Import_info.Intf.info import in
-        CU.Name.Tbl.replace interfaces name ();
+        CU.Name.Tbl.replace t.interfaces name ();
         match info with
         | None -> ()
         | Some (kind, crc) ->
-          Cmi_consistbl.check crc_interfaces name kind crc file_name)
+          Cmi_consistbl.check t.crc_interfaces name kind crc file_name)
       cmis
   with
   | Cmi_consistbl.Inconsistency
@@ -93,19 +105,19 @@ let check_cmi_consistency file_name cmis =
   ->
     raise (Error (Inconsistent_interface (name, user, auth)))
 
-let check_cmx_consistency file_name cmxs =
+let check_cmx_consistency t file_name cmxs =
   try
     Array.iter
       (fun import ->
         let name = Import_info.cu import in
         let crco = Import_info.crc import in
-        implementations := name :: !implementations;
+        t.implementations <- name :: t.implementations;
         match crco with
         | None ->
-          if List.mem name !cmx_required
+          if List.mem name t.cmx_required
           then raise (Error (Missing_cmx (file_name, name)))
         | Some crc ->
-          Cmx_consistbl.check crc_implementations name () crc file_name)
+          Cmx_consistbl.check t.crc_implementations name () crc file_name)
       cmxs
   with
   | Cmx_consistbl.Inconsistency
@@ -113,28 +125,28 @@ let check_cmx_consistency file_name cmxs =
   ->
     raise (Error (Inconsistent_implementation (name, user, auth)))
 
-let check_consistency ~unit cmis cmxs =
-  check_cmi_consistency unit.file_name cmis;
-  check_cmx_consistency unit.file_name cmxs;
+let check_consistency t ~unit cmis cmxs =
+  check_cmi_consistency t unit.file_name cmis;
+  check_cmx_consistency t unit.file_name cmxs;
   let ui_unit = CU.name unit.name in
   (try
-     let source = CU.Tbl.find implementations_defined unit.name in
+     let source = CU.Tbl.find t.implementations_defined unit.name in
      raise (Error (Multiple_definition (ui_unit, unit.file_name, source)))
    with Not_found -> ());
-  implementations := unit.name :: !implementations;
-  Cmx_consistbl.check crc_implementations unit.name () unit.crc unit.file_name;
-  CU.Tbl.replace implementations_defined unit.name unit.file_name;
-  if CU.is_packed unit.name then cmx_required := unit.name :: !cmx_required
+  t.implementations <- unit.name :: t.implementations;
+  Cmx_consistbl.check t.crc_implementations unit.name () unit.crc unit.file_name;
+  CU.Tbl.replace t.implementations_defined unit.name unit.file_name;
+  if CU.is_packed unit.name then t.cmx_required <- unit.name :: t.cmx_required
 
-let extract_crc_interfaces () =
+let extract_crc_interfaces t =
   CU.Name.Tbl.fold
     (fun name () crcs ->
-      let crc_with_unit = Cmi_consistbl.find crc_interfaces name in
+      let crc_with_unit = Cmi_consistbl.find t.crc_interfaces name in
       Import_info.Intf.create name crc_with_unit :: crcs)
-    interfaces []
+    t.interfaces []
 
-let extract_crc_implementations () =
-  Cmx_consistbl.extract !implementations crc_implementations
+let extract_crc_implementations t =
+  Cmx_consistbl.extract t.implementations t.crc_implementations
   |> List.map (fun (cu, crc) ->
          let crc = Option.map (fun ((), crc) -> crc) crc in
          Import_info.create_normal cu ~crc)
@@ -142,40 +154,31 @@ let extract_crc_implementations () =
 (* Add C objects and options and "custom" info from a library descriptor. See
    bytecomp/bytelink.ml for comments on the order of C objects. *)
 
-let lib_ccobjs = ref []
-
-let lib_ccopts = ref []
-
-let missing_globals =
-  (Hashtbl.create 17 : (CU.t, (string * CU.Name.t option) list ref) Hashtbl.t)
-
-let check_consistency = check_consistency
-
-let add_ccobjs origin l =
+let add_ccobjs t origin (l : Cmx_format.library_infos) =
   if not !Clflags.no_auto_link
   then (
-    lib_ccobjs := l.lib_ccobjs @ !lib_ccobjs;
+    t.lib_ccobjs <- l.lib_ccobjs @ t.lib_ccobjs;
     let replace_origin =
       Misc.replace_substring ~before:"$CAMLORIGIN" ~after:origin
     in
-    lib_ccopts := List.map replace_origin l.lib_ccopts @ !lib_ccopts)
+    t.lib_ccopts <- List.map replace_origin l.lib_ccopts @ t.lib_ccopts)
 
-let is_required name =
+let is_required t name =
   try
-    ignore (Hashtbl.find missing_globals name);
+    ignore (Hashtbl.find t.missing_globals name);
     true
   with Not_found -> false
 
-let add_required by import =
+let add_required t by import =
   let name = Import_info.cu import in
   try
-    let rq = Hashtbl.find missing_globals name in
+    let rq = Hashtbl.find t.missing_globals name in
     rq := by :: !rq
-  with Not_found -> Hashtbl.add missing_globals name (ref [by])
+  with Not_found -> Hashtbl.add t.missing_globals name (ref [by])
 
-let remove_required name = Hashtbl.remove missing_globals name
+let remove_required t name = Hashtbl.remove t.missing_globals name
 
-let extract_missing_globals () =
+let extract_missing_globals t =
   let mg = ref [] in
   let fmt = function
     | file, None -> file
@@ -183,35 +186,22 @@ let extract_missing_globals () =
   in
   Hashtbl.iter
     (fun md rq -> mg := (md, List.map fmt !rq) :: !mg)
-    missing_globals;
+    t.missing_globals;
   !mg
-
-let reset () =
-  (* CR-someday jvanburen: should we [Hashtbl.reset missing_globals;]? *)
-  ignore missing_globals;
-  Cmi_consistbl.clear crc_interfaces;
-  Cmx_consistbl.clear crc_implementations;
-  CU.Tbl.reset implementations_defined;
-  cmx_required := [];
-  CU.Name.Tbl.reset interfaces;
-  implementations := [];
-  lib_ccobjs := [];
-  lib_ccopts := [];
-  quoted_globals := CU.Name.Set.empty
 
 let assume_no_prefix modname =
   (* We're the linker, so we assume that everything's already been packed, so no
      module needs its prefix considered. *)
   CU.create CU.Prefix.empty modname
 
-let make_globals_map units_list =
+let make_globals_map t units_list =
   (* The order in which entries appear in the globals map does not matter (see
      the natdynlink code). *)
   let find_crc name =
-    Cmi_consistbl.find crc_interfaces name
+    Cmi_consistbl.find t.crc_interfaces name
     |> Option.map (fun (_unit, crc) -> crc)
   in
-  let interfaces = CU.Name.Tbl.copy interfaces in
+  let interfaces = CU.Name.Tbl.copy t.interfaces in
   let defined =
     List.map
       (fun unit ->
@@ -228,9 +218,9 @@ let make_globals_map units_list =
       (assume_no_prefix name, intf_crc, None, []) :: globals_map)
     interfaces defined
 
-let lib_ccobjs () = !lib_ccobjs
+let lib_ccobjs t = t.lib_ccobjs
 
-let lib_ccopts () = !lib_ccopts
+let lib_ccopts t = t.lib_ccopts
 
 (* Error report *)
 
