@@ -171,8 +171,8 @@ module Namespace = struct
     let to_lookup f lid = fst @@ in_printing_env (f (Lident lid)) in
     function
     | Some Type -> to_lookup Env.find_type_by_name
-    | Some Module -> to_lookup Env.find_module_by_name
-    | Some Module_type -> to_lookup Env.find_modtype_by_name
+    | Some Module -> to_lookup Env.find_module_by_name_lazy
+    | Some Module_type -> to_lookup Env.find_modtype_by_name_lazy
     | Some Class -> to_lookup Env.find_class_by_name
     | Some Class_type -> to_lookup Env.find_cltype_by_name
     | None
@@ -184,8 +184,9 @@ module Namespace = struct
     try Some (
         match namespace with
         | Some Type -> (in_printing_env @@ Env.find_type path).type_loc
-        | Some Module -> (in_printing_env @@ Env.find_module path).md_loc
-        | Some Module_type -> (in_printing_env @@ Env.find_modtype path).mtd_loc
+        | Some Module -> (in_printing_env @@ Env.find_module_lazy path).md_loc
+        | Some Module_type ->
+          (in_printing_env @@ Env.find_modtype_lazy path).mtd_loc
         | Some Class -> (in_printing_env @@ Env.find_class path).cty_loc
         | Some Class_type -> (in_printing_env @@ Env.find_cltype path).clty_loc
         | Some (Extension_constructor|Value|Constructor|Label|Unboxed_label)
@@ -518,7 +519,7 @@ let rec rewrite_double_underscore_paths env p =
     match expand_longident_head name with
     | None -> p
     | Some better_lid ->
-      match Env.find_module_by_name better_lid env with
+      match Env.find_module_by_name_lazy better_lid env with
       | exception Not_found -> p
       | p', _ ->
           if module_path_is_an_alias_of env p' ~alias_of:p then
@@ -543,7 +544,10 @@ let rec rewrite_double_underscore_longidents env (l : Longident.t) =
     match expand_longident_head name with
     | None -> l
     | Some l' ->
-      match Env.find_module_by_name l env, Env.find_module_by_name l' env with
+      match
+        (Env.find_module_by_name_lazy l env,
+         Env.find_module_by_name_lazy l' env)
+      with
       | exception Not_found -> l
       | (p, _), (p', _) ->
           if module_path_is_an_alias_of env p' ~alias_of:p then

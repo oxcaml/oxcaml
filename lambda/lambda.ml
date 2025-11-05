@@ -1452,7 +1452,7 @@ let transl_prim mod_name name =
   let pers = Ident.create_persistent mod_name in
   let env = Env.add_persistent_structure pers Env.empty in
   let lid = Longident.Ldot (Longident.Lident mod_name, name) in
-  match Env.find_value_by_name lid env with
+  match Env.find_value_by_name_lazy lid env with
   | path, _ -> transl_value_path Loc_unknown env path
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")

@@ -5953,7 +5953,7 @@ and type_expect_
         match desc.val_kind with
         | Val_ivar (_, cl_num) ->
             let (self_path, _) =
-              Env.find_value_by_name
+              Env.find_value_by_name_lazy
                 (Longident.Lident ("self-" ^ cl_num)) env
             in
             Texp_instvar(self_path, path,
@@ -5973,7 +5973,9 @@ and type_expect_
           end
         | Val_self (_, _, _, cl_num) ->
             let (path, _) =
-              Env.find_value_by_name (Longident.Lident ("self-" ^ cl_num)) env
+              Env.find_value_by_name_lazy
+                (Longident.Lident ("self-" ^ cl_num))
+                env
             in
             Texp_ident(path, lid, desc, kind,
               unique_use ~loc ~env actual_mode.mode
@@ -6837,7 +6839,9 @@ and type_expect_
               type_expect env mode_legacy snewval (mk_expected (instance ty))
             in
             let (path_self, _) =
-              Env.find_value_by_name (Longident.Lident ("self-" ^ cl_num)) env
+              Env.find_value_by_name_lazy
+                (Longident.Lident ("self-" ^ cl_num))
+                env
             in
             Texp_setinstvar(path_self, path, lab, newval)
         | Instance_variable (_,Immutable,_,_) ->
@@ -6870,7 +6874,7 @@ and type_expect_
       begin match
         try
           Env.find_value_by_name (Longident.Lident "selfpat-*") env,
-          Env.find_value_by_name (Longident.Lident "self-*") env
+          Env.find_value_by_name_lazy (Longident.Lident "self-*") env
         with Not_found ->
           raise(Error(loc, env, Outside_class))
       with
@@ -7865,7 +7869,7 @@ and type_binding_op_ident env s =
         fatal_error "Illegal name for instance variable"
     | Val_self (_, _, _, cl_num) ->
         let path, _ =
-          Env.find_value_by_name (Longident.Lident ("self-" ^ cl_num)) env
+          Env.find_value_by_name_lazy (Longident.Lident ("self-" ^ cl_num)) env
         in
         path
     | _ -> path
@@ -10734,7 +10738,7 @@ and type_send env loc explanation e met =
         in
         let typ = Btype.method_type met sign in
         let (self_path, _) =
-          Env.find_value_by_name
+          Env.find_value_by_name_lazy
             (Longident.Lident ("self-" ^ cl_num)) env
         in
         Tmeth_ancestor(id, self_path), typ

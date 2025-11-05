@@ -3755,25 +3755,33 @@ and lookup_apply ~errors ~use ~loc lid0 env =
   in
   check_apply ~path:f0_path ~comp:f0_comp args0
 
-and lookup_module ~errors ~use ~loc lid env =
+and lookup_module_lazy ~errors ~use ~loc lid env =
   match lid with
   | Lident s ->
       let path, mode_with_locks, data =
         lookup_ident_module Load ~errors ~use ~loc s env
       in
-      let md = Subst.Lazy.force_module_decl data.mda_declaration in
-      path, md, mode_with_locks
+      path, data.mda_declaration, mode_with_locks
   | Ldot(l, s) ->
       let path, locks, data = lookup_dot_module ~errors ~use ~loc l s env in
       let md, mode = normalize_mda_mode data in
-      let md = Subst.Lazy.force_module_decl md in
       path, md, (mode, locks)
   | Lapply _ as lid ->
       let path_f, comp_f, path_arg = lookup_apply ~errors ~use ~loc lid env in
-      let md = md (modtype_of_functor_appl comp_f path_f path_arg) in
+      let md =
+        md (modtype_of_functor_appl comp_f path_f path_arg)
+        |> Subst.Lazy.of_module_decl
+      in
       (* [Lapply] is for [F(M).t] so nothing is closed over. *)
       Papply(path_f, path_arg), md,
       (Mode.alloc_as_value fcomp_res_mode, locks_empty)
+
+and lookup_module ~errors ~use ~loc lid env =
+  let path, md, mode_with_locks =
+    lookup_module_lazy ~errors ~use ~loc lid env
+  in
+  let md = Subst.Lazy.force_module_decl md in
+  path, md, mode_with_locks
 
 and lookup_dot_module ~errors ~use ~loc l s env =
   let p, (_, locks), comps =
@@ -4082,19 +4090,20 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
   path, locks
 
 let lookup_value_lazy ~errors ~use ~loc lid env =
-  match lid with
-  | Lident s -> lookup_ident_value ~errors ~use ~loc s env
-  | Ldot(l, s) -> lookup_dot_value ~errors ~use ~loc l s env
-  | Lapply _ -> assert false
-
-let lookup_value ~errors ~use ~loc lid env =
   check_value_name (Longident.last lid) loc;
   let path, locks, vda =
-    lookup_value_lazy ~errors ~use ~loc lid env
+    match lid with
+    | Lident s -> lookup_ident_value ~errors ~use ~loc s env
+    | Ldot(l, s) -> lookup_dot_value ~errors ~use ~loc l s env
+    | Lapply _ -> assert false
   in
   let vd, mode = normalize_vda_mode vda in
-  let vd = Subst.Lazy.force_value_description vd in
   path, vd, (mode, locks)
+
+let lookup_value ~errors ~use ~loc lid env =
+  let path, vd, mode_with_locks = lookup_value_lazy ~errors ~use ~loc lid env in
+  let vd = Subst.Lazy.force_value_description vd in
+  path, vd, mode_with_locks
 
 let lookup_type_full ~errors ~use ~loc lid env =
   match lid with
@@ -4233,23 +4242,31 @@ let lookup_all_constructors_from_type ~use ~loc usage ty_path env =
    warn if it has alerts, and raise [Not_found] rather
    than report errors *)
 
-let find_module_by_name lid env =
+let find_module_by_name_lazy lid env =
   let loc = Location.(in_file !input_name) in
-  let path, desc, _ = lookup_module ~errors:false ~use:false ~loc lid env in
+  let path, desc, _ =
+    lookup_module_lazy ~errors:false ~use:false ~loc lid env
+  in
+  path, desc
+
+let find_value_by_name_lazy lid env =
+  let loc = Location.(in_file !input_name) in
+  let path, desc, _ = lookup_value_lazy ~errors:false ~use:false ~loc lid env in
   path, desc
 
 let find_value_by_name lid env =
-  let loc = Location.(in_file !input_name) in
-  let path, desc, _ = lookup_value ~errors:false ~use:false ~loc lid env in
+  let path, desc = find_value_by_name_lazy lid env in
+  let desc = Subst.Lazy.force_value_description desc in
   path, desc
 
 let find_type_by_name lid env =
   let loc = Location.(in_file !input_name) in
   lookup_type ~errors:false ~use:false ~loc lid env
 
-let find_modtype_by_name lid env =
+let find_modtype_by_name_lazy lid env =
   let loc = Location.(in_file !input_name) in
-  lookup_modtype ~errors:false ~use:false ~loc lid env
+  let path, _, mt = lookup_modtype_lazy ~errors:false ~use:false ~loc lid env in
+  path, mt
 
 let find_class_by_name lid env =
   let loc = Location.(in_file !input_name) in
@@ -4799,7 +4816,7 @@ let report_lookup_error ~level _loc env ppf = function
   | Unbound_module lid -> begin
       fprintf ppf "Unbound module %a"
         (Style.as_inline_code !print_longident) lid;
-       match find_modtype_by_name lid env with
+       match find_modtype_by_name_lazy lid env with
       | exception Not_found -> spellcheck ppf extract_modules env lid;
       | _ ->
          fprintf ppf
@@ -4864,7 +4881,7 @@ let report_lookup_error ~level _loc env ppf = function
   | Unbound_modtype lid -> begin
       fprintf ppf "Unbound module type %a"
         (Style.as_inline_code !print_longident) lid;
-      match find_module_by_name lid env with
+      match find_module_by_name_lazy lid env with
       | exception Not_found -> spellcheck ppf extract_modtypes env lid;
       | _ ->
          fprintf ppf
