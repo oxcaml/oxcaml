@@ -90,19 +90,19 @@ module Reader = struct
 
   exception Parse_error of string
 
-  let split_and_unescape line =
+  let split_and_unescape ~buffer line =
     let len = String.length line in
     let rec loop i current_token tokens =
       if i >= len
       then (
         let token = Buffer.contents current_token in
         let tokens = if token = "" then tokens else token :: tokens in
+        Buffer.clear current_token;
         List.rev tokens)
       else (
-        let c = line.[i] in
-        match c with
+        match String.unsafe_get line i with
         | '\\' when i + 1 < len ->
-          (match line.[i + 1] with
+          (match String.unsafe_get line (i + 1) with
            | '\\' ->
              Buffer.add_char current_token '\\';
              loop (i + 2) current_token tokens
@@ -116,21 +116,21 @@ module Reader = struct
              Buffer.add_char current_token '\r';
              loop (i + 2) current_token tokens
            | c -> raise (Parse_error (Printf.sprintf "Invalid escape sequence: \\%c" c)))
-        | '\\' -> raise (Parse_error "Trailing backslash in field")
+        | '\\' -> raise (Parse_error "Trailing backslash")
         | ' ' ->
           let token = Buffer.contents current_token in
           let tokens = if token = "" then tokens else token :: tokens in
           Buffer.clear current_token;
           loop (i + 1) current_token tokens
-        | _ ->
+        | c ->
           Buffer.add_char current_token c;
           loop (i + 1) current_token tokens)
     in
-    loop 0 (Buffer.create len) []
+    loop 0 buffer []
   ;;
 
-  let parse_line line =
-    match split_and_unescape line with
+  let parse_line ~buffer line =
+    match split_and_unescape ~buffer line with
     | [ "file"; filename; location ] ->
       let location = Path.of_string location in
       `File (filename, location)
@@ -141,11 +141,18 @@ module Reader = struct
   ;;
 
   let rec iter_manifest t ~f ~manifest_path =
+    let buffer = Buffer.create 16 in
     visit t manifest_path ~f:(fun manifest_path ->
       iter_lines manifest_path ~f:(fun line ->
-        match parse_line line with
+        match parse_line ~buffer line with
         | `File (filename, location) ->
           visit t location ~f:(fun location -> f ~filename ~location)
         | `Manifest manifest_path -> iter_manifest t ~f ~manifest_path))
   ;;
+end
+
+module For_testing = struct
+  exception Parse_error = Reader.Parse_error
+
+  let split_and_unescape = Reader.split_and_unescape
 end

@@ -1,0 +1,15 @@
+'a b c' -> ["a"; "b"; "c"]
+'a\ b c' -> ["a b"; "c"]
+'a\\b c' -> ["a\\b"; "c"]
+'foo   bar   hello' -> ["foo"; "bar"; "hello"]
+'a\nb' -> ["a\nb"]
+'a\rb' -> ["a\rb"]
+'a\\b c\ d e\nf g\rh' -> ["a\\b"; "c d"; "e\nf"; "g\rh"]
+'a  b   c' -> ["a"; "b"; "c"]
+' a b' -> ["a"; "b"]
+'a b ' -> ["a"; "b"]
+'' -> []
+'   ' -> []
+'   \n' -> ["\n"]
+'a\xb' -> Parse_error("Invalid escape sequence: \\x")
+'a b\' -> Parse_error("Trailing backslash")

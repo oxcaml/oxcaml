@@ -32,3 +32,9 @@ module Reader : sig
     -> manifest_path:Path.load_root_relative Path.t
     -> unit
 end
+
+module For_testing : sig
+  exception Parse_error of string
+
+  val split_and_unescape : buffer:Buffer.t -> string -> string list
+end
