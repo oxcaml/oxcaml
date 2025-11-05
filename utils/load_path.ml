@@ -143,18 +143,15 @@ end = struct
         let ubase = Misc.normalized_unit_filename base in
         update ubase fn visible_files_uncap hidden_files_uncap)
       (Dir.files dir)
-  ;;
 
   let find fn visible_files hidden_files =
     try (STbl.find !visible_files fn, Visible) with
     | Not_found -> (STbl.find !hidden_files fn, Hidden)
-  ;;
 
   let find ~uncap fn =
     if uncap
     then find (String.uncapitalize_ascii fn) visible_files_uncap hidden_files_uncap
     else find fn visible_files hidden_files
-  ;;
 end
 
 type auto_include_callback = (Dir.t -> string -> string option) -> string -> string
@@ -162,6 +159,7 @@ type auto_include_callback = (Dir.t -> string -> string option) -> string -> str
 let visible_dirs = s_ref []
 let visible_basenames = s_ref []
 let hidden_dirs = s_ref []
+let hidden_basenames = s_ref []
 let no_auto_include _ _ = raise Not_found
 let auto_include_callback = ref no_auto_include
 
@@ -169,6 +167,7 @@ let reset () =
   assert (not Config.merlin || Local_store.is_bound ());
   Path_cache.reset ();
   hidden_dirs := [];
+  hidden_basenames := [];
   visible_dirs := [];
   visible_basenames := [];
   auto_include_callback := no_auto_include
@@ -200,33 +199,21 @@ let get_hidden_path_list () = List.rev_map Dir.path !hidden_dirs
 
 let init_manifests () =
   let manifest_reader = Manifests.Reader.create () in
-  List.iter
-    (fun manifest_path ->
-      let manifest_path = Manifests.Reader.Path.of_string manifest_path in
-      Manifests.Reader.iter_manifest
-        manifest_reader
-        ~manifest_path
-        ~f:(fun ~filename ~location ->
+  let load_manifest ~hidden ~basenames manifest_path =
+    let manifest_path = Manifests.Reader.Path.of_string manifest_path in
+    Manifests.Reader.iter_manifest
+      manifest_reader
+      ~manifest_path
+      ~f:(fun ~filename ~location ->
           let basename = Filename.basename filename in
-          visible_basenames := basename :: !visible_basenames;
+          basenames := basename :: !basenames;
           Path_cache.prepend_add_single
-            ~hidden:false
+            ~hidden
             basename
-            (Manifests.Reader.Path.to_string location)))
-    !Clflags.include_manifests;
-  List.iter
-    (fun manifest_path ->
-      let manifest_path = Manifests.Reader.Path.of_string manifest_path in
-      Manifests.Reader.iter_manifest
-        manifest_reader
-        ~manifest_path
-        ~f:(fun ~filename ~location ->
-          let basename = Filename.basename filename in
-          Path_cache.prepend_add_single
-            ~hidden:true
-            basename
-            (Manifests.Reader.Path.to_string location)))
-    !Clflags.hidden_include_manifests
+            (Manifests.Reader.Path.to_string location))
+  in
+  List.iter (load_manifest ~hidden:false ~basenames:visible_basenames) !Clflags.include_manifests;
+  List.iter (load_manifest ~hidden:true ~basenames:hidden_basenames) !Clflags.hidden_include_manifests
 
 let init ~auto_include ~visible ~hidden =
   reset ();
