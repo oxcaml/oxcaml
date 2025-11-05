@@ -91,6 +91,9 @@ uintnat caml_gc_pacing_policy = GC_PACING_2025;
    (0 = disabled, 50 = theoretically optimal space/time tradeoff) */
 uintnat caml_gc_overhead_adjustment = 0;
 
+/* Experimental switch to allow automatic major GCs to be turned off completely. */
+uintnat caml_major_gc_disable = 0;
+
 /* This variable is only written with the world stopped, so it need not be
    atomic */
 uintnat caml_major_cycles_completed = 0;
@@ -874,7 +877,8 @@ static void update_major_slice_work(intnat howmuch,
                   "%"ARCH_INTNAT_PRINTF_FORMAT "u words. Work: "
                   "%"ARCH_INTNAT_PRINTF_FORMAT "d work, "
                   "%"ARCH_INTNAT_PRINTF_FORMAT "d new_work, "
-                  "%"ARCH_INTNAT_PRINTF_FORMAT "d slice_budget\n",
+                  "%"ARCH_INTNAT_PRINTF_FORMAT "d slice_budget, "
+                  "%"ARCH_INTNAT_PRINTF_FORMAT "d%% space_overhead\n",
                   caml_gc_phase_char(may_access_gc_phase),
                   caml_gc_pacing_policy,
                   my_alloc_count,
@@ -885,7 +889,8 @@ static void update_major_slice_work(intnat howmuch,
                   diffmod(atomic_load(&total_work_incurred),
                           atomic_load(&total_work_completed)),
                   new_work,
-                  dom_st->slice_budget);
+                  dom_st->slice_budget,
+                  caml_percent_free);
 
   if (log_events) {
     CAML_EV_COUNTER(EV_C_MAJOR_SLICE_ALLOC_WORDS,
@@ -1954,6 +1959,13 @@ static void major_collection_slice(intnat howmuch,
   uintnat saved_ephe_cycle;
   uintnat saved_major_cycle = caml_major_cycles_completed;
   intnat budget;
+
+  /* Don't do a slice if major GC is turned off, unless the slice size
+   * is 1,000,000, which is used during full_major etc. */
+
+  if ((howmuch < 1000000) && caml_major_gc_disable) {
+    return;
+  }
 
   /* Opportunistic slices may run concurrently with gc phase updates. */
   int may_access_gc_phase = (mode != Slice_opportunistic);
