@@ -707,7 +707,8 @@ let report_type_mismatch first second decl env ppf err =
          "has a constructor represented as a null pointer";
       pr "@ Hint: add [%@%@or_null_reexport]."
   | Jkind v ->
-      Jkind.Violation.report_with_name ~name:first ~level:(Ctype.get_current_level ()) ppf v
+      Jkind.Violation.report_with_name ~name:first
+        ~level:(Ctype.get_current_level ()) ppf v
   | Unsafe_mode_crossing mismatch ->
     pr "They have different unsafe mode crossing behavior:@,@[<v 2>%a@]"
       (fun ppf (first, second, mismatch) ->

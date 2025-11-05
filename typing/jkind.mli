@@ -787,7 +787,7 @@ val equal : Types.jkind_lr -> Types.jkind_lr -> bool
     sort variables. Works over any mix of l- and r-jkinds, because the only
     way not to have an intersection is by looking at the layout: all axes
     have a bottom element. *)
-val has_intersection : 'd1 Types.jkind -> 'd2 Types.jkind -> bool
+val has_intersection : level:int -> 'd1 Types.jkind -> 'd2 Types.jkind -> bool
 
 (** Finds the intersection of two jkinds, constraining sort variables to
     create one if needed, or returns a [Violation.t] if an intersection does

@@ -320,10 +320,10 @@ module Layout = struct
     Sub_result.of_le_result (sub t1 t2) ~failure_reason:(fun () ->
         [Layout_disagreement])
 
-  let rec intersection t1 t2 =
+  let rec intersection ~level t1 t2 =
     (* pre-condition to [products]: [ts1] and [ts2] have the same length *)
     let products ts1 ts2 =
-      let components = List.map2 intersection ts1 ts2 in
+      let components = List.map2 (intersection ~level) ts1 ts2 in
       Option.map
         (fun x -> Product x)
         (Misc.Stdlib.List.some_if_all_elements_are_some components)
@@ -335,10 +335,7 @@ module Layout = struct
     | Product ts1, Product ts2 ->
       if List.compare_lengths ts1 ts2 = 0 then products ts1 ts2 else None
     | Product ts, Sort sort | Sort sort, Product ts -> (
-      match
-        Sort.decompose_into_product ~level:Btype.generic_level sort
-          (List.length ts)
-      with
+      match Sort.decompose_into_product ~level sort (List.length ts) with
       | None -> None
       | Some sorts -> products ts (List.map (fun x -> Sort x) sorts))
 
@@ -2281,10 +2278,10 @@ module Jkind_desc = struct
     let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
     Sub_result.combine layout bounds
 
-  let intersection
+  let intersection ~level
       { layout = lay1; mod_bounds = mod_bounds1; with_bounds = with_bounds1 }
       { layout = lay2; mod_bounds = mod_bounds2; with_bounds = with_bounds2 } =
-    match Layout.intersection lay1 lay2 with
+    match Layout.intersection ~level lay1 lay2 with
     | None -> None
     | Some layout ->
       Some
@@ -3766,12 +3763,12 @@ let combine_histories ~type_equal ~context ~level reason (Pack_jkind k1)
         history2 = k2.history
       }
 
-let has_intersection t1 t2 =
+let has_intersection ~level t1 t2 =
   (* Need to check only the layouts: all the axes have bottom elements. *)
-  Option.is_some (Layout.intersection t1.jkind.layout t2.jkind.layout)
+  Option.is_some (Layout.intersection ~level t1.jkind.layout t2.jkind.layout)
 
 let intersection_or_error ~type_equal ~context ~reason ~level t1 t2 =
-  match Jkind_desc.intersection t1.jkind t2.jkind with
+  match Jkind_desc.intersection ~level t1.jkind t2.jkind with
   | None -> Error (Violation.of_ ~context (No_intersection (t1, t2)))
   | Some jkind ->
     Ok
@@ -3819,7 +3816,9 @@ let sub_or_intersect ~type_equal ~context ~level t1 t2 =
   match sub_with_reason ~type_equal ~context ~level t1 t2 with
   | Ok () -> Sub
   | Error reason ->
-    if has_intersection t1 t2 then Has_intersection reason else Disjoint reason
+    if has_intersection ~level t1 t2
+    then Has_intersection reason
+    else Disjoint reason
 
 let sub_or_error ~type_equal ~context ~level t1 t2 =
   match sub_or_intersect ~type_equal ~context ~level t1 t2 with

@@ -3421,8 +3421,8 @@ let equivalent_with_nolabels l1 l2 =
 (* the [tk] means we're comparing a type against a jkind; axes do
    not matter, so a jkind extracted from a type_declaration does
    not need to be substed *)
-let has_jkind_intersection_tk env ty jkind =
-  Jkind.has_intersection (type_jkind env ty) jkind
+let has_jkind_intersection_tk ~level env ty jkind =
+  Jkind.has_intersection ~level (type_jkind env ty) jkind
 
 (* [mcomp] tests if two types are "compatible" -- i.e., if they could ever
    unify.  (This is distinct from [eqtype], which checks if two types *are*
@@ -3439,7 +3439,8 @@ let has_jkind_intersection_tk env ty jkind =
 
 let rec mcomp type_pairs env t1 t2 =
   let check_jkinds ty jkind =
-    if not (has_jkind_intersection_tk env ty (Jkind.disallow_right jkind))
+    if not (has_jkind_intersection_tk ~level:!current_level env ty
+              (Jkind.disallow_right jkind))
     then raise Incompatible
   in
   if eq_type t1 t2 then () else
@@ -3474,8 +3475,9 @@ let rec mcomp type_pairs env t1 t2 =
             begin try
               let decl = Env.find_type p env in
               if non_aliasable p decl || is_datatype decl ||
-                 not (has_jkind_intersection_tk env other decl.type_jkind) then
-                raise Incompatible
+                 not (has_jkind_intersection_tk ~level:!current_level env other
+                        decl.type_jkind)
+              then raise Incompatible
             with Not_found -> ()
             end
         (*
@@ -3604,7 +3606,8 @@ and mcomp_type_decl type_pairs env p1 p2 tl1 tl2 =
     let decl = Env.find_type p1 env in
     let decl' = Env.find_type p2 env in
     let check_jkinds () =
-      if not (Jkind.has_intersection decl.type_jkind decl'.type_jkind)
+      if not (Jkind.has_intersection ~level:!current_level decl.type_jkind
+                decl'.type_jkind)
       then raise Incompatible
     in
     if compatible_paths p1 p2 then begin
