@@ -373,7 +373,7 @@ CAMLno_tsan_for_perf
 static intnat pool_sweep(struct caml_heap_state* local,
                          pool**,
                          sizeclass_t sz ,
-                         int release_to_global_pool);
+                         bool release_to_global_pool);
 
 /* Adopt pool from the pool_freelist avail and full pools
    to satisfy an allocation */
@@ -433,7 +433,7 @@ static pool* pool_global_adopt(struct caml_heap_state* local, sizeclass_t sz)
 
   if( !r && adopted_pool ) {
     Caml_state->sweep_work_done_between_slices +=
-      pool_sweep(local, &local->full_pools[sz], sz, 0);
+      pool_sweep(local, &local->full_pools[sz], sz, false);
     r = local->avail_pools[sz];
   }
   CAMLassert(r == NULL || r->owner == local->owner);
@@ -458,7 +458,7 @@ static pool* pool_find(struct caml_heap_state* local, sizeclass_t sz) {
   /* Otherwise, try to sweep until we find one */
   while (!local->avail_pools[sz] && local->unswept_avail_pools[sz]) {
     Caml_state->sweep_work_done_between_slices +=
-      pool_sweep(local, &local->unswept_avail_pools[sz], sz, 0);
+      pool_sweep(local, &local->unswept_avail_pools[sz], sz, false);
   }
 
   r = local->avail_pools[sz];
@@ -595,11 +595,14 @@ void clear_garbage(header_t *p,
 }
 
 static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
-                         sizeclass_t sz, int release_to_global_pool) {
-  uintnat work = 0;
+                         sizeclass_t sz, bool release_to_global_pool)
+{
   pool* a = *plist;
   if (!a) return 0;
+  uintnat work = 0;
+  uintnat swept = 0;
   *plist = a->next;
+  status garbage = caml_global_heap_state.GARBAGE; /* doesn't change */
 
   {
     header_t* p = POOL_FIRST_BLOCK(a, sz);
@@ -613,7 +616,7 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
       if (hd == 0) {
         /* already on freelist */
         all_used = 0;
-      } else if (Has_status_hd(hd, caml_global_heap_state.GARBAGE)) {
+      } else if (Has_status_hd(hd, garbage)) {
         clear_garbage(p, hd, wh, local);
         /* add to freelist */
         atomic_store_relaxed((atomic_uintnat*)p, 0);
@@ -621,11 +624,11 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
         CAMLassert(Is_block((value)p));
         a->next_obj = (value*)p;
         all_used = 0;
-        local->owner->swept_words += Whsize_hd(hd);
+        swept += Whsize_hd(hd);
         work += wh;
       } else {
         /* still live, the pool can't be released to the global freelist */
-        release_to_global_pool = 0;
+        release_to_global_pool = false;
         work += wh;
       }
       p += wh;
@@ -642,6 +645,7 @@ static intnat pool_sweep(struct caml_heap_state* local, pool** plist,
   }
 
   /* Return the amount of GC budget consumed in units of words */
+  local->owner->swept_words += swept;
   return work;
 }
 
@@ -685,10 +689,10 @@ intnat caml_sweep(struct caml_heap_state* local, intnat work) {
   /* Sweep local pools */
   while (work > 0 && local->next_to_sweep < NUM_SIZECLASSES) {
     sizeclass_t sz = local->next_to_sweep;
-    work -= pool_sweep(local, &local->unswept_avail_pools[sz], sz, 1);
+    work -= pool_sweep(local, &local->unswept_avail_pools[sz], sz, true);
 
     if (work > 0) {
-      work -= pool_sweep(local, &local->unswept_full_pools[sz], sz, 1);
+      work -= pool_sweep(local, &local->unswept_full_pools[sz], sz, true);
     }
 
     if (local->unswept_avail_pools[sz] == NULL &&
