@@ -191,4 +191,4 @@ type asm_line =
   | Ins of instruction
   | Directive of Asm_targets.Asm_directives.Directive.t
 
-type asm_program = asm_line list
+type asm_program = asm_line Oxcaml_utils.Doubly_linked_list.t

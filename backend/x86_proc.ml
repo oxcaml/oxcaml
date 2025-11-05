@@ -426,14 +426,13 @@ let reset_asm_code () =
 
 let generate_code asm =
   (match asm with
-  | Some f ->
-    Profile.record ~accumulate:true "write_asm" f (DLL.to_list asm_code)
+  | Some f -> Profile.record ~accumulate:true "write_asm" f asm_code
   | None -> ());
   match !internal_assembler with
   | Some f ->
     let get sections =
       Section_name.Tbl.fold
-        (fun name instrs acc -> (name, DLL.to_list instrs) :: acc)
+        (fun name instrs acc -> (name, instrs) :: acc)
         sections []
     in
     let instrs = get asm_code_by_section in

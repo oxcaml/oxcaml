@@ -369,6 +369,20 @@ let for_alli t ~f =
 
 let to_list t = fold_right t ~f:(fun hd tl -> hd :: tl) ~init:[]
 
+let to_array t =
+  let len = length t in
+  if len = 0
+  then [||]
+  else
+    let first_val =
+      match t.first with
+      | Empty -> assert false
+      | Node node -> node.value
+    in
+    let arr = Array.make len first_val in
+    iteri t ~f:(fun i v -> arr.(i) <- v);
+    arr
+
 let transfer ~to_ ~from () =
   match to_.last, from.first with
   | _, Empty ->
