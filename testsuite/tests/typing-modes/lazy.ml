@@ -56,7 +56,7 @@ let foo (x @ local) =
     match x with
     | lazy y -> y
 [%%expect{|
-val foo : local_ 'a lazy_t -> 'a = <fun>
+val foo : 'a lazy_t @ local -> 'a = <fun>
 |}]
 
 (* one can construct [portable] lazy only if the result is [portable] *)

@@ -160,7 +160,7 @@ let foo (local_ x : string ref) =
       object method m = y end
   end in new M.c
 [%%expect{|
-val foo : local_ string ref -> (unit -> < m : string >) = <fun>
+val foo : string ref @ local -> (unit -> < m : string >) = <fun>
 |}]
 
 let () =

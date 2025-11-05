@@ -103,21 +103,21 @@ class type cla = object method m : string end
 let foo (obj @ local) =
     obj#m
 [%%expect{|
-val foo : local_ < m : 'a; .. > -> 'a = <fun>
+val foo : < m : 'a; .. > @ local -> 'a = <fun>
 |}]
 
 (* crosses at function application *)
 let foo (obj @ local) =
     ref (obj : cla)
 [%%expect{|
-val foo : local_ cla -> cla ref = <fun>
+val foo : cla @ local -> cla ref = <fun>
 |}]
 
 (* crosses at binding site. This allows the closure to be global. *)
 let foo (obj : cla @ local) =
     ref (fun () -> let _ = obj in ())
 [%%expect{|
-val foo : local_ cla -> (unit -> unit) ref = <fun>
+val foo : cla @ local -> (unit -> unit) ref = <fun>
 |}]
 
 (* Objects don't cross monadic axes. Objects are defined at [uncontended]

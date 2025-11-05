@@ -1192,11 +1192,11 @@ type ('a : value mod global) t : value mod global = Foo of 'a @@ global [@@unbox
 type ('a : immediate) t : immediate = Foo of 'a @@ global [@@unboxed]
 type ('a : value mod global) t : value mod global = Foo of 'a @@ local [@@unboxed]
 [%%expect {|
-type ('a : value mod global) t = { global_ x : 'a; } [@@unboxed]
-type ('a : immediate) t = { global_ x : 'a; } [@@unboxed]
+type ('a : value mod global) t = { x : 'a @@ global; } [@@unboxed]
+type ('a : immediate) t = { x : 'a @@ global; } [@@unboxed]
 type ('a : value mod global) t = { x : 'a; } [@@unboxed]
-type ('a : value mod global) t = Foo of global_ 'a [@@unboxed]
-type ('a : immediate) t = Foo of global_ 'a [@@unboxed]
+type ('a : value mod global) t = Foo of 'a @@ global [@@unboxed]
+type ('a : immediate) t = Foo of 'a @@ global [@@unboxed]
 type ('a : value mod global) t = Foo of 'a [@@unboxed]
 |}]
 

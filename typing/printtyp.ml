@@ -1410,42 +1410,17 @@ let outcome_label : Types.arg_label -> Outcometree.arg_label = function
   | Optional l -> Optional l
   | Position l -> Position l
 
-let rec all_or_none f = function
-  | [] -> Some []
-  | x :: xs ->
-    Option.bind (f x) (fun y ->
-      Option.bind (all_or_none f xs) (fun ys ->
-        Some (y :: ys)
-        )
-      )
-
-let tree_of_modality_new (t: Parsetree.modality loc) =
-  let Modality s = t.txt in Ogf_new s
-
-let tree_of_modality_old (t: Parsetree.modality loc) =
-  match t.txt with
-  | Modality "global" -> Some (Ogf_legacy Ogf_global)
-  | _ -> None
+let tree_of_modality (t: Parsetree.modality loc) =
+  let Modality s = t.txt in s
 
 let tree_of_modalities mut t =
   let t = Typemode.untransl_modalities mut t in
-  match all_or_none tree_of_modality_old t with
-  | Some l -> l
-  | None -> List.map tree_of_modality_new t
-
-let tree_of_modalities_new mut t =
-  let l = Typemode.untransl_modalities mut t in
-  List.map (fun ({txt = Parsetree.Modality s; _}) -> s) l
+  List.map tree_of_modality t
 
 (** [tree_of_mode m l] finds the outcome node in [l] that corresponds to [m].
 Raise if not found. *)
-let tree_of_mode_old (t : Parsetree.mode loc) =
-  match t.txt with
-  | Mode "local" -> Some (Omd_legacy Omd_local)
-  | _ -> None
-
-let tree_of_mode_new (t: Parsetree.mode loc) =
-  let Mode s = t.txt in Omd_new s
+let tree_of_mode (t: Parsetree.mode loc) =
+  let Mode s = t.txt in s
 
 let tree_of_modes (modes : Mode.Alloc.Const.t) =
   let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
@@ -1481,9 +1456,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
   let diff = {diff with forkable; yielding; contention; portability} in
   (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
   let l = Typemode.untransl_mode_annots diff in
-  match all_or_none tree_of_mode_old l with
-  | Some l -> l
-  | None -> List.map tree_of_mode_new l
+  List.map tree_of_mode l
 
 (** The modal context on a type when printing it. This is to reproduce the mode
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)
@@ -1788,7 +1761,7 @@ let modality ?(id = fun _ppf -> ()) ax ppf modality =
   else
     Atom (ax, modality)
     |> Typemode.untransl_modality
-    |> tree_of_modality_new
+    |> tree_of_modality
     |> !Oprint.out_modality ppf
 
 let prepared_type_expr ppf ty = typexp Type ppf ty
@@ -1831,7 +1804,7 @@ let () =
   Jkind.set_outcometree_of_type (fun ty ->
     prepare_for_printing [ty];
     tree_of_typexp Type ty);
-  Jkind.set_outcometree_of_modalities_new tree_of_modalities_new;
+  Jkind.set_outcometree_of_modalities tree_of_modalities;
   Jkind.set_print_type_expr type_expr;
   Jkind.set_raw_type_expr raw_type_expr
 
@@ -2330,7 +2303,7 @@ let tree_of_value_description id decl =
   let vd =
     { oval_name = id;
       oval_type = Otyp_poly(qtvs, ty);
-      oval_modalities = tree_of_modalities_new Immutable moda;
+      oval_modalities = tree_of_modalities Immutable moda;
       oval_prims = [];
       oval_attributes = attrs
     }
@@ -2797,7 +2770,7 @@ and tree_of_module ?abbrev id md rs =
   let moda = Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities in
   let r =
     Osig_module (Ident.name id, tree_of_modtype ?abbrev md.md_type,
-    tree_of_modalities_new Immutable moda,
+    tree_of_modalities Immutable moda,
     tree_of_rec rs)
   in
   Btype.backtrack snap;

@@ -81,7 +81,7 @@ Error: This value is "local" to the parent region but is expected to be "global"
 let int_escape : local_ _ -> int * int = fun x -> x, x
 
 [%%expect{|
-val int_escape : local_ int -> int * int = <fun>
+val int_escape : int @ local -> int * int = <fun>
 |}]
 
 let string_list_escape : local_ _ -> string list * string list = fun x -> x, x
@@ -116,7 +116,7 @@ let hidden_int_escape : local_ _ -> Hidden_int.t * Hidden_int.t =
   fun x -> x, x
 
 [%%expect{|
-val hidden_int_escape : local_ Hidden_int.t -> Hidden_int.t * Hidden_int.t =
+val hidden_int_escape : Hidden_int.t @ local -> Hidden_int.t * Hidden_int.t =
   <fun>
 |}]
 
@@ -134,7 +134,7 @@ let float_u_escape : local_ _ -> (float#, float#) Float_u.pair =
   fun x -> Float_u.mk_pair x x [@nontail]
 
 [%%expect{|
-val float_u_escape : local_ float# -> (float#, float#) Float_u.pair = <fun>
+val float_u_escape : float# @ local -> (float#, float#) Float_u.pair = <fun>
 |}, Principal{|
 Line 2, characters 27-28:
 2 |   fun x -> Float_u.mk_pair x x [@nontail]
@@ -148,7 +148,7 @@ let hidden_float_u_escape :
 
 [%%expect{|
 val hidden_float_u_escape :
-  local_ Hidden_float_u.t ->
+  Hidden_float_u.t @ local ->
   (Hidden_float_u.t, Hidden_float_u.t) Float_u.pair = <fun>
 |}, Principal{|
 Line 3, characters 27-28:

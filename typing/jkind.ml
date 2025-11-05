@@ -1351,9 +1351,9 @@ let outcometree_of_type = ref (fun _ -> assert false)
 
 let set_outcometree_of_type p = outcometree_of_type := p
 
-let outcometree_of_modalities_new = ref (fun _ _ -> assert false)
+let outcometree_of_modalities = ref (fun _ _ -> assert false)
 
-let set_outcometree_of_modalities_new p = outcometree_of_modalities_new := p
+let set_outcometree_of_modalities p = outcometree_of_modalities := p
 
 module Const = struct
   type 'd t = (Layout.Const.t, 'd) Types.layout_and_axes
@@ -1885,7 +1885,7 @@ module Const = struct
       { base : string;
         modal_bounds : string list;
         printable_with_bounds :
-          (Outcometree.out_type * Outcometree.out_modality_new list) list
+          (Outcometree.out_type * Outcometree.out_modality list) list
       }
 
     let get_modal_bound (type a) ~(axis : a Axis.t) ~(base : a) (actual : a) =
@@ -1988,8 +1988,7 @@ module Const = struct
                 ~mod_bounds:actual.mod_bounds ~type_info
             in
             ( !outcometree_of_type type_expr,
-              !outcometree_of_modalities_new
-                Types.Immutable
+              !outcometree_of_modalities Types.Immutable
                 (modality_to_ignore_axes axes_ignored_by_modalities) ))
           (With_bounds.to_list actual.with_bounds)
       in

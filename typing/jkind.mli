@@ -729,8 +729,8 @@ val normalize :
 (** Call these before trying to print. *)
 val set_outcometree_of_type : (Types.type_expr -> Outcometree.out_type) -> unit
 
-val set_outcometree_of_modalities_new :
-  (Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode_new list) ->
+val set_outcometree_of_modalities :
+  (Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list) ->
   unit
 
 (** Provides the [Printtyp.path] formatter back up the dependency chain to
