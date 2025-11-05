@@ -119,7 +119,7 @@ let install_printer ppf lid =
   let v =
     try
       eval_value_path Env.empty path
-    with Symtable.Error(Symtable.Undefined_global global) ->`
+    with Symtable.Error(Symtable.Undefined_global global) ->
       let s = Symtable.Global.name global in
       raise(Error(Unavailable_module(s, lid))) in
   let print_function =
