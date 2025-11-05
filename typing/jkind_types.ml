@@ -510,6 +510,7 @@ module Sort = struct
     | Equal_mutated_second -> Equal_mutated_first
     | (Unequal | Equal_no_mutation | Equal_mutated_both) as r -> r
 
+  (* Pre-condition: [s] is a [Product] *)
   let[@inline] sorts_of_product s =
     (* In the equate functions, it's useful to pass around lists of sorts inside
        the product constructor they came from to avoid re-allocating it if we
@@ -556,6 +557,7 @@ module Sort = struct
         set v1 (Some (of_var v2));
         Equal_mutated_first
 
+  (* Pre-condition: [s2] is a [Product] *)
   and equate_var_product v1 s2 =
     match v1.contents with
     | Some s1 -> equate_sort_product s1 s2
@@ -563,6 +565,7 @@ module Sort = struct
       set v1 (Some s2);
       Equal_mutated_first
 
+  (* Pre-condition: [s2] is a [Product] *)
   and equate_sort_product s1 s2 =
     match s1 with
     | Base _ -> Unequal
@@ -617,9 +620,15 @@ module Sort = struct
       false
     | Product _ -> false
 
-  let decompose_into_product ~level t n =
-    let ts = List.init n (fun _ -> new_var ~level) in
-    if equate t (Product ts) then Some ts else None
+  let rec decompose_into_product t n =
+    match t with
+    | Base _ -> None
+    | Var { contents = Some t; _ } -> decompose_into_product t n
+    | Var ({ level; _ } as v) ->
+      let ts = List.init n (fun _ -> new_var ~level) in
+      set v (Some (Product ts));
+      Some ts
+    | Product ts -> if List.compare_length_with ts n = 0 then Some ts else None
 
   (*** pretty printing ***)
 

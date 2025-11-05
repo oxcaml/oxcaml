@@ -91,7 +91,7 @@ module Sort : sig
 
   (** Decompose a sort into a list (of the given length) of fresh sort variables,
       equating the input sort with the product of the output sorts. *)
-  val decompose_into_product : level:int -> t -> int -> t list option
+  val decompose_into_product : t -> int -> t list option
 end
 
 module Layout : sig

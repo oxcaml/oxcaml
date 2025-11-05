@@ -645,10 +645,9 @@ exception Error of error
 
 open Format
 
-val report_error: level:int -> formatter -> error -> unit
+val report_error: formatter -> error -> unit
 
-val report_lookup_error:
-    level:int -> Location.t -> t -> formatter -> lookup_error -> unit
+val report_lookup_error: Location.t -> t -> formatter -> lookup_error -> unit
 
 val in_signature: bool -> t -> t
 

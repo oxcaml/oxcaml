@@ -678,8 +678,7 @@ let report_type_mismatch first second decl env ppf err =
   | Parameter_jkind (ty, v) ->
       pr "The problem is in the kinds of a parameter:@,";
       Jkind.Violation.report_with_offender
-        ~offender:(fun pp -> Printtyp.type_expr pp ty)
-        ~level:(Ctype.get_current_level ()) ppf v
+        ~offender:(fun pp -> Printtyp.type_expr pp ty) ppf v
   | Private_variant (_ty1, _ty2, mismatch) ->
       report_private_variant_mismatch first second decl env ppf mismatch
   | Private_object (_ty1, _ty2, mismatch) ->
@@ -706,9 +705,7 @@ let report_type_mismatch first second decl env ppf err =
          (choose ord first second) decl
          "has a constructor represented as a null pointer";
       pr "@ Hint: add [%@%@or_null_reexport]."
-  | Jkind v ->
-      Jkind.Violation.report_with_name ~name:first
-        ~level:(Ctype.get_current_level ()) ppf v
+  | Jkind v -> Jkind.Violation.report_with_name ~name:first ppf v
   | Unsafe_mode_crossing mismatch ->
     pr "They have different unsafe mode crossing behavior:@,@[<v 2>%a@]"
       (fun ppf (first, second, mismatch) ->

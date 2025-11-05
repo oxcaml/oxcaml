@@ -1211,8 +1211,8 @@ let report_error ppf = function
       | Some err ->
         fprintf ppf "@ %a"
         (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ())) err
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty))
+        err
       end
   | Sort_without_extension (sort, maturity, ty) ->
       fprintf ppf "Non-value layout %a detected" Jkind.Sort.format sort;
@@ -1269,8 +1269,8 @@ let report_error ppf = function
   | Not_a_sort (ty, err) ->
       fprintf ppf "A representable layout is required here.@ %a"
         (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) ) err
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty))
+        err
   | Unsupported_product_in_lazy const ->
       fprintf ppf
         "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \
@@ -1308,8 +1308,8 @@ let report_error ppf = function
           Printtyp.type_expr array_type
           Printtyp.type_expr ty
           (Jkind.Violation.report_with_offender
-             ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-             ~level:(Ctype.get_current_level ())) err
+             ~offender:(fun ppf -> Printtyp.type_expr ppf ty))
+          err
       | None ->
         fprintf ppf
           "This array operation expects an array type, but %a does not appear@ \

@@ -103,7 +103,7 @@ module Layout : sig
 
   val of_const : Const.t -> Sort.t t
 
-  val sub : level:int -> Sort.t t -> Sort.t t -> Sub_result.t
+  val sub : Sort.t t -> Sort.t t -> Sub_result.t
 
   module Debug_printers : sig
     val t :
@@ -220,25 +220,16 @@ module Violation : sig
   (** Prints a violation and the thing that had an unexpected jkind
       ([offender], which you supply an arbitrary printer for). *)
   val report_with_offender :
-    offender:(Format.formatter -> unit) ->
-    level:int ->
-    Format.formatter ->
-    t ->
-    unit
+    offender:(Format.formatter -> unit) -> Format.formatter -> t -> unit
 
   (** Like [report_with_offender], but additionally prints that the issue is
       that a representable jkind was expected. *)
   val report_with_offender_sort :
-    offender:(Format.formatter -> unit) ->
-    level:int ->
-    Format.formatter ->
-    t ->
-    unit
+    offender:(Format.formatter -> unit) -> Format.formatter -> t -> unit
 
   (** Simpler version of [report_with_offender] for when the thing that had an
       unexpected jkind is available as a string. *)
-  val report_with_name :
-    name:string -> level:int -> Format.formatter -> t -> unit
+  val report_with_name : name:string -> Format.formatter -> t -> unit
 end
 
 (******************************)
@@ -787,7 +778,7 @@ val equal : Types.jkind_lr -> Types.jkind_lr -> bool
     sort variables. Works over any mix of l- and r-jkinds, because the only
     way not to have an intersection is by looking at the layout: all axes
     have a bottom element. *)
-val has_intersection : level:int -> 'd1 Types.jkind -> 'd2 Types.jkind -> bool
+val has_intersection : 'd1 Types.jkind -> 'd2 Types.jkind -> bool
 
 (** Finds the intersection of two jkinds, constraining sort variables to
     create one if needed, or returns a [Violation.t] if an intersection does
@@ -800,7 +791,6 @@ val intersection_or_error :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
   reason:History.interact_reason ->
-  level:int ->
   ('l1 * allowed) Types.jkind ->
   ('l2 * allowed) Types.jkind ->
   (('l1 * allowed) Types.jkind, Violation.t) Result.t
@@ -810,7 +800,6 @@ val intersection_or_error :
 val sub :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
-  level:int ->
   Types.jkind_l ->
   Types.jkind_r ->
   bool
@@ -828,7 +817,6 @@ type sub_or_intersect =
 val sub_or_intersect :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
-  level:int ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
   sub_or_intersect
@@ -838,7 +826,6 @@ val sub_or_intersect :
 val sub_or_error :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
-  level:int ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
   (unit, Violation.t) result
@@ -850,7 +837,6 @@ val sub_or_error :
 val sub_jkind_l :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
-  level:int ->
   ?allow_any_crossing:bool ->
   Types.jkind_l ->
   Types.jkind_l ->

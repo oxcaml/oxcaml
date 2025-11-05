@@ -4775,7 +4775,7 @@ let print_unsupported_quotation ppf =
   | Open_qt -> fprintf ppf "Opening modules"
 
 
-let report_lookup_error ~level _loc env ppf = function
+let report_lookup_error _loc env ppf = function
   | Unbound_value(lid, hint) -> begin
       fprintf ppf "Unbound value %a"
         (Style.as_inline_code !print_longident) lid;
@@ -4991,8 +4991,7 @@ let report_lookup_error ~level _loc env ppf = function
                    captured by an object.@ %a@]"
         (Style.as_inline_code !print_longident) lid
         (fun v -> Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> !print_type_expr ppf typ)
-           ~level v)
+           ~offender:(fun ppf -> !print_type_expr ppf typ) v)
         err
   | No_unboxed_version (lid, decl) ->
       fprintf ppf "@[The type %a has no unboxed version.@]"
@@ -5041,7 +5040,7 @@ let report_lookup_error ~level _loc env ppf = function
         (Style.as_inline_code !print_longident) lid
         print_stage usage_stage
 
-let report_error ~level ppf = function
+let report_error ppf = function
   | Missing_module(_, path1, path2) ->
       fprintf ppf "@[@[<hov>";
       if Path.same path1 path2 then
@@ -5058,7 +5057,7 @@ let report_error ~level ppf = function
   | Illegal_value_name(_loc, name) ->
       fprintf ppf "%a is not a valid value identifier."
        Style.inline_code name
-  | Lookup_error(loc, t, err) -> report_lookup_error ~level loc t ppf err
+  | Lookup_error(loc, t, err) -> report_lookup_error loc t ppf err
   | Incomplete_instantiation { unset_param } ->
       fprintf ppf "@[<hov>Not enough instance arguments: the parameter@ %a@ is \
                    required.@]"
@@ -5094,7 +5093,7 @@ let () =
             then Location.error_of_printer_file
             else Location.error_of_printer ~loc ?sub:None
           in
-          Some (error_of_printer (report_error ~level:Btype.generic_level) err)
+          Some (error_of_printer report_error err)
       | _ ->
           None
     )

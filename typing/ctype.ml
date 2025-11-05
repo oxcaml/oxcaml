@@ -1179,8 +1179,7 @@ let limited_generalize ty0 ty =
   List.iter (generalize_parents ~is_root:true) !roots;
   TypeHash.iter
     (fun ty _ ->
-       if get_level ty <> generic_level then
-         set_level ty !current_level)
+       if get_level ty <> generic_level then set_level ty !current_level)
     graph
 
 let limited_generalize_class_type rv cty =
@@ -2570,8 +2569,7 @@ let constrain_type_jkind ~fixed env ty jkind =
         *)
        let jkind_inter =
          Jkind.intersection_or_error ~type_equal ~context
-           ~reason:Tyvar_refinement_intersection ~level:!current_level
-           ty's_jkind jkind
+           ~reason:Tyvar_refinement_intersection ty's_jkind jkind
        in
        Result.map (set_var_jkind ty) jkind_inter
 
@@ -2582,10 +2580,7 @@ let constrain_type_jkind ~fixed env ty jkind =
       loop ~fuel ~expanded:false t ~is_open ty's_jkind jkind
 
     | _ ->
-       match
-         Jkind.sub_or_intersect ~type_equal ~context ~level:!current_level
-           ty's_jkind jkind
-       with
+       match Jkind.sub_or_intersect ~type_equal ~context ty's_jkind jkind with
        | Sub -> Ok ()
        | Disjoint sub_failure_reasons ->
           (* Reporting that [ty's_jkind] must be a subjkind of [jkind] is not
@@ -3421,8 +3416,8 @@ let equivalent_with_nolabels l1 l2 =
 (* the [tk] means we're comparing a type against a jkind; axes do
    not matter, so a jkind extracted from a type_declaration does
    not need to be substed *)
-let has_jkind_intersection_tk ~level env ty jkind =
-  Jkind.has_intersection ~level (type_jkind env ty) jkind
+let has_jkind_intersection_tk env ty jkind =
+  Jkind.has_intersection (type_jkind env ty) jkind
 
 (* [mcomp] tests if two types are "compatible" -- i.e., if they could ever
    unify.  (This is distinct from [eqtype], which checks if two types *are*
@@ -3439,8 +3434,7 @@ let has_jkind_intersection_tk ~level env ty jkind =
 
 let rec mcomp type_pairs env t1 t2 =
   let check_jkinds ty jkind =
-    if not (has_jkind_intersection_tk ~level:!current_level env ty
-              (Jkind.disallow_right jkind))
+    if not (has_jkind_intersection_tk env ty (Jkind.disallow_right jkind))
     then raise Incompatible
   in
   if eq_type t1 t2 then () else
@@ -3475,8 +3469,7 @@ let rec mcomp type_pairs env t1 t2 =
             begin try
               let decl = Env.find_type p env in
               if non_aliasable p decl || is_datatype decl ||
-                 not (has_jkind_intersection_tk ~level:!current_level env other
-                        decl.type_jkind)
+                 not (has_jkind_intersection_tk env other decl.type_jkind)
               then raise Incompatible
             with Not_found -> ()
             end
@@ -3606,8 +3599,7 @@ and mcomp_type_decl type_pairs env p1 p2 tl1 tl2 =
     let decl = Env.find_type p1 env in
     let decl' = Env.find_type p2 env in
     let check_jkinds () =
-      if not (Jkind.has_intersection ~level:!current_level decl.type_jkind
-                decl'.type_jkind)
+      if not (Jkind.has_intersection decl.type_jkind decl'.type_jkind)
       then raise Incompatible
     in
     if compatible_paths p1 p2 then begin
@@ -3737,9 +3729,7 @@ let add_jkind_equation ~reason uenv destination jkind1 =
      abstract, we can improve type checking by assigning destination that
      jkind. *)
   let env = get_env uenv in
-  match
-    intersect_type_jkind ~reason ~level:!current_level env destination jkind1
-  with
+  match intersect_type_jkind ~reason env destination jkind1 with
   | Error err -> raise_for Unify (Bad_jkind (destination,err))
   | Ok jkind -> begin
       match get_desc destination with
@@ -7522,20 +7512,14 @@ let check_decl_jkind env decl jkind =
       Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
     | _ -> decl.type_jkind
   in
-  match
-    Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level
-      decl_jkind jkind
-  with
+  match Jkind.sub_jkind_l ~type_equal ~context decl_jkind jkind with
   | Ok () -> Ok ()
   | Error _ as err ->
     match decl.type_manifest with
     | None -> err
     | Some ty ->
       let ty_jkind = type_jkind env ty in
-      match
-        Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level ty_jkind
-          jkind
-      with
+      match Jkind.sub_jkind_l ~type_equal ~context ty_jkind jkind with
       | Ok () -> Ok ()
       | Error _ as err -> err
 
@@ -7550,10 +7534,7 @@ let constrain_decl_jkind env decl jkind =
   | Some jkind ->
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
-    match
-      Jkind.sub_or_error ~type_equal ~context ~level:!current_level
-        decl.type_jkind jkind
-    with
+    match Jkind.sub_or_error ~type_equal ~context decl.type_jkind jkind with
     | Ok () as ok -> ok
     | Error _ as err ->
         match decl.type_manifest with

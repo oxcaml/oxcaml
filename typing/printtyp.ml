@@ -3253,13 +3253,13 @@ let explanation (type variety) intro prev env
   | Errortrace.Bad_jkind (t,e) ->
       Some (dprintf "@ @[<hov>%a@]"
               (Jkind.Violation.report_with_offender
-                 ~offender:(fun ppf -> type_expr ppf t)
-                 ~level:(get_current_level ())) e)
+                 ~offender:(fun ppf -> type_expr ppf t))
+              e)
   | Errortrace.Bad_jkind_sort (t,e) ->
       Some (dprintf "@ @[<hov>%a@]"
               (Jkind.Violation.report_with_offender_sort
-                 ~offender:(fun ppf -> type_expr ppf t)
-                 ~level:(get_current_level ())) e)
+                 ~offender:(fun ppf -> type_expr ppf t))
+              e)
   | Errortrace.Unequal_var_jkinds (t1,k1,t2,k2) ->
       let fmt_history t k ppf =
         Jkind.(format_history ~intro:(
