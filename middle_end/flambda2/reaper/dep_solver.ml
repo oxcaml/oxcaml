@@ -109,9 +109,15 @@ module Syntax = struct
     let@ xs = variables xs in
     f (ps, xs)
 
-  let ( ==> ) h c = where h (deduce c)
+  let rec flatten_hypotheses l =
+    match l with
+    | [] -> []
+    | `And l1 :: l2 -> flatten_hypotheses l1 @ flatten_hypotheses l2
+    | (#hypothesis as x) :: l -> x :: flatten_hypotheses l
 
-  let ( =>? ) h l = where h (yield l)
+  let ( ==> ) h c = where (flatten_hypotheses h) (deduce c)
+
+  let ( =>? ) h l = where (flatten_hypotheses h) (yield l)
 
   let ( !! ) = Term.constant
 
@@ -308,6 +314,10 @@ let reading_field = rel2 "reading_field" Cols.[f; n]
 
 let escaping_field = rel2 "escaping_field" Cols.[f; n]
 
+let actual_usages x y = and_ [~~(any_usage x); usages x y]
+
+let actual_sources x y = and_ [~~(any_source x); sources x y]
+
 let datalog_schedule =
   (* Reverse relations, because datalog does not implement a more efficient
      representation yet. Datalog iterates on the first key of a relation first.
@@ -431,7 +441,7 @@ let datalog_schedule =
   in
   let usages_alias =
     let$ [to_; from; usage] = ["to_"; "from"; "usage"] in
-    [~~(any_usage from); ~~(any_usage to_); usages to_ usage; alias ~to_ ~from]
+    [~~(any_usage from); actual_usages to_ usage; alias ~to_ ~from]
     ==> usages from usage
   in
   (* accessor-usage
@@ -470,10 +480,9 @@ let datalog_schedule =
   let field_usages_from_accessor_field_usages =
     let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
     [ ~~(any_usage base);
-      ~~(any_usage to_);
+      actual_usages to_ _var;
       ~~(field_usages_top base relation);
-      accessor ~to_ relation ~base;
-      usages to_ _var ]
+      accessor ~to_ relation ~base ]
     ==> field_usages base relation to_
   in
   (* coaccessor-usages
@@ -513,9 +522,8 @@ let datalog_schedule =
     in
     [ ~~(any_usage from);
       ~~(field_usages_top base_use relation);
-      ~~(any_usage base);
       constructor ~base relation ~from;
-      usages base base_use;
+      actual_usages base base_use;
       field_usages base_use relation to_ ]
     ==> alias ~to_ ~from
   in
@@ -542,8 +550,7 @@ let datalog_schedule =
       ["base"; "base_use"; "relation"; "from"]
     in
     [ constructor ~base relation ~from;
-      ~~(any_usage base);
-      usages base base_use;
+      actual_usages base base_use;
       field_usages_top base_use relation ]
     ==> any_usage from
   in
@@ -634,10 +641,7 @@ let datalog_schedule =
   in
   let sources_alias =
     let$ [from; to_; source] = ["from"; "to_"; "source"] in
-    [ ~~(any_source from);
-      ~~(any_source to_);
-      sources from source;
-      rev_alias ~from ~to_ ]
+    [~~(any_source to_); actual_sources from source; rev_alias ~from ~to_]
     ==> sources to_ source
   in
   (* constructor-sources
@@ -674,10 +678,9 @@ let datalog_schedule =
   let field_sources_from_constructor_field_sources =
     let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
     [ ~~(any_source base);
-      ~~(any_source from);
       ~~(field_sources_top base relation);
       rev_constructor ~from relation ~base;
-      sources from _var ]
+      actual_sources from _var ]
     ==> field_sources base relation from
   in
   (* coaccessor-sources
@@ -715,9 +718,8 @@ let datalog_schedule =
     let$ [base; base_use; relation; from; to_] =
       ["base"; "base_use"; "relation"; "from"; "to_"]
     in
-    [ ~~(any_usage base);
-      coconstructor ~base relation ~from;
-      usages base base_use;
+    [ coconstructor ~base relation ~from;
+      actual_usages base base_use;
       cofield_usages base_use relation to_ ]
     ==> alias ~to_:from ~from:to_
   in
@@ -754,9 +756,8 @@ let datalog_schedule =
     in
     [ ~~(any_source to_);
       ~~(field_sources_top base_source relation);
-      ~~(any_source base);
       rev_accessor ~base relation ~to_;
-      sources base base_source;
+      actual_sources base base_source;
       field_sources base_source relation from ]
     ==> alias ~to_ ~from
   in
@@ -775,8 +776,7 @@ let datalog_schedule =
       ["base"; "base_source"; "relation"; "to_"]
     in
     [ rev_accessor ~base relation ~to_;
-      ~~(any_source base);
-      sources base base_source;
+      actual_sources base base_source;
       field_sources_top base_source relation ]
     ==> any_source to_
   in
@@ -818,9 +818,8 @@ let datalog_schedule =
     let$ [base; base_source; relation; to_; from] =
       ["base"; "base_source"; "relation"; "to_"; "from"]
     in
-    [ ~~(any_source base);
-      rev_coaccessor ~base relation ~to_;
-      sources base base_source;
+    [ rev_coaccessor ~base relation ~to_;
+      actual_sources base base_source;
       cofield_sources base_source relation from ]
     ==> alias ~to_:from ~from:to_
   in
