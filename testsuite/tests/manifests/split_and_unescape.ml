@@ -2,8 +2,6 @@
  include ocamlcommon;
 *)
 
-(* Test split_and_unescape function *)
-
 let buffer = lazy (Buffer.create 16)
 
 let print_result input =
