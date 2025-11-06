@@ -1417,8 +1417,6 @@ let tree_of_modalities mut t =
   let t = Typemode.untransl_modalities mut t in
   List.map tree_of_modality t
 
-(** [tree_of_mode m l] finds the outcome node in [l] that corresponds to [m].
-Raise if not found. *)
 let tree_of_mode (t: Parsetree.mode loc) =
   let Mode s = t.txt in s
 
