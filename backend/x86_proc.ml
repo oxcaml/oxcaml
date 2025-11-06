@@ -596,8 +596,6 @@ module X86_peephole = struct
           Directive (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d2) )
         when Int64.equal (Int64.of_int d1) (Int64.neg n1)
              && Int64.equal (Int64.of_int d2) (Int64.neg n2) ->
-        (* Get continuation before modifying anything *)
-        let next_cell = DLL.next cell4 in
         (* Combine the instructions *)
         let combined_imm = Int64.add n1 n2 in
         let combined_offset = d1 + d2 in
@@ -610,7 +608,8 @@ module X86_peephole = struct
         (* Delete the redundant cells *)
         DLL.delete_curr cell3;
         DLL.delete_curr cell4;
-        Some next_cell
+        (* Return cell1 to allow iterative combination of multiple ADDs *)
+        Some (Some cell1)
       | _, _, _, _ -> None)
     | _ -> None
 
