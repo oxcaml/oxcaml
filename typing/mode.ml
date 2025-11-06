@@ -273,7 +273,9 @@ module Lattices = struct
   (* Make the type of [Locality] and [Regionality] below distinguishable,
      so that we can be sure [Comonadic_with] is applied correctly. *)
   module type Areality = sig
-    include Heyting
+    include Const
+
+    include Heyting with type t := t
 
     val _is_areality : unit
   end
@@ -762,8 +764,6 @@ module Lattices = struct
     let min = L.max
 
     let max = L.min
-
-    let legacy = L.legacy
 
     let[@inline] le a b = L.le b a
 
@@ -2302,7 +2302,7 @@ let () =
     | _ -> None)
 
 module type Common_axis_pos = sig
-  module Const : Lattice
+  module Const : Const
 
   include
     Common_axis
@@ -2312,7 +2312,7 @@ module type Common_axis_pos = sig
 end
 
 module type Common_axis_neg = sig
-  module Const : Lattice
+  module Const : Const
 
   include
     Common_axis
@@ -4434,8 +4434,6 @@ module Crossing = struct
 
     let min = Modality (Join_const Mode.Const.max)
 
-    let legacy = max
-
     let join (Modality (Join_const c0)) (Modality (Join_const c1)) =
       Modality (Join_const (Mode.Const.meet c0 c1))
 
@@ -4522,8 +4520,6 @@ module Crossing = struct
     let max = Modality (Meet_const Mode.Const.max)
 
     let min = Modality (Meet_const Mode.Const.min)
-
-    let legacy = max
 
     let join (Modality (Meet_const c0)) (Modality (Meet_const c1)) =
       Modality (Meet_const (Mode.Const.join c0 c1))
@@ -4669,8 +4665,6 @@ module Crossing = struct
   let max = { monadic = Monadic.max; comonadic = Comonadic.max }
 
   let min = { monadic = Monadic.min; comonadic = Comonadic.min }
-
-  let legacy = { monadic = Monadic.legacy; comonadic = Comonadic.legacy }
 
   let join t0 t1 =
     { monadic = Monadic.join t0.monadic t1.monadic;

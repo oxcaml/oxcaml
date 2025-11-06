@@ -24,8 +24,6 @@ module type Lattice = sig
 
   val max : t
 
-  val legacy : t
-
   val le : t -> t -> bool
 
   (** [equal a b] is equivalent to [le a b && le b a], but defined separately for
@@ -39,8 +37,14 @@ module type Lattice = sig
   val print : Format.formatter -> t -> unit
 end
 
-module type Lattice_product = sig
+module type Const = sig
   include Lattice
+
+  val legacy : t
+end
+
+module type Const_product = sig
+  include Const
 
   type 'a axis
 
@@ -76,7 +80,7 @@ type print_error_result =
 type print_error = (Format.formatter -> print_error_result) simple_error
 
 module type Common = sig
-  module Const : Lattice
+  module Const : Const
 
   type error
 
@@ -182,7 +186,7 @@ module type Common = sig
 end
 
 module type Common_axis = sig
-  module Const : Lattice
+  module Const : Const
 
   include
     Common
@@ -217,7 +221,7 @@ module type Common_product = sig
 
   type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error
 
-  module Const : Lattice_product with type 'a axis := 'a Axis.t
+  module Const : Const_product with type 'a axis := 'a Axis.t
 
   include
     Common with type simple_error := simple_error and module Const := Const
@@ -275,7 +279,7 @@ module type S = sig
     }
 
   module type Common_axis_pos = sig
-    module Const : Lattice
+    module Const : Const
 
     include
       Common_axis
@@ -285,7 +289,7 @@ module type S = sig
   end
 
   module type Common_axis_neg = sig
-    module Const : Lattice
+    module Const : Const
 
     include
       Common_axis
@@ -300,7 +304,7 @@ module type S = sig
         | Global
         | Local
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -333,7 +337,7 @@ module type S = sig
         | Regional
         | Local
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -351,7 +355,7 @@ module type S = sig
         | Many
         | Once
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -367,7 +371,7 @@ module type S = sig
         | Portable
         | Nonportable
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -379,7 +383,7 @@ module type S = sig
         | Unique
         | Aliased
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_neg with module Const := Const
@@ -396,7 +400,7 @@ module type S = sig
         | Shared
         | Contended
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_neg with module Const := Const
@@ -408,7 +412,7 @@ module type S = sig
         | Forkable
         | Unforkable
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -424,7 +428,7 @@ module type S = sig
         | Unyielding
         | Yielding
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -441,7 +445,7 @@ module type S = sig
         | Observing
         | Stateful
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -460,7 +464,7 @@ module type S = sig
         | Read
         | Immutable
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_neg with module Const := Const
@@ -585,7 +589,7 @@ module type S = sig
 
     module Const : sig
       include
-        Lattice
+        Const
           with type t =
             ( Areality.Const.t,
               Linearity.Const.t,
