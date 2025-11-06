@@ -447,7 +447,10 @@ end
 Line 7, characters 20-23:
 7 |     uncontended_use M.r
                         ^^^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+       because it is used inside the function (at Lines 5-7, characters 23-23)
+       which is expected to be "portable".
+       However, the highlighted expression is expected to be "uncontended".
 |}]
 
 module Close_over_value_comonadic = struct

@@ -142,7 +142,8 @@ Line 4, characters 23-26:
                            ^^^
 Error: This value is "nonportable"
        because it contains a usage (of the value "r" at Line 3, characters 25-26)
-       which is expected to be "shared" or "uncontended".
+       which is expected to be "shared" or "uncontended"
+       because its mutable field "a" is being read.
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -157,7 +158,8 @@ Line 3, characters 23-26:
                            ^^^
 Error: This value is "nonportable"
        because it contains a usage (of the value "r" at Line 2, characters 25-26)
-       which is expected to be "shared" or "uncontended".
+       which is expected to be "shared" or "uncontended"
+       because its mutable field "a" is being read.
        However, the highlighted expression is expected to be "portable".
 |}]
 

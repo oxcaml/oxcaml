@@ -290,7 +290,10 @@ let (foo @ stateless) () =
 Line 3, characters 34-35:
 3 |     raise (StatefulFun (fun () -> x.contents <- 1))
                                       ^
-Error: This value is "immutable" but is expected to be "read_write"
+Error: This value is "immutable"
+       because it is used inside the function (at Line 3, characters 23-50)
+       which is expected to be "stateless".
+       However, the highlighted expression is expected to be "read_write"
        because its mutable field "contents" is being written.
 |}]
 
@@ -304,7 +307,8 @@ Line 4, characters 23-24:
                            ^
 Error: This value is "stateful"
        because it contains a usage (of the value "x" at Line 3, characters 15-16)
-       which is expected to be "read_write".
+       which is expected to be "read_write"
+       because its mutable field "contents" is being written.
        However, the highlighted expression is expected to be "stateless".
 |}]
 

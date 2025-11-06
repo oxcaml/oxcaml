@@ -3773,7 +3773,8 @@ let alloc_as_value_unhint m =
   let comonadic = comonadic_locality_as_regionality comonadic in
   { comonadic; monadic }
 
-let alloc_as_value m = m |> Alloc.unhint |> alloc_as_value_unhint |> Value.hint
+let alloc_as_value m =
+  m |> Alloc.unhint |> alloc_as_value_unhint |> Value.hint ~monadic:Skip
 
 let alloc_to_value_l2r_unhint m =
   let { comonadic; monadic } = m in
@@ -3785,7 +3786,7 @@ let alloc_to_value_l2r_unhint m =
 
 let alloc_to_value_l2r m =
   m |> Alloc.disallow_right |> Alloc.unhint |> alloc_to_value_l2r_unhint
-  |> Value.hint
+  |> Value.hint ~monadic:Skip
 
 let value_to_alloc_r2g_unhint m =
   let { comonadic; monadic } = m in
@@ -3796,7 +3797,7 @@ let value_to_alloc_r2g_unhint m =
   { comonadic; monadic }
 
 let value_to_alloc_r2g m =
-  m |> Value.unhint |> value_to_alloc_r2g_unhint |> Alloc.hint
+  m |> Value.unhint |> value_to_alloc_r2g_unhint |> Alloc.hint ~monadic:Skip
 
 let value_r2g ?hint m =
   Value.wrap ~monadic:Skip ?comonadic:hint
@@ -3809,7 +3810,7 @@ let value_to_alloc_r2l_unhint m =
   { comonadic; monadic }
 
 let value_to_alloc_r2l m =
-  m |> Value.unhint |> value_to_alloc_r2l_unhint |> Alloc.hint
+  m |> Value.unhint |> value_to_alloc_r2l_unhint |> Alloc.hint ~monadic:Skip
 
 module Modality = struct
   (* Inferred modalities
