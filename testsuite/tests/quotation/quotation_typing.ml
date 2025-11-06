@@ -316,10 +316,15 @@ val eta : 'a expr -> 'a expr = <fun>
 (* These should fail kinding checks *)
 
 let id : 'a -> 'a = fun x -> x
-let id' : <[<['a]>]> -> <[<['a]>]> = id
 
 [%%expect{|
 val id : 'a -> 'a = <fun>
+|}]
+
+(* But this should preferably work at some point *)
+let id' : <[<['a]>]> -> <[<['a]>]> = id
+
+[%%expect{|
 Line 1:
 Error: Values do not match:
          val id' : ('a : any). 'a -> 'a
