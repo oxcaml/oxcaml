@@ -277,7 +277,6 @@ type error =
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
   | Param_mode_mismatch of Alloc.equate_error
   | Uncurried_function_escapes of Alloc.error
-  | Local_return_annotation_mismatch of Location.t
   | Function_returns_local
   | Tail_call_local_returning
   | Bad_tail_annotation of [`Conflict|`Not_a_tailcall]
@@ -11765,10 +11764,6 @@ let report_error ~loc env =
             (Style.as_inline_code (Alloc.Const.print_axis ax)) left
             (Style.as_inline_code (Alloc.Const.print_axis ax)) right
     end
-  | Local_return_annotation_mismatch _ ->
-      Location.errorf ~loc
-        "This function return is not annotated with \"local_\"@ \
-         whilst other returns were."
   | Bad_tail_annotation err ->
       Location.errorf ~loc
         "The tail-call annotation on this application %s."
