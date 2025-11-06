@@ -774,7 +774,7 @@ for instance, we say that `t_in_a_trenchcoat.inner_t` is `contended` when
 [rule 1]: #rule-contended-parallel
 
 Now, you may be surprised to see that projecting a field from a `contended`
-record gives a `contended` value. After all, we have the function:
+record gives an `uncontended` value. After all, we have the function:
 
 ```ocaml
 let price t = t.price

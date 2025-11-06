@@ -11,8 +11,8 @@ let use_local_product : ('a : value & value). 'a @ local -> unit = fun _ -> ()
 [%%expect{|
 val use_global : 'a -> unit = <fun>
 val use_global_product : ('a : value & value). 'a -> unit = <fun>
-val use_local : local_ 'a -> unit = <fun>
-val use_local_product : ('a : value & value). local_ 'a -> unit = <fun>
+val use_local : 'a @ local -> unit = <fun>
+val use_local_product : ('a : value & value). 'a @ local -> unit = <fun>
 |}]
 
 let f x =
@@ -51,14 +51,14 @@ let f e0 (e1 @ local) =
     match e0, e1 with
     | x0, x1 -> use_global x0; use_local x1; ()
 [%%expect{|
-val f : 'a -> local_ 'b -> unit = <fun>
+val f : 'a -> 'b @ local -> unit = <fun>
 |}]
 
 let f e0 (e1 @ local) =
     match #(e0, e1) with
     | #(x0, x1) -> use_global x0; use_local x1; ()
 [%%expect{|
-val f : 'a -> local_ 'b -> unit = <fun>
+val f : 'a -> 'b @ local -> unit = <fun>
 |}]
 
 let f e0 (e1 @ local) =
@@ -112,7 +112,7 @@ let f e0 (e1 @ local) =
     | x0, x1 when x0 = x1 -> use_global x0; use_local x1; ()
     | x -> use_local x; ()
 [%%expect{|
-val f : 'a -> local_ 'a -> unit = <fun>
+val f : 'a -> 'a @ local -> unit = <fun>
 |}]
 
 let f e0 (e1 @ local) =
@@ -120,7 +120,7 @@ let f e0 (e1 @ local) =
     | #(x0, x1) when x0 = x1 -> use_global x0; use_local x1; ()
     | x -> use_local_product x; ()
 [%%expect{|
-val f : 'a -> local_ 'a -> unit = <fun>
+val f : 'a -> 'a @ local -> unit = <fun>
 |}]
 
 (* we can return [e1], because it's regional. We can't return [x] (or its
@@ -147,7 +147,7 @@ let f e0 (e1 @ local) =
     | #(x0, x1) when x0 = x1 -> use_global x0; use_local x1; e1
     | x -> use_local_product x; let #(x0, x1) = x in x0
 [%%expect{|
-val f : 'a -> local_ 'a -> local_ 'a = <fun>
+val f : 'a -> 'a @ local -> 'a @ local = <fun>
 |}]
 
 (* The value being matched upon is [local] in one branch, so the match result is
@@ -176,14 +176,14 @@ let f b e0 (e1 @ local) e2 e3 =
     match if b then e0, e1 else e2, e3 with
     | x0, x1 -> use_global x0; use_local x1; ()
 [%%expect{|
-val f : bool -> 'a -> local_ 'b -> 'a -> 'b -> unit = <fun>
+val f : bool -> 'a -> 'b @ local -> 'a -> 'b -> unit = <fun>
 |}]
 
 let f b e0 (e1 @ local) e2 e3 =
     match if b then #(e0, e1) else #(e2, e3) with
     | #(x0, x1) -> use_global x0; use_local x1; ()
 [%%expect{|
-val f : bool -> 'a -> local_ 'b -> 'a -> 'b -> unit = <fun>
+val f : bool -> 'a -> 'b @ local -> 'a -> 'b -> unit = <fun>
 |}]
 
 let f b e0 (e1 @ local) e2 e3 =
@@ -212,7 +212,7 @@ let f_unboxed_tuple (local_ a) (local_ b) =
   let #(a', _) = t in
   a'
 [%%expect{|
-val f_unboxed_tuple : local_ 'a -> local_ 'b -> local_ 'a = <fun>
+val f_unboxed_tuple : 'a @ local -> 'b @ local -> 'a @ local = <fun>
 |}]
 
 let f_boxed_tuple (local_ a) (local_ b) =

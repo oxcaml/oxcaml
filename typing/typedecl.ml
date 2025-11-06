@@ -171,7 +171,9 @@ let make_params env path params =
        have jkind any).  But it might be possible to infer [any] in some
        cases. *)
     let jkind =
-      Jkind.of_new_legacy_sort ~why:(Unannotated_type_parameter path)
+      Jkind.of_new_legacy_sort
+        ~why:(Unannotated_type_parameter path)
+        ~level:(Ctype.get_current_level ())
     in
     try
       (transl_type_param env path jkind sty, v)
@@ -973,7 +975,9 @@ let transl_declaration env sdecl (id, uid) =
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
         let rep, jkind =
           if unbox then
-            Variant_unboxed, Jkind.of_new_sort ~why:Old_style_unboxed_type
+            Variant_unboxed,
+            Jkind.of_new_sort ~why:Old_style_unboxed_type
+              ~level:(Ctype.get_current_level ())
           else
             (* We mark all arg sorts "void" here.  They are updated later,
                after the circular type checks make it safe to check sorts.
@@ -1004,6 +1008,7 @@ let transl_declaration env sdecl (id, uid) =
             if unbox then
               Record_unboxed,
               Jkind.of_new_sort ~why:Old_style_unboxed_type
+                ~level:(Ctype.get_current_level ())
             else
             (* Note this is inaccurate, using `Record_boxed` in cases where the
                correct representation is [Record_float], [Record_ufloat], or
@@ -1025,6 +1030,7 @@ let transl_declaration env sdecl (id, uid) =
              [update_decl_jkind]. *)
           let jkind =
             Jkind.Builtin.product_of_sorts ~why:Unboxed_record
+              ~level:(Ctype.get_current_level ())
               (List.length lbls)
           in
           Ttype_record_unboxed_product lbls,
@@ -1213,7 +1219,8 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
     in
     (* CR layouts v11: update type_jkind once we have [layout_of] layouts *)
     let jkind =
-      Jkind.Builtin.product_of_sorts ~why:Unboxed_record (List.length lbls) in
+      Jkind.Builtin.product_of_sorts ~why:Unboxed_record
+        ~level:(Ctype.get_current_level ()) (List.length lbls) in
     let kind =
       Type_record_unboxed_product(lbls_unboxed, Record_unboxed_product, umc)
     in
@@ -1507,7 +1514,7 @@ let narrow_to_manifest_jkind env loc decl =
         let context = Ctype.mk_jkind_context_always_principal env in
         match
           Jkind.sub_jkind_l ~type_equal ~context
-            manifest_jkind decl.type_jkind
+            ~level:(Ctype.get_current_level ()) manifest_jkind decl.type_jkind
         with
         | Ok () -> ()
         | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v)))
@@ -2165,7 +2172,8 @@ let rec update_decl_jkind env dpath decl =
      other types in a (maybe mutually recursive) type declaration. See Note [Default
      jkinds in transl_declaration]) *)
   match
-    Jkind.Layout.sub new_decl.type_jkind.jkind.layout decl.type_jkind.jkind.layout
+    Jkind.Layout.sub ~level:(Ctype.get_current_level ())
+      new_decl.type_jkind.jkind.layout decl.type_jkind.jkind.layout
   with
   | Not_le reason ->
     let context = Ctype.mk_jkind_context_always_principal env in
@@ -2817,6 +2825,7 @@ let normalize_decl_jkinds env decls =
           ~type_equal
           ~context
           ~allow_any_crossing
+          ~level:(Ctype.get_current_level ())
           decl.type_jkind
           original_decl.type_jkind
       with
@@ -4404,7 +4413,8 @@ let report_jkind_mismatch_due_to_bad_inference ppf ty violation loc =
      the declaration where this error is reported.@]"
     loc
     (Jkind.Violation.report_with_offender
-       ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) violation
+       ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+       ~level:(Ctype.get_current_level ())) violation
 
 let report_error ppf = function
   | Repeated_parameter ->
@@ -4694,11 +4704,13 @@ let report_error ppf = function
       in
       fprintf ppf "type %a" Style.inline_code path_end
     in
-    Jkind.Violation.report_with_offender ~offender ppf v
+    Jkind.Violation.report_with_offender ~offender
+      ~level:(Ctype.get_current_level ()) ppf v
   | Jkind_mismatch_of_type (ty,v) ->
     let offender ppf = fprintf ppf "type %a"
         (Style.as_inline_code Printtyp.type_expr) ty in
-    Jkind.Violation.report_with_offender ~offender ppf v
+    Jkind.Violation.report_with_offender ~offender
+      ~level:(Ctype.get_current_level ()) ppf v
   | Jkind_sort {kloc; typ; err} ->
     let s =
       match kloc with
@@ -4724,14 +4736,17 @@ let report_error ppf = function
     fprintf ppf "@[%s must have a representable layout%t.@ %a@]" s
       extra
       (Jkind.Violation.report_with_offender
-         ~offender:(fun ppf -> Printtyp.type_expr ppf typ)) err
+         ~offender:(fun ppf -> Printtyp.type_expr ppf typ)
+         ~level:(Ctype.get_current_level ())) err
   | Jkind_empty_record ->
     fprintf ppf "@[Records must contain at least one runtime value.@]"
   | Non_value_in_sig (err, val_name, ty) ->
     let offender ppf = fprintf ppf "type %a" Printtyp.type_expr ty in
     fprintf ppf "@[This type signature for %a is not a value type.@ %a@]"
       Style.inline_code val_name
-      (Jkind.Violation.report_with_offender ~offender) err
+      (Jkind.Violation.report_with_offender ~offender
+         ~level:(Ctype.get_current_level ()))
+      err
   | Invalid_jkind_in_block (typ, sort_const, lloc) ->
     let struct_desc =
       match lloc with

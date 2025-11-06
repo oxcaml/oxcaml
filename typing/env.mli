@@ -362,12 +362,14 @@ val lookup_settable_variable:
 
 val find_value_by_name:
   Longident.t -> t -> Path.t * value_description
+val find_value_by_name_lazy:
+  Longident.t -> t -> Path.t * Subst.Lazy.value_description
 val find_type_by_name:
   Longident.t -> t -> Path.t * type_declaration
-val find_module_by_name:
-  Longident.t -> t -> Path.t * module_declaration
-val find_modtype_by_name:
-  Longident.t -> t -> Path.t * modtype_declaration
+val find_module_by_name_lazy:
+  Longident.t -> t -> Path.t * Subst.Lazy.module_declaration
+val find_modtype_by_name_lazy:
+  Longident.t -> t -> Path.t * Subst.Lazy.modtype_declaration
 val find_class_by_name:
   Longident.t -> t -> Path.t * class_declaration
 val find_cltype_by_name:
@@ -645,9 +647,10 @@ exception Error of error
 
 open Format
 
-val report_error: formatter -> error -> unit
+val report_error: level:int -> formatter -> error -> unit
 
-val report_lookup_error: Location.t -> t -> formatter -> lookup_error -> unit
+val report_lookup_error:
+    level:int -> Location.t -> t -> formatter -> lookup_error -> unit
 
 val in_signature: bool -> t -> t
 

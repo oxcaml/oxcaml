@@ -131,9 +131,9 @@ type succeeds = t_immediate_or_null accepts_nonfloat
 let f (x : int or_null @ local) (g : int or_null -> unit) = g x [@nontail]
 
 [%%expect{|
-val f : local_ int or_null -> ((int or_null -> unit) -> unit) = <fun>
+val f : int or_null @ local -> ((int or_null -> unit) -> unit) = <fun>
 |}, Principal{|
-val f : local_ int or_null -> (int or_null -> unit) -> unit = <fun>
+val f : int or_null @ local -> (int or_null -> unit) -> unit = <fun>
 |}]
 
 module M : sig

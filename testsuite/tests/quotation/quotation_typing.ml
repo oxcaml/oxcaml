@@ -307,3 +307,8 @@ Error: Type variable "'a" is used outside any quotations,
        it already occurs inside a quotation (<[ ... ]>).
        Hint: Consider using "<['a]>".
 |}];;
+
+let eta (type a) (x : a expr) : a expr = <[ $x ]>
+[%%expect {|
+val eta : 'a expr -> 'a expr = <fun>
+|}]

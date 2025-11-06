@@ -559,7 +559,7 @@ type 'a mut_not_unyielding = { mutable mut_not_unyielding : 'a @@ yielding }
 [%%expect{|
 type 'a box = { item : 'a; }
 type 'a box_mut = { mutable mut : 'a; }
-type 'a global = { global_ global : 'a; }
+type 'a global = { global : 'a @@ global; }
 type 'a aliased = { aliased : 'a @@ aliased; }
 type 'a many = { many : 'a @@ many; }
 type 'a unyielding = { unyielding : 'a @@ unyielding; }

@@ -6,7 +6,7 @@ expect;
 
 let ignore_local : 'a @ local -> unit = fun _ -> ()
 [%%expect{|
-val ignore_local : local_ 'a -> unit = <fun>
+val ignore_local : 'a @ local -> unit = <fun>
 |}]
 
 let f = ref (stack_ fun x -> x)
@@ -229,7 +229,7 @@ Error: This value is "local"
 
 let f () = exclave_ stack_ (3, 5)
 [%%expect{|
-val f : unit -> local_ int * int = <fun>
+val f : unit -> int * int @ local = <fun>
 |}]
 
 let f () =
@@ -390,7 +390,7 @@ let mk () =
   let r = stack_ { x = [1;2;3]; y = [4;5;6] } in
   r.y
 [%%expect{|
-type t = { x : int list; global_ y : int list; }
+type t = { x : int list; y : int list @@ global; }
 val mk : unit -> int list = <fun>
 |}]
 
@@ -419,7 +419,7 @@ external c_func : 'a -> 'a = "foo"
 external fst : ('a * 'b [@local_opt]) -> ('a [@local_opt]) = "%field0_immut"
 external ref : 'a -> ('a ref [@local_opt]) = "%makemutable"
 external ref_heap : 'a -> 'a ref = "%makemutable"
-external ref_stack : 'a -> local_ 'a ref = "%makemutable"
+external ref_stack : 'a -> 'a ref @ local = "%makemutable"
 external id : 'a -> 'a = "%identity"
 external c_func : 'a -> 'a = "foo"
 |}]
@@ -454,7 +454,7 @@ Line 2, characters 17-30:
 2 |   let _ = stack_ (ref_heap 52) in
                      ^^^^^^^^^^^^^
 Error: This primitive always allocates on heap
-       (maybe it should be declared with "[@local_opt]" or "local_"?)
+       (maybe it should be declared with "[@local_opt]" or "@ local"?)
 |}]
 
 let foo () =

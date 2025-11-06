@@ -362,12 +362,12 @@ val unique_default_args : ?x:float @ unique -> unit -> float = <fun>
 
 let ul (unique_ local_ x) = x
 [%%expect{|
-val ul : 'a @ local unique -> local_ 'a = <fun>
+val ul : 'a @ local unique -> 'a @ local = <fun>
 |}]
 
 let ul_ret x = exclave_ unique_ x
 [%%expect{|
-val ul_ret : 'a @ unique -> local_ 'a = <fun>
+val ul_ret : 'a @ unique -> 'a @ local = <fun>
 |}]
 
 let rec foo =
@@ -542,8 +542,8 @@ Error: This expression has type "int" but an expression was expected of type
 let return_local : local_ 'a -> local_ 'a = fun x -> x
 let return_global : local_ 'a -> int = fun x -> 0
 [%%expect{|
-val return_local : local_ 'a -> local_ 'a = <fun>
-val return_global : local_ 'a -> int = <fun>
+val return_local : 'a @ local -> 'a @ local = <fun>
+val return_global : 'a @ local -> int = <fun>
 |}]
 
 

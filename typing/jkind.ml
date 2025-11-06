@@ -289,7 +289,7 @@ module Layout = struct
     | Any, Any -> true
     | (Any | Sort _ | Product _), _ -> false
 
-  let sub t1 t2 =
+  let sub ~level t1 t2 =
     let rec sub t1 t2 : Misc.Le_result.t =
       match t1, t2 with
       | Any, Any -> Equal
@@ -305,13 +305,13 @@ module Layout = struct
            to end up less than a sort (so, no [any]), but it seems easier to keep
            this case lined up with the inverse case, which definitely cannot use
            [to_product_sort]. *)
-        match Sort.decompose_into_product s2 (List.length ts1) with
+        match Sort.decompose_into_product ~level s2 (List.length ts1) with
         | None -> Not_le
         | Some ss2 ->
           Misc.Le_result.combine_list
             (List.map2 (fun t1 s2 -> sub t1 (Sort s2)) ts1 ss2))
       | Sort s1, Product ts2 -> (
-        match Sort.decompose_into_product s1 (List.length ts2) with
+        match Sort.decompose_into_product ~level s1 (List.length ts2) with
         | None -> Not_le
         | Some ss1 ->
           Misc.Le_result.combine_list
@@ -320,10 +320,10 @@ module Layout = struct
     Sub_result.of_le_result (sub t1 t2) ~failure_reason:(fun () ->
         [Layout_disagreement])
 
-  let rec intersection t1 t2 =
+  let rec intersection ~level t1 t2 =
     (* pre-condition to [products]: [ts1] and [ts2] have the same length *)
     let products ts1 ts2 =
-      let components = List.map2 intersection ts1 ts2 in
+      let components = List.map2 (intersection ~level) ts1 ts2 in
       Option.map
         (fun x -> Product x)
         (Misc.Stdlib.List.some_if_all_elements_are_some components)
@@ -335,12 +335,12 @@ module Layout = struct
     | Product ts1, Product ts2 ->
       if List.compare_lengths ts1 ts2 = 0 then products ts1 ts2 else None
     | Product ts, Sort sort | Sort sort, Product ts -> (
-      match Sort.decompose_into_product sort (List.length ts) with
+      match Sort.decompose_into_product ~level sort (List.length ts) with
       | None -> None
       | Some sorts -> products ts (List.map (fun x -> Sort x) sorts))
 
-  let of_new_sort_var () =
-    let sort = Sort.new_var () in
+  let of_new_sort_var ~level =
+    let sort = Sort.new_var ~level in
     Sort sort, sort
 
   let rec default_to_value_and_get : _ Layout.t -> Const.t = function
@@ -1351,9 +1351,9 @@ let outcometree_of_type = ref (fun _ -> assert false)
 
 let set_outcometree_of_type p = outcometree_of_type := p
 
-let outcometree_of_modalities_new = ref (fun _ _ -> assert false)
+let outcometree_of_modalities = ref (fun _ _ -> assert false)
 
-let set_outcometree_of_modalities_new p = outcometree_of_modalities_new := p
+let set_outcometree_of_modalities p = outcometree_of_modalities := p
 
 module Const = struct
   type 'd t = (Layout.Const.t, 'd) Types.layout_and_axes
@@ -1885,7 +1885,7 @@ module Const = struct
       { base : string;
         modal_bounds : string list;
         printable_with_bounds :
-          (Outcometree.out_type * Outcometree.out_modality_new list) list
+          (Outcometree.out_type * Outcometree.out_modality list) list
       }
 
     let get_modal_bound (type a) ~(axis : a Axis.t) ~(base : a) (actual : a) =
@@ -1988,8 +1988,7 @@ module Const = struct
                 ~mod_bounds:actual.mod_bounds ~type_info
             in
             ( !outcometree_of_type type_expr,
-              !outcometree_of_modalities_new
-                Types.Immutable
+              !outcometree_of_modalities Types.Immutable
                 (modality_to_ignore_axes axes_ignored_by_modalities) ))
           (With_bounds.to_list actual.with_bounds)
       in
@@ -2259,7 +2258,8 @@ module Jkind_desc = struct
   let equate_or_equal ~allow_mutation t1 t2 =
     Layout_and_axes.equal (Layout.equate_or_equal ~allow_mutation) t1 t2
 
-  let sub (type l r) ~type_equal:_ ~context (sub : (allowed * r) jkind_desc)
+  let sub (type l r) ~type_equal:_ ~context ~level
+      (sub : (allowed * r) jkind_desc)
       ({ layout = lay2; mod_bounds = bounds2; with_bounds = No_with_bounds } :
         (l * allowed) jkind_desc) =
     let axes_max_on_right =
@@ -2273,14 +2273,14 @@ module Jkind_desc = struct
       Layout_and_axes.normalize ~skip_axes:axes_max_on_right ~mode:Ignore_best
         ~context sub
     in
-    let layout = Layout.sub lay1 lay2 in
+    let layout = Layout.sub ~level lay1 lay2 in
     let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
     Sub_result.combine layout bounds
 
-  let intersection
+  let intersection ~level
       { layout = lay1; mod_bounds = mod_bounds1; with_bounds = with_bounds1 }
       { layout = lay2; mod_bounds = mod_bounds2; with_bounds = with_bounds2 } =
-    match Layout.intersection lay1 lay2 with
+    match Layout.intersection ~level lay1 lay2 with
     | None -> None
     | Some layout ->
       Some
@@ -2291,8 +2291,8 @@ module Jkind_desc = struct
 
   let map_type_expr f t = Layout_and_axes.map_type_expr f t
 
-  let of_new_sort_var nullability_upper_bound separability_upper_bound =
-    let layout, sort = Layout.of_new_sort_var () in
+  let of_new_sort_var ~level nullability_upper_bound separability_upper_bound =
+    let layout, sort = Layout.of_new_sort_var ~level in
     ( { layout;
         mod_bounds =
           Mod_bounds.max
@@ -2442,10 +2442,10 @@ module Builtin = struct
        the product, by one step, never loses any information. *)
     |> mark_best
 
-  let product_of_sorts ~why arity =
+  let product_of_sorts ~why ~level arity =
     let layout =
       Layout.product
-        (List.init arity (fun _ -> fst (Layout.of_new_sort_var ())))
+        (List.init arity (fun _ -> fst (Layout.of_new_sort_var ~level)))
     in
     let desc : _ jkind_desc =
       { layout; mod_bounds = Mod_bounds.max; with_bounds = No_with_bounds }
@@ -2477,21 +2477,23 @@ let has_with_bounds (type r) (t : (_ * r) jkind) =
 (******************************)
 (* construction *)
 
-let of_new_sort_var ~why =
-  let jkind, sort = Jkind_desc.of_new_sort_var Maybe_null Maybe_separable in
+let of_new_sort_var ~why ~level =
+  let jkind, sort =
+    Jkind_desc.of_new_sort_var ~level Maybe_null Maybe_separable
+  in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
-let of_new_sort ~why = fst (of_new_sort_var ~why)
+let of_new_sort ~why ~level = fst (of_new_sort_var ~why ~level)
 
-let of_new_legacy_sort_var ~why =
-  let jkind, sort = Jkind_desc.of_new_sort_var Non_null Separable in
+let of_new_legacy_sort_var ~why ~level =
+  let jkind, sort = Jkind_desc.of_new_sort_var ~level Non_null Separable in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_legacy_creation why), sort
 
-let of_new_non_float_sort_var ~why =
-  let jkind, sort = Jkind_desc.of_new_sort_var Maybe_null Non_float in
+let of_new_non_float_sort_var ~why ~level =
+  let jkind, sort = Jkind_desc.of_new_sort_var ~level Maybe_null Non_float in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
-let of_new_legacy_sort ~why = fst (of_new_legacy_sort_var ~why)
+let of_new_legacy_sort ~why ~level = fst (of_new_legacy_sort_var ~why ~level)
 
 let of_const (type l r) ~annotation ~why ~(quality : (l * r) jkind_quality)
     (c : (l * r) Const.t) =
@@ -2787,7 +2789,9 @@ let for_object =
   (* The crossing of objects are based on the fact that they are
      produced/defined/allocated at legacy, which applies to only the
      comonadic axes. *)
-  let comonadic = Crossing.Comonadic.legacy in
+  let comonadic =
+    Crossing.Comonadic.always_constructed_at Value.Comonadic.Const.legacy
+  in
   let monadic = Crossing.Monadic.max in
   fresh_jkind
     { layout = Sort (Base Value);
@@ -2822,8 +2826,10 @@ let for_array_argument =
     { layout = Any; mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Any_creation Array_type_argument)
 
-let for_array_element_sort () =
-  let jkind_desc, sort = Jkind_desc.of_new_sort_var Maybe_null Separable in
+let for_array_element_sort ~level =
+  let jkind_desc, sort =
+    Jkind_desc.of_new_sort_var ~level Maybe_null Separable
+  in
   let jkind = { for_array_argument.jkind with layout = jkind_desc.layout } in
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
     sort )
@@ -3579,11 +3585,11 @@ module Violation = struct
     if first_ran_out then report_fuel_for_type "first";
     if second_ran_out then report_fuel_for_type "second"
 
-  let report_general preamble pp_former former ppf t =
+  let report_general ~level preamble pp_former former ppf t =
     let mismatch_type =
       match t.violation with
       | Not_a_subjkind (k1, k2, _) ->
-        if Sub_result.is_le (Layout.sub k1.jkind.layout k2.jkind.layout)
+        if Sub_result.is_le (Layout.sub ~level k1.jkind.layout k2.jkind.layout)
         then Mode
         else Layout
       | No_intersection _ -> Layout
@@ -3675,12 +3681,15 @@ module Violation = struct
 
   let pp_t ppf x = fprintf ppf "%t" x
 
-  let report_with_offender ~offender = report_general "" pp_t offender
+  let report_with_offender ~offender ~level =
+    report_general ~level "" pp_t offender
 
-  let report_with_offender_sort ~offender =
-    report_general "A representable layout was expected, but " pp_t offender
+  let report_with_offender_sort ~offender ~level =
+    report_general ~level "A representable layout was expected, but " pp_t
+      offender
 
-  let report_with_name ~name = report_general "" pp_print_string name
+  let report_with_name ~name ~level =
+    report_general ~level "" pp_print_string name
 end
 
 (******************************)
@@ -3720,7 +3729,7 @@ let score_reason = function
   | Creation (Concrete_creation _ | Concrete_legacy_creation _) -> -1
   | _ -> 0
 
-let combine_histories ~type_equal ~context reason (Pack_jkind k1)
+let combine_histories ~type_equal ~context ~level reason (Pack_jkind k1)
     (Pack_jkind k2) =
   if flattened_histories
   then
@@ -3730,7 +3739,7 @@ let combine_histories ~type_equal ~context reason (Pack_jkind k1)
       else history_b
     in
     let choose_subjkind_history k_a history_a k_b history_b =
-      match Jkind_desc.sub ~type_equal ~context k_a k_b with
+      match Jkind_desc.sub ~level ~type_equal ~context k_a k_b with
       | Less -> history_a
       | Not_le _ ->
         (* CR layouts: this will be wrong if we ever have a non-trivial meet in
@@ -3755,19 +3764,19 @@ let combine_histories ~type_equal ~context reason (Pack_jkind k1)
         history2 = k2.history
       }
 
-let has_intersection t1 t2 =
+let has_intersection ~level t1 t2 =
   (* Need to check only the layouts: all the axes have bottom elements. *)
-  Option.is_some (Layout.intersection t1.jkind.layout t2.jkind.layout)
+  Option.is_some (Layout.intersection ~level t1.jkind.layout t2.jkind.layout)
 
-let intersection_or_error ~type_equal ~context ~reason t1 t2 =
-  match Jkind_desc.intersection t1.jkind t2.jkind with
+let intersection_or_error ~type_equal ~context ~reason ~level t1 t2 =
+  match Jkind_desc.intersection ~level t1.jkind t2.jkind with
   | None -> Error (Violation.of_ ~context (No_intersection (t1, t2)))
   | Some jkind ->
     Ok
       { jkind;
         annotation = None;
         history =
-          combine_histories ~type_equal ~context reason (Pack_jkind t1)
+          combine_histories ~type_equal ~context ~level reason (Pack_jkind t1)
             (Pack_jkind t2);
         has_warned = t1.has_warned || t2.has_warned;
         ran_out_of_fuel_during_normalize =
@@ -3793,32 +3802,35 @@ let map_type_expr f t =
 (* this is hammered on; it must be fast! *)
 let check_sub ~context sub super = Jkind_desc.sub ~context sub.jkind super.jkind
 
-let sub_with_reason ~type_equal ~context sub super =
-  Sub_result.require_le (check_sub ~type_equal ~context sub super)
+let sub_with_reason ~type_equal ~context ~level sub super =
+  Sub_result.require_le (check_sub ~type_equal ~context ~level sub super)
 
-let sub ~type_equal ~context sub super =
-  Result.is_ok (sub_with_reason ~type_equal ~context sub super)
+let sub ~type_equal ~context ~level sub super =
+  Result.is_ok (sub_with_reason ~type_equal ~context ~level sub super)
 
 type sub_or_intersect =
   | Sub
   | Disjoint of Violation.Sub_failure_reason.t Nonempty_list.t
   | Has_intersection of Violation.Sub_failure_reason.t Nonempty_list.t
 
-let sub_or_intersect ~type_equal ~context t1 t2 =
-  match sub_with_reason ~type_equal ~context t1 t2 with
+let sub_or_intersect ~type_equal ~context ~level t1 t2 =
+  match sub_with_reason ~type_equal ~context ~level t1 t2 with
   | Ok () -> Sub
   | Error reason ->
-    if has_intersection t1 t2 then Has_intersection reason else Disjoint reason
+    if has_intersection ~level t1 t2
+    then Has_intersection reason
+    else Disjoint reason
 
-let sub_or_error ~type_equal ~context t1 t2 =
-  match sub_or_intersect ~type_equal ~context t1 t2 with
+let sub_or_error ~type_equal ~context ~level t1 t2 =
+  match sub_or_intersect ~type_equal ~context ~level t1 t2 with
   | Sub -> Ok ()
   | Disjoint reason | Has_intersection reason ->
     Error
       (Violation.of_ ~context
          (Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
-let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub super =
+let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) sub
+    super =
   (* This function implements the "SUB" judgement from kind-inference.md. *)
   let open Misc.Stdlib.Monad.Result.Syntax in
   let require_le sub_result =
@@ -3839,7 +3851,7 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub super =
   in
   let* () =
     (* Validate layouts *)
-    require_le (Layout.sub sub.jkind.layout super.jkind.layout)
+    require_le (Layout.sub ~level sub.jkind.layout super.jkind.layout)
   in
   match allow_any_crossing with
   | true -> Ok ()

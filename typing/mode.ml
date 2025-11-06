@@ -273,7 +273,9 @@ module Lattices = struct
   (* Make the type of [Locality] and [Regionality] below distinguishable,
      so that we can be sure [Comonadic_with] is applied correctly. *)
   module type Areality = sig
-    include Heyting
+    include Const
+
+    include Heyting with type t := t
 
     val _is_areality : unit
   end
@@ -762,8 +764,6 @@ module Lattices = struct
     let min = L.max
 
     let max = L.min
-
-    let legacy = L.legacy
 
     let[@inline] le a b = L.le b a
 
@@ -2043,14 +2043,12 @@ module Report = struct
     | Expression -> Some (dprintf "expression")
     | Allocation -> Some (dprintf "allocation")
 
-  let print_pinpoint : ?parens:bool -> pinpoint -> (formatter -> unit) option =
-   fun ?(parens = true) (loc, desc) ->
+  let print_pinpoint : pinpoint -> (formatter -> unit) option =
+   fun (loc, desc) ->
     print_pinpoint_desc desc
     |> Option.map (fun print_desc ppf ->
            if Location.is_none loc
            then fprintf ppf "a %t" print_desc
-           else if parens
-           then fprintf ppf "the %t (at %a)" print_desc Location.print_loc loc
            else fprintf ppf "the %t at %a" print_desc Location.print_loc loc)
 
   let print_allocation_desc : allocation_desc -> formatter -> unit = function
@@ -2071,7 +2069,7 @@ module Report = struct
       print_pinpoint pp
       |> Option.map (fun print_pp -> dprintf "closes over %t" print_pp, pp)
     | Close_over { closed = pp; polarity = Monadic; _ } ->
-      print_pinpoint ~parens:false pp
+      print_pinpoint pp
       |> Option.map (fun print_pp ->
              dprintf "contains a usage (of %t)" print_pp, pp)
     | Is_closed_by { closure = pp; _ } ->
@@ -2302,7 +2300,7 @@ let () =
     | _ -> None)
 
 module type Common_axis_pos = sig
-  module Const : Lattice
+  module Const : Const
 
   include
     Common_axis
@@ -2312,7 +2310,7 @@ module type Common_axis_pos = sig
 end
 
 module type Common_axis_neg = sig
-  module Const : Lattice
+  module Const : Const
 
   include
     Common_axis
@@ -3773,7 +3771,8 @@ let alloc_as_value_unhint m =
   let comonadic = comonadic_locality_as_regionality comonadic in
   { comonadic; monadic }
 
-let alloc_as_value m = m |> Alloc.unhint |> alloc_as_value_unhint |> Value.hint
+let alloc_as_value m =
+  m |> Alloc.unhint |> alloc_as_value_unhint |> Value.hint ~monadic:Skip
 
 let alloc_to_value_l2r_unhint m =
   let { comonadic; monadic } = m in
@@ -3785,7 +3784,7 @@ let alloc_to_value_l2r_unhint m =
 
 let alloc_to_value_l2r m =
   m |> Alloc.disallow_right |> Alloc.unhint |> alloc_to_value_l2r_unhint
-  |> Value.hint
+  |> Value.hint ~monadic:Skip
 
 let value_to_alloc_r2g_unhint m =
   let { comonadic; monadic } = m in
@@ -3796,7 +3795,7 @@ let value_to_alloc_r2g_unhint m =
   { comonadic; monadic }
 
 let value_to_alloc_r2g m =
-  m |> Value.unhint |> value_to_alloc_r2g_unhint |> Alloc.hint
+  m |> Value.unhint |> value_to_alloc_r2g_unhint |> Alloc.hint ~monadic:Skip
 
 let value_r2g ?hint m =
   Value.wrap ~monadic:Skip ?comonadic:hint
@@ -3809,7 +3808,7 @@ let value_to_alloc_r2l_unhint m =
   { comonadic; monadic }
 
 let value_to_alloc_r2l m =
-  m |> Value.unhint |> value_to_alloc_r2l_unhint |> Alloc.hint
+  m |> Value.unhint |> value_to_alloc_r2l_unhint |> Alloc.hint ~monadic:Skip
 
 module Modality = struct
   (* Inferred modalities
@@ -4434,8 +4433,6 @@ module Crossing = struct
 
     let min = Modality (Join_const Mode.Const.max)
 
-    let legacy = Modality (Join_const Mode.Const.legacy)
-
     let join (Modality (Join_const c0)) (Modality (Join_const c1)) =
       Modality (Join_const (Mode.Const.meet c0 c1))
 
@@ -4494,6 +4491,8 @@ module Crossing = struct
              yielding
            })
 
+    let always_constructed_at c = Modality (Meet_const c)
+
     let proj (type a) (ax : a Mode.Axis.t) (Modality (Meet_const c)) : a Atom.t
         =
       Modality (Meet_with ((Axis.proj [@inlined hint]) ax c))
@@ -4520,8 +4519,6 @@ module Crossing = struct
     let max = Modality (Meet_const Mode.Const.max)
 
     let min = Modality (Meet_const Mode.Const.min)
-
-    let legacy = Modality (Meet_const Mode.Const.legacy)
 
     let join (Modality (Meet_const c0)) (Modality (Meet_const c1)) =
       Modality (Meet_const (Mode.Const.join c0 c1))
@@ -4667,8 +4664,6 @@ module Crossing = struct
   let max = { monadic = Monadic.max; comonadic = Comonadic.max }
 
   let min = { monadic = Monadic.min; comonadic = Comonadic.min }
-
-  let legacy = max (* legacy behavior is no mode crossing *)
 
   let join t0 t1 =
     { monadic = Monadic.join t0.monadic t1.monadic;

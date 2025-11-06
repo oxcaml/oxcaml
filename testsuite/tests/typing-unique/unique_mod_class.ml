@@ -148,7 +148,10 @@ module M : sig val foo : string end
 Line 7, characters 12-17:
 7 |   unique_id M.foo
                 ^^^^^
-Error: This value is "aliased" but is expected to be "unique".
+Error: This value is "aliased"
+       because it is used inside the function at Lines 6-7, characters 22-17
+       which is expected to be "many".
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 
@@ -160,7 +163,7 @@ let foo (local_ x : string ref) =
       object method m = y end
   end in new M.c
 [%%expect{|
-val foo : local_ string ref -> (unit -> < m : string >) = <fun>
+val foo : string ref @ local -> (unit -> < m : string >) = <fun>
 |}]
 
 let () =
