@@ -519,6 +519,20 @@ module X86_peephole = struct
         false)
     | Ins _ -> false
 
+  (* Utility: get at most n cells starting from the given cell.
+     Returns a list of cells (may be shorter than n if we reach the end). *)
+  let get_cells cell n =
+    let rec loop acc remaining current_opt =
+      if remaining <= 0
+      then List.rev acc
+      else
+        match current_opt with
+        | None -> List.rev acc
+        | Some current ->
+          loop (current :: acc) (remaining - 1) (DLL.next current)
+    in
+    loop [] n (Some cell)
+
   (* Compare two args for equality *)
   let equal_args arg1 arg2 =
     match[@warning "-4"] arg1, arg2 with
@@ -549,21 +563,18 @@ module X86_peephole = struct
 
   (* Rewrite rule: remove useless MOV x, y; MOV y, x pattern *)
   let remove_useless_mov cell =
-    match[@warning "-4"] DLL.value cell with
-    | Ins (MOV (src1, dst1)) -> (
-      match DLL.next cell with
-      | None -> None
-      | Some next_cell -> (
-        match[@warning "-4"] DLL.value next_cell with
-        | Ins (MOV (src2, dst2))
-          when equal_args src1 dst2 && equal_args dst1 src2 ->
-          (* Get the cell after next_cell before deleting *)
-          let after_next = DLL.next next_cell in
-          (* Delete the second MOV (the first one is still useful) *)
-          DLL.delete_curr next_cell;
-          (* Continue from the cell after the deleted one *)
-          Some after_next
-        | _ -> None))
+    match get_cells cell 2 with
+    | [cell1; cell2] -> (
+      match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
+      | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2))
+        when equal_args src1 dst2 && equal_args dst1 src2 ->
+        (* Get the cell after cell2 before deleting *)
+        let after_cell2 = DLL.next cell2 in
+        (* Delete the second MOV (the first one is still useful) *)
+        DLL.delete_curr cell2;
+        (* Continue from the cell after the deleted one *)
+        Some after_cell2
+      | _, _ -> None)
     | _ -> None
 
   (* Apply all rewrite rules in sequence.
