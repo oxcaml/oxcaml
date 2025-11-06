@@ -666,9 +666,8 @@ module X86_peephole = struct
         DLL.set_value cell1 (Ins (MOV (src1, dst2)));
         DLL.set_value cell2 (Ins (MOV (src3, dst3)));
         DLL.delete_curr cell3;
-        (* Return cell1 to check for additional optimization opportunities *)
-        let after_cell2 = DLL.next cell2 in
-        Some after_cell2
+        (* Return cell1 to allow iterative combination of MOV chains *)
+        Some (Some cell1)
       | _, _, _ -> None)
     | _ -> None
 
