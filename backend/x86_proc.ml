@@ -435,12 +435,26 @@ module X86_peephole = struct
 
   let equal_reg64 left right =
     match left, right with
-    | RAX, RAX | RBX, RBX | RCX, RCX | RDX, RDX | RSP, RSP | RBP, RBP
-    | RSI, RSI | RDI, RDI | R8, R8 | R9, R9 | R10, R10 | R11, R11 | R12, R12
-    | R13, R13 | R14, R14 | R15, R15 ->
+    | RAX, RAX
+    | RBX, RBX
+    | RCX, RCX
+    | RDX, RDX
+    | RSP, RSP
+    | RBP, RBP
+    | RSI, RSI
+    | RDI, RDI
+    | R8, R8
+    | R9, R9
+    | R10, R10
+    | R11, R11
+    | R12, R12
+    | R13, R13
+    | R14, R14
+    | R15, R15 ->
       true
-    | (RAX | RBX | RCX | RDX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11
-      | R12 | R13 | R14 | R15), _ ->
+    | ( ( RAX | RBX | RCX | RDX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11
+        | R12 | R13 | R14 | R15 ),
+        _ ) ->
       false
 
   let equal_reg8h left right =
@@ -460,12 +474,22 @@ module X86_peephole = struct
 
   let equal_data_type left right =
     match left, right with
-    | NONE, NONE | REAL4, REAL4 | REAL8, REAL8 | BYTE, BYTE | WORD, WORD
-    | DWORD, DWORD | QWORD, QWORD | VEC128, VEC128 | VEC256, VEC256
-    | VEC512, VEC512 | NEAR, NEAR | PROC, PROC ->
+    | NONE, NONE
+    | REAL4, REAL4
+    | REAL8, REAL8
+    | BYTE, BYTE
+    | WORD, WORD
+    | DWORD, DWORD
+    | QWORD, QWORD
+    | VEC128, VEC128
+    | VEC256, VEC256
+    | VEC512, VEC512
+    | NEAR, NEAR
+    | PROC, PROC ->
       true
-    | (NONE | REAL4 | REAL8 | BYTE | WORD | DWORD | QWORD | VEC128 | VEC256
-      | VEC512 | NEAR | PROC), _ ->
+    | ( ( NONE | REAL4 | REAL8 | BYTE | WORD | DWORD | QWORD | VEC128 | VEC256
+        | VEC512 | NEAR | PROC ),
+        _ ) ->
       false
 
   let equal_addr left right =
@@ -478,10 +502,8 @@ module X86_peephole = struct
     && left.displ = right.displ
 
   (* Hard barriers are instruction boundaries that stop peephole optimization.
-     These include:
-     - Labels (control flow targets)
-     - Section changes
-     - Alignment directives *)
+     These include: - Labels (control flow targets) - Section changes -
+     Alignment directives *)
   let is_hard_barrier = function
     | Directive d -> (
       match d with
@@ -519,8 +541,8 @@ module X86_peephole = struct
         false)
     | Ins _ -> false
 
-  (* Utility: get at most n cells starting from the given cell.
-     Returns a list of cells (may be shorter than n if we reach the end). *)
+  (* Utility: get at most n cells starting from the given cell. Returns a list
+     of cells (may be shorter than n if we reach the end). *)
   let get_cells cell n =
     let rec loop acc remaining current_opt =
       if remaining <= 0
@@ -577,13 +599,13 @@ module X86_peephole = struct
       | _, _ -> None)
     | _ -> None
 
-  (* Rewrite rule: combine adjacent ADD to RSP with CFI directives.
-     Pattern: addq $n1, %rsp; .cfi_adjust_cfa_offset d1;
-              addq $n2, %rsp; .cfi_adjust_cfa_offset d2
-     Rewrite: addq $(n1+n2), %rsp; .cfi_adjust_cfa_offset (d1+d2)
+  (* Rewrite rule: combine adjacent ADD to RSP with CFI directives. Pattern:
+     addq $n1, %rsp; .cfi_adjust_cfa_offset d1; addq $n2, %rsp;
+     .cfi_adjust_cfa_offset d2 Rewrite: addq $(n1+n2), %rsp;
+     .cfi_adjust_cfa_offset (d1+d2)
 
-     This only applies when d1 = -n1 and d2 = -n2
-     (i.e., the CFI offsets correctly track the stack adjustment). *)
+     This only applies when d1 = -n1 and d2 = -n2 (i.e., the CFI offsets
+     correctly track the stack adjustment). *)
   let combine_add_rsp cell =
     match get_cells cell 4 with
     | [cell1; cell2; cell3; cell4] -> (
@@ -591,9 +613,11 @@ module X86_peephole = struct
         DLL.value cell1, DLL.value cell2, DLL.value cell3, DLL.value cell4
       with
       | ( Ins (ADD (Imm n1, Reg64 RSP)),
-          Directive (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d1),
+          Directive
+            (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d1),
           Ins (ADD (Imm n2, Reg64 RSP)),
-          Directive (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d2) )
+          Directive
+            (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d2) )
         when Int64.equal (Int64.of_int d1) (Int64.neg n1)
              && Int64.equal (Int64.of_int d2) (Int64.neg n2) ->
         (* Combine the instructions *)
@@ -613,8 +637,33 @@ module X86_peephole = struct
       | _, _, _, _ -> None)
     | _ -> None
 
-  (* Apply all rewrite rules in sequence.
-     Returns Some continuation_cell if a rule matched, None otherwise. *)
+  (* Rewrite rule: optimize MOV chain that writes to intermediate register.
+     Pattern: mov A, x; mov x, y; mov B, x Rewrite: mov A, y; mov B, x
+
+     This is safe when B ≠ x (otherwise we'd incorrectly eliminate a write). The
+     transformation preserves the final values: x = B, y = A. *)
+  let remove_mov_chain cell =
+    match get_cells cell 3 with
+    | [cell1; cell2; cell3] -> (
+      match[@warning "-4"]
+        DLL.value cell1, DLL.value cell2, DLL.value cell3
+      with
+      | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2)), Ins (MOV (src3, dst3))
+        when equal_args dst1 src2 && equal_args dst1 dst3
+             && not (equal_args src3 dst3) ->
+        (* Pattern: mov A, x; mov x, y; mov B, x where B ≠ x *)
+        (* Rewrite to: mov A, y; mov B, x *)
+        DLL.set_value cell1 (Ins (MOV (src1, dst2)));
+        DLL.set_value cell2 (Ins (MOV (src3, dst3)));
+        DLL.delete_curr cell3;
+        (* Return cell1 to check for additional optimization opportunities *)
+        let after_cell2 = DLL.next cell2 in
+        Some after_cell2
+      | _, _, _ -> None)
+    | _ -> None
+
+  (* Apply all rewrite rules in sequence. Returns Some continuation_cell if a
+     rule matched, None otherwise. *)
   let apply_rules cell =
     match remove_mov_x_x cell with
     | Some cont -> Some cont
@@ -622,21 +671,25 @@ module X86_peephole = struct
       match remove_useless_mov cell with
       | Some cont -> Some cont
       | None -> (
-        match combine_add_rsp cell with Some cont -> Some cont | None -> None))
+        match remove_mov_chain cell with
+        | Some cont -> Some cont
+        | None -> (
+          match combine_add_rsp cell with
+          | Some cont -> Some cont
+          | None -> None)))
 
-  (* Main optimization loop for a single asm_program.
-     Iterates through the instruction list, applying rewrite rules and
-     respecting hard barriers. *)
+  (* Main optimization loop for a single asm_program. Iterates through the
+     instruction list, applying rewrite rules and respecting hard barriers. *)
   let peephole_optimize_asm_program asm_program =
     let rec optimize_from cell_opt =
       match cell_opt with
       | None -> ()
-      | Some cell ->
+      | Some cell -> (
         if is_hard_barrier (DLL.value cell)
         then
           (* Skip hard barriers and continue after them *)
           optimize_from (DLL.next cell)
-        else (
+        else
           match apply_rules cell with
           | Some continuation_cell ->
             (* A rule was applied, continue from the continuation point *)
@@ -649,9 +702,8 @@ module X86_peephole = struct
 end
 
 let generate_code asm =
-  (* Apply peephole optimizations to asm_code.
-     TODO: Extend this to optimize all sections in asm_code_by_section,
-     not just asm_code. *)
+  (* Apply peephole optimizations to asm_code. TODO: Extend this to optimize all
+     sections in asm_code_by_section, not just asm_code. *)
   if !Oxcaml_flags.x86_peephole_optimize
   then X86_peephole.peephole_optimize_asm_program asm_code;
   (match asm with
