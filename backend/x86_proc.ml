@@ -572,16 +572,15 @@ module X86_peephole = struct
     | _, _ -> false
 
   (* Check if an arg is a safe-to-optimize self-move *)
-  let is_safe_self_move_arg = function
+  let is_safe_self_move_arg = function[@warning "-4"]
     | Reg8L _ | Reg8H _ | Reg16 _ | Reg64 _ -> true
     | _ -> false
 
-  (* Rewrite rule: remove MOV x, x (moving a value to itself)
-     Note: We can only safely remove self-moves for registers that don't
-     have zero-extension side effects. On x86-64:
-     - 32-bit moves (Reg32) zero the upper 32 bits
-     - SIMD moves (Regf) may zero upper bits depending on instruction encoding
-     So we only optimize 8/16/64-bit integer register self-moves. *)
+  (* Rewrite rule: remove MOV x, x (moving a value to itself) Note: We can only
+     safely remove self-moves for registers that don't have zero-extension side
+     effects. On x86-64: - 32-bit moves (Reg32) zero the upper 32 bits - SIMD
+     moves (Regf) may zero upper bits depending on instruction encoding So we
+     only optimize 8/16/64-bit integer register self-moves. *)
   let remove_mov_x_x cell =
     match[@warning "-4"] DLL.value cell with
     | Ins (MOV (src, dst)) when equal_args src dst && is_safe_self_move_arg src
