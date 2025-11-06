@@ -2660,6 +2660,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         [ Simple
             (Simple.const_bool machine_width
                (String.equal Sys.os_type "Cygwin")) ]
+      | Arch_amd64 ->
+        [ Simple
+            (Simple.const_bool machine_width
+               (String.equal Config.architecture "amd64")) ]
+      | Arch_arm64 ->
+        [ Simple
+            (Simple.const_bool machine_width
+               (String.equal Config.architecture "arm64")) ]
       | Backend_type ->
         [Simple (Simple.const_zero machine_width)]
         (* constructor 0 is the same as Native here *)
