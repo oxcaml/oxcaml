@@ -5416,6 +5416,12 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tsplice t1, Tsplice t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
+          | (Tquote t1, _) ->
+              let t2 = newty2 ~level:(get_level t2) (Tsplice t2) in
+              moregen inst_nongen variance type_pairs env t1 t2
+          | (Tsplice t1, _) ->
+              let t2 = newty2 ~level:(get_level t2) (Tquote t2) in
+              moregen inst_nongen variance type_pairs env t1 t2
           | (_, _) ->
               raise_unexplained_for Moregen
         end
