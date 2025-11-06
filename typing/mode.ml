@@ -2027,6 +2027,34 @@ module Report = struct
 
   open Format
 
+  let print_lock_item ppf : lock_item -> _ = function
+    | Module -> fprintf ppf "module"
+    | Class -> fprintf ppf "class"
+    | Value -> fprintf ppf "value"
+    | Constructor -> fprintf ppf "constructor"
+
+  let print_pinpoint_desc : pinpoint_desc -> (formatter -> unit) option =
+    function
+    | Unknown -> None
+    | Ident { category; lid } ->
+      Some
+        (dprintf "%a %a" print_lock_item category
+           (Misc.Style.as_inline_code !print_longident)
+           lid)
+    | Function -> Some (dprintf "function")
+    | Functor -> Some (dprintf "functor")
+    | Lazy -> Some (dprintf "lazy expression")
+    | Expression -> Some (dprintf "expression")
+    | Allocation -> Some (dprintf "allocation")
+
+  let print_pinpoint : pinpoint -> (formatter -> unit) option =
+   fun (loc, desc) ->
+    print_pinpoint_desc desc
+    |> Option.map (fun print_desc ppf ->
+           if Location.is_none loc
+           then fprintf ppf "a %t" print_desc
+           else fprintf ppf "the %t at %a" print_desc Location.print_loc loc)
+
   let print_mutable_part ppf = function
     | Record_field s -> fprintf ppf "mutable field %a" Misc.Style.inline_code s
     | Array_elements -> fprintf ppf "array elements"
@@ -2075,34 +2103,6 @@ module Report = struct
         pp_print_string ppf "modules always need"
       | _ -> pp_print_string ppf "it is a module and thus needs");
       pp_print_string ppf " to be allocated on the heap"
-
-  let print_lock_item ppf : lock_item -> _ = function
-    | Module -> fprintf ppf "module"
-    | Class -> fprintf ppf "class"
-    | Value -> fprintf ppf "value"
-    | Constructor -> fprintf ppf "constructor"
-
-  let print_pinpoint_desc : pinpoint_desc -> (formatter -> unit) option =
-    function
-    | Unknown -> None
-    | Ident { category; lid } ->
-      Some
-        (dprintf "%a %a" print_lock_item category
-           (Misc.Style.as_inline_code !print_longident)
-           lid)
-    | Function -> Some (dprintf "function")
-    | Functor -> Some (dprintf "functor")
-    | Lazy -> Some (dprintf "lazy expression")
-    | Expression -> Some (dprintf "expression")
-    | Allocation -> Some (dprintf "allocation")
-
-  let print_pinpoint : pinpoint -> (formatter -> unit) option =
-   fun (loc, desc) ->
-    print_pinpoint_desc desc
-    |> Option.map (fun print_desc ppf ->
-           if Location.is_none loc
-           then fprintf ppf "a %t" print_desc
-           else fprintf ppf "the %t at %a" print_desc Location.print_loc loc)
 
   let print_allocation_l : allocation -> formatter -> unit =
    fun { txt; loc } ->
