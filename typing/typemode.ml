@@ -347,8 +347,10 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     match annots.portability, annots.statefulness with
     | (Some _ as p), _ | p, None -> p
     | None, Some Statefulness.Const.Stateless -> Some Portability.Const.Portable
-    | None, Some Statefulness.Const.Observing -> Some Portability.Const.Splittable
-    | None, Some Statefulness.Const.Stateful -> Some Portability.Const.Nonportable
+    | None, Some Statefulness.Const.Observing ->
+      Some Portability.Const.Splittable
+    | None, Some Statefulness.Const.Stateful ->
+      Some Portability.Const.Nonportable
   in
   { annots with forkable; yielding; contention; portability }
 
