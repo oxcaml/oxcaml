@@ -195,7 +195,7 @@ let speclist = [
    "-no-breakpoint-message", Arg.Clear Parameters.breakpoint,
       " Do not print message at breakpoint setup and removal";
    "-quiet", Arg.Set Parameters.quiet,
-      " Suppress printing while executing an initalization file";
+      " Suppress printing while executing an initialization file";
    ]
 
 let function_placeholder () =
