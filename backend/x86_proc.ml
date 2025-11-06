@@ -438,11 +438,39 @@ module X86_peephole = struct
      - Alignment directives *)
   let is_hard_barrier = function
     | Directive d -> (
-      match[@warning "-4"] d with
+      match d with
       | Asm_targets.Asm_directives.Directive.New_label _ -> true
       | Asm_targets.Asm_directives.Directive.Section _ -> true
       | Asm_targets.Asm_directives.Directive.Align _ -> true
-      | _ -> false)
+      | Asm_targets.Asm_directives.Directive.Bytes _
+      | Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset _
+      | Asm_targets.Asm_directives.Directive.Cfi_def_cfa_offset _
+      | Asm_targets.Asm_directives.Directive.Cfi_endproc
+      | Asm_targets.Asm_directives.Directive.Cfi_offset _
+      | Asm_targets.Asm_directives.Directive.Cfi_startproc
+      | Asm_targets.Asm_directives.Directive.Cfi_remember_state
+      | Asm_targets.Asm_directives.Directive.Cfi_restore_state
+      | Asm_targets.Asm_directives.Directive.Cfi_def_cfa_register _
+      | Asm_targets.Asm_directives.Directive.Comment _
+      | Asm_targets.Asm_directives.Directive.Const _
+      | Asm_targets.Asm_directives.Directive.Direct_assignment _
+      | Asm_targets.Asm_directives.Directive.File _
+      | Asm_targets.Asm_directives.Directive.Global _
+      | Asm_targets.Asm_directives.Directive.Indirect_symbol _
+      | Asm_targets.Asm_directives.Directive.Loc _
+      | Asm_targets.Asm_directives.Directive.New_line
+      | Asm_targets.Asm_directives.Directive.Private_extern _
+      | Asm_targets.Asm_directives.Directive.Size _
+      | Asm_targets.Asm_directives.Directive.Sleb128 _
+      | Asm_targets.Asm_directives.Directive.Space _
+      | Asm_targets.Asm_directives.Directive.Type _
+      | Asm_targets.Asm_directives.Directive.Uleb128 _
+      | Asm_targets.Asm_directives.Directive.Protected _
+      | Asm_targets.Asm_directives.Directive.Hidden _
+      | Asm_targets.Asm_directives.Directive.Weak _
+      | Asm_targets.Asm_directives.Directive.External _
+      | Asm_targets.Asm_directives.Directive.Reloc _ ->
+        false)
     | Ins _ -> false
 
   (* Compare two args for equality *)
