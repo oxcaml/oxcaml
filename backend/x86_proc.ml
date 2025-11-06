@@ -424,7 +424,114 @@ let reset_asm_code () =
   asm_code_current_section := DLL.make_empty ();
   Section_name.Tbl.clear asm_code_by_section
 
+(* Peephole optimization for x86 instruction lists.
+
+   TODO: This code should eventually be moved to a separate module in
+   backend/x86_peephole/ to better organize the peephole optimization
+   infrastructure and rules. *)
+
+module X86_peephole = struct
+  (* Hard barriers are instruction boundaries that stop peephole optimization.
+     These include:
+     - Labels (control flow targets)
+     - Section changes
+     - Alignment directives *)
+  let is_hard_barrier = function
+    | Directive d -> (
+      match[@warning "-4"] d with
+      | Asm_targets.Asm_directives.Directive.New_label _ -> true
+      | Asm_targets.Asm_directives.Directive.Section _ -> true
+      | Asm_targets.Asm_directives.Directive.Align _ -> true
+      | _ -> false)
+    | Ins _ -> false
+
+  (* Compare two args for equality *)
+  let equal_args arg1 arg2 =
+    match[@warning "-4"] arg1, arg2 with
+    | Imm i1, Imm i2 -> Int64.equal i1 i2
+    | Sym s1, Sym s2 -> String.equal s1 s2
+    | Reg8L r1, Reg8L r2 -> Stdlib.( = ) r1 r2
+    | Reg8H r1, Reg8H r2 -> Stdlib.( = ) r1 r2
+    | Reg16 r1, Reg16 r2 -> Stdlib.( = ) r1 r2
+    | Reg32 r1, Reg32 r2 -> Stdlib.( = ) r1 r2
+    | Reg64 r1, Reg64 r2 -> Stdlib.( = ) r1 r2
+    | Regf rf1, Regf rf2 -> Stdlib.( = ) rf1 rf2
+    | Mem addr1, Mem addr2 ->
+      Stdlib.( = ) addr1.arch addr2.arch
+      && Stdlib.( = ) addr1.typ addr2.typ
+      && Stdlib.( = ) addr1.idx addr2.idx
+      && addr1.scale = addr2.scale
+      && Option.equal Stdlib.( = ) addr1.base addr2.base
+      && Option.equal String.equal addr1.sym addr2.sym
+      && addr1.displ = addr2.displ
+    | Mem64_RIP (t1, s1, i1), Mem64_RIP (t2, s2, i2) ->
+      Stdlib.( = ) t1 t2 && String.equal s1 s2 && i1 = i2
+    | _, _ -> false
+
+  (* Rewrite rule: remove MOV x, x (moving a value to itself) *)
+  let remove_mov_x_x cell =
+    match[@warning "-4"] DLL.value cell with
+    | Ins (MOV (src, dst)) when equal_args src dst ->
+      (* Delete the redundant instruction *)
+      DLL.delete_curr cell;
+      (* Continue from the next cell *)
+      Some (DLL.next cell)
+    | _ -> None
+
+  (* Rewrite rule: remove useless MOV x, y; MOV y, x pattern *)
+  let remove_useless_mov cell =
+    match[@warning "-4"] DLL.value cell with
+    | Ins (MOV (src1, dst1)) -> (
+      match DLL.next cell with
+      | None -> None
+      | Some next_cell -> (
+        match[@warning "-4"] DLL.value next_cell with
+        | Ins (MOV (src2, dst2))
+          when equal_args src1 dst2 && equal_args dst1 src2 ->
+          (* Delete the second MOV (the first one is still useful) *)
+          DLL.delete_curr next_cell;
+          (* Continue from the cell after the deleted one *)
+          Some (DLL.next next_cell)
+        | _ -> None))
+    | _ -> None
+
+  (* Apply all rewrite rules in sequence.
+     Returns Some continuation_cell if a rule matched, None otherwise. *)
+  let apply_rules cell =
+    match remove_mov_x_x cell with
+    | Some cont -> Some cont
+    | None -> (
+      match remove_useless_mov cell with Some cont -> Some cont | None -> None)
+
+  (* Main optimization loop for a single asm_program.
+     Iterates through the instruction list, applying rewrite rules and
+     respecting hard barriers. *)
+  let peephole_optimize_asm_program asm_program =
+    let rec optimize_from cell_opt =
+      match cell_opt with
+      | None -> ()
+      | Some cell ->
+        if is_hard_barrier (DLL.value cell)
+        then
+          (* Skip hard barriers and continue after them *)
+          optimize_from (DLL.next cell)
+        else (
+          match apply_rules cell with
+          | Some continuation_cell ->
+            (* A rule was applied, continue from the continuation point *)
+            optimize_from continuation_cell
+          | None ->
+            (* No rule matched, move to the next instruction *)
+            optimize_from (DLL.next cell))
+    in
+    optimize_from (DLL.hd_cell asm_program)
+end
+
 let generate_code asm =
+  (* Apply peephole optimizations to asm_code.
+     TODO: Extend this to optimize all sections in asm_code_by_section,
+     not just asm_code. *)
+  X86_peephole.peephole_optimize_asm_program asm_code;
   (match asm with
   | Some f -> Profile.record ~accumulate:true "write_asm" f asm_code
   | None -> ());
