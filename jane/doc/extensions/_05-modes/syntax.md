@@ -16,7 +16,7 @@ mode ::= locality | uniqueness | linearity | portability | contention
 locality ::= `global` | `local`
 uniqueness ::= `unique` | `aliased`
 linearity ::= `many` | `once`
-portability ::= `portable` | `nonportable`
+portability ::= `portable` | `splittable` | `nonportable`
 contention ::= `uncontended` | `shared` | `contended`
 yield ::= `unyielding` | `yielding`
 fork ::= `forkable` | `unforkable`
@@ -293,6 +293,7 @@ and modalities, according to this table:
 | `global`      | `unyielding` |
 | `local`       | `yielding`   |
 | `stateless`   | `portable`   |
+| `observing`   | `splittable` |
 | `immutable`   | `contended`  |
 | `read`        | `shared`     |
 

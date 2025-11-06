@@ -531,14 +531,29 @@ Line 1, characters 70-71:
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
-(* [observing] or [stateful] don't change the default. *)
+(* [observing] => [splittable]. *)
+
+let default : 'a @ observing -> 'a @ splittable = fun x -> x
+[%%expect{|
+val default : 'a @ observing -> 'a @ splittable = <fun>
+|}]
+
+let override : 'a @ observing nonportable -> 'a @ splittable = fun x -> x
+[%%expect{|
+Line 1, characters 72-73:
+1 | let override : 'a @ observing nonportable -> 'a @ splittable = fun x -> x
+                                                                            ^
+Error: This value is "nonportable" but is expected to be "splittable".
+|}]
+
+(* [stateful] doesn't change the default. *)
 
 let fails : 'a @ observing -> 'a @ portable = fun x -> x
 [%%expect{|
 Line 1, characters 55-56:
 1 | let fails : 'a @ observing -> 'a @ portable = fun x -> x
                                                            ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "splittable" but is expected to be "portable".
 |}]
 
 let succeeds : 'a @ observing portable -> 'a @ portable = fun x -> x

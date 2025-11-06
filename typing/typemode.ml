@@ -47,6 +47,7 @@ module Mode_axis_pair = struct
     | "once" -> comonadic Linearity Once
     | "many" -> comonadic Linearity Many
     | "nonportable" -> comonadic Portability Nonportable
+    | "splittable" -> comonadic Portability Splittable
     | "portable" -> comonadic Portability Portable
     | "contended" -> monadic Contention Contended
     | "shared" -> monadic Contention Shared
@@ -346,8 +347,8 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     match annots.portability, annots.statefulness with
     | (Some _ as p), _ | p, None -> p
     | None, Some Statefulness.Const.Stateless -> Some Portability.Const.Portable
-    | None, Some Statefulness.Const.(Observing | Stateful) ->
-      Some Portability.Const.Nonportable
+    | None, Some Statefulness.Const.Observing -> Some Portability.Const.Splittable
+    | None, Some Statefulness.Const.Stateful -> Some Portability.Const.Nonportable
   in
   { annots with forkable; yielding; contention; portability }
 
@@ -403,8 +404,8 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
   let portability =
     match modes.statefulness, modes.portability with
     | Some Statefulness.Const.Stateless, Some Portability.Const.Portable
-    | ( Some Statefulness.Const.(Observing | Stateful),
-        Some Portability.Const.Nonportable ) ->
+    | Some Statefulness.Const.Observing, Some Portability.Const.Splittable
+    | Some Statefulness.Const.Stateful, Some Portability.Const.Nonportable ->
       None
     | _, _ -> print_to_string_opt Mode.Portability.Const.print modes.portability
   in
@@ -548,7 +549,10 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
     [Atom (Monadic Contention, Join_with b)]
   | Comonadic Statefulness, Meet_with a ->
     let b : Portability.Const.t =
-      match a with Stateless -> Portable | Stateful | Observing -> Nonportable
+      match a with
+      | Stateless -> Portable
+      | Observing -> Splittable
+      | Stateful -> Nonportable
     in
     [Atom (Comonadic Portability, Meet_with b)]
   | _ -> []

@@ -140,7 +140,7 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable"
+Error: This value is "splittable"
        because it contains a usage (of the value "r" at Line 3, characters 25-26)
        which is expected to be "shared" or "uncontended"
        because its mutable field "a" is being read.
@@ -156,7 +156,7 @@ let foo (r @ shared) =
 Line 3, characters 23-26:
 3 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable"
+Error: This value is "splittable"
        because it contains a usage (of the value "r" at Line 2, characters 25-26)
        which is expected to be "shared" or "uncontended"
        because its mutable field "a" is being read.
@@ -331,7 +331,7 @@ let foo : 'a @ shared portable -> (unit -> unit) @ portable = fun a () -> ()
 Line 1, characters 62-76:
 1 | let foo : 'a @ shared portable -> (unit -> unit) @ portable = fun a () -> ()
                                                                   ^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "nonportable",
+Error: This function when partially applied returns a value which is "splittable",
        but expected to be "portable".
 |}]
 (* CR modes: These three tests are in principle fine to allow (they don't cause a data

@@ -128,16 +128,18 @@ when they are contended.
 |-----------------|
 | **nonportable** |
 | `|`             |
+| splittable      |
+| `|`             |
 | portable        |
 {: .table }
 
 Portability is a future axis that tracks whether a value is permitted to be
-shared with another thread. OxCaml's parallelism API does not allow
-*nonportable* values to move across thread boundaries, while *portable* values
-may move freely.
+shared with another thread. OxCaml's parallelism API allows only *portable* values to
+move across thread boundaries.
 
 Portability is about functions: functions that capture uncontended mutable state
-are not portable.
+are not portable. Portable closures capture all values at *contended*,
+while splittable closures capture all values at *shared*.
 
 Notably, it is generally safe to send mutable data *itself* to other threads,
 because it will then be *contended*, so the mutable portions will be
@@ -167,8 +169,8 @@ defaulted to *forkable*, while *local* values are defaulted to *unforkable*.
 More documentation on mode implications is available [here](../../kinds/syntax).
 
 Forkable is irrelevant for types that do not contain functions, and values of such types
-*mode cross* on the forkable axis; they may be used as unforkable even
-when they are forkable.
+*mode cross* on the forkable axis; they may be used as forkable even when they are
+unforkable.
 
 # Modes for aliasing {#uniqueness-linearity}
 
