@@ -461,7 +461,7 @@ Line 2, characters 23-24:
 2 | fork (fun () -> Xm.set r 1);;
                            ^
 Error: The value "r" is "nonportable" but is expected to be "portable"
-       because it is used inside the function (at Line 2, characters 5-27)
+       because it is used inside the function at Line 2, characters 5-27
        which is expected to be "portable".
 |}]
 

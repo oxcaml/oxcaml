@@ -2043,14 +2043,12 @@ module Report = struct
     | Expression -> Some (dprintf "expression")
     | Allocation -> Some (dprintf "allocation")
 
-  let print_pinpoint : ?parens:bool -> pinpoint -> (formatter -> unit) option =
-   fun ?(parens = true) (loc, desc) ->
+  let print_pinpoint : pinpoint -> (formatter -> unit) option =
+   fun (loc, desc) ->
     print_pinpoint_desc desc
     |> Option.map (fun print_desc ppf ->
            if Location.is_none loc
            then fprintf ppf "a %t" print_desc
-           else if parens
-           then fprintf ppf "the %t (at %a)" print_desc Location.print_loc loc
            else fprintf ppf "the %t at %a" print_desc Location.print_loc loc)
 
   let print_allocation_desc : allocation_desc -> formatter -> unit = function
@@ -2071,7 +2069,7 @@ module Report = struct
       print_pinpoint pp
       |> Option.map (fun print_pp -> dprintf "closes over %t" print_pp, pp)
     | Close_over { closed = pp; polarity = Monadic; _ } ->
-      print_pinpoint ~parens:false pp
+      print_pinpoint pp
       |> Option.map (fun print_pp ->
              dprintf "contains a usage (of %t)" print_pp, pp)
     | Is_closed_by { closure = pp; _ } ->

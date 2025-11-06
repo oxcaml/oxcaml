@@ -71,7 +71,7 @@ Line 2, characters 45-46:
 2 |   let closure @ local unyielding = fun () -> k () in
                                                  ^
 Error: The value "k" is "yielding" but is expected to be "unyielding"
-       because it is used inside the function (at Line 2, characters 35-49)
+       because it is used inside the function at Line 2, characters 35-49
        which is expected to be "unyielding".
 |}]
 

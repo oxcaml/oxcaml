@@ -163,7 +163,7 @@ Line 2, characters 16-17:
 2 |   fun n -> lazy n
                     ^
 Error: The value "n" is "local" to the parent region but is expected to be "global"
-       because it is used inside the lazy expression (at Line 2, characters 11-17)
+       because it is used inside the lazy expression at Line 2, characters 11-17
        which is expected to be "global".
 |}]
 

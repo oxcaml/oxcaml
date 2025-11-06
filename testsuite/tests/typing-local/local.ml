@@ -443,7 +443,7 @@ Line 10, characters 24-26:
 10 |   let _force_heap = ref fn in
                              ^^
 Error: This value is "local"
-       because it closes over the value "foo" (at Line 5, characters 25-28)
+       because it closes over the value "foo" at Line 5, characters 25-28
        which is "local".
        However, the highlighted expression is expected to be "global".
 |}]
@@ -577,7 +577,7 @@ Line 3, characters 39-40:
 3 |   use_locally (fun x -> let _ = local_ r in r.contents <- Some x; x) 42
                                            ^
 Error: The value "r" is "local" but is expected to be "global"
-       because it is used inside the function (at Line 3, characters 14-68)
+       because it is used inside the function at Line 3, characters 14-68
        which is expected to be "global".
 |}]
 
@@ -697,7 +697,7 @@ Line 2, characters 30-31:
 2 |   let _ = lazy (print_string !x) in
                                   ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used inside the lazy expression (at Line 2, characters 10-32)
+       because it is used inside the lazy expression at Line 2, characters 10-32
        which is expected to be "global"
        because lazy expressions always need to be allocated on the heap.
 |}]
@@ -715,7 +715,7 @@ Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used inside the functor (at Lines 2-4, characters 17-5)
+       because it is used inside the functor at Lines 2-4, characters 17-5
        which is expected to be "global"
        because modules always need to be allocated on the heap.
 |}]
@@ -733,7 +733,7 @@ Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used inside the functor (at Lines 2-4, characters 17-5)
+       because it is used inside the functor at Lines 2-4, characters 17-5
        which is expected to be "global"
        because modules always need to be allocated on the heap.
 |}]
@@ -751,7 +751,7 @@ Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used inside the functor (at Lines 2-4, characters 17-5)
+       because it is used inside the functor at Lines 2-4, characters 17-5
        which is expected to be "global"
        because modules always need to be allocated on the heap.
 |}]
@@ -769,7 +769,7 @@ Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used inside the functor (at Lines 2-4, characters 17-5)
+       because it is used inside the functor at Lines 2-4, characters 17-5
        which is expected to be "global"
        because modules always need to be allocated on the heap.
 |}]
@@ -787,7 +787,7 @@ Line 3, characters 27-28:
 3 |     let () = print_string !x
                                ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used inside the functor (at Lines 2-4, characters 17-5)
+       because it is used inside the functor at Lines 2-4, characters 17-5
        which is expected to be "global"
        because modules always need to be allocated on the heap.
 |}]
@@ -1000,7 +1000,7 @@ Line 2, characters 41-42:
 2 | let foo (local_ x) = local_cb (fun () -> x := 17; 42)
                                              ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used inside the function (at Line 2, characters 30-53)
+       because it is used inside the function at Line 2, characters 30-53
        which is expected to be "global"
        because it is from the allocation at Line 2, characters 30-53
        which is expected to be "local" to the parent region or "global"

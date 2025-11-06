@@ -437,7 +437,7 @@ Line 1, characters 73-74:
 1 | let foo (f : (unit -> unit) @ stateful portable) @ stateless = fun () -> f ()
                                                                              ^
 Error: The value "f" is "stateful" but is expected to be "stateless"
-       because it is used inside the function (at Line 1, characters 63-77)
+       because it is used inside the function at Line 1, characters 63-77
        which is expected to be "stateless".
 |}]
 
@@ -449,7 +449,7 @@ Line 1, characters 64-65:
 1 | let foo (f : (unit -> unit) @ stateful) @ stateless = fun () -> f ()
                                                                     ^
 Error: The value "f" is "stateful" but is expected to be "stateless"
-       because it is used inside the function (at Line 1, characters 54-68)
+       because it is used inside the function at Line 1, characters 54-68
        which is expected to be "stateless".
 |}]
 
@@ -459,7 +459,7 @@ Line 1, characters 74-75:
 1 | let foo (f : (unit -> unit) @ observing portable) @ stateless = fun () -> f ()
                                                                               ^
 Error: The value "f" is "observing" but is expected to be "stateless"
-       because it is used inside the function (at Line 1, characters 64-78)
+       because it is used inside the function at Line 1, characters 64-78
        which is expected to be "stateless".
 |}]
 
@@ -507,7 +507,7 @@ Line 1, characters 64-65:
 1 | let foo (f : (unit -> unit) @ stateful) @ observing = fun () -> f ()
                                                                     ^
 Error: The value "f" is "stateful" but is expected to be "observing"
-       because it is used inside the function (at Line 1, characters 54-68)
+       because it is used inside the function at Line 1, characters 54-68
        which is expected to be "observing".
 |}]
 
@@ -690,7 +690,7 @@ Line 1, characters 42-43:
 1 | let foo (x : int ref) @ stateless = lazy (x.contents)
                                               ^
 Error: This value is "immutable"
-       because it is used inside the lazy expression (at Line 1, characters 36-53)
+       because it is used inside the lazy expression at Line 1, characters 36-53
        which is expected to be "stateless".
        However, the highlighted expression is expected to be "read" or "read_write"
        because its mutable field "contents" is being read.
@@ -702,7 +702,7 @@ Line 1, characters 42-43:
 1 | let zap (x : int ref) @ stateless = lazy (x.contents <- 3)
                                               ^
 Error: This value is "immutable"
-       because it is used inside the lazy expression (at Line 1, characters 36-58)
+       because it is used inside the lazy expression at Line 1, characters 36-58
        which is expected to be "stateless".
        However, the highlighted expression is expected to be "read_write"
        because its mutable field "contents" is being written.
@@ -716,7 +716,7 @@ Line 1, characters 42-43:
 1 | let bat (x : int ref) @ observing = lazy (x.contents <- 4)
                                               ^
 Error: This value is "read"
-       because it is used inside the lazy expression (at Line 1, characters 36-58)
+       because it is used inside the lazy expression at Line 1, characters 36-58
        which is expected to be "observing".
        However, the highlighted expression is expected to be "read_write"
        because its mutable field "contents" is being written.
