@@ -375,9 +375,7 @@ let to_array t =
   then [||]
   else
     let first_val =
-      match t.first with
-      | Empty -> assert false
-      | Node node -> node.value
+      match t.first with Empty -> assert false | Node node -> node.value
     in
     let arr = Array.make len first_val in
     iteri t ~f:(fun i v -> arr.(i) <- v);
