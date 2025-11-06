@@ -571,6 +571,11 @@ module X86_peephole = struct
       equal_data_type t1 t2 && String.equal s1 s2 && i1 = i2
     | _, _ -> false
 
+  (* Check if an argument is a register *)
+  let is_register = function
+    | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ -> true
+    | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
+
   (* Rewrite rule: remove MOV x, x (moving a value to itself) *)
   let remove_mov_x_x cell =
     match[@warning "-4"] DLL.value cell with
@@ -641,7 +646,10 @@ module X86_peephole = struct
      Pattern: mov A, x; mov x, y; mov B, x Rewrite: mov A, y; mov B, x
 
      This is safe when B ≠ x (otherwise we'd incorrectly eliminate a write). The
-     transformation preserves the final values: x = B, y = A. *)
+     transformation preserves the final values: x = B, y = A.
+
+     Additionally, both x and y must be registers to ensure the rewritten
+     instruction mov A, y is valid (x86 cannot have both operands as memory). *)
   let remove_mov_chain cell =
     match get_cells cell 3 with
     | [cell1; cell2; cell3] -> (
@@ -650,8 +658,10 @@ module X86_peephole = struct
       with
       | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2)), Ins (MOV (src3, dst3))
         when equal_args dst1 src2 && equal_args dst1 dst3
-             && not (equal_args src3 dst3) ->
-        (* Pattern: mov A, x; mov x, y; mov B, x where B ≠ x *)
+             && not (equal_args src3 dst3) && is_register dst1
+             && is_register dst2 ->
+        (* Pattern: mov A, x; mov x, y; mov B, x where B ≠ x and x, y are
+           registers *)
         (* Rewrite to: mov A, y; mov B, x *)
         DLL.set_value cell1 (Ins (MOV (src1, dst2)));
         DLL.set_value cell2 (Ins (MOV (src3, dst3)));
