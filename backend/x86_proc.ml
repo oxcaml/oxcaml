@@ -571,10 +571,21 @@ module X86_peephole = struct
       equal_data_type t1 t2 && String.equal s1 s2 && i1 = i2
     | _, _ -> false
 
-  (* Rewrite rule: remove MOV x, x (moving a value to itself) *)
+  (* Check if an arg is a safe-to-optimize self-move *)
+  let is_safe_self_move_arg = function
+    | Reg8L _ | Reg8H _ | Reg16 _ | Reg64 _ -> true
+    | _ -> false
+
+  (* Rewrite rule: remove MOV x, x (moving a value to itself)
+     Note: We can only safely remove self-moves for registers that don't
+     have zero-extension side effects. On x86-64:
+     - 32-bit moves (Reg32) zero the upper 32 bits
+     - SIMD moves (Regf) may zero upper bits depending on instruction encoding
+     So we only optimize 8/16/64-bit integer register self-moves. *)
   let remove_mov_x_x cell =
     match[@warning "-4"] DLL.value cell with
-    | Ins (MOV (src, dst)) when equal_args src dst ->
+    | Ins (MOV (src, dst)) when equal_args src dst && is_safe_self_move_arg src
+      ->
       (* Get next cell before deleting *)
       let next = DLL.next cell in
       (* Delete the redundant instruction *)
