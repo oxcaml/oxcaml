@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension runtime_metaprogramming";
+ flags = "-extension runtime_metaprogramming comprehensions";
  expect;
 *)
 
@@ -322,38 +322,14 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 
 <[ let Some x = Some "foo" in x ]>;;
 [%%expect {|
-Line 1, characters 3-31:
-1 | <[ let Some x = Some "foo" in x ]>;;
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-None
-
-- : <[string]> expr = <[match Some "foo" with | Some (x) -> x]>
 |}];;
 
 <[ let x::xs = [1; 2; 3] in x ]>;;
 [%%expect {|
-Line 1, characters 3-29:
-1 | <[ let x::xs = [1; 2; 3] in x ]>;;
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-[]
-
-- : <[int]> expr = <[match [1; 2; 3] with | x::xs -> x]>
 |}];;
 
 <[ let x::xs = [1; 2; 3] in xs ]>;;
 [%%expect {|
-Line 1, characters 3-30:
-1 | <[ let x::xs = [1; 2; 3] in xs ]>;;
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-[]
-
-- : <[int list]> expr = <[match [1; 2; 3] with | x::xs -> xs]>
 |}];;
 
 <[ let foo x = (x, x) in foo 42 ]>;;
@@ -696,44 +672,26 @@ end;;
 module Mod : sig type t = int val mk : 'a -> 'a end
 |}];;
 
+<[fun (module M : Hashtbl.S) x -> M.clear (M.create x)]>;;
+[%%expect {|
+- : <[(module Hashtbl.S) -> int -> unit]> expr =
+<[fun (module M : Stdlib.Hashtbl.S) x -> M.clear (M.create x)]>
+|}];;
+
 <[ fun (module _ : S) x -> 42 ]>;;
 [%%expect {|
-Line 1, characters 19-20:
-1 | <[ fun (module _ : S) x -> 42 ]>;;
-                       ^
-Error: Identifier "S" is used at Line 1, characters 19-20,
-       inside a quotation (<[ ... ]>);
-       it is introduced at Lines 1-7, characters 0-3, outside any quotations.
 |}];;
 
 <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
 [%%expect {|
-Line 1, characters 18-52:
-1 | <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
-                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Module definition using "struct..end"
-       is not supported inside quoted expressions,
-       as seen at Line 1, characters 18-52.
 |}];;
 
 <[ Mod.mk 42 ]>;;
 [%%expect {|
-Line 1, characters 3-9:
-1 | <[ Mod.mk 42 ]>;;
-       ^^^^^^
-Error: Identifier "Mod" is used at Line 1, characters 3-9,
-       inside a quotation (<[ ... ]>);
-       it is introduced at File "_none_", line 1, outside any quotations.
 |}];;
 
 let x = 42 in <[ x ]>;;
 [%%expect {|
-Line 1, characters 17-18:
-1 | let x = 42 in <[ x ]>;;
-                     ^
-Error: Identifier "x" is used at Line 1, characters 17-18,
-       inside a quotation (<[ ... ]>);
-       it is introduced at Line 1, characters 4-5, outside any quotations.
 |}];;
 
 let x = <[ 123 ]> in <[ $x ]>;;
@@ -741,23 +699,50 @@ let x = <[ 123 ]> in <[ $x ]>;;
 - : <[int]> expr = <[123]>
 |}];;
 
+let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 ] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ a * b for a = 1 to 10 for b = a to 10 ]]>
+|}];;
+
+let _ = <[ [ a * b for a = 1 to 10 and b = 1 to 10 ] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ a * b for a = 1 to 10 and b = 1 to 10 ]]>
+|}];;
+
+let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 ] ]>;;
+[%%expect {|
+- : <[int list]> expr =
+<[[ a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0 ]]>
+|}];;
+
+let _ = <[ [| a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 |] ]>;;
+[%%expect {|
+- : <[int array]> expr =
+<[[| a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0 |]]>
+|}];;
+
+let _ = <[ [| a ^ "!" for a in [|"foo"; "bar"|] |] ]>;;
+[%%expect {|
+- : <[string array]> expr = <[[| a ^ "!" for a in [|"foo"; "bar"|] |]]>
+|}];;
+
+let _ = <[ [: a ^ "!" for a in [:"foo"; "bar":] :] ]>;;
+[%%expect {|
+- : <[string iarray]> expr = <[[: a ^ "!" for a in [|"foo"; "bar"|] :]]>
+|}];;
+
+let _ = <[ [ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ] ]>;;
+[%%expect {|
+- : <[string list]> expr =
+<[[ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ]]>
+|}];;
+
 <[ let o = object method f = 1 end in o#f ]>;;
 [%%expect {|
-Line 1, characters 11-34:
-1 | <[ let o = object method f = 1 end in o#f ]>;;
-               ^^^^^^^^^^^^^^^^^^^^^^^
-Error: Object definition using "object..end"
-       is not supported inside quoted expressions,
-       as seen at Line 1, characters 11-34.
 |}];;
 
 <[ let open List in map ]>;;
 [%%expect {|
-Line 1, characters 3-23:
-1 | <[ let open List in map ]>;;
-       ^^^^^^^^^^^^^^^^^^^^
-Error: Opening modules is not supported inside quoted expressions,
-       as seen at Line 1, characters 3-23.
 |}];;
 
 module M = struct
