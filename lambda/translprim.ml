@@ -2448,7 +2448,7 @@ let report_error ppf = function
       fprintf ppf
         "This primitive always allocates on heap@ \
         (maybe it should be declared with %a or %a?)"
-        Style.inline_code "[@local_opt]" Style.inline_code "local_"
+        Style.inline_code "[@local_opt]" Style.inline_code "@ local"
 
 let () =
   Location.register_error_of_exn
