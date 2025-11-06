@@ -2,6 +2,7 @@
 
 open Utils256
 open Builtins
+module Float64 = Utils256.Float64
 
 (* Scalar float64 FMA tests *)
 let () =
@@ -80,363 +81,222 @@ let () =
 (* float64x2 FMA tests *)
 let () =
   (* Test mul_add: a * b + c = 2.0 * 3.0 + 1.0 = 7.0 *)
-  let a = float64x2_of_int64s 0x4000000000000000L 0x4000000000000000L in
-  let b = float64x2_of_int64s 0x4008000000000000L 0x4008000000000000L in
-  let c = float64x2_of_int64s 0x3FF0000000000000L 0x3FF0000000000000L in
+  let a = Float64.to_float64x2 2.0 2.0 in
+  let b = Float64.to_float64x2 3.0 3.0 in
+  let c = Float64.to_float64x2 1.0 1.0 in
   let result = FMA.float64x2_mul_add a b c in
-  let expect = float64x2_of_int64s 0x401C000000000000L 0x401C000000000000L in
+  let expect = Float64.to_float64x2 7.0 7.0 in
   eq_float64x2 ~result ~expect
 
 let () =
   (* Test mul_sub: a * b - c = 3.0 * 2.0 - 1.0 = 5.0 *)
-  let a = float64x2_of_int64s 0x4008000000000000L 0x4008000000000000L in
-  let b = float64x2_of_int64s 0x4000000000000000L 0x4000000000000000L in
-  let c = float64x2_of_int64s 0x3FF0000000000000L 0x3FF0000000000000L in
+  let a = Float64.to_float64x2 3.0 3.0 in
+  let b = Float64.to_float64x2 2.0 2.0 in
+  let c = Float64.to_float64x2 1.0 1.0 in
   let result = FMA.float64x2_mul_sub a b c in
-  let expect = float64x2_of_int64s 0x4014000000000000L 0x4014000000000000L in
+  let expect = Float64.to_float64x2 5.0 5.0 in
   eq_float64x2 ~result ~expect
 
 let () =
   (* Test mul_addsub: [a0*b0 - c0, a1*b1 + c1] *)
-  let a = float64x2_of_int64s 0x4000000000000000L 0x4008000000000000L in
-  let b = float64x2_of_int64s 0x4008000000000000L 0x4000000000000000L in
-  let c = float64x2_of_int64s 0x3FF0000000000000L 0x3FF0000000000000L in
+  let a = Float64.to_float64x2 2.0 3.0 in
+  let b = Float64.to_float64x2 3.0 2.0 in
+  let c = Float64.to_float64x2 1.0 1.0 in
   let result = FMA.float64x2_mul_addsub a b c in
-  let expect = float64x2_of_int64s 0x4014000000000000L 0x401C000000000000L in
+  let expect = Float64.to_float64x2 5.0 7.0 in
   eq_float64x2 ~result ~expect
 
 let () =
   (* Test mul_subadd: [a0*b0 + c0, a1*b1 - c1] *)
-  let a = float64x2_of_int64s 0x4008000000000000L 0x4000000000000000L in
-  let b = float64x2_of_int64s 0x4000000000000000L 0x4008000000000000L in
-  let c = float64x2_of_int64s 0x3FF0000000000000L 0x3FF0000000000000L in
+  let a = Float64.to_float64x2 3.0 2.0 in
+  let b = Float64.to_float64x2 2.0 3.0 in
+  let c = Float64.to_float64x2 1.0 1.0 in
   let result = FMA.float64x2_mul_subadd a b c in
-  let expect = float64x2_of_int64s 0x401C000000000000L 0x4014000000000000L in
+  let expect = Float64.to_float64x2 7.0 5.0 in
   eq_float64x2 ~result ~expect
 
 let () =
   (* Test neg_mul_add: -(a * b) + c = -(2.0 * 2.0) + 8.0 = 4.0 *)
-  let a = float64x2_of_int64s 0x4000000000000000L 0x4000000000000000L in
-  let b = float64x2_of_int64s 0x4000000000000000L 0x4000000000000000L in
-  let c = float64x2_of_int64s 0x4020000000000000L 0x4020000000000000L in
+  let a = Float64.to_float64x2 2.0 2.0 in
+  let b = Float64.to_float64x2 2.0 2.0 in
+  let c = Float64.to_float64x2 8.0 8.0 in
   let result = FMA.float64x2_neg_mul_add a b c in
-  let expect = float64x2_of_int64s 0x4010000000000000L 0x4010000000000000L in
+  let expect = Float64.to_float64x2 4.0 4.0 in
   eq_float64x2 ~result ~expect
 
 let () =
   (* Test neg_mul_sub: -(a * b) - c = -(2.0 * 3.0) - 1.0 = -7.0 *)
-  let a = float64x2_of_int64s 0x4000000000000000L 0x4000000000000000L in
-  let b = float64x2_of_int64s 0x4008000000000000L 0x4008000000000000L in
-  let c = float64x2_of_int64s 0x3FF0000000000000L 0x3FF0000000000000L in
+  let a = Float64.to_float64x2 2.0 2.0 in
+  let b = Float64.to_float64x2 3.0 3.0 in
+  let c = Float64.to_float64x2 1.0 1.0 in
   let result = FMA.float64x2_neg_mul_sub a b c in
-  let expect = float64x2_of_int64s 0xC01C000000000000L 0xC01C000000000000L in
+  let expect = Float64.to_float64x2 (-7.0) (-7.0) in
   eq_float64x2 ~result ~expect
 
 (* float32x4 FMA tests *)
 let () =
   (* Test mul_add: a * b + c = 2.0 * 3.0 + 1.0 = 7.0 *)
-  let a = float32x4_of_int64s 0x4000000040000000L 0x4000000040000000L in
-  let b = float32x4_of_int64s 0x4040000040400000L 0x4040000040400000L in
-  let c = float32x4_of_int64s 0x3f8000003f800000L 0x3f8000003f800000L in
+  let a = Float32.to_float32x4' 2.0s 2.0s 2.0s 2.0s in
+  let b = Float32.to_float32x4' 3.0s 3.0s 3.0s 3.0s in
+  let c = Float32.to_float32x4' 1.0s 1.0s 1.0s 1.0s in
   let result = FMA.float32x4_mul_add a b c in
-  let expect = float32x4_of_int64s 0x40e0000040e00000L 0x40e0000040e00000L in
+  let expect = Float32.to_float32x4' 7.0s 7.0s 7.0s 7.0s in
   eq_float32x4 ~result ~expect
 
 let () =
   (* Test mul_sub: a * b - c = 3.0 * 2.0 - 1.0 = 5.0 *)
-  let a = float32x4_of_int64s 0x4040000040400000L 0x4040000040400000L in
-  let b = float32x4_of_int64s 0x4000000040000000L 0x4000000040000000L in
-  let c = float32x4_of_int64s 0x3f8000003f800000L 0x3f8000003f800000L in
+  let a = Float32.to_float32x4' 3.0s 3.0s 3.0s 3.0s in
+  let b = Float32.to_float32x4' 2.0s 2.0s 2.0s 2.0s in
+  let c = Float32.to_float32x4' 1.0s 1.0s 1.0s 1.0s in
   let result = FMA.float32x4_mul_sub a b c in
-  let expect = float32x4_of_int64s 0x40a0000040a00000L 0x40a0000040a00000L in
+  let expect = Float32.to_float32x4' 5.0s 5.0s 5.0s 5.0s in
   eq_float32x4 ~result ~expect
 
 let () =
   (* Test mul_addsub: alternating sub/add *)
-  let a = float32x4_of_int64s 0x4000000040400000L 0x4000000040400000L in
-  let b = float32x4_of_int64s 0x4040000040000000L 0x4040000040000000L in
-  let c = float32x4_of_int64s 0x3f8000003f800000L 0x3f8000003f800000L in
+  let a = Float32.to_float32x4' 2.0s 3.0s 2.0s 3.0s in
+  let b = Float32.to_float32x4' 3.0s 2.0s 3.0s 2.0s in
+  let c = Float32.to_float32x4' 1.0s 1.0s 1.0s 1.0s in
   let result = FMA.float32x4_mul_addsub a b c in
-  let expect = float32x4_of_int64s 0x40e0000040a00000L 0x40e0000040a00000L in
+  let expect = Float32.to_float32x4' 5.0s 7.0s 5.0s 7.0s in
   eq_float32x4 ~result ~expect
 
 let () =
   (* Test mul_subadd: alternating add/sub *)
-  let a = float32x4_of_int64s 0x4040000040000000L 0x4040000040000000L in
-  let b = float32x4_of_int64s 0x4000000040400000L 0x4000000040400000L in
-  let c = float32x4_of_int64s 0x3f8000003f800000L 0x3f8000003f800000L in
+  let a = Float32.to_float32x4' 3.0s 2.0s 3.0s 2.0s in
+  let b = Float32.to_float32x4' 2.0s 3.0s 2.0s 3.0s in
+  let c = Float32.to_float32x4' 1.0s 1.0s 1.0s 1.0s in
   let result = FMA.float32x4_mul_subadd a b c in
-  let expect = float32x4_of_int64s 0x40a0000040e00000L 0x40a0000040e00000L in
+  let expect = Float32.to_float32x4' 7.0s 5.0s 7.0s 5.0s in
   eq_float32x4 ~result ~expect
 
 let () =
   (* Test neg_mul_add: -(a * b) + c = -(2.0 * 2.0) + 8.0 = 4.0 *)
-  let a = float32x4_of_int64s 0x4000000040000000L 0x4000000040000000L in
-  let b = float32x4_of_int64s 0x4000000040000000L 0x4000000040000000L in
-  let c = float32x4_of_int64s 0x4100000041000000L 0x4100000041000000L in
+  let a = Float32.to_float32x4' 2.0s 2.0s 2.0s 2.0s in
+  let b = Float32.to_float32x4' 2.0s 2.0s 2.0s 2.0s in
+  let c = Float32.to_float32x4' 8.0s 8.0s 8.0s 8.0s in
   let result = FMA.float32x4_neg_mul_add a b c in
-  let expect = float32x4_of_int64s 0x4080000040800000L 0x4080000040800000L in
+  let expect = Float32.to_float32x4' 4.0s 4.0s 4.0s 4.0s in
   eq_float32x4 ~result ~expect
 
 let () =
   (* Test neg_mul_sub: -(a * b) - c = -(2.0 * 3.0) - 1.0 = -7.0 *)
-  let a = float32x4_of_int64s 0x4000000040000000L 0x4000000040000000L in
-  let b = float32x4_of_int64s 0x4040000040400000L 0x4040000040400000L in
-  let c = float32x4_of_int64s 0x3f8000003f800000L 0x3f8000003f800000L in
+  let a = Float32.to_float32x4' 2.0s 2.0s 2.0s 2.0s in
+  let b = Float32.to_float32x4' 3.0s 3.0s 3.0s 3.0s in
+  let c = Float32.to_float32x4' 1.0s 1.0s 1.0s 1.0s in
   let result = FMA.float32x4_neg_mul_sub a b c in
-  let expect = float32x4_of_int64s 0xc0e00000c0e00000L 0xc0e00000c0e00000L in
+  let expect = Float32.to_float32x4' (-7.0s) (-7.0s) (-7.0s) (-7.0s) in
   eq_float32x4 ~result ~expect
 
 (* float64x4 FMA tests *)
 let () =
   (* Test mul_add: a * b + c = 2.0 * 3.0 + 1.0 = 7.0 *)
-  let a =
-    float64x4_of_int64s 0x4000000000000000L 0x4000000000000000L
-      0x4000000000000000L 0x4000000000000000L
-  in
-  let b =
-    float64x4_of_int64s 0x4008000000000000L 0x4008000000000000L
-      0x4008000000000000L 0x4008000000000000L
-  in
-  let c =
-    float64x4_of_int64s 0x3FF0000000000000L 0x3FF0000000000000L
-      0x3FF0000000000000L 0x3FF0000000000000L
-  in
+  let a = Float64.to_float64x4 2.0 2.0 2.0 2.0 in
+  let b = Float64.to_float64x4 3.0 3.0 3.0 3.0 in
+  let c = Float64.to_float64x4 1.0 1.0 1.0 1.0 in
   let result = FMA.float64x4_mul_add a b c in
-  let expect =
-    float64x4_of_int64s 0x401C000000000000L 0x401C000000000000L
-      0x401C000000000000L 0x401C000000000000L
-  in
+  let expect = Float64.to_float64x4 7.0 7.0 7.0 7.0 in
   eq_float64x4 ~result ~expect
 
 let () =
   (* Test mul_sub: a * b - c = 3.0 * 2.0 - 1.0 = 5.0 *)
-  let a =
-    float64x4_of_int64s 0x4008000000000000L 0x4008000000000000L
-      0x4008000000000000L 0x4008000000000000L
-  in
-  let b =
-    float64x4_of_int64s 0x4000000000000000L 0x4000000000000000L
-      0x4000000000000000L 0x4000000000000000L
-  in
-  let c =
-    float64x4_of_int64s 0x3FF0000000000000L 0x3FF0000000000000L
-      0x3FF0000000000000L 0x3FF0000000000000L
-  in
+  let a = Float64.to_float64x4 3.0 3.0 3.0 3.0 in
+  let b = Float64.to_float64x4 2.0 2.0 2.0 2.0 in
+  let c = Float64.to_float64x4 1.0 1.0 1.0 1.0 in
   let result = FMA.float64x4_mul_sub a b c in
-  let expect =
-    float64x4_of_int64s 0x4014000000000000L 0x4014000000000000L
-      0x4014000000000000L 0x4014000000000000L
-  in
+  let expect = Float64.to_float64x4 5.0 5.0 5.0 5.0 in
   eq_float64x4 ~result ~expect
 
 let () =
   (* Test mul_addsub: alternating sub/add *)
-  let a =
-    float64x4_of_int64s 0x4000000000000000L 0x4008000000000000L
-      0x4000000000000000L 0x4008000000000000L
-  in
-  let b =
-    float64x4_of_int64s 0x4008000000000000L 0x4000000000000000L
-      0x4008000000000000L 0x4000000000000000L
-  in
-  let c =
-    float64x4_of_int64s 0x3FF0000000000000L 0x3FF0000000000000L
-      0x3FF0000000000000L 0x3FF0000000000000L
-  in
+  let a = Float64.to_float64x4 2.0 3.0 2.0 3.0 in
+  let b = Float64.to_float64x4 3.0 2.0 3.0 2.0 in
+  let c = Float64.to_float64x4 1.0 1.0 1.0 1.0 in
   let result = FMA.float64x4_mul_addsub a b c in
-  let expect =
-    float64x4_of_int64s 0x4014000000000000L 0x401C000000000000L
-      0x4014000000000000L 0x401C000000000000L
-  in
+  let expect = Float64.to_float64x4 5.0 7.0 5.0 7.0 in
   eq_float64x4 ~result ~expect
 
 let () =
   (* Test mul_subadd: alternating add/sub *)
-  let a =
-    float64x4_of_int64s 0x4008000000000000L 0x4000000000000000L
-      0x4008000000000000L 0x4000000000000000L
-  in
-  let b =
-    float64x4_of_int64s 0x4000000000000000L 0x4008000000000000L
-      0x4000000000000000L 0x4008000000000000L
-  in
-  let c =
-    float64x4_of_int64s 0x3FF0000000000000L 0x3FF0000000000000L
-      0x3FF0000000000000L 0x3FF0000000000000L
-  in
+  let a = Float64.to_float64x4 3.0 2.0 3.0 2.0 in
+  let b = Float64.to_float64x4 2.0 3.0 2.0 3.0 in
+  let c = Float64.to_float64x4 1.0 1.0 1.0 1.0 in
   let result = FMA.float64x4_mul_subadd a b c in
-  let expect =
-    float64x4_of_int64s 0x401C000000000000L 0x4014000000000000L
-      0x401C000000000000L 0x4014000000000000L
-  in
+  let expect = Float64.to_float64x4 7.0 5.0 7.0 5.0 in
   eq_float64x4 ~result ~expect
 
 let () =
   (* Test neg_mul_add: -(a * b) + c = -(2.0 * 2.0) + 8.0 = 4.0 *)
-  let a =
-    float64x4_of_int64s 0x4000000000000000L 0x4000000000000000L
-      0x4000000000000000L 0x4000000000000000L
-  in
-  let b =
-    float64x4_of_int64s 0x4000000000000000L 0x4000000000000000L
-      0x4000000000000000L 0x4000000000000000L
-  in
-  let c =
-    float64x4_of_int64s 0x4020000000000000L 0x4020000000000000L
-      0x4020000000000000L 0x4020000000000000L
-  in
+  let a = Float64.to_float64x4 2.0 2.0 2.0 2.0 in
+  let b = Float64.to_float64x4 2.0 2.0 2.0 2.0 in
+  let c = Float64.to_float64x4 8.0 8.0 8.0 8.0 in
   let result = FMA.float64x4_neg_mul_add a b c in
-  let expect =
-    float64x4_of_int64s 0x4010000000000000L 0x4010000000000000L
-      0x4010000000000000L 0x4010000000000000L
-  in
+  let expect = Float64.to_float64x4 4.0 4.0 4.0 4.0 in
   eq_float64x4 ~result ~expect
 
 let () =
   (* Test neg_mul_sub: -(a * b) - c = -(2.0 * 3.0) - 1.0 = -7.0 *)
-  let a =
-    float64x4_of_int64s 0x4000000000000000L 0x4000000000000000L
-      0x4000000000000000L 0x4000000000000000L
-  in
-  let b =
-    float64x4_of_int64s 0x4008000000000000L 0x4008000000000000L
-      0x4008000000000000L 0x4008000000000000L
-  in
-  let c =
-    float64x4_of_int64s 0x3FF0000000000000L 0x3FF0000000000000L
-      0x3FF0000000000000L 0x3FF0000000000000L
-  in
+  let a = Float64.to_float64x4 2.0 2.0 2.0 2.0 in
+  let b = Float64.to_float64x4 3.0 3.0 3.0 3.0 in
+  let c = Float64.to_float64x4 1.0 1.0 1.0 1.0 in
   let result = FMA.float64x4_neg_mul_sub a b c in
-  let expect =
-    float64x4_of_int64s 0xC01C000000000000L 0xC01C000000000000L
-      0xC01C000000000000L 0xC01C000000000000L
-  in
+  let expect = Float64.to_float64x4 (-7.0) (-7.0) (-7.0) (-7.0) in
   eq_float64x4 ~result ~expect
 
 (* float32x8 FMA tests *)
 let () =
   (* Test mul_add: a * b + c = 2.0 * 3.0 + 1.0 = 7.0 *)
-  let a =
-    float32x8_of_int64s 0x4000000040000000L 0x4000000040000000L
-      0x4000000040000000L 0x4000000040000000L
-  in
-  let b =
-    float32x8_of_int64s 0x4040000040400000L 0x4040000040400000L
-      0x4040000040400000L 0x4040000040400000L
-  in
-  let c =
-    float32x8_of_int64s 0x3f8000003f800000L 0x3f8000003f800000L
-      0x3f8000003f800000L 0x3f8000003f800000L
-  in
+  let a = Float32.to_float32x8' 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s in
+  let b = Float32.to_float32x8' 3.0s 3.0s 3.0s 3.0s 3.0s 3.0s 3.0s 3.0s in
+  let c = Float32.to_float32x8' 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s in
   let result = FMA.float32x8_mul_add a b c in
-  let expect =
-    float32x8_of_int64s 0x40e0000040e00000L 0x40e0000040e00000L
-      0x40e0000040e00000L 0x40e0000040e00000L
-  in
+  let expect = Float32.to_float32x8' 7.0s 7.0s 7.0s 7.0s 7.0s 7.0s 7.0s 7.0s in
   eq_float32x8 ~result ~expect
 
 let () =
   (* Test mul_sub: a * b - c = 3.0 * 2.0 - 1.0 = 5.0 *)
-  let a =
-    float32x8_of_int64s 0x4040000040400000L 0x4040000040400000L
-      0x4040000040400000L 0x4040000040400000L
-  in
-  let b =
-    float32x8_of_int64s 0x4000000040000000L 0x4000000040000000L
-      0x4000000040000000L 0x4000000040000000L
-  in
-  let c =
-    float32x8_of_int64s 0x3f8000003f800000L 0x3f8000003f800000L
-      0x3f8000003f800000L 0x3f8000003f800000L
-  in
+  let a = Float32.to_float32x8' 3.0s 3.0s 3.0s 3.0s 3.0s 3.0s 3.0s 3.0s in
+  let b = Float32.to_float32x8' 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s in
+  let c = Float32.to_float32x8' 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s in
   let result = FMA.float32x8_mul_sub a b c in
-  let expect =
-    float32x8_of_int64s 0x40a0000040a00000L 0x40a0000040a00000L
-      0x40a0000040a00000L 0x40a0000040a00000L
-  in
+  let expect = Float32.to_float32x8' 5.0s 5.0s 5.0s 5.0s 5.0s 5.0s 5.0s 5.0s in
   eq_float32x8 ~result ~expect
 
 let () =
   (* Test mul_addsub: alternating sub/add *)
-  let a =
-    float32x8_of_int64s 0x4000000040400000L 0x4000000040400000L
-      0x4000000040400000L 0x4000000040400000L
-  in
-  let b =
-    float32x8_of_int64s 0x4040000040000000L 0x4040000040000000L
-      0x4040000040000000L 0x4040000040000000L
-  in
-  let c =
-    float32x8_of_int64s 0x3f8000003f800000L 0x3f8000003f800000L
-      0x3f8000003f800000L 0x3f8000003f800000L
-  in
+  let a = Float32.to_float32x8' 2.0s 3.0s 2.0s 3.0s 2.0s 3.0s 2.0s 3.0s in
+  let b = Float32.to_float32x8' 3.0s 2.0s 3.0s 2.0s 3.0s 2.0s 3.0s 2.0s in
+  let c = Float32.to_float32x8' 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s in
   let result = FMA.float32x8_mul_addsub a b c in
-  let expect =
-    float32x8_of_int64s 0x40e0000040a00000L 0x40e0000040a00000L
-      0x40e0000040a00000L 0x40e0000040a00000L
-  in
+  let expect = Float32.to_float32x8' 5.0s 7.0s 5.0s 7.0s 5.0s 7.0s 5.0s 7.0s in
   eq_float32x8 ~result ~expect
 
 let () =
   (* Test mul_subadd: alternating add/sub *)
-  let a =
-    float32x8_of_int64s 0x4040000040000000L 0x4040000040000000L
-      0x4040000040000000L 0x4040000040000000L
-  in
-  let b =
-    float32x8_of_int64s 0x4000000040400000L 0x4000000040400000L
-      0x4000000040400000L 0x4000000040400000L
-  in
-  let c =
-    float32x8_of_int64s 0x3f8000003f800000L 0x3f8000003f800000L
-      0x3f8000003f800000L 0x3f8000003f800000L
-  in
+  let a = Float32.to_float32x8' 3.0s 2.0s 3.0s 2.0s 3.0s 2.0s 3.0s 2.0s in
+  let b = Float32.to_float32x8' 2.0s 3.0s 2.0s 3.0s 2.0s 3.0s 2.0s 3.0s in
+  let c = Float32.to_float32x8' 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s in
   let result = FMA.float32x8_mul_subadd a b c in
-  let expect =
-    float32x8_of_int64s 0x40a0000040e00000L 0x40a0000040e00000L
-      0x40a0000040e00000L 0x40a0000040e00000L
-  in
+  let expect = Float32.to_float32x8' 7.0s 5.0s 7.0s 5.0s 7.0s 5.0s 7.0s 5.0s in
   eq_float32x8 ~result ~expect
 
 let () =
   (* Test neg_mul_add: -(a * b) + c = -(2.0 * 2.0) + 8.0 = 4.0 *)
-  let a =
-    float32x8_of_int64s 0x4000000040000000L 0x4000000040000000L
-      0x4000000040000000L 0x4000000040000000L
-  in
-  let b =
-    float32x8_of_int64s 0x4000000040000000L 0x4000000040000000L
-      0x4000000040000000L 0x4000000040000000L
-  in
-  let c =
-    float32x8_of_int64s 0x4100000041000000L 0x4100000041000000L
-      0x4100000041000000L 0x4100000041000000L
-  in
+  let a = Float32.to_float32x8' 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s in
+  let b = Float32.to_float32x8' 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s in
+  let c = Float32.to_float32x8' 8.0s 8.0s 8.0s 8.0s 8.0s 8.0s 8.0s 8.0s in
   let result = FMA.float32x8_neg_mul_add a b c in
-  let expect =
-    float32x8_of_int64s 0x4080000040800000L 0x4080000040800000L
-      0x4080000040800000L 0x4080000040800000L
-  in
+  let expect = Float32.to_float32x8' 4.0s 4.0s 4.0s 4.0s 4.0s 4.0s 4.0s 4.0s in
   eq_float32x8 ~result ~expect
 
 let () =
   (* Test neg_mul_sub: -(a * b) - c = -(2.0 * 3.0) - 1.0 = -7.0 *)
-  let a =
-    float32x8_of_int64s 0x4000000040000000L 0x4000000040000000L
-      0x4000000040000000L 0x4000000040000000L
-  in
-  let b =
-    float32x8_of_int64s 0x4040000040400000L 0x4040000040400000L
-      0x4040000040400000L 0x4040000040400000L
-  in
-  let c =
-    float32x8_of_int64s 0x3f8000003f800000L 0x3f8000003f800000L
-      0x3f8000003f800000L 0x3f8000003f800000L
-  in
+  let a = Float32.to_float32x8' 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s 2.0s in
+  let b = Float32.to_float32x8' 3.0s 3.0s 3.0s 3.0s 3.0s 3.0s 3.0s 3.0s in
+  let c = Float32.to_float32x8' 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s 1.0s in
   let result = FMA.float32x8_neg_mul_sub a b c in
   let expect =
-    float32x8_of_int64s 0xc0e00000c0e00000L 0xc0e00000c0e00000L
-      0xc0e00000c0e00000L 0xc0e00000c0e00000L
+    Float32.to_float32x8' (-7.0s) (-7.0s) (-7.0s) (-7.0s) (-7.0s) (-7.0s)
+      (-7.0s) (-7.0s)
   in
   eq_float32x8 ~result ~expect

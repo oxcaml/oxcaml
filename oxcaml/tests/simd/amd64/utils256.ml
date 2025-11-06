@@ -481,6 +481,17 @@ module Float32 = struct
     let low = to_float32x4 a b c d in
     let high = to_float32x4 e f g h in
     float32x8_of_float32x4s low high
+
+  let to_float32x8' t0 t1 t2 t3 t4 t5 t6 t7 =
+    to_float32x8
+      (Stdlib_stable.Float32.to_bits t0)
+      (Stdlib_stable.Float32.to_bits t1)
+      (Stdlib_stable.Float32.to_bits t2)
+      (Stdlib_stable.Float32.to_bits t3)
+      (Stdlib_stable.Float32.to_bits t4)
+      (Stdlib_stable.Float32.to_bits t5)
+      (Stdlib_stable.Float32.to_bits t6)
+      (Stdlib_stable.Float32.to_bits t7)
 end
 
 module Float64 = struct
