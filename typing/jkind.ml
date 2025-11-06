@@ -807,11 +807,6 @@ module Layout_and_axes = struct
     type t =
       | Ran_out_of_fuel
       | Sufficient_fuel
-
-    let both a b =
-      match a, b with
-      | Ran_out_of_fuel, _ | _, Ran_out_of_fuel -> Ran_out_of_fuel
-      | Sufficient_fuel, Sufficient_fuel -> Sufficient_fuel
   end
 
   (* Normalize the jkind. If mode is [Require_best], only jkinds that have quality [Best]
@@ -1092,13 +1087,15 @@ module Layout_and_axes = struct
       end in
       let rec loop (ctl : Loop_control.t) bounds_so_far relevant_axes :
           (type_expr * With_bounds_type_info.t) list ->
-          Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t = function
+          Mod_bounds.t * (l * r2) with_bounds * Loop_control.t = function
         (* early cutoff *)
-        | [] -> bounds_so_far, No_with_bounds, ctl.fuel_status
+        | [] -> bounds_so_far, No_with_bounds, ctl
         | _ when Mod_bounds.is_max_within_set bounds_so_far relevant_axes ->
           (* CR layouts v2.8: we can do better by early-terminating on a per-axis
              basis *)
-          bounds_so_far, No_with_bounds, Sufficient_fuel
+          ( bounds_so_far,
+            No_with_bounds,
+            { ctl with fuel_status = Sufficient_fuel } )
         | (ty, ti) :: bs -> (
           (* Map the type's info before expanding the type *)
           let ti =
@@ -1160,9 +1157,9 @@ module Layout_and_axes = struct
                 ~nullability:(value_for_axis ~axis:(Nonmodal Nullability))
                 ~separability:(value_for_axis ~axis:(Nonmodal Separability))
             in
-            let found_jkind_for_ty new_ctl b_upper_bounds b_with_bounds quality
+            let found_jkind_for_ty ctl b_upper_bounds b_with_bounds quality
                 skippable_axes :
-                Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t =
+                Mod_bounds.t * (l * r2) with_bounds * Loop_control.t =
               let relevant_axes_for_ty =
                 Axis_set.diff relevant_axes_for_ty skippable_axes
               in
@@ -1177,13 +1174,13 @@ module Layout_and_axes = struct
                 in
                 (* Descend into the with-bounds of each of our with-bounds types'
                     with-bounds *)
-                let bounds_so_far, nested_with_bounds, fuel_result1 =
-                  loop new_ctl bounds_so_far relevant_axes_for_ty
+                let bounds_so_far, nested_with_bounds, ctl =
+                  loop ctl bounds_so_far relevant_axes_for_ty
                     (With_bounds.to_list b_with_bounds)
                 in
-                match fuel_result1, mode with
+                match ctl.fuel_status, mode with
                 | Ran_out_of_fuel, Ignore_best | Sufficient_fuel, _ ->
-                  (* CR layouts v2.8: we use [new_ctl] here, not [ctl], to avoid big
+                  (* CR layouts v2.8: we use the same [ctl] here, to avoid big
                      quadratic stack growth for very widely recursive types. This is
                      sad, since it prevents us from mode crossing a record with 20
                      lists with different payloads, but less sad than a stack
@@ -1191,62 +1188,60 @@ module Layout_and_axes = struct
 
                      Ideally, this whole problem goes away once we rethink fuel.
                   *)
-                  let bounds, bs', fuel_result2 =
-                    loop new_ctl bounds_so_far relevant_axes bs
+                  let bounds, bs', ctl =
+                    loop ctl bounds_so_far relevant_axes bs
                   in
-                  ( bounds,
-                    With_bounds.join nested_with_bounds bs',
-                    Fuel_status.both fuel_result1 fuel_result2 )
+                  bounds, With_bounds.join nested_with_bounds bs', ctl
                 | Ran_out_of_fuel, Require_best ->
                   (* See Note [Ran out of fuel when requiring best]. *)
-                  Mod_bounds.max, No_with_bounds, Ran_out_of_fuel)
+                  Mod_bounds.max, No_with_bounds, ctl)
               | Not_best, Require_best ->
                 (* CR layouts v2.8: The type annotation on the next line is
                    necessary only because [loop] is
                    local. Bizarre. Investigate. *)
-                let bounds_so_far, (bs' : (l * r2) With_bounds.t), fuel_result =
-                  loop new_ctl bounds_so_far relevant_axes bs
+                let bounds_so_far, (bs' : (l * r2) With_bounds.t), ctl =
+                  loop ctl bounds_so_far relevant_axes bs
                 in
                 ( bounds_so_far,
                   With_bounds.add ty
                     { relevant_axes = relevant_axes_for_ty }
                     bs',
-                  fuel_result )
+                  ctl )
             in
             match
               Loop_control.check ~relevant_axes:relevant_axes_for_ty ctl ty
             with
-            | Stop ctl_after_stop -> (
+            | Stop ctl -> (
               match mode with
               | Ignore_best ->
                 (* out of fuel, so assume [ty] has the worst possible bounds. *)
-                found_jkind_for_ty ctl_after_stop Mod_bounds.max No_with_bounds
-                  Not_best Axis_set.empty [@nontail]
+                found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
+                  Axis_set.empty [@nontail]
               | Require_best ->
                 (* See Note [Ran out of fuel when requiring best]. *)
-                Mod_bounds.max, No_with_bounds, Ran_out_of_fuel)
+                Mod_bounds.max, No_with_bounds, ctl)
             | Skip -> loop ctl bounds_so_far relevant_axes bs (* skip [b] *)
-            | Continue { ctl = ctl_after_unpacking_b; skippable_axes } -> (
+            | Continue { ctl; skippable_axes } -> (
               match context.jkind_of_type ty with
               | Some b_jkind ->
-                found_jkind_for_ty ctl_after_unpacking_b
-                  b_jkind.jkind.mod_bounds b_jkind.jkind.with_bounds
-                  b_jkind.quality skippable_axes [@nontail]
+                found_jkind_for_ty ctl b_jkind.jkind.mod_bounds
+                  b_jkind.jkind.with_bounds b_jkind.quality skippable_axes
+                [@nontail]
               | None ->
                 (* kind of b is not principally known, so we treat it as having
                    the max bound (only along the axes we care about for this
                    type!) *)
-                found_jkind_for_ty ctl_after_unpacking_b Mod_bounds.max
-                  No_with_bounds Not_best skippable_axes [@nontail])))
+                found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
+                  skippable_axes [@nontail])))
       in
       let mod_bounds = Mod_bounds.set_max_in_set t.mod_bounds skip_axes in
-      let mod_bounds, with_bounds, fuel_status =
+      let mod_bounds, with_bounds, ctl =
         loop Loop_control.starting mod_bounds
           (Axis_set.complement skip_axes)
           (With_bounds.to_list t.with_bounds)
       in
       let normalized_t : (layout, l * r2) layout_and_axes =
-        match mode, fuel_status with
+        match mode, ctl.fuel_status with
         | Require_best, Sufficient_fuel | Ignore_best, _ ->
           { t with mod_bounds; with_bounds }
         | Require_best, Ran_out_of_fuel ->
@@ -1287,7 +1282,7 @@ module Layout_and_axes = struct
           *)
           t |> disallow_right
       in
-      normalized_t, fuel_status
+      normalized_t, ctl.fuel_status
 end
 
 (*********************************)
