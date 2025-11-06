@@ -149,7 +149,7 @@ Line 7, characters 12-17:
 7 |   unique_id M.foo
                 ^^^^^
 Error: This value is "aliased"
-       because it is used inside the function (at Lines 6-7, characters 22-17)
+       because it is used inside the function at Lines 6-7, characters 22-17
        which is expected to be "many".
        However, the highlighted expression is expected to be "unique".
 |}]

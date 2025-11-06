@@ -422,7 +422,7 @@ Line 2, characters 25-26:
 2 |     fun () -> Atomic.set a 0
                              ^
 Error: This value is "immutable"
-       because it is used inside the function (at Line 2, characters 4-28)
+       because it is used inside the function at Line 2, characters 4-28
        which is expected to be "stateless".
        However, the highlighted expression is expected to be "read_write".
 |}]
