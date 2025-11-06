@@ -138,8 +138,8 @@ shared with another thread. OxCaml's parallelism API allows only *portable* valu
 move across thread boundaries.
 
 Portability is about functions: functions that capture uncontended mutable state
-are not portable. Portable closures capture all values at *contended*,
-while splittable closures capture all values at *shared*.
+are *nonportable*. Conversely, portable closures capture all values at contended,
+and splittable closures capture all values at shared.
 
 Notably, it is generally safe to send mutable data *itself* to other threads,
 because it will then be *contended*, so the mutable portions will be
