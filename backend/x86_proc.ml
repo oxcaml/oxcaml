@@ -539,10 +539,12 @@ module X86_peephole = struct
   let remove_mov_x_x cell =
     match[@warning "-4"] DLL.value cell with
     | Ins (MOV (src, dst)) when equal_args src dst ->
+      (* Get next cell before deleting *)
+      let next = DLL.next cell in
       (* Delete the redundant instruction *)
       DLL.delete_curr cell;
       (* Continue from the next cell *)
-      Some (DLL.next cell)
+      Some next
     | _ -> None
 
   (* Rewrite rule: remove useless MOV x, y; MOV y, x pattern *)
@@ -555,10 +557,12 @@ module X86_peephole = struct
         match[@warning "-4"] DLL.value next_cell with
         | Ins (MOV (src2, dst2))
           when equal_args src1 dst2 && equal_args dst1 src2 ->
+          (* Get the cell after next_cell before deleting *)
+          let after_next = DLL.next next_cell in
           (* Delete the second MOV (the first one is still useful) *)
           DLL.delete_curr next_cell;
           (* Continue from the cell after the deleted one *)
-          Some (DLL.next next_cell)
+          Some after_next
         | _ -> None))
     | _ -> None
 
