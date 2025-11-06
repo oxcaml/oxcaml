@@ -667,8 +667,8 @@ module X86_peephole = struct
       with
       | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2)), Ins (MOV (src3, dst3))
         when equal_args dst1 src2 && equal_args dst1 dst3
-             && not (equal_args src3 dst3) && is_register dst1
-             && is_register dst2 ->
+             && (not (equal_args src3 dst3))
+             && is_register dst1 && is_register dst2 ->
         (* Pattern: mov A, x; mov x, y; mov B, x where B ≠ x and x, y are
            registers *)
         (* Rewrite to: mov A, y; mov B, x *)
