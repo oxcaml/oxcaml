@@ -3091,7 +3091,7 @@ int main(void) {
     // Old versions of gcc don't accept "f16c" in __builtin_cpu_supports
     unsigned int eax, ebx, ecx, edx;
     if (!__get_cpuid(1, &eax, &ebx, &ecx, &edx)) return 1;
-    return (ecx & (1 << 29)) == 0;
+    return (ecx & bit_F16C) == 0;
 }
 ]])], AC_DEFINE([HAS_F16C]) has_f16c=yes, [])
 
