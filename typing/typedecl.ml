@@ -609,7 +609,7 @@ let make_constructor
         Ctype.with_local_level_if closed begin fun () ->
           TyVarEnv.reset ();
           let univar_list =
-            TyVarEnv.make_poly_univars_jkinds
+            TyVarEnv.make_poly_univars_jkinds env
               ~context:(fun v -> Constructor_type_parameter (cstr_path, v))
               (List.map (fun (v, l) -> (v, l, Env.stage env)) svars)
           in

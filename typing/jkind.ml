@@ -2071,6 +2071,8 @@ module Format_history = struct
     | Existential_unpack name -> fprintf ppf "the existential variable %s" name
     | Univar name -> fprintf ppf "the universal variable %s" name
     | Type_variable name -> fprintf ppf "the type variable %s" name
+    | Implicit_jkind name ->
+      fprintf ppf "the implicit kind of type variables named %s" name
     | Type_wildcard loc ->
       fprintf ppf "the wildcard _ at %a" Location.print_loc_in_lowercase loc
     | Type_of_kind loc ->
@@ -2892,6 +2894,7 @@ module Debug_printers = struct
     | Existential_unpack name -> fprintf ppf "Existential_unpack %s" name
     | Univar name -> fprintf ppf "Univar %S" name
     | Type_variable name -> fprintf ppf "Type_variable %S" name
+    | Implicit_jkind name -> fprintf ppf "Implicit_jkind %S" name
     | Type_wildcard loc ->
       fprintf ppf "Type_wildcard (%a)" Location.print_loc loc
     | Type_of_kind loc -> fprintf ppf "Type_of_kind (%a)" Location.print_loc loc

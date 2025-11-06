@@ -2366,7 +2366,19 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         typedtree, tsg, newenv
     | Psig_attribute attr ->
         Builtin_attributes.parse_standard_interface_attributes attr;
-        mksig (Tsig_attribute attr) env loc, [], env
+        let newenv =
+          let register_default env (var_name, jkind_annot) =
+            let context =
+              Jkind.History.Implicit_jkind var_name
+            in
+            Env.add_implicit_jkind
+              ~loc:jkind_annot.pjkind_loc var_name
+              (Jkind.of_annotation ~context jkind_annot) env
+          in
+          List.fold_left register_default env
+            (Builtin_attributes.get_implicit_jkind_attr attr)
+        in
+        mksig (Tsig_attribute attr) env loc, [], newenv
     | Psig_extension (ext, _attrs) ->
         raise (Error_forward (Builtin_attributes.error_of_extension ext))
     | Psig_kind_abbrev _ ->
@@ -3374,6 +3386,8 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
 
 and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
   sstr =
+  (* CR implicit-types: implement implicit variable jkinds in structures. *)
+  let env = Env.clear_implicit_jkinds env in
   let names = Signature_names.create () in
   let _, md_mode = register_allocation () in
   Option.iter (fun x -> Value.submode md_mode x |> ignore)

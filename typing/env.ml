@@ -650,6 +650,7 @@ type t = {
   functor_args: unit Ident.tbl;
   summary: summary;
   local_constraints: type_declaration Path.Map.t;
+  implicit_jkinds: jkind_lr loc String.Map.t;
   flags: int;
   stage: stage;
 }
@@ -856,6 +857,11 @@ type lookup_error =
 type error =
   | Missing_module of Location.t * Path.t * Path.t
   | Illegal_value_name of Location.t * string
+  | Implicit_jkind_already_defined of {
+      loc : Location.t;
+      name : string;
+      defined_at : Location.t;
+    }
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t }
   | Toplevel_splice of Location.t
@@ -939,6 +945,7 @@ let empty = {
   modules = IdTbl.empty; modtypes = IdTbl.empty;
   classes = IdTbl.empty; cltypes = IdTbl.empty;
   summary = Env_empty; local_constraints = Path.Map.empty;
+  implicit_jkinds = String.Map.empty;
   flags = 0;
   functor_args = Ident.empty;
   stage = 0;
@@ -1694,6 +1701,11 @@ let find_hash_type path env =
       let cltda = NameMap.find name c.comp_cltypes in
       cltda.cltda_declaration.clty_hash_type
   | Papply _ | Pextra_ty _ -> raise Not_found
+
+let find_implicit_jkind name env =
+  match String.Map.find_opt name env.implicit_jkinds with
+  | Some { txt = jkind; loc = _ } -> Some jkind
+  | None -> None
 
 let global_of_instance_compilation_unit cu =
   let global_name = Compilation_unit.to_global_name_exn cu in
@@ -2845,6 +2857,19 @@ let add_module ?arg ?shape id presence mty ?mode env =
 let add_local_constraint path info env =
   { env with
     local_constraints = Path.Map.add path info env.local_constraints }
+
+let add_implicit_jkind ~loc name jkind env =
+  match String.Map.find_opt name env.implicit_jkinds with
+  | Some { loc = defined_loc; txt = _ } ->
+      error
+        (Implicit_jkind_already_defined { loc; name; defined_at = defined_loc })
+  | None ->
+      { env with
+        implicit_jkinds =
+          String.Map.add name { txt = jkind; loc } env.implicit_jkinds }
+
+let clear_implicit_jkinds env =
+  { env with implicit_jkinds = String.Map.empty }
 
 (* Insertion of bindings by name *)
 
@@ -5086,6 +5111,11 @@ let report_error ~level ppf = function
   | Illegal_value_name(_loc, name) ->
       fprintf ppf "%a is not a valid value identifier."
        Style.inline_code name
+  | Implicit_jkind_already_defined { name; defined_at; loc = _ } ->
+      fprintf ppf
+        "@[<hov>The implicit kind for %a is already defined at %a.@]"
+        Style.inline_code name
+        Location.print_loc defined_at
   | Lookup_error(loc, t, err) -> report_lookup_error ~level loc t ppf err
   | Incomplete_instantiation { unset_param } ->
       fprintf ppf "@[<hov>Not enough instance arguments: the parameter@ %a@ is \
@@ -5112,6 +5142,7 @@ let () =
             match err with
             | Missing_module (loc, _, _)
             | Illegal_value_name (loc, _)
+            | Implicit_jkind_already_defined { loc; _ }
             | Toplevel_splice loc
             | Unsupported_inside_quotation (loc, _)
             | Lookup_error(loc, _, _) -> loc

@@ -31,11 +31,13 @@ module TyVarEnv : sig
   (** Evaluate in a narrowed type-variable scope *)
 
   type poly_univars
-  val make_poly_univars : (string Location.loc * Env.stage) list -> poly_univars
+  val make_poly_univars :
+    Env.t -> (string Location.loc * Env.stage) list -> poly_univars
     (** A variant of [make_poly_univars_jkinds] that gets variables
         without jkind annotations *)
 
   val make_poly_univars_jkinds :
+    Env.t ->
     context:(string -> Jkind.History.annotation_context_lr) ->
     (string Location.loc * Parsetree.jkind_annotation option * Env.stage) list
     -> poly_univars
@@ -185,6 +187,8 @@ type error =
       {name : string;
        intro_stage : Env.stage;
        usage_stage : Env.stage}
+  | Mismatched_jkind_annotation of
+    { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
 
 exception Error of Location.t * Env.t * error
 
