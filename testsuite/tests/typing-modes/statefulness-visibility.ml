@@ -523,6 +523,14 @@ let default : 'a @ stateless -> 'a @ portable = fun x -> x
 val default : 'a @ stateless -> 'a @ portable = <fun>
 |}]
 
+let override : 'a @ stateless splittable -> 'a @ portable = fun x -> x
+[%%expect{|
+Line 1, characters 69-70:
+1 | let override : 'a @ stateless splittable -> 'a @ portable = fun x -> x
+                                                                         ^
+Error: This value is "splittable" but is expected to be "portable".
+|}]
+
 let override : 'a @ stateless nonportable -> 'a @ portable = fun x -> x
 [%%expect{|
 Line 1, characters 70-71:

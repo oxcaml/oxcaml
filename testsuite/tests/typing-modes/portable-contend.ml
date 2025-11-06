@@ -130,7 +130,7 @@ Error: This value is "nonportable"
        However, the highlighted expression is expected to be "portable".
 |}]
 
-(* Closing over reading mutable field gives nonportable *)
+(* Closing over reading mutable field gives splittable *)
 let foo () =
     let r = {a = best_bytes (); b = best_bytes ()} in
     let bar () = let _ = r.a in () in
@@ -147,7 +147,7 @@ Error: This value is "splittable"
        However, the highlighted expression is expected to be "portable".
 |}]
 
-(* Closing over reading mutable field from shared value is nonportable *)
+(* Closing over reading mutable field from shared value is splittable *)
 let foo (r @ shared) =
     let bar () = let _ = r.a in () in
     let _ @ portable = bar in
@@ -325,7 +325,7 @@ Error: This function when partially applied returns a value which is "nonportabl
        but expected to be "portable".
 |}]
 
-(* closing over shared gives nonportable *)
+(* closing over shared gives splittable *)
 let foo : 'a @ shared portable -> (unit -> unit) @ portable = fun a () -> ()
 [%%expect{|
 Line 1, characters 62-76:
