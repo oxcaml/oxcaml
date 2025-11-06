@@ -572,16 +572,11 @@ module X86_peephole = struct
     | _, _ -> false
 
   (* Rewrite rule: remove MOV x, x (moving a value to itself) *)
-  let remove_mov_x_x cell =
-    match[@warning "-4"] DLL.value cell with
-    | Ins (MOV (src, dst)) when equal_args src dst ->
-      (* Get next cell before deleting *)
-      let next = DLL.next cell in
-      (* Delete the redundant instruction *)
-      DLL.delete_curr cell;
-      (* Continue from the next cell *)
-      Some next
-    | _ -> None
+  let remove_mov_x_x _cell = None
+  (* XXX match[@warning "-4"] DLL.value cell with | Ins (MOV (src, dst)) when
+     equal_args src dst -> (* Get next cell before deleting *) let next =
+     DLL.next cell in (* Delete the redundant instruction *) DLL.delete_curr
+     cell; (* Continue from the next cell *) Some next | _ -> None *)
 
   (* Rewrite rule: remove useless MOV x, y; MOV y, x pattern *)
   let remove_useless_mov cell =
