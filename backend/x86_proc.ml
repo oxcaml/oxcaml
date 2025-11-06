@@ -431,6 +431,52 @@ let reset_asm_code () =
    infrastructure and rules. *)
 
 module X86_peephole = struct
+  (* Equality functions for x86_ast types, avoiding polymorphic equality *)
+
+  let equal_reg64 left right =
+    match left, right with
+    | RAX, RAX | RBX, RBX | RCX, RCX | RDX, RDX | RSP, RSP | RBP, RBP
+    | RSI, RSI | RDI, RDI | R8, R8 | R9, R9 | R10, R10 | R11, R11 | R12, R12
+    | R13, R13 | R14, R14 | R15, R15 ->
+      true
+    | (RAX | RBX | RCX | RDX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11
+      | R12 | R13 | R14 | R15), _ ->
+      false
+
+  let equal_reg8h left right =
+    match left, right with
+    | AH, AH | BH, BH | CH, CH | DH, DH -> true
+    | (AH | BH | CH | DH), _ -> false
+
+  let equal_regf left right =
+    match left, right with
+    | XMM n1, XMM n2 | YMM n1, YMM n2 | ZMM n1, ZMM n2 -> n1 = n2
+    | (XMM _ | YMM _ | ZMM _), _ -> false
+
+  let equal_arch left right =
+    match left, right with
+    | X64, X64 | X86, X86 -> true
+    | (X64 | X86), _ -> false
+
+  let equal_data_type left right =
+    match left, right with
+    | NONE, NONE | REAL4, REAL4 | REAL8, REAL8 | BYTE, BYTE | WORD, WORD
+    | DWORD, DWORD | QWORD, QWORD | VEC128, VEC128 | VEC256, VEC256
+    | VEC512, VEC512 | NEAR, NEAR | PROC, PROC ->
+      true
+    | (NONE | REAL4 | REAL8 | BYTE | WORD | DWORD | QWORD | VEC128 | VEC256
+      | VEC512 | NEAR | PROC), _ ->
+      false
+
+  let equal_addr left right =
+    equal_arch left.arch right.arch
+    && equal_data_type left.typ right.typ
+    && equal_reg64 left.idx right.idx
+    && left.scale = right.scale
+    && Option.equal equal_reg64 left.base right.base
+    && Option.equal String.equal left.sym right.sym
+    && left.displ = right.displ
+
   (* Hard barriers are instruction boundaries that stop peephole optimization.
      These include:
      - Labels (control flow targets)
@@ -478,22 +524,15 @@ module X86_peephole = struct
     match[@warning "-4"] arg1, arg2 with
     | Imm i1, Imm i2 -> Int64.equal i1 i2
     | Sym s1, Sym s2 -> String.equal s1 s2
-    | Reg8L r1, Reg8L r2 -> Stdlib.( = ) r1 r2
-    | Reg8H r1, Reg8H r2 -> Stdlib.( = ) r1 r2
-    | Reg16 r1, Reg16 r2 -> Stdlib.( = ) r1 r2
-    | Reg32 r1, Reg32 r2 -> Stdlib.( = ) r1 r2
-    | Reg64 r1, Reg64 r2 -> Stdlib.( = ) r1 r2
-    | Regf rf1, Regf rf2 -> Stdlib.( = ) rf1 rf2
-    | Mem addr1, Mem addr2 ->
-      Stdlib.( = ) addr1.arch addr2.arch
-      && Stdlib.( = ) addr1.typ addr2.typ
-      && Stdlib.( = ) addr1.idx addr2.idx
-      && addr1.scale = addr2.scale
-      && Option.equal Stdlib.( = ) addr1.base addr2.base
-      && Option.equal String.equal addr1.sym addr2.sym
-      && addr1.displ = addr2.displ
+    | Reg8L r1, Reg8L r2 -> equal_reg64 r1 r2
+    | Reg8H r1, Reg8H r2 -> equal_reg8h r1 r2
+    | Reg16 r1, Reg16 r2 -> equal_reg64 r1 r2
+    | Reg32 r1, Reg32 r2 -> equal_reg64 r1 r2
+    | Reg64 r1, Reg64 r2 -> equal_reg64 r1 r2
+    | Regf rf1, Regf rf2 -> equal_regf rf1 rf2
+    | Mem addr1, Mem addr2 -> equal_addr addr1 addr2
     | Mem64_RIP (t1, s1, i1), Mem64_RIP (t2, s2, i2) ->
-      Stdlib.( = ) t1 t2 && String.equal s1 s2 && i1 = i2
+      equal_data_type t1 t2 && String.equal s1 s2 && i1 = i2
     | _, _ -> false
 
   (* Rewrite rule: remove MOV x, x (moving a value to itself) *)
