@@ -3404,8 +3404,8 @@ let closure_mode ~loc ~item ~lid
   in
   {Mode.monadic; comonadic}
 
-let const_closure_mode ~loc ~item ~lid
-  {Mode.monadic; comonadic} closure_context comonadic0 =
+let const_closure_mode ~loc ~item ~lid {Mode.monadic; comonadic}
+  closure_context comonadic0 =
   let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
   Mode.Value.Comonadic.(submode_err pp comonadic
     (of_const ~hint:(Is_used_in closure_context) comonadic0));
@@ -4930,7 +4930,8 @@ let report_lookup_error ~level _loc env ppf = function
   | Mutable_value_used_in_closure ctx ->
       fprintf ppf
         "@[Mutable variable cannot be used inside %t.@]"
-        (Mode.print_pinpoint ctx |> Option.get)
+        ((Mode.print_pinpoint ctx |> Option.get)
+          ~definite:false ~capitalize:false)
   | Incompatible_stage (lid, usage_loc, usage_stage, intro_loc, intro_stage) ->
       fprintf ppf
         "@[Identifier %a is used at %a,@ \

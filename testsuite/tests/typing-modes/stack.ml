@@ -38,7 +38,7 @@ Line 2, characters 18-26:
                       ^^^^^^^^
 Error: The allocation is "local"
        because it is "stack_"-allocated.
-       However, the highlighted allocation is expected to be "global".
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 let f () =
@@ -62,7 +62,7 @@ Line 2, characters 18-30:
                       ^^^^^^^^^^^^
 Error: The allocation is "local"
        because it is "stack_"-allocated.
-       However, the highlighted allocation is expected to be "global".
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 let f () =

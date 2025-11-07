@@ -23,7 +23,7 @@ Error: The value "bar" is "nonportable"
        which is "nonportable"
        because it contains a usage (of the value "x" at Line 4, characters 8-9)
        which is expected to be "uncontended".
-       However, the highlighted value "bar" is expected to be "portable"
+       However, the value "bar" highlighted is expected to be "portable"
        because it is used inside the function at Lines 9-10, characters 25-25
        which is expected to be "portable".
 |}]
@@ -45,7 +45,7 @@ Error: The value "bar" is "nonportable"
        which is "nonportable"
        because it contains a usage (of the value "x" at Line 4, characters 17-18)
        which is expected to be "uncontended".
-       However, the highlighted value "bar" is expected to be "portable"
+       However, the value "bar" highlighted is expected to be "portable"
        because it is used inside the function at Line 6, characters 25-47
        which is expected to be "portable".
 |}]

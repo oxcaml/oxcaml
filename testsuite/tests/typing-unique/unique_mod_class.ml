@@ -19,7 +19,7 @@ Line 8, characters 20-21:
 8 |   val bar = unique_ x
                         ^
 Error: This value is "aliased"
-       because it is used in the class at Lines 7-9, characters 2-5.
+       because it is used in a class (at Lines 7-9, characters 2-5).
        However, the highlighted expression is expected to be "unique".
 |}]
 

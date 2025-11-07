@@ -258,7 +258,11 @@ module type S = sig
 
   module Hint = Mode_hint
 
-  val print_pinpoint : Hint.pinpoint -> (Format.formatter -> unit) option
+  (** Prints a [pinpoint]. Say "a foo" if [definite] is [false], say "the foo"
+      otherwise. Defaults to the latter. *)
+  val print_pinpoint :
+    Hint.pinpoint ->
+    (definite:bool -> capitalize:bool -> Format.formatter -> unit) option
 
   type nonrec 'a simple_error = 'a simple_error
 

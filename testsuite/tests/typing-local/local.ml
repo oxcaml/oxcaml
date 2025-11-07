@@ -525,7 +525,7 @@ Line 3, characters 33-38:
 3 |   let _obj = object method foo = thing end in
                                      ^^^^^
 Error: The value "thing" is "local" but is expected to be "global"
-       because it is used in the class at Line 3, characters 13-42.
+       because it is used in a class (at Line 3, characters 13-42).
 |}]
 
 
@@ -812,7 +812,7 @@ Line 4, characters 18-19:
 4 |       method m = !x
                       ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used in the class at Lines 3-5, characters 14-7.
+       because it is used in a class (at Lines 3-5, characters 14-7).
 |}]
 
 (* Don't escape through an object method *)
@@ -828,7 +828,7 @@ Line 3, characters 16-17:
 3 |     method m = !x
                     ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used in the class at Lines 2-4, characters 10-5.
+       because it is used in a class (at Lines 2-4, characters 10-5).
 |}]
 
 (* Don't escape through a class instance variable *)
@@ -844,7 +844,7 @@ Line 4, characters 15-16:
 4 |       val m = !x
                    ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used in the class at Lines 3-5, characters 14-7.
+       because it is used in a class (at Lines 3-5, characters 14-7).
 |}]
 
 (* Don't escape through a class instance variable *)
@@ -858,7 +858,7 @@ Line 3, characters 13-14:
 3 |     val m = !x
                  ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used in the class at Lines 2-4, characters 10-5.
+       because it is used in a class (at Lines 2-4, characters 10-5).
 |}]
 
 (* Don't escape through a class local variable *)
@@ -911,7 +911,7 @@ Line 5, characters 15-16:
 5 |       let y = !x in
                    ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used in the class at Lines 4-6, characters 10-29.
+       because it is used in a class (at Lines 4-6, characters 10-29).
 |}]
 
 let foo (local_ x : string ref) =
@@ -942,7 +942,7 @@ Line 6, characters 17-18:
 6 |       inherit d !x
                      ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used in the class at Lines 5-8, characters 14-7.
+       because it is used in a class (at Lines 5-8, characters 14-7).
 |}]
 
 (* Don't escape in initializers *)
@@ -958,7 +958,7 @@ Line 3, characters 31-32:
 3 |     initializer (print_string !x)
                                    ^
 Error: The value "x" is "local" to the parent region but is expected to be "global"
-       because it is used in the class at Lines 2-4, characters 10-5.
+       because it is used in a class (at Lines 2-4, characters 10-5).
 |}]
 
 (* Don't escape in non-function 'let rec' bindings *)
