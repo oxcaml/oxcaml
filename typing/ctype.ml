@@ -2672,12 +2672,21 @@ let constrain_type_jkind ~fixed env ty jkind =
              let recur ty's_jkinds jkinds =
                let results =
                  Misc.Stdlib.List.map3
-                   (fun { ty; bound_vars = bound_vars2; modality } ty's_jkind jkind ->
-                      let bound_vars = Bound_vars.union bound_vars bound_vars2 in
+                   (fun { ty; bound_vars = bound_vars2; modality } ty's_jkind
+                        jkind ->
+                      let bound_vars =
+                        Bound_vars.union bound_vars bound_vars2
+                      in
                       let jkind =
                         Jkind.apply_modality_r modality jkind
                       in
-                      loop ~fuel ~expanded:false ~bound_vars ty ty's_jkind jkind)
+                      loop
+                        ~fuel
+                        ~expanded:false
+                        ~bound_vars
+                        ty
+                        ty's_jkind
+                        jkind)
                    tys ty's_jkinds jkinds
                in
                if List.for_all Result.is_ok results
