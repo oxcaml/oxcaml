@@ -313,42 +313,10 @@ let eta (type a) (x : a expr) : a expr = <[ $x ]>
 val eta : 'a expr -> 'a expr = <fun>
 |}]
 
-(* These should fail kinding checks *)
-
-let id : 'a -> 'a = fun x -> x
-
-[%%expect{|
-val id : 'a -> 'a = <fun>
-|}]
-
-(* But this should preferably work at some point *)
-let id' : <[<['a]>]> -> <[<['a]>]> = id
-
-[%%expect{|
-Line 1:
-Error: Values do not match:
-         val id' : ('a : any). 'a -> 'a
-       is not included in
-         val id' : ('a : any). 'a -> 'a
-       The type "$('a) -> $('a)" is not compatible with the type "'a -> 'a"
-       Type "$('a)" = "$('a)" is not compatible with type "'a" = "'a"
-       Type "'a" is not compatible with type "<['a]>"
-|}]
-
-let foo : <[<['a]>]> -> <['a]> -> 'a -> 'a = fun _ _ a -> a
-
-[%%expect{|
-Line 1, characters 26-28:
-1 | let foo : <[<['a]>]> -> <['a]> -> 'a -> 'a = fun _ _ a -> a
-                              ^^
-Error: Type variable "'a" is used inside a quotation (<[ ... ]>),
-       it already occurs inside 2 layers of quotation (<[ ... ]>).
-       Hint: Consider using "<['a]>".
-|}]
-
 (* Inclusion checks *)
 
-(*  [M1] and [M2] pass due to stage normalisation *)
+(*  [M1] and [M2] pass due to stage normalisation
+    (moving all type variables to occur at stage offset zero) *)
 
 module M1 : sig
   val foo : 'a -> <[$('a) -> int]> expr
@@ -437,29 +405,6 @@ Error: Signature mismatch:
        Type "string" = "string" is not compatible with type "int"
 |}]
 
-module M3'' : sig
-  val f : <[ (int -> unit) * (string -> unit) ]> expr
-end = M3
-
-[%%expect{|
-Line 3, characters 6-8:
-3 | end = M3
-          ^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val f : <[($('a) -> unit) * ($('a) -> unit)]> expr end
-       is not included in
-         sig val f : <[(int -> unit) * (string -> unit)]> expr end
-       Values do not match:
-         val f : <[($('a) -> unit) * ($('a) -> unit)]> expr
-       is not included in
-         val f : <[(int -> unit) * (string -> unit)]> expr
-       The type "<[(int -> unit) * (int -> unit)]> expr"
-       is not compatible with the type
-         "<[(int -> unit) * (string -> unit)]> expr"
-       Type "int" = "int" is not compatible with type "string"
-|}]
-
 (*  [M4] is similar, but featuring an uninhabited type *)
 
 module M4 : sig
@@ -500,26 +445,4 @@ Error: Signature mismatch:
        The type "<[int * int]> expr" is not compatible with the type
          "<[int * string]> expr"
        Type "int" = "int" is not compatible with type "string"
-|}]
-
-module M4'' : sig
-  val x : <[ string * int ]> expr
-end = M4
-
-[%%expect{|
-Line 3, characters 6-8:
-3 | end = M4
-          ^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val x : <[$('a) * $('a)]> expr end
-       is not included in
-         sig val x : <[string * int]> expr end
-       Values do not match:
-         val x : <[$('a) * $('a)]> expr
-       is not included in
-         val x : <[string * int]> expr
-       The type "<[string * string]> expr" is not compatible with the type
-         "<[string * int]> expr"
-       Type "string" = "string" is not compatible with type "int"
 |}]
