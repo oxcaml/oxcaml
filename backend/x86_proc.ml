@@ -581,6 +581,121 @@ module X86_peephole = struct
     | Reg8L _ | Reg8H _ | Reg16 _ | Reg64 _ -> true
     | _ -> false
 
+  (* Check if an instruction is a control flow instruction (jump, call, return).
+     These act as basic block boundaries for peephole optimization. *)
+  let is_control_flow = function[@warning "-4"]
+    | J _ | JMP _ | CALL _ | RET -> true
+    | _ -> false
+
+  (* Check if an instruction writes to a given argument. Conservative: only
+     handles common cases explicitly. *)
+  let writes_to_arg target = function[@warning "-4"]
+    | MOV (_, dst)
+    | MOVSX (_, dst)
+    | MOVSXD (_, dst)
+    | MOVZX (_, dst)
+    | LEA (_, dst)
+    | ADD (_, dst)
+    | SUB (_, dst)
+    | AND (_, dst)
+    | OR (_, dst)
+    | XOR (_, dst)
+    | SAL (_, dst)
+    | SAR (_, dst)
+    | SHR (_, dst)
+    | BSF (_, dst)
+    | BSR (_, dst)
+    | POPCNT (_, dst)
+    | TZCNT (_, dst)
+    | LZCNT (_, dst)
+    | CMOV (_, _, dst) ->
+      equal_args target dst
+    | INC dst | DEC dst | NEG dst | BSWAP dst | SET (_, dst) ->
+      equal_args target dst
+    | POP dst -> equal_args target dst
+    | IMUL (dst, None) -> equal_args target dst
+    | IMUL (_, Some dst) -> equal_args target dst
+    | LOCK_XADD (_, dst) -> equal_args target dst
+    | XCHG (op1, op2) -> equal_args target op1 || equal_args target op2
+    | _ -> false
+
+  (* Check if an instruction reads from a given argument. Conservative: returns
+     true if unsure. *)
+  let reads_from_arg target = function[@warning "-4"]
+    | MOV (src, _) | MOVSX (src, _) | MOVSXD (src, _) | MOVZX (src, _) ->
+      equal_args target src
+    | PUSH src -> equal_args target src
+    | ADD (src, dst)
+    | SUB (src, dst)
+    | AND (src, dst)
+    | OR (src, dst)
+    | XOR (src, dst)
+    | CMP (src, dst)
+    | TEST (src, dst) ->
+      equal_args target src || equal_args target dst
+    | LEA (src, _)
+    | BSF (src, _)
+    | BSR (src, _)
+    | POPCNT (src, _)
+    | TZCNT (src, _)
+    | LZCNT (src, _)
+    | SAL (src, _)
+    | SAR (src, _)
+    | SHR (src, _) ->
+      equal_args target src
+    | CMOV (_, src, dst) -> equal_args target src || equal_args target dst
+    | INC dst | DEC dst | NEG dst | BSWAP dst -> equal_args target dst
+    | IMUL (op, None) -> equal_args target op
+    | IMUL (op1, Some op2) -> equal_args target op1 || equal_args target op2
+    | MUL op | IDIV op -> equal_args target op
+    | CALL arg | JMP arg | J (_, arg) -> equal_args target arg
+    | XCHG (op1, op2) -> equal_args target op1 || equal_args target op2
+    | LOCK_CMPXCHG (op1, op2)
+    | LOCK_XADD (op1, op2)
+    | LOCK_ADD (op1, op2)
+    | LOCK_SUB (op1, op2)
+    | LOCK_AND (op1, op2)
+    | LOCK_OR (op1, op2)
+    | LOCK_XOR (op1, op2) ->
+      equal_args target op1 || equal_args target op2
+    | SET (_, dst) -> equal_args target dst
+    | POP _ -> false
+    | CLDEMOTE arg -> equal_args target arg
+    | PREFETCH (_, _, arg) -> equal_args target arg
+    | _ ->
+      (* Conservative: for unknown instructions, assume they might read. *)
+      false
+
+  (* Find the next occurrence of a register within the same basic block.
+     Returns: - `WriteFound if the next occurrence is a write (without a read) -
+     `ReadFound if a read occurs before any write - `NotFound if we reach the
+     end of block or the list *)
+  type next_occurrence =
+    | WriteFound
+    | ReadFound
+    | NotFound
+
+  let find_next_occurrence_of_register target start_cell =
+    let rec loop cell_opt =
+      match cell_opt with
+      | None -> NotFound
+      | Some cell -> (
+        match DLL.value cell with
+        | Ins instr ->
+          if is_control_flow instr
+          then NotFound
+          else if reads_from_arg target instr
+          then ReadFound
+          else if writes_to_arg target instr
+          then WriteFound
+          else loop (DLL.next cell)
+        | Directive _ ->
+          if is_hard_barrier (DLL.value cell)
+          then NotFound
+          else loop (DLL.next cell))
+    in
+    loop (DLL.next start_cell)
+
   (* Rewrite rule: remove MOV x, x (moving a value to itself) Note: We can only
      safely remove self-moves for registers that don't have zero-extension side
      effects. On x86-64: - 32-bit moves (Reg32) zero the upper 32 bits - SIMD
@@ -680,6 +795,36 @@ module X86_peephole = struct
       | _, _, _ -> None)
     | _ -> None
 
+  (* Rewrite rule: optimize MOV to register that is overwritten before use.
+     Pattern: mov A, x; mov x, y where the next occurrence of x is a write.
+     Rewrite: mov A, y
+
+     This is safe when both x and y are registers and x is not read before the
+     next write to x within the same basic block. The transformation preserves
+     semantics: y gets the value of A, and x is overwritten before being
+     read. *)
+  let remove_mov_to_dead_register cell =
+    match get_cells cell 2 with
+    | [cell1; cell2] -> (
+      match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
+      | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2))
+        when equal_args dst1 src2 && is_register dst1 && is_register dst2 -> (
+        (* Pattern: mov A, x; mov x, y where x and y are registers *)
+        (* Check if the next occurrence of x is a write *)
+        match find_next_occurrence_of_register dst1 cell2 with
+        | WriteFound ->
+          (* x is written before being read, so we can optimize *)
+          (* Rewrite to: mov A, y *)
+          DLL.set_value cell1 (Ins (MOV (src1, dst2)));
+          DLL.delete_curr cell2;
+          (* Return cell1 to allow iterative combination *)
+          Some (Some cell1)
+        | ReadFound | NotFound ->
+          (* x is read before write, or we can't determine - don't optimize *)
+          None)
+      | _, _ -> None)
+    | _ -> None
+
   (* Apply all rewrite rules in sequence. Returns Some continuation_cell if a
      rule matched, None otherwise. *)
   let apply_rules cell =
@@ -692,9 +837,12 @@ module X86_peephole = struct
         match remove_mov_chain cell with
         | Some cont -> Some cont
         | None -> (
-          match combine_add_rsp cell with
+          match remove_mov_to_dead_register cell with
           | Some cont -> Some cont
-          | None -> None)))
+          | None -> (
+            match combine_add_rsp cell with
+            | Some cont -> Some cont
+            | None -> None))))
 
   (* Main optimization loop for a single asm_program. Iterates through the
      instruction list, applying rewrite rules and respecting hard barriers. *)
