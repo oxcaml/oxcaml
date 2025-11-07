@@ -206,6 +206,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Tailcall_argument -> Tailcall_argument
          | Function_return -> Function_return
          | Module_allocated_on_heap -> Module_allocated_on_heap
+         | Is_used_in pp -> Is_used_in pp
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
         fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -222,6 +223,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Function_return -> Function_return
          | Stack_expression -> Stack_expression
          | Module_allocated_on_heap -> Module_allocated_on_heap
+         | Is_used_in pp -> Is_used_in pp
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
         fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -238,6 +240,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Function_return -> Function_return
          | Stack_expression -> Stack_expression
          | Module_allocated_on_heap -> Module_allocated_on_heap
+         | Is_used_in pp -> Is_used_in pp
     end)
   end
 end
@@ -2046,6 +2049,9 @@ module Report = struct
     | Lazy -> Some (dprintf "lazy expression")
     | Expression -> Some (dprintf "expression")
     | Allocation -> Some (dprintf "allocation")
+    | Class -> Some (dprintf "class")
+    | Loop -> Some (dprintf "loop")
+    | Letop -> Some (dprintf "letop")
 
   let print_pinpoint : pinpoint -> (formatter -> unit) option =
    fun (loc, desc) ->
@@ -2103,6 +2109,8 @@ module Report = struct
         pp_print_string ppf "modules always need"
       | _ -> pp_print_string ppf "it is a module and thus needs");
       pp_print_string ppf " to be allocated on the heap"
+    | Is_used_in pp ->
+      print_pinpoint pp |> Option.get |> fprintf ppf "it is used in %t"
 
   let print_allocation_l : allocation -> formatter -> unit =
    fun { txt; loc } ->
@@ -2333,6 +2341,8 @@ module Report = struct
     let right ppf = Option.get (print_ahint_sided pp obj ppf expected) in
     { left; right }
 end
+
+let print_pinpoint = Report.print_pinpoint
 
 type changes = S.changes
 
@@ -3344,6 +3354,8 @@ module Value_with (Areality : Areality) = struct
     t |> unhint |> f |> hint ?monadic ?comonadic
 
   module Const = struct
+    let comonadic_to_monadic_min = C.comonadic_to_monadic_min Comonadic.Obj.obj
+
     module Monadic = Monadic.Const
     module Comonadic = Comonadic.Const
 

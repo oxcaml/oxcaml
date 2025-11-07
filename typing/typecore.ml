@@ -272,7 +272,7 @@ type error =
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.equate_error }
   | Block_index_atomic_unsupported
-  | Submode_failed of Value.error * submode_reason * Env.shared_context option
+  | Submode_failed of Value.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
   | Param_mode_mismatch of Alloc.equate_error
@@ -684,22 +684,15 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
 
 (* expected_mode.locality_context explains why expected_mode.mode is low;
    shared_context explains why mode.uniqueness is high *)
-let submode ~loc ~env ?(reason = Other) ?shared_context mode expected_mode =
+let submode ~loc ~env ?(reason = Other) mode expected_mode =
   let res =
     Value.submode ~pp:(loc, Expression) mode (as_single_mode expected_mode)
   in
   match res with
   | Ok () -> ()
   | Error failure_reason ->
-      let error =
-        Submode_failed(failure_reason, reason, shared_context)
-      in
+      let error = Submode_failed(failure_reason, reason) in
       raise (Error(loc, env, error))
-
-let actual_submode ~loc ~env ?reason (actual_mode : Env.actual_mode)
-    expected_mode =
-  submode ~loc ~env ?reason ?shared_context:actual_mode.context actual_mode.mode
-    expected_mode
 
 let escape ~loc ~env ~reason m =
   submode ~loc ~env ~reason m mode_legacy
@@ -1060,11 +1053,6 @@ let has_poly_constraint spat =
       | _ -> false
     end
   | _ -> false
-
-let actual_mode_cross_left env ty (actual_mode : Env.actual_mode)
-  : Env.actual_mode =
-  let mode = cross_left env ty actual_mode.mode in
-  {actual_mode with mode}
 
 (** Mode cross a mode whose monadic fragment is a right mode, and whose comonadic
     fragment is a left mode. *)
@@ -3234,7 +3222,7 @@ and type_pat_aux
           lid constr.cstr_tag ~res:expected_ty ~args locks with
         | Ok mode -> mode
         | Error e -> raise (Error (lid.loc, !!penv,
-          Submode_failed (e, Constructor lid.txt, None)))
+          Submode_failed (e, Constructor lid.txt)))
       in
       let is_contained_by : Mode.Hint.is_contained_by =
         { containing = Constructor constr.cstr_name; container = loc }
@@ -6061,7 +6049,7 @@ and type_expect_
   in
   match desc with
   | Pexp_ident lid ->
-      let path, (actual_mode : Env.actual_mode), desc, kind =
+      let path, actual_mode, desc, kind =
         type_ident env ~recarg lid
       in
       let exp_desc =
@@ -6079,7 +6067,7 @@ and type_expect_
             match path with
             | Path.Pident id ->
               let modalities = Typemode.let_mutable_modalities in
-              let mode = Modality.Const.apply modalities actual_mode.mode in
+              let mode = Modality.Const.apply modalities actual_mode in
               submode ~loc ~env mode expected_mode;
               Texp_mutvar {loc = lid.loc; txt = id}
             | _ ->
@@ -6093,11 +6081,11 @@ and type_expect_
                 env
             in
             Texp_ident(path, lid, desc, kind,
-              unique_use ~loc ~env actual_mode.mode
+              unique_use ~loc ~env actual_mode
                 (as_single_mode expected_mode))
         | _ ->
             Texp_ident(path, lid, desc, kind,
-              unique_use ~loc ~env actual_mode.mode
+              unique_use ~loc ~env actual_mode
                 (as_single_mode expected_mode))
       in
       let exp = rue {
@@ -6106,7 +6094,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
       in
-      actual_submode ~loc ~env actual_mode expected_mode;
+      submode ~loc ~env actual_mode expected_mode;
       exp
   | Pexp_constant(Pconst_string (str, _, _) as cst) -> (
       let cst = constant_or_raise env loc cst in
@@ -6807,7 +6795,10 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_while(scond, sbody) ->
-      let env = Env.add_share_lock While_loop env in
+      let env =
+        Env.add_const_closure_lock (loc, Loop)
+          {Value.Comonadic.Const.max with linearity = Many} env
+      in
       let cond_env = Env.add_region_lock env in
       let mode = mode_region Value.max in
       let wh_cond =
@@ -6841,7 +6832,10 @@ and type_expect_
         type_expect env (mode_region Value.max) shigh
           (mk_expected ~explanation:For_loop_stop_index Predef.type_int)
       in
-      let env = Env.add_share_lock For_loop env in
+      let env =
+        Env.add_const_closure_lock (loc, Loop)
+          {Value.Comonadic.Const.max with linearity = Many} env
+      in
       let (for_id, for_uid), new_env =
         type_for_loop_index ~loc ~env ~param
       in
@@ -7303,8 +7297,10 @@ and type_expect_
       let exp, exp_sort, ands =
         type_andops env slet.pbop_exp sands sort_andops ty_andops
       in
-      let body_env = Env.add_escape_lock Letop env in
-      let body_env = Env.add_share_lock Letop body_env in
+      let body_env =
+        Env.add_const_closure_lock (loc, Letop) Value.Comonadic.Const.legacy
+          env
+      in
       let scase = Ast_helper.Exp.case spat_params sbody in
       let cases, partial =
         type_cases Value body_env
@@ -7955,7 +7951,7 @@ and type_ident env ?(recarg=Rejected) lid =
   and the second only deals with monadic. *)
   (* CR layouts: allow to cross comonadic fragment and monadic fragment
      separately. *)
-  let actual_mode = actual_mode_cross_left env desc.val_type actual_mode in
+  let actual_mode = cross_left env desc.val_type actual_mode in
   let is_recarg =
     match get_desc desc.val_type with
     | Tconstr(p, _, _) -> Path.is_constructor_typath p
@@ -7991,7 +7987,7 @@ and type_binding_op_ident env s =
   let loc = s.loc in
   let lid = Location.mkloc (Longident.Lident s.txt) loc in
   let path, actual_mode, desc, kind = type_ident env lid in
-  actual_submode ~env ~loc:lid.loc ~reason:Other actual_mode mode_legacy;
+  submode ~env ~loc:lid.loc ~reason:Other actual_mode mode_legacy;
   let path =
     match desc.val_kind with
     | Val_ivar _ ->
@@ -9401,7 +9397,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
       constr.cstr_tag ~res:ty_res ~args:ty_args locks with
     | Ok mode -> mode
     | Error e -> raise (Error (lid.loc, env,
-        Submode_failed (e, Constructor lid.txt, None)))
+        Submode_failed (e, Constructor lid.txt)))
   in
   let expected_mode =
     { expected_mode with mode =
@@ -11882,19 +11878,13 @@ let report_error ~loc env =
   | Block_index_atomic_unsupported ->
     Location.error ~loc
       "Block indices do not yet support [@atomic] record fields."
-  | Submode_failed(e, submode_reason, shared_context) ->
+  | Submode_failed(e, submode_reason) ->
     let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
     (* CR-soon zqian: move the following hints into the new hint system, then
       we can invoke [submode_err] instead of [submode], and remove this
       exception. *)
     let sub =
       match ax with
-        | Comonadic Linearity | Monadic Uniqueness ->
-            shared_context
-          |> Option.map
-              (fun context -> Location.mknoloc
-                (fun ppf -> Env.sharedness_hint ppf context))
-          |> Option.to_list
       | Comonadic Areality -> escaping_submode_reason_hint submode_reason
       | _ -> []
     in

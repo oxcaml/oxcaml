@@ -67,7 +67,7 @@ let foo2 y =
 Line 5, characters 6-16:
 5 |       x <- x + i
           ^^^^^^^^^^
-Error: Mutable variable cannot be used inside closure.
+Error: Mutable variable cannot be used inside the function at Lines 3-7, characters 13-5.
 |}]
 
 (* Test 3: Rejected for same reason as test 2, but this one is actually safe and
@@ -84,7 +84,7 @@ let foo3 y =
 Line 5, characters 11-12:
 5 |     | 0 -> x
                ^
-Error: Mutable variable cannot be used inside closure.
+Error: Mutable variable cannot be used inside the function at Lines 3-6, characters 17-35.
 |}]
 
 (* Tests 3.1 and 3.2: Disallow closures created by [lazy] *)
@@ -95,7 +95,7 @@ let disallowed_3_1 =
 Line 3, characters 7-8:
 3 |   lazy x
            ^
-Error: Mutable variable cannot be used inside closure.
+Error: Mutable variable cannot be used inside the lazy expression at Line 3, characters 2-8.
 |}]
 
 let disallowed_3_2 =
@@ -105,7 +105,7 @@ let disallowed_3_2 =
 Line 3, characters 8-9:
 3 |   lazy (x + 1)
             ^
-Error: Mutable variable cannot be used inside closure.
+Error: Mutable variable cannot be used inside the lazy expression at Line 3, characters 2-14.
 |}]
 
 (* Test 3.3: Locally defined functors *)
@@ -120,7 +120,7 @@ module type S_3_3 = sig module F : functor () -> sig val x : int end end
 Line 5, characters 47-48:
 5 |   (module (struct module F () = struct let x = y end end) : S_3_3)
                                                    ^
-Error: Mutable variable cannot be used inside closure.
+Error: Mutable variable cannot be used inside the functor at Line 5, characters 27-52.
 |}]
 
 (* Test 3.4: Disallow closures in monadic operators *)
@@ -133,7 +133,7 @@ let disallowed_3_4 =
 Line 5, characters 2-3:
 5 |   x + y
       ^
-Error: Mutable variable cannot be used inside a letop.
+Error: Mutable variable cannot be used inside the letop at Lines 4-5, characters 2-7.
 |}]
 
 
@@ -172,7 +172,7 @@ let foo4_2 y = (* Can't sneak local out of non-local for loop body region *)
 Line 5, characters 6-26:
 5 |       x <- local_ (i :: x)
           ^^^^^^^^^^^^^^^^^^^^
-Error: Mutable variable cannot be used inside closure.
+Error: Mutable variable cannot be used inside the function at Lines 3-9, characters 17-20.
 |}]
 
 

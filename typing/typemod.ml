@@ -3080,7 +3080,7 @@ and type_module_path_aux ~alias ~hold_locks sttn env path
       let vmode =
         Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Module None (mode, locks)
       in
-      vmode.mode, None
+      vmode, None
   in
   let md = { mod_desc = Tmod_ident (path, lid);
              mod_type = Mty_alias path;

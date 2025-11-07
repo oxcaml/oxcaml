@@ -141,7 +141,8 @@ let f () =
 Line 4, characters 4-5:
 4 |     k
         ^
-Error: The value "k" is once, so cannot be used inside a for loop
+Error: The value "k" is "once" but is expected to be "many"
+       because it is used in the loop at Lines 3-5, characters 2-6.
 |}]
 
 (* The following is bad, because k is used uniquely *)
@@ -154,9 +155,9 @@ let f () =
 Line 4, characters 12-13:
 4 |     unique_ k
                 ^
-Error: This value is "aliased" but is expected to be "unique".
-  Hint: This identifier cannot be used uniquely,
-  because it was defined outside of the for-loop.
+Error: This value is "aliased"
+       because it is used in the loop at Lines 3-5, characters 2-6.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let f =
@@ -170,9 +171,9 @@ let f =
 Line 5, characters 14-15:
 5 |     let _ = g a in ()
                   ^
-Error: This value is "aliased" but is expected to be "unique".
-  Hint: This identifier cannot be used uniquely,
-  because it was defined outside of the for-loop.
+Error: This value is "aliased"
+       because it is used in the loop at Lines 4-6, characters 2-6.
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let f =

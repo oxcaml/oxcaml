@@ -7574,7 +7574,7 @@ let exn_constructor_crossing env lid ~args locks =
   (* Exceptions cross contention and visibility on the monadic side, and
      portability and statefulness on the comonadic side, so we project those
      axes. *)
-  let monadic_mode = vmode.mode.monadic in
+  let monadic_mode = vmode.monadic in
   let monadic =
     [ monadic_mode
       |> Mode.Value.Monadic.proj Contention

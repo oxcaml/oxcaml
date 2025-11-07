@@ -143,22 +143,8 @@ type module_unbound_reason =
   | Mod_unbound_illegal_recursion of
       { container : string option; unbound : string }
 
-type escaping_context =
-  | Letop
-  | Probe
-  | Class
-
-type shared_context =
-  | For_loop
-  | While_loop
-  | Letop
-  | Comprehension
-  | Class
-  | Probe
-
 type lock =
-  | Escape_lock of escaping_context
-  | Share_lock of shared_context
+  | Const_closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.Const.t
   | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
   | Region_lock
   | Exclave_lock
@@ -845,14 +831,11 @@ type lookup_error =
         container_class_type : string;
       }
   | Cannot_scrape_alias of Longident.t * Path.t
-  | Local_value_escaping of Mode.Hint.lock_item * Longident.t * escaping_context
-  | Once_value_used_in of Mode.Hint.lock_item * Longident.t * shared_context
   | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
-  | Mutable_value_used_in_closure of
-      [`Escape of escaping_context | `Shared of shared_context | `Closure]
+  | Mutable_value_used_in_closure of Mode.Hint.pinpoint
   | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
   | No_constructor_in_stage of Longident.t * Location.t * int
 
@@ -870,16 +853,6 @@ let error err = raise (Error err)
 
 let lookup_error loc env err =
   error (Lookup_error(loc, env, err))
-
-type actual_mode = {
-  mode : Mode.Value.l;
-  context : shared_context option
-}
-
-let mode_default mode = {
-  mode;
-  context = None
-}
 
 let env_labels (type rep) (record_form : rep record_form) env
     : (empty, rep gen_label_description) TycompTbl.t  =
@@ -2872,12 +2845,8 @@ let add_lock lock env =
     constrs = TycompTbl.add_lock lock env.constrs;
   }
 
-let add_escape_lock escaping_context env =
-  let lock = Escape_lock escaping_context in
-  add_lock lock env
-
-let add_share_lock shared_context env =
-  let lock = Share_lock shared_context in
+let add_const_closure_lock closure_context comonadic env =
+  let lock = Const_closure_lock (closure_context, comonadic) in
   add_lock lock env
 
 let add_closure_lock closure_context comonadic env =
@@ -2914,11 +2883,10 @@ let quotation_locks_offset locks =
        match lock with
        | Quotation_lock -> rel_stage + 1
        | Splice_lock -> rel_stage - 1
-       | Escape_lock _
        | Exclave_lock
        | Region_lock
        | Unboxed_lock
-       | Share_lock _
+       | Const_closure_lock _
        | Closure_lock _  -> rel_stage)
     locks
     0
@@ -3418,37 +3386,8 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
       path, (Mode.Value.(disallow_right mode_unit), locks), a
     end
 
-let escape_mode ~errors ~env ~loc ~item ~lid vmode escaping_context =
-  begin match
-  Mode.Regionality.submode
-    (Mode.Value.proj_comonadic Areality vmode.mode)
-    (Mode.Regionality.global)
-  with
-  | Ok () -> ()
-  | Error _ ->
-      may_lookup_error errors loc env
-        (Local_value_escaping (item, lid, escaping_context))
-  end;
-  vmode
-
-let share_mode ~errors ~env ~loc ~item ~lid vmode shared_context =
-  match
-    Mode.Linearity.submode
-      (Mode.Value.proj_comonadic Linearity vmode.mode)
-      Mode.Linearity.many
-  with
-  | Error _ ->
-      may_lookup_error errors loc env
-        (Once_value_used_in (item, lid, shared_context))
-  | Ok () ->
-    let mode =
-      Mode.Value.join_with Uniqueness Mode.Uniqueness.Const.Aliased
-        vmode.mode
-    in
-    {mode; context = Some shared_context}
-
 let closure_mode ~loc ~item ~lid
-  ({mode = {Mode.monadic; comonadic}; _} as vmode) closure_context comonadic0 =
+  {Mode.monadic; comonadic} closure_context comonadic0 =
   let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
   let hint_comonadic : _ Mode.Hint.morph =
     Is_closed_by (Comonadic, {closure = closure_context; closed = pp})
@@ -3463,26 +3402,34 @@ let closure_mode ~loc ~item ~lid
       [ monadic;
         Mode.Value.comonadic_to_monadic_min ~hint:hint_monadic comonadic0 ]
   in
-  {vmode with mode = {monadic; comonadic}}
+  {Mode.monadic; comonadic}
+
+let const_closure_mode ~loc ~item ~lid
+  {Mode.monadic; comonadic} closure_context comonadic0 =
+  let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
+  Mode.Value.Comonadic.(submode_err pp comonadic
+    (of_const ~hint:(Is_used_in closure_context) comonadic0));
+  let monadic =
+    Mode.Value.(Monadic.join
+      [ monadic;
+        Const.comonadic_to_monadic_min comonadic0
+        |> Monadic.of_const ~hint:(Is_used_in closure_context) ])
+  in
+  {Mode.monadic; comonadic}
 
 let exclave_mode ~errors ~env ~loc ~item ~lid vmode =
   match
   Mode.Regionality.submode
-    (Mode.Value.proj_comonadic Areality vmode.mode)
+    (Mode.Value.proj_comonadic Areality vmode)
     Mode.Regionality.regional
 with
-| Ok () ->
-  let mode = vmode.mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value in
-  {vmode with mode}
+| Ok () -> vmode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
 | Error _ ->
     may_lookup_error errors loc env
       (Local_value_used_in_exclave (item, lid))
 
 let region_mode vmode =
-  let mode =
-    vmode.mode |> Mode.value_to_alloc_r2l |> Mode.alloc_to_value_l2r
-  in
-  {vmode with mode}
+  vmode |> Mode.value_to_alloc_r2l |> Mode.alloc_to_value_l2r
 
 let unboxed_type ~errors ~env ~loc ~lid ty =
   match ty with
@@ -3505,15 +3452,12 @@ let unboxed_type ~errors ~env ~loc ~lid ty =
     [ty] is optional as the function works on modules and classes as well, for
     which [ty] should be [None]. *)
 let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
-  let vmode = { mode; context = None } in
   List.fold_left
     (fun vmode lock ->
       match lock with
       | Region_lock -> region_mode vmode
-      | Escape_lock escaping_context ->
-          escape_mode ~errors ~env ~loc ~item ~lid vmode escaping_context
-      | Share_lock shared_context ->
-          share_mode ~errors ~env ~loc ~item ~lid vmode shared_context
+      | Const_closure_lock (closure_context, comonadic) ->
+          const_closure_mode ~loc ~item ~lid vmode closure_context comonadic
       | Closure_lock (closure_context, comonadic) ->
           closure_mode ~loc ~item ~lid vmode closure_context comonadic
       | Exclave_lock ->
@@ -3522,7 +3466,7 @@ let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
           unboxed_type ~errors ~env ~loc ~lid ty;
           vmode
       | Quotation_lock | Splice_lock -> vmode
-    ) vmode locks
+    ) mode locks
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
   and [locks] which is the locks between the declaration and the usage (either
@@ -3553,17 +3497,11 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
-      | Escape_lock (Letop | Probe | Class as ctx) ->
-          may_lookup_error errors loc env
-            (Mutable_value_used_in_closure (`Escape ctx))
-      | Share_lock (Letop | Probe | Class as ctx) ->
-          may_lookup_error errors loc env
-            (Mutable_value_used_in_closure (`Shared ctx))
-      | Share_lock (For_loop | While_loop | Comprehension) ->
+      | Const_closure_lock ((_, Loop), _) ->
           mode
-      | Closure_lock _ ->
+      | Const_closure_lock (pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env
-            (Mutable_value_used_in_closure `Closure)
+            (Mutable_value_used_in_closure pp)
       | Unboxed_lock | Quotation_lock | Splice_lock ->
           mode
     ) mode locks
@@ -4183,7 +4121,7 @@ let lookup_class ~errors ~use ~loc lid env =
     if use then
       walk_locks ~errors ~loc ~env ~item:Class ~lid clda_mode None locks
     else
-      mode_default clda_mode
+      clda_mode
   in
   path, cld, vmode
 
@@ -4345,7 +4283,7 @@ let lookup_modtype_path ?(use=true) ~loc lid env =
 
 let lookup_class ?(use=true) ~loc lid env =
   let path, desc, vmode = lookup_class ~errors:true ~use ~loc lid env in
-  path, desc, vmode.mode
+  path, desc, vmode
 
 let lookup_cltype ?(use=true) ~loc lid env =
   lookup_cltype ~errors:true ~use ~loc lid env
@@ -4717,47 +4655,6 @@ let extract_settable_variables env =
        | Val_ivar _ | Val_mut _ -> name :: acc
        | _ -> acc) None env []
 
-let string_of_escaping_context : escaping_context -> string =
-  function
-  | Letop -> "a letop"
-  | Probe -> "a probe"
-  | Class -> "a class"
-
-let string_of_shared_context : shared_context -> string =
-  function
-  | For_loop -> "a for loop"
-  | While_loop -> "a while loop"
-  | Letop -> "a letop"
-  | Comprehension -> "a comprehension"
-  | Class -> "a class"
-  | Probe -> "a probe"
-
-let sharedness_hint ppf : shared_context -> _ = function
-  | For_loop ->
-    Format.fprintf ppf
-        "@[Hint: This identifier cannot be used uniquely,@ \
-          because it was defined outside of the for-loop.@]"
-  | While_loop ->
-    Format.fprintf ppf
-        "@[Hint: This identifier cannot be used uniquely,@ \
-          because it was defined outside of the while-loop.@]"
-  | Comprehension ->
-    Format.fprintf ppf
-        "@[Hint: This identifier cannot be used uniquely,@ \
-          because it was defined outside of the comprehension.@]"
-  | Letop ->
-    Format.fprintf ppf
-        "@[Hint: This identifier cannot be used uniquely,@ \
-          because it was defined outside of the let-op.@]"
-  | Class ->
-    Format.fprintf ppf
-        "@[Hint: This identifier cannot be used uniquely,@ \
-          because it is defined in a class.@]"
-  | Probe ->
-    Format.fprintf ppf
-        "@[Hint: This identifier cannot be used uniquely,@ \
-          because it is defined outside of the probe.@]"
-
 let print_lock_item ppf (item, lid) =
   match (item : Mode.Hint.lock_item) with
   | Module ->
@@ -5001,18 +4898,6 @@ let report_lookup_error ~level _loc env ppf = function
         "The module %a is an alias for module %a, which %s"
         (Style.as_inline_code !print_longident) lid
         (Style.as_inline_code !print_path) p cause
-  | Local_value_escaping (item, lid, context) ->
-      fprintf ppf
-        "@[%a local, so cannot be used \
-          inside %s.@]"
-        print_lock_item (item, lid)
-        (string_of_escaping_context context);
-  | Once_value_used_in (item, lid, context) ->
-      fprintf ppf
-        "@[%a once, so cannot be used \
-            inside %s@]"
-        print_lock_item (item, lid)
-        (string_of_shared_context context)
   | Local_value_used_in_exclave (item, lid) ->
       fprintf ppf "@[%a local, so it cannot be used \
                   inside an exclave_@]"
@@ -5043,14 +4928,9 @@ let report_lookup_error ~level _loc env ppf = function
   | Error_from_persistent_env err ->
       Persistent_env.report_error ppf err
   | Mutable_value_used_in_closure ctx ->
-      let ctx =
-        match ctx with
-        | `Escape ctx -> string_of_escaping_context ctx
-        | `Shared ctx -> string_of_shared_context ctx
-        | `Closure -> "closure"
-      in
       fprintf ppf
-        "@[Mutable variable cannot be used inside %s.@]" ctx
+        "@[Mutable variable cannot be used inside %t.@]"
+        (Mode.print_pinpoint ctx |> Option.get)
   | Incompatible_stage (lid, usage_loc, usage_stage, intro_loc, intro_stage) ->
       fprintf ppf
         "@[Identifier %a is used at %a,@ \

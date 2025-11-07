@@ -94,8 +94,7 @@ let check_modes env ?(crossing = Crossing.max) ~item ?typ = function
         | None -> m0
         | Some (locks, lid, loc) ->
             let m0 = Crossing.apply_left crossing m0 in
-            let m0 = Env.walk_locks ~env ~loc lid ~item typ (m0, locks) in
-            m0.mode
+            Env.walk_locks ~env ~loc lid ~item typ (m0, locks)
       in
       let m1 = Crossing.apply_right crossing m1 in
       Mode.Value.submode m0 m1

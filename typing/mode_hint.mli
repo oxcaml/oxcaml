@@ -24,6 +24,9 @@ type pinpoint_desc =
   | Lazy  (** A lazy expression *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
+  | Class  (** An class declaration *)
+  | Loop  (** a loop *)
+  | Letop  (** let op *)
 
 (** A pinpoint is a location in the source code, accompanied by additional description *)
 type pinpoint = Location.t * pinpoint_desc
@@ -46,6 +49,9 @@ type 'd const =
   | Function_return : (disallowed * 'r) pos const
   | Stack_expression : ('l * disallowed) pos const
   | Module_allocated_on_heap : (disallowed * 'r) pos const
+  | Is_used_in : pinpoint -> (disallowed * 'r) const
+      (** A variant of [Is_closed_by] where the closure mode is constant.
+        INVARIANT: The [pinpoint] cannot be [Unknown]. *)
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 
