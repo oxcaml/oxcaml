@@ -3008,20 +3008,6 @@ comprehension_iterator:
 comprehension_clause_binding:
   | attributes pattern comprehension_iterator
       { { pcomp_cb_pattern = $2 ; pcomp_cb_iterator = $3 ; pcomp_cb_attributes = $1 } }
-  (* We can't write [[e for local_ x = 1 to 10]], because the [local_] has to
-     move to the RHS and there's nowhere for it to move to; besides, you never
-     want that [int] to be [local_].  But we can parse [[e for local_ x in xs]].
-     We have to have that as a separate rule here because it moves the [local_]
-     over to the RHS of the binding, so we need everything to be visible. *)
-  | attributes mode_legacy pattern IN expr
-      { let expr =
-          mkexp_constraint ~loc:$sloc ~exp:$5 ~cty:None ~modes:[$2]
-        in
-        { pcomp_cb_pattern    = $3
-        ; pcomp_cb_iterator   = Pcomp_in expr
-        ; pcomp_cb_attributes = $1
-        }
-      }
 ;
 
 comprehension_clause:

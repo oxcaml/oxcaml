@@ -316,18 +316,6 @@ val nums : (int * int * int) array =
     (9, 3, 4); (9, 3, 2); (9, 0, 1); (9, 0, 3); (10, 5, 3); (10, 2, 2)|]
 |}]
 
-(* local_ is allowed in the parser in this one place, but the type-checker
-   rejects *)
-let broken_local =
-  [ 5 for local_ n in [ 1; 2 ] ];;
-
-[%%expect{|
-Line 2, characters 10-30:
-2 |   [ 5 for local_ n in [ 1; 2 ] ];;
-              ^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
-|}]
-
 (* User-written attributes *)
 let nums =
   ([(x[@test.attr1]) for (x[@test.attr2]) in ([][@test.attr3])] [@test.attr4]);;
