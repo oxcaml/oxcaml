@@ -271,72 +271,15 @@ let print_operation ?addr printreg (op : operation) ppf regs =
   ()
 
 module Mem = struct
-  (** Initial support for some operations with memory arguments.
-      Requires 16-byte aligned memory. *)
-  module Fused = struct
-    (* CR-someday mslater: just use Simd.operation *)
-    type operation =
-      | Add_f32
-      | Sub_f32
-      | Mul_f32
-      | Div_f32
-      | Add_f64
-      | Sub_f64
-      | Mul_f64
-      | Div_f64
-
-    let class_of_operation (op : operation) =
-      match op with
-      | Add_f32 | Sub_f32 | Mul_f32 | Div_f32 | Add_f64 | Sub_f64 | Mul_f64
-      | Div_f64 ->
-        Load { is_mutable = true }
-
-    let op_name (op : operation) =
-      match op with
-      | Add_f32 -> "add_f32"
-      | Sub_f32 -> "sub_f32"
-      | Mul_f32 -> "mul_f32"
-      | Div_f32 -> "div_f32"
-      | Add_f64 -> "add_f64"
-      | Sub_f64 -> "sub_f64"
-      | Mul_f64 -> "mul_f64"
-      | Div_f64 -> "div_f64"
-
-    let print_operation printreg printaddr (op : operation) ppf arg =
-      let addr_args = Array.sub arg 1 (Array.length arg - 1) in
-      fprintf ppf "%s %a [%a]" (op_name op) printreg arg.(0) printaddr addr_args
-
-    let equal_operation (l : operation) (r : operation) =
-      match l, r with
-      | Add_f64, Add_f64
-      | Sub_f64, Sub_f64
-      | Mul_f64, Mul_f64
-      | Div_f64, Div_f64
-      | Add_f32, Add_f32
-      | Sub_f32, Sub_f32
-      | Mul_f32, Mul_f32
-      | Div_f32, Div_f32 ->
-        true
-      | ( ( Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32 | Mul_f32
-          | Div_f32 ),
-          _ ) ->
-        false
-  end
-
   type nonrec operation =
     | Load of operation (* Loads from memory argument *)
     | Store of operation (* Stores to memory argument *)
-    | Fused of Fused.operation (* Implicit load; has memory-optional argument *)
 
   let class_of_operation (op : operation) : operation_class =
-    match op with
-    | Load _ -> Load { is_mutable = true }
-    | Store _ -> Store
-    | Fused op -> Fused.class_of_operation op
+    match op with Load _ -> Load { is_mutable = true } | Store _ -> Store
 
   let print_operation printreg printaddr addr_args (op : operation) ppf arg =
     match op with
-    | Fused op -> Fused.print_operation printreg printaddr op ppf arg
     | Load op | Store op ->
       print_operation ~addr:(printaddr, addr_args) printreg op ppf arg
 
@@ -349,6 +292,5 @@ module Mem = struct
   let equal_operation (l : operation) (r : operation) =
     match l, r with
     | Load l, Load r | Store l, Store r -> equal_operation l r
-    | Fused l, Fused r -> Fused.equal_operation l r
-    | (Load _ | Store _ | Fused _), _ -> false
+    | (Load _ | Store _), _ -> false
 end

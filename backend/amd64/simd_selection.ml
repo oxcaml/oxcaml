@@ -1011,14 +1011,7 @@ let pseudoregs_for_operation (simd : Simd.operation) arg res =
   pseudoregs_for_instr sse_or_avx arg_regs res_regs
 
 let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
-  match op with
-  | Load op | Store op -> pseudoregs_for_operation op arg res
-  | Fused
-      ( Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32 | Mul_f32
-      | Div_f32 ) ->
-    if Proc.has_three_operand_float_ops ()
-    then arg, res
-    else [| res.(0); arg.(1) |], res
+  match op with Load op | Store op -> pseudoregs_for_operation op arg res
 
 (* Error report *)
 
@@ -1504,23 +1497,26 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         then args.(0) <- Vectorize_utils.Vectorized_instruction.Argument 0;
         args
       in
+      let sse, avx =
+        match float_width, float_op with
+        | Float64, Ifloatadd -> addpd, vaddpd_X_X_Xm128
+        | Float64, Ifloatsub -> subpd, vsubpd_X_X_Xm128
+        | Float64, Ifloatmul -> mulpd, vmulpd_X_X_Xm128
+        | Float64, Ifloatdiv -> divpd, vdivpd_X_X_Xm128
+        | Float32, Ifloatadd -> addps, vaddps_X_X_Xm128
+        | Float32, Ifloatsub -> subps, vsubps_X_X_Xm128
+        | Float32, Ifloatmul -> mulps, vmulps_X_X_Xm128
+        | Float32, Ifloatdiv -> divps, vdivps_X_X_Xm128
+      in
       if is_aligned_to_vector_width ()
       then
-        let sse_op : Simd.Mem.Fused.operation =
-          match float_width, float_op with
-          | Float64, Ifloatadd -> Add_f64
-          | Float64, Ifloatsub -> Sub_f64
-          | Float64, Ifloatmul -> Mul_f64
-          | Float64, Ifloatdiv -> Div_f64
-          | Float32, Ifloatadd -> Add_f32
-          | Float32, Ifloatsub -> Sub_f32
-          | Float32, Ifloatmul -> Mul_f32
-          | Float32, Ifloatdiv -> Div_f32
-        in
         let arguments = append_result results address_args in
+        let instr = if Arch.Extension.enabled AVX then avx else sse in
         Some
           [ { operation =
-                Operation.Specific (Isimd_mem (Fused sse_op, addressing_mode));
+                Operation.Specific
+                  (Isimd_mem
+                     (Load (Simd.instruction instr None), addressing_mode));
               arguments;
               results
             } ]
@@ -1528,17 +1524,6 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         (* Emit a load followed by an arithmetic operation, effectively
            reverting the decision from Arch.selection. It will probably not be
            beneficial with 128-bit accesses. *)
-        let sse, avx =
-          match float_width, float_op with
-          | Float64, Ifloatadd -> addpd, vaddpd_X_X_Xm128
-          | Float64, Ifloatsub -> subpd, vsubpd_X_X_Xm128
-          | Float64, Ifloatmul -> mulpd, vmulpd_X_X_Xm128
-          | Float64, Ifloatdiv -> divpd, vdivpd_X_X_Xm128
-          | Float32, Ifloatadd -> addps, vaddps_X_X_Xm128
-          | Float32, Ifloatsub -> subps, vsubps_X_X_Xm128
-          | Float32, Ifloatmul -> mulps, vmulps_X_X_Xm128
-          | Float32, Ifloatdiv -> divps, vdivps_X_X_Xm128
-        in
         let new_reg =
           [| Vectorize_utils.Vectorized_instruction.New_Vec128 0 |]
         in

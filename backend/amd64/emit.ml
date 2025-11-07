@@ -1799,31 +1799,10 @@ let emit_simd ?mode (op : Simd.operation) instr =
       I.set A (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0))
 
-(* CR mslater: delete *)
-let emit_fused_simd_instr (simd : Simd.Mem.Fused.operation) i addr =
-  let open Simd_instrs in
-  assert (Reg.is_reg i.arg.(0));
-  assert (not (Reg.is_reg i.arg.(1)));
-  match simd with
-  | Add_f64 -> sse_or_avx3 addpd vaddpd_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Sub_f64 -> sse_or_avx3 subpd vsubpd_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Mul_f64 -> sse_or_avx3 mulpd vmulpd_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Div_f64 -> sse_or_avx3 divpd vdivpd_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Add_f32 -> sse_or_avx3 addps vaddps_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Sub_f32 -> sse_or_avx3 subps vsubps_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Mul_f32 -> sse_or_avx3 mulps vmulps_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Div_f32 -> sse_or_avx3 divps vdivps_X_X_Xm128 (arg i 0) addr (res i 0)
-
 let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i mode =
   match simd with
   | Load op -> emit_simd ~mode:(mode, Load) op i
   | Store op -> emit_simd ~mode:(mode, Store_modify) op i
-  | Fused op ->
-    let addr = addressing mode VEC128 i 1 in
-    Address_sanitizer.emit_sanitize
-      ~dependencies:[| res i 0 |]
-      ~instr:i ~address:addr Onetwentyeight_unaligned Store_modify;
-    emit_fused_simd_instr op i addr
 
 let prologue_stack_offset () =
   assert !frame_required;

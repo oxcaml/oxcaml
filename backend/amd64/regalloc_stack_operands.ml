@@ -198,14 +198,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       else if res_mem
       then may_use_stack_operand_for_result map instr ~num_args
       else May_still_have_spilled_registers)
-  | Op
-      (Specific
-        (Isimd_mem
-          ( ( Load _ | Store _
-            | Fused
-                ( Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32
-                | Mul_f32 | Div_f32 ) ),
-            _ ))) ->
+  | Op (Specific (Isimd_mem ((Load _ | Store _), _))) ->
     May_still_have_spilled_registers
   | Op
       (Reinterpret_cast

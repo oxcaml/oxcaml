@@ -545,8 +545,6 @@ let destroyed_by_simd_op (op : Simd.operation) =
 let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with
   | Load op | Store op -> destroyed_by_simd_op op
-  | Fused (Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | 
-           Add_f32 | Sub_f32 | Mul_f32 | Div_f32) -> [||]
 
 let destroyed_at_raise = all_phys_regs
 
