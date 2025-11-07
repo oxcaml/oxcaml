@@ -174,6 +174,50 @@ module Separability = struct
     | Maybe_separable -> Format.fprintf ppf "maybe_separable"
 end
 
+module Pointerness = struct
+  type t =
+    | Non_pointer
+    | Maybe_pointer
+
+  let max = Maybe_pointer
+
+  let min = Non_pointer
+
+  let legacy = Maybe_pointer
+
+  let equal p1 p2 =
+    match p1, p2 with
+    | Non_pointer, Non_pointer -> true
+    | Maybe_pointer, Maybe_pointer -> true
+    | (Non_pointer | Maybe_pointer), _ -> false
+
+  let less_or_equal p1 p2 : Misc.Le_result.t =
+    match p1, p2 with
+    | Non_pointer, Non_pointer -> Equal
+    | Non_pointer, Maybe_pointer -> Less
+    | Maybe_pointer, Non_pointer -> Not_le
+    | Maybe_pointer, Maybe_pointer -> Equal
+
+  let le p1 p2 = Misc.Le_result.is_le (less_or_equal p1 p2)
+
+  let meet p1 p2 =
+    match p1, p2 with
+    | Non_pointer, (Non_pointer | Maybe_pointer) | Maybe_pointer, Non_pointer ->
+      Non_pointer
+    | Maybe_pointer, Maybe_pointer -> Maybe_pointer
+
+  let join p1 p2 =
+    match p1, p2 with
+    | Maybe_pointer, (Maybe_pointer | Non_pointer) | Non_pointer, Maybe_pointer
+      ->
+      Maybe_pointer
+    | Non_pointer, Non_pointer -> Non_pointer
+
+  let print ppf = function
+    | Non_pointer -> Format.fprintf ppf "non_pointer"
+    | Maybe_pointer -> Format.fprintf ppf "maybe_pointer"
+end
+
 module Axis = struct
   module Nonmodal = struct
     type 'a t =

@@ -94,27 +94,14 @@ module Sort : sig
   val decompose_into_product : t -> int -> t list option
 end
 
-(* CR zeisbach: I'm not sure exactly where this module should go *)
-module Pointerness : sig
-  type t =
-    | Non_pointer
-    | Maybe_pointer
-
-  (* CR zeisbach: this included module might become more refined over time *)
-  include Jkind_axis.Axis_ops with type t := t
-end
-
-(* CR zeisbach: [Layout] will be redefined to use [Scannable_axes], which
-   means that should probably be in this file, or in [Jkind_axis.mli].
-   not sure which is the better place for this... *)
+(* CR zeisbach: consider moving this around! *)
 module Scannable_axes : sig
   type t
 
-  include Jkind_axis.Axis_ops with type t := t
-
-  (* CR zeisbach: this function currently is entirely redundant, but is good to
-     have as more axes get added. should it be here now? *)
-  val create : pointerness:Pointerness.t -> t
+  (* CR zeisbach: determine if this is needed here, or if it can be replaced
+     by a version in [Jkind.ml]. This depends on who needs to construct
+     [Scannable_axes.t]s and where. My guess is this might be needed. *)
+  val create : pointerness:Jkind_axis.Pointerness.t -> t
 end
 
 module Layout : sig

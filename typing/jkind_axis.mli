@@ -51,6 +51,17 @@ module Separability : sig
   include Axis_ops with type t := t
 end
 
+module Pointerness : sig
+  type t =
+    | Non_pointer
+    | Maybe_pointer
+
+  (* CR zeisbach: this included module might become more refined over time.
+     there are more operations that make sense here. But also, this will
+     probably change as more things get refactored. Seems ok for now. *)
+  include Axis_ops with type t := t
+end
+
 module Axis : sig
   module Nonmodal : sig
     type 'a t =
