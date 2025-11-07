@@ -63,6 +63,7 @@ let _ = f_float32x4_unboxed (float32x4_of_floats #0.0s #0.0s #0.0s #0.0s)
 let _ = f_float32x4_unboxed
     (float32x4_of_floats (-#2.5s) #10.0s (-#100.0s) #1e5s)
 
+(* CR sspies: consider printing float16s with fewer significant digits *)
 let[@inline never] [@local never] f_float16x8_unboxed (x: float16x8#) = x
 let _ = f_float16x8_unboxed (float16x8_of_floats #1.1s #2.0s #3.0s #4.1s
                                                  (-#1.1s) (-#2.0s) (-#3.0s) (-#4.1s))
