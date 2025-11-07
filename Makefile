@@ -1,6 +1,6 @@
 SHELL = /usr/bin/env bash
 ROOTDIR = .
-include Makefile.build_config
+include Makefile.config_if_required
 export ARCH
 
 boot_ocamlc = main_native.exe
@@ -10,6 +10,61 @@ boot_ocamldep = tools/ocamldep.exe
 boot_ocamlobjinfo = tools/objinfo.exe
 ocamldir = .
 toplevels_installed = top opttop
+
+CLEAN_DUNE_WORKSPACES = \
+  duneconf/boot.ws \
+  duneconf/runtime_stdlib.ws \
+  duneconf/main.ws
+
+CLEAN_DIRS = \
+  _build \
+  _build_upstream \
+  _compare \
+  _coverage \
+  _install \
+  _profile \
+  _runtest
+
+CLEAN_FILES = \
+  $(CLEAN_DUNE_WORKSPACES) \
+  duneconf/dirs-to-ignore.inc \
+  duneconf/ox-extra.inc \
+  dune.runtime_selection \
+  otherlibs/dune \
+  chamelon/dune \
+  natdynlinkops \
+  otherlibs/dynlink/natdynlinkops \
+  ocamlopt_upstream_flags.sexp \
+  ocamlopt_oxcaml_flags.sexp \
+  boot_oc_cflags.sexp \
+  oc_cflags.sexp \
+  oc_cppflags.sexp \
+  sharedlib_cflags.sexp \
+  .rsync-output \
+  .rsync-output-compare \
+  ocamlc \
+  ocamlopt \
+  .ocamldebug
+
+ifdef dune
+  CLEAN_DUNE_BIN := $(dune)
+else
+  CLEAN_DUNE_BIN := $(shell command -v dune 2>/dev/null)
+endif
+
+.PHONY: clean
+clean:
+	$(if $(filter 1,$(V)),,@)set -e; \
+	ws_list="$(CLEAN_DUNE_WORKSPACES)"; \
+	if [ -n "$(strip $(CLEAN_DUNE_BIN))" ]; then \
+	  for ws in $$ws_list; do \
+	    if [ -f $$ws ]; then \
+	      "$(strip $(CLEAN_DUNE_BIN))" clean --root=. --workspace=$$ws; \
+	    fi; \
+	  done; \
+	fi
+	$(if $(filter 1,$(V)),,@)rm -rf -- $(CLEAN_DIRS)
+	$(if $(filter 1,$(V)),,@)rm -f -- $(CLEAN_FILES)
 
 $(ocamldir)/duneconf/ox-extra.inc:
 	echo > $@
