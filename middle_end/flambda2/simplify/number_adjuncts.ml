@@ -524,12 +524,13 @@ module For_int8s : Int_number_kind = struct
 
     let div x y = of_int (Int.div (to_int x) (to_int y))
 
-    let div_unsigned x y = of_int (Int.div (to_int x) (to_int y))
-    (* CR jrayman *)
+    let div_unsigned x y =
+      unsigned_of_int (Int.div (unsigned_to_int x) (unsigned_to_int y))
 
     let rem x y = of_int (Int.rem (to_int x) (to_int y))
 
-    let rem_unsigned x y = of_int (Int.rem (to_int x) (to_int y))
+    let rem_unsigned x y =
+      unsigned_of_int (Int.rem (unsigned_to_int x) (unsigned_to_int y))
 
     let logand x y = of_int (Int.logand (to_int x) (to_int y))
 
@@ -646,12 +647,13 @@ module For_int16s : Int_number_kind = struct
 
     let div x y = of_int (Int.div (to_int x) (to_int y))
 
-    let div_unsigned x y = of_int (Int.div (to_int x) (to_int y))
+    let div_unsigned x y =
+      unsigned_of_int (Int.div (unsigned_to_int x) (unsigned_to_int y))
 
     let rem x y = of_int (Int.rem (to_int x) (to_int y))
 
-    let rem_unsigned x y = of_int (Int.rem (to_int x) (to_int y))
-    (* CR jrayman *)
+    let rem_unsigned x y =
+      unsigned_of_int (Int.rem (unsigned_to_int x) (unsigned_to_int y))
 
     let logand x y = of_int (Int.logand (to_int x) (to_int y))
 

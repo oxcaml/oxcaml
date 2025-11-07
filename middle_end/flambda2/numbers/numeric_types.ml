@@ -87,7 +87,13 @@ struct
       let extra_bits = Sys.int_size - num_bits in
       (i lsl extra_bits) asr extra_bits
 
+    let unsigned_of_int i =
+      let extra_bits = Sys.int_size - num_bits in
+      (i lsl extra_bits) lsr extra_bits
+
     let to_int i = i
+
+    let unsigned_to_int i = i
 
     let to_float = Float.of_int
 
