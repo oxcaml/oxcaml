@@ -2231,33 +2231,18 @@ end = struct
   (* It is rare to care about which variables have been bound. This
      implementation prioritizes the common case of caring only about the
      presence of variables. *)
-  type t = { is_empty : bool; var_set : TypeSet.t Lazy.t }
+  type t = TypeSet.t
 
-  let empty = { is_empty = true; var_set = Lazy.from_val TypeSet.empty }
+  let empty = TypeSet.empty
 
-  let of_list = function
-    | [] -> empty
-    | new_ones ->
-      let var_set =
-        lazy (TypeSet.of_list (List.map Transient_expr.repr new_ones))
-      in
-      { is_empty = false; var_set }
+  let of_list new_ones =
+    TypeSet.of_list (List.map Transient_expr.repr new_ones)
 
-  let union ({ is_empty = empty1; var_set = set1 } as t1)
-        ({ is_empty = empty2; var_set = set2 } as t2) =
-    match empty1, empty2 with
-    | true, true -> empty
-    | true, false -> t2
-    | false, true -> t1
-    | false, false ->
-      let var_set = lazy (TypeSet.union (Lazy.force set1) (Lazy.force set2)) in
-      { is_empty = false; var_set }
+  let union = TypeSet.union
 
-  let mem { is_empty; var_set } ty =
-    not is_empty &&
-    TypeSet.mem ty (Lazy.force var_set)
+  let mem t ty = TypeSet.mem ty t
 
-  let is_empty { is_empty } = is_empty
+  let is_empty = TypeSet.is_empty
 end
 
 type unwrapped_type_expr =
