@@ -8,10 +8,10 @@ let print_result input =
   let buffer = Lazy.force buffer in
   Printf.printf "'%s' -> " input;
   try
-    let result = Manifests.For_testing.split_and_unescape ~buffer input in
+    let result = Load_path.For_testing.split_and_unescape ~buffer input in
     Printf.printf "[%s]\n" (String.concat "; " (List.map (Printf.sprintf "%S") result))
   with
-  | Manifests.For_testing.Parse_error msg ->
+  | Load_path.For_testing.Parse_error msg ->
     Printf.printf "Parse_error(%S)\n" msg
 ;;
 
