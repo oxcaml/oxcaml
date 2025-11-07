@@ -613,10 +613,21 @@ module X86_peephole = struct
     | INC dst | DEC dst | NEG dst | BSWAP dst | SET (_, dst) ->
       equal_args target dst
     | POP dst -> equal_args target dst
-    | IMUL (dst, None) -> equal_args target dst
     | IMUL (_, Some dst) -> equal_args target dst
     | LOCK_XADD (_, dst) -> equal_args target dst
     | XCHG (op1, op2) -> equal_args target op1 || equal_args target op2
+    | MUL _ | IMUL (_, None) ->
+      (* MUL/IMUL(single-op) implicitly write to RAX and RDX *)
+      equal_args target (Reg64 RAX) || equal_args target (Reg64 RDX)
+    | IDIV _ ->
+      (* IDIV implicitly writes RAX (quotient) and RDX (remainder) *)
+      equal_args target (Reg64 RAX) || equal_args target (Reg64 RDX)
+    | CDQ ->
+      (* CDQ sign-extends EAX into EDX *)
+      equal_args target (Reg32 RAX)
+    | CQO ->
+      (* CQO sign-extends RAX into RDX *)
+      equal_args target (Reg64 RDX)
     | _ ->
       (* Conservative: assume unknown instructions might write to the target. *)
       true
@@ -647,9 +658,24 @@ module X86_peephole = struct
       equal_args target src
     | CMOV (_, src, dst) -> equal_args target src || equal_args target dst
     | INC dst | DEC dst | NEG dst | BSWAP dst -> equal_args target dst
-    | IMUL (op, None) -> equal_args target op
     | IMUL (op1, Some op2) -> equal_args target op1 || equal_args target op2
-    | MUL op | IDIV op -> equal_args target op
+    | MUL op ->
+      (* MUL implicitly reads RAX in addition to explicit operand *)
+      equal_args target op || equal_args target (Reg64 RAX)
+    | IMUL (op, None) ->
+      (* Single-operand IMUL implicitly reads RAX in addition to explicit op *)
+      equal_args target op || equal_args target (Reg64 RAX)
+    | IDIV op ->
+      (* IDIV implicitly reads RDX:RAX in addition to explicit operand *)
+      equal_args target op
+      || equal_args target (Reg64 RAX)
+      || equal_args target (Reg64 RDX)
+    | CDQ ->
+      (* CDQ reads EAX to sign-extend into EDX *)
+      equal_args target (Reg32 RAX)
+    | CQO ->
+      (* CQO reads RAX to sign-extend into RDX *)
+      equal_args target (Reg64 RAX)
     | CALL arg | JMP arg | J (_, arg) -> equal_args target arg
     | XCHG (op1, op2) -> equal_args target op1 || equal_args target op2
     | LOCK_CMPXCHG (op1, op2)
