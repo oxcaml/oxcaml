@@ -101,8 +101,12 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
   Dll.iter instrs ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
       match instr.desc with
       | Op (Const_int c) -> replace instr.res.(0) (Const_int c)
-      | Op (Const_float32 c) -> replace instr.res.(0) (Const_float32 c)
-      | Op (Const_float c) -> replace instr.res.(0) (Const_float c)
+      | Op (Const_float32 c) ->
+        if !Oxcaml_flags.cfg_value_propagation_float
+        then replace instr.res.(0) (Const_float32 c)
+      | Op (Const_float c) ->
+        if !Oxcaml_flags.cfg_value_propagation_float
+        then replace instr.res.(0) (Const_float c)
       | Op Move -> (
         (* CR xclerc for xclerc: double check the "magic" / conversions behind
            moves in `Emit` will not result in invalid tracking here. *)
@@ -113,12 +117,12 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
           replace instr.res.(0) value
         | Some _ | None -> remove instr.res.(0))
       | Op
-          ( Spill | Reload | Const_float32 _ | Const_float _ | Const_symbol _
-          | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-          | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _
-          | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
-          | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-          | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ | Tls_get )
+          ( Spill | Reload | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+          | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Intop _
+          | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
+          | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
+          | Begin_region | End_region | Specific _ | Name_for_debugger _
+          | Dls_get | Poll | Pause | Alloc _ | Tls_get )
       | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
       | Stack_check _ ->
         Array.iter
