@@ -581,6 +581,28 @@ module X86_peephole = struct
     | Reg8L _ | Reg8H _ | Reg16 _ | Reg64 _ -> true
     | _ -> false
 
+  (* Check if a register appears in an argument, including inside memory
+     operands. This handles the fact that Mem operands contain registers as
+     base/index. *)
+  let reg_appears_in_arg target arg =
+    if equal_args target arg
+    then true
+    else
+      match[@warning "-4"] arg with
+      | Mem addr -> (
+        match(* Check if target register appears as base or index in memory
+                operand *)
+             [@warning "-4"]
+          target
+        with
+        | Reg64 r | Reg32 r | Reg16 r | Reg8L r ->
+          (match addr.base with
+          | Some base when equal_reg64 r base -> true
+          | _ -> false)
+          || (addr.scale <> 0 && equal_reg64 r addr.idx)
+        | _ -> false)
+      | _ -> false
+
   (* Check if an instruction is a control flow instruction (jump, call, return).
      These act as basic block boundaries for peephole optimization. *)
   let is_control_flow = function[@warning "-4"]
@@ -609,13 +631,14 @@ module X86_peephole = struct
     | TZCNT (_, dst)
     | LZCNT (_, dst)
     | CMOV (_, _, dst) ->
-      equal_args target dst
+      reg_appears_in_arg target dst
     | INC dst | DEC dst | NEG dst | BSWAP dst | SET (_, dst) ->
-      equal_args target dst
-    | POP dst -> equal_args target dst
-    | IMUL (_, Some dst) -> equal_args target dst
-    | LOCK_XADD (_, dst) -> equal_args target dst
-    | XCHG (op1, op2) -> equal_args target op1 || equal_args target op2
+      reg_appears_in_arg target dst
+    | POP dst -> reg_appears_in_arg target dst
+    | IMUL (_, Some dst) -> reg_appears_in_arg target dst
+    | LOCK_XADD (_, dst) -> reg_appears_in_arg target dst
+    | XCHG (op1, op2) ->
+      reg_appears_in_arg target op1 || reg_appears_in_arg target op2
     | MUL _ | IMUL (_, None) ->
       (* MUL/IMUL(single-op) implicitly write to RAX and RDX *)
       equal_args target (Reg64 RAX) || equal_args target (Reg64 RDX)
@@ -628,6 +651,9 @@ module X86_peephole = struct
     | CQO ->
       (* CQO sign-extends RAX into RDX *)
       equal_args target (Reg64 RDX)
+    | LOCK_CMPXCHG (_, dst) ->
+      (* CMPXCHG writes to RAX (always) and conditionally to dst *)
+      reg_appears_in_arg target dst || equal_args target (Reg64 RAX)
     | _ ->
       (* Conservative: assume unknown instructions might write to the target. *)
       true
@@ -636,8 +662,8 @@ module X86_peephole = struct
      true if unsure. *)
   let reads_from_arg target = function[@warning "-4"]
     | MOV (src, _) | MOVSX (src, _) | MOVSXD (src, _) | MOVZX (src, _) ->
-      equal_args target src
-    | PUSH src -> equal_args target src
+      reg_appears_in_arg target src
+    | PUSH src -> reg_appears_in_arg target src
     | ADD (src, dst)
     | SUB (src, dst)
     | AND (src, dst)
@@ -645,7 +671,7 @@ module X86_peephole = struct
     | XOR (src, dst)
     | CMP (src, dst)
     | TEST (src, dst) ->
-      equal_args target src || equal_args target dst
+      reg_appears_in_arg target src || reg_appears_in_arg target dst
     | LEA (src, _)
     | BSF (src, _)
     | BSR (src, _)
@@ -655,19 +681,21 @@ module X86_peephole = struct
     | SAL (src, _)
     | SAR (src, _)
     | SHR (src, _) ->
-      equal_args target src
-    | CMOV (_, src, dst) -> equal_args target src || equal_args target dst
-    | INC dst | DEC dst | NEG dst | BSWAP dst -> equal_args target dst
-    | IMUL (op1, Some op2) -> equal_args target op1 || equal_args target op2
+      reg_appears_in_arg target src
+    | CMOV (_, src, dst) ->
+      reg_appears_in_arg target src || reg_appears_in_arg target dst
+    | INC dst | DEC dst | NEG dst | BSWAP dst -> reg_appears_in_arg target dst
+    | IMUL (op1, Some op2) ->
+      reg_appears_in_arg target op1 || reg_appears_in_arg target op2
     | MUL op ->
       (* MUL implicitly reads RAX in addition to explicit operand *)
-      equal_args target op || equal_args target (Reg64 RAX)
+      reg_appears_in_arg target op || equal_args target (Reg64 RAX)
     | IMUL (op, None) ->
       (* Single-operand IMUL implicitly reads RAX in addition to explicit op *)
-      equal_args target op || equal_args target (Reg64 RAX)
+      reg_appears_in_arg target op || equal_args target (Reg64 RAX)
     | IDIV op ->
       (* IDIV implicitly reads RDX:RAX in addition to explicit operand *)
-      equal_args target op
+      reg_appears_in_arg target op
       || equal_args target (Reg64 RAX)
       || equal_args target (Reg64 RDX)
     | CDQ ->
@@ -676,20 +704,26 @@ module X86_peephole = struct
     | CQO ->
       (* CQO reads RAX to sign-extend into RDX *)
       equal_args target (Reg64 RAX)
-    | CALL arg | JMP arg | J (_, arg) -> equal_args target arg
-    | XCHG (op1, op2) -> equal_args target op1 || equal_args target op2
-    | LOCK_CMPXCHG (op1, op2)
+    | CALL arg | JMP arg | J (_, arg) -> reg_appears_in_arg target arg
+    | XCHG (op1, op2) ->
+      reg_appears_in_arg target op1 || reg_appears_in_arg target op2
+    | LOCK_CMPXCHG (op1, op2) ->
+      (* CMPXCHG implicitly reads RAX (for comparison) in addition to
+         operands *)
+      reg_appears_in_arg target op1
+      || reg_appears_in_arg target op2
+      || equal_args target (Reg64 RAX)
     | LOCK_XADD (op1, op2)
     | LOCK_ADD (op1, op2)
     | LOCK_SUB (op1, op2)
     | LOCK_AND (op1, op2)
     | LOCK_OR (op1, op2)
     | LOCK_XOR (op1, op2) ->
-      equal_args target op1 || equal_args target op2
-    | SET (_, dst) -> equal_args target dst
+      reg_appears_in_arg target op1 || reg_appears_in_arg target op2
+    | SET (_, dst) -> reg_appears_in_arg target dst
     | POP _ -> false
-    | CLDEMOTE arg -> equal_args target arg
-    | PREFETCH (_, _, arg) -> equal_args target arg
+    | CLDEMOTE arg -> reg_appears_in_arg target arg
+    | PREFETCH (_, _, arg) -> reg_appears_in_arg target arg
     | _ ->
       (* Conservative: assume unknown instructions might read from the
          target. *)
