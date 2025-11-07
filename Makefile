@@ -46,6 +46,39 @@ CLEAN_FILES = \
   ocamlopt \
   .ocamldebug
 
+DISTCLEAN_DIRS = \
+  $(CLEAN_DIRS) \
+  autom4te.cache
+
+DISTCLEAN_FILES = \
+  $(CLEAN_FILES) \
+  Makefile.build_config \
+  Makefile.config \
+  config.cache \
+  config.log \
+  config.status \
+  configure \
+  configure~ \
+  libtool \
+  manual/src/version.tex \
+  manual/src/html_processing/src/common.ml \
+  ocamltest/ocamltest_config.ml \
+  ocamltest/ocamltest_unix.ml \
+  tools/eventlog_metadata \
+  utils/config.common.ml \
+  utils/config.generated.ml \
+  compilerlibs/META \
+  otherlibs/unix/unix.ml \
+  stdlib/META \
+  stdlib/runtime.info \
+  stdlib/target_runtime.info \
+  stdlib/sys.ml \
+  runtime4/caml/exec.h \
+  runtime4/caml/m.h \
+  runtime4/caml/s.h \
+  runtime4/caml/version.h \
+  $(wildcard otherlibs/*/META)
+
 ifdef dune
   CLEAN_DUNE_BIN := $(dune)
 else
@@ -55,16 +88,23 @@ endif
 .PHONY: clean
 clean:
 	$(if $(filter 1,$(V)),,@)set -e; \
-	ws_list="$(CLEAN_DUNE_WORKSPACES)"; \
-	if [ -n "$(strip $(CLEAN_DUNE_BIN))" ]; then \
-	  for ws in $$ws_list; do \
-	    if [ -f $$ws ]; then \
-	      "$(strip $(CLEAN_DUNE_BIN))" clean --root=. --workspace=$$ws; \
-	    fi; \
-	  done; \
-	fi
+		ws_list="$(CLEAN_DUNE_WORKSPACES)"; \
+		if [ -n "$(strip $(CLEAN_DUNE_BIN))" ]; then \
+		  for ws in $$ws_list; do \
+		    if [ -f $$ws ]; then \
+		      if ! "$(strip $(CLEAN_DUNE_BIN))" clean --root=. --workspace=$$ws; then \
+		        echo "dune clean failed for workspace $$ws, continuing with manual cleanup" >&2; \
+		      fi; \
+		    fi; \
+		  done; \
+		fi
 	$(if $(filter 1,$(V)),,@)rm -rf -- $(CLEAN_DIRS)
 	$(if $(filter 1,$(V)),,@)rm -f -- $(CLEAN_FILES)
+
+.PHONY: distclean
+distclean: clean
+	$(if $(filter 1,$(V)),,@)rm -rf -- $(DISTCLEAN_DIRS)
+	$(if $(filter 1,$(V)),,@)rm -f -- $(DISTCLEAN_FILES)
 
 $(ocamldir)/duneconf/ox-extra.inc:
 	echo > $@
