@@ -213,8 +213,6 @@ module Pseudo_instr = struct
 
   let instr = function Instruction instr | Sequence { instr; _ } -> instr
 
-  let n_args t = Array.length (instr t).args
-
   let equal t1 t2 =
     match t1, t2 with
     | Instruction i0, Instruction i1 -> Amd64_simd_instrs.equal i0 i1
@@ -240,8 +238,6 @@ type operation_class =
   | Pure
   | Load of { is_mutable : bool }
   | Store
-
-let n_args { instr; _ } = Pseudo_instr.n_args instr
 
 let class_of_operation _op = Pure
 
