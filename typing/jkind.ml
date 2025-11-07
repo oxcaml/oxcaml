@@ -153,6 +153,14 @@ module Layout = struct
 
     include Static
 
+    let allow_scannable_axes = function
+      | Any | Base Value -> true
+      | Base
+          ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
+          | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
+        false
+      | Product _ -> false
+
     let rec get_sort : t -> Sort.Const.t option = function
       | Any -> None
       | Base b -> Some (Base b)
@@ -2103,42 +2111,71 @@ module Const = struct
       with_bounds
     }
 
+  (* CR zeisbach: there are a few ways to design this function. one would be to
+     emulate [Typemode.transl_mod_bounds], which uses an auxiliary data
+     structure. here, I am tracking that same information using an accumulator.
+     I believe that this structure should scale to adding more axes *)
+  let transl_scannable_axes sa =
+    let rec go sa ~pointerness =
+      match sa with
+      | [] -> pointerness
+      | axis :: rest -> (
+        match axis with
+        | "non_pointer" -> go rest ~pointerness:(Some Pointerness.Non_pointer)
+        | "maybe_pointer" ->
+          go rest ~pointerness:(Some Pointerness.Maybe_pointer)
+        | _ -> failwith "unknown scannable axis")
+    in
+    let pointerness = go sa ~pointerness:None in
+    Scannable_axes.create
+      ~pointerness:(Option.value pointerness ~default:Pointerness.max)
+
   let rec of_user_written_annotation_unchecked_level :
       type l r.
       (l * r) Context_with_transl.t -> Parsetree.jkind_annotation -> (l * r) t =
    fun context jkind ->
     match jkind.pjkind_desc with
-    (* CR zeisbach: this is temporary, because the logic to implement this
-       relies on some data definitions and functions in another PR *)
-    | Pjk_abbreviation (_, _ :: _) ->
-      raise ~loc:jkind.pjkind_loc Unimplemented_syntax
-    | Pjk_abbreviation (name, []) ->
+    | Pjk_abbreviation (name, sa_annot) -> (
       (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
-      (match name with
-      | "any" -> Builtin.any.jkind
-      | "value_or_null" -> Builtin.value_or_null.jkind
-      | "value" -> Builtin.value.jkind
-      | "void" -> Builtin.void.jkind
-      | "immediate64" -> Builtin.immediate64.jkind
-      | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
-      | "immediate" -> Builtin.immediate.jkind
-      | "immediate_or_null" -> Builtin.immediate_or_null.jkind
-      | "float64" -> Builtin.float64.jkind
-      | "float32" -> Builtin.float32.jkind
-      | "word" -> Builtin.word.jkind
-      | "untagged_immediate" -> Builtin.untagged_immediate.jkind
-      | "bits8" -> Builtin.bits8.jkind
-      | "bits16" -> Builtin.bits16.jkind
-      | "bits32" -> Builtin.bits32.jkind
-      | "bits64" -> Builtin.bits64.jkind
-      | "vec128" -> Builtin.vec128.jkind
-      | "vec256" -> Builtin.vec256.jkind
-      | "vec512" -> Builtin.vec512.jkind
-      | "immutable_data" -> Builtin.immutable_data.jkind
-      | "sync_data" -> Builtin.sync_data.jkind
-      | "mutable_data" -> Builtin.mutable_data.jkind
-      | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
-      |> allow_left |> allow_right
+      let jkind_without_sa =
+        (match name with
+        | "any" -> Builtin.any.jkind
+        | "value_or_null" -> Builtin.value_or_null.jkind
+        | "value" -> Builtin.value.jkind
+        | "void" -> Builtin.void.jkind
+        | "immediate64" -> Builtin.immediate64.jkind
+        | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
+        | "immediate" -> Builtin.immediate.jkind
+        | "immediate_or_null" -> Builtin.immediate_or_null.jkind
+        | "float64" -> Builtin.float64.jkind
+        | "float32" -> Builtin.float32.jkind
+        | "word" -> Builtin.word.jkind
+        | "untagged_immediate" -> Builtin.untagged_immediate.jkind
+        | "bits8" -> Builtin.bits8.jkind
+        | "bits16" -> Builtin.bits16.jkind
+        | "bits32" -> Builtin.bits32.jkind
+        | "bits64" -> Builtin.bits64.jkind
+        | "vec128" -> Builtin.vec128.jkind
+        | "vec256" -> Builtin.vec256.jkind
+        | "vec512" -> Builtin.vec512.jkind
+        | "immutable_data" -> Builtin.immutable_data.jkind
+        | "sync_data" -> Builtin.sync_data.jkind
+        | "mutable_data" -> Builtin.mutable_data.jkind
+        | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
+        |> allow_left |> allow_right
+      in
+      (* CR zeisbach: what is the cleanest way to express this logic? *)
+      match sa_annot with
+      | [] -> jkind_without_sa
+      | _ :: _ when Layout.Const.allow_scannable_axes jkind_without_sa.layout ->
+        let sa = transl_scannable_axes sa_annot in
+        (* CR zeisbach: implement this! or, consider raising an error...
+           the correct behavior is to make a new jkind that differs only in
+           the layout by adding in the annotated scannable axes.
+           for inspiration, see [set_nullability_upper_bound] *)
+        ignore sa;
+        jkind_without_sa
+      | _ :: _ -> failwith "sa annotations make no sense")
     | Pjk_mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
       (* for each mode, lower the corresponding modal bound to be that mode *)

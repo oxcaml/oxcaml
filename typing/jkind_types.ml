@@ -612,6 +612,77 @@ module Sort = struct
   include Static.T
 end
 
+module Pointerness = struct
+  type t =
+    | Non_pointer
+    | Maybe_pointer
+
+  let max = Maybe_pointer
+
+  let min = Non_pointer
+
+  let legacy = Maybe_pointer
+
+  let equal p1 p2 =
+    match p1, p2 with
+    | Non_pointer, Non_pointer -> true
+    | Maybe_pointer, Maybe_pointer -> true
+    | (Non_pointer | Maybe_pointer), _ -> false
+
+  let less_or_equal p1 p2 : Misc.Le_result.t =
+    match p1, p2 with
+    | Non_pointer, Non_pointer -> Equal
+    | Non_pointer, Maybe_pointer -> Less
+    | Maybe_pointer, Non_pointer -> Not_le
+    | Maybe_pointer, Maybe_pointer -> Equal
+
+  let le p1 p2 = Misc.Le_result.is_le (less_or_equal p1 p2)
+
+  let meet p1 p2 =
+    match p1, p2 with
+    | Non_pointer, (Non_pointer | Maybe_pointer) | Maybe_pointer, Non_pointer ->
+      Non_pointer
+    | Maybe_pointer, Maybe_pointer -> Maybe_pointer
+
+  let join p1 p2 =
+    match p1, p2 with
+    | Maybe_pointer, (Maybe_pointer | Non_pointer) | Non_pointer, Maybe_pointer
+      ->
+      Maybe_pointer
+    | Non_pointer, Non_pointer -> Non_pointer
+
+  let print ppf = function
+    | Non_pointer -> Format.fprintf ppf "non_pointer"
+    | Maybe_pointer -> Format.fprintf ppf "maybe_pointer"
+end
+
+module Scannable_axes = struct
+  type t = Pointerness.t
+
+  (* CR zeisbach: expand these stubs to take more axes into account as they
+     get refactored from non-modal axes to scannable axes *)
+
+  let max = Pointerness.max
+
+  let min = Pointerness.min
+
+  let legacy = Pointerness.legacy
+
+  let equal sa1 sa2 = Pointerness.equal sa1 sa2
+
+  let less_or_equal sa1 sa2 = Pointerness.less_or_equal sa1 sa2
+
+  let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
+
+  let meet sa1 sa2 = Pointerness.meet sa1 sa2
+
+  let join sa1 sa2 = Pointerness.join sa1 sa2
+
+  let print ppf sa = Pointerness.print ppf sa
+
+  let create ~pointerness = pointerness
+end
+
 module Layout = struct
   type 'sort t =
     | Sort of 'sort
