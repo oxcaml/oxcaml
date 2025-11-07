@@ -1642,55 +1642,74 @@ let assert_loc (loc : Simd.loc) arg =
   | Some XMM0 -> assert (Reg.same_loc arg (phys_xmm0v ()))
   | None -> ()
 
-let check_simd_instr ?addr (simd : Simd.instr) imm instr =
+let check_simd_instr ?mode (simd : Simd.instr) imm instr =
   (match simd.imm with
   | Imm_none | Imm_reg -> assert (Option.is_none imm)
   | Imm_spec -> assert (Option.is_some imm));
-  let _ =
+  let addr_used = ref (Option.is_none mode) in
+  let use_addr () =
+    assert (not !addr_used);
+    addr_used := true
+  in
+  let args_used =
     Array.fold_left
       (fun idx (arg : Simd.arg) ->
-        if Simd.arg_is_addr arg
-        then (
-          assert (Option.is_some addr);
-          idx)
-        else (
+        if not (Simd.loc_allows_reg arg.loc) then assert (Option.is_some mode);
+        match Simd.loc_allows_mem arg.loc, mode with
+        | true, Some mode ->
+          use_addr ();
+          idx + num_args_addressing mode
+        | _ ->
           assert_loc arg.loc instr.arg.(idx);
-          idx + 1))
+          idx + 1)
       0 simd.args
   in
+  assert !addr_used;
+  assert (args_used = Array.length instr.arg);
   match simd.res with
   | First_arg -> assert (Reg.same_loc instr.arg.(0) instr.res.(0))
   | Res { loc; _ } -> assert_loc loc instr.res.(0)
 
 let to_arg_with_width loc instr i =
-  match Simd.loc_requires_width loc with
+  match Simd.loc_register_width loc with
   | Some Eight -> arg8 instr i
   | Some Sixteen -> arg16 instr i
   | Some Thirtytwo -> arg32 instr i
-  | Some Sixtyfour | None -> arg instr i
+  | Some (Sixtyfour | Onetwentyeight | Twofiftysix) | None -> arg instr i
 
 let to_res_with_width loc instr i =
-  match Simd.loc_requires_width loc with
+  match Simd.loc_register_width loc with
   | Some Eight -> res8 instr i
   | Some Sixteen -> res16 instr i
   | Some Thirtytwo -> res32 instr i
-  | Some Sixtyfour | None -> res instr i
+  | Some (Sixtyfour | Onetwentyeight | Twofiftysix) | None -> res instr i
 
-let emit_simd_instr ?addr (simd : Simd.instr) imm instr =
-  check_simd_instr ?addr simd imm instr;
-  let total_args =
-    Array.length instr.arg + if Option.is_some addr then 1 else 0
-  in
-  if total_args <> Array.length simd.args
-  then Misc.fatal_errorf "wrong number of arguments for %s" simd.mnemonic;
+let to_addr_width loc : X86_ast.data_type =
+  match Simd.loc_memory_width loc with
+  | Simd.Eight -> BYTE
+  | Sixteen -> WORD
+  | Thirtytwo -> DWORD
+  | Sixtyfour -> QWORD
+  | Onetwentyeight -> VEC128
+  | Twofiftysix -> VEC256
+
+let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
+  check_simd_instr ?mode simd imm instr;
   let args =
-    List.init total_args (fun i ->
-        if Simd.arg_is_implicit simd.args.(i)
-        then None
-        else if Simd.arg_is_addr simd.args.(i)
-        then addr
-        else Some (to_arg_with_width simd.args.(i).loc instr i))
-    |> List.filter_map (fun arg -> arg)
+    Array.fold_left
+      (fun (idx, args) (arg : Simd.arg) ->
+        if Simd.arg_is_implicit arg
+        then idx, args
+        else
+          match Simd.loc_allows_mem arg.loc, mode with
+          | true, Some mode ->
+            (* CR mslater: sanitize *)
+            let width = to_addr_width arg.loc in
+            let address = addressing mode width instr idx in
+            num_args_addressing mode + idx, address :: args
+          | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args)
+      (0, []) simd.args
+    |> fun (_, args) -> List.rev args
   in
   let args =
     match simd.res with
@@ -1707,18 +1726,18 @@ let emit_simd_instr ?addr (simd : Simd.instr) imm instr =
   in
   I.simd simd (Array.of_list args)
 
-let emit_simd ?addr (op : Simd.operation) instr =
+let emit_simd ?mode (op : Simd.operation) instr =
   let open Simd_instrs in
   let imm = op.imm in
   match op.instr with
-  | Instruction simd -> emit_simd_instr ?addr simd imm instr
+  | Instruction simd -> emit_simd_instr ?mode simd imm instr
   | Sequence seq -> (
     match seq.id with
     | Sqrtss | Sqrtsd | Roundss | Roundsd ->
       (* Avoids partial register stall *)
       if not (equal_arg (arg instr 0) (res instr 0))
       then sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res instr 0) (res instr 0);
-      emit_simd_instr ?addr seq.instr imm instr
+      emit_simd_instr ?mode seq.instr imm instr
     | Pcompare_string p | Vpcompare_string p ->
       let cond : X86_ast.condition =
         match p with
@@ -1733,22 +1752,23 @@ let emit_simd ?addr (op : Simd.operation) instr =
         | Pcmpistrs -> S
         | Pcmpistrz -> E
       in
-      emit_simd_instr ?addr seq.instr imm instr;
+      emit_simd_instr ?mode seq.instr imm instr;
       I.set cond (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
     | Ptestz | Vptestz_X | Vptestz_Y ->
-      emit_simd_instr ?addr seq.instr imm instr;
+      emit_simd_instr ?mode seq.instr imm instr;
       I.set E (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
     | Ptestc | Vptestc_X | Vptestc_Y ->
-      emit_simd_instr ?addr seq.instr imm instr;
+      emit_simd_instr ?mode seq.instr imm instr;
       I.set B (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
     | Ptestnzc | Vptestnzc_X | Vptestnzc_Y ->
-      emit_simd_instr ?addr seq.instr imm instr;
+      emit_simd_instr ?mode seq.instr imm instr;
       I.set A (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0))
 
+(* CR mslater: delete *)
 let emit_fused_simd_instr (simd : Simd.Mem.Fused.operation) i addr =
   let open Simd_instrs in
   assert (Reg.is_reg i.arg.(0));
@@ -1763,10 +1783,15 @@ let emit_fused_simd_instr (simd : Simd.Mem.Fused.operation) i addr =
   | Mul_f32 -> sse_or_avx3 mulps vmulps_X_X_Xm128 (arg i 0) addr (res i 0)
   | Div_f32 -> sse_or_avx3 divps vdivps_X_X_Xm128 (arg i 0) addr (res i 0)
 
-let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i addr =
+let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i mode =
   match simd with
-  | Load op | Store op -> emit_simd ~addr op i
-  | Fused op -> emit_fused_simd_instr op i addr
+  | Load op | Store op -> emit_simd ~mode op i
+  | Fused op ->
+    let addr = addressing mode VEC128 i 1 in
+    Address_sanitizer.emit_sanitize
+      ~dependencies:[| res i 0 |]
+      ~instr:i ~address:addr Onetwentyeight_unaligned Store_modify;
+    emit_fused_simd_instr op i addr
 
 let prologue_stack_offset () =
   assert !frame_required;
@@ -2266,11 +2291,7 @@ let emit_instr ~first ~fallthrough i =
     else I.simd unpcklps [| arg i 1; res i 0 |]
   | Lop (Specific (Isimd op)) -> emit_simd op i
   | Lop (Specific (Isimd_mem (op, addressing_mode))) ->
-    let address = addressing addressing_mode VEC128 i 1 in
-    Address_sanitizer.emit_sanitize
-      ~dependencies:[| res i 0 |]
-      ~instr:i ~address Onetwentyeight_unaligned Store_modify;
-    emit_simd_instr_with_memory_arg op i address
+    emit_simd_instr_with_memory_arg op i addressing_mode
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr

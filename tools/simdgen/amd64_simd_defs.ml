@@ -185,8 +185,6 @@ let loc_is_pinned = function Pin reg -> Some reg | Temp _ -> None
 let arg_is_implicit ({ enc; _ } : arg) =
   match enc with Implicit -> true | Immediate | RM_r | RM_rm | Vex_v -> false
 
-let arg_is_addr ({ loc; _ } : arg) = not (loc_allows_reg loc)
-
 let ext_to_string : ext -> string = function
   | SSE -> "SSE"
   | SSE2 -> "SSE2"
@@ -209,8 +207,10 @@ type bit_width =
   | Sixteen
   | Thirtytwo
   | Sixtyfour
+  | Onetwentyeight
+  | Twofiftysix
 
-let loc_requires_width = function
+let loc_register_width = function
   | Pin _ -> None
   | Temp temps ->
     let width = ref None in
@@ -223,7 +223,29 @@ let loc_requires_width = function
         | R8 -> set Eight
         | R16 -> set Sixteen
         | R32 -> set Thirtytwo
-        | R64 -> set Sixtyfour
-        | M8 | M16 | M32 | M64 | M128 | M256 | MM | XMM | YMM -> ())
+        | R64 | MM -> set Sixtyfour
+        | XMM -> set Onetwentyeight
+        | YMM -> set Twofiftysix
+        | M8 | M16 | M32 | M64 | M128 | M256 -> ())
       temps;
     !width
+
+let loc_memory_width = function
+  | Pin _ -> assert false
+  | Temp temps ->
+    let width = ref None in
+    let set w =
+      assert (Option.is_none !width);
+      width := Some w
+    in
+    Array.iter
+      (function
+        | M8 -> set Eight
+        | M16 -> set Sixteen
+        | M32 -> set Thirtytwo
+        | M64 -> set Sixtyfour
+        | M128 -> set Onetwentyeight
+        | M256 -> set Twofiftysix
+        | R8 | R16 | R32 | R64 | MM | XMM | YMM -> ())
+      temps;
+    Option.get !width

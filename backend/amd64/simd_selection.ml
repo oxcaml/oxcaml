@@ -48,6 +48,24 @@ let seq_or_avx_zeroed ~dbg seq instr ?i args =
       (Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args)
   else cfg_operation (Simd.sequence seq i) args
 
+let simd_load ~mode ?i instr args =
+  Some
+    ( Operation.Specific (Isimd_mem (Load (Simd.instruction instr i), mode)),
+      args )
+
+let simd_store ~mode ?i instr args =
+  Some
+    ( Operation.Specific (Isimd_mem (Store (Simd.instruction instr i), mode)),
+      args )
+
+let simd_load_sse_or_avx ~mode ?i sse vex args =
+  let instr = if Arch.Extension.enabled AVX then vex else sse in
+  simd_load ~mode ?i instr args
+
+let simd_store_sse_or_avx ~mode ?i sse vex args =
+  let instr = if Arch.Extension.enabled AVX then vex else sse in
+  simd_store ~mode ?i instr args
+
 let bad_immediate fmt =
   Format.kasprintf (fun msg -> raise (Error (Bad_immediate msg))) fmt
 
@@ -115,27 +133,16 @@ let select_operation_bmi2 ~dbg:_ op args =
       sse_or_avx pdep_r64_r64_r64m64 pdep_r64_r64_r64m64 args
     | _ -> None
 
-let simd_load memory_chunk args =
-  Some
-    ( Operation.Load
-        { memory_chunk;
-          addressing_mode = Iindexed 0;
-          mutability = Mutable;
-          is_atomic = false
-        },
-      args )
-
-let simd_store memory_chunk args =
-  Some (Operation.Store (memory_chunk, Iindexed 0, true), args)
-
 let select_operation_sse ~dbg op args =
   match op with
-  | "caml_sse_load_aligned" -> simd_load Onetwentyeight_aligned args
-  | "caml_sse_load_unaligned" -> simd_load Onetwentyeight_unaligned args
+  | "caml_sse_load_aligned" ->
+    simd_load_sse_or_avx ~mode:(Iindexed 0) movapd_X_Xm128 vmovapd_X_Xm128 args
+  | "caml_sse_load_unaligned" ->
+    simd_load_sse_or_avx ~mode:(Iindexed 0) movupd_X_Xm128 vmovupd_X_Xm128 args
   | "caml_sse_store_aligned" ->
-    simd_store Onetwentyeight_aligned (List.rev args)
+    simd_store_sse_or_avx ~mode:(Iindexed 0) movapd_Xm128_X vmovapd_Xm128_X args
   | "caml_sse_store_unaligned" ->
-    simd_store Onetwentyeight_unaligned (List.rev args)
+    simd_store_sse_or_avx ~mode:(Iindexed 0) movupd_Xm128_X vmovupd_Xm128_X args
   | "caml_sse_float32_sqrt" | "sqrtf" ->
     seq_or_avx_zeroed ~dbg Seq.sqrtss vsqrtss args
   | "caml_simd_float32_max" | "caml_sse_float32_max" ->
@@ -599,11 +606,14 @@ let select_operation_avx ~dbg:_ op args =
   then None
   else
     match op with
-    | "caml_avx_load_aligned" -> simd_load Twofiftysix_aligned args
-    | "caml_avx_load_unaligned" -> simd_load Twofiftysix_unaligned args
-    | "caml_avx_store_aligned" -> simd_store Twofiftysix_aligned (List.rev args)
+    | "caml_avx_load_aligned" ->
+      simd_load ~mode:(Iindexed 0) vmovapd_Y_Ym256 args
+    | "caml_avx_load_unaligned" ->
+      simd_load ~mode:(Iindexed 0) vmovupd_Y_Ym256 args
+    | "caml_avx_store_aligned" ->
+      simd_store ~mode:(Iindexed 0) vmovapd_Ym256_Y args
     | "caml_avx_store_unaligned" ->
-      simd_store Twofiftysix_unaligned (List.rev args)
+      simd_store ~mode:(Iindexed 0) vmovupd_Ym256_Y args
     | "caml_avx_float64x4_add" -> instr vaddpd_Y_Y_Ym256 args
     | "caml_avx_float32x8_add" -> instr vaddps_Y_Y_Ym256 args
     | "caml_avx_float32x8_addsub" -> instr vaddsubps_Y_Y_Ym256 args
@@ -618,7 +628,6 @@ let select_operation_avx ~dbg:_ op args =
       instr vblendps_Y_Y_Ym256 ~i args
     | "caml_avx_vec256_blendv_64" -> instr vblendvpd_Y_Y_Ym256_Y args
     | "caml_avx_vec256_blendv_32" -> instr vblendvps_Y_Y_Ym256_Y args
-    | "caml_avx_vec256_broadcast_128" -> instr vbroadcastf128 args
     | "caml_avx_vec256_broadcast_64" -> instr vbroadcastsd_Y_X args
     | "caml_avx_vec256_broadcast_32" -> instr vbroadcastss_Y_X args
     | "caml_avx_vec128_broadcast_32" -> instr vbroadcastss_X_X args

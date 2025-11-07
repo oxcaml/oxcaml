@@ -258,19 +258,14 @@ let print_operation ?addr printreg (op : operation) ppf regs =
   let _ =
     Array.fold_left
       (fun idx arg ->
-        if Amd64_simd_defs.loc_allows_reg arg.loc
-        then (
+        match Amd64_simd_defs.loc_allows_mem arg.loc, addr with
+        | true, Some (print, n) ->
+          let addr_args = Array.sub regs idx (idx + n) in
+          fprintf ppf " [%a]" print addr_args;
+          idx + n
+        | _ ->
           fprintf ppf " %a" printreg regs.(idx);
           idx + 1)
-        else
-          match addr with
-          | Some (print, n) ->
-            let addr_args = Array.sub regs idx (idx + n) in
-            fprintf ppf " [%a]" print addr_args;
-            idx + n
-          | None ->
-            fprintf ppf " [?]";
-            idx)
       0 (Pseudo_instr.instr op.instr).args
   in
   ()
@@ -329,8 +324,8 @@ module Mem = struct
   end
 
   type nonrec operation =
-    | Load of operation (* Explicit load; has memory-only argument *)
-    | Store of operation (* Explicit store; has memory-only argument *)
+    | Load of operation (* Loads from memory argument *)
+    | Store of operation (* Stores to memory argument *)
     | Fused of Fused.operation (* Implicit load; has memory-optional argument *)
 
   let class_of_operation (op : operation) : operation_class =
