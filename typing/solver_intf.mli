@@ -215,8 +215,8 @@ module type Solver_mono = sig
 
   (* CR-soon zqian: [to_const_exn] should return hints as well. *)
 
-  (** Returns the constant represented by the given tightened mode; Raises
-  exception if not tightened. *)
+  (** Given a mode whose lower and upper bounds are equal, returns that bound. Raises
+  exception if the condition does not hold. *)
   val to_const_exn : 'a obj -> ('a, allowed * allowed) mode -> 'a
 
   (** The minimum mode in the lattice *)
