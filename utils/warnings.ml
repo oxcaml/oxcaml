@@ -130,6 +130,8 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
+  | Nonsense_scannable_axis of string       (* 184 *)
+  | Duplicated_scannable_axis of string     (* 185 *)
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
@@ -227,6 +229,8 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
+  | Nonsense_scannable_axis _ -> 184
+  | Duplicated_scannable_axis _ -> 185
   | Unmutated_mutable _ -> 186
   | Incompatible_with_upstream _ -> 187
   | Unerasable_position_argument -> 188
@@ -584,6 +588,13 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
+  { number = 185;
+    names = ["duplicated-scannable-axis"];
+    (* CR zeisbach: is this message any good? what verison for since?
+       also, this makes me question whether it should be an error... *)
+    description = "A scannable axis is annotated more than once; the \
+                   last annotation will be used.";
+    since = since 5 2 };
   { number = 186;
     names = ["unmutated-mutable"];
     description =
@@ -1248,6 +1259,13 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
+  | Nonsense_scannable_axis abbrev ->
+    (* CR zeisbach: make this message better. should we say "layout"?
+       what about saying "scannable axes"? *)
+    "The specified scannable axes are meaningless, \
+     since they apply to the layout " ^ abbrev
+  | Duplicated_scannable_axis axis ->
+      "The " ^ axis ^ " axis has already been specified."
   | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
   | Incompatible_with_upstream (Immediate_erasure id)  ->
       Printf.sprintf

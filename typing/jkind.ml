@@ -401,6 +401,7 @@ module Error = struct
         }
         -> t
     | Unknown_jkind of Parsetree.jkind_annotation
+    | Unknown_scannable_axis of string
     | Multiple_jkinds of
         { from_annotation : Parsetree.jkind_annotation;
           from_attribute : Builtin_attributes.jkind_attribute Location.loc
@@ -2111,24 +2112,31 @@ module Const = struct
       with_bounds
     }
 
-  (* CR zeisbach: there are a few ways to design this function. one would be to
-     emulate [Typemode.transl_mod_bounds], which uses an auxiliary data
-     structure. here, I am tracking that same information using an accumulator.
-     I believe that this structure should scale to adding more axes *)
-  let transl_scannable_axes sa =
-    let rec go (sa : string Location.loc list) ~pointerness =
-      match sa with
-      | [] -> pointerness
-      | axis :: rest -> (
-        match axis.txt with
-        | "non_pointer" -> go rest ~pointerness:(Some Pointerness.Non_pointer)
-        | "maybe_pointer" ->
-          go rest ~pointerness:(Some Pointerness.Maybe_pointer)
-        | _ -> failwith "unknown scannable axis")
+  let transl_scannable_axes sa_annots =
+    (* CR zeisbach: this should work for the other axes as they get added.
+       however, without a data representation for "the axis", this doesn't
+       report a very good error. Using [Per_axis] is one solution; having
+       one warning helper per axis is another. For now, we just specialize *)
+    let check_and_warn ~loc pointerness =
+      match pointerness with
+      | Some _ ->
+        Location.prerr_warning loc
+          (Warnings.Duplicated_scannable_axis "pointerness")
+      | None -> ()
     in
-    let pointerness = go sa ~pointerness:None in
-    Scannable_axes.create
-      ~pointerness:(Option.value pointerness ~default:Pointerness.max)
+    List.fold_left
+      (fun pointerness ({ txt; loc } : string Location.loc) ->
+        match txt with
+        | "non_pointer" ->
+          check_and_warn ~loc pointerness;
+          (* CR zeisbach: this means that the _last_ specified axis will be
+             used, which contradicts design doc but this has postfix syntax *)
+          Some Pointerness.Non_pointer
+        | "maybe_pointer" ->
+          check_and_warn ~loc pointerness;
+          Some Pointerness.Maybe_pointer
+        | _ -> raise ~loc (Unknown_scannable_axis txt))
+      None sa_annots
 
   let rec of_user_written_annotation_unchecked_level :
       type l r.
@@ -2168,14 +2176,22 @@ module Const = struct
       match sa_annot with
       | [] -> jkind_without_sa
       | _ :: _ when Layout.Const.allow_scannable_axes jkind_without_sa.layout ->
-        let sa = transl_scannable_axes sa_annot in
+        let pointerness = transl_scannable_axes sa_annot in
         (* CR zeisbach: implement this! or, consider raising an error...
            the correct behavior is to make a new jkind that differs only in
            the layout by adding in the annotated scannable axes.
-           for inspiration, see [set_nullability_upper_bound] *)
-        ignore sa;
+           for inspiration, see [set_nullability_upper_bound].
+
+           this should emit a warning if the jkind_without_sa already has
+           the specified non-trivialities. this is why this currently returns
+           an optional with the annotation (since none vs default matters) *)
+        ignore pointerness;
         jkind_without_sa
-      | _ :: _ -> failwith "sa annotations make no sense")
+      | _ :: _ ->
+        Location.prerr_warning jkind.pjkind_loc
+          (Warnings.Nonsense_scannable_axis name.txt);
+        (* CR zeisbach: this could go and update anyways, but probably not *)
+        jkind_without_sa)
     | Pjk_mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
       (* for each mode, lower the corresponding modal bound to be that mode *)
@@ -4231,6 +4247,10 @@ let report_error ~loc : Error.t -> _ = function
          When RAE tried this, some types got printed like [t/2], but the
          [/2] shouldn't be there. Investigate and fix. *)
       "@[<v>Unknown layout %a@]" Pprintast.jkind_annotation jkind
+  | Unknown_scannable_axis saxis ->
+    (* CR zeisbach: is it bad for "scannable axis" to be present in an error
+       message? "modifier" is another option (used for "mod foo" currently) *)
+    Location.errorf ~loc "@[<v>Unknown scannable axis %s@]" saxis
   | Multiple_jkinds { from_annotation; from_attribute } ->
     Location.errorf ~loc
       "@[<v>A type declaration's layout can be given at most once.@;\

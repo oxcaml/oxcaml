@@ -94,7 +94,6 @@ module Sort : sig
   val decompose_into_product : t -> int -> t list option
 end
 
-(* CR zeisbach: consider moving this around! *)
 module Scannable_axes : sig
   type t
 
