@@ -40,7 +40,7 @@ type additional_action =
     (* The [prepare_jkind] function should be applied to all jkinds when
        saving; this commons them up, truncates their histories, and runs
        a check that all unconstrained variables have been defaulted to value.
-       The [prepare_mode] function should be applied to all modes when saving;
+       The [prepare_mode]/[prepare_modality] functions should be applied to all modes/modalities when saving;
        this ensures the saved file doesn't contain mode variables. *)
   | Duplicate_variables
   | No_action
