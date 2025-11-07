@@ -2224,7 +2224,6 @@ module Bound_vars : sig
 
   val empty : t
   val of_list : type_expr list -> t
-  val add : t -> type_expr list -> t
   val union : t -> t -> t
   val mem : t -> type_expr -> bool
   val is_empty : t -> bool
@@ -2242,17 +2241,6 @@ end = struct
       let var_set =
         lazy (TypeSet.of_list (List.map Transient_expr.repr new_ones))
       in
-      { is_empty = false; var_set }
-
-  let add t = function
-    | [] -> t
-    | new_ones ->
-      let var_set = lazy begin
-        let new_ones_set =
-          TypeSet.of_list (List.map Transient_expr.repr new_ones)
-        in
-        TypeSet.union new_ones_set (Lazy.force t.var_set)
-      end in
       { is_empty = false; var_set }
 
   let union ({ is_empty = empty1; var_set = set1 } as t1)
@@ -2643,7 +2631,7 @@ let constrain_type_jkind ~fixed env ty jkind =
     (* Handle the [Tpoly] case out here so [Tvar]s wrapped in [Tpoly]s can get
        the treatment above. *)
     | Tpoly (t, bound_vars2) ->
-      let bound_vars = Bound_vars.add bound_vars bound_vars2 in
+      let bound_vars = Bound_vars.(union bound_vars (of_list bound_vars2)) in
       loop ~fuel ~expanded:false t ~bound_vars ty's_jkind jkind
 
     | _ ->
