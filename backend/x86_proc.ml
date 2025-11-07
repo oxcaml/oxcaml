@@ -617,7 +617,9 @@ module X86_peephole = struct
     | IMUL (_, Some dst) -> equal_args target dst
     | LOCK_XADD (_, dst) -> equal_args target dst
     | XCHG (op1, op2) -> equal_args target op1 || equal_args target op2
-    | _ -> false
+    | _ ->
+      (* Conservative: assume unknown instructions might write to the target. *)
+      true
 
   (* Check if an instruction reads from a given argument. Conservative: returns
      true if unsure. *)
@@ -663,8 +665,9 @@ module X86_peephole = struct
     | CLDEMOTE arg -> equal_args target arg
     | PREFETCH (_, _, arg) -> equal_args target arg
     | _ ->
-      (* Conservative: for unknown instructions, assume they might read. *)
-      false
+      (* Conservative: assume unknown instructions might read from the
+         target. *)
+      true
 
   (* Find the next occurrence of a register within the same basic block.
      Returns: - `WriteFound if the next occurrence is a write (without a read) -
