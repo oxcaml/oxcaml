@@ -128,7 +128,6 @@ end = struct
       (fun ({ basename; path } : Dir.entry) ->
         prepend_add_single ~hidden:(Dir.hidden dir) basename path)
       (Dir.files dir)
-  ;;
 
   let add dir =
     let update base fn visible_files hidden_files =
@@ -293,7 +292,7 @@ let find fn =
     then fst (Path_cache.find ~uncap:false fn)
     else Misc.find_in_path (get_path_list ()) fn
   with
-  | Not_found -> !auto_include_callback Dir.find fn
+Not_found -> !auto_include_callback Dir.find fn
 
 let find_normalized_with_visibility fn =
   assert (not Config.merlin || Local_store.is_bound ());
