@@ -222,6 +222,9 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
     let successor_block = C.get_block_exn cfg successor_label in
     if Dll.is_empty successor_block.body
     then
+      (* CR-soon xclerc for xclerc: this logic is similar to the one of
+         `block_known_values`, except for the guard and whether one or two
+         blocks are involved. *)
       let new_successor =
         if is_after_regalloc
         then
