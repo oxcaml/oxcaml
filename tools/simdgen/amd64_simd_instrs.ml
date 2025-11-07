@@ -76,6 +76,7 @@ type id =
   | Minss
   | Movapd_X_Xm128
   | Movapd_Xm128_X
+  | Movapd_m128_X
   | Movaps_X_Xm128
   | Movaps_Xm128_X
   | Movd_X_r32m32
@@ -115,6 +116,7 @@ type id =
   | Movss_Xm32_X
   | Movupd_X_Xm128
   | Movupd_Xm128_X
+  | Movupd_m128_X
   | Movups_X_Xm128
   | Movups_Xm128_X
   | Mpsadbw
@@ -543,6 +545,8 @@ type id =
   | Vmovapd_Xm128_X
   | Vmovapd_Y_Ym256
   | Vmovapd_Ym256_Y
+  | Vmovapd_m128_X
+  | Vmovapd_m256_Y
   | Vmovaps_X_Xm128
   | Vmovaps_Xm128_X
   | Vmovaps_Y_Ym256
@@ -599,6 +603,8 @@ type id =
   | Vmovupd_Xm128_X
   | Vmovupd_Y_Ym256
   | Vmovupd_Ym256_Y
+  | Vmovupd_m128_X
+  | Vmovupd_m256_Y
   | Vmovups_X_Xm128
   | Vmovups_Xm128_X
   | Vmovups_Y_Ym256
@@ -1509,7 +1515,7 @@ let ldmxcsr = {
     id = Ldmxcsr
   ; ext = [|SSE|]
   ; args = [|{ loc = Temp [|M32|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "ldmxcsr"
   ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 2; opcode = 174 }
@@ -1518,7 +1524,7 @@ let maskmovdqu = {
     id = Maskmovdqu
   ; ext = [|SSE2|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "maskmovdqu"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 247 }
@@ -1609,6 +1615,15 @@ let movapd_Xm128_X = {
   ; ext = [|SSE2|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; res = Res { loc = Temp [|XMM;M128|]; enc = RM_rm }
+  ; imm = Imm_none
+  ; mnemonic = "movapd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 41 }
+}
+let movapd_m128_X = {
+    id = Movapd_m128_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "movapd"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 41 }
@@ -1960,6 +1975,15 @@ let movupd_Xm128_X = {
   ; ext = [|SSE2|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; res = Res { loc = Temp [|XMM;M128|]; enc = RM_rm }
+  ; imm = Imm_none
+  ; mnemonic = "movupd"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+}
+let movupd_m128_X = {
+    id = Movupd_m128_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "movupd"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
@@ -3759,7 +3783,7 @@ let ucomisd = {
     id = Ucomisd
   ; ext = [|SSE2|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "ucomisd"
   ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 46 }
@@ -3768,7 +3792,7 @@ let ucomiss = {
     id = Ucomiss
   ; ext = [|SSE|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "ucomiss"
   ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 46 }
@@ -5586,7 +5610,7 @@ let vldmxcsr = {
     id = Vldmxcsr
   ; ext = [|AVX|]
   ; args = [|{ loc = Temp [|M32|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "vldmxcsr"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Spec 2; opcode = 174 }
@@ -5595,7 +5619,7 @@ let vmaskmovdqu = {
     id = Vmaskmovdqu
   ; ext = [|AVX|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "vmaskmovdqu"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 247 }
@@ -5816,6 +5840,24 @@ let vmovapd_Ym256_Y = {
   ; mnemonic = "vmovapd"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 41 }
 }
+let vmovapd_m128_X = {
+    id = Vmovapd_m128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmovapd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 41 }
+}
+let vmovapd_m256_Y = {
+    id = Vmovapd_m256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M256|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmovapd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 41 }
+}
 let vmovaps_X_Xm128 = {
     id = Vmovaps_X_Xm128
   ; ext = [|AVX|]
@@ -6018,7 +6060,7 @@ let vmovlpd_X_X_m64 = {
     id = Vmovlpd_X_X_m64
   ; ext = [|AVX|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "vmovlpd"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 18 }
@@ -6316,6 +6358,24 @@ let vmovupd_Ym256_Y = {
   ; ext = [|AVX|]
   ; args = [|{ loc = Temp [|YMM|]; enc = RM_r }|]
   ; res = Res { loc = Temp [|YMM;M256|]; enc = RM_rm }
+  ; imm = Imm_none
+  ; mnemonic = "vmovupd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 17 }
+}
+let vmovupd_m128_X = {
+    id = Vmovupd_m128_X
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M128|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "vmovupd"
+  ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 17 }
+}
+let vmovupd_m256_Y = {
+    id = Vmovupd_m256_Y
+  ; ext = [|AVX|]
+  ; args = [|{ loc = Temp [|M256|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r }|]
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "vmovupd"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 17 }
@@ -9312,7 +9372,7 @@ let vtestpd_X_Xm128 = {
     id = Vtestpd_X_Xm128
   ; ext = [|AVX|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "vtestpd"
   ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 15 }
@@ -9321,7 +9381,7 @@ let vtestpd_Y_Ym256 = {
     id = Vtestpd_Y_Ym256
   ; ext = [|AVX|]
   ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "vtestpd"
   ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 15 }
@@ -9330,7 +9390,7 @@ let vtestps_X_Xm128 = {
     id = Vtestps_X_Xm128
   ; ext = [|AVX|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "vtestps"
   ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 14 }
@@ -9339,7 +9399,7 @@ let vtestps_Y_Ym256 = {
     id = Vtestps_Y_Ym256
   ; ext = [|AVX|]
   ; args = [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM;M256|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "vtestps"
   ; enc = { prefix = Vex { vex_m = Vexm_0F38; vex_w = false; vex_l = true; vex_p = Prx_66 }; rm_reg = Reg; opcode = 14 }
@@ -9348,7 +9408,7 @@ let vucomisd = {
     id = Vucomisd
   ; ext = [|AVX|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "vucomisd"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_66 }; rm_reg = Reg; opcode = 46 }
@@ -9357,7 +9417,7 @@ let vucomiss = {
     id = Vucomiss
   ; ext = [|AVX|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "vucomiss"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 46 }
@@ -9474,7 +9534,7 @@ let vzeroall = {
     id = Vzeroall
   ; ext = [|AVX|]
   ; args = [||]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "vzeroall"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = true; vex_p = Prx_none }; rm_reg = Reg; opcode = 119 }
@@ -9483,7 +9543,7 @@ let vzeroupper = {
     id = Vzeroupper
   ; ext = [|AVX|]
   ; args = [||]
-  ; res = First_arg
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "vzeroupper"
   ; enc = { prefix = Vex { vex_m = Vexm_0F; vex_w = false; vex_l = false; vex_p = Prx_none }; rm_reg = Reg; opcode = 119 }

@@ -76,9 +76,13 @@ let rec parse_args mnemonic acc encs args imm res =
     if !imm <> Imm_none then failwith mnemonic;
     imm := i
   in
+  (* MULX has two results *)
+  let set_res_fst () =
+    if not (!res = Res_none) then raise Unsupported;
+    res := First_arg
+  in
   let set_res loc enc =
-    (* MULX has two results *)
-    if not (!res = First_arg) then raise Unsupported;
+    if not (!res = Res_none) then raise Unsupported;
     res := Res { loc; enc }
   in
   match args, encs with
@@ -161,6 +165,9 @@ let rec parse_args mnemonic acc encs args imm res =
     | None -> parse_args mnemonic acc encs args imm res
     | Some loc -> (
       match String.trim rw with
+      | "(r, w)" ->
+        set_res_fst ();
+        parse_args mnemonic ({ loc; enc } :: acc) encs args imm res
       | "(w)" ->
         set_res loc enc;
         parse_args mnemonic acc encs args imm res
@@ -169,7 +176,7 @@ let rec parse_args mnemonic acc encs args imm res =
 
 let parse_args mnemonic enc args =
   let imm = ref Imm_none in
-  let res = ref First_arg in
+  let res = ref Res_none in
   let args = parse_args mnemonic [] enc args imm res in
   Array.of_list args, !imm, !res
 
@@ -312,7 +319,7 @@ let binding instr =
     in
     let res =
       match instr.res with
-      | First_arg -> ""
+      | Res_none | First_arg -> ""
       | Res { loc; _ } -> mangle_loc loc ^ "_"
     in
     instr.mnemonic ^ "_" ^ res ^ args
@@ -372,6 +379,7 @@ let print_one bind instr =
     | Imm_spec -> "Imm_spec"
   in
   let print_res : res -> string = function
+    | Res_none -> "Res_none"
     | First_arg -> "First_arg"
     | Res { loc; enc } ->
       sprintf "Res { loc = %s; enc = %s }" (print_loc loc) (print_arg_enc enc)

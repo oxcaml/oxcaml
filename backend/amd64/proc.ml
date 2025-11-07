@@ -520,7 +520,7 @@ let destroyed_by_simd_instr (instr : Simd.instr) =
   | Vzeroall -> all_simd_regs
   | _ ->
     match instr.res with
-    | First_arg -> [||]
+    | Res_none | First_arg -> [||]
     | Res { loc; _ } ->
       match Simd.loc_is_pinned loc with
       | Some RAX -> [|rax|]

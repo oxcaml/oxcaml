@@ -1666,9 +1666,17 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
   in
   assert !addr_used;
   assert (args_used = Array.length instr.arg);
-  match simd.res with
-  | First_arg -> assert (Reg.same_loc instr.arg.(0) instr.res.(0))
-  | Res { loc; _ } -> assert_loc loc instr.res.(0)
+  let res_used =
+    match simd.res with
+    | Res_none -> 0
+    | First_arg ->
+      assert (Reg.same_loc instr.arg.(0) instr.res.(0));
+      1
+    | Res { loc; _ } ->
+      assert_loc loc instr.res.(0);
+      1
+  in
+  assert (res_used = Array.length instr.res)
 
 let to_arg_with_width loc instr i =
   match Simd.loc_register_width loc with
@@ -1713,7 +1721,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   in
   let args =
     match simd.res with
-    | First_arg | Res { enc = Implicit | Immediate; _ } -> args
+    | Res_none | First_arg | Res { enc = Implicit | Immediate; _ } -> args
     | Res { loc; enc = RM_r | RM_rm | Vex_v } -> (
       match Simd.loc_is_pinned loc with
       | Some _ -> args

@@ -140,9 +140,9 @@ let select_operation_sse ~dbg op args =
   | "caml_sse_load_unaligned" ->
     simd_load_sse_or_avx ~mode:(Iindexed 0) movupd_X_Xm128 vmovupd_X_Xm128 args
   | "caml_sse_store_aligned" ->
-    simd_store_sse_or_avx ~mode:(Iindexed 0) movapd_Xm128_X vmovapd_Xm128_X args
+    simd_store_sse_or_avx ~mode:(Iindexed 0) movapd_m128_X vmovapd_m128_X args
   | "caml_sse_store_unaligned" ->
-    simd_store_sse_or_avx ~mode:(Iindexed 0) movupd_Xm128_X vmovupd_Xm128_X args
+    simd_store_sse_or_avx ~mode:(Iindexed 0) movupd_m128_X vmovupd_m128_X args
   | "caml_sse_float32_sqrt" | "sqrtf" ->
     seq_or_avx_zeroed ~dbg Seq.sqrtss vsqrtss args
   | "caml_simd_float32_max" | "caml_sse_float32_max" ->
@@ -611,9 +611,9 @@ let select_operation_avx ~dbg:_ op args =
     | "caml_avx_load_unaligned" ->
       simd_load ~mode:(Iindexed 0) vmovupd_Y_Ym256 args
     | "caml_avx_store_aligned" ->
-      simd_store ~mode:(Iindexed 0) vmovapd_Ym256_Y args
+      simd_store ~mode:(Iindexed 0) vmovapd_m256_Y args
     | "caml_avx_store_unaligned" ->
-      simd_store ~mode:(Iindexed 0) vmovupd_Ym256_Y args
+      simd_store ~mode:(Iindexed 0) vmovupd_m256_Y args
     | "caml_avx_float64x4_add" -> instr vaddpd_Y_Y_Ym256 args
     | "caml_avx_float32x8_add" -> instr vaddps_Y_Y_Ym256 args
     | "caml_avx_float32x8_addsub" -> instr vaddsubps_Y_Y_Ym256 args
@@ -986,6 +986,7 @@ let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
     (fun i (simd_arg : Simd.arg) -> maybe_pin arg_regs i simd_arg.loc)
     simd.args;
   (match simd.res with
+  | Res_none -> ()
   | First_arg ->
     assert (not (Reg.is_preassigned arg_regs.(0)));
     arg_regs.(0) <- res_regs.(0)

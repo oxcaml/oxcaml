@@ -71,6 +71,7 @@ type arg =
   }
 
 type res =
+  | Res_none (* No result *)
   | First_arg (* Result is returned in the first argument operand. *)
   | Res of arg (* Separate operand for result. *)
 

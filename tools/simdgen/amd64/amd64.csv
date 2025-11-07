@@ -1042,10 +1042,13 @@ MONITOR,0F 01 C8,,NA,NA,NA,NA
 "MOV DR0-DR7, r64",0F 23 /r,,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "MOVAPD xmm1, xmm2/m128",66 0F 28 /r,SSE2,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "MOVAPD xmm2/m128, xmm1",66 0F 29 /r,SSE2,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"MOVAPD m128, xmm1",66 0F 29 /r,SSE2,ModRM:r/m (r),ModRM:reg (r),NA,NA
 "VMOVAPD xmm1, xmm2/m128",VEX.128.66.0F.WIG 28 /r,AVX,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVAPD xmm2/m128, xmm1",VEX.128.66.0F.WIG 29 /r,AVX,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"VMOVAPD m128, xmm1",VEX.128.66.0F.WIG 29 /r,AVX,ModRM:r/m (r),ModRM:reg (r),NA,NA
 "VMOVAPD ymm1, ymm2/m256",VEX.256.66.0F.WIG 28 /r,AVX,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVAPD ymm2/m256, ymm1",VEX.256.66.0F.WIG 29 /r,AVX,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"VMOVAPD m256, ymm1",VEX.256.66.0F.WIG 29 /r,AVX,ModRM:r/m (r),ModRM:reg (r),NA,NA
 "VMOVAPD xmm1 {k1}{z}, xmm2/m128",EVEX.128.66.0F.W1 28 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVAPD ymm1 {k1}{z}, ymm2/m256",EVEX.256.66.0F.W1 28 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVAPD zmm1 {k1}{z}, zmm2/m512",EVEX.512.66.0F.W1 28 /r,AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
@@ -1261,10 +1264,13 @@ MOVSQ,REX.W + A5,,NA,NA,NA,NA
 "MOVSXD r64, r/m32",REX.W + 63 /r,,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "MOVUPD xmm1, xmm2/m128",66 0F 10 /r,SSE2,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "MOVUPD xmm2/m128, xmm1",66 0F 11 /r,SSE2,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"MOVUPD m128, xmm1",66 0F 11 /r,SSE2,ModRM:r/m (r),ModRM:reg (r),NA,NA
 "VMOVUPD xmm1, xmm2/m128",VEX.128.66.0F.WIG 10 /r,AVX,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVUPD xmm2/m128, xmm1",VEX.128.66.0F.WIG 11 /r,AVX,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"VMOVUPD m128, xmm1",VEX.128.66.0F.WIG 11 /r,AVX,ModRM:r/m (r),ModRM:reg (r),NA,NA
 "VMOVUPD ymm1, ymm2/m256",VEX.256.66.0F.WIG 10 /r,AVX,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVUPD ymm2/m256, ymm1",VEX.256.66.0F.WIG 11 /r,AVX,ModRM:r/m (w),ModRM:reg (r),NA,NA
+"VMOVUPD m256, ymm1",VEX.256.66.0F.WIG 11 /r,AVX,ModRM:r/m (r),ModRM:reg (r),NA,NA
 "VMOVUPD xmm1 {k1}{z}, xmm2/m128",EVEX.128.66.0F.W1 10 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA
 "VMOVUPD xmm2/m128 {k1}{z}, xmm1",EVEX.128.66.0F.W1 11 /r,AVX512VL AVX512F,ModRM:r/m (w),ModRM:reg (r),NA,NA
 "VMOVUPD ymm1 {k1}{z}, ymm2/m256",EVEX.256.66.0F.W1 10 /r,AVX512VL AVX512F,ModRM:reg (w),ModRM:r/m (r),NA,NA

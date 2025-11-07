@@ -171,7 +171,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
         instr
     in
     match Array.length simd.args, simd.res with
-    | 1, First_arg -> May_still_have_spilled_registers
+    | 1, (Res_none | First_arg) -> May_still_have_spilled_registers
     | 1, Res { loc = res_loc; _ } ->
       let arg_mem = Simd.loc_allows_mem simd.args.(0).loc in
       let res_mem = Simd.loc_allows_mem res_loc in
@@ -181,7 +181,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       else if res_mem
       then may_use_stack_operand_for_result map instr ~num_args:1
       else May_still_have_spilled_registers
-    | num_args, First_arg ->
+    | num_args, (Res_none | First_arg) ->
       if Simd.loc_allows_mem simd.args.(1).loc
       then
         may_use_stack_operand_for_second_argument map instr ~num_args
