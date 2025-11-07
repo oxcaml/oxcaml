@@ -738,7 +738,7 @@ module X86_peephole = struct
     | ReadFound
     | NotFound
 
-  let find_next_occurrence_of_register target start_cell =
+  let _find_next_occurrence_of_register target start_cell =
     let rec loop cell_opt =
       match cell_opt with
       | None -> NotFound
@@ -861,7 +861,7 @@ module X86_peephole = struct
   (* Check if a register is safe for dead register optimization. We restrict to
      Reg64 to avoid aliasing issues: our liveness analysis doesn't track that
      writes to %eax (Reg32) also affect %rax (Reg64). *)
-  let is_safe_for_dead_register_opt = function[@warning "-4"]
+  let _is_safe_for_dead_register_opt = function[@warning "-4"]
     | Reg64 _ -> true
     | _ -> false
 
@@ -873,29 +873,16 @@ module X86_peephole = struct
      next write to x within the same basic block. The transformation preserves
      semantics: y gets the value of A, and x is overwritten before being read.
 
-     We restrict x to Reg64 to avoid register aliasing issues. *)
-  let remove_mov_to_dead_register cell =
-    match get_cells cell 2 with
-    | [cell1; cell2] -> (
-      match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
-      | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2))
-        when equal_args dst1 src2 && is_register dst1 && is_register dst2
-             && is_safe_for_dead_register_opt dst1 -> (
-        (* Pattern: mov A, x; mov x, y where x and y are registers *)
-        (* Check if the next occurrence of x is a write *)
-        match find_next_occurrence_of_register dst1 cell2 with
-        | WriteFound ->
-          (* x is written before being read, so we can optimize *)
-          (* Rewrite to: mov A, y *)
-          DLL.set_value cell1 (Ins (MOV (src1, dst2)));
-          DLL.delete_curr cell2;
-          (* Return cell1 to allow iterative combination *)
-          Some (Some cell1)
-        | ReadFound | NotFound ->
-          (* x is read before write, or we can't determine - don't optimize *)
-          None)
-      | _, _ -> None)
-    | _ -> None
+     We restrict x to Reg64 to avoid register aliasing issues.
+
+     CURRENTLY DISABLED: This optimization is triggering segfaults in CI that
+     are difficult to diagnose without specific test cases. The liveness
+     analysis appears sound, but there may be a subtle interaction with other
+     compiler phases or edge cases we haven't identified. Disabled until we can
+     debug with concrete failing examples. *)
+  let remove_mov_to_dead_register _cell =
+    (* Disabled - return None unconditionally *)
+    None
 
   (* Apply all rewrite rules in sequence. Returns Some continuation_cell if a
      rule matched, None otherwise. *)
