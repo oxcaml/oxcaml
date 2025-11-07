@@ -315,7 +315,7 @@ val eta : 'a expr -> 'a expr = <fun>
 
 (* Inclusion checks *)
 
-(*  [M1] and [M2] pass due to stage normalisation
+(*  [M1] and [M2] pass solely due to stage normalisation
     (moving all type variables to occur at stage offset zero) *)
 
 module M1 : sig
@@ -348,6 +348,7 @@ end
 module M1'' : sig val foo : 'a expr -> <[$('a) -> int]> expr end
 |}]
 
+(*  Simple functions with a type variable under a quote-splice *)
 module M2 = struct
   let f (x : <[ 'a ]> expr) = <[ ($x, $x) ]>
 end
@@ -356,6 +357,9 @@ end
 module M2 : sig val f : 'a expr -> <[$('a) * $('a)]> expr end
 |}]
 
+(*  Checking [M2'] does not rely on any quote-splice inverses:
+    'a will be unified with <[int]> when checking the function parameter side,
+    skipping any nontrivial reasoning.  *)
 module M2' : sig
   val f : <[ int ]> expr -> <[ int * int ]> expr
 end = M2
@@ -374,6 +378,7 @@ end
 module M3 : sig val f : <[($('a) -> unit) * ($('a) -> unit)]> expr end
 |}]
 
+(*   $('a) = int  <=>  'a = <[int]> *)
 module M3' : sig
   val f : <[ (int -> unit) * (int -> unit) ]> expr
 end = M3
@@ -382,6 +387,9 @@ end = M3
 module M3' : sig val f : <[(int -> unit) * (int -> unit)]> expr end
 |}]
 
+(*   [M3''] is a simple failure to check the error message when we end up with
+     contradicting quoted unificands *)
+(*   string = $('a) = int  <=>  <[string]> = 'a = <[int]>  <=>  string = int (error!) *)
 module M3'' : sig
   val f : <[ (string -> unit) * (int -> unit) ]> expr
 end = M3
@@ -405,7 +413,7 @@ Error: Signature mismatch:
        Type "string" = "string" is not compatible with type "int"
 |}]
 
-(*  [M4] is similar, but featuring an uninhabited type *)
+(*  [M4] is analogous to [M3], but featuring an uninhabited type *)
 
 module M4 : sig
   val x : <[ 'a * 'a ]> expr
@@ -425,6 +433,7 @@ end = M4
 module M4' : sig val x : <[int * int]> expr end
 |}]
 
+(* Analogously to [M3''], [M4''] checks we detect any failing unifications *)
 module M4'' : sig
   val x : <[ int * string ]> expr
 end = M4
