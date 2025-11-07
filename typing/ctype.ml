@@ -2287,7 +2287,7 @@ let unbox_once env ty =
     begin match Env.find_type p env with
     | exception Not_found -> Missing p
     | decl ->
-      let apply ty2 existentials =
+      let apply ty2 ~existentials =
         (* put [existentials] first as they're often empty. This will
            unify the copied existentials with the originals after the copy, thus
            preserving their identity. *)
@@ -2305,7 +2305,7 @@ let unbox_once env ty =
           | Type_record_unboxed_product _ | Type_open -> []
           | exception Not_found -> (* but we found it earlier! *) assert false
         in
-        Stepped { ty = apply ty2 existentials;
+        Stepped { ty = apply ty2 ~existentials;
                   bound_vars = Bound_vars.of_list existentials;
                   modality }
       | None -> begin match decl.type_kind with
@@ -2315,7 +2315,7 @@ let unbox_once env ty =
         | Type_record_unboxed_product
             ((_::_::_ as lbls), Record_unboxed_product, _) ->
           Stepped_record_unboxed_product
-            (List.map (fun ld -> { ty = apply ld.ld_type [];
+            (List.map (fun ld -> { ty = apply ld.ld_type ~existentials:[];
                                    bound_vars = Bound_vars.empty;
                                    modality = ld.ld_modalities }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
@@ -2325,7 +2325,7 @@ let unbox_once env ty =
           | Cstr_tuple [arg] ->
             (* [arg.ca_modalities] is currently always empty, but won't be
                when we let users define custom or-null-like types. *)
-            Stepped_or_null { ty = apply arg.ca_type [];
+            Stepped_or_null { ty = apply arg.ca_type ~existentials:[];
                               bound_vars = Bound_vars.empty;
                               modality = arg.ca_modalities }
           | _ -> Misc.fatal_error "Invalid constructor for Variant_with_null"
