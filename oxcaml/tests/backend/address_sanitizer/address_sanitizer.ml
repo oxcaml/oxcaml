@@ -16,7 +16,13 @@ let run_test func_name ~test ~validate =
        Unix.close write_fd;
        ignore (Unix.waitpid [] child_pid);
        let child_output = Unix.in_channel_of_descr read_fd |> In_channel.input_all in
-       validate child_output
+       try validate child_output with
+       | exn ->
+         Printf.eprintf
+            "Validation failed for '%s':\n%s\nOutput: %s\n\n%!"
+            func_name
+            (Printexc.to_string exn)
+            child_output
      with
      | exn ->
        Printf.eprintf
@@ -952,6 +958,104 @@ module Test_out_of_bounds_accesses = struct
       ~test
       ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:4)
   ;;
+
+  type void : void
+
+  external malloc : nativeint# -> nativeint# = "" "malloc"
+
+  external vec128_load_aligned : nativeint# -> int64x2# = "" "caml_sse_load_aligned"
+  [@@noalloc] [@@builtin]
+  external vec128_load_unaligned : nativeint# -> int64x2# = "" "caml_sse_load_unaligned"
+  [@@noalloc] [@@builtin]
+  external vec128_store_aligned : nativeint# -> int64x2# -> void = "" "caml_sse_store_aligned"
+  [@@noalloc] [@@builtin]
+  external vec128_store_unaligned : nativeint# -> int64x2# -> void = "" "caml_sse_store_unaligned"
+  [@@noalloc] [@@builtin]
+
+  let vec128_load_aligned () =
+    let test () = let _ = vec128_load_aligned (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
+  ;;
+
+  let vec128_load_unaligned () =
+    let test () = let _ = vec128_load_unaligned (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
+  ;;
+
+  let vec128_store_aligned () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_store_aligned (malloc #1n) x in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:16)
+  ;;
+
+  let vec128_store_unaligned () =
+    let test () =
+      let x = Vec128_bigarray.create_elem #0L #0L in
+      let _ = vec128_store_unaligned (malloc #1n) x in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:16)
+  ;;
+
+  external vec256_load_aligned : nativeint# -> int64x4# = "" "caml_avx_load_aligned"
+  [@@noalloc] [@@builtin]
+  external vec256_load_unaligned : nativeint# -> int64x4# = "" "caml_avx_load_unaligned"
+  [@@noalloc] [@@builtin]
+  external vec256_store_aligned : nativeint# -> int64x4# -> void = "" "caml_avx_store_aligned"
+  [@@noalloc] [@@builtin]
+  external vec256_store_unaligned : nativeint# -> int64x4# -> void = "" "caml_avx_store_unaligned"
+  [@@noalloc] [@@builtin]
+
+  let vec256_load_aligned () =
+    let test () = let _ = vec256_load_aligned (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
+  ;;
+
+  let vec256_load_unaligned () =
+    let test () = let _ = vec256_load_unaligned (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
+  ;;
+
+  let vec256_store_aligned () =
+    let test () =
+      let x = Vec256_bigarray.create_elem #0L #0L #0L #0L in
+      let _ = vec256_store_aligned (malloc #1n) x in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:32)
+  ;;
+
+  let vec256_store_unaligned () =
+    let test () =
+      let x = Vec256_bigarray.create_elem #0L #0L #0L #0L in
+      let _ = vec256_store_unaligned (malloc #1n) x in ()
+    in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:32)
+  ;;
 end
 
 (* Main entry point *)
@@ -993,6 +1097,15 @@ let () =
     in
     let () =
       let open Test_out_of_bounds_accesses in
+      (* Out-of-bounds vector load/store tests *)
+      vec128_load_aligned ();
+      vec128_load_unaligned ();
+      vec128_store_aligned ();
+      vec128_store_unaligned ();
+      vec256_load_aligned ();
+      vec256_load_unaligned ();
+      vec256_store_aligned ();
+      vec256_store_unaligned ();
       (* Out-of-bounds array access tests *)
       read_int_array ();
       write_int_array ();

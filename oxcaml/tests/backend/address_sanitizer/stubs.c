@@ -10,6 +10,17 @@
 #include <caml/memory.h>
 #include <caml/simd.h>
 
+#define BUILTIN(name) void name() { assert(0); }
+
+BUILTIN(caml_sse_load_aligned);
+BUILTIN(caml_sse_load_unaligned);
+BUILTIN(caml_sse_store_aligned);
+BUILTIN(caml_sse_store_unaligned);
+BUILTIN(caml_avx_load_aligned);
+BUILTIN(caml_avx_load_unaligned);
+BUILTIN(caml_avx_store_aligned);
+BUILTIN(caml_avx_store_unaligned);
+
 #define DO_NOT_SANITIZE __attribute__((no_sanitize("address")))
 
 CAMLprim value ocaml_address_sanitizer_test_alloc(size_t len, int64_t tag) {

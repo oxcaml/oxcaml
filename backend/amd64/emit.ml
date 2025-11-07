@@ -1021,7 +1021,7 @@ let movpd ~unaligned src dst =
   | false, false, true -> I.simd movupd_Xm128_X [| src; dst |]
   | true, false, false -> I.simd vmovupd_Xm128_X [| src; dst |]
   | true, false, true -> I.simd vmovupd_Xm128_X [| src; dst |]
-  | true, true, false -> I.simd vmovupd_X_Xm128 [| src; dst |]
+  | true, true, false -> I.simd vmovapd_X_Xm128 [| src; dst |]
   | true, true, true -> I.simd vmovupd_X_Xm128 [| src; dst |]
 
 let move (src : Reg.t) (dst : Reg.t) =
@@ -1656,7 +1656,7 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
       (fun idx (arg : Simd.arg) ->
         if not (Simd.loc_allows_reg arg.loc) then assert (Option.is_some mode);
         match Simd.loc_allows_mem arg.loc, mode with
-        | true, Some mode ->
+        | true, Some (mode, _) ->
           use_addr ();
           idx + num_args_addressing mode
         | _ ->
@@ -1701,6 +1701,27 @@ let to_addr_width loc : X86_ast.data_type =
   | Onetwentyeight -> VEC128
   | Twofiftysix -> VEC256
 
+(* Conservatively assumes unaligned memory. This means ASAN checks are slower
+   than they could be if we were sure the input address is aligned. *)
+let to_memory_chunk loc : Cmm.memory_chunk =
+  match Simd.loc_memory_width loc with
+  | Simd.Eight -> Byte_unsigned
+  | Sixteen -> Sixteen_unsigned
+  | Thirtytwo -> Thirtytwo_unsigned
+  | Sixtyfour -> Word_int
+  | Onetwentyeight -> Onetwentyeight_unaligned
+  | Twofiftysix -> Twofiftysix_unaligned
+
+let emit_simd_sanitize ~address ~instr ~chunk ~kind =
+  if Config.with_address_sanitizer && !Arch.is_asan_enabled
+  then
+    (* May duplicate dependencies, including anything in [address]. *)
+    let arg = Array.init (Array.length instr.arg) (fun i -> arg instr i) in
+    let res = Array.init (Array.length instr.res) (fun i -> res instr i) in
+    let dependencies = Array.append arg res in
+    Address_sanitizer.emit_sanitize ~dependencies ~instr ~address chunk kind
+  else ()
+
 let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   check_simd_instr ?mode simd imm instr;
   let args =
@@ -1710,11 +1731,13 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
         then idx, args
         else
           match Simd.loc_allows_mem arg.loc, mode with
-          | true, Some mode ->
-            (* CR mslater: sanitize *)
+          | true, Some (mode, kind) ->
+            let n = num_args_addressing mode in
             let width = to_addr_width arg.loc in
+            let chunk = to_memory_chunk arg.loc in
             let address = addressing mode width instr idx in
-            num_args_addressing mode + idx, address :: args
+            emit_simd_sanitize ~address ~instr ~chunk ~kind;
+            idx + n, address :: args
           | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args)
       (0, []) simd.args
     |> fun (_, args) -> List.rev args
@@ -1793,7 +1816,8 @@ let emit_fused_simd_instr (simd : Simd.Mem.Fused.operation) i addr =
 
 let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i mode =
   match simd with
-  | Load op | Store op -> emit_simd ~mode op i
+  | Load op -> emit_simd ~mode:(mode, Load) op i
+  | Store op -> emit_simd ~mode:(mode, Store_modify) op i
   | Fused op ->
     let addr = addressing mode VEC128 i 1 in
     Address_sanitizer.emit_sanitize
