@@ -2957,7 +2957,8 @@ Line 1, characters 10-12:
               ^^
 Error: This type "t1" should be an instance of type
          "('a : immediate & immediate)"
-       The kind of t1 is immediate with 'a & immediate with 'a
+       The kind of t1 is
+           immediate mod dynamic with 'a & immediate mod dynamic with 'a
          because it is an unboxed tuple.
        But the kind of t1 must be a subkind of immediate & immediate
          because of the definition of t2 at line 2, characters 0-36.
