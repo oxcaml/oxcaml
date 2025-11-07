@@ -172,7 +172,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     in
     match Array.length simd.args, simd.res with
     | _, Res_none ->
-      (* Res_none implies one argument is always a memory location. *)
+      (* Res_none implies one argument is already an address. *)
       May_still_have_spilled_registers
     | 1, First_arg -> May_still_have_spilled_registers
     | 1, Res { loc = res_loc; _ } ->
