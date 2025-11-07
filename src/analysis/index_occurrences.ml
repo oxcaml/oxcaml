@@ -44,8 +44,8 @@ let should_ignore_lid (lid : Longident.t Location.loc) =
   *)
   Location.is_none lid.loc
 
-let iterator ~current_buffer_path ~index ~stamp ~reduce_for_uid =
-  let add uid loc = Stamped_hashtable.add index ~stamp (uid, loc) () in
+let iterator ~current_buffer_path ~index ~reduce_for_uid =
+  let add uid loc = index := Shape.Uid.Map.add_to_list uid loc !index in
   let f ~namespace env path (lid : Longident.t Location.loc) =
     log ~title:"index_buffer" "Path: %a" Logger.fmt (Fun.flip Path.print path);
     let lid = { lid with loc = set_fname ~file:current_buffer_path lid.loc } in
@@ -89,7 +89,7 @@ let iterator ~current_buffer_path ~index ~stamp ~reduce_for_uid =
   in
   Ast_iterators.iterator_on_usages ~include_hidden:true ~f
 
-let items ~index ~stamp (config : Mconfig.t) items =
+let items index (config : Mconfig.t) items =
   let module Shape_reduce = Shape_reduce.Make (struct
     let fuel () = Misc_stdlib.Maybe_bounded.of_int 10
 
@@ -123,7 +123,11 @@ let items ~index ~stamp (config : Mconfig.t) items =
     Filename.concat config.query.directory config.query.filename
   in
   let reduce_for_uid = Shape_reduce.reduce_for_uid in
-  let iterator = iterator ~current_buffer_path ~index ~stamp ~reduce_for_uid in
-  match items with
-  | `Impl items -> List.iter ~f:(iterator.structure_item iterator) items
-  | `Intf items -> List.iter ~f:(iterator.signature_item iterator) items
+  let index = ref index in
+  let iterator = iterator ~current_buffer_path ~index ~reduce_for_uid in
+  let () =
+    match items with
+    | `Impl items -> List.iter ~f:(iterator.structure_item iterator) items
+    | `Intf items -> List.iter ~f:(iterator.signature_item iterator) items
+  in
+  !index
