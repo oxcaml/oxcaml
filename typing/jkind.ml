@@ -2116,11 +2116,11 @@ module Const = struct
      structure. here, I am tracking that same information using an accumulator.
      I believe that this structure should scale to adding more axes *)
   let transl_scannable_axes sa =
-    let rec go sa ~pointerness =
+    let rec go (sa : string Location.loc list) ~pointerness =
       match sa with
       | [] -> pointerness
       | axis :: rest -> (
-        match axis with
+        match axis.txt with
         | "non_pointer" -> go rest ~pointerness:(Some Pointerness.Non_pointer)
         | "maybe_pointer" ->
           go rest ~pointerness:(Some Pointerness.Maybe_pointer)
@@ -2138,7 +2138,7 @@ module Const = struct
     | Pjk_abbreviation (name, sa_annot) -> (
       (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
       let jkind_without_sa =
-        (match name with
+        (match name.txt with
         | "any" -> Builtin.any.jkind
         | "value_or_null" -> Builtin.value_or_null.jkind
         | "value" -> Builtin.value.jkind
@@ -2399,7 +2399,9 @@ end
 let mk_annot name =
   Some
     Parsetree.
-      { pjkind_loc = Location.none; pjkind_desc = Pjk_abbreviation (name, []) }
+      { pjkind_loc = Location.none;
+        pjkind_desc = Pjk_abbreviation (Location.mknoloc name, [])
+      }
 
 let mark_best (type l r) (t : (l * r) Types.jkind) =
   { (disallow_right t) with quality = Best }
