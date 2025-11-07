@@ -1452,7 +1452,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
   let portability =
     match modes.statefulness, modes.portability with
     | Stateless, Portable
-    | Observing, Splittable
+    | Observing, Sharable
     | Stateful, Nonportable -> None
     | _, _ -> Some modes.portability
   in

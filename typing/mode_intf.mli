@@ -369,7 +369,7 @@ module type S = sig
     module Const : sig
       type t =
         | Portable
-        | Splittable
+        | Sharable
         | Nonportable
 
       include Const with type t := t

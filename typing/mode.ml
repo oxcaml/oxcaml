@@ -377,7 +377,7 @@ module Lattices = struct
   module Portability = struct
     type t =
       | Portable
-      | Splittable
+      | Sharable
       | Nonportable
 
     include Total (struct
@@ -387,14 +387,14 @@ module Lattices = struct
 
       let max = Nonportable
 
-      let ord = function Portable -> 0 | Splittable -> 1 | Nonportable -> 2
+      let ord = function Portable -> 0 | Sharable -> 1 | Nonportable -> 2
     end)
 
     let legacy = Nonportable
 
     let print ppf = function
       | Portable -> Format.fprintf ppf "portable"
-      | Splittable -> Format.fprintf ppf "splittable"
+      | Sharable -> Format.fprintf ppf "sharable"
       | Nonportable -> Format.fprintf ppf "nonportable"
   end
 
@@ -1405,12 +1405,12 @@ module Lattices_mono = struct
 
   let portable_to_contended = function
     | Portability.Portable -> Contention.Contended
-    | Portability.Splittable -> Contention.Shared
+    | Portability.Sharable -> Contention.Shared
     | Portability.Nonportable -> Contention.Uncontended
 
   let contended_to_portable = function
     | Contention.Contended -> Portability.Portable
-    | Contention.Shared -> Portability.Splittable
+    | Contention.Shared -> Portability.Sharable
     | Contention.Uncontended -> Portability.Nonportable
 
   let local_to_regional = function
@@ -2691,7 +2691,7 @@ module Portability = struct
 
   let legacy = of_const Const.legacy
 
-  (* CR dkalinichenko: ideally, [observing] should zap to [splittable]. *)
+  (* CR dkalinichenko: ideally, [observing] should zap to [sharable]. *)
   let zap_to_legacy ~statefulness =
     match statefulness with
     | Statefulness.Const.Stateful | Statefulness.Const.Observing -> zap_to_ceil

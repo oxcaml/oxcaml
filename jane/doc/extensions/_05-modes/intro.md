@@ -128,18 +128,16 @@ when they are contended.
 |-----------------|
 | **nonportable** |
 | `|`             |
-| splittable      |
+| sharable        |
 | `|`             |
 | portable        |
 {: .table }
 
-Portability is a future axis that tracks whether a value is permitted to be
-shared with another thread. OxCaml's parallelism API allows only *portable* values to
-move across thread boundaries.
-
-Portability is about functions: functions that capture uncontended mutable state
-are *nonportable*. Conversely, portable closures capture all values at contended,
-and splittable closures capture all values at shared.
+Portability is a future axis that tracks whether a value is allowed to move across
+thread boundaries. Functions that capture uncontended state are *nonportable*, 
+so cannot escape the current thread. Functions that capture shared state are
+*sharable*, so may be executed in parallel. Functions that capture all values at
+contended are *portable*, so may execute concurrently.
 
 Notably, it is generally safe to send mutable data *itself* to other threads,
 because it will then be *contended*, so the mutable portions will be
