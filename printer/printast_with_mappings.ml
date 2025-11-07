@@ -575,10 +575,11 @@ and jkind_annotation i ppf (jkind : jkind_annotation) =
   line i ppf "jkind %a\n" fmt_location jkind.pjkind_loc;
   match jkind.pjkind_desc with
   | Pjk_default -> line i ppf "Pjk_default\n"
-  (* CR zeisbach: I don't know what is a better way to print this out *)
-  | Pjk_abbreviation (jkind, nts) ->
-      line i ppf "Pjk_abbreviation %a\n"
-        (pp_print_list ~pp_sep:pp_print_space (string_loc i)) (jkind :: nts)
+  | Pjk_abbreviation (abbrev, sa) ->
+    line i ppf "Pjk_abbreviation %a\n" fmt_string_loc abbrev;
+    List.iter (fun a ->
+      line i ppf "scannable_axis %a" (string_loc (i+1)) a
+    ) sa
   | Pjk_mod (jkind, m) ->
       line i ppf "Pjk_mod\n";
       jkind_annotation (i+1) ppf jkind;
