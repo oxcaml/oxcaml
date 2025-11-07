@@ -211,6 +211,10 @@ module Pseudo_instr = struct
     | Instruction of Amd64_simd_instrs.instr
     | Sequence of Seq.t
 
+  let instr = function Instruction instr | Sequence { instr; _ } -> instr
+
+  let n_args t = Array.length (instr t).args
+
   let equal t1 t2 =
     match t1, t2 with
     | Instruction i0, Instruction i1 -> Amd64_simd_instrs.equal i0 i1
@@ -235,71 +239,121 @@ let sequence instr imm = { instr = Pseudo_instr.Sequence instr; imm }
 type operation_class =
   | Pure
   | Load of { is_mutable : bool }
+  | Store
 
-let is_pure_operation _op = true
+let n_args { instr; _ } = Pseudo_instr.n_args instr
 
 let class_of_operation _op = Pure
+
+let is_pure_operation op =
+  match class_of_operation op with Pure -> true | Load _ | Store -> false
 
 let equal_operation { instr = instr0; imm = imm0 }
     { instr = instr1; imm = imm1 } =
   Pseudo_instr.equal instr0 instr1 && Option.equal Int.equal imm0 imm1
 
-let print_operation printreg (op : operation) ppf regs =
+let print_operation ?addr printreg (op : operation) ppf regs =
   Pseudo_instr.print ppf op.instr;
-  Option.iter (fun imm -> fprintf ppf " %d" imm) op.imm;
-  Array.iter (fun reg -> fprintf ppf " %a" printreg reg) regs
+  Option.iter (fun imm -> fprintf ppf " (%d)" imm) op.imm;
+  let _ =
+    Array.fold_left
+      (fun idx arg ->
+        if Amd64_simd_defs.loc_allows_reg arg.loc
+        then (
+          fprintf ppf " %a" printreg regs.(idx);
+          idx + 1)
+        else
+          match addr with
+          | Some (print, n) ->
+            let addr_args = Array.sub regs idx (idx + n) in
+            fprintf ppf " [%a]" print addr_args;
+            idx + n
+          | None ->
+            fprintf ppf " [?]";
+            idx)
+      0 (Pseudo_instr.instr op.instr).args
+  in
+  ()
 
 module Mem = struct
   (** Initial support for some operations with memory arguments.
       Requires 16-byte aligned memory. *)
+  module Fused = struct
+    (* CR-someday mslater: just use Simd.operation *)
+    type operation =
+      | Add_f32
+      | Sub_f32
+      | Mul_f32
+      | Div_f32
+      | Add_f64
+      | Sub_f64
+      | Mul_f64
+      | Div_f64
 
-  type operation =
-    | Add_f32
-    | Sub_f32
-    | Mul_f32
-    | Div_f32
-    | Add_f64
-    | Sub_f64
-    | Mul_f64
-    | Div_f64
+    let class_of_operation (op : operation) =
+      match op with
+      | Add_f32 | Sub_f32 | Mul_f32 | Div_f32 | Add_f64 | Sub_f64 | Mul_f64
+      | Div_f64 ->
+        Load { is_mutable = true }
 
-  let class_of_operation (op : operation) =
+    let op_name (op : operation) =
+      match op with
+      | Add_f32 -> "add_f32"
+      | Sub_f32 -> "sub_f32"
+      | Mul_f32 -> "mul_f32"
+      | Div_f32 -> "div_f32"
+      | Add_f64 -> "add_f64"
+      | Sub_f64 -> "sub_f64"
+      | Mul_f64 -> "mul_f64"
+      | Div_f64 -> "div_f64"
+
+    let print_operation printreg printaddr (op : operation) ppf arg =
+      let addr_args = Array.sub arg 1 (Array.length arg - 1) in
+      fprintf ppf "%s %a [%a]" (op_name op) printreg arg.(0) printaddr addr_args
+
+    let equal_operation (l : operation) (r : operation) =
+      match l, r with
+      | Add_f64, Add_f64
+      | Sub_f64, Sub_f64
+      | Mul_f64, Mul_f64
+      | Div_f64, Div_f64
+      | Add_f32, Add_f32
+      | Sub_f32, Sub_f32
+      | Mul_f32, Mul_f32
+      | Div_f32, Div_f32 ->
+        true
+      | ( ( Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32 | Mul_f32
+          | Div_f32 ),
+          _ ) ->
+        false
+  end
+
+  type nonrec operation =
+    | Load of operation (* Explicit load; has memory-only argument *)
+    | Store of operation (* Explicit store; has memory-only argument *)
+    | Fused of Fused.operation (* Implicit load; has memory-optional argument *)
+
+  let class_of_operation (op : operation) : operation_class =
     match op with
-    | Add_f32 | Sub_f32 | Mul_f32 | Div_f32 | Add_f64 | Sub_f64 | Mul_f64
-    | Div_f64 ->
-      Load { is_mutable = true }
+    | Load _ -> Load { is_mutable = true }
+    | Store _ -> Store
+    | Fused op -> Fused.class_of_operation op
 
-  let op_name (op : operation) =
+  let print_operation printreg printaddr addr_args (op : operation) ppf arg =
     match op with
-    | Add_f32 -> "add_f32"
-    | Sub_f32 -> "sub_f32"
-    | Mul_f32 -> "mul_f32"
-    | Div_f32 -> "div_f32"
-    | Add_f64 -> "add_f64"
-    | Sub_f64 -> "sub_f64"
-    | Mul_f64 -> "mul_f64"
-    | Div_f64 -> "div_f64"
-
-  let print_operation printreg printaddr (op : operation) ppf arg =
-    let addr_args = Array.sub arg 1 (Array.length arg - 1) in
-    fprintf ppf "%s %a [%a]" (op_name op) printreg arg.(0) printaddr addr_args
+    | Fused op -> Fused.print_operation printreg printaddr op ppf arg
+    | Load op | Store op ->
+      print_operation ~addr:(printaddr, addr_args) printreg op ppf arg
 
   let is_pure_operation op =
-    match class_of_operation op with Pure -> true | Load _ -> true
+    match class_of_operation op with
+    | Pure -> true
+    | Load _ -> true
+    | Store -> false
 
   let equal_operation (l : operation) (r : operation) =
     match l, r with
-    | Add_f64, Add_f64
-    | Sub_f64, Sub_f64
-    | Mul_f64, Mul_f64
-    | Div_f64, Div_f64
-    | Add_f32, Add_f32
-    | Sub_f32, Sub_f32
-    | Mul_f32, Mul_f32
-    | Div_f32, Div_f32 ->
-      true
-    | ( ( Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32 | Mul_f32
-        | Div_f32 ),
-        _ ) ->
-      false
+    | Load l, Load r | Store l, Store r -> equal_operation l r
+    | Fused l, Fused r -> Fused.equal_operation l r
+    | (Load _ | Store _ | Fused _), _ -> false
 end

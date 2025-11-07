@@ -201,8 +201,10 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op
       (Specific
         (Isimd_mem
-          ( ( Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32
-            | Mul_f32 | Div_f32 ),
+          ( ( Load _ | Store _
+            | Fused
+                ( Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32
+                | Mul_f32 | Div_f32 ) ),
             _ ))) ->
     May_still_have_spilled_registers
   | Op

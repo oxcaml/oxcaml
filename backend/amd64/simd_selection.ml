@@ -956,14 +956,6 @@ let select_operation_cfg ~dbg op args =
   |> or_else select_operation_f16c
   |> or_else select_operation_fma
 
-let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
-  match op with
-  | Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32 | Mul_f32
-  | Div_f32 ->
-    if Proc.has_three_operand_float_ops ()
-    then None
-    else Some ([| res.(0); arg.(1) |], res)
-
 let rax = Proc.phys_reg Int 0
 
 let rcx = Proc.phys_reg Int 5
@@ -1007,6 +999,16 @@ let pseudoregs_for_operation (simd : Simd.operation) arg res =
       instr
   in
   pseudoregs_for_instr sse_or_avx arg_regs res_regs
+
+let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
+  match op with
+  | Load op | Store op -> pseudoregs_for_operation op arg res
+  | Fused
+      ( Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32 | Mul_f32
+      | Div_f32 ) ->
+    if Proc.has_three_operand_float_ops ()
+    then arg, res
+    else [| res.(0); arg.(1) |], res
 
 (* Error report *)
 
@@ -1494,7 +1496,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       in
       if is_aligned_to_vector_width ()
       then
-        let sse_op : Simd.Mem.operation =
+        let sse_op : Simd.Mem.Fused.operation =
           match float_width, float_op with
           | Float64, Ifloatadd -> Add_f64
           | Float64, Ifloatsub -> Sub_f64
@@ -1508,7 +1510,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         let arguments = append_result results address_args in
         Some
           [ { operation =
-                Operation.Specific (Isimd_mem (sse_op, addressing_mode));
+                Operation.Specific (Isimd_mem (Fused sse_op, addressing_mode));
               arguments;
               results
             } ]

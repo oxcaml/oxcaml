@@ -185,6 +185,8 @@ let loc_is_pinned = function Pin reg -> Some reg | Temp _ -> None
 let arg_is_implicit ({ enc; _ } : arg) =
   match enc with Implicit -> true | Immediate | RM_r | RM_rm | Vex_v -> false
 
+let arg_is_addr ({ loc; _ } : arg) = not (loc_allows_reg loc)
+
 let ext_to_string : ext -> string = function
   | SSE -> "SSE"
   | SSE2 -> "SSE2"
