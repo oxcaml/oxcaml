@@ -32,6 +32,7 @@ type ext =
 (* Fixed machine register location *)
 type reg =
   | RAX
+  | RDI
   | RCX
   | RDX
   | XMM0
@@ -139,8 +140,8 @@ type 'id instr =
 
 let equal_reg reg0 reg1 =
   match reg0, reg1 with
-  | RAX, RAX | RCX, RCX | RDX, RDX | XMM0, XMM0 -> true
-  | (RAX | RCX | RDX | XMM0), _ -> false
+  | RAX, RAX | RDI, RDI | RCX, RCX | RDX, RDX | XMM0, XMM0 -> true
+  | (RAX | RDI | RCX | RDX | XMM0), _ -> false
 
 let equal_temp temp0 temp1 =
   match temp0, temp1 with

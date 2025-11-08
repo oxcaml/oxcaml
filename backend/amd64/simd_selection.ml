@@ -143,6 +143,8 @@ let select_operation_sse ~dbg op args =
     simd_store_sse_or_avx ~mode:(Iindexed 0) movapd_m128_X vmovapd_m128_X args
   | "caml_sse_store_unaligned" ->
     simd_store_sse_or_avx ~mode:(Iindexed 0) movupd_m128_X vmovupd_m128_X args
+  | "caml_sse_store_aligned_uncached" ->
+    simd_store_sse_or_avx ~mode:(Iindexed 0) movntps vmovntps_m128_X args
   | "caml_sse_float32_sqrt" | "sqrtf" ->
     seq_or_avx_zeroed ~dbg Seq.sqrtss vsqrtss args
   | "caml_simd_float32_max" | "caml_sse_float32_max" ->
@@ -182,6 +184,29 @@ let select_operation_sse ~dbg op args =
 
 let select_operation_sse2 ~dbg op args =
   match op with
+  | "caml_sse2_load_int64" ->
+    simd_load_sse_or_avx ~mode:(Iindexed 0) movq_X_r64m64 vmovq_X_r64m64 args
+  | "caml_sse2_load_int32" ->
+    simd_load_sse_or_avx ~mode:(Iindexed 0) movd_X_r32m32 vmovd_X_r32m32 args
+  | "caml_sse2_store_int32_uncached" ->
+    simd_store ~mode:(Iindexed 0) movnti_m32_r32 args
+  | "caml_sse2_store_int64_uncached" ->
+    simd_store ~mode:(Iindexed 0) movnti_m64_r64 args
+  | "caml_sse2_load_low64" ->
+    simd_load_sse_or_avx ~mode:(Iindexed 0) movlpd_X_m64 vmovlpd_X_X_m64 args
+  | "caml_sse2_load_high64" ->
+    simd_load_sse_or_avx ~mode:(Iindexed 0) movhpd_X_m64 vmovhpd_X_X_m64 args
+  | "caml_sse2_load_zero32" ->
+    simd_load_sse_or_avx ~mode:(Iindexed 0) movss_X_m32 vmovss_X_m32 args
+  | "caml_sse2_load_zero64" ->
+    simd_load_sse_or_avx ~mode:(Iindexed 0) movsd_X_m64 vmovsd_X_m64 args
+  | "caml_sse2_store_low32" ->
+    simd_store_sse_or_avx ~mode:(Iindexed 0) movss_Xm32_X vmovss_m32_X args
+  | "caml_sse2_store_low64" ->
+    simd_store_sse_or_avx ~mode:(Iindexed 0) movsd_Xm64_X vmovsd_m64_X args
+  | "caml_sse2_int8x16_store_masked" ->
+    (* CR mslater: addr has to go in rdi *)
+    simd_store_sse_or_avx ~mode:(Iindexed 0) maskmovdqu vmaskmovdqu args
   | "caml_sse2_float64_sqrt" | "sqrt" ->
     seq_or_avx_zeroed ~dbg Seq.sqrtsd vsqrtsd args
   | "caml_simd_float64_max" | "caml_sse2_float64_max" ->
@@ -347,6 +372,8 @@ let select_operation_sse3 ~dbg:_ op args =
   then None
   else
     match op with
+    | "caml_sse3_load_broadcast64" ->
+      simd_load_sse_or_avx ~mode:(Iindexed 0) movddup vmovddup_X_Xm64 args
     | "caml_sse3_float32x4_addsub" ->
       sse_or_avx addsubps vaddsubps_X_X_Xm128 args
     | "caml_sse3_float64x2_addsub" ->
@@ -404,6 +431,8 @@ let select_operation_sse41 ~dbg op args =
   then None
   else
     match op with
+    | "caml_sse41_load_aligned_uncached" ->
+      simd_load_sse_or_avx ~mode:(Iindexed 0) movntdqa vmovntdqa_X_m128 args
     | "caml_sse41_vec128_blend_16" ->
       let i, args = extract_constant args ~max:255 op in
       sse_or_avx pblendw vpblendw_X_X_Xm128 ~i args
@@ -614,6 +643,10 @@ let select_operation_avx ~dbg:_ op args =
       simd_store ~mode:(Iindexed 0) vmovapd_m256_Y args
     | "caml_avx_store_unaligned" ->
       simd_store ~mode:(Iindexed 0) vmovupd_m256_Y args
+    | "caml_avx_load_aligned_uncached" ->
+      simd_load ~mode:(Iindexed 0) vmovntdqa_Y_m256 args
+    | "caml_avx_store_aligned_uncached" ->
+      simd_store ~mode:(Iindexed 0) vmovntps_m256_Y args
     | "caml_avx_float64x4_add" -> instr vaddpd_Y_Y_Ym256 args
     | "caml_avx_float32x8_add" -> instr vaddps_Y_Y_Ym256 args
     | "caml_avx_float32x8_addsub" -> instr vaddsubps_Y_Y_Ym256 args
@@ -967,6 +1000,8 @@ let select_operation_cfg ~dbg op args =
 
 let rax = Proc.phys_reg Int 0
 
+let rdi = Proc.phys_reg Int 2
+
 let rcx = Proc.phys_reg Int 5
 
 let rdx = Proc.phys_reg Int 4
@@ -974,7 +1009,12 @@ let rdx = Proc.phys_reg Int 4
 let xmm0v = Proc.phys_reg Vec128 100
 
 let to_phys_reg (pinned_reg : Simd.reg) =
-  match pinned_reg with RAX -> rax | RCX -> rcx | RDX -> rdx | XMM0 -> xmm0v
+  match pinned_reg with
+  | RAX -> rax
+  | RDI -> rdi
+  | RCX -> rcx
+  | RDX -> rdx
+  | XMM0 -> xmm0v
 
 let maybe_pin arr i loc =
   match Simd.loc_is_pinned loc with

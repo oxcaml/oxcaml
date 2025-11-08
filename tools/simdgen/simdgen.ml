@@ -92,6 +92,7 @@ let rec parse_args mnemonic acc encs args imm res =
     let loc : loc option =
       match String.trim arg with
       | "<RAX>" -> Some (Pin RAX)
+      | "<RDI>" -> Some (Pin RDI)
       | "<RCX>" -> Some (Pin RCX)
       | "<RDX>" -> Some (Pin RDX)
       | "<XMM0>" -> Some (Pin XMM0)
@@ -152,7 +153,8 @@ let rec parse_args mnemonic acc encs args imm res =
       | "ModRM:reg" -> RM_r
       | "ModRM:r/m" -> RM_rm
       | "VEX.vvvv" -> Vex_v
-      | "NA" | "<XMM0>" | "<RAX>" | "<RCX>" | "<RDX>" | "implicit" -> Implicit
+      | "NA" | "<XMM0>" | "<RAX>" | "<RDI>" | "<RCX>" | "<RDX>" | "implicit" ->
+        Implicit
       | "Imm8" | "imm8" | "imm8[3:0]" | "imm8[7:4]" ->
         if Option.is_some loc
         then (
@@ -297,6 +299,7 @@ let mangle_loc (loc : loc) =
   in
   match loc with
   | Pin RAX -> "rax"
+  | Pin RDI -> "rdi"
   | Pin RCX -> "rcx"
   | Pin RDX -> "rdx"
   | Pin XMM0 -> "xmm0"
@@ -357,6 +360,7 @@ let print_one bind instr =
   in
   let print_loc : loc -> string = function
     | Pin RAX -> "Pin RAX"
+    | Pin RDI -> "Pin RDI"
     | Pin RCX -> "Pin RCX"
     | Pin RDX -> "Pin RDX"
     | Pin XMM0 -> "Pin XMM0"

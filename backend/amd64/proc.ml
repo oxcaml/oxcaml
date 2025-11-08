@@ -524,6 +524,7 @@ let destroyed_by_simd_instr (instr : Simd.instr) =
     | Res { loc; _ } ->
       match Simd.loc_is_pinned loc with
       | Some RAX -> [|rax|]
+      | Some RDI -> [|rdi|]
       | Some RCX -> [|rcx|]
       | Some RDX -> [|rdx|]
       | Some XMM0 -> destroy_xmm 0

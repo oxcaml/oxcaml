@@ -129,6 +129,8 @@ let register_name typ r : X86_ast.arg =
 
 let phys_rax = phys_reg Int 0
 
+let phys_rdi = phys_reg Int 2
+
 let phys_rdx = phys_reg Int 4
 
 let phys_rcx = phys_reg Int 5
@@ -1637,6 +1639,7 @@ let assert_loc (loc : Simd.loc) arg =
   | false -> assert (Simd.loc_allows_mem loc));
   match Simd.loc_is_pinned loc with
   | Some RAX -> assert (Reg.same_loc arg phys_rax)
+  | Some RDI -> assert (Reg.same_loc arg phys_rdi)
   | Some RCX -> assert (Reg.same_loc arg phys_rcx)
   | Some RDX -> assert (Reg.same_loc arg phys_rdx)
   | Some XMM0 -> assert (Reg.same_loc arg (phys_xmm0v ()))
