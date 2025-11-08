@@ -14,8 +14,8 @@ authors: [
 homepage: "https://github.com/ocaml/ocaml/"
 bug-reports: "https://github.com/ocaml/ocaml/issues"
 depends: [
-  # This is OCaml 5.4.0
-  "ocaml" {= "5.4.0" & post}
+  # This is OCaml 5.4.1
+  "ocaml" {= "5.4.1" & post}
 
   # General base- packages
   "base-unix" {post}
