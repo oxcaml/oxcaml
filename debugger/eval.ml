@@ -98,7 +98,7 @@ let rec expression event env = function
             match valdesc.val_kind with
             | Val_ivar (_, cl_num) ->
                 let (p0, _) =
-                  Env.find_value_by_name
+                  Env.find_value_by_name_lazy
                     (Longident.Lident ("self-" ^ cl_num)) env
                 in
                 let v = value_path event env p0 in

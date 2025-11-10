@@ -74,7 +74,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Cxor | Clsl | Clsr | Casr | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz _
       | Cctz _ | Cpopcnt | Cbswap _ | Ccsel _ | Cabsf _ | Caddf _ | Csubf _
       | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _
-      | Ctuple_field _ | Ccmpf _ | Cdls_get ->
+      | Ctuple_field _ | Ccmpf _ | Cdls_get | Ctls_get ->
         List.for_all is_simple_expr args)
     | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ -> false
 
@@ -122,7 +122,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | Catomic _ -> EC.arbitrary
         | Craise _ -> EC.effect_only Raise
         | Cload { mutability = Immutable } -> EC.none
-        | Cload { mutability = Mutable } | Cdls_get ->
+        | Cload { mutability = Mutable } | Cdls_get | Ctls_get ->
           EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
         | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
@@ -327,6 +327,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | _ -> SU.basic_op (Store (chunk, addr, is_assign)), [arg2; eloc]
       (* Inversion addr/datum in Istore *))
     | Cdls_get -> SU.basic_op Dls_get, args
+    | Ctls_get -> SU.basic_op Tls_get, args
     | Calloc (mode, alloc_block_kind) ->
       let placeholder_for_alloc_block_kind : Cmm.alloc_dbginfo_item =
         { alloc_words = 0; alloc_block_kind; alloc_dbg = Debuginfo.none }

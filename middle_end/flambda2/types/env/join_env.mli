@@ -24,12 +24,12 @@ type n_way_join_type =
 
 val joined_env : t -> env_id -> Typing_env.t
 
-val machine_width : t -> Target_system.Machine_width.t
-
 val code_age_relation : t -> Code_age_relation.t
 
 val code_age_relation_resolver :
   t -> Compilation_unit.t -> Code_age_relation.t option
+
+val machine_width : t -> Target_system.Machine_width.t
 
 val n_way_join_simples :
   t -> Flambda_kind.t -> Simple.t join_arg list -> Simple.t Or_bottom.t * t

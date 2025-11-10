@@ -72,6 +72,7 @@ module Jkind_mod_bounds = struct
   let yielding = Crossing.Axis.Comonadic Yielding
   let statefulness = Crossing.Axis.Comonadic Statefulness
   let visibility = Crossing.Axis.Monadic Visibility
+  let staticity = Crossing.Axis.Monadic Staticity
   let[@inline] externality t = t.externality
   let[@inline] nullability t = t.nullability
   let[@inline] separability t = t.separability
@@ -111,6 +112,7 @@ module Jkind_mod_bounds = struct
     let yielding = modal yielding in
     let statefulness = modal statefulness in
     let visibility = modal visibility in
+    let staticity = modal staticity in
     let externality =
       if mem max_axes (Nonmodal Externality)
       then Externality.max
@@ -127,7 +129,7 @@ module Jkind_mod_bounds = struct
       else t.separability
     in
     let monadic =
-      Crossing.Monadic.create ~uniqueness ~contention ~visibility
+      Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
     in
     let comonadic =
       Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
@@ -159,6 +161,7 @@ module Jkind_mod_bounds = struct
     let yielding = modal yielding in
     let statefulness = modal statefulness in
     let visibility = modal visibility in
+    let staticity = modal staticity in
     let externality =
       if mem min_axes (Nonmodal Externality)
       then Externality.min
@@ -175,7 +178,7 @@ module Jkind_mod_bounds = struct
       else t.separability
     in
     let monadic =
-      Crossing.Monadic.create ~uniqueness ~contention ~visibility
+      Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
     in
     let comonadic =
       Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
@@ -205,6 +208,7 @@ module Jkind_mod_bounds = struct
     modal yielding &&
     modal statefulness &&
     modal visibility &&
+    modal staticity &&
     (not (mem axes (Nonmodal Externality)) ||
      Externality.(le max (externality t))) &&
     (not (mem axes (Nonmodal Nullability)) ||

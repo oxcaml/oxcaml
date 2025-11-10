@@ -131,9 +131,9 @@ type succeeds = t_immediate_or_null accepts_nonfloat
 let f (x : int or_null @ local) (g : int or_null -> unit) = g x [@nontail]
 
 [%%expect{|
-val f : local_ int or_null -> ((int or_null -> unit) -> unit) = <fun>
+val f : int or_null @ local -> ((int or_null -> unit) -> unit) = <fun>
 |}, Principal{|
-val f : local_ int or_null -> (int or_null -> unit) -> unit = <fun>
+val f : int or_null @ local -> (int or_null -> unit) -> unit = <fun>
 |}]
 
 module M : sig
@@ -230,7 +230,7 @@ Line 1, characters 19-30:
                        ^^^^^^^^^^^
 Error: This type "exn or_null" should be an instance of type
          "('a : immediate64_or_null)"
-       The kind of exn or_null is value_or_null mod contended portable
+       The kind of exn or_null is value_or_null mod stateless immutable
          because it is the primitive type or_null.
        But the kind of exn or_null must be a subkind of immediate64_or_null
          because of the definition of accept_immediate64_or_null at line 1, characters 0-58.

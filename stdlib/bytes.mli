@@ -59,7 +59,7 @@ open! Stdlib
 
    *)
 
-external length : bytes @ immutable -> int = "%bytes_length"
+external length : (bytes[@local_opt]) @ immutable -> int = "%bytes_length"
 (** Return the length (number of bytes) of the argument. *)
 
 external get : bytes -> int -> char = "%bytes_safe_get"
@@ -91,15 +91,15 @@ val init : int -> (int -> char) -> bytes
 val empty : bytes
 (** A byte sequence of size 0. *)
 
-val copy : bytes -> bytes
+val copy : bytes @ local -> bytes
 (** Return a new byte sequence that contains the same bytes as the
     argument. *)
 
-val of_string : string -> bytes
+val of_string : string @ local -> bytes
 (** Return a new byte sequence that contains the same bytes as the
     given string. *)
 
-val to_string : bytes -> string
+val to_string : bytes @ local -> string
 (** Return a new string that contains the same bytes as the given byte
     sequence. *)
 
@@ -344,7 +344,8 @@ val ends_with :
     always-correct {!to_string} and {!of_string} instead.
 *)
 
-val unsafe_to_string : bytes -> string
+external unsafe_to_string :
+  (bytes[@local_opt]) -> (string[@local_opt]) = "%bytes_to_string"
 (** Unsafely convert a byte sequence into a string.
 
     To reason about the use of [unsafe_to_string], it is convenient to
@@ -420,7 +421,8 @@ let bytes_length (s : bytes) =
    closure is fully applied and returns ownership.
 *)
 
-val unsafe_of_string : string -> bytes
+external unsafe_of_string :
+  (string[@local_opt]) -> (bytes[@local_opt]) = "%bytes_of_string"
 (** Unsafely convert a shared string to a byte sequence that should
     not be mutated.
 
@@ -817,15 +819,18 @@ let d1 = Domain.spawn (fun () -> Bytes.set_int32_ne b 0 100; b.[0] <- 'd' )
 
 (* The following is for system use only. Do not call directly. *)
 
-external unsafe_get : bytes -> int -> char = "%bytes_unsafe_get"
-external unsafe_set : bytes -> int -> char -> unit = "%bytes_unsafe_set"
+external unsafe_get :
+  (bytes[@local_opt]) @ read -> int -> char = "%bytes_unsafe_get"
+external unsafe_set :
+  (bytes[@local_opt]) -> int -> char -> unit = "%bytes_unsafe_set"
 external unsafe_blit :
-  bytes -> int -> bytes -> int -> int ->
-    unit = "caml_blit_bytes" [@@noalloc]
+  (bytes[@local_opt]) @ read -> int -> (bytes[@local_opt]) -> int -> int -> unit
+  = "caml_blit_bytes" [@@noalloc]
 external unsafe_blit_string :
-  string -> int -> bytes -> int -> int -> unit
+  (string[@local_opt]) -> int -> (bytes[@local_opt]) -> int -> int -> unit
   = "caml_blit_string" [@@noalloc]
 external unsafe_fill :
-  bytes -> int -> int -> char -> unit = "caml_fill_bytes" [@@noalloc]
+  (bytes[@local_opt]) -> int -> int -> char -> unit
+  = "caml_fill_bytes" [@@noalloc]
 
 val unsafe_escape : bytes -> bytes

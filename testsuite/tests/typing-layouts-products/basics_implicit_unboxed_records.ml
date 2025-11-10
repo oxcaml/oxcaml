@@ -124,7 +124,7 @@ let f_unboxed_record (local_ left) (local_ right) =
 [%%expect{|
 type ('a, 'b) ab = { left : 'a; right : 'b; }
 type ('a, 'b) ab_u = { left : 'a; right : 'b; }
-val f_unboxed_record : local_ 'a -> local_ 'b -> local_ 'a = <fun>
+val f_unboxed_record : 'a @ local -> 'b @ local -> 'a @ local = <fun>
 |}]
 
 let f_boxed_record (local_ left) (local_ right) =
@@ -136,7 +136,9 @@ Line 4, characters 2-7:
 4 |   left'
       ^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is from the allocation (at Line 2, characters 10-25) containing a value
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]

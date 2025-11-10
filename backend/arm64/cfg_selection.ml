@@ -258,8 +258,9 @@ let pseudoregs_for_operation op arg res =
       | Ishiftarith (_, _)
       | Ibswap _ | Isignext _ )
   | Move | Spill | Reload | Opaque | Pause | Begin_region | End_region | Dls_get
-  | Poll | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-  | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
+  | Tls_get | Poll | Const_int _ | Const_float32 _ | Const_float _
+  | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+  | Stackoffset _ | Load _
   | Store (_, _, _)
   | Intop _
   | Intop_imm (_, _)

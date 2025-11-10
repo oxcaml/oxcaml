@@ -612,12 +612,12 @@ type rcd_u = #{ xu : int; yu : string; }
 
 <[ fun () -> exclave_ Some 42 ]>;;
 [%%expect {|
-- : <[unit -> local_ int option]> expr = <[fun () -> exclave_ Some 42]>
+- : <[unit -> int option @ local]> expr = <[fun () -> exclave_ Some 42]>
 |}];;
 
 <[ fun () -> exclave_ stack_ (Some 42) ]>;;
 [%%expect {|
-- : <[unit -> local_ int option]> expr =
+- : <[unit -> int option @ local]> expr =
 <[fun () -> exclave_ stack_ (Some 42)]>
 |}];;
 

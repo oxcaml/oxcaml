@@ -387,10 +387,8 @@ ocaml/primitives.new
 /tools/debug_printers
 /tools/lintapidiff.opt
 
-/toplevel/byte/topeval.mli
 /toplevel/byte/trace.mli
 /toplevel/byte/topmain.mli
-/toplevel/native/topeval.mli
 /toplevel/native/trace.mli
 /toplevel/native/topmain.mli
 

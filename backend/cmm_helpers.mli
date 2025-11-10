@@ -1384,6 +1384,8 @@ val set_field_unboxed :
 
 val dls_get : dbg:Debuginfo.t -> expression
 
+val tls_get : dbg:Debuginfo.t -> expression
+
 val cpu_relax : dbg:Debuginfo.t -> expression
 
 val poll : dbg:Debuginfo.t -> expression

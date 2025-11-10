@@ -347,6 +347,7 @@ type primitive =
   | Ppoke of peek_or_poke
   (* Fetching domain-local state *)
   | Pdls_get
+  | Ptls_get
   (* Poll for runtime actions *)
   | Ppoll
   | Pcpu_relax
@@ -1051,7 +1052,7 @@ let layout_list =
 let layout_tuple_element = nullable_value Pgenval
 let layout_value_field = nullable_value Pgenval
 let layout_tmc_field = nullable_value Pgenval
-let layout_optional_arg = non_null_value Pgenval
+let layout_optional_arg = nullable_value Pgenval
 let layout_variant_arg = nullable_value Pgenval
 let layout_exception = non_null_value Pgenval
 let layout_function = non_null_value Pgenval
@@ -1451,7 +1452,7 @@ let transl_prim mod_name name =
   let pers = Ident.create_persistent mod_name in
   let env = Env.add_persistent_structure pers Env.empty in
   let lid = Longident.Ldot (Longident.Lident mod_name, name) in
-  match Env.find_value_by_name lid env with
+  match Env.find_value_by_name_lazy lid env with
   | path, _ -> transl_value_path Loc_unknown env path
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
@@ -2055,6 +2056,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_lor_field
   | Patomic_lxor_field
   | Pdls_get
+  | Ptls_get
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _
   | Pget_idx _ | Pset_idx _
@@ -2213,7 +2215,7 @@ let primitive_can_raise prim =
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
   | Prunstack | Pperform | Presume | Preperform -> true (* XXX! *)
-  | Pdls_get | Ppoll | Pcpu_relax
+  | Pdls_get | Ptls_get | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _
@@ -2584,7 +2586,7 @@ let primitive_result_layout (p : primitive) =
     layout_any_value
   | Patomic_compare_set_field _
   | Patomic_fetch_add_field -> layout_int
-  | Pdls_get -> layout_any_value
+  | Pdls_get | Ptls_get -> layout_any_value
   | Patomic_add_field
   | Patomic_sub_field
   | Patomic_land_field

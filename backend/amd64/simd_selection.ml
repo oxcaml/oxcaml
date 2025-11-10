@@ -884,6 +884,60 @@ let select_operation_avx2 ~dbg:_ op args =
     | "caml_avx2_vec128x2_interleave_low_16" -> instr vpunpcklwd_Y_Y_Ym256 args
     | _ -> None
 
+let select_operation_f16c ~dbg:_ op args =
+  if not (Arch.Extension.enabled F16C)
+  then None
+  else
+    match op with
+    | "caml_f16c_cvt_float16x8_float32x4" -> instr vcvtph2ps_X_Xm64 args
+    | "caml_f16c_cvt_float16x8_float32x8" -> instr vcvtph2ps_Y_Xm128 args
+    | "caml_f16c_cvt_float32x4_float16x8" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vcvtps2ph_Xm64_X ~i args
+    | "caml_f16c_cvt_float32x8_float16x8" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vcvtps2ph_Xm128_Y ~i args
+    | _ -> None
+
+let select_operation_fma ~dbg:_ op args =
+  if not (Arch.Extension.enabled FMA)
+  then None
+  else
+    match op with
+    | "caml_fma_float64x2_mul_add" -> instr vfmadd213pd_X_X_Xm128 args
+    | "caml_fma_float64x4_mul_add" -> instr vfmadd213pd_Y_Y_Ym256 args
+    | "caml_fma_float32x4_mul_add" -> instr vfmadd213ps_X_X_Xm128 args
+    | "caml_fma_float32x8_mul_add" -> instr vfmadd213ps_Y_Y_Ym256 args
+    | "caml_fma_float64_mul_add" -> instr vfmadd213sd args
+    | "caml_fma_float32_mul_add" -> instr vfmadd213ss args
+    | "caml_fma_float64x2_mul_addsub" -> instr vfmaddsub213pd_X_X_Xm128 args
+    | "caml_fma_float64x4_mul_addsub" -> instr vfmaddsub213pd_Y_Y_Ym256 args
+    | "caml_fma_float32x4_mul_addsub" -> instr vfmaddsub213ps_X_X_Xm128 args
+    | "caml_fma_float32x8_mul_addsub" -> instr vfmaddsub213ps_Y_Y_Ym256 args
+    | "caml_fma_float64x2_mul_sub" -> instr vfmsub213pd_X_X_Xm128 args
+    | "caml_fma_float64x4_mul_sub" -> instr vfmsub213pd_Y_Y_Ym256 args
+    | "caml_fma_float32x4_mul_sub" -> instr vfmsub213ps_X_X_Xm128 args
+    | "caml_fma_float32x8_mul_sub" -> instr vfmsub213ps_Y_Y_Ym256 args
+    | "caml_fma_float64_mul_sub" -> instr vfmsub213sd args
+    | "caml_fma_float32_mul_sub" -> instr vfmsub213ss args
+    | "caml_fma_float64x2_mul_subadd" -> instr vfmsubadd213pd_X_X_Xm128 args
+    | "caml_fma_float64x4_mul_subadd" -> instr vfmsubadd213pd_Y_Y_Ym256 args
+    | "caml_fma_float32x4_mul_subadd" -> instr vfmsubadd213ps_X_X_Xm128 args
+    | "caml_fma_float32x8_mul_subadd" -> instr vfmsubadd213ps_Y_Y_Ym256 args
+    | "caml_fma_float64x2_neg_mul_add" -> instr vfnmadd213pd_X_X_Xm128 args
+    | "caml_fma_float64x4_neg_mul_add" -> instr vfnmadd213pd_Y_Y_Ym256 args
+    | "caml_fma_float32x4_neg_mul_add" -> instr vfnmadd213ps_X_X_Xm128 args
+    | "caml_fma_float32x8_neg_mul_add" -> instr vfnmadd213ps_Y_Y_Ym256 args
+    | "caml_fma_float64_neg_mul_add" -> instr vfnmadd213sd args
+    | "caml_fma_float32_neg_mul_add" -> instr vfnmadd213ss args
+    | "caml_fma_float64x2_neg_mul_sub" -> instr vfnmsub213pd_X_X_Xm128 args
+    | "caml_fma_float64x4_neg_mul_sub" -> instr vfnmsub213pd_Y_Y_Ym256 args
+    | "caml_fma_float32x4_neg_mul_sub" -> instr vfnmsub213ps_X_X_Xm128 args
+    | "caml_fma_float32x8_neg_mul_sub" -> instr vfnmsub213ps_Y_Y_Ym256 args
+    | "caml_fma_float64_neg_mul_sub" -> instr vfnmsub213sd args
+    | "caml_fma_float32_neg_mul_sub" -> instr vfnmsub213ss args
+    | _ -> None
+
 let select_operation_cfg ~dbg op args =
   let or_else try_ opt =
     match opt with Some x -> Some x | None -> try_ ~dbg op args
@@ -899,6 +953,8 @@ let select_operation_cfg ~dbg op args =
   |> or_else select_operation_sse42
   |> or_else select_operation_avx
   |> or_else select_operation_avx2
+  |> or_else select_operation_f16c
+  |> or_else select_operation_fma
 
 let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
   match op with
@@ -1159,7 +1215,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Stackoffset _ | Intop_atomic _ | Floatop _ | Csel _
       | Probe_is_enabled _ | Opaque | Begin_region | End_region | Pause
-      | Name_for_debugger _ | Dls_get | Poll ->
+      | Name_for_debugger _ | Dls_get | Tls_get | Poll ->
         assert false
     in
     assert (arg_count = 0 && res_count = 1);
@@ -1214,7 +1270,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
       | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
       | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
-      | End_region | Name_for_debugger _ | Dls_get | Poll | Pause ->
+      | End_region | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause ->
         assert false
     in
     let consts = List.map extract_intop_imm_int cfg_ops in
@@ -1255,7 +1311,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
         | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
         | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
-        | End_region | Name_for_debugger _ | Dls_get | Poll | Pause ->
+        | End_region | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause ->
           assert false
       in
       let get_scale op =
@@ -1387,7 +1443,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
           | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
-          | End_region | Name_for_debugger _ | Dls_get | Poll | Pause ->
+          | End_region | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause
+            ->
             assert false
         in
         let consts = List.map extract_store_int_imm cfg_ops in
@@ -1503,5 +1560,5 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
   | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
   | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _ | Floatop _
   | Csel _ | Probe_is_enabled _ | Opaque | Pause | Begin_region | End_region
-  | Name_for_debugger _ | Dls_get | Poll ->
+  | Name_for_debugger _ | Dls_get | Tls_get | Poll ->
     None

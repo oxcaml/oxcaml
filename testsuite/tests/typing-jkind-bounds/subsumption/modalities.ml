@@ -461,7 +461,8 @@ Line 2, characters 23-24:
 2 | fork (fun () -> Xm.set r 1);;
                            ^
 Error: The value "r" is "nonportable" but is expected to be "portable"
-       because it is used inside a function which is expected to be "portable".
+       because it is used inside the function at Line 2, characters 5-27
+       which is expected to be "portable".
 |}]
 
 
@@ -474,5 +475,8 @@ val r' : int ref = {contents = 0}
 Line 2, characters 16-18:
 2 | fork (fun () -> r' := 1);;
                     ^^
-Error: This value is "contended" but is expected to be "uncontended".
+Error: This value is "contended"
+       because it is used inside the function at Line 2, characters 5-24
+       which is expected to be "portable".
+       However, the highlighted expression is expected to be "uncontended".
 |}]

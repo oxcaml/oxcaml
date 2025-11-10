@@ -39,46 +39,44 @@ type unit_link_info =
     dynunit : Cmxs_format.dynunit option
   }
 
-val extract_crc_interfaces : unit -> Import_info.t list
+(** Values of type [t] are mutable structures. *)
+type t
 
-val extract_crc_implementations : unit -> Import_info.t list
+val create : unit -> t
 
-val lib_ccopts : unit -> string list
+val extract_crc_interfaces : t -> Import_info.t list
 
-val lib_ccobjs : unit -> filepath list
+val extract_crc_implementations : t -> Import_info.t list
 
-val reset : unit -> unit
+val lib_ccopts : t -> string list
 
-type snapshot
-
-val save_snapshot : unit -> snapshot
-
-val restore_snapshot : snapshot -> unit
+val lib_ccobjs : t -> filepath list
 
 val make_globals_map :
+  t ->
   unit_link_info list ->
   (CU.t * Digest.t option * Digest.t option * Symbol.t list) list
 
-val add_ccobjs : filepath -> Cmx_format.library_infos -> unit
+val add_ccobjs : t -> filepath -> Cmx_format.library_infos -> unit
 
-val is_required : Compilation_unit.t -> bool
+val is_required : t -> Compilation_unit.t -> bool
 
-val add_required : filepath * CU.Name.t option -> Import_info.t -> unit
+val add_required : t -> filepath * CU.Name.t option -> Import_info.t -> unit
 
-val remove_required : CU.t -> unit
+val remove_required : t -> CU.t -> unit
 
-val add_quoted_globals : CU.Name.t list -> unit
+val add_quoted_globals : t -> CU.Name.t list -> unit
 
-val get_quoted_globals : unit -> CU.Name.Set.t
+val get_quoted_globals : t -> CU.Name.Set.t
 
-val extract_missing_globals : unit -> (CU.t * filepath list) list
+val extract_missing_globals : t -> (CU.t * filepath list) list
 
-val check_cmi_consistency : filepath -> Import_info.t array -> unit
+val check_cmi_consistency : t -> filepath -> Import_info.t array -> unit
 
-val check_cmx_consistency : filepath -> Import_info.t array -> unit
+val check_cmx_consistency : t -> filepath -> Import_info.t array -> unit
 
 val check_consistency :
-  unit:unit_link_info -> Import_info.t array -> Import_info.t array -> unit
+  t -> unit:unit_link_info -> Import_info.t array -> Import_info.t array -> unit
 
 type error =
   | File_not_found of filepath

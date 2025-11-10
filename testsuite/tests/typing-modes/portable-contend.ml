@@ -125,7 +125,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over the value "best_bytes" (at Line 3, characters 24-34)
+       because it closes over the value "best_bytes" at Line 3, characters 24-34
        which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -142,7 +142,8 @@ Line 4, characters 23-26:
                            ^^^
 Error: This value is "nonportable"
        because it contains a usage (of the value "r" at Line 3, characters 25-26)
-       which is expected to be "shared" or "uncontended".
+       which is expected to be "shared" or "uncontended"
+       because its mutable field "a" is being read.
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -157,7 +158,8 @@ Line 3, characters 23-26:
                            ^^^
 Error: This value is "nonportable"
        because it contains a usage (of the value "r" at Line 2, characters 25-26)
-       which is expected to be "shared" or "uncontended".
+       which is expected to be "shared" or "uncontended"
+       because its mutable field "a" is being read.
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -298,7 +300,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-       because it closes over the value "r" (at Line 3, characters 25-26)
+       because it closes over the value "r" at Line 3, characters 25-26
        which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -350,7 +352,8 @@ Line 1, characters 105-115:
 1 | let foo : ('a @ contended portable -> (string -> string) @ portable) @ uncontended portable = fun a b -> best_bytes ()
                                                                                                              ^^^^^^^^^^
 Error: The value "best_bytes" is "nonportable" but is expected to be "portable"
-       because it is used inside a function which is expected to be "portable".
+       because it is used inside the function at Line 1, characters 94-118
+       which is expected to be "portable".
 |}]
 
 (* immediates crosses portability and contention *)

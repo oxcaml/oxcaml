@@ -71,6 +71,18 @@ val recommended_domain_count : unit -> int @@ portable
 
     The value returned is at least [1]. *)
 
+val self_index : unit -> int
+(** The index of the current domain. It is an integer unique among
+    currently-running domains, in the interval [0; N-1] where N is the
+    peak number of domains running simultaneously so far.
+
+    The index of a terminated domain may be reused for a new
+    domain. Use [(Domain.self () :> int)] instead for an identifier
+    unique among all domains ever created by the program.
+
+    @since 5.3
+*)
+
 val before_first_spawn : (unit -> unit) -> unit @@ nonportable
 (** [before_first_spawn f] registers [f] to be called before the first domain
     is spawned by the program. The functions registered with

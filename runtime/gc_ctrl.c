@@ -59,6 +59,7 @@ extern uintnat caml_percent_sweep_per_mark; /* see major_gc.c */
 extern uintnat caml_gc_pacing_policy;       /* see major_gc.c */
 extern uintnat caml_gc_overhead_adjustment; /* see major_gc.c */
 extern uintnat caml_nohugepage_stacks;    /* see fiber.c */
+extern uintnat caml_enable_segv_handler;  /* see signals.c / signals_nat.c */
 
 CAMLprim value caml_gc_quick_stat(value v)
 {
@@ -445,6 +446,7 @@ static struct gc_tweak gc_tweaks[] = {
   { "gc_pacing_policy", &caml_gc_pacing_policy, 0 },
   { "gc_overhead_adjustment", &caml_gc_overhead_adjustment, 0 },
   { "nohugepage_stacks", &caml_nohugepage_stacks, 0 },
+  { "enable_segv_handler", &caml_enable_segv_handler, 0 },
 };
 
 enum {N_GC_TWEAKS = sizeof(gc_tweaks)/sizeof(gc_tweaks[0])};

@@ -114,6 +114,7 @@ let vec128_name = function
   | Int16x8 -> "int16x8"
   | Int32x4 -> "int32x4"
   | Int64x2 -> "int64x2"
+  | Float16x8 -> "float16x8"
   | Float32x4 -> "float32x4"
   | Float64x2 -> "float64x2"
 
@@ -122,6 +123,7 @@ let vec256_name = function
   | Int16x16 -> "int16x16"
   | Int32x8 -> "int32x8"
   | Int64x4 -> "int64x4"
+  | Float16x16 -> "float16x16"
   | Float32x8 -> "float32x8"
   | Float64x4 -> "float64x4"
 
@@ -130,6 +132,7 @@ let vec512_name = function
   | Int16x32 -> "int16x32"
   | Int32x16 -> "int32x16"
   | Int64x8 -> "int64x8"
+  | Float16x32 -> "float16x32"
   | Float32x16 -> "float32x16"
   | Float64x8 -> "float64x8"
 
@@ -322,6 +325,7 @@ let operation d = function
   | Cendregion -> "endregion"
   | Ctuple_field (field, _ty) -> to_string "tuple_field %i" field
   | Cdls_get -> "dls_get"
+  | Ctls_get -> "tls_get"
   | Cpoll -> "poll"
   | Cpause -> "pause"
 

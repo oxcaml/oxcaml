@@ -54,7 +54,19 @@ let eqf' lv l =
   let fail = lv <> l && not (Float.is_nan lv && Float.is_nan l) in
   if fail then Printf.printf "expected = %f <> %f = actual\n" l lv;
   if fail then failure ();
-  (* if fail then abort (); *)
+  ()
+
+let eqf32' lv l =
+  let fail =
+    lv <> l
+    && not (Stdlib_stable.Float32.is_nan lv && Stdlib_stable.Float32.is_nan l)
+  in
+  if fail
+  then
+    Printf.printf "expected = %f <> %f = actual\n"
+      (Stdlib_stable.Float32.to_float l)
+      (Stdlib_stable.Float32.to_float lv);
+  if fail then failure ();
   ()
 
 external int64x2_of_int64s : int64 -> int64 -> int64x2
@@ -443,6 +455,13 @@ module Float32 = struct
     let i0 = Int64.logor (Int64.shift_left i1 32) i0 in
     let i1 = Int64.logor (Int64.shift_left i3 32) i2 in
     float32x4_of_int64s i0 i1
+
+  let to_float32x4' t0 t1 t2 t3 =
+    to_float32x4
+      (Stdlib_stable.Float32.to_bits t0)
+      (Stdlib_stable.Float32.to_bits t1)
+      (Stdlib_stable.Float32.to_bits t2)
+      (Stdlib_stable.Float32.to_bits t3)
 end
 
 module Float64 = struct
