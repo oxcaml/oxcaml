@@ -2143,7 +2143,7 @@ module Const = struct
       (l * r) Context_with_transl.t -> Parsetree.jkind_annotation -> (l * r) t =
    fun context jkind ->
     match jkind.pjkind_desc with
-    | Pjk_abbreviation (name, sa_annot) -> (
+    | Pjk_abbreviation (name, sa_annot) ->
       (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
       let jkind_without_sa =
         (match name.txt with
@@ -2172,26 +2172,22 @@ module Const = struct
         | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
         |> allow_left |> allow_right
       in
-      (* CR zeisbach: what is the cleanest way to express this logic? *)
-      match sa_annot with
-      | [] -> jkind_without_sa
-      | _ :: _ when Layout.Const.allow_scannable_axes jkind_without_sa.layout ->
-        let pointerness = transl_scannable_axes sa_annot in
-        (* CR zeisbach: implement this! or, consider raising an error...
-           the correct behavior is to make a new jkind that differs only in
-           the layout by adding in the annotated scannable axes.
-           for inspiration, see [set_nullability_upper_bound].
-
-           this should emit a warning if the jkind_without_sa already has
-           the specified non-trivialities. this is why this currently returns
-           an optional with the annotation (since none vs default matters) *)
-        ignore pointerness;
-        jkind_without_sa
-      | _ :: _ ->
+      let pointerness = transl_scannable_axes sa_annot in
+      if sa_annot <> []
+         (* CR zeisbach: maybe tweak this? an alternative is to replace with
+            [disallow_scannable_axes]. should be understandable regardless *)
+         && not (Layout.Const.allow_scannable_axes jkind_without_sa.layout)
+      then
         Location.prerr_warning jkind.pjkind_loc
           (Warnings.Ignored_scannable_axes name.txt);
-        (* CR zeisbach: this could go and update anyways, but probably not *)
-        jkind_without_sa)
+      (* CR zeisbach: the correct behavior is to make a new jkind that differs
+         only in the layout by adding in the non-None scannable axes.
+         for inspiration, see [set_nullability_upper_bound].
+         this should emit a warning if the jkind_without_sa already has
+         the specified non-trivialities. this is why this currently returns
+         an optional with the annotation (since none vs default matters) *)
+      ignore pointerness;
+      jkind_without_sa
     | Pjk_mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
       (* for each mode, lower the corresponding modal bound to be that mode *)
