@@ -584,26 +584,7 @@ let least_modalities_implying mut (t : Modality.Const.t) =
 
 let untransl_mod_bounds (bounds : Types.Jkind_mod_bounds.t) : Parsetree.modes =
   let crossing = Types.Jkind_mod_bounds.crossing bounds in
-  let modality =
-    let open Modality in
-    let add_comonadic acc axis =
-      let (Crossing.Comonadic.Atom.Modality atom) =
-        Crossing.proj (Crossing.Axis.Comonadic axis) crossing
-      in
-      Const.set (Comonadic axis) atom acc
-    in
-    let add_monadic acc axis =
-      let (Crossing.Monadic.Atom.Modality atom) =
-        Crossing.proj (Crossing.Axis.Monadic axis) crossing
-      in
-      Const.set (Monadic axis) atom acc
-    in
-    let add acc = function
-      | Value.Axis.P (Comonadic axis) -> add_comonadic acc axis
-      | Value.Axis.P (Monadic axis) -> add_monadic acc axis
-    in
-    List.fold_left add Modality.Const.id Value.Axis.all
-  in
+  let modality = Crossing.to_modality crossing in
   let modality_annots =
     least_modalities_implying Types.Immutable modality
     |> List.map (fun atom ->
