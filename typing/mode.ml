@@ -1140,9 +1140,12 @@ module Lattices_mono = struct
         (** Maps regional to global, identity otherwise *)
     | Global_to_regional : (Locality.t, Regionality.t, disallowed * 'r) morph
         (** Maps global to regional, local to local *)
+    | Splice : ('a, 'a, 'l * 'r) morph
+    | Quote_min : ('a, 'a, 'l * disallowed) morph
+    | Quote_max : ('a, 'a, disallowed * 'r) morph
     | Compose :
         ('b, 'c, 'l * 'r) morph * ('a, 'b, 'l * 'r) morph
-        -> ('a, 'c, 'l * 'r) morph  (** Compoistion of two morphisms *)
+        -> ('a, 'c, 'l * 'r) morph  (** Composition of two morphisms *)
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
 
@@ -1169,6 +1172,8 @@ module Lattices_mono = struct
       | Map_comonadic f ->
         let f = allow_left f in
         Map_comonadic f
+      | Splice -> Splice
+      | Quote_min -> Quote_min
 
     let rec allow_right :
         type a b l r. (a, b, l * allowed) morph -> (a, b, l * r) morph =
@@ -1191,6 +1196,8 @@ module Lattices_mono = struct
       | Map_comonadic f ->
         let f = allow_right f in
         Map_comonadic f
+      | Splice -> Splice
+      | Quote_max -> Quote_max
 
     let rec disallow_left :
         type a b l r. (a, b, l * r) morph -> (a, b, disallowed * r) morph =
@@ -1217,6 +1224,9 @@ module Lattices_mono = struct
       | Map_comonadic f ->
         let f = disallow_left f in
         Map_comonadic f
+      | Splice -> Splice
+      | Quote_min -> Quote_min
+      | Quote_max -> Quote_max
 
     let rec disallow_right :
         type a b l r. (a, b, l * r) morph -> (a, b, l * disallowed) morph =
@@ -1243,6 +1253,9 @@ module Lattices_mono = struct
       | Map_comonadic f ->
         let f = disallow_right f in
         Map_comonadic f
+      | Splice -> Splice
+      | Quote_min -> Quote_min
+      | Quote_max -> Quote_max
   end)
 
   let set_areality : type a0 a1. a1 -> a0 comonadic_with -> a1 comonadic_with =
@@ -1303,6 +1316,9 @@ module Lattices_mono = struct
       let dst0 = proj_obj Areality dst in
       let src0 = src dst0 f in
       comonadic_with_obj src0
+    | Splice -> dst
+    | Quote_min -> dst
+    | Quote_max -> dst
 
   module Equal_morph = Magic_equal (struct
     type ('a, 'b, 'd) t = ('a, 'b, 'd) morph constraint 'd = 'l * 'r
@@ -1345,6 +1361,9 @@ module Lattices_mono = struct
       | Global_to_regional, Global_to_regional -> Some Refl
       | Regional_to_local, Regional_to_local -> Some Refl
       | Regional_to_global, Regional_to_global -> Some Refl
+      | Splice, Splice -> Some Refl
+      | Quote_min, Quote_min -> Some Refl
+      | Quote_max, Quote_max -> Some Refl
       | Compose (f0, g0), Compose (f1, g1) -> (
         match equal f0 f1 with
         | None -> None
@@ -1356,8 +1375,8 @@ module Lattices_mono = struct
           | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
           | Comonadic_to_monadic_max _ | Monadic_to_comonadic_max
           | Local_to_regional | Locality_as_regionality | Global_to_regional
-          | Regional_to_local | Regional_to_global | Compose _ | Map_comonadic _
-          | Imply _ ),
+          | Regional_to_local | Regional_to_global | Splice | Quote_min
+          | Quote_max | Compose _ | Map_comonadic _ | Imply _ ),
           _ ) ->
         None
   end)
@@ -1387,6 +1406,9 @@ module Lattices_mono = struct
     | Locality_as_regionality -> Format.fprintf ppf "locality_as_regionality"
     | Regional_to_global -> Format.fprintf ppf "regional_to_global"
     | Global_to_regional -> Format.fprintf ppf "global_to_regional"
+    | Splice -> Format.fprintf ppf "splice"
+    | Quote_min -> Format.fprintf ppf "quote_min"
+    | Quote_max -> Format.fprintf ppf "quote_max"
     | Compose (f0, f1) ->
       let mid = src dst f0 in
       Format.fprintf ppf "%a ∘ %a" (print_morph dst) f0 (print_morph mid) f1
@@ -1521,6 +1543,10 @@ module Lattices_mono = struct
       let dst0 = proj_obj Areality dst in
       let a0 = Axis.proj Areality a in
       set_areality (apply dst0 f a0) a
+    (* TODO *)
+    | Splice -> a
+    | Quote_min -> a
+    | Quote_max -> a
 
   module For_hint = struct
     (** Describes the portion of the input that's responsible for a portion of the output
@@ -1558,7 +1584,7 @@ module Lattices_mono = struct
       | Id | Meet_with _ | Imply _ -> SourceIsSingle
       | Max_with _ | Min_with _ | Map_comonadic _ | Monadic_to_comonadic_min
       | Comonadic_to_monadic_min _ | Monadic_to_comonadic_max
-      | Comonadic_to_monadic_max _ ->
+      | Comonadic_to_monadic_max _ | Splice | Quote_min | Quote_max ->
         assert false
       | Local_to_regional | Regional_to_local | Locality_as_regionality
       | Regional_to_global | Global_to_regional ->
@@ -1618,6 +1644,10 @@ module Lattices_mono = struct
       | Monadic_to_comonadic_max, ax -> handle_monadic_to_comonadic ax
       | Comonadic_to_monadic_min _, ax -> handle_comonadic_to_monadic ax
       | Comonadic_to_monadic_max _, ax -> handle_comonadic_to_monadic ax
+      (* TODO: Should [Axis] work with quoted axes here? *)
+      | Splice, ax -> Axis ax
+      | Quote_min, ax -> Axis ax
+      | Quote_max, ax -> Axis ax
       | Proj _, _
       | Local_to_regional, _
       | Regional_to_local, _
@@ -1734,6 +1764,20 @@ module Lattices_mono = struct
     | Monadic_to_comonadic_max, _ -> None
     | Comonadic_to_monadic_min _, _ -> None
     | Comonadic_to_monadic_max _, _ -> None
+    | Splice, Quote_min -> Some Splice
+    | Splice, Quote_max -> Some Splice
+    | Quote_min, Splice -> Some Id (* TODO *)
+    | Quote_max, Splice -> Some Id (* TODO *)
+    | Splice, Splice -> None
+    | Quote_min, Quote_min -> None
+    | Quote_max, Quote_max -> None
+    (* TODO: These should be made redundant via [obj] *)
+    | Quote_min, _ -> None
+    | _, Quote_min -> None
+    | Quote_max, _ -> None
+    | _, Quote_max -> None
+    | Splice, _ -> None
+    | _, Splice -> None
     | ( Proj _,
         ( Local_to_regional | Regional_to_local | Locality_as_regionality
         | Regional_to_global | Global_to_regional ) ) ->
@@ -1782,6 +1826,8 @@ module Lattices_mono = struct
       let dst0 = proj_obj Areality dst in
       let f' = left_adjoint dst0 f in
       Map_comonadic f'
+    | Splice -> Quote_min
+    | Quote_max -> Splice
 
   and right_adjoint :
       type a b r.
@@ -1807,6 +1853,8 @@ module Lattices_mono = struct
       let dst0 = proj_obj Areality dst in
       let f' = right_adjoint dst0 f in
       Map_comonadic f'
+    | Splice -> Quote_max
+    | Quote_min -> Splice
 end
 
 module C = Lattices_mono
@@ -3102,7 +3150,7 @@ type ('mo, 'como) monadic_comonadic =
     comonadic : 'como
   }
 
-module Value_with (Areality : Areality) = struct
+module Value_with_unquoted (Areality : Areality) = struct
   module Comonadic = Comonadic_with (Areality)
   module Monadic = Monadic
 
@@ -3710,8 +3758,24 @@ module Value_with (Areality : Areality) = struct
 end
 [@@inline]
 
-module Value = Value_with (Regionality)
-module Alloc = Value_with (Locality)
+module Quoted = struct
+  type 'm t =
+    | Cons of 'm * 'm t
+    | Forever of [`Legacy | `Min | `Max]
+
+  let rec hom ~f = function
+    | Cons (x, xs) -> Cons (f x, hom ~f xs)
+    | Forever e -> Forever e
+end
+
+module Value_with (Areality : Areality) = struct
+  module Unquoted = Value_with_unquoted (Areality)
+
+  (* TODO: Implement the interface of [Value_with_unquoted] *)
+end
+
+module Value = Value_with_unquoted (Regionality)
+module Alloc = Value_with_unquoted (Locality)
 
 module Const = struct
   let alloc_as_value
