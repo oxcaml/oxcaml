@@ -3,9 +3,6 @@
  expect;
 *)
 
-(* CR zeisbach: once the scannable axes can actually be parsed into a
-   [Scannable_axes.t], then more tests should be added here, and they
-   should be moved into [source_jane_street.ml] since they will round-trip *)
 (* CR zeisbach: once annotations aren't being dropped on the floor, the printing
    in the good cases should include more layout information *)
 type t : value non_pointer = int
@@ -31,8 +28,17 @@ type t : non_pointer value = int
 Line 1, characters 9-26:
 1 | type t : non_pointer value = int
              ^^^^^^^^^^^^^^^^^
-Error: Unknown layout non_pointer
-       value
+Error: Unknown layout non_pointer value
+|}]
+
+type t : value non_pointer = int [@@immediate]
+(* CR zeisbach: maybe this should be able to break on the space? I vote no *)
+[%%expect{|
+Line 1, characters 0-46:
+1 | type t : value non_pointer = int [@@immediate]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: A type declaration's layout can be given at most once.
+       This declaration has an layout annotation (value non_pointer) and a layout attribute ([@@immediate]).
 |}]
 
 (* CR zeisbach: this should give a warning for a redundant annotation.

@@ -455,8 +455,8 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
   | Pjk_default -> pp f "_"
   | Pjk_abbreviation (abbrev, sa) ->
     (* CR zeisbach: is there a better way to do this? *)
-    let as_string_list = List.map Location.get_txt (abbrev :: sa) in
-    (pp_print_list ~pp_sep:pp_print_space pp_print_string) f as_string_list
+    let as_strs = List.map Location.get_txt (abbrev :: sa) in
+    (pp_print_list ~pp_sep:(fun f () -> pp f " ") pp_print_string) f as_strs
   | Pjk_mod (t, modes) ->
     begin match modes with
     | [] -> Misc.fatal_error "malformed jkind annotation"
