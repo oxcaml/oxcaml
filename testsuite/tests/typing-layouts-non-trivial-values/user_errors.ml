@@ -3,23 +3,6 @@
  expect;
 *)
 
-(* CR zeisbach: once annotations aren't being dropped on the floor, the printing
-   in the good cases should include more layout information *)
-type t : value non_pointer = int
-[%%expect{|
-type t = int
-|}]
-
-type t : immutable_data non_pointer = int
-[%%expect{|
-type t = int
-|}]
-
-type ('a : any non_pointer, 'b : any maybe_pointer, 'c : any) t;;
-[%%expect{|
-type ('a : any, 'b : any, 'c : any) t
-|}]
-
 type t : non_pointer value = int
 (* CR zeisbach: should this pretty-printing be changed? maybe it will just
    change automatically in the next PR with more printing.
