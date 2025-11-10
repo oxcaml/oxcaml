@@ -1042,6 +1042,8 @@ module type S = sig
     module Per_axis :
       Solver_intf.Lattices with type 'a elt := 'a and type 'a obj := 'a Axis.t
 
+    type atom = Atom : 'a Axis.t * 'a -> atom
+
     (** Convenience for creating a mode crossing capability on all axes, using a
     boolean for each axis where [true] means full crossing and [false] means no
     crossing. Alternatively, call [Monadic.create] and [Comonadic.create] and
@@ -1066,6 +1068,8 @@ module type S = sig
     val set : 'a Axis.t -> 'a -> t -> t
 
     include Lattice with type t := t
+
+    val diff : t -> t -> atom list
 
     (** [modality m t] gives the mode crossing of type [T] wrapped in modality
     [m] where [T] has mode crossing [t]. *)

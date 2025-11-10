@@ -505,6 +505,47 @@ module Mod_bounds = struct
     && Nullability.equal (nullability t1) (nullability t2)
     && Separability.equal (separability t1) (separability t2)
 
+  (* [diff base actual] returns the axes on which [actual] is strictly
+     stronger than [base], represented as a mod-bounds where unchanged axes
+     are set to [max]. *)
+  let diff base actual =
+    match less_or_equal actual base with
+    | Not_le _ -> None
+    | Equal -> Some max
+    | Less ->
+      let crossing_base = crossing base in
+      let crossing_actual = crossing actual in
+      let crossing_diff =
+        List.fold_left
+          (fun acc value_ax ->
+            let (Crossing.Axis.P ax) =
+              value_ax |> Modality.Axis.of_value |> Crossing.Axis.of_modality
+            in
+            let base_value = Crossing.proj ax crossing_base in
+            let actual_value = Crossing.proj ax crossing_actual in
+            (* [le] here implies equality. *)
+            if Crossing.Per_axis.le ax base_value actual_value
+            then acc
+            else Crossing.set ax actual_value acc)
+          Crossing.max Value.Axis.all
+      in
+      let externality =
+        if Externality.equal (externality base) (externality actual)
+        then Externality.max
+        else externality actual
+      in
+      let nullability =
+        if Nullability.equal (nullability base) (nullability actual)
+        then Nullability.max
+        else nullability actual
+      in
+      let separability =
+        if Separability.equal (separability base) (separability actual)
+        then Separability.max
+        else separability actual
+      in
+      Some (create crossing_diff ~externality ~nullability ~separability)
+
   let[@inline] get (type a) ~(axis : a Axis.t) t : a =
     match axis with
     | Modal ax -> t |> crossing |> (Crossing.proj [@inlined hint]) ax
@@ -1888,79 +1929,13 @@ module Const = struct
           (Outcometree.out_type * Outcometree.out_modality list) list
       }
 
-    let get_modal_bound (type a) ~(axis : a Axis.t) ~(base : a) (actual : a) =
-      (* CR layouts v2.8: Fix printing! Internal ticket 5096. *)
-      let less_or_equal a b =
-        Misc.Le_result.less_or_equal ~le:(Per_axis.le axis) a b
-      in
-      match less_or_equal actual base with
-      | Less | Equal -> (
-        match less_or_equal base actual with
-        | Less | Equal -> `Valid None
-        | Not_le ->
-          `Valid (Some (Format.asprintf "%a" (Per_axis.print axis) actual)))
-      | Not_le -> `Invalid
-
     let get_modal_bounds ~(base : Mod_bounds.t) (actual : Mod_bounds.t) =
-      Axis.all
-      |> List.map (fun (Axis.Pack axis) ->
-             let base = Mod_bounds.get ~axis base in
-             let actual = Mod_bounds.get ~axis actual in
-             get_modal_bound ~axis ~base actual)
-      |> List.rev
-      |> List.fold_left
-           (fun acc mode ->
-             match acc, mode with
-             | _, `Invalid | None, _ -> None
-             | acc, `Valid None -> acc
-             | Some acc, `Valid (Some mode) -> Some (mode :: acc))
-           (Some [])
-      |> function
+      match Mod_bounds.diff base actual with
       | None -> None
-      | Some modes ->
-        (* CR dkalinichenko: reuse logic from [Typemode]. *)
-        (* Handle all the mode implications *)
+      | Some diff ->
         let modes =
-          match List.mem "global" modes, List.mem "unyielding" modes with
-          | true, true ->
-            (* [global] implies [unyielding], omit it. *)
-            List.filter (fun m -> m <> "unyielding") modes
-          | true, false ->
-            (* Otherwise, print [mod global yielding] to indicate [yielding]. *)
-            modes @ ["yielding"]
-          | _, _ -> modes
-        in
-        let modes =
-          (* Likewise for [global] and [forkable]. *)
-          match List.mem "global" modes, List.mem "forkable" modes with
-          | true, true -> List.filter (fun m -> m <> "forkable") modes
-          | true, false -> modes @ ["unforkable"]
-          | _, _ -> modes
-        in
-        let modes =
-          (* Likewise for [global] and [aliased]. *)
-          match List.mem "global" modes, List.mem "aliased" modes with
-          | true, true -> List.filter (fun m -> m <> "aliased") modes
-          | true, false -> assert false (* this case should not happen *)
-          | _, _ -> modes
-        in
-        let modes =
-          (* Likewise for [stateless] and [portable]. *)
-          match List.mem "stateless" modes, List.mem "portable" modes with
-          | true, true -> List.filter (fun m -> m <> "portable") modes
-          | true, false -> modes @ ["portable"]
-          | _, _ -> modes
-        in
-        (* Likewise for [immutable] and [contended], or [read] and [shared]. *)
-        let modes =
-          match List.mem "immutable" modes, List.mem "contended" modes with
-          | true, true -> List.filter (fun m -> m <> "contended") modes
-          | true, false -> modes @ ["contended"]
-          | _, _ -> (
-            match List.mem "read" modes, List.mem "shared" modes with
-            | true, true -> List.filter (fun m -> m <> "shared") modes
-            | true, false -> modes @ ["shared"]
-            | _, _ -> modes)
+          Typemode.untransl_mod_bounds diff
+          |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
         in
         Some modes
 
