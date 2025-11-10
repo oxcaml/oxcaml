@@ -20,6 +20,7 @@ open Dwarf_high
 type function_range =
   { start_label : Asm_label.t;
     end_label : Asm_label.t;
+    offset_past_end_label : int option;
     function_symbol : Asm_symbol.t
   }
 
@@ -114,10 +115,13 @@ let code_layout t = t.code_layout
 
 let function_ranges t = List.rev t.function_ranges
 
-let record_function_range t ~function_symbol ~start_label ~end_label =
+let record_function_range t ~function_symbol ~start_label ~end_label
+    ~offset_past_end_label =
   match t.code_layout with
   | Function_sections ->
-    let range = { start_label; end_label; function_symbol } in
+    let range =
+      { start_label; end_label; offset_past_end_label; function_symbol }
+    in
     t.function_ranges <- range :: t.function_ranges
   | Continuous_code_section _ ->
     (* Function ranges are not needed for continuous code *)

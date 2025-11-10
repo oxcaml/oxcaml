@@ -2426,7 +2426,8 @@ let fundecl fundecl =
   D.align ~fill_x86_bin_emitter:Nop ~bytes:8;
   D.global fun_sym;
   D.type_symbol ~ty:Function fun_sym;
-  D.define_joint_label_and_symbol ~section:Text fun_sym;
+  D.define_symbol_label ~section:Text fun_sym;
+  let fun_start_label = L.create_label_for_local_symbol Text fun_sym in
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   let num_call_gc = num_call_gc_points fundecl.fun_body in
@@ -2440,11 +2441,11 @@ let fundecl fundecl =
   (match fun_end_label with
   | None -> ()
   | Some fun_end_label ->
-    let end_label = label_to_asm_label ~section:Text fun_end_label in
-    D.define_label end_label;
-    let start_label = L.create_label_for_local_symbol Text fun_sym in
+    let fun_end_label = label_to_asm_label ~section:Text fun_end_label in
+    D.define_label fun_end_label;
     Emitaux.Dwarf_helpers.record_function_range ~function_symbol:fun_sym
-      ~start_label ~end_label);
+      ~start_label:fun_start_label ~end_label:fun_end_label
+      ~offset_past_end_label:None);
   D.cfi_endproc ();
   (* The type symbol and the size are system specific. They are not output on
      macOS. The asm directives take care of correctly handling this distinction.

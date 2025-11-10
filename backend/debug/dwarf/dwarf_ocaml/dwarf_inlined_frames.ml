@@ -106,7 +106,7 @@ let create_discontiguous_range_list_entry state ~start_of_code_symbol
     dwarf_4_range_list_entries, range_list, summary
 
 let create_discontiguous_range_list_and_summarise state ~start_of_code_symbol
-    range =
+    ~dwarf_4_base_address_entry range =
   let dwarf_4_range_list_entries, range_list, summary =
     IF.Range.fold range
       ~init:([], Range_list.create (), Address_index.Pair.Set.empty)
@@ -114,17 +114,16 @@ let create_discontiguous_range_list_and_summarise state ~start_of_code_symbol
         create_discontiguous_range_list_entry state ~start_of_code_symbol
           dwarf_4_range_list_entries range_list summary subrange)
   in
-  let initial_dwarf_4_entries =
+  let base_address_entry =
     match !Dwarf_flags.gdwarf_version with
-    | Four ->
-      [ Dwarf_4_range_list_entry.create_base_address_selection_entry
-          ~base_address_symbol:start_of_code_symbol ]
+    | Four -> dwarf_4_base_address_entry
     | Five -> []
   in
   Discontiguous
-    (initial_dwarf_4_entries @ dwarf_4_range_list_entries, range_list, summary)
+    (base_address_entry @ dwarf_4_range_list_entries, range_list, summary)
 
-let create_range_list_and_summarise state ~start_of_code_symbol range =
+let create_range_list_and_summarise state ~start_of_code_symbol
+    ~dwarf_4_base_address_entry range =
   match IF.Range.get_singleton range with
   | No_ranges -> None
   | One_subrange subrange ->
@@ -132,7 +131,7 @@ let create_range_list_and_summarise state ~start_of_code_symbol range =
   | More_than_one_subrange ->
     Some
       (create_discontiguous_range_list_and_summarise state ~start_of_code_symbol
-         range)
+         ~dwarf_4_base_address_entry range)
 
 (* "Summaries", sets of pairs of the starting and ending points of ranges, are
    used to dedup entries in the range list table. We do this for range lists but
@@ -184,9 +183,12 @@ let die_for_inlined_frame state ~compilation_unit_proto_die ~parent
       else [])
     ()
 
-let create_range_list_attributes_and_summarise state ~start_of_code_symbol range
-    all_summaries =
-  match create_range_list_and_summarise state ~start_of_code_symbol range with
+let create_range_list_attributes_and_summarise state ~start_of_code_symbol
+    ~dwarf_4_base_address_entry range all_summaries =
+  match
+    create_range_list_and_summarise state ~start_of_code_symbol
+      ~dwarf_4_base_address_entry range
+  with
   | None -> [], all_summaries
   | Some (Contiguous { start_pos; start_pos_offset; end_pos; end_pos_offset })
     ->
@@ -229,9 +231,9 @@ let create_range_list_attributes_and_summarise state ~start_of_code_symbol range
     | range_list_attributes -> range_list_attributes, all_summaries)
 
 let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
-    ~compilation_unit_proto_die ~(prefix : Debuginfo.item list)
-    ~(blocks_outermost_first : Debuginfo.t) scope_proto_dies all_summaries
-    ~parent_die range inlined_frame_ranges =
+    ~dwarf_4_base_address_entry ~compilation_unit_proto_die
+    ~(prefix : Debuginfo.item list) ~(blocks_outermost_first : Debuginfo.t)
+    scope_proto_dies all_summaries ~parent_die range inlined_frame_ranges =
   DS.Debug.log ">> create_down_to_innermost_frame: %a || %a\n%!"
     Debuginfo.print_compact_extended
     (Debuginfo.of_items prefix)
@@ -257,7 +259,8 @@ let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
         Asm_label.print
         (Proto_die.reference existing_die);
       create_down_to_innermost_frame fundecl state ~start_of_code_symbol
-        ~compilation_unit_proto_die ~prefix:(prefix @ [block_item])
+        ~dwarf_4_base_address_entry ~compilation_unit_proto_die
+        ~prefix:(prefix @ [block_item])
         ~blocks_outermost_first:(Debuginfo.of_items deeper_blocks)
         scope_proto_dies all_summaries ~parent_die:existing_die range
         inlined_frame_ranges
@@ -282,7 +285,7 @@ let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
         (Proto_die.reference parent_die);
       let range_list_attributes, all_summaries =
         create_range_list_attributes_and_summarise state ~start_of_code_symbol
-          range all_summaries
+          ~dwarf_4_base_address_entry range all_summaries
       in
       let inlined_subroutine_die =
         die_for_inlined_frame state ~compilation_unit_proto_die
@@ -301,10 +304,15 @@ let dwarf state (fundecl : L.fundecl) inlined_frame_ranges ~function_symbol
   DS.Debug.log "\n\nDwarf_inlined_frames.dwarf: function proto DIE is %a\n%!"
     Asm_label.print
     (Proto_die.reference function_proto_die);
-  let start_of_code_symbol =
+  let start_of_code_symbol, dwarf_4_base_address_entry =
     match DS.code_layout state with
-    | Function_sections -> function_symbol
-    | Continuous_code_section { code_begin; _ } -> code_begin
+    | Function_sections ->
+      let base_address_entry =
+        Dwarf_4_range_list_entry.create_base_address_selection_entry
+          ~base_address_symbol:function_symbol
+      in
+      function_symbol, [base_address_entry]
+    | Continuous_code_section { code_begin; _ } -> code_begin, []
   in
   let all_blocks = IF.all_indexes inlined_frame_ranges in
   let scope_proto_dies, _all_summaries =
@@ -346,7 +354,8 @@ let dwarf state (fundecl : L.fundecl) inlined_frame_ranges ~function_symbol
           match IF.find inlined_frame_ranges block_with_parents with
           | range ->
             create_down_to_innermost_frame fundecl state ~start_of_code_symbol
-              ~compilation_unit_proto_die ~prefix:[first_item]
+              ~dwarf_4_base_address_entry ~compilation_unit_proto_die
+              ~prefix:[first_item]
               ~blocks_outermost_first:parents_outermost_first scope_proto_dies
               all_summaries ~parent_die:function_proto_die range
               inlined_frame_ranges

@@ -74,8 +74,10 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_layout =
     get_file_id
   }
 
-let record_function_range t ~function_symbol ~start_label ~end_label =
+let record_function_range t ~function_symbol ~start_label ~end_label
+    ~offset_past_end_label =
   DS.record_function_range t.state ~function_symbol ~start_label ~end_label
+    ~offset_past_end_label
 
 type fundecl =
   { fun_end_label : Cmm.label;

@@ -191,7 +191,7 @@ let dwarf_for_variable state ~function_symbol ~function_proto_die
        blocks) changed completely between DWARF-4 and DWARF-5. *)
     (* Determine start_of_code_symbol and whether we need a base address entry
        based on the code layout. *)
-    let start_of_code_symbol, base_address_entry_list =
+    let start_of_code_symbol, dwarf_4_base_address_entry =
       match DS.code_layout state with
       | Function_sections ->
         let base_address_entry =
@@ -231,7 +231,7 @@ let dwarf_for_variable state ~function_symbol ~function_proto_die
     match !Dwarf_flags.gdwarf_version with
     | Four ->
       let location_list_entries =
-        base_address_entry_list @ dwarf_4_location_list_entries
+        dwarf_4_base_address_entry @ dwarf_4_location_list_entries
       in
       let location_list = Dwarf_4_location_list.create ~location_list_entries in
       ( [Debug_loc_table.attribute_to_reference_location_list location_list],
