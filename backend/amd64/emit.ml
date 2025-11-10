@@ -1728,7 +1728,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
     Array.fold_left
       (fun (idx, args) (arg : Simd.arg) ->
         if Simd.arg_is_implicit arg
-        then idx, args
+        then idx + 1, args
         else
           match Simd.loc_allows_mem arg.loc, mode with
           | true, Some (mode, kind) ->
