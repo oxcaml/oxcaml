@@ -346,8 +346,8 @@ let outval_of_sig_value env id val_kind val_type =
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-       | Sig_value(id, {val_kind = Val_reg sort; val_type; _}, _) ->
-         Some (outval_of_sig_value env id (Val_reg sort) val_type)
+       | Sig_value(id, {val_kind = (Val_reg _) as vk; val_type; _}, _) ->
+         Some (outval_of_sig_value env id vk val_type)
       | _ -> None
     )
 
