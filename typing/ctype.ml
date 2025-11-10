@@ -1716,7 +1716,6 @@ let instance_poly_for_jkind univars sch =
     | _ -> Misc.fatal_error "Ctype.instance_poly_for_jkind: expected Tunivar"
   in
   For_copy.with_scope (fun copy_scope ->
-    (* CR lstevenson: I'm not sure what to pass for [fixed] here *)
     let _, ty =
       instance_poly' copy_scope ~keep_names:false ~fixed:false
         ~copy_var:(Some copy_var) univars sch
