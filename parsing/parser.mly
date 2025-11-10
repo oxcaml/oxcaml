@@ -383,7 +383,7 @@ let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
      | No_modes ->
       let mk = if ghost then ghexp else mkexp ?attrs:None in
       mk ~loc (Pexp_coerce(e, t1, t2))
-     | _ -> not_expecting loc "mode annotations"
+     | Modes _ -> not_expecting loc "mode annotations"
 
 let mkexp_opt_type_constraint_with_modes ?ghost ~loc ~modes e = function
   | None -> e
@@ -952,7 +952,7 @@ let unboxed_type sloc lident tys =
 let maybe_pmod_constraint mode expr =
   match mode with
   | No_modes -> expr
-  | _ -> Mod.constraint_ None mode expr
+  | Modes _ -> Mod.constraint_ None mode expr
 %}
 
 /* Tokens */
@@ -2173,7 +2173,6 @@ module_declaration_body(module_type_with_optional_modal_expr):
           let (ret, mret) = body in
           Pmty_functor(arg, ret, (Option.value ~default:No_modes mret)) }
     )
-    // either No_modes or No_modalities provided at call site
     { $1, None }
 ;
 
@@ -3290,9 +3289,7 @@ let_binding_body_no_punning:
       { let v, modes0 = $1 in
         let typ, modes1 = $3 in
         let modes = Modes.merge modes0 modes1 in
-        (v,
-         $5,
-         Some (Pvc_constraint { locally_abstract_univars = []; typ }),
+        (v, $5, Some (Pvc_constraint { locally_abstract_univars = []; typ }),
          modes)
       }
   | let_ident_with_modes COLON TYPE ntys = newtypes DOT
@@ -3325,9 +3322,7 @@ let_binding_body_no_punning:
         let modes = Modes.merge modes0 modes1 in
         let loc = ($startpos($1), $endpos(modes1)) in
         (ghpat_with_modes ~loc ~pat:v ~cty:(Some poly) ~modes:No_modes,
-         exp,
-         None,
-         modes)
+         exp, None, modes)
        }
   | pattern_no_exn EQUAL seq_expr
       { ($1, $3, None, No_modes) }

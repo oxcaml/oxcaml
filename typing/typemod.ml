@@ -1429,8 +1429,6 @@ and approx_sig_items env ssg=
               let sg =
                 match moda with
                 | No_modalities -> sg
-                | Modalities { crossings = _ :: _; _ } ->
-                    Misc.fatal_error "crossings on includes are not supported"
                 | Modalities { crossings = []; _ } ->
                   let modalities =
                     Typemode.transl_modalities ~maturity:Stable Immutable moda
@@ -1439,6 +1437,8 @@ and approx_sig_items env ssg=
                     not @@ Builtin_attributes.has_attribute "no_recursive_modalities" attrs
                   in
                   apply_modalities_signature ~recursive env modalities sg
+                | Modalities { crossings = _ :: _; _ } ->
+                    Misc.fatal_error "crossings on includes are not supported"
               in
               let sg, newenv = Env.enter_signature ~scope sg env in
               sg @ approx_sig_items newenv srem

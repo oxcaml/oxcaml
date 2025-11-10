@@ -62,8 +62,8 @@ module Modes = struct
 
   let merge mode mode' =
     match mode, mode' with
-    | No_modes, mode' -> mode'
-    | mode, No_modes -> mode
+    | No_modes, modes
+    | modes, No_modes -> modes
     | Modes { modes = m; crossings = c; loc = l },
       Modes { modes = m'; crossings = c'; loc = l' } ->
       let loc = Location.merge ~ghost:false [l; l'] in
@@ -76,17 +76,6 @@ module Modalities = struct
     | [], [] -> No_modalities
     | _, _ -> Modalities { modalities; crossings; loc }
 
-  (* NOTE: like [Modes.merge], this function will merge the locations
-     of the provided modalities and should be used with caution. *)
-  let merge moda moda' =
-    match moda, moda' with
-    | No_modalities, _ -> moda'
-    | _, No_modalities -> moda
-    | Modalities { modalities = m; crossings = c; loc = l },
-      Modalities { modalities = m'; crossings = c'; loc = l' } ->
-      let loc = Location.merge ~ghost:false [l; l'] in
-      mk ~loc (m @ m') (c @ c')
-
   let of_core_modalities ?loc core_modalities =
     match loc, core_modalities with
     | _, [] -> No_modalities
@@ -96,6 +85,15 @@ module Modalities = struct
         Location.merge ~ghost:false (List.map (fun m -> m.loc) core_modalities)
       in
       mk ~loc core_modalities []
+
+  let merge moda moda' =
+    match moda, moda' with
+    | No_modalities, modalities
+    | modalities, No_modalities -> modalities
+    | Modalities { modalities = m; crossings = c; loc = l },
+      Modalities { modalities = m'; crossings = c'; loc = l' } ->
+      let loc = Location.merge ~ghost:false [l; l'] in
+      mk ~loc (m @ m') (c @ c')
 end
 
 module Attr = struct

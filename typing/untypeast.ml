@@ -429,9 +429,8 @@ let exp_extra sub (extra, loc, attrs) sexp =
         Pexp_newtype (label_loc, jkind, sexp)
     | Texp_stack -> Pexp_stack sexp
     | Texp_mode modes ->
-        let modes =
-          Modes.of_core_modes (Typemode.untransl_mode_annots modes)
-        in
+        let core_modes = Typemode.untransl_mode_annots modes in
+        let modes = Modes.of_core_modes core_modes in
         Pexp_constraint (sexp, None, modes)
   in
   Exp.mk ~loc ~attrs desc
@@ -828,9 +827,9 @@ let signature_item sub item =
     | Tsig_open od ->
         Psig_open (sub.open_description sub od)
     | Tsig_include (incl, moda) ->
-        let modalities = Typemode.untransl_modalities Immutable moda in
-        let pmoda = Modalities.of_core_modalities modalities in
-        Psig_include (sub.include_description sub incl, pmoda)
+        let core_modalities = Typemode.untransl_modalities Immutable moda in
+        let modalities = Modalities.of_core_modalities core_modalities in
+        Psig_include (sub.include_description sub incl, modalities)
     | Tsig_class list ->
         Psig_class (List.map (sub.class_description sub) list)
     | Tsig_class_type list ->
