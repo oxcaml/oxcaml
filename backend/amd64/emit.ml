@@ -1727,11 +1727,18 @@ let emit_simd_sanitize ~address ~instr ~chunk ~kind =
 
 let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   check_simd_instr ?mode simd imm instr;
+  (match[@warning "-4"] simd.id with
+  | Maskmovdqu | Vmaskmovdqu ->
+    (* This instruction has an implicit memory operand. *)
+    let address = addressing (Iindexed 0) VEC128 instr 2 in
+    emit_simd_sanitize ~address ~instr ~chunk:Onetwentyeight_unaligned
+      ~kind:Store_modify
+  | _ -> ());
   let args =
     Array.fold_left
       (fun (idx, args) (arg : Simd.arg) ->
         if Simd.arg_is_implicit arg
-        then idx, args
+        then idx + 1, args
         else
           match Simd.loc_allows_mem arg.loc, mode with
           | true, Some (mode, kind) ->

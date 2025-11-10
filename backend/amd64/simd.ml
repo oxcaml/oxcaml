@@ -239,7 +239,10 @@ type operation_class =
   | Load of { is_mutable : bool }
   | Store
 
-let class_of_operation _op = Pure
+let class_of_operation op =
+  match[@warning "-4"] (Pseudo_instr.instr op.instr).id with
+  | Maskmovdqu | Vmaskmovdqu -> Store
+  | _ -> Pure
 
 let is_pure_operation op =
   match class_of_operation op with Pure -> true | Load _ | Store -> false

@@ -1,14 +1,42 @@
 #include <assert.h>
 #define BUILTIN(name) void name() { assert(0); }
 
-BUILTIN(caml_sse_load_aligned);
-BUILTIN(caml_sse_load_unaligned);
-BUILTIN(caml_sse_store_aligned);
-BUILTIN(caml_sse_store_unaligned);
-BUILTIN(caml_avx_load_aligned);
-BUILTIN(caml_avx_load_unaligned);
-BUILTIN(caml_avx_store_aligned);
-BUILTIN(caml_avx_store_unaligned);
+BUILTIN(caml_sse_vec128_load_aligned);
+BUILTIN(caml_sse_vec128_load_unaligned);
+BUILTIN(caml_sse_vec128_store_aligned);
+BUILTIN(caml_sse_vec128_store_unaligned);
+BUILTIN(caml_avx_vec256_load_aligned);
+BUILTIN(caml_avx_vec256_load_unaligned);
+BUILTIN(caml_avx_vec256_store_aligned);
+BUILTIN(caml_avx_vec256_store_unaligned);
+BUILTIN(caml_sse_vec128_store_aligned_uncached);
+BUILTIN(caml_sse2_vec128_load_low64);
+BUILTIN(caml_sse2_vec128_load_low32);
+BUILTIN(caml_sse2_int32_store_uncached);
+BUILTIN(caml_sse2_int64_store_uncached);
+BUILTIN(caml_sse2_vec128_load_copy_low64);
+BUILTIN(caml_sse2_vec128_load_copy_high64);
+BUILTIN(caml_sse2_vec128_load_zero_low32);
+BUILTIN(caml_sse2_vec128_load_zero_low64);
+BUILTIN(caml_sse2_vec128_store_low32);
+BUILTIN(caml_sse2_vec128_store_low64);
+BUILTIN(caml_sse2_vec128_store_mask8);
+BUILTIN(caml_sse3_vec128_load_broadcast64);
+BUILTIN(caml_sse41_vec128_load_aligned_uncached);
+BUILTIN(caml_avx_vec256_load_aligned_uncached);
+BUILTIN(caml_avx_vec256_store_aligned_uncached);
+BUILTIN(caml_avx_vec256_load_broadcast128);
+BUILTIN(caml_avx_vec256_load_broadcast64);
+BUILTIN(caml_avx_vec256_load_broadcast32);
+BUILTIN(caml_avx_vec128_load_broadcast32);
+BUILTIN(caml_avx_vec128_load_mask64);
+BUILTIN(caml_avx_vec256_load_mask64);
+BUILTIN(caml_avx_vec128_load_mask32);
+BUILTIN(caml_avx_vec256_load_mask32);
+BUILTIN(caml_avx_vec128_store_mask64);
+BUILTIN(caml_avx_vec256_store_mask64);
+BUILTIN(caml_avx_vec128_store_mask32);
+BUILTIN(caml_avx_vec256_store_mask32);
 
 BUILTIN(caml_sse2_float64_add);
 BUILTIN(caml_sse2_float64_sub);
