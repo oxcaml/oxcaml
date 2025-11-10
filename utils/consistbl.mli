@@ -37,8 +37,6 @@ end) : sig
 
   val clear: t -> unit
 
-  val copy : t -> t
-
   val check: t -> Module_name.t -> Data.t -> Digest.t -> filepath -> unit
         (* [check tbl name data crc source]
              checks consistency of ([name], [crc]) with infos previously
