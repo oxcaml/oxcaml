@@ -91,3 +91,42 @@ Line 1, characters 43-46:
                                                ^^^
 Error: This value is "sharable" but is expected to be "portable".
 |}]
+
+(* Crossing *)
+
+type cross_sharable : value mod sharable
+
+[%%expect{|
+type cross_sharable : value mod sharable
+|}]
+
+let cross_sharable1 (x : cross_sharable @ sharable) : _ @ portable = x
+
+[%%expect{|
+Line 1, characters 69-70:
+1 | let cross_sharable1 (x : cross_sharable @ sharable) : _ @ portable = x
+                                                                         ^
+Error: This value is "sharable" but is expected to be "portable".
+|}]
+
+let cross_sharable2 (x : cross_sharable @ nonportable) : _ @ sharable = x
+
+[%%expect{|
+val cross_sharable2 : cross_sharable -> cross_sharable @ sharable = <fun>
+|}]
+
+type t
+
+(* Doesn't work yet. *)
+type s : value mod sharable = { v : t @@ sharable } [@@unboxed]
+
+[%%expect{|
+type t
+Line 4, characters 0-63:
+4 | type s : value mod sharable = { v : t @@ sharable } [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "s" is value
+         because of the definition of t at line 1, characters 0-6.
+       But the kind of type "s" must be a subkind of value mod sharable
+         because of the annotation on the declaration of the type s.
+|}]
