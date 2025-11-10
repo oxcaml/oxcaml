@@ -2426,7 +2426,7 @@ let fundecl fundecl =
   D.align ~fill_x86_bin_emitter:Nop ~bytes:8;
   D.global fun_sym;
   D.type_symbol ~ty:Function fun_sym;
-  D.define_symbol_label ~section:Text fun_sym;
+  D.define_joint_label_and_symbol ~section:Text fun_sym;
   let fun_start_label = L.create_label_for_local_symbol Text fun_sym in
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
