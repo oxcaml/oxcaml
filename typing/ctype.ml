@@ -2221,11 +2221,10 @@ let is_principal ty =
 
 type unwrapped_type_expr =
   { ty : type_expr
-  ; is_open : bool
   ; modality : Mode.Modality.Const.t }
 
 let mk_unwrapped_type_expr ty =
-  { ty; is_open = false; modality = Mode.Modality.Const.id }
+  { ty; modality = Mode.Modality.Const.id }
 
 type unbox_result =
   (* unboxing process made a step: either an unboxing or removal of a [Tpoly] *)
@@ -2258,9 +2257,7 @@ let unbox_once env ty =
           | Type_record_unboxed_product _ | Type_open -> []
           | exception Not_found -> (* but we found it earlier! *) assert false
         in
-        Stepped { ty = apply ty2;
-                  is_open = not (Misc.Stdlib.List.is_empty existentials);
-                  modality }
+        Stepped { ty = apply ty2; modality }
       | None -> begin match decl.type_kind with
         | Type_record_unboxed_product ([_], Record_unboxed_product, _) ->
           (* [find_unboxed_type] would have returned [Some] *)
@@ -2269,7 +2266,6 @@ let unbox_once env ty =
             ((_::_::_ as lbls), Record_unboxed_product, _) ->
           Stepped_record_unboxed_product
             (List.map (fun ld -> { ty = apply ld.ld_type;
-                                   is_open = false;
                                    modality = ld.ld_modalities }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
@@ -2279,7 +2275,6 @@ let unbox_once env ty =
             (* [arg.ca_modalities] is currently always empty, but won't be
                when we let users define custom or-null-like types. *)
             Stepped_or_null { ty = apply arg.ca_type;
-                              is_open = false;
                               modality = arg.ca_modalities }
           | _ -> Misc.fatal_error "Invalid constructor for Variant_with_null"
           end
@@ -2290,7 +2285,6 @@ let unbox_once env ty =
     end
   | Tpoly (ty, bound_vars) ->
     Stepped { ty;
-              is_open = not (Misc.Stdlib.List.is_empty bound_vars);
               modality = Mode.Modality.Const.id }
   | _ -> Final_result
 
@@ -2298,8 +2292,8 @@ let contained_without_boxing env ty =
   match get_desc ty with
   | Tconstr _ ->
     begin match unbox_once env ty with
-    | Stepped { ty; is_open = _; modality = _ } -> [ty]
-    | Stepped_or_null { ty; is_open = _; modality = _ } -> [ty]
+    | Stepped { ty; modality = _ } -> [ty]
+    | Stepped_or_null { ty; modality = _ } -> [ty]
     | Stepped_record_unboxed_product tys ->
       List.map (fun { ty; _ } -> ty) tys
     | Final_result | Missing _ -> []
@@ -2314,27 +2308,23 @@ let contained_without_boxing env ty =
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
    we eventually bottom out at a missing cmi file, or otherwise. *)
-let rec get_unboxed_type_representation
-          ~is_open ~modality env ty_prev ty fuel =
-  if fuel < 0 then Error { ty; is_open; modality }
+let rec get_unboxed_type_representation ~modality env ty_prev ty fuel =
+  if fuel < 0 then Error { ty; modality }
   else
     (* We use expand_head_opt version of expand_head to get access
        to the manifest type of private abbreviations. *)
     let ty = expand_head_opt env ty in
     match unbox_once env ty with
-    | Stepped { ty = ty2; is_open = is_open2; modality = modality2 } ->
-      let is_open = is_open || is_open2 in
+    | Stepped { ty = ty2; modality = modality2 } ->
       let modality = Mode.Modality.Const.concat modality ~then_:modality2 in
-      get_unboxed_type_representation
-        ~is_open ~modality env ty ty2 (fuel - 1)
+      get_unboxed_type_representation ~modality env ty ty2 (fuel - 1)
     | Stepped_or_null _ | Stepped_record_unboxed_product _ | Final_result ->
-      Ok { ty; is_open; modality }
-    | Missing _ -> Ok { ty = ty_prev; is_open; modality }
+      Ok { ty; modality }
+    | Missing _ -> Ok { ty = ty_prev; modality }
 
 let get_unboxed_type_representation env ty =
   (* Do not give too much fuel: PR#7424 *)
-  get_unboxed_type_representation
-    ~is_open:false ~modality:Mode.Modality.Const.id env ty ty 100
+  get_unboxed_type_representation ~modality:Mode.Modality.Const.id env ty ty 100
 
 let get_unboxed_type_approximation env ty =
   match get_unboxed_type_representation env ty with
@@ -2380,12 +2370,12 @@ let rec estimate_type_jkind ~expand_component env ty =
   | Tarrow _ -> Jkind.for_arrow
   | Ttuple elts -> Jkind.for_boxed_tuple elts
   | Tunboxed_tuple ltys ->
-     let is_open, tys_modalities =
-       List.fold_left_map
-         (fun is_open1 (_lbl, ty) ->
-            let { ty; is_open = is_open2; modality } = expand_component ty in
-            (is_open1 || is_open2), (ty, modality))
-         false ltys
+     let tys_modalities =
+       List.map
+         (fun (_lbl, ty) ->
+            let { ty; modality } = expand_component ty in
+            (ty, modality))
+         ltys
      in
      (* CR layouts v2.8: This pretty ridiculous use of [estimate_type_jkind]
         just to throw most of it away will go away once we get [layout_of].
@@ -2398,7 +2388,7 @@ let rec estimate_type_jkind ~expand_component env ty =
      in
      Jkind.Builtin.product
        ~why:Unboxed_tuple tys_modalities layouts |>
-     close_open_jkind ~expand_component ~is_open env
+     close_open_jkind ~expand_component env
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
       let jkind = type_decl.type_jkind in
@@ -2444,7 +2434,8 @@ let rec estimate_type_jkind ~expand_component env ty =
   | Tof_kind jkind -> Jkind.mark_best jkind
   | Tpackage _ -> Jkind.for_non_float ~why:First_class_module
 
-and close_open_jkind ~expand_component ~is_open env jkind =
+and close_open_jkind ~expand_component env jkind =
+  let is_open = failwith "todo" in
   if is_open (* if the type has free variables, we can't let these leak into
                 with-bounds *)
     (* CR layouts v2.8: Do better, by tracking the actual free variables and
@@ -2456,9 +2447,9 @@ and close_open_jkind ~expand_component ~is_open env jkind =
   else jkind
 
 let estimate_type_jkind_unwrapped
-      ~expand_component env { ty; is_open; modality } =
+      ~expand_component env { ty; modality } =
   estimate_type_jkind ~expand_component env ty |>
-  close_open_jkind ~expand_component ~is_open env |>
+  close_open_jkind ~expand_component env |>
   Jkind.apply_modality_l modality
 
 
@@ -2534,7 +2525,7 @@ let constrain_type_jkind ~fixed env ty jkind =
      Trying to apply the modality to the jkind extracted from [ty] would be
      wrong, as it would incorrectly change the jkind on a [Tvar] to mode-cross
      more than necessary.  *)
-  let rec loop ~fuel ~expanded ty ~is_open ty's_jkind jkind =
+  let rec loop ~fuel ~expanded ty ty's_jkind jkind =
     (* Just succeed if we're comparing against [any] *)
     if Jkind.is_obviously_max jkind then Ok () else
     if fuel < 0 then
@@ -2576,8 +2567,7 @@ let constrain_type_jkind ~fixed env ty jkind =
     (* Handle the [Tpoly] case out here so [Tvar]s wrapped in [Tpoly]s can get
        the treatment above. *)
     | Tpoly (t, bound_vars) ->
-      let is_open = is_open || not (Misc.Stdlib.List.is_empty bound_vars) in
-      loop ~fuel ~expanded:false t ~is_open ty's_jkind jkind
+      loop ~fuel ~expanded:false t ty's_jkind jkind
 
     | _ ->
        match
@@ -2602,11 +2592,11 @@ let constrain_type_jkind ~fixed env ty jkind =
              let recur ty's_jkinds jkinds =
                let results =
                  Misc.Stdlib.List.map3
-                   (fun { ty; is_open = _; modality } ty's_jkind jkind ->
+                   (fun { ty; modality } ty's_jkind jkind ->
                       let jkind =
                         Jkind.apply_modality_r modality jkind
                       in
-                      loop ~fuel ~expanded:false ~is_open ty ty's_jkind jkind)
+                      loop ~fuel ~expanded:false ty ty's_jkind jkind)
                    tys ty's_jkinds jkinds
                in
                if List.for_all Result.is_ok results
@@ -2634,7 +2624,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                   (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
              end
           in
-          let or_null ~fuel ty is_open modality =
+          let or_null ~fuel ty modality =
             let error () =
               Error (Jkind.Violation.of_ ~context
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
@@ -2645,7 +2635,7 @@ let constrain_type_jkind ~fixed env ty jkind =
             with
             | Ok jkind ->
               (match
-                loop ~fuel ~expanded:false ty ~is_open
+                loop ~fuel ~expanded:false ty
                   (estimate_type_jkind env ty) jkind
               with
               | Ok () -> Ok ()
@@ -2667,8 +2657,7 @@ let constrain_type_jkind ~fixed env ty jkind =
              if not expanded
              then
                let ty = expand_head_opt env ty in
-               loop ~fuel ~expanded:true ty ~is_open
-                 (estimate_type_jkind env ty) jkind
+               loop ~fuel ~expanded:true ty (estimate_type_jkind env ty) jkind
              else
                begin match unbox_once env ty with
                | Missing path -> Error (Jkind.Violation.of_
@@ -2679,13 +2668,12 @@ let constrain_type_jkind ~fixed env ty jkind =
                  Error
                    (Jkind.Violation.of_ ~context
                       (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
-               | Stepped { ty; is_open = is_open2; modality } ->
-                 let is_open = is_open || is_open2 in
+               | Stepped { ty; modality } ->
                  let jkind = Jkind.apply_modality_r modality jkind in
-                 loop ~fuel:(fuel - 1) ~expanded:false ty ~is_open
+                 loop ~fuel:(fuel - 1) ~expanded:false ty
                    (estimate_type_jkind env ty) jkind
-               | Stepped_or_null { ty; is_open = is_open2; modality } ->
-                 or_null ~fuel:(fuel - 1) ty (is_open || is_open2) modality
+               | Stepped_or_null { ty; modality } ->
+                 or_null ~fuel:(fuel - 1) ty modality
                | Stepped_record_unboxed_product tys_modalities ->
                  product ~fuel:(fuel - 1) tys_modalities
                end
@@ -2700,7 +2688,7 @@ let constrain_type_jkind ~fixed env ty jkind =
             Error (Jkind.Violation.of_ ~context
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
   in
-  loop ~fuel:100 ~expanded:false ty ~is_open:false
+  loop ~fuel:100 ~expanded:false ty
     (estimate_type_jkind env ty) (Jkind.disallow_left jkind)
 
 let type_sort ~why ~fixed env ty =
@@ -7458,7 +7446,7 @@ let check_decl_jkind env decl jkind =
 
          Normally, this would be handled in [constrain_type_jkind]. *)
       begin match unbox_once env inner_ty with
-      | Stepped_or_null { ty; modality; is_open = _ } ->
+      | Stepped_or_null { ty; modality } ->
           begin match
             Jkind.apply_modality_l modality (type_jkind_purely ty)
             |> Jkind.apply_or_null_l with
