@@ -44,8 +44,8 @@ value caml_bundled_cmxs_this_exe()
   return (value) &caml_bundled_cmxs;
 }
 
-value caml_bundle_not_available(value bundle)
+value caml_bundle_available(value bundle)
 {
-  return (bundle == (value) 0) ? Val_true : Val_false;
+  return (bundle == (value) 0) ? Val_false : Val_true;
 }
 

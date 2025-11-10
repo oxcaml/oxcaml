@@ -72,17 +72,17 @@ external bundled_cmis_this_exe : unit -> bundle = "caml_bundled_cmis_this_exe"
 
 external bundled_cmxs_this_exe : unit -> bundle = "caml_bundled_cmxs_this_exe"
 
-external bundle_not_available : bundle -> bool = "caml_bundle_not_available"
+external bundle_available : bundle -> bool = "caml_bundle_available"
 
 let find_bundle_in_exe ~ext get_this_exe =
   let bundle = get_this_exe () in
-  if bundle_not_available bundle
-  then
+  if bundle_available bundle
+  then bundle
+  else
     failwith
       ("Executable does not contain ." ^ ext
      ^ " bundle and [use_existing_compilerlibs_state_for_artifacts]"
      ^ " has not been called")
-  else bundle
 
 let cmis = ref Compilation_unit.Name.Map.empty
 
