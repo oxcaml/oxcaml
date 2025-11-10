@@ -2513,7 +2513,7 @@ let fundecl fundecl =
     D.define_label end_label;
     let start_label = L.create_label_for_local_symbol Text fundecl_sym in
     Emitaux.Dwarf_helpers.record_function_range ~function_symbol:fundecl_sym
-      ~start_label ~end_label
+      ~start_label ~end_label ~offset_past_end_label:None
   | None -> ());
   D.comment ("LLVM-MCA-END " ^ !function_name);
   D.cfi_endproc ();

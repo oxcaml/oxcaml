@@ -433,10 +433,12 @@ module Dwarf_helpers = struct
 
   let ppf_dump = ref Format.err_formatter
 
-  let record_function_range ~function_symbol ~start_label ~end_label =
+  let record_function_range ~function_symbol ~start_label ~end_label
+      ~offset_past_end_label =
     Option.iter
       (fun d ->
-        Dwarf.record_function_range d ~function_symbol ~start_label ~end_label)
+        Dwarf.record_function_range d ~function_symbol ~start_label ~end_label
+          ~offset_past_end_label)
       !dwarf
 
   let begin_dwarf ~code_begin ~code_end ~file_emitter =

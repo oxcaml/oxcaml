@@ -118,6 +118,7 @@ module Dwarf_helpers : sig
     function_symbol:Asm_targets.Asm_symbol.t ->
     start_label:Asm_targets.Asm_label.t ->
     end_label:Asm_targets.Asm_label.t ->
+    offset_past_end_label:int option ->
     unit
 end
 

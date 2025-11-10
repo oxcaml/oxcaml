@@ -21,6 +21,7 @@ open Dwarf_high
 type function_range =
   { start_label : Asm_label.t;
     end_label : Asm_label.t;
+    offset_past_end_label : int option;
     function_symbol : Asm_symbol.t
   }
 
@@ -102,6 +103,7 @@ val record_function_range :
   function_symbol:Asm_symbol.t ->
   start_label:Asm_label.t ->
   end_label:Asm_label.t ->
+  offset_past_end_label:int option ->
   unit
 
 module Debug : sig
