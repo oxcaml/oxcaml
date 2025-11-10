@@ -5,30 +5,6 @@
 
 (******************************************)
 
-(* This type used to cause an infinite loop between [Ctype.estimate_type_jkind]
-   and [Jkind.normalize]. *)
-(* CR layouts v2.8: It's not clear what kind this type should get. At the
-   moment, it gets value. But should we give it immutable_data? *)
-type 'a t = { f : 'b. 'b t }
-[%%expect {|
-type 'a t = { f : 'b. 'b t; }
-|}]
-
-type 'a t : immutable_data = { f : 'b. 'b t }
-[%%expect {|
-Line 1, characters 0-45:
-1 | type 'a t : immutable_data = { f : 'b. 'b t }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'b. 'b t
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
-|}]
-
-(******************************************)
-
 (* Define some utilities for following tests *)
 
 type 'a ignore_type = unit
@@ -47,6 +23,59 @@ type 'a ignore_type = unit
 val require_immutable_data : ('a : immutable_data). 'a -> unit = <fun>
 type ('a, 'b) eq = Eq : ('a, 'a) eq
 module Abs : sig type t val eq : (t, unit) eq end
+|}]
+
+(******************************************)
+
+(* This type used to cause an infinite loop between [Ctype.estimate_type_jkind]
+   and [Jkind.normalize]. *)
+type 'a t = { f : 'b. 'b t }
+[%%expect {|
+type 'a t = { f : 'b. 'b t; }
+|}]
+
+let rec v : 'a. 'a t = { f = v }
+let () = require_immutable_data v
+(* CR layouts v2.8: This should be accepted in principal mode. *)
+[%%expect {|
+val v : 'a t = {f = <cycle>}
+|}, Principal{|
+val v : 'a t = {f = <cycle>}
+Line 2, characters 32-33:
+2 | let () = require_immutable_data v
+                                    ^
+Error: This expression has type "'a t" but an expression was expected of type
+         "('b : immutable_data)"
+       The kind of 'a t is immutable_data with 'b. 'b t
+         because of the definition of t at line 1, characters 0-28.
+       But the kind of 'a t must be a subkind of immutable_data
+         because of the definition of require_immutable_data at line 2, characters 27-58.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
+|}]
+
+type 'a t : immutable_data = { f : 'b. 'b t }
+(* CR layouts v2.8: This should be accepted. *)
+[%%expect {|
+Line 1, characters 0-45:
+1 | type 'a t : immutable_data = { f : 'b. 'b t }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with 'b. 'b t
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
+|}, Principal{|
+Line 1, characters 0-45:
+1 | type 'a t : immutable_data = { f : 'b. 'b t }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with 'b. 'b t/2
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
 |}]
 
 (******************************************)
