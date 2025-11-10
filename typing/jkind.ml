@@ -2189,7 +2189,7 @@ module Const = struct
         jkind_without_sa
       | _ :: _ ->
         Location.prerr_warning jkind.pjkind_loc
-          (Warnings.Ignored_scannable_axis name.txt);
+          (Warnings.Ignored_scannable_axes name.txt);
         (* CR zeisbach: this could go and update anyways, but probably not *)
         jkind_without_sa)
     | Pjk_mod (base, modifiers) ->
