@@ -1283,9 +1283,9 @@ let inc r = #{ r with i = r.#i + 1 }
 [%%expect{|
 type 'a boxed_with_idx = { data : 'a; i : int; }
 type 'a with_idx = 'a boxed_with_idx# = #{ data : 'a; i : int; }
-val idx : 'a with_idx2 -> int = <fun>
+val idx : 'a with_idx -> int = <fun>
 val payload : string = "payload"
-val inc : 'a with_idx2 -> 'a with_idx2 = <fun>
+val inc : 'a with_idx -> 'a with_idx = <fun>
 |}]
 
 (*****************)

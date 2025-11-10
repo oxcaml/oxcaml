@@ -8,7 +8,7 @@ type t : value non_pointerrrrr
 Line 1, characters 15-30:
 1 | type t : value non_pointerrrrr
                    ^^^^^^^^^^^^^^^
-Error: Unknown scannable axis non_pointerrrrr
+Error: Unknown kind modifier non_pointerrrrr
 |}]
 
 type t : non_pointer value

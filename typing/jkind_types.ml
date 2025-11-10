@@ -614,8 +614,6 @@ end
 
 module Scannable_axes = struct
   type t = Jkind_axis.Pointerness.t
-
-  let create ~pointerness = pointerness
 end
 
 module Layout = struct

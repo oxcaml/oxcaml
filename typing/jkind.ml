@@ -402,8 +402,6 @@ module Error = struct
         }
         -> t
     | Unknown_jkind of Parsetree.jkind_annotation
-    (* CR layouts-scannable: Once [box] is added, it may be appropriate to add
-       more data here to specialize these error messages. *)
     | Unknown_kind_modifier of string
     | Multiple_jkinds of
         { from_annotation : Parsetree.jkind_annotation;
