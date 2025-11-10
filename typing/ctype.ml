@@ -1669,13 +1669,16 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) sch =
   List.iter (fun force -> force ()) !delayed_copies;
   ty
 
-let instance_poly' copy_scope ~keep_names ~fixed univars sch =
+let instance_poly' copy_scope ~keep_names ~fixed ~copy_var univars sch =
   (* In order to compute univars below, [sch] should not contain [Tsubst] *)
-  let copy_var ty =
-    match get_desc ty with
-      Tunivar { name; jkind } ->
-        if keep_names then newty (Tvar { name; jkind }) else newvar jkind
-    | _ -> assert false
+  let copy_var =
+    Option.value copy_var
+      ~default:
+        (fun ty ->
+          match get_desc ty with
+            Tunivar { name; jkind } ->
+              if keep_names then newty (Tvar { name; jkind }) else newvar jkind
+          | _ -> assert false)
   in
   let vars = List.map copy_var univars in
   let visited = TypeHash.create 17 in
@@ -1685,12 +1688,40 @@ let instance_poly' copy_scope ~keep_names ~fixed univars sch =
 
 let instance_poly_fixed ?(keep_names=false) univars sch =
   For_copy.with_scope (fun copy_scope ->
-    instance_poly' copy_scope ~keep_names ~fixed:true univars sch
+    instance_poly' copy_scope ~keep_names ~fixed:true ~copy_var:None univars sch
   )
 
 let instance_poly ?(keep_names=false) univars sch =
   For_copy.with_scope (fun copy_scope ->
-    snd (instance_poly' copy_scope ~keep_names ~fixed:false univars sch)
+    snd (instance_poly' copy_scope ~keep_names ~fixed:false ~copy_var:None
+          univars sch)
+  )
+
+(** The body of a [Tpoly] will likely have references to the [Tunivar]s bound in
+    it. When asking for the jkind of a [Tpoly], we don't want to let those
+    vars escape the scope. To resolve this, we substitute all occurrences of
+    them with a [Tof_kind]. *)
+let instance_poly_for_jkind univars sch =
+  (* Replace a univar in [sch] with a [Tof_jkind]s. *)
+  let copy_var ty =
+    match get_desc ty with
+    | Tunivar { name = _; jkind } ->
+      (* CR layouts v2.8: We can likely do better here. We suspect that it is
+         sound to use the bottom jkind here rather than the jkind bound on the
+         univar. However, the utility of this is not clear, as most univars
+         occur within arrow types (or an abstract type that is really an arrow),
+         whose jkind is (at the moment) independent of the types in the
+         arrow. *)
+      newgenty (Tof_kind jkind)
+    | _ -> Misc.fatal_error "Ctype.instance_poly_for_jkind: expected Tunivar"
+  in
+  For_copy.with_scope (fun copy_scope ->
+    (* CR lstevenson: I'm not sure what to pass for [fixed] here *)
+    let _, ty =
+      instance_poly' copy_scope ~keep_names:false ~fixed:false
+        ~copy_var:(Some copy_var) univars sch
+    in
+    ty
   )
 
 let instance_label ~fixed lbl =
@@ -1698,7 +1729,8 @@ let instance_label ~fixed lbl =
     let vars, ty_arg =
       match get_desc lbl.lbl_arg with
         Tpoly (ty, tl) ->
-          instance_poly' copy_scope ~keep_names:false ~fixed tl ty
+          instance_poly' copy_scope ~keep_names:false ~copy_var:None ~fixed
+            tl ty
       | _ ->
           [], copy copy_scope lbl.lbl_arg
     in
@@ -2244,10 +2276,16 @@ let unbox_once env ty =
     begin match Env.find_type p env with
     | exception Not_found -> Missing p
     | decl ->
-      let apply ty2 = apply env decl.type_params ty2 args in
+      let apply ty2 ~extra_substs =
+        let extra_params, extra_args = List.split extra_substs in
+        (* put extras first as they're often empty. *)
+        apply env (extra_params @ decl.type_params) ty2 (extra_args @ args)
+      in
       begin match find_unboxed_type decl with
       | Some (ty2, modality) ->
         let ty2 = match get_desc ty2 with Tpoly (t, _) -> t | _ -> ty2 in
+        (* We need to ensure that existential variables do not escape their
+           scope. To do so, we substitute them with [Tof_kind]s. *)
         let existentials =
           match Env.find_type_descrs p env with
           | Type_variant ([{ cstr_existentials }], _, _) -> cstr_existentials
@@ -2255,9 +2293,21 @@ let unbox_once env ty =
             Misc.fatal_error "Ctype.unbox_once: not just one constructor"
           | Type_abstract _ | Type_record _
           | Type_record_unboxed_product _ | Type_open -> []
-          | exception Not_found -> (* but we found it earlier! *) assert false
+          | exception Not_found ->
+            (* but we found it earlier! *)
+            Misc.fatal_error "Ctype.unbox_once: expected to find [p] in [env]"
         in
-        Stepped { ty = apply ty2; modality }
+        let extra_substs =
+          List.map
+            (fun ty ->
+              match get_desc ty with
+              | Tvar { name = _; jkind } -> ty, newgenty (Tof_kind jkind)
+              | _ ->
+                Misc.fatal_error
+                  "Ctype.unbox_once: existensial is not a variable")
+            existentials
+        in
+        Stepped { ty = apply ty2 ~extra_substs; modality }
       | None -> begin match decl.type_kind with
         | Type_record_unboxed_product ([_], Record_unboxed_product, _) ->
           (* [find_unboxed_type] would have returned [Some] *)
@@ -2265,7 +2315,7 @@ let unbox_once env ty =
         | Type_record_unboxed_product
             ((_::_::_ as lbls), Record_unboxed_product, _) ->
           Stepped_record_unboxed_product
-            (List.map (fun ld -> { ty = apply ld.ld_type;
+            (List.map (fun ld -> { ty = apply ld.ld_type ~extra_substs:[];
                                    modality = ld.ld_modalities }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
@@ -2274,7 +2324,7 @@ let unbox_once env ty =
           | Cstr_tuple [arg] ->
             (* [arg.ca_modalities] is currently always empty, but won't be
                when we let users define custom or-null-like types. *)
-            Stepped_or_null { ty = apply arg.ca_type;
+            Stepped_or_null { ty = apply arg.ca_type ~extra_substs:[];
                               modality = arg.ca_modalities }
           | _ -> Misc.fatal_error "Invalid constructor for Variant_with_null"
           end
@@ -2283,9 +2333,11 @@ let unbox_once env ty =
         end
       end
     end
-  | Tpoly (ty, bound_vars) ->
-    Stepped { ty;
-              modality = Mode.Modality.Const.id }
+  | Tpoly (ty, univars) ->
+    Stepped
+      { ty = instance_poly_for_jkind univars ty
+      ; modality = Mode.Modality.Const.id
+      }
   | _ -> Final_result
 
 let contained_without_boxing env ty =
@@ -2358,7 +2410,7 @@ let mk_jkind_context env jkind_of_type =
   { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
 
 (* This uses the forward ref - only needed inside estimate_type_jkind *)
-let mk_jkind_context_check_principal_ref env =
+let _mk_jkind_context_check_principal_ref env =
   mk_jkind_context env (!type_jkind_purely_if_principal' env)
 
 (* We parameterize [estimate_type_jkind] by a function
@@ -2386,9 +2438,7 @@ let rec estimate_type_jkind ~expand_component env ty =
          Jkind.extract_layout)
          tys_modalities
      in
-     Jkind.Builtin.product
-       ~why:Unboxed_tuple tys_modalities layouts |>
-     close_open_jkind ~expand_component env
+     Jkind.Builtin.product ~why:Unboxed_tuple tys_modalities layouts
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
       let jkind = type_decl.type_jkind in
@@ -2419,37 +2469,19 @@ let rec estimate_type_jkind ~expand_component env ty =
   | Tvariant row ->
      Jkind.for_boxed_row row
   | Tunivar { jkind } -> Jkind.disallow_right jkind
-  | Tpoly (ty, _) ->
-    let context = mk_jkind_context_check_principal_ref env in
-    estimate_type_jkind ~expand_component env ty |>
+  | Tpoly (ty, univars) ->
     (* The jkind of [ty] might mention the variables bound in this [Tpoly]
        node, and so just returning it here would be wrong. Instead, we need
-       to eliminate these variables. For now, we just [round_up] to eliminate
-       _all_ with-bounds. We can imagine doing better, just rounding up those
-       variables bound in this [Tpoly]. *)
-    (* CR layouts v2.8: Consider doing better -- but only once we can write
-       down a test case that cares. Internal ticket 5110. *)
-    Jkind.round_up ~context |>
-    Jkind.disallow_right
+       to eliminate these variables. We do this by replacing them with
+       [Tof_kind]s. *)
+    instance_poly_for_jkind univars ty
+    |> estimate_type_jkind ~expand_component env
   | Tof_kind jkind -> Jkind.mark_best jkind
   | Tpackage _ -> Jkind.for_non_float ~why:First_class_module
-
-and close_open_jkind ~expand_component env jkind =
-  let is_open = failwith "todo" in
-  if is_open (* if the type has free variables, we can't let these leak into
-                with-bounds *)
-    (* CR layouts v2.8: Do better, by tracking the actual free variables and
-       rounding only those variables up. Internal ticket 5110. *)
-  then
-    let context = mk_jkind_context env (fun ty ->
-      Some (estimate_type_jkind ~expand_component env ty)) in
-    Jkind.round_up ~context jkind |> Jkind.disallow_right
-  else jkind
 
 let estimate_type_jkind_unwrapped
       ~expand_component env { ty; modality } =
   estimate_type_jkind ~expand_component env ty |>
-  close_open_jkind ~expand_component env |>
   Jkind.apply_modality_l modality
 
 
@@ -2516,10 +2548,6 @@ let constrain_type_jkind ~fixed env ty jkind =
      like this that can occur, though, and may need a more principled solution
      later).
 
-     As this unboxes types, it might unbox an existential type. We thus keep
-     track of whether [ty] [is_open]. EDIT: This is actually pointless and
-     could be removed: #3684.
-
      As this unboxed types, it might also encounter modalities. These modalities
      are accommodated by changing [jkind], the expected jkind of the type.
      Trying to apply the modality to the jkind extracted from [ty] would be
@@ -2566,7 +2594,7 @@ let constrain_type_jkind ~fixed env ty jkind =
 
     (* Handle the [Tpoly] case out here so [Tvar]s wrapped in [Tpoly]s can get
        the treatment above. *)
-    | Tpoly (t, bound_vars) ->
+    | Tpoly (t, _) ->
       loop ~fuel ~expanded:false t ty's_jkind jkind
 
     | _ ->
