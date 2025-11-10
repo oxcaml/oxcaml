@@ -130,7 +130,7 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
-  | Nonsense_scannable_axis of string       (* 184 *)
+  | Ignored_scannable_axis of string        (* 184 *)
   | Duplicated_scannable_axis of string     (* 185 *)
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
@@ -229,7 +229,7 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
-  | Nonsense_scannable_axis _ -> 184
+  | Ignored_scannable_axis _ -> 184
   | Duplicated_scannable_axis _ -> 185
   | Unmutated_mutable _ -> 186
   | Incompatible_with_upstream _ -> 187
@@ -588,6 +588,15 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
+    { number = 184;
+      (* CR zeisbach: this name is probably not great *)
+      names = ["ignored-scannable-axis"];
+      (* CR zeisbach: is this user-facing at all? Probably. Should "layout"
+         be used, or a more technically correct alternative? What is the
+         right mental model that we want to emphasize here? *)
+      description = "A scannable axis annotation appears on a non-value, \
+                     non-any layout.";
+      since = since 5 2 };
   { number = 185;
     names = ["duplicated-scannable-axis"];
     (* CR zeisbach: is this message any good? what verison for since?
@@ -1259,7 +1268,7 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
-  | Nonsense_scannable_axis abbrev ->
+  | Ignored_scannable_axis abbrev ->
     (* CR zeisbach: make this message better. should we say "layout"?
        what about saying "scannable axes"? *)
     "The specified scannable axes are meaningless, \
