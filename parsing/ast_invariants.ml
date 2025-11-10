@@ -51,9 +51,9 @@ let simple_longident id =
   in
   if not (is_simple id.txt) then complex_id id.loc
 
-let check_empty_constraint ~loc ty mode =
-  match ty, mode with
-  | None, [] -> empty_constraint loc
+let check_empty_constraint ~loc ty modes =
+  match ty, modes with
+  | None, No_modes -> empty_constraint loc
   | _ -> ()
 
 (* Is this pattern a single variable, possibly with a type annotation? *)
