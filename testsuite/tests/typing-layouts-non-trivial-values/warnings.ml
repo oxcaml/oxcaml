@@ -28,14 +28,14 @@ Error: A type declaration's layout can be given at most once.
        This declaration has an layout annotation (value non_pointer) and a layout attribute ([@@immediate]).
 |}]
 
-(* CR zeisbach: this should give a warning for a redundant annotation.
+(* CR layouts-scannable: this should give a warning for a redundant annotation.
    this logic will come in the _following_ PR! *)
 type t : immediate non_pointer
 [%%expect{|
 type t : immediate
 |}]
 
-(* CR zeisbach: the following errors should only print ONCE.
+(* CR layouts-scannable: the following errors should only print ONCE.
    they are disabled by default because of the triple printing
    and enabled locally in this test file. once this is fixed, adjust this *)
 
