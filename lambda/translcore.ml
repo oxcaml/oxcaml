@@ -1158,7 +1158,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                !transl_module ~scopes Tcoerce_none None od.open_expr, body)
       end
   | Texp_probe {name; handler=exp; enabled_at_init} ->
-    if !Clflags.native_code && !Clflags.probes then begin
+    if !Clflags.native_code then begin
       let lam = transl_exp ~scopes Jkind.Sort.Const.for_probe_body exp in
       let map =
         Ident.Set.fold (fun v acc -> Ident.Map.add v (Ident.rename v) acc)
@@ -1277,7 +1277,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           ap_tailcall = Default_tailcall;
           ap_inlined = Never_inlined;
           ap_specialised = Always_specialise;
-          ap_probe = Some {name; enabled_at_init};
+          ap_probe = Some (Optimized {name; enabled_at_init});
         }
       in
       Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler,

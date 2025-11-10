@@ -405,6 +405,18 @@ type alloc_dbginfo_item =
 
 type alloc_dbginfo = alloc_dbginfo_item list
 
+type probe_desc =
+  | Optimized of
+      { name : string;
+        handler_code_sym : string;
+        enabled_at_init : bool
+      }
+  | Behaves_like_direct_call of
+      { name : string;
+        handler_code_sym : string;
+        enabled_at_init : bool
+      }
+
 type operation =
   | Capply of machtype * Lambda.region_close
   | Cextcall of
@@ -463,11 +475,7 @@ type operation =
   | Cstatic_cast of static_cast
   | Ccmpf of float_width * float_comparison
   | Craise of Lambda.raise_kind
-  | Cprobe of
-      { name : string;
-        handler_code_sym : string;
-        enabled_at_init : bool
-      }
+  | Cprobe of probe_desc
   | Cprobe_is_enabled of { name : string }
   | Copaque
   | Cbeginregion

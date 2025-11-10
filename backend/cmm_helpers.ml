@@ -4535,12 +4535,18 @@ let beginregion ~dbg = Cop (Cbeginregion, [], dbg)
 
 let endregion ~dbg region = Cop (Cendregion, [region], dbg)
 
-let probe ~dbg ~name ~handler_code_linkage_name ~enabled_at_init ~args =
-  Cop
-    ( Cprobe
-        { name; handler_code_sym = handler_code_linkage_name; enabled_at_init },
-      args,
-      dbg )
+let probe ~dbg ~name ~handler_code_linkage_name ~enabled_at_init
+    ~behaves_like_direct_call ~args =
+  let desc =
+    if behaves_like_direct_call
+    then
+      Behaves_like_direct_call
+        { name; handler_code_sym = handler_code_linkage_name; enabled_at_init }
+    else
+      Optimized
+        { name; handler_code_sym = handler_code_linkage_name; enabled_at_init }
+  in
+  Cop (Cprobe desc, args, dbg)
 
 let load ~dbg memory_chunk mutability ~addr =
   Cop (Cload { memory_chunk; mutability; is_atomic = false }, [addr], dbg)

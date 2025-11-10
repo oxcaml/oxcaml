@@ -311,8 +311,13 @@ let operation d = function
   | Ccmpf (Float64, c) -> Printf.sprintf "%sf" (float_comparison c)
   | Ccmpf (Float32, c) -> Printf.sprintf "%sf32" (float_comparison c)
   | Craise k -> Lambda.raise_kind k ^ location d
-  | Cprobe { name; handler_code_sym; enabled_at_init } ->
+  | Cprobe (Optimized { name; handler_code_sym; enabled_at_init }) ->
     Printf.sprintf "probe[%s %s%s]" name handler_code_sym
+      (if enabled_at_init then " enabled_at_init" else "")
+  | Cprobe
+      (Behaves_like_direct_call { name; handler_code_sym; enabled_at_init }) ->
+    Printf.sprintf "probe[%s %s behaves_like_direct_call%s]" name
+      handler_code_sym
       (if enabled_at_init then " enabled_at_init" else "")
   | Cprobe_is_enabled { name } -> Printf.sprintf "probe_is_enabled[%s]" name
   | Cprefetch { is_write; locality } ->

@@ -57,6 +57,18 @@ and instruction_desc =
   | Lraise of Lambda.raise_kind
   | Lstackcheck of { max_frame_size_bytes : int }
 
+and probe_desc =
+  | Optimized of
+      { name : string;
+        handler_code_sym : string;
+        enabled_at_init : bool
+      }
+  | Behaves_like_direct_call of
+      { name : string;
+        handler_code_sym : string;
+        enabled_at_init : bool
+      }
+
 and call_operation =
   | Lcall_ind
   | Lcall_imm of { func : Cmm.symbol }
@@ -71,11 +83,7 @@ and call_operation =
         stack_ofs : int;
         stack_align : Cmm.stack_align
       }
-  | Lprobe of
-      { name : string;
-        handler_code_sym : string;
-        enabled_at_init : bool
-      }
+  | Lprobe of probe_desc
 
 let has_fallthrough = function
   | Lreturn | Lbranch _ | Lswitch _ | Lraise _

@@ -1304,8 +1304,10 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Specific Imove32) -> 1
     | Lop (Specific (Isignext _)) -> 1
     | Lop (Name_for_debugger _) -> 0
-    | Lcall_op (Lprobe _) | Lop (Probe_is_enabled _) ->
-      fatal_error "Probes not supported."
+    | Lcall_op (Lprobe (Optimized _)) ->
+      fatal_error "Optimized probes not supported on arm64."
+    | Lcall_op (Lprobe (Behaves_like_direct_call _)) -> 1
+    | Lop (Probe_is_enabled _) -> 3
     | Lop Dls_get -> 1
     | Lop Tls_get -> 1
     | Lreloadretaddr -> 0
@@ -2139,8 +2141,31 @@ let emit_instr i =
       |]
   | Lop (Specific (Isimd simd)) -> DSL.simd_instr simd i
   | Lop (Name_for_debugger _) -> ()
-  | Lcall_op (Lprobe _) | Lop (Probe_is_enabled _) ->
-    fatal_error "Probes not supported."
+  | Lcall_op (Lprobe (Optimized _)) ->
+    fatal_error "Optimized probes not supported on arm64."
+  | Lcall_op
+      (Lprobe
+        (Behaves_like_direct_call { enabled_at_init; name; handler_code_sym }))
+    ->
+    let probe_label = Cmm.new_label () in
+    Probe_emission.add_probe ~probe_label ~probe_insn:i ~probe_name:name
+      ~probe_enabled_at_init:enabled_at_init
+      ~probe_handler_code_sym:handler_code_sym ~stack_offset:!stack_offset
+      ~num_stack_slots:(Stack_class.Tbl.copy num_stack_slots);
+    D.define_label (label_to_asm_label ~section:Text probe_label);
+    (* Emit direct call to probe handler *)
+    DSL.ins I.BL [| DSL.emit_symbol (S.create handler_code_sym) |];
+    record_frame i.live (Dbg_other i.dbg)
+  | Lop (Probe_is_enabled { name }) ->
+    let semaphore_sym = Probe_emission.find_or_add_semaphore name None i.dbg in
+    (* Load address of the semaphore symbol *)
+    emit_load_symbol_addr reg_tmp1 (S.create semaphore_sym);
+    (* Load unsigned 2-byte integer value from offset 2 *)
+    DSL.ins I.LDRH
+      [| DSL.emit_reg_w i.res.(0); DSL.emit_addressing (Iindexed 2) reg_tmp1 |];
+    (* Compare with 0 and set result to 1 if non-zero, 0 if zero *)
+    DSL.ins I.CMP [| DSL.emit_reg_w i.res.(0); DSL.imm 0 |];
+    DSL.ins I.CSET [| DSL.emit_reg i.res.(0); DSL.cond NE |]
   | Lop Dls_get ->
     if Config.runtime5
     then
@@ -2481,6 +2506,7 @@ let file_emitter ~file_num ~file_name =
 
 let begin_assembly _unix =
   reset_debug_info ();
+  Probe_emission.reset ();
   Asm_targets.Asm_label.initialize ~new_label:(fun () ->
       Cmm.new_label () |> Label.to_int);
   let asm_line_buffer = Buffer.create 200 in
@@ -2571,4 +2597,5 @@ let end_assembly () =
   D.size frametable_sym;
   if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
+  Probe_emission.emit_probe_notes ~slot_offset ~add_def_symbol:(fun _ -> ());
   D.mark_stack_non_executable ()

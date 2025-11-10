@@ -311,14 +311,7 @@ let mk_no_keep_locs f =
 ;;
 
 let mk_probes f =
-  if Config.probes then
-    "-probes", Arg.Unit f, " Emit tracing probes as specified by [%%probe ..]"
-  else
-    let err () =
-      raise (Arg.Bad "OCaml has been configured without support for \
-                      tracing probes: -probes not available.")
-    in
-    "-probes", Arg.Unit err, " (option not available)"
+  "-probes", Arg.Unit f, " Emit tracing probes as specified by [%%probe ..]"
 ;;
 
 let mk_no_probes f =

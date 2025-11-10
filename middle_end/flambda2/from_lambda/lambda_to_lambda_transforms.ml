@@ -810,3 +810,28 @@ let transform_primitive env (prim : L.primitive) args loc =
     arrayblit env ~src_mutability ~dst_array_set_kind args loc
   | _ -> env, transform_primitive0 env prim args loc
   [@@ocaml.warning "-fragile-match"]
+
+type apply_transform_result =
+  | Apply of Lambda.lambda_apply
+  | Transformed of Lambda.lambda
+
+let transform_apply (apply : L.lambda_apply) : apply_transform_result =
+  match Config.probes, apply.ap_probe with
+  | _, None -> Apply apply
+  | true, Some _ -> Apply apply
+  | false, Some (L.Behaves_like_direct_call _ as probe) ->
+    Apply { apply with ap_probe = Some probe }
+  | false, Some (L.Optimized { name; enabled_at_init }) ->
+    (* Slower implementation of probes where there isn't clever
+       architecture-specific codegen. Just read the semaphore each time. *)
+    Transformed
+      (Lifthenelse
+         ( Lprim (Pprobe_is_enabled { name }, [], apply.ap_loc),
+           (* Note: probe bodies have type [unit] *)
+           Lapply
+             { apply with
+               ap_probe =
+                 Some (Behaves_like_direct_call { name; enabled_at_init })
+             },
+           L.lambda_unit,
+           L.layout_unit ))

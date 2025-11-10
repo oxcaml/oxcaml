@@ -50,3 +50,9 @@ val transform_primitive :
   Lambda.lambda list ->
   Lambda.scoped_location ->
   Lambda_to_flambda_env.t * primitive_transform_result
+
+type apply_transform_result = private
+  | Apply of Lambda.lambda_apply
+  | Transformed of Lambda.lambda
+
+val transform_apply : Lambda.lambda_apply -> apply_transform_result

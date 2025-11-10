@@ -392,8 +392,13 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
             stack_ofs;
             stack_align
           }
-      | Probe { name; handler_code_sym; enabled_at_init } ->
-        Linear.Lprobe { name; handler_code_sym; enabled_at_init });
+      | Probe (Optimized { name; handler_code_sym; enabled_at_init }) ->
+        Linear.Lprobe (Optimized { name; handler_code_sym; enabled_at_init })
+      | Probe
+          (Behaves_like_direct_call { name; handler_code_sym; enabled_at_init })
+        ->
+        Linear.Lprobe
+          (Behaves_like_direct_call { name; handler_code_sym; enabled_at_init }));
     Format.fprintf ppf "%sgoto %a" sep Label.format label_after
 
 let dump_terminator ?sep ppf terminator = dump_terminator' ?sep ppf terminator

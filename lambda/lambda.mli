@@ -628,7 +628,17 @@ type inlined_attribute =
 val equal_inline_attribute : inline_attribute -> inline_attribute -> bool
 val equal_inlined_attribute : inlined_attribute -> inlined_attribute -> bool
 
-type probe_desc = { name: string; enabled_at_init: bool; }
+(** An [Optimized] probe is the usual one with fancy codegen that combines
+    the probe-is-enabled check with the branch-to-probe-handler instruction.
+
+    By contrast, [Behaves_like_direct_call] does *not* include the check
+    as to whether the probe is enabled: it behaves like a unilateral direct
+    call to the probe handler.  The reason this constructor exists is for
+    emission of the corresponding semaphore. *)
+type probe_desc =
+  | Optimized of { name: string; enabled_at_init: bool; }
+  | Behaves_like_direct_call of { name: string; enabled_at_init: bool; }
+
 type probe = probe_desc option
 
 type specialise_attribute =

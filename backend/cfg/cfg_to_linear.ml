@@ -205,8 +205,14 @@ let linearize_terminator cfg_with_layout (func : string) start
               stack_ofs;
               stack_align
             }
-        | Probe { name; handler_code_sym; enabled_at_init } ->
-          Lprobe { name; handler_code_sym; enabled_at_init }
+        | Probe (Optimized { name; handler_code_sym; enabled_at_init }) ->
+          Lprobe (Optimized { name; handler_code_sym; enabled_at_init })
+        | Probe
+            (Behaves_like_direct_call
+              { name; handler_code_sym; enabled_at_init }) ->
+          Lprobe
+            (Behaves_like_direct_call
+               { name; handler_code_sym; enabled_at_init })
       in
       branch_or_fallthrough [L.Lcall_op op] label_after, None
     | Switch labels -> single (L.Lswitch labels)

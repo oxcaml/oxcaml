@@ -12,9 +12,14 @@
 (** Annotation on function call that represents a probe. *)
 
 type desc = private
-  { name : string;
-    enabled_at_init : bool
-  }
+  | Optimized of
+      { name : string;
+        enabled_at_init : bool
+      }
+  | Behaves_like_direct_call of
+      { name : string;
+        enabled_at_init : bool
+      }
 
 type t = desc option
 

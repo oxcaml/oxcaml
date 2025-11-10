@@ -392,10 +392,23 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let addr, eloc = Target.select_addressing dst_size dst in
         ( SU.basic_op (Intop_atomic { op; size; addr }),
           [compare_with; set_to; eloc] ))
-    | Cprobe { name; handler_code_sym; enabled_at_init } ->
+    | Cprobe (Optimized { name; handler_code_sym; enabled_at_init }) ->
       ( Terminator
           (Prim
-             { op = Probe { name; handler_code_sym; enabled_at_init };
+             { op =
+                 Probe (Optimized { name; handler_code_sym; enabled_at_init });
+               label_after
+             }),
+        args )
+    | Cprobe
+        (Behaves_like_direct_call { name; handler_code_sym; enabled_at_init })
+      ->
+      ( Terminator
+          (Prim
+             { op =
+                 Probe
+                   (Behaves_like_direct_call
+                      { name; handler_code_sym; enabled_at_init });
                label_after
              }),
         args )

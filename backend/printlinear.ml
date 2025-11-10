@@ -38,8 +38,13 @@ let call_operation ?(print_reg = Printreg.reg) ppf op arg =
   | Lextcall { func; alloc; _ } ->
     fprintf ppf "extcall \"%s\" %a%s" func regs arg
       (if alloc then "" else " (noalloc)")
-  | Lprobe { name; handler_code_sym; enabled_at_init } ->
+  | Lprobe (Optimized { name; handler_code_sym; enabled_at_init }) ->
     fprintf ppf "probe \"%s\" %s%s %a"
+      (if enabled_at_init then "enabled_at_init " else "")
+      name handler_code_sym regs arg
+  | Lprobe
+      (Behaves_like_direct_call { name; handler_code_sym; enabled_at_init }) ->
+    fprintf ppf "probe \"%s\" %s%s behaves_like_direct_call %a"
       (if enabled_at_init then "enabled_at_init " else "")
       name handler_code_sym regs arg
 

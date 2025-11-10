@@ -2676,8 +2676,19 @@ end = struct
         | Prim { op = External { alloc = true; func_symbol = func; _ }; _ } ->
           let w = create_witnesses t (Extcall { callee = func }) dbg in
           transform_top t ~next ~exn w ("external call to " ^ func) dbg
-        | Prim { op = Probe { name; handler_code_sym; enabled_at_init = _ }; _ }
-          ->
+        | Prim
+            { op =
+                Probe
+                  (Optimized { name; handler_code_sym; enabled_at_init = _ });
+              _
+            }
+        | Prim
+            { op =
+                Probe
+                  (Behaves_like_direct_call
+                    { name; handler_code_sym; enabled_at_init = _ });
+              _
+            } ->
           let desc =
             Printf.sprintf "probe %s handler %s" name handler_code_sym
           in

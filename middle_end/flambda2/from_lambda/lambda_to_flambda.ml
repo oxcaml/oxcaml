@@ -491,24 +491,29 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
          (Flambda_kind.With_subkind.from_lambda_values_and_unboxed_numbers_only
             (Lambda.structured_constant_layout const)
             ~machine_width:(Acc.machine_width acc)))
-  | Lapply
-      { ap_func;
-        ap_args;
-        ap_result_layout;
-        ap_region_close;
-        ap_mode;
-        ap_loc;
-        ap_tailcall = _;
-        ap_inlined;
-        ap_specialised = _;
-        ap_probe
-      } ->
-    (* Note that we don't need kind information about [ap_args] since we already
-       have it on the corresponding [Simple]s in the environment. *)
-    maybe_insert_let_cont "apply_result" ap_result_layout k acc env ccenv
-      (fun acc env ccenv k ->
-        cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode
-          ap_loc ap_inlined ap_probe ap_result_layout k k_exn)
+  | Lapply lapply -> (
+    match Lambda_to_lambda_transforms.transform_apply lapply with
+    | Transformed lam -> cps acc env ccenv lam k k_exn
+    | Apply lapply ->
+      let { L.ap_func;
+            ap_args;
+            ap_result_layout;
+            ap_region_close;
+            ap_mode;
+            ap_loc;
+            ap_tailcall = _;
+            ap_inlined;
+            ap_specialised = _;
+            ap_probe
+          } =
+        lapply
+      in
+      (* Note that we don't need kind information about [ap_args] since we
+         already have it on the corresponding [Simple]s in the environment. *)
+      maybe_insert_let_cont "apply_result" ap_result_layout k acc env ccenv
+        (fun acc env ccenv k ->
+          cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode
+            ap_loc ap_inlined ap_probe ap_result_layout k k_exn))
   | Lfunction func ->
     let id = Ident.create_local (name_for_function func) in
     let id_duid = Flambda_debug_uid.none in
@@ -1216,8 +1221,18 @@ and cps_non_tail_var :
     k_exn
 
 and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode ap_loc
-    ap_inlined ap_probe ap_return (k : Continuation.t) (k_exn : Continuation.t)
-    : Expr_with_acc.t =
+    ap_inlined (ap_probe : L.probe_desc option) ap_return (k : Continuation.t)
+    (k_exn : Continuation.t) : Expr_with_acc.t =
+  if (not Config.probes)
+     &&
+     match ap_probe with
+     | None -> false
+     | Some (Optimized _) -> true
+     | Some (Behaves_like_direct_call _) -> false
+  then
+    Misc.fatal_errorf "Optimized probes not supported on this target:@ %a"
+      Debuginfo.print_compact
+      (Debuginfo.from_location ap_loc);
   cps_non_tail_list acc env ccenv ap_args
     (fun acc env ccenv args args_arity ->
       cps_non_tail_var "func" acc env ccenv ap_func

@@ -47,13 +47,21 @@ module S = struct
       stack_align : Cmm.stack_align
     }
 
-  type prim_call_operation =
-    | External of external_call_operation
-    | Probe of
+  type probe_desc =
+    | Optimized of
         { name : string;
           handler_code_sym : string;
           enabled_at_init : bool
         }
+    | Behaves_like_direct_call of
+        { name : string;
+          handler_code_sym : string;
+          enabled_at_init : bool
+        }
+
+  type prim_call_operation =
+    | External of external_call_operation
+    | Probe of probe_desc
 
   type bool_test =
     { ifso : Label.t;  (** if test is true goto [ifso] label *)

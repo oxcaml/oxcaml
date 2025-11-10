@@ -2914,7 +2914,7 @@ AS_CASE([$arch],
   [*],[probes=false])
 
 AS_IF([test x"$probes" = "xfalse"],
-  [AC_MSG_NOTICE([Disabling tracing probes: no support on $target.])],
+  [AC_MSG_NOTICE([Using unoptimized tracing probes for $target.])],
   [])
 
 AS_IF([test x"$with_afl" = "xyes"],

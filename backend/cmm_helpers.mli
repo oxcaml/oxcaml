@@ -951,6 +951,7 @@ val probe :
   name:string ->
   handler_code_linkage_name:string ->
   enabled_at_init:bool ->
+  behaves_like_direct_call:bool ->
   args:expression list ->
   expression
 

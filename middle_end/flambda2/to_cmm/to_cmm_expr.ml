@@ -303,9 +303,17 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         env,
         res,
         Ece.all )
-    | Some { name; enabled_at_init } ->
+    | Some (Optimized { name; enabled_at_init }) ->
       ( C.probe ~dbg ~name ~handler_code_linkage_name:code_sym.sym_name ~args
-          ~enabled_at_init
+          ~enabled_at_init ~behaves_like_direct_call:false
+        |> C.return_unit dbg,
+        free_vars,
+        env,
+        res,
+        Ece.all )
+    | Some (Behaves_like_direct_call { name; enabled_at_init }) ->
+      ( C.probe ~dbg ~name ~handler_code_linkage_name:code_sym.sym_name ~args
+          ~enabled_at_init ~behaves_like_direct_call:true
         |> C.return_unit dbg,
         free_vars,
         env,

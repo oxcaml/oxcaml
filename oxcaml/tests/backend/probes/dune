@@ -1,18 +1,12 @@
 (rule
  (alias   runtest)
- (enabled_if
-  (and (= %{context_name} "main")
-       (= %{system} "linux")
-       (= %{architecture} "amd64")))
+ (enabled_if (= %{context_name} "main"))
  (deps t1.ml)
  (action (run %{bin:ocamlopt.opt} %{deps} -warn-error "+190" -c)))
 
 (rule
  (alias runtest)
- (enabled_if
-  (and (= %{context_name} "main")
-       (= %{system} "linux")
-       (= %{architecture} "amd64")))
+ (enabled_if (= %{context_name} "main"))
  (deps region.ml)
  (action (run %{bin:ocamlopt.opt} %{deps} -c)))
 
@@ -22,10 +16,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if
-  (and (= %{context_name} "main")
-       (= %{system} "linux")
-       (= %{architecture} "amd64")))
+ (enabled_if (= %{context_name} "main"))
  (deps t2.expected t2.output)
  (action (diff t2.expected t2.output)))
 
@@ -36,10 +27,7 @@
 
 
 (rule
- (enabled_if
-  (and (= %{context_name} "main")
-       (= %{system} "linux")
-       (= %{architecture} "amd64")))
+ (enabled_if (= %{context_name} "main"))
  (target t3.output)
  (deps t3.ml)
  (action (with-outputs-to %{target}
@@ -48,10 +36,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if
-  (and (= %{context_name} "main")
-       (= %{system} "linux")
-       (= %{architecture} "amd64")))
+ (enabled_if (= %{context_name} "main"))
  (deps t3.expected t3.output)
  (action (diff t3.expected t3.output)))
 
@@ -62,18 +47,12 @@
 
 (rule
  (alias   runtest)
- (enabled_if
-  (and (= %{context_name} "main")
-       (= %{system} "linux")
-       (= %{architecture} "amd64")))
+ (enabled_if (= %{context_name} "main"))
  (deps test_ocamldep.expected test_ocamldep.output)
  (action (diff test_ocamldep.expected test_ocamldep.output)))
 
 (rule
- (enabled_if
-  (and (= %{context_name} "main")
-       (= %{system} "linux")
-       (= %{architecture} "amd64")))
+ (enabled_if (= %{context_name} "main"))
  (target f1.exe)
  (deps f1.ml)
  (action (with-accepted-exit-codes 0
@@ -88,18 +67,12 @@
 
 (rule
  (alias   runtest)
- (enabled_if
-  (and (= %{context_name} "main")
-       (= %{system} "linux")
-       (= %{architecture} "amd64")))
+ (enabled_if (= %{context_name} "main"))
  (deps f1.expected f1.output)
  (action (diff f1.expected f1.output)))
 
 (rule
- (enabled_if
-  (and (= %{context_name} "main")
-       (= %{system} "linux")
-       (= %{architecture} "amd64")))
+ (enabled_if (= %{context_name} "main"))
  (target f2.exe)
  (deps f2.ml)
  (action (with-accepted-exit-codes 0
@@ -114,10 +87,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if
-  (and (= %{context_name} "main")
-       (= %{system} "linux")
-       (= %{architecture} "amd64")))
+ (enabled_if (= %{context_name} "main"))
  (deps f2.expected f2.output)
  (action (diff f2.expected f2.output)))
 

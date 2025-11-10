@@ -1110,7 +1110,9 @@ let apply_specialised_attribute ppf = function
 
 let apply_probe ppf : probe -> unit = function
   | None -> ()
-  | Some {name} -> fprintf ppf " (probe %s)" name
+  | Some (Optimized {name; _}) -> fprintf ppf " (probe %s)" name
+  | Some (Behaves_like_direct_call {name; _}) ->
+      fprintf ppf " (probe %s behaves_like_direct_call)" name
 
 let apply_kind name pos mode =
   let name =
