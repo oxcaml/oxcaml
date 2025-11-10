@@ -1037,7 +1037,11 @@ let core_type sub ct =
     | Ttyp_arrow (arg_label, ct1, ct2) ->
         (* CR cgunn: recover mode annotation here *)
         Ptyp_arrow
-          (label arg_label, sub.typ sub ct1, sub.typ sub ct2, No_modes, No_modes)
+          (label arg_label,
+           sub.typ sub ct1,
+           sub.typ sub ct2,
+           No_modes,
+           No_modes)
     | Ttyp_tuple list ->
         Ptyp_tuple (List.map (fun (lbl, t) -> lbl, sub.typ sub t) list)
     | Ttyp_unboxed_tuple list ->

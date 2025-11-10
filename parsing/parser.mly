@@ -3290,10 +3290,15 @@ let_binding_body_no_punning:
       { let v, modes0 = $1 in
         let typ, modes1 = $3 in
         let modes = Modes.merge modes0 modes1 in
-        (v, $5, Some (Pvc_constraint { locally_abstract_univars = []; typ }), modes)
+        (v,
+         $5,
+         Some (Pvc_constraint { locally_abstract_univars = []; typ }),
+         modes)
       }
-  | let_ident_with_modes COLON TYPE ntys = newtypes DOT cty = core_type  modes1 = empty_modes   EQUAL e = seq_expr
-  | let_ident_with_modes COLON TYPE ntys = newtypes DOT cty = tuple_type modes1=mode_annot_expr EQUAL e = seq_expr
+  | let_ident_with_modes COLON TYPE ntys = newtypes DOT
+    cty = core_type  modes1 = empty_modes     EQUAL e = seq_expr
+  | let_ident_with_modes COLON TYPE ntys = newtypes DOT
+    cty = tuple_type modes1 = mode_annot_expr EQUAL e = seq_expr
       (* The code upstream looks like:
          {[
            let constraint' =
@@ -3310,12 +3315,19 @@ let_binding_body_no_punning:
          version, even though we are creating a slightly different [core_type].
       *)
       { let exp, poly =
-          wrap_type_annotation ~loc:$sloc ~modes:No_modes ~typloc:$loc(cty) ntys cty e
+          wrap_type_annotation
+            ~loc:$sloc
+            ~modes:No_modes
+            ~typloc:$loc(cty)
+            ntys cty e
         in
         let v, modes0 = $1 in
         let modes = Modes.merge modes0 modes1 in
         let loc = ($startpos($1), $endpos(modes1)) in
-        (ghpat_with_modes ~loc ~pat:v ~cty:(Some poly) ~modes:No_modes, exp, None, modes)
+        (ghpat_with_modes ~loc ~pat:v ~cty:(Some poly) ~modes:No_modes,
+         exp,
+         None,
+         modes)
        }
   | pattern_no_exn EQUAL seq_expr
       { ($1, $3, None, No_modes) }
@@ -3517,7 +3529,11 @@ fun_params:
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN %prec below_HASH
       { Some label,
         mkexp_type_constraint_with_modes
-          ~loc:($startpos($2), $endpos) ~modes:No_modes (mkexpvar ~loc:$loc(label) label) c }
+          ~loc:($startpos($2), $endpos)
+          ~modes:No_modes
+          (mkexpvar ~loc:$loc(label) label)
+          c
+      }
 ;
 reversed_labeled_tuple_body:
   (* > 2 elements *)
@@ -3544,7 +3560,10 @@ reversed_labeled_tuple_body:
   x2 = labeled_tuple_element
   { let x1 =
       mkexp_type_constraint_with_modes
-        ~loc:($startpos($2), $endpos) ~modes:No_modes (mkexpvar ~loc:$loc(l1) l1) c
+        ~loc:($startpos($2), $endpos)
+        ~modes:No_modes
+        (mkexpvar ~loc:$loc(l1) l1)
+        c
     in
     [ x2; Some l1, x1] }
 ;
@@ -3570,7 +3589,12 @@ record_expr_content:
           | Some e ->
               ($startpos(c), $endpos), label, e
         in
-        label, mkexp_opt_type_constraint_with_modes ~loc:constraint_loc ~modes:No_modes e c }
+        label,
+        mkexp_opt_type_constraint_with_modes
+          ~loc:constraint_loc
+          ~modes:No_modes
+          e c
+      }
 ;
 %inline object_expr_content:
   xs = separated_or_terminated_nonempty_list(SEMI, object_expr_field)
@@ -3718,7 +3742,9 @@ pattern_no_exn:
       { let lbl_loc = $loc(label) in
         let pat_loc = $startpos($2), $endpos in
         let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat_with_modes ~loc:pat_loc ~modes:No_modes ~pat ~cty:(Some cty) }
+        Some label,
+        mkpat_with_modes ~loc:pat_loc ~modes:No_modes ~pat ~cty:(Some cty)
+      }
 
 (* If changing this, don't forget to change its copy just above. *)
 %inline labeled_tuple_pat_element_noprec(self):
@@ -3732,7 +3758,9 @@ pattern_no_exn:
       { let lbl_loc = $loc(label) in
         let pat_loc = $startpos($2), $endpos in
         let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat_with_modes ~loc:pat_loc ~modes:No_modes ~pat ~cty:(Some cty) }
+        Some label,
+        mkpat_with_modes ~loc:pat_loc ~modes:No_modes ~pat ~cty:(Some cty)
+      }
 
 labeled_tuple_pat_element_list(self):
   | labeled_tuple_pat_element_list(self) COMMA labeled_tuple_pat_element(self)
@@ -3786,7 +3814,9 @@ simple_pattern_not_ident:
       { mkpat_attrs ~loc:$sloc (Ppat_unpack $4) $3 }
   | LPAREN MODULE ext_attributes mkrhs(module_name) COLON package_type RPAREN
       { mkpat_attrs ~loc:$sloc
-          (Ppat_constraint(mkpat ~loc:$loc($4) (Ppat_unpack $4), Some $6, No_modes))
+          (Ppat_constraint(mkpat ~loc:$loc($4) (Ppat_unpack $4),
+                           Some $6,
+                           No_modes))
           $3 }
   | simple_pattern_not_ident_
       { $1 }
@@ -4268,14 +4298,18 @@ label_declarations:
   | label_declaration_semi label_declarations   { $1 :: $2 }
 ;
 label_declaration:
-    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_modality_annot_expr attrs=attributes
+    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr
+      m1=optional_modality_annot_expr
+      attrs=attributes
       { let info = symbol_info $endpos in
         let mut, m0 = $1 in
         let modalities = Modalities.merge m0 m1 in
         Type.field $2 $4 ~mut ~modalities ~attrs ~loc:(make_loc $sloc) ~info}
 ;
 label_declaration_semi:
-    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_modality_annot_expr attrs0=attributes
+    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr
+      m1=optional_modality_annot_expr
+      attrs0=attributes
       SEMI attrs1=attributes
       { let info =
           match rhs_info $endpos(attrs0) with
@@ -5268,11 +5302,16 @@ mutable_or_global_flag:
     { Mutable, No_modalities }
   | GLOBAL
     { Immutable,
-      Modalities.of_core_modalities [(mkloc (Modality "global") (make_loc $sloc))] }
+      Modalities.of_core_modalities
+        [(mkloc (Modality "global") (make_loc $sloc))]
+    }
 ;
 %inline global_flag:
            { No_modalities }
-  | GLOBAL { Modalities.of_core_modalities [(mkloc (Modality "global") (make_loc $sloc))]}
+  | GLOBAL
+    { Modalities.of_core_modalities
+        [(mkloc (Modality "global") (make_loc $sloc))]
+    }
 ;
 virtual_flag:
     /* empty */                                 { Concrete }
