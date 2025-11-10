@@ -3,11 +3,8 @@
  expect;
 *)
 
-(* CR zeisbach: these should probably be worked into [source_jane_street.ml].
-   currently, some are sprinkled in there but not a ton. not sure what's best *)
-
-(* CR zeisbach: once annotations aren't being dropped on the floor, the printing
-   in the good cases should include more layout information *)
+(* CR layouts-scannable: once annotations aren't being dropped on the floor, the
+   printing in the good cases should include more layout information *)
 
 type t : value non_pointer = int
 [%%expect{|

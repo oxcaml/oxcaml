@@ -1339,6 +1339,11 @@ and module_binding =
 
 and jkind_annotation_desc =
   | Pjk_default
+  (* CR layouts-scannable: Scannable axes annotations only currently parse on
+     abbreviations, not on products/etc. It could be desirable for these
+     annotations to parse in more places with a warning (ex: for generated
+     code). This change should only be made if necessary (and after the
+     ignored-scannable-axes warning is enabled), since it adds confusion. *)
   | Pjk_abbreviation of string loc * string loc list
   (** Stores the abbreviation along with a list of scannable axis modifiers *)
   (* CR layouts v2.8: [mod] can have only layouts on the left, not

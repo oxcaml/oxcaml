@@ -166,11 +166,15 @@ type ('a, 'b : float64, 'c : any, 'd, 'e, 'f, 'g, 'h, 'i, 'j : bits64, 'k,
      t14
 |}]
 
+(* non-trivial values: scannable axis annotations *)
+
 type t15 : any non_pointer
 type t16 : value non_pointer
+type t17 : value & value non_pointer
 [%%expect{|
 type t15 : any
 type t16
+type t17 : value & value
 |}]
 
 type t = #(int * float#)
@@ -1273,15 +1277,12 @@ result: 7
 type 'a boxed_with_idx = { data : 'a ; i : int }
 type 'a with_idx : value & immediate =
   'a boxed_with_idx# = #{ data : 'a ; i : int }
-type 'a with_idx2 : value & value non_pointer =
-  'a boxed_with_idx# = #{ data : 'a ; i : int }
 let idx #{ data = _ ; i } = i
 let #{ data = payload; _ } = #{ data = "payload" ; i = 0 }
 let inc r = #{ r with i = r.#i + 1 }
 [%%expect{|
 type 'a boxed_with_idx = { data : 'a; i : int; }
 type 'a with_idx = 'a boxed_with_idx# = #{ data : 'a; i : int; }
-type 'a with_idx2 = 'a boxed_with_idx# = #{ data : 'a; i : int; }
 val idx : 'a with_idx2 -> int = <fun>
 val payload : string = "payload"
 val inc : 'a with_idx2 -> 'a with_idx2 = <fun>

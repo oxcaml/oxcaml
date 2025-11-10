@@ -153,7 +153,8 @@ module Layout = struct
 
     include Static
 
-    let allow_scannable_axes = function
+    (* if so, scannable axis annotations should not trigger a warning *)
+    let is_value_or_any = function
       | Any | Base Value -> true
       | Base
           ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
@@ -401,7 +402,9 @@ module Error = struct
         }
         -> t
     | Unknown_jkind of Parsetree.jkind_annotation
-    | Unknown_scannable_axis of string
+    (* CR layouts-scannable: Once [box] is added, it may be appropriate to add
+       more data here to specialize these error messages. *)
+    | Unknown_kind_modifier of string
     | Multiple_jkinds of
         { from_annotation : Parsetree.jkind_annotation;
           from_attribute : Builtin_attributes.jkind_attribute Location.loc
@@ -2134,7 +2137,7 @@ module Const = struct
         | "maybe_pointer" ->
           check_and_warn ~loc pointerness;
           Some Pointerness.Maybe_pointer
-        | _ -> raise ~loc (Unknown_scannable_axis txt))
+        | _ -> raise ~loc (Unknown_kind_modifier txt))
       None sa_annots
 
   let rec of_user_written_annotation_unchecked_level :
@@ -2173,7 +2176,7 @@ module Const = struct
       in
       let pointerness = transl_scannable_axes sa_annot in
       if sa_annot <> []
-         && not (Layout.Const.allow_scannable_axes jkind_without_sa.layout)
+         && not (Layout.Const.is_value_or_any jkind_without_sa.layout)
       then
         Location.prerr_warning jkind.pjkind_loc
           (Warnings.Ignored_scannable_axes name.txt);
@@ -4240,10 +4243,8 @@ let report_error ~loc : Error.t -> _ = function
          When RAE tried this, some types got printed like [t/2], but the
          [/2] shouldn't be there. Investigate and fix. *)
       "@[<v>Unknown layout %a@]" Pprintast.jkind_annotation jkind
-  | Unknown_scannable_axis saxis ->
-    (* CR zeisbach: is it bad for "scannable axis" to be present in an error
-       message? "modifier" is another option (used for "mod foo" currently) *)
-    Location.errorf ~loc "@[<v>Unknown scannable axis %s@]" saxis
+  | Unknown_kind_modifier saxis ->
+    Location.errorf ~loc "@[<v>Unknown kind modifier %s@]" saxis
   | Multiple_jkinds { from_annotation; from_attribute } ->
     Location.errorf ~loc
       "@[<v>A type declaration's layout can be given at most once.@;\

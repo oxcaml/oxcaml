@@ -95,12 +95,7 @@ module Sort : sig
 end
 
 module Scannable_axes : sig
-  type t
-
-  (* CR zeisbach: determine if this is needed here, or if it can be replaced
-     by a version in [Jkind.ml]. This depends on who needs to construct
-     [Scannable_axes.t]s and where. My guess is this might be needed. *)
-  val create : pointerness:Jkind_axis.Pointerness.t -> t
+  type t = Jkind_axis.Pointerness.t
 end
 
 module Layout : sig
