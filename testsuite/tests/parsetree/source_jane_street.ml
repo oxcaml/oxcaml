@@ -166,9 +166,6 @@ type ('a, 'b : float64, 'c : any, 'd, 'e, 'f, 'g, 'h, 'i, 'j : bits64, 'k,
      t14
 |}]
 
-(* CR zeisbach: these should be printed with more information (soon!)
-   also, add in more non-trivial value tests as they come up *)
-
 type t15 : any non_pointer
 type t16 : value non_pointer
 [%%expect{|

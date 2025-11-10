@@ -2116,7 +2116,8 @@ module Const = struct
     (* CR zeisbach: this should work for the other axes as they get added.
        however, without a data representation for "the axis", this doesn't
        report a very good error. Using [Per_axis] is one solution; having
-       one warning helper per axis is another. For now, we just specialize *)
+       one warning helper per axis is another, as is passing a string (lame).
+       For now, we just specialize. *)
     let check_and_warn ~loc pointerness =
       match pointerness with
       | Some _ ->
@@ -2129,8 +2130,6 @@ module Const = struct
         match txt with
         | "non_pointer" ->
           check_and_warn ~loc pointerness;
-          (* CR zeisbach: this means that the _last_ specified axis will be
-             used, which contradicts design doc but this has postfix syntax *)
           Some Pointerness.Non_pointer
         | "maybe_pointer" ->
           check_and_warn ~loc pointerness;
@@ -2174,8 +2173,6 @@ module Const = struct
       in
       let pointerness = transl_scannable_axes sa_annot in
       if sa_annot <> []
-         (* CR zeisbach: maybe tweak this? an alternative is to replace with
-            [disallow_scannable_axes]. should be understandable regardless *)
          && not (Layout.Const.allow_scannable_axes jkind_without_sa.layout)
       then
         Location.prerr_warning jkind.pjkind_loc

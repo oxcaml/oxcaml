@@ -4,9 +4,6 @@
 *)
 
 type t : non_pointer value = int
-(* CR zeisbach: should this pretty-printing be changed? maybe it will just
-   change automatically in the next PR with more printing.
-   if not, try to do this... *)
 [%%expect{|
 Line 1, characters 9-26:
 1 | type t : non_pointer value = int
@@ -15,7 +12,6 @@ Error: Unknown layout non_pointer value
 |}]
 
 type t : value non_pointer = int [@@immediate]
-(* CR zeisbach: maybe this should be able to break on the space? I vote no *)
 [%%expect{|
 Line 1, characters 0-46:
 1 | type t : value non_pointer = int [@@immediate]
