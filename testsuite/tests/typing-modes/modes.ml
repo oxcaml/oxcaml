@@ -376,7 +376,7 @@ type r = {
   global_ x : string @@ aliased
 }
 [%%expect{|
-type r = { global_ x : string; }
+type r = { x : string @@ global; }
 |}]
 
 type r = {

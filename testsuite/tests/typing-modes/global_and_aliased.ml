@@ -10,9 +10,9 @@ type 'a t1 : value mod global = { x1 : 'a @@ global } [@@unboxed]
 type 'a t2 : value mod aliased = { x2 : 'a @@ aliased } [@@unboxed]
 type 'a t3 : value mod global = { x3 : 'a @@ global aliased } [@@unboxed]
 [%%expect{|
-type 'a t1 = { global_ x1 : 'a; } [@@unboxed]
+type 'a t1 = { x1 : 'a @@ global; } [@@unboxed]
 type 'a t2 = { x2 : 'a @@ aliased; } [@@unboxed]
-type 'a t3 = { global_ x3 : 'a; } [@@unboxed]
+type 'a t3 = { x3 : 'a @@ global; } [@@unboxed]
 |}]
 
 type 'a t4 : value mod global = { x4 : 'a @@ global unique } [@@unboxed]
@@ -30,7 +30,7 @@ let mk3 (x3 : 'a) : 'a t3 @ unique = { x3 }
 
 [%%expect{|
 val mk1 : 'a -> 'a t1 @ unique = <fun>
-val mk2 : local_ 'a -> 'a t2 @ local unique = <fun>
+val mk2 : 'a @ local -> 'a t2 @ local unique = <fun>
 val mk3 : 'a -> 'a t3 @ unique = <fun>
 |}]
 
@@ -60,9 +60,9 @@ let unmk2 ({ x2 } : 'a t2 @ local) : 'a @ local = x2
 let unmk3 ({ x3 } : 'a t3 @ local) : 'a = x3
 
 [%%expect{|
-val unmk1 : local_ 'a t1 -> 'a = <fun>
-val unmk2 : local_ 'a t2 -> local_ 'a = <fun>
-val unmk3 : local_ 'a t3 -> 'a = <fun>
+val unmk1 : 'a t1 @ local -> 'a = <fun>
+val unmk2 : 'a t2 @ local -> 'a @ local = <fun>
+val unmk3 : 'a t3 @ local -> 'a = <fun>
 |}]
 
 let fail1 ({ x1 } : 'a t1 @ local unique) : 'a @ unique = x1
