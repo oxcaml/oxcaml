@@ -2177,7 +2177,8 @@ module Const = struct
          && not (Layout.Const.is_value_or_any jkind_without_sa.layout)
       then
         Location.prerr_warning jkind.pjkind_loc
-          (Warnings.Ignored_scannable_axes name.txt);
+          (Warnings.Ignored_kind_modifier
+             (name.txt, List.map Location.get_txt sa_annot));
       (* CR zeisbach: the correct behavior is to make a new jkind that differs
          only in the layout by adding in the non-None scannable axes.
          for inspiration, see [set_nullability_upper_bound].

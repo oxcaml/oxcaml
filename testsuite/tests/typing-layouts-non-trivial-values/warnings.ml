@@ -119,17 +119,17 @@ type t : void non_pointer
 Line 1, characters 9-25:
 1 | type t : void non_pointer
              ^^^^^^^^^^^^^^^^
-Warning 184 [ignored-scannable-axes]: The specified scannable axes are meaningless, since they apply to the layout void
+Warning 184 [ignored-kind-modifier]: The specified kind modifier(s) "non_pointer" are meaningless when applied to the layout void.
 
 Line 1, characters 9-25:
 1 | type t : void non_pointer
              ^^^^^^^^^^^^^^^^
-Warning 184 [ignored-scannable-axes]: The specified scannable axes are meaningless, since they apply to the layout void
+Warning 184 [ignored-kind-modifier]: The specified kind modifier(s) "non_pointer" are meaningless when applied to the layout void.
 
 Line 1, characters 9-25:
 1 | type t : void non_pointer
              ^^^^^^^^^^^^^^^^
-Warning 184 [ignored-scannable-axes]: The specified scannable axes are meaningless, since they apply to the layout void
+Warning 184 [ignored-kind-modifier]: The specified kind modifier(s) "non_pointer" are meaningless when applied to the layout void.
 
 type t : void
 |}]
@@ -144,7 +144,7 @@ Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been s
 Line 1, characters 9-39:
 1 | type t : void non_pointer maybe_pointer
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-scannable-axes]: The specified scannable axes are meaningless, since they apply to the layout void
+Warning 184 [ignored-kind-modifier]: The specified kind modifier(s) "non_pointer maybe_pointer" are meaningless when applied to the layout void.
 
 Line 1, characters 26-39:
 1 | type t : void non_pointer maybe_pointer
@@ -154,7 +154,7 @@ Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been s
 Line 1, characters 9-39:
 1 | type t : void non_pointer maybe_pointer
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-scannable-axes]: The specified scannable axes are meaningless, since they apply to the layout void
+Warning 184 [ignored-kind-modifier]: The specified kind modifier(s) "non_pointer maybe_pointer" are meaningless when applied to the layout void.
 
 Line 1, characters 26-39:
 1 | type t : void non_pointer maybe_pointer
@@ -164,7 +164,7 @@ Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been s
 Line 1, characters 9-39:
 1 | type t : void non_pointer maybe_pointer
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-scannable-axes]: The specified scannable axes are meaningless, since they apply to the layout void
+Warning 184 [ignored-kind-modifier]: The specified kind modifier(s) "non_pointer maybe_pointer" are meaningless when applied to the layout void.
 
 type t : void
 |}]

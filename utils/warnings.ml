@@ -130,7 +130,7 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
-  | Ignored_scannable_axes of string        (* 184 *)
+  | Ignored_kind_modifier of string * string list (* 184 *)
   | Duplicated_scannable_axis of string     (* 185 *)
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
@@ -229,7 +229,7 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
-  | Ignored_scannable_axes _ -> 184
+  | Ignored_kind_modifier _ -> 184
   | Duplicated_scannable_axis _ -> 185
   | Unmutated_mutable _ -> 186
   | Incompatible_with_upstream _ -> 187
@@ -588,20 +588,16 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
-    { number = 184;
-      (* CR zeisbach: this name is probably not great *)
-      names = ["ignored-scannable-axes"];
-      (* CR zeisbach: is this user-facing at all? Probably. Should "layout"
-         be used, or a more technically correct alternative? What is the
-         right mental model that we want to emphasize here? *)
-      description = "Scannable axes annotations appear on a non-value, \
-                     non-any layout.";
-      since = since 5 2 };
+  { number = 184;
+    names = ["ignored-kind-modifier"];
+    (* CR layouts-scannable: as more axes are added, this description (and
+       the following description) should be updated in tandem. *)
+    description = "A pointerness axis annotation appears on a non-value, \
+                   non-any layout.";
+    since = since 5 2 };
   { number = 185;
     names = ["duplicated-scannable-axis"];
-    (* CR zeisbach: is this message any good? what verison for since?
-       also, this makes me question whether it should be an error... *)
-    description = "A scannable axis is annotated more than once; the \
+    description = "The pointerness axis is annotated more than once; the \
                    last annotation will be used.";
     since = since 5 2 };
   { number = 186;
@@ -1268,11 +1264,10 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
-  | Ignored_scannable_axes abbrev ->
-    (* CR zeisbach: make this message better. should we say "layout"?
-       what about saying "scannable axes"? *)
-    "The specified scannable axes are meaningless, \
-     since they apply to the layout " ^ abbrev
+  | Ignored_kind_modifier (abbrev, modifiers) ->
+      Printf.sprintf
+      "The specified kind modifier(s) \"%s\" are meaningless when applied \
+      to the layout %s." (String.concat " " modifiers) abbrev
   | Duplicated_scannable_axis axis ->
       "The " ^ axis ^ " axis has already been specified."
   | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
