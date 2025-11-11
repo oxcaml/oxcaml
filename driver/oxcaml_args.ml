@@ -379,6 +379,12 @@ let mk_internal_assembler f =
     "Write object files directly instead of using the system assembler (x86-64 \
      ELF only)" )
 
+let mk_save_binary_sections f =
+  ( "-save-binary-sections",
+    Arg.Unit f,
+    "Save binary emitter section output to <prefix>.binary-sections/ directory \
+     (ARM64 only, for testing)" )
+
 let mk_gc_timings f =
   ("-dgc-timings", Arg.Unit f, "Output information about time spent in the GC")
 
@@ -1130,6 +1136,7 @@ module type Oxcaml_options = sig
   val long_frames_threshold : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
   val internal_assembler : unit -> unit
+  val save_binary_sections : unit -> unit
   val gc_timings : unit -> unit
   val no_mach_ir : unit -> unit
   val dllvmir : unit -> unit
@@ -1282,6 +1289,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_debug_long_frames_threshold F.long_frames_threshold;
       mk_caml_apply_inline_fast_path F.caml_apply_inline_fast_path;
       mk_internal_assembler F.internal_assembler;
+      mk_save_binary_sections F.save_binary_sections;
       mk_gc_timings F.gc_timings;
       mk_no_mach_ir F.no_mach_ir;
       mk_dllvmir F.dllvmir;
@@ -1525,6 +1533,7 @@ module Oxcaml_options_impl = struct
     set' Oxcaml_flags.caml_apply_inline_fast_path
 
   let internal_assembler = set' Oxcaml_flags.internal_assembler
+  let save_binary_sections = set' Oxcaml_flags.save_binary_sections
   let gc_timings = set' Oxcaml_flags.gc_timings
   let no_mach_ir () = ()
   let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
@@ -1898,6 +1907,7 @@ module Extra_params = struct
     in
     match name with
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
+    | "save-binary-sections" -> set' Oxcaml_flags.save_binary_sections
     | "dgc-timings" -> set' Oxcaml_flags.gc_timings
     | "no-mach-ir" ->
         Oxcaml_options_impl.no_mach_ir ();

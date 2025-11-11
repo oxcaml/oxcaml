@@ -1455,7 +1455,7 @@ let assemble_line b loc ins =
         match eval_const b (Buffer.length b.buf) cst with
         | Rint n -> (get_symbol b lbl).sy_size <- Some (Int64.to_int n)
         | _ -> assert false)
-    | Directive (D.Align { fill_x86_bin_emitter=data; bytes = n}) -> (
+    | Directive (D.Align { fill=data; bytes = n}) -> (
         (* TODO: Buffer.length = 0 => set section align *)
         let pos = Buffer.length b.buf in
         let current = pos mod n in
@@ -1617,3 +1617,149 @@ let contents b =
 let relocations b = b.relocations
 
 let labels b = b.labels
+
+(* For_jit module implementing Binary_emitter.S *)
+module For_jit = struct
+  (* Alias parent Relocation before shadowing it *)
+  module Reloc = Relocation
+  module Kind = Relocation.Kind
+
+  module Relocation = struct
+    type t = Reloc.t
+
+    let offset_from_section_beginning (r : Reloc.t) =
+      r.Reloc.offset_from_section_beginning
+
+    let size (r : Reloc.t) : Binary_emitter_intf.data_size =
+      match r.Reloc.kind with
+      | Kind.REL32 _ | Kind.DIR32 _ -> Binary_emitter_intf.B32
+      | Kind.DIR64 _ -> Binary_emitter_intf.B64
+
+    let parse_label label =
+      match String.split_on_char '@' label with
+      | [sym] -> sym, None
+      | [sym; suffix] -> sym, Some suffix
+      | _ -> label, None
+
+    let target_symbol (r : Reloc.t) =
+      let label = match r.Reloc.kind with
+        | Kind.REL32 (label, _)
+        | Kind.DIR32 (label, _)
+        | Kind.DIR64 (label, _) -> label
+      in
+      let sym, _ = parse_label label in
+      sym
+
+    let is_got_reloc (r : Reloc.t) =
+      let label = match r.Reloc.kind with
+        | Kind.REL32 (label, _)
+        | Kind.DIR32 (label, _)
+        | Kind.DIR64 (label, _) -> label
+      in
+      let _, suffix = parse_label label in
+      match suffix with Some "GOTPCREL" -> true | _ -> false
+
+    let is_plt_reloc (r : Reloc.t) =
+      let label = match r.Reloc.kind with
+        | Kind.REL32 (label, _)
+        | Kind.DIR32 (label, _)
+        | Kind.DIR64 (label, _) -> label
+      in
+      let _, suffix = parse_label label in
+      match suffix with Some "PLT" -> true | _ -> false
+
+    let compute_value (r : Reloc.t) ~place_address ~lookup_symbol
+          ~read_instruction:_ =
+      let label, addend = match r.Reloc.kind with
+        | Kind.REL32 (label, addend)
+        | Kind.DIR32 (label, addend)
+        | Kind.DIR64 (label, addend) -> label, addend
+      in
+      let sym, _ = parse_label label in
+      match lookup_symbol sym with
+      | None -> Error (Printf.sprintf "Symbol not found: %s" sym)
+      | Some target_addr ->
+        let target_addr = Int64.add target_addr addend in
+        (match r.Reloc.kind with
+        | Kind.REL32 _ ->
+          (* Relative: compute offset from place to target *)
+          let rel_size = 4L in (* REL32 is 4 bytes *)
+          let src_addr = Int64.add place_address rel_size in
+          Ok (Int64.sub target_addr src_addr)
+        | Kind.DIR32 _ | Kind.DIR64 _ ->
+          (* Absolute: just use the target address *)
+          Ok target_addr)
+  end
+
+  module Assembled_section = struct
+    type t = buffer
+    type relocation = Reloc.t
+
+    let size b = Buffer.length b.buf
+
+    let contents b = Bytes.to_string (contents_mut b)
+
+    let contents_mut = contents_mut
+
+    let relocations b = b.relocations
+
+    let find_symbol_offset b name =
+      match String.Tbl.find_opt b.labels name with
+      | Some sym -> sym.sy_pos
+      | None -> None
+
+    let find_label_offset = find_symbol_offset
+
+    let iter_symbols b ~f =
+      String.Tbl.iter
+        (fun name sym ->
+          match sym.sy_pos with
+          | Some offset -> f ~name ~offset
+          | None -> ())
+        b.labels
+
+    let add_patch b ~offset ~size:(sz : Binary_emitter_intf.data_size) ~data =
+      let sz = match sz with
+        | Binary_emitter_intf.B8 -> B8
+        | Binary_emitter_intf.B16 -> B16
+        | Binary_emitter_intf.B32 -> B32
+        | Binary_emitter_intf.B64 -> B64
+      in
+      add_patch ~offset ~size:sz ~data b
+  end
+
+  module Plt = struct
+    (* x86-64 PLT entry:
+       movabs r10, <address>   ; 49 ba <8 bytes>
+       jmp *r10                ; 41 ff e2
+       Total: 10 bytes *)
+    let movabs_r10_opcode = "\x49\xba"
+    let jmp_r10_instr = "\x41\xff\xe2"
+
+    let entry_size =
+      String.length movabs_r10_opcode + 8 + String.length jmp_r10_instr
+
+    let write_entry buf address =
+      Buffer.add_string buf movabs_r10_opcode;
+      for i = 0 to 7 do
+        let byte = Int64.(to_int (logand (shift_right_logical address (i * 8))
+          0xFFL)) in
+        Buffer.add_char buf (Char.chr byte)
+      done;
+      Buffer.add_string buf jmp_r10_instr
+  end
+
+  module Internal_assembler = struct
+    type assembled_section = Assembled_section.t
+
+    type hook = (string * assembled_section) list -> (string -> unit)
+
+    let current_hook : hook option ref = ref None
+
+    let register h = current_hook := Some h
+
+    let unregister () = current_hook := None
+
+    let get () = !current_hook
+  end
+end

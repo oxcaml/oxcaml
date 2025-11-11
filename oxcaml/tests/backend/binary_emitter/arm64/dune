@@ -1,0 +1,25 @@
+; Tests for ARM64 binary emitter
+; Compares binary emitter output against system assembler output
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "arm64")))
+ (targets test_basic.o test_basic.s (dir test_basic.binary-sections))
+ (deps test_basic.ml)
+ (action
+  (run %{bin:ocamlopt.opt} -c -S -save-binary-sections %{deps})))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "arm64")))
+ (deps
+  test_basic.o
+  (glob_files test_basic.binary-sections/*)
+  compare_sections.sh)
+ (action
+  (run bash compare_sections.sh test_basic)))

@@ -202,7 +202,7 @@
   ast_invariants
   depend
   parser_types ; manual update: mli only files asttypes parsetree
-  ;; TYPING
+               ;; TYPING
   ident
   path
   jkind
@@ -500,10 +500,7 @@
  (package ocaml))
 
 (install
- (files
-  Makefile.build_config
-  Makefile.config_if_required
-  Makefile.config)
+ (files Makefile.build_config Makefile.config_if_required Makefile.config)
  (section lib)
  (package ocaml))
 
@@ -597,7 +594,7 @@
   x86_gas
   x86_masm
   x86_proc
-  arm64_ast
+  jit_backend
   zero_alloc_checker
   zero_alloc_info
   ;; backend/cfg
@@ -704,7 +701,8 @@
   compiler_owee
   gc_timings
   dwarf_low
-  dwarf_high))
+  dwarf_high
+  binary_emitter_intf))
 
 (library
  (name oxcaml_common)
@@ -725,7 +723,12 @@
   (:include %{project_root}/ocamlopt_flags.sexp))
  (instrumentation
   (backend bisect_ppx))
- (libraries ocamlcommon dwarf_flags asm_targets)
+ (libraries
+  ocamlcommon
+  dwarf_flags
+  asm_targets
+  arm64_ast
+  arm64_binary_emitter)
  (modules oxcaml_args oxcaml_flags))
 
 (executable
@@ -778,12 +781,7 @@
  ; to be built against the system compiler, which won't work.
  (ocamlc_flags unix.cma)
  (ocamlopt_flags unix.cmxa)
- (libraries
-  flambda2
-  flambda2_ui
-  flambda2_to_cmm
-  ocamloptcomp
-  ocamlcommon)
+ (libraries flambda2 flambda2_ui flambda2_to_cmm ocamloptcomp ocamlcommon)
  (modules boot_ocamlopt))
 
 ; The input archives (.a, .cma and .cmxa) to the following three rules
@@ -797,6 +795,9 @@
    %{targets}
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.a}
    %{dep:backend/asm_targets/asm_targets.a}
+   %{dep:backend/arm64/ast/arm64_ast.a}
+   %{dep:backend/arm64/binary_emitter/arm64_binary_emitter.a}
+   %{dep:backend/binary_emitter_intf/binary_emitter_intf.a}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.a}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.a}
    %{dep:oxcaml_common.a}
@@ -836,6 +837,9 @@
    %{targets}
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.cma}
    %{dep:backend/asm_targets/asm_targets.cma}
+   %{dep:backend/arm64/ast/arm64_ast.cma}
+   %{dep:backend/arm64/binary_emitter/arm64_binary_emitter.cma}
+   %{dep:backend/binary_emitter_intf/binary_emitter_intf.cma}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cma}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cma}
    %{dep:oxcaml_common.cma}
@@ -875,6 +879,9 @@
    %{targets}
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.cmxa}
    %{dep:backend/asm_targets/asm_targets.cmxa}
+   %{dep:backend/arm64/ast/arm64_ast.cmxa}
+   %{dep:backend/arm64/binary_emitter/arm64_binary_emitter.cmxa}
+   %{dep:backend/binary_emitter_intf/binary_emitter_intf.cmxa}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cmxa}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cmxa}
    %{dep:oxcaml_common.cmxa}

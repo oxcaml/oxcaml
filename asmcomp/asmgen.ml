@@ -558,6 +558,7 @@ let compile_genfuns ~ppf_dump f =
 let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
     ~may_reduce_heap ~ppf_dump gen =
   reset ();
+  Emitaux.output_prefix := output_prefix;
   let create_asm =
     should_emit () && (keep_asm || not !Emitaux.binary_backend_available)
   in
