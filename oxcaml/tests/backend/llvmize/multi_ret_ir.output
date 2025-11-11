@@ -1,6 +1,6 @@
 source_filename = "multi_ret.ml"
 
-define  oxcamlcc { { i64, i64 }, { double, double, double, double } } @camlMulti_ret__permute_HIDE_STAMP(i64 %0, i64 %1, double %2, double %3, double %4, double %5) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { double, double, double, double } } @_OM9Multi_retF7permute_HIDE_STAMP(i64 %0, i64 %1, double %2, double %3, double %4, double %5) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -94,9 +94,9 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlMulti_ret__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlMulti_ret = global i64 2816, section ".data", align 8
-@camlMulti_ret = global { ptr, ptr } { ptr @camlMulti_ret__empty_block4, ptr @camlMulti_ret__permute_1 }, section ".data", align 8
-@header.camlMulti_ret__permute_1 = global i64 4087, section ".data", align 8
-@camlMulti_ret__permute_1 = global { ptr, i64, ptr } { ptr @caml_curryF_F_F_F_RFFFF, i64 324259173170675719, ptr @camlMulti_ret__permute_HIDE_STAMP }, section ".data", align 8
+@camlMulti_ret = global { ptr, ptr } { ptr @camlMulti_ret__empty_block4, ptr @camlMulti_ret__permute_HIDE_STAMP }, section ".data", align 8
+@header.camlMulti_ret__permute_HIDE_STAMP = global i64 4087, section ".data", align 8
+@camlMulti_ret__permute_HIDE_STAMP = global { ptr, i64, ptr } { ptr @caml_curryF_F_F_F_RFFFF, i64 324259173170675719, ptr @_OM9Multi_retF7permute_HIDE_STAMP }, section ".data", align 8
 @header.camlMulti_ret__empty_block4 = global i64 768, section ".data", align 8
 @camlMulti_ret__empty_block4 = global {  } {  }, section ".data", align 8
 @caml_curryF_F_F_F_RFFFF = external global ptr

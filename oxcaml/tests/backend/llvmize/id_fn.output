@@ -1,6 +1,6 @@
 source_filename = "id_fn.ml"
 
-define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlId_fn__f_HIDE_STAMP(i64 %0, i64 %1, ptr addrspace(1) %2) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @_OM5Id_fnF1f_HIDE_STAMP(i64 %0, i64 %1, ptr addrspace(1) %2) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -67,9 +67,9 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlId_fn__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlId_fn = global i64 1792, section ".data", align 8
-@camlId_fn = global { ptr } { ptr @camlId_fn__f_1 }, section ".data", align 8
-@header.camlId_fn__f_1 = global i64 3063, section ".data", align 8
-@camlId_fn__f_1 = global { ptr, i64 } { ptr @camlId_fn__f_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlId_fn = global { ptr } { ptr @camlId_fn__f_HIDE_STAMP }, section ".data", align 8
+@header.camlId_fn__f_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlId_fn__f_HIDE_STAMP = global { ptr, i64 } { ptr @_OM5Id_fnF1f_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 
 
 

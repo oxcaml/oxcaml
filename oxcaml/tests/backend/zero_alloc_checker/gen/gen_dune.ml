@@ -2,10 +2,14 @@ let () =
   let enabled_if =
     (* CR xclerc: on arm64, we currently get different results for a couple of
        cases (e.g. probes) *)
-    (* Disable tests when RunLengthEncoding name mangling is enabled, since
+    (* Enable tests when RunLengthEncoding name mangling is enabled, since
        symbol names differ. The OXCAML_NAME_MANGLING environment variable is set
        by the Makefile based on configure. *)
-    {|(enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "LegacyOCaml"))) )|}
+    {|(enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")))|}
   in
   let buf = Buffer.create 1000 in
   let print_test ?(extra_flags = "-zero-alloc-check default") deps =

@@ -1,5 +1,5 @@
 File "test_arity.ml", line 8, characters 5-15:
-Error: Annotation check for zero_alloc failed on function Test_arity.f_not_zero_alloc (camlTest_arity.f_not_zero_alloc_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Test_arity.f_not_zero_alloc (_OM10Test_arityF16f_not_zero_alloc_HIDE_STAMP).
 
 File "test_arity.ml", line 8, characters 60-64:
 Error: allocation of 24 bytes

@@ -1,6 +1,6 @@
 source_filename = "array_rev.ml"
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlArray_rev__rev_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { i64 } } @_OM9Array_revF3rev_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -267,9 +267,9 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlArray_rev__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlArray_rev = global i64 1792, section ".data", align 8
-@camlArray_rev = global { ptr } { ptr @camlArray_rev__rev_1 }, section ".data", align 8
-@header.camlArray_rev__rev_1 = global i64 3063, section ".data", align 8
-@camlArray_rev__rev_1 = global { ptr, i64 } { ptr @camlArray_rev__rev_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlArray_rev = global { ptr } { ptr @camlArray_rev__rev_HIDE_STAMP }, section ".data", align 8
+@header.camlArray_rev__rev_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlArray_rev__rev_HIDE_STAMP = global { ptr, i64 } { ptr @_OM9Array_revF3rev_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @camlArray_rev_data = external global ptr
 
 
