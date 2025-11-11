@@ -17,7 +17,6 @@
 
 open Misc
 open Compile_common
-
 module SL = Slambda
 
 module type S = sig
@@ -90,15 +89,15 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let compile_from_slambda i slambda ~keep_symbol_tables ~as_arg_for =
     slambda
     |> Profile.(record generate) (fun (program : SL.program) ->
-          Builtin_attributes.warn_unused ();
-          program
-          |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program
-          |> Slambdaeval.eval
-          |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
-               (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
-          |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
-          |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
-          |> fun program ->
+           Builtin_attributes.warn_unused ();
+           program
+           |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program
+           |> Slambdaeval.eval
+           |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
+                  Type_shape.print_debug_uid_tables ppf)
+           |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
+           |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
+           |> fun program ->
            let code =
              Simplif.simplify_lambda program.Lambda.code
                ~restrict_to_upstream_dwarf:
