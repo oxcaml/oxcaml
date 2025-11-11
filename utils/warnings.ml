@@ -1269,7 +1269,11 @@ let message = function
       "The specified kind modifier(s) \"%s\" are meaningless when applied \
       to the layout %s." (String.concat " " modifiers) abbrev
   | Duplicated_scannable_axis axis ->
-      "The " ^ axis ^ " axis has already been specified."
+      (* CR layouts-scannable: specializing this error would enable better
+         error messages (ex: including the previous annotation, or specifying
+         that it is redundant) *)
+      "The " ^ axis ^ " axis has already been specified, \n\
+       and this annotation will override the previous one."
   | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
   | Incompatible_with_upstream (Immediate_erasure id)  ->
       Printf.sprintf
