@@ -2114,11 +2114,10 @@ module Const = struct
     }
 
   let transl_scannable_axes sa_annots =
-    (* CR layouts-scannable: this should work for more axes as they're added
-       however, without a data representation for "the axis", this doesn't
-       report a very good error. Using [Per_axis] is one solution; having
-       one warning helper per axis is another, as is passing a string (lame).
-       For now, we specialize. Or, accumulate the string to avoid to_string *)
+    (* CR layouts-scannable: This should work for more axes as they're added
+       The current implementation is quite specialized. The [to_string] call
+       seems avoidable if an additional string is accumulated; this may not be
+       the best though. Consider refactoring as more axes are added. *)
     let set_or_warn ~loc ~to_ pointerness =
       match pointerness with
       | Some overridden_by ->
@@ -2182,12 +2181,12 @@ module Const = struct
         Location.prerr_warning jkind.pjkind_loc
           (Warnings.Ignored_kind_modifier
              (name.txt, List.map Location.get_txt sa_annot));
-      (* CR layouts-scannable: the correct behavior is to make a new jkind that
-         differs only in the layout by adding in the non-None scannable axes.
-         for inspiration, see [set_nullability_upper_bound].
-         this should emit a warning if the jkind_without_sa already has
-         the specified non-trivialities. this is why this currently returns
-         an optional with the annotation (since none vs default matters) *)
+      (* CR layouts-scannable: The correct behavior is to make a new jkind that
+         differs only in the layout by adding in the non-[None] scannable axes.
+         For inspiration, see [set_nullability_upper_bound].
+         This should emit a warning if the [jkind_without_sa] already has
+         the specified scannable axes. This is why the helper currently
+         returns an optional annotation (since none vs default matters). *)
       ignore pointerness;
       jkind_without_sa
     | Pjk_mod (base, modifiers) ->

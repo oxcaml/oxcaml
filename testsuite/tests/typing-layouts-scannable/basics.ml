@@ -3,8 +3,8 @@
  expect;
 *)
 
-(* CR layouts-scannable: once annotations aren't being dropped on the floor, the
-   printing in the good cases should include more layout information *)
+(* CR layouts-scannable: Ince annotations aren't being ignored, the
+   printing in the good cases should include more layout information. *)
 
 type t : value non_pointer = int
 [%%expect{|
