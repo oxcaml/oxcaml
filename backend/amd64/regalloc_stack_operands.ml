@@ -225,15 +225,11 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     ->
     may_use_stack_operand_for_only_argument map instr ~has_result:true
   | Op (Reinterpret_cast (Int64_of_float | Int32_of_float32))
-  | Op (Static_cast (Scalar_of_v128 (Int64x2 | Int32x4)))
-  | Op (Static_cast (Scalar_of_v256 (Int64x4 | Int32x8)))
-  | Op (Static_cast (Scalar_of_v512 (Int64x8 | Int32x16))) ->
+  | Op (Static_cast (Scalar_of_v128 (Int64x2 | Int32x4 | Int16x8 | Int8x16)))
+  | Op (Static_cast (Scalar_of_v256 (Int64x4 | Int32x8 | Int16x16 | Int8x32)))
+  | Op (Static_cast (Scalar_of_v512 (Int64x8 | Int32x16 | Int16x32 | Int8x64)))
+    ->
     may_use_stack_operand_for_result map instr ~num_args:1
-  | Op (Static_cast (Scalar_of_v128 (Int16x8 | Int8x16)))
-  | Op (Static_cast (Scalar_of_v256 (Int16x16 | Int8x32)))
-  | Op (Static_cast (Scalar_of_v512 (Int16x32 | Int8x64))) ->
-    (* CR-someday mslater: int8#/int16# shouldn't require sign extension *)
-    May_still_have_spilled_registers
   | Op
       (Static_cast
         ( Float_of_int (Float32 | Float64)

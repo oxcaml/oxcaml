@@ -181,6 +181,8 @@ val copy_row:
     (type_expr -> type_expr) ->
     bool -> row_desc -> bool -> type_expr -> row_desc
 
+val copy_commu : commutable -> commutable
+
 module For_copy : sig
 
   type copy_scope

@@ -277,7 +277,7 @@ Error: Signature mismatch:
        is not included in
          type t : immediate64_or_null
        The kind of the first is
-           value_or_null mod many forkable unyielding stateless immutable
+           value_or_null mod forkable unyielding many stateless immutable
          because it is the primitive type or_null.
        But the kind of the first must be a subkind of immediate64_or_null
          because of the definition of t at line 2, characters 2-30.

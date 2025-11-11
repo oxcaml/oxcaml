@@ -1610,17 +1610,9 @@ let emit_static_cast (cast : Cmm.static_cast) i =
   | V256_of_scalar Float16x16 ->
     Misc.fatal_error "float16 scalar type not supported"
   | Scalar_of_v128 Int16x8 | Scalar_of_v256 Int16x16 ->
-    (* CR-someday mslater: int16# shouldn't require sign extension *)
-    (* [movw] and [movzx] cannot operate on vector registers. We must sign
-       extend as the result is an untagged int8. *)
-    movd (argX i 0) (res32 i 0);
-    I.movsx (res16 i 0) (res i 0)
+    movd (argX i 0) (res32 i 0)
   | Scalar_of_v128 Int8x16 | Scalar_of_v256 Int8x32 ->
-    (* CR-someday mslater: int8# shouldn't require sign extension *)
-    (* [movb] and [movzx] cannot operate on vector registers. We must sign
-       extend as the result is an untagged int16. *)
-    movd (argX i 0) (res32 i 0);
-    I.movsx (res8 i 0) (res i 0)
+    movd (argX i 0) (res32 i 0)
   | V128_of_scalar Int16x8
   | V128_of_scalar Int8x16
   | V256_of_scalar Int16x16

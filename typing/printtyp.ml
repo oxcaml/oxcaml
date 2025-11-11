@@ -1451,7 +1451,9 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
   (* [portability] has implied defaults based on [statefulness]: *)
   let portability =
     match modes.statefulness, modes.portability with
-    | Stateless, Portable | (Observing | Stateful), Nonportable -> None
+    | Stateless, Portable
+    | Observing, Sharable
+    | Stateful, Nonportable -> None
     | _, _ -> Some modes.portability
   in
 

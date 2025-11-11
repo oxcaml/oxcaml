@@ -523,6 +523,14 @@ let default : 'a @ stateless -> 'a @ portable = fun x -> x
 val default : 'a @ stateless -> 'a @ portable = <fun>
 |}]
 
+let override : 'a @ stateless sharable -> 'a @ portable = fun x -> x
+[%%expect{|
+Line 1, characters 67-68:
+1 | let override : 'a @ stateless sharable -> 'a @ portable = fun x -> x
+                                                                       ^
+Error: This value is "sharable" but is expected to be "portable".
+|}]
+
 let override : 'a @ stateless nonportable -> 'a @ portable = fun x -> x
 [%%expect{|
 Line 1, characters 70-71:
@@ -531,14 +539,29 @@ Line 1, characters 70-71:
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
-(* [observing] or [stateful] don't change the default. *)
+(* [observing] => [sharable]. *)
+
+let default : 'a @ observing -> 'a @ sharable = fun x -> x
+[%%expect{|
+val default : 'a @ observing -> 'a @ sharable = <fun>
+|}]
+
+let override : 'a @ observing nonportable -> 'a @ sharable = fun x -> x
+[%%expect{|
+Line 1, characters 70-71:
+1 | let override : 'a @ observing nonportable -> 'a @ sharable = fun x -> x
+                                                                          ^
+Error: This value is "nonportable" but is expected to be "sharable".
+|}]
+
+(* [stateful] => [nonportable] *)
 
 let fails : 'a @ observing -> 'a @ portable = fun x -> x
 [%%expect{|
 Line 1, characters 55-56:
 1 | let fails : 'a @ observing -> 'a @ portable = fun x -> x
                                                            ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "sharable" but is expected to be "portable".
 |}]
 
 let succeeds : 'a @ observing portable -> 'a @ portable = fun x -> x

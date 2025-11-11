@@ -3451,12 +3451,12 @@ let closure_mode ~loc ~item ~lid
   ({mode = {Mode.monadic; comonadic}; _} as vmode) closure_context comonadic0 =
   let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
   let hint_comonadic : _ Mode.Hint.morph =
-    Is_closed_by {closure = closure_context; closed = pp; polarity = Comonadic}
+    Is_closed_by (Comonadic, {closure = closure_context; closed = pp})
   in
   Mode.Value.Comonadic.submode_err pp
     comonadic (Mode.Value.Comonadic.apply_hint hint_comonadic comonadic0);
   let hint_monadic : _ Mode.Hint.morph =
-    Is_closed_by {closure = closure_context; closed = pp; polarity = Monadic}
+    Is_closed_by (Monadic, {closure = closure_context; closed = pp})
   in
   let monadic =
     Mode.Value.Monadic.join

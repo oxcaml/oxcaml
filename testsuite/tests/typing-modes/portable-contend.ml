@@ -130,7 +130,7 @@ Error: This value is "nonportable"
        However, the highlighted expression is expected to be "portable".
 |}]
 
-(* Closing over reading mutable field gives nonportable *)
+(* Closing over reading mutable field gives sharable *)
 let foo () =
     let r = {a = best_bytes (); b = best_bytes ()} in
     let bar () = let _ = r.a in () in
@@ -140,14 +140,14 @@ let foo () =
 Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable"
+Error: This value is "sharable"
        because it contains a usage (of the value "r" at Line 3, characters 25-26)
        which is expected to be "shared" or "uncontended"
        because its mutable field "a" is being read.
        However, the highlighted expression is expected to be "portable".
 |}]
 
-(* Closing over reading mutable field from shared value is nonportable *)
+(* Closing over reading mutable field from shared value is sharable *)
 let foo (r @ shared) =
     let bar () = let _ = r.a in () in
     let _ @ portable = bar in
@@ -156,7 +156,7 @@ let foo (r @ shared) =
 Line 3, characters 23-26:
 3 |     let _ @ portable = bar in
                            ^^^
-Error: This value is "nonportable"
+Error: This value is "sharable"
        because it contains a usage (of the value "r" at Line 2, characters 25-26)
        which is expected to be "shared" or "uncontended"
        because its mutable field "a" is being read.
@@ -325,13 +325,13 @@ Error: This function when partially applied returns a value which is "nonportabl
        but expected to be "portable".
 |}]
 
-(* closing over shared gives nonportable *)
+(* closing over shared gives sharable *)
 let foo : 'a @ shared portable -> (unit -> unit) @ portable = fun a () -> ()
 [%%expect{|
 Line 1, characters 62-76:
 1 | let foo : 'a @ shared portable -> (unit -> unit) @ portable = fun a () -> ()
                                                                   ^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "nonportable",
+Error: This function when partially applied returns a value which is "sharable",
        but expected to be "portable".
 |}]
 (* CR modes: These three tests are in principle fine to allow (they don't cause a data

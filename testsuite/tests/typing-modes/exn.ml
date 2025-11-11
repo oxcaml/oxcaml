@@ -69,7 +69,9 @@ let (foo @ portable) (g @ nonportable) =
 Line 2, characters 23-24:
 2 |     raise (Nonportable g)
                            ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is contained (via constructor "Nonportable") in the value at Line 2, characters 10-25
+       which is expected to be "portable".
 |}]
 
 let (foo @ portable) () =
@@ -292,6 +294,8 @@ Line 3, characters 34-35:
                                       ^
 Error: This value is "immutable"
        because it is used inside the function at Line 3, characters 23-50
+       which is expected to be "stateless"
+       because it is contained (via constructor "StatefulFun") in the value at Line 3, characters 10-51
        which is expected to be "stateless".
        However, the highlighted expression is expected to be "read_write"
        because its mutable field "contents" is being written.
@@ -309,7 +313,9 @@ Error: This value is "stateful"
        because it contains a usage (of the value "x" at Line 3, characters 15-16)
        which is expected to be "read_write"
        because its mutable field "contents" is being written.
-       However, the highlighted expression is expected to be "stateless".
+       However, the highlighted expression is expected to be "stateless"
+       because it is contained (via constructor "StatefulFun") in the value at Line 4, characters 10-25
+       which is expected to be "stateless".
 |}]
 
 (* visibility axis *)

@@ -783,12 +783,12 @@ module F :
 NB: coercion is the only place of subtype checking packages; all other places
 are equality check. *)
 module type S = sig val foo : 'a -> 'a @@ global many end
-module type S' = sig val foo : 'a -> 'a end
+module type S' = sig val foo : 'a -> 'a @@ aliased end
 
 let f (x : (module S)) = (x : (module S) :> (module S'))
 [%%expect{|
 module type S = sig val foo : 'a -> 'a @@ global many end
-module type S' = sig val foo : 'a -> 'a end
+module type S' = sig val foo : 'a -> 'a @@ aliased end
 val f : (module S) -> (module S') = <fun>
 |}]
 
@@ -897,15 +897,14 @@ Error: Signature mismatch:
          module type S = sig val foo : 'a @@ global many end
        does not match
          module type S = sig val foo : 'a end
-       The second module type is not included in the first
        At position "module type S = <here>"
        Module types do not match:
-         sig val foo : 'a end
-       is not equal to
          sig val foo : 'a @@ global many end
+       is not equal to
+         sig val foo : 'a end
        At position "module type S = <here>"
        Modalities on foo do not match:
-       The second is global and the first is not.
+       The second is empty and the first is aliased.
 |}]
 
 (* Module declaration inclusion check inside a module type declaration inclusion
@@ -941,20 +940,19 @@ Error: Signature mismatch:
            sig module M : sig val foo : 'a -> 'a @@ global many end end
        does not match
          module type N = sig module M : sig val foo : 'a -> 'a end end
-       The second module type is not included in the first
        At position "module type N = <here>"
        Module types do not match:
-         sig module M : sig val foo : 'a -> 'a end end
-       is not equal to
          sig module M : sig val foo : 'a -> 'a @@ global many end end
+       is not equal to
+         sig module M : sig val foo : 'a -> 'a end end
        At position "module type N = sig module M : <here> end"
        Modules do not match:
-         sig val foo : 'a -> 'a end
-       is not included in
          sig val foo : 'a -> 'a @@ global many end
+       is not included in
+         sig val foo : 'a -> 'a end
        At position "module type N = sig module M : <here> end"
        Modalities on foo do not match:
-       The second is global and the first is not.
+       The second is empty and the first is aliased.
 |}]
 
 (* functor type inclusion: the following two functor types are equivalent,

@@ -298,10 +298,12 @@ let native unix
         "camlinternaleval" ]
 
     let support_files_for_eval () =
+      List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval
+
+    let set_load_path_for_eval () =
       List.iter
         (fun lib ->
           Load_path.add_dir ~hidden:false
             (Misc.expand_directory Config.standard_library ("+" ^ lib)))
-        extra_load_paths_for_eval;
-      List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval
+        extra_load_paths_for_eval
   end) : S)

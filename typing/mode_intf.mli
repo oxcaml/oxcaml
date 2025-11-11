@@ -166,7 +166,8 @@ module type Common = sig
 
   (** Similiar to [submode], but crashes the compiler if errors. Use this
     function if the submode is guaranteed to succeed. *)
-  val submode_exn : (allowed * 'r) t -> ('l * allowed) t -> unit
+  val submode_exn :
+    ?pp:Mode_hint.pinpoint -> (allowed * 'r) t -> ('l * allowed) t -> unit
 
   val equate_exn : lr -> lr -> unit
 
@@ -369,6 +370,7 @@ module type S = sig
     module Const : sig
       type t =
         | Portable
+        | Sharable
         | Nonportable
 
       include Const with type t := t
@@ -674,6 +676,8 @@ module type S = sig
       ?hint_comonadic:('l * 'r) pos Hint.const ->
       Const.t ->
       ('l * 'r) t
+
+    val to_const_exn : lr -> Const.t
 
     module List : sig
       (* No new types exposed to avoid too many type names *)
@@ -1067,6 +1071,10 @@ module type S = sig
     (** [modality m t] gives the mode crossing of type [T] wrapped in modality
     [m] where [T] has mode crossing [t]. *)
     val modality : Modality.Const.t -> t -> t
+
+    (** Takes a mode crossing [t], returns the modality needed to make [max] into [t].
+      More precisely, [to_modality] is the inverse of [modality _ max]. *)
+    val to_modality : t -> Modality.Const.t
 
     (** Apply mode crossing on a left mode, making it stronger. *)
     val apply_left : t -> Value.l -> Value.l
