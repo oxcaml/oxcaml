@@ -1,7 +1,7 @@
 'a b c' -> ["a"; "b"; "c"]
 'a\ b c' -> ["a b"; "c"]
 'a\\b c' -> ["a\\b"; "c"]
-'foo   bar   hello' -> ["foo"; "bar"; "hello"]
+'foo\ \ \ bar\   hello' -> ["foo   bar "; "hello"]
 'a\nb' -> ["a\nb"]
 'a\rb' -> ["a\rb"]
 'a\\b c\ d e\nf g\rh' -> ["a\\b"; "c d"; "e\nf"; "g\rh"]
