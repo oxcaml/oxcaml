@@ -131,7 +131,6 @@ end = struct
         ~quality
         ~annotation:(Some
           { pjkind_loc = Location.none;
-            (* CR layouts-scannable: this may have to change; take a look! *)
             pjkind_desc = Pjk_abbreviation (Location.mknoloc builtin.name, [])})
         ~why:Jkind.History.Imported)
 

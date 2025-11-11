@@ -131,7 +131,7 @@ type t =
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
   | Ignored_kind_modifier of string * string list (* 184 *)
-  | Duplicated_scannable_axis of string     (* 185 *)
+  | Overridden_kind_modifier of string      (* 185 *)
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
@@ -230,7 +230,7 @@ let number = function
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
   | Ignored_kind_modifier _ -> 184
-  | Duplicated_scannable_axis _ -> 185
+  | Overridden_kind_modifier _ -> 185
   | Unmutated_mutable _ -> 186
   | Incompatible_with_upstream _ -> 187
   | Unerasable_position_argument -> 188
@@ -596,9 +596,8 @@ let descriptions = [
                    non-any layout.";
     since = since 5 2 };
   { number = 185;
-    names = ["duplicated-scannable-axis"];
-    description = "The pointerness axis is annotated more than once; the \
-                   last annotation will be used.";
+    names = ["overridden-kind-modifier"];
+    description = "A kind modifier is present but overridden later.";
     since = since 5 2 };
   { number = 186;
     names = ["unmutated-mutable"];
@@ -1266,14 +1265,10 @@ let message = function
        should be applied to '()'; using '(struct end)' is deprecated."
   | Ignored_kind_modifier (abbrev, modifiers) ->
       Printf.sprintf
-      "The specified kind modifier(s) \"%s\" are meaningless when applied \
-      to the layout %s." (String.concat " " modifiers) abbrev
-  | Duplicated_scannable_axis axis ->
-      (* CR layouts-scannable: specializing this error would enable better
-         error messages (ex: including the previous annotation, or specifying
-         that it is redundant) *)
-      "The " ^ axis ^ " axis has already been specified, \n\
-       and this annotation will override the previous one."
+      "The kind modifier(s) \"%s\" have no effect on the layout \"%s\"."
+      (String.concat " " modifiers) abbrev
+  | Overridden_kind_modifier overridden_by ->
+      "This modifier is overridden by \"" ^ overridden_by ^ "\" later."
   | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
   | Incompatible_with_upstream (Immediate_erasure id)  ->
       Printf.sprintf

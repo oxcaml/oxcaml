@@ -2118,25 +2118,28 @@ module Const = struct
        however, without a data representation for "the axis", this doesn't
        report a very good error. Using [Per_axis] is one solution; having
        one warning helper per axis is another, as is passing a string (lame).
-       For now, we just specialize. *)
-    let check_and_warn ~loc pointerness =
+       For now, we specialize. Or, accumulate the string to avoid to_string *)
+    let set_or_warn ~loc ~to_ pointerness =
       match pointerness with
-      | Some _ ->
+      | Some overridden_by ->
         Location.prerr_warning loc
-          (Warnings.Duplicated_scannable_axis "pointerness")
-      | None -> ()
+          (Warnings.Overridden_kind_modifier
+             (Pointerness.to_string overridden_by));
+        pointerness
+      | None -> Some to_
     in
-    List.fold_left
-      (fun pointerness ({ txt; loc } : string Location.loc) ->
+    (* This will compute and report errors from right-to-left, which enables
+       better error messages while traversing the list only once. It comes at
+       the cost of warnings being reported in a slightly weirder order. *)
+    List.fold_right
+      (fun ({ txt; loc } : string Location.loc) pointerness ->
         match txt with
         | "non_pointer" ->
-          check_and_warn ~loc pointerness;
-          Some Pointerness.Non_pointer
+          set_or_warn ~loc ~to_:Pointerness.Non_pointer pointerness
         | "maybe_pointer" ->
-          check_and_warn ~loc pointerness;
-          Some Pointerness.Maybe_pointer
+          set_or_warn ~loc ~to_:Pointerness.Maybe_pointer pointerness
         | _ -> raise ~loc (Unknown_kind_modifier txt))
-      None sa_annots
+      sa_annots None
 
   let rec of_user_written_annotation_unchecked_level :
       type l r.

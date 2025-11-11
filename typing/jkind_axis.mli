@@ -60,6 +60,8 @@ module Pointerness : sig
      there are more operations that make sense here. But also, this will
      probably change as more things get refactored. Seems ok for now. *)
   include Axis_ops with type t := t
+
+  val to_string : t -> string
 end
 
 module Axis : sig
