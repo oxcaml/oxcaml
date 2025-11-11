@@ -22,7 +22,7 @@ BUILTIN(caml_sse2_vec128_load_low32);
 BUILTIN(caml_sse2_int32_store_uncached);
 BUILTIN(caml_sse2_int64_store_uncached);
 BUILTIN(caml_sse2_vec128_load_low64_copy_high64);
-BUILTIN(caml_sse2_vec128_load_high64_copy_high64);
+BUILTIN(caml_sse2_vec128_load_high64_copy_low64);
 BUILTIN(caml_sse2_vec128_load_zero_low32);
 BUILTIN(caml_sse2_vec128_load_zero_low64);
 BUILTIN(caml_sse2_vec128_store_low32);
