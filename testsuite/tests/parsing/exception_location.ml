@@ -43,7 +43,7 @@ let () = test_impl "exception E of int [@@deriving sexp]"
 
 [%%expect {|
 Structure item loc: File "file.ml", line 1, characters 0-36
-Exception declaration loc: File "file.ml", line 1, characters 0-18
-Exception constructor loc: File "file.ml", line 1, characters 0-18
+Exception declaration loc: File "file.ml", line 1, characters 0-36
+Exception constructor loc: File "file.ml", line 1, characters 0-36
 Exception constructor name loc: File "file.ml", line 1, characters 10-11
 |}]
