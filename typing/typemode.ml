@@ -241,8 +241,7 @@ let enforce_forbidden_modalities ~loc annot_type m =
   with
   | ( Meet_with Global,
       Modality.Monadic.Atom.Join_with Mode.Uniqueness.Const.Unique ) ->
-    raise
-      (Error (loc, Forbidden_modality (annot_type, Global_and_unique)))
+    raise (Error (loc, Forbidden_modality (annot_type, Global_and_unique)))
   | _ -> ()
 
 let transl_mod_bounds annots =
