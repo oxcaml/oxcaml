@@ -8830,6 +8830,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
               |> mode_morph (fun _mode -> exp_mode)
               |> expect_mode_cross env ty_expected'
             in
+            let expected_mode = {expected_mode with position = RNontail} in
             type_exp ~overwrite env expected_mode sarg)
       in
       let rec make_args args ty_fun =
