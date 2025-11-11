@@ -44,17 +44,20 @@ type t : value non_pointer maybe_pointer
 Line 1, characters 27-40:
 1 | type t : value non_pointer maybe_pointer
                                ^^^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 Line 1, characters 27-40:
 1 | type t : value non_pointer maybe_pointer
                                ^^^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 Line 1, characters 27-40:
 1 | type t : value non_pointer maybe_pointer
                                ^^^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 type t
 |}]
@@ -64,17 +67,20 @@ type t : value non_pointer non_pointer
 Line 1, characters 27-38:
 1 | type t : value non_pointer non_pointer
                                ^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 Line 1, characters 27-38:
 1 | type t : value non_pointer non_pointer
                                ^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 Line 1, characters 27-38:
 1 | type t : value non_pointer non_pointer
                                ^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 type t
 |}]
@@ -84,32 +90,38 @@ type t : value maybe_pointer non_pointer maybe_pointer
 Line 1, characters 29-40:
 1 | type t : value maybe_pointer non_pointer maybe_pointer
                                  ^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 Line 1, characters 41-54:
 1 | type t : value maybe_pointer non_pointer maybe_pointer
                                              ^^^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 Line 1, characters 29-40:
 1 | type t : value maybe_pointer non_pointer maybe_pointer
                                  ^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 Line 1, characters 41-54:
 1 | type t : value maybe_pointer non_pointer maybe_pointer
                                              ^^^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 Line 1, characters 29-40:
 1 | type t : value maybe_pointer non_pointer maybe_pointer
                                  ^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 Line 1, characters 41-54:
 1 | type t : value maybe_pointer non_pointer maybe_pointer
                                              ^^^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 type t
 |}]
@@ -139,7 +151,8 @@ type t : void non_pointer maybe_pointer
 Line 1, characters 26-39:
 1 | type t : void non_pointer maybe_pointer
                               ^^^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 Line 1, characters 9-39:
 1 | type t : void non_pointer maybe_pointer
@@ -149,7 +162,8 @@ Warning 184 [ignored-kind-modifier]: The specified kind modifier(s) "non_pointer
 Line 1, characters 26-39:
 1 | type t : void non_pointer maybe_pointer
                               ^^^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 Line 1, characters 9-39:
 1 | type t : void non_pointer maybe_pointer
@@ -159,7 +173,8 @@ Warning 184 [ignored-kind-modifier]: The specified kind modifier(s) "non_pointer
 Line 1, characters 26-39:
 1 | type t : void non_pointer maybe_pointer
                               ^^^^^^^^^^^^^
-Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified.
+Warning 185 [duplicated-scannable-axis]: The pointerness axis has already been specified,
+and this annotation will override the previous one.
 
 Line 1, characters 9-39:
 1 | type t : void non_pointer maybe_pointer
