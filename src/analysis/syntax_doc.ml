@@ -25,10 +25,10 @@ let rec drop_until list ~f =
     | false -> drop_until rest ~f)
 
 module Loc_comparison_result = struct
-  type t = Before | Inside | After
+  type t = Before | Inside | After | Ghost
 
   let is_inside = function
-    | Before | After -> false
+    | Before | After | Ghost -> false
     | Inside -> true
 end
 
@@ -317,11 +317,14 @@ let get_modality_doc modality =
 let get_oxcaml_syntax_doc cursor_loc nodes : syntax_info =
   (* Merlin-jst specific: This function gets documentation for oxcaml language
      extensions. *)
-  let compare_cursor_to_loc loc : Loc_comparison_result.t =
-    match Location_aux.compare_pos cursor_loc loc with
-    | n when n < 0 -> Before
-    | n when n > 0 -> After
-    | _ -> Inside
+  let compare_cursor_to_loc (loc : Location.t) : Loc_comparison_result.t =
+    match loc.loc_ghost with
+    | true -> Ghost
+    | false -> (
+      match Location_aux.compare_pos cursor_loc loc with
+      | n when n < 0 -> Before
+      | n when n > 0 -> After
+      | _ -> Inside)
   in
   let nodes = List.map nodes ~f:snd in
   let nodes =
@@ -336,9 +339,7 @@ let get_oxcaml_syntax_doc cursor_loc nodes : syntax_info =
        until we reach one that includes the cursor. *)
     drop_until nodes ~f:(fun node ->
         let loc = Browse_raw.node_merlin_loc Location.none node in
-        match compare_cursor_to_loc loc with
-        | Inside -> true
-        | Before | After -> false)
+        Loc_comparison_result.is_inside (compare_cursor_to_loc loc))
   in
   let stack_allocation_url =
     syntax_doc_url Oxcaml "stack-allocation/reference/"
@@ -683,7 +684,8 @@ let get_oxcaml_syntax_doc cursor_loc nodes : syntax_info =
           description = "Mark a type as included under a modality";
           documentation = syntax_doc_url Oxcaml "kinds/intro/";
           level = Advanced
-        })
+        }
+    | Ghost -> None)
   (* Module Strengthening *)
   | Module_type { mty_desc = Tmty_strengthen (_, _, mod_ident); _ } :: _ -> (
     (* Due to a current bug, there is no node for the module name after the `with`, so
@@ -700,7 +702,7 @@ let get_oxcaml_syntax_doc cursor_loc nodes : syntax_info =
               "miscellaneous-extensions/module-strengthening/";
           level = Advanced
         }
-    | Inside | After -> None)
+    | Inside | After | Ghost -> None)
   (* Local allocations *)
   | Expression { exp_desc = Texp_exclave _; _ } :: _ ->
     Some
@@ -764,7 +766,7 @@ let get_oxcaml_syntax_doc cursor_loc nodes : syntax_info =
             | Attribute attribute -> (
               match compare_cursor_to_loc attribute.attr_loc with
               | Inside -> get_doc_for_attribute attribute
-              | Before | After -> None)
+              | Before | After | Ghost -> None)
             | _ -> None))
 
 let get_syntax_doc cursor_loc node : syntax_info =
