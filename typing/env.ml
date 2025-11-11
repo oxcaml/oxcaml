@@ -144,7 +144,8 @@ type module_unbound_reason =
       { container : string option; unbound : string }
 
 type lock =
-  | Const_closure_lock of bool * Mode.Hint.pinpoint * Mode.Value.Comonadic.Const.t
+  | Const_closure_lock of bool * Mode.Hint.pinpoint *
+      Mode.Value.Comonadic.Const.t
   | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
   | Region_lock
   | Exclave_lock
