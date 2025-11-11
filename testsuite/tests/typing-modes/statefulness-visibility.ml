@@ -525,9 +525,9 @@ val default : 'a @ stateless -> 'a @ portable = <fun>
 
 let override : 'a @ stateless shareable -> 'a @ portable = fun x -> x
 [%%expect{|
-Line 1, characters 67-68:
+Line 1, characters 68-69:
 1 | let override : 'a @ stateless shareable -> 'a @ portable = fun x -> x
-                                                                       ^
+                                                                        ^
 Error: This value is "shareable" but is expected to be "portable".
 |}]
 
@@ -548,9 +548,9 @@ val default : 'a @ observing -> 'a @ shareable = <fun>
 
 let override : 'a @ observing nonportable -> 'a @ shareable = fun x -> x
 [%%expect{|
-Line 1, characters 70-71:
+Line 1, characters 71-72:
 1 | let override : 'a @ observing nonportable -> 'a @ shareable = fun x -> x
-                                                                          ^
+                                                                           ^
 Error: This value is "nonportable" but is expected to be "shareable".
 |}]
 
