@@ -503,10 +503,16 @@ val enter_unbound_module : string -> module_unbound_reason -> t -> t
 
 (* Lock the environment *)
 
-val add_const_closure_lock : Mode.Hint.pinpoint -> Mode.Value.Comonadic.Const.t
-  -> t -> t
 val add_closure_lock : Mode.Hint.pinpoint
   -> ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
+
+(** A variant of [add_closure_lock] where the mode of the closure is a constant
+due to the nature of the pinpoint. As a result, the mode is not printed in error
+messages. [real = false] means the closure is merely a semantic closure (such as
+a loop) rather than a real one. *)
+val add_const_closure_lock : ?real:bool -> Mode.Hint.pinpoint ->
+  Mode.Value.Comonadic.Const.t -> t -> t
+
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t

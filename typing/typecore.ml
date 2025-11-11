@@ -6796,7 +6796,7 @@ and type_expect_
         exp_env = env }
   | Pexp_while(scond, sbody) ->
       let env =
-        Env.add_const_closure_lock (loc, Loop)
+        Env.add_const_closure_lock ~real:false (loc, Loop)
           {Value.Comonadic.Const.max with linearity = Many} env
       in
       let cond_env = Env.add_region_lock env in
@@ -6833,7 +6833,7 @@ and type_expect_
           (mk_expected ~explanation:For_loop_stop_index Predef.type_int)
       in
       let env =
-        Env.add_const_closure_lock (loc, Loop)
+        Env.add_const_closure_lock ~real:false (loc, Loop)
           {Value.Comonadic.Const.max with linearity = Many} env
       in
       let (for_id, for_uid), new_env =
