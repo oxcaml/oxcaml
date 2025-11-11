@@ -192,9 +192,9 @@ let select_operation_sse2 ~dbg op args =
     simd_store ~mode:(Iindexed 0) movnti_m32_r32 args
   | "caml_sse2_int64_store_uncached" ->
     simd_store ~mode:(Iindexed 0) movnti_m64_r64 args
-  | "caml_sse2_vec128_load_copy_low64" ->
+  | "caml_sse2_vec128_load_low64_copy_high64" ->
     simd_load_sse_or_avx ~mode:(Iindexed 0) movlpd_X_m64 vmovlpd_X_X_m64 args
-  | "caml_sse2_vec128_load_copy_high64" ->
+  | "caml_sse2_vec128_load_high64_copy_low64" ->
     simd_load_sse_or_avx ~mode:(Iindexed 0) movhpd_X_m64 vmovhpd_X_X_m64 args
   | "caml_sse2_vec128_load_zero_low32" ->
     simd_load_sse_or_avx ~mode:(Iindexed 0) movss_X_m32 vmovss_X_m32 args

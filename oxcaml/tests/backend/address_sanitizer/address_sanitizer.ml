@@ -977,9 +977,9 @@ module Test_out_of_bounds_accesses = struct
   [@@noalloc] [@@builtin]
   external vec128_load_low64 : nativeint# -> int64x2# = "" "caml_sse2_vec128_load_low64"
   [@@noalloc] [@@builtin]
-  external vec128_load_copy_low64 : int64x2# -> nativeint# -> int64x2# = "" "caml_sse2_vec128_load_copy_low64"
+  external vec128_load_low64_copy_high64 : int64x2# -> nativeint# -> int64x2# = "" "caml_sse2_vec128_load_low64_copy_high64"
   [@@noalloc] [@@builtin]
-  external vec128_load_copy_high64 : int64x2# -> nativeint# -> int64x2# = "" "caml_sse2_vec128_load_copy_high64"
+  external vec128_load_high64_copy_low64 : int64x2# -> nativeint# -> int64x2# = "" "caml_sse2_vec128_load_high64_copy_low64"
   [@@noalloc] [@@builtin]
   external vec128_load_zero_low64 : nativeint# -> int64x2# = "" "caml_sse2_vec128_load_zero_low64"
   [@@noalloc] [@@builtin]
@@ -1065,10 +1065,10 @@ module Test_out_of_bounds_accesses = struct
       ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:8)
   ;;
 
-  let vec128_load_copy_low64 () =
+  let vec128_load_low64_copy_high64 () =
     let test () =
       let x = Vec128_bigarray.create_elem #0L #0L in
-      let _ = vec128_load_copy_low64 x (malloc #1n) |> Sys.opaque_identity in
+      let _ = vec128_load_low64_copy_high64 x (malloc #1n) |> Sys.opaque_identity in
       ()
     in
     run_test
@@ -1077,10 +1077,10 @@ module Test_out_of_bounds_accesses = struct
       ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:8)
   ;;
 
-  let vec128_load_copy_high64 () =
+  let vec128_load_high64_copy_low64 () =
     let test () =
       let x = Vec128_bigarray.create_elem #0L #0L in
-      let _ = vec128_load_copy_high64 x (malloc #1n) |> Sys.opaque_identity in
+      let _ = vec128_load_high64_copy_low64 x (malloc #1n) |> Sys.opaque_identity in
       ()
     in
     run_test
@@ -1194,21 +1194,22 @@ module Test_out_of_bounds_accesses = struct
   [@@noalloc] [@@builtin]
   external vec256_broadcast32x4 : nativeint# -> int32x4# = "" "caml_avx_vec128_load_broadcast32"
   [@@noalloc] [@@builtin]
-  external vec256_load_mask64x2 : int64x2# -> nativeint# -> int64x2# = "" "caml_avx_vec128_load_mask64"
-  [@@noalloc] [@@builtin]
   external vec256_load_mask64x4 : int64x4# -> nativeint# -> int64x4# = "" "caml_avx_vec256_load_mask64"
-  [@@noalloc] [@@builtin]
-  external vec256_load_mask32x4 : int64x2# -> nativeint# -> int64x2# = "" "caml_avx_vec128_load_mask32"
   [@@noalloc] [@@builtin]
   external vec256_load_mask32x8 : int64x4# -> nativeint# -> int64x4# = "" "caml_avx_vec256_load_mask32"
   [@@noalloc] [@@builtin]
-  external vec256_store_mask64x2 : nativeint# -> int64x2# -> int64x2# -> void = "" "caml_avx_vec128_store_mask64"
-  [@@noalloc] [@@builtin]
   external vec256_store_mask64x4 : nativeint# -> int64x4# -> int64x4# -> void = "" "caml_avx_vec256_store_mask64"
   [@@noalloc] [@@builtin]
-  external vec256_store_mask32x4 : nativeint# -> int64x2# -> int64x2# -> void = "" "caml_avx_vec128_store_mask32"
-  [@@noalloc] [@@builtin]
   external vec256_store_mask32x8 : nativeint# -> int64x4# -> int64x4# -> void = "" "caml_avx_vec256_store_mask32"
+  [@@noalloc] [@@builtin]
+
+  external vec128_load_mask64x2 : int64x2# -> nativeint# -> int64x2# = "" "caml_avx_vec128_load_mask64"
+  [@@noalloc] [@@builtin]
+  external vec128_store_mask64x2 : nativeint# -> int64x2# -> int64x2# -> void = "" "caml_avx_vec128_store_mask64"
+  [@@noalloc] [@@builtin]
+  external vec128_load_mask32x4 : int64x2# -> nativeint# -> int64x2# = "" "caml_avx_vec128_load_mask32"
+  [@@noalloc] [@@builtin]
+  external vec128_store_mask32x4 : nativeint# -> int64x2# -> int64x2# -> void = "" "caml_avx_vec128_store_mask32"
   [@@noalloc] [@@builtin]
 
   let vec256_load_aligned () =
@@ -1300,10 +1301,10 @@ module Test_out_of_bounds_accesses = struct
       ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:4)
   ;;
 
-  let vec256_load_mask64x2 () =
+  let vec128_load_mask64x2 () =
     let test () =
       let x = Vec128_bigarray.create_elem #0L #0L in
-      let _ = vec256_load_mask64x2 x (malloc #1n) |> Sys.opaque_identity in
+      let _ = vec128_load_mask64x2 x (malloc #1n) |> Sys.opaque_identity in
       ()
     in
     run_test
@@ -1324,10 +1325,10 @@ module Test_out_of_bounds_accesses = struct
       ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
   ;;
 
-  let vec256_load_mask32x4 () =
+  let vec128_load_mask32x4 () =
     let test () =
       let x = Vec128_bigarray.create_elem #0L #0L in
-      let _ = vec256_load_mask32x4 x (malloc #1n) |> Sys.opaque_identity in
+      let _ = vec128_load_mask32x4 x (malloc #1n) |> Sys.opaque_identity in
       ()
     in
     run_test
@@ -1348,10 +1349,10 @@ module Test_out_of_bounds_accesses = struct
       ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
   ;;
 
-  let vec256_store_mask64x2 () =
+  let vec128_store_mask64x2 () =
     let test () =
       let x = Vec128_bigarray.create_elem #0L #0L in
-      let _ = vec256_store_mask64x2 (malloc #1n) x x in
+      let _ = vec128_store_mask64x2 (malloc #1n) x x in
       ()
     in
     run_test
@@ -1372,10 +1373,10 @@ module Test_out_of_bounds_accesses = struct
       ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:32)
   ;;
 
-  let vec256_store_mask32x4 () =
+  let vec128_store_mask32x4 () =
     let test () =
       let x = Vec128_bigarray.create_elem #0L #0L in
-      let _ = vec256_store_mask32x4 (malloc #1n) x x in
+      let _ = vec128_store_mask32x4 (malloc #1n) x x in
       ()
     in
     run_test
@@ -1436,7 +1437,7 @@ let () =
     in
     let () =
       let open Test_out_of_bounds_accesses in
-      (* Out-of-bounds vector load/store tests *)
+      (* Out-of-bounds sse load/store tests *)
       vec128_load_aligned ();
       vec128_load_unaligned ();
       vec128_store_aligned ();
@@ -1444,8 +1445,8 @@ let () =
       vec128_load_aligned_uncached ();
       vec128_store_aligned_uncached ();
       vec128_load_low64 ();
-      vec128_load_copy_low64 ();
-      vec128_load_copy_high64 ();
+      vec128_load_low64_copy_high64 ();
+      vec128_load_high64_copy_low64 ();
       vec128_load_zero_low64 ();
       vec128_load_broadcast64 ();
       vec128_store_low64 ();
@@ -1455,6 +1456,11 @@ let () =
       vec128_store_mask8 ();
       vec128_store_int32_uncached ();
       vec128_store_int64_uncached ();
+      (* Out-of-bounds avx load/store tests *)
+      vec128_load_mask64x2 ();
+      vec128_store_mask64x2 ();
+      vec128_load_mask32x4 ();
+      vec128_store_mask32x4 ();
       vec256_load_aligned ();
       vec256_load_aligned ();
       vec256_load_unaligned ();
@@ -1466,13 +1472,9 @@ let () =
       vec256_broadcast64 ();
       vec256_broadcast32x8 ();
       vec256_broadcast32x4 ();
-      vec256_load_mask64x2 ();
       vec256_load_mask64x4 ();
-      vec256_load_mask32x4 ();
       vec256_load_mask32x8 ();
-      vec256_store_mask64x2 ();
       vec256_store_mask64x4 ();
-      vec256_store_mask32x4 ();
       vec256_store_mask32x8 ();
       (* Out-of-bounds array access tests *)
       read_int_array ();

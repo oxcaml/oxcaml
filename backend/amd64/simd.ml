@@ -240,6 +240,8 @@ type operation_class =
   | Store
 
 let class_of_operation op =
+  (* Operations with implicit memory operands must also appear in
+     [Emit.emit_implicit_simd_sanitize]. *)
   match[@warning "-4"] (Pseudo_instr.instr op.instr).id with
   | Maskmovdqu | Vmaskmovdqu -> Store
   | _ -> Pure

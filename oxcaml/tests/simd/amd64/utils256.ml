@@ -136,6 +136,28 @@ let eq_float64x4 ~result ~expect =
   eq_float64x2 ~result:result_low ~expect:expect_low;
   eq_float64x2 ~result:result_high ~expect:expect_high
 
+let eq_int64x4 ~result ~expect =
+  eq4
+    (int64x4_first_int64 result)
+    (int64x4_second_int64 result)
+    (int64x4_third_int64 result)
+    (int64x4_fourth_int64 result)
+    (int64x4_first_int64 expect)
+    (int64x4_second_int64 expect)
+    (int64x4_third_int64 expect)
+    (int64x4_fourth_int64 expect)
+
+let eq_int32x8 ~result ~expect =
+  eq4
+    (int32x8_first_int64 result)
+    (int32x8_second_int64 result)
+    (int32x8_third_int64 result)
+    (int32x8_fourth_int64 result)
+    (int32x8_first_int64 expect)
+    (int32x8_second_int64 expect)
+    (int32x8_third_int64 expect)
+    (int32x8_fourth_int64 expect)
+
 module Vector256_casts = struct
   let eq a b c d e f g h =
     if a <> e || b <> f || c <> g || d <> h

@@ -1727,13 +1727,6 @@ let emit_simd_sanitize ~address ~instr ~chunk ~kind =
 
 let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   check_simd_instr ?mode simd imm instr;
-  (match[@warning "-4"] simd.id with
-  | Maskmovdqu | Vmaskmovdqu ->
-    (* This instruction has an implicit memory operand. *)
-    let address = addressing (Iindexed 0) VEC128 instr 2 in
-    emit_simd_sanitize ~address ~instr ~chunk:Onetwentyeight_unaligned
-      ~kind:Store_modify
-  | _ -> ());
   let args =
     Array.fold_left
       (fun (idx, args) (arg : Simd.arg) ->
@@ -1767,8 +1760,24 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   in
   I.simd simd (Array.of_list args)
 
+(* Only used for instructions that have an implicit memory operand. Explicit
+   load/store operations are sanitized automatically by [emit_simd_instr]. *)
+let emit_implicit_simd_sanitize (op : Simd.operation) instr =
+  if Config.with_address_sanitizer && !Arch.is_asan_enabled
+     && not (Simd.is_pure_operation op)
+  then
+    match[@warning "-4"] (Simd.Pseudo_instr.instr op.instr).id with
+    | Maskmovdqu | Vmaskmovdqu ->
+      let address = addressing (Iindexed 0) VEC128 instr 2 in
+      emit_simd_sanitize ~address ~instr ~chunk:Onetwentyeight_unaligned
+        ~kind:Store_modify
+    | _ ->
+      (* Must handle all impure cases in [Simd.class_of_operation] *)
+      Misc.fatal_errorf "Don't know how to sanitize implicit memory operand"
+
 let emit_simd ?mode (op : Simd.operation) instr =
   let open Simd_instrs in
+  emit_implicit_simd_sanitize op instr;
   let imm = op.imm in
   match op.instr with
   | Instruction simd -> emit_simd_instr ?mode simd imm instr
