@@ -1,6 +1,5 @@
 #include <assert.h>
-#define BUILTIN(name) \
-    void name() { assert(0); }
+#define BUILTIN(name) void name() { assert(0); }
 
 BUILTIN(caml_sse_vec128_load_aligned);
 BUILTIN(caml_sse_vec128_load_unaligned);
