@@ -2105,7 +2105,7 @@ module Report = struct
    fun { txt; loc } ->
     match txt with
     | Unknown ->
-      dprintf "is allocated at %a with content" Location.print_loc loc
+      dprintf "is allocated at %a containing data" Location.print_loc loc
     | Optional_argument ->
       dprintf
         "is an optional argument wrapper (and thus allocated) of the value at \

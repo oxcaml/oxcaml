@@ -17,7 +17,7 @@ Line 1, characters 72-73:
 Error: This value is "local"
        because it is contained (via constructor "Pair") in the value at Line 1, characters 37-48
        which is "local"
-       because it is allocated at Line 1, characters 51-68 with content
+       because it is allocated at Line 1, characters 51-68 containing data
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
@@ -33,7 +33,7 @@ Line 1, characters 72-73:
 Error: This value is "local"
        because it is contained (via constructor "Pair") in the value at Line 1, characters 37-48
        which is "local"
-       because it is allocated at Line 1, characters 51-68 with content
+       because it is allocated at Line 1, characters 51-68 containing data
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
@@ -51,7 +51,7 @@ Line 1, characters 63-64:
 Error: This value is "local"
        because it is contained (via constructor "Pair") in the value at Line 1, characters 34-45
        which is "local"
-       because it is allocated at Line 1, characters 48-59 with content
+       because it is allocated at Line 1, characters 48-59 containing data
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
@@ -69,7 +69,7 @@ Line 1, characters 63-64:
 Error: This value is "local"
        because it is contained (via constructor "Pair") in the value at Line 1, characters 34-45
        which is "local"
-       because it is allocated at Line 1, characters 48-59 with content
+       because it is allocated at Line 1, characters 48-59 containing data
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.

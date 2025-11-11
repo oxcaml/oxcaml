@@ -163,7 +163,7 @@ Line 4, characters 2-7:
 Error: This value is "local"
        because it is the field "left" of the record at Line 3, characters 6-25
        which is "local"
-       because it is allocated at Line 2, characters 10-25 with content
+       because it is allocated at Line 2, characters 10-25 containing data
        which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
