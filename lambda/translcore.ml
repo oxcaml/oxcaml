@@ -80,16 +80,6 @@ let transl_object =
   ref (fun ~scopes:_ _id _s _cl -> assert false :
        scopes:scopes -> Ident.t -> string list -> class_expr -> lambda)
 
-(* Probe handlers are generated from %probe as closed functions
-   during transl_exp and immediately lifted to top level. *)
-let probe_handlers = ref []
-let clear_probe_handlers () = probe_handlers := []
-let declare_probe_handlers lam =
-  List.fold_left (fun acc (funcid, func_duid, func) ->
-      Llet(Strict, Lambda.layout_function, funcid, func_duid, func, acc))
-    lam
-    !probe_handlers
-
 (* Compile an exception/extension definition *)
 
 let prim_fresh_oo_id =
@@ -1290,19 +1280,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           ap_probe = Some {name; enabled_at_init};
         }
       in
-      begin match Config.flambda || Config.flambda2 with
-      | true ->
-          Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler,
-               Lapply app)
-      | false ->
-        (* Needs to be lifted to top level manually here,
-           because functions that contain other function declarations
-           are not inlined by Closure. For example, adding a probe into
-           the body of function foo will prevent foo from being inlined
-           into another function. *)
-        probe_handlers := (funcid, funcid_duid, handler)::!probe_handlers;
-        Lapply app
-      end
+      Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler,
+            Lapply app)
     end else begin
       lambda_unit
     end

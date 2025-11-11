@@ -1004,7 +1004,6 @@ let transl_implementation compilation_unit impl =
   reset_labels ();
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
-  Translcore.clear_probe_handlers ();
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
   let body, (size, arg_block_idx) =
     Translobj.transl_label_init (fun () ->
@@ -1012,7 +1011,7 @@ let transl_implementation compilation_unit impl =
         transl_implementation_module ~scopes compilation_unit
           impl
       in
-      Translcore.declare_probe_handlers body, (size, arg_block_idx))
+      body, (size, arg_block_idx))
   in
   let body, main_module_block_format =
     match has_parameters () with
@@ -1239,11 +1238,10 @@ let transl_toplevel_item_and_close ~scopes itm =
     (transl_label_init
        (fun () ->
           let expr = transl_toplevel_item ~scopes itm
-          in Translcore.declare_probe_handlers expr, ()))
+          in expr, ()))
 
 let transl_toplevel_definition str =
   reset_labels ();
-  Translcore.clear_probe_handlers ();
   Translprim.clear_used_primitives ();
   make_sequence
     (transl_toplevel_item_and_close ~scopes:empty_scopes)
