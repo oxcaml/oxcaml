@@ -28,6 +28,7 @@ val command_line_options : (string * Arg.spec * string) list
 
 type addressing_mode =
   | Iindexed of int                     (* reg + displ *)
+  (* CR mshinwell: this should not be a string *)
   | Ibased of string * int              (* global var + displ *)
 
 (* We do not support the reg + shifted reg addressing mode, because
@@ -111,8 +112,6 @@ val specific_operation_name : specific_operation -> string
 val print_specific_operation :
   (Format.formatter -> 'a -> unit) -> specific_operation ->
   Format.formatter -> 'a array -> unit
-
-val is_logical_immediate : nativeint -> bool
 
 (* Specific operations that are pure *)
 

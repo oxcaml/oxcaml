@@ -296,10 +296,11 @@ module Int32x4 = struct
     let low = to_int16x8_low_saturating_unsigned low in
     to_int16x8_high_saturating_unsigned low high
 
-  (* The meaning of PACKUSDW on amd64 is not exactly the same as UQXTN on arm64:
-     amd64 treats the input as signed int32, whereas arm64 treats the input as
-     unsigned int32, therefore negative input results in 0H on amd64 and FFFFH
-     on arm64. *)
+  (* PACKUSDW on amd64 treats input as unsigned int32 and saturates to [0,
+     65535]. ARM64's UQXTN does the same, so we can use it directly. *)
+
+  (* XXX mshinwell for gyorsh: need to check the diff in this file, this might
+     be wrong *)
 
   external mul_low : t -> t -> t
     = "caml_vec128_unreachable" "caml_neon_int32x4_mul_low"
@@ -1213,10 +1214,12 @@ module SSE3_Util = struct
     let res = a in
     let i = 1 in
     let lane = extract i a in
-    let res = insert (i - 1) res lane in
+    let res = insert 0 res lane in
+    let res = insert 1 res lane in
     let i = 3 in
     let lane = extract i a in
-    let res = insert (i - 1) res lane in
+    let res = insert 2 res lane in
+    let res = insert 3 res lane in
     res
 
   let dup_even_32 : int32x4 -> int32x4 =
@@ -1233,10 +1236,12 @@ module SSE3_Util = struct
     let res = a in
     let i = 0 in
     let lane = extract i a in
-    let res = insert (i + 1) res lane in
+    let res = insert 0 res lane in
+    let res = insert 1 res lane in
     let i = 2 in
     let lane = extract i a in
-    let res = insert (i + 1) res lane in
+    let res = insert 2 res lane in
+    let res = insert 3 res lane in
     res
 end
 

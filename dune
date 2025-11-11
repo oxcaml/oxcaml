@@ -540,6 +540,7 @@
   optlink
   ;; backend/
   afl_instrument
+  arm64_logical_immediates
   arch
   branch_relaxation
   branch_relaxation_intf

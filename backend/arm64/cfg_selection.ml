@@ -42,7 +42,8 @@ let is_offset chunk n =
      | Fivetwelve_unaligned ->
        Misc.fatal_error "arm64: got 256/512 bit vector"
 
-let is_logical_immediate_int n = Arch.is_logical_immediate (Nativeint.of_int n)
+let is_logical_immediate_int n =
+  Arm64_logical_immediates.is_logical_immediate (Nativeint.of_int n)
 
 (* Signed immediates are simpler *)
 

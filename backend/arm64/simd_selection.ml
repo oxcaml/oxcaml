@@ -28,6 +28,12 @@ exception Error of error * Debuginfo.t
 let bad_immediate dbg fmt =
   Format.kasprintf (fun msg -> raise (Error (Bad_immediate msg, dbg))) fmt
 
+(* Swap two arguments for commutative condition flipping *)
+let swap_args args =
+  match args with
+  | [a; b] -> [b; a]
+  | _ -> Misc.fatal_error "Expected exactly two arguments for swap_args"
+
 (* Assumes untagged int *)
 let[@ocaml.warning "-4"] extract_constant args name ~max dbg =
   match args with
@@ -224,13 +230,17 @@ let select_simd_instr op args dbg =
   | "caml_neon_float32x4_cmeq" -> Some (Cmp_f32 EQ, args)
   | "caml_neon_float32x4_cmge" -> Some (Cmp_f32 GE, args)
   | "caml_neon_float32x4_cmgt" -> Some (Cmp_f32 GT, args)
-  | "caml_neon_float32x4_cmle" -> Some (Cmp_f32 LE, args)
-  | "caml_neon_float32x4_cmlt" -> Some (Cmp_f32 LT, args)
+  (* FCMLE/FCMLT are not supported; use FCMGE/FCMGT with swapped operands. This
+     matches the weird semantics of amd64 "minss" even when the flag [FPCR.AH]
+     is not set. *)
+  | "caml_neon_float32x4_cmle" -> Some (Cmp_f32 GE, swap_args args)
+  | "caml_neon_float32x4_cmlt" -> Some (Cmp_f32 GT, swap_args args)
   | "caml_neon_float64x2_cmeq" -> Some (Cmp_f64 EQ, args)
   | "caml_neon_float64x2_cmge" -> Some (Cmp_f64 GE, args)
   | "caml_neon_float64x2_cmgt" -> Some (Cmp_f64 GT, args)
-  | "caml_neon_float64x2_cmle" -> Some (Cmp_f64 LE, args)
-  | "caml_neon_float64x2_cmlt" -> Some (Cmp_f64 LT, args)
+  (* FCMLE/FCMLT are not supported; use FCMGE/FCMGT with swapped operands *)
+  | "caml_neon_float64x2_cmle" -> Some (Cmp_f64 GE, swap_args args)
+  | "caml_neon_float64x2_cmlt" -> Some (Cmp_f64 GT, swap_args args)
   | "caml_neon_int32x4_cmpeqz" -> Some (Cmpz_s32 EQ, args)
   | "caml_neon_int32x4_cmpgez" -> Some (Cmpz_s32 GE, args)
   | "caml_neon_int32x4_cmpgtz" -> Some (Cmpz_s32 GT, args)
@@ -408,29 +418,32 @@ let select_operation_cfg op args dbg =
   |> Option.map (fun (op, args) -> Operation.Specific (Isimd op), args)
 
 let pseudoregs_for_operation (simd_op : Simd.operation) arg res =
-  match Simd_proc.register_behavior simd_op with
-  | Rs32x4_Rs32_to_First _ | Rs64x2_Rs64_to_First _ | Rs16x8_Rs16_to_First _
-  | Rs8x16_Rs8_to_First _ | Rs64x2_Rs64x2_to_First _ | Rs16x8_Rs32x4_to_First
-  | Rs8x16_Rs16x8_to_First | Rs32x4_Rs64x2_to_First ->
-    let arg = Array.copy arg in
-    let res = Array.copy res in
-    assert (not (Reg.is_preassigned arg.(0)));
-    arg.(0) <- res.(0);
-    arg, res
-  | Rf32x2_Rf32x2_to_Rf32x2 | Rf32x4_Rf32x4_to_Rf32x4 | Rf64x2_Rf64x2_to_Rf64x2
-  | Rs64x2_Rs64x2_to_Rs64x2 | Rf32x4_Rf32x4_to_Rs32x4 | Rs32x4_to_Rs32x4
-  | Rs32x4_to_Rf32x4 | Rf32x4_to_Rf32x4 | Rf32x4_to_Rs32x4 | Rf32x2_to_Rf64x2
-  | Rf64x2_to_Rf32x2 | Rs8x16_to_Rs8x16 | Rs8x16_Rs8x16_to_Rs8x16
-  | Rs64x2_to_Rs64x2 | Rf64x2_to_Rs64x2 | Rf64x2_Rf64x2_to_Rs64x2
-  | Rs32x4_Rs32x4_to_Rs32x4 | Rf32_Rf32_to_Rf32 | Rf64_Rf64_to_Rf64
-  | Rf32_to_Rf32 | Rf64_to_Rf64 | Rf32_to_Rs64 | Rf64_to_Rs64 | Rs64x2_to_Rs64 _
-  | Rs32x4_to_Rs32 _ | Rs32x4lane_to_Rs32x4 _ | Rs64x2lane_to_Rs64x2 _
-  | Rf64x2_to_Rf64x2 | Rs64x2_to_Rf64x2 | Rs32x2_to_Rs64x2
-  | Rs16x8_Rs16x8_to_Rs16x8 | Rs16x8_to_Rs16x8 | Rs16x8_to_Rs16 _
-  | Rs16x8lane_to_Rs16x8 _ | Rs64x2_to_Rs32x2 | Rs8x16lane_to_Rs8x16 _
-  | Rs8x16_to_Rs8 _ | Rs32x4_to_Rs16x4 | Rs16x8_to_Rs8x8
-  | Rs16x8_Rs16x8_to_Rs32x4 | Rs16x4_Rs16x4_to_Rs32x4 | Rs16x4_to_Rs32x4
-  | Rs8x8_to_Rs16x8 ->
+  let check_shape (type a) (shape : a Simd_proc.operand_shape) =
+    match shape with
+    (* XXX make sure this list of special cases matches the old code *)
+    | V4S_V2D | V8H_V4S | V16B_V8H | V16B_W _ | V8H_W _ | V4S_W _ | V2D_X _
+    | V2D_V2D_lanes _ ->
+      let arg = Array.copy arg in
+      let res = Array.copy res in
+      assert (not (Reg.is_preassigned arg.(0)));
+      arg.(0) <- res.(0);
+      arg, res
+    | V2S_V2S_V2S | V4S_V4S_V4S | V2D_V2D_V2D | V16B_V16B_V16B | V8H_V8H_V8H
+    | V4S_V8H_V8H | V4S_V4H_V4H | V4S_V4S | V2D_V2S | V2S_V2D_cvt | V16B_V16B
+    | V2D_V2D | V2D_V2D_imm6 _ | V4S_V4S_imm6 _ | V8H_V8H_imm6 _
+    | V16B_V16B_imm6 _ | V16B_V16B_V16B_imm6 _ | V8H_V8H | V2S_V2D_narrow
+    | V4H_V4S | V8B_V8H | V4S_V4H | V8H_V8B | RegD_RegD_RegD | RegS_RegS_RegS
+    | RegD_RegD | RegS_RegS | RegD_RegX | RegS_RegX | Reg_LaneB _ | Reg_LaneH _
+    | Reg_LaneS _ | Reg_LaneD _ | RegX_V16B _ | RegX_V8H _ | RegX_V4S _
+    | LaneB_W _ | LaneH_W _ | LaneS_W _ | LaneD_Reg _ | LaneD_LaneD _
+    | V16B_LaneB _ | V8H_LaneH _ | V4S_LaneS _ | V2D_LaneD _ | RegX_RegD
+    | RegX_RegS | RegX_V2D _ | DUP_V16B _ | DUP_V8H _ | DUP_V4S _ | DUP_V2D _ ->
+      arg, res
+  in
+  match Simd_proc.simd_operation_with_operand_regs simd_op with
+  | S (_instr, shape) -> check_shape shape
+  | Transformed_in_emit ->
+    (* None of these currently need special handling here. *)
     arg, res
 
 (* See `amd64/simd_selection.ml`. *)
