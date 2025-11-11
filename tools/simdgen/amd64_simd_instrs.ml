@@ -111,11 +111,13 @@ type id =
   | Movsd_X_X
   | Movsd_X_m64
   | Movsd_Xm64_X
+  | Movsd_m64_X
   | Movshdup
   | Movsldup
   | Movss_X_X
   | Movss_X_m32
   | Movss_Xm32_X
+  | Movss_m32_X
   | Movupd_X_Xm128
   | Movupd_Xm128_X
   | Movupd_m128_X
@@ -1936,6 +1938,15 @@ let movsd_Xm64_X = {
   ; mnemonic = "movsd"
   ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
 }
+let movsd_m64_X = {
+    id = Movsd_m64_X
+  ; ext = [|SSE2|]
+  ; args = [|{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
+  ; imm = Imm_none
+  ; mnemonic = "movsd"
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+}
 let movshdup = {
     id = Movshdup
   ; ext = [|SSE3|]
@@ -1977,6 +1988,15 @@ let movss_Xm32_X = {
   ; ext = [|SSE|]
   ; args = [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; res = Res { loc = Temp [|XMM;M32|]; enc = RM_rm }
+  ; imm = Imm_none
+  ; mnemonic = "movss"
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+}
+let movss_m32_X = {
+    id = Movss_m32_X
+  ; ext = [|SSE|]
+  ; args = [|{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "movss"
   ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }

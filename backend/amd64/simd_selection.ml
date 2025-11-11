@@ -201,9 +201,9 @@ let select_operation_sse2 ~dbg op args =
   | "caml_sse2_vec128_load_zero_low64" ->
     simd_load_sse_or_avx ~mode:(Iindexed 0) movsd_X_m64 vmovsd_X_m64 args
   | "caml_sse2_vec128_store_low32" ->
-    simd_store_sse_or_avx ~mode:(Iindexed 0) movss_Xm32_X vmovss_m32_X args
+    simd_store_sse_or_avx ~mode:(Iindexed 0) movss_m32_X vmovss_m32_X args
   | "caml_sse2_vec128_store_low64" ->
-    simd_store_sse_or_avx ~mode:(Iindexed 0) movsd_Xm64_X vmovsd_m64_X args
+    simd_store_sse_or_avx ~mode:(Iindexed 0) movsd_m64_X vmovsd_m64_X args
   | "caml_sse2_vec128_store_mask8" ->
     (* Does not have a mode; base address is always in rdi. *)
     sse_or_avx maskmovdqu vmaskmovdqu args
