@@ -19,7 +19,7 @@ let () =
   print_result "a b c";
   print_result "a\\ b c";
   print_result "a\\\\b c";
-  print_result "foo\ \ \ bar\   hello";
+  print_result "foo\\ \\ \\ bar\\   hello";
   print_result "a\\nb";
   print_result "a\\rb";
   print_result "a\\\\b c\\ d e\\nf g\\rh";

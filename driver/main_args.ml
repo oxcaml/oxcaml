@@ -184,9 +184,9 @@ let mk_I_manifest f =
   \    describes a file that the compiler can reference, 'manifest' means that the\n\
   \    compiler should read the specified manifest file recursively, <visible_path> is\n\
   \    the path as interpreted by the compiler, <actual_path> is where this file is\n\
-  \    in the filesystem (relative to [$OXCAML_MANIFEST_LOAD_PATH_ROOT]). The manifest\n\
+  \    in the filesystem (relative to [$DUNE_MANIFEST_LOAD_PATH_ROOT]). The manifest\n\
   \    file passed to the [-I-manifest] flag should itself be relative to\n\
-  \    [$OXCAML_MANIFEST_LOAD_PATH_ROOT]."
+  \    [$DUNE_MANIFEST_LOAD_PATH_ROOT]."
 
 let mk_H_manifest f =
   "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given paths\n\
