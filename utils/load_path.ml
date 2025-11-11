@@ -55,7 +55,7 @@ let split_and_unescape ~buffer line =
   loop 0 buffer []
 ;;
 
-module Manifests_reader : sig
+module Dune_manifests_reader : sig
   module Path : sig
     type load_root_relative
     type cwd_relative
@@ -102,7 +102,7 @@ end = struct
 
     let of_string path = Load_root_relative path
     let to_string (Cwd_relative path) = path
-    let root = lazy (Sys.getenv "OXCAML_MANIFEST_LOAD_PATH_ROOT")
+    let root = lazy (Sys.getenv "DUNE_MANIFEST_LOAD_PATH_ROOT")
 
     let make_cwd_relative (Load_root_relative path) =
       let root = Lazy.force root in
@@ -361,10 +361,10 @@ let get_visible_path_list () = List.rev_map Dir.path !visible_dirs
 let get_hidden_path_list () = List.rev_map Dir.path !hidden_dirs
 
 let init_manifests () =
-  let manifests_reader = Manifests_reader.create () in
+  let manifests_reader = Dune_manifests_reader.create () in
   let load_manifest ~hidden ~basenames manifest_path =
-    let manifest_path = Manifests_reader.Path.of_string manifest_path in
-    Manifests_reader.iter_manifest
+    let manifest_path = Dune_manifests_reader.Path.of_string manifest_path in
+    Dune_manifests_reader.iter_manifest
       manifests_reader
       ~manifest_path
       ~f:(fun ~filename ~location ->
@@ -373,7 +373,7 @@ let init_manifests () =
           Path_cache.prepend_add_single
             ~hidden
             basename
-            (Manifests_reader.Path.to_string location))
+            (Dune_manifests_reader.Path.to_string location))
   in
   List.iter (load_manifest ~hidden:false ~basenames:visible_basenames) !Clflags.include_manifests;
   List.iter (load_manifest ~hidden:true ~basenames:hidden_basenames) !Clflags.hidden_include_manifests
