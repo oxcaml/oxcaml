@@ -48,23 +48,23 @@ let seq_or_avx_zeroed ~dbg seq instr ?i args =
       (Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args)
   else cfg_operation (Simd.sequence seq i) args
 
-let simd_load ~mode ?i instr args =
+let simd_load ~mode instr args =
   Some
-    ( Operation.Specific (Isimd_mem (Load (Simd.instruction instr i), mode)),
+    ( Operation.Specific (Isimd_mem (Load (Simd.instruction instr None), mode)),
       args )
 
-let simd_store ~mode ?i instr args =
+let simd_store ~mode instr args =
   Some
-    ( Operation.Specific (Isimd_mem (Store (Simd.instruction instr i), mode)),
+    ( Operation.Specific (Isimd_mem (Store (Simd.instruction instr None), mode)),
       args )
 
-let simd_load_sse_or_avx ~mode ?i sse vex args =
+let simd_load_sse_or_avx ~mode sse vex args =
   let instr = if Arch.Extension.enabled AVX then vex else sse in
-  simd_load ~mode ?i instr args
+  simd_load ~mode instr args
 
-let simd_store_sse_or_avx ~mode ?i sse vex args =
+let simd_store_sse_or_avx ~mode sse vex args =
   let instr = if Arch.Extension.enabled AVX then vex else sse in
-  simd_store ~mode ?i instr args
+  simd_store ~mode instr args
 
 let bad_immediate fmt =
   Format.kasprintf (fun msg -> raise (Error (Bad_immediate msg))) fmt
@@ -136,13 +136,17 @@ let select_operation_bmi2 ~dbg:_ op args =
 let select_operation_sse ~dbg op args =
   match op with
   | "caml_sse_load_aligned" ->
-    simd_load_sse_or_avx ~mode:(Iindexed 0) movapd_X_Xm128 vmovapd_X_Xm128 args
+    simd_load_sse_or_avx ~mode:Arch.identity_addressing movapd_X_Xm128
+      vmovapd_X_Xm128 args
   | "caml_sse_load_unaligned" ->
-    simd_load_sse_or_avx ~mode:(Iindexed 0) movupd_X_Xm128 vmovupd_X_Xm128 args
+    simd_load_sse_or_avx ~mode:Arch.identity_addressing movupd_X_Xm128
+      vmovupd_X_Xm128 args
   | "caml_sse_store_aligned" ->
-    simd_store_sse_or_avx ~mode:(Iindexed 0) movapd_m128_X vmovapd_m128_X args
+    simd_store_sse_or_avx ~mode:Arch.identity_addressing movapd_m128_X
+      vmovapd_m128_X args
   | "caml_sse_store_unaligned" ->
-    simd_store_sse_or_avx ~mode:(Iindexed 0) movupd_m128_X vmovupd_m128_X args
+    simd_store_sse_or_avx ~mode:Arch.identity_addressing movupd_m128_X
+      vmovupd_m128_X args
   | "caml_sse_float32_sqrt" | "sqrtf" ->
     seq_or_avx_zeroed ~dbg Seq.sqrtss vsqrtss args
   | "caml_simd_float32_max" | "caml_sse_float32_max" ->
@@ -607,13 +611,13 @@ let select_operation_avx ~dbg:_ op args =
   else
     match op with
     | "caml_avx_load_aligned" ->
-      simd_load ~mode:(Iindexed 0) vmovapd_Y_Ym256 args
+      simd_load ~mode:Arch.identity_addressing vmovapd_Y_Ym256 args
     | "caml_avx_load_unaligned" ->
-      simd_load ~mode:(Iindexed 0) vmovupd_Y_Ym256 args
+      simd_load ~mode:Arch.identity_addressing vmovupd_Y_Ym256 args
     | "caml_avx_store_aligned" ->
-      simd_store ~mode:(Iindexed 0) vmovapd_m256_Y args
+      simd_store ~mode:Arch.identity_addressing vmovapd_m256_Y args
     | "caml_avx_store_unaligned" ->
-      simd_store ~mode:(Iindexed 0) vmovupd_m256_Y args
+      simd_store ~mode:Arch.identity_addressing vmovupd_m256_Y args
     | "caml_avx_float64x4_add" -> instr vaddpd_Y_Y_Ym256 args
     | "caml_avx_float32x8_add" -> instr vaddps_Y_Y_Ym256 args
     | "caml_avx_float32x8_addsub" -> instr vaddsubps_Y_Y_Ym256 args
@@ -1511,15 +1515,12 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       if is_aligned_to_vector_width ()
       then
         let arguments = append_result results address_args in
-        let instr = if Arch.Extension.enabled AVX then avx else sse in
-        Some
-          [ { operation =
-                Operation.Specific
-                  (Isimd_mem
-                     (Load (Simd.instruction instr None), addressing_mode));
-              arguments;
-              results
-            } ]
+        simd_load_sse_or_avx ~mode:addressing_mode sse avx arguments
+        |> Option.map (fun (operation, arguments) ->
+               [ { Vectorize_utils.Vectorized_instruction.operation;
+                   arguments;
+                   results
+                 } ])
       else
         (* Emit a load followed by an arithmetic operation, effectively
            reverting the decision from Arch.selection. It will probably not be

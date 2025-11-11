@@ -242,7 +242,10 @@ type operation_class =
 let class_of_operation _op = Pure
 
 let is_pure_operation op =
-  match class_of_operation op with Pure -> true | Load _ | Store -> false
+  match class_of_operation op with
+  | Pure -> true
+  | Load _ -> true
+  | Store -> false
 
 let equal_operation { instr = instr0; imm = imm0 }
     { instr = instr1; imm = imm1 } =

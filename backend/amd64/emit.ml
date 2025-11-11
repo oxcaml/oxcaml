@@ -1019,7 +1019,7 @@ let movpd ~unaligned src dst =
   | false, true, true -> I.simd movupd_X_Xm128 [| src; dst |]
   | false, false, false -> I.simd movapd_Xm128_X [| src; dst |]
   | false, false, true -> I.simd movupd_Xm128_X [| src; dst |]
-  | true, false, false -> I.simd vmovupd_Xm128_X [| src; dst |]
+  | true, false, false -> I.simd vmovapd_Xm128_X [| src; dst |]
   | true, false, true -> I.simd vmovupd_Xm128_X [| src; dst |]
   | true, true, false -> I.simd vmovapd_X_Xm128 [| src; dst |]
   | true, true, true -> I.simd vmovupd_X_Xm128 [| src; dst |]
@@ -1646,10 +1646,10 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
   (match simd.imm with
   | Imm_none | Imm_reg -> assert (Option.is_none imm)
   | Imm_spec -> assert (Option.is_some imm));
-  let addr_used = ref (Option.is_none mode) in
+  let addr_used_or_not_provided = ref (Option.is_none mode) in
   let use_addr () =
-    assert (not !addr_used);
-    addr_used := true
+    assert (not !addr_used_or_not_provided);
+    addr_used_or_not_provided := true
   in
   let args_used =
     Array.fold_left
@@ -1664,7 +1664,7 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
           idx + 1)
       0 simd.args
   in
-  assert !addr_used;
+  assert !addr_used_or_not_provided;
   assert (args_used = Array.length instr.arg);
   let res_used =
     match simd.res with
