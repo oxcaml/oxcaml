@@ -67,7 +67,7 @@ module Mode_axis_pair = struct
     | "once" -> comonadic Linearity Once
     | "many" -> comonadic Linearity Many
     | "nonportable" -> comonadic Portability Nonportable
-    | "sharable" -> comonadic Portability Sharable
+    | "shareable" -> comonadic Portability Shareable
     | "portable" -> comonadic Portability Portable
     | "contended" -> monadic Contention Contended
     | "shared" -> monadic Contention Shared
@@ -228,7 +228,7 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
     let b : Portability.Const.t =
       match a with
       | Stateless -> Portable
-      | Observing -> Sharable
+      | Observing -> Shareable
       | Stateful -> Nonportable
     in
     [Atom (Comonadic Portability, Meet_with b)]
@@ -382,7 +382,8 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     match annots.portability, annots.statefulness with
     | (Some _ as p), _ | p, None -> p
     | None, Some Statefulness.Const.Stateless -> Some Portability.Const.Portable
-    | None, Some Statefulness.Const.Observing -> Some Portability.Const.Sharable
+    | None, Some Statefulness.Const.Observing ->
+      Some Portability.Const.Shareable
     | None, Some Statefulness.Const.Stateful ->
       Some Portability.Const.Nonportable
   in
@@ -440,7 +441,7 @@ let untransl_mode_annots (modes : Mode.Alloc.Const.Option.t) =
   let portability =
     match modes.statefulness, modes.portability with
     | Some Statefulness.Const.Stateless, Some Portability.Const.Portable
-    | Some Statefulness.Const.Observing, Some Portability.Const.Sharable
+    | Some Statefulness.Const.Observing, Some Portability.Const.Shareable
     | Some Statefulness.Const.Stateful, Some Portability.Const.Nonportable ->
       None
     | _, _ -> print_to_string_opt Mode.Portability.Const.print modes.portability

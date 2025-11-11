@@ -427,7 +427,7 @@ module Lattices = struct
   module Portability = struct
     type t =
       | Portable
-      | Sharable
+      | Shareable
       | Nonportable
 
     include Total (struct
@@ -437,14 +437,14 @@ module Lattices = struct
 
       let max = Nonportable
 
-      let ord = function Portable -> 0 | Sharable -> 1 | Nonportable -> 2
+      let ord = function Portable -> 0 | Shareable -> 1 | Nonportable -> 2
     end)
 
     let legacy = Nonportable
 
     let print ppf = function
       | Portable -> Format.fprintf ppf "portable"
-      | Sharable -> Format.fprintf ppf "sharable"
+      | Shareable -> Format.fprintf ppf "shareable"
       | Nonportable -> Format.fprintf ppf "nonportable"
   end
 
@@ -1455,12 +1455,12 @@ module Lattices_mono = struct
 
   let portable_to_contended = function
     | Portability.Portable -> Contention.Contended
-    | Portability.Sharable -> Contention.Shared
+    | Portability.Shareable -> Contention.Shared
     | Portability.Nonportable -> Contention.Uncontended
 
   let contended_to_portable = function
     | Contention.Contended -> Portability.Portable
-    | Contention.Shared -> Portability.Sharable
+    | Contention.Shared -> Portability.Shareable
     | Contention.Uncontended -> Portability.Nonportable
 
   let local_to_regional = function
