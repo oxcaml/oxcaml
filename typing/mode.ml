@@ -2036,9 +2036,10 @@ module Report = struct
 
   let print_article_noun ~definite ~capitalize sound s =
     let article =
-      if definite
-      then "the"
-      else match sound with Consonant -> "a" | Vowel -> "an"
+      match definite, sound with
+      | true, _ -> "the"
+      | false, Consonant -> "a"
+      | false, Vowel -> "an"
     in
     let article =
       if capitalize then String.capitalize_ascii article else article
@@ -2071,19 +2072,22 @@ module Report = struct
 
   let print_pinpoint : pinpoint -> _ =
    fun (loc, desc) ->
-    print_pinpoint_desc desc
-    |> Option.map (fun print_desc ~definite ~capitalize ppf ->
-           if Location.is_none loc
-           then print_desc ~definite:false ~capitalize ppf
-           else if definite
-           then
-             fprintf ppf "%t at %a"
-               (print_desc ~definite ~capitalize)
-               Location.print_loc loc
-           else
-             fprintf ppf "%t (at %a)"
-               (print_desc ~definite ~capitalize)
-               Location.print_loc loc)
+    match print_pinpoint_desc desc with
+    | None -> None
+    | Some print_desc ->
+      Some
+        (fun ~definite ~capitalize ppf ->
+          if Location.is_none loc
+          then print_desc ~definite:false ~capitalize ppf
+          else if definite
+          then
+            fprintf ppf "%t at %a"
+              (print_desc ~definite ~capitalize)
+              Location.print_loc loc
+          else
+            fprintf ppf "%t (at %a)"
+              (print_desc ~definite ~capitalize)
+              Location.print_loc loc)
 
   let print_mutable_part ppf = function
     | Record_field s -> fprintf ppf "mutable field %a" Misc.Style.inline_code s
