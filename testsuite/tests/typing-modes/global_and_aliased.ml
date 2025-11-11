@@ -19,7 +19,16 @@ type 'a t4 : value mod global = { x4 : 'a @@ global unique } [@@unboxed]
 
 [%%expect{|
 File "_none_", line 1:
-Error: "global" modality can't be used together with "unique"
+Error: The modality "global" can't be used together with "unique"
+|}]
+
+type t5 : value mod global unique = int
+
+[%%expect{|
+Line 1, characters 27-33:
+1 | type t5 : value mod global unique = int
+                               ^^^^^^
+Error: The modifier "global" can't be used together with "unique"
 |}]
 
 (* Constructors. *)
@@ -113,7 +122,7 @@ type 'a mut6 = { mutable x6 : 'a @@ unique }
 
 [%%expect{|
 File "_none_", line 1:
-Error: "global" modality can't be used together with "unique"
+Error: The modality "global" can't be used together with "unique"
 |}]
 
 (* [mod global] implies [mod aliased]. *)

@@ -7,6 +7,12 @@ type 'ax annot_type =
   | Mode : 'a Alloc.Axis.t annot_type
   | Modality : 'a Modality.Axis.t annot_type
 
+let print_annot_type (type a) ppf (annot_type : a annot_type) =
+  match annot_type with
+  | Modifier -> Format.fprintf ppf "modifier"
+  | Mode -> Format.fprintf ppf "mode"
+  | Modality -> Format.fprintf ppf "modality"
+
 let print_annot_axis (type a) (annot_type : a annot_type) ppf (ax : a) =
   match annot_type with
   | Modifier -> Format.fprintf ppf "%s" (Axis.name ax)
@@ -29,7 +35,7 @@ type forbidden_modality_kind =
   *)
 
 type error =
-  | Forbidden_modality of forbidden_modality_kind
+  | Forbidden_modality : 'a annot_type * forbidden_modality_kind -> error
   | Duplicated_axis : 'a annot_type * 'a -> error
   | Unrecognized_modifier : 'a annot_type * string -> error
 
@@ -273,7 +279,7 @@ let transl_mod_bounds annots =
     | ( Some
           { txt = Modality (Join_with Uniqueness.Const.Unique); loc = uniq_loc },
         Some { txt = Modality (Meet_with Global); _ } ) ->
-      raise (Error (uniq_loc, Forbidden_modality Global_and_unique))
+      raise (Error (uniq_loc, Forbidden_modality (Modifier, Global_and_unique)))
     | None, Some { txt = Modality (Meet_with Global); _ } ->
       let set = Transled_modifiers.set ~axis:(Modal (Monadic Uniqueness)) in
       set modifiers
@@ -657,7 +663,8 @@ let enforce_forbidden_modalities m =
   with
   | ( Meet_with Global,
       Modality.Monadic.Atom.Join_with Mode.Uniqueness.Const.Unique ) ->
-    raise (Error (Location.none, Forbidden_modality Global_and_unique))
+    raise
+      (Error (Location.none, Forbidden_modality (Modality, Global_and_unique)))
   | _ -> m
 
 let transl_modalities ~maturity mut modalities =
@@ -707,17 +714,11 @@ let report_error ppf =
     fprintf ppf "The %a axis has already been specified."
       (print_annot_axis annot_type)
       axis
-  | Forbidden_modality Global_and_unique ->
-    fprintf ppf "%a modality can't be used together with %a"
-      Misc.Style.inline_code "global" Misc.Style.inline_code "unique"
+  | Forbidden_modality (annot_type, Global_and_unique) ->
+    fprintf ppf "The %a %a can't be used together with %a" print_annot_type
+      annot_type Misc.Style.inline_code "global" Misc.Style.inline_code "unique"
   | Unrecognized_modifier (annot_type, modifier) ->
-    let annot_type_str =
-      match annot_type with
-      | Modifier -> "modifier"
-      | Mode -> "mode"
-      | Modality -> "modality"
-    in
-    fprintf ppf "Unrecognized %s %s." annot_type_str modifier
+    fprintf ppf "Unrecognized %a %s." print_annot_type annot_type modifier
 
 let () =
   Location.register_error_of_exn (function
