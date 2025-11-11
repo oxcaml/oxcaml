@@ -28,6 +28,8 @@ exception Error of error
 
 let output_channel = ref stdout
 
+let output_prefix = ref ""
+
 let emit_string s = output_string !output_channel s
 
 let emit_buffer b = Buffer.output_buffer !output_channel b

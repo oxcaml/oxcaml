@@ -2997,15 +2997,13 @@ let end_assembly () =
   D.int64 0L;
   D.text ();
   (* We align to 8 bytes before the frame table. Perhaps somewhat
-     counterintuitively, we use [~fill:Zero] even though we are
-     now in the text section. The reason is that the additional padding will
-     never be executed, so there is no need to pad it with nops in the X86
-     binary emitter. *)
+     counterintuitively, we use [~fill:Zero] even though we are now in the text
+     section. The reason is that the additional padding will never be executed,
+     so there is no need to pad it with nops in the X86 binary emitter. *)
   (* CR sspies: We should just determine the filling based on the current
-     section for the binary emitter and then remove the argument
-     [fill]. This is the only place, where it does not seem to
-     match the current section, and it seems it does not matter whether we pad
-     with zeros or nops here. *)
+     section for the binary emitter and then remove the argument [fill]. This is
+     the only place, where it does not seem to match the current section, and it
+     seems it does not matter whether we pad with zeros or nops here. *)
   D.align ~fill:Zero ~bytes:8;
   (* PR#7591 *)
   emit_global_label ~section:Text "frametable";

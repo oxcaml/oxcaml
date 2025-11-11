@@ -1,8 +1,11 @@
 (* TEST
-  flags = "-extension runtime_metaprogramming";
-  arch_amd64;
+  flags = "-extension runtime_metaprogramming -gno-upstream-dwarf -g";
   native;
 *)
+
+(* We add extra debugging flags above in case of failure, when this test
+   can be hard to debug *)
+
 
 #syntax quotations on
 

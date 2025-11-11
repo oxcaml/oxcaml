@@ -1,7 +1,6 @@
 (* TEST
  modules = "poly_types.ml util.ml";
  flags = "-extension runtime_metaprogramming";
- arch_amd64;
  native;
 *)
 

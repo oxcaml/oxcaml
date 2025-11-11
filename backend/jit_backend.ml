@@ -84,8 +84,30 @@ let register callback =
         in
         callback packed)
   | AArch64 ->
-    (* ARM64 binary emitter JIT support not yet available *)
-    Misc.fatal_error "JIT not yet supported on AArch64"
+    (* Register hook with ARM64 binary emitter. The hook receives sections and
+       returns a file writer function (which we don't use for JIT). *)
+    Arm64_binary_emitter.Binary_emitter.For_jit.Internal_assembler.register
+      (fun sections ->
+        let sections_map =
+          List.fold_left
+            (fun map (name, section) ->
+              if
+                Arm64_binary_emitter.Binary_emitter.For_jit.Assembled_section
+                .size section
+                = 0
+              then map
+              else String_map.add name section map)
+            String_map.empty sections
+        in
+        let packed =
+          Packed
+            { emitter = (module Arm64_binary_emitter.Binary_emitter.For_jit);
+              sections = sections_map
+            }
+        in
+        callback packed;
+        (* Return dummy file writer - not used for JIT *)
+        fun _filename -> ())
   | _ -> Misc.fatal_error "JIT not supported on this architecture"
 
 let unregister () =
@@ -95,6 +117,5 @@ let unregister () =
     X86_proc.internal_assembler := !saved_x86_internal_assembler;
     saved_x86_internal_assembler := None
   | AArch64 ->
-    (* ARM64 binary emitter JIT support not yet available *)
-    ()
+    Arm64_binary_emitter.Binary_emitter.For_jit.Internal_assembler.unregister ()
   | _ -> Misc.fatal_error "JIT not supported on this architecture"

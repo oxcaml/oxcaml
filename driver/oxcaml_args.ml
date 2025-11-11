@@ -420,7 +420,7 @@ let mk_verify_binary_emitter f =
   ( "-verify-binary-emitter",
     Arg.Unit f,
     " Verify binary emitter output matches system assembler output. Exits with \
-     error on mismatch." )
+     error on mismatch. (ARM64 only)" )
 
 let mk_gc_timings f =
   ("-dgc-timings", Arg.Unit f, "Output information about time spent in the GC")

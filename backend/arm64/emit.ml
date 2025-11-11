@@ -2261,9 +2261,15 @@ let begin_assembly _unix =
   A.set_emit_string ~emit_string:Emitaux.emit_string;
   Asm_targets.Asm_label.initialize ~new_label:(fun () ->
       Cmm.new_label () |> Label.to_int);
+  (* Set up binary emitter if JIT hook is registered or save_binary_sections is
+     set *)
+  let binary_emitter_callback = Binary_emitter_helpers.begin_emission () in
   let asm_line_buffer = Buffer.create 200 in
   D.initialize ~big_endian:Arch.big_endian
     ~emit_assembly_comments:!Oxcaml_flags.dasm_comments ~emit:(fun d ->
+      (* Emit to binary emitter if enabled *)
+      binary_emitter_callback d;
+      (* Emit to text *)
       Buffer.clear asm_line_buffer;
       D.Directive.print asm_line_buffer d;
       Buffer.add_string asm_line_buffer "\n";
@@ -2350,4 +2356,6 @@ let end_assembly () =
   if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
   Probe_emission.emit_probe_notes ~slot_offset ~add_def_symbol:(fun _ -> ());
-  D.mark_stack_non_executable ()
+  D.mark_stack_non_executable ();
+  (* Finalize binary emitter if enabled *)
+  Binary_emitter_helpers.end_emission ()
