@@ -1026,15 +1026,20 @@ and class_structure cl_num virt self_scope final val_env met_env loc
      - cannot refer to local or once variables in the
      environment
      - access to unique variables will be relaxed to shared *)
+  let pp : Mode.Hint.pinpoint =
+    match final with
+    | Not_final -> (loc, Class)
+    | Final -> (loc, Object)
+  in
   let val_env =
     val_env
     |> Env.add_unboxed_lock
-    |> Env.add_const_closure_lock (loc, Class) Mode.Value.Comonadic.Const.legacy
+    |> Env.add_const_closure_lock pp Mode.Value.Comonadic.Const.legacy
   in
   let met_env =
     met_env
     |> Env.add_unboxed_lock
-    |> Env.add_const_closure_lock (loc, Class) Mode.Value.Comonadic.Const.legacy
+    |> Env.add_const_closure_lock pp Mode.Value.Comonadic.Const.legacy
   in
   let par_env = met_env in
 

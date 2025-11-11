@@ -2067,6 +2067,7 @@ module Report = struct
     | Expression -> Some (print_article_noun Vowel "expression")
     | Allocation -> Some (print_article_noun Vowel "allocation")
     | Class -> Some (print_article_noun Consonant "class")
+    | Object -> Some (print_article_noun Vowel "object")
     | Loop -> Some (print_article_noun Consonant "loop")
     | Letop -> Some (print_article_noun Consonant "letop")
 

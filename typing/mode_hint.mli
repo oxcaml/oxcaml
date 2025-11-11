@@ -25,6 +25,7 @@ type pinpoint_desc =
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
   | Class  (** An class declaration *)
+  | Object  (** An object declaration *)
   | Loop  (** a loop *)
   | Letop  (** let op *)
 
