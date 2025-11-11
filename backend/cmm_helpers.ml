@@ -4375,9 +4375,45 @@ let cexit id args trap_actions = Cmm.Cexit (Cmm.Lbl id, args, trap_actions)
 let trap_return arg trap_actions =
   Cmm.Cexit (Cmm.Return_lbl, [arg], trap_actions)
 
-let create_ccatch ~rec_flag ~handlers ~body =
-  let rec_flag = if rec_flag then Cmm.Recursive else Cmm.Normal in
-  Cmm.Ccatch (rec_flag, handlers, body)
+let create_ccatch ~(rec_flag : bool) ~(handlers : Cmm.static_handler list)
+    ~(body : Cmm.expression) =
+  match[@ocaml.warning "-4"] rec_flag, body, handlers with
+  | ( false,
+      Cifthenelse
+        ( body_cond,
+          body_cond_dbg,
+          Cexit (Lbl if_exit_label, [Cconst_int (const_if, _dbg_const_if)], []),
+          _dbg_if,
+          Cexit
+            (Lbl else_exit_label, [Cconst_int (const_else, _dbg_const_else)], []),
+          _dbg_else ),
+      [ { Cmm.label = handler_label;
+          params = [(handler_param, [| Int |])];
+          body =
+            Cifthenelse
+              ( Cvar handler_cond_var,
+                _handler_cond_dbg,
+                handler_if,
+                handler_if_dbg,
+                handler_else,
+                handler_else_dbg );
+          dbg = _;
+          is_cold = _
+        } ] )
+    when Ident.equal (VP.var handler_param) handler_cond_var
+         && Static_label.equal handler_label if_exit_label
+         && Static_label.equal handler_label else_exit_label
+         && Int.min const_if const_else = 0
+         && Int.max const_if const_else = 1 ->
+    let if_expr, if_dbg, else_expr, else_dbg =
+      if const_if = 1
+      then handler_if, handler_if_dbg, handler_else, handler_else_dbg
+      else handler_else, handler_else_dbg, handler_if, handler_if_dbg
+    in
+    Cifthenelse (body_cond, body_cond_dbg, if_expr, if_dbg, else_expr, else_dbg)
+  | _ ->
+    let rec_flag = if rec_flag then Cmm.Recursive else Cmm.Normal in
+    Cmm.Ccatch (rec_flag, handlers, body)
 
 let unary op ~dbg x = Cop (op, [x], dbg)
 
