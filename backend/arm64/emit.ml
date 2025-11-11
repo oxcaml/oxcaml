@@ -1056,7 +1056,7 @@ let num_call_gc_points instr =
           | Ibswap _ | Isignext _ | Isimd _ ))
     | Lop
         ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
-        | Dls_get | Const_int _ | Const_float32 _ | Const_float _
+        | Dls_get | Tls_get | Const_int _ | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _
@@ -1128,8 +1128,9 @@ module BR = Branch_relaxation.Make (struct
       | Lcondbranch3 _ -> Some Bcc
       | Lop
           ( Specific _ | Move | Spill | Reload | Opaque | Begin_region | Pause
-          | End_region | Dls_get | Const_int _ | Const_float32 _ | Const_float _
-          | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
+          | End_region | Dls_get | Tls_get | Const_int _ | Const_float32 _
+          | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
+          | Load _
           | Store (_, _, _)
           | Intop _
           | Intop_imm (_, _)
@@ -1278,6 +1279,8 @@ module BR = Branch_relaxation.Make (struct
           | Int_of_float Float32
           | Float_of_float32 | Float32_of_float )) ->
       1
+    | Lop (Static_cast (Scalar_of_v128 Float16x8 | V128_of_scalar Float16x8)) ->
+      Misc.fatal_error "float16 scalar type not supported"
     | Lop (Static_cast (Scalar_of_v128 (Int8x16 | Int16x8))) -> 2
     | Lop
         (Static_cast
@@ -1304,6 +1307,7 @@ module BR = Branch_relaxation.Make (struct
     | Lcall_op (Lprobe _) | Lop (Probe_is_enabled _) ->
       fatal_error "Probes not supported."
     | Lop Dls_get -> 1
+    | Lop Tls_get -> 1
     | Lreloadretaddr -> 0
     | Lreturn -> epilogue_size ()
     | Llabel _ -> 0
@@ -1617,6 +1621,7 @@ let emit_static_cast (cast : Cmm.static_cast) i =
       DSL.ins I.UXTH [| DSL.emit_reg dst; DSL.emit_reg_w dst |]
     | Int32x4 -> DSL.ins I.FMOV [| DSL.emit_reg_w dst; DSL.emit_reg_s src |]
     | Int64x2 -> DSL.ins I.FMOV [| DSL.emit_reg dst; DSL.emit_reg_d src |]
+    | Float16x8 -> Misc.fatal_error "float16 scalar type not supported"
     | Float32x4 ->
       if distinct
       then (
@@ -1634,6 +1639,7 @@ let emit_static_cast (cast : Cmm.static_cast) i =
     | Int16x8 -> DSL.ins I.FMOV [| DSL.emit_reg_s dst; DSL.emit_reg_w src |]
     | Int32x4 -> DSL.ins I.FMOV [| DSL.emit_reg_s dst; DSL.emit_reg_w src |]
     | Int64x2 -> DSL.ins I.FMOV [| DSL.emit_reg_d dst; DSL.emit_reg src |]
+    | Float16x8 -> Misc.fatal_error "float16 scalar type not supported"
     | Float32x4 ->
       if distinct
       then (
@@ -2138,12 +2144,18 @@ let emit_instr i =
   | Lop Dls_get ->
     if Config.runtime5
     then
-      let offset = Domainstate.(idx_of_field Domain_dls_root) * 8 in
+      let offset = Domainstate.(idx_of_field Domain_dls_state) * 8 in
       DSL.ins I.LDR
         [| DSL.emit_reg i.res.(0);
            DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
         |]
     else Misc.fatal_error "Dls is not supported in runtime4."
+  | Lop Tls_get ->
+    let offset = Domainstate.(idx_of_field Domain_tls_state) * 8 in
+    DSL.ins I.LDR
+      [| DSL.emit_reg i.res.(0);
+         DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
+      |]
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in

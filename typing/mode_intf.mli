@@ -24,8 +24,6 @@ module type Lattice = sig
 
   val max : t
 
-  val legacy : t
-
   val le : t -> t -> bool
 
   (** [equal a b] is equivalent to [le a b && le b a], but defined separately for
@@ -39,8 +37,14 @@ module type Lattice = sig
   val print : Format.formatter -> t -> unit
 end
 
-module type Lattice_product = sig
+module type Const = sig
   include Lattice
+
+  val legacy : t
+end
+
+module type Const_product = sig
+  include Const
 
   type 'a axis
 
@@ -69,10 +73,24 @@ type 'a simple_error =
     right : 'a
   }
 
+type print_error_result =
+  | Mode  (** A mode constant is printed *)
+  | Mode_with_hint  (** A mode constant with hints is printed *)
+
+type print_error = (Format.formatter -> print_error_result) simple_error
+
 module type Common = sig
-  module Const : Lattice
+  module Const : Const
 
   type error
+
+  (** Takes a submode [error] accompanied by a [pinpoint] of the original
+  submode, returns an explaining printer for each side. Each printer prints
+  either a mode constant name, or "[mode] because ...". The function assumes
+  [pinpoint] is already printed, which allows simplifying its own printing. The
+  caller is responsible for printing [pinpoint] and placing the result of this
+  function in a suitable linguistic context. *)
+  val print_error : Mode_hint.pinpoint -> error -> print_error
 
   type equate_error = equate_step * error
 
@@ -104,18 +122,52 @@ module type Common = sig
 
   val newvar : unit -> ('l * 'r) t
 
-  (* CR-soon zqian: The following [submode] is currently abused at callsites
-     where the two modes should be linked via some morph hint, instead of being
-     linked directly. *)
+  (* How to submode
 
-  (** Constrain the first mode lower than the second mode. It also assumes the
-  submode is trivial and links the two modes directly, without inserting an
-  [Unknown] morph hint. *)
-  val submode : (allowed * 'r) t -> ('l * allowed) t -> (unit, error) result
+     Naively, mode constraints need to be justified by some explanation (e.g. a
+     location in the source code). For example, for function application [f e],
+     we check that the mode of [e] is less than the mode of the parameter of
+     [f], and this mode constraint can be justified by pointing to the location
+     of [e] in the application. Such explanation should be made into an
+     adjunction pair in [Mode_hint.morph] and applied to either modes, such that
+     both modes are about the argument (or equivalently, both modes are about
+     the parameter) . After the adjustment, the submode itself becomes
+     self-evident and doesn't require any mode-related hint.
+
+     However, while both modes can self-explain why they are high or low, they
+     don't always know what the "thing" that they both describe is. This
+     information is best known by the caller of submode, and encoded in the
+     [pinpoint] argument passed to submode. *)
+
+  (** Takes the actual and expected mode of something, check that the actual
+    mode is less than the expected mode. In case of error, the error is returned
+    and no mutation is done.
+
+    The two modes should be hinted sufficently that the submode is self-evident.
+    In particular, the two modes should be about the "same thing". See the notes
+    [How to submode] for details. *)
+  val submode :
+    ?pp:Mode_hint.pinpoint ->
+    (allowed * 'r) t ->
+    ('l * allowed) t ->
+    (unit, error) result
+  (* CR-soon zqian: make [pp] mandatory *)
+
+  (** Similar to [submode], but instead of returning an error, raise
+    user-friendly errors directly, with [pinpoint] describing the thing
+    whose actual and expected modes are being checked.
+
+    If you need more than [pinpoint] as the context in the error message,
+    consider [submode]. *)
+  val submode_err :
+    Mode_hint.pinpoint -> (allowed * 'r) t -> ('l * allowed) t -> unit
 
   val equate : lr -> lr -> (unit, equate_error) result
 
-  val submode_exn : (allowed * 'r) t -> ('l * allowed) t -> unit
+  (** Similiar to [submode], but crashes the compiler if errors. Use this
+    function if the submode is guaranteed to succeed. *)
+  val submode_exn :
+    ?pp:Mode_hint.pinpoint -> (allowed * 'r) t -> ('l * allowed) t -> unit
 
   val equate_exn : lr -> lr -> unit
 
@@ -135,7 +187,7 @@ module type Common = sig
 end
 
 module type Common_axis = sig
-  module Const : Lattice
+  module Const : Const
 
   include
     Common
@@ -170,21 +222,10 @@ module type Common_product = sig
 
   type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error
 
-  module Const : Lattice_product with type 'a axis := 'a Axis.t
+  module Const : Const_product with type 'a axis := 'a Axis.t
 
   include
     Common with type simple_error := simple_error and module Const := Const
-
-  (* CR-soon zqian: Move [?target] into hints, and let [report_error] extract this
-     information. *)
-
-  (** Takes an optional [lock_item] and identifier of the offending value, and report the
-      submode error with hints. *)
-  val report_error :
-    ?target:Mode_hint.lock_item * Longident.t ->
-    Format.formatter ->
-    error ->
-    unit
 
   type 'd hint_const constraint 'd = 'l * 'r
 
@@ -208,12 +249,16 @@ type 'd pos_hint_morph = 'd pos Mode_hint.morph constraint 'd = _ * _
 module type S = sig
   val print_longident : (Format.formatter -> Longident.t -> unit) ref
 
+  (* CR-someday zqian: find a better stroy to erase bounds (and hints) that incorporates
+     into [disallow_*]. *)
+
+  (** Remove hints from all variables that have been created. See the comments
+  on [erase_hint] in [Solver_intf] for details. *)
+  val erase_hints : unit -> unit
+
   module Hint = Mode_hint
 
   type nonrec 'a simple_error = 'a simple_error
-
-  (** Rich mode error specific to axis whose carrier type is ['a]. *)
-  type 'a error
 
   type changes
 
@@ -235,24 +280,22 @@ module type S = sig
     }
 
   module type Common_axis_pos = sig
-    module Const : Lattice
+    module Const : Const
 
     include
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
-         and type error = Const.t error
          and type 'd hint_const := 'd pos_hint_const
   end
 
   module type Common_axis_neg = sig
-    module Const : Lattice
+    module Const : Const
 
     include
       Common_axis
         with module Const := Const
          and type 'd t = (Const.t, 'd neg) mode
-         and type error = Const.t error
          and type 'd hint_const := 'd neg_hint_const
   end
 
@@ -262,7 +305,7 @@ module type S = sig
         | Global
         | Local
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -295,7 +338,7 @@ module type S = sig
         | Regional
         | Local
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -313,7 +356,7 @@ module type S = sig
         | Many
         | Once
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -327,9 +370,10 @@ module type S = sig
     module Const : sig
       type t =
         | Portable
+        | Sharable
         | Nonportable
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -341,7 +385,7 @@ module type S = sig
         | Unique
         | Aliased
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_neg with module Const := Const
@@ -354,23 +398,39 @@ module type S = sig
   module Contention : sig
     module Const : sig
       type t =
-        | Contended
-        | Shared
         | Uncontended
+        | Shared
+        | Contended
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_neg with module Const := Const
   end
 
+  module Forkable : sig
+    module Const : sig
+      type t =
+        | Forkable
+        | Unforkable
+
+      include Const with type t := t
+    end
+
+    include Common_axis_pos with module Const := Const
+
+    val unforkable : lr
+
+    val forkable : lr
+  end
+
   module Yielding : sig
     module Const : sig
       type t =
-        | Yielding
         | Unyielding
+        | Yielding
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -387,7 +447,7 @@ module type S = sig
         | Observing
         | Stateful
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -402,11 +462,11 @@ module type S = sig
   module Visibility : sig
     module Const : sig
       type t =
-        | Immutable
-        | Read
         | Read_write
+        | Read
+        | Immutable
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_neg with module Const := Const
@@ -418,10 +478,20 @@ module type S = sig
     val read_write : lr
   end
 
+  (* CR-soon zqian: rewrite other axes into this shape as well. *)
+  module Staticity : sig
+    type const =
+      | Static
+      | Dynamic
+
+    include Common_axis_neg with type Const.t = const
+  end
+
   type 'a comonadic_with =
     { areality : 'a;
       linearity : Linearity.Const.t;
       portability : Portability.Const.t;
+      forkable : Forkable.Const.t;
       yielding : Yielding.Const.t;
       statefulness : Statefulness.Const.t
     }
@@ -429,7 +499,8 @@ module type S = sig
   type monadic =
     { uniqueness : Uniqueness.Const.t;
       contention : Contention.Const.t;
-      visibility : Visibility.Const.t
+      visibility : Visibility.Const.t;
+      staticity : Staticity.Const.t
     }
 
   module Axis : sig
@@ -439,6 +510,7 @@ module type S = sig
     NB: must listed in the order of axis implication. See [typemode.ml]. *)
     type ('p, 'r) t =
       | Areality : ('a comonadic_with, 'a) t
+      | Forkable : ('areality comonadic_with, Forkable.Const.t) t
       | Yielding : ('areality comonadic_with, Yielding.Const.t) t
       | Linearity : ('areality comonadic_with, Linearity.Const.t) t
       | Statefulness : ('areality comonadic_with, Statefulness.Const.t) t
@@ -446,6 +518,7 @@ module type S = sig
       | Uniqueness : (monadic, Uniqueness.Const.t) t
       | Visibility : (monadic, Visibility.Const.t) t
       | Contention : (monadic, Contention.Const.t) t
+      | Staticity : (monadic, Staticity.Const.t) t
 
     val print : Format.formatter -> ('p, 'r) t -> unit
 
@@ -459,12 +532,17 @@ module type S = sig
       include
         Common_product
           with type Const.t = monadic
-           and type error = monadic error
            and type 'a Axis.t = (monadic, 'a) Axis.t
            and type 'd hint_morph := 'd neg_hint_morph
            and type 'd hint_const := 'd neg_hint_const
 
       val proj : 'a Axis.t -> ('r * 'l) t -> ('a, 'l * 'r) mode
+
+      module Per_axis : sig
+        val zap_to_floor : 'a Axis.t -> ('a, 'l * allowed) mode -> 'a
+
+        val zap_to_ceil : 'a Axis.t -> ('a, allowed * 'r) mode -> 'a
+      end
 
       val min_with : 'a Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
     end
@@ -473,12 +551,17 @@ module type S = sig
       include
         Common_product
           with type Const.t = Areality.Const.t comonadic_with
-           and type error = Areality.Const.t comonadic_with error
            and type 'a Axis.t = (Areality.Const.t comonadic_with, 'a) Axis.t
            and type 'd hint_morph := 'd pos_hint_morph
            and type 'd hint_const := 'd pos_hint_const
 
       val proj : 'a Axis.t -> ('l * 'r) t -> ('a, 'l * 'r) mode
+
+      module Per_axis : sig
+        val zap_to_floor : 'a Axis.t -> ('a, allowed * 'r) mode -> 'a
+
+        val zap_to_ceil : 'a Axis.t -> ('a, 'l * allowed) mode -> 'a
+      end
 
       val max_with : 'a Axis.t -> ('a, 'l * 'r) mode -> (disallowed * 'r) t
     end
@@ -493,29 +576,33 @@ module type S = sig
       include Axis with type 'a t := 'a t
     end
 
-    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) modes =
+    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes =
       { areality : 'a;
         linearity : 'b;
         uniqueness : 'c;
         portability : 'd;
         contention : 'e;
-        yielding : 'f;
-        statefulness : 'g;
-        visibility : 'h
+        forkable : 'f;
+        yielding : 'g;
+        statefulness : 'h;
+        visibility : 'i;
+        staticity : 'j
       }
 
     module Const : sig
       include
-        Lattice
+        Const
           with type t =
             ( Areality.Const.t,
               Linearity.Const.t,
               Uniqueness.Const.t,
               Portability.Const.t,
               Contention.Const.t,
+              Forkable.Const.t,
               Yielding.Const.t,
               Statefulness.Const.t,
-              Visibility.Const.t )
+              Visibility.Const.t,
+              Staticity.Const.t )
             modes
 
       module Option : sig
@@ -527,9 +614,11 @@ module type S = sig
             Uniqueness.Const.t option,
             Portability.Const.t option,
             Contention.Const.t option,
+            Forkable.Const.t option,
             Yielding.Const.t option,
             Statefulness.Const.t option,
-            Visibility.Const.t option )
+            Visibility.Const.t option,
+            Staticity.Const.t option )
           modes
 
         val none : t
@@ -556,10 +645,10 @@ module type S = sig
       val diff : t -> t -> Option.t
 
       (** Similar to [Alloc.close_over] but for constants *)
-      val close_over : t -> t
+      val close_over : t -> Comonadic.Const.t
 
       (** Similar to [Alloc.partial_apply] but for constants *)
-      val partial_apply : t -> t
+      val partial_apply : t -> Comonadic.Const.t
 
       (** Prints a constant on any axis. *)
       val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
@@ -568,8 +657,6 @@ module type S = sig
     type error =
       | Monadic of Monadic.error
       | Comonadic of Comonadic.error
-
-    val report_error : Format.formatter -> error -> unit
 
     type 'a simple_axerror := 'a simple_error
 
@@ -589,6 +676,8 @@ module type S = sig
       ?hint_comonadic:('l * 'r) pos Hint.const ->
       Const.t ->
       ('l * 'r) t
+
+    val to_const_exn : lr -> Const.t
 
     module List : sig
       (* No new types exposed to avoid too many type names *)
@@ -618,8 +707,10 @@ module type S = sig
 
     val zap_to_legacy : lr -> Const.t
 
-    val comonadic_to_monadic :
-      ?hint:('l * 'r) Hint.morph -> ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
+    val comonadic_to_monadic_min :
+      ?hint:('r * disallowed) neg Hint.morph ->
+      ('l * 'r) Comonadic.t ->
+      ('r * disallowed) Monadic.t
 
     val monadic_to_comonadic_max :
       ('r * disallowed) Monadic.t -> (disallowed * 'r) Comonadic.t
@@ -897,6 +988,7 @@ module type S = sig
         uniqueness:Uniqueness.Const.t Atom.t ->
         contention:Contention.Const.t Atom.t ->
         visibility:Visibility.Const.t Atom.t ->
+        staticity:Staticity.Const.t Atom.t ->
         t
     end
 
@@ -921,9 +1013,13 @@ module type S = sig
         regionality:Regionality.Const.t Atom.t ->
         linearity:Linearity.Const.t Atom.t ->
         portability:Portability.Const.t Atom.t ->
+        forkable:Forkable.Const.t Atom.t ->
         yielding:Yielding.Const.t Atom.t ->
         statefulness:Statefulness.Const.t Atom.t ->
         t
+
+      (** Create the mode crossing for a type whose values are always constructed at the given mode. *)
+      val always_constructed_at : Value.Comonadic.Const.t -> t
     end
 
     (** The mode crossing capability on all axes, split into monadic and
@@ -957,19 +1053,28 @@ module type S = sig
       uniqueness:bool ->
       portability:bool ->
       contention:bool ->
+      forkable:bool ->
       yielding:bool ->
       statefulness:bool ->
       visibility:bool ->
+      staticity:bool ->
       t
 
     (** Project a mode crossing (of all axes) onto the specified axis. *)
     val proj : 'a Axis.t -> t -> 'a
+
+    (** Set the specified axis to the specified crossing. *)
+    val set : 'a Axis.t -> 'a -> t -> t
 
     include Lattice with type t := t
 
     (** [modality m t] gives the mode crossing of type [T] wrapped in modality
     [m] where [T] has mode crossing [t]. *)
     val modality : Modality.Const.t -> t -> t
+
+    (** Takes a mode crossing [t], returns the modality needed to make [max] into [t].
+      More precisely, [to_modality] is the inverse of [modality _ max]. *)
+    val to_modality : t -> Modality.Const.t
 
     (** Apply mode crossing on a left mode, making it stronger. *)
     val apply_left : t -> Value.l -> Value.l

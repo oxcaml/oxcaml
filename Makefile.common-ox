@@ -174,7 +174,7 @@ $(ocamldir)/dune.runtime_selection:
 	fi
 
 _build/_bootinstall: Makefile.config $(dune_config_targets)
-	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/otherlibs/dynlink/natdynlinkops
+	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/natdynlinkops
 
 # flags.sexp
 	echo '(:standard $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_upstream_flags.sexp

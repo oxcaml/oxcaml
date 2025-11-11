@@ -126,4 +126,4 @@ val operation_supported : Cmm.operation -> bool
 val expression_supported : Cmm.expression -> bool
 
 (** The number of bytes each trap occupies on the stack. *)
-val trap_size_in_bytes : int
+val trap_size_in_bytes : unit -> int

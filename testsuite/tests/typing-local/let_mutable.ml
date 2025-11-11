@@ -152,7 +152,7 @@ Line 4, characters 9-24:
 4 |     x <- local_ (i :: x)
              ^^^^^^^^^^^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global".
+       but is expected to be "local" to the parent region or "global".
 |}]
 
 
@@ -189,7 +189,7 @@ Line 5, characters 9-26:
 5 |     x <- (local_ (x + !i));
              ^^^^^^^^^^^^^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global".
+       but is expected to be "local" to the parent region or "global".
 |}]
 
 let foo4_4 y = (* Can't sneak local out of non-local while cond region *)
@@ -203,7 +203,7 @@ Line 3, characters 13-29:
 3 |   while x <- (local_ (x + 1)); x <= 100 do
                  ^^^^^^^^^^^^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global".
+       but is expected to be "local" to the parent region or "global".
 |}]
 
 (* exclave_ closes one region, not two *)
@@ -237,7 +237,7 @@ Line 5, characters 11-30:
 5 |       x <- local_ ((i*j) :: x)
                ^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global".
+       but is expected to be "local" to the parent region or "global".
 |}]
 
 (* This is valid since both regions are closed *)
@@ -266,7 +266,7 @@ Line 4, characters 2-3:
       ^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global"
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -283,7 +283,7 @@ Line 4, characters 2-3:
       ^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global"
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -362,7 +362,7 @@ let disallowed_6_2 =
 Line 6, characters 11-12:
 6 |       x <- z
                ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (* 6.3: The mode system doesn't distinguish higher levels of regionality from
@@ -379,7 +379,7 @@ let disallowed_6_3 =
 Line 6, characters 11-12:
 6 |       x <- y
                ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (* Test 11: binding a mutable variable shouldn't be simplified away *)
@@ -493,7 +493,7 @@ Line 4, characters 19-20:
 4 |   require_portable f
                        ^
 Error: This value is "nonportable"
-       because it closes over the value "x_13_3" (at Line 3, characters 17-23)
+       because it contains a usage (of the value "x_13_3" at Line 3, characters 17-23)
        which is expected to be "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -509,7 +509,7 @@ Line 5, characters 19-20:
 5 |   require_portable f
                        ^
 Error: This value is "nonportable"
-       because it closes over the value "x_13_3" (at Line 3, characters 17-23)
+       because it contains a usage (of the value "x_13_3" at Line 3, characters 17-23)
        which is expected to be "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -642,7 +642,7 @@ Line 4, characters 2-3:
       ^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global"
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]

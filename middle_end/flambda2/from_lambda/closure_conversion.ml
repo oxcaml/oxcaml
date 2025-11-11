@@ -1238,11 +1238,11 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pmake_unboxed_product _ | Punboxed_product_field _
       | Parray_element_size_in_bytes _ | Pget_header _ | Prunstack | Pperform
       | Presume | Preperform | Pmake_idx_field _ | Pmake_idx_mixed_field _
-      | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _ | Pset_idx _
-      | Patomic_exchange_field _ | Patomic_compare_exchange_field _
+      | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _ | Pset_idx _ | Pget_ptr _
+      | Pset_ptr _ | Patomic_exchange_field _ | Patomic_compare_exchange_field _
       | Patomic_compare_set_field _ | Patomic_fetch_add_field
       | Patomic_add_field | Patomic_sub_field | Patomic_land_field
-      | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ppoll
+      | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ptls_get | Ppoll
       | Patomic_load_field _ | Patomic_set_field _
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
@@ -4015,10 +4015,12 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
         Slot_offsets.
           { function_slots_in_normal_projections =
               Name_occurrences.function_slots_in_normal_projections free_names;
-            all_function_slots = Name_occurrences.all_function_slots free_names;
+            all_function_slots =
+              Name_occurrences.all_function_slots_at_normal_mode free_names;
             value_slots_in_normal_projections =
               Name_occurrences.value_slots_in_normal_projections free_names;
-            all_value_slots = Name_occurrences.all_value_slots free_names
+            all_value_slots =
+              Name_occurrences.all_value_slots_at_normal_mode free_names
           }
       in
       Slot_offsets.finalize_offsets (Acc.slot_offsets acc) ~get_code_metadata

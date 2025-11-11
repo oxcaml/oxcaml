@@ -88,8 +88,8 @@ let coalesce_temp_spills_and_reloads (block : Cfg.basic_block)
     | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
     | Stack_check _
     | Op
-        ( Move | Opaque | Begin_region | End_region | Dls_get | Poll | Pause
-        | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+        ( Move | Opaque | Begin_region | End_region | Dls_get | Tls_get | Poll
+        | Pause | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
         | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
         | Load _
         | Store (_, _, _)
@@ -218,9 +218,14 @@ let rewrite_gen :
           let new_instr = Move.make_instr move ~id ~copy:instr ~from ~to_ in
           match direction with
           | Load_before_cell cell -> DLL.insert_before cell new_instr
-          | Store_after_cell cell -> DLL.insert_after cell new_instr
+          | Store_after_cell cell ->
+            (* See comment before Insert_skipping_name_for_debugger *)
+            Insert_skipping_name_for_debugger.insert_after cell new_instr
+              ~reg:from
           | Load_after_list list -> DLL.add_end list new_instr
-          | Store_before_list list -> DLL.add_begin list new_instr);
+          | Store_before_list list ->
+            (* See comment before Insert_skipping_name_for_debugger *)
+            Insert_skipping_name_for_debugger.add_begin list new_instr ~reg:from);
         temp)
       else reg
     in

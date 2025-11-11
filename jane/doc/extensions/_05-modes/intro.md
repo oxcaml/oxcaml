@@ -128,16 +128,16 @@ when they are contended.
 |-----------------|
 | **nonportable** |
 | `|`             |
+| sharable        |
+| `|`             |
 | portable        |
 {: .table }
 
-Portability is a future axis that tracks whether a value is permitted to be
-shared with another thread. OxCaml's parallelism API does not allow
-*nonportable* values to move across thread boundaries, while *portable* values
-may move freely.
-
-Portability is about functions: functions that capture uncontended mutable state
-are not portable.
+Portability is a future axis that tracks whether a value is allowed to move across
+thread boundaries. Functions that capture uncontended state are *nonportable*, 
+so cannot escape the current thread. Functions that capture shared state are
+*sharable*, so may be executed in parallel. Functions that capture all values at
+contended are *portable*, so may execute concurrently.
 
 Notably, it is generally safe to send mutable data *itself* to other threads,
 because it will then be *contended*, so the mutable portions will be
@@ -150,6 +150,25 @@ data race!).
 Portability is irrelevant for types that do not contain functions. Values of
 such types *mode cross* on the portability axis; they may be used as portable
 even when they are nonportable.
+
+## Future modes: Forkable
+
+|----------------|
+| unforkable     |
+| `|`            |
+| **forkable**   |
+{: .table }
+
+Forkable is a future axis that tracks whether a function is permitted to access
+shared values in its parent stack. See [parallelism](../../parallelism/01-intro/).
+
+Forkable has different defaults depending on the locality axis: *global* values are
+defaulted to *forkable*, while *local* values are defaulted to *unforkable*.
+More documentation on mode implications is available [here](../../kinds/syntax).
+
+Forkable is irrelevant for types that do not contain functions, and values of such types
+*mode cross* on the forkable axis; they may be used as forkable even when they are
+unforkable.
 
 # Modes for aliasing {#uniqueness-linearity}
 
@@ -230,6 +249,7 @@ for effect handlers](https://ocaml.org/manual/5.3/effects.html).
 Yielding has different defaults depending on the locality axis: *global* values are
 defaulted to *unyielding*, while *local* values are defaulted to *yielding*.
 More documentation on mode implications is available [here](../../kinds/syntax).
+
 
 Yielding is irrelevant for types that do not contain functions, and values of such types
 *mode cross* on the yielding axis; they may be used as unyielding even

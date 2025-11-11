@@ -266,7 +266,7 @@ Error: Signature mismatch:
          external f : int -> int = "f" "f_nat" [@@noalloc]
        is not included in
          external f : int -> int = "f" "f_nat"
-       The first primitive is "[@@noalloc]" but the second is not
+       The left-hand side primitive is "[@@noalloc]" but the right-hand side is not
 |}]
 
 (* Bad: attributes in the interface but not in the implementation *)
@@ -429,7 +429,7 @@ Error: Signature mismatch:
          external f : int -> int = "f" "f_nat"
        is not included in
          external f : int -> int = "f" "f_nat" [@@noalloc]
-       The second primitive is "[@@noalloc]" but the first is not
+       The right-hand side primitive is "[@@noalloc]" but the left-hand side is not
 |}]
 
 (* Bad: claiming something is a primitive when it isn't *)

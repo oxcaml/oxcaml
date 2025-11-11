@@ -387,6 +387,7 @@ let nullary_prim_size prim =
   | Probe_is_enabled { name = _ } -> 4
   | Enter_inlined_apply _ -> 0
   | Dls_get -> 1
+  | Tls_get -> 1
   | Poll | Cpu_relax -> alloc_size
 
 let unary_prim_size ~machine_width prim =

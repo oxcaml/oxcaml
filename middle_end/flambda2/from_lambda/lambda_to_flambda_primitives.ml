@@ -2936,6 +2936,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [Ternary (Atomic_field_int_arith Xor, atomic, field, i)]
   | Pcpu_relax, _ -> [Nullary Cpu_relax]
   | Pdls_get, _ -> [Nullary Dls_get]
+  | Ptls_get, _ -> [Nullary Tls_get]
   | Ppoll, _ -> [Nullary Poll]
   | Preinterpret_unboxed_int64_as_tagged_int63, [[i]] ->
     if not (Target_system.is_64_bit ())
@@ -2957,7 +2958,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Ppoke layout, [[ptr]; [new_value]] ->
     let kind = standard_int_or_float_of_peek_or_poke layout in
     [Binary (Poke kind, ptr, new_value)]
-  | Pget_idx (layout, mut), [[ptr]; [idx]] ->
+  | Pget_idx (layout, mut), [[ptr]; [idx]] | Pget_ptr (layout, mut), [[ptr; idx]]
+    ->
     needs_64_bit_target prim dbg;
     let offsets = block_index_access_offsets ~machine_width layout idx in
     let kinds =
@@ -2971,7 +2973,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         kinds offsets
     in
     [H.maybe_create_unboxed_product reads]
-  | Pset_idx (layout, mode), [[ptr]; [idx]; new_values] ->
+  | Pget_ptr _, [([] | [_] | _ :: _ :: _ :: _)] ->
+    Misc.fatal_errorf
+      "Closure_convertion.convert_primitive: The argument to Pget_ptr should \
+       be an unboxed product of length 2"
+      Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
+  | Pset_idx (layout, mode), [[ptr]; [idx]; new_values]
+  | Pset_ptr (layout, mode), [[ptr; idx]; new_values] ->
     needs_64_bit_target prim dbg;
     let mode = Alloc_mode.For_assignments.from_lambda mode in
     let offsets = block_index_access_offsets ~machine_width layout idx in
@@ -2986,6 +2994,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         kinds offsets new_values
     in
     [H.Sequence writes]
+  | Pset_ptr _, [([] | [_] | _ :: _ :: _ :: _); _] ->
+    Misc.fatal_errorf
+      "Closure_convertion.convert_primitive: The first argument to Pset_ptr \
+       should be an unboxed product of length 2"
+      Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
@@ -3010,7 +3023,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Parray_element_size_in_bytes _ | Pmake_idx_array _ | Pidx_deepen _
       | Ppeek _ | Pmakelazyblock _
-      | Pscalar (Unary _) ),
+      | Pscalar (Unary _)
+      | Pget_ptr _ ),
       ([] | _ :: _ :: _ | [([] | _ :: _ :: _)]) ) ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Wrong arity for unary primitive \
@@ -3043,7 +3057,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             _ )
       | Patomic_load_field _ | Ppoke _ | Pphys_equal _
       | Pscalar (Binary _)
-      | Pget_idx _ ),
+      | Pget_idx _ | Pset_ptr _ ),
       ( []
       | [_]
       | _ :: _ :: _ :: _

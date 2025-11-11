@@ -615,7 +615,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pstringrefs -> binary (Ccall "caml_string_get")
     | Pbytesrefs -> binary (Ccall "caml_bytes_get")
     | Pbytessets -> ternary (Ccall "caml_bytes_set")
-    | Pstringrefu | Pbytesrefu -> binary Getbyteschar
+    | Pstringrefu -> binary Getstringchar
+    | Pbytesrefu -> binary Getbyteschar
     | Pbytessetu -> ternary Setbyteschar
     | Pstring_load_16 { index_kind; _ } ->
       binary (indexing_primitive index_kind "caml_string_get16")
@@ -777,6 +778,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Patomic_lor_field -> ternary (Ccall "caml_atomic_lor_field")
     | Patomic_lxor_field -> ternary (Ccall "caml_atomic_lxor_field")
     | Pdls_get -> unary (Ccall "caml_domain_dls_get")
+    | Ptls_get -> unary (Ccall "caml_domain_tls_get")
     | Ppoll -> unary (Ccall "caml_process_pending_actions_with_root")
     | Pcpu_relax -> unary (Ccall "caml_ml_domain_cpu_relax")
     | Pisnull -> unary (Ccall "caml_is_null")
@@ -831,7 +833,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Punboxedfloatarray_set _ | Pgcscannableproductarray_set _
       | Pgcignorableproductarray_set _ ->
         n_ary (Ccall "caml_array_blit") ~arity:5)
-    | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ ->
+    | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ | Pget_ptr _ | Pset_ptr _ ->
       Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"
         Printlambda.primitive primitive
     | Pmakelazyblock Lazy_tag ->

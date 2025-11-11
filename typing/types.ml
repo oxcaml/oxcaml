@@ -68,9 +68,11 @@ module Jkind_mod_bounds = struct
   let uniqueness = Crossing.Axis.Monadic Uniqueness
   let portability = Crossing.Axis.Comonadic Portability
   let contention = Crossing.Axis.Monadic Contention
+  let forkable = Crossing.Axis.Comonadic Forkable
   let yielding = Crossing.Axis.Comonadic Yielding
   let statefulness = Crossing.Axis.Comonadic Statefulness
   let visibility = Crossing.Axis.Monadic Visibility
+  let staticity = Crossing.Axis.Monadic Staticity
   let[@inline] externality t = t.externality
   let[@inline] nullability t = t.nullability
   let[@inline] separability t = t.separability
@@ -106,9 +108,11 @@ module Jkind_mod_bounds = struct
     let uniqueness = modal uniqueness in
     let portability = modal portability in
     let contention = modal contention in
+    let forkable = modal forkable in
     let yielding = modal yielding in
     let statefulness = modal statefulness in
     let visibility = modal visibility in
+    let staticity = modal staticity in
     let externality =
       if mem max_axes (Nonmodal Externality)
       then Externality.max
@@ -125,11 +129,11 @@ module Jkind_mod_bounds = struct
       else t.separability
     in
     let monadic =
-      Crossing.Monadic.create ~uniqueness ~contention ~visibility
+      Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
     in
     let comonadic =
       Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
-        ~statefulness
+        ~forkable ~statefulness
     in
     let crossing : Mode.Crossing.t = { monadic; comonadic } in
     {
@@ -153,9 +157,11 @@ module Jkind_mod_bounds = struct
     let uniqueness = modal uniqueness in
     let portability = modal portability in
     let contention = modal contention in
+    let forkable = modal forkable in
     let yielding = modal yielding in
     let statefulness = modal statefulness in
     let visibility = modal visibility in
+    let staticity = modal staticity in
     let externality =
       if mem min_axes (Nonmodal Externality)
       then Externality.min
@@ -172,11 +178,11 @@ module Jkind_mod_bounds = struct
       else t.separability
     in
     let monadic =
-      Crossing.Monadic.create ~uniqueness ~contention ~visibility
+      Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
     in
     let comonadic =
       Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
-        ~statefulness
+        ~forkable ~statefulness
     in
     let crossing : Mode.Crossing.t = { monadic; comonadic } in
     {
@@ -198,9 +204,11 @@ module Jkind_mod_bounds = struct
     modal uniqueness &&
     modal portability &&
     modal contention &&
+    modal forkable &&
     modal yielding &&
     modal statefulness &&
     modal visibility &&
+    modal staticity &&
     (not (mem axes (Nonmodal Externality)) ||
      Externality.(le max (externality t))) &&
     (not (mem axes (Nonmodal Nullability)) ||
@@ -249,6 +257,8 @@ and type_desc =
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   | Tfield of string * field_kind * type_expr * type_expr
+  | Tquote of type_expr
+  | Tsplice of type_expr
   | Tnil
   | Tlink of type_expr
   | Tsubst of type_expr * type_expr option
@@ -1296,6 +1306,8 @@ let best_effort_compare_type_expr te1 te2 =
         | Tvariant _
         | Tpackage (_, _)
         | Tarrow (_, _, _, _)
+        | Tquote _
+        | Tsplice _
         (* CR layouts v2.8: we can actually see Tsubst here in certain cases, eg during
            [Ctype.copy] when copying the types inside of with_bounds. We also can't
            compare Tsubst structurally, because the Tsubsts that are created in

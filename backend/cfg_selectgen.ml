@@ -74,7 +74,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Cxor | Clsl | Clsr | Casr | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz _
       | Cctz _ | Cpopcnt | Cbswap _ | Ccsel _ | Cabsf _ | Caddf _ | Csubf _
       | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _
-      | Ctuple_field _ | Ccmpf _ | Cdls_get ->
+      | Ctuple_field _ | Ccmpf _ | Cdls_get | Ctls_get ->
         List.for_all is_simple_expr args)
     | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ -> false
 
@@ -122,7 +122,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | Catomic _ -> EC.arbitrary
         | Craise _ -> EC.effect_only Raise
         | Cload { mutability = Immutable } -> EC.none
-        | Cload { mutability = Mutable } | Cdls_get ->
+        | Cload { mutability = Mutable } | Cdls_get | Ctls_get ->
           EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
         | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
@@ -187,7 +187,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     then
       let naming_op =
         SU.make_name_for_debugger ~ident:(VP.var v) ~which_parameter:None
-          ~provenance ~is_assignment:false ~regs:r1
+          ~provenance ~regs:r1
       in
       SU.insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]);
     env
@@ -327,6 +327,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | _ -> SU.basic_op (Store (chunk, addr, is_assign)), [arg2; eloc]
       (* Inversion addr/datum in Istore *))
     | Cdls_get -> SU.basic_op Dls_get, args
+    | Ctls_get -> SU.basic_op Tls_get, args
     | Calloc (mode, alloc_block_kind) ->
       let placeholder_for_alloc_block_kind : Cmm.alloc_dbginfo_item =
         { alloc_words = 0; alloc_block_kind; alloc_dbg = Debuginfo.none }
@@ -862,12 +863,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             let bound_name = VP.var bound_name in
             let naming_op =
               Operation.Name_for_debugger
-                { ident = bound_name;
-                  provenance;
-                  which_parameter = None;
-                  is_assignment = false;
-                  regs
-                }
+                { ident = bound_name; provenance; which_parameter = None; regs }
             in
             insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]
       in
@@ -1096,7 +1092,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                       { ident = var;
                         provenance;
                         which_parameter = None;
-                        is_assignment = false;
                         regs = r
                       }
                   in
@@ -1376,7 +1371,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                       { ident = var;
                         provenance;
                         which_parameter = None;
-                        is_assignment = false;
                         regs = r
                       }
                   in
@@ -1456,7 +1450,6 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               { ident = var;
                 provenance;
                 which_parameter = Some param_index;
-                is_assignment = false;
                 regs = hard_regs_for_arg
               }
           in
@@ -1525,6 +1518,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
            (Cfg.Always (Sub_cfg.start_label body))
            [||] [||] Debuginfo.none)
     in
+    insert_param_name_for_debugger tailrec_block f.Cmm.fun_args loc_arg
+      num_regs_per_arg;
     Cfg.add_block_exn cfg tailrec_block;
     DLL.add_end layout tailrec_block.start;
     Sub_cfg.iter_basic_blocks body ~f:(fun (block : Cfg.basic_block) ->

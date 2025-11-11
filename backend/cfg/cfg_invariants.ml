@@ -216,9 +216,11 @@ let check_stack_offset t label (block : Cfg.basic_block) =
               Cfg.dump_basic basic.desc cur_stack_offset
               (Label.to_string lbl_handler)
               handler_block.stack_offset;
-          cur_stack_offset + Proc.trap_size_in_bytes
+          cur_stack_offset + Proc.trap_size_in_bytes ()
         | Poptrap { lbl_handler = _ } ->
-          let new_stack_offset = cur_stack_offset - Proc.trap_size_in_bytes in
+          let new_stack_offset =
+            cur_stack_offset - Proc.trap_size_in_bytes ()
+          in
           if Int.compare new_stack_offset 0 < 0
           then
             report t
@@ -243,8 +245,8 @@ let check_stack_offset t label (block : Cfg.basic_block) =
             | Const_vec512 _ | Load _ | Store _ | Intop _ | Intop_imm _
             | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
             | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
-            | End_region | Specific _ | Name_for_debugger _ | Dls_get | Poll
-            | Pause | Alloc _ )
+            | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
+            | Poll | Pause | Alloc _ )
         | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
           cur_stack_offset)
   in

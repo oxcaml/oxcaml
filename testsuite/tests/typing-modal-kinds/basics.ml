@@ -38,9 +38,9 @@ end
 module Hidden_string : sig type t val hide : string -> t end
 module Hidden_int : sig type t : immediate val hide : int -> t end
 module Hidden_float_u :
-  sig type t : float64 mod global aliased many val hide : float# -> t end
+  sig type t : float64 mod global many val hide : float# -> t end
 module Hidden_int64_u :
-  sig type t : bits64 mod global aliased many val hide : int64# -> t end
+  sig type t : bits64 mod global many val hide : int64# -> t end
 |}]
 
 module Immediate : sig
@@ -931,7 +931,8 @@ Line 1, characters 10-19:
               ^^^^^^^^^
 Error: This type "int t ref" should be an instance of type
          "('a : value mod contended)"
-       The kind of int t ref is mutable_data with int t @@ unyielding many.
+       The kind of int t ref is
+           mutable_data with int t @@ forkable unyielding many.
        But the kind of int t ref must be a subkind of value mod contended
          because of the definition of require_contended at line 1, characters 0-49.
 

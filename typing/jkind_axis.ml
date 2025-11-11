@@ -30,8 +30,6 @@ module Externality = struct
 
   let min = External
 
-  let legacy = Internal
-
   let equal e1 e2 =
     match e1, e2 with
     | External, External -> true
@@ -71,6 +69,12 @@ module Externality = struct
     | External -> Format.fprintf ppf "external_"
     | External64 -> Format.fprintf ppf "external64"
     | Internal -> Format.fprintf ppf "internal"
+
+  let upper_bound_if_is_always_gc_ignorable () =
+    (* We check that we're compiling to (64-bit) native code before counting
+        External64 types as gc_ignorable, because bytecode is intended to be
+        platform independent. *)
+    if !Clflags.native_code && Sys.word_size = 64 then External64 else External
 end
 
 module Nullability = struct
@@ -81,8 +85,6 @@ module Nullability = struct
   let max = Maybe_null
 
   let min = Non_null
-
-  let legacy = Non_null
 
   let equal n1 n2 =
     match n1, n2 with
@@ -123,8 +125,6 @@ module Separability = struct
   let max = Maybe_separable
 
   let min = Non_float
-
-  let legacy = Separable
 
   let equal s1 s2 =
     match s1, s2 with
@@ -188,9 +188,12 @@ module Axis = struct
       Pack (Modal (Comonadic Linearity));
       Pack (Modal (Monadic Contention));
       Pack (Modal (Comonadic Portability));
+      Pack (Modal (Comonadic Forkable));
       Pack (Modal (Comonadic Yielding));
       Pack (Modal (Comonadic Statefulness));
       Pack (Modal (Monadic Visibility));
+      Pack (Modal (Monadic Staticity));
+      (* CR-soon zqian: call [Mode.Crossing.Axis.all] for modal axes *)
       Pack (Nonmodal Externality);
       Pack (Nonmodal Nullability);
       Pack (Nonmodal Separability) ]
@@ -311,12 +314,15 @@ module Axis_set = struct
     | Modal (Monadic Uniqueness) -> 2
     | Modal (Comonadic Portability) -> 3
     | Modal (Monadic Contention) -> 4
-    | Modal (Comonadic Yielding) -> 5
-    | Modal (Comonadic Statefulness) -> 6
-    | Modal (Monadic Visibility) -> 7
-    | Nonmodal Externality -> 8
-    | Nonmodal Nullability -> 9
-    | Nonmodal Separability -> 10
+    | Modal (Comonadic Forkable) -> 5
+    | Modal (Comonadic Yielding) -> 6
+    | Modal (Comonadic Statefulness) -> 7
+    | Modal (Monadic Visibility) -> 8
+    | Modal (Monadic Staticity) -> 9
+    (* CR-soon zqian: call [Mode.Crossing.Axis.index] for modal axes *)
+    | Nonmodal Externality -> 10
+    | Nonmodal Nullability -> 11
+    | Nonmodal Separability -> 12
 
   let[@inline] axis_mask ax = 1 lsl axis_index ax
 
@@ -341,9 +347,11 @@ module Axis_set = struct
     |> set_axis (Modal (Monadic Uniqueness))
     |> set_axis (Modal (Comonadic Portability))
     |> set_axis (Modal (Monadic Contention))
+    |> set_axis (Modal (Comonadic Forkable))
     |> set_axis (Modal (Comonadic Yielding))
     |> set_axis (Modal (Comonadic Statefulness))
     |> set_axis (Modal (Monadic Visibility))
+    |> set_axis (Modal (Monadic Staticity))
     |> set_axis (Nonmodal Externality)
     |> set_axis (Nonmodal Nullability)
     |> set_axis (Nonmodal Separability)

@@ -180,6 +180,8 @@ module type Solver_mono = sig
   (** The object type from the [Lattices_mono] we're working with *)
   type 'a obj
 
+  type pinpoint
+
   type 'd hint_morph constraint 'd = 'l * 'r
 
   type 'd hint_const constraint 'd = 'l * 'r
@@ -211,6 +213,12 @@ module type Solver_mono = sig
   val of_const :
     'a obj -> ?hint:('l * 'r) hint_const -> 'a -> ('a, 'l * 'r) mode
 
+  (* CR-soon zqian: [to_const_exn] should return hints as well. *)
+
+  (** Given a mode whose lower and upper bounds are equal, returns that bound. Raises
+  exception if the condition does not hold. *)
+  val to_const_exn : 'a obj -> ('a, allowed * allowed) mode -> 'a
+
   (** The minimum mode in the lattice *)
   val min : 'a obj -> ('a, 'l * 'r) mode
 
@@ -233,6 +241,18 @@ module type Solver_mono = sig
   (** Create a new mode variable of the full range. *)
   val newvar : 'a obj -> ('a, 'l * 'r) mode
 
+  (** Remove hints from all vars that have been created. This doesn't affect
+  hints that were applied on top of vars. For example:
+
+  let m = newvar () in
+  submode m (apply ~hint:hint0 g n);
+  let m' = apply ~hint:hint1 f m in
+  erase_hints ()
+
+  The last line erases the hints on [m] (caused by [n]), but [m'] has an immutable hint
+  on top of [m], which is not affected. *)
+  val erase_hints : unit -> unit
+
   (** Raw hint returned by failed [submode a b]. To consume it, see [populate_hint]. *)
   type ('a, 'd) hint_raw constraint 'd = 'l * 'r
 
@@ -248,8 +268,10 @@ module type Solver_mono = sig
       right_hint : ('a, right_only) hint_raw
     }
 
-  (** Try to constrain the first mode below the second mode. *)
+  (** Try to constrain the first mode below the second mode. [pinpoint]
+  describes the thing that has both modes. *)
   val submode :
+    pinpoint ->
     'a obj ->
     ('a, allowed * 'r) mode ->
     ('a, 'l * allowed) mode ->
@@ -364,6 +386,14 @@ end
 
 (** Hint module to be provided by the user of the solver. *)
 module type Hint = sig
+  module Pinpoint : sig
+    (** Descriptions of things that have modes. *)
+    type t
+
+    (** Something that have modes but not described. *)
+    val unknown : t
+  end
+
   module Morph : sig
     (** Hints that explain morphisms. The allowance ['d] describes if the morphism can be on
       the LHS or RHS of [submode]. *)
@@ -372,11 +402,15 @@ module type Hint = sig
     (** The hint for the identity morphism *)
     val id : 'd t
 
-    (** Given a hint for a mode morphism, return a hint for the left adjoint of the morphism *)
-    val left_adjoint : (_ * allowed) t -> (allowed * disallowed) t
+    (** Given a hint for a mode morphism with its destination pinpoint, return a
+    hint for the left adjoint of the morphism with the opposite pinpoint. *)
+    val left_adjoint :
+      Pinpoint.t -> (_ * allowed) t -> Pinpoint.t * (allowed * disallowed) t
 
-    (** Given a hint for a mode morphism, return a hint for the right adjoint of the morphism *)
-    val right_adjoint : (allowed * _) t -> (disallowed * allowed) t
+    (** Given a hint for a mode morphism with its destination pinpoint, return a
+    hint for the right adjoint of the morphism with the opposite pinpoint. *)
+    val right_adjoint :
+      Pinpoint.t -> (allowed * _) t -> Pinpoint.t * (disallowed * allowed) t
 
     (** The hint for unexplained morphs *)
     val unknown : 'd t
@@ -415,6 +449,7 @@ module type S = sig
     Solver_mono
       with type ('a, 'b, 'd) morph := ('a, 'b, 'd) C.morph
        and type 'a obj := 'a C.obj
+       and type pinpoint := Hint.Pinpoint.t
        and type 'd hint_morph := 'd Hint.Morph.t
        and type 'd hint_const := 'd Hint.Const.t
 end

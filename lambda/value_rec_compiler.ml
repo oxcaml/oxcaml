@@ -326,12 +326,15 @@ let compute_static_size lam =
     | Patomic_fetch_add_field
     | Popaque _
     | Pdls_get
+    | Ptls_get
     | Ppeek _
     | Ppoke _
     | Pscalar _
     | Pphys_equal _
     | Pget_idx _
-    | Pset_idx _ ->
+    | Pset_idx _
+    | Pget_ptr _
+    | Pset_ptr _ ->
         dynamic_size lam
 
     (* Primitives specific to oxcaml *)

@@ -296,7 +296,12 @@ let load_slambda ppf ~compilation_unit ~required_globals program size =
   let program = Slambdaeval.eval program in
   let lam = program.code in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
-  let slam = Simplif.simplify_lambda lam in
+  let slam =
+    Simplif.simplify_lambda lam
+      ~restrict_to_upstream_dwarf:
+        !Dwarf_flags.restrict_to_upstream_dwarf
+      ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
+  in
   if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda slam;
   let program =
     { Lambda.

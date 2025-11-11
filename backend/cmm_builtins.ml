@@ -276,20 +276,18 @@ let const_int64_args =
     ~type_name:"int64"
 
 let int64_of_int8 i =
-  (* CR mslater: (SIMD) replace once we have unboxed int8 *)
-  if i < 0 || i > 0xff
-  then bad_immediate "Int8 constant not in range [0x0,0xff]: 0x%016x" i;
-  Int64.of_int i
+  if i < -0x80 || i > 0x7f
+  then bad_immediate "Int8 constant not in range [0x0,0xff]: 0x%x" i;
+  Int64.of_int i |> Int64.logand 0xffL
 
 let int64_of_int16 i =
-  (* CR mslater: (SIMD) replace once we have unboxed int16 *)
-  if i < 0 || i > 0xffff
-  then bad_immediate "Int16 constant not in range [0x0,0xffff]: 0x%016x" i;
-  Int64.of_int i
+  if i < -0x8000 || i > 0x7fff
+  then bad_immediate "Int16 constant not in range [0x0,0xffff]: 0x%x" i;
+  Int64.of_int i |> Int64.logand 0xffffL
 
 let int64_of_int32 i =
   if i < Int32.to_int Int32.min_int || i > Int32.to_int Int32.max_int
-  then bad_immediate "Int32 constant not in range [0x0,0xffffffff]: 0x%016x" i;
+  then bad_immediate "Int32 constant not in range [0x0,0xffffffff]: 0x%x" i;
   Int64.of_int i |> Int64.logand 0xffffffffL
 
 let int64_of_float32 f =
@@ -368,20 +366,16 @@ let transl_vec_builtin name args dbg _typ_res =
   | "caml_int32x4_low_to_int32" ->
     let op = Cstatic_cast (Scalar_of_v128 Int32x4) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int16x8_low_of_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
+  | "caml_int16x8_low_of_int16" ->
     let op = Cstatic_cast (V128_of_scalar Int16x8) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int16x8_low_to_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
+  | "caml_int16x8_low_to_int16" ->
     let op = Cstatic_cast (Scalar_of_v128 Int16x8) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int8x16_low_of_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
+  | "caml_int8x16_low_of_int8" ->
     let op = Cstatic_cast (V128_of_scalar Int8x16) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int8x16_low_to_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
+  | "caml_int8x16_low_to_int8" ->
     let op = Cstatic_cast (Scalar_of_v128 Int8x16) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_float64x4_low_of_float" ->
@@ -408,20 +402,16 @@ let transl_vec_builtin name args dbg _typ_res =
   | "caml_int32x8_low_to_int32" ->
     let op = Cstatic_cast (Scalar_of_v256 Int32x8) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int16x16_low_of_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
+  | "caml_int16x16_low_of_int16" ->
     let op = Cstatic_cast (V256_of_scalar Int16x16) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int16x16_low_to_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
+  | "caml_int16x16_low_to_int16" ->
     let op = Cstatic_cast (Scalar_of_v256 Int16x16) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int8x32_low_of_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
+  | "caml_int8x32_low_of_int8" ->
     let op = Cstatic_cast (V256_of_scalar Int8x32) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int8x32_low_to_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
+  | "caml_int8x32_low_to_int8" ->
     let op = Cstatic_cast (Scalar_of_v256 Int8x32) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_float64x8_low_of_float" ->
@@ -448,20 +438,16 @@ let transl_vec_builtin name args dbg _typ_res =
   | "caml_int32x16_low_to_int32" ->
     let op = Cstatic_cast (Scalar_of_v512 Int32x16) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int16x32_low_of_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
+  | "caml_int16x32_low_of_int16" ->
     let op = Cstatic_cast (V512_of_scalar Int16x32) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int16x32_low_to_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
+  | "caml_int16x32_low_to_int16" ->
     let op = Cstatic_cast (Scalar_of_v512 Int16x32) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int8x64_low_of_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
+  | "caml_int8x64_low_of_int8" ->
     let op = Cstatic_cast (V512_of_scalar Int8x64) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
-  | "caml_int8x64_low_to_int" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
+  | "caml_int8x64_low_to_int8" ->
     let op = Cstatic_cast (Scalar_of_v512 Int8x64) in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   (* 128-bit constants *)
@@ -509,12 +495,10 @@ let transl_vec_builtin name args dbg _typ_res =
     let word1 = pack_int32s vals.(2) vals.(3) in
     if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int16x8_const1" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
     let i = const_int_args 1 args name |> List.hd |> int64_of_int16 in
     let i = pack_int16s i i i i in
     if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int16x8_const8" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
     let vals =
       const_int_args 8 args name |> Array.of_list |> Array.map int64_of_int16
     in
@@ -522,12 +506,10 @@ let transl_vec_builtin name args dbg _typ_res =
     let word1 = pack_int16s vals.(4) vals.(5) vals.(6) vals.(7) in
     if_expr_supported (Cconst_vec128 ({ word0; word1 }, dbg))
   | "caml_int8x16_const1" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
     let i = const_int_args 1 args name |> List.hd |> int64_of_int8 in
     let i = pack_int8s i i i i i i i i in
     if_expr_supported (Cconst_vec128 ({ word0 = i; word1 = i }, dbg))
   | "caml_int8x16_const16" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
     let vals =
       const_int_args 16 args name |> Array.of_list |> Array.map int64_of_int8
     in
@@ -593,13 +575,11 @@ let transl_vec_builtin name args dbg _typ_res =
     let word3 = pack_int32s vals.(6) vals.(7) in
     if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
   | "caml_int16x16_const1" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
     let i = const_int_args 1 args name |> List.hd |> int64_of_int16 in
     let i = pack_int16s i i i i in
     if_expr_supported
       (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
   | "caml_int16x16_const16" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
     let vals =
       const_int_args 16 args name |> Array.of_list |> Array.map int64_of_int16
     in
@@ -609,13 +589,11 @@ let transl_vec_builtin name args dbg _typ_res =
     let word3 = pack_int16s vals.(12) vals.(13) vals.(14) vals.(15) in
     if_expr_supported (Cconst_vec256 ({ word0; word1; word2; word3 }, dbg))
   | "caml_int8x32_const1" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
     let i = const_int_args 1 args name |> List.hd |> int64_of_int8 in
     let i = pack_int8s i i i i i i i i in
     if_expr_supported
       (Cconst_vec256 ({ word0 = i; word1 = i; word2 = i; word3 = i }, dbg))
   | "caml_int8x32_const32" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
     let vals =
       const_int_args 32 args name |> Array.of_list |> Array.map int64_of_int8
     in
@@ -763,7 +741,6 @@ let transl_vec_builtin name args dbg _typ_res =
       (Cconst_vec512
          ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
   | "caml_int16x32_const1" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
     let i = const_int_args 1 args name |> List.hd |> int64_of_int16 in
     let i = pack_int16s i i i i in
     if_expr_supported
@@ -779,7 +756,6 @@ let transl_vec_builtin name args dbg _typ_res =
            },
            dbg ))
   | "caml_int16x32_const32" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16 *)
     let vals =
       const_int_args 32 args name |> Array.of_list |> Array.map int64_of_int16
     in
@@ -795,7 +771,6 @@ let transl_vec_builtin name args dbg _typ_res =
       (Cconst_vec512
          ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
   | "caml_int8x64_const1" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
     let i = const_int_args 1 args name |> List.hd |> int64_of_int8 in
     let i = pack_int8s i i i i i i i i in
     if_expr_supported
@@ -811,7 +786,6 @@ let transl_vec_builtin name args dbg _typ_res =
            },
            dbg ))
   | "caml_int8x64_const64" ->
-    (* CR mslater: (SIMD) replace once we have unboxed int8 *)
     let vals =
       const_int_args 64 args name |> Array.of_list |> Array.map int64_of_int8
     in

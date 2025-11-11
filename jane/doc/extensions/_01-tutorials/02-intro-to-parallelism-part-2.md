@@ -214,7 +214,7 @@ let rec quicksort parallel slice =
     let length = Slice.length slice in
     let left = Slice.sub slice ~i:0 ~j:pivot in
     let right = Slice.sub slice ~i:pivot ~j:length in
-    let (), () =
+    let #((), ()) =
       Parallel.fork_join2
         parallel
         (fun parallel -> quicksort parallel left)
@@ -237,7 +237,7 @@ let rec quicksort parallel slice =
   if Slice.length slice > 1
   then (
     let pivot = partition slice in
-    let (), () =
+    let #((), ()) =
       Slice.fork_join2
         parallel
         ~pivot

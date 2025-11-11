@@ -171,8 +171,8 @@ module Namespace = struct
     let to_lookup f lid = fst @@ in_printing_env (f (Lident lid)) in
     function
     | Some Type -> to_lookup Env.find_type_by_name
-    | Some Module -> to_lookup Env.find_module_by_name
-    | Some Module_type -> to_lookup Env.find_modtype_by_name
+    | Some Module -> to_lookup Env.find_module_by_name_lazy
+    | Some Module_type -> to_lookup Env.find_modtype_by_name_lazy
     | Some Class -> to_lookup Env.find_class_by_name
     | Some Class_type -> to_lookup Env.find_cltype_by_name
     | None
@@ -184,8 +184,9 @@ module Namespace = struct
     try Some (
         match namespace with
         | Some Type -> (in_printing_env @@ Env.find_type path).type_loc
-        | Some Module -> (in_printing_env @@ Env.find_module path).md_loc
-        | Some Module_type -> (in_printing_env @@ Env.find_modtype path).mtd_loc
+        | Some Module -> (in_printing_env @@ Env.find_module_lazy path).md_loc
+        | Some Module_type ->
+          (in_printing_env @@ Env.find_modtype_lazy path).mtd_loc
         | Some Class -> (in_printing_env @@ Env.find_class path).cty_loc
         | Some Class_type -> (in_printing_env @@ Env.find_cltype path).clty_loc
         | Some (Extension_constructor|Value|Constructor|Label|Unboxed_label)
@@ -518,7 +519,7 @@ let rec rewrite_double_underscore_paths env p =
     match expand_longident_head name with
     | None -> p
     | Some better_lid ->
-      match Env.find_module_by_name better_lid env with
+      match Env.find_module_by_name_lazy better_lid env with
       | exception Not_found -> p
       | p', _ ->
           if module_path_is_an_alias_of env p' ~alias_of:p then
@@ -543,7 +544,10 @@ let rec rewrite_double_underscore_longidents env (l : Longident.t) =
     match expand_longident_head name with
     | None -> l
     | Some l' ->
-      match Env.find_module_by_name l env, Env.find_module_by_name l' env with
+      match
+        (Env.find_module_by_name_lazy l env,
+         Env.find_module_by_name_lazy l' env)
+      with
       | exception Not_found -> l
       | (p, _), (p', _) ->
           if module_path_is_an_alias_of env p' ~alias_of:p then
@@ -703,6 +707,10 @@ and raw_type_desc ppf = function
           match !nm with None -> fprintf ppf " None"
           | Some(p,tl) ->
               fprintf ppf "(Some(@,%a,@,%a))" path p raw_type_list tl)
+  | Tquote t ->
+      fprintf ppf "@[Tquote@ %a@]" raw_type t
+  | Tsplice t ->
+      fprintf ppf "@[Tsplice@ %a@]" raw_type t
   | Tfield (f, k, t1, t2) ->
       fprintf ppf "@[<hov1>Tfield(@,%s,@,%s,@,%a,@;<0 -1>%a)@]" f
         (string_of_field_kind k)
@@ -925,14 +933,14 @@ let is_unambiguous path env =
       List.for_all (fun p -> lid_of_path p = id) rem &&
       Path.same p (fst (Env.find_type_by_name id env))
 
-let penalty_size = 10
+let penalty_size = 20
 
 let name_penalty s =
   if s <> "" && s.[0] = '_' then
     penalty_size
   else
     match find_double_underscore s with
-    | None -> 1
+    | None -> 2
     | Some _ -> penalty_size
 
 let ambiguity_penalty path env =
@@ -947,7 +955,10 @@ let path_size path env =
     | Papply (p1, p2) ->
         let (l, b) = size p1 in
         (l + fst (size p2), b)
-    | Pextra_ty (p, _) -> size p
+    | Pextra_ty (p, Pext_ty) ->
+        size p
+    | Pextra_ty (p, Punboxed_ty) ->
+        let (l, b) = size p in (1 + l, b)
   in
   let l, s = size path in
   l + ambiguity_penalty path env, s
@@ -1403,45 +1414,25 @@ let outcome_label : Types.arg_label -> Outcometree.arg_label = function
   | Optional l -> Optional l
   | Position l -> Position l
 
-let rec all_or_none f = function
-  | [] -> Some []
-  | x :: xs ->
-    Option.bind (f x) (fun y ->
-      Option.bind (all_or_none f xs) (fun ys ->
-        Some (y :: ys)
-        )
-      )
-
-let tree_of_modality_new (t: Parsetree.modality loc) =
-  let Modality s = t.txt in Ogf_new s
-
-let tree_of_modality_old (t: Parsetree.modality loc) =
-  match t.txt with
-  | Modality "global" -> Some (Ogf_legacy Ogf_global)
-  | _ -> None
+let tree_of_modality (t: Parsetree.modality loc) =
+  let Modality s = t.txt in s
 
 let tree_of_modalities mut t =
   let t = Typemode.untransl_modalities mut t in
-  match all_or_none tree_of_modality_old t with
-  | Some l -> l
-  | None -> List.map tree_of_modality_new t
+  List.map tree_of_modality t
 
-let tree_of_modalities_new mut t =
-  let l = Typemode.untransl_modalities mut t in
-  List.map (fun ({txt = Parsetree.Modality s; _}) -> s) l
-
-(** [tree_of_mode m l] finds the outcome node in [l] that corresponds to [m].
-Raise if not found. *)
-let tree_of_mode_old (t : Parsetree.mode loc) =
-  match t.txt with
-  | Mode "local" -> Some (Omd_legacy Omd_local)
-  | _ -> None
-
-let tree_of_mode_new (t: Parsetree.mode loc) =
-  let Mode s = t.txt in Omd_new s
+let tree_of_mode (t: Parsetree.mode loc) =
+  let Mode s = t.txt in s
 
 let tree_of_modes (modes : Mode.Alloc.Const.t) =
   let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
+
+  (* [forkable] has implied defaults depending on [areality]: *)
+  let forkable =
+    match modes.areality, modes.forkable with
+    | Local, Unforkable | Global, Forkable -> None
+    | _, _ -> Some modes.forkable
+  in
 
   (* [yielding] has implied defaults depending on [areality]: *)
   let yielding =
@@ -1460,16 +1451,16 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
   (* [portability] has implied defaults based on [statefulness]: *)
   let portability =
     match modes.statefulness, modes.portability with
-    | Stateless, Portable | (Observing | Stateful), Nonportable -> None
+    | Stateless, Portable
+    | Observing, Sharable
+    | Stateful, Nonportable -> None
     | _, _ -> Some modes.portability
   in
 
-  let diff = {diff with yielding; contention; portability} in
+  let diff = {diff with forkable; yielding; contention; portability} in
   (* The mapping passed to [tree_of_mode] must cover all non-legacy modes *)
   let l = Typemode.untransl_mode_annots diff in
-  match all_or_none tree_of_mode_old l with
-  | Some l -> l
-  | None -> List.map tree_of_mode_new l
+  List.map tree_of_mode l
 
 (** The modal context on a type when printing it. This is to reproduce the mode
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)
@@ -1593,6 +1584,10 @@ let rec tree_of_modal_typexp mode modal ty =
         end
     | Tobject (fi, nm) ->
         tree_of_typobject mode fi !nm
+    | Tquote ty ->
+        Otyp_quote (tree_of_typexp mode alloc_mode ty)
+    | Tsplice ty ->
+        Otyp_splice (tree_of_typexp mode alloc_mode ty)
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
     | Tsubst _ ->
@@ -1770,7 +1765,7 @@ let modality ?(id = fun _ppf -> ()) ax ppf modality =
   else
     Atom (ax, modality)
     |> Typemode.untransl_modality
-    |> tree_of_modality_new
+    |> tree_of_modality
     |> !Oprint.out_modality ppf
 
 let prepared_type_expr ppf ty = typexp Type ppf ty
@@ -1813,7 +1808,7 @@ let () =
   Jkind.set_outcometree_of_type (fun ty ->
     prepare_for_printing [ty];
     tree_of_typexp Type ty);
-  Jkind.set_outcometree_of_modalities_new tree_of_modalities_new;
+  Jkind.set_outcometree_of_modalities tree_of_modalities;
   Jkind.set_print_type_expr type_expr;
   Jkind.set_raw_type_expr raw_type_expr
 
@@ -2312,7 +2307,7 @@ let tree_of_value_description id decl =
   let vd =
     { oval_name = id;
       oval_type = Otyp_poly(qtvs, ty);
-      oval_modalities = tree_of_modalities_new Immutable moda;
+      oval_modalities = tree_of_modalities Immutable moda;
       oval_prims = [];
       oval_attributes = attrs
     }
@@ -2779,7 +2774,7 @@ and tree_of_module ?abbrev id md rs =
   let moda = Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities in
   let r =
     Osig_module (Ident.name id, tree_of_modtype ?abbrev md.md_type,
-    tree_of_modalities_new Immutable moda,
+    tree_of_modalities Immutable moda,
     tree_of_rec rs)
   in
   Btype.backtrack snap;
@@ -3235,11 +3230,13 @@ let explanation (type variety) intro prev env
   | Errortrace.Bad_jkind (t,e) ->
       Some (dprintf "@ @[<hov>%a@]"
               (Jkind.Violation.report_with_offender
-                 ~offender:(fun ppf -> type_expr ppf t)) e)
+                 ~offender:(fun ppf -> type_expr ppf t)
+                 ~level:(get_current_level ())) e)
   | Errortrace.Bad_jkind_sort (t,e) ->
       Some (dprintf "@ @[<hov>%a@]"
               (Jkind.Violation.report_with_offender_sort
-                 ~offender:(fun ppf -> type_expr ppf t)) e)
+                 ~offender:(fun ppf -> type_expr ppf t)
+                 ~level:(get_current_level ())) e)
   | Errortrace.Unequal_var_jkinds (t1,k1,t2,k2) ->
       let fmt_history t k ppf =
         Jkind.(format_history ~intro:(

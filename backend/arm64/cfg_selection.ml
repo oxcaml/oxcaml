@@ -258,8 +258,9 @@ let pseudoregs_for_operation op arg res =
       | Ishiftarith (_, _)
       | Ibswap _ | Isignext _ )
   | Move | Spill | Reload | Opaque | Pause | Begin_region | End_region | Dls_get
-  | Poll | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-  | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
+  | Tls_get | Poll | Const_int _ | Const_float32 _ | Const_float _
+  | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+  | Stackoffset _ | Load _
   | Store (_, _, _)
   | Intop _
   | Intop_imm (_, _)
@@ -274,7 +275,7 @@ let pseudoregs_for_operation op arg res =
        not using LLVM backend"
       intr
 
-let insert_op_debug env sub_cfg op dbg rs rd :
+let insert_op_debug' env sub_cfg op dbg rs rd :
     Cfg_selectgen_target_intf.insert_op_debug_result =
   try
     let rsrc, rdst = pseudoregs_for_operation op rs rd in
@@ -283,3 +284,9 @@ let insert_op_debug env sub_cfg op dbg rs rd :
     Select_utils.insert_moves env sub_cfg rdst rd;
     Regs rd
   with Use_default_exn -> Use_default
+
+let insert_op_debug env sub_cfg op dbg rs rd :
+    Cfg_selectgen_target_intf.insert_op_debug_result =
+  if !Clflags.llvm_backend
+  then Use_default
+  else insert_op_debug' env sub_cfg op dbg rs rd

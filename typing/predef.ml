@@ -51,6 +51,9 @@ and ident_extension_constructor = ident_create "extension_constructor"
 and ident_floatarray = ident_create "floatarray"
 and ident_lexing_position = ident_create "lexing_position"
 and ident_atomic_loc = ident_create "atomic_loc"
+(* CR metaprogramming aivaskovic: there is a question about naming;
+   keep `expr` for now instead of `code` *)
+and ident_code = ident_create "expr"
 
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
@@ -60,18 +63,21 @@ and ident_int8x16 = ident_create "int8x16"
 and ident_int16x8 = ident_create "int16x8"
 and ident_int32x4 = ident_create "int32x4"
 and ident_int64x2 = ident_create "int64x2"
+and ident_float16x8 = ident_create "float16x8"
 and ident_float32x4 = ident_create "float32x4"
 and ident_float64x2 = ident_create "float64x2"
 and ident_int8x32 = ident_create "int8x32"
 and ident_int16x16 = ident_create "int16x16"
 and ident_int32x8 = ident_create "int32x8"
 and ident_int64x4 = ident_create "int64x4"
+and ident_float16x16 = ident_create "float16x16"
 and ident_float32x8 = ident_create "float32x8"
 and ident_float64x4 = ident_create "float64x4"
 and ident_int8x64 = ident_create "int8x64"
 and ident_int16x32 = ident_create "int16x32"
 and ident_int32x16 = ident_create "int32x16"
 and ident_int64x8 = ident_create "int64x8"
+and ident_float16x32 = ident_create "float16x32"
 and ident_float32x16 = ident_create "float32x16"
 and ident_float64x8 = ident_create "float64x8"
 
@@ -100,6 +106,7 @@ and path_lexing_position = Pident ident_lexing_position
 and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
 and path_atomic_loc = Pident ident_atomic_loc
+and path_code = Pident ident_code
 
 and path_or_null = Pident ident_or_null
 
@@ -107,18 +114,21 @@ and path_int8x16 = Pident ident_int8x16
 and path_int16x8 = Pident ident_int16x8
 and path_int32x4 = Pident ident_int32x4
 and path_int64x2 = Pident ident_int64x2
+and path_float16x8 = Pident ident_float16x8
 and path_float32x4 = Pident ident_float32x4
 and path_float64x2 = Pident ident_float64x2
 and path_int8x32 = Pident ident_int8x32
 and path_int16x16 = Pident ident_int16x16
 and path_int32x8 = Pident ident_int32x8
 and path_int64x4 = Pident ident_int64x4
+and path_float16x16 = Pident ident_float16x16
 and path_float32x8 = Pident ident_float32x8
 and path_float64x4 = Pident ident_float64x4
 and path_int8x64 = Pident ident_int8x64
 and path_int16x32 = Pident ident_int16x32
 and path_int32x16 = Pident ident_int32x16
 and path_int64x8 = Pident ident_int64x8
+and path_float16x32 = Pident ident_float16x32
 and path_float32x16 = Pident ident_float32x16
 and path_float64x8 = Pident ident_float64x8
 
@@ -136,18 +146,21 @@ and path_unboxed_int8x16 = Path.unboxed_version path_int8x16
 and path_unboxed_int16x8 = Path.unboxed_version path_int16x8
 and path_unboxed_int32x4 = Path.unboxed_version path_int32x4
 and path_unboxed_int64x2 = Path.unboxed_version path_int64x2
+and path_unboxed_float16x8 = Path.unboxed_version path_float16x8
 and path_unboxed_float32x4 = Path.unboxed_version path_float32x4
 and path_unboxed_float64x2 = Path.unboxed_version path_float64x2
 and path_unboxed_int8x32 = Path.unboxed_version path_int8x32
 and path_unboxed_int16x16 = Path.unboxed_version path_int16x16
 and path_unboxed_int32x8 = Path.unboxed_version path_int32x8
 and path_unboxed_int64x4 = Path.unboxed_version path_int64x4
+and path_unboxed_float16x16 = Path.unboxed_version path_float16x16
 and path_unboxed_float32x8 = Path.unboxed_version path_float32x8
 and path_unboxed_float64x4 = Path.unboxed_version path_float64x4
 and path_unboxed_int8x64 = Path.unboxed_version path_int8x64
 and path_unboxed_int16x32 = Path.unboxed_version path_int16x32
 and path_unboxed_int32x16 = Path.unboxed_version path_int32x16
 and path_unboxed_int64x8 = Path.unboxed_version path_int64x8
+and path_unboxed_float16x32 = Path.unboxed_version path_float16x32
 and path_unboxed_float32x16 = Path.unboxed_version path_float32x16
 and path_unboxed_float64x8 = Path.unboxed_version path_float64x8
 
@@ -175,6 +188,7 @@ and type_extension_constructor =
 and type_floatarray = newgenty (Tconstr(path_floatarray, [], ref Mnil))
 and type_lexing_position = newgenty (Tconstr(path_lexing_position, [], ref Mnil))
 and type_atomic_loc t = newgenty (Tconstr(path_atomic_loc, [t], ref Mnil))
+and type_code t = newgenty (Tconstr(path_code, [t], ref Mnil))
 
 and type_unboxed_float = newgenty (Tconstr(path_unboxed_float, [], ref Mnil))
 and type_unboxed_float32 = newgenty (Tconstr(path_unboxed_float32, [], ref Mnil))
@@ -194,18 +208,21 @@ and type_int8x16 = newgenty (Tconstr(path_int8x16, [], ref Mnil))
 and type_int16x8 = newgenty (Tconstr(path_int16x8, [], ref Mnil))
 and type_int32x4 = newgenty (Tconstr(path_int32x4, [], ref Mnil))
 and type_int64x2 = newgenty (Tconstr(path_int64x2, [], ref Mnil))
+and type_float16x8 = newgenty (Tconstr(path_float16x8, [], ref Mnil))
 and type_float32x4 = newgenty (Tconstr(path_float32x4, [], ref Mnil))
 and type_float64x2 = newgenty (Tconstr(path_float64x2, [], ref Mnil))
 and type_int8x32 = newgenty (Tconstr(path_int8x32, [], ref Mnil))
 and type_int16x16 = newgenty (Tconstr(path_int16x16, [], ref Mnil))
 and type_int32x8 = newgenty (Tconstr(path_int32x8, [], ref Mnil))
 and type_int64x4 = newgenty (Tconstr(path_int64x4, [], ref Mnil))
+and type_float16x16 = newgenty (Tconstr(path_float16x16, [], ref Mnil))
 and type_float32x8 = newgenty (Tconstr(path_float32x8, [], ref Mnil))
 and type_float64x4 = newgenty (Tconstr(path_float64x4, [], ref Mnil))
 and type_int8x64 = newgenty (Tconstr(path_int8x64, [], ref Mnil))
 and type_int16x32 = newgenty (Tconstr(path_int16x32, [], ref Mnil))
 and type_int32x16 = newgenty (Tconstr(path_int32x16, [], ref Mnil))
 and type_int64x8 = newgenty (Tconstr(path_int64x8, [], ref Mnil))
+and type_float16x32 = newgenty (Tconstr(path_float16x32, [], ref Mnil))
 and type_float32x16 = newgenty (Tconstr(path_float32x16, [], ref Mnil))
 and type_float64x8 = newgenty (Tconstr(path_float64x8, [], ref Mnil))
 
@@ -217,6 +234,8 @@ and type_unboxed_int32x4 =
   newgenty (Tconstr(path_unboxed_int32x4, [], ref Mnil))
 and type_unboxed_int64x2 =
   newgenty (Tconstr(path_unboxed_int64x2, [], ref Mnil))
+and type_unboxed_float16x8 =
+  newgenty (Tconstr(path_unboxed_float16x8, [], ref Mnil))
 and type_unboxed_float32x4 =
   newgenty (Tconstr(path_unboxed_float32x4, [], ref Mnil))
 and type_unboxed_float64x2 =
@@ -229,6 +248,8 @@ and type_unboxed_int32x8 =
   newgenty (Tconstr(path_unboxed_int32x8, [], ref Mnil))
 and type_unboxed_int64x4 =
   newgenty (Tconstr(path_unboxed_int64x4, [], ref Mnil))
+and type_unboxed_float16x16 =
+  newgenty (Tconstr(path_unboxed_float16x16, [], ref Mnil))
 and type_unboxed_float32x8 =
   newgenty (Tconstr(path_unboxed_float32x8, [], ref Mnil))
 and type_unboxed_float64x4 =
@@ -241,6 +262,8 @@ and type_unboxed_int32x16 =
   newgenty (Tconstr(path_unboxed_int32x16, [], ref Mnil))
 and type_unboxed_int64x8 =
   newgenty (Tconstr(path_unboxed_int64x8, [], ref Mnil))
+and type_unboxed_float16x32 =
+  newgenty (Tconstr(path_unboxed_float16x32, [], ref Mnil))
 and type_unboxed_float32x16 =
   newgenty (Tconstr(path_unboxed_float32x16, [], ref Mnil))
 and type_unboxed_float64x8 =
@@ -589,7 +612,7 @@ let build_initial_env add_type add_extension empty_env =
          }))
        ~jkind:(
          Jkind.of_builtin ~why:(Primitive ident_idx_imm)
-           Jkind.Const.Builtin.bits64)
+           Jkind.Const.Builtin.kind_of_idx)
        ~type_variance:[Variance.full; Variance.covariant]
        ~type_separability:[Separability.Ind; Separability.Ind]
   |> add_type2 ident_idx_mut
@@ -607,7 +630,7 @@ let build_initial_env add_type add_extension empty_env =
          }))
        ~jkind:(
          Jkind.of_builtin ~why:(Primitive ident_idx_mut)
-           Jkind.Const.Builtin.bits64)
+           Jkind.Const.Builtin.kind_of_idx)
        ~type_variance:[Variance.full; Variance.full]
        ~type_separability:[Separability.Ind; Separability.Ind]
   |> add_type_with_jkind ident_lexing_position
@@ -658,6 +681,14 @@ let build_initial_env add_type add_extension empty_env =
            ~modality:Mode.Modality.Const.id
            ~type_expr:param)
   |> add_type ident_string ~jkind:Jkind.Const.Builtin.immutable_data
+  |> add_type1 ident_code
+       ~variance:Variance.covariant
+       ~separability:Separability.Ind
+       ~jkind:(fun param ->
+         Jkind.Builtin.immutable_data ~why:Tquote |>
+           Jkind.add_with_bounds
+             ~modality:Mode.Modality.Const.id
+             ~type_expr:param)
   |> add_type ident_bytes ~jkind:Jkind.Const.Builtin.mutable_data
   |> add_type ident_unit
        ~kind:(variant [cstr ident_void []])
@@ -696,6 +727,8 @@ let add_simd_stable_extension_types add_type env =
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
   |> add_type ident_int64x2 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
+  |> add_type ident_float16x8 ~jkind:Jkind.Const.Builtin.immutable_data
+      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
   |> add_type ident_float32x4 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
   |> add_type ident_float64x2 ~jkind:Jkind.Const.Builtin.immutable_data
@@ -707,6 +740,8 @@ let add_simd_stable_extension_types add_type env =
   |> add_type ident_int32x8 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
   |> add_type ident_int64x4 ~jkind:Jkind.Const.Builtin.immutable_data
+      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
+  |> add_type ident_float16x16 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
   |> add_type ident_float32x8 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
@@ -725,6 +760,8 @@ let add_simd_alpha_extension_types add_type env =
   |> add_type ident_int32x16 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_512bit_vectors
   |> add_type ident_int64x8 ~jkind:Jkind.Const.Builtin.immutable_data
+      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_512bit_vectors
+  |> add_type ident_float16x32 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_512bit_vectors
   |> add_type ident_float32x16 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_512bit_vectors

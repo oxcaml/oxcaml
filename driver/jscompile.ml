@@ -18,7 +18,7 @@ open Compile_common
 module SL = Slambda
 
 let tool_name = "ocamlj"
-let with_info = Compile_common.with_info ~native:false ~tool_name
+let with_info = Compile_common.with_info ~backend:(Opt Js_of_ocaml) ~tool_name
 
 let interface ~source_file ~output_prefix =
   with_info ~source_file ~output_prefix ~dump_ext:"cmi"
@@ -48,7 +48,8 @@ let slambda_to_jsir i slambda ~as_arg_for =
          |> fun (program : Lambda.program) ->
          program.code
          |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
-         |> Simplif.simplify_lambda
+         |> Simplif.simplify_lambda ~restrict_to_upstream_dwarf:true
+              ~gdwarf_may_alter_codegen:false
          |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
          |> fun lambda ->
          let arg_descr =

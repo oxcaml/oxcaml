@@ -66,6 +66,15 @@ val id : t -> int
    is an integer that identifies uniquely the thread.
    It can be used to build data structures indexed by threads. *)
 
+val set_current_thread_name : string -> unit
+(** Set the thread's name. This should be called from within the thread
+    function. Setting thread name is available on most systems.
+
+    This does nothing if the functionality is not implemented but will
+    print a warning on the standard error if enabled.
+
+    @since 5.4 *)
+
 exception Exit
 (** Exception raised by user code to initiate termination of the
     current thread.
@@ -199,3 +208,24 @@ val use_domains : unit -> unit
     used by domains. This ensures that domains can be started from threads
     other than the initial one. It prevents the use of a custom locking
     scheme, such as the one used by pyocaml. *)
+
+(** Thread-local storage. Like {!Domain.DLS}, but stores a distinct value
+    for each thread. Domains can contain multiple threads, so [TLS] should be
+    preferred in nearly all cases. *)
+module TLS : sig @@ portable
+
+   type 'a key : value mod portable contended
+   (** Type of a TLS key *)
+
+   val new_key
+   : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
+   -> (unit -> 'a) @ portable
+   -> 'a key
+   (** Like {!DLS.new_key}, but represents a distinct value in every thread. *)
+
+   val get : ('a : value mod portable). 'a key -> 'a @ contended
+   (** Like {!DLS.get}, but reads the value for the current thread. *)
+
+   val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
+   (** Like {!DLS.set}, but sets the value for the current thread. *)
+end

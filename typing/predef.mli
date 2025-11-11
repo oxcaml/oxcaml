@@ -40,6 +40,7 @@ val type_extension_constructor:type_expr
 val type_floatarray:type_expr
 val type_lexing_position:type_expr
 val type_atomic_loc:type_expr -> type_expr
+val type_code: type_expr -> type_expr
 val type_unboxed_float:type_expr
 val type_unboxed_float32:type_expr
 val type_unboxed_nativeint:type_expr
@@ -57,12 +58,14 @@ val type_int8x16: type_expr
 val type_int16x8: type_expr
 val type_int32x4: type_expr
 val type_int64x2: type_expr
+val type_float16x8: type_expr
 val type_float32x4: type_expr
 val type_float64x2: type_expr
 val type_unboxed_int8x16: type_expr
 val type_unboxed_int16x8: type_expr
 val type_unboxed_int32x4: type_expr
 val type_unboxed_int64x2: type_expr
+val type_unboxed_float16x8: type_expr
 val type_unboxed_float32x4: type_expr
 val type_unboxed_float64x2: type_expr
 
@@ -70,12 +73,14 @@ val type_int8x32: type_expr
 val type_int16x16: type_expr
 val type_int32x8: type_expr
 val type_int64x4: type_expr
+val type_float16x16: type_expr
 val type_float32x8: type_expr
 val type_float64x4: type_expr
 val type_unboxed_int8x32: type_expr
 val type_unboxed_int16x16: type_expr
 val type_unboxed_int32x8: type_expr
 val type_unboxed_int64x4: type_expr
+val type_unboxed_float16x16: type_expr
 val type_unboxed_float32x8: type_expr
 val type_unboxed_float64x4: type_expr
 
@@ -83,12 +88,14 @@ val type_int8x64: type_expr
 val type_int16x32: type_expr
 val type_int32x16: type_expr
 val type_int64x8: type_expr
+val type_float16x32: type_expr
 val type_float32x16: type_expr
 val type_float64x8: type_expr
 val type_unboxed_int8x64: type_expr
 val type_unboxed_int16x32: type_expr
 val type_unboxed_int32x16: type_expr
 val type_unboxed_int64x8: type_expr
+val type_unboxed_float16x32: type_expr
 val type_unboxed_float32x16: type_expr
 val type_unboxed_float64x8: type_expr
 
@@ -114,6 +121,7 @@ val path_lazy_t: Path.t
 val path_extension_constructor: Path.t
 val path_floatarray: Path.t
 val path_lexing_position: Path.t
+val path_code: Path.t
 
 val path_unboxed_float: Path.t
 val path_unboxed_float32: Path.t
@@ -132,12 +140,14 @@ val path_int8x16: Path.t
 val path_int16x8: Path.t
 val path_int32x4: Path.t
 val path_int64x2: Path.t
+val path_float16x8: Path.t
 val path_float32x4: Path.t
 val path_float64x2: Path.t
 val path_unboxed_int8x16: Path.t
 val path_unboxed_int16x8: Path.t
 val path_unboxed_int32x4: Path.t
 val path_unboxed_int64x2: Path.t
+val path_unboxed_float16x8: Path.t
 val path_unboxed_float32x4: Path.t
 val path_unboxed_float64x2: Path.t
 
@@ -145,12 +155,14 @@ val path_int8x32: Path.t
 val path_int16x16: Path.t
 val path_int32x8: Path.t
 val path_int64x4: Path.t
+val path_float16x16: Path.t
 val path_float32x8: Path.t
 val path_float64x4: Path.t
 val path_unboxed_int8x32: Path.t
 val path_unboxed_int16x16: Path.t
 val path_unboxed_int32x8: Path.t
 val path_unboxed_int64x4: Path.t
+val path_unboxed_float16x16: Path.t
 val path_unboxed_float32x8: Path.t
 val path_unboxed_float64x4: Path.t
 
@@ -158,12 +170,14 @@ val path_int8x64: Path.t
 val path_int16x32: Path.t
 val path_int32x16: Path.t
 val path_int64x8: Path.t
+val path_float16x32: Path.t
 val path_float32x16: Path.t
 val path_float64x8: Path.t
 val path_unboxed_int8x64: Path.t
 val path_unboxed_int16x32: Path.t
 val path_unboxed_int32x16: Path.t
 val path_unboxed_int64x8: Path.t
+val path_unboxed_float16x32: Path.t
 val path_unboxed_float32x16: Path.t
 val path_unboxed_float64x8: Path.t
 

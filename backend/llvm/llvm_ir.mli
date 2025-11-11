@@ -129,6 +129,8 @@ module Ident : sig
 
   val to_string_hum : t -> string
 
+  val to_string_encoded : t -> string
+
   module Gen : sig
     type ident = t
 
@@ -358,7 +360,7 @@ module Instruction : sig
   val insertvalue :
     aggregate:Value.t -> indices:int list -> to_insert:Value.t -> op
 
-  val alloca : Type.t -> op
+  val alloca : ?count:Value.t -> Type.t -> op
 
   val load : ptr:Value.t -> typ:Type.t -> op
 

@@ -10,8 +10,6 @@ val apply_array : t -> Reg.t array -> Reg.t array
 
 val apply_set : t -> Reg.Set.t -> Reg.Set.t
 
-val apply_instruction_in_place : t -> _ Cfg.instruction -> unit
-
 val apply_block_in_place : t -> Cfg.basic_block -> unit
 
 type map = t Label.Tbl.t

@@ -250,7 +250,7 @@ integers (we promise the other examples are more substantial) would be this:
 <a id="code-add4"></a>
 ```ocaml
 let add4 (par : Parallel.t) a b c d =
-  let a_plus_b, c_plus_d =
+  let #(a_plus_b, c_plus_d) =
     Parallel.fork_join2 par
       (fun _par -> a + b)
       (fun _par -> c + d)
@@ -347,8 +347,8 @@ let average_par (par : Parallel.t) tree =
     match tree with
     | Tree.Leaf x -> ~total:x, ~count:1
     | Tree.Node (l, r) ->
-      let ( (~total:total_l, ~count:count_l),
-            (~total:total_r, ~count:count_r) ) =
+      let #( (~total:total_l, ~count:count_l),
+             (~total:total_r, ~count:count_r) ) =
         Parallel.fork_join2 par
           (fun par -> total par l)
           (fun par -> total par r)
@@ -687,7 +687,7 @@ if they could be called in parallel:
 ```ocaml
 let beat_the_system par =
   let t = { price = 42.0; mood = Neutral } in
-  let (), () =
+  let #((), ()) =
     Parallel.fork_join2 par
       (fun _par -> cheer_up t)
       (fun _par -> bum_out t)
@@ -774,7 +774,7 @@ for instance, we say that `t_in_a_trenchcoat.inner_t` is `contended` when
 [rule 1]: #rule-contended-parallel
 
 Now, you may be surprised to see that projecting a field from a `contended`
-record gives a `contended` value. After all, we have the function:
+record gives an `uncontended` value. After all, we have the function:
 
 ```ocaml
 let price t = t.price
@@ -815,7 +815,7 @@ race by it, adding a few things for illustration:
 let beat_the_system par =
   let t @ uncontended = { price = 42.0; mood = Neutral }
   cheer_up t; (* line A *)
-  let (), () =
+  let #((), ()) =
     Parallel.fork_join2 par
       (fun _par -> cheer_up t) (* line B *)
       (fun _par -> bum_out t) (* line C *)
@@ -1214,7 +1214,7 @@ let average_par_running (par : Parallel.t) tree =
         ~pure_f:(fun total -> total +. Thing.price x);
       Atomic.incr count
     | Tree.Node (l, r) ->
-      let (), () =
+      let #((), ()) =
         Parallel.fork_join2 par
           (fun par -> go par l)
           (fun par -> go par r)

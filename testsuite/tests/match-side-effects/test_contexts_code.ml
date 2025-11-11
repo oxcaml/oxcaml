@@ -31,27 +31,27 @@ let example_1 () =
       Result.Error 3
   | { a = true; b = Either.Left y } -> Result.Ok y;;
 (let
-  (example_1/304 =
-     (function {nlocal = 0} param/328[value<int>]
+  (example_1/305 =
+     (function {nlocal = 0} param/329[value<int>]
        : (consts ()) (non_consts ([1: ?] [0: ?]))
        (region
          (let
-           (input/306 =
+           (input/307 =
               (makelocalmutable 0 (value<int>,value<
                                                (consts ())
                                                 (non_consts ([1: ?] [0: ?]))>)
                 1 [0: 1]))
-           (if (field_int 0 input/306)
-             (let (*match*/331 =o? (field_mut 1 input/306))
-               (switch* *match*/331
+           (if (field_int 0 input/307)
+             (let (*match*/332 =o? (field_mut 1 input/307))
+               (switch* *match*/332
                 case tag 0:
-                 (if (seq (setfield_ptr(maybe-stack) 1 input/306 [1: 3]) 0)
+                 (if (seq (setfield_ptr(maybe-stack) 1 input/307 [1: 3]) 0)
                    [1: 3]
-                   (let (*match*/333 =o? (field_mut 1 input/306))
-                     (makeblock 0 (value<int>) (field_imm 0 *match*/333))))
+                   (let (*match*/334 =o? (field_mut 1 input/307))
+                     (makeblock 0 (value<int>) (field_imm 0 *match*/334))))
                 case tag 1: [1: 2]))
              [1: 1])))))
-  (apply (field_imm 1 (global Toploop!)) "example_1" example_1/304))
+  (apply (field_imm 1 (global Toploop!)) "example_1" example_1/305))
 val example_1 : unit -> (bool, int) Result.t = <fun>
 |}]
 
@@ -80,33 +80,33 @@ let example_2 () =
       Result.Error 3
   | { a = true; b = { mut = Either.Left y } } -> Result.Ok y;;
 (let
-  (example_2/343 =
-     (function {nlocal = 0} param/347[value<int>]
+  (example_2/344 =
+     (function {nlocal = 0} param/348[value<int>]
        : (consts ()) (non_consts ([1: ?] [0: ?]))
        (region
          (let
-           (input/345 =[value<(consts ()) (non_consts ([0: value<int>, *]))>]
+           (input/346 =[value<(consts ()) (non_consts ([0: value<int>, *]))>]
               (makelocalblock 0 (value<int>,*) 1
                 (makelocalmutable 0 (value<
                                       (consts ()) (non_consts ([1: ?]
                                        [0: ?]))>)
                   [0: 1])))
-           (if (field_int 0 input/345)
-             (let (*match*/351 =o? (field_mut 0 (field_imm 1 input/345)))
-               (switch* *match*/351
+           (if (field_int 0 input/346)
+             (let (*match*/352 =o? (field_mut 0 (field_imm 1 input/346)))
+               (switch* *match*/352
                 case tag 0:
                  (if
                    (seq
-                     (setfield_ptr(maybe-stack) 0 (field_imm 1 input/345)
+                     (setfield_ptr(maybe-stack) 0 (field_imm 1 input/346)
                        [1: 3])
                      0)
                    [1: 3]
                    (let
-                     (*match*/354 =o? (field_mut 0 (field_imm 1 input/345)))
-                     (makeblock 0 (value<int>) (field_imm 0 *match*/354))))
+                     (*match*/355 =o? (field_mut 0 (field_imm 1 input/346)))
+                     (makeblock 0 (value<int>) (field_imm 0 *match*/355))))
                 case tag 1: [1: 2]))
              [1: 1])))))
-  (apply (field_imm 1 (global Toploop!)) "example_2" example_2/343))
+  (apply (field_imm 1 (global Toploop!)) "example_2" example_2/344))
 val example_2 : unit -> (bool, int) Result.t = <fun>
 |}]
 
@@ -133,27 +133,27 @@ let example_3 () =
       Result.Error 3
   | { mut = (true, Either.Left y) } -> Result.Ok y;;
 (let
-  (example_3/361 =
-     (function {nlocal = 0} param/365[value<int>]
+  (example_3/362 =
+     (function {nlocal = 0} param/366[value<int>]
        : (consts ()) (non_consts ([1: ?] [0: ?]))
        (region
          (let
-           (input/363 =mut[value<
+           (input/364 =mut[value<
                             (consts ())
                              (non_consts ([0: value<int>,
                                            value<
                                             (consts ()) (non_consts (
                                              [1: ?] [0: ?]))>]))>]
               [0: 1 [0: 1]]
-            *match*/366 =o? *input/363)
-           (if (field_imm 0 *match*/366)
-             (switch* (field_imm 1 *match*/366)
+            *match*/367 =o? *input/364)
+           (if (field_imm 0 *match*/367)
+             (switch* (field_imm 1 *match*/367)
               case tag 0:
-               (if (seq (assign input/363 [0: 1 [1: 3]]) 0) [1: 3]
+               (if (seq (assign input/364 [0: 1 [1: 3]]) 0) [1: 3]
                  (makeblock 0 (value<int>)
-                   (field_imm 0 (field_imm 1 *match*/366))))
+                   (field_imm 0 (field_imm 1 *match*/367))))
               case tag 1: [1: 2])
              [1: 1])))))
-  (apply (field_imm 1 (global Toploop!)) "example_3" example_3/361))
+  (apply (field_imm 1 (global Toploop!)) "example_3" example_3/362))
 val example_3 : unit -> (bool, int) Result.t = <fun>
 |}]

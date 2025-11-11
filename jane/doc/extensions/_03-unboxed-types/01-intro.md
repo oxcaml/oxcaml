@@ -130,7 +130,7 @@ Most unboxed numeric types have their own layout: `float# : float64`, `int32# : 
 `int64# : bits64`, `nativeint# : word`.
 
 All of the 128-bit vectors have the same layout: `float32x4# : vec128`,
-`float64x2# : vec128`, `int8x16# : vec128`, `int16x2# : vec128`, `int32x4# : vec128`,
+`float64x2# : vec128`, `int8x16# : vec128`, `int16x8# : vec128`, `int32x4# : vec128`,
 and `int64x2# : vec128`.
 
 Using layouts, you can usefully make a synonym of `float#` (or any of
@@ -184,7 +184,7 @@ Each numeric type has its own library for working with it: `float_u`,
 ## Unboxed options
 
 We now have `type 'a or_null : value_or_null`, the type of unboxed options.
-It has constructors `Null` and `This v`. See the [`or_null` document](../or-null)
+It has constructors `Null` and `This v`. See the [`or_null` document](../02-or-null)
 for more details.
 
 # Unboxed products
@@ -546,7 +546,7 @@ or (unsafe) OCaml code.
 
 Note also that, while unboxed types are generally considered an "upstream
 compatible" (because they can be erased while preserving behavior), depending on
-the exact representation of mixed blocks is not. Thus, use of these mechanism is
+the exact representation of mixed blocks is not. Thus, use of these mechanisms is
 also a sign that your code may need a custom mechanism if it is intended to work
 both in OxCaml and upstream OCaml.
 
@@ -593,7 +593,7 @@ Assert_mixed_block_layout_v4;
 
 ### Future changes and history
 
-We will bump the version number if make changes to the layout of mixed
+We will bump the version number if we make changes to the layout of mixed
 blocks. For example, it will be bumped if:
 
   * We change what word half the int32 is stored in

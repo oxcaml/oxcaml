@@ -619,7 +619,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
                   | Isextend32 | Izextend32
                   | Ilfence | Isfence | Imfence)
-       | Name_for_debugger _ | Dls_get | Pause)
+       | Name_for_debugger _ | Dls_get | Tls_get | Pause)
   | Poptrap _ | Prologue | Epilogue ->
     if fp then [| rbp |] else [||]
   | Stack_check _ ->
@@ -759,6 +759,7 @@ let operation_supported = function
   | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion | Cendregion
   | Ctuple_field _
   | Cdls_get
+  | Ctls_get
   | Cpoll
   | Cpause
   | Creinterpret_cast (Int_of_value | Value_of_int |
@@ -780,4 +781,5 @@ let expression_supported = function
   | Cconst_vec256 _ -> Arch.Extension.enabled_vec256 ()
   | Cconst_vec512 _ -> Arch.Extension.enabled_vec512 ()
 
-let trap_size_in_bytes = 16
+let trap_size_in_bytes () =
+  if !Clflags.llvm_backend then 32 else 16

@@ -164,8 +164,6 @@ struct dom_internal {
      caml_interrupt_all_signal_safe. The innermost atomic is also for
      cross-domain communication.*/
   _Atomic(atomic_uintnat *) interrupt_word;
-  caml_plat_mutex interrupt_lock;
-  caml_plat_cond interrupt_cond;
 
   int running;
   int terminating;
@@ -179,8 +177,11 @@ struct dom_internal {
   int backup_thread_running;
   pthread_t backup_thread;
   atomic_uintnat backup_thread_msg;
-  caml_plat_mutex domain_lock;
-  caml_plat_cond domain_cond;
+  caml_plat_mutex backup_thread_lock;
+  caml_plat_cond backup_thread_cond;
+
+  /* default domain lock (only used if systhreads is not loaded) */
+  caml_plat_mutex default_domain_lock;
 
   /* modified only during STW sections */
   uintnat minor_heap_area_start;
@@ -337,7 +338,6 @@ int caml_incoming_interrupts_queued(void)
   return domain_has_pending(domain_self);
 }
 
-/* must NOT be called with s->interrupt_lock held */
 static void stw_handler(caml_domain_state* domain);
 static int handle_incoming(dom_internal *d)
 {
@@ -362,20 +362,28 @@ void caml_handle_incoming_interrupts(void)
   handle_incoming(domain_self);
 }
 
-int caml_send_interrupt(dom_internal *target)
+/* Signal the backup thread of a given domain. Can be called from any domain. */
+
+static void caml_bt_signal(dom_internal* dom)
+{
+  caml_plat_lock_blocking(&dom->backup_thread_lock);
+  caml_plat_signal(&dom->backup_thread_cond);
+  caml_plat_unlock(&dom->backup_thread_lock);
+  if (dom->state != NULL)
+    caml_domain_send_interrupt_hook(dom->state);
+}
+
+static void caml_send_interrupt(dom_internal *target)
 {
   /* signal that there is an interrupt pending */
   domain_set_pending(target);
-
-  /* Signal the condition variable, in case the target is
-     itself waiting for an interrupt to be processed elsewhere */
-  caml_plat_lock_blocking(&target->interrupt_lock);
-  caml_plat_broadcast(&target->interrupt_cond); // OPT before/after unlock? elide?
-  caml_plat_unlock(&target->interrupt_lock);
-
   interrupt_domain(target);
 
-  return 1;
+  /* see caml_bt_exit_ocaml for explanation of this fence */
+  atomic_thread_fence(memory_order_seq_cst);
+
+  if (atomic_load_acquire(&target->backup_thread_msg) == BT_IN_BLOCKING_SECTION)
+    caml_bt_signal(target);
 }
 
 asize_t caml_norm_minor_heap_size (intnat wsize)
@@ -555,6 +563,9 @@ static uintnat fresh_domain_unique_id(void) {
     return next;
 }
 
+static inline void domain_root_register(value *root, value t);
+static inline void domain_root_remove(value *root);
+
 /* must be run on the domain's thread */
 static void domain_create(uintnat initial_minor_heap_wsize,
                           caml_domain_state *parent)
@@ -620,17 +631,14 @@ static void domain_create(uintnat initial_minor_heap_wsize,
     domain_state = (caml_domain_state*)
       caml_stat_calloc_noexc(1, sizeof(caml_domain_state));
     if (domain_state == NULL)
-      goto fail_domain_state;
+      goto fail_domain;
     d->state = domain_state;
+    domain_state->id = d->id;
   } else {
     domain_state = d->state;
+    CAMLassert(domain_state->id == d->id);
   }
 
-  /* Note: until we take d->domain_lock, the domain_state may still be
-   * shared with a domain which is terminating (see
-   * domain_terminate). */
-
-  caml_plat_lock_blocking(&d->domain_lock);
 
   /* Set domain_self if we have successfully allocated the
    * caml_domain_state. Otherwise domain_self will be NULL and it's up
@@ -639,9 +647,13 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_self = d;
   caml_state = domain_state;
 
-  domain_state->young_limit = 0;
+  /* Note: until we take the domain lock, the domain_state may still be
+   * shared with a domain which is terminating (see
+   * domain_terminate). */
 
-  domain_state->id = d->id;
+  caml_domain_lock_hook();
+
+  domain_state->young_limit = 0;
   domain_state->unique_id = d->unique_id;
 
   /* Synchronized with [caml_interrupt_all_signal_safe], so that the
@@ -700,9 +712,9 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->in_minor_collection = 0;
 
-  domain_state->dls_root = Val_unit;
   /* This call may fail, but fatally so we don't need an error path */
-  caml_register_generational_global_root(&domain_state->dls_root);
+  domain_root_register(&domain_state->dls_state, Atom(0) /* Empty array */);
+  domain_root_register(&domain_state->tls_state, Atom(0) /* Empty array */);
 
   domain_state->stack_cache = caml_alloc_stack_cache();
   if(domain_state->stack_cache == NULL) {
@@ -742,11 +754,9 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->local_roots = NULL;
 
   domain_state->backtrace_buffer = NULL;
-  domain_state->backtrace_last_exn = Val_unit;
-  domain_state->backtrace_active = 0;
-
   /* This call may fail, but fatally so we don't need an error path */
-  caml_register_generational_global_root(&domain_state->backtrace_last_exn);
+  domain_root_register(&domain_state->backtrace_last_exn, Val_unit);
+  domain_state->backtrace_active = 0;
 
   domain_state->local_sp = 0;
   domain_state->local_top = NULL;
@@ -784,7 +794,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 fail_main_stack:
   caml_free_stack_cache(domain_state->stack_cache);
 fail_stack_cache:
-  caml_remove_generational_global_root(&domain_state->dls_root);
+  domain_root_remove(&domain_state->dls_state);
+  domain_root_remove(&domain_state->tls_state);
   free_minor_heap();
 fail_minor_heap:
   caml_teardown_major_gc();
@@ -802,10 +813,9 @@ fail_memprof:
   atomic_store_explicit(&d->interrupt_word, NULL, memory_order_release);
   caml_stat_free(d->state);
   d->state = NULL;
+  caml_domain_unlock_hook();
   domain_self = NULL;
   caml_state = NULL;
-fail_domain_state:
-  caml_plat_unlock(&d->domain_lock);
 fail_domain:
   CAML_GC_MESSAGE(DOMAIN, "Creation failed.\n");
   caml_plat_unlock(&all_domains_lock);
@@ -814,7 +824,7 @@ fail_domain:
 CAMLexport void caml_reset_domain_lock(void)
 {
   dom_internal* self = domain_self;
-  // This is only used to reset the domain_lock state on fork.
+  // This is only used to reset the domain lock state on fork.
   /* FIXME: initializing an already-initialized mutex and cond
      variable is UB (especially mutexes that are locked).
 
@@ -828,8 +838,9 @@ CAMLexport void caml_reset_domain_lock(void)
        portability on POSIX the lock should be released and destroyed
        prior to calling fork and then init afterwards in both parent
        and child. */
-  caml_plat_mutex_init(&self->domain_lock);
-  caml_plat_cond_init(&self->domain_cond);
+  caml_plat_mutex_init(&self->backup_thread_lock);
+  caml_plat_cond_init(&self->backup_thread_cond);
+  caml_plat_mutex_init(&self->default_domain_lock);
 
   return;
 }
@@ -1003,15 +1014,14 @@ void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz)
     dom->id = i;
 
     dom->interrupt_word = NULL;
-    caml_plat_mutex_init(&dom->interrupt_lock);
-    caml_plat_cond_init(&dom->interrupt_cond);
     dom->running = 0;
     dom->terminating = 0;
     dom->unique_id = 0;
     dom->pending = 0;
 
-    caml_plat_mutex_init(&dom->domain_lock);
-    caml_plat_cond_init(&dom->domain_cond);
+    caml_plat_mutex_init(&dom->default_domain_lock);
+    caml_plat_mutex_init(&dom->backup_thread_lock);
+    caml_plat_cond_init(&dom->backup_thread_cond);
     dom->backup_thread_running = 0;
     dom->backup_thread_msg = BT_INIT;
   }
@@ -1063,6 +1073,9 @@ static void free_domain_ml_values(struct domain_ml_values* ml_values)
    parameters returned to the parent by the child.
 */
 struct domain_startup_params {
+  caml_plat_mutex lock;
+  caml_plat_cond cond;
+
   dom_internal *parent; /* in */
   enum domain_status status; /* in+out:
                                 parent and child synchronize on this value. */
@@ -1071,57 +1084,42 @@ struct domain_startup_params {
   uintnat unique_id; /* out */
 };
 
+/* The backup thread mostly waits to be signalled on
+ * backup_thread_cond. If the domain is in a blocking section, and an
+ * interrupt is queued for this domain, the condition variable is
+ * signalled and the backup thread wakes up to process the
+ * interrupt. */
+
 static void* backup_thread_func(void* v)
 {
   dom_internal* di = (dom_internal*)v;
-  uintnat msg;
 
   domain_self = di;
   caml_state = di->state;
 
-  msg = atomic_load_acquire (&di->backup_thread_msg);
-  while (msg != BT_TERMINATE) {
-    CAMLassert (msg <= BT_TERMINATE);
-    switch (msg) {
-      case BT_IN_BLOCKING_SECTION:
-        /* Handle interrupts on behalf of the main thread:
-         *  - must hold domain_lock to handle interrupts
-         *  - need to guarantee no blocking so that backup thread
-         *    can be signalled from caml_leave_blocking_section
-         */
-        if (caml_incoming_interrupts_queued()) {
-          if (caml_plat_try_lock(&di->domain_lock)) {
-            caml_handle_incoming_interrupts();
-            caml_plat_unlock(&di->domain_lock);
-          }
-        }
-        /* Wait safely if there is nothing to do.
-         * Will be woken from caml_leave_blocking_section
-         */
-        caml_plat_lock_blocking(&di->interrupt_lock);
-        msg = atomic_load_acquire (&di->backup_thread_msg);
-        if (msg == BT_IN_BLOCKING_SECTION &&
-            !caml_incoming_interrupts_queued())
-          caml_plat_wait(&di->interrupt_cond, &di->interrupt_lock);
-        caml_plat_unlock(&di->interrupt_lock);
-        break;
-      case BT_ENTERING_OCAML:
-        /* Main thread wants to enter OCaml
-         * Will be woken from caml_bt_exit_ocaml
-         * or domain_terminate
-         */
-        caml_plat_lock_blocking(&di->domain_lock);
-        msg = atomic_load_acquire (&di->backup_thread_msg);
-        if (msg == BT_ENTERING_OCAML)
-          caml_plat_wait(&di->domain_cond, &di->domain_lock);
-        caml_plat_unlock(&di->domain_lock);
-        break;
-      default:
-        cpu_relax();
-        break;
-    };
-    msg = atomic_load_acquire (&di->backup_thread_msg);
+  caml_plat_lock_blocking(&di->backup_thread_lock);
+  while (1) {
+    uintnat msg = atomic_load_acquire(&di->backup_thread_msg);
+    if (msg == BT_TERMINATE)
+      break;
+
+    if (msg == BT_IN_BLOCKING_SECTION && caml_incoming_interrupts_queued()) {
+      caml_plat_unlock(&di->backup_thread_lock);
+      /* We must have the domain lock to handle interrupts. If the
+       * domain has finished its blocking section and re-taken the
+       * domain lock before we get here, we will wait here until the
+       * next blocking section, but then (if there are no interrupts
+       * pending) quickly go back around the loop to wait on the
+       * condition variable again. */
+      caml_domain_lock_hook();
+      caml_handle_incoming_interrupts();
+      caml_domain_unlock_hook();
+      caml_plat_lock_blocking(&di->backup_thread_lock);
+    } else {
+      caml_plat_wait(&di->backup_thread_cond, &di->backup_thread_lock);
+    }
   }
+  caml_plat_unlock(&di->backup_thread_lock);
 
   /* doing terminate */
   atomic_store_release(&di->backup_thread_msg, BT_INIT);
@@ -1136,6 +1134,7 @@ static void install_backup_thread (dom_internal* di)
   sigset_t mask, old_mask;
 #endif
 
+  CAMLassert(di == domain_self);
   if (di->backup_thread_running == 0) {
     uintnat msg;
     msg = atomic_load_acquire(&di->backup_thread_msg);
@@ -1144,9 +1143,9 @@ static void install_backup_thread (dom_internal* di)
 
     while (msg != BT_INIT) {
       /* Give a chance for backup thread on this domain to terminate */
-      caml_plat_unlock (&di->domain_lock);
+      caml_domain_unlock_hook();
       cpu_relax ();
-      caml_plat_lock_blocking(&di->domain_lock);
+      caml_domain_lock_hook();
       msg = atomic_load_acquire(&di->backup_thread_msg);
     }
 
@@ -1170,14 +1169,19 @@ static void install_backup_thread (dom_internal* di)
   }
 }
 
-static void caml_domain_spawn_default(void)
+static void caml_domain_initialize_default(void)
 {
   return;
 }
 
-static void caml_domain_initialize_default(void)
+static void caml_domain_lock_default(void)
 {
-  return;
+  caml_plat_lock_blocking(&domain_self->default_domain_lock);
+}
+
+static void caml_domain_unlock_default(void)
+{
+  caml_plat_unlock(&domain_self->default_domain_lock);
 }
 
 static void caml_domain_stop_default(void)
@@ -1190,17 +1194,28 @@ static void caml_domain_external_interrupt_hook_default(void)
   return;
 }
 
-CAMLexport void (*caml_domain_spawn_hook)(void)=
-  caml_domain_spawn_default;
+static void caml_domain_send_interrupt_hook_default(caml_domain_state* target)
+{
+  return;
+}
 
 CAMLexport void (*caml_domain_initialize_hook)(void) =
    caml_domain_initialize_default;
+
+CAMLexport void (*caml_domain_lock_hook)(void) =
+   caml_domain_lock_default;
+
+CAMLexport void (*caml_domain_unlock_hook)(void) =
+   caml_domain_unlock_default;
 
 CAMLexport void (*caml_domain_stop_hook)(void) =
    caml_domain_stop_default;
 
 CAMLexport void (*caml_domain_external_interrupt_hook)(void) =
    caml_domain_external_interrupt_hook_default;
+
+CAMLexport void (*caml_domain_send_interrupt_hook)(caml_domain_state*) =
+   caml_domain_send_interrupt_hook_default;
 
 CAMLexport _Atomic caml_timing_hook caml_domain_terminated_hook =
   (caml_timing_hook)NULL;
@@ -1266,15 +1281,15 @@ static void* domain_thread_func(void* v)
   p->newdom = domain_self;
 
   /* handshake with the parent domain */
-  caml_plat_lock_blocking(&p->parent->interrupt_lock);
+  caml_plat_lock_blocking(&p->lock);
   if (domain_self) {
     p->status = Dom_started;
     p->unique_id = domain_self->unique_id;
   } else {
     p->status = Dom_failed;
   }
-  caml_plat_broadcast(&p->parent->interrupt_cond);
-  caml_plat_unlock(&p->parent->interrupt_lock);
+  caml_plat_broadcast(&p->cond);
+  caml_plat_unlock(&p->lock);
   /* Cannot access p below here. */
 
   if (domain_self) {
@@ -1328,12 +1343,16 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
   pthread_t th;
   int err;
 
-  caml_domain_spawn_hook();
+  /* When domain 0 first spawns a domain, the backup thread is not active, we
+     ensure it is started here. */
+  install_backup_thread(domain_self);
 
 #ifndef NATIVE_CODE
   if (caml_debugger_in_use)
     caml_fatal_error("ocamldebug does not support spawning multiple domains");
 #endif
+  caml_plat_mutex_init(&p.lock);
+  caml_plat_cond_init(&p.cond);
   p.parent = domain_self;
   p.status = Dom_starting;
 
@@ -1349,19 +1368,13 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
     caml_failwith("failed to create domain thread");
   }
 
-  /* While waiting for the child thread to start up, we need to service any
-     stop-the-world requests as they come in. */
-  caml_plat_lock_blocking(&domain_self->interrupt_lock);
+  caml_enter_blocking_section();
+  caml_plat_lock_blocking(&p.lock);
   while (p.status == Dom_starting) {
-    if (caml_incoming_interrupts_queued()) {
-      caml_plat_unlock(&domain_self->interrupt_lock);
-      handle_incoming(domain_self);
-      caml_plat_lock_blocking(&domain_self->interrupt_lock);
-    } else {
-      caml_plat_wait(&domain_self->interrupt_cond, &domain_self->interrupt_lock);
-    }
+    caml_plat_wait(&p.cond, &p.lock);
   }
-  caml_plat_unlock(&domain_self->interrupt_lock);
+  caml_plat_unlock(&p.lock);
+  caml_leave_blocking_section();
 
   if (p.status == Dom_started) {
     /* successfully created a domain.
@@ -1374,9 +1387,8 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
     free_domain_ml_values(p.ml_values);
     caml_failwith("failed to allocate domain");
   }
-  /* When domain 0 first spawns a domain, the backup thread is not active, we
-     ensure it is started here. */
-  install_backup_thread(domain_self);
+  caml_plat_mutex_free(&p.lock);
+  caml_plat_cond_free(&p.cond);
 
   CAMLreturn (Val_long(p.unique_id));
 }
@@ -1998,8 +2010,8 @@ CAMLexport intnat caml_domain_is_multicore (void)
 CAMLexport void caml_acquire_domain_lock(void)
 {
   dom_internal* self = domain_self;
-  caml_plat_lock_blocking(&self->domain_lock);
   caml_state = self->state;
+  caml_domain_lock_hook();
 }
 
 CAMLexport void caml_bt_enter_ocaml(void)
@@ -2015,9 +2027,8 @@ CAMLexport void caml_bt_enter_ocaml(void)
 
 CAMLexport void caml_release_domain_lock(void)
 {
-  dom_internal* self = domain_self;
+  caml_domain_unlock_hook();
   caml_state = NULL;
-  caml_plat_unlock(&self->domain_lock);
 }
 
 CAMLexport void caml_bt_exit_ocaml(void)
@@ -2028,8 +2039,22 @@ CAMLexport void caml_bt_exit_ocaml(void)
 
   if (self->backup_thread_running) {
     atomic_store_release(&self->backup_thread_msg, BT_IN_BLOCKING_SECTION);
-    /* Wakeup backup thread if it is sleeping */
-    caml_plat_signal(&self->domain_cond);
+
+    /* We must [caml_bt_signal] when we set BT_IN_BLOCKING_SECTION and
+       interrupts are queued, so that the backup thread wakes to handle them.
+
+       There is a race between this function (which sets BT_IN_BLOCKING_SECTION)
+       and caml_send_interrupt (which queues an interrupt). Both set one flag
+       then check the other, which is the store-buffering memory order pattern.
+
+       To ensure that at least one of them observes both conditions
+       when they happen in parallel, we need a seq_cst fence (since the
+       operations themselves are only release and acquire). */
+    atomic_thread_fence(memory_order_seq_cst);
+
+    if (caml_incoming_interrupts_queued()) {
+      caml_bt_signal(domain_self);
+    }
   }
 }
 
@@ -2110,13 +2135,6 @@ static void domain_terminate (void)
       /* Remove this domain from stw_domains */
       remove_from_stw_domains(domain_self);
 
-      /* signal the condition variable
-       * because the backup thread may be waiting on it
-       */
-      caml_plat_lock_blocking(&domain_self->interrupt_lock);
-      caml_plat_broadcast(&domain_self->interrupt_cond);
-      caml_plat_unlock(&domain_self->interrupt_lock);
-
       CAMLassert (domain_self->backup_thread_running);
       domain_self->backup_thread_running = 0;
 
@@ -2131,7 +2149,7 @@ static void domain_terminate (void)
   /* domain_state may be re-used by a fresh domain here (now that we
    * have done remove_from_stw_domains and released the
    * all_domains_lock). However, domain_create() won't touch it until
-   * it has claimed the domain_lock, so we hang onto that while we are
+   * it has claimed the domain lock, so we hang onto that while we are
    * tearing down the state. */
 
   /* Delete the domain state from statmemprof after any promotion
@@ -2140,8 +2158,9 @@ static void domain_terminate (void)
   caml_memprof_delete_domain(domain_state);
 
   /* We can not touch domain_self after here because it may be reused */
-  caml_remove_generational_global_root(&domain_state->dls_root);
-  caml_remove_generational_global_root(&domain_state->backtrace_last_exn);
+  domain_root_remove(&domain_state->dls_state);
+  domain_root_remove(&domain_state->tls_state);
+  domain_root_remove(&domain_state->backtrace_last_exn);
   caml_stat_free(domain_state->final_info);
   caml_stat_free(domain_state->ephe_info);
   caml_free_intern_state();
@@ -2177,8 +2196,9 @@ static void domain_terminate (void)
      NB: for a program with no additional domains, the backup thread
      will not have been started */
   atomic_store_release(&domain_self->backup_thread_msg, BT_TERMINATE);
-  caml_plat_signal(&domain_self->domain_cond);
-  caml_plat_unlock(&domain_self->domain_lock);
+  caml_bt_signal(domain_self);
+
+  caml_domain_unlock_hook();
 
   caml_plat_assert_all_locks_unlocked();
   /* This is the last thing we do because we need to be able to rely
@@ -2198,29 +2218,66 @@ CAMLprim value caml_ml_domain_cpu_relax(value t)
 #endif
 }
 
+/* OCaml values stored in the domain state. */
+
+static inline void domain_root_register(value *root, value t) {
+  CAMLnoalloc;
+  *root = t;
+  caml_register_generational_global_root(root);
+}
+
+static inline void domain_root_set(value *root, value t) {
+  CAMLnoalloc;
+  caml_modify_generational_global_root(root, t);
+}
+
+static inline value domain_root_get(value *root) {
+  CAMLnoalloc;
+  return *root;
+}
+
+static inline void domain_root_remove(value *root) {
+  CAMLnoalloc;
+  caml_remove_generational_global_root(root);
+  *root = Val_unit;
+}
+
+/* Domain-local state */
+
 CAMLprim value caml_domain_dls_set(value t)
 {
-  CAMLnoalloc;
-  caml_modify_generational_global_root(&Caml_state->dls_root, t);
+  domain_root_set(&Caml_state->dls_state, t);
   return Val_unit;
 }
 
 CAMLprim value caml_domain_dls_get(value unused)
 {
-  CAMLnoalloc;
-  return Caml_state->dls_root;
+  return domain_root_get(&Caml_state->dls_state);
 }
 
 CAMLprim value caml_domain_dls_compare_and_set(value old, value new)
 {
   CAMLnoalloc;
-  value current = Caml_state->dls_root;
+  value current = Caml_state->dls_state;
   if (current == old) {
-    caml_modify_generational_global_root(&Caml_state->dls_root, new);
+    caml_modify_generational_global_root(&Caml_state->dls_state, new);
     return Val_true;
   } else {
     return Val_false;
   }
+}
+
+/* Thread-local state */
+
+CAMLprim value caml_domain_tls_set(value t)
+{
+  domain_root_set(&Caml_state->tls_state, t);
+  return Val_unit;
+}
+
+CAMLprim value caml_domain_tls_get(value unused)
+{
+  return domain_root_get(&Caml_state->tls_state);
 }
 
 CAMLprim value caml_recommended_domain_count(value unused)

@@ -333,6 +333,11 @@ let mk_ddebug_invariants f =
     Arg.Unit f,
     " Run invariant checks during generation of debugging information" )
 
+let mk_ddebug_available_regs f =
+  ( "-ddebug-available-regs",
+    Arg.Unit f,
+    " Enable debug output for available registers analysis" )
+
 let mk_ddwarf_types f =
   ("-ddwarf-types", Arg.Unit f, " Enable debug output for DWARF type generation")
 
@@ -501,6 +506,18 @@ let mk_no_flambda2_reaper f =
     Arg.Unit f,
     Printf.sprintf " Disable reaper pass%s (Flambda2 only)"
       (format_not_default Flambda2.Default.enable_reaper) )
+
+let mk_reaper_preserve_direct_calls f =
+  ( "-reaper-preserve-direct-calls",
+    Arg.Symbol ([ "never"; "always"; "zero-alloc" ], f),
+    Printf.sprintf
+      " Choose the direct call preservation strategy of the reaper (Flambda2 \
+       only)\n\
+      \      Valid values are: \n\
+      \       \"never\": do not try to preserve direct calls to old functions;\n\
+      \       \"always\": always preserve existing direct calls;\n\
+      \       \"zero-alloc\": preserve direct calls only in zero-alloc checked \
+       functions." )
 
 let mk_flambda2_expert_fallback_inlining_heuristic f =
   ( "-flambda2-expert-fallback-inlining-heuristic",
@@ -882,7 +899,20 @@ let mk_gdwarf_may_alter_codegen f =
 let mk_no_gdwarf_may_alter_codegen f =
   ( "-gno-dwarf-may-alter-codegen",
     Arg.Unit f,
-    " Do not alter code\n     generation when emitting debugging information" )
+    " Do not alter code generation when emitting debugging information" )
+
+let mk_gdwarf_may_alter_codegen_experimental f =
+  ( "-gdwarf-may-alter-codegen-experimental",
+    Arg.Unit f,
+    " Like -gdwarf-may-alter-codegen but with more experimental features.\n\
+    \     Implies -gdwarf-may-alter-codegen.\n\
+    \     THIS MAY GENERATE BROKEN CODE." )
+
+let mk_no_gdwarf_may_alter_codegen_experimental f =
+  ( "-gno-dwarf-may-alter-codegen-experimental",
+    Arg.Unit f,
+    " Disable experimental changes to code generation when emitting\n\
+    \     debugging information." )
 
 let mk_gdwarf_max_function_complexity f =
   ( "-gdwarf-max-function-complexity",
@@ -951,6 +981,7 @@ module type Oxcaml_options = sig
   val davail : unit -> unit
   val dranges : unit -> unit
   val ddebug_invariants : unit -> unit
+  val ddebug_available_regs : unit -> unit
   val ddwarf_types : unit -> unit
   val ddwarf_metrics : unit -> unit
   val dcfg : unit -> unit
@@ -1026,6 +1057,7 @@ module type Oxcaml_options = sig
   val flambda2_join_depth : int -> unit
   val flambda2_reaper : unit -> unit
   val no_flambda2_reaper : unit -> unit
+  val reaper_preserve_direct_calls : string -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
@@ -1082,6 +1114,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_davail F.davail;
       mk_dranges F.dranges;
       mk_ddebug_invariants F.ddebug_invariants;
+      mk_ddebug_available_regs F.ddebug_available_regs;
       mk_ddwarf_types F.ddwarf_types;
       mk_ddwarf_metrics F.ddwarf_metrics;
       mk_ocamlcfg F.ocamlcfg;
@@ -1166,6 +1199,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_join_depth F.flambda2_join_depth;
       mk_flambda2_reaper F.flambda2_reaper;
       mk_no_flambda2_reaper F.no_flambda2_reaper;
+      mk_reaper_preserve_direct_calls F.reaper_preserve_direct_calls;
       mk_flambda2_expert_fallback_inlining_heuristic
         F.flambda2_expert_fallback_inlining_heuristic;
       mk_no_flambda2_expert_fallback_inlining_heuristic
@@ -1294,6 +1328,7 @@ module Oxcaml_options_impl = struct
   let davail = set' Oxcaml_flags.davail
   let dranges = set' Oxcaml_flags.dranges
   let ddebug_invariants = set' Dwarf_flags.ddebug_invariants
+  let ddebug_available_regs = set' Dwarf_flags.ddebug_available_regs
   let ddwarf_types = set' Dwarf_flags.ddwarf_types
   let ddwarf_metrics = set' Dwarf_flags.ddwarf_metrics
   let heap_reduction_threshold x = Oxcaml_flags.heap_reduction_threshold := x
@@ -1375,7 +1410,8 @@ module Oxcaml_options_impl = struct
       Oxcaml_flags.Set Oxcaml_flags.All_functions
 
   let no_flambda2_result_types () =
-    Flambda2.function_result_types := Oxcaml_flags.Set Oxcaml_flags.Never
+    Flambda2.function_result_types :=
+      Oxcaml_flags.Set (Oxcaml_flags.Never : Oxcaml_flags.function_result_types)
 
   let flambda2_basic_meet () = ()
   let flambda2_advanced_meet () = ()
@@ -1404,6 +1440,23 @@ module Oxcaml_options_impl = struct
   let flambda2_join_depth n = Flambda2.join_depth := Oxcaml_flags.Set n
   let flambda2_reaper = set Flambda2.enable_reaper
   let no_flambda2_reaper = clear Flambda2.enable_reaper
+
+  let reaper_preserve_direct_calls s =
+    match s with
+    | "never" ->
+        Flambda2.reaper_preserve_direct_calls :=
+          Oxcaml_flags.Set
+            (Oxcaml_flags.Never : Oxcaml_flags.reaper_preserve_direct_calls)
+    | "always" ->
+        Flambda2.reaper_preserve_direct_calls :=
+          Oxcaml_flags.Set Oxcaml_flags.Always
+    | "zero-alloc" ->
+        Flambda2.reaper_preserve_direct_calls :=
+          Oxcaml_flags.Set Oxcaml_flags.Zero_alloc
+    | "auto" ->
+        Flambda2.reaper_preserve_direct_calls :=
+          Oxcaml_flags.Set Oxcaml_flags.Auto
+    | _ -> () (* This should not occur as we use Arg.Symbol *)
 
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic
@@ -1558,6 +1611,8 @@ module type Debugging_options = sig
   val no_dwarf_for_startup_file : unit -> unit
   val gdwarf_may_alter_codegen : unit -> unit
   val no_gdwarf_may_alter_codegen : unit -> unit
+  val gdwarf_may_alter_codegen_experimental : unit -> unit
+  val no_gdwarf_may_alter_codegen_experimental : unit -> unit
   val gdwarf_max_function_complexity : int -> unit
   val gdwarf_compression : string -> unit
   val gdwarf_fission : string -> unit
@@ -1575,6 +1630,10 @@ module Make_debugging_options (F : Debugging_options) = struct
       mk_no_dwarf_for_startup_file F.no_dwarf_for_startup_file;
       mk_gdwarf_may_alter_codegen F.gdwarf_may_alter_codegen;
       mk_no_gdwarf_may_alter_codegen F.no_gdwarf_may_alter_codegen;
+      mk_gdwarf_may_alter_codegen_experimental
+        F.gdwarf_may_alter_codegen_experimental;
+      mk_no_gdwarf_may_alter_codegen_experimental
+        F.no_gdwarf_may_alter_codegen_experimental;
       mk_gdwarf_max_function_complexity F.gdwarf_max_function_complexity;
       mk_gdwarf_compression F.gdwarf_compression;
       mk_gdwarf_fission F.gdwarf_fission;
@@ -1602,7 +1661,18 @@ module Debugging_options_impl = struct
   let gdwarf_may_alter_codegen () = Debugging.gdwarf_may_alter_codegen := true
 
   let no_gdwarf_may_alter_codegen () =
-    Debugging.gdwarf_may_alter_codegen := false
+    Debugging.gdwarf_may_alter_codegen := false;
+    Debugging.gdwarf_may_alter_codegen_experimental := false;
+    Oxcaml_options_impl.clear Flambda2.Expert.phantom_lets ()
+
+  let gdwarf_may_alter_codegen_experimental () =
+    Debugging.gdwarf_may_alter_codegen := true;
+    Debugging.gdwarf_may_alter_codegen_experimental := true;
+    Oxcaml_options_impl.set Flambda2.Expert.phantom_lets ()
+
+  let no_gdwarf_may_alter_codegen_experimental () =
+    Debugging.gdwarf_may_alter_codegen_experimental := false;
+    Oxcaml_options_impl.clear Flambda2.Expert.phantom_lets ()
 
   let gdwarf_max_function_complexity c =
     Debugging.dwarf_max_function_complexity := c
@@ -1711,6 +1781,7 @@ module Extra_params = struct
     | "davail" -> set' Oxcaml_flags.davail
     | "dranges" -> set' Oxcaml_flags.dranges
     | "ddebug-invariants" -> set' Dwarf_flags.ddebug_invariants
+    | "ddebug-available-regs" -> set' Dwarf_flags.ddebug_available_regs
     | "ddwarf-types" -> set' Dwarf_flags.ddwarf_types
     | "ddwarf-metrics" -> set' Dwarf_flags.ddwarf_metrics
     | "reorder-blocks-random" ->
@@ -1781,6 +1852,9 @@ module Extra_params = struct
     | "dasm-comments" -> set' Oxcaml_flags.dasm_comments
     | "gupstream-dwarf" -> set' Debugging.restrict_to_upstream_dwarf
     | "gdwarf-may-alter-codegen" -> set' Debugging.gdwarf_may_alter_codegen
+    | "gdwarf-may-alter-codegen-experimental" ->
+        set' Debugging.gdwarf_may_alter_codegen_experimental
+        && set Flambda2.Expert.phantom_lets
     | "gstartup" -> set' Debugging.dwarf_for_startup_file
     | "gdwarf-pedantic" -> set' Clflags.dwarf_pedantic
     | "gdwarf-max-function-complexity" ->
@@ -1800,7 +1874,9 @@ module Extra_params = struct
     | "flambda2-join-points" -> set Flambda2.join_points
     | "flambda2-result-types" ->
         (match String.lowercase_ascii v with
-        | "never" -> Flambda2.function_result_types := Oxcaml_flags.(Set Never)
+        | "never" ->
+            Flambda2.function_result_types :=
+              Oxcaml_flags.(Set (Never : function_result_types))
         | "functors-only" ->
             Flambda2.function_result_types := Oxcaml_flags.(Set Functors_only)
         | "all-functions" ->
@@ -1919,6 +1995,23 @@ module Extra_params = struct
         Oxcaml_flags.cached_generic_functions_path := v;
         true
     | "reaper" -> set Flambda2.enable_reaper
+    | "reaper-preserve-direct-calls" ->
+        (match String.lowercase_ascii v with
+        | "never" ->
+            Flambda2.reaper_preserve_direct_calls :=
+              Oxcaml_flags.(Set (Never : reaper_preserve_direct_calls))
+        | "always" ->
+            Flambda2.reaper_preserve_direct_calls := Oxcaml_flags.(Set Always)
+        | "zero-alloc" ->
+            Flambda2.reaper_preserve_direct_calls :=
+              Oxcaml_flags.(Set Zero_alloc)
+        | "auto" ->
+            Flambda2.reaper_preserve_direct_calls := Oxcaml_flags.(Set Auto)
+        | _ ->
+            Misc.fatal_error
+              "Syntax: reaper-preserve-direct-calls: \
+               always|never|zero-alloc|auto");
+        true
     | _ -> false
 end
 

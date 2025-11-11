@@ -32,7 +32,7 @@ val current_domain : unit -> int
 
 type 'a spawn_result =
   | Spawned
-  | Failed of 'a * exn @@ aliased * Printexc.raw_backtrace @@ aliased
+  | Failed of 'a * exn @@ aliased many * Printexc.raw_backtrace @@ aliased many
 
 (** [spawn_on ~domain action] spawns [action] as a thread running on the
     specified [domain].
@@ -48,9 +48,9 @@ type 'a spawn_result =
     @raise Sys_error in case the system fails to create a new thread. *)
 val spawn_on
   :   domain:int
-  -> ('a @ unique portable -> unit) @ once portable unyielding
-  -> 'a @ unique portable
-  -> 'a spawn_result @ unique portable
+  -> ('a @ contended once portable unique -> unit) @ once portable unyielding
+  -> 'a @ contended once portable unique
+  -> 'a spawn_result @ contended once portable unique
 
 (** [spawn action] spawns [action] as a thread running on some domain.
 
@@ -63,6 +63,6 @@ val spawn_on
 
     @raise Sys_error in case the system fails to create a new thread. *)
 val spawn
-  :  ('a @ unique portable -> unit) @ once portable unyielding
-  -> 'a @ unique portable
-  -> 'a spawn_result @ unique portable
+  :  ('a @ contended once portable unique -> unit) @ once portable unyielding
+  -> 'a @ contended once portable unique
+  -> 'a spawn_result @ contended once portable unique

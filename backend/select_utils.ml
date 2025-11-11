@@ -184,6 +184,7 @@ let oper_result_type = function
   | Calloc _ -> typ_val
   | Cstore (_c, _) -> typ_void
   | Cdls_get -> typ_val
+  | Ctls_get -> typ_val
   | Cprefetch _ -> typ_void
   | Catomic
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
@@ -224,16 +225,22 @@ let oper_result_type = function
   | Cstatic_cast (V128_of_scalar _) -> typ_vec128
   | Cstatic_cast (Scalar_of_v128 Float64x2) -> typ_float
   | Cstatic_cast (Scalar_of_v128 Float32x4) -> typ_float32
+  | Cstatic_cast (Scalar_of_v128 Float16x8) ->
+    Misc.fatal_error "float16x8: scalar type not supported"
   | Cstatic_cast (Scalar_of_v128 (Int8x16 | Int16x8 | Int32x4 | Int64x2)) ->
     typ_int
   | Cstatic_cast (V256_of_scalar _) -> typ_vec256
   | Cstatic_cast (Scalar_of_v256 Float64x4) -> typ_float
   | Cstatic_cast (Scalar_of_v256 Float32x8) -> typ_float32
+  | Cstatic_cast (Scalar_of_v256 Float16x16) ->
+    Misc.fatal_error "float16x16: scalar type not supported"
   | Cstatic_cast (Scalar_of_v256 (Int8x32 | Int16x16 | Int32x8 | Int64x4)) ->
     typ_int
   | Cstatic_cast (V512_of_scalar _) -> typ_vec512
   | Cstatic_cast (Scalar_of_v512 Float64x8) -> typ_float
   | Cstatic_cast (Scalar_of_v512 Float32x16) -> typ_float32
+  | Cstatic_cast (Scalar_of_v512 Float16x32) ->
+    Misc.fatal_error "float16x32: scalar type not supported"
   | Cstatic_cast (Scalar_of_v512 (Int8x64 | Int16x32 | Int32x16 | Int64x8)) ->
     typ_int
   | Craise _ -> typ_void
@@ -480,7 +487,7 @@ module Stack_offset_and_exn = struct
   let fun_name = ref ""
 
   let compute_stack_offset ~stack_offset ~traps =
-    stack_offset + (Proc.trap_size_in_bytes * List.length traps)
+    stack_offset + (Proc.trap_size_in_bytes () * List.length traps)
 
   let check_and_set_stack_offset :
       'a Cfg.instruction -> stack_offset:int -> traps:handler_stack -> unit =
@@ -542,7 +549,7 @@ module Stack_offset_and_exn = struct
         | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
         | Csel _ | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _
         | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
-        | Dls_get | Poll | Pause | Alloc _ )
+        | Dls_get | Tls_get | Poll | Pause | Alloc _ )
     | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->
@@ -596,11 +603,9 @@ end
 
 let make_stack_offset stack_ofs = Cfg.Op (Stackoffset stack_ofs)
 
-let make_name_for_debugger ~ident ~which_parameter ~provenance ~is_assignment
-    ~regs =
+let make_name_for_debugger ~ident ~which_parameter ~provenance ~regs =
   Cfg.Op
-    (Operation.Name_for_debugger
-       { ident; which_parameter; provenance; is_assignment; regs })
+    (Operation.Name_for_debugger { ident; which_parameter; provenance; regs })
 
 let make_const_int x = Operation.Const_int x
 
@@ -675,12 +680,7 @@ let maybe_emit_naming_op env sub_cfg ~bound_name regs =
       let bound_name = Backend_var.With_provenance.var bound_name in
       let naming_op =
         Operation.Name_for_debugger
-          { ident = bound_name;
-            provenance;
-            which_parameter = None;
-            is_assignment = false;
-            regs
-          }
+          { ident = bound_name; provenance; which_parameter = None; regs }
       in
       insert_debug env sub_cfg (Cfg.Op naming_op) Debuginfo.none [||] [||]
 

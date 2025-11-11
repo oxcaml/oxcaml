@@ -138,7 +138,8 @@ let classify env ty : classification =
              Maybe we should emit a warning. *)
           Any)
     | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _ -> Addr
-    | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _ ->
+    | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _
+    | Tquote _ | Tsplice _ ->
       (* None of these should occur in the arguments to an external function. *)
       assert false
 
@@ -253,7 +254,8 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
     else
       match lookup_subst (get_id ty) subst with None -> Value | Some sh -> sh)
   | Tpoly _ -> assert false (* handled by [scrape_ty] currently *)
-  | Tfield _ | Tnil | Tlink _ | Tsubst _ | Tof_kind _ | Tunboxed_tuple _ ->
+  | Tfield _ | Tnil | Tlink _ | Tsubst _ | Tof_kind _ | Tunboxed_tuple _
+  | Tquote _ | Tsplice _ ->
     (* NOTE: we should never encounter those in an external declaration *)
     assert false
   | Tpackage _ -> Block None

@@ -26,6 +26,8 @@ type ext =
   | BMI2
   | AVX
   | AVX2
+  | F16C
+  | FMA
 
 (* Fixed machine register location *)
 type reg =
@@ -194,6 +196,8 @@ let ext_to_string : ext -> string = function
   | BMI2 -> "BMI2"
   | AVX -> "AVX"
   | AVX2 -> "AVX2"
+  | F16C -> "F16C"
+  | FMA -> "FMA"
 
 let exts_to_string exts =
   Array.map ext_to_string exts |> Array.to_list |> String.concat ", "

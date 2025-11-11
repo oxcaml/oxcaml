@@ -33,10 +33,17 @@ type type_replacement =
 
 type additional_action =
   | Prepare_for_saving of
-      { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind }
-    (* The [Prepare_for_saving] function should be applied to all jkinds when
+      { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
+        prepare_mode : Mode.Alloc.lr -> Mode.Alloc.lr;
+        prepare_modality : Mode.Modality.t -> Mode.Modality.t
+      }
+    (* The [prepare_jkind] function should be applied to all jkinds when
        saving; this commons them up, truncates their histories, and runs
-       a check that all unconstrained variables have been defaulted to value. *)
+       a check that all unconstrained variables have been defaulted to value.
+
+       The [prepare_mode]/[prepare_modality] functions should be applied to all
+       modes/modalities when saving; this ensures the saved file doesn't contain
+       mode variables. *)
   | Duplicate_variables
   | No_action
 
@@ -130,7 +137,7 @@ end = struct
         const_jkind
         ~quality
         ~annotation:(Some { pjkind_loc = Location.none;
-                            pjkind_desc = Abbreviation builtin.name })
+                            pjkind_desc = Pjk_abbreviation builtin.name })
         ~why:Jkind.History.Imported)
 
   let best_builtins : (allowed * disallowed) builtins = make_builtins Best
@@ -185,7 +192,15 @@ let with_additional_action =
             end
           | None -> raise(Error (loc, Unconstrained_jkind_variable))
         in
-        Prepare_for_saving { prepare_jkind }
+        (* CR-someday zqian: preserve the hints *)
+        (* modes and modalities should have been zapped already *)
+        let prepare_mode mode =
+          Mode.Alloc.(mode |> to_const_exn |> of_const)
+        in
+        let prepare_modality modality =
+          Mode.Modality.(modality |> to_const_exn|> of_const)
+        in
+        Prepare_for_saving { prepare_jkind; prepare_mode; prepare_modality }
   in
   { s with additional_action; last_compose = None }
 
@@ -398,7 +413,7 @@ let rec typexp copy_scope s ty =
         let ty' =
           match s.additional_action with
           | Duplicate_variables -> newpersty desc
-          | Prepare_for_saving { prepare_jkind } ->
+          | Prepare_for_saving { prepare_jkind; _ } ->
               newpersty (norm desc ~prepare_jkind)
           | No_action -> newty2 ~level:(get_level ty) desc
         in
@@ -475,7 +490,8 @@ let rec typexp copy_scope s ty =
               let more' =
                 match mored with
                   Tsubst (ty, None) -> ty
-                | Tconstr _ | Tnil | Tof_kind _ -> typexp copy_scope s more
+                | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _ ->
+                    typexp copy_scope s more
                 | Tunivar _ | Tvar _ ->
                     if should_duplicate_vars then newpersty mored
                     else if dup && is_Tvar more then newgenty mored
@@ -501,6 +517,17 @@ let rec typexp copy_scope s ty =
           end
       | Tfield(_label, kind, _t1, t2) when field_kind_repr kind = Fabsent ->
           Tlink (typexp copy_scope s t2)
+      | Tarrow ((label, marg, mret), arg, ret, comm) ->
+          let marg, mret =
+            match s.additional_action with
+            | Prepare_for_saving { prepare_mode; _ } ->
+              prepare_mode marg, prepare_mode mret
+            | _ -> marg, mret
+          in
+          let arg = typexp copy_scope s arg in
+          let ret = typexp copy_scope s ret in
+          let comm = copy_commu comm in
+          Tarrow ((label, marg, mret), arg, ret, comm)
       | _ -> copy_type_desc (typexp copy_scope s) desc
     in
     Transient_expr.set_stub_desc ty' desc;
@@ -601,7 +628,7 @@ let rec type_declaration' copy_scope s decl =
       begin
         let jkind =
           match s.additional_action with
-          | Prepare_for_saving { prepare_jkind } ->
+          | Prepare_for_saving { prepare_jkind; _ } ->
             prepare_jkind decl.type_loc decl.type_jkind
           | Duplicate_variables | No_action -> decl.type_jkind
         in
@@ -862,8 +889,14 @@ let force_type_expr ty = Wrap.force (fun _ s ty ->
   For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)) ty
 
 let rec subst_lazy_value_description s descr =
+  let val_modalities =
+    match s.additional_action with
+    | Prepare_for_saving { prepare_modality; _ } ->
+        prepare_modality descr.val_modalities
+    | _ -> descr.val_modalities
+  in
   { val_type = Wrap.substitute ~compose Keep s descr.val_type;
-    val_modalities = descr.val_modalities;
+    val_modalities;
     val_kind = descr.val_kind;
     val_loc = loc s descr.val_loc;
     val_zero_alloc =
@@ -883,8 +916,14 @@ let rec subst_lazy_value_description s descr =
 
 and subst_lazy_module_decl scoping s md =
   let md_type = subst_lazy_modtype scoping s md.md_type in
+  let md_modalities =
+    match s.additional_action with
+    | Prepare_for_saving { prepare_modality; _ } ->
+        prepare_modality md.md_modalities
+    | _ -> md.md_modalities
+  in
   { md_type;
-    md_modalities = md.md_modalities;
+    md_modalities;
     md_attributes = attrs s md.md_attributes;
     md_loc = loc s md.md_loc;
     md_uid = md.md_uid }

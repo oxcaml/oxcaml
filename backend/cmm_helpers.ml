@@ -2984,17 +2984,17 @@ module SArgBlocks = struct
 
   (* CR mshinwell: GPR#2294 will fix the Debuginfo here *)
 
-  let make_const i = Cconst_int (i, Debuginfo.none)
+  let make_const dbg i = Cconst_int (i, dbg)
 
-  let make_prim p args = Cop (p, args, Debuginfo.none)
+  let make_prim dbg p args = Cop (p, args, dbg)
 
-  let make_offset arg n = add_const arg n Debuginfo.none
+  let make_offset dbg arg n = add_const arg n dbg
 
-  let make_isout h arg = Cop (Ccmpi Cult, [h; arg], Debuginfo.none)
+  let make_isout dbg h arg = Cop (Ccmpi Cult, [h; arg], dbg)
 
-  let make_isin h arg = Cop (Ccmpi Cuge, [h; arg], Debuginfo.none)
+  let make_isin dbg h arg = Cop (Ccmpi Cuge, [h; arg], dbg)
 
-  let make_is_nonzero arg = arg
+  let make_is_nonzero _dbg arg = arg
 
   let arg_as_test arg = arg
 
@@ -4991,6 +4991,8 @@ let allocate_unboxed_vec512_array ~elements mode dbg =
 let block_header x y = block_header x y
 
 let dls_get ~dbg = Cop (Cdls_get, [], dbg)
+
+let tls_get ~dbg = Cop (Ctls_get, [], dbg)
 
 let perform ~dbg eff =
   let cont =

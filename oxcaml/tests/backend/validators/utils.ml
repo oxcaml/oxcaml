@@ -30,8 +30,8 @@ module Instruction = struct
       irc_work_list = Unknown_list;
       live = Reg.Set.empty;
       stack_offset = 0;
-      available_before = None;
-      available_across = None
+      available_before = Unreachable;
+      available_across = Unreachable
     }
 end
 

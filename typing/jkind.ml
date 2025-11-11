@@ -289,7 +289,7 @@ module Layout = struct
     | Any, Any -> true
     | (Any | Sort _ | Product _), _ -> false
 
-  let sub t1 t2 =
+  let sub ~level t1 t2 =
     let rec sub t1 t2 : Misc.Le_result.t =
       match t1, t2 with
       | Any, Any -> Equal
@@ -305,13 +305,13 @@ module Layout = struct
            to end up less than a sort (so, no [any]), but it seems easier to keep
            this case lined up with the inverse case, which definitely cannot use
            [to_product_sort]. *)
-        match Sort.decompose_into_product s2 (List.length ts1) with
+        match Sort.decompose_into_product ~level s2 (List.length ts1) with
         | None -> Not_le
         | Some ss2 ->
           Misc.Le_result.combine_list
             (List.map2 (fun t1 s2 -> sub t1 (Sort s2)) ts1 ss2))
       | Sort s1, Product ts2 -> (
-        match Sort.decompose_into_product s1 (List.length ts2) with
+        match Sort.decompose_into_product ~level s1 (List.length ts2) with
         | None -> Not_le
         | Some ss1 ->
           Misc.Le_result.combine_list
@@ -320,10 +320,10 @@ module Layout = struct
     Sub_result.of_le_result (sub t1 t2) ~failure_reason:(fun () ->
         [Layout_disagreement])
 
-  let rec intersection t1 t2 =
+  let rec intersection ~level t1 t2 =
     (* pre-condition to [products]: [ts1] and [ts2] have the same length *)
     let products ts1 ts2 =
-      let components = List.map2 intersection ts1 ts2 in
+      let components = List.map2 (intersection ~level) ts1 ts2 in
       Option.map
         (fun x -> Product x)
         (Misc.Stdlib.List.some_if_all_elements_are_some components)
@@ -335,12 +335,12 @@ module Layout = struct
     | Product ts1, Product ts2 ->
       if List.compare_lengths ts1 ts2 = 0 then products ts1 ts2 else None
     | Product ts, Sort sort | Sort sort, Product ts -> (
-      match Sort.decompose_into_product sort (List.length ts) with
+      match Sort.decompose_into_product ~level sort (List.length ts) with
       | None -> None
       | Some sorts -> products ts (List.map (fun x -> Sort x) sorts))
 
-  let of_new_sort_var () =
-    let sort = Sort.new_var () in
+  let of_new_sort_var ~level =
+    let sort = Sort.new_var ~level in
     Sort sort, sort
 
   let rec default_to_value_and_get : _ Layout.t -> Const.t = function
@@ -482,9 +482,11 @@ module Mod_bounds = struct
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Linearity))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Contention))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Portability))
+    @@ Sub_result.combine (modal_less_or_equal (Comonadic Forkable))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Yielding))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Statefulness))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Visibility))
+    @@ Sub_result.combine (modal_less_or_equal (Monadic Staticity))
     @@ Sub_result.combine
          (axis_less_or_equal ~le:Externality.le
             ~axis:(Pack (Nonmodal Externality)) (externality t1)
@@ -528,9 +530,11 @@ module Mod_bounds = struct
     |> add_crossing_if (Monadic Uniqueness)
     |> add_crossing_if (Comonadic Portability)
     |> add_crossing_if (Monadic Contention)
+    |> add_crossing_if (Comonadic Forkable)
     |> add_crossing_if (Comonadic Yielding)
     |> add_crossing_if (Comonadic Statefulness)
     |> add_crossing_if (Monadic Visibility)
+    |> add_crossing_if (Monadic Staticity)
     |> add_if
          (Externality.le Externality.max (externality t))
          (Nonmodal Externality)
@@ -544,8 +548,8 @@ module Mod_bounds = struct
   let for_arrow =
     let crossing =
       Crossing.create ~linearity:false ~regionality:false ~uniqueness:true
-        ~portability:false ~contention:true ~yielding:false ~statefulness:false
-        ~visibility:true
+        ~portability:false ~contention:true ~forkable:false ~yielding:false
+        ~statefulness:false ~visibility:true ~staticity:false
     in
     create crossing ~externality:Externality.max
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
@@ -884,26 +888,45 @@ module Layout_and_axes = struct
          recursive descent" bit is why we recur separately down one type before
          iterating down the list.)
       *)
-      (* CR reisenberg: document seen_args *)
       let module Loop_control = struct
+        (** Represents the cache for a specific type constructor *)
+        type seen_constr =
+          { fuel : int;
+            seen_args : type_expr list;
+                (** The arguments the type constructor was most recently seen
+                    with. *)
+            relevant_axes_when_seen : Axis_set.t
+                (** The axes that were relevant when the type constructor was
+                    most recently seen. *)
+          }
+
+        type seen_row_var =
+          { relevant_axes_when_seen : Axis_set.t
+                (** The axes that were relevant when the row var was seen. *)
+          }
+        [@@unboxed]
+
         type t =
           { tuple_fuel : int;
-            constr : (int * type_expr list) Path.Map.t;
-            seen_row_var : Numbers.Int.Set.t;
+            seen_constrs : seen_constr Path.Map.t;
+            seen_row_vars : seen_row_var Numbers.Int.Map.t;
             fuel_status : Fuel_status.t
           }
 
         type result =
-          | Stop of t (* give up, returning [max] *)
-          | Skip (* skip reducing this type, but otherwise continue *)
-          | Continue of t (* continue, with a new [t] *)
+          | Stop of t  (** give up, returning [max] *)
+          | Skip  (** skip reducing this type, but otherwise continue *)
+          | Continue of
+              { ctl : t;
+                skippable_axes : Axis_set.t
+              }  (** continue, with a new [t] *)
 
         let initial_fuel_per_ty = 2
 
         let starting =
           { tuple_fuel = initial_fuel_per_ty;
-            constr = Path.Map.empty;
-            seen_row_var = Numbers.Int.Set.empty;
+            seen_constrs = Path.Map.empty;
+            seen_row_vars = Numbers.Int.Map.empty;
             fuel_status = Sufficient_fuel
           }
 
@@ -958,53 +981,108 @@ module Layout_and_axes = struct
            cutting off the recursion, it continues until it runs out of fuel.
         *)
 
-        let rec check
-            ({ tuple_fuel; constr; seen_row_var; fuel_status = _ } as t) ty =
+        let rec check ~relevant_axes
+            ({ tuple_fuel; seen_constrs; seen_row_vars; fuel_status = _ } as t)
+            ty =
           match Types.get_desc ty with
-          | Tpoly (ty, _) -> check t ty
+          | Tpoly (ty, _) -> check ~relevant_axes t ty
           | Ttuple _ ->
             if tuple_fuel > 0
-            then Continue { t with tuple_fuel = tuple_fuel - 1 }
+            then
+              Continue
+                { ctl = { t with tuple_fuel = tuple_fuel - 1 };
+                  skippable_axes = Axis_set.empty
+                }
             else Stop { t with fuel_status = Ran_out_of_fuel }
           | Tconstr (p, args, _) -> (
-            match Path.Map.find_opt p constr with
+            match Path.Map.find_opt p seen_constrs with
             | None ->
               Continue
-                { t with
-                  constr = Path.Map.add p (initial_fuel_per_ty, args) constr
+                { ctl =
+                    { t with
+                      seen_constrs =
+                        Path.Map.add p
+                          { fuel = initial_fuel_per_ty;
+                            seen_args = args;
+                            relevant_axes_when_seen = relevant_axes
+                          }
+                          seen_constrs
+                    };
+                  skippable_axes = Axis_set.empty
                 }
-            | Some (fuel, seen_args) ->
-              if List.for_all2
-                   (fun ty1 ty2 ->
-                     TransientTypeOps.equal (Transient_expr.repr ty1)
-                       (Transient_expr.repr ty2))
-                   seen_args args
-                 && not (context.is_abstract p)
+            | Some { fuel; seen_args; relevant_axes_when_seen } ->
+              let args_equal =
+                List.for_all2
+                  (fun ty1 ty2 ->
+                    TransientTypeOps.equal (Transient_expr.repr ty1)
+                      (Transient_expr.repr ty2))
+                  seen_args args
+              in
+              let skippable_axes =
+                if args_equal && not (context.is_abstract p)
+                then relevant_axes_when_seen
+                else Axis_set.empty
+              in
+              if Axis_set.is_subset relevant_axes skippable_axes
               then Skip
               else if fuel > 0
               then
                 Continue
-                  { t with constr = Path.Map.add p (fuel - 1, args) constr }
+                  { ctl =
+                      { t with
+                        seen_constrs =
+                          Path.Map.add p
+                            { fuel = fuel - 1;
+                              seen_args = args;
+                              relevant_axes_when_seen =
+                                (* Even if we can't skip the type, if the args match
+                                   the most recently seen args, we can merge the
+                                   relevant axes with the ones seen previously since
+                                   we have now seen the types under all of these
+                                   axes. *)
+                                (if args_equal
+                                then
+                                  Axis_set.union relevant_axes
+                                    relevant_axes_when_seen
+                                else relevant_axes)
+                            }
+                            seen_constrs
+                      };
+                    skippable_axes
+                  }
               else Stop { t with fuel_status = Ran_out_of_fuel })
-          | Tvariant _ -> (
+          | Tvariant _ ->
             let row_var_id = get_id (Btype.proxy ty) in
-            match Numbers.Int.Set.mem row_var_id seen_row_var with
-            | false ->
+            let { relevant_axes_when_seen } =
+              Numbers.Int.Map.find_opt row_var_id seen_row_vars
+              |> Option.value
+                   ~default:{ relevant_axes_when_seen = Axis_set.empty }
+            in
+            (* For our purposes, row variables are like constructors with no arguments,
+               so if we saw one already, we don't need to expand it again. *)
+            if Axis_set.is_subset relevant_axes relevant_axes_when_seen
+            then Skip
+            else
               Continue
-                { t with
-                  seen_row_var = Numbers.Int.Set.add row_var_id seen_row_var
+                { ctl =
+                    { t with
+                      seen_row_vars =
+                        Numbers.Int.Map.add row_var_id
+                          { relevant_axes_when_seen =
+                              Axis_set.union relevant_axes_when_seen
+                                relevant_axes
+                          }
+                          seen_row_vars
+                    };
+                  skippable_axes = relevant_axes_when_seen
                 }
-            | true ->
-              (* For our purposes, row variables are like constructors with no arguments,
-                 so if we saw one already, we don't need to expand it again. *)
-              Skip)
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-          | Tunivar _ | Tpackage _ | Tof_kind _ ->
+          | Tunivar _ | Tpackage _ | Tquote _ | Tsplice _ | Tof_kind _ ->
             (* these cases either cannot be infinitely recursive or their jkinds
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
                should double-check before we're done that they haven't. *)
-            Continue t
+            Continue { ctl = t; skippable_axes = Axis_set.empty }
           | Tlink _ | Tsubst _ ->
             Misc.fatal_error "Tlink or Tsubst in normalize"
       end in
@@ -1013,7 +1091,7 @@ module Layout_and_axes = struct
           Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t = function
         (* early cutoff *)
         | [] -> bounds_so_far, No_with_bounds, ctl.fuel_status
-        | _ when Mod_bounds.equal Mod_bounds.max bounds_so_far ->
+        | _ when Mod_bounds.is_max_within_set bounds_so_far relevant_axes ->
           (* CR layouts v2.8: we can do better by early-terminating on a per-axis
              basis *)
           bounds_so_far, No_with_bounds, Sufficient_fuel
@@ -1026,14 +1104,16 @@ module Layout_and_axes = struct
           in
           (* We don't care about axes that are already max because they can't get
              any better or worse. By ignoring them, we may be able to terminate
-             early *)
-          let ti : With_bounds_type_info.t =
-            { relevant_axes =
-                Axis_set.diff ti.relevant_axes
-                  (Mod_bounds.get_max_axes bounds_so_far)
-            }
+             early.
+
+             We also don't care about axes that aren't in [relevant_axes]. *)
+          let relevant_axes_for_ty =
+            Axis_set.intersection
+              (Axis_set.diff ti.relevant_axes
+                 (Mod_bounds.get_max_axes bounds_so_far))
+              relevant_axes
           in
-          match Axis_set.is_empty ti.relevant_axes with
+          match Axis_set.is_empty relevant_axes_for_ty with
           | true ->
             (* If [ty] is not relevant to any axes, then we can safely drop it and
                thereby avoid doing the work of expanding it. *)
@@ -1055,6 +1135,7 @@ module Layout_and_axes = struct
                     (value_for_axis ~axis:(Modal (Monadic Contention)))
                   ~visibility:
                     (value_for_axis ~axis:(Modal (Monadic Visibility)))
+                  ~staticity:(value_for_axis ~axis:(Modal (Monadic Staticity)))
               in
               let comonadic =
                 Mod_bounds.Crossing.Comonadic.create
@@ -1064,6 +1145,7 @@ module Layout_and_axes = struct
                     (value_for_axis ~axis:(Modal (Comonadic Linearity)))
                   ~portability:
                     (value_for_axis ~axis:(Modal (Comonadic Portability)))
+                  ~forkable:(value_for_axis ~axis:(Modal (Comonadic Forkable)))
                   ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
                   ~statefulness:
                     (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
@@ -1075,33 +1157,25 @@ module Layout_and_axes = struct
                 ~separability:(value_for_axis ~axis:(Nonmodal Separability))
             in
             let found_jkind_for_ty new_ctl b_upper_bounds b_with_bounds quality
-                : Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t =
+                skippable_axes :
+                Mod_bounds.t * (l * r2) with_bounds * Fuel_status.t =
+              let relevant_axes_for_ty =
+                Axis_set.diff relevant_axes_for_ty skippable_axes
+              in
               match quality, mode with
               | Best, _ | Not_best, Ignore_best ->
                 (* The relevant axes are the intersection of the relevant axes within our
                    branch of the with-bounds tree, and the relevant axes on this
                    particular with-bound *)
-                let next_relevant_axes =
-                  Axis_set.intersection relevant_axes ti.relevant_axes
-                in
                 let bounds_so_far =
                   join_bounds bounds_so_far b_upper_bounds
-                    ~relevant_axes:next_relevant_axes
+                    ~relevant_axes:relevant_axes_for_ty
                 in
                 (* Descend into the with-bounds of each of our with-bounds types'
                     with-bounds *)
                 let bounds_so_far, nested_with_bounds, fuel_result1 =
-                  loop new_ctl bounds_so_far next_relevant_axes
+                  loop new_ctl bounds_so_far relevant_axes_for_ty
                     (With_bounds.to_list b_with_bounds)
-                in
-                let nested_with_bounds =
-                  With_bounds.map
-                    (fun ti ->
-                      { relevant_axes =
-                          Axis_set.intersection ti.relevant_axes
-                            next_relevant_axes
-                      })
-                    nested_with_bounds
                 in
                 (* CR layouts v2.8: we use [new_ctl] here, not [ctl], to avoid big
                    quadratic stack growth for very widely recursive types. This is
@@ -1124,26 +1198,32 @@ module Layout_and_axes = struct
                 let bounds_so_far, (bs' : (l * r2) With_bounds.t), fuel_result =
                   loop new_ctl bounds_so_far relevant_axes bs
                 in
-                bounds_so_far, With_bounds.add ty ti bs', fuel_result
+                ( bounds_so_far,
+                  With_bounds.add ty
+                    { relevant_axes = relevant_axes_for_ty }
+                    bs',
+                  fuel_result )
             in
-            match Loop_control.check ctl ty with
+            match
+              Loop_control.check ~relevant_axes:relevant_axes_for_ty ctl ty
+            with
             | Stop ctl_after_stop ->
               (* out of fuel, so assume [ty] has the worst possible bounds. *)
               found_jkind_for_ty ctl_after_stop Mod_bounds.max No_with_bounds
-                Not_best [@nontail]
+                Not_best Axis_set.empty [@nontail]
             | Skip -> loop ctl bounds_so_far relevant_axes bs (* skip [b] *)
-            | Continue ctl_after_unpacking_b -> (
+            | Continue { ctl = ctl_after_unpacking_b; skippable_axes } -> (
               match context.jkind_of_type ty with
               | Some b_jkind ->
                 found_jkind_for_ty ctl_after_unpacking_b
                   b_jkind.jkind.mod_bounds b_jkind.jkind.with_bounds
-                  b_jkind.quality [@nontail]
+                  b_jkind.quality skippable_axes [@nontail]
               | None ->
                 (* kind of b is not principally known, so we treat it as having
                    the max bound (only along the axes we care about for this
                    type!) *)
                 found_jkind_for_ty ctl_after_unpacking_b Mod_bounds.max
-                  No_with_bounds Not_best [@nontail])))
+                  No_with_bounds Not_best skippable_axes [@nontail])))
       in
       let mod_bounds = Mod_bounds.set_max_in_set t.mod_bounds skip_axes in
       let mod_bounds, with_bounds, fuel_status =
@@ -1271,9 +1351,9 @@ let outcometree_of_type = ref (fun _ -> assert false)
 
 let set_outcometree_of_type p = outcometree_of_type := p
 
-let outcometree_of_modalities_new = ref (fun _ _ -> assert false)
+let outcometree_of_modalities = ref (fun _ _ -> assert false)
 
-let set_outcometree_of_modalities_new p = outcometree_of_modalities_new := p
+let set_outcometree_of_modalities p = outcometree_of_modalities := p
 
 module Const = struct
   type 'd t = (Layout.Const.t, 'd) Types.layout_and_axes
@@ -1312,48 +1392,53 @@ module Const = struct
         name : string
       }
 
-    let mk_jkind ~mode_crossing ~nullability ~separability
+    (* Mode crossing that crosses everything except staticity *)
+    let cross_all_except_staticity =
+      let ax : _ Crossing.Axis.t = Monadic Staticity in
+      Crossing.(set ax (Per_axis.max ax) min)
+
+    let mk_jkind ~crossing ~nullability ~separability ~externality
         (layout : Layout.Const.t) =
       let mod_bounds =
-        (match mode_crossing with
-        | true -> Mod_bounds.min
-        | false -> Mod_bounds.max)
-        |> Mod_bounds.set_nullability nullability
-        |> Mod_bounds.set_separability separability
+        Mod_bounds.create crossing ~nullability ~separability ~externality
       in
       { layout; mod_bounds; with_bounds = No_with_bounds }
 
     let any =
       { jkind =
-          mk_jkind Any ~mode_crossing:false ~nullability:Maybe_null
-            ~separability:Maybe_separable;
+          mk_jkind Any ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Maybe_null ~separability:Maybe_separable;
         name = "any"
       }
 
     let any_mod_everything =
       { jkind =
-          mk_jkind Any ~mode_crossing:true ~nullability:Maybe_null
+          mk_jkind Any ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Maybe_null
             ~separability:Maybe_separable;
         name = "any mod everything"
       }
 
     let value_or_null =
       { jkind =
-          mk_jkind (Base Value) ~mode_crossing:false ~nullability:Maybe_null
+          mk_jkind (Base Value) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Maybe_null
             ~separability:Maybe_separable;
         name = "value_or_null"
       }
 
     let value_or_null_mod_everything =
       { jkind =
-          mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
+          mk_jkind (Base Value) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Maybe_null
             ~separability:Maybe_separable;
         name = "value_or_null mod everything"
       }
 
     let value =
       { jkind =
-          mk_jkind (Base Value) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Value) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Separable;
         name = "value"
       }
@@ -1364,8 +1449,9 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
-                   ~portability:true ~yielding:true ~uniqueness:false
-                   ~contention:true ~statefulness:true ~visibility:true
+                   ~portability:true ~forkable:true ~yielding:true
+                   ~uniqueness:false ~contention:true ~statefulness:true
+                   ~visibility:true ~staticity:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1381,8 +1467,9 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:false
-                   ~portability:true ~yielding:false ~uniqueness:false
-                   ~contention:true ~statefulness:false ~visibility:false
+                   ~portability:true ~forkable:false ~yielding:false
+                   ~uniqueness:false ~contention:true ~statefulness:true
+                   ~visibility:true ~staticity:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1398,8 +1485,9 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
-                   ~portability:true ~yielding:true ~uniqueness:false
-                   ~contention:true ~statefulness:true ~visibility:false
+                   ~portability:true ~forkable:true ~yielding:true
+                   ~uniqueness:false ~contention:true ~statefulness:true
+                   ~visibility:false ~staticity:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1415,8 +1503,9 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
-                   ~portability:true ~yielding:true ~contention:false
-                   ~uniqueness:false ~statefulness:true ~visibility:false
+                   ~portability:true ~forkable:true ~yielding:true
+                   ~contention:false ~uniqueness:false ~statefulness:true
+                   ~visibility:false ~staticity:false
                in
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
@@ -1428,28 +1517,32 @@ module Const = struct
 
     let void =
       { jkind =
-          mk_jkind (Base Void) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Void) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "void"
       }
 
     let void_mod_everything =
       { jkind =
-          mk_jkind (Base Void) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Void) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "void mod everything"
       }
 
     let immediate =
       { jkind =
-          mk_jkind (Base Value) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Value) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "immediate"
       }
 
     let immediate_or_null =
       { jkind =
-          mk_jkind (Base Value) ~mode_crossing:true ~nullability:Maybe_null
+          mk_jkind (Base Value) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Maybe_null
             ~separability:Non_float;
         name = "immediate_or_null"
       }
@@ -1494,11 +1587,22 @@ module Const = struct
         name = "immediate64"
       }
 
+    let immediate64_or_null =
+      { jkind =
+          { immediate_or_null.jkind with
+            mod_bounds =
+              Mod_bounds.set_externality Externality.External64
+                immediate_or_null.jkind.mod_bounds
+          };
+        name = "immediate64_or_null"
+      }
+
     (* CR or_null: nullability here should be [Maybe_null], but is set
        to [Non_null] for now due to inference limitations. *)
     let float64 =
       { jkind =
-          mk_jkind (Base Float64) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Float64) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
@@ -1509,7 +1613,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_float =
       { jkind =
-          mk_jkind (Base Float64) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Float64) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
@@ -1520,7 +1625,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let float32 =
       { jkind =
-          mk_jkind (Base Float32) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Float32) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
@@ -1531,7 +1637,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_float32 =
       { jkind =
-          mk_jkind (Base Float32) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Float32) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
@@ -1542,7 +1649,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let word =
       { jkind =
-          mk_jkind (Base Word) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Word) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "word"
       }
@@ -1551,21 +1659,24 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_nativeint =
       { jkind =
-          mk_jkind (Base Word) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Word) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "word mod everything"
       }
 
     let untagged_immediate =
       { jkind =
-          mk_jkind (Base Untagged_immediate) ~mode_crossing:false
-            ~nullability:Non_null ~separability:Non_float;
+          mk_jkind (Base Untagged_immediate) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
+            ~separability:Non_float;
         name = "untagged_immediate"
       }
 
     let kind_of_untagged_immediate =
       { jkind =
-          mk_jkind (Base Untagged_immediate) ~mode_crossing:true
+          mk_jkind (Base Untagged_immediate)
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
             ~nullability:Non_null ~separability:Non_float;
         name = "untagged_immediate mod everything"
       }
@@ -1574,7 +1685,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let bits8 =
       { jkind =
-          mk_jkind (Base Bits8) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Bits8) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "bits8"
       }
@@ -1583,7 +1695,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int8 =
       { jkind =
-          mk_jkind (Base Bits8) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Bits8) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "bits8 mod everything"
       }
@@ -1592,7 +1705,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let bits16 =
       { jkind =
-          mk_jkind (Base Bits16) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Bits16) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "bits16"
       }
@@ -1601,7 +1715,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int16 =
       { jkind =
-          mk_jkind (Base Bits16) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Bits16) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "bits16 mod everything"
       }
@@ -1610,7 +1725,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let bits32 =
       { jkind =
-          mk_jkind (Base Bits32) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Bits32) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "bits32"
       }
@@ -1619,7 +1735,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int32 =
       { jkind =
-          mk_jkind (Base Bits32) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Bits32) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "bits32 mod everything"
       }
@@ -1628,7 +1745,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let bits64 =
       { jkind =
-          mk_jkind (Base Bits64) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Bits64) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "bits64"
       }
@@ -1637,7 +1755,16 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int64 =
       { jkind =
-          mk_jkind (Base Bits64) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Bits64) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
+            ~separability:Non_float;
+        name = "bits64 mod everything"
+      }
+
+    let kind_of_idx =
+      { jkind =
+          mk_jkind (Base Bits64) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "bits64 mod everything"
       }
@@ -1646,7 +1773,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let vec128 =
       { jkind =
-          mk_jkind (Base Vec128) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Vec128) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "vec128"
       }
@@ -1655,7 +1783,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let vec256 =
       { jkind =
-          mk_jkind (Base Vec256) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Vec256) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "vec256"
       }
@@ -1664,7 +1793,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let vec512 =
       { jkind =
-          mk_jkind (Base Vec512) ~mode_crossing:false ~nullability:Non_null
+          mk_jkind (Base Vec512) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Non_null
             ~separability:Non_float;
         name = "vec512"
       }
@@ -1673,7 +1803,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_128bit_vectors =
       { jkind =
-          mk_jkind (Base Vec128) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Vec128) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "vec128 mod everything"
       }
@@ -1682,7 +1813,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_256bit_vectors =
       { jkind =
-          mk_jkind (Base Vec256) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Vec256) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "vec256 mod everything"
       }
@@ -1691,7 +1823,8 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_512bit_vectors =
       { jkind =
-          mk_jkind (Base Vec512) ~mode_crossing:true ~nullability:Non_null
+          mk_jkind (Base Vec512) ~crossing:cross_all_except_staticity
+            ~externality:Externality.min ~nullability:Non_null
             ~separability:Non_float;
         name = "vec512 mod everything"
       }
@@ -1710,6 +1843,7 @@ module Const = struct
         immediate;
         immediate_or_null;
         immediate64;
+        immediate64_or_null;
         float64;
         kind_of_unboxed_float;
         float32;
@@ -1751,67 +1885,65 @@ module Const = struct
       { base : string;
         modal_bounds : string list;
         printable_with_bounds :
-          (Outcometree.out_type * Outcometree.out_modality_new list) list
+          (Outcometree.out_type * Outcometree.out_modality list) list
       }
 
-    let get_modal_bound (type a) ~(axis : a Axis.t) ~(base : a) (actual : a) =
-      (* CR layouts v2.8: Fix printing! Internal ticket 5096. *)
-      let less_or_equal a b =
-        Misc.Le_result.less_or_equal ~le:(Per_axis.le axis) a b
-      in
-      match less_or_equal actual base with
-      | Less | Equal -> (
-        match less_or_equal base actual with
-        | Less | Equal -> `Valid None
-        | Not_le ->
-          `Valid (Some (Format.asprintf "%a" (Per_axis.print axis) actual)))
-      | Not_le -> `Invalid
+    (** [diff base actual] returns the axes on which [actual] is strictly
+     stronger than [base], represented as a mod-bounds where unchanged axes
+     are set to [max]. Returns [None] if [actual] isn't stronger than [base]. *)
+    let diff base actual =
+      match Mod_bounds.less_or_equal actual base with
+      | Not_le _ -> None
+      | Equal -> Some Mod_bounds.max
+      | Less ->
+        let crossing_base = Mod_bounds.crossing base in
+        let crossing_actual = Mod_bounds.crossing actual in
+        let crossing_diff =
+          List.fold_left
+            (fun acc value_ax ->
+              let (Crossing.Axis.P ax) =
+                value_ax |> Modality.Axis.of_value |> Crossing.Axis.of_modality
+              in
+              let base_value = Crossing.proj ax crossing_base in
+              let actual_value = Crossing.proj ax crossing_actual in
+              (* [le] here implies equality. *)
+              if Crossing.Per_axis.le ax base_value actual_value
+              then acc
+              else Crossing.set ax actual_value acc)
+            Crossing.max Value.Axis.all
+        in
+        let externality =
+          if Externality.equal
+               (Mod_bounds.externality base)
+               (Mod_bounds.externality actual)
+          then Externality.max
+          else Mod_bounds.externality actual
+        in
+        let nullability =
+          if Nullability.equal
+               (Mod_bounds.nullability base)
+               (Mod_bounds.nullability actual)
+          then Nullability.max
+          else Mod_bounds.nullability actual
+        in
+        let separability =
+          if Separability.equal
+               (Mod_bounds.separability base)
+               (Mod_bounds.separability actual)
+          then Separability.max
+          else Mod_bounds.separability actual
+        in
+        Some
+          (Mod_bounds.create crossing_diff ~externality ~nullability
+             ~separability)
 
     let get_modal_bounds ~(base : Mod_bounds.t) (actual : Mod_bounds.t) =
-      Axis.all
-      |> List.map (fun (Axis.Pack axis) ->
-             let base = Mod_bounds.get ~axis base in
-             let actual = Mod_bounds.get ~axis actual in
-             get_modal_bound ~axis ~base actual)
-      |> List.rev
-      |> List.fold_left
-           (fun acc mode ->
-             match acc, mode with
-             | _, `Invalid | None, _ -> None
-             | acc, `Valid None -> acc
-             | Some acc, `Valid (Some mode) -> Some (mode :: acc))
-           (Some [])
-      |> function
+      match diff base actual with
       | None -> None
-      | Some modes ->
-        (* Handle all the mode implications *)
+      | Some diff ->
         let modes =
-          match List.mem "global" modes, List.mem "unyielding" modes with
-          | true, true ->
-            (* [global] implies [unyielding], omit it. *)
-            List.filter (fun m -> m <> "unyielding") modes
-          | true, false ->
-            (* Otherwise, print [mod global yielding] to indicate [yielding]. *)
-            modes @ ["yielding"]
-          | _, _ -> modes
-        in
-        let modes =
-          (* Likewise for [stateless] and [portable]. *)
-          match List.mem "stateless" modes, List.mem "portable" modes with
-          | true, true -> List.filter (fun m -> m <> "portable") modes
-          | true, false -> modes @ ["portable"]
-          | _, _ -> modes
-        in
-        (* Likewise for [immutable] and [contended], or [read] and [shared]. *)
-        let modes =
-          match List.mem "immutable" modes, List.mem "contended" modes with
-          | true, true -> List.filter (fun m -> m <> "contended") modes
-          | true, false -> modes @ ["contended"]
-          | _, _ -> (
-            match List.mem "read" modes, List.mem "shared" modes with
-            | true, true -> List.filter (fun m -> m <> "shared") modes
-            | true, false -> modes @ ["shared"]
-            | _, _ -> modes)
+          Typemode.untransl_mod_bounds diff
+          |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
         in
         Some modes
 
@@ -1847,8 +1979,7 @@ module Const = struct
                 ~mod_bounds:actual.mod_bounds ~type_info
             in
             ( !outcometree_of_type type_expr,
-              !outcometree_of_modalities_new
-                Types.Immutable
+              !outcometree_of_modalities Types.Immutable
                 (modality_to_ignore_axes axes_ignored_by_modalities) ))
           (With_bounds.to_list actual.with_bounds)
       in
@@ -1967,7 +2098,7 @@ module Const = struct
       (l * r) Context_with_transl.t -> Parsetree.jkind_annotation -> (l * r) t =
    fun context jkind ->
     match jkind.pjkind_desc with
-    | Abbreviation name ->
+    | Pjk_abbreviation name ->
       (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
       (match name with
       | "any" -> Builtin.any.jkind
@@ -1975,6 +2106,7 @@ module Const = struct
       | "value" -> Builtin.value.jkind
       | "void" -> Builtin.void.jkind
       | "immediate64" -> Builtin.immediate64.jkind
+      | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
       | "immediate" -> Builtin.immediate.jkind
       | "immediate_or_null" -> Builtin.immediate_or_null.jkind
       | "float64" -> Builtin.float64.jkind
@@ -1993,19 +2125,19 @@ module Const = struct
       | "mutable_data" -> Builtin.mutable_data.jkind
       | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
       |> allow_left |> allow_right
-    | Mod (base, modifiers) ->
+    | Pjk_mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
       (* for each mode, lower the corresponding modal bound to be that mode *)
       let mod_bounds =
         Mod_bounds.meet base.mod_bounds (Typemode.transl_mod_bounds modifiers)
       in
       { layout = base.layout; mod_bounds; with_bounds = No_with_bounds }
-    | Product ts ->
+    | Pjk_product ts ->
       let jkinds =
         List.map (of_user_written_annotation_unchecked_level context) ts
       in
       jkind_of_product_annotations jkinds
-    | With (base, type_, modalities) -> (
+    | Pjk_with (base, type_, modalities) -> (
       let base = of_user_written_annotation_unchecked_level context base in
       match context with
       | Right_jkind _ -> raise ~loc:type_.ptyp_loc With_on_right
@@ -2020,7 +2152,8 @@ module Const = struct
             With_bounds.add_modality ~modality ~relevant_for_shallow:`Irrelevant
               ~type_expr:type_ base.with_bounds
         })
-    | Default | Kind_of _ -> raise ~loc:jkind.pjkind_loc Unimplemented_syntax
+    | Pjk_default | Pjk_kind_of _ ->
+      raise ~loc:jkind.pjkind_loc Unimplemented_syntax
 
   (* The [annotation_context] parameter can be used to allow annotations / kinds
      in different contexts to be enabled with different extension settings.
@@ -2116,7 +2249,8 @@ module Jkind_desc = struct
   let equate_or_equal ~allow_mutation t1 t2 =
     Layout_and_axes.equal (Layout.equate_or_equal ~allow_mutation) t1 t2
 
-  let sub (type l r) ~type_equal:_ ~context (sub : (allowed * r) jkind_desc)
+  let sub (type l r) ~type_equal:_ ~context ~level
+      (sub : (allowed * r) jkind_desc)
       ({ layout = lay2; mod_bounds = bounds2; with_bounds = No_with_bounds } :
         (l * allowed) jkind_desc) =
     let axes_max_on_right =
@@ -2130,14 +2264,14 @@ module Jkind_desc = struct
       Layout_and_axes.normalize ~skip_axes:axes_max_on_right ~mode:Ignore_best
         ~context sub
     in
-    let layout = Layout.sub lay1 lay2 in
+    let layout = Layout.sub ~level lay1 lay2 in
     let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
     Sub_result.combine layout bounds
 
-  let intersection
+  let intersection ~level
       { layout = lay1; mod_bounds = mod_bounds1; with_bounds = with_bounds1 }
       { layout = lay2; mod_bounds = mod_bounds2; with_bounds = with_bounds2 } =
-    match Layout.intersection lay1 lay2 with
+    match Layout.intersection ~level lay1 lay2 with
     | None -> None
     | Some layout ->
       Some
@@ -2148,8 +2282,8 @@ module Jkind_desc = struct
 
   let map_type_expr f t = Layout_and_axes.map_type_expr f t
 
-  let of_new_sort_var nullability_upper_bound separability_upper_bound =
-    let layout, sort = Layout.of_new_sort_var () in
+  let of_new_sort_var ~level nullability_upper_bound separability_upper_bound =
+    let layout, sort = Layout.of_new_sort_var ~level in
     ( { layout;
         mod_bounds =
           Mod_bounds.max
@@ -2213,7 +2347,9 @@ end
 
 (* every context where this is used actually wants an [option] *)
 let mk_annot name =
-  Some Parsetree.{ pjkind_loc = Location.none; pjkind_desc = Abbreviation name }
+  Some
+    Parsetree.
+      { pjkind_loc = Location.none; pjkind_desc = Pjk_abbreviation name }
 
 let mark_best (type l r) (t : (l * r) Types.jkind) =
   { (disallow_right t) with quality = Best }
@@ -2297,10 +2433,10 @@ module Builtin = struct
        the product, by one step, never loses any information. *)
     |> mark_best
 
-  let product_of_sorts ~why arity =
+  let product_of_sorts ~why ~level arity =
     let layout =
       Layout.product
-        (List.init arity (fun _ -> fst (Layout.of_new_sort_var ())))
+        (List.init arity (fun _ -> fst (Layout.of_new_sort_var ~level)))
     in
     let desc : _ jkind_desc =
       { layout; mod_bounds = Mod_bounds.max; with_bounds = No_with_bounds }
@@ -2332,21 +2468,23 @@ let has_with_bounds (type r) (t : (_ * r) jkind) =
 (******************************)
 (* construction *)
 
-let of_new_sort_var ~why =
-  let jkind, sort = Jkind_desc.of_new_sort_var Maybe_null Maybe_separable in
+let of_new_sort_var ~why ~level =
+  let jkind, sort =
+    Jkind_desc.of_new_sort_var ~level Maybe_null Maybe_separable
+  in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
-let of_new_sort ~why = fst (of_new_sort_var ~why)
+let of_new_sort ~why ~level = fst (of_new_sort_var ~why ~level)
 
-let of_new_legacy_sort_var ~why =
-  let jkind, sort = Jkind_desc.of_new_sort_var Non_null Separable in
+let of_new_legacy_sort_var ~why ~level =
+  let jkind, sort = Jkind_desc.of_new_sort_var ~level Non_null Separable in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_legacy_creation why), sort
 
-let of_new_non_float_sort_var ~why =
-  let jkind, sort = Jkind_desc.of_new_sort_var Maybe_null Non_float in
+let of_new_non_float_sort_var ~why ~level =
+  let jkind, sort = Jkind_desc.of_new_sort_var ~level Maybe_null Non_float in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
-let of_new_legacy_sort ~why = fst (of_new_legacy_sort_var ~why)
+let of_new_legacy_sort ~why ~level = fst (of_new_legacy_sort_var ~why ~level)
 
 let of_const (type l r) ~annotation ~why ~(quality : (l * r) jkind_quality)
     (c : (l * r) Const.t) =
@@ -2595,20 +2733,38 @@ let for_open_boxed_row =
     { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Value_creation Polymorphic_variant)
 
+let limit_for_mode_crossing_rows = 100
+
 let for_boxed_row row =
   if Btype.tvariant_not_immediate row
   then
     if not (Btype.static_row row)
     then
-      (* CR layouts v2.8: We can probably do a fair bit better here in most cases. Internal ticket 5097 and 5098. *)
+      (* CR layouts v2.8: We can probably do a fair bit better here in most cases. But if we ever allow open types to mode-cross, we have to get rid of the 100-row limit below. Internal ticket 5097 and 5098. *)
       for_open_boxed_row
     else
-      let base = Builtin.immutable_data ~why:Polymorphic_variant in
-      Btype.fold_row
-        (fun jkind type_expr ->
-          add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr jkind)
-        base row
-      |> mark_best
+      (* Here we count how many rows are in the polymorphic variant and default
+         to value if there are more than 100. This is to avoid regressions in
+         compilation time, which was observed in some files with large
+         polymorphic variants.
+
+         We choose to make two different calls to [Btype.fold_row] to avoid
+         doing allocations in the case where there's a large number of variants,
+         as those allocations were enough to slow down the problematic files
+         with large polymorphic variants. Presumably the second loop is fast
+         anyways due to caching. *)
+      (* CR layouts v2.8: Remove this [limit_for_mode_crossing_rows]
+         restriction. See internal ticket 5435. *)
+      let bounds_count = Btype.fold_row (fun acc _ -> acc + 1) 0 row in
+      if bounds_count <= limit_for_mode_crossing_rows
+      then
+        let base = Builtin.immutable_data ~why:Polymorphic_variant in
+        Btype.fold_row
+          (fun jkind type_expr ->
+            add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr jkind)
+          base row
+        |> mark_best
+      else Builtin.value ~why:Polymorphic_variant_too_big
   else Builtin.immediate ~why:Immediate_polymorphic_variant
 
 let for_arrow =
@@ -2624,8 +2780,18 @@ let for_object =
   (* The crossing of objects are based on the fact that they are
      produced/defined/allocated at legacy, which applies to only the
      comonadic axes. *)
-  let comonadic = Crossing.Comonadic.legacy in
-  let monadic = Crossing.Monadic.max in
+  let comonadic =
+    Crossing.Comonadic.always_constructed_at Value.Comonadic.Const.legacy
+  in
+  let monadic =
+    Crossing.Monadic.create
+      ~uniqueness:(Crossing.Per_axis.min (Crossing.Axis.Monadic Uniqueness))
+        (* Since [global] implies [aliased] in presence of borrowing,
+           objects also cross uniqueness. *)
+      ~contention:(Crossing.Per_axis.max (Crossing.Axis.Monadic Contention))
+      ~visibility:(Crossing.Per_axis.max (Crossing.Axis.Monadic Visibility))
+      ~staticity:(Crossing.Per_axis.max (Crossing.Axis.Monadic Staticity))
+  in
   fresh_jkind
     { layout = Sort (Base Value);
       mod_bounds =
@@ -2638,8 +2804,8 @@ let for_object =
 let for_float ident =
   let crossing =
     Crossing.create ~regionality:false ~linearity:true ~portability:true
-      ~yielding:true ~uniqueness:false ~contention:true ~statefulness:true
-      ~visibility:true
+      ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
+      ~statefulness:true ~visibility:true ~staticity:false
   in
   let mod_bounds =
     Mod_bounds.create crossing ~externality:Externality.max
@@ -2659,8 +2825,10 @@ let for_array_argument =
     { layout = Any; mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Any_creation Array_type_argument)
 
-let for_array_element_sort () =
-  let jkind_desc, sort = Jkind_desc.of_new_sort_var Maybe_null Separable in
+let for_array_element_sort ~level =
+  let jkind_desc, sort =
+    Jkind_desc.of_new_sort_var ~level Maybe_null Separable
+  in
   let jkind = { for_array_argument.jkind with layout = jkind_desc.layout } in
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
     sort )
@@ -3112,6 +3280,10 @@ module Format_history = struct
     | Tuple -> fprintf ppf "it's a tuple type"
     | Row_variable -> format_with_notify_js ppf "it's a row variable"
     | Polymorphic_variant -> fprintf ppf "it's a polymorphic variant type"
+    | Polymorphic_variant_too_big ->
+      fprintf ppf
+        "it's a polymorphic variant type that has more than %d entries"
+        limit_for_mode_crossing_rows
     | Arrow -> fprintf ppf "it's a function type"
     | Tfield ->
       format_with_notify_js ppf
@@ -3153,6 +3325,10 @@ module Format_history = struct
       fprintf ppf
         "it's the type of the first argument to a function in a recursive \
          module"
+    | Quotation_result -> fprintf ppf "it's the result type of a quotation"
+    | Antiquotation_result -> fprintf ppf "it's the result type of splicing"
+    | Tquote -> fprintf ppf "it's a staged type"
+    | Tsplice -> fprintf ppf "it's a splice of a staged type"
     | Unknown s ->
       fprintf ppf
         "unknown @[(please alert the Jane Street@;\
@@ -3408,11 +3584,11 @@ module Violation = struct
     if first_ran_out then report_fuel_for_type "first";
     if second_ran_out then report_fuel_for_type "second"
 
-  let report_general preamble pp_former former ppf t =
+  let report_general ~level preamble pp_former former ppf t =
     let mismatch_type =
       match t.violation with
       | Not_a_subjkind (k1, k2, _) ->
-        if Sub_result.is_le (Layout.sub k1.jkind.layout k2.jkind.layout)
+        if Sub_result.is_le (Layout.sub ~level k1.jkind.layout k2.jkind.layout)
         then Mode
         else Layout
       | No_intersection _ -> Layout
@@ -3504,12 +3680,15 @@ module Violation = struct
 
   let pp_t ppf x = fprintf ppf "%t" x
 
-  let report_with_offender ~offender = report_general "" pp_t offender
+  let report_with_offender ~offender ~level =
+    report_general ~level "" pp_t offender
 
-  let report_with_offender_sort ~offender =
-    report_general "A representable layout was expected, but " pp_t offender
+  let report_with_offender_sort ~offender ~level =
+    report_general ~level "A representable layout was expected, but " pp_t
+      offender
 
-  let report_with_name ~name = report_general "" pp_print_string name
+  let report_with_name ~name ~level =
+    report_general ~level "" pp_print_string name
 end
 
 (******************************)
@@ -3549,7 +3728,7 @@ let score_reason = function
   | Creation (Concrete_creation _ | Concrete_legacy_creation _) -> -1
   | _ -> 0
 
-let combine_histories ~type_equal ~context reason (Pack_jkind k1)
+let combine_histories ~type_equal ~context ~level reason (Pack_jkind k1)
     (Pack_jkind k2) =
   if flattened_histories
   then
@@ -3559,7 +3738,7 @@ let combine_histories ~type_equal ~context reason (Pack_jkind k1)
       else history_b
     in
     let choose_subjkind_history k_a history_a k_b history_b =
-      match Jkind_desc.sub ~type_equal ~context k_a k_b with
+      match Jkind_desc.sub ~level ~type_equal ~context k_a k_b with
       | Less -> history_a
       | Not_le _ ->
         (* CR layouts: this will be wrong if we ever have a non-trivial meet in
@@ -3584,19 +3763,19 @@ let combine_histories ~type_equal ~context reason (Pack_jkind k1)
         history2 = k2.history
       }
 
-let has_intersection t1 t2 =
+let has_intersection ~level t1 t2 =
   (* Need to check only the layouts: all the axes have bottom elements. *)
-  Option.is_some (Layout.intersection t1.jkind.layout t2.jkind.layout)
+  Option.is_some (Layout.intersection ~level t1.jkind.layout t2.jkind.layout)
 
-let intersection_or_error ~type_equal ~context ~reason t1 t2 =
-  match Jkind_desc.intersection t1.jkind t2.jkind with
+let intersection_or_error ~type_equal ~context ~reason ~level t1 t2 =
+  match Jkind_desc.intersection ~level t1.jkind t2.jkind with
   | None -> Error (Violation.of_ ~context (No_intersection (t1, t2)))
   | Some jkind ->
     Ok
       { jkind;
         annotation = None;
         history =
-          combine_histories ~type_equal ~context reason (Pack_jkind t1)
+          combine_histories ~type_equal ~context ~level reason (Pack_jkind t1)
             (Pack_jkind t2);
         has_warned = t1.has_warned || t2.has_warned;
         ran_out_of_fuel_during_normalize =
@@ -3622,32 +3801,35 @@ let map_type_expr f t =
 (* this is hammered on; it must be fast! *)
 let check_sub ~context sub super = Jkind_desc.sub ~context sub.jkind super.jkind
 
-let sub_with_reason ~type_equal ~context sub super =
-  Sub_result.require_le (check_sub ~type_equal ~context sub super)
+let sub_with_reason ~type_equal ~context ~level sub super =
+  Sub_result.require_le (check_sub ~type_equal ~context ~level sub super)
 
-let sub ~type_equal ~context sub super =
-  Result.is_ok (sub_with_reason ~type_equal ~context sub super)
+let sub ~type_equal ~context ~level sub super =
+  Result.is_ok (sub_with_reason ~type_equal ~context ~level sub super)
 
 type sub_or_intersect =
   | Sub
   | Disjoint of Violation.Sub_failure_reason.t Nonempty_list.t
   | Has_intersection of Violation.Sub_failure_reason.t Nonempty_list.t
 
-let sub_or_intersect ~type_equal ~context t1 t2 =
-  match sub_with_reason ~type_equal ~context t1 t2 with
+let sub_or_intersect ~type_equal ~context ~level t1 t2 =
+  match sub_with_reason ~type_equal ~context ~level t1 t2 with
   | Ok () -> Sub
   | Error reason ->
-    if has_intersection t1 t2 then Has_intersection reason else Disjoint reason
+    if has_intersection ~level t1 t2
+    then Has_intersection reason
+    else Disjoint reason
 
-let sub_or_error ~type_equal ~context t1 t2 =
-  match sub_or_intersect ~type_equal ~context t1 t2 with
+let sub_or_error ~type_equal ~context ~level t1 t2 =
+  match sub_or_intersect ~type_equal ~context ~level t1 t2 with
   | Sub -> Ok ()
   | Disjoint reason | Has_intersection reason ->
     Error
       (Violation.of_ ~context
          (Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
-let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub super =
+let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) sub
+    super =
   (* This function implements the "SUB" judgement from kind-inference.md. *)
   let open Misc.Stdlib.Monad.Result.Syntax in
   let require_le sub_result =
@@ -3668,7 +3850,7 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub super =
   in
   let* () =
     (* Validate layouts *)
-    require_le (Layout.sub sub.jkind.layout super.jkind.layout)
+    require_le (Layout.sub ~level sub.jkind.layout super.jkind.layout)
   in
   match allow_any_crossing with
   | true -> Ok ()
@@ -3890,6 +4072,7 @@ module Debug_printers = struct
     | Tuple -> fprintf ppf "Tuple"
     | Row_variable -> fprintf ppf "Row_variable"
     | Polymorphic_variant -> fprintf ppf "Polymorphic_variant"
+    | Polymorphic_variant_too_big -> fprintf ppf "Polymorphic_variant_too_big"
     | Arrow -> fprintf ppf "Arrow"
     | Tfield -> fprintf ppf "Tfield"
     | Tnil -> fprintf ppf "Tnil"
@@ -3908,6 +4091,10 @@ module Debug_printers = struct
     | Class_term_argument -> fprintf ppf "Class_term_argument"
     | Debug_printer_argument -> fprintf ppf "Debug_printer_argument"
     | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
+    | Quotation_result -> fprintf ppf "Quotation_result"
+    | Antiquotation_result -> fprintf ppf "Antiquotation_result"
+    | Tquote -> fprintf ppf "Tquote"
+    | Tsplice -> fprintf ppf "Tsplice"
     | Unknown s -> fprintf ppf "Unknown %s" s
     | Array_type_kind -> fprintf ppf "Array_type_kind"
 

@@ -173,18 +173,26 @@ let value_descriptions ~loc env name
      match vd2.val_kind with
      | Val_prim p2 -> begin
          let locality = [ Mode.Locality.global; Mode.Locality.local ] in
+         let forkable = [ Mode.Forkable.forkable; Mode.Forkable.unforkable ] in
          let yielding = [ Mode.Yielding.unyielding; Mode.Yielding.yielding ] in
          List.iter (fun loc ->
+          List.iter (fun fork ->
            List.iter (fun yield ->
              let ty1, _, _, _ = Ctype.instance_prim p1 vd1.val_type in
-             let ty2, mode_l2, mode_y2, _ = Ctype.instance_prim p2 vd2.val_type in
+             let ty2, mode_l2, mode_fy2, _ =
+               Ctype.instance_prim p2 vd2.val_type
+             in
+             let mode_f2 = Option.map fst mode_fy2 in
+             let mode_y2 = Option.map snd mode_fy2 in
              Option.iter (Mode.Locality.equate_exn loc) mode_l2;
+             Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
              try
                Ctype.moregeneral env true ty1 ty2
              with Ctype.Moregen err ->
                raise (Dont_match (Type err))
            ) yielding
+          ) forkable
          ) locality;
          match primitive_descriptions p1 p2 with
          | None -> Tcoerce_none
@@ -344,15 +352,16 @@ let report_modality_sub_error first second ppf e =
     (print_modality "not") left
 
 let report_mode_sub_error got expected ppf e =
-  let Mode.Value.Error(ax, {left; right}) = Mode.Value.to_simple_error e in
-  match ax with
-  | Comonadic Areality -> Format.fprintf ppf "This escapes its region."
-  | _ ->
-    Format.fprintf ppf "%s %a but %s %a."
-      (String.capitalize_ascii got)
-      (Misc.Style.as_inline_code (Value.Const.print_axis ax)) left
-      expected
-      (Misc.Style.as_inline_code (Value.Const.print_axis ax)) right
+  let {left; right} : _ Mode.simple_error =
+    Mode.Value.print_error (Location.none, Unknown) e
+  in
+  Format.fprintf ppf "%s " (String.capitalize_ascii got);
+  begin match left ppf with
+  | Mode -> Format.fprintf ppf "@ but %s " expected
+  | Mode_with_hint -> Format.fprintf ppf ".@\nHowever, %s " expected
+  end;
+  ignore (right ppf);
+  Format.pp_print_string ppf "."
 
 let report_modality_equate_error first second ppf
   ((equate_step, sub_error) : Modality.equate_error) =
@@ -669,7 +678,8 @@ let report_type_mismatch first second decl env ppf err =
   | Parameter_jkind (ty, v) ->
       pr "The problem is in the kinds of a parameter:@,";
       Jkind.Violation.report_with_offender
-        ~offender:(fun pp -> Printtyp.type_expr pp ty) ppf v
+        ~offender:(fun pp -> Printtyp.type_expr pp ty)
+        ~level:(Ctype.get_current_level ()) ppf v
   | Private_variant (_ty1, _ty2, mismatch) ->
       report_private_variant_mismatch first second decl env ppf mismatch
   | Private_object (_ty1, _ty2, mismatch) ->
@@ -697,7 +707,8 @@ let report_type_mismatch first second decl env ppf err =
          "has a constructor represented as a null pointer";
       pr "@ Hint: add [%@%@or_null_reexport]."
   | Jkind v ->
-      Jkind.Violation.report_with_name ~name:first ppf v
+      Jkind.Violation.report_with_name ~name:first
+        ~level:(Ctype.get_current_level ()) ppf v
   | Unsafe_mode_crossing mismatch ->
     pr "They have different unsafe mode crossing behavior:@,@[<v 2>%a@]"
       (fun ppf (first, second, mismatch) ->

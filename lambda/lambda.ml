@@ -347,11 +347,14 @@ type primitive =
   | Ppoke of peek_or_poke
   (* Fetching domain-local state *)
   | Pdls_get
+  | Ptls_get
   (* Poll for runtime actions *)
   | Ppoll
   | Pcpu_relax
   | Pget_idx of layout * Asttypes.mutable_flag
   | Pset_idx of layout * modify_mode
+  | Pget_ptr of layout * Asttypes.mutable_flag
+  | Pset_ptr of layout * modify_mode
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
@@ -1051,7 +1054,7 @@ let layout_list =
 let layout_tuple_element = nullable_value Pgenval
 let layout_value_field = nullable_value Pgenval
 let layout_tmc_field = nullable_value Pgenval
-let layout_optional_arg = non_null_value Pgenval
+let layout_optional_arg = nullable_value Pgenval
 let layout_variant_arg = nullable_value Pgenval
 let layout_exception = non_null_value Pgenval
 let layout_function = non_null_value Pgenval
@@ -1451,7 +1454,7 @@ let transl_prim mod_name name =
   let pers = Ident.create_persistent mod_name in
   let env = Env.add_persistent_structure pers Env.empty in
   let lid = Longident.Ldot (Longident.Lident mod_name, name) in
-  match Env.find_value_by_name lid env with
+  match Env.find_value_by_name_lazy lid env with
   | path, _ -> transl_value_path Loc_unknown env path
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
@@ -2055,9 +2058,11 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_lor_field
   | Patomic_lxor_field
   | Pdls_get
+  | Ptls_get
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _
   | Pget_idx _ | Pset_idx _
+  | Pget_ptr _ | Pset_ptr _
   | Ppeek _ | Ppoke _ ->
     None
   | Pmake_idx_field _
@@ -2212,13 +2217,14 @@ let primitive_can_raise prim =
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
   | Prunstack | Pperform | Presume | Preperform -> true (* XXX! *)
-  | Pdls_get | Ppoll | Pcpu_relax
+  | Pdls_get | Ptls_get | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
   | Pidx_deepen _
   | Pget_idx _ | Pset_idx _
+  | Pget_ptr _ | Pset_ptr _
   | Ppeek _ | Ppoke _ ->
     false
 
@@ -2359,12 +2365,22 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_vector Unboxed_vec512 -> Vec512
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
 
-let rec layout_of_mixed_block_element_for_idx_set (mbe : _ mixed_block_element)
+let value_kind_of_value_with_externality ext =
+  let open Jkind_axis.Externality in
+  if le ext (upper_bound_if_is_always_gc_ignorable ()) then Pintval else Pgenval
+
+let rec layout_of_mixed_block_element_for_idx_set
+  ext (mbe : _ mixed_block_element)
   : layout =
   match mbe with
   | Product mbes ->
+    (* Propagate known externality to components *)
     Punboxed_product
-      (Array.to_list (Array.map layout_of_mixed_block_element_for_idx_set mbes))
+      (Array.to_list
+        (Array.map (layout_of_mixed_block_element_for_idx_set ext) mbes))
+  | Value ({ raw_kind = Pgenval; _ } as value_kind) ->
+    let raw_kind = value_kind_of_value_with_externality ext in
+    Pvalue { value_kind with raw_kind }
   | Value value_kind -> Pvalue value_kind
   | Float64 | Float_boxed _ -> Punboxed_float Unboxed_float64
   | Float32 -> Punboxed_float Unboxed_float32
@@ -2572,7 +2588,7 @@ let primitive_result_layout (p : primitive) =
     layout_any_value
   | Patomic_compare_set_field _
   | Patomic_fetch_add_field -> layout_int
-  | Pdls_get -> layout_any_value
+  | Pdls_get | Ptls_get -> layout_any_value
   | Patomic_add_field
   | Patomic_sub_field
   | Patomic_land_field
@@ -2597,6 +2613,8 @@ let primitive_result_layout (p : primitive) =
   | Ppoke _ -> layout_unit
   | Pget_idx (layout, _) -> layout
   | Pset_idx _ -> layout_unit
+  | Pget_ptr (layout, _) -> layout
+  | Pset_ptr _ -> layout_unit
 
 let compute_expr_layout free_vars_kind lam =
   let rec compute_expr_layout kinds = function

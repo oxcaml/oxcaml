@@ -60,216 +60,169 @@ L101:
   store i64 %50, ptr %5
   %51 = ptrtoint ptr @camlArray_rev_data to i64
   store i64 %51, ptr %6
-  %52 = load i64, ptr %6
-  %53 = inttoptr i64 %52 to ptr addrspace(1)
+  %52 = load ptr addrspace(1), ptr %6
+  %53 = getelementptr i8, ptr addrspace(1) %52, i64 8
   store ptr addrspace(1) %53, ptr %7
   %54 = load ptr addrspace(1), ptr %7
-  %55 = getelementptr i8, ptr addrspace(1) %54, i64 8
-  store ptr addrspace(1) %55, ptr %7
-  %56 = load ptr addrspace(1), ptr %7
-  %57 = load ptr addrspace(1), ptr addrspace(1) %56
-  store ptr addrspace(1) %57, ptr %8
-  %58 = load ptr addrspace(1), ptr %8
-  store ptr addrspace(1) %58, ptr %9
-  %59 = load ptr addrspace(1), ptr %9
-  %60 = ptrtoint ptr addrspace(1) %59 to i64
-  store i64 %60, ptr %10
-  %61 = load i64, ptr %10
-  %62 = ashr i64 %61, 1
-  store i64 %62, ptr %10
-  %63 = load i64, ptr %10
-  store i64 %63, ptr %11
-  %64 = load i64, ptr %11
-  store i64 %64, ptr %12
-  %65 = load i64, ptr %12
-  %66 = lshr i64 %65, 63
-  store i64 %66, ptr %12
-  %67 = load i64, ptr %11
-  store i64 %67, ptr %13
-  %68 = load i64, ptr %13
-  %69 = load i64, ptr %12
-  %70 = add i64 %68, %69
-  store i64 %70, ptr %13
-  %71 = load i64, ptr %13
-  store i64 %71, ptr %14
-  %72 = load i64, ptr %14
-  %73 = ashr i64 %72, 1
-  store i64 %73, ptr %14
-  %74 = load i64, ptr %14
-  store i64 %74, ptr %15
-  %75 = load i64, ptr %15
-  %76 = shl i64 %75, 1
-  store i64 %76, ptr %15
-  %77 = load i64, ptr %15
-  store i64 %77, ptr %16
-  %78 = load i64, ptr %16
-  %79 = add i64 %78, -1
-  store i64 %79, ptr %16
-  %80 = load i64, ptr %16
-  store i64 %80, ptr %17
-  %81 = load i64, ptr %17
-  %82 = icmp slt i64 %81, 1
-  br i1 %82, label %L144, label %L147
+  %55 = load ptr addrspace(1), ptr addrspace(1) %54
+  store ptr addrspace(1) %55, ptr %8
+  %56 = load ptr addrspace(1), ptr %8
+  store ptr addrspace(1) %56, ptr %9
+  %57 = load i64, ptr %9
+  %58 = ashr i64 %57, 1
+  store i64 %58, ptr %10
+  %59 = load i64, ptr %10
+  store i64 %59, ptr %11
+  %60 = load i64, ptr %11
+  %61 = lshr i64 %60, 63
+  store i64 %61, ptr %12
+  %62 = load i64, ptr %11
+  %63 = load i64, ptr %12
+  %64 = add i64 %62, %63
+  store i64 %64, ptr %13
+  %65 = load i64, ptr %13
+  %66 = ashr i64 %65, 1
+  store i64 %66, ptr %14
+  %67 = load i64, ptr %14
+  %68 = shl i64 %67, 1
+  store i64 %68, ptr %15
+  %69 = load i64, ptr %15
+  %70 = add i64 %69, -1
+  store i64 %70, ptr %16
+  %71 = load i64, ptr %16
+  store i64 %71, ptr %17
+  %72 = load i64, ptr %17
+  %73 = icmp slt i64 %72, 1
+  br i1 %73, label %L144, label %L147
 L147:
-  %83 = load i64, ptr %17
-  %84 = icmp sgt i64 %83, 1
-  br i1 %84, label %L114, label %L114
+  %74 = load i64, ptr %17
+  %75 = icmp sgt i64 %74, 1
+  br i1 %75, label %L114, label %L114
 L114:
   store i64 1, ptr %19
-  %85 = load i64, ptr %19
-  store i64 %85, ptr %20
-  %86 = load i64, ptr %20
-  store i64 %86, ptr %18
+  %76 = load i64, ptr %19
+  store i64 %76, ptr %20
+  %77 = load i64, ptr %20
+  store i64 %77, ptr %18
   br label %L116
 L116:
-  %87 = ptrtoint ptr @camlArray_rev_data to i64
-  store i64 %87, ptr %21
-  %88 = load i64, ptr %21
-  %89 = inttoptr i64 %88 to ptr
-  %90 = load ptr addrspace(1), ptr %89
-  store ptr addrspace(1) %90, ptr %22
-  %91 = load ptr addrspace(1), ptr %22
-  store ptr addrspace(1) %91, ptr %23
-  %92 = load i64, ptr %18
-  store i64 %92, ptr %24
-  %93 = load i64, ptr %24
-  %94 = shl i64 %93, 2
-  store i64 %94, ptr %24
-  %95 = load ptr addrspace(1), ptr %23
-  store ptr addrspace(1) %95, ptr %25
-  %96 = load ptr addrspace(1), ptr %25
-  %97 = load i64, ptr %24
-  %98 = getelementptr i8, ptr addrspace(1) %96, i64 %97
-  store ptr addrspace(1) %98, ptr %25
-  %99 = load ptr addrspace(1), ptr %25
-  store ptr addrspace(1) %99, ptr %26
-  %100 = load ptr addrspace(1), ptr %26
-  %101 = getelementptr i8, ptr addrspace(1) %100, i64 -4
-  store ptr addrspace(1) %101, ptr %26
-  %102 = load ptr addrspace(1), ptr %26
-  %103 = load i64, ptr addrspace(1) %102
-  store i64 %103, ptr %27
-  %104 = load i64, ptr %27
-  store i64 %104, ptr %28
-  %105 = load ptr addrspace(1), ptr %9
-  %106 = ptrtoint ptr addrspace(1) %105 to i64
-  store i64 %106, ptr %29
-  %107 = load i64, ptr %29
-  %108 = load i64, ptr %18
-  %109 = sub i64 %107, %108
-  store i64 %109, ptr %29
-  %110 = load i64, ptr %29
-  store i64 %110, ptr %30
-  %111 = load i64, ptr %30
-  %112 = add i64 %111, -1
-  store i64 %112, ptr %30
-  %113 = load i64, ptr %30
-  store i64 %113, ptr %31
-  %114 = load i64, ptr %18
-  store i64 %114, ptr %32
-  %115 = load i64, ptr %32
-  %116 = shl i64 %115, 2
-  store i64 %116, ptr %32
-  %117 = load ptr addrspace(1), ptr %23
-  store ptr addrspace(1) %117, ptr %33
-  %118 = load ptr addrspace(1), ptr %33
-  %119 = load i64, ptr %32
-  %120 = getelementptr i8, ptr addrspace(1) %118, i64 %119
-  store ptr addrspace(1) %120, ptr %33
-  %121 = load ptr addrspace(1), ptr %33
-  store ptr addrspace(1) %121, ptr %34
-  %122 = load ptr addrspace(1), ptr %34
-  %123 = getelementptr i8, ptr addrspace(1) %122, i64 -4
-  store ptr addrspace(1) %123, ptr %34
-  %124 = load i64, ptr %31
-  store i64 %124, ptr %35
-  %125 = load i64, ptr %35
-  %126 = shl i64 %125, 2
-  store i64 %126, ptr %35
-  %127 = load ptr addrspace(1), ptr %23
-  store ptr addrspace(1) %127, ptr %36
-  %128 = load ptr addrspace(1), ptr %36
-  %129 = load i64, ptr %35
-  %130 = getelementptr i8, ptr addrspace(1) %128, i64 %129
-  store ptr addrspace(1) %130, ptr %36
-  %131 = load ptr addrspace(1), ptr %36
-  store ptr addrspace(1) %131, ptr %37
-  %132 = load ptr addrspace(1), ptr %37
-  %133 = getelementptr i8, ptr addrspace(1) %132, i64 -4
-  store ptr addrspace(1) %133, ptr %37
-  %134 = load ptr addrspace(1), ptr %37
-  %135 = load i64, ptr addrspace(1) %134
-  store i64 %135, ptr %38
-  %136 = load ptr addrspace(1), ptr %34
-  %137 = load i64, ptr %38
-  store i64 %137, ptr addrspace(1) %136
+  %78 = ptrtoint ptr @camlArray_rev_data to i64
+  store i64 %78, ptr %21
+  %79 = load i64, ptr %21
+  %80 = inttoptr i64 %79 to ptr
+  %81 = load ptr addrspace(1), ptr %80
+  store ptr addrspace(1) %81, ptr %22
+  %82 = load ptr addrspace(1), ptr %22
+  store ptr addrspace(1) %82, ptr %23
+  %83 = load i64, ptr %18
+  %84 = shl i64 %83, 2
+  store i64 %84, ptr %24
+  %85 = load ptr addrspace(1), ptr %23
+  %86 = load i64, ptr %24
+  %87 = getelementptr i8, ptr addrspace(1) %85, i64 %86
+  store ptr addrspace(1) %87, ptr %25
+  %88 = load ptr addrspace(1), ptr %25
+  %89 = getelementptr i8, ptr addrspace(1) %88, i64 -4
+  store ptr addrspace(1) %89, ptr %26
+  %90 = load ptr addrspace(1), ptr %26
+  %91 = load i64, ptr addrspace(1) %90
+  store i64 %91, ptr %27
+  %92 = load i64, ptr %27
+  store i64 %92, ptr %28
+  %93 = load i64, ptr %9
+  %94 = load i64, ptr %18
+  %95 = sub i64 %93, %94
+  store i64 %95, ptr %29
+  %96 = load i64, ptr %29
+  %97 = add i64 %96, -1
+  store i64 %97, ptr %30
+  %98 = load i64, ptr %30
+  store i64 %98, ptr %31
+  %99 = load i64, ptr %18
+  %100 = shl i64 %99, 2
+  store i64 %100, ptr %32
+  %101 = load ptr addrspace(1), ptr %23
+  %102 = load i64, ptr %32
+  %103 = getelementptr i8, ptr addrspace(1) %101, i64 %102
+  store ptr addrspace(1) %103, ptr %33
+  %104 = load ptr addrspace(1), ptr %33
+  %105 = getelementptr i8, ptr addrspace(1) %104, i64 -4
+  store ptr addrspace(1) %105, ptr %34
+  %106 = load i64, ptr %31
+  %107 = shl i64 %106, 2
+  store i64 %107, ptr %35
+  %108 = load ptr addrspace(1), ptr %23
+  %109 = load i64, ptr %35
+  %110 = getelementptr i8, ptr addrspace(1) %108, i64 %109
+  store ptr addrspace(1) %110, ptr %36
+  %111 = load ptr addrspace(1), ptr %36
+  %112 = getelementptr i8, ptr addrspace(1) %111, i64 -4
+  store ptr addrspace(1) %112, ptr %37
+  %113 = load ptr addrspace(1), ptr %37
+  %114 = load i64, ptr addrspace(1) %113
+  store i64 %114, ptr %38
+  %115 = load ptr addrspace(1), ptr %34
+  %116 = load i64, ptr %38
+  store i64 %116, ptr addrspace(1) %115
   store i64 1, ptr %39
-  %138 = load i64, ptr %39
-  store i64 %138, ptr %40
-  %139 = load i64, ptr %31
-  store i64 %139, ptr %41
-  %140 = load i64, ptr %41
-  %141 = shl i64 %140, 2
-  store i64 %141, ptr %41
-  %142 = load ptr addrspace(1), ptr %23
-  store ptr addrspace(1) %142, ptr %42
-  %143 = load ptr addrspace(1), ptr %42
-  %144 = load i64, ptr %41
-  %145 = getelementptr i8, ptr addrspace(1) %143, i64 %144
-  store ptr addrspace(1) %145, ptr %42
-  %146 = load ptr addrspace(1), ptr %42
-  store ptr addrspace(1) %146, ptr %43
-  %147 = load ptr addrspace(1), ptr %43
-  %148 = getelementptr i8, ptr addrspace(1) %147, i64 -4
-  store ptr addrspace(1) %148, ptr %43
-  %149 = load ptr addrspace(1), ptr %43
-  %150 = load i64, ptr %28
-  store i64 %150, ptr addrspace(1) %149
+  %117 = load i64, ptr %39
+  store i64 %117, ptr %40
+  %118 = load i64, ptr %31
+  %119 = shl i64 %118, 2
+  store i64 %119, ptr %41
+  %120 = load ptr addrspace(1), ptr %23
+  %121 = load i64, ptr %41
+  %122 = getelementptr i8, ptr addrspace(1) %120, i64 %121
+  store ptr addrspace(1) %122, ptr %42
+  %123 = load ptr addrspace(1), ptr %42
+  %124 = getelementptr i8, ptr addrspace(1) %123, i64 -4
+  store ptr addrspace(1) %124, ptr %43
+  %125 = load ptr addrspace(1), ptr %43
+  %126 = load i64, ptr %28
+  store i64 %126, ptr addrspace(1) %125
   store i64 1, ptr %44
-  %151 = load i64, ptr %44
-  store i64 %151, ptr %45
-  %152 = load i64, ptr %18
-  %153 = load i64, ptr %17
-  %154 = icmp slt i64 %152, %153
-  br i1 %154, label %L137, label %L148
+  %127 = load i64, ptr %44
+  store i64 %127, ptr %45
+  %128 = load i64, ptr %18
+  %129 = load i64, ptr %17
+  %130 = icmp slt i64 %128, %129
+  br i1 %130, label %L137, label %L148
 L148:
-  %155 = load i64, ptr %18
-  %156 = load i64, ptr %17
-  %157 = icmp sgt i64 %155, %156
-  br i1 %157, label %L137, label %L140
+  %131 = load i64, ptr %18
+  %132 = load i64, ptr %17
+  %133 = icmp sgt i64 %131, %132
+  br i1 %133, label %L137, label %L140
 L137:
-  %158 = load i64, ptr %18
-  store i64 %158, ptr %46
-  %159 = load i64, ptr %46
-  %160 = add i64 %159, 2
-  store i64 %160, ptr %46
-  %161 = load i64, ptr %46
-  store i64 %161, ptr %47
-  %162 = load i64, ptr %47
-  store i64 %162, ptr %18
+  %134 = load i64, ptr %18
+  %135 = add i64 %134, 2
+  store i64 %135, ptr %46
+  %136 = load i64, ptr %46
+  store i64 %136, ptr %47
+  %137 = load i64, ptr %47
+  store i64 %137, ptr %18
   br label %L116
 L140:
   store i64 1, ptr %48
-  %163 = load i64, ptr %48
-  store i64 %163, ptr %4
-  %164 = load i64, ptr %4
-  %165 = load i64, ptr %ds
-  %166 = load i64, ptr %alloc
-  %167 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %165, 0, 0
-  %168 = insertvalue { { i64, i64 }, { i64 } } %167, i64 %166, 0, 1
-  %169 = insertvalue { { i64, i64 }, { i64 } } %168, i64 %164, 1, 0
-  ret { { i64, i64 }, { i64 } } %169
+  %138 = load i64, ptr %48
+  store i64 %138, ptr %4
+  %139 = load i64, ptr %4
+  %140 = load i64, ptr %ds
+  %141 = load i64, ptr %alloc
+  %142 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %140, 0, 0
+  %143 = insertvalue { { i64, i64 }, { i64 } } %142, i64 %141, 0, 1
+  %144 = insertvalue { { i64, i64 }, { i64 } } %143, i64 %139, 1, 0
+  ret { { i64, i64 }, { i64 } } %144
 L144:
   store i64 1, ptr %49
-  %170 = load i64, ptr %49
-  store i64 %170, ptr %4
-  %171 = load i64, ptr %4
-  %172 = load i64, ptr %ds
-  %173 = load i64, ptr %alloc
-  %174 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %172, 0, 0
-  %175 = insertvalue { { i64, i64 }, { i64 } } %174, i64 %173, 0, 1
-  %176 = insertvalue { { i64, i64 }, { i64 } } %175, i64 %171, 1, 0
-  ret { { i64, i64 }, { i64 } } %176
+  %145 = load i64, ptr %49
+  store i64 %145, ptr %4
+  %146 = load i64, ptr %4
+  %147 = load i64, ptr %ds
+  %148 = load i64, ptr %alloc
+  %149 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %147, 0, 0
+  %150 = insertvalue { { i64, i64 }, { i64 } } %149, i64 %148, 0, 1
+  %151 = insertvalue { { i64, i64 }, { i64 } } %150, i64 %146, 1, 0
+  ret { { i64, i64 }, { i64 } } %151
 }
 
 define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlArray_rev__entry(i64 %0, i64 %1) gc "oxcaml" {
@@ -318,6 +271,7 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @header.camlArray_rev__rev_1 = global i64 3063, section ".data", align 8
 @camlArray_rev__rev_1 = global { ptr, i64 } { ptr @camlArray_rev__rev_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @camlArray_rev_data = external global ptr
+
 
 
 !0 = !{ i32 1, !"oxcaml_module", !"Array_rev" }

@@ -1,4 +1,5 @@
 open Stdlib
+open Stdlib_stable
 open Utils
 
 [@@@ocaml.warning "-unused-module"]
@@ -181,22 +182,22 @@ end
 module Int16x8 = struct
   type t = int16x8
 
-  external low_to : (t[@unboxed]) -> (int[@untagged])
-    = "" "caml_int16x8_low_to_int"
+  external low_to : (t[@unboxed]) -> int16#
+    = "" "caml_int16x8_low_to_int16"
     [@@noalloc] [@@builtin]
 
-  external const1 : (int[@untagged]) -> (t[@unboxed]) = "" "caml_int16x8_const1"
+  external const1 : int16# -> (t[@unboxed]) = "" "caml_int16x8_const1"
     [@@noalloc] [@@builtin]
 
   external const8 :
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
+    int16# ->
     (t[@unboxed]) = "" "caml_int16x8_const8"
     [@@noalloc] [@@builtin]
 
@@ -206,11 +207,11 @@ module Int16x8 = struct
     let i64 = i16 i in
     let i64 = Int64.(logor (shift_left i64 16) i64) in
     let i64 = Int64.(logor (shift_left i64 32) i64) in
-    let v = const1 i in
+    let v = const1 (Int16_u.of_int i) in
     let l = int16x8_low_int64 v in
     let h = int16x8_high_int64 v in
     eq l h i64 i64;
-    let _i = low_to v in
+    let _i = low_to v |> Int16_u.to_int |> (land) 0xffff in
     eqi _i 0 i 0
 
   let () =
@@ -232,11 +233,12 @@ module Int16x8 = struct
           (logor (shift_left (i16 h) 48) (shift_left (i16 g) 32))
           (logor (shift_left (i16 f) 16) (i16 e)))
     in
-    let v = const8 a b c d e f g h in
+    let v = const8 (Int16_u.of_int a) (Int16_u.of_int b) (Int16_u.of_int c) (Int16_u.of_int d)
+                   (Int16_u.of_int e) (Int16_u.of_int f) (Int16_u.of_int g) (Int16_u.of_int h) in
     let l = int16x8_low_int64 v in
     let h = int16x8_high_int64 v in
     eq l h l64 h64;
-    let _a = low_to v in
+    let _a = low_to v |> Int16_u.to_int |> (land) 0xffff in
     eqi _a 0 a 0
 
   let () =
@@ -250,30 +252,30 @@ end
 module Int8x16 = struct
   type t = int8x16
 
-  external low_to : (t[@unboxed]) -> (int[@untagged])
-    = "" "caml_int8x16_low_to_int"
+  external low_to : (t[@unboxed]) -> int8#
+    = "" "caml_int8x16_low_to_int8"
     [@@noalloc] [@@builtin]
 
-  external const1 : (int[@untagged]) -> (t[@unboxed]) = "" "caml_int8x16_const1"
+  external const1 : int8# -> (t[@unboxed]) = "" "caml_int8x16_const1"
     [@@noalloc] [@@builtin]
 
   external const16 :
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
-    (int[@untagged]) ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
+    int8# ->
     (t[@unboxed]) = "" "caml_int8x16_const16"
     [@@noalloc] [@@builtin]
 
@@ -284,11 +286,11 @@ module Int8x16 = struct
     let i64 = Int64.(logor (shift_left i64 8) i64) in
     let i64 = Int64.(logor (shift_left i64 16) i64) in
     let i64 = Int64.(logor (shift_left i64 32) i64) in
-    let v = const1 i in
+    let v = const1 (Int8_u.of_int i) in
     let l = int8x16_low_int64 v in
     let h = int8x16_high_int64 v in
     eq l h i64 i64;
-    let _i = low_to v in
+    let _i = low_to v |> Int8_u.to_int |> (land) 0xff in
     eqi _i 0 i 0
 
   let () =
@@ -324,11 +326,14 @@ module Int8x16 = struct
           (logor (shift_left (i8 n) 8) (i8 m)))
     in
     let h64 = Int64.(logor (shift_left h32 32) l32) in
-    let v = const16 a b c d e f g h i j k l m n o p in
+    let v = const16 (Int8_u.of_int a) (Int8_u.of_int b) (Int8_u.of_int c) (Int8_u.of_int d)
+                    (Int8_u.of_int e) (Int8_u.of_int f) (Int8_u.of_int g) (Int8_u.of_int h)
+                    (Int8_u.of_int i) (Int8_u.of_int j) (Int8_u.of_int k) (Int8_u.of_int l)
+                    (Int8_u.of_int m) (Int8_u.of_int n) (Int8_u.of_int o) (Int8_u.of_int p) in
     let l = int8x16_low_int64 v in
     let h = int8x16_high_int64 v in
     eq l h l64 h64;
-    let _a = low_to v in
+    let _a = low_to v |> Int8_u.to_int |> (land) 0xff in
     eqi _a 0 a 0
 
   let () =

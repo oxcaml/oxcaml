@@ -1,10 +1,9 @@
 (* TEST
- flags = "-extension layouts_alpha";
- include stdlib_beta;
+ include stdlib_stable;
  expect;
 *)
 
-open Stdlib_beta
+open Stdlib_stable
 
 (*********************************)
 (* Basic typechecking of indices *)
@@ -161,13 +160,23 @@ val t_float64 : unit -> (t, t_float64) idx_imm = <fun>
 (* Singleton unboxed records containing floats can appear in float records *)
 type fr = #{ f : float }
 type t = { f : float; fr : fr  }
-let fr () = (.fr)
 let fr_f () = (.fr.#f)
 [%%expect{|
 type fr = #{ f : float; }
 type t = { f : float; fr : fr; }
-val fr : unit -> (t, float#) idx_imm = <fun>
 val fr_f : unit -> (t, float#) idx_imm = <fun>
+|}]
+
+(* But we can't create a pointer to a flattened [fr], because it has no unboxed
+   version *)
+let bad () = (.fr)
+[%%expect{|
+Line 1, characters 13-18:
+1 | let bad () = (.fr)
+                 ^^^^^
+Error: This block index points to an element stored as a flattened float.
+       Such block indices require the element type to have an unboxed
+       version, but "fr" does not.
 |}]
 
 (* Mixed float record *)
@@ -176,7 +185,6 @@ type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr  }
 let f () = (.f)
 let fu () = (.fu)
 let t_float64 () = (.t_float64)
-let fr () = (.fr)
 let fr_f () = (.fr.#f)
 [%%expect{|
 type t_float64 : float64
@@ -184,8 +192,39 @@ type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr; }
 val f : unit -> (t, float#) idx_imm = <fun>
 val fu : unit -> (t, float#) idx_imm = <fun>
 val t_float64 : unit -> (t, t_float64) idx_imm = <fun>
-val fr : unit -> (t, float#) idx_imm = <fun>
 val fr_f : unit -> (t, float#) idx_imm = <fun>
+|}]
+
+(* Can't take a block index to a flattened [fr] because it doesn't have an
+   unboxed version *)
+let bad () = (.fr)
+[%%expect{|
+Line 1, characters 13-18:
+1 | let bad () = (.fr)
+                 ^^^^^
+Error: This block index points to an element stored as a flattened float.
+       Such block indices require the element type to have an unboxed
+       version, but "fr" does not.
+|}]
+
+type pfa = private float
+type r = { mutable pfa : pfa }
+let f () : (r, pfa#) idx_mut = (.pfa)
+[%%expect{|
+type pfa = private float
+type r = { mutable pfa : pfa; }
+val f : unit -> (r, pfa#) idx_mut = <fun>
+|}]
+
+(* Cannot bypass private float aliases *)
+let bad () : (r, float#) idx_mut = (.pfa)
+[%%expect{|
+Line 1, characters 35-41:
+1 | let bad () : (r, float#) idx_mut = (.pfa)
+                                       ^^^^^^
+Error: This expression has type "(r, pfa#) idx_mut"
+       but an expression was expected of type "(r, float#) idx_mut"
+       Type "pfa#" is not compatible with type "float#"
 |}]
 
 (***************)
@@ -490,6 +529,18 @@ val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
 val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
 |}]
 
+(*****************************************)
+(* Block indices to atomic record fields *)
+type atomic = { mutable i : int [@atomic] }
+let bad () = (.i)
+[%%expect{|
+type atomic = { mutable i : int [@atomic]; }
+Line 2, characters 13-17:
+2 | let bad () = (.i)
+                 ^^^^
+Error: Block indices do not yet support [@atomic] record fields.
+|}]
+
 (**************)
 (* Modalities *)
 
@@ -503,12 +554,11 @@ type 'a portable = { portable : 'a @@ portable }
 type 'a contended = { contended : 'a @@ contended }
 type 'a mut_not_global = { mutable mut_not_global : 'a @@ local }
 type 'a mut_not_many = { mutable mut_not_many : 'a @@ once }
-type 'a mut_not_aliased = { mutable mut_not_aliased : 'a @@ unique }
 type 'a mut_not_unyielding = { mutable mut_not_unyielding : 'a @@ yielding }
 [%%expect{|
 type 'a box = { item : 'a; }
 type 'a box_mut = { mutable mut : 'a; }
-type 'a global = { global_ global : 'a; }
+type 'a global = { global : 'a @@ global; }
 type 'a aliased = { aliased : 'a @@ aliased; }
 type 'a many = { many : 'a @@ many; }
 type 'a unyielding = { unyielding : 'a @@ unyielding; }
@@ -516,7 +566,6 @@ type 'a portable = { portable : 'a @@ portable; }
 type 'a contended = { contended : 'a @@ contended; }
 type 'a mut_not_global = { mutable mut_not_global : 'a @@ local; }
 type 'a mut_not_many = { mutable mut_not_many : 'a @@ once; }
-type 'a mut_not_aliased = { mutable mut_not_aliased : 'a @@ unique; }
 type 'a mut_not_unyielding = { mutable mut_not_unyielding : 'a @@ yielding; }
 |}]
 
@@ -527,7 +576,7 @@ Line 1, characters 13-22:
 1 | let bad () = (.global)
                  ^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is global.
+       immutable elements must have the identity modality, but this is aliased.
 |}]
 let bad () = (.aliased)
 [%%expect{|
@@ -589,15 +638,6 @@ Error: Block indices do not yet support non-default modalities. In particular,
        mutable elements must be many, but this is not.
 |}]
 
-let bad () = (.mut_not_aliased)
-[%%expect{|
-Line 1, characters 13-31:
-1 | let bad () = (.mut_not_aliased)
-                 ^^^^^^^^^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be aliased, but this is not.
-|}]
-
 let bad () = (.mut_not_unyielding)
 [%%expect{|
 Line 1, characters 13-34:
@@ -648,7 +688,7 @@ Line 1, characters 13-28:
 1 | let bad () = (.:(0).#global)
                  ^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is global.
+       immutable elements must have the identity modality, but this is aliased.
 |}]
 let bad () = (.:(0).#item.#global.#item)
 [%%expect{|
@@ -656,7 +696,7 @@ Line 1, characters 13-40:
 1 | let bad () = (.:(0).#item.#global.#item)
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is global.
+       immutable elements must have the identity modality, but this is aliased.
 |}]
 
 (* A few positive examples to show that it's the composition of modalities we
@@ -689,7 +729,8 @@ Line 1, characters 40-46:
                                             ^^^^^^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
-       The kind of float is value mod many unyielding stateless immutable
+       The kind of float is
+           value mod forkable unyielding many stateless immutable
          because it is the primitive type float.
        But the kind of float must be a subkind of value_or_null mod non_float
          because it's the element type (the second type parameter) for a
@@ -727,7 +768,8 @@ Line 1, characters 41-48:
                                              ^^^^^^^
 Error: This expression has type "('a iarray, 'a) idx_imm"
        but an expression was expected of type "(float iarray, 'b) idx_imm"
-       The kind of float is value mod many unyielding stateless immutable
+       The kind of float is
+           value mod forkable unyielding many stateless immutable
          because it is the primitive type float.
        But the kind of float must be a subkind of value_or_null mod non_float
          because it's the element type (the second type parameter) for a
@@ -744,7 +786,8 @@ Line 3, characters 23-24:
                            ^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
-       The kind of float is value mod many unyielding stateless immutable
+       The kind of float is
+           value mod forkable unyielding many stateless immutable
          because it is the primitive type float.
        But the kind of float must be a subkind of value_or_null mod non_float
          because of the definition of y at line 2, characters 10-17.

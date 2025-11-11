@@ -471,8 +471,8 @@ let insert_block :
         Fdo_info.none,
         Reg.Set.empty,
         predecessor_block.terminator.stack_offset,
-        None,
-        None )
+        Reg_availability_set.Unreachable,
+        Reg_availability_set.Unreachable )
     | Some
         { dbg; fdo; live; stack_offset; available_before; available_across; _ }
       ->

@@ -343,7 +343,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         | Stackoffset _
         | Intop_imm _ | Intop_atomic _
         | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
-        | Begin_region | End_region | Dls_get)
+        | Begin_region | End_region | Dls_get | Tls_get)
   | Poptrap _ | Prologue | Epilogue
   | Op (Reinterpret_cast (Int_of_value | Value_of_int | Float_of_float32 |
                           Float32_of_float | Float_of_int64 | Int64_of_float |
@@ -491,6 +491,7 @@ let operation_supported : Cmm.operation -> bool = function
   | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpause
   | Cbeginregion | Cendregion | Ctuple_field _
   | Cdls_get
+  | Ctls_get
   | Cpoll
   | Creinterpret_cast (Int_of_value | Value_of_int |
                        Int64_of_float | Float_of_int64 |
@@ -510,4 +511,10 @@ let expression_supported : Cmm.expression -> bool = function
   | Cexit _ -> true
   | Cconst_vec256 _ | Cconst_vec512 _ -> false
 
-let trap_size_in_bytes = 16
+
+let trap_size_in_bytes () =
+  if !Clflags.llvm_backend
+  then
+    Misc.fatal_error
+      "Proc.trap_size_in_bytes: LLVM backend not supported for ARM"
+  else 16

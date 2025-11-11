@@ -132,7 +132,7 @@ type 'a t : value mod non_null = Foo of 'a
 [%%expect {|
 type t = Foo of { x : unit -> unit; }
 type 'a t = Foo of ('a -> 'a) | Bar
-type ('a : value mod contended portable, 'b : value mod portable) t =
+type ('a : value mod portable contended, 'b : value mod portable) t =
     Foo of 'a
   | Bar of 'b
 type ('a : value mod many) t = Foo of { x : 'a; }
@@ -158,7 +158,7 @@ type 'a t : immutable_data = Foo of { mutable x : 'a }
 Line 1, characters 0-54:
 1 | type 'a t : immutable_data = Foo of { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
@@ -285,7 +285,7 @@ type ('a : mutable_data) t : sync_data = Foo of { mutable x : 'a [@atomic] }
 Line 1, characters 0-76:
 1 | type ('a : mutable_data) t : sync_data = Foo of { mutable x : 'a [@atomic] }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is sync_data with 'a @@ unyielding many
+Error: The kind of type "t" is sync_data with 'a @@ forkable unyielding many
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of sync_data
          because of the annotation on the declaration of the type t.
@@ -325,7 +325,7 @@ type 'a t : immutable_data with 'a = Foo of { mutable x : 'a }
 Line 1, characters 0-62:
 1 | type 'a t : immutable_data with 'a = Foo of { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data with 'a
          because of the annotation on the declaration of the type t.
@@ -397,7 +397,7 @@ let foo (t : t @ local) = use_global t [@nontail]
 Line 1, characters 37-38:
 1 | let foo (t : t @ local) = use_global t [@nontail]
                                          ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -422,7 +422,7 @@ let foo (t : t @ local) = use_global t [@nontail]
 Line 1, characters 37-38:
 1 | let foo (t : t @ local) = use_global t [@nontail]
                                          ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -456,7 +456,7 @@ let foo (t : int t @ local) = use_global t [@nontail]
 Line 1, characters 41-42:
 1 | let foo (t : int t @ local) = use_global t [@nontail]
                                              ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -499,7 +499,7 @@ let foo (t : _ t @ local) = use_global t [@nontail]
 Line 1, characters 39-40:
 1 | let foo (t : _ t @ local) = use_global t [@nontail]
                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -532,7 +532,7 @@ let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
 Line 1, characters 59-60:
 1 | let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
                                                                ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
@@ -565,7 +565,7 @@ let foo (t : _ t @ local) = use_global t [@nontail]
 Line 1, characters 39-40:
 1 | let foo (t : _ t @ local) = use_global t [@nontail]
                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t

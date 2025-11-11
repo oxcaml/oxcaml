@@ -1233,7 +1233,7 @@ end = struct
             ~const:(fun const -> VA.Value_const const)
             ~var:(fun _ ~coercion:_ -> VA.Value_unknown)
             ~symbol:(fun symbol ~coercion:_ -> VA.Value_symbol symbol)
-        | Ok (No_alias { is_null = Maybe_null; _ })
+        | Ok (No_alias { is_null = Maybe_null _; _ })
         | Ok (No_alias { non_null = Unknown | Bottom; _ }) ->
           VA.Value_unknown
         | Ok (No_alias { is_null = Not_null; non_null = Ok head }) -> (
@@ -1267,43 +1267,50 @@ end = struct
               { immediates = _;
                 blocks = Unknown;
                 extensions = _;
-                is_unique = _
+                is_unique = _;
+                is_int = _;
+                get_tag = _
               }
           | Variant
               { immediates = Unknown;
                 blocks = _;
                 extensions = _;
-                is_unique = _
+                is_unique = _;
+                is_int = _;
+                get_tag = _
               } ->
             Value_unknown
           | Variant
               { immediates = Known imms;
                 blocks = Known blocks;
                 extensions = _;
-                is_unique = _
+                is_unique = _;
+                is_int = _;
+                get_tag = _
               } ->
             if TG.is_obviously_bottom imms
             then
               match TG.Row_like_for_blocks.get_singleton blocks with
               | None -> Value_unknown
-              | Some (tag, Scannable shape, _size, fields, alloc_mode) ->
+              | Some (tag, Scannable Value_only, _size, fields, alloc_mode) ->
                 let tag =
                   match Tag.Scannable.of_tag tag with
                   | Some tag -> tag
                   | None ->
                     Misc.fatal_errorf
                       "For symbol %a, the tag %a is non-scannable yet the \
-                       block shape appears to be scannable:@ %a"
+                       block shape appears to be scannable"
                       Symbol.print symbol Tag.print tag
-                      K.Scannable_block_shape.print shape
                 in
                 let fields =
                   List.map type_to_approx
                     (TG.Product.Int_indexed.components fields)
                 in
                 Block_approximation
-                  (tag, shape, Array.of_list fields, alloc_mode)
-              | Some (_, Float_record, _, _, _) -> Value_unknown
+                  (tag, Value_only, Array.of_list fields, alloc_mode)
+              | Some (_, (Float_record | Scannable (Mixed_record _)), _, _, _)
+                ->
+                Value_unknown
             else Value_unknown))
       | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _

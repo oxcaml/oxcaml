@@ -290,7 +290,11 @@ module Ident = struct
     | Local s -> s ^ ":"
     | Global _ -> fail "Type.to_label_string_exn"
 
-  let to_string_hum t = match t with Local s -> "%" ^ s | Global s -> "@" ^ s
+  let to_string_hum t = match t with Local s -> s | Global s -> s
+
+  let to_string_encoded = function
+    | Local s -> s
+    | Global s -> Asm_targets.(Asm_symbol.create s |> Asm_symbol.encode)
 
   module Gen = struct
     type ident = t
@@ -341,18 +345,25 @@ module Value = struct
 
   let of_nativeint ?(typ = Type.i64) i = typ, Immediate (Nativeint.to_string i)
 
-  let of_float32_bits bits =
-    (* Note that "%#x" formats 0 as "0", not "0x0"... *)
-    Type.float, Immediate (Format.sprintf "0x%lx" bits)
-
   let of_float64_bits bits =
+    (* Note that "%#x" formats 0 as "0", not "0x0"... *)
     Type.double, Immediate (Format.sprintf "0x%Lx" bits)
 
-  (* CR yusumez: 64-bit floats with at least 17 digits are guaranteed to round
-     trip exactly through string conversions by the IEEE 754 standard (9 digits
-     for 32-bit floats). However, it would still be nice to prefer the functions
-     above whenever possible. *)
-  let of_float ~typ f = typ, Immediate (Format.sprintf "%.20f" f)
+  (* Strangely enough, all floating point numbers use the 64-bit representation
+     if written in hexadecimal. So we first convert that to a 64-bit float and
+     back to its bits. *)
+  let of_float32_bits bits =
+    let bits = Int64.bits_of_float (Int32.float_of_bits bits) in
+    Type.float, Immediate (Format.sprintf "0x%Lx" bits)
+
+  let of_float ~(typ : Type.t) f =
+    match typ with
+    | Float -> of_float32_bits (Int32.bits_of_float f)
+    | Double -> of_float64_bits (Int64.bits_of_float f)
+    | Int _ | Ptr _ | Struct _ | Array _ | Vector _ | Label | Token | Metadata
+      ->
+      fail_msg ~name:"Value.of_float"
+        "expected type to be a float or double, got %a" Type.pp_t typ
 
   let of_label label = of_ident ~typ:Type.label (Ident.of_label label)
 
@@ -716,7 +727,10 @@ module Instruction = struct
           to_insert : Value.t
         }
     (* Memory *)
-    | Alloca of Type.t
+    | Alloca of
+        { typ : Type.t;
+          count : Value.t option
+        }
     | Load of
         { ptr : Value.t;
           typ : Type.t
@@ -879,7 +893,7 @@ module Instruction = struct
   let insertvalue ~aggregate ~indices ~to_insert =
     Insertvalue { aggregate; indices; to_insert }
 
-  let alloca typ = Alloca typ
+  let alloca ?count typ = Alloca { typ; count }
 
   let load ~ptr ~typ =
     assert' "load" (Value.get_type ptr |> Type.is_ptr);
@@ -914,8 +928,10 @@ module Instruction = struct
     Select { cond; ifso; ifnot }
 
   let call ~func ~args ~res_type ~attrs ~cc ~musttail =
-    (* Statepoint insertion breaks musttail checks, so we disable it if so. *)
-    let attrs = if musttail then Fn_attr.Gc_leaf_function :: attrs else attrs in
+    (* Statepoint insertion breaks musttail checks. We can't mark them as GC
+       leaves here, as LLVM might inline them to a position where they aren't
+       tail calls anymore and we'd need a statepoint there. So, we make LLVM
+       skip `musttail` calls instead. *)
     Call { func; args; res_type; attrs; cc; musttail }
 
   let inline_asm ~args ~res_type ~asm ~constraints ~sideeffect =
@@ -982,7 +998,13 @@ module Instruction = struct
       ins_res "insertvalue %a, %a, %a" Value.pp_t aggregate Value.pp_t to_insert
         (pp_print_list ~pp_sep:pp_comma pp_print_int)
         indices
-    | Alloca typ -> ins_res "alloca %a" Type.pp_t typ
+    | Alloca { typ; count } ->
+      let pp_count ppf () =
+        match count with
+        | Some count -> fprintf ppf ", %a" Value.pp_t count
+        | None -> ()
+      in
+      ins_res "alloca %a%a" Type.pp_t typ pp_count ()
     | Load { ptr; typ } -> ins_res "load %a, %a" Type.pp_t typ Value.pp_t ptr
     | Store { ptr; to_store } ->
       ins "store %a, %a" Value.pp_t to_store Value.pp_t ptr

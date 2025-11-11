@@ -272,6 +272,27 @@ val meet : Typing_env.t -> t -> t -> (t * Typing_env.t) Or_bottom.t
 
 val meet_shape : Typing_env.t -> t -> shape:t -> Typing_env.t Or_bottom.t
 
+module Join_analysis : sig
+  type 'a t
+
+  val print : Format.formatter -> 'a t -> unit
+
+  module Variable_refined_at_join : sig
+    type 'a t
+
+    val fold_values_at_uses :
+      ('a -> Reg_width_const.t Or_unknown.t -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  end
+
+  type 'a simple_refined_at_join =
+    | Not_refined_at_join
+    | Invariant_in_all_uses of Simple.t
+    | Variable_refined_at_these_uses of 'a Variable_refined_at_join.t
+
+  val simple_refined_at_join :
+    'a t -> Typing_env.t -> Simple.t -> 'a simple_refined_at_join
+end
+
 val cut_and_n_way_join :
   Typing_env.t ->
   (Typing_env.t * Apply_cont_rewrite_id.t * Continuation_use_kind.t) list ->
@@ -279,7 +300,7 @@ val cut_and_n_way_join :
   cut_after:Scope.t ->
   extra_lifted_consts_in_use_envs:Symbol.Set.t ->
   extra_allowed_names:Name_occurrences.t ->
-  Typing_env.t
+  Typing_env.t * Apply_cont_rewrite_id.t Join_analysis.t option
 
 module Function_type : sig
   type t

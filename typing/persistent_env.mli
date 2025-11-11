@@ -118,8 +118,8 @@ val check : allow_hidden:bool -> 'a t -> 'a sig_reader
    been imported as a non-parameter. *)
 val register_parameter : 'a t -> Global_module.Parameter_name.t -> unit
 
-(* [is_parameter_import penv md] checks if [md] is a parameter. Raises a fatal
-   error if the module has not been imported. *)
+(* [is_parameter_import penv md] checks if [md] is a loaded parameter or has
+   been registered as a parameter. *)
 val is_parameter_import : 'a t -> Global_module.Name.t -> bool
 
 (* [looked_up penv md] checks if one has already tried
@@ -171,6 +171,13 @@ val import_crcs : 'a t -> source:filepath ->
 
 (* Return the set of compilation units imported, with their CRC *)
 val imports : 'a t -> Import_info.Intf.t list
+
+(* Require that the specified compilation unit will be available at quotation
+   compile time. *)
+val require_global_for_quote : 'a t -> Compilation_unit.Name.t -> unit
+
+(* Return the set of compilation units referenced by quotes *)
+val quoted_globals : 'a t -> Compilation_unit.Name.t list
 
 (* Return the set of imports represented as runtime parameters. If this module is indeed
    parameterised (that is, [parameters] returns a non-empty list), it will be compiled as

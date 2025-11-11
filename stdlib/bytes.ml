@@ -26,22 +26,33 @@ open! Stdlib
    These functions have a "duplicated" comment above their definition.
 *)
 
-external length : bytes @ immutable -> int @@ portable = "%bytes_length"
-external string_length : string -> int @@ portable = "%string_length"
-external get : bytes -> int -> char @@ portable = "%bytes_safe_get"
-external set : bytes -> int -> char -> unit @@ portable = "%bytes_safe_set"
+external length :
+  (bytes[@local_opt]) @ immutable -> int @@ portable = "%bytes_length"
+external string_length :
+  (string[@local_opt]) -> int @@ portable = "%string_length"
+external get :
+  (bytes[@local_opt]) @ read -> int -> char @@ portable = "%bytes_safe_get"
+external set :
+  (bytes[@local_opt]) -> int -> char -> unit @@ portable = "%bytes_safe_set"
 external create : int -> bytes @@ portable = "caml_create_bytes"
-external unsafe_get : bytes -> int -> char @@ portable = "%bytes_unsafe_get"
-external unsafe_set : bytes -> int -> char -> unit @@ portable = "%bytes_unsafe_set"
-external unsafe_fill : bytes -> int -> int -> char -> unit @@ portable
-                     = "caml_fill_bytes" [@@noalloc]
-external unsafe_to_string : bytes -> string @@ portable = "%bytes_to_string"
-external unsafe_of_string : string -> bytes @@ portable = "%bytes_of_string"
+external unsafe_get :
+  (bytes[@local_opt]) @ read -> int -> char @@ portable = "%bytes_unsafe_get"
+external unsafe_set :
+  (bytes[@local_opt]) -> int -> char -> unit @@ portable = "%bytes_unsafe_set"
+external unsafe_fill :
+  (bytes[@local_opt]) -> int -> int -> char -> unit @@ portable
+  = "caml_fill_bytes" [@@noalloc]
+external unsafe_to_string :
+  (bytes[@local_opt]) -> (string[@local_opt]) @@ portable = "%bytes_to_string"
+external unsafe_of_string :
+  (string[@local_opt]) -> (bytes[@local_opt]) @@ portable = "%bytes_of_string"
 
-external unsafe_blit : bytes -> int -> bytes -> int -> int -> unit @@ portable
-                     = "caml_blit_bytes" [@@noalloc]
-external unsafe_blit_string : string -> int -> bytes -> int -> int -> unit @@ portable
-                     = "caml_blit_string" [@@noalloc]
+external unsafe_blit :
+  (bytes[@local_opt]) @ read -> int -> (bytes[@local_opt]) -> int -> int -> unit
+  @@ portable = "caml_blit_bytes" [@@noalloc]
+external unsafe_blit_string :
+  (string[@local_opt]) -> int -> (bytes[@local_opt]) -> int -> int -> unit
+  @@ portable = "caml_blit_string" [@@noalloc]
 
 let make n c =
   let s = create n in
@@ -64,7 +75,7 @@ let copy s =
   r
 
 let to_string b = unsafe_to_string (copy b)
-let of_string s = copy (unsafe_of_string s)
+let of_string s = copy (unsafe_of_string s) [@nontail]
 
 let sub s ofs len =
   if ofs < 0 || len < 0 || ofs > length s - len

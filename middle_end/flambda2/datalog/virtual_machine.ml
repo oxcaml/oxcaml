@@ -91,8 +91,10 @@ struct
             if n > 1
             then Format.fprintf ff "break %d" n
             else Format.fprintf ff "break";
-            Format.fprintf ff "%t%a" pp_terminator pp_instruction
-              (instr, depth - n)
+            for _ = 0 to n - 1 do
+              pp_terminator ff
+            done;
+            pp_instruction ff (instr, depth - n)
         in
         print_breaks 1 instr
       | Open (_iterator, _var, instr1, Dispatch, iterator_name, var_name) ->
@@ -192,84 +194,4 @@ struct
   let action a k = Action (a, k)
 
   let call f ~name y k = Call (f, y.values, k, name, y.names)
-
-  let rec channels :
-      type s.
-      s Iterator.hlist -> s Option_sender.hlist * s Option_receiver.hlist =
-    function
-    | [] -> [], []
-    | _ :: iterators ->
-      let send, recv = Channel.create None in
-      let senders, receivers = channels iterators in
-      send :: senders, recv :: receivers
-
-  type erev = Erev : 's Iterator.hlist * 's Option_sender.hlist -> erev
-
-  let iterate :
-      type a.
-      (a Constant.hlist -> unit) ->
-      a Iterator.hlist with_names ->
-      (_, nil) instruction =
-   fun f iterators ->
-    let iterator_names = iterators.names in
-    let iterators = iterators.values in
-    let rec rev0 :
-        type s. s Iterator.hlist -> s Option_sender.hlist -> erev -> erev =
-     fun iterators refs acc ->
-      match iterators, refs with
-      | [], [] -> acc
-      | iterator :: iterators, r :: refs ->
-        let (Erev (rev_iterators, rev_refs)) = acc in
-        rev0 iterators refs (Erev (iterator :: rev_iterators, r :: rev_refs))
-    in
-    let senders, receivers = channels iterators in
-    let (Erev (rev_iterators, rev_refs)) =
-      rev0 iterators senders (Erev ([], []))
-    in
-    let rec loop :
-        type s a.
-        (a -> s) Iterator.hlist ->
-        (a -> s) Option_sender.hlist ->
-        (_, a -> s) instruction ->
-        string list ->
-        (_, nil) instruction =
-     fun iterators refs instruction iterator_names ->
-      match iterators, refs, iterator_names with
-      | [iterator], [r], [name] ->
-        open_ { value = iterator; name } { value = r; name = "_" } instruction
-          dispatch
-      | iterator :: (_ :: _ as iterators), r :: refs, name :: iterator_names ->
-        loop iterators refs
-          (open_ { value = iterator; name } { value = r; name = "_" }
-             instruction dispatch)
-          iterator_names
-      | _, _, [] | [_], [_], _ :: _ :: _ ->
-        Misc.fatal_errorf "Incorrect number of names for iterators in [iterate]"
-    in
-    match rev_iterators with
-    | [] -> Advance
-    | _ :: _ ->
-      loop rev_iterators rev_refs
-        (call f ~name:"yield"
-           { values = receivers;
-             names = List.map (fun _ -> "_") iterator_names
-           }
-           advance)
-        (List.rev iterator_names)
-
-  type 'a iterator =
-    | Iterator of ('a Constant.hlist -> unit) ref * nil continuation
-
-  type void = |
-
-  let iterator iterators =
-    let evaluate : void -> outcome = function _ -> . in
-    let f_ref = ref ignore in
-    let f args = !f_ref args in
-    Iterator (f_ref, execute ~evaluate (iterate f iterators))
-
-  let[@inline] iter f (Iterator (f_ref, continuation)) =
-    f_ref := f;
-    continuation Stack_nil;
-    f_ref := ignore
 end

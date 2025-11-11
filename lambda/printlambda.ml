@@ -824,6 +824,7 @@ let primitive ppf = function
   | Patomic_lxor_field -> fprintf ppf "atomic_lxor_field"
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
+  | Ptls_get -> fprintf ppf "tls_get"
   | Ppoll -> fprintf ppf "poll"
   | Pcpu_relax -> fprintf ppf "cpu_relax"
   | Pprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled[%s]" name
@@ -854,6 +855,16 @@ let primitive ppf = function
         layout l
   | Pset_idx (l, mode) ->
       fprintf ppf "(set_idx%s@ %a)"
+        (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
+        layout l
+  | Pget_ptr (l, Mutable) ->
+      fprintf ppf "(get_ptr@ %a)"
+        layout l
+  | Pget_ptr (l, Immutable) ->
+      fprintf ppf "(get_ptr_imm@ %a)"
+        layout l
+  | Pset_ptr (l, mode) ->
+      fprintf ppf "(set_ptr%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
         layout l
 
@@ -996,6 +1007,7 @@ let name_of_primitive = function
   | Pperform -> "Pperform"
   | Preperform -> "Preperform"
   | Pdls_get -> "Pdls_get"
+  | Ptls_get -> "Ptls_get"
   | Ppoll -> "Ppoll"
   | Pprobe_is_enabled _ -> "Pprobe_is_enabled"
   | Pobj_dup -> "Pobj_dup"
@@ -1014,6 +1026,8 @@ let name_of_primitive = function
   | Ppoke _ -> "Ppoke"
   | Pget_idx _ -> "Pget_idx"
   | Pset_idx _ -> "Pset_idx"
+  | Pget_ptr _ -> "Pget_ptr"
+  | Pset_ptr _ -> "Pset_ptr"
 
 let zero_alloc_attribute ppf check =
   match check with
