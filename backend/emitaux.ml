@@ -28,6 +28,8 @@ exception Error of error
 
 let output_channel = ref stdout
 
+let output_prefix = ref ""
+
 let emit_string s = output_string !output_channel s
 
 let emit_buffer b = Buffer.output_buffer !output_channel b
@@ -602,7 +604,7 @@ let emit_elf_note ~section ~owner ~typ ~emit_desc =
   let module D = Asm_targets.Asm_directives in
   let module L = Asm_targets.Asm_label in
   let bytes = if Target_system.is_macos () then 8 else 4 in
-  D.align ~fill_x86_bin_emitter:Zero ~bytes;
+  D.align ~fill:Zero ~bytes;
   let a = L.create section in
   let b = L.create section in
   let c = L.create section in
@@ -613,11 +615,11 @@ let emit_elf_note ~section ~owner ~typ ~emit_desc =
   D.define_label a;
   D.string (owner ^ "\000");
   D.define_label b;
-  D.align ~fill_x86_bin_emitter:Zero ~bytes;
+  D.align ~fill:Zero ~bytes;
   D.define_label c;
   emit_desc ();
   D.define_label d;
-  D.align ~fill_x86_bin_emitter:Zero ~bytes
+  D.align ~fill:Zero ~bytes
 
 let reset () =
   reset_debug_info ();

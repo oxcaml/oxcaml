@@ -46,6 +46,9 @@ let visibility_of_cmm_global : Cmm.is_global -> S.visibility = function
 let symbol_of_cmm_symbol (s : Cmm.symbol) : S.t =
   S.create ~visibility:(visibility_of_cmm_global s.sym_global) s.sym_name
 
+(* Binary emitter for JIT mode *)
+let jit_emitter : Arm64_binary_emitter.Binary_emitter.t option ref = ref None
+
 (* Tradeoff between code size and code speed *)
 
 let fastcode_flag = ref true
@@ -1396,7 +1399,7 @@ let emit_literals p align emit_literal =
        ref does not support named text sections yet. Fix this when cleaning up
        the section mechanism. *)
     D.unsafe_set_internal_section_ref Text;
-    D.align ~fill_x86_bin_emitter:Nop ~bytes:align;
+    D.align ~fill:Nop ~bytes:align;
     List.iter emit_literal !p;
     p := [])
 
@@ -2815,7 +2818,7 @@ let fundecl fundecl =
   contains_calls := fundecl.fun_contains_calls;
   emit_named_text_section !function_name;
   let fun_sym = S.create_global fundecl.fun_name in
-  D.align ~fill_x86_bin_emitter:Nop ~bytes:8;
+  D.align ~fill:Nop ~bytes:8;
   D.global fun_sym;
   D.type_symbol ~ty:Function fun_sym;
   D.define_symbol_label ~section:Text fun_sym;
@@ -2877,11 +2880,11 @@ let emit_item (d : Cmm.data_item) =
     D.symbol_plus_offset ~offset_in_bytes:(Targetint.of_int o) sym
   | Cstring s -> D.string s
   | Cskip n -> D.space ~bytes:n
-  | Calign n -> D.align ~fill_x86_bin_emitter:Zero ~bytes:n
+  | Calign n -> D.align ~fill:Zero ~bytes:n
 
 let data l =
   D.data ();
-  D.align ~fill_x86_bin_emitter:Zero ~bytes:8;
+  D.align ~fill:Zero ~bytes:8;
   List.iter emit_item l
 
 let file_emitter ~file_num ~file_name =
@@ -2895,9 +2898,35 @@ let begin_assembly _unix =
   Arm64_ast.Ast.DSL.Acc.set_emit_string ~emit_string:Emitaux.emit_string;
   Asm_targets.Asm_label.initialize ~new_label:(fun () ->
       Cmm.new_label () |> Label.to_int);
+  (* Set up binary emitter if JIT hook is registered or save_binary_sections is
+     set *)
+  let use_binary_emitter =
+    Option.is_some
+      (Arm64_binary_emitter.Binary_emitter.For_jit.Internal_assembler.get ())
+    || !Oxcaml_flags.save_binary_sections
+  in
+  if use_binary_emitter
+  then (
+    (* When saving binary sections (for verification), emit relocations for all
+       symbol references to match assembler behavior *)
+    if !Oxcaml_flags.save_binary_sections
+    then
+      Arm64_binary_emitter.Binary_emitter.emit_relocs_for_all_symbol_refs
+        := true;
+    let emitter = Arm64_binary_emitter.Binary_emitter.create () in
+    jit_emitter := Some emitter;
+    Arm64_ast.Ast.DSL.Acc.set_emit_instruction
+      ~emit_instruction:
+        (Arm64_binary_emitter.Binary_emitter.add_instruction emitter));
   let asm_line_buffer = Buffer.create 200 in
   D.initialize ~big_endian:Arch.big_endian
     ~emit_assembly_comments:!Oxcaml_flags.dasm_comments ~emit:(fun d ->
+      (* Emit to binary emitter if in JIT mode *)
+      (match !jit_emitter with
+      | Some emitter ->
+        Arm64_binary_emitter.Binary_emitter.add_directive emitter d
+      | None -> ());
+      (* Emit to text *)
       Buffer.clear asm_line_buffer;
       D.Directive.print asm_line_buffer d;
       Buffer.add_string asm_line_buffer "\n";
@@ -2921,7 +2950,7 @@ let begin_assembly _unix =
   if macosx
   then (
     A.ins0 NOP;
-    D.align ~fill_x86_bin_emitter:Nop ~bytes:8);
+    D.align ~fill:Nop ~bytes:8);
   let code_end = Cmm_helpers.make_symbol "code_end" in
   Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter
 
@@ -2939,7 +2968,7 @@ let end_assembly () =
   D.global data_end_sym;
   D.define_symbol_label ~section:Data data_end_sym;
   D.int64 0L;
-  D.align ~fill_x86_bin_emitter:Zero ~bytes:8;
+  D.align ~fill:Zero ~bytes:8;
   (* #7887 *)
   let frametable = Cmm_helpers.make_symbol "frametable" in
   let frametable_sym = S.create_global frametable in
@@ -2964,7 +2993,7 @@ let end_assembly () =
       efa_u16 = (fun n -> D.uint16 n);
       efa_u32 = (fun n -> D.uint32 n);
       efa_word = (fun n -> D.targetint (Targetint.of_int_exn n));
-      efa_align = (fun n -> D.align ~fill_x86_bin_emitter:Zero ~bytes:n);
+      efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
           let lbl = label_to_asm_label ~section:Data lbl in
@@ -2984,4 +3013,149 @@ let end_assembly () =
   if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
   Probe_emission.emit_probe_notes ~slot_offset ~add_def_symbol:(fun _ -> ());
-  D.mark_stack_non_executable ()
+  D.mark_stack_non_executable ();
+  (* Finalize binary emitter if enabled *)
+  match !jit_emitter with
+  | None -> ()
+  | Some emitter -> (
+    (* Clear the instruction emission callback *)
+    Arm64_ast.Ast.DSL.Acc.clear_emit_instruction ();
+    jit_emitter := None;
+    (* Dump instructions if JIT debug is enabled *)
+    (match Sys.getenv_opt "OCAML_JIT_DEBUG" with
+    | Some ("true" | "1") ->
+      Arm64_binary_emitter.Binary_emitter.dump_instructions emitter
+    | _ -> ());
+    (* Get assembled sections. for_jit is true only when there's a JIT hook
+       registered (actual JIT compilation). When we're just saving binary
+       sections for verification, we're generating an object file and should use
+       for_jit:false to match ELF relocation format. *)
+    let for_jit =
+      Option.is_some
+        (Arm64_binary_emitter.Binary_emitter.For_jit.Internal_assembler.get ())
+    in
+    let section_tbl =
+      Arm64_binary_emitter.Binary_emitter.emit ~for_jit emitter
+    in
+    (* Convert to list of (name, section) pairs. Include both standard sections
+       (by Asm_section.t) and individual sections (by name string, for function
+       sections like .text.caml.<funcname>). *)
+    let sections =
+      let from_standard =
+        Arm64_binary_emitter.All_section_states.fold section_tbl ~init:[]
+          ~f:(fun section state acc ->
+            let name = Asm_targets.Asm_section.to_string section in
+            (name, state) :: acc)
+      in
+      let from_individual =
+        Arm64_binary_emitter.All_section_states.fold_individual section_tbl
+          ~init:[] ~f:(fun name state acc -> (name, state) :: acc)
+      in
+      from_standard @ from_individual
+    in
+    (* For JIT, we need to aggregate all .text.* sections into a single .text
+       section because the JIT loader expects exactly one .text section. *)
+    let sections_for_jit =
+      let is_text_section sec_name =
+        let len = Stdlib.String.length sec_name in
+        len >= 5 && String.equal (Stdlib.String.sub sec_name 0 5) ".text"
+      in
+      let text_sections, other_sections =
+        List.partition (fun (sec_name, _) -> is_text_section sec_name) sections
+      in
+      match text_sections with
+      | [] -> sections
+      | [(sec_name, _)] when String.equal sec_name ".text" -> sections
+      | _ ->
+        (* Aggregate all text sections into one .text section. Sort by name for
+           deterministic ordering. *)
+        let sorted_text =
+          List.sort (fun (a, _) (b, _) -> String.compare a b) text_sections
+        in
+        let module SS = Arm64_binary_emitter.Binary_emitter.Section_state in
+        let aggregated = SS.create () in
+        List.iter
+          (fun (_name, state) ->
+            let content = SS.contents state in
+            let base_offset = Buffer.length (SS.buffer aggregated) in
+            Buffer.add_string (SS.buffer aggregated) content;
+            (* Copy relocations with adjusted offsets *)
+            List.iter
+              (fun (reloc : Arm64_binary_emitter.Relocation.t) ->
+                let adjusted =
+                  { reloc with
+                    offset_from_section_beginning =
+                      reloc.offset_from_section_beginning + base_offset
+                  }
+                in
+                SS.add_relocation aggregated adjusted)
+              (SS.relocations state))
+          sorted_text;
+        (".text", aggregated) :: other_sections
+    in
+    (* Save sections to files if save_binary_sections is enabled *)
+    if !Oxcaml_flags.save_binary_sections
+    then (
+      let dir = !Emitaux.output_prefix ^ ".binary-sections" in
+      (try Sys.mkdir dir 0o755 with Sys_error _ -> ());
+      List.iter
+        (fun (name, state) ->
+          (* Convert section name like ".text" to "section_text" *)
+          let safe_name =
+            if String.length name > 0 && Char.equal (String.get name 0) '.'
+            then "section_" ^ String.sub name 1 (String.length name - 1)
+            else "section_" ^ name
+          in
+          (* Save binary content *)
+          let bin_filename = Filename.concat dir (safe_name ^ ".bin") in
+          let oc = open_out_bin bin_filename in
+          output_string oc
+            (Arm64_binary_emitter.Binary_emitter.Section_state.contents state);
+          close_out oc;
+          (* Save relocations if any *)
+          let relocs =
+            Arm64_binary_emitter.Binary_emitter.Section_state.relocations state
+          in
+          match relocs with
+          | [] -> ()
+          | _ ->
+            let reloc_filename = Filename.concat dir (safe_name ^ ".relocs") in
+            let oc = open_out reloc_filename in
+            let module R = Arm64_binary_emitter.Relocation in
+            let module ED = Arm64_binary_emitter.Binary_emitter.Encode_directive
+            in
+            List.iter
+              (fun reloc ->
+                (* For paired relocations (SUBTRACTOR + UNSIGNED), write both
+                   symbols as separate lines at the same offset. On RELA
+                   platforms (Linux), include addends for proper verification.
+                   Also convert local/file-scope symbols to section+offset. *)
+                let offset = R.offset_from_section_beginning reloc in
+                List.iter
+                  (fun (target, addend) ->
+                    (* For verification output, convert local/file-scope symbols
+                       to section+offset format to match assembler behavior *)
+                    let resolved_sym, resolved_addend =
+                      ED.resolve_local_label_for_elf ~all_sections:section_tbl
+                        ~target ~sym_offset:addend
+                    in
+                    if resolved_addend = 0
+                    then Printf.fprintf oc "%d %s\n" offset resolved_sym
+                    else
+                      Printf.fprintf oc "%d %s %d\n" offset resolved_sym
+                        resolved_addend)
+                  (R.all_targets_with_addends reloc))
+              relocs;
+            close_out oc)
+        sections);
+    (* Call the JIT hook if registered *)
+    match
+      Arm64_binary_emitter.Binary_emitter.For_jit.Internal_assembler.get ()
+    with
+    | None -> ()
+    | Some hook ->
+      (* The hook expects (string * assembled_section) list and returns a file
+         writer function. We ignore the file writer for JIT. Use the aggregated
+         sections where all .text.* are merged into .text. *)
+      let _file_writer = hook sections_for_jit in
+      ())

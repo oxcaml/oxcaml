@@ -417,6 +417,123 @@ promote-failed:
 
 runtest-upstream: test
 
+# Run the upstream testsuite with the ARM64 binary emitter enabled.
+# This exercises the binary emitter code path during compilation to catch
+# any encoding bugs or crashes. The binary emitter runs in parallel with
+# the text assembler output; the text assembler is still used for linking.
+.PHONY: runtest-upstream-binary-emitter
+runtest-upstream-binary-emitter: install_for_test
+	if [ "$(middle_end)" = "flambda2" ]; then \
+	  for dir in `cd testsuite; ls -1 -d tests/*`; do \
+	    if ! grep -q "^  $$dir " oxcaml/testsuite/flambda2-test-list; then \
+	      echo "  $$dir"; \
+	    fi; \
+	  done > _runtest/flambda2-test-list; \
+	fi
+	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
+	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
+	 export OCAMLPARAM='_,save-binary-sections=1'; \
+	 if $$(which gfortran > /dev/null 2>&1); then \
+	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
+	 fi; \
+	 cd _runtest/testsuite \
+	  && if $$(which parallel > /dev/null 2>&1); \
+             then \
+	       echo "Running testsuite with binary emitter in parallel (nproc=$$(nproc))"; \
+               if [ "$(middle_end)" = "flambda2" ]; then \
+                 make --no-print-directory KEEP_TEST_DIR_ON_SUCCESS=1 list-parallel FILE=$$(pwd)/../flambda2-test-list; \
+	       else \
+                 make --no-print-directory KEEP_TEST_DIR_ON_SUCCESS=1 parallel; \
+               fi \
+             else \
+	       echo "Running testsuite with binary emitter sequentially"; \
+               if [ "$(middle_end)" = "flambda2" ]; then \
+                 make --no-print-directory KEEP_TEST_DIR_ON_SUCCESS=1 list FILE=$$(pwd)/../flambda2-test-list; \
+	       else \
+                 make --no-print-directory KEEP_TEST_DIR_ON_SUCCESS=1 all; \
+               fi \
+             fi)
+
+# Compare binary emitter output against assembler output from the testsuite run.
+# Run this after runtest-upstream-binary-emitter to verify encoding correctness.
+.PHONY: compare-binary-emitter
+compare-binary-emitter:
+	oxcaml/tests/backend/binary_emitter/arm64/compare_all_sections.sh _runtest/testsuite
+
+# Compare binary emitter output against assembler output from dune tests (simd, etc).
+# Run this after: OCAMLPARAM='_,save-binary-sections=1' make runtest
+.PHONY: compare-binary-emitter-dune
+compare-binary-emitter-dune:
+	oxcaml/tests/backend/binary_emitter/arm64/compare_all_sections.sh _build/main
+
+# Compile a single testsuite file with the boot compiler and compare binary emitter
+# output against assembler output. Fast iteration for fixing encoding bugs.
+# Usage: make compare-one TEST=tests/basic/localfunction.ml
+# Requires: make boot-compiler to have been run
+.PHONY: compare-one
+compare-one:
+	@if [ -z "$(TEST)" ]; then \
+	  echo "Usage: make compare-one TEST=tests/basic/foo.ml"; \
+	  exit 1; \
+	fi
+	@test_path=$$(echo "$(TEST)" | sed 's|^testsuite/||'); \
+	test_file="testsuite/$$test_path"; \
+	if [ ! -f "$$test_file" ]; then \
+	  echo "Error: $$test_file not found"; \
+	  exit 1; \
+	fi; \
+	test_name=$$(basename "$$test_file" .ml); \
+	test_dir=$$(dirname "$$test_file"); \
+	obj_file="$$test_dir/$$test_name.o"; \
+	binary_sections="$$test_dir/$$test_name.binary-sections"; \
+	tmpdir=$$(mktemp -d); \
+	trap "rm -rf $$tmpdir $$obj_file $$test_dir/$$test_name.cm* $$binary_sections" EXIT; \
+	echo "Compiling $$test_file..."; \
+	_build/_bootinstall/bin/ocamlopt -I _build/_bootinstall/lib/ocaml \
+	  -save-binary-sections "$$test_file" \
+	  -o "$$tmpdir/$$test_name" 2>&1 || { \
+	    echo "Compilation failed"; \
+	    exit 1; \
+	  }; \
+	echo "Comparing text section..."; \
+	segedit "$$obj_file" -extract __TEXT __text "$$tmpdir/asm_text.bin" 2>/dev/null; \
+	if [ ! -f "$$tmpdir/asm_text.bin" ]; then \
+	  echo "Could not extract __TEXT __text from $$obj_file"; \
+	  exit 1; \
+	fi; \
+	emitter_text="$$binary_sections/section_text.bin"; \
+	if [ ! -f "$$emitter_text" ]; then \
+	  echo "Binary emitter did not produce section_text.bin"; \
+	  exit 1; \
+	fi; \
+	asm_size=$$(wc -c < "$$tmpdir/asm_text.bin"); \
+	emitter_size=$$(wc -c < "$$emitter_text"); \
+	echo "Assembler text size: $$asm_size bytes"; \
+	echo "Binary emitter text size: $$emitter_size bytes"; \
+	if cmp -s "$$tmpdir/asm_text.bin" "$$emitter_text"; then \
+	  echo "SUCCESS: Text sections match!"; \
+	else \
+	  echo "MISMATCH: Text sections differ"; \
+	  diff_offset=$$(cmp -l "$$tmpdir/asm_text.bin" "$$emitter_text" 2>/dev/null | head -1 | awk '{print $$1}'); \
+	  if [ -n "$$diff_offset" ]; then \
+	    instr_offset=$$(( (diff_offset - 1) / 4 * 4 )); \
+	    echo "First difference at byte offset: $$((diff_offset - 1)) (instruction at offset $$instr_offset)"; \
+	    echo ""; \
+	    echo "Assembler bytes at offset $$instr_offset:"; \
+	    xxd -s $$instr_offset -l 16 "$$tmpdir/asm_text.bin" | sed 's/^/  /'; \
+	    echo "Binary emitter bytes at offset $$instr_offset:"; \
+	    xxd -s $$instr_offset -l 16 "$$emitter_text" | sed 's/^/  /'; \
+	    echo ""; \
+	    echo "Disassembly around offset $$instr_offset:"; \
+	    otool -tv "$$obj_file" 2>/dev/null | awk -v off="$$instr_offset" ' \
+	      /^[0-9a-f]+/ { \
+	        addr = strtonum("0x" $$1); \
+	        if (addr >= off - 16 && addr <= off + 16) print; \
+	      }' | head -10; \
+	  fi; \
+	  exit 1; \
+	fi
+
 test-one: install_for_test
 	$(MAKE) test-one-no-rebuild
 
@@ -432,6 +549,17 @@ locate_test = \
 test-one-no-rebuild:
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
+	 if $$(which gfortran > /dev/null 2>&1); then \
+	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
+	 fi; \
+	 cd _runtest/testsuite && make one $(if $(TEST),TEST=$(call locate_test,$(TEST))) $(if $(DIR),DIR=$(call locate_test,$(DIR))))
+
+# Run a single test with the binary emitter enabled
+.PHONY: test-one-binary-emitter
+test-one-binary-emitter: install_for_test
+	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
+	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
+	 export OCAMLPARAM='_,save-binary-sections=1'; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
 	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
 	 fi; \

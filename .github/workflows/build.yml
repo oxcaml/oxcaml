@@ -85,8 +85,8 @@ jobs:
           - name: runtime5 regalloc (aarch64-darwin)
             config: --enable-runtime5 --disable-warn-error
             os: warp-macos-15-arm64-6x
-            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             run_regalloc_tool: true
 
           - name: runtime5 debug regalloc (aarch64-darwin)
@@ -101,8 +101,8 @@ jobs:
           - name: runtime5 regalloc (aarch64-linux)
             config: --enable-runtime5 --disable-warn-error
             os: warp-ubuntu-latest-arm64-8x
-            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
-            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             run_regalloc_tool: true
 
           - name: runtime4 regalloc (x86_64-linux)

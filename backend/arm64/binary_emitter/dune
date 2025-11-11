@@ -1,0 +1,9 @@
+(include_subdirs unqualified)
+
+(library
+ (name arm64_binary_emitter)
+ (wrapped true)
+ (ocamlopt_flags
+  (:standard -w +4
+   (:include %{project_root}/ocamlopt_flags.sexp)))
+ (libraries ocamlcommon asm_targets arm64_ast binary_emitter_intf))

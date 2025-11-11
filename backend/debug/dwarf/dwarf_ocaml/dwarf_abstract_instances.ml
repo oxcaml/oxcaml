@@ -38,6 +38,7 @@ let attributes fun_name =
   [DAH.create_name fun_name; DAH.create_external ~is_visible_externally:true]
 
 let abstract_instance_proto_die_symbol ~fun_symbol =
+  (* DWARF internal symbol - local visibility *)
   Asm_symbol.create_local (Asm_symbol.to_raw_string fun_symbol ^ "_absinst")
 
 let add_empty state ~compilation_unit_proto_die ~fun_symbol ~demangled_name =

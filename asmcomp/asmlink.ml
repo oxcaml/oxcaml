@@ -201,7 +201,7 @@ let link_shared_actual unix ml_objfiles output_name ~genfns ~units_tolink
   in
   let startup_obj = output_name ^ ".startup" ^ ext_obj in
   let sourcefile_for_dwarf = sourcefile_for_dwarf ~named_startup_file startup in
-  Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:startup
+  Asmgen.compile_unit unix ~output_prefix:output_name ~asm_filename:startup
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
       Profile.record_call "make_shared_startup_file" (fun () ->
@@ -382,7 +382,7 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
       | exception Cm_bundle.Error error -> raise (Error (Cm_bundle_error error))
       | bundled_cm_obj -> bundled_cm_obj :: ml_objfiles
   in
-  Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:startup
+  Asmgen.compile_unit unix ~output_prefix:output_name ~asm_filename:startup
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
       Profile.record_call "make_startup_file" (fun () ->

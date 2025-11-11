@@ -19,6 +19,8 @@
 
 val output_channel : out_channel ref
 
+val output_prefix : string ref
+
 val emit_string : string -> unit
 
 val emit_buffer : Buffer.t -> unit
