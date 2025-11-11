@@ -2114,7 +2114,7 @@ module Const = struct
     }
 
   let transl_scannable_axes sa_annots =
-    (* CR zeisbach: this should work for the other axes as they get added.
+    (* CR layouts-scannable: this should work for more axes as they're added
        however, without a data representation for "the axis", this doesn't
        report a very good error. Using [Per_axis] is one solution; having
        one warning helper per axis is another, as is passing a string (lame).
@@ -2179,8 +2179,8 @@ module Const = struct
         Location.prerr_warning jkind.pjkind_loc
           (Warnings.Ignored_kind_modifier
              (name.txt, List.map Location.get_txt sa_annot));
-      (* CR zeisbach: the correct behavior is to make a new jkind that differs
-         only in the layout by adding in the non-None scannable axes.
+      (* CR layouts-scannable: the correct behavior is to make a new jkind that
+         differs only in the layout by adding in the non-None scannable axes.
          for inspiration, see [set_nullability_upper_bound].
          this should emit a warning if the jkind_without_sa already has
          the specified non-trivialities. this is why this currently returns

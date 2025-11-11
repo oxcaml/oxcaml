@@ -1343,9 +1343,11 @@ and jkind_annotation_desc =
      abbreviations, not on products/etc. It could be desirable for these
      annotations to parse in more places with a warning (ex: for generated
      code). This change should only be made if necessary (and after the
-     ignored-scannable-axes warning is enabled), since it adds confusion. *)
+     ignored-kind-modifier warning is enabled), since it adds confusion. *)
   | Pjk_abbreviation of string loc * string loc list
-  (** Stores the abbreviation along with a list of scannable axis modifiers *)
+  (** [Pjk_abbreviation(A, [SA1; ...; SAn])] represents the layout
+      [A SA1 ... SAn] where [A] is some abbreviation (like [value])
+      and each [SAi] is a scannable axis annotation (like [non_pointer]) *)
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
      full kind annotations. We may want to narrow this type some.
      Internal ticket 5085. *)
