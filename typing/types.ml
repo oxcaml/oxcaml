@@ -1128,25 +1128,6 @@ let rec bound_value_identifiers = function
   | Sig_class(id, _, _, _) :: rem -> id :: bound_value_identifiers rem
   | _ :: rem -> bound_value_identifiers rem
 
-let rec bound_value_identifiers_and_sorts = function
-    [] -> []
-  | Sig_value(id, {val_kind = Val_reg sort}, _) :: rem ->
-      (id, sort) :: bound_value_identifiers_and_sorts rem
-  | Sig_typext(id, _, _, _) :: rem ->
-      (id, Jkind_types.Sort.(of_const Const.for_type_extension))
-        :: bound_value_identifiers_and_sorts rem
-  | Sig_module(id, Mp_present, _, _, _) :: rem ->
-      (id, Jkind_types.Sort.(of_const Const.for_module)) ::
-        bound_value_identifiers_and_sorts rem
-  | Sig_class(id, _, _, _) :: rem ->
-      (id, Jkind_types.Sort.(of_const Const.for_class)) ::
-        bound_value_identifiers_and_sorts rem
-  | Sig_value(_, {val_kind = (Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _
-                              | Val_anc _)}, _) :: rem
-  | Sig_module(_, Mp_absent, _, _, _) :: rem
-  | (Sig_type _ | Sig_modtype _ | Sig_class_type _) :: rem ->
-      bound_value_identifiers_and_sorts rem
-
 let signature_item_id = function
   | Sig_value (id, _, _)
   | Sig_type (id, _, _, _)
@@ -1156,6 +1137,14 @@ let signature_item_id = function
   | Sig_class (id, _, _, _)
   | Sig_class_type (id, _, _, _)
     -> id
+
+let signature_item_representation sg =
+  match sort_of_signature_item sg with
+  | None -> None
+  | Some sort -> Some (signature_item_id sg, sort)
+
+let bound_value_identifiers_and_sorts sigs =
+  List.filter_map signature_item_representation sigs
 
 let rec mixed_block_element_to_string = function
   | Value -> "Value"

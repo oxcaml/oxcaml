@@ -867,7 +867,8 @@ and module_coercion =
       ; output_repr : Types.module_representation
       ; pos_cc_list : (int * module_coercion) list
       ; id_pos_list : (Ident.t * int * module_coercion) list
-      (* [pos] is an index into [input_repr] *)
+      (* [pos] (the [int]s in [pos_cc_list] and [id_pos_list]) is an index into
+         the list of fields in the input module *)
       }
   | Tcoerce_functor of module_coercion * module_coercion
   | Tcoerce_primitive of primitive_coercion
@@ -993,10 +994,18 @@ and open_declaration = module_expr open_infos
 and include_kind =
   | Tincl_structure
   | Tincl_functor of
-      (Ident.t * module_coercion) list * Types.module_representation
+      { input_coercion : (Ident.t * module_coercion) list
+      ; input_repr : Types.module_representation
+      }
       (* S1 -> S2 *)
+      (* Since [Types.module_representation = Jkind.sort array], this could've
+         been [of { inputs : (Ident.t * module_coercion * Jkind.sort) list }],
+         but the way [input_coercion] and [input_repr] are used makes keeping
+         them separate more natural. *)
   | Tincl_gen_functor of
-      (Ident.t * module_coercion) list * Types.module_representation
+      { input_coercion : (Ident.t * module_coercion) list
+      ; input_repr : Types.module_representation
+      }
       (* S1 -> () -> S2 *)
 
 and 'a include_infos =

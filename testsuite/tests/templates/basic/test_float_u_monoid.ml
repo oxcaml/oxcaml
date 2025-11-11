@@ -3,7 +3,7 @@
    float64_monoid.mli \
    monoid.mli \
    float64_monoid_utils.ml float64_monoid_utils.mli \
-   float64_monoid_utils_2.ml float64_monoid_utils_2.mli \
+   float64_monoid_utils_mixed.ml float64_monoid_utils_mixed.mli \
    float_u_monoid.ml float_u_monoid.mli \
    string_monoid.ml string_monoid.mli \
    float_u_with_monoid.ml float_u_with_monoid.mli \
@@ -32,7 +32,7 @@
  ocamlopt.byte;
 
  flags = "-parameter Float64_monoid";
- module = "float64_monoid_utils_2.mli float64_monoid_utils_2.ml";
+ module = "float64_monoid_utils_mixed.mli float64_monoid_utils_mixed.ml";
  ocamlopt.byte;
 
  flags = "-parameter Monoid";
@@ -48,9 +48,9 @@
 
  flags = "-instantiate";
  module = "";
- program = "float64_monoid_utils_2-Float_u_monoid.cmx";
+ program = "float64_monoid_utils_mixed-Float_u_monoid.cmx";
   (* Mixed module that takes a mixed module as a parameter. *)
- all_modules = "float64_monoid_utils_2.cmx float_u_monoid.cmx";
+ all_modules = "float64_monoid_utils_mixed.cmx float_u_monoid.cmx";
  ocamlopt.byte;
 
  flags = "-instantiate";
@@ -73,10 +73,10 @@
    float_u_monoid.cmx \
    string_monoid.cmx \
    float64_monoid_utils.cmx \
-   float64_monoid_utils_2.cmx \
+   float64_monoid_utils_mixed.cmx \
    float_u_with_monoid.cmx \
    float64_monoid_utils-Float_u_monoid.cmx \
-   float64_monoid_utils_2-Float_u_monoid.cmx \
+   float64_monoid_utils_mixed-Float_u_monoid.cmx \
    float_u_with_monoid-String_monoid.cmx \
    test_float_u_monoid.cmx \
  ";
@@ -94,7 +94,7 @@ module M =
   Float64_monoid_utils(Float64_monoid)(Float_u_monoid) [@jane.non_erasable.instances]
 
 module M_2 =
-  Float64_monoid_utils_2(Float64_monoid)(Float_u_monoid) [@jane.non_erasable.instances]
+  Float64_monoid_utils_mixed(Float64_monoid)(Float_u_monoid) [@jane.non_erasable.instances]
 
 module M_3 =
   Float_u_with_monoid(Monoid)(String_monoid) [@jane.non_erasable.instances]

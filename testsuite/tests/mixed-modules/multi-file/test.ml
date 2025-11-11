@@ -41,6 +41,7 @@
 *)
 
 let _ =
-  Printf.printf "%s\n%s\n"
+  print_endline "Expected: 625 625 625 1024 1024 1024";
+  Printf.printf "Actual:   %s %s\n"
     (Ring.to_string (Ring_utils.pow Numbers.five 4))
     (Ring.to_string (Ring_utils.pow Numbers.two 10))

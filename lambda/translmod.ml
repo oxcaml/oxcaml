@@ -890,12 +890,12 @@ and transl_structure ~scopes loc
             match incl.incl_kind with
             | Tincl_structure ->
                 pure_module modl, transl_module ~scopes Tcoerce_none None modl
-            | Tincl_functor (ccs, input_repr) ->
-                Strict, transl_include_functor ~generative:false modl ccs
-                          scopes loc ~input_repr
-            | Tincl_gen_functor (ccs, input_repr) ->
-                Strict, transl_include_functor ~generative:true modl ccs
-                          scopes loc ~input_repr
+            | Tincl_functor { input_coercion; input_repr } ->
+                Strict, transl_include_functor ~generative:false modl
+                          input_coercion scopes loc ~input_repr
+            | Tincl_gen_functor { input_coercion; input_repr } ->
+                Strict, transl_include_functor ~generative:true modl
+                          input_coercion scopes loc ~input_repr
           in
           Llet(let_kind, Lambda.layout_module, mid, mid_duid, modl, body),
           repr
@@ -1287,12 +1287,12 @@ let transl_toplevel_item ~scopes item =
         match incl.incl_kind with
         | Tincl_structure ->
             transl_module ~scopes Tcoerce_none None modl
-        | Tincl_functor (ccs, input_repr) ->
-            transl_include_functor ~generative:false modl ccs scopes loc
-              ~input_repr
-        | Tincl_gen_functor (ccs, input_repr) ->
-            transl_include_functor ~generative:true modl ccs scopes loc
-              ~input_repr
+        | Tincl_functor { input_coercion; input_repr } ->
+            transl_include_functor ~generative:false modl input_coercion scopes
+              loc ~input_repr
+        | Tincl_gen_functor { input_coercion; input_repr } ->
+            transl_include_functor ~generative:true modl input_coercion scopes
+              loc ~input_repr
       in
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in

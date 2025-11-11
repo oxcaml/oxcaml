@@ -1486,26 +1486,22 @@ let mod_setfield pos = function
     Psetmixedfield([pos], shape, Root_initialization)
 
 let transl_module_representation repr =
-  let value_count = ref 0 in
   let shape =
     Array.map
       (fun sort ->
-         let elt =
-           sort
-           |> Jkind.Sort.default_for_transl_and_get
-           |> Types.mixed_block_element_of_const_sort
-         in
-         begin match elt with
-         | Value -> incr value_count
-         | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-         | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
-         | Product _ | Void -> ()
-         end;
-         elt)
+         sort
+         |> Jkind.Sort.default_for_transl_and_get
+         |> Types.mixed_block_element_of_const_sort)
       repr
   in
-  (* CR jrayman *)
-  if !value_count = Array.length shape
+  let is_value (elt : Types.mixed_block_element) =
+    match elt with
+    | Value -> true
+    | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
+    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
+    | Product _ | Void -> false
+  in
+  if Array.for_all is_value shape
   then Module_value_only { field_count = Array.length shape }
   else
     Module_mixed
@@ -1560,14 +1556,18 @@ let transl_prim mod_name name =
 let block_of_module_representation ~loc = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
   | Module_mixed (shape, _) ->
-    let value_count = ref 0 in
-    Array.iter (function
-      | Value _ -> incr value_count
-      | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-      | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
-      | Product _ -> ()) shape;
+    let rec count_values shape =
+      Array.fold_left
+        (fun acc elt ->
+          match elt with
+          | Value _ -> acc + 1
+          | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+          | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate -> acc
+          | Product product_shape -> acc + count_values product_shape)
+        0 shape
+    in
     Typedecl.assert_mixed_product_support loc Module
-      ~value_prefix_len:(!value_count);
+      ~value_prefix_len:(count_values shape);
     Pmakemixedblock(0, Immutable, shape, alloc_heap)
 
 (* Compile a sequence of expressions *)

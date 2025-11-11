@@ -3,7 +3,7 @@
    unboxed_product_monoid.mli \
    monoid.mli \
    unboxed_product_monoid_utils.ml unboxed_product_monoid_utils.mli \
-   unboxed_product_monoid_utils_2.ml unboxed_product_monoid_utils_2.mli \
+   unboxed_product_monoid_utils_mixed.ml unboxed_product_monoid_utils_mixed.mli \
    mixed_monoid.ml mixed_monoid.mli \
    string_monoid.ml string_monoid.mli \
    mixed_with_monoid.ml mixed_with_monoid.mli \
@@ -32,7 +32,7 @@
  ocamlopt.byte;
 
  flags = "-parameter Unboxed_product_monoid";
- module = "unboxed_product_monoid_utils_2.mli unboxed_product_monoid_utils_2.ml";
+ module = "unboxed_product_monoid_utils_mixed.mli unboxed_product_monoid_utils_mixed.ml";
  ocamlopt.byte;
 
  flags = "-parameter Monoid";
@@ -48,9 +48,9 @@
 
  flags = "-instantiate";
  module = "";
- program = "unboxed_product_monoid_utils_2-Mixed_monoid.cmx";
+ program = "unboxed_product_monoid_utils_mixed-Mixed_monoid.cmx";
   (* Mixed module that takes a mixed module as a parameter. *)
- all_modules = "unboxed_product_monoid_utils_2.cmx mixed_monoid.cmx";
+ all_modules = "unboxed_product_monoid_utils_mixed.cmx mixed_monoid.cmx";
  ocamlopt.byte;
 
  flags = "-instantiate";
@@ -73,10 +73,10 @@
    mixed_monoid.cmx \
    string_monoid.cmx \
    unboxed_product_monoid_utils.cmx \
-   unboxed_product_monoid_utils_2.cmx \
+   unboxed_product_monoid_utils_mixed.cmx \
    mixed_with_monoid.cmx \
    unboxed_product_monoid_utils-Mixed_monoid.cmx \
-   unboxed_product_monoid_utils_2-Mixed_monoid.cmx \
+   unboxed_product_monoid_utils_mixed-Mixed_monoid.cmx \
    mixed_with_monoid-String_monoid.cmx \
    test_mixed_monoid.cmx \
  ";
@@ -95,8 +95,8 @@ module M_mixed =
   Unboxed_product_monoid_utils (Unboxed_product_monoid) (Mixed_monoid)
 [@jane.non_erasable.instances]
 
-module M_mixed_2 =
-  Unboxed_product_monoid_utils_2 (Unboxed_product_monoid) (Mixed_monoid)
+module M_mixed_utils_mixed =
+  Unboxed_product_monoid_utils_mixed (Unboxed_product_monoid) (Mixed_monoid)
 [@jane.non_erasable.instances]
 
 module M_with_string =
@@ -114,11 +114,11 @@ let () =
     (Int64.to_string (to_int64 a)) (to_float b) c
 ;;
 
-let () = print_endline "Test: Mixed monoid with utils_2"
+let () = print_endline "Test: Mixed monoid with utils_mixed"
 
 let () =
   let #(a, b, c, _void) =
-    M_mixed_2.pow #(#2L, #2.0, "a", Mixed_monoid.void ()) 5
+    M_mixed_utils_mixed.pow #(#2L, #2.0, "a", Mixed_monoid.void ()) 5
   in
   print_endline "Expected: 32 32.0 aaaaa";
   Printf.printf "Actual:   %s %.1f %s\n"
@@ -126,7 +126,7 @@ let () =
 ;;
 
 let () =
-  let #(a, b, c, _void) = M_mixed_2.one in
+  let #(a, b, c, _void) = M_mixed_utils_mixed.one in
   print_endline "Expected: 1 1.0 (empty string)";
   Printf.printf "Actual:   %s %.1f %s\n\n"
     (Int64.to_string (to_int64 a))

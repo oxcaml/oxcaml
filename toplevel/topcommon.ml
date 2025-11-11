@@ -108,6 +108,7 @@ module MakeEvalPrinter (E: EVAL_BASE) = struct
       match module_repr with
       | Module_value_only _ -> Obj.field (eval_address p) pos
       | Module_mixed _ ->
+        (* CR jrayman *)
         Misc.fatal_error "Topcommon.eval_address: Can't handle mixed module"
 
   let eval_path find env path =

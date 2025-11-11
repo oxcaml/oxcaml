@@ -2,7 +2,7 @@ Test: Mixed monoid with utils
 Expected: 16 81.0 xxxx
 Actual:   16 81.0 xxxx
 
-Test: Mixed monoid with utils_2
+Test: Mixed monoid with utils_mixed
 Expected: 32 32.0 aaaaa
 Actual:   32 32.0 aaaaa
 Expected: 1 1.0 (empty string)

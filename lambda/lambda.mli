@@ -594,9 +594,6 @@ val layout_of_extern_repr : extern_repr -> layout
 
 val extern_repr_involves_unboxed_products : extern_repr -> bool
 
-(* Used to alias module fields in [Translmod] *)
-val layout_of_const_sort : Jkind.Sort.Const.t -> layout
-
 type structured_constant =
     Const_base of constant
   | Const_block of int * structured_constant list

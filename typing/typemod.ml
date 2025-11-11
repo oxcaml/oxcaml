@@ -185,14 +185,14 @@ let extract_sig_functor_open funct_body env loc mty sig_acc =
         | Mty_signature sg_param -> sg_param
         | _ -> raise (Error (loc,env,Signature_parameter_expected mty_func))
       in
-      let coercion =
+      let input_coercion =
         try
           Includemod.include_functor_signatures ~mark:true env
             sig_acc sg_param
         with Includemod.Error msg ->
           raise (Error(loc, env, Not_included_functor msg))
       in
-      let param_repr =
+      let input_repr =
         List.filter_map sort_of_signature_item sg_param |> Array.of_list;
       in
       (* We must scrape the result type in an environment expanded with the
@@ -214,13 +214,13 @@ let extract_sig_functor_open funct_body env loc mty sig_acc =
               sig..end -> () -> sig..end *)
         match Mtype.scrape extended_env mty_result with
         | Mty_signature sg_result ->
-            Tincl_functor (coercion, param_repr), sg_result
+            Tincl_functor { input_coercion; input_repr }, sg_result
         | Mty_functor (Unit,_) when funct_body && Mtype.contains_type env mty ->
             raise (Error (loc, env, Not_includable_in_functor_body))
         | Mty_functor (Unit,mty_result) -> begin
             match Mtype.scrape extended_env mty_result with
             | Mty_signature sg_result ->
-                Tincl_gen_functor (coercion, param_repr), sg_result
+              Tincl_gen_functor { input_coercion; input_repr }, sg_result
             | sg -> raise (Error (loc,env,Signature_result_expected
                                             (Mty_functor (Unit,sg))))
           end

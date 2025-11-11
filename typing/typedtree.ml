@@ -714,9 +714,13 @@ and open_declaration = module_expr open_infos
 and include_kind =
   | Tincl_structure
   | Tincl_functor of
-      (Ident.t * module_coercion) list * Types.module_representation
+      { input_coercion : (Ident.t * module_coercion) list
+      ; input_repr : Types.module_representation
+      }
   | Tincl_gen_functor of
-      (Ident.t * module_coercion) list * Types.module_representation
+      { input_coercion : (Ident.t * module_coercion) list
+      ; input_repr : Types.module_representation
+      }
 
 and 'a include_infos =
     {
