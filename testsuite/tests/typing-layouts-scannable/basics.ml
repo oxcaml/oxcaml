@@ -105,13 +105,40 @@ type succeeds : value non_pointer & value non_pointer = #{ a : t_nonptr_val; b :
 type succeeds = #{ a : t_nonptr_val; b : t_nonptr_val; }
 |}]
 
+(* CR layouts-scannable: the current approach does not play nicely with
+   mutually recursive declarations, as demonstrated by the following test: *)
+(* CR zeisbach: is this actually a problem? the examples here look ok ... *)
+type a : (value non_pointer & value) & value non_pointer
+       = #{ p : #(t_nonptr_val * t_maybeptr_val); b : b }
+(* CR zeisbach: is it expected for this annotation to get ignored?
+   also, without the annotations, how to check that the right thing happens? *)
+and b : value maybe_pointer = #{ i : t_nonptr_val }
+[%%expect{|
+type a = #{ p : #(t_nonptr_val * t_maybeptr_val); b : b; }
+and b = #{ i : t_nonptr_val; }
+|}]
+
+module M : sig
+  type a : (value non_pointer & value) & value non_pointer
+  and b : value non_pointer
+end = struct
+  type a = #{ p : #(t_nonptr_val * t_maybeptr_val); b : b }
+  and b = #{ i : t_nonptr_val }
+end
+[%%expect{|
+module M :
+  sig
+    type a : (value non_pointer & value) & value non_pointer
+    and b : value non_pointer
+  end
+|}]
+
+
 (* CR zeisbach: add tests to make sure that the first component of a
 [value non_pointer & value] record can be passed to a value non_pointer
    accepting function *)
 
-(* CR zeisbach: module inclusion tests (see line 941 of sep file) *)
-
-
+(* CR zeisbach: more module inclusion tests (see line 941 of sep file) *)
 
 let f (a : (_ : any non_pointer)) (b : (_ : any maybe_pointer)) =
   let _unify_them = [ a; b ] in
