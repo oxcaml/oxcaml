@@ -97,18 +97,13 @@ Error: The layout of type "fails" is value maybe_pointer
 |}]
 type succeeds : value non_pointer = #{ a : t_nonptr_val }
 [%%expect{|
-Line 1, characters 0-57:
-1 | type succeeds : value non_pointer = #{ a : t_nonptr_val }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "succeeds" is value maybe_pointer
-         because it is an unboxed record.
-       But the layout of type "succeeds" must be a sublayout of
-           value non_pointer
-         because of the annotation on the declaration of the type succeeds.
+type succeeds = #{ a : t_nonptr_val; }
 |}]
 
 type succeeds : value non_pointer & value non_pointer = #{ a : t_nonptr_val; b : t_nonptr_val }
-[%%expect{| |}]
+[%%expect{|
+type succeeds = #{ a : t_nonptr_val; b : t_nonptr_val; }
+|}]
 
 (* CR zeisbach: add tests to make sure that the first component of a
 [value non_pointer & value] record can be passed to a value non_pointer
@@ -118,8 +113,16 @@ type succeeds : value non_pointer & value non_pointer = #{ a : t_nonptr_val; b :
 
 
 
-
 let f (a : (_ : any non_pointer)) (b : (_ : any maybe_pointer)) =
+  let _unify_them = [ a; b ] in
+  ()
+[%%expect{|
+val f : ('a : value_or_null non_pointer). 'a -> 'a -> unit = <fun>
+|}]
+
+let f x =
   let g (x : (_ : any non_pointer)) = () in
-  let _unify_them = [| a; b |] in
-  g b
+  g x
+[%%expect{|
+val f : ('a : value_or_null non_pointer). 'a -> unit = <fun>
+|}]

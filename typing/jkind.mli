@@ -559,7 +559,8 @@ val of_type_decl_default :
 val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 
 (** Choose an appropriate jkind for an unboxed record type. *)
-val for_unboxed_record : Types.label_declaration list -> Types.jkind_l
+val for_unboxed_record :
+  Types.label_declaration list -> sort Layout.t list -> Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed variant type. *)
 val for_boxed_variant :

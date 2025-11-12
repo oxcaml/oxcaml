@@ -2846,21 +2846,10 @@ let for_boxed_record lbls =
     in
     add_labels_as_with_bounds lbls base
 
-let for_unboxed_record lbls =
+let for_unboxed_record lbls layouts =
   let open Types in
   let tys_modalities =
     List.map (fun lbl -> lbl.ld_type, lbl.ld_modalities) lbls
-  in
-  let layouts =
-    List.map
-      (fun lbl ->
-        Layout.Const.of_sort_const lbl.ld_sort
-          (* CR zeisbach: this will change when modules get reorg *)
-          (* CR zeisbach: this is indicative of [ld_sort] not storing enough
-             information: we want to store both a sort AND scannable axes *)
-          Scannable_axes.max
-        |> Layout.of_const)
-      lbls
   in
   Builtin.product ~why:Unboxed_record tys_modalities layouts
 
