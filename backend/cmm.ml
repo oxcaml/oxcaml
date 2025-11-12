@@ -542,6 +542,10 @@ type symbol =
     sym_global : is_global
   }
 
+let equal_symbol left right =
+  String.equal left.sym_name right.sym_name
+  && equal_is_global left.sym_global right.sym_global
+
 type vec128_bits =
   { word0 : int64; (* Least significant *)
     word1 : int64

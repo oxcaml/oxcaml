@@ -440,10 +440,6 @@ let dump ppf op =
   | Alloc { bytes; dbginfo = _; mode = Local } ->
     Format.fprintf ppf "alloc_local %i" bytes
 
-let equal_symbol left right =
-  String.equal left.Cmm.sym_name right.Cmm.sym_name
-  && Cmm.equal_is_global left.Cmm.sym_global right.Cmm.sym_global
-
 let equal_alloc_dbginfo_item left right =
   Int.equal left.Cmm.alloc_words right.Cmm.alloc_words
   && Cmm.equal_alloc_block_kind left.Cmm.alloc_block_kind right.Cmm.alloc_block_kind
@@ -480,7 +476,7 @@ let equal left right =
   | Const_float left_f, Const_float right_f ->
     Int64.equal left_f right_f
   | Const_symbol left_s, Const_symbol right_s ->
-    equal_symbol left_s right_s
+    Cmm.equal_symbol left_s right_s
   | Const_vec128 left_v, Const_vec128 right_v ->
     Int64.equal left_v.Cmm.word0 right_v.Cmm.word0
     && Int64.equal left_v.Cmm.word1 right_v.Cmm.word1

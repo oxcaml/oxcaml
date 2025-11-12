@@ -532,6 +532,13 @@ and raise_kind =
   | Raise_reraise
   | Raise_notrace
 
+let equal_raise_kind left right =
+  match left, right with
+  | Raise_regular, Raise_regular
+  | Raise_reraise, Raise_reraise
+  | Raise_notrace, Raise_notrace -> true
+  | (Raise_regular | Raise_reraise | Raise_notrace), _ -> false
+
 let generic_value =
   { raw_kind = Pgenval;
     nullable = Nullable;

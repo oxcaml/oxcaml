@@ -476,6 +476,8 @@ type symbol =
     sym_global : is_global
   }
 
+val equal_symbol : symbol -> symbol -> bool
+
 (* SIMD vectors are untyped in the backend. This record holds the bitwise
    representation of a 128-bit value. [word0] is the least significant word. *)
 type vec128_bits =

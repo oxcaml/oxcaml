@@ -793,18 +793,6 @@ let remove_blocks t labels_to_remove =
       labels_not_found;
   remove_trap_instructions t !removed_trap_handlers
 
-let equal_symbol left right =
-  String.equal left.Cmm.sym_name right.Cmm.sym_name
-  && Cmm.equal_is_global left.Cmm.sym_global right.Cmm.sym_global
-
-let equal_raise_kind left right =
-  match left, right with
-  | Lambda.Raise_regular, Lambda.Raise_regular
-  | Lambda.Raise_reraise, Lambda.Raise_reraise
-  | Lambda.Raise_notrace, Lambda.Raise_notrace -> true
-  | (Lambda.Raise_regular | Lambda.Raise_reraise | Lambda.Raise_notrace), _ ->
-    false
-
 let equal_basic left right =
   match left, right with
   | Op left_op, Op right_op -> Operation.equal left_op right_op
@@ -841,7 +829,7 @@ let equal_float_test (left : float_test) (right : float_test) =
 let equal_func_call_operation left right =
   match left, right with
   | Indirect, Indirect -> true
-  | Direct left_sym, Direct right_sym -> equal_symbol left_sym right_sym
+  | Direct left_sym, Direct right_sym -> Cmm.equal_symbol left_sym right_sym
   | (Indirect | Direct _), _ -> false
 
 let equal_effects left right =
@@ -896,7 +884,7 @@ let equal_terminator left right =
     && (try Array.for_all2 Label.equal left_labels right_labels
         with Invalid_argument _ -> false)
   | Return, Return -> true
-  | Raise left_kind, Raise right_kind -> equal_raise_kind left_kind right_kind
+  | Raise left_kind, Raise right_kind -> Lambda.equal_raise_kind left_kind right_kind
   | ( Tailcall_self { destination = left_dest },
       Tailcall_self { destination = right_dest } ) ->
     Label.equal left_dest right_dest
