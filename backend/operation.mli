@@ -148,7 +148,10 @@ type t =
   | Csel of test
   | Reinterpret_cast of Cmm.reinterpret_cast
   | Static_cast of Cmm.static_cast
-  | Probe_is_enabled of { name : string }
+  | Probe_is_enabled of
+      { name : string;
+        enabled_at_init : bool option
+      }
   | Opaque
   | Begin_region
   | End_region

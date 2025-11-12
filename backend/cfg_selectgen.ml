@@ -399,7 +399,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                label_after
              }),
         args )
-    | Cprobe_is_enabled { name } -> SU.basic_op (Probe_is_enabled { name }), []
+    | Cprobe_is_enabled { name; enabled_at_init } ->
+      SU.basic_op (Probe_is_enabled { name; enabled_at_init }), []
     | Cbeginregion -> SU.basic_op Begin_region, []
     | Cendregion -> SU.basic_op End_region, args
     | Cpackf32 | Copaque | Cbswap _ | Cprefetch _ | Craise _

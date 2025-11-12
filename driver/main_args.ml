@@ -325,6 +325,26 @@ let mk_no_probes f =
     "-no-probes", Arg.Unit f, " Ignore [%%probe ..]"
 ;;
 
+let mk_probes_optimized f =
+  if Clflags.supports_optimized_probes then
+    "-probes-optimized", Arg.Unit f,
+    " Emit efficient code for [%%probe ..]."
+  else
+    let err () =
+      raise
+        (Arg.Bad
+          "OCaml has been configured without support for \
+           tracing probes or optimized probes are not supported on the target: \
+           -probes-optimized not available.")
+    in
+    "-probes-optimized", Arg.Unit err, " (option not available)"
+;;
+
+
+let mk_no_probes_optimized f =
+    "-no-probes-optimized", Arg.Unit f, " Emit naive code for [%%probe ..]"
+;;
+
 let mk_labels f =
   "-labels", Arg.Unit f, " Use commuting label mode"
 
@@ -1274,6 +1294,8 @@ module type Optcomp_options = sig
   val _save_ir_before : string -> unit
   val _probes : unit -> unit
   val _no_probes : unit -> unit
+  val _probes_optimized : unit -> unit
+  val _no_probes_optimized : unit -> unit
   val _gdwarf_config_shape_reduce_depth : string -> unit
   val _gdwarf_config_shape_eval_depth : string -> unit
   val _gdwarf_config_max_cms_files_per_unit : string -> unit
@@ -1619,6 +1641,8 @@ struct
     mk_save_ir_before ~native:true F._save_ir_before;
     mk_probes F._probes;
     mk_no_probes F._no_probes;
+    mk_probes_optimized F._probes_optimized;
+    mk_no_probes_optimized F._no_probes_optimized;
     mk_i F._i;
     mk_I F._I;
     mk_H F._H;
@@ -2482,6 +2506,8 @@ module Default = struct
     let _v () = Compenv.print_version_and_library "native-code compiler"
     let _no_probes = clear probes
     let _probes = set probes
+    let _no_probes_optimized = clear emit_optimized_probes
+    let _probes_optimized = set emit_optimized_probes
     let _gdwarf_config_shape_reduce_depth s =
       gdwarf_config_shape_reduce_depth :=
         parse_int_option ~parameter:"-gdwarf-config-shape-reduce-depth" s

@@ -436,7 +436,10 @@ type operation =
         handler_code_sym : string;
         enabled_at_init : bool
       }
-  | Cprobe_is_enabled of { name : string }
+  | Cprobe_is_enabled of
+      { name : string;
+        enabled_at_init : bool option
+      }
   | Copaque (* Sys.opaque_identity *)
   | Cbeginregion
   | Cendregion

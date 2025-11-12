@@ -292,7 +292,10 @@ type t =
   | Csel of test
   | Reinterpret_cast of Cmm.reinterpret_cast
   | Static_cast of Cmm.static_cast
-  | Probe_is_enabled of { name : string }
+  | Probe_is_enabled of
+      { name : string;
+        enabled_at_init : bool option
+      }
   | Opaque
   | Begin_region
   | End_region
@@ -426,7 +429,11 @@ let dump ppf op =
   | Static_cast cast -> Format.fprintf ppf "%s" (Printcmm.static_cast cast)
   | Specific specific ->
     Format.fprintf ppf "specific %s" (Arch.specific_operation_name specific)
-  | Probe_is_enabled { name } -> Format.fprintf ppf "probe_is_enabled %s" name
+  | Probe_is_enabled { name; enabled_at_init } ->
+    Format.fprintf ppf "probe_is_enabled %s%s" name
+      (match enabled_at_init with
+      | None | Some false -> ""
+      | Some true -> " enabled_at_init")
   | Opaque -> Format.fprintf ppf "opaque"
   | Begin_region -> Format.fprintf ppf "beginregion"
   | End_region -> Format.fprintf ppf "endregion"

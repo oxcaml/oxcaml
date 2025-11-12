@@ -258,6 +258,12 @@ let afl_inst_ratio = ref 100           (* -afl-inst-ratio *)
 
 let function_sections = ref false      (* -function-sections *)
 let probes = ref Config.probes         (* -probes *)
+
+let supports_optimized_probes =
+  Config.probes && (String.equal Config.architecture "amd64")
+let emit_optimized_probes =
+  ref supports_optimized_probes (* -probes-optimized *)
+
 let simplify_rounds = ref None        (* -rounds *)
 let default_simplify_rounds = ref 1        (* -rounds *)
 let rounds () =
@@ -829,7 +835,7 @@ module Register_allocator = struct
     match left, right with
     | Cfg, Cfg | Irc, Irc | Ls, Ls | Gi, Gi -> true
     | (Cfg | Irc | Ls | Gi), _ -> false
-  
+
   let to_string = function
     | Cfg -> "cfg"
     | Irc -> "irc"
@@ -839,7 +845,7 @@ module Register_allocator = struct
   let assoc_list = List.map (fun regalloc -> to_string regalloc, regalloc) all
 
   let of_string s = List.assoc_opt (String.lowercase_ascii s) assoc_list
-  
+
   let format ppf regalloc =
     Format.fprintf ppf "%s" (to_string regalloc)
 end

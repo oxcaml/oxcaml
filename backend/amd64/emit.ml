@@ -2318,8 +2318,10 @@ let emit_instr ~first ~fallthrough i =
        the correct place and managing the spilling/reloading of live registers.
        See [emit_probe_handler_wrapper] below. *)
     emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label
-  | Lop (Probe_is_enabled { name }) ->
-    let semaphore_sym = Probe_emission.find_or_add_semaphore name None i.dbg in
+  | Lop (Probe_is_enabled { name; enabled_at_init }) ->
+    let semaphore_sym =
+      Probe_emission.find_or_add_semaphore name enabled_at_init i.dbg
+    in
     (* Load unsigned 2-byte integer value of the semaphore. According to the
        documentation [1], semaphores are of type unsigned short. [1]
        https://sourceware.org/systemtap/wiki/UserSpaceProbeImplementation *)
