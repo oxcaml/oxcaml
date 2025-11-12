@@ -89,6 +89,9 @@ module Sort : sig
       result is a [Var v], then [!v] is [None]. *)
   val get : t -> t
 
+  (** Determines if the sort is [Value] or an unfilled sort variable *)
+  val is_possibly_scannable : t -> bool
+
   (** Decompose a sort into a list (of the given length) of fresh sort variables,
       equating the input sort with the product of the output sorts. *)
   val decompose_into_product : t -> int -> t list option
@@ -103,14 +106,17 @@ module Layout : sig
       [Sort (Product ...]. This duplication is hard to eliminate because of the
       possibility that a sort variable may be instantiated by a product sort. *)
   type 'sort t =
-    | Sort of 'sort
+    | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
-    | Any
+    | Any of Scannable_axes.t
 
+  (* CR zeisbach: I moved Any below the others but that disagrees with the
+     [jkind.ml] implementation. Not sure what is right here: should I clean
+     things up as I am going through, or try to minimize the diff? *)
   module Const : sig
     type t =
-      | Any
-      | Base of Sort.base
+      | Base of Sort.base * Scannable_axes.t
       | Product of t list
+      | Any of Scannable_axes.t
   end
 end

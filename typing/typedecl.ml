@@ -1061,7 +1061,7 @@ let transl_declaration env sdecl (id, uid) =
       match kind with
       | Type_record_unboxed_product _ ->
         begin match Jkind.get_layout jkind with
-        | Some Any ->
+        | Some (Any _) ->
           (* [jkind_default] has just what we need here *)
           Jkind.set_layout jkind (Jkind.extract_layout jkind_default)
         | _ -> jkind
@@ -2552,7 +2552,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
     (* A type whose layout has [any] could contain all its parameters.
        CR layouts v11: update this function for [layout_of] layouts. *)
     let rec has_any : Jkind_types.Layout.Const.t -> bool = function
-      | Any -> true
+      | Any _ -> true
       | Base _ -> false
       | Product l -> List.exists has_any l
     in

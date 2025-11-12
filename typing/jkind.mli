@@ -83,25 +83,47 @@ module Sub_result : sig
   val is_le : t -> bool
 end
 
+module Scannable_axes : sig
+  type t = Jkind_types.Scannable_axes.t
+
+  (* CR zeisbach: there should be a creation function that takes labeled
+     arguments for each axes, then the defaults in [jkind.ml] should be updated *)
+
+  (* CR zeisbach: should this be an Axis_ops? having equal and
+     the other version of <= is nice. but this might indicate that
+     Axis_ops is not the right name to call this. *)
+  include Jkind_axis.Axis_ops with type t := t
+
+  val to_string : t -> string
+
+  (* CR zeisbach: should this include a debug print? *)
+  val debug_print : Format.formatter -> t -> unit
+end
+
 (* The layout of a type describes its memory layout. A layout is either the
    indeterminate [Any] or a sort, which is a concrete memory layout. *)
 module Layout : sig
   type 'sort t = 'sort Jkind_types.Layout.t =
-    | Sort of 'sort
+    | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
-    | Any
+    | Any of Scannable_axes.t
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
 
+    (* CR zeisbach: maybe this needs [get_scannable_axes] too? *)
+
     val get_sort : t -> Sort.Const.t option
 
-    val of_sort_const : Sort.Const.t -> t
+    (* CR zeisbach: is this right? TODO: look at call sites! *)
+    val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 
     val to_string : t -> string
   end
 
   val of_const : Const.t -> Sort.t t
+
+  val get_root_scannable_axes : Sort.t t -> Scannable_axes.t option
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
 

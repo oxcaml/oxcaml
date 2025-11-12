@@ -79,6 +79,38 @@ module Sub_result = struct
   let is_le t = require_le t |> Result.is_ok
 end
 
+module Scannable_axes = struct
+  type t = Jkind_types.Scannable_axes.t
+
+  (* adding in the stubs explicitly so that they can be expanded later *)
+
+  let max = Pointerness.max
+
+  let min = Pointerness.min
+
+  let legacy = Pointerness.legacy
+
+  let equal sa1 sa2 = Pointerness.equal sa1 sa2
+
+  let less_or_equal sa1 sa2 = Pointerness.less_or_equal sa1 sa2
+
+  let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
+
+  let meet sa1 sa2 = Pointerness.meet sa1 sa2
+
+  let join sa1 sa2 = Pointerness.join sa1 sa2
+
+  (* CR zeisbach: this should get better with more axes *)
+  let to_string sa = Pointerness.to_string sa
+
+  let print ppf sa = Pointerness.print ppf sa
+
+  (* CR zeisbach: print this out like { nullability: ...; ... } eventually.
+     could also have Caps versions of the points on the axis, which might
+     be nice. if so, could add to a signature somewhere *)
+  let debug_print ppf sa = Pointerness.print ppf sa
+end
+
 (* A *layout* of a type describes the way values of that type are stored at
    runtime, including details like width, register convention, calling
    convention, etc. A layout may be *representable* or *unrepresentable*.  The
@@ -89,69 +121,33 @@ module Layout = struct
   open Jkind_types.Layout
 
   type nonrec 'sort t = 'sort t =
-    | Sort of 'sort
+    | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
-    | Any
+    | Any of Scannable_axes.t
 
   module Const = struct
     type t = Const.t =
-      | Any
-      | Base of Sort.base
+      | Base of Sort.base * Scannable_axes.t
       | Product of t list
+      | Any of Scannable_axes.t
 
-    let max = Any
+    let max = Any Scannable_axes.max
 
     let rec equal c1 c2 =
       match c1, c2 with
-      | Base b1, Base b2 -> Sort.equal_base b1 b2
-      | Any, Any -> true
+      | Base (Value, sa1), Base (Value, sa2) -> Scannable_axes.equal sa1 sa2
+      | Base (b1, _), Base (b2, _) -> Sort.equal_base b1 b2
+      | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
-      | (Base _ | Any | Product _), _ -> false
+      | (Base _ | Any _ | Product _), _ -> false
 
     module Static = struct
-      let value = Base Sort.Value
-
-      let void = Base Sort.Void
-
-      let float64 = Base Sort.Float64
-
-      let float32 = Base Sort.Float32
-
-      let word = Base Sort.Word
-
-      let untagged_immediate = Base Sort.Untagged_immediate
-
-      let bits8 = Base Sort.Bits8
-
-      let bits16 = Base Sort.Bits16
-
-      let bits32 = Base Sort.Bits32
-
-      let bits64 = Base Sort.Bits64
-
-      let vec128 = Base Sort.Vec128
-
-      let vec256 = Base Sort.Vec256
-
-      let vec512 = Base Sort.Vec512
-
-      let of_base : Sort.base -> t = function
-        | Value -> value
-        | Void -> void
-        | Untagged_immediate -> untagged_immediate
-        | Float64 -> float64
-        | Float32 -> float32
-        | Word -> word
-        | Bits8 -> bits8
-        | Bits16 -> bits16
-        | Bits32 -> bits32
-        | Bits64 -> bits64
-        | Vec128 -> vec128
-        | Vec256 -> vec256
-        | Vec512 -> vec512
+      (* CR zeisbach: this used to have a bunch of constants defined so that
+         they only had to be allocated once. now that there are SA as well,
+         this is not really a thing. Unless we wanted to statically allocate
+         _all_ of the possibilities. Could be worth benchmarking... *)
+      let of_base (b : Sort.base) sa = Base (b, sa)
     end
-
-    include Static
 
     (* if so, scannable axis annotations should not trigger a warning *)
     let is_value_or_any = function
@@ -163,38 +159,52 @@ module Layout = struct
       | Product _ -> false
 
     let rec get_sort : t -> Sort.Const.t option = function
-      | Any -> None
-      | Base b -> Some (Base b)
+      | Any _ -> None
+      | Base (b, _) -> Some (Base b)
       | Product ts ->
         Option.map
           (fun x -> Sort.Const.Product x)
           (Misc.Stdlib.List.map_option get_sort ts)
 
-    let of_sort s =
-      let rec of_sort : Sort.t -> _ = function
+    let of_sort s sa =
+      (* CR zeisbach: check style here, same as above (function, arg order) *)
+      let rec of_sort (s : Sort.t) sa =
+        match s with
         | Var _ -> None
-        | Base b -> Some (Static.of_base b)
+        | Base b -> Some (Static.of_base b sa)
         | Product sorts ->
           Option.map
             (fun x -> Product x)
             (* [Sort.get] is deep, so no need to repeat it here *)
-            (Misc.Stdlib.List.map_option of_sort sorts)
+            (* CR zeisbach: maybe this isn't necessary, but defensively
+               setting to max instead of propagating while experimenting *)
+            (Misc.Stdlib.List.map_option
+               (fun s -> of_sort s Scannable_axes.max)
+               sorts)
       in
-      of_sort (Sort.get s)
+      of_sort (Sort.get s) sa
 
-    let of_flat_sort : Sort.Flat.t -> _ = function
-      | Var _ -> None
-      | Base b -> Some (Static.of_base b)
+    let of_flat_sort (s : Sort.Flat.t) sa =
+      match s with Var _ -> None | Base b -> Some (Static.of_base b sa)
 
-    let rec of_sort_const : Sort.Const.t -> t = function
-      | Base b -> Base b
-      | Product consts -> Product (List.map of_sort_const consts)
+    let rec of_sort_const (s : Sort.Const.t) sa =
+      match s with
+      | Base b -> Base (b, sa)
+      (* CR zeisbach: this take sa before s and partially apply?
+         this is a stylistic question and I am not sure what is preferred.
+
+         For now I am just keeping everything [s sa] for consistency
+         and adding [fun]s, but I kinda don't like it. easy to swap. *)
+      | Product consts ->
+        Product (List.map (fun s -> of_sort_const s sa) consts)
 
     let to_string t =
       let rec to_string nested (t : t) =
         match t with
-        | Any -> "any"
-        | Base b -> Sort.to_string_base b
+        (* CR zeisbach: what is the style here? with [^]s and [" "]s *)
+        | Any sa -> "any " ^ Scannable_axes.to_string sa
+        | Base (b, sa) ->
+          Sort.to_string_base b ^ " " ^ Scannable_axes.to_string sa
         | Product ts ->
           String.concat ""
             [ (if nested then "(" else "");
@@ -214,8 +224,9 @@ module Layout = struct
     open Format
 
     let rec t format_sort ppf = function
-      | Any -> fprintf ppf "Any"
-      | Sort s -> fprintf ppf "Sort %a" format_sort s
+      | Any sa -> fprintf ppf "Any %a" Scannable_axes.debug_print sa
+      | Sort (s, sa) ->
+        fprintf ppf "Sort (%a, %a)" format_sort s Scannable_axes.debug_print sa
       | Product ts ->
         fprintf ppf "Product [ %a ]"
           (pp_print_list
@@ -226,8 +237,8 @@ module Layout = struct
 
   let rec of_const (const : Const.t) : _ t =
     match const with
-    | Any -> Any
-    | Base b -> Sort (Sort.of_base b)
+    | Any sa -> Any sa
+    | Base (b, sa) -> Sort (Sort.of_base b, sa)
     | Product cs -> Product (List.map of_const cs)
 
   let product = function
@@ -236,8 +247,8 @@ module Layout = struct
     | lays -> Product lays
 
   let rec to_sort = function
-    | Any -> None
-    | Sort s -> Some s
+    | Any _ -> None
+    | Sort (s, _) -> Some s
     | Product ts -> to_product_sort ts
 
   and to_product_sort ts =
@@ -246,21 +257,24 @@ module Layout = struct
       (Misc.Stdlib.List.map_option to_sort ts)
 
   let rec get : Sort.t t -> Sort.Flat.t t =
-    let rec flatten_sort : Sort.t -> Sort.Flat.t t = function
-      | Var v -> Sort (Var (Sort.Var.get_id v))
+    let rec flatten_sort (s : Sort.t) sa : Sort.Flat.t t =
+      match s with
+      | Var v -> Sort (Var (Sort.Var.get_id v), sa)
       | Base b ->
-        Sort (Base b)
+        Sort (Base b, sa)
         (* No need to call [Sort.get] here, because one [get] is deep. *)
-      | Product sorts -> Product (List.map flatten_sort sorts)
+        (* CR zeisbach: again, like above, maxing this out *)
+      | Product sorts ->
+        Product (List.map (fun s -> flatten_sort s Scannable_axes.max) sorts)
     in
     function
-    | Any -> Any
-    | Sort s -> flatten_sort (Sort.get s)
+    | Any sa -> Any sa
+    | Sort (s, sa) -> flatten_sort (Sort.get s) sa
     | Product ts -> Product (List.map get ts)
 
   let rec get_const of_sort : _ t -> Const.t option = function
-    | Any -> Some Any
-    | Sort s -> of_sort s
+    | Any sa -> Some (Any sa)
+    | Sort (s, sa) -> of_sort s sa
     | Product layouts ->
       Option.map
         (fun x -> Layout.Const.Product x)
@@ -282,12 +296,29 @@ module Layout = struct
 
   let rec equate_or_equal ~allow_mutation t1 t2 =
     match t1, t2 with
-    | Sort s1, Sort s2 ->
+    | Sort (s1, sa1), Sort (s2, sa2) ->
       sort_equal_result ~allow_mutation (Sort.equate_tracking_mutation s1 s2)
-    | Product ts, Sort sort | Sort sort, Product ts -> (
+      &&
+      if Sort.is_possibly_scannable s1
+         (* CR zeisbach: if s1 and s2 are both unfilled sort variables, AND
+            [sa1 <> sa2] then they should _not_ be equal. It is possible that
+            unifying that (now shared) sort variable with [Value] (soon to be
+            called [Scannable]) then we may get better error reporting.
+            For now, it just concludes that they are not equal *)
+      then Scannable_axes.equal sa1 sa2
+      else true
+    | Product ts, Sort (sort, sa) | Sort (sort, sa), Product ts -> (
       (* If [ts] can't be turned into a product sort -- because it has [any]
          -- then equality will surely fail. No need to create new sort
          variables here. *)
+      (* CR zeisbach: it is unclear when this code path will arise/matter.
+         for now, ignoring. it might be correct to check any [Value] leaves
+         in [sort], but I'm not sure what they would be compared against. *)
+      (* CR zeisbach: after more discussion, we think that this should ensure
+         that the [sa]s at any leaves in [ts] are all top. currently, this
+         check is missing; it would require some refactoring, possible using
+         [decompose_into_product] *)
+      ignore sa;
       match to_product_sort ts with
       | None -> false
       | Some sort' ->
@@ -295,36 +326,79 @@ module Layout = struct
           (Sort.equate_tracking_mutation sort sort'))
     | Product ts1, Product ts2 ->
       List.equal (equate_or_equal ~allow_mutation) ts1 ts2
-    | Any, Any -> true
-    | (Any | Sort _ | Product _), _ -> false
+    | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
+    | (Any _ | Sort _ | Product _), _ -> false
+
+  (* only meets at the root, meaning products are left unchanged. *)
+  (* CR zeisbach: this suggests we may want to change our data definition
+     to just be a pair of a layout and some scannable axes.
+     TODO: think about how this relates to storing sorts with SA too *)
+  let meet_scannable_axes t sa =
+    match t with
+    | Any sa' -> Any (Scannable_axes.meet sa sa')
+    | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
+    | Product _ -> t
+
+  let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
+    | Any sa | Sort (_, sa) -> Some sa
+    (* CR zeisbach: it feels like ignoring this is the only sensible
+       thing to do here, but think about this carefully *)
+    | Product _ -> None
 
   let sub t1 t2 =
     let rec sub t1 t2 : Misc.Le_result.t =
       match t1, t2 with
-      | Any, Any -> Equal
-      | _, Any -> Less
-      | Any, _ -> Not_le
-      | Sort s1, Sort s2 -> if Sort.equate s1 s2 then Equal else Not_le
+      | Any sa1, Any sa2 -> Scannable_axes.less_or_equal sa1 sa2
+      | Sort (sort, sa1), Any sa2 ->
+        (* CR zeisbach: again, there is a case that is not quite handled here,
+           where the sort is an empty variable and sa1 </= sa2. this is ok as
+           long as the variable is not unified to [Value], but we defensively
+           say that it is not le.
+
+           a better thing to do could be to unify the variable with [Value]
+           and let it fail later. OR, could return something finer grained
+           than [Layout_disagreement] for the resulting [Sub_result] *)
+        if Sort.is_possibly_scannable sort && not (Scannable_axes.le sa1 sa2)
+        then Not_le
+        else Less
+      | Product _, Any _ ->
+        (* CR zeisbach: we may want to look into the leaves of this Product? *)
+        Less
+      | Any _, _ -> Not_le
+      | Sort (s1, sa1), Sort (s2, sa2) ->
+        if Sort.equate s1 s2
+        then
+          if Sort.is_possibly_scannable s1
+          then Scannable_axes.less_or_equal sa1 sa2
+          else Equal
+        else Not_le
       | Product ts1, Product ts2 ->
         if List.compare_lengths ts1 ts2 = 0
         then Misc.Le_result.combine_list (List.map2 sub ts1 ts2)
         else Not_le
-      | Product ts1, Sort s2 -> (
+      | Product ts1, Sort (s2, _) -> (
         (* This case could use [to_product_sort] because every component will need
            to end up less than a sort (so, no [any]), but it seems easier to keep
            this case lined up with the inverse case, which definitely cannot use
            [to_product_sort]. *)
+        (* CR zeisbach: this just discards the [sa] in the Sort and turns things
+           into max when recurring. maybe there is another constraint we may want
+           to apply to make things (errors?) less confusing? *)
         match Sort.decompose_into_product s2 (List.length ts1) with
         | None -> Not_le
         | Some ss2 ->
           Misc.Le_result.combine_list
-            (List.map2 (fun t1 s2 -> sub t1 (Sort s2)) ts1 ss2))
-      | Sort s1, Product ts2 -> (
+            (List.map2
+               (fun t1 s2 -> sub t1 (Sort (s2, Scannable_axes.max)))
+               ts1 ss2))
+      | Sort (s1, _), Product ts2 -> (
         match Sort.decompose_into_product s1 (List.length ts2) with
         | None -> Not_le
         | Some ss1 ->
           Misc.Le_result.combine_list
-            (List.map2 (fun s1 t2 -> sub (Sort s1) t2) ss1 ts2))
+            (List.map2
+               (fun s1 t2 -> sub (Sort (s1, Scannable_axes.max)) t2)
+               ss1 ts2))
     in
     Sub_result.of_le_result (sub t1 t2) ~failure_reason:(fun () ->
         [Layout_disagreement])
@@ -338,30 +412,42 @@ module Layout = struct
         (Misc.Stdlib.List.some_if_all_elements_are_some components)
     in
     match t1, t2 with
-    | _, Any -> Some t1
-    | Any, _ -> Some t2
-    | Sort s1, Sort s2 -> if Sort.equate s1 s2 then Some t1 else None
+    | _, Any sa2 -> Some (meet_scannable_axes t1 sa2)
+    | Any sa1, _ -> Some (meet_scannable_axes t2 sa1)
+    | Sort (s1, sa1), Sort (s2, sa2) ->
+      if Sort.equate s1 s2
+      then Some (Sort (s1, Scannable_axes.meet sa1 sa2))
+      else None
     | Product ts1, Product ts2 ->
       if List.compare_lengths ts1 ts2 = 0 then products ts1 ts2 else None
-    | Product ts, Sort sort | Sort sort, Product ts -> (
+    | Product ts, Sort (sort, _) | Sort (sort, _), Product ts -> (
+      (* CR zeisbach: like in the case above, the [sa]s are just ignored
+         for intersection since they are nonsense in this case.
+         this should be considered more carefully. *)
       match Sort.decompose_into_product sort (List.length ts) with
       | None -> None
-      | Some sorts -> products ts (List.map (fun x -> Sort x) sorts))
+      | Some sorts ->
+        products ts (List.map (fun x -> Sort (x, Scannable_axes.max)) sorts))
 
   let of_new_sort_var () =
     let sort = Sort.new_var () in
-    Sort sort, sort
+    Sort (sort, Scannable_axes.max), sort
 
   let rec default_to_value_and_get : _ Layout.t -> Const.t = function
-    | Any -> Any
-    | Sort s -> Const.of_sort_const (Sort.default_to_value_and_get s)
+    | Any sa -> Any sa
+    | Sort (s, sa) -> Const.of_sort_const (Sort.default_to_value_and_get s) sa
     | Product p -> Product (List.map default_to_value_and_get p)
 
   let format ppf layout =
     let open Format in
     let rec pp_element ~nested ppf : _ Layout.t -> unit = function
-      | Any -> fprintf ppf "any"
-      | Sort s -> Sort.format ppf s
+      (* CR zeisbach: do we want to be always printing all of these out?
+         it might be possible to add a "turn off sa printing" parameter *)
+      (* CR zeisbach: also, it's a bit awkward to have that called print
+         and not format, but that seems to be inherited... *)
+      | Any sa -> fprintf ppf "any %a" Scannable_axes.print sa
+      | Sort (s, sa) ->
+        fprintf ppf "%a %a" Sort.format s Scannable_axes.print sa
       | Product ts ->
         let pp_sep ppf () = Format.fprintf ppf "@ & " in
         Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
@@ -1416,14 +1502,15 @@ module Const = struct
 
     let any =
       { jkind =
-          mk_jkind Any ~crossing:Crossing.max ~externality:Externality.max
-            ~nullability:Maybe_null ~separability:Maybe_separable;
+          mk_jkind (Any Scannable_axes.max) ~crossing:Crossing.max
+            ~externality:Externality.max ~nullability:Maybe_null
+            ~separability:Maybe_separable;
         name = "any"
       }
 
     let any_mod_everything =
       { jkind =
-          mk_jkind Any ~crossing:cross_all_except_staticity
+          mk_jkind (Any Scannable_axes.max) ~crossing:cross_all_except_staticity
             ~externality:Externality.min ~nullability:Maybe_null
             ~separability:Maybe_separable;
         name = "any mod everything"
@@ -1431,31 +1518,34 @@ module Const = struct
 
     let value_or_null =
       { jkind =
-          mk_jkind (Base Value) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Maybe_null
-            ~separability:Maybe_separable;
+          mk_jkind
+            (Base (Value, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Maybe_null ~separability:Maybe_separable;
         name = "value_or_null"
       }
 
     let value_or_null_mod_everything =
       { jkind =
-          mk_jkind (Base Value) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Maybe_null
-            ~separability:Maybe_separable;
+          mk_jkind
+            (Base (Value, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Maybe_null ~separability:Maybe_separable;
         name = "value_or_null mod everything"
       }
 
     let value =
       { jkind =
-          mk_jkind (Base Value) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Non_null
-            ~separability:Separable;
+          mk_jkind
+            (Base (Value, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Non_null ~separability:Separable;
         name = "value"
       }
 
     let immutable_data =
       { jkind =
-          { layout = Base Value;
+          { layout = Base (Value, Scannable_axes.max);
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
@@ -1473,7 +1563,7 @@ module Const = struct
 
     let exn =
       { jkind =
-          { layout = Base Value;
+          { layout = Base (Value, Scannable_axes.max);
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:false
@@ -1491,7 +1581,7 @@ module Const = struct
 
     let sync_data =
       { jkind =
-          { layout = Base Value;
+          { layout = Base (Value, Scannable_axes.max);
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
@@ -1509,7 +1599,7 @@ module Const = struct
 
     let mutable_data =
       { jkind =
-          { layout = Base Value;
+          { layout = Base (Value, Scannable_axes.max);
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
@@ -1527,33 +1617,40 @@ module Const = struct
 
     let void =
       { jkind =
-          mk_jkind (Base Void) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Void, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Non_null ~separability:Non_float;
         name = "void"
       }
 
     let void_mod_everything =
       { jkind =
-          mk_jkind (Base Void) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Void, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Non_null ~separability:Non_float;
         name = "void mod everything"
       }
 
+    (* CR zeisbach: for now (to reduce the diff in tests), this is going to be
+       set to max. In reality, this should have [non_pointer]! This will be
+       added and reviewed in a later PR (or this one, if that's too weird) *)
     let immediate =
       { jkind =
-          mk_jkind (Base Value) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Value, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Non_null ~separability:Non_float;
         name = "immediate"
       }
 
     let immediate_or_null =
       { jkind =
-          mk_jkind (Base Value) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Maybe_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Value, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Maybe_null ~separability:Non_float;
         name = "immediate_or_null"
       }
 
@@ -1611,9 +1708,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let float64 =
       { jkind =
-          mk_jkind (Base Float64) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Float64, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Non_null ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
         name = "float64"
@@ -1623,9 +1721,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_float =
       { jkind =
-          mk_jkind (Base Float64) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Float64, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Non_null ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
         name = "float64 mod everything"
@@ -1635,9 +1734,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let float32 =
       { jkind =
-          mk_jkind (Base Float32) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Float32, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Non_null ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
         name = "float32"
@@ -1647,9 +1747,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_float32 =
       { jkind =
-          mk_jkind (Base Float32) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Float32, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Non_null ~separability:Non_float;
         (* [separability] is intentionally [Non_float]:
            only boxed floats are relevant for separability. *)
         name = "float32 mod everything"
@@ -1659,9 +1760,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let word =
       { jkind =
-          mk_jkind (Base Word) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Word, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Non_null ~separability:Non_float;
         name = "word"
       }
 
@@ -1669,23 +1771,26 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_nativeint =
       { jkind =
-          mk_jkind (Base Word) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Word, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Non_null ~separability:Non_float;
         name = "word mod everything"
       }
 
     let untagged_immediate =
       { jkind =
-          mk_jkind (Base Untagged_immediate) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Untagged_immediate, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Non_null ~separability:Non_float;
         name = "untagged_immediate"
       }
 
     let kind_of_untagged_immediate =
       { jkind =
-          mk_jkind (Base Untagged_immediate)
+          mk_jkind
+            (Base (Untagged_immediate, Scannable_axes.max))
             ~crossing:cross_all_except_staticity ~externality:Externality.min
             ~nullability:Non_null ~separability:Non_float;
         name = "untagged_immediate mod everything"
@@ -1695,9 +1800,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let bits8 =
       { jkind =
-          mk_jkind (Base Bits8) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Bits8, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Non_null ~separability:Non_float;
         name = "bits8"
       }
 
@@ -1705,9 +1811,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int8 =
       { jkind =
-          mk_jkind (Base Bits8) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Bits8, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Non_null ~separability:Non_float;
         name = "bits8 mod everything"
       }
 
@@ -1715,9 +1822,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let bits16 =
       { jkind =
-          mk_jkind (Base Bits16) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Bits16, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Non_null ~separability:Non_float;
         name = "bits16"
       }
 
@@ -1725,9 +1833,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int16 =
       { jkind =
-          mk_jkind (Base Bits16) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Bits16, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Non_null ~separability:Non_float;
         name = "bits16 mod everything"
       }
 
@@ -1735,9 +1844,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let bits32 =
       { jkind =
-          mk_jkind (Base Bits32) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Bits32, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Non_null ~separability:Non_float;
         name = "bits32"
       }
 
@@ -1745,9 +1855,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int32 =
       { jkind =
-          mk_jkind (Base Bits32) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Bits32, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Non_null ~separability:Non_float;
         name = "bits32 mod everything"
       }
 
@@ -1755,9 +1866,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let bits64 =
       { jkind =
-          mk_jkind (Base Bits64) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Bits64, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Non_null ~separability:Non_float;
         name = "bits64"
       }
 
@@ -1765,17 +1877,19 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int64 =
       { jkind =
-          mk_jkind (Base Bits64) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Bits64, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Non_null ~separability:Non_float;
         name = "bits64 mod everything"
       }
 
     let kind_of_idx =
       { jkind =
-          mk_jkind (Base Bits64) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Bits64, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Non_null ~separability:Non_float;
         name = "bits64 mod everything"
       }
 
@@ -1783,9 +1897,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let vec128 =
       { jkind =
-          mk_jkind (Base Vec128) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Vec128, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Non_null ~separability:Non_float;
         name = "vec128"
       }
 
@@ -1793,9 +1908,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let vec256 =
       { jkind =
-          mk_jkind (Base Vec256) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Vec256, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Non_null ~separability:Non_float;
         name = "vec256"
       }
 
@@ -1803,9 +1919,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let vec512 =
       { jkind =
-          mk_jkind (Base Vec512) ~crossing:Crossing.max
-            ~externality:Externality.max ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Vec512, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Non_null ~separability:Non_float;
         name = "vec512"
       }
 
@@ -1813,9 +1930,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_128bit_vectors =
       { jkind =
-          mk_jkind (Base Vec128) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Vec128, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Non_null ~separability:Non_float;
         name = "vec128 mod everything"
       }
 
@@ -1823,9 +1941,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_256bit_vectors =
       { jkind =
-          mk_jkind (Base Vec256) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Vec256, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Non_null ~separability:Non_float;
         name = "vec256 mod everything"
       }
 
@@ -1833,9 +1952,10 @@ module Const = struct
        to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_512bit_vectors =
       { jkind =
-          mk_jkind (Base Vec512) ~crossing:cross_all_except_staticity
-            ~externality:Externality.min ~nullability:Non_null
-            ~separability:Non_float;
+          mk_jkind
+            (Base (Vec512, Scannable_axes.max))
+            ~crossing:cross_all_except_staticity ~externality:Externality.min
+            ~nullability:Non_null ~separability:Non_float;
         name = "vec512 mod everything"
       }
 
@@ -2078,10 +2198,16 @@ module Const = struct
         | { base; modal_bounds = _ :: _ as modal_bounds; printable_with_bounds }
           ->
           ( Outcometree.Ojkind_const_mod
-              (Some (Ojkind_const_abbreviation base), modal_bounds),
+              (* CR zeisbach: this obviously needs to do something more useful.
+                 the answer is to add a field to printable_jkind to store the
+                 scannable axes, but I think that should be saved for the
+                 separability porting refactor. unless everything explodes *)
+              ( Some (Ojkind_const_abbreviation (base, ["placeholder"])),
+                modal_bounds ),
             printable_with_bounds )
         | { base; modal_bounds = []; printable_with_bounds } ->
-          Outcometree.Ojkind_const_abbreviation base, printable_with_bounds
+          ( Outcometree.Ojkind_const_abbreviation (base, []),
+            printable_with_bounds )
       in
       (* Finally, add on the [with]-types and their modalities *)
       List.fold_left
@@ -2230,18 +2356,19 @@ module Const = struct
     let rec scan_layout (l : Layout.Const.t) : Language_extension.maturity =
       match l, Mod_bounds.nullability jkind.mod_bounds with
       | ( ( Base
-              ( Float64 | Float32 | Word | Bits8 | Bits16 | Bits32 | Bits64
-              | Vec128 | Vec256 | Vec512 | Untagged_immediate )
-          | Any ),
+              ( ( Float64 | Float32 | Word | Bits8 | Bits16 | Bits32 | Bits64
+                | Vec128 | Vec256 | Vec512 | Untagged_immediate ),
+                _ )
+          | Any _ ),
           _ )
-      | Base Value, Non_null
-      | Base Value, Maybe_null ->
+      | Base (Value, _), Non_null
+      | Base (Value, _), Maybe_null ->
         Stable
       | Product layouts, _ ->
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
           Language_extension.Stable layouts
-      | Base Void, _ -> Stable
+      | Base (Void, _), _ -> Stable
     in
     scan_layout jkind.layout
 
@@ -2267,9 +2394,14 @@ module Desc = struct
     let open Format in
     let rec format_desc ~nested ppf (desc : _ t) =
       match desc.layout with
-      | Sort (Var n) -> fprintf ppf "'s%d" (Sort.Var.get_print_number n)
+      | Sort (Var n, sa) ->
+        fprintf ppf "'s%d %a"
+          (Sort.Var.get_print_number n)
+          (* CR zeisbach: do we even want to print this out here? take a look at
+             what it would impact (maybe just debug??). *)
+          Scannable_axes.print sa
       (* Analyze a product before calling [get_const]: the machinery in
-         [Const.format] works better for atomic layouts, not products. *)
+         ormat] works better for atomic layouts, not products. *)
       | Product lays ->
         let pp_sep ppf () = fprintf ppf "@ & " in
         Misc.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
@@ -2666,7 +2798,13 @@ let for_unboxed_record lbls =
   in
   let layouts =
     List.map
-      (fun lbl -> lbl.ld_sort |> Layout.Const.of_sort_const |> Layout.of_const)
+      (fun lbl ->
+        Layout.Const.of_sort_const lbl.ld_sort
+          (* CR zeisbach: this will change when modules get reorg *)
+          (* CR zeisbach: this is indicative of [ld_sort] not storing enough
+             information: we want to store both a sort AND scannable axes *)
+          Scannable_axes.max
+        |> Layout.of_const)
       lbls
   in
   Builtin.product ~why:Unboxed_record tys_modalities layouts
@@ -2677,7 +2815,10 @@ let for_non_float ~(why : History.value_creation_reason) =
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
-    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    { layout = Sort (Base Value, Maybe_pointer);
+      mod_bounds;
+      with_bounds = No_with_bounds
+    }
     ~annotation:None ~why:(Value_creation why)
 
 let for_or_null_argument ident =
@@ -2690,7 +2831,10 @@ let for_or_null_argument ident =
       ~separability:Separability.Maybe_separable
   in
   fresh_jkind
-    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    { layout = Sort (Base Value, Maybe_pointer);
+      mod_bounds;
+      with_bounds = No_with_bounds
+    }
     ~annotation:None ~why:(Value_creation why)
 
 let for_abbreviation ~type_jkind_purely ~modality ty =
@@ -2793,7 +2937,10 @@ let for_open_boxed_row =
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
-    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    { layout = Sort (Base Value, Maybe_pointer);
+      mod_bounds;
+      with_bounds = No_with_bounds
+    }
     ~annotation:None ~why:(Value_creation Polymorphic_variant)
 
 let limit_for_mode_crossing_rows = 100
@@ -2832,7 +2979,7 @@ let for_boxed_row row =
 
 let for_arrow =
   fresh_jkind
-    { layout = Sort (Base Value);
+    { layout = Sort (Base Value, Maybe_pointer);
       mod_bounds = Mod_bounds.for_arrow;
       with_bounds = No_with_bounds
     }
@@ -2846,7 +2993,7 @@ let for_object =
   let comonadic = Crossing.Comonadic.legacy in
   let monadic = Crossing.Monadic.max in
   fresh_jkind
-    { layout = Sort (Base Value);
+    { layout = Sort (Base Value, Maybe_pointer);
       mod_bounds =
         Mod_bounds.create { comonadic; monadic } ~externality:Externality.max
           ~nullability:Non_null ~separability:Separability.Non_float;
@@ -2865,7 +3012,10 @@ let for_float ident =
       ~nullability:Nullability.Non_null ~separability:Separability.Separable
   in
   fresh_jkind
-    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    { layout = Sort (Base Value, Maybe_pointer);
+      mod_bounds;
+      with_bounds = No_with_bounds
+    }
     ~annotation:None ~why:(Primitive ident)
   |> mark_best
 
@@ -2875,7 +3025,7 @@ let for_array_argument =
       ~nullability:Nullability.Maybe_null ~separability:Separability.Separable
   in
   fresh_jkind
-    { layout = Any; mod_bounds; with_bounds = No_with_bounds }
+    { layout = Any Maybe_pointer; mod_bounds; with_bounds = No_with_bounds }
     ~annotation:None ~why:(Any_creation Array_type_argument)
 
 let for_array_element_sort () =
@@ -2924,8 +3074,8 @@ let get_const t = Jkind_desc.get_const t.jkind
 let sort_of_jkind (t : jkind_l) : sort =
   let rec sort_of_layout (t : _ Layout.t) =
     match t with
-    | Any -> Misc.fatal_error "Jkind.sort_of_jkind"
-    | Sort s -> s
+    | Any _ -> Misc.fatal_error "Jkind.sort_of_jkind"
+    | Sort (s, _) -> s
     | Product ls -> Sort.Product (List.map sort_of_layout ls)
   in
   sort_of_layout t.jkind.layout
@@ -3069,10 +3219,18 @@ let decompose_product ({ jkind; _ } as jk) =
   let deal_with_sort : Sort.t -> _ = function
     | Var _ -> None (* we've called [get] and there's *still* a variable *)
     | Base _ -> None
-    | Product sorts -> Some (List.map (fun sort -> mk_jkind (Sort sort)) sorts)
+    | Product sorts ->
+      Some
+        (List.map
+           (fun sort ->
+             (* CR zeisbach: fix namespacing problems here.
+                ALSO is this what we want to do? Feels like a forced move.
+                OR could push in non-trivialities. this matches the present *)
+             mk_jkind (Sort (sort, Scannable_axes.max)))
+           sorts)
   in
   match jkind.layout with
-  | Any -> None
+  | Any _ -> None
   | Product layouts ->
     (* CR layouts v7.1: The histories here are wrong (we are giving each
        component the history of the whole product).  They don't show up in
@@ -3081,7 +3239,7 @@ let decompose_product ({ jkind; _ } as jk) =
        relevant bits of [Ctype.type_jkind_sub] to just work on layouts, or
        introduce product histories. *)
     Some (List.map mk_jkind layouts)
-  | Sort s -> deal_with_sort (Sort.get s)
+  | Sort (s, _) -> deal_with_sort (Sort.get s)
 
 (*********************************)
 (* pretty printing *)
@@ -3648,9 +3806,9 @@ module Violation = struct
       match mismatch_type with Mode -> "kind" | Layout -> "layout"
     in
     let rec has_sort_var : Sort.Flat.t Layout.t -> bool = function
-      | Sort (Var _) -> true
+      | Sort (Var _, _) -> true
       | Product layouts -> List.exists has_sort_var layouts
-      | Sort (Base _) | Any -> false
+      | Sort (Base _, _) | Any _ -> false
     in
     let format_layout_or_kind ppf jkind =
       let indent =
@@ -3968,18 +4126,19 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub super =
     Ok ()
 
 let is_void_defaulting = function
-  | { jkind = { layout = Sort s; _ }; _ } -> Sort.is_void_defaulting s
+  | { jkind = { layout = Sort (s, _); _ }; _ } -> Sort.is_void_defaulting s
   | _ -> false
 
 let is_obviously_max = function
   (* This doesn't do any mutation because mutating a sort variable can't make it
      any, and modal upper bounds are constant. *)
-  | { jkind = { layout = Any; mod_bounds; with_bounds = _ }; _ } ->
-    Mod_bounds.is_max mod_bounds
+  | { jkind = { layout = Any sa; mod_bounds; with_bounds = _ }; _ } ->
+    (* CR zeisbach: [=] vs [equal] ? *)
+    Scannable_axes.(equal sa max) && Mod_bounds.is_max mod_bounds
   | _ -> false
 
 let has_layout_any jkind =
-  match jkind.jkind.layout with Any -> true | _ -> false
+  match jkind.jkind.layout with Any _ -> true | _ -> false
 
 let is_value_for_printing ~ignore_null { jkind; _ } =
   match Desc.get_const (Jkind_desc.get jkind) with

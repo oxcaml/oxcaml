@@ -1369,9 +1369,13 @@ let out_jkind_of_const_jkind jkind =
    be overhauled with [with]-types. Internal ticket 5096. *)
 let rec out_jkind_of_desc (desc : 'd Jkind.Desc.t) =
   match desc.layout with
-  | Sort (Var n) ->
+  | Sort ((Var n), sa) ->
     Ojkind_var ("'_representable_layout_" ^
-                Int.to_string (Jkind.Sort.Var.get_print_number n))
+                Int.to_string (Jkind.Sort.Var.get_print_number n),
+                (* CR zeisbach: this should handle ALL of the axes, meaning we
+                   probably want a [t -> string list] printing function.
+                   deal with this later. Per_axes would solve this *)
+                [Jkind.Scannable_axes.to_string sa])
   (* Analyze a product before calling [get_const]: the machinery in
      [Jkind.Const.to_out_jkind_const] works better for atomic layouts, not
      products. *)
@@ -1392,7 +1396,7 @@ let out_jkind_option_of_jkind ~ignore_null jkind =
   let elide =
     Jkind.is_value_for_printing ~ignore_null jkind (* C2.1 *)
     || (match desc.layout with
-        | Sort (Var _) -> not !Clflags.verbose_types (* X1 *)
+        | Sort ((Var _), _)-> not !Clflags.verbose_types (* X1 *)
         | _ -> false)
   in
   if elide then None else Some (out_jkind_of_desc desc)

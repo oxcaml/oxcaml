@@ -1596,8 +1596,8 @@ let report_error env ppf =
           dprintf "But it was inferred to have %t"
             (fun ppf -> let desc = Jkind.get inferred_jkind in
               match desc.layout with
-              | Sort (Var _) -> fprintf ppf "a representable kind"
-              | Sort (Base _) | Any | Product _ ->
+              | Sort (Var _, _) -> fprintf ppf "a representable kind"
+              | Sort (Base _, _) | Any _ | Product _ ->
                 fprintf ppf "kind %a" Jkind.format
                   inferred_jkind)))
         inferred_jkind
