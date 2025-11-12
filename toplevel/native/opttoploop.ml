@@ -96,7 +96,7 @@ type directive_info = {
 
 let remembered = ref Ident.empty
 
-let remember phrase_name signature =
+let remember phrase_name signature repr =
   let exported = List.filter Includemod.is_runtime_component signature in
   List.iteri (fun i sg ->
     match sg with
@@ -104,7 +104,7 @@ let remember phrase_name signature =
     | Sig_module (id, _, _, _, _)
     | Sig_typext (id, _, _, _)
     | Sig_class  (id, _, _, _) ->
-      remembered := Ident.add id (phrase_name, i) !remembered
+      remembered := Ident.add id (phrase_name, i, repr) !remembered
     | _ -> ())
     exported
 
@@ -112,10 +112,10 @@ let toplevel_value id =
   try Ident.find_same id !remembered
   with _ -> failwith ("Unknown ident: " ^ Ident.unique_name id)
 
-let close_phrase lam repr =
+let close_phrase lam =
   let open Lambda in
   Ident.Set.fold (fun id l ->
-    let glb, pos = toplevel_value id in
+    let glb, pos, repr = toplevel_value id in
     let layout = Lambda.layout_of_module_field repr pos in
     let glob =
       Lprim (mod_field pos repr,
@@ -125,13 +125,9 @@ let close_phrase lam repr =
     Llet(Strict, layout, id, Lambda.debug_uid_none, glob, l)
   ) (free_variables lam) lam
 
-let close_slambda_phrase slam repr =
+let close_slambda_phrase slam =
   match slam with
-  | SL.Quote lam -> SL.Quote (close_phrase lam repr)
-
-let toplevel_value id =
-  let glob, pos = toplevel_value id in
-  (Obj.magic (global_symbol glob)).(pos)
+  | SL.Quote lam -> SL.Quote (close_phrase lam)
 
 (* Return the value referred to by a path *)
 
@@ -139,7 +135,9 @@ let rec eval_address = function
   | Env.Aunit cu ->
       global_symbol cu
   | Env.Alocal id ->
-      toplevel_value id
+      let glob, pos, _repr = toplevel_value id in
+      (* CR jrayman *)
+      (Obj.magic (global_symbol glob)).(pos)
   | Env.Adot(a, module_repr, pos) ->
       let module_repr = Lambda.transl_module_representation module_repr in
       match module_repr with
@@ -322,33 +320,22 @@ let load_slambda ppf ~compilation_unit ~required_globals program repr =
   | None -> default_load ppf program
   | Some {Jit.load; _} -> load ppf program
 
-(* Don't call [outval_of_value] on non-values *)
-let outval_of_sig_value env id val_kind val_type =
-  let sort =
-    match val_kind with
-    | Val_reg sort -> sort
-    | Val_ivar _ -> Jkind_types.Sort.(of_const Const.for_instance_var)
-    | Val_self _ | Val_anc _ -> Jkind_types.Sort.(of_const Const.for_object)
-    | Val_prim _ ->
-      Misc.fatal_error "Unexpected primitive"
-    | Val_mut _ ->
-      Misc.fatal_error "Mutable variable found at the structure level"
-  in
-  let call_outval () = outval_of_value env (toplevel_value id) val_type in
-  match Jkind.Sort.default_for_transl_and_get sort with
-  | Base Value -> call_outval ()
-  | _ when not !Clflags.native_code -> call_outval()
-  | Base (Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
-         | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
-  | Product _ -> Oval_stuff "<abstr>"
+let outval_of_id env id val_type =
+  let glob, pos, (repr : Lambda.module_representation) = toplevel_value id in
+  match repr with
+  | Module_value_only _ ->
+    let obj_to_print = Obj.field (global_symbol glob) pos in
+    outval_of_value env obj_to_print val_type
+  | Module_mixed _ -> Oval_stuff "<abstr>"
+    (* CR layouts: don't print values in mixed phrases as <abstr> *)
 
 (* Print the outcome of an evaluation *)
 
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-       | Sig_value(id, {val_kind = (Val_reg _) as vk; val_type; _}, _) ->
-         Some (outval_of_sig_value env id vk val_type)
+      | Sig_value(id, {val_kind = Val_reg _; val_type; _}, _) ->
+         Some (outval_of_id env id val_type)
       | _ -> None
     )
 
@@ -476,14 +463,14 @@ let execute_phrase print_outcome ppf phr =
           Translmod.transl_implementation compilation_unit
             (str, coercion, None) ~loc:Location.none
         in
-        remember compilation_unit sg';
         let repr =
           match main_module_block_format with
           | Mb_struct { mb_repr } -> mb_repr
           | Mb_instantiating_functor _ ->
             Misc.fatal_error "Unexpected parameterised module in toplevel"
         in
-        let program = { program with code = close_slambda_phrase res repr } in
+        remember compilation_unit sg' repr;
+        let program = { program with code = close_slambda_phrase res } in
         compilation_unit, program, required_globals, repr
       in
       Warnings.check_fatal ();
@@ -506,10 +493,7 @@ let execute_phrase print_outcome ppf phr =
                     if rewritten then
                       match sg' with
                       | [ Sig_value (id, vd, _) ] ->
-                          let outv =
-                            outval_of_sig_value newenv id vd.val_kind
-                              vd.val_type
-                          in
+                          let outv = outval_of_id newenv id vd.val_type in
                           let ty = Printtyp.tree_of_type_scheme vd.val_type in
                           Ophr_eval (outv, ty)
                       | _ -> assert false
