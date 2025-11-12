@@ -32,7 +32,7 @@ Error: A type declaration's layout can be given at most once.
    This logic will come in the _following_ PR! *)
 type t : immediate non_pointer
 [%%expect{|
-type t : immediate
+type t : immediate non_pointer
 |}]
 
 (* CR layouts-scannable: The following errors should only print ONCE.
@@ -76,7 +76,7 @@ Line 1, characters 15-26:
                    ^^^^^^^^^^^
 Warning 185 [overridden-kind-modifier]: This modifier is overridden by "non_pointer" later.
 
-type t
+type t : value non_pointer
 |}]
 
 type t : value maybe_pointer non_pointer maybe_pointer
@@ -131,7 +131,7 @@ Line 1, characters 9-25:
              ^^^^^^^^^^^^^^^^
 Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the layout "void".
 
-type t : void
+type t : void non_pointer
 |}]
 
 type t : void non_pointer maybe_pointer

@@ -105,6 +105,11 @@ module Scannable_axes = struct
 
   let print ppf sa = Pointerness.print ppf sa
 
+  (* CR zeisbach: when sa is more than one field, use this parameter! *)
+  let set_pointerness sa pointerness =
+    ignore sa;
+    pointerness
+
   (* CR zeisbach: print this out like { nullability: ...; ... } eventually.
      could also have Caps versions of the points on the axis, which might
      be nice. if so, could add to a signature somewhere *)
@@ -150,10 +155,9 @@ module Layout = struct
       | (Base _ | Any _ | Product _), _ -> false
 
     module Static = struct
-      (* CR zeisbach: this used to have a bunch of constants defined so that
-         they only had to be allocated once. now that there are SA as well,
-         this is not really a thing. Unless we wanted to statically allocate
-         _all_ of the possibilities. Could be worth benchmarking... *)
+      (* CR zeisbach: replace this with a version that pre-allocates all of
+         the non-Value things, and maybe the Value ones as well.
+         then match on the sa in of_base to determine which value one! *)
       let of_base (b : Sort.base) sa = Base (b, sa)
     end
 
@@ -206,6 +210,14 @@ module Layout = struct
          and adding [fun]s, but I kinda don't like it. easy to swap. *)
       | Product consts ->
         Product (List.map (fun s -> of_sort_const s sa) consts)
+
+    let set_pointerness_upper_bound t pointerness =
+      match t with
+      | Any sa -> Any (Scannable_axes.set_pointerness sa pointerness)
+      | Base (b, sa) -> Base (b, Scannable_axes.set_pointerness sa pointerness)
+      (* CR zeisbach: this seems like a plausible thing to do. This would
+         get easier if we did the refactor to just store a product. *)
+      | Product _ -> t
 
     let to_string t =
       let rec to_string nested (t : t) =
@@ -2256,6 +2268,18 @@ module Const = struct
   (*******************************)
   (* converting user annotations *)
 
+  (* CR zeisbach: is this the right place to put this function? we may want to
+     use it outside of Const, but also it has the warning so maybe not?
+     regardless, it has to come before the current batch of these setter
+     functions (for the current non-modal axes), which will have to be moved *)
+  let set_pointerness_upper_bound t = function
+    | None -> t
+    | Some pointerness ->
+      let new_layout =
+        Layout.Const.set_pointerness_upper_bound t.layout pointerness
+      in
+      { t with layout = new_layout }
+
   let jkind_of_product_annotations (type l r) (jkinds : (l * r) t list) =
     let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
         ({ layout; mod_bounds; with_bounds } : (l * r) t) =
@@ -2345,8 +2369,7 @@ module Const = struct
          This should emit a warning if the [jkind_without_sa] already has
          the specified scannable axes. This is why the helper currently
          returns an optional annotation (since none vs default matters). *)
-      ignore pointerness;
-      jkind_without_sa
+      set_pointerness_upper_bound jkind_without_sa pointerness
     | Pjk_mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
       (* for each mode, lower the corresponding modal bound to be that mode *)
