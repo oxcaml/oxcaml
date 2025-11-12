@@ -20,7 +20,7 @@ module Ident : sig
 
   val name : t -> string
 
-  val global : string -> t
+  val global : Global_module.Name.t -> t
 
 end
 

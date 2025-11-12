@@ -330,7 +330,7 @@ let register_pers_for_short_paths penv modname ps components =
             let crc = Import_info.crc import in
             name, crc)
   in
-  let deps, alias_deps =
+  let depends, alias_depends =
     List.fold_left
       (fun (deps, alias_deps) (name, digest) ->
          let name_as_string = Compilation_unit.Name.to_string name in
@@ -356,10 +356,9 @@ let register_pers_for_short_paths penv modname ps components =
     if is_deprecated then Short_paths.Desc.Deprecated
     else Short_paths.Desc.Not_deprecated
   in
-  (* CR parameterized modules: this will probably break with parameterized modules *)
-  let modname_as_string = Global_module.Name.to_string modname  in
-  Short_paths.Basis.load (short_paths_basis penv) modname_as_string
-    deps alias_deps desc ps.ps_name_info.pn_import.imp_visibility deprecated
+  (* CR parameterized modules: [depends] and [alias_depends] are missing instantiation. *)
+  Short_paths.Basis.load (short_paths_basis penv) modname
+    ~depends ~alias_depends desc ps.ps_name_info.pn_import.imp_visibility deprecated
 (* Reading persistent structures from .cmi files *)
 
 let save_import penv crc modname impl flags filename =
