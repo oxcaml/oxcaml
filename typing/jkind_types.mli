@@ -94,6 +94,10 @@ module Sort : sig
   val decompose_into_product : level:int -> t -> int -> t list option
 end
 
+module Scannable_axes : sig
+  type t = Jkind_axis.Pointerness.t
+end
+
 module Layout : sig
   (** Note that products have two possible encodings: as [Product ...] or as
       [Sort (Product ...]. This duplication is hard to eliminate because of the
