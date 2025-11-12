@@ -807,7 +807,7 @@ let equal_raise_kind left right =
 
 let equal_basic left right =
   match left, right with
-  | Op left_op, Op right_op -> Stdlib.( = ) left_op right_op
+  | Op left_op, Op right_op -> Operation.equal left_op right_op
   | Reloadretaddr, Reloadretaddr -> true
   | Pushtrap { lbl_handler = left_lbl }, Pushtrap { lbl_handler = right_lbl }
   | Poptrap { lbl_handler = left_lbl }, Poptrap { lbl_handler = right_lbl } ->
