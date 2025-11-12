@@ -832,22 +832,11 @@ let equal_func_call_operation left right =
   | Direct left_sym, Direct right_sym -> Cmm.equal_symbol left_sym right_sym
   | (Indirect | Direct _), _ -> false
 
-let equal_effects left right =
-  match left, right with
-  | Cmm.No_effects, Cmm.No_effects
-  | Cmm.Arbitrary_effects, Cmm.Arbitrary_effects -> true
-  | (Cmm.No_effects | Cmm.Arbitrary_effects), _ -> false
-
-let equal_machtype left right =
-  Int.equal (Array.length left) (Array.length right)
-  && (try Array.for_all2 Cmm.equal_machtype_component left right
-      with Invalid_argument _ -> false)
-
 let equal_external_call_operation left right =
   String.equal left.func_symbol right.func_symbol
   && Bool.equal left.alloc right.alloc
-  && equal_effects left.effects right.effects
-  && equal_machtype left.ty_res right.ty_res
+  && Cmm.equal_effects left.effects right.effects
+  && Cmm.equal_machtype left.ty_res right.ty_res
   && List.equal Cmm.equal_exttype left.ty_args right.ty_args
   && Int.equal left.stack_ofs right.stack_ofs
   && Cmm.equal_stack_align left.stack_align right.stack_align

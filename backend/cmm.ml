@@ -261,6 +261,12 @@ type effects =
   | No_effects
   | Arbitrary_effects
 
+let equal_effects left right =
+  match left, right with
+  | No_effects, No_effects
+  | Arbitrary_effects, Arbitrary_effects -> true
+  | (No_effects | Arbitrary_effects), _ -> false
+
 type coeffects =
   | No_coeffects
   | Has_coeffects
@@ -836,6 +842,11 @@ let equal_machtype_component
      left :
       machtype_component) (right : machtype_component) =
   rank_machtype_component left = rank_machtype_component right
+
+let equal_machtype left right =
+  Int.equal (Array.length left) (Array.length right)
+  && (try Array.for_all2 equal_machtype_component left right
+      with Invalid_argument _ -> false)
 
 let equal_exttype
     (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128

@@ -56,6 +56,8 @@ tracked by the GC:
 
 type machtype = machtype_component array
 
+val equal_machtype : machtype -> machtype -> bool
+
 val typ_void : machtype
 
 val typ_val : machtype
@@ -180,6 +182,8 @@ val equal_atomic_bitwidth : atomic_bitwidth -> atomic_bitwidth -> bool
 type effects =
   | No_effects
   | Arbitrary_effects
+
+val equal_effects : effects -> effects -> bool
 
 type coeffects =
   | No_coeffects
