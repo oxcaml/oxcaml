@@ -16,7 +16,7 @@ Error: The type of a module-level value must have a representable layout.
        The layout of type t is any
          because of the definition of t at line 2, characters 2-14.
        But the layout of type t must be representable
-         because it's the type of something stored in a module structure.
+         because it's the type of something in a signature.
 |}]
 
 

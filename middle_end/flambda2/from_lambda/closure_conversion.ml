@@ -3848,7 +3848,6 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       let block_access pos : P.Block_access_kind.t =
         let field_kind =
           Lambda_to_flambda_primitives_helpers.block_access_for_element
-            ~for_block_load:true
             flattened_reordered_shape.(pos)
         in
         Mixed
@@ -3914,15 +3913,14 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       (fun (acc, body) (pos, var, var_duid) ->
         let var = VB.create var var_duid Name_mode.normal in
         let pat = Bound_pattern.singleton var in
-        let pos' = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
+        let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
         let block = module_block_simple in
-        match simplify_block_load acc env ~block ~field:pos' with
+        match simplify_block_load acc env ~block ~field with
         | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
           let named =
             Named.create_prim
               (Unary
-                 ( Block_load
-                     { kind = block_access pos; mut = Immutable; field = pos' },
+                 ( Block_load { kind = block_access pos; mut = Immutable; field },
                    block ))
               Debuginfo.none
           in

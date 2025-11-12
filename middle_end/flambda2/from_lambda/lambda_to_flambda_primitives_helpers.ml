@@ -503,15 +503,12 @@ let convert_block_access_field_kind_from_value_kind
   | Pboxedvectorval _ ->
     Any_value
 
-let block_access_for_element ~for_block_load
+let block_access_for_element
     (elt : 'a Mixed_block_shape.Singleton_mixed_block_element.t) :
     P.Mixed_block_access_field_kind.t =
   match elt with
   | Value value_kind ->
-    Value_prefix
-      (if for_block_load
-      then Any_value
-      else convert_block_access_field_kind_from_value_kind value_kind)
+    Value_prefix (convert_block_access_field_kind_from_value_kind value_kind)
   | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
     | Vec512 | Word | Untagged_immediate ) as mixed_block_element ->
     Flat_suffix

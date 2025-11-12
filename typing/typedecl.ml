@@ -3843,12 +3843,10 @@ let check_for_hidden_arrow env loc ty =
   | Assert_default -> ()
 
 (* Translate a value declaration *)
-let transl_value_decl env loc ~modalities valdecl =
+let transl_value_decl env loc ~modalities ~why valdecl =
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
   let sort =
-    match
-      Ctype.type_sort ~why:Structure_element ~fixed:false env cty.ctyp_type
-    with
+    match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with
     | Ok sort -> sort
     | Error err ->
       raise
@@ -3967,9 +3965,9 @@ let transl_value_decl env loc ~modalities valdecl =
   in
   desc, newenv
 
-let transl_value_decl env ~modalities loc valdecl =
+let transl_value_decl env ~modalities ~why loc valdecl =
   Builtin_attributes.warning_scope valdecl.pval_attributes
-    (fun () -> transl_value_decl env ~modalities loc valdecl)
+    (fun () -> transl_value_decl env ~modalities ~why loc valdecl)
 
 (* Translate a "with" constraint -- much simplified version of
    transl_type_decl. For a constraint [Sig with t = sdecl],

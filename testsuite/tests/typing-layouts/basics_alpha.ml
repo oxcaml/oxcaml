@@ -1709,7 +1709,7 @@ Error: The type of a module-level value must have a representable layout.
        The layout of type t_any is any
          because of the definition of t_any at line 1, characters 0-18.
        But the layout of type t_any must be representable
-         because it's the type of something stored in a module structure.
+         because it's the type of something stored in a module.
 |}]
 
 

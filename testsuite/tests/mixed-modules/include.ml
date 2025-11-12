@@ -15,6 +15,9 @@ external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
 type void : void
 external void : unit -> void = "%unbox_unit"
 
+
+(* Tests exercising errors are in `typing.ml` *)
+
 let _ = print_endline "Test: include with module ident"
 
 module M = struct

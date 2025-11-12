@@ -974,7 +974,6 @@ let main_module_representation = function
   | Mb_struct { mb_repr } -> mb_repr
   | Mb_instantiating_functor _ -> Module_value_only { field_count = 1 }
 
-
 type 'lam program0 =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
@@ -1505,6 +1504,7 @@ let transl_module_representation repr =
          elt)
       repr
   in
+  (* CR jrayman *)
   if !value_count = Array.length shape
   then Module_value_only { field_count = Array.length shape }
   else

@@ -1368,8 +1368,7 @@ let add_pattern_variables ?check ?check_as env pv =
           pv_attributes; pv_uid} env ->
        let check = if pv_as_var then check_as else check in
        Env.add_value ?check ~mode:pv_mode pv_id
-         {val_type = pv_type; val_kind = pv_kind;
-          Types.val_loc = pv_loc;
+         {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
           val_attributes = pv_attributes; val_modalities = Modality.id;
           val_zero_alloc = Zero_alloc.default;
           val_uid = pv_uid
@@ -2090,9 +2089,8 @@ let type_for_loop_index ~loc ~env ~param =
             let pv_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
             let pv =
               { pv_id; pv_uid; pv_mode;
-                pv_kind =
-                  Val_reg Jkind.Sort.(of_const Const.for_loop_index)
-                ; pv_type; pv_loc; pv_as_var;
+                pv_kind = Val_reg Jkind.Sort.(of_const Const.for_loop_index);
+                pv_type; pv_loc; pv_as_var;
                 pv_attributes;
                 pv_sort = Jkind.Sort.(of_const Const.for_loop_index)
                 }
@@ -3009,11 +3007,6 @@ and type_pat_aux
       let ty = instance expected_ty in
       let alloc_mode =
         cross_left !!penv expected_ty alloc_mode.mode
-      in
-      let sort =
-        match Ctype.type_sort !!penv ty ~why:Let_binding ~fixed:false with
-        | Error _ -> assert false
-        | Ok sort -> sort
       in
       let mode, kind =
         match mutable_flag with
@@ -7900,9 +7893,7 @@ and type_constraint_expect
 and type_ident env ?(recarg=Rejected) lid =
   (* CR zqian: [lookup_value] should close over the memaddr of all prefix
   modules.  *)
-  let path, desc, (mode, locks) =
-    Env.lookup_value ~loc:lid.loc lid.txt env
-  in
+  let path, desc, (mode, locks) = Env.lookup_value ~loc:lid.loc lid.txt env in
   (* We cross modes when typing [Ppat_ident], before adding new variables into
   the environment. Therefore, one might think all values in the environment are
   already mode-crossed. That is not true for several reasons:

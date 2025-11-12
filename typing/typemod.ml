@@ -107,8 +107,6 @@ type error =
   | Invalid_type_subst_rhs
   | Non_packable_local_modtype_subst of Path.t
   | With_cannot_remove_packed_modtype of Path.t * module_type
-  | Toplevel_nonvalue of string * Jkind.sort
-  | Toplevel_unnamed_nonvalue of Jkind.sort
   | Strengthening_mismatch of Longident.t * Includemod.explanation
   | Cannot_pack_parameter
   | Compiling_as_parameterised_parameter
@@ -313,7 +311,7 @@ let type_open_descr ?used_slot ?toplevel env sod =
     {
       open_expr = (path, sod.popen_expr);
       open_bound_items = [];
-      open_bound_repr = [||];
+      open_items_repr = [||];
       open_override = sod.popen_override;
       open_env = newenv;
       open_attributes = sod.popen_attributes;
@@ -2033,7 +2031,8 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         in
         let modalities = Mode.Modality.of_const modalities in
         let (tdesc, newenv) =
-          Typedecl.transl_value_decl env ~modalities item.psig_loc sdesc
+          Typedecl.transl_value_decl
+            env ~modalities ~why:Signature_item item.psig_loc sdesc
         in
         Signature_names.check_value names tdesc.val_loc tdesc.val_id;
         mksig (Tsig_value tdesc) env loc,
@@ -3300,7 +3299,7 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     let open_descr = {
       open_expr = md;
       open_bound_items = [];
-      open_bound_repr = [||];
+      open_items_repr = [||];
       open_override = od.popen_override;
       open_env = newenv;
       open_loc = loc;
@@ -3337,7 +3336,7 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     let open_descr = {
       open_expr = md;
       open_bound_items = sg;
-      open_bound_repr =
+      open_items_repr =
         List.filter_map sort_of_signature_item sg |> Array.of_list;
       open_override = od.popen_override;
       open_env = newenv;
@@ -3477,7 +3476,8 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         in
         let modalities = infer_modalities ~loc ~env ~md_mode ~mode in
         let (desc, newenv) =
-          Typedecl.transl_value_decl env ~modalities loc sdesc
+          Typedecl.transl_value_decl
+            env ~modalities ~why:Structure_item loc sdesc
         in
         Signature_names.check_value names desc.val_loc desc.val_id;
         Tstr_primitive desc,
@@ -4719,18 +4719,6 @@ let report_error ~loc _env = function
          for an anonymous module type.@ %a"
         Style.inline_code (Path.name p)
         Misc.print_see_manual manual_ref
-  | Toplevel_nonvalue (id, sort) ->
-      Location.errorf ~loc
-        "@[Types of top-level module bindings must have layout %a, but@ \
-         the type of %a has layout@ %a.@]"
-        Style.inline_code "value"
-        Style.inline_code id
-        (Style.as_inline_code Jkind.Sort.format) sort
-  | Toplevel_unnamed_nonvalue sort ->
-      Location.errorf ~loc
-        "@[Types of unnamed expressions must have layout value when using@ \
-           the toplevel, but this expression has layout@ %a.@]"
-        (Style.as_inline_code Jkind.Sort.format) sort
  | Strengthening_mismatch(lid, explanation) ->
       let main = Includemod_errorprinter.err_msgs explanation in
       Location.errorf ~loc

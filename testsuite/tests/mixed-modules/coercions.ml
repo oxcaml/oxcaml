@@ -16,6 +16,8 @@ type void : void
 external void : unit -> void = "%unbox_unit"
 
 
+(* Coercions involving module aliases are tested in `module_aliases.ml` *)
+
 let () = print_endline "Test: mixed to mixed"
 
 module Module_1 = struct

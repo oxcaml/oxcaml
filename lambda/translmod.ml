@@ -657,7 +657,6 @@ and transl_struct ~scopes loc fields cc rootpath
 (* The function  transl_structure is called by  the bytecode compiler.
    Some effort is made to compile in top to bottom order, in order to display
    warning by increasing locations. *)
-
 and transl_structure ~scopes loc
   (fields : (Ident.t * Jkind.Sort.t) list) cc rootpath final_env =
   function
@@ -688,10 +687,13 @@ and transl_structure ~scopes loc
               if pos < 0 then layout_value_field
               else let _, shape = v.(pos) in
                 shape |> Jkind.Sort.default_for_transl_and_get
-                      |> layout_of_const_sort
+                      |> Typeopt.layout_of_sort (to_location loc)
             in
-            let ids = List.fold_right (fun (id, _) s -> Ident.Set.add id s)
-              fields Ident.Set.empty in
+            let ids =
+              List.fold_right
+                (fun (id, _) s -> Ident.Set.add id s)
+                fields Ident.Set.empty
+            in
             let output_repr = transl_module_representation output_repr in
             let lam =
               Lprim(block_of_module_representation
@@ -865,7 +867,9 @@ and transl_structure ~scopes loc
                 transl_structure ~scopes loc newfields cc rootpath final_env rem
             | (id, sort) :: ids_with_sorts ->
                 let const_sort = Jkind.Sort.default_for_transl_and_get sort in
-                let lambda_layout = layout_of_const_sort const_sort in
+                let lambda_layout =
+                  Typeopt.layout_of_sort (to_location loc) const_sort
+                in
                 let body, repr =
                   rebind_idents (pos + 1) ((id, sort) :: newfields)
                     ids_with_sorts
@@ -911,13 +915,15 @@ and transl_structure ~scopes loc
               in
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
-              let open_repr = transl_module_representation od.open_bound_repr in
+              let open_repr = transl_module_representation od.open_items_repr in
               let rec rebind_idents pos newfields = function
                   [] -> transl_structure
                           ~scopes loc newfields cc rootpath final_env rem
                 | (id, sort) :: ids_with_sorts ->
                   let const_sort = Jkind.Sort.default_for_transl_and_get sort in
-                  let lambda_layout = layout_of_const_sort const_sort in
+                  let lambda_layout =
+                    Typeopt.layout_of_sort (to_location loc) const_sort
+                  in
                   let body, repr =
                     rebind_idents (pos + 1) ((id, sort) :: newfields)
                       ids_with_sorts
@@ -1167,8 +1173,7 @@ let toploop_getvalue id =
     fatal_error "Translmod.toploop_getvalue: expected bytecode";
   Lapply{
     ap_loc=Loc_unknown;
-    ap_func=Lprim(mod_field toploop_getvalue_pos
-                    (Module_value_only { field_count = -1 }),
+    ap_func=Lprim(Pfield (toploop_getvalue_pos, Pointer, Reads_agree),
                   [Lprim(Pgetglobal toploop_unit, [], Loc_unknown)],
                   Loc_unknown);
     ap_args=[Lconst(Const_base(
@@ -1188,8 +1193,7 @@ let toploop_setvalue id lam =
     fatal_error "Translmod.toploop_setvalue: expected bytecode";
   Lapply{
     ap_loc=Loc_unknown;
-    ap_func=Lprim(mod_field toploop_setvalue_pos
-                    (Module_value_only { field_count = -1 }),
+    ap_func=Lprim(Pfield (toploop_setvalue_pos, Pointer, Reads_agree),
                   [Lprim(Pgetglobal toploop_unit, [], Loc_unknown)],
                   Loc_unknown);
     ap_args=
@@ -1317,7 +1321,7 @@ let transl_toplevel_item ~scopes item =
           let ids = bound_value_identifiers od.open_bound_items in
           let mid = Ident.create_local "open" in
           let mid_duid = Lambda.debug_uid_none in
-          let open_repr = transl_module_representation od.open_bound_repr in
+          let open_repr = transl_module_representation od.open_items_repr in
           let rec set_idents pos = function
               [] ->
                 lambda_unit
@@ -1365,6 +1369,7 @@ let () =
   | _ -> Misc.fatal_error "Lambda.transl_package: expected modules to be values"
     (* If this assumption is broken, [transl_package] should return a
        module representation instead of a size *)
+
 let transl_package component_names coercion =
   let field_count =
     match coercion with
@@ -1417,13 +1422,11 @@ let transl_instance_impl
   let instantiating_functor_lam =
     (* Any parameterised module has a block with exactly one field, namely the
        instantiating functor (see [Lambda.main_module_block_format]) *)
-    Lprim (mod_field 0 (Module_value_only { field_count = -1 }),
+    Lprim (mod_field 0 (Module_value_only { field_count = 1 }),
            [Lprim (Pgetglobal base_compilation_unit, [], Loc_unknown)],
            Loc_unknown)
   in
-  let runtime_args_lam =
-    List.map transl_runtime_arg runtime_args
-  in
+  let runtime_args_lam = List.map transl_runtime_arg runtime_args in
   let code =
     Lapply {
       ap_func = instantiating_functor_lam;

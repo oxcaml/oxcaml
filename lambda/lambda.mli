@@ -947,6 +947,7 @@ type module_representation =
      one for allocating (used by [block_of_module_representation]) and one for
      reading (used by [mod_field]) *)
 
+(* Logical field count: Each unboxed product counts as 1 field *)
 val module_representation_field_count : module_representation -> int
 
 val layout_of_module_field : module_representation -> int -> layout
@@ -1144,9 +1145,6 @@ val transl_class_path: scoped_location -> Env.t -> Path.t -> lambda
 val transl_address : scoped_location -> Persistent_env.address -> lambda
 
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
-
-val transl_mixed_block_element :
-  Types.mixed_block_element -> unit mixed_block_element
 
 val transl_mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)

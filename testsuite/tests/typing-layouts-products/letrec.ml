@@ -37,18 +37,14 @@ type bx = { bx : ubx; }
 and ubx = #{ ubx : bx; }
 |}]
 
-(* The cycle-finding algorithm in genprintval does not store non-values in its
-   [ObjTbl.t]. As a result, a cyclic unboxed record may be printed twice ([ubx]
-   in this example), but any cycle will contain at least one boxed value and
-   will eventually be detected by genprintval. *)
 let rec t = #{ ubx = { bx = t } }
 [%%expect{|
-val t : ubx = #{ubx = {bx = #{ubx = <cycle>}}}
+val t : ubx = #{ubx = {bx = <cycle>}}
 |}]
 
 let rec t = { bx = #{ ubx = t } }
 [%%expect{|
-val t : bx = {bx = #{ubx = <cycle>}}
+val t : bx = {bx = <cycle>}
 |}]
 
 type bx = { bx : bx2# }
@@ -60,12 +56,30 @@ and bx2 = { bx2 : bx; }
 
 let rec t = #{ bx2 = { bx = t } }
 [%%expect{|
-val t : bx2# = #{bx2 = {bx = #{bx2 = <cycle>}}}
+val t : bx2# = #{bx2 = {bx = <cycle>}}
 |}]
 
 let rec t = { bx = #{ bx2 = t } }
 [%%expect{|
-val t : bx = {bx = #{bx2 = <cycle>}}
+val t : bx = {bx = <cycle>}
+|}]
+
+(* The cycle-finding algorithm in genprintval does not store non-values in its
+   [ObjTbl.t]. As a result, a cyclic unboxed record may be printed twice
+   ([unboxed_cycle] in this example), but any cycle will contain at least one
+   boxed value and will eventually be detected by genprintval. *)
+type unboxed = #{ b : boxed option; name : string }
+and boxed = { mutable a : unboxed }
+
+let unboxed_cycle =
+  let t = { a = #{ b = None; name = "t" } } in
+  t.a <- #{ b = Some t; name = "t" };
+  t.a
+[%%expect{|
+type unboxed = #{ b : boxed option; name : string; }
+and boxed = { mutable a : unboxed; }
+val unboxed_cycle : unboxed =
+  #{b = Some {a = #{b = <cycle>; name = "t"}}; name = "t"}
 |}]
 
 (* The below is adapted from [testsuite/tests/letrec-check/unboxed.ml]. *)

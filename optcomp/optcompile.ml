@@ -237,11 +237,6 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let read_unit_info file : Instantiator.unit_info =
     let unit_info, _crc = Compilenv.read_unit_info file in
     let { Cmx_format.ui_unit; ui_arg_descr; ui_format; _ } = unit_info in
-    let ui_format =
-      match ui_format with
-      | Some ui_format -> ui_format
-      | None -> Misc.fatal_error "Cm_bundle.cmx_bundle: ui_format is None"
-    in
     { Instantiator.ui_unit; ui_arg_descr; ui_format }
 
   let instantiate ~src ~args targetcmx =

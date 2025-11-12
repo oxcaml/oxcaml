@@ -1088,7 +1088,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Base Word -> Word
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
-  | Base Void -> Product [||]
+  | Base Void -> Void
 
 let find_unboxed_type decl =
   match decl.type_kind with

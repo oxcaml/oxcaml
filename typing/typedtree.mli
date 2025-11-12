@@ -979,7 +979,7 @@ and 'a open_infos =
     {
      open_expr: 'a;
      open_bound_items: Types.signature;
-     open_bound_repr: Types.module_representation;
+     open_items_repr: Types.module_representation;
      open_override: override_flag;
      open_env: Env.t;
      open_loc: Location.t;

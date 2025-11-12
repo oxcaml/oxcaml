@@ -700,7 +700,7 @@ and 'a open_infos =
     {
      open_expr: 'a;
      open_bound_items: Types.signature;
-     open_bound_repr: Types.module_representation;
+     open_items_repr: Types.module_representation;
      open_override: override_flag;
      open_env: Env.t;
      open_loc: Location.t;
@@ -1268,9 +1268,11 @@ let let_bound_idents_with_modes_sorts_and_checks bindings =
 
 let let_bound_idents_full bindings =
   List.rev (rev_let_bound_idents_full bindings)
+
 let let_bound_idents_with_sorts pat =
   List.rev_map (fun (id,_,_,sort,_) -> (id, sort))
     (rev_let_bound_idents_full pat)
+
 let let_bound_idents pat =
   List.rev_map (fun (id,_,_,_,_) -> id) (rev_let_bound_idents_full pat)
 

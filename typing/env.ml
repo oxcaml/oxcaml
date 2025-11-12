@@ -2127,6 +2127,9 @@ let add_to_tbl id decl tbl =
 let primitive_address_error =
   Invalid_argument "Primitives don't have addresses"
 
+let mutable_variable_address_error =
+  Invalid_argument "Mutable variables don't have addresses"
+
 let value_declaration_address (_ : t) id decl =
   match decl.Subst.Lazy.val_kind with
   | Val_prim _ -> Lazy_backtrack.create_failed primitive_address_error
@@ -2202,7 +2205,7 @@ let rec components_of_module_maker
               | Val_ivar _ | Val_self _ | Val_anc _ ->
                 next_address ()
               | Val_mut _ ->
-                Misc.fatal_error "Mutable variable found at the structure level"
+                Lazy_backtrack.create_failed mutable_variable_address_error
             in
             let vda_shape = Shape.proj cm_shape (Shape.Item.value id) in
             let vda =
