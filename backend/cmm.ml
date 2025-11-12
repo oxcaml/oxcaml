@@ -568,6 +568,10 @@ let equal_is_global g g' =
   | Local, Local | Global, Global -> true
   | Local, Global | Global, Local -> false
 
+let equal_symbol left right =
+  String.equal left.sym_name right.sym_name
+  && equal_is_global left.sym_global right.sym_global
+
 type vec128_bits =
   { word0 : int64; (* Least significant *)
     word1 : int64

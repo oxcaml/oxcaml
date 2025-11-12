@@ -406,6 +406,8 @@ type symbol =
     sym_global : is_global
   }
 
+val equal_symbol : symbol -> symbol -> bool
+
 type operation =
   | Capply of
       { result_type : machtype;
