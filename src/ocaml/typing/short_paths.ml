@@ -1775,8 +1775,7 @@ module Basis = struct
     Rev_deps.extend_up_to t.rev_deps t.next_dep;
     List.iter
       (fun { name; depends; alias_depends; _ } ->
-         String_map.find_opt name.Global_module.Name.head t.assignment
-         |> Option.iter (fun index ->
+         let index = String_map.find name.Global_module.Name.head t.assignment in
          List.iter
            (fun dep_name ->
               let dep_index = String_map.find dep_name t.assignment in
@@ -1786,15 +1785,14 @@ module Basis = struct
            (fun dep_name ->
               let dep_index = String_map.find dep_name t.assignment in
               Rev_deps.add_alias t.rev_deps ~source:dep_index ~target:index)
-           alias_depends))
+           alias_depends)
       loads
 
   let update_shortest t additions loads =
     let components =
-      List.filter_map
+      List.map
         (fun { name; desc; visibility=load_visibility; deprecated; _ } ->
-           String_map.find_opt name.Global_module.Name.head t.assignment
-           |> Option.map (fun index ->
+           let index = String_map.find name.Global_module.Name.head t.assignment in
            let origin = Origin.Dependency index in
            let id = Ident.global name in
            let component_visibility : Desc.visibility =
@@ -1802,7 +1800,7 @@ module Basis = struct
              | Hidden, _ | _, Deprecated -> Hidden
              | Visible, Not_deprecated -> Visible
              in
-           Component.Module(origin, id, desc, Component.Global, component_visibility)))
+           Component.Module(origin, id, desc, Component.Global, component_visibility))
         loads
     in
     let components =
