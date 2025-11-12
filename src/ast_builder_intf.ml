@@ -7,7 +7,6 @@ module type S = sig
   type arrow_argument := Shim.arrow_argument
   type arrow_result := Shim.arrow_result
   type block_access := Shim.block_access
-  type modality := Shim.Modality.t
   type modalities := Shim.Modalities.t
   type modes := Shim.Modes.t
   type include_kind := Shim.Include_kind.t
@@ -48,7 +47,7 @@ module type S = sig
 
   (** Construct a [Pcstr_tuple], a representation for the contents of a tupled variant
       constructor, that attaches the provided modalities to each field. *)
-  val pcstr_tuple : ((modality list * core_type) list -> constructor_arguments) with_loc
+  val pcstr_tuple : ((modalities * core_type) list -> constructor_arguments) with_loc
 
   (** Construct a [Psig_include] with modalities *)
   val psig_include
@@ -62,37 +61,37 @@ module type S = sig
   (** Splits a possibly-modality-annotated field of a tupled variant constructor into a
       pair of its modality and the unannotated field. If the resulting mode is [None],
       then the field is returned unchanged. *)
-  val get_tuple_field_modalities : Pcstr_tuple_arg.t -> modality list * core_type
+  val get_tuple_field_modalities : Pcstr_tuple_arg.t -> modalities * core_type
 
   (** Splits a possibly-modality-annotated label declaration into a pair of its modality
       and the unannotated label declaration. If the resulting modality is [None], then the
       label declaration is returned unchanged. *)
   val get_label_declaration_modalities
     :  label_declaration
-    -> modality list * label_declaration
+    -> modalities * label_declaration
 
   val label_declaration
     : (name:string Location.loc
        -> mutable_:mutable_flag
-       -> modalities:modality list
+       -> modalities:modalities
        -> type_:core_type
        -> label_declaration)
         with_loc
 
   val get_value_description_modalities
     :  value_description
-    -> modality list * value_description
+    -> modalities * value_description
 
   val value_description
     : (name:string Location.loc
        -> type_:core_type
-       -> modalities:modality list
+       -> modalities:modalities
        -> prim:string list
        -> value_description)
         with_loc
 
   val pcstr_tuple_arg
-    : (modalities:modality list -> type_:core_type -> Pcstr_tuple_arg.t) with_loc
+    : (modalities:modalities -> type_:core_type -> Pcstr_tuple_arg.t) with_loc
 
   val include_infos
     : (?attrs:attributes -> kind:include_kind -> 'a -> 'a include_infos) with_loc
@@ -329,12 +328,28 @@ module type S = sig
        -> core_type)
         with_loc
 
+  val ptyp_quote : (?attrs:attributes -> core_type -> core_type) with_loc
+  val ptyp_splice : (?attrs:attributes -> core_type -> core_type) with_loc
+
   val pexp_newtype
     : (?attrs:attributes
        -> string loc
        -> jkind_annotation option
        -> expression
        -> expression)
+        with_loc
+
+  val type_declaration
+    : (?attrs:attributes
+       -> ?jkind_annotation:jkind_annotation
+       -> name:string Location.loc
+       -> params:(core_type * (variance * injectivity)) list
+       -> cstrs:(core_type * core_type * Location.t) list
+       -> kind:type_kind
+       -> private_:private_flag
+       -> manifest:core_type option
+       -> unit
+       -> type_declaration)
         with_loc
 
   (** {2 Labeled tuples} *)

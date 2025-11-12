@@ -8,79 +8,83 @@
 <   type t = mode = Mode of string [@@unboxed]
 ---
 >   type t = Mode of string [@@unboxed]
-26c21
-<   type t = include_kind =
----
->   type t =
-53c48
+27c22
 <   type t = modality = Modality of string [@@unboxed]
 ---
 >   type t = Modality of string [@@unboxed]
-64c59
+38c33
+<   type t = include_kind =
+---
+>   type t =
+67c62
 <   type t = constructor_argument
 ---
 >   type t = core_type
-104c99
+106c101
 <   type t = module_declaration =
 ---
 >   type t =
-127c122
+129c124
 < type nonrec jkind_annotation_desc = jkind_annotation_desc =
 ---
 > type jkind_annotation_desc =
-135c130
+137c132
 < type nonrec jkind_annotation = jkind_annotation =
 ---
 > and jkind_annotation =
-145c140
+143c138
+<   type t = type_declaration =
+---
+>   type t =
+161c156
 <   type t = constant =
 ---
 >   type t =
-160c155
+176c171
 <   type nonrec function_param_desc = function_param_desc =
 ---
 >   type function_param_desc =
-164c159
+180c175
 <   type nonrec function_param = function_param =
 ---
 >   type function_param =
-169c164
+185c180
 <   type nonrec type_constraint = type_constraint =
 ---
 >   type type_constraint =
-174c169
+190c185
 <     type t = function_constraint =
 ---
 >     type t =
-184c179
+200c195
 <   type nonrec function_body = function_body =
 ---
 >   type function_body =
-200c195
+216c211
 < type nonrec index_kind = index_kind =
 ---
 > type index_kind =
-208c203
+224c219
 < type nonrec block_access = block_access =
 ---
 > type block_access =
-213c208
+229c224
 < type nonrec unboxed_access = unboxed_access = Uaccess_unboxed_field of Longident.t loc
 ---
 > type unboxed_access = Uaccess_unboxed_field of Longident.t loc
-216c211
+232c227
 <   type t = core_type_desc =
 ---
 >   type t =
-237c232
+255c250
 <   type t = core_type =
 ---
 >   type t =
-249c244
+267c262
 <   type t = pattern_desc =
 ---
 >   type t =
-277c272,279
+295c290,297
 <   type t = expression_desc =
 ---
 >
@@ -89,47 +93,48 @@
 >     | Pcomp_array_comprehension of unit
 > 
 >   type t =
-332c334
+352c354
 <   type t = type_kind =
 ---
 >   type t =
-358c360
+378c380
 <   type 'a t = 'a include_infos =
 ---
 >   type 'a t =
-370c372
+390c392
 <   type t = signature_item_desc =
 ---
 >   type t =
-394c396
+414c416
 <   type t = signature =
 ---
 >   type t =
-405c407
+425c427
 <   type t = structure_item_desc =
 ---
 >   type t =
-428c430
+448c450
 <   type t = functor_parameter =
 ---
 >   type t =
-437c439
+457c459
 <   type t = module_type_desc =
 ---
 >   type t =
-452c454,459
+472c474,479
 <   type t = module_expr_desc =
 ---
 >
 >   type module_instance = private Module_instance
 > 
 >   type t =
-467,471c474,510
+487,492c494,511
 <   class virtual map : Ppxlib_ast.Ast.map
 <   class virtual iter : Ppxlib_ast.Ast.iter
 <   class virtual ['acc] fold : ['acc] Ppxlib_ast.Ast.fold
 <   class virtual ['acc] fold_map : ['acc] Ppxlib_ast.Ast.fold_map
 <   class virtual ['ctx] map_with_context : ['ctx] Ppxlib_ast.Ast.map_with_context
+<   class virtual ['res] lift : ['res] Ppxlib_ast.Ast.lift
 ---
 >   module Jane_street_extensions0 (T : sig
 >       type 'a t
@@ -149,8 +154,11 @@
 >       method signature_items : signature_item list T.t
 >     end
 >   end
-> 
->   module Jane_street_extensions1 (T : sig
+494,495c513,633
+<   class virtual ['ctx, 'res] lift_map_with_context :
+<     ['ctx, 'res] Ppxlib_ast.Ast.lift_map_with_context
+---
+>   module Jane_street_extensions0_ctx (T : sig
 >       type ('a, 'b) t
 >     end) : sig
 >     class type ['ctx] t = object
@@ -168,11 +176,27 @@
 >       method signature_items : ('ctx, signature_item list) T.t
 >     end
 >   end
-473,474c512,585
-<   class virtual ['ctx, 'res] lift_map_with_context :
-<     ['ctx, 'res] Ppxlib_ast.Ast.lift_map_with_context
----
->   module Jane_street_extensions2 (T : sig
+> 
+>   module Jane_street_extensions1 (T : sig
+>       type ('a, 'b) t
+>     end) : sig
+>     class type ['a] t = object
+>       method jkind_annotation : (jkind_annotation, 'a) T.t
+>       method jkind_annotation_desc : (jkind_annotation_desc, 'a) T.t
+>       method function_body : (Pexp_function.function_body, 'a) T.t
+>       method function_param : (Pexp_function.function_param, 'a) T.t
+>       method function_param_desc : (Pexp_function.function_param_desc, 'a) T.t
+>       method function_constraint : (Pexp_function.Function_constraint.t, 'a) T.t
+>       method type_constraint : (Pexp_function.type_constraint, 'a) T.t
+>       method mode : (Mode.t, 'a) T.t
+>       method modes : (Modes.t, 'a) T.t
+>       method modality : (Modality.t, 'a) T.t
+>       method modalities : (Modalities.t, 'a) T.t
+>       method signature_items : (signature_item list, 'a) T.t
+>     end
+>   end
+> 
+>   module Jane_street_extensions1_ctx (T : sig
 >       type ('a, 'b, 'c) t
 >     end) : sig
 >     class type ['ctx, 'res] t = object
@@ -212,6 +236,10 @@
 >       type ('a, 'b) t = ('a, 'b) Ppxlib_traverse_builtins.T.map_with_context
 >     end
 > 
+>     module Lift : sig
+>       type ('a, 'b) t = ('a, 'b) Ppxlib_traverse_builtins.T.lift
+>     end
+> 
 >     module Lift_map_with_context : sig
 >       type ('a, 'b, 'c) t = ('a, 'b, 'c) Ppxlib_traverse_builtins.T.lift_map_with_context
 >     end
@@ -229,20 +257,25 @@
 > 
 >   class virtual ['ctx] fold : object
 >     inherit ['ctx] Ppxlib_ast.Ast.fold
->     inherit ['ctx] Jane_street_extensions1(Ts.Fold).t
+>     inherit ['ctx] Jane_street_extensions0_ctx(Ts.Fold).t
 >   end
 > 
 >   class virtual ['ctx] fold_map : object
 >     inherit ['ctx] Ppxlib_ast.Ast.fold_map
->     inherit ['ctx] Jane_street_extensions1(Ts.Fold_map).t
+>     inherit ['ctx] Jane_street_extensions0_ctx(Ts.Fold_map).t
 >   end
 > 
 >   class virtual ['ctx] map_with_context : object
 >     inherit ['ctx] Ppxlib_ast.Ast.map_with_context
->     inherit ['ctx] Jane_street_extensions1(Ts.Map_with_context).t
+>     inherit ['ctx] Jane_street_extensions0_ctx(Ts.Map_with_context).t
+>   end
+> 
+>   class virtual ['res] lift : object
+>     inherit ['res] Ppxlib_ast.Ast.lift
+>     inherit ['res] Jane_street_extensions1(Ts.Lift).t
 >   end
 > 
 >   class virtual ['ctx, 'res] lift_map_with_context : object
 >     inherit ['ctx, 'res] Ppxlib_ast.Ast.lift_map_with_context
->     inherit ['ctx, 'res] Jane_street_extensions2(Ts.Lift_map_with_context).t
+>     inherit ['ctx, 'res] Jane_street_extensions1_ctx(Ts.Lift_map_with_context).t
 >   end

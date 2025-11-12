@@ -26,3 +26,12 @@ val localize_include_sig : Ast.include_description -> Ast.include_description
 
 (** Like [localize_include_sig], but appends "__stack" rather than "__local". *)
 val stackify_include_sig : Ast.include_description -> Ast.include_description
+
+(** Like [localize_include_sig], but appends an arbitrary suffix.
+
+    This is useful when the suffix for your signature is not a standard mangling suffix as
+    produced by [ppx_template]. *)
+val append_arbitrary_suffix_to_include_signature
+  :  Ast.include_description
+  -> suffix:string
+  -> Ast.include_description

@@ -11,6 +11,7 @@ include Common
 (** {2 Common Jane Street helper types} *)
 
 type modality = Shim.Modality.t = Modality of string [@@unboxed]
+type modalities = Shim.Modalities.t
 type mode = Shim.Mode.t = Mode of string [@@unboxed]
 type modes = Shim.Modes.t
 
@@ -26,12 +27,12 @@ type arrow_argument = Shim.arrow_argument =
   }
 
 type jkind_annotation_desc = Shim.jkind_annotation_desc =
-  | Default
-  | Abbreviation of string
-  | Mod of Shim.jkind_annotation * Shim.Modes.t
-  | With of Shim.jkind_annotation * Ppxlib_ast.Parsetree.core_type * Shim.Modalities.t
-  | Kind_of of Ppxlib_ast.Parsetree.core_type
-  | Product of Shim.jkind_annotation list
+  | Pjk_default
+  | Pjk_abbreviation of string
+  | Pjk_mod of Shim.jkind_annotation * Shim.Modes.t
+  | Pjk_with of Shim.jkind_annotation * Ppxlib_ast.Parsetree.core_type * Shim.Modalities.t
+  | Pjk_kind_of of Ppxlib_ast.Parsetree.core_type
+  | Pjk_product of Shim.jkind_annotation list
 
 type jkind_annotation = Shim.jkind_annotation =
   { pjkind_loc : Location.t

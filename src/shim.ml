@@ -1,21 +1,16 @@
-open Stdppx
+open! Stdppx
 open Ppxlib_ast.Asttypes
 open Ppxlib_ast.Parsetree
 
 module Modality = struct
   type nonrec t = modality = Modality of string [@@unboxed]
-
-  let to_ast_modalities_list ~loc modalities =
-    List.map modalities ~f:(fun modality -> { txt = modality; loc })
-  ;;
-
-  let of_ast_modalities_list ast_modalities =
-    List.map ast_modalities ~f:(fun { txt = modality; _ } -> modality)
-  ;;
 end
 
 module Modalities = struct
   type t = Modality.t loc list
+
+  let none = []
+  let portable ~loc = [ { txt = Modality.Modality "portable"; loc } ]
 end
 
 module Mode = struct
@@ -25,8 +20,8 @@ end
 module Modes = struct
   type t = Mode.t loc list
 
-  let local = [ { txt = Mode "local"; loc = Location.none } ]
   let none = []
+  let local ~loc = [ { txt = Mode "local"; loc } ]
 end
 
 module Include_kind = struct
@@ -49,7 +44,7 @@ type arrow_result =
 module Pcstr_tuple_arg = struct
   type t = constructor_argument
 
-  let extract_modalities t = Modality.of_ast_modalities_list t.pca_modalities, t.pca_type
+  let extract_modalities t = t.pca_modalities, t.pca_type
   let to_core_type t = t.pca_type
 
   let of_core_type core_type =
@@ -64,21 +59,16 @@ module Pcstr_tuple_arg = struct
   ;;
 
   let create ~loc ~modalities ~type_ =
-    { pca_type = type_
-    ; pca_loc = loc
-    ; pca_modalities = Modality.to_ast_modalities_list ~loc modalities
-    }
+    { pca_type = type_; pca_loc = loc; pca_modalities = modalities }
   ;;
 end
 
 module Label_declaration = struct
-  let extract_modalities ld =
-    Modality.of_ast_modalities_list ld.pld_modalities, { ld with pld_modalities = [] }
-  ;;
+  let extract_modalities ld = ld.pld_modalities, { ld with pld_modalities = [] }
 
   let create ~loc ~name ~mutable_ ~modalities ~type_ =
     { pld_loc = loc
-    ; pld_modalities = Modality.to_ast_modalities_list ~loc modalities
+    ; pld_modalities = modalities
     ; pld_name = name
     ; pld_type = type_
     ; pld_mutable = mutable_
@@ -88,19 +78,11 @@ module Label_declaration = struct
 end
 
 module Value_description = struct
-  let extract_modalities_with_locs vd =
-    vd.pval_modalities, { vd with pval_modalities = [] }
-  ;;
-
-  let extract_modalities vd =
-    let modalities, vd = extract_modalities_with_locs vd in
-    let modalities = Modality.of_ast_modalities_list modalities in
-    modalities, vd
-  ;;
+  let extract_modalities vd = vd.pval_modalities, { vd with pval_modalities = [] }
 
   let create ~loc ~name ~type_ ~modalities ~prim =
     { pval_loc = loc
-    ; pval_modalities = Modality.to_ast_modalities_list ~loc modalities
+    ; pval_modalities = modalities
     ; pval_name = name
     ; pval_type = type_
     ; pval_prim = prim
@@ -217,6 +199,8 @@ module Core_type_desc = struct
     | Ptyp_variant of row_field list * closed_flag * label list option
     | Ptyp_poly of (string loc * jkind_annotation option) list * core_type
     | Ptyp_package of package_type
+    | Ptyp_quote of core_type
+    | Ptyp_splice of core_type
     | Ptyp_of_kind of jkind_annotation
     | Ptyp_extension of extension
 
@@ -301,6 +285,8 @@ module Expression_desc = struct
     | Pexp_stack of expression
     | Pexp_comprehension of comprehension_expression
     | Pexp_overwrite of expression * expression
+    | Pexp_quote of expression
+    | Pexp_splice of expression
     | Pexp_hole
 
   (* The ignored [loc] argument is used in shim_upstream.ml. *)
@@ -371,12 +357,12 @@ module Signature_item_desc = struct
 end
 
 type nonrec jkind_annotation_desc = jkind_annotation_desc =
-  | Default
-  | Abbreviation of string
-  | Mod of jkind_annotation * Modes.t
-  | With of jkind_annotation * core_type * Modality.t loc list
-  | Kind_of of core_type
-  | Product of jkind_annotation list
+  | Pjk_default
+  | Pjk_abbreviation of string
+  | Pjk_mod of jkind_annotation * Modes.t
+  | Pjk_with of jkind_annotation * core_type * Modality.t loc list
+  | Pjk_kind_of of core_type
+  | Pjk_product of jkind_annotation list
 
 type nonrec jkind_annotation = jkind_annotation =
   { pjkind_loc : Location.t
@@ -384,6 +370,20 @@ type nonrec jkind_annotation = jkind_annotation =
   }
 
 module Type_declaration = struct
+  type t = type_declaration =
+    { ptype_name : string loc
+    ; ptype_params : (core_type * (variance * injectivity)) list
+    ; ptype_cstrs : (core_type * core_type * Location.t) list
+    ; ptype_kind : type_kind
+    ; ptype_private : private_flag
+    ; ptype_manifest : core_type option
+    ; ptype_attributes : attributes
+    ; ptype_jkind_annotation : jkind_annotation option
+    ; ptype_loc : Location.t
+    }
+
+  let to_parsetree t = t
+  let of_parsetree t = t
   let extract_jkind_annotation (td : type_declaration) = td.ptype_jkind_annotation
 end
 
@@ -495,6 +495,7 @@ module Ast_traverse = struct
   class virtual ['acc] fold = ['acc] Ppxlib_ast.Ast.fold
   class virtual ['acc] fold_map = ['acc] Ppxlib_ast.Ast.fold_map
   class virtual ['ctx] map_with_context = ['ctx] Ppxlib_ast.Ast.map_with_context
+  class virtual ['res] lift = ['res] Ppxlib_ast.Ast.lift
 
   class virtual ['ctx, 'res] lift_map_with_context =
     ['ctx, 'res] Ppxlib_ast.Ast.lift_map_with_context

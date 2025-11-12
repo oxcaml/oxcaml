@@ -15,6 +15,8 @@ module Language_feature_name = struct
     | Ptyp_class _ -> "class as a type"
     | Ptyp_poly _ -> "explicit polymorphic type"
     | Ptyp_package _ -> "first-class module type"
+    | Ptyp_quote _ -> "quoted type"
+    | Ptyp_splice _ -> "spliced type"
     | Ptyp_of_kind _ -> "type of a fixed kind"
     | Ptyp_extension _ -> "extension point as a type"
   ;;
@@ -76,6 +78,8 @@ module Language_feature_name = struct
     | Pexp_comprehension (Pcomp_list_comprehension _) -> "list comprehension expression"
     | Pexp_comprehension (Pcomp_array_comprehension _) -> "array comprehension expression"
     | Pexp_overwrite _ -> "overwrite"
+    | Pexp_quote _ -> "quoted expression"
+    | Pexp_splice _ -> "spliced expression"
     | Pexp_hole -> "hole"
   ;;
 
@@ -189,6 +193,8 @@ module Constructor_name = struct
     | Ptyp_class _ -> "Ptyp_class"
     | Ptyp_poly _ -> "Ptyp_poly"
     | Ptyp_package _ -> "Ptyp_package"
+    | Ptyp_quote _ -> "Ptyp_quote"
+    | Ptyp_splice _ -> "Ptyp_splice"
     | Ptyp_of_kind _ -> "Ptyp_of_kind"
     | Ptyp_extension _ -> "Ptyp_extension"
   ;;
@@ -237,6 +243,8 @@ module Constructor_name = struct
     | Pexp_stack _ -> "Pexp_stack"
     | Pexp_comprehension _ -> "Pexp_comprehension"
     | Pexp_overwrite _ -> "Pexp_overwrite"
+    | Pexp_quote _ -> "Pexp_quote"
+    | Pexp_splice _ -> "Pexp_splice"
     | Pexp_hole -> "Pexp_hole"
   ;;
 

@@ -67,6 +67,32 @@ module Default = struct
     mkpat ~loc ppat_desc
   ;;
 
+  let type_declaration
+    ~loc
+    ?attrs
+    ?jkind_annotation
+    ~name
+    ~params
+    ~cstrs
+    ~kind
+    ~private_
+    ~manifest
+    ()
+    : type_declaration
+    =
+    { ptype_loc = loc
+    ; ptype_name = name
+    ; ptype_params = params
+    ; ptype_cstrs = cstrs
+    ; ptype_kind = kind
+    ; ptype_private = private_
+    ; ptype_manifest = manifest
+    ; ptype_jkind_annotation = jkind_annotation
+    ; ptype_attributes = Option.value attrs ~default:[]
+    }
+    |> Shim.Type_declaration.to_parsetree
+  ;;
+
   let value_binding = Shim.Value_binding.create
 
   let pcstr_tuple ~loc modalities_tys =
@@ -403,6 +429,16 @@ module Default = struct
       mktyp ~attrs ~loc desc
   ;;
 
+  let ptyp_quote ~loc ?attrs core_type =
+    let desc = Shim.Core_type_desc.to_parsetree (Ptyp_quote core_type) in
+    mktyp ?attrs ~loc desc
+  ;;
+
+  let ptyp_splice ~loc ?attrs core_type =
+    let desc = Shim.Core_type_desc.to_parsetree (Ptyp_splice core_type) in
+    mktyp ?attrs ~loc desc
+  ;;
+
   let pexp_newtype ~loc ?attrs a b c =
     let desc = Shim.Expression_desc.to_parsetree ~loc (Pexp_newtype (a, b, c)) in
     mkexp ?attrs ~loc desc
@@ -432,6 +468,30 @@ struct
   let pexp_let a b c d : expression = pexp_let ~loc a b c d
   let pexp_constraint a b c : expression = pexp_constraint ~loc a b c
   let ppat_constraint a b c : pattern = ppat_constraint ~loc a b c
+
+  let type_declaration
+    ?attrs
+    ?jkind_annotation
+    ~name
+    ~params
+    ~cstrs
+    ~kind
+    ~private_
+    ~manifest
+    ()
+    =
+    type_declaration
+      ~loc
+      ?attrs
+      ?jkind_annotation
+      ~name
+      ~params
+      ~cstrs
+      ~kind
+      ~private_
+      ~manifest
+      ()
+  ;;
 
   let value_binding ~pat ~expr ~modes : value_binding =
     value_binding ~loc ~pat ~expr ~modes
@@ -506,6 +566,8 @@ struct
   let pnativeint_u c : pattern = pnativeint_u ~loc c
   let pfloat_u c : pattern = pfloat_u ~loc c
   let ptyp_tuple ?attrs a : core_type = ptyp_tuple ~loc ?attrs a
+  let ptyp_quote ?attrs a : core_type = ptyp_quote ~loc ?attrs a
+  let ptyp_splice ?attrs a : core_type = ptyp_splice ~loc ?attrs a
   let pexp_tuple ?attrs a : expression = pexp_tuple ~loc ?attrs a
   let ppat_tuple ?attrs a b : pattern = ppat_tuple ~loc ?attrs a b
   let pmty_signature a : module_type = pmty_signature ~loc a

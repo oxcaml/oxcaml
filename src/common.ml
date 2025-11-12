@@ -51,3 +51,7 @@ let mangle_include_sig incl ~f =
 
 let localize_include_sig incl = mangle_include_sig incl ~f:localize_longident
 let stackify_include_sig incl = mangle_include_sig incl ~f:stackify_longident
+
+let append_arbitrary_suffix_to_include_signature incl ~suffix =
+  mangle_include_sig incl ~f:(mangle_longident ~suffix)
+;;
