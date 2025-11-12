@@ -141,6 +141,14 @@ module Layout = struct
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | (Base _ | Any _ | Product _), _ -> false
 
+    let rec equal_up_to_scannable_axes c1 c2 =
+      match c1, c2 with
+      | Base (b1, _), Base (b2, _) -> Sort.equal_base b1 b2
+      | Any _, Any _ -> true
+      | Product cs1, Product cs2 ->
+        List.equal equal_up_to_scannable_axes cs1 cs2
+      | (Base _ | Any _ | Product _), _ -> false
+
     module Static = struct
       (* CR zeisbach: this used to have a bunch of constants defined so that
          they only had to be allocated once. now that there are SA as well,
@@ -151,10 +159,11 @@ module Layout = struct
 
     (* if so, scannable axis annotations should not trigger a warning *)
     let is_value_or_any = function
-      | Any | Base Value -> true
+      | Any _ | Base (Value, _) -> true
       | Base
-          ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
-          | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
+          ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
+            | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ),
+            _ ) ->
         false
       | Product _ -> false
 
@@ -342,7 +351,8 @@ module Layout = struct
   let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
     | Any sa | Sort (_, sa) -> Some sa
     (* CR zeisbach: it feels like ignoring this is the only sensible
-       thing to do here, but think about this carefully *)
+       thing to do here, but think about this carefully.
+       ALSO, it is a bit awkward to get them out for float64 but not products *)
     | Product _ -> None
 
   let sub t1 t2 =
@@ -1478,6 +1488,7 @@ module Const = struct
     in
     match t1_t2 with
     | Some (t1, t2) ->
+      (* CR zeisbach: maybe this should change, see CR below *)
       Layout.Const.equal t1.layout t2.layout
       && Mod_bounds.equal t1.mod_bounds t2.mod_bounds
     | None -> false
@@ -2013,6 +2024,7 @@ module Const = struct
   end = struct
     type printable_jkind =
       { base : string;
+        scannable_axes : string list;
         modal_bounds : string list;
         printable_with_bounds :
           (Outcometree.out_type * Outcometree.out_modality_new list) list
@@ -2086,6 +2098,25 @@ module Const = struct
         in
         Some modes
 
+    let get_scannable_axes ~base actual =
+      (* CR zeisbach: should this be in Layout.Const?
+         In general, duplication vs convert? *)
+      let base_sa = Layout.get_root_scannable_axes (Layout.of_const base) in
+      let actual_sa = Layout.get_root_scannable_axes (Layout.of_const actual) in
+      match base_sa, actual_sa with
+      (* CR zeisbach: returning empty list is a little weird here.
+         The modal bounds functions return None and manipulate, but I think
+         that just an empty list should be okay for this purpose?
+         Although it is a little weird since it is specialized currently.
+         It seems likely to have to add something to [Scannable_axes], or do
+         the per-axis thing (which I want to avoid). Duplication maybe needed *)
+      | None, _ | _, None -> []
+      | Some base_sa, Some actual_sa ->
+        (* CR zeisbach: this should be comparing per-axis, really. *)
+        if Scannable_axes.equal base_sa actual_sa
+        then []
+        else [Pointerness.to_string actual_sa]
+
     let modality_to_ignore_axes axes_to_ignore =
       (* The modality is constant along axes to ignore and id along others *)
       List.fold_left
@@ -2105,7 +2136,10 @@ module Const = struct
     (** Write [actual] in terms of [base] *)
     let convert_with_base ~(base : Builtin.t) (actual : _ t) =
       let matching_layouts =
-        Layout.Const.equal base.jkind.layout actual.layout
+        Layout.Const.equal_up_to_scannable_axes base.jkind.layout actual.layout
+      in
+      let scannable_axes =
+        get_scannable_axes ~base:base.jkind.layout actual.layout
       in
       let modal_bounds =
         get_modal_bounds ~base:base.jkind.mod_bounds actual.mod_bounds
@@ -2125,7 +2159,12 @@ module Const = struct
       in
       match matching_layouts, modal_bounds with
       | true, Some modal_bounds ->
-        Some { base = base.name; modal_bounds; printable_with_bounds }
+        Some
+          { base = base.name;
+            scannable_axes;
+            modal_bounds;
+            printable_with_bounds
+          }
       | false, _ | _, None -> None
 
     (** Select the out_jkind_const with the least number of modal bounds to print *)
@@ -2150,7 +2189,7 @@ module Const = struct
         |> List.filter_map (fun base -> convert_with_base ~base jkind)
         |> select_simplest
       in
-      let printable_jkind =
+      let { base; scannable_axes; modal_bounds; printable_with_bounds } =
         match simplest with
         | Some simplest -> simplest
         | None -> (
@@ -2193,27 +2232,20 @@ module Const = struct
                matches and the modal bounds are all max *)
             Option.get out_jkind_verbose)
       in
-      let base, with_tys =
-        match printable_jkind with
-        | { base; modal_bounds = _ :: _ as modal_bounds; printable_with_bounds }
-          ->
-          ( Outcometree.Ojkind_const_mod
-              (* CR zeisbach: this obviously needs to do something more useful.
-                 the answer is to add a field to printable_jkind to store the
-                 scannable axes, but I think that should be saved for the
-                 separability porting refactor. unless everything explodes *)
-              ( Some (Ojkind_const_abbreviation (base, ["placeholder"])),
-                modal_bounds ),
-            printable_with_bounds )
-        | { base; modal_bounds = []; printable_with_bounds } ->
-          ( Outcometree.Ojkind_const_abbreviation (base, []),
-            printable_with_bounds )
+      let base = Outcometree.Ojkind_const_abbreviation (base, scannable_axes) in
+      (* Add on [mod] bounds, if there are any *)
+      let base =
+        (* CR zeisbach: prefer [List.is_empty] or [= []]?
+           also (style): is the shadowing okay? *)
+        if modal_bounds = []
+        then base
+        else Outcometree.Ojkind_const_mod (Some base, modal_bounds)
       in
       (* Finally, add on the [with]-types and their modalities *)
       List.fold_left
         (fun jkind (ty, modalities) ->
           Outcometree.Ojkind_const_with (jkind, ty, modalities))
-        base with_tys
+        base printable_with_bounds
   end
 
   let to_out_jkind_const jkind = To_out_jkind_const.convert jkind
@@ -4158,6 +4190,9 @@ let is_value_for_printing ~ignore_null { jkind; _ } =
         :: values
       else values
     in
+    (* CR zeisbach: should this take scannable axes into account?
+       if not, then tweak [no_with_bounds_and_equal] to use the new
+       [equal_up_to_scannable_axes] *)
     List.exists (fun v -> Const.no_with_bounds_and_equal const v) values
 
 (*********************************)
