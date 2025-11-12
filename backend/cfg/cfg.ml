@@ -800,13 +800,13 @@ let equal_basic left right =
   | Pushtrap { lbl_handler = left_lbl }, Pushtrap { lbl_handler = right_lbl }
   | Poptrap { lbl_handler = left_lbl }, Poptrap { lbl_handler = right_lbl } ->
     Label.equal left_lbl right_lbl
-  | Prologue, Prologue
-  | Epilogue, Epilogue -> true
+  | Prologue, Prologue | Epilogue, Epilogue -> true
   | ( Stack_check { max_frame_size_bytes = left_size },
       Stack_check { max_frame_size_bytes = right_size } ) ->
     Int.equal left_size right_size
-  | (Op _ | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
-    | Stack_check _), _ ->
+  | ( ( Op _ | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+      | Stack_check _ ),
+      _ ) ->
     false
 
 let equal_bool_test (left : bool_test) (right : bool_test) =
@@ -845,10 +845,16 @@ let equal_prim_call_operation left right =
   match left, right with
   | External left_op, External right_op ->
     equal_external_call_operation left_op right_op
-  | ( Probe { name = left_name; handler_code_sym = left_handler;
-              enabled_at_init = left_enabled },
-      Probe { name = right_name; handler_code_sym = right_handler;
-              enabled_at_init = right_enabled } ) ->
+  | ( Probe
+        { name = left_name;
+          handler_code_sym = left_handler;
+          enabled_at_init = left_enabled
+        },
+      Probe
+        { name = right_name;
+          handler_code_sym = right_handler;
+          enabled_at_init = right_enabled
+        } ) ->
     String.equal left_name right_name
     && String.equal left_handler right_handler
     && Bool.equal left_enabled right_enabled
@@ -870,10 +876,10 @@ let equal_terminator left right =
     equal_int_test left_test right_test
   | Switch left_labels, Switch right_labels ->
     Int.equal (Array.length left_labels) (Array.length right_labels)
-    && (try Array.for_all2 Label.equal left_labels right_labels
-        with Invalid_argument _ -> false)
+    && Array.for_all2 Label.equal left_labels right_labels
   | Return, Return -> true
-  | Raise left_kind, Raise right_kind -> Lambda.equal_raise_kind left_kind right_kind
+  | Raise left_kind, Raise right_kind ->
+    Lambda.equal_raise_kind left_kind right_kind
   | ( Tailcall_self { destination = left_dest },
       Tailcall_self { destination = right_dest } ) ->
     Label.equal left_dest right_dest
@@ -885,7 +891,8 @@ let equal_terminator left right =
     equal_with_label_after equal_func_call_operation left_call right_call
   | Prim left_prim, Prim right_prim ->
     equal_with_label_after equal_prim_call_operation left_prim right_prim
-  | (Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
-    | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-    | Tailcall_func _ | Call_no_return _ | Call _ | Prim _), _ ->
+  | ( ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+      | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+      | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ),
+      _ ) ->
     false

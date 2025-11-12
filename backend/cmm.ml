@@ -240,9 +240,11 @@ let equal_atomic_op left right =
   | Lxor, Lxor
   | Exchange, Exchange
   | Compare_set, Compare_set
-  | Compare_exchange, Compare_exchange -> true
-  | ( Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange | Compare_set
-    | Compare_exchange ), _ ->
+  | Compare_exchange, Compare_exchange ->
+    true
+  | ( ( Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange | Compare_set
+      | Compare_exchange ),
+      _ ) ->
     false
 
 type atomic_bitwidth =
@@ -263,8 +265,7 @@ type effects =
 
 let equal_effects left right =
   match left, right with
-  | No_effects, No_effects
-  | Arbitrary_effects, Arbitrary_effects -> true
+  | No_effects, No_effects | Arbitrary_effects, Arbitrary_effects -> true
   | (No_effects | Arbitrary_effects), _ -> false
 
 type coeffects =
@@ -440,17 +441,19 @@ let equal_alloc_block_kind left right =
   | Alloc_block_kind_int64_u_array, Alloc_block_kind_int64_u_array
   | Alloc_block_kind_vec128_u_array, Alloc_block_kind_vec128_u_array
   | Alloc_block_kind_vec256_u_array, Alloc_block_kind_vec256_u_array
-  | Alloc_block_kind_vec512_u_array, Alloc_block_kind_vec512_u_array -> true
+  | Alloc_block_kind_vec512_u_array, Alloc_block_kind_vec512_u_array ->
+    true
   | Alloc_block_kind_boxed_int left_bi, Alloc_block_kind_boxed_int right_bi ->
     Primitive.equal_boxed_integer left_bi right_bi
-  | ( Alloc_block_kind_other | Alloc_block_kind_closure
-    | Alloc_block_kind_float | Alloc_block_kind_float32
-    | Alloc_block_kind_vec128 | Alloc_block_kind_vec256
-    | Alloc_block_kind_vec512 | Alloc_block_kind_boxed_int _
-    | Alloc_block_kind_float_array | Alloc_block_kind_float32_u_array
-    | Alloc_block_kind_int32_u_array | Alloc_block_kind_int64_u_array
-    | Alloc_block_kind_vec128_u_array | Alloc_block_kind_vec256_u_array
-    | Alloc_block_kind_vec512_u_array ), _ ->
+  | ( ( Alloc_block_kind_other | Alloc_block_kind_closure
+      | Alloc_block_kind_float | Alloc_block_kind_float32
+      | Alloc_block_kind_vec128 | Alloc_block_kind_vec256
+      | Alloc_block_kind_vec512 | Alloc_block_kind_boxed_int _
+      | Alloc_block_kind_float_array | Alloc_block_kind_float32_u_array
+      | Alloc_block_kind_int32_u_array | Alloc_block_kind_int64_u_array
+      | Alloc_block_kind_vec128_u_array | Alloc_block_kind_vec256_u_array
+      | Alloc_block_kind_vec512_u_array ),
+      _ ) ->
     false
 
 type alloc_dbginfo_item =
@@ -845,8 +848,7 @@ let equal_machtype_component
 
 let equal_machtype left right =
   Int.equal (Array.length left) (Array.length right)
-  && (try Array.for_all2 equal_machtype_component left right
-      with Invalid_argument _ -> false)
+  && Array.for_all2 equal_machtype_component left right
 
 let equal_exttype
     (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128

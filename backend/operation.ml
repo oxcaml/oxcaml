@@ -442,7 +442,8 @@ let dump ppf op =
 
 let equal_alloc_dbginfo_item left right =
   Int.equal left.Cmm.alloc_words right.Cmm.alloc_words
-  && Cmm.equal_alloc_block_kind left.Cmm.alloc_block_kind right.Cmm.alloc_block_kind
+  && Cmm.equal_alloc_block_kind left.Cmm.alloc_block_kind
+       right.Cmm.alloc_block_kind
   && Debuginfo.compare left.Cmm.alloc_dbg right.Cmm.alloc_dbg = 0
 
 let equal_alloc_dbginfo left right =
@@ -453,30 +454,27 @@ let equal_test left right =
   | Itruetest, Itruetest
   | Ifalsetest, Ifalsetest
   | Ioddtest, Ioddtest
-  | Ieventest, Ieventest -> true
+  | Ieventest, Ieventest ->
+    true
   | Iinttest left_cmp, Iinttest right_cmp ->
     equal_integer_comparison left_cmp right_cmp
   | Iinttest_imm (left_cmp, left_n), Iinttest_imm (right_cmp, right_n) ->
     equal_integer_comparison left_cmp right_cmp && Int.equal left_n right_n
   | Ifloattest (left_w, left_cmp), Ifloattest (right_w, right_cmp) ->
-    equal_float_width left_w right_w && equal_float_comparison left_cmp right_cmp
-  | ( Itruetest | Ifalsetest | Iinttest _ | Iinttest_imm _ | Ifloattest _
-    | Ioddtest | Ieventest ), _ ->
+    equal_float_width left_w right_w
+    && equal_float_comparison left_cmp right_cmp
+  | ( ( Itruetest | Ifalsetest | Iinttest _ | Iinttest_imm _ | Ifloattest _
+      | Ioddtest | Ieventest ),
+      _ ) ->
     false
 
 let equal left right =
   match left, right with
-  | Move, Move
-  | Spill, Spill
-  | Reload, Reload -> true
-  | Const_int left_n, Const_int right_n ->
-    Nativeint.equal left_n right_n
-  | Const_float32 left_f, Const_float32 right_f ->
-    Int32.equal left_f right_f
-  | Const_float left_f, Const_float right_f ->
-    Int64.equal left_f right_f
-  | Const_symbol left_s, Const_symbol right_s ->
-    Cmm.equal_symbol left_s right_s
+  | Move, Move | Spill, Spill | Reload, Reload -> true
+  | Const_int left_n, Const_int right_n -> Nativeint.equal left_n right_n
+  | Const_float32 left_f, Const_float32 right_f -> Int32.equal left_f right_f
+  | Const_float left_f, Const_float right_f -> Int64.equal left_f right_f
+  | Const_symbol left_s, Const_symbol right_s -> Cmm.equal_symbol left_s right_s
   | Const_vec128 left_v, Const_vec128 right_v ->
     Int64.equal left_v.Cmm.word0 right_v.Cmm.word0
     && Int64.equal left_v.Cmm.word1 right_v.Cmm.word1
@@ -494,12 +492,19 @@ let equal left right =
     && Int64.equal left_v.Cmm.word5 right_v.Cmm.word5
     && Int64.equal left_v.Cmm.word6 right_v.Cmm.word6
     && Int64.equal left_v.Cmm.word7 right_v.Cmm.word7
-  | Stackoffset left_n, Stackoffset right_n ->
-    Int.equal left_n right_n
-  | ( Load { memory_chunk = left_chunk; addressing_mode = left_addr;
-             mutability = left_mut; is_atomic = left_atomic },
-      Load { memory_chunk = right_chunk; addressing_mode = right_addr;
-             mutability = right_mut; is_atomic = right_atomic } ) ->
+  | Stackoffset left_n, Stackoffset right_n -> Int.equal left_n right_n
+  | ( Load
+        { memory_chunk = left_chunk;
+          addressing_mode = left_addr;
+          mutability = left_mut;
+          is_atomic = left_atomic
+        },
+      Load
+        { memory_chunk = right_chunk;
+          addressing_mode = right_addr;
+          mutability = right_mut;
+          is_atomic = right_atomic
+        } ) ->
     Cmm.equal_memory_chunk left_chunk right_chunk
     && Arch.equal_addressing_mode left_addr right_addr
     && equal_mutable_flag left_mut right_mut
@@ -509,54 +514,53 @@ let equal left right =
     Cmm.equal_memory_chunk left_chunk right_chunk
     && Arch.equal_addressing_mode left_addr right_addr
     && Bool.equal left_assign right_assign
-  | Intop left_op, Intop right_op ->
-    equal_integer_operation left_op right_op
+  | Intop left_op, Intop right_op -> equal_integer_operation left_op right_op
   | Intop_imm (left_op, left_n), Intop_imm (right_op, right_n) ->
-    equal_integer_operation left_op right_op
-    && Int.equal left_n right_n
+    equal_integer_operation left_op right_op && Int.equal left_n right_n
   | ( Intop_atomic { op = left_op; size = left_size; addr = left_addr },
       Intop_atomic { op = right_op; size = right_size; addr = right_addr } ) ->
     Cmm.equal_atomic_op left_op right_op
     && Cmm.equal_atomic_bitwidth left_size right_size
     && Arch.equal_addressing_mode left_addr right_addr
   | Floatop (left_w, left_op), Floatop (right_w, right_op) ->
-    equal_float_width left_w right_w
-    && equal_float_operation left_op right_op
-  | Csel left_test, Csel right_test ->
-    equal_test left_test right_test
+    equal_float_width left_w right_w && equal_float_operation left_op right_op
+  | Csel left_test, Csel right_test -> equal_test left_test right_test
   | Reinterpret_cast left_c, Reinterpret_cast right_c ->
     Cmm.equal_reinterpret_cast left_c right_c
   | Static_cast left_c, Static_cast right_c ->
     Cmm.equal_static_cast left_c right_c
-  | Probe_is_enabled { name = left_name },
-    Probe_is_enabled { name = right_name } ->
+  | ( Probe_is_enabled { name = left_name },
+      Probe_is_enabled { name = right_name } ) ->
     String.equal left_name right_name
-  | Opaque, Opaque
-  | Begin_region, Begin_region
-  | End_region, End_region -> true
+  | Opaque, Opaque | Begin_region, Begin_region | End_region, End_region -> true
   | Specific left_op, Specific right_op ->
     Arch.equal_specific_operation left_op right_op
-  | ( Name_for_debugger { ident = left_ident; which_parameter = left_wp;
-                          provenance = left_prov; regs = _ },
-      Name_for_debugger { ident = right_ident; which_parameter = right_wp;
-                          provenance = right_prov; regs = _ } ) ->
+  | ( Name_for_debugger
+        { ident = left_ident;
+          which_parameter = left_wp;
+          provenance = left_prov;
+          regs = _
+        },
+      Name_for_debugger
+        { ident = right_ident;
+          which_parameter = right_wp;
+          provenance = right_prov;
+          regs = _
+        } ) ->
     Ident.same left_ident right_ident
     && Option.equal Int.equal left_wp right_wp
     && Option.equal Backend_var.Provenance.equal left_prov right_prov
-  | Dls_get, Dls_get
-  | Tls_get, Tls_get
-  | Poll, Poll
-  | Pause, Pause -> true
+  | Dls_get, Dls_get | Tls_get, Tls_get | Poll, Poll | Pause, Pause -> true
   | ( Alloc { bytes = left_bytes; dbginfo = left_dbg; mode = left_mode },
       Alloc { bytes = right_bytes; dbginfo = right_dbg; mode = right_mode } ) ->
     Int.equal left_bytes right_bytes
     && equal_alloc_dbginfo left_dbg right_dbg
     && Cmm.Alloc_mode.equal left_mode right_mode
-  | ( Move | Spill | Reload | Const_int _ | Const_float32 _
-    | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-    | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Intop _
-    | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
-    | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
-    | Begin_region | End_region | Specific _ | Name_for_debugger _
-    | Dls_get | Tls_get | Poll | Pause | Alloc _ ), _ ->
+  | ( ( Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Stackoffset _ | Load _ | Store _ | Intop _ | Intop_imm _
+      | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+      | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
+      | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause | Alloc _ ),
+      _ ) ->
     false
