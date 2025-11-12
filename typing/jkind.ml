@@ -273,6 +273,7 @@ module Error = struct
         }
         -> t
     | Unknown_jkind of Parsetree.jkind_annotation
+    | Unknown_kind_modifier of string
     | Multiple_jkinds of
         { from_annotation : Parsetree.jkind_annotation;
           from_attribute : Builtin_attributes.jkind_attribute Location.loc
@@ -1300,38 +1301,82 @@ module Const = struct
       with_bounds
     }
 
+  let transl_scannable_axes sa_annots =
+    (* CR layouts-scannable: This should work for more axes as they're added
+       The current implementation is quite specialized. The [to_string] call
+       seems avoidable if an additional string is accumulated; this may not be
+       the best though. Consider refactoring as more axes are added. *)
+    let set_or_warn ~loc ~to_ pointerness =
+      match pointerness with
+      | Some overridden_by ->
+        Location.prerr_warning loc
+          (Warnings.Overridden_kind_modifier
+             (Pointerness.to_string overridden_by));
+        pointerness
+      | None -> Some to_
+    in
+    (* This will compute and report errors from right-to-left, which enables
+       better error messages while traversing the list only once. It comes at
+       the cost of warnings being reported in a slightly weirder order. *)
+    List.fold_right
+      (fun ({ txt; loc } : string Location.loc) pointerness ->
+        match txt with
+        | "non_pointer" ->
+          set_or_warn ~loc ~to_:Pointerness.Non_pointer pointerness
+        | "maybe_pointer" ->
+          set_or_warn ~loc ~to_:Pointerness.Maybe_pointer pointerness
+        | _ -> raise ~loc (Unknown_kind_modifier txt))
+      sa_annots None
+
   let rec of_user_written_annotation_unchecked_level :
       type l r.
       (l * r) Context_with_transl.t -> Parsetree.jkind_annotation -> (l * r) t =
    fun context jkind ->
     match jkind.pjkind_desc with
-    | Pjk_abbreviation name ->
+    | Pjk_abbreviation (name, sa_annot) ->
       (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
-      (match name with
-      | "any" -> Builtin.any.jkind
-      | "value_or_null" -> Builtin.value_or_null.jkind
-      | "value" -> Builtin.value.jkind
-      | "void" -> Builtin.void.jkind
-      | "immediate64" -> Builtin.immediate64.jkind
-      | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
-      | "immediate" -> Builtin.immediate.jkind
-      | "immediate_or_null" -> Builtin.immediate_or_null.jkind
-      | "float64" -> Builtin.float64.jkind
-      | "float32" -> Builtin.float32.jkind
-      | "word" -> Builtin.word.jkind
-      | "untagged_immediate" -> Builtin.untagged_immediate.jkind
-      | "bits8" -> Builtin.bits8.jkind
-      | "bits16" -> Builtin.bits16.jkind
-      | "bits32" -> Builtin.bits32.jkind
-      | "bits64" -> Builtin.bits64.jkind
-      | "vec128" -> Builtin.vec128.jkind
-      | "vec256" -> Builtin.vec256.jkind
-      | "vec512" -> Builtin.vec512.jkind
-      | "immutable_data" -> Builtin.immutable_data.jkind
-      | "sync_data" -> Builtin.sync_data.jkind
-      | "mutable_data" -> Builtin.mutable_data.jkind
-      | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
-      |> allow_left |> allow_right
+      let jkind_without_sa =
+        (match name.txt with
+        | "any" -> Builtin.any.jkind
+        | "value_or_null" -> Builtin.value_or_null.jkind
+        | "value" -> Builtin.value.jkind
+        | "void" -> Builtin.void.jkind
+        | "immediate64" -> Builtin.immediate64.jkind
+        | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
+        | "immediate" -> Builtin.immediate.jkind
+        | "immediate_or_null" -> Builtin.immediate_or_null.jkind
+        | "float64" -> Builtin.float64.jkind
+        | "float32" -> Builtin.float32.jkind
+        | "word" -> Builtin.word.jkind
+        | "untagged_immediate" -> Builtin.untagged_immediate.jkind
+        | "bits8" -> Builtin.bits8.jkind
+        | "bits16" -> Builtin.bits16.jkind
+        | "bits32" -> Builtin.bits32.jkind
+        | "bits64" -> Builtin.bits64.jkind
+        | "vec128" -> Builtin.vec128.jkind
+        | "vec256" -> Builtin.vec256.jkind
+        | "vec512" -> Builtin.vec512.jkind
+        | "immutable_data" -> Builtin.immutable_data.jkind
+        | "sync_data" -> Builtin.sync_data.jkind
+        | "mutable_data" -> Builtin.mutable_data.jkind
+        | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
+        |> allow_left |> allow_right
+      in
+      let pointerness = transl_scannable_axes sa_annot in
+      if sa_annot <> []
+         && not (Layout.Const.is_value_or_any jkind_without_sa.layout)
+      then
+        Location.prerr_warning jkind.pjkind_loc
+          (Warnings.Ignored_kind_modifier
+             (name.txt, List.map Location.get_txt sa_annot));
+      (* CR layouts-scannable: The correct behavior is to make a new jkind that
+         differs only in the layout by adding in the non-[None] scannable axes.
+         For inspiration, see [set_nullability_upper_bound].
+         This should emit a warning if the [jkind_without_sa] already has
+         the specified scannable axes. This is why the helper currently
+         returns an optional annotation (since none vs default matters). *)
+      ignore pointerness;
+      jkind_without_sa
     | Pjk_mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
       (* for each mode, lower the corresponding modal bound to be that mode *)
@@ -3076,6 +3121,8 @@ let report_error ~loc : Error.t -> _ = function
          When RAE tried this, some types got printed like [t/2], but the
          [/2] shouldn't be there. Investigate and fix. *)
       "@[<v>Unknown layout %a@]" Pprintast.jkind_annotation jkind
+  | Unknown_kind_modifier saxis ->
+    Location.errorf ~loc "@[<v>Unknown kind modifier %s@]" saxis
   | Multiple_jkinds { from_annotation; from_attribute } ->
     Location.errorf ~loc
       "@[<v>A type declaration's layout can be given at most once.@;\
