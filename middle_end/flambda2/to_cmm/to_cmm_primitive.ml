@@ -964,11 +964,11 @@ let nullary_primitive _env res dbg prim =
     let expr, res = C.invalid res ~message in
     None, res, expr
   | Optimised_out _ -> Misc.fatal_errorf "TODO: phantom let-bindings in to_cmm"
-  | Probe_is_enabled { name } ->
+  | Probe_is_enabled { name; enabled_at_init } ->
     (* CR gbury: we should never manually build cmm expression in this file. We
        should instead always use smart constructors defined in `cmm_helpers` or
        `to_cmm_shared.ml` *)
-    let expr = Cmm.Cop (Cprobe_is_enabled { name }, [], dbg) in
+    let expr = Cmm.Cop (Cprobe_is_enabled { name; enabled_at_init }, [], dbg) in
     None, res, expr
   | Enter_inlined_apply _ ->
     Misc.fatal_errorf

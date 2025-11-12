@@ -2880,9 +2880,9 @@ AS_IF([test x"$enable_function_sections" = "xno"],
     [])])
 
 AS_CASE([$arch],
-  [amd64],
+  [amd64|arm64],
     [AS_CASE([$target],
-      [*-cygwin*|*-mingw*|*-windows],[probes=false],
+      [*-cygwin*|*-mingw*|*-windowss|*-apple-darwin*],[probes=false],
       [*],[probes=true])],
   [*],[probes=false])
 
