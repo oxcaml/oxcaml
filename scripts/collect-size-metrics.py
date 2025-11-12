@@ -69,18 +69,22 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Collect file size metrics from install directory"
     )
-    parser.add_argument("install_directory", help="Path to install directory")
-    parser.add_argument("output_directory", help="Output directory for CSV file")
-    parser.add_argument("commit_hash", help="Git commit hash")
-    parser.add_argument("commit_message", help="Git commit message")
+    parser.add_argument("--install-dir", required=True,
+                        help="Path to install directory")
+    parser.add_argument("--output-dir", required=True,
+                        help="Output directory for CSV file")
+    parser.add_argument("--commit-hash", required=True,
+                        help="Git commit hash")
+    parser.add_argument("--commit-message", required=True,
+                        help="Git commit message")
     parser.add_argument("--verbose", action="store_true",
                         help="Print contents of generated CSV file")
 
     args = parser.parse_args()
 
     collect_metrics(
-        args.install_directory,
-        args.output_directory,
+        args.install_dir,
+        args.output_dir,
         args.commit_hash,
         args.commit_message,
         args.verbose
