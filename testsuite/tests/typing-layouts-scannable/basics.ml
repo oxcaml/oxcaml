@@ -159,6 +159,16 @@ Error: The layout of type "a" is
          because of the annotation on the declaration of the type a.
 |}]
 
+(* BUT adding in the additional kind annotation makes this work! *)
+type a : (value non_pointer & value) & (value non_pointer & value non_pointer)
+       = #{ p : #(t_nonptr_val * t_maybeptr_val); b : b }
+and b : value non_pointer & value non_pointer
+      = #{ i : t_nonptr_val; j : t_nonptr_val }
+[%%expect{|
+type a = #{ p : #(t_nonptr_val * t_maybeptr_val); b : b; }
+and b = #{ i : t_nonptr_val; j : t_nonptr_val; }
+|}]
+
 (* CR zeisbach: add tests to make sure that the first component of a
 [value non_pointer & value] record can be passed to a value non_pointer
    accepting function *)
