@@ -4,7 +4,7 @@
   (and (= %{context_name} "main")
        (= %{system} "linux")))
  (deps t1.ml)
- (action (run %{bin:ocamlopt.opt} %{deps} -warn-error "+190" -c)))
+ (action (run %{bin:ocamlopt.opt} -no-probes-optimized %{deps} -warn-error "+190" -c)))
 
 (rule
  (alias runtest)
@@ -12,7 +12,7 @@
   (and (= %{context_name} "main")
        (= %{system} "linux")))
  (deps region.ml)
- (action (run %{bin:ocamlopt.opt} %{deps} -c)))
+ (action (run %{bin:ocamlopt.opt} -no-probes-optimized %{deps} -c)))
 
 (executable
  (name t2)
@@ -40,7 +40,17 @@
  (deps t3.ml)
  (action (with-outputs-to %{target}
          (with-accepted-exit-codes 2
-         (run %{bin:ocamlopt.opt} %{deps} -color never -error-style short -warn-error "+190" -c)))))
+         (run %{bin:ocamlopt.opt} -no-probes-optimized %{deps} -color never -error-style short -warn-error "+190" -c)))))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (target t3.output.filtered)
+ (deps t3.output)
+ (action (with-outputs-to %{target}
+         (pipe-outputs (run cat %{deps})
+                  (run ./filter.sh)))))
 
 (rule
  (alias   runtest)
@@ -48,7 +58,7 @@
   (and (= %{context_name} "main")
        (= %{system} "linux")))
  (deps t3.expected t3.output)
- (action (diff t3.expected t3.output)))
+ (action (diff t3.expected t3.output.filtered)))
 
 (rule
  (target test_ocamldep.output)
@@ -70,7 +80,7 @@
  (target f1.exe)
  (deps f1.ml)
  (action (with-accepted-exit-codes 0
-         (run %{bin:ocamlopt.opt} -O3 %{deps} -o f1.exe))))
+         (run %{bin:ocamlopt.opt} -no-probes-optimized -no-probes-optimized -O3 %{deps} -o f1.exe))))
 
 (rule
  (target f1.output)
@@ -94,7 +104,7 @@
  (target f2.exe)
  (deps f2.ml)
  (action (with-accepted-exit-codes 0
-         (run %{bin:ocamlopt.opt} -O3 %{deps} -o f2.exe))))
+         (run %{bin:ocamlopt.opt} -no-probes-optimized -O3 %{deps} -o f2.exe))))
 
 (rule
  (target f2.output)
@@ -102,6 +112,7 @@
  (action (with-outputs-to %{target}
          (with-accepted-exit-codes 2
          (with-outputs-to %{target} (run %{deps}))))))
+
 
 (rule
  (alias   runtest)
