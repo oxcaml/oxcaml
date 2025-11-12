@@ -645,6 +645,10 @@ module Sort = struct
   end
 end
 
+module Scannable_axes = struct
+  type t = Jkind_axis.Pointerness.t
+end
+
 module Layout = struct
   type 'sort t =
     | Sort of 'sort
@@ -708,6 +712,15 @@ module Layout = struct
         | Vec256 -> vec256
         | Vec512 -> vec512
     end
+
+    (* if so, scannable axis annotations should not trigger a warning *)
+    let is_value_or_any = function
+      | Any | Base Value -> true
+      | Base
+          ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
+          | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
+        false
+      | Product _ -> false
 
     let of_sort s =
       let rec of_sort : Sort.t -> _ = function
