@@ -503,7 +503,7 @@ let convert_block_access_field_kind_from_value_kind
   | Pboxedvectorval _ ->
     Any_value
 
-let block_access_for_element
+let mixed_block_access_field_kind
     (elt : 'a Mixed_block_shape.Singleton_mixed_block_element.t) :
     P.Mixed_block_access_field_kind.t =
   match elt with

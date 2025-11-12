@@ -36,6 +36,7 @@ val transl_implementation:
       Compilation_unit.t -> structure * module_coercion * module_coercion option
         -> loc:Location.t -> SL.program
 
+(* Can only be used when targeting bytecode *)
 val transl_toplevel_definition: structure -> lambda
 
 val transl_package:

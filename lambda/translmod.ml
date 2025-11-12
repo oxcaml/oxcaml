@@ -664,12 +664,10 @@ and transl_structure ~scopes loc
       let body, repr =
         match cc with
           Tcoerce_none ->
-            let repr =
-              List.rev_map (fun (_, sort) -> sort) fields |> Array.of_list
-            in
-            let repr = transl_module_representation repr in
+            let ids, sorts = List.split (List.rev fields) in
+            let repr = transl_module_representation (Array.of_list sorts) in
             Lprim(block_of_module_representation ~loc:(to_location loc) repr,
-                  List.map (fun (id, _) -> Lvar id) (List.rev fields), loc),
+                  List.map (fun id -> Lvar id) ids, loc),
               repr
         | Tcoerce_structure
           { input_repr = _; output_repr; pos_cc_list; id_pos_list; } ->

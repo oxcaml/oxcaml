@@ -2417,7 +2417,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         let mutability = convert_field_read_semantics sem in
         let block_access : P.Block_access_kind.t =
           let field_kind =
-            H.block_access_for_element flattened_reordered_shape.(new_index)
+            H.mixed_block_access_field_kind
+              flattened_reordered_shape.(new_index)
           in
           Mixed
             { tag = Unknown; field_kind; shape = kind_shape; size = Unknown }
@@ -2498,7 +2499,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           let block_access : P.Block_access_kind.t =
             Mixed
               { field_kind =
-                  H.block_access_for_element
+                  H.mixed_block_access_field_kind
                     flattened_reordered_shape.(new_index);
                 shape = kind_shape;
                 tag = Unknown;
