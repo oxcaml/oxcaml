@@ -12,7 +12,7 @@ module Ident = struct
   let name = Ident.name
 
   let global name =
-    Ident.create_persistent name
+    Ident.create_global name
 
 end
 

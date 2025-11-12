@@ -1739,7 +1739,7 @@ module String_set = Set.Make(String)
 module Basis = struct
 
   type load =
-    { name : string;
+    { name : Global_module.Name.t;
       depends : string list;
       alias_depends : string list;
       desc : Desc.Module.t;
@@ -1775,7 +1775,8 @@ module Basis = struct
     Rev_deps.extend_up_to t.rev_deps t.next_dep;
     List.iter
       (fun { name; depends; alias_depends; _ } ->
-         let index = String_map.find name t.assignment in
+         String_map.find_opt name.Global_module.Name.head t.assignment
+         |> Option.iter (fun index ->
          List.iter
            (fun dep_name ->
               let dep_index = String_map.find dep_name t.assignment in
@@ -1785,14 +1786,15 @@ module Basis = struct
            (fun dep_name ->
               let dep_index = String_map.find dep_name t.assignment in
               Rev_deps.add_alias t.rev_deps ~source:dep_index ~target:index)
-           alias_depends)
+           alias_depends))
       loads
 
   let update_shortest t additions loads =
     let components =
-      List.map
+      List.filter_map
         (fun { name; desc; visibility=load_visibility; deprecated; _ } ->
-           let index = String_map.find name t.assignment in
+           String_map.find_opt name.Global_module.Name.head t.assignment
+           |> Option.map (fun index ->
            let origin = Origin.Dependency index in
            let id = Ident.global name in
            let component_visibility : Desc.visibility =
@@ -1800,7 +1802,7 @@ module Basis = struct
              | Hidden, _ | _, Deprecated -> Hidden
              | Visible, Not_deprecated -> Visible
              in
-           Component.Module(origin, id, desc, Component.Global, component_visibility))
+           Component.Module(origin, id, desc, Component.Global, component_visibility)))
         loads
     in
     let components =
@@ -1808,6 +1810,7 @@ module Basis = struct
         (fun name acc ->
            let index = String_map.find name t.assignment in
            let origin = Origin.Dependency index in
+           let name = Global_module.Name.create_no_args name in
            let id = Ident.global name in
            Component.Declare_module(origin, id) :: acc)
         additions
@@ -1844,7 +1847,7 @@ module Basis = struct
   let add t name =
     t.pending_additions <- String_set.add name t.pending_additions
 
-  let load t name depends alias_depends desc visibility deprecated =
+  let load t name ~depends ~alias_depends desc visibility deprecated =
     let load = { name; depends; alias_depends; desc; visibility; deprecated } in
     t.pending_loads <- load :: t.pending_loads
 
