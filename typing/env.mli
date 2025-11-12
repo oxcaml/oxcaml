@@ -508,9 +508,9 @@ val add_closure_lock : Mode.Hint.pinpoint
 
 (** A variant of [add_closure_lock] where the mode of the closure is a constant
 due to the nature of the pinpoint. As a result, the mode is not printed in error
-messages. [real = false] means the closure is merely a semantic closure (such as
-a loop) rather than a real one. *)
-val add_const_closure_lock : ?real:bool -> Mode.Hint.pinpoint ->
+messages. [ghost = true] means the closure is not a value (such as
+a loop) *)
+val add_const_closure_lock : ?ghost:bool -> Mode.Hint.pinpoint ->
   Mode.Value.Comonadic.Const.t -> t -> t
 
 val add_region_lock : t -> t

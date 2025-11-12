@@ -2073,22 +2073,18 @@ module Report = struct
 
   let print_pinpoint : pinpoint -> _ =
    fun (loc, desc) ->
-    match print_pinpoint_desc desc with
-    | None -> None
-    | Some print_desc ->
-      Some
-        (fun ~definite ~capitalize ppf ->
-          if Location.is_none loc
-          then print_desc ~definite:false ~capitalize ppf
-          else if definite
-          then
-            fprintf ppf "%t at %a"
-              (print_desc ~definite ~capitalize)
-              Location.print_loc loc
-          else
-            fprintf ppf "%t (at %a)"
-              (print_desc ~definite ~capitalize)
-              Location.print_loc loc)
+    print_pinpoint_desc desc
+    |> Option.map (fun print_desc ~definite ~capitalize ppf ->
+           match Location.is_none loc, definite with
+           | true, _ -> print_desc ~definite:false ~capitalize ppf
+           | false, true ->
+             fprintf ppf "%t at %a"
+               (print_desc ~definite ~capitalize)
+               Location.print_loc loc
+           | false, false ->
+             fprintf ppf "%t (at %a)"
+               (print_desc ~definite ~capitalize)
+               Location.print_loc loc)
 
   let print_mutable_part ppf = function
     | Record_field s -> fprintf ppf "mutable field %a" Misc.Style.inline_code s

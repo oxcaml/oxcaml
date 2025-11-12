@@ -2846,8 +2846,8 @@ let add_lock lock env =
     constrs = TycompTbl.add_lock lock env.constrs;
   }
 
-let add_const_closure_lock ?(real = true) closure_context comonadic env =
-  let lock = Const_closure_lock (real, closure_context, comonadic) in
+let add_const_closure_lock ?(ghost = false) closure_context comonadic env =
+  let lock = Const_closure_lock (ghost, closure_context, comonadic) in
   add_lock lock env
 
 let add_closure_lock closure_context comonadic env =
@@ -3498,9 +3498,9 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
-      | Const_closure_lock (false, _, _) ->
+      | Const_closure_lock (true, _, _) ->
           mode
-      | Const_closure_lock (true, pp, _) | Closure_lock (pp, _) ->
+      | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure pp)
       | Unboxed_lock | Quotation_lock | Splice_lock ->
