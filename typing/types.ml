@@ -2717,7 +2717,8 @@ module Jkind0 = struct
     let mk_annot name =
       Some
         Parsetree.
-          { pjkind_loc = Location.none; pjkind_desc = Pjk_abbreviation name }
+          { pjkind_loc = Location.none;
+            pjkind_desc = Pjk_abbreviation (Location.mknoloc name, []) }
 
     let mark_best (type l r) (t : (l * r) jkind) =
       { (disallow_right t) with quality = Best }

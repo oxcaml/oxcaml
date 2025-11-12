@@ -100,6 +100,10 @@ module Sort : sig
   end
 end
 
+module Scannable_axes : sig
+  type t = Jkind_axis.Pointerness.t
+end
+
 module Layout : sig
   (** Note that products have two possible encodings: as [Product ...] or as
       [Sort (Product ...]. This duplication is hard to eliminate because of the
@@ -118,6 +122,8 @@ module Layout : sig
     val equal : t -> t -> bool
 
     val max : t
+
+    val is_value_or_any : t -> bool
   end
 
   val of_const : Const.t -> Sort.t t
