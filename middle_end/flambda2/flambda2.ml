@@ -131,10 +131,10 @@ type flambda_result =
 
 let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
     (program : Lambda.program) =
-  let compilation_unit = program.compilation_unit in
-  let module_block_size_in_words =
-    Lambda.main_module_block_size program.main_module_block_format
+  let module_repr =
+    Lambda.main_module_representation program.main_module_block_format
   in
+  let compilation_unit = program.compilation_unit in
   let module_initializer = program.code in
   (* Make sure -linscan is enabled in classic mode. Doing this here to be sure
      it happens exactly when -Oclassic is in effect, which we don't know at CLI
@@ -175,8 +175,8 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
       } =
     Profile.record_call "lambda_to_flambda" (fun () ->
         Lambda_to_flambda.lambda_to_flambda ~mode ~machine_width
-          ~big_endian:Arch.big_endian ~cmx_loader ~compilation_unit
-          ~module_block_size_in_words module_initializer)
+          ~big_endian:Arch.big_endian ~cmx_loader ~compilation_unit ~module_repr
+          module_initializer)
   in
   Compiler_hooks.execute Raw_flambda2 raw_flambda;
   print_rawflambda ppf raw_flambda;

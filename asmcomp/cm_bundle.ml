@@ -100,6 +100,11 @@ let cmx_bundle ~quoted_globals =
       let serialized_sections, toc, total_length =
         Oxcaml_utils.File_sections.serialize sections
       in
+      let uir_format =
+        match info.ui_format with
+        | Some ui_format -> ui_format
+        | None -> Misc.fatal_error "Cm_bundle.cmx_bundle: ui_format is None"
+      in
       let raw_info : Cmx_format.unit_infos_raw =
         { uir_unit = info.ui_unit;
           uir_defines = info.ui_defines;
@@ -107,7 +112,7 @@ let cmx_bundle ~quoted_globals =
           uir_imports_cmi = Array.of_list info.ui_imports_cmi;
           uir_imports_cmx = Array.of_list info.ui_imports_cmx;
           uir_quoted_globals = Array.of_list info.ui_quoted_globals;
-          uir_format = info.ui_format;
+          uir_format;
           uir_generic_fns = info.ui_generic_fns;
           uir_export_info = raw_export_info;
           uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;

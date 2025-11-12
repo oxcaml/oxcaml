@@ -1222,7 +1222,8 @@ end = struct
     { defined_symbols_without_equations; code_age_relation; just_after_level }
 
   let extract_symbol_approx env symbol find_code =
-    let rec type_to_approx (ty : Type_grammar.t) : _ Value_approximation.t =
+    let rec type_to_approx (ty : Type_grammar.t) ~(expect_value : bool) :
+        _ Value_approximation.t =
       let module VA = Value_approximation in
       match ty with
       | Value descr -> (
@@ -1303,7 +1304,8 @@ end = struct
                       Symbol.print symbol Tag.print tag
                 in
                 let fields =
-                  List.map type_to_approx
+                  List.map
+                    (type_to_approx ~expect_value:false)
                     (TG.Product.Int_indexed.components fields)
                 in
                 Block_approximation
@@ -1316,11 +1318,13 @@ end = struct
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
       | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _
       | Region _ ->
-        assert false
+        if expect_value
+        then Misc.fatal_errorf "Got type %a, but expected value" TG.print ty
+        else Value_unknown
     in
     let symbol_ty, _binding_time_and_mode =
       Name.Map.find (Name.symbol symbol)
         (Cached_level.names_to_types env.just_after_level)
     in
-    type_to_approx symbol_ty
+    type_to_approx symbol_ty ~expect_value:true
 end

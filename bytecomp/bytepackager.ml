@@ -320,7 +320,8 @@ let package_object_files ~ppf_dump files target coercion =
     in
     let format : Lambda.main_module_block_format =
       (* Open modules not supported with packs, so always just a record *)
-      Mb_struct { mb_size = main_module_block_size }
+      Mb_struct
+        { mb_repr = Module_value_only { field_count = main_module_block_size } }
     in
     let compunit =
       { cu_name = packed_compilation_unit;

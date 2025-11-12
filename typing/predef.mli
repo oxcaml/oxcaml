@@ -186,6 +186,9 @@ val path_invalid_argument: Path.t
 val path_assert_failure : Path.t
 val path_undefined_recursive_module : Path.t
 
+val unboxed_predef_paths : Path.t list
+val is_unboxed_predef_path : Path.t -> bool
+
 val ident_false : Ident.t
 val ident_true : Ident.t
 val ident_void : Ident.t

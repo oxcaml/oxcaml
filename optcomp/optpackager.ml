@@ -130,7 +130,10 @@ end) : S = struct
             ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
         in
         let main_module_block_format : Lambda.main_module_block_format =
-          Mb_struct { mb_size = main_module_block_size }
+          Mb_struct
+            { mb_repr =
+                Module_value_only { field_count = main_module_block_size }
+            }
         in
         let arg_block_idx =
           (* Packs not supported as argument modules *)
@@ -194,7 +197,8 @@ end) : S = struct
     let modname = Compilation_unit.name ui.ui_unit in
     let format : Lambda.main_module_block_format =
       (* Open modules not supported with packs, so always just a record *)
-      Mb_struct { mb_size = main_module_block_size }
+      Mb_struct
+        { mb_repr = Module_value_only { field_count = main_module_block_size } }
     in
     let pkg_infos =
       { ui_unit = ui.ui_unit;
@@ -208,7 +212,7 @@ end) : S = struct
           :: filter (Linkenv.extract_crc_interfaces linkenv);
         ui_imports_cmx = filter (Linkenv.extract_crc_implementations linkenv);
         ui_quoted_globals = [] (* CR jrickard: Metaprogramming support. *);
-        ui_format = format;
+        ui_format = Some format;
         ui_generic_fns =
           { curry_fun =
               union (List.map (fun info -> info.ui_generic_fns.curry_fun) units);

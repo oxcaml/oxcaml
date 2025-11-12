@@ -36,7 +36,7 @@ module type S = sig
     output_prefix:string ->
     compilation_unit:Compilation_unit.t ->
     runtime_args:Translmod.runtime_arg list ->
-    main_module_block_size:int ->
+    main_module_block_repr:Lambda.module_representation ->
     arg_descr:Lambda.arg_descr option ->
     keep_symbol_tables:bool ->
     unit
@@ -79,9 +79,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   (** Native compilation backend for .ml files. *)
 
-  let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
+  let make_arg_descr ~param ~arg_block_idx ~main_repr : Lambda.arg_descr option
+      =
     match param, arg_block_idx with
-    | Some arg_param, Some arg_block_idx -> Some { arg_param; arg_block_idx }
+    | Some arg_param, Some arg_block_idx ->
+      Some { arg_param; arg_block_idx; main_repr }
     | None, None -> None
     | Some _, None -> Misc.fatal_error "No argument field"
     | None, Some _ -> Misc.fatal_error "Unexpected argument field"
@@ -118,6 +120,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
              let arg_descr =
                make_arg_descr ~param:as_arg_for
                  ~arg_block_idx:program.arg_block_idx
+                 ~main_repr:
+                   (Lambda.main_module_representation
+                      program.main_module_block_format)
              in
              Compilenv.save_unit_info
                (Unit_info.Artifact.filename
@@ -127,8 +132,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                ~arg_descr))
 
   let compile_from_typed i typed ~keep_symbol_tables ~as_arg_for =
+    let loc = Location.in_file (Unit_info.original_source_file i.target) in
     typed
-    |> Profile.(record transl) (Translmod.transl_implementation i.module_name)
+    |> Profile.(record transl)
+         (Translmod.transl_implementation ~loc i.module_name)
     |> compile_from_slambda i ~keep_symbol_tables ~as_arg_for
 
   type starting_point =
@@ -136,7 +143,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     | Emit of Optcomp_intf.emit
     | Instantiation of
         { runtime_args : Translmod.runtime_arg list;
-          main_module_block_size : int;
+          main_module_block_repr : Lambda.module_representation;
           arg_descr : Lambda.arg_descr option
         }
 
@@ -182,7 +189,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
         info ~backend
     | Emit emit -> emit info (* Emit assembly directly from Linear IR *)
-    | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
+    | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
       (match !Clflags.as_argument_for with
       | Some _ ->
         (* CR lmaurer: Needs nicer error message (this is a user error) *)
@@ -197,7 +204,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       in
       let impl =
         Translmod.transl_instance info.module_name ~runtime_args
-          ~main_module_block_size ~arg_block_idx
+          ~main_module_block_repr ~arg_block_idx
       in
       if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
       compile_from_slambda info impl ~as_arg_for ~keep_symbol_tables
@@ -209,9 +216,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       ~keep_symbol_tables ~compilation_unit:Inferred_from_output_prefix
 
   let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
-      ~main_module_block_size ~arg_descr ~keep_symbol_tables =
+      ~main_module_block_repr ~arg_descr ~keep_symbol_tables =
     let start_from =
-      Instantiation { runtime_args; main_module_block_size; arg_descr }
+      Instantiation { runtime_args; main_module_block_repr; arg_descr }
     in
     implementation_aux ~start_from ~source_file ~output_prefix
       ~keep_symbol_tables ~compilation_unit:(Exactly compilation_unit)
@@ -230,6 +237,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let read_unit_info file : Instantiator.unit_info =
     let unit_info, _crc = Compilenv.read_unit_info file in
     let { Cmx_format.ui_unit; ui_arg_descr; ui_format; _ } = unit_info in
+    let ui_format =
+      match ui_format with
+      | Some ui_format -> ui_format
+      | None -> Misc.fatal_error "Cm_bundle.cmx_bundle: ui_format is None"
+    in
     { Instantiator.ui_unit; ui_arg_descr; ui_format }
 
   let instantiate ~src ~args targetcmx =

@@ -116,7 +116,7 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
         let ui : Cmx_format.unit_infos =
           { ui_unit = uir.uir_unit;
             ui_defines = uir.uir_defines;
-            ui_format = uir.uir_format;
+            ui_format = Some uir.uir_format;
             ui_arg_descr = uir.uir_arg_descr;
             ui_imports_cmi = uir.uir_imports_cmi |> Array.to_list;
             ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
@@ -215,7 +215,7 @@ let eval code =
     Typemod.type_implementation unit_info compilation_unit env ast
   in
   let slambda_program =
-    Translmod.transl_implementation compilation_unit
+    Translmod.transl_implementation compilation_unit ~loc:(Location.curr lexbuf)
       ( typed_impl.structure,
         typed_impl.coercion,
         Option.map

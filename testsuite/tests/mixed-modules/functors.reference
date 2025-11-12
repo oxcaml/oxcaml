@@ -1,0 +1,15 @@
+Test: no coercion in or out
+2.
+1+1
+Test: coercion in, no coercion out
+11.
+10+1
+Test: coercion out, no coercion in
+4.
+(1+1)*2
+Test: coercion in and out
+6.
+(3)*2
+Test: generative functor
+1.
+2.

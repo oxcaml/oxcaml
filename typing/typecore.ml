@@ -1368,7 +1368,8 @@ let add_pattern_variables ?check ?check_as env pv =
           pv_attributes; pv_uid} env ->
        let check = if pv_as_var then check_as else check in
        Env.add_value ?check ~mode:pv_mode pv_id
-         {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
+         {val_type = pv_type; val_kind = pv_kind;
+          Types.val_loc = pv_loc;
           val_attributes = pv_attributes; val_modalities = Modality.id;
           val_zero_alloc = Zero_alloc.default;
           val_uid = pv_uid
@@ -2089,7 +2090,9 @@ let type_for_loop_index ~loc ~env ~param =
             let pv_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
             let pv =
               { pv_id; pv_uid; pv_mode;
-                pv_kind=Val_reg; pv_type; pv_loc; pv_as_var;
+                pv_kind =
+                  Val_reg Jkind.Sort.(of_const Const.for_loop_index)
+                ; pv_type; pv_loc; pv_as_var;
                 pv_attributes;
                 pv_sort = Jkind.Sort.(of_const Const.for_loop_index)
                 }
@@ -2109,7 +2112,7 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
     ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_as_var ~pv_attributes ->
           enter_variable
             ~is_as_variable:pv_as_var
-            ~kind:Val_reg
+            ~kind:(Val_reg Jkind.Sort.(of_const Const.for_loop_index))
             tps
             pv_loc
             name
@@ -3007,26 +3010,17 @@ and type_pat_aux
       let alloc_mode =
         cross_left !!penv expected_ty alloc_mode.mode
       in
+      let sort =
+        match Ctype.type_sort !!penv ty ~why:Let_binding ~fixed:false with
+        | Error _ -> assert false
+        | Ok sort -> sort
+      in
       let mode, kind =
         match mutable_flag with
-        | Immutable -> alloc_mode, Val_reg
+        | Immutable -> alloc_mode, Val_reg sort
         | Mutable ->
             let m0 = Value.Comonadic.newvar () in
             let mode = mutvar_mode ~loc ~env:!!penv m0 alloc_mode in
-            (* Sort information is used when translating a [Texp_mutvar] into an
-               [Lassign]. We calculate [sort] here so we can store and reuse it.
-               However, since we already make sure pattern variables are
-               representable, we are already calculating [sort] elsewhere, but
-               that place is too far removed to easily pass it here. *)
-            let sort =
-              match
-                Ctype.type_sort ~why:Jkind.History.Mutable_var_assignment
-                  ~fixed:false !!penv ty
-              with
-              | Ok sort -> sort
-              | Error err -> raise(Error(loc, !!penv,
-                                          Mutable_var_not_rep(ty, err)))
-            in
             let kind = Val_mut (m0, sort) in
             mode, kind
       in
@@ -3060,7 +3054,7 @@ and type_pat_aux
           let sort = Jkind.Sort.(of_const Const.for_module) in
           let id, uid =
             enter_variable tps loc v alloc_mode.mode t ~is_module:true
-            ~kind:Val_reg sp.ppat_attributes sort
+              ~kind:(Val_reg sort) sp.ppat_attributes sort
           in
           rvp {
             pat_desc = Tpat_var (id, v, uid, sort, alloc_mode.mode);
@@ -3076,7 +3070,8 @@ and type_pat_aux
       let ty_var, mode = solve_Ppat_alias ~mode:alloc_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
       let id, uid =
-        enter_variable ~is_as_variable:true ~kind:Val_reg tps name.loc name mode
+        enter_variable ~is_as_variable:true
+          ~kind:(Val_reg sort) tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
       rvp { pat_desc = Tpat_alias(q, id, name, uid, sort, mode, ty_var);
@@ -3481,7 +3476,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
   in
   let (pv, val_env, met_env) =
     List.fold_right
-      (fun {pv_id; pv_uid; pv_type; pv_loc; pv_as_var; pv_attributes}
+      (fun {pv_id; pv_uid; pv_type; pv_loc; pv_as_var; pv_attributes; pv_sort}
         (pv, val_env, met_env) ->
          let check s =
            if pv_as_var then Warnings.Unused_var { name = s; mutated = false }
@@ -3490,7 +3485,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
          let val_env =
           Env.add_value ~mode:Mode.Value.legacy pv_id
             { val_type = pv_type
-            ; val_kind = Val_reg
+            ; val_kind = Val_reg pv_sort
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.id
@@ -7905,7 +7900,9 @@ and type_constraint_expect
 and type_ident env ?(recarg=Rejected) lid =
   (* CR zqian: [lookup_value] should close over the memaddr of all prefix
   modules.  *)
-  let path, desc, (mode, locks) = Env.lookup_value ~loc:lid.loc lid.txt env in
+  let path, desc, (mode, locks) =
+    Env.lookup_value ~loc:lid.loc lid.txt env
+  in
   (* We cross modes when typing [Ppat_ident], before adding new variables into
   the environment. Therefore, one might think all values in the environment are
   already mode-crossed. That is not true for several reasons:
@@ -8874,7 +8871,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       let var_pair ~(mode : Value.lr) name ty sort =
         let id = Ident.create_local name in
         let desc =
-          { val_type = ty; val_kind = Val_reg;
+          { val_type = ty; val_kind = Val_reg sort;
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
             val_modalities = Modality.id;
@@ -10257,7 +10254,7 @@ and type_let_def_wrap_warnings
                 let mutable_ =
                   (match vd.val_kind with
                    | Val_mut _ -> true
-                   | Val_reg | Val_prim _ | Val_ivar _
+                   | Val_reg _ | Val_prim _ | Val_ivar _
                    | Val_self _ | Val_anc _ -> false)
                 in
                 let mutated = ref false in
@@ -10291,7 +10288,7 @@ and type_let_def_wrap_warnings
                 | Val_mut _->
                   Env.set_value_mutated_callback
                     vd (fun () -> mutated := true)
-                | Val_reg | Val_prim _ | Val_ivar _
+                | Val_reg _ | Val_prim _ | Val_ivar _
                 | Val_self _ | Val_anc _ -> ()
               )
               (Typedtree.pat_bound_idents pat);

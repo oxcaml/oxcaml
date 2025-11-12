@@ -194,6 +194,9 @@ let extract_sig_functor_open funct_body env loc mty sig_acc =
         with Includemod.Error msg ->
           raise (Error(loc, env, Not_included_functor msg))
       in
+      let param_repr =
+        List.filter_map sort_of_signature_item sg_param |> Array.of_list;
+      in
       (* We must scrape the result type in an environment expanded with the
          parameter type (to avoid `Not_found` exceptions when it is referenced).
          Because we don't have an actual parameter, we create definitions for
@@ -212,12 +215,14 @@ let extract_sig_functor_open funct_body env loc mty sig_acc =
            and
               sig..end -> () -> sig..end *)
         match Mtype.scrape extended_env mty_result with
-        | Mty_signature sg_result -> Tincl_functor coercion, sg_result
+        | Mty_signature sg_result ->
+            Tincl_functor (coercion, param_repr), sg_result
         | Mty_functor (Unit,_) when funct_body && Mtype.contains_type env mty ->
             raise (Error (loc, env, Not_includable_in_functor_body))
         | Mty_functor (Unit,mty_result) -> begin
             match Mtype.scrape extended_env mty_result with
-            | Mty_signature sg_result -> Tincl_gen_functor coercion, sg_result
+            | Mty_signature sg_result ->
+                Tincl_gen_functor (coercion, param_repr), sg_result
             | sg -> raise (Error (loc,env,Signature_result_expected
                                             (Mty_functor (Unit,sg))))
           end
@@ -308,6 +313,7 @@ let type_open_descr ?used_slot ?toplevel env sod =
     {
       open_expr = (path, sod.popen_expr);
       open_bound_items = [];
+      open_bound_repr = [||];
       open_override = sod.popen_override;
       open_env = newenv;
       open_attributes = sod.popen_attributes;
@@ -2006,6 +2012,8 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
     let incl =
       { incl_mod = tmty;
         incl_type = sg;
+        incl_repr =
+          List.filter_map sort_of_signature_item sg |> Array.of_list;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;
@@ -3292,6 +3300,7 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     let open_descr = {
       open_expr = md;
       open_bound_items = [];
+      open_bound_repr = [||];
       open_override = od.popen_override;
       open_env = newenv;
       open_loc = loc;
@@ -3328,6 +3337,8 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     let open_descr = {
       open_expr = md;
       open_bound_items = sg;
+      open_bound_repr =
+        List.filter_map sort_of_signature_item sg |> Array.of_list;
       open_override = od.popen_override;
       open_env = newenv;
       open_loc = loc;
@@ -3372,6 +3383,8 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
     let incl =
       { incl_mod = modl;
         incl_type = sg;
+        incl_repr =
+          List.filter_map sort_of_signature_item sg |> Array.of_list;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;
@@ -3381,13 +3394,10 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
   in
 
   let force_toplevel =
-    (* A couple special cases are needed for the toplevel:
+    (* A special case is needed for the toplevel:
 
        - Expressions bound by '_' still escape in the toplevel, because they may
          be printed even though they are not named, and therefore can't be local
-       - Those expressions and also all [Pstr_eval]s must have types of layout
-         value for the same reason (see the special case in
-         [Opttoploop.execute_phrase]).
     *)
     Option.is_some toplevel
   in
@@ -3403,15 +3413,6 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
             (fun () -> Typecore.type_representable_expression
                          ~why:Structure_item_expression env sexpr)
         in
-        if force_toplevel then
-          (* See comment on [force_toplevel]. *)
-          begin match Jkind.Sort.default_to_value_and_get sort with
-          | Base Value -> ()
-          | Product _
-          | Base (Void | Untagged_immediate | Float64 | Float32 | Word |
-                 Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
-            raise (Error (sexpr.pexp_loc, env, Toplevel_unnamed_nonvalue sort))
-          end;
         Tstr_eval (expr, sort, attrs), [], shape_map, env
     | Pstr_value (rec_flag, sdefs) ->
         let (defs, newenv) =
@@ -3420,37 +3421,11 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
           | Recursive -> Typecore.annotate_recursive_bindings env defs
           | Nonrecursive -> defs
         in
-        if force_toplevel then
-          (* See comment on [force_toplevel] *)
-          List.iter (fun vb ->
-            match vb.vb_pat.pat_desc with
-            | Tpat_any ->
-              begin match Jkind.Sort.default_to_value_and_get vb.vb_sort with
-              | Base Value -> ()
-              | Product _
-              | Base (Void | Untagged_immediate | Float64 | Float32 | Word |
-                     Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 |
-                     Vec512) ->
-                raise (Error (vb.vb_loc, env,
-                              Toplevel_unnamed_nonvalue vb.vb_sort))
-              end
-            | _ -> ()
-          ) defs;
         (* Note: Env.find_value does not trigger the value_used event. Values
            will be marked as being used during the signature inclusion test. *)
         let items, shape_map =
           List.fold_left
             (fun (acc, shape_map) (id, id_info, zero_alloc) ->
-              List.iter
-                (fun (loc, _mode, sort) ->
-                   (* CR layouts v5: this jkind check has the effect of
-                      defaulting the sort of top-level bindings to value, which
-                      will change. *)
-                   if not Jkind.Sort.(equate sort value)
-                   then raise (Error (loc, env,
-                                   Toplevel_nonvalue (Ident.name id,sort)))
-                )
-                id_info;
               let zero_alloc =
                 (* We only allow "Check" attributes in signatures.  Here we
                    convert "Assume"s in structures to the equivalent "Check" for

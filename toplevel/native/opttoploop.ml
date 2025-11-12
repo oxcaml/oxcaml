@@ -112,21 +112,22 @@ let toplevel_value id =
   try Ident.find_same id !remembered
   with _ -> failwith ("Unknown ident: " ^ Ident.unique_name id)
 
-let close_phrase lam =
+let close_phrase lam repr =
   let open Lambda in
   Ident.Set.fold (fun id l ->
     let glb, pos = toplevel_value id in
+    let layout = Lambda.layout_of_module_field repr pos in
     let glob =
-      Lprim (mod_field pos,
+      Lprim (mod_field pos repr,
              [Lprim (Pgetglobal glb, [], Loc_unknown)],
              Loc_unknown)
     in
-    Llet(Strict, Lambda.layout_module_field, id, Lambda.debug_uid_none, glob, l)
+    Llet(Strict, layout, id, Lambda.debug_uid_none, glob, l)
   ) (free_variables lam) lam
 
-let close_slambda_phrase slam =
+let close_slambda_phrase slam repr =
   match slam with
-  | SL.Quote lam -> SL.Quote (close_phrase lam)
+  | SL.Quote lam -> SL.Quote (close_phrase lam repr)
 
 let toplevel_value id =
   let glob, pos = toplevel_value id in
@@ -139,8 +140,9 @@ let rec eval_address = function
       global_symbol cu
   | Env.Alocal id ->
       toplevel_value id
-  | Env.Adot(a, pos) ->
+  | Env.Adot(a, _, pos) ->
       Obj.field (eval_address a) pos
+    (* CR layouts v5: this is not correct if the fields have been reordered. *)
 
 let eval_path find env path =
   match find path env with
@@ -290,7 +292,7 @@ let default_load ppf (program : Lambda.program) =
      files) *)
   res
 
-let load_slambda ppf ~compilation_unit ~required_globals program size =
+let load_slambda ppf ~compilation_unit ~required_globals program repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_slambda then fprintf ppf "%a@." Printslambda.program program;
   let program = Slambdaeval.eval program in
@@ -306,7 +308,7 @@ let load_slambda ppf ~compilation_unit ~required_globals program size =
   let program =
     { Lambda.
       code = slam;
-      main_module_block_format = Mb_struct { mb_size = size };
+      main_module_block_format = Mb_struct { mb_repr = repr };
       arg_block_idx = None;
       compilation_unit;
       required_globals;
@@ -316,13 +318,33 @@ let load_slambda ppf ~compilation_unit ~required_globals program size =
   | None -> default_load ppf program
   | Some {Jit.load; _} -> load ppf program
 
+(* Don't call [outval_of_value] on non-values *)
+let outval_of_sig_value env id val_kind val_type =
+  let sort =
+    match val_kind with
+    | Val_reg sort -> sort
+    | Val_ivar _ -> Jkind_types.Sort.(of_const Const.for_instance_var)
+    | Val_self _ | Val_anc _ -> Jkind_types.Sort.(of_const Const.for_object)
+    | Val_prim _ ->
+      Misc.fatal_error "Unexpected primitive"
+    | Val_mut _ ->
+      Misc.fatal_error "Mutable variable found at the structure level"
+  in
+  let call_outval () = outval_of_value env (toplevel_value id) val_type in
+  match Jkind.Sort.default_for_transl_and_get sort with
+  | Base Value -> call_outval ()
+  | _ when not !Clflags.native_code -> call_outval()
+  | Base (Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
+         | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
+  | Product _ -> Oval_stuff "<abstr>"
+
 (* Print the outcome of an evaluation *)
 
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-       | Sig_value(id, {val_kind = Val_reg; val_type; _}, _) ->
-          Some (outval_of_value env (toplevel_value id) val_type)
+       | Sig_value(id, {val_kind = Val_reg sort; val_type; _}, _) ->
+         Some (outval_of_sig_value env id (Val_reg sort) val_type)
       | _ -> None
     )
 
@@ -360,7 +382,7 @@ let name_expression ~loc ~attrs sort exp =
   let id = Ident.create_local name in
   let vd =
     { val_type = exp.exp_type;
-      val_kind = Val_reg;
+      val_kind = Val_reg sort;
       val_loc = loc;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
@@ -370,8 +392,7 @@ let name_expression ~loc ~attrs sort exp =
   let sg = [Sig_value(id, vd, Exported)] in
   let pat =
     { pat_desc =
-        Tpat_var(id, mknoloc name, vd.val_uid,
-          Jkind.Sort.(of_const Const.for_module_field),
+        Tpat_var(id, mknoloc name, vd.val_uid, sort,
           Mode.Value.disallow_right Mode.Value.legacy);
       pat_loc = loc;
       pat_extra = [];
@@ -445,28 +466,28 @@ let execute_phrase print_outcome ppf phr =
             str, sg', true
         | _ -> str, sg', false
       in
-      let compilation_unit, program, required_globals, size =
+      let compilation_unit, program, required_globals, repr =
         let { Lambda.compilation_unit; main_module_block_format;
               required_globals; code = res } as program =
           Translmod.transl_implementation compilation_unit
-            (str, coercion, None)
+            (str, coercion, None) ~loc:Location.none
         in
         remember compilation_unit sg';
-        let size =
+        let repr =
           match main_module_block_format with
-          | Mb_struct { mb_size } -> mb_size;
+          | Mb_struct { mb_repr } -> mb_repr
           | Mb_instantiating_functor _ ->
             Misc.fatal_error "Unexpected parameterised module in toplevel"
         in
-        let program = { program with code = close_slambda_phrase res } in
-        compilation_unit, program, required_globals, size
+        let program = { program with code = close_slambda_phrase res repr } in
+        compilation_unit, program, required_globals, repr
       in
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;
         toplevel_sig := List.rev_append sg' oldsig;
         let res =
-          load_slambda ppf ~required_globals ~compilation_unit program size
+          load_slambda ppf ~required_globals ~compilation_unit program repr
         in
         let out_phr =
           match res with
@@ -482,7 +503,7 @@ let execute_phrase print_outcome ppf phr =
                       match sg' with
                       | [ Sig_value (id, vd, _) ] ->
                           let outv =
-                            outval_of_value newenv (toplevel_value id)
+                            outval_of_sig_value newenv id vd.val_kind
                               vd.val_type
                           in
                           let ty = Printtyp.tree_of_type_scheme vd.val_type in

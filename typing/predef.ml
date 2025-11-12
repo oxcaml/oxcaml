@@ -26,6 +26,8 @@ let wrap create s =
   builtin_idents := (s, id) :: !builtin_idents;
   id
 
+(* N.B.: There are a few places that assume that predefs are always values,
+   e.g. [Jkind.Sort.Const.for_predef_value] and [Lambda.layout_predef_value] *)
 let ident_create = wrap Ident.create_predef
 
 let ident_int = ident_create "int"
@@ -302,6 +304,39 @@ let path_match_failure = Pident ident_match_failure
 and path_invalid_argument = Pident ident_invalid_argument
 and path_assert_failure = Pident ident_assert_failure
 and path_undefined_recursive_module = Pident ident_undefined_recursive_module
+
+let unboxed_predef_paths = [
+  path_unboxed_float;
+  path_unboxed_float32;
+  path_unboxed_nativeint;
+  path_unboxed_char;
+  path_unboxed_int;
+  path_unboxed_int8;
+  path_unboxed_int16;
+  path_unboxed_int32;
+  path_unboxed_int64;
+  path_unboxed_int8x16;
+  path_unboxed_int16x8;
+  path_unboxed_int32x4;
+  path_unboxed_int64x2;
+  path_unboxed_int8x32;
+  path_unboxed_int16x16;
+  path_unboxed_int32x8;
+  path_unboxed_int64x4;
+  path_unboxed_float32x8;
+  path_unboxed_float64x4;
+  path_unboxed_float32x4;
+  path_unboxed_float64x2;
+  path_unboxed_int8x64;
+  path_unboxed_int16x32;
+  path_unboxed_int32x16;
+  path_unboxed_int64x8;
+  path_unboxed_float32x16;
+  path_unboxed_float64x8
+]
+
+let is_unboxed_predef_path path =
+  List.exists (Path.same path) unboxed_predef_paths
 
 let cstr id args =
   {

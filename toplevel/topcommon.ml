@@ -103,7 +103,8 @@ module MakeEvalPrinter (E: EVAL_BASE) = struct
   let rec eval_address = function
     | Env.Aunit cu -> E.eval_compilation_unit cu
     | Env.Alocal id -> E.eval_ident id
-    | Env.Adot(p, pos) -> Obj.field (eval_address p) pos
+    | Env.Adot(p, _, pos) -> Obj.field (eval_address p) pos
+      (* CR layouts v5: This is not correct if the fields have been reordered *)
 
   let eval_path find env path =
     match find path env with

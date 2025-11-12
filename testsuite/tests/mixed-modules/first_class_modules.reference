@@ -1,0 +1,53 @@
+Test: basic first-class mixed module
+Expected: 42 hello 3.14 100
+Actual:   42 hello 3.14 100
+
+Test: passing modules to functions
+Expected: 142 hello 3.14
+Actual:   142 hello 3.14
+
+Test: returning modules from functions
+Expected: 10 ten 11.0 20
+Actual:   10 ten 11.0 20
+
+Test: list of first-class modules
+Expected: 6
+Actual:   6
+
+Test: conditional module selection
+Expected: 222.222 false branch
+Actual:   222.222 false branch
+Expected: 111.111 true branch
+Actual:   111.111 true branch
+
+Test: unboxed tuples and records in a first-class module
+Expected: 42 answer
+Actual:   42 answer
+Expected: 3.14 271828
+Actual:   3.14 271828
+Expected: 2.718 314159
+Actual:   2.718 314159
+
+Test: functor producing first-class mixed modules
+Expected: 5 3.0
+Actual:   5 3.0
+
+Test: first-class functors
+Expected: 5.0 (doubled) (+1.5) = 11.5
+Actual:   5.0 (doubled) (+1.5) = 11.5
+Expected: 20 (*2) (+3) = 43
+Actual:   20 (*2) (+3) = 43
+Expected: 1 [+100] [*2] [+3] = 207
+Actual:   1 [+100] [*2] [+3] = 205
+
+Test: subtype by forgetting abstract types
+Expected: 42 3.14
+Actual:   42 3.14
+
+Test: subtype by forgetting type alias
+Expected: 1 2.718
+Actual:   1 2.718
+
+Test: subtype with unboxed type in forgotten types
+Expected: 99.9
+Actual:   99.9
