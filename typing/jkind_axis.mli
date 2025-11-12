@@ -51,6 +51,19 @@ module Separability : sig
   include Axis_ops with type t := t
 end
 
+module Pointerness : sig
+  type t =
+    | Non_pointer
+    | Maybe_pointer
+
+  (* CR layouts-scannable: This included module may get refined over time.
+     There are more operations that make sense here. But also, this will
+     probably change as more things get refactored. Seems ok for now. *)
+  include Axis_ops with type t := t
+
+  val to_string : t -> string
+end
+
 module Axis : sig
   module Nonmodal : sig
     type 'a t =
