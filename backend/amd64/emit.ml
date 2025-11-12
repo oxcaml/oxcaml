@@ -1758,14 +1758,16 @@ let emit_implicit_simd_sanitize (op : Simd.operation) instr =
   if Config.with_address_sanitizer && !Arch.is_asan_enabled
      && Simd.is_memory_operation op
   then
-    match[@warning "-4"] (Simd.Pseudo_instr.instr op.instr).id with
+    let simd = Simd.Pseudo_instr.instr op.instr in
+    match[@warning "-4"] simd.id with
     | Maskmovdqu | Vmaskmovdqu ->
-      let address = addressing (Iindexed 0) VEC128 instr 2 in
+      let address = addressing identity_addressing VEC128 instr 2 in
       emit_simd_sanitize ~address ~instr ~chunk:Onetwentyeight_unaligned
         ~kind:Store_modify
     | _ ->
       (* Must handle all impure cases in [Simd.class_of_operation] *)
-      Misc.fatal_errorf "Don't know how to sanitize implicit memory operand"
+      Misc.fatal_errorf
+        "Don't know how to sanitize implicit memory operand of %s" simd.mnemonic
 
 let emit_simd ?mode (op : Simd.operation) instr =
   let open Simd_instrs in
