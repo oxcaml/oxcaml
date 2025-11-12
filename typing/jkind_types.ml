@@ -612,6 +612,10 @@ module Sort = struct
   include Static.T
 end
 
+module Scannable_axes = struct
+  type t = Jkind_axis.Pointerness.t
+end
+
 module Layout = struct
   type 'sort t =
     | Sort of 'sort
