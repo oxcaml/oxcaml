@@ -262,4 +262,8 @@ val basic_block_contains_calls : basic_block -> bool
 
 val equal_irc_work_list : irc_work_list -> irc_work_list -> bool
 
+val equal_basic : basic -> basic -> bool
+
+val equal_terminator : terminator -> terminator -> bool
+
 val invalid_stack_offset : int
