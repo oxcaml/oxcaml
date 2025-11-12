@@ -32,7 +32,7 @@ def collect_metrics(install_dir: str, output_dir: str, commit_hash: str,
     # Create output directory and compute CSV filename
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    csv_path = output_path / f"metrics-{date_str}-{short_hash}.csv"
+    csv_path = output_path / f"artifact-sizes-{date_str}-{short_hash}.csv"
 
     # Extensions to track
     extensions = [
