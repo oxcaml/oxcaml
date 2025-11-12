@@ -230,10 +230,32 @@ type atomic_op =
   | Compare_set
   | Compare_exchange
 
+let equal_atomic_op left right =
+  match left, right with
+  | Fetch_and_add, Fetch_and_add
+  | Add, Add
+  | Sub, Sub
+  | Land, Land
+  | Lor, Lor
+  | Lxor, Lxor
+  | Exchange, Exchange
+  | Compare_set, Compare_set
+  | Compare_exchange, Compare_exchange -> true
+  | ( Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange | Compare_set
+    | Compare_exchange ), _ ->
+    false
+
 type atomic_bitwidth =
   | Thirtytwo
   | Sixtyfour
   | Word
+
+let equal_atomic_bitwidth (left : atomic_bitwidth) (right : atomic_bitwidth) =
+  match left, right with
+  | Thirtytwo, Thirtytwo -> true
+  | Sixtyfour, Sixtyfour -> true
+  | Word, Word -> true
+  | (Thirtytwo | Sixtyfour | Word), _ -> false
 
 type effects =
   | No_effects
@@ -396,6 +418,34 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128_u_array
   | Alloc_block_kind_vec256_u_array
   | Alloc_block_kind_vec512_u_array
+
+let equal_alloc_block_kind left right =
+  match left, right with
+  | Alloc_block_kind_other, Alloc_block_kind_other
+  | Alloc_block_kind_closure, Alloc_block_kind_closure
+  | Alloc_block_kind_float, Alloc_block_kind_float
+  | Alloc_block_kind_float32, Alloc_block_kind_float32
+  | Alloc_block_kind_vec128, Alloc_block_kind_vec128
+  | Alloc_block_kind_vec256, Alloc_block_kind_vec256
+  | Alloc_block_kind_vec512, Alloc_block_kind_vec512
+  | Alloc_block_kind_float_array, Alloc_block_kind_float_array
+  | Alloc_block_kind_float32_u_array, Alloc_block_kind_float32_u_array
+  | Alloc_block_kind_int32_u_array, Alloc_block_kind_int32_u_array
+  | Alloc_block_kind_int64_u_array, Alloc_block_kind_int64_u_array
+  | Alloc_block_kind_vec128_u_array, Alloc_block_kind_vec128_u_array
+  | Alloc_block_kind_vec256_u_array, Alloc_block_kind_vec256_u_array
+  | Alloc_block_kind_vec512_u_array, Alloc_block_kind_vec512_u_array -> true
+  | Alloc_block_kind_boxed_int left_bi, Alloc_block_kind_boxed_int right_bi ->
+    Primitive.equal_boxed_integer left_bi right_bi
+  | ( Alloc_block_kind_other | Alloc_block_kind_closure
+    | Alloc_block_kind_float | Alloc_block_kind_float32
+    | Alloc_block_kind_vec128 | Alloc_block_kind_vec256
+    | Alloc_block_kind_vec512 | Alloc_block_kind_boxed_int _
+    | Alloc_block_kind_float_array | Alloc_block_kind_float32_u_array
+    | Alloc_block_kind_int32_u_array | Alloc_block_kind_int64_u_array
+    | Alloc_block_kind_vec128_u_array | Alloc_block_kind_vec256_u_array
+    | Alloc_block_kind_vec512_u_array ), _ ->
+    false
 
 type alloc_dbginfo_item =
   { alloc_words : int;

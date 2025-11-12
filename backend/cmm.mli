@@ -168,10 +168,14 @@ type atomic_op =
   | Compare_set
   | Compare_exchange
 
+val equal_atomic_op : atomic_op -> atomic_op -> bool
+
 type atomic_bitwidth =
   | Thirtytwo
   | Sixtyfour
   | Word
+
+val equal_atomic_bitwidth : atomic_bitwidth -> atomic_bitwidth -> bool
 
 type effects =
   | No_effects
@@ -355,6 +359,8 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128_u_array
   | Alloc_block_kind_vec256_u_array
   | Alloc_block_kind_vec512_u_array
+
+val equal_alloc_block_kind : alloc_block_kind -> alloc_block_kind -> bool
 
 (** Due to Comballoc, a single Ialloc instruction may combine several
     unrelated allocations. Their Debuginfo.t (which may differ) are stored

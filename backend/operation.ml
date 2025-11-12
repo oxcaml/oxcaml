@@ -444,60 +444,9 @@ let equal_symbol left right =
   String.equal left.Cmm.sym_name right.Cmm.sym_name
   && Cmm.equal_is_global left.Cmm.sym_global right.Cmm.sym_global
 
-let equal_atomic_op left right =
-  match left, right with
-  | Cmm.Fetch_and_add, Cmm.Fetch_and_add
-  | Cmm.Add, Cmm.Add
-  | Cmm.Sub, Cmm.Sub
-  | Cmm.Land, Cmm.Land
-  | Cmm.Lor, Cmm.Lor
-  | Cmm.Lxor, Cmm.Lxor
-  | Cmm.Exchange, Cmm.Exchange
-  | Cmm.Compare_set, Cmm.Compare_set
-  | Cmm.Compare_exchange, Cmm.Compare_exchange -> true
-  | ( Cmm.Fetch_and_add | Cmm.Add | Cmm.Sub | Cmm.Land | Cmm.Lor
-    | Cmm.Lxor | Cmm.Exchange | Cmm.Compare_set | Cmm.Compare_exchange ), _ ->
-    false
-
-let equal_atomic_bitwidth (left : Cmm.atomic_bitwidth) (right : Cmm.atomic_bitwidth) =
-  match left, right with
-  | Cmm.Thirtytwo, Cmm.Thirtytwo -> true
-  | Cmm.Sixtyfour, Cmm.Sixtyfour -> true
-  | Cmm.Word, Cmm.Word -> true
-  | (Cmm.Thirtytwo | Cmm.Sixtyfour | Cmm.Word), _ -> false
-
-let equal_alloc_block_kind left right =
-  match left, right with
-  | Cmm.Alloc_block_kind_other, Cmm.Alloc_block_kind_other
-  | Cmm.Alloc_block_kind_closure, Cmm.Alloc_block_kind_closure
-  | Cmm.Alloc_block_kind_float, Cmm.Alloc_block_kind_float
-  | Cmm.Alloc_block_kind_float32, Cmm.Alloc_block_kind_float32
-  | Cmm.Alloc_block_kind_vec128, Cmm.Alloc_block_kind_vec128
-  | Cmm.Alloc_block_kind_vec256, Cmm.Alloc_block_kind_vec256
-  | Cmm.Alloc_block_kind_vec512, Cmm.Alloc_block_kind_vec512
-  | Cmm.Alloc_block_kind_float_array, Cmm.Alloc_block_kind_float_array
-  | Cmm.Alloc_block_kind_float32_u_array, Cmm.Alloc_block_kind_float32_u_array
-  | Cmm.Alloc_block_kind_int32_u_array, Cmm.Alloc_block_kind_int32_u_array
-  | Cmm.Alloc_block_kind_int64_u_array, Cmm.Alloc_block_kind_int64_u_array
-  | Cmm.Alloc_block_kind_vec128_u_array, Cmm.Alloc_block_kind_vec128_u_array
-  | Cmm.Alloc_block_kind_vec256_u_array, Cmm.Alloc_block_kind_vec256_u_array
-  | Cmm.Alloc_block_kind_vec512_u_array, Cmm.Alloc_block_kind_vec512_u_array
-    -> true
-  | Cmm.Alloc_block_kind_boxed_int left_bi, Cmm.Alloc_block_kind_boxed_int right_bi ->
-    Primitive.equal_boxed_integer left_bi right_bi
-  | ( Cmm.Alloc_block_kind_other | Cmm.Alloc_block_kind_closure
-    | Cmm.Alloc_block_kind_float | Cmm.Alloc_block_kind_float32
-    | Cmm.Alloc_block_kind_vec128 | Cmm.Alloc_block_kind_vec256
-    | Cmm.Alloc_block_kind_vec512 | Cmm.Alloc_block_kind_boxed_int _
-    | Cmm.Alloc_block_kind_float_array | Cmm.Alloc_block_kind_float32_u_array
-    | Cmm.Alloc_block_kind_int32_u_array | Cmm.Alloc_block_kind_int64_u_array
-    | Cmm.Alloc_block_kind_vec128_u_array | Cmm.Alloc_block_kind_vec256_u_array
-    | Cmm.Alloc_block_kind_vec512_u_array ), _ ->
-    false
-
 let equal_alloc_dbginfo_item left right =
   Int.equal left.Cmm.alloc_words right.Cmm.alloc_words
-  && equal_alloc_block_kind left.Cmm.alloc_block_kind right.Cmm.alloc_block_kind
+  && Cmm.equal_alloc_block_kind left.Cmm.alloc_block_kind right.Cmm.alloc_block_kind
   && Debuginfo.compare left.Cmm.alloc_dbg right.Cmm.alloc_dbg = 0
 
 let equal_alloc_dbginfo left right =
@@ -571,8 +520,8 @@ let equal left right =
     && Int.equal left_n right_n
   | ( Intop_atomic { op = left_op; size = left_size; addr = left_addr },
       Intop_atomic { op = right_op; size = right_size; addr = right_addr } ) ->
-    equal_atomic_op left_op right_op
-    && equal_atomic_bitwidth left_size right_size
+    Cmm.equal_atomic_op left_op right_op
+    && Cmm.equal_atomic_bitwidth left_size right_size
     && Arch.equal_addressing_mode left_addr right_addr
   | Floatop (left_w, left_op), Floatop (right_w, right_op) ->
     equal_float_width left_w right_w
