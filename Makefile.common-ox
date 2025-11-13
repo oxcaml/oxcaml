@@ -67,30 +67,6 @@ define dune_main_context
     $(ENV_VARS)))))
 endef
 
-# CR-sspies: Horrible hack to copy those .cms files that have corresponding .cmt files into the install directory.
-# Fix this once the upstream dune has support for -bin-annot-cms.
-define copy_cms_files
-	declare -A install_cmt_map; \
-	for install_cmt in $$(find _install/lib/ocaml/ -name "*.cmt" -type f); do \
-		base=$$(basename "$$install_cmt"); \
-		install_cmt_map["$$base"]="$$install_cmt"; \
-	done; \
-	for build_cms in $$(find _build/main/ _build/runtime_stdlib/ -name "*.cms" -type f); do \
-		build_cmt="$$(echo "$$build_cms" | sed 's|/native/|/byte/|' | sed 's/\.cms$$/.cmt/')"; \
-		if [ -f "$$build_cmt" ]; then \
-			base=$$(basename "$$build_cmt"); \
-			install_cmt="$${install_cmt_map[$$base]}"; \
-			if [ -n "$$install_cmt" ]; then \
-				build_size=$$(stat -c '%s' "$$build_cmt" 2>/dev/null); \
-				install_size=$$(stat -c '%s' "$$install_cmt" 2>/dev/null); \
-				if [ "$$build_size" = "$$install_size" ]; then \
-					cp -f "$$build_cms" "$$(dirname "$$install_cmt")/"; \
-				fi; \
-			fi; \
-		fi; \
-	done
-endef
-
 
 .DEFAULT_GOAL := compiler
 .PHONY: boot-compiler boot-runtest runtime-stdlib compiler runtest runtest-llvmize runtest-dwarf
@@ -258,10 +234,14 @@ _install: compiler
 	done
 	mkdir _install/lib/stublibs
 	cp _build/main/parser.cmly _install/lib/ocaml/compiler-libs/
-	find _build/main/ \( -name "flambda2*.cmi" \
+	find _build/main/ \( -name "flambda2*.cmi" -or -name "flambda2*.cms" \
           -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
           -exec cp -f {} _install/lib/ocaml/compiler-libs \;
-	$(copy_cms_files)
+	# CR-sspies: Hack to copy the .cms files into the install directory.
+	# Fix this once the upstream dune has support for -bin-annot-cms.
+	# This only copies part of the files, mainly meant for metrics. It only covers
+	# about half of the files which we would want to copy over.
+	find _build/runtime_stdlib/stdlib/ -name '*.cms' -exec cp -f {} _install/lib/ocaml/ \;
 
 # Copy _install to the final install directory (no-op if they are the same)
 install: _install
