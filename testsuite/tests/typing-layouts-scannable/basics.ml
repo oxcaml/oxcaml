@@ -30,10 +30,11 @@ type t : value non_pointer & value & float64 maybe_pointer
 |}]
 
 (* checking non_pointer annotations, based on
-   [typing-layouts-or-null/separability] *)
+   [typing-layouts-or-null/separability.ml] and
+   [typing-jkind-bounds/annots.ml] *)
 (* CR layouts-scannable: as separability becomes a scannable axis, move this! *)
 
-(* sub-layout relation *)
+(* Annotation on type parameters *)
 
 type t_maybeptr : any maybe_pointer
 type t_nonptr : any non_pointer
@@ -73,6 +74,46 @@ type succeeds = t_nonptr accepts_nonptr
 type succeeds = t_nonptr accepts_nonptr
 |}]
 
+(* CR layouts-scannable: There are versions of these tests that use [immediate]
+   instead of [value non_pointer]. Once [immediate] means that, these will be
+   redundant and can probably be removed *)
+type 'a t = 'a accepts_nonptr
+type ('a : value) t = 'a accepts_nonptr
+[%%expect{|
+type ('a : value non_pointer) t = 'a accepts_nonptr
+type ('a : value non_pointer) t = 'a accepts_nonptr
+|}]
+
+let f : ('a : value non_pointer) accepts_nonptr -> ('a : value) accepts_nonptr = fun x -> x
+let f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
+let f : ('a : value). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
+[%%expect{|
+val f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr =
+  <fun>
+val f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr =
+  <fun>
+Line 3, characters 8-60:
+3 | let f : ('a : value). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The universal type variable 'a was declared to have kind value.
+       But it was inferred to have kind value non_pointer
+         because of the definition of accepts_nonptr at line 2, characters 0-42.
+|}]
+
+let f : (_ : value) accepts_nonptr -> unit = fun _ -> ()
+let g : (_ : value non_pointer) accepts_nonptr -> unit = fun _ -> ()
+[%%expect{|
+val f : ('a : value non_pointer). 'a accepts_nonptr -> unit = <fun>
+val g : ('a : value non_pointer). 'a accepts_nonptr -> unit = <fun>
+|}]
+
+let f : (_ : value non_pointer) -> (_ : value) = fun _ -> assert false
+let g : (_ : value) -> (_ : value non_pointer) = fun _ -> assert false
+[%%expect{|
+val f : ('a : value non_pointer) 'b. 'a -> 'b = <fun>
+val g : 'a ('b : value non_pointer). 'a -> 'b = <fun>
+|}]
+
 (* CR layouts-separability: as base jkinds become non_pointer, test these!
    including the interesting cases where annotations don't matter *)
 
@@ -105,9 +146,7 @@ type succeeds : value non_pointer & value non_pointer = #{ a : t_nonptr_val; b :
 type succeeds = #{ a : t_nonptr_val; b : t_nonptr_val; }
 |}]
 
-(* CR zeisbach: add tests to make sure that the first component of a
-   [value non_pointer & value] record can be passed to a value non_pointer
-   accepting function *)
+(* Annotation on types in functions *)
 
 let f (a : (_ : any non_pointer)) (b : (_ : any maybe_pointer)) =
   let _unify_them = [ a; b ] in
@@ -121,6 +160,50 @@ let f x =
   g x
 [%%expect{|
 val f : ('a : value_or_null non_pointer). 'a -> unit = <fun>
+|}]
+
+(* when we have a rigid type variable, it has the exact kind *)
+(* CR zeisbach: what are the right words to refer to these things? *)
+let f (type a : value maybe_pointer) (x : a) =
+  let g (x : (_ : value non_pointer)) = () in
+  g x
+[%%expect{|
+Line 3, characters 4-5:
+3 |   g x
+        ^
+Error: This expression has type "a" but an expression was expected of type
+         "('a : value non_pointer)"
+       The layout of a is value maybe_pointer
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be a sublayout of value non_pointer
+         because of the definition of g at line 2, characters 8-42.
+|}]
+
+let f (type a : value non_pointer) (x : a) =
+  (* here, x is value maybe_pointer *)
+  let g x = () in
+  g x
+[%%expect{|
+val f : ('a : value non_pointer). 'a -> unit = <fun>
+|}]
+
+let f (t : (_ : value non_pointer & value)) =
+  (* here, x is value maybe_pointer *)
+  let g (type a : value non_pointer) (x : a) = () in
+  let #(x, y) = t in
+  g x
+[%%expect{|
+val f : ('a : value non_pointer) 'b. #('a * 'b) -> unit = <fun>
+|}]
+
+let f (t : (_ : value non_pointer & value)) =
+  (* here, x is value maybe_pointer *)
+  let g (type a : value non_pointer) (x : a) = () in
+  let #(x, y) = t in
+  g y
+[%%expect{|
+val f : ('a : value non_pointer) ('b : value non_pointer). #('a * 'b) -> unit =
+  <fun>
 |}]
 
 (* modules and module inclusion *)
