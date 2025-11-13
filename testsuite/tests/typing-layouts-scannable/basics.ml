@@ -106,10 +106,8 @@ type succeeds = #{ a : t_nonptr_val; b : t_nonptr_val; }
 |}]
 
 (* CR zeisbach: add tests to make sure that the first component of a
-[value non_pointer & value] record can be passed to a value non_pointer
+   [value non_pointer & value] record can be passed to a value non_pointer
    accepting function *)
-
-(* CR zeisbach: more module inclusion tests (see line 941 of sep file) *)
 
 let f (a : (_ : any non_pointer)) (b : (_ : any maybe_pointer)) =
   let _unify_them = [ a; b ] in
@@ -123,4 +121,89 @@ let f x =
   g x
 [%%expect{|
 val f : ('a : value_or_null non_pointer). 'a -> unit = <fun>
+|}]
+
+(* modules and module inclusion *)
+
+module M (X : sig type t : any non_pointer end) : sig type t : any end = X
+module M (X : sig type t : any end) : sig type t : any non_pointer end = X
+[%%expect{|
+module M :
+  functor (X : sig type t : any non_pointer end) -> sig type t : any end
+Line 2, characters 73-74:
+2 | module M (X : sig type t : any end) : sig type t : any non_pointer end = X
+                                                                             ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = X.t end
+       is not included in
+         sig type t : any non_pointer end
+       Type declarations do not match:
+         type t = X.t
+       is not included in
+         type t : any non_pointer
+       The layout of the first is any maybe_pointer
+         because of the definition of t at line 2, characters 18-30.
+       But the layout of the first must be a sublayout of any non_pointer
+         because of the definition of t at line 2, characters 42-66.
+|}]
+
+module M1 : sig
+  type ('a : value non_pointer) t : value
+end = struct
+  type ('a : value maybe_pointer) t = t_nonptr_val
+end
+[%%expect{|
+module M1 : sig type ('a : value non_pointer) t end
+|}]
+
+module MContravariantFailing : sig
+  type ('a : value) t : value
+end = struct
+  type ('a : value non_pointer) t = int
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type ('a : value non_pointer) t = int
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type ('a : value non_pointer) t = int end
+       is not included in
+         sig type 'a t end
+       Type declarations do not match:
+         type ('a : value non_pointer) t = int
+       is not included in
+         type 'a t
+       The problem is in the kinds of a parameter:
+       The layout of 'a is value maybe_pointer
+         because of the definition of t at line 2, characters 2-29.
+       But the layout of 'a must be a sublayout of value non_pointer
+         because of the definition of t at line 4, characters 2-39.
+|}]
+
+module MCovariantFailing : sig
+  type ('a : value non_pointer) t : value non_pointer
+end = struct
+  type ('a : value) t = t_maybeptr_val
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type ('a : value) t = t_maybeptr_val
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = t_maybeptr_val end
+       is not included in
+         sig type ('a : value non_pointer) t : value non_pointer end
+       Type declarations do not match:
+         type 'a t = t_maybeptr_val
+       is not included in
+         type ('a : value non_pointer) t : value non_pointer
+       The layout of the first is value maybe_pointer
+         because of the definition of t_maybeptr_val at line 1, characters 0-41.
+       But the layout of the first must be a sublayout of value non_pointer
+         because of the definition of t at line 2, characters 2-53.
 |}]

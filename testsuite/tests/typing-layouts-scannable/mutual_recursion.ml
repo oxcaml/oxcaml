@@ -1,7 +1,14 @@
 (* TEST
- flags = "-extension layouts_alpha -w +184+185";
+ flags = "-extension layouts_alpha";
  expect;
 *)
+
+type t_maybeptr_val : value maybe_pointer
+type t_nonptr_val : value non_pointer
+[%%expect{|
+type t_maybeptr_val
+type t_nonptr_val : value non_pointer
+|}]
 
 (* these almost demonstrate the bad mutual recursion behavior, but work. *)
 
