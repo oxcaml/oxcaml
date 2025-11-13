@@ -603,6 +603,35 @@ module X86_peephole = struct
         | _ -> false)
       | _ -> false
 
+  (* Check if a register is directly written by an argument. Returns true only
+     if the argument IS a register that equals the target, not if the register
+     merely appears in a memory address. For example: - mov %rax, %rbx: %rbx is
+     written - mov %rax, (%rbx): %rbx is NOT written (it's read for the
+     address) *)
+  let reg_is_written_by_arg target arg =
+    match[@warning "-4"] arg with
+    | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ ->
+      equal_args target arg
+    | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
+
+  (* Check if a register appears in a memory operand's address calculation.
+     Returns true only for memory operands where the register is used as
+     base/index, not for register operands. For example: - mov %rax, (%rbx): %rbx
+     is in address - mov %rax, %rbx: %rbx is NOT in address *)
+  let reg_in_memory_address target arg =
+    match[@warning "-4"] arg with
+    | Mem addr -> (
+      match[@warning "-4"] target with
+      | Reg64 r | Reg32 r | Reg16 r | Reg8L r ->
+        (match addr.base with
+        | Some base when equal_reg64 r base -> true
+        | _ -> false)
+        || (addr.scale <> 0 && equal_reg64 r addr.idx)
+      | _ -> false)
+    | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Imm _ | Sym _
+    | Mem64_RIP _ ->
+      false
+
   (* Check if an instruction is a control flow instruction (jump, call, return).
      These act as basic block boundaries for peephole optimization. *)
   let is_control_flow = function[@warning "-4"]
@@ -631,14 +660,14 @@ module X86_peephole = struct
     | TZCNT (_, dst)
     | LZCNT (_, dst)
     | CMOV (_, _, dst) ->
-      reg_appears_in_arg target dst
+      reg_is_written_by_arg target dst
     | INC dst | DEC dst | NEG dst | BSWAP dst | SET (_, dst) ->
-      reg_appears_in_arg target dst
-    | POP dst -> reg_appears_in_arg target dst
-    | IMUL (_, Some dst) -> reg_appears_in_arg target dst
-    | LOCK_XADD (_, dst) -> reg_appears_in_arg target dst
+      reg_is_written_by_arg target dst
+    | POP dst -> reg_is_written_by_arg target dst
+    | IMUL (_, Some dst) -> reg_is_written_by_arg target dst
+    | LOCK_XADD (_, dst) -> reg_is_written_by_arg target dst
     | XCHG (op1, op2) ->
-      reg_appears_in_arg target op1 || reg_appears_in_arg target op2
+      reg_is_written_by_arg target op1 || reg_is_written_by_arg target op2
     | MUL _ | IMUL (_, None) ->
       (* MUL/IMUL(single-op) implicitly write to RAX and RDX *)
       equal_args target (Reg64 RAX) || equal_args target (Reg64 RDX)
@@ -653,7 +682,7 @@ module X86_peephole = struct
       equal_args target (Reg64 RDX)
     | LOCK_CMPXCHG (_, dst) ->
       (* CMPXCHG writes to RAX (always) and conditionally to dst *)
-      reg_appears_in_arg target dst || equal_args target (Reg64 RAX)
+      reg_is_written_by_arg target dst || equal_args target (Reg64 RAX)
     | _ ->
       (* Conservative: assume unknown instructions might write to the target. *)
       true
@@ -661,8 +690,12 @@ module X86_peephole = struct
   (* Check if an instruction reads from a given argument. Conservative: returns
      true if unsure. *)
   let reads_from_arg target = function[@warning "-4"]
-    | MOV (src, _) | MOVSX (src, _) | MOVSXD (src, _) | MOVZX (src, _) ->
-      reg_appears_in_arg target src
+    | MOV (src, dst) | MOVSX (src, dst) | MOVSXD (src, dst) | MOVZX (src, dst)
+      ->
+      (* src is read (including address registers if memory operand). dst is not
+         read as a value, but address registers are read if dst is a memory
+         operand. *)
+      reg_appears_in_arg target src || reg_in_memory_address target dst
     | PUSH src -> reg_appears_in_arg target src
     | ADD (src, dst)
     | SUB (src, dst)
@@ -671,20 +704,28 @@ module X86_peephole = struct
     | XOR (src, dst)
     | CMP (src, dst)
     | TEST (src, dst) ->
+      (* Read-modify-write or comparison: both src and dst are read *)
       reg_appears_in_arg target src || reg_appears_in_arg target dst
     | LEA (src, _)
     | BSF (src, _)
     | BSR (src, _)
     | POPCNT (src, _)
     | TZCNT (src, _)
-    | LZCNT (src, _)
-    | SAL (src, _)
-    | SAR (src, _)
-    | SHR (src, _) ->
+    | LZCNT (src, _) ->
+      (* These instructions don't read dst value, only write to it. dst must be
+         a register for these instructions. *)
       reg_appears_in_arg target src
-    | CMOV (_, src, dst) ->
+    | SAL (src, dst) | SAR (src, dst) | SHR (src, dst) ->
+      (* Shift instructions are read-modify-write: both src (shift amount) and dst
+         (value to shift, or address if memory operand) are read *)
       reg_appears_in_arg target src || reg_appears_in_arg target dst
-    | INC dst | DEC dst | NEG dst | BSWAP dst -> reg_appears_in_arg target dst
+    | CMOV (_, src, dst) ->
+      (* CMOV reads both operands: src is copied to dst if condition is met, but
+         dst retains its value otherwise *)
+      reg_appears_in_arg target src || reg_appears_in_arg target dst
+    | INC dst | DEC dst | NEG dst | BSWAP dst ->
+      (* Read-modify-write: reads dst (value or address if memory operand) *)
+      reg_appears_in_arg target dst
     | IMUL (op1, Some op2) ->
       reg_appears_in_arg target op1 || reg_appears_in_arg target op2
     | MUL op ->
@@ -720,8 +761,14 @@ module X86_peephole = struct
     | LOCK_OR (op1, op2)
     | LOCK_XOR (op1, op2) ->
       reg_appears_in_arg target op1 || reg_appears_in_arg target op2
-    | SET (_, dst) -> reg_appears_in_arg target dst
-    | POP _ -> false
+    | SET (_, dst) ->
+      (* SET writes to dst based on condition flags, doesn't read dst value.
+         Only reads address registers if dst is a memory operand. *)
+      reg_in_memory_address target dst
+    | POP dst ->
+      (* POP writes to dst from stack, doesn't read dst value. Only reads
+         address registers if dst is a memory operand. *)
+      reg_in_memory_address target dst
     | CLDEMOTE arg -> reg_appears_in_arg target arg
     | PREFETCH (_, _, arg) -> reg_appears_in_arg target arg
     | _ ->
