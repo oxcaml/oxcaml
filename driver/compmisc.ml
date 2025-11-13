@@ -113,7 +113,10 @@ let rec make_directory dir =
   if Sys.file_exists dir then () else
     begin
       make_directory (Filename.dirname dir);
-      Sys.mkdir dir 0o777
+      (try
+        Sys.mkdir dir 0o777
+      with (Sys_error _) as se ->
+        if not ( Sys.file_exists dir) then raise se)
     end
 
 let with_ppf_file ~file_prefix ~file_extension f =
