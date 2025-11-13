@@ -135,7 +135,9 @@ let rec eval_address = function
   | Env.Aunit cu ->
       global_symbol cu
   | Env.Alocal id ->
-      let glob, pos, (repr : Lambda.module_representation) = toplevel_value id in
+      let glob, pos, (repr : Lambda.module_representation) =
+        toplevel_value id
+      in
       begin match repr with
       | Module_value_only _ -> Obj.field (global_symbol glob) pos
       | Module_mixed _ ->
