@@ -581,13 +581,38 @@ module X86_peephole = struct
     | Reg8L _ | Reg8H _ | Reg16 _ | Reg64 _ -> true
     | _ -> false
 
+  (* Extract the underlying reg64 from any integer register variant. Returns
+     None for non-register arguments or float registers. *)
+  let underlying_reg64 = function[@warning "-4"]
+    | Reg64 r | Reg32 r | Reg16 r | Reg8L r -> Some r
+    | Reg8H h -> (
+      match[@warning "-4"] h with
+      | AH -> Some RAX
+      | BH -> Some RBX
+      | CH -> Some RCX
+      | DH -> Some RDX)
+    | Regf _ | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> None
+
+  (* Check if two register arguments refer to the same underlying physical
+     register (considering aliasing). Examples: - Reg64 RAX and Reg8L RAX:
+     aliased (both refer to RAX) - Reg32 RBX and Reg16 RBX: aliased (both refer
+     to RBX) - Reg64 RAX and Reg64 RBX: not aliased (different registers) - Reg8H
+     AH and Reg64 RAX: aliased (AH is part of RAX) *)
+  let registers_alias arg1 arg2 =
+    match underlying_reg64 arg1, underlying_reg64 arg2 with
+    | Some r1, Some r2 -> equal_reg64 r1 r2
+    | _ -> false
+
   (* Check if a register appears in an argument, including inside memory
-     operands. This handles the fact that Mem operands contain registers as
-     base/index. *)
+     operands. Handles sub-register aliasing: reading %al counts as reading
+     %rax. Examples: - mov %rax, ...: reads %rax - mov %al, ...: reads %rax (via
+     sub-register) - mov (%rax), ...: reads %rax (for address) *)
   let reg_appears_in_arg target arg =
-    if equal_args target arg
+    (* First check direct register usage (including aliasing) *)
+    if registers_alias target arg
     then true
     else
+      (* Then check if target appears in memory operand address *)
       match[@warning "-4"] arg with
       | Mem addr -> (
         match(* Check if target register appears as base or index in memory
@@ -605,29 +630,32 @@ module X86_peephole = struct
 
   (* Check if a register is directly written by an argument. Returns true only
      if the argument IS a register that equals the target, not if the register
-     merely appears in a memory address. For example: - mov %rax, %rbx: %rbx is
-     written - mov %rax, (%rbx): %rbx is NOT written (it's read for the
-     address) *)
+     merely appears in a memory address. Handles sub-register aliasing: writing
+     to %al counts as writing to %rax. Examples: - mov %rax, %rbx: %rbx is
+     written - mov %rax, (%rbx): %rbx is NOT written (it's read for the address)
+     - mov c, %al: %rax is written (via sub-register) *)
   let reg_is_written_by_arg target arg =
     match[@warning "-4"] arg with
-    | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ ->
-      equal_args target arg
+    | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ ->
+      registers_alias target arg
+    | Regf _ -> equal_args target arg
     | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
 
   (* Check if a register appears in a memory operand's address calculation.
      Returns true only for memory operands where the register is used as
-     base/index, not for register operands. For example: - mov %rax, (%rbx): %rbx
-     is in address - mov %rax, %rbx: %rbx is NOT in address *)
+     base/index, not for register operands. Handles aliasing: checking if %ebx is
+     in address of (%rbx) returns true. Examples: - mov %rax, (%rbx): %rbx is in
+     address - mov %rax, %rbx: %rbx is NOT in address *)
   let reg_in_memory_address target arg =
     match[@warning "-4"] arg with
     | Mem addr -> (
-      match[@warning "-4"] target with
-      | Reg64 r | Reg32 r | Reg16 r | Reg8L r ->
+      match underlying_reg64 target with
+      | Some target_r64 ->
         (match addr.base with
-        | Some base when equal_reg64 r base -> true
+        | Some base when equal_reg64 target_r64 base -> true
         | _ -> false)
-        || (addr.scale <> 0 && equal_reg64 r addr.idx)
-      | _ -> false)
+        || (addr.scale <> 0 && equal_reg64 target_r64 addr.idx)
+      | None -> false)
     | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Imm _ | Sym _
     | Mem64_RIP _ ->
       false
