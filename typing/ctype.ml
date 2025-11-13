@@ -2915,41 +2915,50 @@ let is_contractive env p =
 
 exception Occur
 
-let occur_rec env allow_recursive visited ty0 ty =
-  let rec check_for_occurrences_in_ty ~visited ty =
-    let check_in_children ~visited ty =
-      fold_type_expr
-        (fun visited ty' -> check_for_occurrences_in_ty ~visited ty')
-        visited
-        ty
+let rec occur_rec env allow_recursive visited ty0 ty =
+  let check_in_children ~visited ty =
+    (* [visited] vs [expanded]: The [visited] set is necessary for correctness,
+       as it ensures that we correctlty handle recursive types and avoid
+       infinite loops. [expanded], however, is an optimization that prevents us
+       from expanding two sibling nodes that are physically equal, as it would
+       be redundant to do so. This prevents being exponential in types like:
+         type 'a t0 = ('a * 'a)
+         type 'a t1 = ('a * 'a) t0
+         type 'a t2 = ('a * 'a) t1
+         ... *)
+    let expanded = TypeHash.create 13 in
+    let check_child_type ty =
+      match TypeHash.mem expanded ty with
+      | false ->
+        occur_rec env allow_recursive visited ty0 ty;
+        TypeHash.add expanded ty ()
+      | true -> ()
     in
-    if eq_type ty ty0 then raise Occur;
-    if TypeSet.mem ty visited then visited
-    else
-      let visited = TypeSet.add ty visited in
-      match get_desc ty with
-      | Tconstr(p, _tl, _abbrev) ->
-        if allow_recursive && is_contractive env p then visited else
-        begin try
-          check_in_children ~visited ty
-        with Occur -> try
-          let ty' = try_expand_head try_expand_safe env ty in
-          (* This call used to be inlined, but there seems no reason for it.
-             Message was referring to change in rev. 1.58 of the CVS repo. *)
-          check_for_occurrences_in_ty ~visited ty'
-        with Cannot_expand ->
-          raise Occur
-        end
-      | Tobject _ | Tvariant _ ->
-        visited
-      | _ ->
-        if allow_recursive
-        then visited else
-        check_in_children ~visited ty
-
+    iter_type_expr check_child_type ty
   in
-  let (_ : TypeSet.t) = check_for_occurrences_in_ty ~visited ty in
-  ()
+  if eq_type ty ty0 then raise Occur;
+  match get_desc ty with
+    Tconstr(p, _tl, _abbrev) ->
+      if allow_recursive && is_contractive env p then () else
+      begin try
+        if TypeSet.mem ty visited then raise Occur;
+        let visited = TypeSet.add ty visited in
+        check_in_children ~visited ty
+      with Occur -> try
+        let ty' = try_expand_head try_expand_safe env ty in
+        (* This call used to be inlined, but there seems no reason for it.
+           Message was referring to change in rev. 1.58 of the CVS repo. *)
+        occur_rec env allow_recursive visited ty0 ty'
+      with Cannot_expand ->
+        raise Occur
+      end
+  | Tobject _ | Tvariant _ ->
+      ()
+  | _ ->
+      if allow_recursive ||  TypeSet.mem ty visited then () else begin
+        let visited = TypeSet.add ty visited in
+        check_in_children ~visited ty
+      end
 
 let type_changed = ref false (* trace possible changes to the studied type *)
 

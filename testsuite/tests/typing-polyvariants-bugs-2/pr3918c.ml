@@ -33,14 +33,11 @@ let f (x : 'a vlist) = (x : 'b vlist)
  ocamlc.byte;
  script = "rm -f pr3918a.cmi";
  script;
- module = "pr3918c.ml";
- ocamlc.byte;
-*)
-
-(* This program used to unnecessarily raise the error:
-File "pr3918c.ml", line 24, characters 11-12:
-24 | let f x = (x : 'a vlist :> 'b vlist)
-                ^
-Error: This expression has type "'b Pr3918b.vlist"
-       but an expression was expected of type "'b Pr3918b.vlist"
+ {
+   module = "pr3918c.ml";
+   ocamlc_byte_exit_status = "2";
+   ocamlc.byte;
+ }{
+   check-ocamlc.byte-output;
+ }
 *)
