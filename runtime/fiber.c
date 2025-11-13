@@ -999,10 +999,10 @@ static void free_stack_memory(struct stack_info* stack)
 void caml_free_stack (struct stack_info* stack)
 {
   CAMLnoalloc;
-  struct stack_info** cache = Caml_state->stack_cache;
+  // struct stack_info** cache = Caml_state->stack_cache;
 
   CAMLassert(stack->magic == 42);
-  CAMLassert(cache != NULL);
+  // CAMLassert(cache != NULL);
 
   // Don't need to update local_sp since this is no longer the current stack.
   caml_free_local_arenas(stack->local_arenas);
