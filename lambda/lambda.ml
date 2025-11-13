@@ -2527,6 +2527,7 @@ let primitive_result_layout (p : primitive) =
   | Parrayblit _
     -> layout_unit
   | Pgetglobal _ -> layout_module
+    (* Note the assumption that predefs are always values *)
   | Pgetpredef _ -> layout_predef_value
   | Pmakeblock _ | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
   | Pduprecord _ | Pmakeufloatblock _ | Pmakemixedblock _ | Pmakelazyblock _

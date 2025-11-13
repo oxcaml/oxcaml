@@ -934,15 +934,14 @@ type runtime_param =
   | Rp_unit                               (* The unit value (only used when
                                              there are no other parameters) *)
 
-(* Like [Types.mixed_block_shape], but the shape in [Module_mixed] has
-   been translated *)
 type module_representation =
   | Module_value_only of { field_count : int }
   (* All module fields are boxed. *)
   | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
   (* The module contains both values and unboxed elements. We have two shapes:
      one for allocating (used by [block_of_module_representation]) and one for
-     reading (used by [mod_field]) *)
+     reading (used by [mod_field]). This will be cleaned up after we add
+     [Pmixedfieldzeroalloc] (name subject to change) *)
 
 (* Logical field count: Each unboxed product counts as 1 field *)
 val module_representation_field_count : module_representation -> int
