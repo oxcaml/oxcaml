@@ -31,7 +31,8 @@ module Code : sig
 end
 
 val transl_quote :
+  scopes:Debuginfo.Scoped_location.scopes ->
+  loc:Location.t ->
   (Typedtree.expression -> Lambda.lambda) ->
   Typedtree.expression ->
-  Location.t ->
   Lambda.lambda
