@@ -207,9 +207,13 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
   | Cextcall { func = "sqrt" | "sqrtf" | "caml_neon_float64_sqrt"; _ } ->
     Rewritten (specific Isqrtf, args)
   | Cextcall { func; builtin = true; _ } -> (
-    match Simd_selection.select_operation_cfg func args dbg with
-    | Some (op, args) -> Rewritten (Basic (Op op), args)
-    | None -> Use_default)
+    match func with
+    | "caml_arm64_read_cntvct_el0_unboxed" ->
+      Rewritten (specific (Iread_system_reg CNTVCT_EL0), args)
+    | _ -> (
+      match Simd_selection.select_operation_cfg func args dbg with
+      | Some (op, args) -> Rewritten (Basic (Op op), args)
+      | None -> Use_default))
   (* Recognize bswap instructions *)
   | Cbswap { bitwidth } ->
     let bitwidth = select_bitwidth bitwidth in
@@ -256,7 +260,7 @@ let pseudoregs_for_operation op arg res =
       ( Ifar_poll | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
       | Imulsubf | Inegmulsubf | Isqrtf | Imove32 | Ifar_alloc _
       | Ishiftarith (_, _)
-      | Ibswap _ | Isignext _ )
+      | Ibswap _ | Isignext _ | Iread_system_reg _ )
   | Move | Spill | Reload | Opaque | Pause | Begin_region | End_region | Dls_get
   | Tls_get | Poll | Const_int _ | Const_float32 _ | Const_float _
   | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
