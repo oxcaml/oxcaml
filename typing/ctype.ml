@@ -2915,50 +2915,55 @@ let is_contractive env p =
 
 exception Occur
 
-let rec occur_rec env allow_recursive visited ty0 ty =
-  let check_in_children ~visited ty =
-    (* [visited] vs [expanded]: The [visited] set is necessary for correctness,
-       as it ensures that we correctlty handle recursive types and avoid
-       infinite loops. [expanded], however, is an optimization that prevents us
-       from expanding two sibling nodes that are physically equal, as it would
-       be redundant to do so. This prevents being exponential in types like:
-         type 'a t0 = ('a * 'a)
-         type 'a t1 = ('a * 'a) t0
-         type 'a t2 = ('a * 'a) t1
-         ... *)
-    let expanded = TypeHash.create 13 in
-    let check_child_type ty =
-      match TypeHash.mem expanded ty with
-      | false ->
-        occur_rec env allow_recursive visited ty0 ty;
-        TypeHash.add expanded ty ()
-      | true -> ()
+let occur_rec env allow_recursive ty0 ty =
+  (* [visited] vs [expanded]: The [visited] set is necessary for correctness,
+      as it ensures that we correctlty handle recursive types and avoid
+      infinite loops. [expanded], however, is an optimization that prevents us
+      from expanding two sibling nodes that are physically equal, as it would
+      be redundant to do so. This prevents being exponential in types like:
+        type 'a t0 = ('a * 'a)
+        type 'a t1 = ('a * 'a) t0
+        type 'a t2 = ('a * 'a) t1
+        ... *)
+  let rec check_in_ty ~visited ~expanded ty =
+    let check_in_children ~visited ~expanded ty =
+      let check_child_type expanded ty =
+        match TypeSet.mem ty expanded with
+        | false ->
+          let expanded = check_in_ty ~visited ~expanded ty in
+          TypeSet.add ty expanded
+        | true -> expanded
+      in
+      fold_type_expr check_child_type expanded ty
     in
-    iter_type_expr check_child_type ty
+    if eq_type ty ty0 then raise Occur;
+    match get_desc ty with
+      Tconstr(p, _tl, _abbrev) ->
+        if allow_recursive && is_contractive env p then expanded else
+        begin try
+          if TypeSet.mem ty visited then raise Occur;
+          let visited = TypeSet.add ty visited in
+          check_in_children ~visited ~expanded ty
+        with Occur -> try
+          let ty' = try_expand_head try_expand_safe env ty in
+          (* This call used to be inlined, but there seems no reason for it.
+            Message was referring to change in rev. 1.58 of the CVS repo. *)
+          check_in_ty ~visited ~expanded ty'
+        with Cannot_expand ->
+          raise Occur
+        end
+    | Tobject _ | Tvariant _ ->
+        expanded
+    | _ ->
+        if allow_recursive ||  TypeSet.mem ty visited then expanded else begin
+          let visited = TypeSet.add ty visited in
+          check_in_children ~visited ~expanded ty
+        end
   in
-  if eq_type ty ty0 then raise Occur;
-  match get_desc ty with
-    Tconstr(p, _tl, _abbrev) ->
-      if allow_recursive && is_contractive env p then () else
-      begin try
-        if TypeSet.mem ty visited then raise Occur;
-        let visited = TypeSet.add ty visited in
-        check_in_children ~visited ty
-      with Occur -> try
-        let ty' = try_expand_head try_expand_safe env ty in
-        (* This call used to be inlined, but there seems no reason for it.
-           Message was referring to change in rev. 1.58 of the CVS repo. *)
-        occur_rec env allow_recursive visited ty0 ty'
-      with Cannot_expand ->
-        raise Occur
-      end
-  | Tobject _ | Tvariant _ ->
-      ()
-  | _ ->
-      if allow_recursive ||  TypeSet.mem ty visited then () else begin
-        let visited = TypeSet.add ty visited in
-        check_in_children ~visited ty
-      end
+  let (_ : TypeSet.t ) =
+    check_in_ty ~visited:TypeSet.empty ~expanded:TypeSet.empty ty
+  in
+  ()
 
 let type_changed = ref false (* trace possible changes to the studied type *)
 
@@ -2972,7 +2977,7 @@ let occur uenv ty0 ty =
     while
       type_changed := false;
       if not (eq_type ty0 ty) then
-        occur_rec env allow_recursive TypeSet.empty ty0 ty;
+        occur_rec env allow_recursive ty0 ty;
       !type_changed
     do () (* prerr_endline "changed" *) done;
     merge type_changed old
