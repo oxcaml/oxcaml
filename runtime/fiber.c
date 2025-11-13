@@ -1007,17 +1007,17 @@ void caml_free_stack (struct stack_info* stack)
   // Don't need to update local_sp since this is no longer the current stack.
   caml_free_local_arenas(stack->local_arenas);
 
-  if (stack->cache_bucket != -1) {
-    stack->exception_ptr =
-      (void*)(cache[stack->cache_bucket]);
-    cache[stack->cache_bucket] = stack;
-#if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
-    memset(Stack_base(stack), 0x42,
-           (Stack_high(stack)-Stack_base(stack))*sizeof(value));
-#endif
-  } else {
+//   if (stack->cache_bucket != -1) {
+//     stack->exception_ptr =
+//       (void*)(cache[stack->cache_bucket]);
+//     cache[stack->cache_bucket] = stack;
+// #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
+//     memset(Stack_base(stack), 0x42,
+//            (Stack_high(stack)-Stack_base(stack))*sizeof(value));
+// #endif
+//   } else {
     free_stack_memory(stack);
-  }
+  // }
 }
 
 void caml_free_gc_regs_buckets(value *gc_regs_buckets)
