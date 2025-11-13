@@ -80,7 +80,7 @@ let find_or_add_semaphore name enabled_at_init dbg =
       (* [find_or_add_semaphore] is called with None for Iprobe_is_enabled
          during code emission only. [find_or_add_semaphore] is called with Some
          to emit probe notes only after all code is emitted. *)
-      assert false
+      assert (not !Clflags.emit_optimized_probes)
     | Some b, Some b' ->
       if not (Bool.equal b b')
       then raise (Emitaux.Error (Inconsistent_probe_init (name, dbg))));
