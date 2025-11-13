@@ -570,6 +570,7 @@
   printoperation
   printreg
   proc
+  probe_emission
   simd
   simd_selection
   simd_proc
