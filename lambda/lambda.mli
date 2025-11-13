@@ -1261,7 +1261,6 @@ val reset: unit -> unit
 val mod_field:
   ?read_semantics: field_read_semantics -> int ->
   module_representation -> primitive
-val mod_setfield: int -> module_representation -> primitive
 
 val structured_constant_layout : structured_constant -> layout
 

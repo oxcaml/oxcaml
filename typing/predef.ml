@@ -26,8 +26,10 @@ let wrap create s =
   builtin_idents := (s, id) :: !builtin_idents;
   id
 
-(* N.B.: There are a few places that assume that predefs are always values,
-   e.g. [Jkind.Sort.Const.for_predef_value] and [Lambda.layout_predef_value] *)
+(* Note: [ident_create] creates identifiers with [Ident.Predef], and later
+   portions of the compiler assume that expressions with these identifiers must
+   have types with layout value (see, e.g., the compilation of [Pgetpredef]
+   in transl). *)
 let ident_create = wrap Ident.create_predef
 
 let ident_int = ident_create "int"

@@ -135,16 +135,22 @@ let rec eval_address = function
   | Env.Aunit cu ->
       global_symbol cu
   | Env.Alocal id ->
-      let glob, pos, _repr = toplevel_value id in
-      (* CR jrayman *)
-      (Obj.magic (global_symbol glob)).(pos)
+      let glob, pos, (repr : Lambda.module_representation) = toplevel_value id in
+      begin match repr with
+      | Module_value_only _ -> Obj.field (global_symbol glob) pos
+      | Module_mixed _ ->
+        Location.raise_errorf
+          ~loc:Location.none
+          "Opttoploop.eval_address: Can't handle mixed module"
+      end
   | Env.Adot(a, module_repr, pos) ->
       let module_repr = Lambda.transl_module_representation module_repr in
       match module_repr with
       | Module_value_only _ -> Obj.field (eval_address a) pos
       | Module_mixed _ ->
-        (* CR jrayman *)
-        Misc.fatal_error "Opttoploop.eval_address: Can't handle mixed module"
+        Location.raise_errorf
+          ~loc:Location.none
+          "Opttoploop.eval_address: Can't handle mixed module"
 
 let eval_path find env path =
   match find path env with

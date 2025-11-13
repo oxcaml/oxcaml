@@ -1480,11 +1480,6 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_mixed (_, shape_for_read) ->
     Pmixedfield([pos], shape_for_read, read_semantics)
 
-let mod_setfield pos = function
-  | Module_value_only _ -> Psetfield (pos, Pointer, Root_initialization)
-  | Module_mixed (shape, _) ->
-    Psetmixedfield([pos], shape, Root_initialization)
-
 let transl_module_representation repr =
   let shape =
     Array.map

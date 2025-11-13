@@ -33,7 +33,7 @@ val print_with_scope : Format.formatter -> t -> unit
 val create_scoped: scope:int -> string -> t
 val create_local: string -> t
 val create_persistent: string -> t
-val create_predef: string -> t
+val create_predef: string -> t (* CR-someday layouts: should take a sort *)
 val create_instance: string -> Global_module.Name.argument list -> t
 val create_global: Global_module.Name.t -> t
 

@@ -1141,9 +1141,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | _ ->
           let oid = Ident.create_local "open" in
           let oid_duid = Lambda.debug_uid_none in
-          let open_repr =
-            transl_module_representation od.open_items_repr
-          in
+          let open_repr = transl_module_representation od.open_items_repr in
           let body, _ =
             List.fold_left (fun (body, pos) id ->
               Llet(Alias, layout_of_module_field open_repr pos, id,
