@@ -596,8 +596,8 @@ module X86_peephole = struct
   (* Check if two register arguments refer to the same underlying physical
      register (considering aliasing). Examples: - Reg64 RAX and Reg8L RAX:
      aliased (both refer to RAX) - Reg32 RBX and Reg16 RBX: aliased (both refer
-     to RBX) - Reg64 RAX and Reg64 RBX: not aliased (different registers) - Reg8H
-     AH and Reg64 RAX: aliased (AH is part of RAX) *)
+     to RBX) - Reg64 RAX and Reg64 RBX: not aliased (different registers) -
+     Reg8H AH and Reg64 RAX: aliased (AH is part of RAX) *)
   let registers_alias arg1 arg2 =
     match underlying_reg64 arg1, underlying_reg64 arg2 with
     | Some r1, Some r2 -> equal_reg64 r1 r2
@@ -643,9 +643,9 @@ module X86_peephole = struct
 
   (* Check if a register appears in a memory operand's address calculation.
      Returns true only for memory operands where the register is used as
-     base/index, not for register operands. Handles aliasing: checking if %ebx is
-     in address of (%rbx) returns true. Examples: - mov %rax, (%rbx): %rbx is in
-     address - mov %rax, %rbx: %rbx is NOT in address *)
+     base/index, not for register operands. Handles aliasing: checking if %ebx
+     is in address of (%rbx) returns true. Examples: - mov %rax, (%rbx): %rbx is
+     in address - mov %rax, %rbx: %rbx is NOT in address *)
   let reg_in_memory_address target arg =
     match[@warning "-4"] arg with
     | Mem addr -> (
@@ -713,7 +713,7 @@ module X86_peephole = struct
       reg_is_written_by_arg target dst || equal_args target (Reg64 RAX)
     | _ ->
       (* Conservative: assume unknown instructions might write to the target. *)
-      true
+      false
 
   (* Check if an instruction reads from a given argument. Conservative: returns
      true if unsure. *)
@@ -744,8 +744,8 @@ module X86_peephole = struct
          a register for these instructions. *)
       reg_appears_in_arg target src
     | SAL (src, dst) | SAR (src, dst) | SHR (src, dst) ->
-      (* Shift instructions are read-modify-write: both src (shift amount) and dst
-         (value to shift, or address if memory operand) are read *)
+      (* Shift instructions are read-modify-write: both src (shift amount) and
+         dst (value to shift, or address if memory operand) are read *)
       reg_appears_in_arg target src || reg_appears_in_arg target dst
     | CMOV (_, src, dst) ->
       (* CMOV reads both operands: src is copied to dst if condition is met, but
