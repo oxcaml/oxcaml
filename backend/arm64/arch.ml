@@ -60,6 +60,9 @@ type cmm_label = Label.t
 
 type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 
+type system_reg =
+  |  CNTVCT_EL0
+
 (* Specific operations, including [Simd], must not raise. *)
 type specific_operation =
   | Ifar_poll
@@ -78,6 +81,7 @@ type specific_operation =
   | Isignext of int (* sign extension *)
   | Isimd of Simd.operation
   | Illvm_intrinsic of string
+  | Iread_system_reg of system_reg  (* MRS *)
 
 and arith_operation =
     Ishiftadd
@@ -146,6 +150,9 @@ let int_of_bswap_bitwidth = function
   | Thirtytwo -> 32
   | Sixtyfour -> 64
 
+let print_system_reg_name = function
+  |  CNTVCT_EL0 -> "cntvct_el0"
+
 let print_specific_operation printreg op ppf arg =
   match op with
   | Ifar_poll ->
@@ -213,6 +220,8 @@ let print_specific_operation printreg op ppf arg =
     Simd.print_operation printreg op ppf arg
   | Illvm_intrinsic name ->
       fprintf ppf "llvm_intrinsic %s" name
+  | Iread_system_reg name ->
+    fprintf ppf "read_system_reg %s" (print_system_reg_name name)
 
 let specific_operation_name : specific_operation -> string = fun op ->
   match op with
@@ -240,6 +249,7 @@ let specific_operation_name : specific_operation -> string = fun op ->
   | Imove32 -> "move32"
   | Isignext _ -> "signext"
   | Isimd _ -> "simd"
+  | Iread_system_reg name -> "read_system_reg " ^ (print_system_reg_name name)
   | Illvm_intrinsic _ -> "llvm_intrinsic"
 
 let equal_addressing_mode left right =
@@ -256,6 +266,10 @@ let equal_arith_operation left right =
   | Ishiftadd, Ishiftadd -> true
   | Ishiftsub, Ishiftsub -> true
   | (Ishiftadd | Ishiftsub), _ -> false
+
+let equal_system_reg_name left right =
+  match left, right with
+  | CNTVCT_EL0, CNTVCT_EL0 -> true
 
 let equal_specific_operation left right =
   match left, right with
@@ -279,10 +293,13 @@ let equal_specific_operation left right =
   | Imove32, Imove32 -> true
   | Isignext left, Isignext right -> Int.equal left right
   | Isimd left, Isimd right -> Simd.equal_operation left right
+  | Iread_system_reg left, Iread_system_reg right ->
+    equal_system_reg_name left right
   | Illvm_intrinsic left, Illvm_intrinsic right -> String.equal left right
   | (Ifar_alloc _  | Ifar_poll  | Ishiftarith _
     | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
     | Inegmulsubf | Isqrtf | Ibswap _ | Imove32 | Isignext _ | Isimd _
+    | Iread_system_reg _
     | Illvm_intrinsic _), _ -> false
 
 let isomorphic_specific_operation op1 op2 =
@@ -372,6 +389,7 @@ let operation_is_pure : specific_operation -> bool = function
   | Ibswap _ -> true
   | Imove32 -> true
   | Isignext _ -> true
+  | Iread_system_reg CNTVCT_EL0 -> true
   | Isimd op -> Simd.operation_is_pure op
   | Illvm_intrinsic intr ->
       Misc.fatal_errorf "Arch.operation_is_pure: Unexpected llvm_intrinsic %s: \
@@ -395,6 +413,7 @@ let operation_allocates = function
   | Ishiftarith (_, _)
   | Isignext _
   | Ibswap _
+  | Iread_system_reg CNTVCT_EL0
   | Isimd _ -> false
   | Illvm_intrinsic _intr ->
       (* Used by the zero_alloc checker that runs before the Llvmize. *)
