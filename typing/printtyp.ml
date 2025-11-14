@@ -1370,7 +1370,7 @@ let out_jkind_of_const_jkind jkind =
 let rec out_jkind_of_desc (desc : 'd Jkind.Desc.t) =
   match desc.layout with
   | Sort ((Var n), sa) ->
-    (* CR zeisback: this is a pretty bad hack *)
+    (* CR zeisbach: this is a pretty bad hack *)
     let sa_strs =
       Jkind.Scannable_axes.(
         if equal sa max then [] else [asprintf "%a" print sa])

@@ -651,7 +651,9 @@ val get_layout : 'd Types.jkind -> Layout.Const.t option
 val extract_layout : 'd Types.jkind -> Sort.t Layout.t
 
 (* CR layouts-scannable: This is a somewhat awkward function to have, and like
-   [extract-layout] may be indicative of some code smells. *)
+   [extract-layout] may be indicative of some code smells. It could be possible
+   to replace this with new [set_layout] behavior? This also may get better if
+   layouts are refactored to be a product with scannable axes. *)
 val get_root_scannable_axes : 'd Types.jkind -> Scannable_axes.t option
 
 (** Gets the mode crossing for types of this jkind. *)

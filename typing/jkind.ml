@@ -108,14 +108,14 @@ module Scannable_axes = struct
   let print_unless_max ppf sa =
     if not (equal sa max) then Format.fprintf ppf " %a" print sa
 
-  (* CR zeisbach: when sa is more than one field, use this parameter! *)
   let set_pointerness sa pointerness =
+    (* CR layouts-scannable: Once there are more axes, use [sa]! *)
     ignore sa;
     pointerness
 
-  (* CR zeisbach: print this out like { nullability: ...; ... } eventually.
-     could also have Caps versions of the points on the axis, which might
-     be nice. if so, could add to a signature somewhere *)
+  (* CR layouts-scannable: When more axes get added, I think this should get
+     printed like [{ nullability: ...; ... }]. Could also have Caps versions
+     of the points on the axis; poke around to see precedent. *)
   let debug_print ppf sa = Pointerness.print ppf sa
 end
 
@@ -158,10 +158,52 @@ module Layout = struct
       | (Base _ | Any _ | Product _), _ -> false
 
     module Static = struct
-      (* CR zeisbach: replace this with a version that pre-allocates all of
-         the non-Value things, and maybe the Value ones as well.
-         then match on the sa in of_base to determine which value one! *)
-      let of_base (b : Sort.base) sa = Base (b, sa)
+      (* CR layouts-scannable: As more scannable axes are added, more
+         combinations should be pre-allocated here. *)
+      let value_non_pointer = Base (Sort.Value, Pointerness.Non_pointer)
+
+      let value_maybe_pointer = Base (Sort.Value, Pointerness.Maybe_pointer)
+
+      let void = Base (Sort.Void, Scannable_axes.max)
+
+      let float64 = Base (Sort.Float64, Scannable_axes.max)
+
+      let float32 = Base (Sort.Float32, Scannable_axes.max)
+
+      let word = Base (Sort.Word, Scannable_axes.max)
+
+      let untagged_immediate = Base (Sort.Untagged_immediate, Scannable_axes.max)
+
+      let bits8 = Base (Sort.Bits8, Scannable_axes.max)
+
+      let bits16 = Base (Sort.Bits16, Scannable_axes.max)
+
+      let bits32 = Base (Sort.Bits32, Scannable_axes.max)
+
+      let bits64 = Base (Sort.Bits64, Scannable_axes.max)
+
+      let vec128 = Base (Sort.Vec128, Scannable_axes.max)
+
+      let vec256 = Base (Sort.Vec256, Scannable_axes.max)
+
+      let vec512 = Base (Sort.Vec512, Scannable_axes.max)
+
+      let of_base (b : Sort.base) sa =
+        match b, sa with
+        | Value, Pointerness.Non_pointer -> value_non_pointer
+        | Value, Pointerness.Maybe_pointer -> value_maybe_pointer
+        | Void, _ -> void
+        | Untagged_immediate, _ -> untagged_immediate
+        | Float64, _ -> float64
+        | Float32, _ -> float32
+        | Word, _ -> word
+        | Bits8, _ -> bits8
+        | Bits16, _ -> bits16
+        | Bits32, _ -> bits32
+        | Bits64, _ -> bits64
+        | Vec128, _ -> vec128
+        | Vec256, _ -> vec256
+        | Vec512, _ -> vec512
     end
 
     (* if so, scannable axis annotations should not trigger a warning *)

@@ -10,7 +10,7 @@ type t_maybeptr_val
 type t_nonptr_val : value non_pointer
 |}]
 
-(* CR layouts-scannable: the current approach does not play nicely with
+(* CR layouts-scannable: The current approach does not play nicely with
    mutually recursive declarations, as demonstrated by the following test: *)
 
 type a : (value non_pointer & value) & (value non_pointer & value non_pointer)
