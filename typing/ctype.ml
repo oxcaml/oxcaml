@@ -1820,7 +1820,7 @@ let instance_prim_layout (desc : Primitive.description) ty =
   (* CR layouts-scannable: It would be nice if this didn't have to take in [sa],
      so [Jkind.get_root_scannable_axes] could be removed. But that would break
      layout_poly for [any non_pointer]. *)
-  let get_jkind jkind _sa =
+  let get_jkind jkind sa =
     let sort = match !new_sort with
     | Some sort -> sort
     | None ->
