@@ -7442,7 +7442,8 @@ and type_expect_
   | Pexp_extension ({ txt = ("eval" | "ocaml.eval"); _ }, payload) ->
     (* CR metaprogramming mshinwell: This match clause needs code review *)
     if not (Language_extension.is_enabled Runtime_metaprogramming) then
-      raise (Typetexp.Error (loc, env, Unsupported_extension Runtime_metaprogramming));
+      raise (Typetexp.Error (loc, env,
+                             Unsupported_extension Runtime_metaprogramming));
     begin match Builtin_attributes.get_eval_payload payload with
     | Error () -> raise (Error (loc, env, Eval_format))
     | Ok typ ->
@@ -7598,7 +7599,8 @@ and type_expect_
             exp_env = env }
   | Pexp_quote exp ->
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
-        raise (Typetexp.Error (loc, env, Unsupported_extension Runtime_metaprogramming));
+        raise (Typetexp.Error (loc, env,
+                               Unsupported_extension Runtime_metaprogramming));
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       let jkind = Jkind.Builtin.value ~why:Quotation_result in
       let new_env = Env.enter_quotation env in
@@ -7616,7 +7618,8 @@ and type_expect_
         exp_env = env }
   | Pexp_splice exp ->
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
-        raise (Typetexp.Error (loc, env, Unsupported_extension Runtime_metaprogramming));
+        raise (Typetexp.Error (loc, env,
+                               Unsupported_extension Runtime_metaprogramming));
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
       let new_env = Env.enter_splice ~loc env in
       let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
