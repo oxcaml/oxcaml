@@ -464,19 +464,40 @@ let insert_block :
     Misc.fatal_errorf
       "Cannot insert a block after block %a: it has no successors" Label.print
       predecessor_block.start;
-  let dbg, fdo, live, stack_offset, available_before, available_across =
+  let ( dbg,
+        fdo,
+        live,
+        stack_offset,
+        available_before,
+        available_across,
+        phantom_available_before ) =
     match DLL.last body with
     | None ->
       ( Debuginfo.none,
         Fdo_info.none,
         Reg.Set.empty,
         predecessor_block.terminator.stack_offset,
+        (* CR mshinwell: should these be propagated from the predecessor? *)
         Reg_availability_set.Unreachable,
-        Reg_availability_set.Unreachable )
+        Reg_availability_set.Unreachable,
+        None )
     | Some
-        { dbg; fdo; live; stack_offset; available_before; available_across; _ }
-      ->
-      dbg, fdo, live, stack_offset, available_before, available_across
+        { dbg;
+          fdo;
+          live;
+          stack_offset;
+          available_before;
+          available_across;
+          phantom_available_before;
+          _
+        } ->
+      ( dbg,
+        fdo,
+        live,
+        stack_offset,
+        available_before,
+        available_across,
+        phantom_available_before )
   in
   let copy (i : Cfg.basic Cfg.instruction) : Cfg.basic Cfg.instruction =
     { i with id = next_instruction_id () }
@@ -512,7 +533,8 @@ let insert_block :
               id = next_instruction_id ();
               irc_work_list = Unknown_list;
               available_before;
-              available_across
+              available_across;
+              phantom_available_before
             };
           (* The [predecessor_block] is the only predecessor. *)
           predecessors = Label.Set.singleton predecessor_block.start;

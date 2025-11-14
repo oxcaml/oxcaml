@@ -955,12 +955,12 @@ let between_labels_16_bit ?comment:_ ~upper:_ ~lower:_ () =
 
 let between_labels_32_bit ?comment:_comment ~upper ~lower () =
   let expr = const_sub (const_label upper) (const_label lower) in
-  (* CR sspies: Unlike in most of the other distance computation functions in
-     this file, we do not force an assembly time constant in this function. This
-     is to follow the existing/previous implementation of the x86 backend. In
-     the future, we should investigate whether it would be more appropriate to
-     force an assembly time constant. *)
-  const expr Thirty_two
+  (* On macOS, we need to force assembly time constants to avoid issues with
+     label differences, especially when one label is on a section boundary. This
+     is needed for proper DWARF emission with phantom variables. *)
+  if TS.is_macos ()
+  then const (force_assembly_time_constant expr) Thirty_two
+  else const expr Thirty_two
 
 let between_labels_64_bit ?comment:_ ~upper:_ ~lower:_ () =
   (* CR poechsel: use the arguments *)

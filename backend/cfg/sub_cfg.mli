@@ -30,7 +30,12 @@ val reset_instr_id : unit -> unit
 (* CR mshinwell: consolidate with [Cfg.make_instruction] and tidy up ID
    interface *)
 val make_instr :
-  'a -> Reg.t array -> Reg.t array -> Debuginfo.t -> 'a Cfg.instruction
+  'a ->
+  Reg.t array ->
+  Reg.t array ->
+  Debuginfo.t ->
+  phantom_available_before:Backend_var.Set.t option ->
+  'a Cfg.instruction
 
 (** A "sub" CFG is the counterpart of an instruction list in the original Mach
     selection pass.
@@ -59,18 +64,36 @@ val add_never_block : t -> label:Label.t -> unit
 
 (** Use [add_instruction] in preference to this function. *)
 val add_instruction_at_start :
-  t -> Cfg.basic -> Reg.t array -> Reg.t array -> Debuginfo.t -> unit
+  t ->
+  Cfg.basic ->
+  Reg.t array ->
+  Reg.t array ->
+  Debuginfo.t ->
+  phantom_available_before:Backend_var.Set.t option ->
+  unit
 
 (** [add_instruction] can only be called when the terminator is [Never]. *)
 val add_instruction :
-  t -> Cfg.basic -> Reg.t array -> Reg.t array -> Debuginfo.t -> unit
+  t ->
+  Cfg.basic ->
+  Reg.t array ->
+  Reg.t array ->
+  Debuginfo.t ->
+  phantom_available_before:Backend_var.Set.t option ->
+  unit
 
 (** [add_instruction'] can only be called when the terminator is [Never]. *)
 val add_instruction' : t -> Cfg.basic Cfg.instruction -> unit
 
 (** [set_terminator] can only be called when the terminator is [Never]. *)
 val set_terminator :
-  t -> Cfg.terminator -> Reg.t array -> Reg.t array -> Debuginfo.t -> unit
+  t ->
+  Cfg.terminator ->
+  Reg.t array ->
+  Reg.t array ->
+  Debuginfo.t ->
+  phantom_available_before:Backend_var.Set.t option ->
+  unit
 
 val iter_basic_blocks : t -> f:(Cfg.basic_block -> unit) -> unit
 

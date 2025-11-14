@@ -31,7 +31,7 @@ let reset_instr_id () = InstructionId.reset instr_id
 
 let next_instr_id () = InstructionId.get_and_incr instr_id
 
-let make_instr desc arg res dbg =
+let make_instr desc arg res dbg ~phantom_available_before =
   { Cfg.desc;
     arg;
     res;
@@ -42,7 +42,8 @@ let make_instr desc arg res dbg =
     id = next_instr_id ();
     irc_work_list = Unknown_list;
     available_before = Unreachable;
-    available_across = Unreachable
+    available_across = Unreachable;
+    phantom_available_before
   }
 
 type t =
@@ -55,13 +56,16 @@ let exit_has_never_terminator sub_cfg =
   Cfg.is_never_terminator sub_cfg.exit.terminator.desc
 
 let make_never_block ?label () : Cfg.basic_block =
-  Cfg.make_empty_block ?label (make_instr Cfg.Never [||] [||] Debuginfo.none)
+  Cfg.make_empty_block ?label
+    (make_instr Cfg.Never [||] [||] Debuginfo.none
+       ~phantom_available_before:None)
 
 let make_empty () =
   let exit = make_never_block () in
   let entry =
     Cfg.make_empty_block
-      (make_instr (Cfg.Always exit.start) [||] [||] Debuginfo.none)
+      (make_instr (Cfg.Always exit.start) [||] [||] Debuginfo.none
+         ~phantom_available_before:None)
   in
   let layout = DLL.make_empty () in
   DLL.add_end layout entry;
@@ -76,7 +80,9 @@ let add_block_at_start sub_cfg block =
 
 let add_empty_block_at_start sub_cfg ~label =
   Cfg.make_empty_block ~label
-    (make_instr (Cfg.Always (start_label sub_cfg)) [||] [||] Debuginfo.none)
+    (make_instr
+       (Cfg.Always (start_label sub_cfg))
+       [||] [||] Debuginfo.none ~phantom_available_before:None)
   |> add_block_at_start sub_cfg
 
 let add_block sub_cfg block =
@@ -86,22 +92,26 @@ let add_block sub_cfg block =
 let add_never_block sub_cfg ~label =
   add_block sub_cfg (make_never_block ~label ())
 
-let add_instruction_at_start sub_cfg desc arg res dbg =
+let add_instruction_at_start sub_cfg desc arg res dbg ~phantom_available_before
+    =
   (* We don't check [exit_has_never_terminator] since we're adding at the start,
      and this function is only used in very specific situations (note comment in
      the interface). *)
-  DLL.add_begin sub_cfg.entry.body (make_instr desc arg res dbg)
+  DLL.add_begin sub_cfg.entry.body
+    (make_instr desc arg res dbg ~phantom_available_before)
 
 let add_instruction' sub_cfg instr =
   assert (exit_has_never_terminator sub_cfg);
   DLL.add_end sub_cfg.exit.body instr
 
-let add_instruction sub_cfg desc arg res dbg =
-  add_instruction' sub_cfg (make_instr desc arg res dbg)
+let add_instruction sub_cfg desc arg res dbg ~phantom_available_before =
+  add_instruction' sub_cfg
+    (make_instr desc arg res dbg ~phantom_available_before)
 
-let set_terminator sub_cfg desc arg res dbg =
+let set_terminator sub_cfg desc arg res dbg ~phantom_available_before =
   assert (Cfg.is_never_terminator sub_cfg.exit.terminator.desc);
-  sub_cfg.exit.terminator <- make_instr desc arg res dbg
+  sub_cfg.exit.terminator
+    <- make_instr desc arg res dbg ~phantom_available_before
 
 let link_if_needed ~(from : Cfg.basic_block) ~(to_ : Cfg.basic_block) () =
   if Cfg.is_never_terminator from.terminator.desc

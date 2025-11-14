@@ -57,7 +57,8 @@ type environment =
         (** Which registers must be populated when jumping to the given
         handler. *)
     trap_stack : Operation.trap_stack;
-    tailrec_label : Label.t
+    tailrec_label : Label.t;
+    phantom_lets : V.Set.t
   }
 
 let env_add ?(mut = Asttypes.Immutable) var regs env =
@@ -102,6 +103,11 @@ let env_find_static_exception id env =
     Misc.fatal_errorf "Not found static exception id=%a" Static_label.format id
 
 let env_set_trap_stack env trap_stack = { env with trap_stack }
+
+let phantom_vars_from_env env =
+  if !Dwarf_flags.restrict_to_upstream_dwarf
+  then None
+  else Some env.phantom_lets
 
 let rec combine_traps trap_stack = function
   | [] -> trap_stack
@@ -159,8 +165,21 @@ let env_create ~tailrec_label =
   { vars = V.Map.empty;
     static_exceptions = Static_label.Map.empty;
     trap_stack = Uncaught;
-    tailrec_label
+    tailrec_label;
+    phantom_lets = V.Set.empty
   }
+
+let env_add_phantom_let var env =
+  (* Information about phantom lets is split at this stage:
+
+     1. The phantom variables in scope are recorded in the environment and
+     subsequently passed through CFG to Linear instructions via the
+     phantom_available_before field.
+
+     2. The defining expressions are recorded separately in the environment and
+     eventually stored in the CFG's fun_phantom_lets field. *)
+  let var = VP.var var in
+  { env with phantom_lets = V.Set.add var env.phantom_lets }
 
 let select_mutable_flag : Asttypes.mutable_flag -> Operation.mutable_flag =
   function
@@ -313,6 +332,8 @@ let size_expr env exp =
     | Cop (op, _, _) -> size_machtype (oper_result_type op)
     | Clet (id, arg, body) ->
       size (V.Map.add (VP.var id) (size localenv arg) localenv) body
+    | Cphantom_let (_id, _defining_expr, body) -> size localenv body
+    | Cname_for_debugger (_var, body) -> size localenv body
     | Csequence (_e1, e2) -> size localenv e2
     | _ -> Misc.fatal_error "Selection.size_expr"
   in
@@ -623,27 +644,37 @@ let make_const_symbol x = Operation.Const_symbol x
 
 let make_opaque () = Operation.Opaque
 
-let insert_debug (_env : environment) sub_cfg basic dbg arg res =
-  Sub_cfg.add_instruction sub_cfg basic arg res dbg
+let insert_debug (env : environment) sub_cfg basic dbg arg res =
+  let phantom_available_before = phantom_vars_from_env env in
+  Sub_cfg.add_instruction sub_cfg basic arg res dbg ~phantom_available_before
 
-let insert_op_debug_returning_id (_env : environment) sub_cfg op dbg arg res =
-  let instr = Sub_cfg.make_instr (Cfg.Op op) arg res dbg in
+let insert_op_debug_returning_id (env : environment) sub_cfg op dbg arg res =
+  let phantom_available_before = phantom_vars_from_env env in
+  let instr =
+    Sub_cfg.make_instr (Cfg.Op op) arg res dbg ~phantom_available_before
+  in
   Sub_cfg.add_instruction' sub_cfg instr;
   instr.id
 
-let insert (_env : environment) sub_cfg basic arg res =
+let insert (env : environment) sub_cfg basic arg res =
   (* CR mshinwell: fix debuginfo *)
+  let phantom_available_before = phantom_vars_from_env env in
   Sub_cfg.add_instruction sub_cfg basic arg res Debuginfo.none
+    ~phantom_available_before
 
-let insert' (_env : environment) sub_cfg term arg res =
+let insert' (env : environment) sub_cfg term arg res =
   (* CR mshinwell: fix debuginfo *)
+  let phantom_available_before = phantom_vars_from_env env in
   Sub_cfg.set_terminator sub_cfg term arg res Debuginfo.none
+    ~phantom_available_before
 
-let insert_debug' (_env : environment) sub_cfg basic dbg arg res =
-  Sub_cfg.set_terminator sub_cfg basic arg res dbg
+let insert_debug' (env : environment) sub_cfg basic dbg arg res =
+  let phantom_available_before = phantom_vars_from_env env in
+  Sub_cfg.set_terminator sub_cfg basic arg res dbg ~phantom_available_before
 
-let insert_op_debug' (_env : environment) sub_cfg op dbg rs rd =
-  Sub_cfg.set_terminator sub_cfg op rs rd dbg;
+let insert_op_debug' (env : environment) sub_cfg op dbg rs rd =
+  let phantom_available_before = phantom_vars_from_env env in
+  Sub_cfg.set_terminator sub_cfg op rs rd dbg ~phantom_available_before;
   rd
 
 let insert_move env sub_cfg src dst =
