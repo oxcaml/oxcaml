@@ -1370,15 +1370,13 @@ let out_jkind_of_const_jkind jkind =
 let rec out_jkind_of_desc (desc : 'd Jkind.Desc.t) =
   match desc.layout with
   | Sort ((Var n), sa) ->
-    (* this is pretty horrible and indicative of the wrong to_string printing *)
+    (* CR zeisback: this is a pretty bad hack *)
     let sa_strs =
-      Jkind.Scannable_axes.(if equal sa max then [] else [to_string sa])
+      Jkind.Scannable_axes.(
+        if equal sa max then [] else [asprintf "%a" print sa])
     in
     Ojkind_var ("'_representable_layout_" ^
                 Int.to_string (Jkind.Sort.Var.get_print_number n),
-                (* CR zeisbach: this should handle ALL of the axes, meaning we
-                   probably want a [t -> string list] printing function.
-                   deal with this later. Per_axes would solve this *)
                 sa_strs)
   (* Analyze a product before calling [get_const]: the machinery in
      [Jkind.Const.to_out_jkind_const] works better for atomic layouts, not

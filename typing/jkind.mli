@@ -91,13 +91,9 @@ module Scannable_axes : sig
 
   (* CR zeisbach: should this be an Axis_ops? having equal and
      the other version of <= is nice. but this might indicate that
-     Axis_ops is not the right name to call this. *)
+     Axis_ops is not the right name to call this.
+     Having this means we need print, which was weird with to_string too... *)
   include Jkind_axis.Axis_ops with type t := t
-
-  val to_string : t -> string
-
-  (* CR zeisbach: should this include a debug print? *)
-  val debug_print : Format.formatter -> t -> unit
 end
 
 (* The layout of a type describes its memory layout. A layout is either the
