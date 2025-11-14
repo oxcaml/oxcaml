@@ -61,6 +61,18 @@
 #include "caml/callback.h"
 #include "caml/startup_aux.h"
 
+/* Temporary hack to report maxrss in the process-end GC log messages */
+
+#include <sys/time.h>
+#include <sys/resource.h>
+
+static uintnat maxrss(void)
+{
+  struct rusage usage;
+  (void)getrusage(RUSAGE_SELF, &usage);
+  return (uintnat)1024 * usage.ru_maxrss;
+}
+
 CAMLexport char * caml_strerror(int errnum, char * buf, size_t buflen)
 {
 #ifdef _WIN32
@@ -166,6 +178,9 @@ CAMLexport void caml_do_exit(int retcode)
     caml_gc_message(0x400,
                     "forced_major_collections: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
                     forcmajcoll);
+    caml_gc_message(0x400,
+                    "Max RSS:: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+                    maxrss());
   }
 
 #ifndef NATIVE_CODE

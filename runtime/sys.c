@@ -66,6 +66,18 @@
 #include "caml/major_gc.h"
 #include "caml/shared_heap.h"
 
+/* Temporary hack to report maxrss in the process-end GC log messages */
+
+#include <sys/time.h>
+#include <sys/resource.h>
+
+static uintnat maxrss(void)
+{
+  struct rusage usage;
+  (void)getrusage(RUSAGE_SELF, &usage);
+  return (uintnat)1024 * usage.ru_maxrss;
+}
+
 CAMLexport char * caml_strerror(int errnum, char * buf, size_t buflen)
 {
 #ifdef _WIN32
@@ -194,6 +206,8 @@ CAMLexport void caml_do_exit(int retcode)
                       s.global_stats.chunk_words);
       CAML_GC_MESSAGE(STATS, "max chunk_words: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
                       s.global_stats.max_chunk_words);
+      CAML_GC_MESSAGE(STATS, "max RSS: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+                      maxrss());
     }
   }
 
