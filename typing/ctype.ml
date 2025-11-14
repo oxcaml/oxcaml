@@ -1817,7 +1817,6 @@ let instance_prim_layout (desc : Primitive.description) ty =
   then ty, None
   else
   let new_sort = ref None in
-  (* CR zeisbach: should this be a CR? Probably, since I want it to change *)
   (* CR layouts-scannable: It would be nice if this didn't have to take in [sa],
      so [Jkind.get_root_scannable_axes] could be removed. But that would break
      layout_poly for [any non_pointer]. *)

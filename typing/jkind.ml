@@ -376,23 +376,21 @@ module Layout = struct
             (conservatively) concludes that they are not equal. *)
       then Scannable_axes.equal sa1 sa2
       else true
-    | Product ts, Sort (sort, sa) | Sort (sort, sa), Product ts -> (
-      (* If [ts] can't be turned into a product sort -- because it has [any]
+    | Product ts, Sort (sort, _) | Sort (sort, _), Product ts -> (
+      (* CR zeisbach / layouts-scannable for rtjoa:
+         We make new sort variables to ensure that the leaves have
+         [Scannable_axes.max]. This may not be necessary, but we came to
+         this conclusion a while ago. This is the conservative thing to do,
+         but I can't think of any examples that hit this code path
+         FORMERLY:
+         If [ts] can't be turned into a product sort -- because it has [any]
          -- then equality will surely fail. No need to create new sort
          variables here. *)
-      (* CR zeisbach: it is unclear when this code path will arise/matter.
-         for now, ignoring. it might be correct to check any [Value] leaves
-         in [sort], but I'm not sure what they would be compared against. *)
-      (* CR zeisbach: after more discussion, we think that this should ensure
-         that the [sa]s at any leaves in [ts] are all top. currently, this
-         check is missing; it would require some refactoring, possible using
-         [decompose_into_product] *)
-      ignore sa;
-      match to_product_sort ts with
+      match Sort.decompose_into_product sort (List.length ts) with
       | None -> false
-      | Some sort' ->
-        sort_equal_result ~allow_mutation
-          (Sort.equate_tracking_mutation sort sort'))
+      | Some sorts ->
+        let sorts = List.map (fun x -> Sort (x, Scannable_axes.max)) sorts in
+        List.equal (equate_or_equal ~allow_mutation) ts sorts)
     | Product ts1, Product ts2 ->
       List.equal (equate_or_equal ~allow_mutation) ts1 ts2
     | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
@@ -443,9 +441,6 @@ module Layout = struct
            to end up less than a sort (so, no [any]), but it seems easier to keep
            this case lined up with the inverse case, which definitely cannot use
            [to_product_sort]. *)
-        (* CR zeisbach: this just discards the [sa] in the Sort and turns things
-           into max when recurring. maybe there is another constraint we may want
-           to apply to make things (errors?) less confusing? *)
         match Sort.decompose_into_product s2 (List.length ts1) with
         | None -> Not_le
         | Some ss2 ->
@@ -483,9 +478,6 @@ module Layout = struct
     | Product ts1, Product ts2 ->
       if List.compare_lengths ts1 ts2 = 0 then products ts1 ts2 else None
     | Product ts, Sort (sort, _) | Sort (sort, _), Product ts -> (
-      (* CR zeisbach: like in the case above, the [sa]s are just ignored
-         for intersection since they are nonsense in this case.
-         this should be considered more carefully. *)
       match Sort.decompose_into_product sort (List.length ts) with
       | None -> None
       | Some sorts ->
