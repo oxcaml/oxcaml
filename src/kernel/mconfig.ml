@@ -633,8 +633,8 @@ let ocaml_ignored_flags =
     "-cfg-prologue-shrink-wrap";
     "-no-cfg-prologue-shrink-wrap";
     "-gdwarf-pedantic";
-    "-ddwarf-metrics"
-    "-afl-instrument";
+    "-ddwarf-metrics";
+    "-afl-instrument"
   ]
 
 let ocaml_ignored_parametrized_flags =
