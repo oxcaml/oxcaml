@@ -9,7 +9,7 @@ type t : float64
 type t : float64 & value
 [%%expect{|
 type t : float64
-type t : float64 maybe_pointer & value
+type t : float64 & value
 |}]
 
 (* CR layouts-scannable: similarly, the printing in error messages contains
@@ -22,9 +22,9 @@ type a : any
 Line 2, characters 0-20:
 2 | type b : float32 = a
     ^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "a" is any maybe_pointer
+Error: The layout of type "a" is any
          because of the definition of a at line 1, characters 0-12.
-       But the layout of type "a" must be a sublayout of float32 maybe_pointer
+       But the layout of type "a" must be a sublayout of float32
          because of the definition of b at line 2, characters 0-20.
 |}]
 
@@ -36,8 +36,8 @@ Line 1, characters 29-36:
                                  ^^^^^^^
 Error: This pattern matches values of type "a"
        but a pattern was expected which matches values of type
-         "('a : '_representable_layout_1 maybe_pointer)"
-       The layout of a is any maybe_pointer
+         "('a : '_representable_layout_1)"
+       The layout of a is any
          because of the annotation on the abstract type declaration for a.
        But the layout of a must be representable
          because we must know concretely how to pass a function argument.

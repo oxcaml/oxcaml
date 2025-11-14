@@ -100,10 +100,15 @@ module Scannable_axes = struct
 
   let join sa1 sa2 = Pointerness.join sa1 sa2
 
-  (* CR zeisbach: this should get better with more axes *)
-  let to_string sa = Pointerness.to_string sa
+  (* CR zeisbach: we should probably not have both to_string and print...
+     that's a bit awkward. also, it means that some choices have to be
+     made multiple times. *)
+  let to_string sa =
+    if Pointerness.equal sa Pointerness.max
+    then ""
+    else Pointerness.to_string sa
 
-  let print ppf sa = Pointerness.print ppf sa
+  let print ppf sa = Format.fprintf ppf "%s" (to_string sa)
 
   (* CR zeisbach: when sa is more than one field, use this parameter! *)
   let set_pointerness sa pointerness =
@@ -223,9 +228,22 @@ module Layout = struct
       let rec to_string nested (t : t) =
         match t with
         (* CR zeisbach: what is the style here? with [^]s and [" "]s *)
-        | Any sa -> "any " ^ Scannable_axes.to_string sa
+        | Any sa ->
+          (* CR zeisbach: there surely is a better way to add this space...
+             maybe [to_string] could be changed? or look at other printing *)
+          let to_append =
+            if Scannable_axes.equal sa Scannable_axes.max
+            then ""
+            else " " ^ Scannable_axes.to_string sa
+          in
+          "any" ^ to_append
         | Base (b, sa) ->
-          Sort.to_string_base b ^ " " ^ Scannable_axes.to_string sa
+          let to_append =
+            if Scannable_axes.equal sa Scannable_axes.max
+            then ""
+            else " " ^ Scannable_axes.to_string sa
+          in
+          Sort.to_string_base b ^ to_append
         | Product ts ->
           String.concat ""
             [ (if nested then "(" else "");
@@ -467,9 +485,16 @@ module Layout = struct
          it might be possible to add a "turn off sa printing" parameter *)
       (* CR zeisbach: also, it's a bit awkward to have that called print
          and not format, but that seems to be inherited... *)
-      | Any sa -> fprintf ppf "any %a" Scannable_axes.print sa
+      | Any sa ->
+        fprintf ppf "any%s%a"
+          (* CR zeisbach: this is a bad hack *)
+          (if Scannable_axes.equal sa Scannable_axes.max then "" else " ")
+          Scannable_axes.print sa
       | Sort (s, sa) ->
-        fprintf ppf "%a %a" Sort.format s Scannable_axes.print sa
+        fprintf ppf "%a%s%a" Sort.format s
+          (* CR zeisbach: this is a bad hack *)
+          (if Scannable_axes.equal sa Scannable_axes.max then "" else " ")
+          Scannable_axes.print sa
       | Product ts ->
         let pp_sep ppf () = Format.fprintf ppf "@ & " in
         Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
@@ -2450,10 +2475,9 @@ module Desc = struct
     let rec format_desc ~nested ppf (desc : _ t) =
       match desc.layout with
       | Sort (Var n, sa) ->
-        fprintf ppf "'s%d %a"
+        fprintf ppf "'s%d%s%a"
           (Sort.Var.get_print_number n)
-          (* CR zeisbach: do we even want to print this out here? take a look at
-             what it would impact (maybe just debug??). *)
+          (if Scannable_axes.equal sa Scannable_axes.max then "" else " ")
           Scannable_axes.print sa
       (* Analyze a product before calling [get_const]: the machinery in
          ormat] works better for atomic layouts, not products. *)

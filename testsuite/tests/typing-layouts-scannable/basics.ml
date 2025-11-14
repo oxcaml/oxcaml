@@ -26,7 +26,7 @@ type ('a : any non_pointer, 'b : any, 'c : any) t
 type t : value non_pointer & value maybe_pointer & float64
 (* CR zeisbach: this should not be printing as float64 maybe_pointer...! *)
 [%%expect{|
-type t : value non_pointer & value & float64 maybe_pointer
+type t : value non_pointer & value & float64
 |}]
 
 (* checking non_pointer annotations, based on
@@ -64,7 +64,7 @@ Line 1, characters 13-23:
                  ^^^^^^^^^^
 Error: This type "t_maybeptr" should be an instance of type
          "('a : any non_pointer)"
-       The layout of t_maybeptr is any maybe_pointer
+       The layout of t_maybeptr is any
          because of the definition of t_maybeptr at line 1, characters 0-35.
        But the layout of t_maybeptr must be a sublayout of any non_pointer
          because of the definition of accepts_nonptr at line 2, characters 0-42.
@@ -131,7 +131,7 @@ type fails : value non_pointer = #{ a : t_maybeptr_val }
 Line 1, characters 0-56:
 1 | type fails : value non_pointer = #{ a : t_maybeptr_val }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "fails" is value maybe_pointer
+Error: The layout of type "fails" is value
          because it is an unboxed record.
        But the layout of type "fails" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type fails.
@@ -173,7 +173,7 @@ Line 3, characters 4-5:
         ^
 Error: This expression has type "a" but an expression was expected of type
          "('a : value non_pointer)"
-       The layout of a is value maybe_pointer
+       The layout of a is value
          because of the annotation on the abstract type declaration for a.
        But the layout of a must be a sublayout of value non_pointer
          because of the definition of g at line 2, characters 8-42.
@@ -225,7 +225,7 @@ Error: Signature mismatch:
          type t = X.t
        is not included in
          type t : any non_pointer
-       The layout of the first is any maybe_pointer
+       The layout of the first is any
          because of the definition of t at line 2, characters 18-30.
        But the layout of the first must be a sublayout of any non_pointer
          because of the definition of t at line 2, characters 42-66.
@@ -260,7 +260,7 @@ Error: Signature mismatch:
        is not included in
          type 'a t
        The problem is in the kinds of a parameter:
-       The layout of 'a is value maybe_pointer
+       The layout of 'a is value
          because of the definition of t at line 2, characters 2-29.
        But the layout of 'a must be a sublayout of value non_pointer
          because of the definition of t at line 4, characters 2-39.
@@ -285,7 +285,7 @@ Error: Signature mismatch:
          type 'a t = t_maybeptr_val
        is not included in
          type ('a : value non_pointer) t : value non_pointer
-       The layout of the first is value maybe_pointer
+       The layout of the first is value
          because of the definition of t_maybeptr_val at line 1, characters 0-41.
        But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-53.
