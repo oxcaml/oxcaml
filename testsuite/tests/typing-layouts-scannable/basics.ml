@@ -74,6 +74,21 @@ type succeeds = t_nonptr accepts_nonptr
 type succeeds = t_nonptr accepts_nonptr
 |}]
 
+(* when the layout is not value, the scannable axes should not be relevant *)
+type succeeds = float# accepts_maybeptr
+type succeeds = float# accepts_nonptr
+[%%expect{|
+type succeeds = float# accepts_maybeptr
+type succeeds = float# accepts_nonptr
+|}]
+
+type succeeds = #(t_nonptr * t_maybeptr) accepts_maybeptr
+type succeeds = #(t_nonptr * t_maybeptr) accepts_nonptr
+[%%expect{|
+type succeeds = #(t_nonptr * t_maybeptr) accepts_maybeptr
+type succeeds = #(t_nonptr * t_maybeptr) accepts_nonptr
+|}]
+
 (* CR layouts-scannable: There are versions of these tests that use [immediate]
    instead of [value non_pointer]. Once [immediate] means that, these will be
    redundant and can probably be removed *)
@@ -162,8 +177,6 @@ let f x =
 val f : ('a : value_or_null non_pointer). 'a -> unit = <fun>
 |}]
 
-(* when we have a rigid type variable, it has the exact kind *)
-(* CR zeisbach: what are the right words to refer to these things? *)
 let f (type a : value maybe_pointer) (x : a) =
   let g (x : (_ : value non_pointer)) = () in
   g x
