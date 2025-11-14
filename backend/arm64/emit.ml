@@ -2145,9 +2145,7 @@ let emit_instr i =
       |]
   | Lop (Specific (Isimd simd)) -> DSL.simd_instr simd i
   | Lop (Specific (Iread_system_reg rn)) ->
-    let s : Arm64_ast.System_reg.t =
-      match rn with CNTVCT_EL0 -> CNTVCT_EL0
-    in
+    let s : Arm64_ast.System_reg.t = match rn with CNTVCT_EL0 -> CNTVCT_EL0 in
     DSL.ins I.MRS [| Arm64_ast.DSL.system_reg_op s |]
   | Lop (Name_for_debugger _) -> ()
   | Lcall_op (Lprobe _) ->
