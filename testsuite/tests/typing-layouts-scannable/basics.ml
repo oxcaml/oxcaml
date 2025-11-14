@@ -28,12 +28,11 @@ type t : value non_pointer & value maybe_pointer & float64
 type t : value non_pointer & value & float64
 |}]
 
-(* checking non_pointer annotations, based on
-   [typing-layouts-or-null/separability.ml] and
-   [typing-jkind-bounds/annots.ml] *)
-(* CR layouts-scannable: as separability becomes a scannable axis, move this! *)
+(* Checking non_pointer annotations, based on [typing-layouts-or-null/separability.ml]
+   and [typing-jkind-bounds/annots.ml]. *)
+(* CR layouts-scannable: Once separability is a scannable axis, move these! *)
 
-(* Annotation on type parameters *)
+(* Annotation on type parameters: *)
 
 type t_maybeptr : any maybe_pointer
 type t_nonptr : any non_pointer
