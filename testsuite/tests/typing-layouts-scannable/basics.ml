@@ -24,7 +24,6 @@ type ('a : any non_pointer, 'b : any, 'c : any) t
 |}]
 
 type t : value non_pointer & value maybe_pointer & float64
-(* CR zeisbach: this should not be printing as float64 maybe_pointer...! *)
 [%%expect{|
 type t : value non_pointer & value & float64
 |}]

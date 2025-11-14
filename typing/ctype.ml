@@ -1825,7 +1825,6 @@ let instance_prim_layout (desc : Primitive.description) ty =
       new_sort := Some sort;
       sort
     in
-    (* CR zeisbach: does this need to copy the scannable axes? or is top ok *)
     let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort (sort, sa)) in
     Jkind.History.update_reason
       jkind (Concrete_creation Layout_poly_in_external)
@@ -1838,18 +1837,14 @@ let instance_prim_layout (desc : Primitive.description) ty =
       if level = generic_level && try_mark_node ty then begin
         begin match get_desc ty with
         | Tvar ({ jkind; _ } as r) when Jkind.has_layout_any jkind ->
-          (* CR zeisbach: fix style! i wish we had ocamlformat here *)
-          (* CR zeisbach: try to get rid of get_root_scannable_axes *)
-          let sa = jkind |> Jkind.extract_layout
-                         |> Jkind.Layout.get_root_scannable_axes in
           (* since we know the layout is [any], [Option.get] is safe here *)
+          let sa = jkind |> Jkind.get_root_scannable_axes |> Option.get in
           For_copy.redirect_desc copy_scope ty
-            (Tvar {r with jkind = get_jkind jkind (Option.get sa)})
+            (Tvar {r with jkind = get_jkind jkind sa})
         | Tunivar ({ jkind; _ } as r) when Jkind.has_layout_any jkind ->
-          let sa = jkind |> Jkind.extract_layout
-                         |> Jkind.Layout.get_root_scannable_axes in
+          let sa = jkind |> Jkind.get_root_scannable_axes |> Option.get in
           For_copy.redirect_desc copy_scope ty
-            (Tunivar {r with jkind = get_jkind jkind (Option.get sa)})
+            (Tunivar {r with jkind = get_jkind jkind sa})
         | _ -> ()
         end;
         iter_type_expr inner ty

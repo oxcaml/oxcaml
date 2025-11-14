@@ -110,13 +110,10 @@ module Layout : sig
     | Product of 'sort t list
     | Any of Scannable_axes.t
 
-  (* CR zeisbach: I moved Any below the others but that disagrees with the
-     [jkind.ml] implementation. Not sure what is right here: should I clean
-     things up as I am going through, or try to minimize the diff? *)
   module Const : sig
     type t =
+      | Any of Scannable_axes.t
       | Base of Sort.base * Scannable_axes.t
       | Product of t list
-      | Any of Scannable_axes.t
   end
 end

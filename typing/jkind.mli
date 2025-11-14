@@ -119,8 +119,6 @@ module Layout : sig
 
   val of_const : Const.t -> Sort.t t
 
-  val get_root_scannable_axes : Sort.t t -> Scannable_axes.t option
-
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
 
   module Debug_printers : sig
@@ -659,6 +657,9 @@ val get_layout : 'd Types.jkind -> Layout.Const.t option
 
 (** Gets the layout of a jkind, without looking through sort variables. *)
 val extract_layout : 'd Types.jkind -> Sort.t Layout.t
+
+(* CR zeisbach: this is a somewhat awkward function to have... *)
+val get_root_scannable_axes : 'd Types.jkind -> Scannable_axes.t option
 
 (** Gets the mode crossing for types of this jkind. *)
 val get_mode_crossing :

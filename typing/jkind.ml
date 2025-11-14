@@ -3131,6 +3131,8 @@ let get_layout jk : Layout.Const.t option = Layout.get_const jk.jkind.layout
 
 let extract_layout jk = jk.jkind.layout
 
+let get_root_scannable_axes jk = Layout.get_root_scannable_axes jk.jkind.layout
+
 let get_mode_crossing (type l r) ~context (jk : (l * r) jkind) =
   let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :
           (_ * allowed) jkind_desc),
