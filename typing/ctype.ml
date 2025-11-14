@@ -1817,7 +1817,10 @@ let instance_prim_layout (desc : Primitive.description) ty =
   then ty, None
   else
   let new_sort = ref None in
-  let get_jkind jkind sa =
+  (* CR layouts-scannable: It would be nice if this didn't have to take in [sa],
+     so [Jkind.get_root_scannable_axes] could be removed. But that would break
+     layout_poly for [any non_pointer]. *)
+  let get_jkind jkind _sa =
     let sort = match !new_sort with
     | Some sort -> sort
     | None ->
@@ -1825,7 +1828,7 @@ let instance_prim_layout (desc : Primitive.description) ty =
       new_sort := Some sort;
       sort
     in
-    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort (sort, sa)) in
+    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort (sort, Jkind.Scannable_axes.max)) in
     Jkind.History.update_reason
       jkind (Concrete_creation Layout_poly_in_external)
   in

@@ -135,9 +135,9 @@ module Layout = struct
 
   module Const = struct
     type t = Const.t =
+      | Any of Scannable_axes.t
       | Base of Sort.base * Scannable_axes.t
       | Product of t list
-      | Any of Scannable_axes.t
 
     let max = Any Scannable_axes.max
 

@@ -301,3 +301,10 @@ Error: Signature mismatch:
        But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-53.
 |}]
+
+external[@layout_poly] id : ('a : any non_pointer). 'a -> 'a = "%identity"
+let id' x = id x
+[%%expect{|
+external id : ('a : any non_pointer). 'a -> 'a = "%identity" [@@layout_poly]
+val id' : ('a : value_or_null non_pointer). 'a -> 'a = <fun>
+|}]

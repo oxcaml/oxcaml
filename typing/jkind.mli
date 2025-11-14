@@ -86,13 +86,8 @@ end
 module Scannable_axes : sig
   type t = Jkind_types.Scannable_axes.t
 
-  (* CR zeisbach: there should be a creation function that takes labeled
-     arguments for each axes, then the defaults in [jkind.ml] should be updated *)
-
-  (* CR zeisbach: should this be an Axis_ops? having equal and
-     the other version of <= is nice. but this might indicate that
-     Axis_ops is not the right name to call this.
-     Having this means we need print, which was weird with to_string too... *)
+  (* CR layouts-scannable: It might be unnecessary to have this module exposed,
+     since most of it goes unused (even internally to this file). *)
   include Jkind_axis.Axis_ops with type t := t
 end
 
@@ -107,11 +102,8 @@ module Layout : sig
   module Const : sig
     type t = Jkind_types.Layout.Const.t
 
-    (* CR zeisbach: maybe this needs [get_scannable_axes] too? *)
-
     val get_sort : t -> Sort.Const.t option
 
-    (* CR zeisbach: is this right? TODO: look at call sites! *)
     val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 
     val to_string : t -> string
@@ -658,7 +650,8 @@ val get_layout : 'd Types.jkind -> Layout.Const.t option
 (** Gets the layout of a jkind, without looking through sort variables. *)
 val extract_layout : 'd Types.jkind -> Sort.t Layout.t
 
-(* CR zeisbach: this is a somewhat awkward function to have... *)
+(* CR layouts-scannable: This is a somewhat awkward function to have, and like
+   [extract-layout] may be indicative of some code smells. *)
 val get_root_scannable_axes : 'd Types.jkind -> Scannable_axes.t option
 
 (** Gets the mode crossing for types of this jkind. *)
