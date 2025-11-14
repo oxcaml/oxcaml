@@ -671,6 +671,9 @@ let has_local_opt attrs =
 let has_layout_poly attrs =
   has_attribute "layout_poly" attrs
 
+let has_runtime_metaprogramming attrs =
+  has_attribute "runtime_metaprogramming" attrs
+
 let curry_attr_name = "extension.curry"
 
 let has_curry attrs =
