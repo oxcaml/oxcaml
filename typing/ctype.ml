@@ -1828,7 +1828,7 @@ let instance_prim_layout (desc : Primitive.description) ty =
       new_sort := Some sort;
       sort
     in
-    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort (sort, Jkind.Scannable_axes.max)) in
+    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort (sort, sa)) in
     Jkind.History.update_reason
       jkind (Concrete_creation Layout_poly_in_external)
   in
