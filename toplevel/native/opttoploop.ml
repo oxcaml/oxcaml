@@ -131,28 +131,52 @@ let close_slambda_phrase slam =
 
 (* Return the value referred to by a path *)
 
+(* Like [Obj.field], but handles field reordering in mixed modules.
+   Returns [None] if the selected field is not a value, [Some field] otherwise.
+   Copied from [Topcommon] *)
+let mod_field obj (module_repr : Lambda.module_representation) pos =
+  if not !Clflags.native_code then
+    Some (Obj.field obj pos)
+  else
+  match module_repr with
+  | Module_value_only _ -> Some (Obj.field obj pos)
+  | Module_mixed (shape, _) ->
+    let shape =
+      Mixed_block_shape.of_mixed_block_elements shape
+        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+    in
+    let new_pos =
+      match Mixed_block_shape.lookup_path_producing_new_indexes shape [pos] with
+      | [new_pos] -> Some new_pos
+      | _ -> None (* [pos] points to an unboxed product or void *)
+    in
+    Option.bind new_pos
+      (fun new_pos ->
+        if new_pos < Mixed_block_shape.value_prefix_len shape
+        then Some (Obj.field obj new_pos)
+        else None (* [pos] points to an unboxed singleton *))
+
 let rec eval_address = function
   | Env.Aunit cu ->
       global_symbol cu
   | Env.Alocal id ->
-      let glob, pos, (repr : Lambda.module_representation) =
-        toplevel_value id
-      in
-      begin match repr with
-      | Module_value_only _ -> Obj.field (global_symbol glob) pos
-      | Module_mixed _ ->
+      let glob, pos, repr = toplevel_value id in
+      begin match mod_field (global_symbol glob) repr pos with
+      | Some field -> field
+      | None ->
         Location.raise_errorf
           ~loc:Location.none
-          "Opttoploop.eval_address: Can't handle mixed module"
+          "Opttoploop.eval_address: Can't return a non-value"
       end
   | Env.Adot(a, module_repr, pos) ->
       let module_repr = Lambda.transl_module_representation module_repr in
-      match module_repr with
-      | Module_value_only _ -> Obj.field (eval_address a) pos
-      | Module_mixed _ ->
+      begin match mod_field (eval_address a) module_repr pos with
+      | Some field -> field
+      | None ->
         Location.raise_errorf
           ~loc:Location.none
-          "Opttoploop.eval_address: Can't handle mixed module"
+          "Opttoploop.eval_address: Can't return a non-value"
+      end
 
 let eval_path find env path =
   match find path env with
@@ -330,12 +354,9 @@ let load_slambda ppf ~compilation_unit ~required_globals program repr =
 
 let outval_of_id env id val_type =
   let glob, pos, (repr : Lambda.module_representation) = toplevel_value id in
-  match repr with
-  | Module_value_only _ ->
-    let obj_to_print = Obj.field (global_symbol glob) pos in
-    outval_of_value env obj_to_print val_type
-  | Module_mixed _ -> Oval_stuff "<abstr>"
-    (* CR layouts: don't print values in mixed phrases as <abstr> *)
+  match mod_field (global_symbol glob) repr pos with
+  | Some obj_to_print -> outval_of_value env obj_to_print val_type
+  | None -> Oval_stuff "<abstr>"
 
 (* Print the outcome of an evaluation *)
 

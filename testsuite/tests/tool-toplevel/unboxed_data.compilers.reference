@@ -1,10 +1,20 @@
-val a_1 : float# = <abstr>
-val b_1 : float32# = <abstr>
-val c_1 : int64# = <abstr>
-val d_1 : int32# = <abstr>
-val e_1 : nativeint# = <abstr>
-type t_2 = #{ x : int; y : int64#; }
-val a_3 : #(int * int) array = <abstr array>
-val b_3 : int ref# array = [|#{contents = 1}; #{contents = 2}|]
-val c_3 : t_2 array = <abstr array>
+val a : float# = <abstr>
+val b : float32# = <abstr>
+val c : int64# = <abstr>
+val d : int32# = <abstr>
+val e : nativeint# = <abstr>
+type t = #{ x : int; y : int64#; }
+val a : #(int * int) = <abstr>
+val b : #(float# * int64#) = <abstr>
+val c : string ref# = #{contents = "foo"}
+val d : t = <abstr>
+val a : #(int * int) array = <abstr array>
+val b : int ref# array = [|#{contents = 1}; #{contents = 2}|]
+val c : t array = <abstr array>
+val x : int64# = <abstr>
+val y : int = 42
+val foo : string = "hello"
+val unboxed_product : #(#(int * float#) * string * int64#) = <abstr>
+val bar : int64# = <abstr>
+val baz : string = "world"
 
