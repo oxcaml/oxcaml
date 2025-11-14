@@ -826,11 +826,12 @@ module Layout_and_axes = struct
       context:_ ->
       mode:r2 normalize_mode ->
       skip_axes:_ ->
+      previously_ran_out_of_fuel:_ ->
       ?map_type_info:
         (type_expr -> With_bounds_type_info.t -> With_bounds_type_info.t) ->
       (layout, l * r1) layout_and_axes ->
       (layout, l * r2) layout_and_axes * Fuel_status.t =
-   fun ~context ~mode ~skip_axes ?map_type_info t ->
+   fun ~context ~mode ~skip_axes ~previously_ran_out_of_fuel ?map_type_info t ->
     (* handle a few common cases first, before doing anything else *)
     (* DEBUGGING
        Format.printf "@[normalize: %a@;  relevant_axes: %a@]@;"
@@ -918,7 +919,8 @@ module Layout_and_axes = struct
                 skippable_axes : Axis_set.t
               }  (** continue, with a new [t] *)
 
-        let initial_fuel_per_ty = 10
+        let initial_fuel_per_ty =
+          match previously_ran_out_of_fuel with false -> 10 | true -> 1
 
         let starting =
           { tuple_fuel = initial_fuel_per_ty;
@@ -2275,7 +2277,8 @@ module Jkind_desc = struct
   let equate_or_equal ~allow_mutation t1 t2 =
     Layout_and_axes.equal (Layout.equate_or_equal ~allow_mutation) t1 t2
 
-  let sub (type l r) ~type_equal:_ ~context (sub : (allowed * r) jkind_desc)
+  let sub (type l r) ~type_equal:_ ~context ~sub_previously_ran_out_of_fuel
+      (sub : (allowed * r) jkind_desc)
       ({ layout = lay2; mod_bounds = bounds2; with_bounds = No_with_bounds } :
         (l * allowed) jkind_desc) =
     let axes_max_on_right =
@@ -2287,7 +2290,7 @@ module Jkind_desc = struct
             (_ * allowed) jkind_desc),
           _ ) =
       Layout_and_axes.normalize ~skip_axes:axes_max_on_right ~mode:Ignore_best
-        ~context sub
+        ~context ~previously_ran_out_of_fuel:sub_previously_ran_out_of_fuel sub
     in
     let layout = Layout.sub lay1 lay2 in
     let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
@@ -3023,7 +3026,8 @@ let[@inline] normalize ~mode ~context t =
     match mode with Require_best -> Require_best | Ignore_best -> Ignore_best
   in
   let jkind, fuel_result =
-    Layout_and_axes.normalize ~context ~skip_axes:Axis_set.empty ~mode t.jkind
+    Layout_and_axes.normalize ~context ~skip_axes:Axis_set.empty ~mode
+      ~previously_ran_out_of_fuel:t.ran_out_of_fuel_during_normalize t.jkind
   in
   { t with
     jkind;
@@ -3066,7 +3070,8 @@ let get_mode_crossing (type l r) ~context (jk : (l * r) jkind) =
           (_ * allowed) jkind_desc),
         _ ) =
     Layout_and_axes.normalize ~mode:Ignore_best
-      ~skip_axes:Axis_set.all_nonmodal_axes ~context jk.jkind
+      ~skip_axes:Axis_set.all_nonmodal_axes ~context
+      ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize jk.jkind
   in
   Mod_bounds.crossing mod_bounds
 
@@ -3083,7 +3088,8 @@ let get_externality_upper_bound ~context jk =
           (_ * allowed) jkind_desc),
         _ ) =
     Layout_and_axes.normalize ~mode:Ignore_best
-      ~skip_axes:all_except_externality ~context jk.jkind
+      ~skip_axes:all_except_externality ~context
+      ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize jk.jkind
   in
   Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
 
@@ -3115,7 +3121,8 @@ let get_nullability ~context jk =
             (_ * allowed) jkind_desc),
           _ ) =
       Layout_and_axes.normalize ~mode:Ignore_best ~context
-        ~skip_axes:all_except_nullability jk.jkind
+        ~skip_axes:all_except_nullability
+        ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize jk.jkind
     in
     Mod_bounds.get mod_bounds ~axis:(Nonmodal Nullability)
 
@@ -3912,22 +3919,24 @@ let combine_histories ~type_equal ~context reason (Pack_jkind k1)
       then history_a
       else history_b
     in
-    let choose_subjkind_history k_a history_a k_b history_b =
-      match Jkind_desc.sub ~type_equal ~context k_a k_b with
-      | Less -> history_a
+    let choose_subjkind_history ka_desc ka kb_desc kb =
+      match
+        Jkind_desc.sub ~type_equal ~context
+          ~sub_previously_ran_out_of_fuel:ka.ran_out_of_fuel_during_normalize
+          ka_desc kb_desc
+      with
+      | Less -> ka.history
       | Not_le _ ->
         (* CR layouts: this will be wrong if we ever have a non-trivial meet in
            the kind lattice -- which is now! So this is actually wrong. *)
-        history_b
-      | Equal -> choose_higher_scored_history history_a history_b
+        kb.history
+      | Equal -> choose_higher_scored_history ka.history kb.history
     in
     match Layout_and_axes.(try_allow_l k1.jkind, try_allow_r k2.jkind) with
-    | Some k1_l, Some k2_r ->
-      choose_subjkind_history k1_l k1.history k2_r k2.history
+    | Some k1_l, Some k2_r -> choose_subjkind_history k1_l k1 k2_r k2
     | _ -> (
       match Layout_and_axes.(try_allow_r k1.jkind, try_allow_l k2.jkind) with
-      | Some k1_r, Some k2_l ->
-        choose_subjkind_history k2_l k2.history k1_r k1.history
+      | Some k1_r, Some k2_l -> choose_subjkind_history k2_l k2 k1_r k1
       | _ -> choose_higher_scored_history k1.history k2.history)
   else
     Interact
@@ -3977,7 +3986,10 @@ let map_type_expr f t =
 let check_sub ~context sub super = Jkind_desc.sub ~context sub.jkind super.jkind
 
 let sub_with_reason ~type_equal ~context sub super =
-  Sub_result.require_le (check_sub ~type_equal ~context sub super)
+  Sub_result.require_le
+    (check_sub ~type_equal ~context
+       ~sub_previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize sub
+       super)
 
 let sub ~type_equal ~context sub super =
   Result.is_ok (sub_with_reason ~type_equal ~context sub super)
@@ -4067,6 +4079,7 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub super =
          removing irrelevant axes. *)
       Layout_and_axes.normalize sub.jkind ~skip_axes:axes_max_on_right ~context
         ~mode:Ignore_best
+        ~previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize
         ~map_type_info:(fun ty { relevant_axes = left_relevant_axes } ->
           let right_relevant_axes =
             (* Look for [ty] on the right. There may be multiple occurrences of
