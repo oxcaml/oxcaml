@@ -2243,11 +2243,11 @@ let quote_value_ident_path loc env path ident_kind =
       then
         Identifier.Value.var loc (Var.Value.mk (Lvar id)) (quote_loc loc)
         |> Identifier.Value.wrap
-      else fatal_error ("Translquote: cannot quote free variable " ^
-                        Ident.name id)
+      else
+        fatal_error ("Translquote: cannot quote free variable " ^ Ident.name id)
     | Path.Pdot _ | Path.Papply _ | Path.Pextra_ty _ ->
-      fatal_error ("Translquote: no global path for identifier " ^
-                   print_path path))
+      fatal_error
+        ("Translquote: no global path for identifier " ^ print_path path))
 
 let quote_value_ident_path_as_exp loc env path ident_kind =
   Exp_desc.ident loc (quote_value_ident_path loc env path ident_kind)
@@ -2584,8 +2584,10 @@ and quote_core_type ~scopes ty =
     let ident = type_for_path loc path
     and tys = List.map (quote_core_type ~scopes) tys in
     Type.constr loc ident tys |> Type.wrap
-  | Ttyp_object (_, _) -> fatal_error "Translquote: Ttyp_object not implemented."
-  | Ttyp_class (_, _, _) -> fatal_error "Translquote: Ttyp_class not implemented."
+  | Ttyp_object (_, _) ->
+    fatal_error "Translquote: Ttyp_object not implemented."
+  | Ttyp_class (_, _, _) ->
+    fatal_error "Translquote: Ttyp_class not implemented."
   | Ttyp_alias (ty, alias_opt, _) -> (
     let ty = quote_core_type ~scopes ty in
     match alias_opt with
