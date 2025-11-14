@@ -26,7 +26,7 @@ let memory_access : Arch.specific_operation -> Memory_access.t option =
     if Arch.operation_is_pure op then None else create Memory_access.Arbitrary
   | Iread_system_reg _ ->
     (* Conservative, don't reorder across system register access. *)
-      create Arbitrary
+    create Arbitrary
   | Illvm_intrinsic intr ->
     Misc.fatal_errorf
       "Vectorize specific: Unexpected llvm_intrinsic %s: not using LLVM backend"
@@ -36,7 +36,7 @@ let is_seed_store (op : Arch.specific_operation) =
   match op with
   | Ifar_poll | Ifar_alloc _ | Ishiftarith _ | Imuladd | Imulsub | Inegmulf
   | Imuladdf | Inegmuladdf | Imulsubf | Inegmulsubf | Isqrtf | Ibswap _
-  | Imove32 | Isignext _ | Isimd _   | Iread_system_reg _ ->
+  | Imove32 | Isignext _ | Isimd _ | Iread_system_reg _ ->
     None
   | Illvm_intrinsic intr ->
     Misc.fatal_errorf
