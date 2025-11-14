@@ -266,8 +266,8 @@ let native unix
 
     let link = Asmlink.link unix
 
-    let link_shared target objfiles ~genfns ~units_tolink ~ppf_dump =
-      Asmlink.link_shared unix target objfiles ~genfns ~units_tolink ~ppf_dump
+    let link_shared target objfiles ~genfns ~dynheader ~ppf_dump =
+      Asmlink.link_shared unix target objfiles ~genfns ~dynheader ~ppf_dump
 
     let emit : Optcomp_intf.emit option =
       Some

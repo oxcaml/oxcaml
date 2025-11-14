@@ -43,8 +43,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       defines : Compilation_unit.t list;
       file_name : string;
       crc : Digest.t;
-      (* for shared libs *)
-      dynunit : Cmxs_format.dynunit option
+      ui_imports_cmi : Import_info.t list;
+      ui_imports_cmx : Import_info.t list;
+      ui_quoted_globals : Compilation_unit.Name.t list
     }
 
   (* First pass: determine which units are needed *)
@@ -85,25 +86,14 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       List.iter
         (fun import -> Linkenv.add_required linkenv (file_name, None) import)
         info.ui_imports_cmx;
-      let dynunit : Cmxs_format.dynunit option =
-        if not shared
-        then None
-        else
-          Some
-            { dynu_name = info.ui_unit;
-              dynu_crc = crc;
-              dynu_defines = info.ui_defines;
-              dynu_imports_cmi = info.ui_imports_cmi |> Array.of_list;
-              dynu_imports_cmx = info.ui_imports_cmx |> Array.of_list;
-              dynu_quoted_globals = info.ui_quoted_globals |> Array.of_list
-            }
-      in
       let unit =
         { name = info.ui_unit;
           crc;
           defines = info.ui_defines;
           file_name;
-          dynunit
+          ui_imports_cmi = info.ui_imports_cmi;
+          ui_imports_cmx = info.ui_imports_cmx;
+          ui_quoted_globals = info.ui_quoted_globals
         }
       in
       let object_file_name =
@@ -169,29 +159,20 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                 imports_list infos.lib_quoted_globals info.li_quoted_globals
               in
               Linkenv.add_quoted_globals linkenv quoted_globals;
-              let dynunit : Cmxs_format.dynunit option =
-                if not shared
-                then None
-                else
-                  Some
-                    { dynu_name = info.li_name;
-                      dynu_crc = info.li_crc;
-                      dynu_defines = info.li_defines;
-                      dynu_imports_cmi =
-                        imports_list infos.lib_imports_cmi info.li_imports_cmi
-                        |> Array.of_list;
-                      dynu_imports_cmx =
-                        imports_list infos.lib_imports_cmx info.li_imports_cmx
-                        |> Array.of_list;
-                      dynu_quoted_globals = quoted_globals |> Array.of_list
-                    }
+              let ui_imports_cmi =
+                imports_list infos.lib_imports_cmi info.li_imports_cmi
+              in
+              let ui_imports_cmx =
+                imports_list infos.lib_imports_cmx info.li_imports_cmx
               in
               let unit =
                 { name = info.li_name;
                   crc = info.li_crc;
                   defines = info.li_defines;
                   file_name;
-                  dynunit
+                  ui_imports_cmi;
+                  ui_imports_cmx;
+                  ui_quoted_globals = quoted_globals
                 }
               in
               Linkenv.check_consistency linkenv ~unit [||] [||];
@@ -222,8 +203,59 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         in
         Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs linkenv;
         Clflags.all_ccopts := Linkenv.lib_ccopts linkenv @ !Clflags.all_ccopts;
+
+        (* Build consolidated import arrays from linkenv *)
+        let dynu_imports_cmi =
+          Linkenv.extract_crc_interfaces linkenv |> Array.of_list
+        in
+        let dynu_imports_cmx =
+          Linkenv.extract_crc_implementations linkenv |> Array.of_list
+        in
+        (* Create index tables for bitmap creation *)
+        let cmi_index = Compilation_unit.Name.Tbl.create 42 in
+        Array.iteri
+          (fun i import ->
+            Compilation_unit.Name.Tbl.add cmi_index (Import_info.name import) i)
+          dynu_imports_cmi;
+        let cmx_index = Compilation_unit.Tbl.create 42 in
+        Array.iteri
+          (fun i import ->
+            Compilation_unit.Tbl.add cmx_index (Import_info.cu import) i)
+          dynu_imports_cmx;
+        (* Helper function to create bitmaps *)
+        let mk_bitmap arr ix entries ~find ~get_name =
+          let module B = Misc.Bitmap in
+          let b = B.make (Array.length arr) in
+          List.iter (fun import -> B.set b (find ix (get_name import))) entries;
+          b
+        in
+        (* Create dynunits with bitmaps *)
+        let dynu_units =
+          List.map
+            (fun unit ->
+              { Cmxs_format.dynu_name = unit.name;
+                dynu_crc = unit.crc;
+                dynu_imports_cmi_bitmap =
+                  mk_bitmap dynu_imports_cmi cmi_index unit.ui_imports_cmi
+                    ~find:Compilation_unit.Name.Tbl.find
+                    ~get_name:Import_info.name;
+                dynu_imports_cmx_bitmap =
+                  mk_bitmap dynu_imports_cmx cmx_index unit.ui_imports_cmx
+                    ~find:Compilation_unit.Tbl.find ~get_name:Import_info.cu;
+                dynu_quoted_globals = Array.of_list unit.ui_quoted_globals;
+                dynu_defines = unit.defines
+              })
+            units_tolink
+        in
+        let dynheader : Cmxs_format.dynheader =
+          { dynu_magic = Config.cmxs_magic_number;
+            dynu_units;
+            dynu_imports_cmi;
+            dynu_imports_cmx
+          }
+        in
         Backend.link_shared ml_objfiles output_name ~ppf_dump ~genfns
-          ~units_tolink)
+        ~dynheader)
 
   (* Main entry point *)
 
@@ -381,13 +413,15 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           ~units_tolink ~uses_eval ~quoted_globals ~cached_genfns_imports)
 
   (* Exported version for Asmlibrarian / Asmpackager *)
-  let check_consistency linkenv file_name u crc =
-    let unit =
+  let check_consistency linkenv file_name (u : Cmx_format.unit_infos) crc =
+    let unit : unit_link_info =
       { file_name;
         name = u.ui_unit;
         defines = u.ui_defines;
         crc;
-        dynunit = None
+        ui_imports_cmi = u.ui_imports_cmi;
+        ui_imports_cmx = u.ui_imports_cmx;
+        ui_quoted_globals = u.ui_quoted_globals
       }
     in
     Linkenv.check_consistency linkenv ~unit

@@ -4294,10 +4294,8 @@ let predef_exception i name =
 
 (* Header for a plugin *)
 
-let plugin_header units =
-  global_data "caml_plugin_header"
-    ({ dynu_magic = Config.cmxs_magic_number; dynu_units = units }
-      : Cmxs_format.dynheader)
+let plugin_header (header : Cmxs_format.dynheader) =
+  global_data "caml_plugin_header" header
 
 (* Build the NULL terminated array of gc roots *)
 
