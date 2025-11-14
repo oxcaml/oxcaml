@@ -100,13 +100,11 @@ module Scannable_axes = struct
 
   let join sa1 sa2 = Pointerness.join sa1 sa2
 
+  let is_max sa = equal sa max
+
   let print ppf sa = Pointerness.print ppf sa
 
-  (* prints with a leading space *)
-  (* CR zeisbach: this is a pattern that isn't really seen elsewhere, which
-     suggests that I'm doing something wrong here. *)
-  let print_unless_max ppf sa =
-    if not (equal sa max) then Format.fprintf ppf " %a" print sa
+  let to_string_list sa = if is_max sa then [] else [Pointerness.to_string sa]
 
   let set_pointerness sa pointerness =
     (* CR layouts-scannable: Once there are more axes, use [sa]! *)
@@ -225,7 +223,6 @@ module Layout = struct
           (Misc.Stdlib.List.map_option get_sort ts)
 
     let of_sort s sa =
-      (* CR zeisbach: check style here, same as above (function, arg order) *)
       let rec of_sort (s : Sort.t) sa =
         match s with
         | Var _ -> None
@@ -234,8 +231,9 @@ module Layout = struct
           Option.map
             (fun x -> Product x)
             (* [Sort.get] is deep, so no need to repeat it here *)
-            (* CR zeisbach: maybe this isn't necessary, but defensively
-               setting to max instead of propagating while experimenting *)
+            (* In all cases where sort products are turned into layout products,
+               [Scannable_axes.max] is used. The sort product doesn't store
+               enough information to make any other choice. *)
             (Misc.Stdlib.List.map_option
                (fun s -> of_sort s Scannable_axes.max)
                sorts)
@@ -248,11 +246,6 @@ module Layout = struct
     let rec of_sort_const (s : Sort.Const.t) sa =
       match s with
       | Base b -> Base (b, sa)
-      (* CR zeisbach: this take sa before s and partially apply?
-         this is a stylistic question and I am not sure what is preferred.
-
-         For now I am just keeping everything [s sa] for consistency
-         and adding [fun]s, but I kinda don't like it. easy to swap. *)
       | Product consts ->
         Product (List.map (fun s -> of_sort_const s sa) consts)
 
@@ -260,19 +253,26 @@ module Layout = struct
       match t with
       | Any sa -> Any (Scannable_axes.set_pointerness sa pointerness)
       | Base (b, sa) -> Base (b, Scannable_axes.set_pointerness sa pointerness)
-      (* CR zeisbach: this seems like a plausible thing to do. This would
-         get easier if we did the refactor to just store a product. *)
+      (* CR layouts-scannable: This is probably okay but a little suspicious.
+         If a Layout was a product with scannable axes, this would be nicer *)
       | Product _ -> t
+
+    (* Returns [None] if the root has no meaningful scannable axes.
+       This duplicates some code [Layout] in order to avoid converting a
+       [Layout.Const.t] to a [Layout.t] which requires traversing. *)
+    let get_root_scannable_axes t =
+      match t with
+      | Any sa -> Some sa
+      | Base (_, sa) -> if is_value_or_any t then Some sa else None
+      | Product _ -> None
 
     let to_string t =
       let rec to_string nested (t : t) =
         match t with
-        (* CR zeisbach: this code is still suspicious. there should be a nicer
-           way to do this, I think... *)
-        | Any sa -> Format.asprintf "any%a" Scannable_axes.print_unless_max sa
+        | Any sa -> String.concat " " ("any" :: Scannable_axes.to_string_list sa)
         | Base (b, sa) ->
-          Format.asprintf "%s%a" (Sort.to_string_base b)
-            Scannable_axes.print_unless_max sa
+          String.concat " "
+            (Sort.to_string_base b :: Scannable_axes.to_string_list sa)
         | Product ts ->
           String.concat ""
             [ (if nested then "(" else "");
@@ -331,7 +331,6 @@ module Layout = struct
       | Base b ->
         Sort (Base b, sa)
         (* No need to call [Sort.get] here, because one [get] is deep. *)
-        (* CR zeisbach: again, like above, maxing this out *)
       | Product sorts ->
         Product (List.map (fun s -> flatten_sort s Scannable_axes.max) sorts)
     in
@@ -368,11 +367,13 @@ module Layout = struct
       sort_equal_result ~allow_mutation (Sort.equate_tracking_mutation s1 s2)
       &&
       if Sort.is_possibly_scannable s1
-         (* CR zeisbach: if s1 and s2 are both unfilled sort variables, AND
-            [sa1 <> sa2] then they should _not_ be equal. It is possible that
-            unifying that (now shared) sort variable with [Value] (soon to be
-            called [Scannable]) then we may get better error reporting.
-            For now, it just concludes that they are not equal *)
+         (* CR layouts-scannable: if [s1] and [s2] are both unfilled sort
+            variables, and [sa1 <> sa2], then they should _not_ be equal,
+            even though they would be in the case that the sort variables
+            aren't filled with [value].
+            It is possible the unifying that (now shared) sort variable with
+            [value] would lead to better error reporting. For now, it just
+            (conservatively) concludes that they are not equal. *)
       then Scannable_axes.equal sa1 sa2
       else true
     | Product ts, Sort (sort, sa) | Sort (sort, sa), Product ts -> (
@@ -398,20 +399,16 @@ module Layout = struct
     | (Any _ | Sort _ | Product _), _ -> false
 
   (* only meets at the root, meaning products are left unchanged. *)
-  (* CR zeisbach: this suggests we may want to change our data definition
-     to just be a pair of a layout and some scannable axes.
-     TODO: think about how this relates to storing sorts with SA too *)
-  let meet_scannable_axes t sa =
+  let meet_root_scannable_axes t sa =
     match t with
     | Any sa' -> Any (Scannable_axes.meet sa sa')
     | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
     | Product _ -> t
 
+  (* returns [None] if the root has no meaningful scannable axes *)
   let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
-    | Any sa | Sort (_, sa) -> Some sa
-    (* CR zeisbach: it feels like ignoring this is the only sensible
-       thing to do here, but think about this carefully.
-       ALSO, it is a bit awkward to get them out for float64 but not products *)
+    | Any sa -> Some sa
+    | Sort (b, sa) -> if Sort.is_possibly_scannable b then Some sa else None
     | Product _ -> None
 
   let sub t1 t2 =
@@ -419,20 +416,16 @@ module Layout = struct
       match t1, t2 with
       | Any sa1, Any sa2 -> Scannable_axes.less_or_equal sa1 sa2
       | Sort (sort, sa1), Any sa2 ->
-        (* CR zeisbach: again, there is a case that is not quite handled here,
-           where the sort is an empty variable and sa1 </= sa2. this is ok as
-           long as the variable is not unified to [Value], but we defensively
-           say that it is not le.
-
-           a better thing to do could be to unify the variable with [Value]
-           and let it fail later. OR, could return something finer grained
-           than [Layout_disagreement] for the resulting [Sub_result] *)
+        (* CR layouts-scannable: If [sort] has not been filled and
+           [sa1] </= [sa2], we conservatively say that it is [Not_le].
+           If [sort] gets filled in with anything other than [value], though,
+           they are equal. Unifying [sort] with [value] and returning [Equal]
+           could potentially get better error messages. Another option could
+           be to extend the [Layout_disagreement] type. *)
         if Sort.is_possibly_scannable sort && not (Scannable_axes.le sa1 sa2)
         then Not_le
         else Less
-      | Product _, Any _ ->
-        (* CR zeisbach: we may want to look into the leaves of this Product? *)
-        Less
+      | Product _, Any _ -> Less
       | Any _, _ -> Not_le
       | Sort (s1, sa1), Sort (s2, sa2) ->
         if Sort.equate s1 s2
@@ -481,8 +474,8 @@ module Layout = struct
         (Misc.Stdlib.List.some_if_all_elements_are_some components)
     in
     match t1, t2 with
-    | _, Any sa2 -> Some (meet_scannable_axes t1 sa2)
-    | Any sa1, _ -> Some (meet_scannable_axes t2 sa1)
+    | _, Any sa2 -> Some (meet_root_scannable_axes t1 sa2)
+    | Any sa1, _ -> Some (meet_root_scannable_axes t2 sa1)
     | Sort (s1, sa1), Sort (s2, sa2) ->
       if Sort.equate s1 s2
       then Some (Sort (s1, Scannable_axes.meet sa1 sa2))
@@ -510,13 +503,15 @@ module Layout = struct
   let format ppf layout =
     let open Format in
     let rec pp_element ~nested ppf : _ Layout.t -> unit = function
-      (* CR zeisbach: do we want to be always printing all of these out?
-         it might be possible to add a "turn off sa printing" parameter *)
-      (* CR zeisbach: also, it's a bit awkward to have that called print
-         and not format, but that seems to be inherited... *)
-      | Any sa -> fprintf ppf "any%a" Scannable_axes.print_unless_max sa
+      | Any sa ->
+        (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
+          ppf
+          ("any" :: Scannable_axes.to_string_list sa)
       | Sort (s, sa) ->
-        fprintf ppf "%a%a" Sort.format s Scannable_axes.print_unless_max sa
+        let sort_str = asprintf "%a" Sort.format s in
+        (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
+          ppf
+          (sort_str :: Scannable_axes.to_string_list sa)
       | Product ts ->
         let pp_sep ppf () = Format.fprintf ppf "@ & " in
         Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
@@ -1547,7 +1542,6 @@ module Const = struct
     in
     match t1_t2 with
     | Some (t1, t2) ->
-      (* CR zeisbach: maybe this should change, see CR below *)
       Layout.Const.equal t1.layout t2.layout
       && Mod_bounds.equal t1.mod_bounds t2.mod_bounds
     | None -> false
@@ -1703,9 +1697,9 @@ module Const = struct
         name = "void mod everything"
       }
 
-    (* CR zeisbach: for now (to reduce the diff in tests), this is going to be
-       set to max. In reality, this should have [non_pointer]! This will be
-       added and reviewed in a later PR (or this one, if that's too weird) *)
+    (* CR layouts-scannable: For now (to reduce the diff in tests), [immediate]
+       means [value maybe_pointer ...]. In a later PR, this will be changed to
+       [value non_pointer]. *)
     let immediate =
       { jkind =
           mk_jkind
@@ -2158,20 +2152,12 @@ module Const = struct
         Some modes
 
     let get_scannable_axes ~base actual =
-      (* CR zeisbach: should this be in Layout.Const?
-         In general, duplication vs convert? *)
-      let base_sa = Layout.get_root_scannable_axes (Layout.of_const base) in
-      let actual_sa = Layout.get_root_scannable_axes (Layout.of_const actual) in
+      let base_sa = Layout.Const.get_root_scannable_axes base in
+      let actual_sa = Layout.Const.get_root_scannable_axes actual in
       match base_sa, actual_sa with
-      (* CR zeisbach: returning empty list is a little weird here.
-         The modal bounds functions return None and manipulate, but I think
-         that just an empty list should be okay for this purpose?
-         Although it is a little weird since it is specialized currently.
-         It seems likely to have to add something to [Scannable_axes], or do
-         the per-axis thing (which I want to avoid). Duplication maybe needed *)
       | None, _ | _, None -> []
       | Some base_sa, Some actual_sa ->
-        (* CR zeisbach: this should be comparing per-axis, really. *)
+        (* CR scannable-layouts: compare along each axis as more are added. *)
         if Scannable_axes.equal base_sa actual_sa
         then []
         else [Pointerness.to_string actual_sa]
@@ -2294,8 +2280,6 @@ module Const = struct
       let base = Outcometree.Ojkind_const_abbreviation (base, scannable_axes) in
       (* Add on [mod] bounds, if there are any *)
       let base =
-        (* CR zeisbach: prefer [List.is_empty] or [= []]?
-           also (style): is the shadowing okay? *)
         if modal_bounds = []
         then base
         else Outcometree.Ojkind_const_mod (Some base, modal_bounds)
@@ -2315,13 +2299,13 @@ module Const = struct
   (*******************************)
   (* converting user annotations *)
 
-  (* CR zeisbach: is this the right place to put this function? we may want to
-     use it outside of Const, but also it has the warning so maybe not?
-     regardless, it has to come before the current batch of these setter
-     functions (for the current non-modal axes), which will have to be moved *)
   let set_pointerness_upper_bound t = function
     | None -> t
     | Some pointerness ->
+      let sa = Layout.Const.get_root_scannable_axes t.layout in
+      (match sa with
+      | None -> ()
+      | Some sa -> if sa = pointerness then failwith "redundant");
       let new_layout =
         Layout.Const.set_pointerness_upper_bound t.layout pointerness
       in
@@ -2497,9 +2481,10 @@ module Desc = struct
     let rec format_desc ~nested ppf (desc : _ t) =
       match desc.layout with
       | Sort (Var n, sa) ->
-        fprintf ppf "'s%d%a"
-          (Sort.Var.get_print_number n)
-          Scannable_axes.print_unless_max sa
+        let sort_var_str = asprintf "'s%d" (Sort.Var.get_print_number n) in
+        (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
+          ppf
+          (sort_var_str :: Scannable_axes.to_string_list sa)
       (* Analyze a product before calling [get_const]: the machinery in
          ormat] works better for atomic layouts, not products. *)
       | Product lays ->
@@ -3313,11 +3298,7 @@ let decompose_product ({ jkind; _ } as jk) =
     | Product sorts ->
       Some
         (List.map
-           (fun sort ->
-             (* CR zeisbach: fix namespacing problems here.
-                ALSO is this what we want to do? Feels like a forced move.
-                OR could push in non-trivialities. this matches the present *)
-             mk_jkind (Sort (sort, Scannable_axes.max)))
+           (fun sort -> mk_jkind (Sort (sort, Scannable_axes.max)))
            sorts)
   in
   match jkind.layout with
@@ -4224,8 +4205,7 @@ let is_obviously_max = function
   (* This doesn't do any mutation because mutating a sort variable can't make it
      any, and modal upper bounds are constant. *)
   | { jkind = { layout = Any sa; mod_bounds; with_bounds = _ }; _ } ->
-    (* CR zeisbach: [=] vs [equal] ? *)
-    Scannable_axes.(equal sa max) && Mod_bounds.is_max mod_bounds
+    Scannable_axes.is_max sa && Mod_bounds.is_max mod_bounds
   | _ -> false
 
 let has_layout_any jkind =
@@ -4249,9 +4229,6 @@ let is_value_for_printing ~ignore_null { jkind; _ } =
         :: values
       else values
     in
-    (* CR zeisbach: should this take scannable axes into account?
-       if not, then tweak [no_with_bounds_and_equal] to use the new
-       [equal_up_to_scannable_axes] *)
     List.exists (fun v -> Const.no_with_bounds_and_equal const v) values
 
 (*********************************)

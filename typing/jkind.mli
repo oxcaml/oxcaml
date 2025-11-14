@@ -89,6 +89,9 @@ module Scannable_axes : sig
   (* CR layouts-scannable: It might be unnecessary to have this module exposed,
      since most of it goes unused (even internally to this file). *)
   include Jkind_axis.Axis_ops with type t := t
+
+  (** Omits all axes set to top, for printing *)
+  val to_string_list : t -> string list
 end
 
 (* The layout of a type describes its memory layout. A layout is either the
@@ -652,8 +655,11 @@ val extract_layout : 'd Types.jkind -> Sort.t Layout.t
 
 (* CR layouts-scannable: This is a somewhat awkward function to have, and like
    [extract-layout] may be indicative of some code smells. It could be possible
-   to replace this with new [set_layout] behavior? This also may get better if
-   layouts are refactored to be a product with scannable axes. *)
+   to replace this with new [set_layout] behavior? Which would also eliminate
+   [Layout.get_root_scannable_axes]. *)
+
+(** Returns [None] if the jkind's layout's root has no meaningful scannable
+    axes. *)
 val get_root_scannable_axes : 'd Types.jkind -> Scannable_axes.t option
 
 (** Gets the mode crossing for types of this jkind. *)

@@ -1371,13 +1371,9 @@ let rec out_jkind_of_desc (desc : 'd Jkind.Desc.t) =
   match desc.layout with
   | Sort ((Var n), sa) ->
     (* CR zeisbach: this is a pretty bad hack *)
-    let sa_strs =
-      Jkind.Scannable_axes.(
-        if equal sa max then [] else [asprintf "%a" print sa])
-    in
     Ojkind_var ("'_representable_layout_" ^
                 Int.to_string (Jkind.Sort.Var.get_print_number n),
-                sa_strs)
+                Jkind.Scannable_axes.to_string_list sa)
   (* Analyze a product before calling [get_const]: the machinery in
      [Jkind.Const.to_out_jkind_const] works better for atomic layouts, not
      products. *)

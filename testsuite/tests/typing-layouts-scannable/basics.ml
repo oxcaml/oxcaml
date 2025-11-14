@@ -190,6 +190,23 @@ Error: This expression has type "a" but an expression was expected of type
          because of the definition of g at line 2, characters 8-42.
 |}]
 
+let f (type a : float64 maybe_pointer) (x : a) =
+  let g (x : (_ : float64 non_pointer)) = () in
+  g x
+[%%expect{|
+Line 1, characters 16-37:
+1 | let f (type a : float64 maybe_pointer) (x : a) =
+                    ^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "maybe_pointer" have no effect on the layout "float64".
+
+Line 2, characters 18-37:
+2 |   let g (x : (_ : float64 non_pointer)) = () in
+                      ^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the layout "float64".
+
+val f : ('a : float64). 'a -> unit = <fun>
+|}]
+
 let f (type a : value non_pointer) (x : a) =
   (* here, x is value maybe_pointer *)
   let g x = () in
