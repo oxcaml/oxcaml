@@ -131,7 +131,7 @@ Line 1, characters 9-25:
              ^^^^^^^^^^^^^^^^
 Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the layout "void".
 
-type t : void non_pointer
+type t : void
 |}]
 
 type t : void non_pointer maybe_pointer

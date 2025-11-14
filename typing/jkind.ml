@@ -2302,10 +2302,11 @@ module Const = struct
   let set_pointerness_upper_bound t = function
     | None -> t
     | Some pointerness ->
-      let sa = Layout.Const.get_root_scannable_axes t.layout in
+      (* CR zeisbach: enable this but get the logic correct! *)
+      (*= let sa = Layout.Const.get_root_scannable_axes t.layout in
       (match sa with
       | None -> ()
-      | Some sa -> if sa = pointerness then failwith "redundant");
+      | Some sa -> if sa = pointerness then failwith "redundant"); *)
       let new_layout =
         Layout.Const.set_pointerness_upper_bound t.layout pointerness
       in
