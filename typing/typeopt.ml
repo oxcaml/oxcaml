@@ -1186,26 +1186,6 @@ let value_kind_union (k1 : Lambda.value_kind) (k2 : Lambda.value_kind) =
        raw kinds separately *)
   else Lambda.generic_value
 
-let rec layout_union l1 l2 =
-  match l1, l2 with
-  | Pbottom, l
-  | l, Pbottom -> l
-  | Pvalue layout1, Pvalue layout2 ->
-      Pvalue (value_kind_union layout1 layout2)
-  | Punboxed_float f1, Punboxed_float f2 ->
-      if Primitive.equal_unboxed_float f1 f2 then l1 else Ptop
-  | Punboxed_or_untagged_integer bi1, Punboxed_or_untagged_integer bi2 ->
-      if Primitive.equal_unboxed_or_untagged_integer bi1 bi2 then l1 else Ptop
-  | Punboxed_vector vi1, Punboxed_vector vi2 ->
-      if Primitive.equal_unboxed_vector vi1 vi2 then l1 else Ptop
-  | Punboxed_product layouts1, Punboxed_product layouts2 ->
-      if List.compare_lengths layouts1 layouts2 <> 0 then Ptop
-      else Punboxed_product (List.map2 layout_union layouts1 layouts2)
-  | (Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ |
-     Punboxed_vector _ | Punboxed_product _),
-    _ ->
-      Ptop
-
 (* Error report *)
 open Format
 

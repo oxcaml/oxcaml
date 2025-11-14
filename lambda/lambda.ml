@@ -16,6 +16,8 @@
 open Misc
 open Asttypes
 
+module SL = Slambda0
+
 type constant = Typedtree.constant
 
 type mutable_flag = Immutable | Immutable_unique | Mutable
@@ -394,6 +396,7 @@ and layout =
   | Punboxed_vector of unboxed_vector
   | Punboxed_product of layout list
   | Pbottom
+  | Psplicevar of Ident.t
 
 and block_shape =
   value_kind list option
@@ -413,6 +416,7 @@ and 'a mixed_block_element =
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
+  | Splice_variable of Ident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -621,24 +625,6 @@ let equal_layout x y =
   | Ptop, Ptop -> true
   | Pbottom, Pbottom -> true
   | _, _ -> false
-
-let rec compatible_layout x y =
-  match x, y with
-  | Pbottom, _
-  | _, Pbottom -> true
-  | Pvalue _, Pvalue _ -> true
-  | Punboxed_float f1, Punboxed_float f2 -> Primitive.equal_unboxed_float f1 f2
-  | Punboxed_or_untagged_integer bi1, Punboxed_or_untagged_integer bi2 ->
-    Primitive.equal_unboxed_or_untagged_integer bi1 bi2
-  | Punboxed_vector bi1, Punboxed_vector bi2 -> Primitive.equal_unboxed_vector bi1 bi2
-  | Punboxed_product layouts1, Punboxed_product layouts2 ->
-      List.compare_lengths layouts1 layouts2 = 0
-      && List.for_all2 compatible_layout layouts1 layouts2
-  | Ptop, Ptop -> true
-  | Ptop, _ | _, Ptop -> false
-  | (Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ |
-     Punboxed_vector _ | Punboxed_product _), _ ->
-      false
 
 let rec equal_ignorable_product_element_kind k1 k2 =
   match k1, k2 with
@@ -885,6 +871,9 @@ type lambda =
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
   | Lexclave of lambda
+  | Lsplice of { splice_loc : scoped_location; slambda : slambda }
+
+and slambda = lambda SL.t0
 
 and rec_binding = {
   id : Ident.t;
@@ -2343,6 +2332,7 @@ let layout_of_mixed_block_shape
     | Product shape ->
       Punboxed_product
         (Array.to_list (Array.map layout_of_mixed_block_element shape))
+    | Splice_variable id -> Psplicevar id
   in
   layout_of_mixed_block_element (project_from_mixed_block_shape shape ~path)
 
@@ -2364,6 +2354,7 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_vector Unboxed_vec256 -> Vec256
   | Punboxed_vector Unboxed_vec512 -> Vec512
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
+  | Psplicevar id -> Splice_variable id
 
 let value_kind_of_value_with_externality ext =
   let open Jkind_axis.Externality in
@@ -2393,6 +2384,7 @@ let rec layout_of_mixed_block_element_for_idx_set
   | Vec256 -> Punboxed_vector Unboxed_vec256
   | Vec512 -> Punboxed_vector Unboxed_vec512
   | Untagged_immediate -> Punboxed_or_untagged_integer Untagged_int
+  | Splice_variable id -> Psplicevar id
 
 let rec mixed_block_element_leaves (el : _ mixed_block_element)
   : _ mixed_block_element list =
@@ -2400,7 +2392,8 @@ let rec mixed_block_element_leaves (el : _ mixed_block_element)
   | Product els ->
     List.concat_map mixed_block_element_leaves (Array.to_list els)
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate ->
+  | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate
+  | Splice_variable _ ->
     [el]
 
 type will_be_reordered_acc = { seen_flat : bool; last_value_after_flat : bool }
@@ -2410,6 +2403,10 @@ let will_be_reordered (mbe : _ mixed_block_element) =
       (fun acc el ->
         match el with
         | Product _ -> assert false
+        | Splice_variable _ ->
+          (* Treat variables as potentially both, that causes this function to
+             be maximally pessimistic. *)
+          { seen_flat = true; last_value_after_flat = acc.seen_flat }
         | Value _ -> { acc with last_value_after_flat = acc.seen_flat }
         | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
         | Word | Vec128 |  Vec256 | Vec512 | Untagged_immediate ->
@@ -2616,44 +2613,6 @@ let primitive_result_layout (p : primitive) =
   | Pget_ptr (layout, _) -> layout
   | Pset_ptr _ -> layout_unit
 
-let compute_expr_layout free_vars_kind lam =
-  let rec compute_expr_layout kinds = function
-    | Lvar id | Lmutvar id -> begin
-        try Ident.Map.find id kinds
-        with Not_found ->
-        match free_vars_kind id with
-        | Some kind -> kind
-        | None ->
-            Misc.fatal_errorf "Unbound layout for variable %a" Ident.print id
-      end
-    | Lconst cst -> structured_constant_layout cst
-    | Lfunction _ -> layout_function
-    | Lapply { ap_result_layout; _ } -> ap_result_layout
-    | Lsend (_, _, _, _, _, _, _, layout) -> layout
-    | Llet(_, kind, id, _duid, _, body) | Lmutlet(kind, id, _duid, _, body) ->
-      compute_expr_layout (Ident.Map.add id kind kinds) body
-    | Lletrec(defs, body) ->
-      let kinds =
-        List.fold_left (fun kinds { id } -> Ident.Map.add id layout_letrec kinds)
-          kinds defs
-      in
-      compute_expr_layout kinds body
-    | Lprim(p, _, _) ->
-      primitive_result_layout p
-    | Lswitch(_, _, _, kind) | Lstringswitch(_, _, _, _, kind)
-    | Lstaticcatch(_, _, _, _, kind) | Ltrywith(_, _, _, _, kind)
-    | Lifthenelse(_, _, _, kind) | Lregion (_, kind) ->
-      kind
-    | Lstaticraise (_, _) ->
-      layout_bottom
-    | Lsequence(_, body) | Levent(body, _) -> compute_expr_layout kinds body
-    | Lwhile _ | Lfor _ | Lassign _ -> layout_unit
-    | Lifused _ ->
-        assert false
-    | Lexclave e -> compute_expr_layout kinds e
-  in
-  compute_expr_layout Ident.Map.empty lam
-
 let array_ref_kind mode = function
   | Pgenarray -> Pgenarray_ref mode
   | Paddrarray -> Paddrarray_ref
@@ -2724,6 +2683,7 @@ let may_allocate_in_region lam =
         rather, it's in the parent region *)
       ()
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
+    | Lsplice { slambda = SL.Quote lam } -> loop lam
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
     | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
       | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
@@ -2764,7 +2724,8 @@ let rec try_to_find_location lam =
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
   | Lsend (_, _, _, _, _, _, loc, _)
-  | Levent (_, { lev_loc = loc; _ }) ->
+  | Levent (_, { lev_loc = loc; _ })
+  | Lsplice { splice_loc = loc; _ }->
     loc
   | Llet (_, _, _, _, lam, _)
   | Lmutlet (_, _, _, lam, _)

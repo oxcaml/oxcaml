@@ -1657,6 +1657,7 @@ let block_index_access_offsets ~machine_width layout idx =
                   (Int64.of_int
                      (BC.on_64_bit_arch cts.value
                      + BC.on_64_bit_arch to_left.flat))))
+        | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
       in
       let prim = add offset offset_from_offset in
       MPB.add to_left (MPB.count mbe), prim

@@ -175,6 +175,7 @@ let rec mixed_block_element print_value_kind ppf el =
     fprintf ppf "product %a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
          (mixed_block_element print_value_kind)) (Array.to_list shape)
+  | Splice_variable id -> fprintf ppf "$%a" Ident.print id
 
 let constructor_shape print_value_kind ppf shape =
   match shape with
@@ -238,6 +239,7 @@ let rec layout ppf layout_ =
     fprintf ppf "@[<hov 1>#(%a)@]"
       (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") layout)
       layouts
+  | Psplicevar id -> fprintf ppf "$%a" Ident.print id
 
 let layout_annotation ppf layout_ =
   match layout_ with
@@ -277,6 +279,7 @@ let return_kind ppf (mode, kind) =
   | Punboxed_product _ -> fprintf ppf ": %a@ " layout kind
   | Ptop -> fprintf ppf ": top@ "
   | Pbottom -> fprintf ppf ": bottom@ "
+  | Psplicevar id -> fprintf ppf ": $%a@ " Ident.print id
 
 let field_kind = value_kind
 
@@ -347,6 +350,7 @@ let rec mixed_block_element
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
   | Product shape ->
     fprintf ppf "product %a" (mixed_block_shape (fun _ _ -> ())) shape
+  | Splice_variable id -> fprintf ppf "$%a" Ident.print id
 
 and mixed_block_shape
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element array -> _
@@ -1359,6 +1363,8 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(region@ %a)@]" lam expr
   | Lexclave expr ->
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
+  | Lsplice slambda ->
+      fprintf ppf "$(%a)" (Printslambda0.slambda0 lam) slambda
 
 and sequence ppf = function
   | Lsequence(l1, l2) ->

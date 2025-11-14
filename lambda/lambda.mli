@@ -477,6 +477,7 @@ and layout =
   | Punboxed_vector of unboxed_vector
   | Punboxed_product of layout list
   | Pbottom
+  | Psplicevar of Ident.t
 
 and block_shape =
   value_kind list option
@@ -496,6 +497,7 @@ and 'a mixed_block_element =
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
+  | Splice_variable of Ident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -572,8 +574,6 @@ and raise_kind =
 val equal_value_kind : value_kind -> value_kind -> bool
 
 val equal_layout : layout -> layout -> bool
-
-val compatible_layout : layout -> layout -> bool
 
 val print_boxed_vector : Format.formatter -> boxed_vector -> unit
 
@@ -841,6 +841,9 @@ type lambda =
   (* [Lexclave] closes the newest region opened.
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
+  | Lsplice of { splice_loc : scoped_location; slambda : slambda; }
+
+and slambda = lambda Slambda0.t0
 
 and rec_binding = {
   id : Ident.t;
@@ -1253,8 +1256,6 @@ val will_be_reordered : _ mixed_block_element -> bool
 val primitive_result_layout : primitive -> layout
 
 val array_ref_kind_result_layout: array_ref_kind -> layout
-
-val compute_expr_layout : (Ident.t -> layout option) -> lambda -> layout
 
 (** The mode will be discarded if unnecessary for the given [array_kind] *)
 val array_ref_kind : locality_mode -> array_kind -> array_ref_kind

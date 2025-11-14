@@ -1449,7 +1449,8 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
     | Pvalue _
     | Punboxed_vector _
     | Punboxed_product _
-    | Pbottom ->
+    | Pbottom
+    | Psplicevar _ ->
       raise (Error (error_loc, Wrong_layout_for_peek_or_poke prim_name))
 
 let should_specialize_primitive p =
