@@ -177,17 +177,38 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     match op with Store (_, _, _) -> true | _ -> false
 
   let bind_let (env : SU.environment) sub_cfg v r1 =
-    let env =
-      let rv = Reg.createv_with_typs_and_id ~id:(VP.var v) r1 in
-      SU.insert_moves env sub_cfg r1 rv;
-      SU.env_add v rv env
-    in
+    let rv = Reg.createv_with_typs_and_id ~id:(VP.var v) r1 in
+    SU.insert_moves env sub_cfg r1 rv;
+    let env = SU.env_add v rv env in
     let provenance = VP.provenance v in
     (if Option.is_some provenance
     then
+      (*= IMPORTANT: Pass both rv (bound variable registers) AND r1 (producer
+         registers) to Name_for_debugger. At this point, r1 and rv contain the
+         same value (we just inserted moves from r1 to rv). By tracking both:
+         - rv (pseudo-register) ensures the variable is tracked through its full
+           live-range as register allocation moves it between locations
+         - r1 (producer register) provides an exact location in the prologue and
+           allows the debug info to follow the producer register through
+           register rewrite so that spills from that register can inherit the
+           debug annotation.
+         This addresses the issue of ranges that are too short by ensuring that
+         both the bound variable (rv) and the actual value location (r1) carry
+         the variable's debug tag through register allocation and spills. *)
+      let regs =
+        if Array.length r1 = Array.length rv
+        then
+          Array.concat
+            (Array.to_list
+               (Array.init (Array.length r1) (fun i ->
+                    if Reg.same r1.(i) rv.(i)
+                    then [| r1.(i) |]
+                    else [| rv.(i); r1.(i) |])))
+        else rv
+      in
       let naming_op =
         SU.make_name_for_debugger ~ident:(VP.var v) ~which_parameter:None
-          ~provenance ~regs:r1
+          ~provenance ~regs
       in
       SU.insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]);
     env
