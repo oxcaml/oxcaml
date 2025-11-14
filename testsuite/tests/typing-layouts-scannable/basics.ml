@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layouts_alpha -w +184+185";
+ flags = "-extension layouts_alpha";
  expect;
 *)
 
@@ -193,7 +193,9 @@ Error: This expression has type "a" but an expression was expected of type
 let f (type a : float64 maybe_pointer) (x : a) =
   let g (x : (_ : float64 non_pointer)) = () in
   g x
-[%%expect{| |}]
+[%%expect{|
+val f : ('a : float64). 'a -> unit = <fun>
+|}]
 
 let f (type a : value non_pointer) (x : a) =
   (* here, x is value maybe_pointer *)

@@ -2299,14 +2299,16 @@ module Const = struct
   (*******************************)
   (* converting user annotations *)
 
-  let set_pointerness_upper_bound t = function
+  let set_pointerness_upper_bound ~abbrev t = function
     | None -> t
-    | Some pointerness ->
-      (* CR zeisbach: enable this but get the logic correct! *)
-      (*= let sa = Layout.Const.get_root_scannable_axes t.layout in
+    | Some (pointerness, loc) ->
+      let sa = Layout.Const.get_root_scannable_axes t.layout in
       (match sa with
       | None -> ()
-      | Some sa -> if sa = pointerness then failwith "redundant"); *)
+      | Some sa ->
+        if sa = pointerness
+        then
+          Location.prerr_warning loc (Warnings.Redundant_kind_modifier abbrev));
       let new_layout =
         Layout.Const.set_pointerness_upper_bound t.layout pointerness
       in
@@ -2334,12 +2336,12 @@ module Const = struct
        the best though. Consider refactoring as more axes are added. *)
     let set_or_warn ~loc ~to_ pointerness =
       match pointerness with
-      | Some overridden_by ->
+      | Some (overridden_by, _overriding_loc) ->
         Location.prerr_warning loc
           (Warnings.Overridden_kind_modifier
              (Pointerness.to_string overridden_by));
         pointerness
-      | None -> Some to_
+      | None -> Some (to_, loc)
     in
     (* This will compute and report errors from right-to-left, which enables
        better error messages while traversing the list only once. It comes at
@@ -2401,7 +2403,7 @@ module Const = struct
          This should emit a warning if the [jkind_without_sa] already has
          the specified scannable axes. This is why the helper currently
          returns an optional annotation (since none vs default matters). *)
-      set_pointerness_upper_bound jkind_without_sa pointerness
+      set_pointerness_upper_bound ~abbrev:name.txt jkind_without_sa pointerness
     | Pjk_mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
       (* for each mode, lower the corresponding modal bound to be that mode *)
