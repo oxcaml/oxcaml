@@ -634,6 +634,7 @@ let ocaml_ignored_flags =
     "-no-cfg-prologue-shrink-wrap";
     "-gdwarf-pedantic";
     "-ddwarf-metrics"
+    "-afl-instrument";
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -723,7 +724,8 @@ let ocaml_ignored_parametrized_flags =
     "-gdwarf-config-max-evaluation-steps-per-variable";
     "-gdwarf-config-shape-reduce-fuel";
     "-gdwarf-fidelity";
-    "-llvm-path"
+    "-llvm-path";
+    "-afl-inst-ratio"
   ]
 
 let ocaml_warnings_spec ~error =
