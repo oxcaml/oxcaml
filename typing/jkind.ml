@@ -314,16 +314,6 @@ module Layout = struct
     | [lay] -> lay
     | lays -> Product lays
 
-  let rec to_sort = function
-    | Any _ -> None
-    | Sort (s, _) -> Some s
-    | Product ts -> to_product_sort ts
-
-  and to_product_sort ts =
-    Option.map
-      (fun x -> Sort.Product x)
-      (Misc.Stdlib.List.map_option to_sort ts)
-
   let rec get : Sort.t t -> Sort.Flat.t t =
     let rec flatten_sort (s : Sort.t) sa : Sort.Flat.t t =
       match s with
@@ -377,15 +367,6 @@ module Layout = struct
       then Scannable_axes.equal sa1 sa2
       else true
     | Product ts, Sort (sort, _) | Sort (sort, _), Product ts -> (
-      (* CR zeisbach / layouts-scannable for rtjoa:
-         We make new sort variables to ensure that the leaves have
-         [Scannable_axes.max]. This may not be necessary, but we came to
-         this conclusion a while ago. This is the conservative thing to do,
-         but I can't think of any examples that hit this code path
-         FORMERLY:
-         If [ts] can't be turned into a product sort -- because it has [any]
-         -- then equality will surely fail. No need to create new sort
-         variables here. *)
       match Sort.decompose_into_product sort (List.length ts) with
       | None -> false
       | Some sorts ->
@@ -437,10 +418,6 @@ module Layout = struct
         then Misc.Le_result.combine_list (List.map2 sub ts1 ts2)
         else Not_le
       | Product ts1, Sort (s2, _) -> (
-        (* This case could use [to_product_sort] because every component will need
-           to end up less than a sort (so, no [any]), but it seems easier to keep
-           this case lined up with the inverse case, which definitely cannot use
-           [to_product_sort]. *)
         match Sort.decompose_into_product s2 (List.length ts1) with
         | None -> Not_le
         | Some ss2 ->
