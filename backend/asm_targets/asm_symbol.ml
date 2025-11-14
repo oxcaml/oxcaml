@@ -145,7 +145,8 @@ module Predef = struct
 
   let stapsdt_base = create_without_encoding "_.stapsdt.base"
 
-  let caml_probes_semaphore ~name = create ("caml_probes_semaphore_" ^ name)
+  let caml_probes_semaphore ~name =
+    create_without_encoding ("caml_probes_semaphore_" ^ name)
 
   let caml_negf_mask = create "caml_negf_mask"
 
