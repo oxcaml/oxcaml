@@ -184,7 +184,7 @@ module Make (P : Dynlink_platform_intf.S) = struct
   let set_loaded filename ui (state : State.t) =
     { state with implems = set_loaded_implem filename ui state.implems }
 
-  let check_interface_imports filename imports ifaces =
+  let check_interface_imports ~check_imports filename imports ifaces =
     Array.fold_left (fun ifaces (name, crc) ->
         match String.Map.find name ifaces with
         | exception Not_found -> begin
@@ -198,7 +198,8 @@ module Make (P : Dynlink_platform_intf.S) = struct
           | Name, Some crc ->
             String.Map.add name (Contents crc, filename) ifaces
           | Contents old_crc, Some crc ->
-            if old_crc <> crc then raise (DT.Error (Inconsistent_import name))
+            if check_imports && old_crc <> crc then
+              raise (DT.Error (Inconsistent_import name))
             else ifaces)
       ifaces
       imports
@@ -269,7 +270,8 @@ module Make (P : Dynlink_platform_intf.S) = struct
     end
 
   let check filename (library_header : LH.t) (units : UH.t list)
-      (state : State.t) ~unsafe_allowed ~priv =
+      (state : State.t) ~unsafe_allowed ~priv ~check_dependency_order
+      ~check_imports =
     List.iter (fun ui -> check_unsafe_module unsafe_allowed ui) units;
     let new_units =
       String.Set.of_list (List.map (fun ui -> UH.name ui) units)
@@ -289,7 +291,7 @@ module Make (P : Dynlink_platform_intf.S) = struct
             let imports =
               UH.interface_imports library_header ui |> Array.of_list
             in
-            check_interface_imports filename imports ifaces)
+            check_interface_imports ~check_imports filename imports ifaces)
           state.ifaces units
         in
         let allowed_units = String.Set.union state.allowed_units new_units in
@@ -299,9 +301,10 @@ module Make (P : Dynlink_platform_intf.S) = struct
               let imports =
                 UH.implementation_imports library_header ui |> Array.of_list
               in
-              check_implementation_imports
-                ~allowed_units ~check_unit_dependency_order:true
-                filename imports acc;
+              if check_imports then
+                check_implementation_imports ~allowed_units
+                  ~check_unit_dependency_order:check_dependency_order
+                  filename imports acc;
               set_loaded_implem filename ui acc)
             implems units
         in
@@ -309,12 +312,15 @@ module Make (P : Dynlink_platform_intf.S) = struct
       | DT.Supports_consolidated_imports { cmi_imports; cmx_imports } ->
         (* Native: check consolidated imports once from header *)
         let ifaces =
-          check_interface_imports filename cmi_imports state.ifaces
+          check_interface_imports ~check_imports filename cmi_imports
+            state.ifaces
         in
-        check_implementation_imports
-          ~allowed_units ~check_unit_dependency_order:false
-          filename cmx_imports implems;
-        check_unit_load_order library_header units filename cmx_imports implems;
+        if check_imports then
+          check_implementation_imports ~allowed_units
+            ~check_unit_dependency_order:false filename cmx_imports implems;
+        if check_dependency_order then
+          check_unit_load_order library_header units filename cmx_imports
+            implems;
         ifaces
     in
     let defined_symbols =
@@ -397,7 +403,7 @@ module Make (P : Dynlink_platform_intf.S) = struct
     if Filename.is_implicit fname then Filename.concat (Sys.getcwd ()) fname
     else fname
 
-  let load priv filename =
+  let load priv filename ~check_dependency_order ~check_imports =
     init ();
     let filename = dll_filename filename in
     match P.load ~filename ~priv with
@@ -406,8 +412,7 @@ module Make (P : Dynlink_platform_intf.S) = struct
       try
         with_lock (fun ({unsafe_allowed; _ } as global) ->
             global.state <- check filename library_header units global.state
-                ~unsafe_allowed
-                ~priv;
+                ~unsafe_allowed ~priv ~check_dependency_order ~check_imports;
             (* [register] must be called after [check]:
                1. so as not to leave outdated entries in the frame table
                   list (etc) after a failure of [check];
@@ -436,8 +441,17 @@ module Make (P : Dynlink_platform_intf.S) = struct
         P.finish handle;
         raise exn
 
-  let loadfile filename = load false filename
-  let loadfile_private filename = load true filename
+  let loadfile filename =
+    load false filename ~check_dependency_order:true ~check_imports:true
+
+  let loadfile_private filename =
+    load true filename ~check_dependency_order:true ~check_imports:true
+
+  let loadfile_unsafe filename ~check_dependency_order ~check_imports =
+    load false filename ~check_dependency_order ~check_imports
+
+  let loadfile_private_unsafe filename ~check_dependency_order ~check_imports =
+    load true filename ~check_dependency_order ~check_imports
 
   let unsafe_get_global_value ~bytecode_or_asm_symbol =
     with_lock (fun _ ->
