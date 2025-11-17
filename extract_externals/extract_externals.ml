@@ -83,7 +83,7 @@ let spec_list =
     ) ]
 
 let parse_arguments () =
-  Arg.parse spec_list
+  Arg.parse_expand spec_list
     (fun a -> files := !files @ [a])
     "Usage: externals.exe <options> <files>\nOptions are:"
 
