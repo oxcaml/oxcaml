@@ -1279,6 +1279,8 @@ module BR = Branch_relaxation.Make (struct
           | Int_of_float Float32
           | Float_of_float32 | Float32_of_float )) ->
       1
+    | Lop (Static_cast (Scalar_of_v128 Float16x8 | V128_of_scalar Float16x8)) ->
+      Misc.fatal_error "float16 scalar type not supported"
     | Lop (Static_cast (Scalar_of_v128 (Int8x16 | Int16x8))) -> 2
     | Lop
         (Static_cast
@@ -1619,6 +1621,7 @@ let emit_static_cast (cast : Cmm.static_cast) i =
       DSL.ins I.UXTH [| DSL.emit_reg dst; DSL.emit_reg_w dst |]
     | Int32x4 -> DSL.ins I.FMOV [| DSL.emit_reg_w dst; DSL.emit_reg_s src |]
     | Int64x2 -> DSL.ins I.FMOV [| DSL.emit_reg dst; DSL.emit_reg_d src |]
+    | Float16x8 -> Misc.fatal_error "float16 scalar type not supported"
     | Float32x4 ->
       if distinct
       then (
@@ -1636,6 +1639,7 @@ let emit_static_cast (cast : Cmm.static_cast) i =
     | Int16x8 -> DSL.ins I.FMOV [| DSL.emit_reg_s dst; DSL.emit_reg_w src |]
     | Int32x4 -> DSL.ins I.FMOV [| DSL.emit_reg_s dst; DSL.emit_reg_w src |]
     | Int64x2 -> DSL.ins I.FMOV [| DSL.emit_reg_d dst; DSL.emit_reg src |]
+    | Float16x8 -> Misc.fatal_error "float16 scalar type not supported"
     | Float32x4 ->
       if distinct
       then (

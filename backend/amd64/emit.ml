@@ -129,6 +129,8 @@ let register_name typ r : X86_ast.arg =
 
 let phys_rax = phys_reg Int 0
 
+let phys_rdi = phys_reg Int 2
+
 let phys_rdx = phys_reg Int 4
 
 let phys_rcx = phys_reg Int 5
@@ -1019,9 +1021,9 @@ let movpd ~unaligned src dst =
   | false, true, true -> I.simd movupd_X_Xm128 [| src; dst |]
   | false, false, false -> I.simd movapd_Xm128_X [| src; dst |]
   | false, false, true -> I.simd movupd_Xm128_X [| src; dst |]
-  | true, false, false -> I.simd vmovupd_Xm128_X [| src; dst |]
+  | true, false, false -> I.simd vmovapd_Xm128_X [| src; dst |]
   | true, false, true -> I.simd vmovupd_Xm128_X [| src; dst |]
-  | true, true, false -> I.simd vmovupd_X_Xm128 [| src; dst |]
+  | true, true, false -> I.simd vmovapd_X_Xm128 [| src; dst |]
   | true, true, true -> I.simd vmovupd_X_Xm128 [| src; dst |]
 
 let move (src : Reg.t) (dst : Reg.t) =
@@ -1602,18 +1604,15 @@ let emit_static_cast (cast : Cmm.static_cast) i =
     if distinct then movss (argX i 0) (res i 0)
   | V128_of_scalar Float32x4 | V256_of_scalar Float32x8 ->
     if distinct then movss (arg i 0) (resX i 0)
+  | Scalar_of_v128 Float16x8
+  | V128_of_scalar Float16x8
+  | Scalar_of_v256 Float16x16
+  | V256_of_scalar Float16x16 ->
+    Misc.fatal_error "float16 scalar type not supported"
   | Scalar_of_v128 Int16x8 | Scalar_of_v256 Int16x16 ->
-    (* CR-someday mslater: int16# shouldn't require sign extension *)
-    (* [movw] and [movzx] cannot operate on vector registers. We must sign
-       extend as the result is an untagged int8. *)
-    movd (argX i 0) (res32 i 0);
-    I.movsx (res16 i 0) (res i 0)
+    movd (argX i 0) (res32 i 0)
   | Scalar_of_v128 Int8x16 | Scalar_of_v256 Int8x32 ->
-    (* CR-someday mslater: int8# shouldn't require sign extension *)
-    (* [movb] and [movzx] cannot operate on vector registers. We must sign
-       extend as the result is an untagged int16. *)
-    movd (argX i 0) (res32 i 0);
-    I.movsx (res8 i 0) (res i 0)
+    movd (argX i 0) (res32 i 0)
   | V128_of_scalar Int16x8
   | V128_of_scalar Int8x16
   | V256_of_scalar Int16x16
@@ -1632,51 +1631,115 @@ let assert_loc (loc : Simd.loc) arg =
   | false -> assert (Simd.loc_allows_mem loc));
   match Simd.loc_is_pinned loc with
   | Some RAX -> assert (Reg.same_loc arg phys_rax)
+  | Some RDI -> assert (Reg.same_loc arg phys_rdi)
   | Some RCX -> assert (Reg.same_loc arg phys_rcx)
   | Some RDX -> assert (Reg.same_loc arg phys_rdx)
   | Some XMM0 -> assert (Reg.same_loc arg (phys_xmm0v ()))
   | None -> ()
 
-let check_simd_instr (simd : Simd.instr) imm instr =
+let check_simd_instr ?mode (simd : Simd.instr) imm instr =
   (match simd.imm with
   | Imm_none | Imm_reg -> assert (Option.is_none imm)
   | Imm_spec -> assert (Option.is_some imm));
-  Array.iteri
-    (fun j (arg : Simd.arg) -> assert_loc arg.loc instr.arg.(j))
-    simd.args;
-  match simd.res with
-  | First_arg -> assert (Reg.same_loc instr.arg.(0) instr.res.(0))
-  | Res { loc; _ } -> assert_loc loc instr.res.(0)
+  let addr_used_or_not_provided = ref (Option.is_none mode) in
+  let use_addr () =
+    assert (not !addr_used_or_not_provided);
+    addr_used_or_not_provided := true
+  in
+  let args_used =
+    Array.fold_left
+      (fun idx (arg : Simd.arg) ->
+        if not (Simd.loc_allows_reg arg.loc) then assert (Option.is_some mode);
+        match Simd.loc_allows_mem arg.loc, mode with
+        | true, Some (mode, _) ->
+          use_addr ();
+          idx + num_args_addressing mode
+        | _ ->
+          assert_loc arg.loc instr.arg.(idx);
+          idx + 1)
+      0 simd.args
+  in
+  assert !addr_used_or_not_provided;
+  assert (args_used = Array.length instr.arg);
+  let res_used =
+    match simd.res with
+    | Res_none -> 0
+    | First_arg ->
+      assert (Reg.same_loc instr.arg.(0) instr.res.(0));
+      1
+    | Res { loc; _ } ->
+      assert_loc loc instr.res.(0);
+      1
+  in
+  assert (res_used = Array.length instr.res)
 
 let to_arg_with_width loc instr i =
-  match Simd.loc_requires_width loc with
+  match Simd.loc_register_width loc with
   | Some Eight -> arg8 instr i
   | Some Sixteen -> arg16 instr i
   | Some Thirtytwo -> arg32 instr i
-  | Some Sixtyfour | None -> arg instr i
+  | Some (Sixtyfour | Onetwentyeight | Twofiftysix) | None -> arg instr i
 
 let to_res_with_width loc instr i =
-  match Simd.loc_requires_width loc with
+  match Simd.loc_register_width loc with
   | Some Eight -> res8 instr i
   | Some Sixteen -> res16 instr i
   | Some Thirtytwo -> res32 instr i
-  | Some Sixtyfour | None -> res instr i
+  | Some (Sixtyfour | Onetwentyeight | Twofiftysix) | None -> res instr i
 
-let emit_simd_instr (simd : Simd.instr) imm instr =
-  check_simd_instr simd imm instr;
-  let total_args = Array.length instr.arg in
-  if total_args <> Array.length simd.args
-  then Misc.fatal_errorf "wrong number of arguments for %s" simd.mnemonic;
+let to_addr_width loc : X86_ast.data_type =
+  match Simd.loc_memory_width loc with
+  | Simd.Eight -> BYTE
+  | Sixteen -> WORD
+  | Thirtytwo -> DWORD
+  | Sixtyfour -> QWORD
+  | Onetwentyeight -> VEC128
+  | Twofiftysix -> VEC256
+
+(* Conservatively assumes unaligned memory. This means ASAN checks are slower
+   than they could be if we were sure the input address is aligned. *)
+let to_memory_chunk loc : Cmm.memory_chunk =
+  match Simd.loc_memory_width loc with
+  | Simd.Eight -> Byte_unsigned
+  | Sixteen -> Sixteen_unsigned
+  | Thirtytwo -> Thirtytwo_unsigned
+  | Sixtyfour -> Word_int
+  | Onetwentyeight -> Onetwentyeight_unaligned
+  | Twofiftysix -> Twofiftysix_unaligned
+
+let emit_simd_sanitize ~address ~instr ~chunk ~kind =
+  if Config.with_address_sanitizer && !Arch.is_asan_enabled
+  then
+    (* May duplicate dependencies, including anything in [address]. *)
+    let arg = Array.init (Array.length instr.arg) (fun i -> arg instr i) in
+    let res = Array.init (Array.length instr.res) (fun i -> res instr i) in
+    let dependencies = Array.append arg res in
+    Address_sanitizer.emit_sanitize ~dependencies ~instr ~address chunk kind
+  else ()
+
+let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
+  check_simd_instr ?mode simd imm instr;
   let args =
-    List.init total_args (fun i ->
-        if Simd.arg_is_implicit simd.args.(i)
-        then None
-        else Some (to_arg_with_width simd.args.(i).loc instr i))
-    |> List.filter_map (fun arg -> arg)
+    Array.fold_left
+      (fun (idx, args) (arg : Simd.arg) ->
+        if Simd.arg_is_implicit arg
+        then idx + 1, args
+        else
+          match Simd.loc_allows_mem arg.loc, mode with
+          | true, Some (mode, kind) ->
+            let n = num_args_addressing mode in
+            let width = to_addr_width arg.loc in
+            let chunk = to_memory_chunk arg.loc in
+            let address = addressing mode width instr idx in
+            emit_simd_sanitize ~address ~instr ~chunk ~kind;
+            idx + n, address :: args
+          | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args)
+      (0, []) simd.args
+    |> fun (_, args) -> List.rev args
   in
   let args =
     match simd.res with
-    | First_arg | Res { enc = Implicit | Immediate; _ } -> args
+    | Res_none | First_arg | Res { enc = Implicit | Immediate; _ } -> args
     | Res { loc; enc = RM_r | RM_rm | Vex_v } -> (
       match Simd.loc_is_pinned loc with
       | Some _ -> args
@@ -1689,18 +1752,36 @@ let emit_simd_instr (simd : Simd.instr) imm instr =
   in
   I.simd simd (Array.of_list args)
 
-let emit_simd (op : Simd.operation) instr =
+(* Only used for instructions that have an implicit memory operand. Explicit
+   load/store operations are sanitized automatically by [emit_simd_instr]. *)
+let emit_implicit_simd_sanitize (op : Simd.operation) instr =
+  if Config.with_address_sanitizer && !Arch.is_asan_enabled
+     && Simd.is_memory_operation op
+  then
+    let simd = Simd.Pseudo_instr.instr op.instr in
+    match[@warning "-4"] simd.id with
+    | Maskmovdqu | Vmaskmovdqu ->
+      let address = addressing identity_addressing VEC128 instr 2 in
+      emit_simd_sanitize ~address ~instr ~chunk:Onetwentyeight_unaligned
+        ~kind:Store_modify
+    | _ ->
+      (* Must handle all impure cases in [Simd.class_of_operation] *)
+      Misc.fatal_errorf
+        "Don't know how to sanitize implicit memory operand of %s" simd.mnemonic
+
+let emit_simd ?mode (op : Simd.operation) instr =
   let open Simd_instrs in
+  emit_implicit_simd_sanitize op instr;
   let imm = op.imm in
   match op.instr with
-  | Instruction simd -> emit_simd_instr simd imm instr
+  | Instruction simd -> emit_simd_instr ?mode simd imm instr
   | Sequence seq -> (
     match seq.id with
     | Sqrtss | Sqrtsd | Roundss | Roundsd ->
       (* Avoids partial register stall *)
       if not (equal_arg (arg instr 0) (res instr 0))
       then sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res instr 0) (res instr 0);
-      emit_simd_instr seq.instr imm instr
+      emit_simd_instr ?mode seq.instr imm instr
     | Pcompare_string p | Vpcompare_string p ->
       let cond : X86_ast.condition =
         match p with
@@ -1715,35 +1796,26 @@ let emit_simd (op : Simd.operation) instr =
         | Pcmpistrs -> S
         | Pcmpistrz -> E
       in
-      emit_simd_instr seq.instr imm instr;
+      emit_simd_instr ?mode seq.instr imm instr;
       I.set cond (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
     | Ptestz | Vptestz_X | Vptestz_Y ->
-      emit_simd_instr seq.instr imm instr;
+      emit_simd_instr ?mode seq.instr imm instr;
       I.set E (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
     | Ptestc | Vptestc_X | Vptestc_Y ->
-      emit_simd_instr seq.instr imm instr;
+      emit_simd_instr ?mode seq.instr imm instr;
       I.set B (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
     | Ptestnzc | Vptestnzc_X | Vptestnzc_Y ->
-      emit_simd_instr seq.instr imm instr;
+      emit_simd_instr ?mode seq.instr imm instr;
       I.set A (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0))
 
-let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i addr =
-  let open Simd_instrs in
-  assert (Reg.is_reg i.arg.(0));
-  assert (not (Reg.is_reg i.arg.(1)));
+let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i mode =
   match simd with
-  | Add_f64 -> sse_or_avx3 addpd vaddpd_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Sub_f64 -> sse_or_avx3 subpd vsubpd_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Mul_f64 -> sse_or_avx3 mulpd vmulpd_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Div_f64 -> sse_or_avx3 divpd vdivpd_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Add_f32 -> sse_or_avx3 addps vaddps_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Sub_f32 -> sse_or_avx3 subps vsubps_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Mul_f32 -> sse_or_avx3 mulps vmulps_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Div_f32 -> sse_or_avx3 divps vdivps_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Load op -> emit_simd ~mode:(mode, Load) op i
+  | Store op -> emit_simd ~mode:(mode, Store_modify) op i
 
 let prologue_stack_offset () =
   assert !frame_required;
@@ -2243,11 +2315,7 @@ let emit_instr ~first ~fallthrough i =
     else I.simd unpcklps [| arg i 1; res i 0 |]
   | Lop (Specific (Isimd op)) -> emit_simd op i
   | Lop (Specific (Isimd_mem (op, addressing_mode))) ->
-    let address = addressing addressing_mode VEC128 i 1 in
-    Address_sanitizer.emit_sanitize
-      ~dependencies:[| res i 0 |]
-      ~instr:i ~address Onetwentyeight_unaligned Store_modify;
-    emit_simd_instr_with_memory_arg op i address
+    emit_simd_instr_with_memory_arg op i addressing_mode
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr

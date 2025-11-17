@@ -36,6 +36,11 @@ ci-coverage: boot-runtest coverage
 # 	cp chamelon/dune.upstream chamelon/dune
 # 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_main) @chamelon/all
 
+.PHONY: boot-minimizer
+boot-minimizer:
+	cp chamelon/dune.ox chamelon/dune
+	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) @chamelon/all
+
 .PHONY: minimizer
 minimizer: runtime-stdlib
 	cp chamelon/dune.ox chamelon/dune

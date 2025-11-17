@@ -132,7 +132,7 @@ type 'a t : value mod non_null = Foo of 'a
 [%%expect {|
 type t = Foo of { x : unit -> unit; }
 type 'a t = Foo of ('a -> 'a) | Bar
-type ('a : value mod contended portable, 'b : value mod portable) t =
+type ('a : value mod portable contended, 'b : value mod portable) t =
     Foo of 'a
   | Bar of 'b
 type ('a : value mod many) t = Foo of { x : 'a; }
