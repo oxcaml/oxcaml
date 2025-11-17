@@ -117,7 +117,7 @@ module Exist_pair = struct
     | Pair (Separability, ()) -> Stable
     | Pair (Let_mutable, ()) -> Stable
     | Pair (Layout_poly, m) -> m
-    | Pair (Runtime_metaprogramming, ()) -> Stable
+    | Pair (Runtime_metaprogramming, ()) -> Alpha
 
   let is_erasable : t -> bool = function Pair (ext, _) -> is_erasable ext
 

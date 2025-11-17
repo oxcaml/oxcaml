@@ -213,7 +213,6 @@ val curry_attr : Location.t -> Parsetree.attribute
 
 val has_local_opt: Parsetree.attributes -> bool
 val has_layout_poly: Parsetree.attributes -> bool
-val has_runtime_metaprogramming: Parsetree.attributes -> bool
 val has_curry: Parsetree.attributes -> bool
 val has_or_null_reexport : Parsetree.attributes -> bool
 
