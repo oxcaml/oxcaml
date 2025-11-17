@@ -31,8 +31,12 @@ jobs:
             config: --enable-runtime5 --enable-poll-insertion
             os: warp-ubuntu-latest-x64-8x
 
-          - name: runtime5 multidomain (x86_64-linux)
+          - name: runtime5 multidomain stack-checks (x86_64-linux)
             config: --enable-runtime5 --enable-stack-checks --enable-poll-insertion --enable-multidomain
+            os: warp-ubuntu-latest-x64-8x
+
+          - name: runtime5 multidomain (x86_64-linux)
+            config: --enable-runtime5 --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
 
           - name: runtime4 dev (x86_64-linux)
