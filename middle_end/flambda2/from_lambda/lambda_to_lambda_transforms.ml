@@ -795,8 +795,8 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       | Ostype_cygwin -> "ostype_cygwin"
       | Backend_type -> "backend_type"
       | Runtime5 -> "runtime5"
-      | Arch_is_amd64 -> "arch_is_amd64"
-      | Arch_is_arm64 -> "arch_is_arm64"
+      | Arch_amd64 -> "arch_amd64"
+      | Arch_arm64 -> "arch_arm64"
     in
     let name = Format.sprintf "caml_sys_const_%s" name in
     let desc = L.simple_prim_on_values ~name ~arity:1 ~alloc:false in

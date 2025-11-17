@@ -615,8 +615,8 @@ let primitive ppf = function
        | Ostype_win32 -> "ostype_win32"
        | Ostype_cygwin -> "ostype_cygwin"
        | Backend_type -> "backend_type"
-       | Arch_is_amd64 -> "arch_is_amd64"
-       | Arch_is_arm64 -> "arch_is_arm64"
+       | Arch_amd64 -> "arch_amd64"
+       | Arch_arm64 -> "arch_arm64"
        | Runtime5 -> "runtime5" in
      fprintf ppf "sys.constant_%s" const_name
   | Pisint { variant_only } ->

@@ -1,5 +1,5 @@
-external amd64 : unit -> bool @@ portable = "%arch_is_amd64"
-external arm64 : unit -> bool @@ portable = "%arch_is_arm64"
+external amd64 : unit -> bool @@ portable = "%arch_amd64"
+external arm64 : unit -> bool @@ portable = "%arch_arm64"
 
 
 let amd64 = amd64 ()
