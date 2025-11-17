@@ -998,7 +998,7 @@ module X86_peephole = struct
                && not (equal_reg64 b c) -> (
           (* Check if %b is dead after the sequence *)
           match find_next_occurrence_of_register dst1 cell3 with
-          | WriteFound | NotFound ->
+          | WriteFound ->
             (* %b is dead, safe to optimize *)
             (* Rewrite to: xchg %a, %c *)
             DLL.set_value cell1 (Ins (XCHG (src1, src2)));
@@ -1006,7 +1006,7 @@ module X86_peephole = struct
             DLL.delete_curr cell3;
             (* Return the cell we modified *)
             Some (Some cell1)
-          | ReadFound -> None)
+          | NotFound | ReadFound -> None)
         | _, _, _, _, _, _ -> None)
       | _, _, _ -> None)
     | _ -> None
