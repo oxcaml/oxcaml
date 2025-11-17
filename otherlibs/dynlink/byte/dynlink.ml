@@ -75,6 +75,8 @@ module Bytecode = struct
           |> Ident.name)
         (Symtable.initialized_compunits t.cu_reloc)
 
+    let imports_cmx_info _ = None
+
     let unsafe_module (t : t) = t.cu_primitives <> []
   end
 

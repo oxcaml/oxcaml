@@ -227,6 +227,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           dynu_imports_cmx_bitmap =
             mk_bitmap dynu_imports_cmx cmx_index unit.ui_imports_cmx
               ~find:Compilation_unit.Tbl.find ~get_name:Import_info.cu;
+          dynu_imports_cmx_self_index =
+            Compilation_unit.Tbl.find_opt cmx_index unit.name;
           dynu_quoted_globals = Array.of_list unit.ui_quoted_globals;
           dynu_defines = unit.defines
         })

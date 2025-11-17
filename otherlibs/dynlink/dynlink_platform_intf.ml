@@ -36,6 +36,8 @@ module type S = sig
     val interface_imports : Dynlink_library_header.t -> t -> (string * Digest.t option) list
     val implementation_imports : Dynlink_library_header.t -> t -> (string * Digest.t option) list
 
+    val imports_cmx_info : t -> (((int -> unit) -> unit) * int option) option
+
     val defined_symbols : t -> string list
     val unsafe_module : t -> bool
   end

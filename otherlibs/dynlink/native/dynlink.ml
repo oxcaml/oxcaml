@@ -98,6 +98,9 @@ module Native = struct
           |> Linkage_name.to_string)
         t.dynu_defines
 
+    let imports_cmx_info (t : t) =
+      Some ((fun f -> Misc.Bitmap.iter f t.dynu_imports_cmx_bitmap), t.dynu_imports_cmx_self_index)
+
     let unsafe_module _t = false
   end
 

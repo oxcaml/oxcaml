@@ -203,7 +203,41 @@ module Make (P : Dynlink_platform_intf.S) = struct
       ifaces
       imports
 
-  let check_implementation_imports ~allowed_units filename imports implems =
+  let check_unit_initialized filename name unit_state =
+    match unit_state with
+    | DT.Not_initialized ->
+      raise (DT.Error (Linking_error (filename, Uninitialized_global name)))
+    | DT.Check_inited i ->
+      if P.num_globals_inited () < i then begin
+        raise (DT.Error (Linking_error (filename, Uninitialized_global name)))
+      end
+    | DT.Loaded -> ()
+  [@@inline]
+
+  let check_unit_load_order units filename cmx_imports implems =
+    let load_status = Array.mapi (fun _i (name, _crc) ->
+        match String.Map.find name implems with
+        | exception Not_found -> DT.Not_initialized
+        | (_crc, _src, unit_state) -> unit_state)
+      cmx_imports
+    in
+    List.iter (fun ui ->
+        match UH.imports_cmx_info ui with
+        | None -> ()
+        | Some (bitmap, self_index) ->
+          (* Check all dependencies are initialized *)
+          bitmap (fun i ->
+              let name, _crc = cmx_imports.(i) in
+              check_unit_initialized filename name load_status.(i))
+          ;
+          (* After checking dependencies, mark this unit as loaded *)
+          match self_index with
+          | None -> ()
+          | Some self_idx -> load_status.(self_idx) <- DT.Loaded)
+      units
+
+  let check_implementation_imports ~allowed_units ~check_unit_dependency_order
+      filename imports implems =
     Array.iter (fun (name, crc) ->
       if not (String.Set.mem name allowed_units) then begin
         raise (DT.Error (Unavailable_unit name))
@@ -221,16 +255,8 @@ module Make (P : Dynlink_platform_intf.S) = struct
             raise (DT.Error (Inconsistent_implementation name))
           end
         end;
-        match unit_state with
-        | Not_initialized ->
-          raise (DT.Error (Linking_error (
-            filename, Uninitialized_global name)))
-        | Check_inited i ->
-          if P.num_globals_inited () < i then begin
-            raise (DT.Error (Linking_error (
-              filename, Uninitialized_global name)))
-          end
-        | Loaded -> ())
+        if check_unit_dependency_order then
+          check_unit_initialized filename name unit_state)
       imports
 
   let check_name filename ui priv ifaces implems =
@@ -260,7 +286,7 @@ module Make (P : Dynlink_platform_intf.S) = struct
         state.implems units
     in
     let allowed_units = String.Set.union state.allowed_units new_units in
-    let ifaces, implems =
+    let ifaces, (_ : implem String.Map.t) =
       match LH.consolidated_imports library_header with
       | DT.Requires_per_unit_checks ->
         (* Bytecode: check imports per-unit *)
@@ -270,22 +296,24 @@ module Make (P : Dynlink_platform_intf.S) = struct
               check_interface_imports filename imports ifaces)
             state.ifaces units
         in
-        List.iter (fun ui ->
-            let imports = UH.implementation_imports library_header ui |> Array.of_list in
-            check_implementation_imports ~allowed_units filename imports implems)
-          units;
-        ifaces, implems
+        let implems_with_loaded =
+          List.fold_left (fun implems_acc ui ->
+              let imports = UH.implementation_imports library_header ui |> Array.of_list in
+              check_implementation_imports ~allowed_units ~check_unit_dependency_order:true
+                filename imports implems_acc;
+              set_loaded_implem filename ui implems_acc)
+            implems units
+        in
+        ifaces, implems_with_loaded
       | DT.Supports_consolidated_imports { cmi_imports; cmx_imports } ->
         (* Native: check consolidated imports once from header *)
         let ifaces =
           check_interface_imports filename cmi_imports state.ifaces
         in
-        check_implementation_imports ~allowed_units filename cmx_imports implems;
+        check_implementation_imports ~allowed_units ~check_unit_dependency_order:false
+          filename cmx_imports implems;
+        check_unit_load_order units filename cmx_imports implems;
         ifaces, implems
-    in
-    let implems =
-      List.fold_left (fun acc ui -> set_loaded_implem filename ui acc)
-        implems units
     in
     let defined_symbols =
       List.fold_left (fun defined_symbols ui ->
