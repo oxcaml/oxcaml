@@ -596,8 +596,8 @@ module X86_peephole = struct
   (* Check if two register arguments refer to the same underlying physical
      register (considering aliasing). Examples: - Reg64 RAX and Reg8L RAX:
      aliased (both refer to RAX) - Reg32 RBX and Reg16 RBX: aliased (both refer
-     to RBX) - Reg64 RAX and Reg64 RBX: not aliased (different registers) - Reg8H
-     AH and Reg64 RAX: aliased (AH is part of RAX) *)
+     to RBX) - Reg64 RAX and Reg64 RBX: not aliased (different registers) -
+     Reg8H AH and Reg64 RAX: aliased (AH is part of RAX) *)
   let registers_alias arg1 arg2 =
     match underlying_reg64 arg1, underlying_reg64 arg2 with
     | Some r1, Some r2 -> equal_reg64 r1 r2
@@ -643,9 +643,9 @@ module X86_peephole = struct
 
   (* Check if a register appears in a memory operand's address calculation.
      Returns true only for memory operands where the register is used as
-     base/index, not for register operands. Handles aliasing: checking if %ebx is
-     in address of (%rbx) returns true. Examples: - mov %rax, (%rbx): %rbx is in
-     address - mov %rax, %rbx: %rbx is NOT in address *)
+     base/index, not for register operands. Handles aliasing: checking if %ebx
+     is in address of (%rbx) returns true. Examples: - mov %rax, (%rbx): %rbx is
+     in address - mov %rax, %rbx: %rbx is NOT in address *)
   let reg_in_memory_address target arg =
     match[@warning "-4"] arg with
     | Mem addr -> (
@@ -744,8 +744,8 @@ module X86_peephole = struct
          a register for these instructions. *)
       reg_appears_in_arg target src
     | SAL (src, dst) | SAR (src, dst) | SHR (src, dst) ->
-      (* Shift instructions are read-modify-write: both src (shift amount) and dst
-         (value to shift, or address if memory operand) are read *)
+      (* Shift instructions are read-modify-write: both src (shift amount) and
+         dst (value to shift, or address if memory operand) are read *)
       reg_appears_in_arg target src || reg_appears_in_arg target dst
     | CMOV (_, src, dst) ->
       (* CMOV reads both operands: src is copied to dst if condition is met, but
@@ -972,6 +972,45 @@ module X86_peephole = struct
       | _, _ -> None)
     | _ -> None
 
+  (* Rewrite rule: optimize MOV sequence to XCHG. Pattern: mov %a, %b; mov %c,
+     %a; mov %b, %c Rewrite: xchg %a, %c
+
+     This is safe when: - All operands are Reg64 registers (to avoid aliasing
+     issues) - %a, %b, %c are all distinct registers - %b is dead after the
+     sequence (not read before next write)
+
+     The transformation changes %b's final value, so %b must not be read. *)
+  let rewrite_mov_sequence_to_xchg cell =
+    match get_cells cell 3 with
+    | [cell1; cell2; cell3] -> (
+      match[@warning "-4"]
+        DLL.value cell1, DLL.value cell2, DLL.value cell3
+      with
+      | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2)), Ins (MOV (src3, dst3))
+        -> (
+        (* Pattern: mov %a, %b; mov %c, %a; mov %b, %c src1=%a, dst1=%b,
+           src2=%c, dst2=%a, src3=%b, dst3=%c *)
+        match src1, dst1, src2, dst2, src3, dst3 with
+        | Reg64 a, Reg64 b, Reg64 c, Reg64 a', Reg64 b', Reg64 c'
+          when equal_reg64 a a' && equal_reg64 b b' && equal_reg64 c c'
+               && (not (equal_reg64 a b))
+               && (not (equal_reg64 a c))
+               && not (equal_reg64 b c) -> (
+          (* Check if %b is dead after the sequence *)
+          match find_next_occurrence_of_register dst1 cell3 with
+          | WriteFound | NotFound ->
+            (* %b is dead, safe to optimize *)
+            (* Rewrite to: xchg %a, %c *)
+            DLL.set_value cell1 (Ins (XCHG (src1, src2)));
+            DLL.delete_curr cell2;
+            DLL.delete_curr cell3;
+            (* Return the cell we modified *)
+            Some (Some cell1)
+          | ReadFound -> None)
+        | _, _, _, _, _, _ -> None)
+      | _, _, _ -> None)
+    | _ -> None
+
   (* Apply all rewrite rules in sequence. Returns Some continuation_cell if a
      rule matched, None otherwise. *)
   let apply_rules cell =
@@ -987,9 +1026,12 @@ module X86_peephole = struct
           match remove_mov_to_dead_register cell with
           | Some cont -> Some cont
           | None -> (
-            match combine_add_rsp cell with
+            match rewrite_mov_sequence_to_xchg cell with
             | Some cont -> Some cont
-            | None -> None))))
+            | None -> (
+              match combine_add_rsp cell with
+              | Some cont -> Some cont
+              | None -> None)))))
 
   (* Main optimization loop for a single asm_program. Iterates through the
      instruction list, applying rewrite rules and respecting hard barriers. *)
