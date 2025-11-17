@@ -1054,16 +1054,18 @@ module X86_peephole = struct
       | _, _, _ -> None)
     | _ -> None
 
-  (* Rewrite rule: optimize MOV followed by ADD/SUB to LEA. Patterns: - mov %a,
-     %b; add $CONST, %b → lea CONST(%a), %b - mov %a, %b; sub $CONST, %b → lea
-     -CONST(%a), %b
+  (* Rewrite rule: optimize MOV followed by ADD/SUB/INC/DEC to LEA. Patterns: -
+     mov %a, %b; add $CONST, %b → lea CONST(%a), %b - mov %a, %b; sub $CONST, %b
+     → lea -CONST(%a), %b - mov %a, %b; inc %b → lea 1(%a), %b - mov %a, %b; dec
+     %b → lea -1(%a), %b
 
      This is safe when: - Both operands are Reg64 registers - For ADD: CONST
      fits in 32-bit signed immediate - For SUB: CONST > Int32.min_int (so -CONST
-     fits in 32-bit signed) - Flags written by ADD/SUB are dead (LEA doesn't
-     modify flags)
+     fits in 32-bit signed) - For INC/DEC: always safe (±1 always fits) - Flags
+     written by ADD/SUB/INC/DEC are dead (LEA doesn't modify flags)
 
-     Key difference: ADD/SUB set flags (CF, OF, SF, ZF, AF, PF), LEA doesn't. *)
+     Key difference: ADD/SUB/INC/DEC set flags (CF, OF, SF, ZF, AF, PF), LEA
+     doesn't. *)
   let rewrite_mov_add_to_lea cell =
     match get_cells cell 2 with
     | [cell1; cell2] -> (
@@ -1139,6 +1141,62 @@ module X86_peephole = struct
             (* Flags might be live, don't optimize *)
             None)
         | _, _, _, _ -> None)
+      | Ins (MOV (src1, dst1)), Ins (INC dst2) when equal_args dst1 dst2 -> (
+        (* Pattern: mov %a, %b; inc %b *)
+        match src1, dst1, dst2 with
+        | Reg64 a, Reg64 b, Reg64 b' when equal_reg64 b b' -> (
+          (* Check if flags are dead after the INC *)
+          match find_next_flag_use cell2 with
+          | WriteFound ->
+            (* Flags are dead (written before read), safe to optimize *)
+            (* Rewrite to: lea 1(%a), %b *)
+            let mem_operand =
+              Mem
+                { arch = X64;
+                  typ = QWORD;
+                  idx = a;
+                  scale = 1;
+                  base = None;
+                  sym = None;
+                  displ = 1
+                }
+            in
+            DLL.set_value cell1 (Ins (LEA (mem_operand, dst1)));
+            DLL.delete_curr cell2;
+            (* Return the cell we modified *)
+            Some (Some cell1)
+          | ReadFound | NotFound ->
+            (* Flags might be live, don't optimize *)
+            None)
+        | _, _, _ -> None)
+      | Ins (MOV (src1, dst1)), Ins (DEC dst2) when equal_args dst1 dst2 -> (
+        (* Pattern: mov %a, %b; dec %b *)
+        match src1, dst1, dst2 with
+        | Reg64 a, Reg64 b, Reg64 b' when equal_reg64 b b' -> (
+          (* Check if flags are dead after the DEC *)
+          match find_next_flag_use cell2 with
+          | WriteFound ->
+            (* Flags are dead (written before read), safe to optimize *)
+            (* Rewrite to: lea -1(%a), %b *)
+            let mem_operand =
+              Mem
+                { arch = X64;
+                  typ = QWORD;
+                  idx = a;
+                  scale = 1;
+                  base = None;
+                  sym = None;
+                  displ = -1
+                }
+            in
+            DLL.set_value cell1 (Ins (LEA (mem_operand, dst1)));
+            DLL.delete_curr cell2;
+            (* Return the cell we modified *)
+            Some (Some cell1)
+          | ReadFound | NotFound ->
+            (* Flags might be live, don't optimize *)
+            None)
+        | _, _, _ -> None)
       | _, _ -> None)
     | _ -> None
 
