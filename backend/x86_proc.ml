@@ -1054,14 +1054,16 @@ module X86_peephole = struct
       | _, _, _ -> None)
     | _ -> None
 
-  (* Rewrite rule: optimize MOV followed by ADD to LEA. Pattern: mov %a, %b; add
-     $CONST, %b Rewrite: lea CONST(%a), %b
+  (* Rewrite rule: optimize MOV followed by ADD/SUB to LEA. Patterns: - mov %a,
+     %b; add $CONST, %b → lea CONST(%a), %b - mov %a, %b; sub $CONST, %b → lea
+     -CONST(%a), %b
 
-     This is safe when: - Both operands are Reg64 registers - CONST fits in
-     32-bit signed immediate (LEA displacement limitation) - Flags written by
-     ADD are dead (LEA doesn't modify flags)
+     This is safe when: - Both operands are Reg64 registers - For ADD: CONST
+     fits in 32-bit signed immediate - For SUB: CONST > Int32.min_int (so -CONST
+     fits in 32-bit signed) - Flags written by ADD/SUB are dead (LEA doesn't
+     modify flags)
 
-     Key difference: ADD sets flags (CF, OF, SF, ZF, AF, PF), LEA doesn't. *)
+     Key difference: ADD/SUB set flags (CF, OF, SF, ZF, AF, PF), LEA doesn't. *)
   let rewrite_mov_add_to_lea cell =
     match get_cells cell 2 with
     | [cell1; cell2] -> (
@@ -1100,6 +1102,43 @@ module X86_peephole = struct
             (* Flags might be live, don't optimize *)
             None)
         | _, _, _, _ -> None)
+      | Ins (MOV (src1, dst1)), Ins (SUB (src2, dst2)) when equal_args dst1 dst2
+        -> (
+        (* Pattern: mov %a, %b; sub $CONST, %b *)
+        match src1, dst1, src2, dst2 with
+        | Reg64 a, Reg64 b, Imm imm, Reg64 b'
+          when equal_reg64 b b'
+               (* For SUB, we negate CONST, so we need CONST != Int32.min_int to
+                  avoid overflow *)
+               && Int64.compare imm (Int64.of_int32 Int32.min_int) > 0
+               && Int64.compare imm (Int64.of_int32 Int32.max_int) <= 0 -> (
+          (* Check if flags are dead after the SUB *)
+          match find_next_flag_use cell2 with
+          | WriteFound ->
+            (* Flags are dead (written before read), safe to optimize *)
+            (* Negate the immediate: sub $CONST, %b becomes lea -CONST(%a),
+               %b *)
+            let displ = Int64.to_int (Int64.neg imm) in
+            (* Rewrite to: lea -CONST(%a), %b *)
+            let mem_operand =
+              Mem
+                { arch = X64;
+                  typ = QWORD;
+                  idx = a;
+                  scale = 1;
+                  base = None;
+                  sym = None;
+                  displ
+                }
+            in
+            DLL.set_value cell1 (Ins (LEA (mem_operand, dst1)));
+            DLL.delete_curr cell2;
+            (* Return the cell we modified *)
+            Some (Some cell1)
+          | ReadFound | NotFound ->
+            (* Flags might be live, don't optimize *)
+            None)
+        | _, _, _, _ -> None)
       | _, _ -> None)
     | _ -> None
 
@@ -1109,6 +1148,10 @@ module X86_peephole = struct
      This is safe when: - All operands are Reg64 registers - %b ≠ %c (if %b ==
      %c, ADD would use the new value of %b after MOV, but LEA would use the old
      value) - Flags written by ADD are dead (LEA doesn't modify flags)
+
+     Note: SUB cannot be optimized here because LEA computes base + index *
+     scale + disp where scale ∈ {1,2,4,8}. To compute %a - %c would require
+     scale = -1, which is not supported by x86-64.
 
      Key difference: ADD sets flags (CF, OF, SF, ZF, AF, PF), LEA doesn't. *)
   let rewrite_mov_add_reg_to_lea cell =
