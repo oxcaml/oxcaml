@@ -603,9 +603,11 @@ and equal_mixed_block_element :
   | Product es1, Product es2 ->
     Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
       es1 es2
+  | Splice_variable id1, Splice_variable id2 -> Ident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-     | Vec256 | Vec512 | Word | Untagged_immediate | Product _), _ -> false
+     | Vec256 | Vec512 | Word | Untagged_immediate | Product _
+     | Splice_variable _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
   Misc.Stdlib.Array.equal (equal_mixed_block_element Unit.equal) shape1 shape2
@@ -956,14 +958,12 @@ let main_module_block_size format =
   | Mb_struct { mb_size } -> mb_size
   | Mb_instantiating_functor _ -> 1
 
-type 'lam program0 =
+type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
     arg_block_idx : int option;
     required_globals : Compilation_unit.Set.t;
-    code : 'lam }
-
-type program = lambda program0
+    code : lambda }
 
 type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
@@ -1188,7 +1188,10 @@ let make_key e =
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
-    | Levent _  ->
+    | Levent _
+    (* CR layout poly: Anything calling this should probably be moved to after
+       slambda eval, we could possibly also make slambda keys. *)
+    | Lsplice _ ->
         raise Not_simple
 
   and tr_recs env es = List.map (tr_rec env) es
@@ -1238,7 +1241,8 @@ let iter_opt f = function
 let shallow_iter ~tail ~non_tail:f = function
     Lvar _
   | Lmutvar _
-  | Lconst _ -> ()
+  | Lconst _
+  | Lsplice _ -> ()
   | Lapply{ap_func = fn; ap_args = args} ->
       f fn; List.iter f args
   | Lfunction{body} ->
@@ -1377,6 +1381,8 @@ let rec free_variables = function
   | Lregion (e, _) ->
       free_variables e
   | Lexclave e ->
+      free_variables e
+  | Lsplice { slambda = (SL.Quote e); _ } ->
       free_variables e
 
 and free_variables_list set exprs =
@@ -1656,6 +1662,8 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lregion (subst s l e, layout)
     | Lexclave e ->
         Lexclave (subst s l e)
+    | Lsplice { splice_loc; slambda = (SL.Quote e) } ->
+        Lsplice { splice_loc; slambda = (SL.Quote (subst s l e)) }
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
@@ -1696,7 +1704,8 @@ let map_lfunction f { kind; params; return; body; attr; loc;
 let shallow_map ~tail ~non_tail:f = function
   | Lvar _
   | Lmutvar _
-  | Lconst _ as lam -> lam
+  | Lconst _
+  | Lsplice _ as lam -> lam
   | Lapply { ap_func; ap_args; ap_result_layout; ap_region_close; ap_mode; ap_loc; ap_tailcall;
              ap_inlined; ap_specialised; ap_probe } ->
       Lapply {
@@ -1888,7 +1897,7 @@ let project_from_mixed_block_shape
         | Value _
         | Float_boxed _
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-        | Untagged_immediate | Vec128 | Vec256 | Vec512 ->
+        | Untagged_immediate | Vec128 | Vec256 | Vec512 | Splice_variable _ ->
           Misc.fatal_error "project_from_mixed_block_element: path too long \
             for mixed block shape")
     in
@@ -1909,6 +1918,10 @@ let mixed_block_projection_may_allocate shape ~path =
           | Some alloc_mode, Some alloc_mode' ->
             Some (join_locality_mode alloc_mode alloc_mode'))
         None shape
+    (* CR layout poly: "At worst" this allocates on the stack because it'll be a
+       Float_boxed. This should probably be computed after slambda eval, but
+       it's currently used by transl. *)
+    | Splice_variable _ -> Some alloc_local
   in
   allocates (project_from_mixed_block_shape shape ~path)
 
@@ -2683,7 +2696,10 @@ let may_allocate_in_region lam =
         rather, it's in the parent region *)
       ()
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
-    | Lsplice { slambda = SL.Quote lam } -> loop lam
+    (* CR layout poly: Pessimistically return true, this really should only get
+       called after slambda eval but translcore does some early simplification.
+       We should fix that at some point. *)
+    | Lsplice _ -> raise Exit
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
     | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
       | Lstaticraise _ | Lstaticcatch _ | Ltrywith _

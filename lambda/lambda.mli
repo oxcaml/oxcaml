@@ -954,7 +954,7 @@ type main_module_block_format =
 (* The number of words in the main module block. *)
 val main_module_block_size : main_module_block_format -> int
 
-type 'lam program0 =
+type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
     arg_block_idx : int option;         (* Index of argument block (see
@@ -969,9 +969,8 @@ type 'lam program0 =
     required_globals : Compilation_unit.Set.t;
                                         (* Modules whose initializer side effects
                                            must occur before [code]. *)
-    code : 'lam }
+    code : lambda }
 
-type program = lambda program0
 (* Lambda code for the middle-end. Here [mbf] is the value of the
    [main_module_block_format] field.
    * In the closure case the code is a sequence of assignments to a

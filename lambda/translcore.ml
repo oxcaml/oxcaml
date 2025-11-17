@@ -137,6 +137,9 @@ let maybe_region get_layout lam =
        Lsend (k, lmet, lobj, largs, Rc_normal, mode, loc, layout)
     | Lregion _ as lam -> lam
     | Lexclave lam -> lam
+    | Lsplice _ ->
+      fatal_error "Translcore.remove_tail_markers_and_exclave: \
+        splices shouldn't be reachable"
     | lam ->
        Lambda.shallow_map ~tail:remove_tail_markers_and_exclave ~non_tail:Fun.id lam
   in

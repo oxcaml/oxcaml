@@ -1180,12 +1180,6 @@ let classify_lazy_argument : Typedtree.expression ->
     | _ ->
        `Other
 
-let value_kind_union (k1 : Lambda.value_kind) (k2 : Lambda.value_kind) =
-  if Lambda.equal_value_kind k1 k2 then k1
-    (* CR vlaviron: we could be more precise by comparing nullability and
-       raw kinds separately *)
-  else Lambda.generic_value
-
 (* Error report *)
 open Format
 
