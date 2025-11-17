@@ -341,10 +341,16 @@ and 'd with_bounds =
     : with_bounds_types -> ('l * Allowance.disallowed) with_bounds
     (** Invariant : there must always be at least one type in this set **)
 
+and normalization_status =
+  | Ran_out_of_fuel
+  | Sufficient_fuel
+
 and ('layout, 'd) layout_and_axes =
   { layout : 'layout;
     mod_bounds : Jkind_mod_bounds.t;
-    with_bounds : 'd with_bounds
+    with_bounds : 'd with_bounds;
+    normalization_status : normalization_status;
+      (** Whether we ran out of fuel while normalizing this jkind. *)
   }
   constraint 'd = 'l * 'r
 
@@ -372,7 +378,6 @@ and 'd jkind =
     annotation : Parsetree.jkind_annotation option;
     history : jkind_history;
     has_warned : bool;
-    ran_out_of_fuel_during_normalize : bool;
     quality : 'd jkind_quality;
   }
   constraint 'd = 'l * 'r
