@@ -3084,6 +3084,29 @@ int main(void) {
 }
 ]])], AC_DEFINE([HAS_AVX2]) has_avx2=yes, [])
 
+AC_SUBST([has_f16c])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <cpuid.h>
+int main(void) {
+    // Old versions of gcc don't accept "f16c" in __builtin_cpu_supports
+    unsigned int eax, ebx, ecx, edx;
+    if (!__get_cpuid(1, &eax, &ebx, &ecx, &edx)) return 1;
+    return (ecx & bit_F16C) == 0;
+}
+]])], AC_DEFINE([HAS_F16C]) has_f16c=yes, [])
+
+AC_SUBST([has_fma])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("fma")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_FMA]) has_fma=yes, [])
+
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"
 ocamlc_cflags="$ocamlc_cflags $common_cflags $sharedlib_cflags $CFLAGS"

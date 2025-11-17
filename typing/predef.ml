@@ -63,18 +63,21 @@ and ident_int8x16 = ident_create "int8x16"
 and ident_int16x8 = ident_create "int16x8"
 and ident_int32x4 = ident_create "int32x4"
 and ident_int64x2 = ident_create "int64x2"
+and ident_float16x8 = ident_create "float16x8"
 and ident_float32x4 = ident_create "float32x4"
 and ident_float64x2 = ident_create "float64x2"
 and ident_int8x32 = ident_create "int8x32"
 and ident_int16x16 = ident_create "int16x16"
 and ident_int32x8 = ident_create "int32x8"
 and ident_int64x4 = ident_create "int64x4"
+and ident_float16x16 = ident_create "float16x16"
 and ident_float32x8 = ident_create "float32x8"
 and ident_float64x4 = ident_create "float64x4"
 and ident_int8x64 = ident_create "int8x64"
 and ident_int16x32 = ident_create "int16x32"
 and ident_int32x16 = ident_create "int32x16"
 and ident_int64x8 = ident_create "int64x8"
+and ident_float16x32 = ident_create "float16x32"
 and ident_float32x16 = ident_create "float32x16"
 and ident_float64x8 = ident_create "float64x8"
 
@@ -111,18 +114,21 @@ and path_int8x16 = Pident ident_int8x16
 and path_int16x8 = Pident ident_int16x8
 and path_int32x4 = Pident ident_int32x4
 and path_int64x2 = Pident ident_int64x2
+and path_float16x8 = Pident ident_float16x8
 and path_float32x4 = Pident ident_float32x4
 and path_float64x2 = Pident ident_float64x2
 and path_int8x32 = Pident ident_int8x32
 and path_int16x16 = Pident ident_int16x16
 and path_int32x8 = Pident ident_int32x8
 and path_int64x4 = Pident ident_int64x4
+and path_float16x16 = Pident ident_float16x16
 and path_float32x8 = Pident ident_float32x8
 and path_float64x4 = Pident ident_float64x4
 and path_int8x64 = Pident ident_int8x64
 and path_int16x32 = Pident ident_int16x32
 and path_int32x16 = Pident ident_int32x16
 and path_int64x8 = Pident ident_int64x8
+and path_float16x32 = Pident ident_float16x32
 and path_float32x16 = Pident ident_float32x16
 and path_float64x8 = Pident ident_float64x8
 
@@ -140,18 +146,21 @@ and path_unboxed_int8x16 = Path.unboxed_version path_int8x16
 and path_unboxed_int16x8 = Path.unboxed_version path_int16x8
 and path_unboxed_int32x4 = Path.unboxed_version path_int32x4
 and path_unboxed_int64x2 = Path.unboxed_version path_int64x2
+and path_unboxed_float16x8 = Path.unboxed_version path_float16x8
 and path_unboxed_float32x4 = Path.unboxed_version path_float32x4
 and path_unboxed_float64x2 = Path.unboxed_version path_float64x2
 and path_unboxed_int8x32 = Path.unboxed_version path_int8x32
 and path_unboxed_int16x16 = Path.unboxed_version path_int16x16
 and path_unboxed_int32x8 = Path.unboxed_version path_int32x8
 and path_unboxed_int64x4 = Path.unboxed_version path_int64x4
+and path_unboxed_float16x16 = Path.unboxed_version path_float16x16
 and path_unboxed_float32x8 = Path.unboxed_version path_float32x8
 and path_unboxed_float64x4 = Path.unboxed_version path_float64x4
 and path_unboxed_int8x64 = Path.unboxed_version path_int8x64
 and path_unboxed_int16x32 = Path.unboxed_version path_int16x32
 and path_unboxed_int32x16 = Path.unboxed_version path_int32x16
 and path_unboxed_int64x8 = Path.unboxed_version path_int64x8
+and path_unboxed_float16x32 = Path.unboxed_version path_float16x32
 and path_unboxed_float32x16 = Path.unboxed_version path_float32x16
 and path_unboxed_float64x8 = Path.unboxed_version path_float64x8
 
@@ -199,18 +208,21 @@ and type_int8x16 = newgenty (Tconstr(path_int8x16, [], ref Mnil))
 and type_int16x8 = newgenty (Tconstr(path_int16x8, [], ref Mnil))
 and type_int32x4 = newgenty (Tconstr(path_int32x4, [], ref Mnil))
 and type_int64x2 = newgenty (Tconstr(path_int64x2, [], ref Mnil))
+and type_float16x8 = newgenty (Tconstr(path_float16x8, [], ref Mnil))
 and type_float32x4 = newgenty (Tconstr(path_float32x4, [], ref Mnil))
 and type_float64x2 = newgenty (Tconstr(path_float64x2, [], ref Mnil))
 and type_int8x32 = newgenty (Tconstr(path_int8x32, [], ref Mnil))
 and type_int16x16 = newgenty (Tconstr(path_int16x16, [], ref Mnil))
 and type_int32x8 = newgenty (Tconstr(path_int32x8, [], ref Mnil))
 and type_int64x4 = newgenty (Tconstr(path_int64x4, [], ref Mnil))
+and type_float16x16 = newgenty (Tconstr(path_float16x16, [], ref Mnil))
 and type_float32x8 = newgenty (Tconstr(path_float32x8, [], ref Mnil))
 and type_float64x4 = newgenty (Tconstr(path_float64x4, [], ref Mnil))
 and type_int8x64 = newgenty (Tconstr(path_int8x64, [], ref Mnil))
 and type_int16x32 = newgenty (Tconstr(path_int16x32, [], ref Mnil))
 and type_int32x16 = newgenty (Tconstr(path_int32x16, [], ref Mnil))
 and type_int64x8 = newgenty (Tconstr(path_int64x8, [], ref Mnil))
+and type_float16x32 = newgenty (Tconstr(path_float16x32, [], ref Mnil))
 and type_float32x16 = newgenty (Tconstr(path_float32x16, [], ref Mnil))
 and type_float64x8 = newgenty (Tconstr(path_float64x8, [], ref Mnil))
 
@@ -222,6 +234,8 @@ and type_unboxed_int32x4 =
   newgenty (Tconstr(path_unboxed_int32x4, [], ref Mnil))
 and type_unboxed_int64x2 =
   newgenty (Tconstr(path_unboxed_int64x2, [], ref Mnil))
+and type_unboxed_float16x8 =
+  newgenty (Tconstr(path_unboxed_float16x8, [], ref Mnil))
 and type_unboxed_float32x4 =
   newgenty (Tconstr(path_unboxed_float32x4, [], ref Mnil))
 and type_unboxed_float64x2 =
@@ -234,6 +248,8 @@ and type_unboxed_int32x8 =
   newgenty (Tconstr(path_unboxed_int32x8, [], ref Mnil))
 and type_unboxed_int64x4 =
   newgenty (Tconstr(path_unboxed_int64x4, [], ref Mnil))
+and type_unboxed_float16x16 =
+  newgenty (Tconstr(path_unboxed_float16x16, [], ref Mnil))
 and type_unboxed_float32x8 =
   newgenty (Tconstr(path_unboxed_float32x8, [], ref Mnil))
 and type_unboxed_float64x4 =
@@ -246,6 +262,8 @@ and type_unboxed_int32x16 =
   newgenty (Tconstr(path_unboxed_int32x16, [], ref Mnil))
 and type_unboxed_int64x8 =
   newgenty (Tconstr(path_unboxed_int64x8, [], ref Mnil))
+and type_unboxed_float16x32 =
+  newgenty (Tconstr(path_unboxed_float16x32, [], ref Mnil))
 and type_unboxed_float32x16 =
   newgenty (Tconstr(path_unboxed_float32x16, [], ref Mnil))
 and type_unboxed_float64x8 =
@@ -709,6 +727,8 @@ let add_simd_stable_extension_types add_type env =
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
   |> add_type ident_int64x2 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
+  |> add_type ident_float16x8 ~jkind:Jkind.Const.Builtin.immutable_data
+      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
   |> add_type ident_float32x4 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_128bit_vectors
   |> add_type ident_float64x2 ~jkind:Jkind.Const.Builtin.immutable_data
@@ -720,6 +740,8 @@ let add_simd_stable_extension_types add_type env =
   |> add_type ident_int32x8 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
   |> add_type ident_int64x4 ~jkind:Jkind.Const.Builtin.immutable_data
+      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
+  |> add_type ident_float16x16 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
   |> add_type ident_float32x8 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_256bit_vectors
@@ -738,6 +760,8 @@ let add_simd_alpha_extension_types add_type env =
   |> add_type ident_int32x16 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_512bit_vectors
   |> add_type ident_int64x8 ~jkind:Jkind.Const.Builtin.immutable_data
+      ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_512bit_vectors
+  |> add_type ident_float16x32 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_512bit_vectors
   |> add_type ident_float32x16 ~jkind:Jkind.Const.Builtin.immutable_data
       ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_512bit_vectors

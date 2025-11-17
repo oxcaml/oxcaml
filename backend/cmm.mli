@@ -251,6 +251,7 @@ type vec128_type =
   | Int16x8
   | Int32x4
   | Int64x2
+  | Float16x8
   | Float32x4
   | Float64x2
 
@@ -259,6 +260,7 @@ type vec256_type =
   | Int16x16
   | Int32x8
   | Int64x4
+  | Float16x16
   | Float32x8
   | Float64x4
 
@@ -267,6 +269,7 @@ type vec512_type =
   | Int16x32
   | Int32x16
   | Int64x8
+  | Float16x32
   | Float32x16
   | Float64x8
 

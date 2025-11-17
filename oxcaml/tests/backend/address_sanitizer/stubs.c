@@ -10,6 +10,46 @@
 #include <caml/memory.h>
 #include <caml/simd.h>
 
+#define BUILTIN(name) void name() { assert(0); }
+
+BUILTIN(caml_sse_vec128_load_aligned);
+BUILTIN(caml_sse_vec128_load_unaligned);
+BUILTIN(caml_sse_vec128_store_aligned);
+BUILTIN(caml_sse_vec128_store_unaligned);
+BUILTIN(caml_sse_vec128_store_aligned_uncached);
+BUILTIN(caml_sse2_vec128_load_low64);
+BUILTIN(caml_sse2_vec128_load_low32);
+BUILTIN(caml_sse2_int32_store_uncached);
+BUILTIN(caml_sse2_int64_store_uncached);
+BUILTIN(caml_sse2_vec128_load_low64_copy_high64);
+BUILTIN(caml_sse2_vec128_load_high64_copy_low64);
+BUILTIN(caml_sse2_vec128_load_zero_low32);
+BUILTIN(caml_sse2_vec128_load_zero_low64);
+BUILTIN(caml_sse2_vec128_store_low32);
+BUILTIN(caml_sse2_vec128_store_low64);
+BUILTIN(caml_sse2_vec128_store_mask8);
+BUILTIN(caml_sse3_vec128_load_broadcast64);
+BUILTIN(caml_sse41_vec128_load_aligned_uncached);
+
+BUILTIN(caml_avx_vec256_load_aligned);
+BUILTIN(caml_avx_vec256_load_unaligned);
+BUILTIN(caml_avx_vec256_store_aligned);
+BUILTIN(caml_avx_vec256_store_unaligned);
+BUILTIN(caml_avx_vec256_load_aligned_uncached);
+BUILTIN(caml_avx_vec256_store_aligned_uncached);
+BUILTIN(caml_avx_vec256_load_broadcast128);
+BUILTIN(caml_avx_vec256_load_broadcast64);
+BUILTIN(caml_avx_vec256_load_broadcast32);
+BUILTIN(caml_avx_vec128_load_broadcast32);
+BUILTIN(caml_avx_vec128_load_mask64);
+BUILTIN(caml_avx_vec256_load_mask64);
+BUILTIN(caml_avx_vec128_load_mask32);
+BUILTIN(caml_avx_vec256_load_mask32);
+BUILTIN(caml_avx_vec128_store_mask64);
+BUILTIN(caml_avx_vec256_store_mask64);
+BUILTIN(caml_avx_vec128_store_mask32);
+BUILTIN(caml_avx_vec256_store_mask32);
+
 #define DO_NOT_SANITIZE __attribute__((no_sanitize("address")))
 
 CAMLprim value ocaml_address_sanitizer_test_alloc(size_t len, int64_t tag) {

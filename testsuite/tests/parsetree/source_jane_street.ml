@@ -316,18 +316,6 @@ val nums : (int * int * int) array =
     (9, 3, 4); (9, 3, 2); (9, 0, 1); (9, 0, 3); (10, 5, 3); (10, 2, 2)|]
 |}]
 
-(* local_ is allowed in the parser in this one place, but the type-checker
-   rejects *)
-let broken_local =
-  [ 5 for local_ n in [ 1; 2 ] ];;
-
-[%%expect{|
-Line 2, characters 10-30:
-2 |   [ 5 for local_ n in [ 1; 2 ] ];;
-              ^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" but is expected to be "global".
-|}]
-
 (* User-written attributes *)
 let nums =
   ([(x[@test.attr1]) for (x[@test.attr2]) in ([][@test.attr3])] [@test.attr4]);;
@@ -458,7 +446,7 @@ type record =
 
 [%%expect{|
 type record = {
-  global_ field0 : int;
+  field0 : int @@ global;
   field1 : int @@ global portable contended;
   field2 : int @@ global portable contended;
   normal_field : int;
@@ -481,16 +469,16 @@ type t =
 
 [%%expect{|
 type 'a parameterized_record = {
-  global_ field0 : 'a;
+  field0 : 'a @@ global;
   field1 : 'a @@ global portable contended;
   field2 : 'a @@ global portable contended;
   normal_field : 'a;
 }
 type t =
-    Foo of global_ int * int
+    Foo of int @@ global * int
   | Foo1 of int @@ global portable contended * int
-  | Foo2 of global_ int * int @@ global portable contended
-  | Foo3 of global_ int * int @@ portable contended
+  | Foo2 of int @@ global * int @@ global portable contended
+  | Foo3 of int @@ global * int @@ portable contended
   | Foo4 of (int * int) @@ global portable contended
 |}]
 
@@ -546,26 +534,26 @@ let f ~(x1 @ many)
 [%%expect{|
 val f :
   x1:'b ->
-  x2:local_ string ->
-  x3:local_ (string -> string) ->
-  x4:local_ ('a. 'a -> 'a) ->
-  x9:local_ ('a. 'a) ->
-  x5:local_ 'c ->
-  x6:local_ bool ->
-  x7:local_ bool ->
-  x8:local_ unit ->
+  x2:string @ local ->
+  x3:(string -> string) @ local ->
+  x4:('a. 'a -> 'a) @ local ->
+  x9:('a. 'a) @ local ->
+  x5:'c @ local ->
+  x6:bool @ local ->
+  x7:bool @ local ->
+  x8:unit @ local ->
   string ->
-  local_ 'd ->
+  'd @ local ->
   'b * string * (string -> string) * ('e -> 'e) * 'c * string * string *
-  int array * string * (int -> local_ (int -> int)) *
-  (int -> local_ (int -> int)) @ local contended = <fun>
+  int array * string * (int -> (int -> int) @ local) *
+  (int -> (int -> int) @ local) @ local contended = <fun>
 |}]
 
 let f1 (_ @ local) = ()
 let f2 () = let x @ local = [1; 2; 3] in f1 x [@nontail]
 
 [%%expect{|
-val f1 : local_ 'a -> unit = <fun>
+val f1 : 'a @ local -> unit = <fun>
 val f2 : unit -> unit = <fun>
 |}]
 
@@ -615,10 +603,10 @@ type t2 = { mutable x : float @@ local once
 
 [%%expect{|
 type t =
-    K1 of global_ string * (float -> float) @@ many * string
-  | K2 : global_ string * (float -> float) @@ many * string -> t
+    K1 of string @@ global * (float -> float) @@ many * string
+  | K2 : string @@ global * (float -> float) @@ many * string -> t
 type t = {
-  global_ x : string;
+  x : string @@ global;
   mutable y : float -> float;
   z : string @@ global many;
 }
@@ -641,7 +629,7 @@ Error: This value is "local" but is expected to be "global".
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
 
 [%%expect{|
-val f2 : local_ float -> (float -> float) @ once -> t2 @ local once = <fun>
+val f2 : float @ local -> (float -> float) @ once -> t2 @ local once = <fun>
 |}]
 
 
@@ -843,7 +831,7 @@ let double1 y = apply ~f:(stack_ fun x -> x + y) y [@nontail]
 let double2 y = apply ~f:(stack_ function x -> x + y) y [@nontail]
 
 [%%expect{|
-val apply : f:local_ ('a -> 'b) -> 'a -> 'b = <fun>
+val apply : f:('a -> 'b) @ local -> 'a -> 'b = <fun>
 val double1 : int -> int = <fun>
 val double2 : int -> int = <fun>
 |}]
@@ -856,7 +844,8 @@ Line 1, characters 23-36:
 Error: This value is "local"
        because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "global"
-       because it is from the allocation at Line 1, characters 23-39
+       because it is an element of the tuple at Line 1, characters 23-39
+       which is expected to be "global" because it is an allocation
        which is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
