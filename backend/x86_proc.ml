@@ -1054,6 +1054,32 @@ module X86_peephole = struct
       | _, _, _ -> None)
     | _ -> None
 
+  (* Helper function: Apply LEA optimization after pattern matching. Checks flag
+     liveness, creates LEA instruction, and replaces the instruction
+     sequence. *)
+  let apply_lea_optimization cell1 cell2 dst idx_reg base_reg_opt displ =
+    match find_next_flag_use cell2 with
+    | WriteFound ->
+      (* Flags are dead (written before read), safe to optimize *)
+      let mem_operand =
+        Mem
+          { arch = X64;
+            typ = QWORD;
+            idx = idx_reg;
+            scale = 1;
+            base = base_reg_opt;
+            sym = None;
+            displ
+          }
+      in
+      DLL.set_value cell1 (Ins (LEA (mem_operand, dst)));
+      DLL.delete_curr cell2;
+      (* Return the cell we modified *)
+      Some (Some cell1)
+    | ReadFound | NotFound ->
+      (* Flags might be live, don't optimize *)
+      None
+
   (* Rewrite rule: optimize MOV followed by ADD/SUB/INC/DEC to LEA. Patterns: -
      mov %a, %b; add $CONST, %b → lea CONST(%a), %b - mov %a, %b; sub $CONST, %b
      → lea -CONST(%a), %b - mov %a, %b; inc %b → lea 1(%a), %b - mov %a, %b; dec
@@ -1077,32 +1103,10 @@ module X86_peephole = struct
         | Reg64 a, Reg64 b, Imm imm, Reg64 b'
           when equal_reg64 b b'
                && Int64.compare imm (Int64.of_int32 Int32.min_int) >= 0
-               && Int64.compare imm (Int64.of_int32 Int32.max_int) <= 0 -> (
-          (* Check if flags are dead after the ADD *)
-          match find_next_flag_use cell2 with
-          | WriteFound ->
-            (* Flags are dead (written before read), safe to optimize *)
-            (* Convert int64 to int - safe because we checked range *)
-            let displ = Int64.to_int imm in
-            (* Rewrite to: lea CONST(%a), %b *)
-            let mem_operand =
-              Mem
-                { arch = X64;
-                  typ = QWORD;
-                  idx = a;
-                  scale = 1;
-                  base = None;
-                  sym = None;
-                  displ
-                }
-            in
-            DLL.set_value cell1 (Ins (LEA (mem_operand, dst1)));
-            DLL.delete_curr cell2;
-            (* Return the cell we modified *)
-            Some (Some cell1)
-          | ReadFound | NotFound ->
-            (* Flags might be live, don't optimize *)
-            None)
+               && Int64.compare imm (Int64.of_int32 Int32.max_int) <= 0 ->
+          (* Convert int64 to int - safe because we checked range *)
+          let displ = Int64.to_int imm in
+          apply_lea_optimization cell1 cell2 dst1 a None displ
         | _, _, _, _ -> None)
       | Ins (MOV (src1, dst1)), Ins (SUB (src2, dst2)) when equal_args dst1 dst2
         -> (
@@ -1113,89 +1117,22 @@ module X86_peephole = struct
                (* For SUB, we negate CONST, so we need CONST != Int32.min_int to
                   avoid overflow *)
                && Int64.compare imm (Int64.of_int32 Int32.min_int) > 0
-               && Int64.compare imm (Int64.of_int32 Int32.max_int) <= 0 -> (
-          (* Check if flags are dead after the SUB *)
-          match find_next_flag_use cell2 with
-          | WriteFound ->
-            (* Flags are dead (written before read), safe to optimize *)
-            (* Negate the immediate: sub $CONST, %b becomes lea -CONST(%a),
-               %b *)
-            let displ = Int64.to_int (Int64.neg imm) in
-            (* Rewrite to: lea -CONST(%a), %b *)
-            let mem_operand =
-              Mem
-                { arch = X64;
-                  typ = QWORD;
-                  idx = a;
-                  scale = 1;
-                  base = None;
-                  sym = None;
-                  displ
-                }
-            in
-            DLL.set_value cell1 (Ins (LEA (mem_operand, dst1)));
-            DLL.delete_curr cell2;
-            (* Return the cell we modified *)
-            Some (Some cell1)
-          | ReadFound | NotFound ->
-            (* Flags might be live, don't optimize *)
-            None)
+               && Int64.compare imm (Int64.of_int32 Int32.max_int) <= 0 ->
+          (* Negate the immediate: sub $CONST, %b becomes lea -CONST(%a), %b *)
+          let displ = Int64.to_int (Int64.neg imm) in
+          apply_lea_optimization cell1 cell2 dst1 a None displ
         | _, _, _, _ -> None)
       | Ins (MOV (src1, dst1)), Ins (INC dst2) when equal_args dst1 dst2 -> (
         (* Pattern: mov %a, %b; inc %b *)
         match src1, dst1, dst2 with
-        | Reg64 a, Reg64 b, Reg64 b' when equal_reg64 b b' -> (
-          (* Check if flags are dead after the INC *)
-          match find_next_flag_use cell2 with
-          | WriteFound ->
-            (* Flags are dead (written before read), safe to optimize *)
-            (* Rewrite to: lea 1(%a), %b *)
-            let mem_operand =
-              Mem
-                { arch = X64;
-                  typ = QWORD;
-                  idx = a;
-                  scale = 1;
-                  base = None;
-                  sym = None;
-                  displ = 1
-                }
-            in
-            DLL.set_value cell1 (Ins (LEA (mem_operand, dst1)));
-            DLL.delete_curr cell2;
-            (* Return the cell we modified *)
-            Some (Some cell1)
-          | ReadFound | NotFound ->
-            (* Flags might be live, don't optimize *)
-            None)
+        | Reg64 a, Reg64 b, Reg64 b' when equal_reg64 b b' ->
+          apply_lea_optimization cell1 cell2 dst1 a None 1
         | _, _, _ -> None)
       | Ins (MOV (src1, dst1)), Ins (DEC dst2) when equal_args dst1 dst2 -> (
         (* Pattern: mov %a, %b; dec %b *)
         match src1, dst1, dst2 with
-        | Reg64 a, Reg64 b, Reg64 b' when equal_reg64 b b' -> (
-          (* Check if flags are dead after the DEC *)
-          match find_next_flag_use cell2 with
-          | WriteFound ->
-            (* Flags are dead (written before read), safe to optimize *)
-            (* Rewrite to: lea -1(%a), %b *)
-            let mem_operand =
-              Mem
-                { arch = X64;
-                  typ = QWORD;
-                  idx = a;
-                  scale = 1;
-                  base = None;
-                  sym = None;
-                  displ = -1
-                }
-            in
-            DLL.set_value cell1 (Ins (LEA (mem_operand, dst1)));
-            DLL.delete_curr cell2;
-            (* Return the cell we modified *)
-            Some (Some cell1)
-          | ReadFound | NotFound ->
-            (* Flags might be live, don't optimize *)
-            None)
+        | Reg64 a, Reg64 b, Reg64 b' when equal_reg64 b b' ->
+          apply_lea_optimization cell1 cell2 dst1 a None (-1)
         | _, _, _ -> None)
       | _, _ -> None)
     | _ -> None
@@ -1221,30 +1158,8 @@ module X86_peephole = struct
         (* Pattern: mov %a, %b; add %c, %b *)
         match src1, dst1, src2, dst2 with
         | Reg64 a, Reg64 b, Reg64 c, Reg64 b'
-          when equal_reg64 b b' && not (equal_reg64 b c) -> (
-          (* Check if flags are dead after the ADD *)
-          match find_next_flag_use cell2 with
-          | WriteFound ->
-            (* Flags are dead (written before read), safe to optimize *)
-            (* Rewrite to: lea (%a,%c), %b *)
-            let mem_operand =
-              Mem
-                { arch = X64;
-                  typ = QWORD;
-                  idx = c;
-                  scale = 1;
-                  base = Some a;
-                  sym = None;
-                  displ = 0
-                }
-            in
-            DLL.set_value cell1 (Ins (LEA (mem_operand, dst1)));
-            DLL.delete_curr cell2;
-            (* Return the cell we modified *)
-            Some (Some cell1)
-          | ReadFound | NotFound ->
-            (* Flags might be live, don't optimize *)
-            None)
+          when equal_reg64 b b' && not (equal_reg64 b c) ->
+          apply_lea_optimization cell1 cell2 dst1 c (Some a) 0
         | _, _, _, _ -> None)
       | _, _ -> None)
     | _ -> None
