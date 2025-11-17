@@ -34,8 +34,8 @@ type compile_time_constant =
   | Ostype_cygwin
   | Backend_type
   | Runtime5
-  | Arch_amd64
-  | Arch_arm64
+  | Arch_is_amd64
+  | Arch_is_arm64
 
 type immediate_or_pointer =
   | Immediate

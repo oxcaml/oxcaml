@@ -719,7 +719,7 @@ CAMLprim value caml_sys_const_runtime5(value unit)
   return Val_true;
 }
 
-CAMLprim value caml_sys_const_arch_amd64(value unit)
+CAMLprim value caml_sys_const_arch_is_amd64(value unit)
 {
 #if defined(__x86_64__)
   return Val_true;
@@ -728,7 +728,7 @@ CAMLprim value caml_sys_const_arch_amd64(value unit)
 #endif
 }
 
-CAMLprim value caml_sys_const_arch_arm64(value unit)
+CAMLprim value caml_sys_const_arch_is_arm64(value unit)
 {
 #if defined(__aarch64__)
   return Val_true;
