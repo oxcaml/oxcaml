@@ -476,11 +476,15 @@ module Layout = struct
         (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
           ppf
           ("any" :: Scannable_axes.to_string_list sa)
-      | Sort (s, sa) ->
+      (* To ensure that scannable axes aren't printed on non-values, we
+         just check before printing. This is easier than maintaining the
+         invariant that [sa] = [Scannable_axes.max] in non-value cases. *)
+      | Sort (s, sa) when Sort.is_possibly_scannable s ->
         let sort_str = asprintf "%a" Sort.format s in
         (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
           ppf
           (sort_str :: Scannable_axes.to_string_list sa)
+      | Sort (s, _) -> fprintf ppf "%a" Sort.format s
       | Product ts ->
         let pp_sep ppf () = Format.fprintf ppf "@ & " in
         Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
@@ -4191,14 +4195,7 @@ let is_value_for_printing ~ignore_null { jkind; _ } =
     let values = [value] in
     let values =
       if ignore_null
-      then
-        { value with
-          mod_bounds =
-            Mod_bounds.set_separability Separability.Maybe_separable
-              (Mod_bounds.set_nullability Nullability.Maybe_null
-                 value.mod_bounds)
-        }
-        :: values
+      then Const.Builtin.value_or_null.jkind :: values
       else values
     in
     List.exists (fun v -> Const.no_with_bounds_and_equal const v) values
