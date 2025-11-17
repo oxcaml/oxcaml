@@ -160,7 +160,9 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns
   compile_phrase (Cmm_helpers.plugin_header dynheader);
   compile_phrase
     (Cmm_helpers.global_table
-       (List.map (fun dynu -> dynu.Cmxs_format.dynu_name) dynheader.Cmxs_format.dynu_units));
+       (List.map
+          (fun dynu -> dynu.Cmxs_format.dynu_name)
+          dynheader.Cmxs_format.dynu_units));
   if !Clflags.output_complete_object then force_linking_of_startup ~ppf_dump;
   (* this is to force a reference to all units, otherwise the linker might drop
      some of them (in case of libraries) *)

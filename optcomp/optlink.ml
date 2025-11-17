@@ -192,12 +192,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let not_output_to_dev_null output_name =
     not (String.equal output_name "/dev/null")
 
-
   (* Based on a similar implementation in optlibrarian.ml *)
   let dynamic_units ~linkenv units_to_link =
     let dynu_imports_cmi, dynu_imports_cmx =
-      Linkenv.extract_crc_interfaces linkenv |> Array.of_list,
-      Linkenv.extract_crc_implementations linkenv |> Array.of_list
+      ( Linkenv.extract_crc_interfaces linkenv |> Array.of_list,
+        Linkenv.extract_crc_implementations linkenv |> Array.of_list )
     in
     let cmi_index, cmx_index =
       Compilation_unit.Name.Tbl.create 42, Compilation_unit.Tbl.create 42
@@ -216,26 +215,25 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       List.iter (fun import -> B.set b (find ix (get_name import))) entries;
       b
     in
-    let dynunits = List.map
-      (fun unit ->
-        { Cmxs_format.dynu_name = unit.name;
-          dynu_crc = unit.crc;
-          dynu_imports_cmi_bitmap =
-            mk_bitmap dynu_imports_cmi cmi_index unit.ui_imports_cmi
-              ~find:Compilation_unit.Name.Tbl.find
-              ~get_name:Import_info.name;
-          dynu_imports_cmx_bitmap =
-            mk_bitmap dynu_imports_cmx cmx_index unit.ui_imports_cmx
-              ~find:Compilation_unit.Tbl.find ~get_name:Import_info.cu;
-          dynu_imports_cmx_self_index =
-            Compilation_unit.Tbl.find_opt cmx_index unit.name;
-          dynu_quoted_globals = Array.of_list unit.ui_quoted_globals;
-          dynu_defines = unit.defines
-        })
-      units_to_link
+    let dynunits =
+      List.map
+        (fun unit ->
+          { Cmxs_format.dynu_name = unit.name;
+            dynu_crc = unit.crc;
+            dynu_imports_cmi_bitmap =
+              mk_bitmap dynu_imports_cmi cmi_index unit.ui_imports_cmi
+                ~find:Compilation_unit.Name.Tbl.find ~get_name:Import_info.name;
+            dynu_imports_cmx_bitmap =
+              mk_bitmap dynu_imports_cmx cmx_index unit.ui_imports_cmx
+                ~find:Compilation_unit.Tbl.find ~get_name:Import_info.cu;
+            dynu_imports_cmx_self_index =
+              Compilation_unit.Tbl.find_opt cmx_index unit.name;
+            dynu_quoted_globals = Array.of_list unit.ui_quoted_globals;
+            dynu_defines = unit.defines
+          })
+        units_to_link
     in
     dynunits, dynu_imports_cmi, dynu_imports_cmx
-
 
   let link_shared ~ppf_dump linkenv objfiles output_name =
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
@@ -258,8 +256,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             dynu_imports_cmx
           }
         in
-        Backend.link_shared ml_objfiles output_name ~ppf_dump ~genfns
-        ~dynheader)
+        Backend.link_shared ml_objfiles output_name ~ppf_dump ~genfns ~dynheader)
 
   (* Main entry point *)
 
