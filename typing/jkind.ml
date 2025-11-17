@@ -953,7 +953,7 @@ module Layout_and_axes = struct
              terminate.) *)
           match t.normalization_status with
           | Sufficient_fuel -> 10
-          | Ran_out_of_fuel -> 1
+          | Ran_out_of_fuel -> 0
 
         let starting =
           { tuple_fuel = initial_fuel_per_ty;
