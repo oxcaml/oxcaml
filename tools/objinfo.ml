@@ -400,9 +400,13 @@ let print_cmxs_infos header =
          None
          None
          (fun f ->
-           B.iter (fun i -> f header.dynu_imports_cmi.(i)) ui.dynu_imports_cmi_bitmap)
+           B.iter
+             (fun i -> f header.dynu_imports_cmi.(i))
+             ui.dynu_imports_cmi_bitmap)
          (fun f ->
-           B.iter (fun i -> f header.dynu_imports_cmx.(i)) ui.dynu_imports_cmx_bitmap)
+           B.iter
+             (fun i -> f header.dynu_imports_cmx.(i))
+             ui.dynu_imports_cmx_bitmap)
          (fun f -> Array.iter f ui.dynu_quoted_globals);)
     header.dynu_units
 

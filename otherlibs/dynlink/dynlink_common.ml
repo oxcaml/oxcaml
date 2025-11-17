@@ -274,8 +274,8 @@ module Make (P : Dynlink_platform_intf.S) = struct
       raise (DT.Error Unsafe_file)
     end
 
-  let check filename (library_header : LH.t) (units : UH.t list) (state : State.t)
-      ~unsafe_allowed ~priv =
+  let check filename (library_header : LH.t) (units : UH.t list)
+      (state : State.t) ~unsafe_allowed ~priv =
     List.iter (fun ui -> check_unsafe_module unsafe_allowed ui) units;
     let new_units =
       String.Set.of_list (List.map (fun ui -> UH.name ui) units)
@@ -292,14 +292,19 @@ module Make (P : Dynlink_platform_intf.S) = struct
         (* Bytecode: check imports per-unit *)
         let ifaces =
           List.fold_left (fun ifaces ui ->
-              let imports = UH.interface_imports library_header ui |> Array.of_list in
+              let imports =
+                UH.interface_imports library_header ui |> Array.of_list
+              in
               check_interface_imports filename imports ifaces)
             state.ifaces units
         in
         let implems_with_loaded =
           List.fold_left (fun implems_acc ui ->
-              let imports = UH.implementation_imports library_header ui |> Array.of_list in
-              check_implementation_imports ~allowed_units ~check_unit_dependency_order:true
+              let imports =
+                UH.implementation_imports library_header ui |> Array.of_list
+              in
+              check_implementation_imports
+                ~allowed_units ~check_unit_dependency_order:true
                 filename imports implems_acc;
               set_loaded_implem filename ui implems_acc)
             implems units
@@ -310,7 +315,8 @@ module Make (P : Dynlink_platform_intf.S) = struct
         let ifaces =
           check_interface_imports filename cmi_imports state.ifaces
         in
-        check_implementation_imports ~allowed_units ~check_unit_dependency_order:false
+        check_implementation_imports
+          ~allowed_units ~check_unit_dependency_order:false
           filename cmx_imports implems;
         check_unit_load_order units filename cmx_imports implems;
         ifaces, implems
