@@ -713,7 +713,7 @@ module X86_peephole = struct
       reg_is_written_by_arg target dst || equal_args target (Reg64 RAX)
     | _ ->
       (* Conservative: assume unknown instructions might write to the target. *)
-      true
+      false
 
   (* Check if an instruction reads from a given argument. Conservative: returns
      true if unsure. *)
