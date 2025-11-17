@@ -193,7 +193,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     not (String.equal output_name "/dev/null")
 
   (* Based on a similar implementation in optlibrarian.ml *)
-  let dynamic_units ~linkenv units_to_link =
+  let create_dynheader ~linkenv units_to_link =
     let dynu_imports_cmi, dynu_imports_cmx =
       ( Linkenv.extract_crc_interfaces linkenv |> Array.of_list,
         Linkenv.extract_crc_implementations linkenv |> Array.of_list )
@@ -233,7 +233,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           })
         units_to_link
     in
-    dynunits, dynu_imports_cmi, dynu_imports_cmx
+    { Cmxs_format.dynu_magic = Config.cmxs_magic_number;
+      dynu_units = dynunits;
+      dynu_imports_cmi;
+      dynu_imports_cmx
+    }
 
   let link_shared ~ppf_dump linkenv objfiles output_name =
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
@@ -246,16 +250,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         in
         Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs linkenv;
         Clflags.all_ccopts := Linkenv.lib_ccopts linkenv @ !Clflags.all_ccopts;
-        let dynu_units, dynu_imports_cmi, dynu_imports_cmx =
-          dynamic_units ~linkenv units_tolink
-        in
-        let dynheader : Cmxs_format.dynheader =
-          { dynu_magic = Config.cmxs_magic_number;
-            dynu_units;
-            dynu_imports_cmi;
-            dynu_imports_cmx
-          }
-        in
+        let dynheader = create_dynheader ~linkenv units_tolink in
         Backend.link_shared ml_objfiles output_name ~ppf_dump ~genfns ~dynheader)
 
   (* Main entry point *)

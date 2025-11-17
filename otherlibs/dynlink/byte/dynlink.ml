@@ -45,10 +45,10 @@ module Bytecode = struct
     let name (t : t) = Compilation_unit.full_path_as_string t.cu_name
     let crc _t = None
 
-    let interface_imports (_header : Dynlink_library_header.t) (t : t) =
+    let interface_imports () (t : t) =
       List.map convert_cmi_import (Array.to_list t.cu_imports)
 
-    let implementation_imports (_header : Dynlink_library_header.t) (t : t) =
+    let implementation_imports () (t : t) =
       let required_from_unit =
         t.cu_required_compunits
         |> List.map Compilation_unit.to_global_ident_for_bytecode
@@ -75,7 +75,13 @@ module Bytecode = struct
           |> Ident.name)
         (Symtable.initialized_compunits t.cu_reloc)
 
-    let imports_cmx_info _ = None
+    let iter_imports_cmx (header : Dynlink_library_header.t) (t : t) f =
+      (* For bytecode, iterate over per-unit implementation_imports.
+         Index ranges 0, 1, 2, ... (not into a consolidated array). *)
+      List.iteri (fun i import -> f i import)
+        (implementation_imports header t)
+
+    let imports_cmx_self_index (_t : t) = None
 
     let unsafe_module (t : t) = t.cu_primitives <> []
   end
