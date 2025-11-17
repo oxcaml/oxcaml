@@ -117,3 +117,9 @@ let () =
       in
       Some (Printf.sprintf "Dynlink.Error (Dynlink.%s)" msg)
     | _ -> None)
+
+type consolidated_imports =
+| Requires_per_unit_checks
+| Supports_consolidated_imports of
+  { cmi_imports : (string * Digest.t option) array;
+    cmx_imports : (string * Digest.t option) array }

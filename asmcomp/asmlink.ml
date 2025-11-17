@@ -35,8 +35,9 @@ type unit_link_info = Linkenv.unit_link_info =
     defines : Compilation_unit.t list;
     file_name : string;
     crc : Digest.t;
-    (* for shared libs *)
-    dynunit : Cmxs_format.dynunit option
+    ui_imports_cmi : Import_info.t list;
+    ui_imports_cmx : Import_info.t list;
+    ui_quoted_globals : Compilation_unit.Name.t list
   }
 
 let runtime_lib () =
@@ -135,7 +136,8 @@ let make_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   then Llvmize.end_assembly ()
   else Emit.end_assembly ()
 
-let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
+let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns
+    dynheader =
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
   Location.input_name := "caml_startup";
   let shared_startup_comp_unit =
@@ -155,10 +157,12 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
   List.iter compile_phrase
     (Cmm_helpers.emit_gc_roots_table ~symbols:[]
        (Generic_fns.compile ~cache:false ~shared:true genfns));
-  let dynunits = List.map (fun u -> Option.get u.dynunit) units in
-  compile_phrase (Cmm_helpers.plugin_header dynunits);
+  compile_phrase (Cmm_helpers.plugin_header dynheader);
   compile_phrase
-    (Cmm_helpers.global_table (List.map (fun unit -> unit.name) units));
+    (Cmm_helpers.global_table
+       (List.map
+          (fun dynu -> dynu.Cmxs_format.dynu_name)
+          dynheader.Cmxs_format.dynu_units));
   if !Clflags.output_complete_object then force_linking_of_startup ~ppf_dump;
   (* this is to force a reference to all units, otherwise the linker might drop
      some of them (in case of libraries) *)
@@ -177,7 +181,7 @@ let call_linker_shared ?(native_toplevel = false) file_list output_name =
 let not_output_to_dev_null output_name =
   not (String.equal output_name "/dev/null")
 
-let link_shared unix ml_objfiles output_name ~genfns ~units_tolink ~ppf_dump =
+let link_shared unix ml_objfiles output_name ~genfns ~dynheader ~ppf_dump =
   if !Oxcaml_flags.use_cached_generic_functions
   then
     (* When doing shared linking do not use the shared generated startup file.
@@ -203,7 +207,7 @@ let link_shared unix ml_objfiles output_name ~genfns ~units_tolink ~ppf_dump =
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
       make_shared_startup_file unix ~ppf_dump
-        ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns units_tolink);
+        ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns dynheader);
   call_linker_shared (startup_obj :: objfiles) output_name;
   if !Oxcaml_flags.internal_assembler
   then

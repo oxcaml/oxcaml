@@ -28,6 +28,11 @@ let convert_cmi_import import =
   let crc = Import_info.crc import in
   name, crc
 
+let convert_cmx_import import =
+  let cu = Import_info.cu import |> Compilation_unit.full_path_as_string in
+  let crc = Import_info.crc import in
+  cu, crc
+
 type global_map = {
   name : Compilation_unit.t;
   crc_intf : Digest.t option;
@@ -55,21 +60,38 @@ module Native = struct
     = "caml_sys_exit" "caml_natdynlink_existssym"
     [@@noalloc]
 
+  module Dynlink_library_header = struct
+    type t = {
+      cmi_imports : (string * Digest.t option) array;
+      cmx_imports : (string * Digest.t option) array;
+    }
+
+    let consolidated_imports (t : t) : DT.consolidated_imports =
+      DT.Supports_consolidated_imports
+        { cmi_imports = t.cmi_imports;
+          cmx_imports = t.cmx_imports }
+  end
+
   module Unit_header = struct
     type t = Cmxs_format.dynunit
 
-    let name (t : t) = t.dynu_name |> Compilation_unit.name_as_string
+    let name (t : t) = t.dynu_name |> Compilation_unit.full_path_as_string
+
     let crc (t : t) = Some t.dynu_crc
 
-    let convert_cmx_import import =
-      let cu = Import_info.cu import |> Compilation_unit.name_as_string in
-      let crc = Import_info.crc import in
-      cu, crc
+    let interface_imports (header : Dynlink_library_header.t) (t : t) =
+      let imports_cmi = ref [] in
+      Misc.Bitmap.iter (fun i ->
+        imports_cmi := header.cmi_imports.(i) :: !imports_cmi)
+        t.dynu_imports_cmi_bitmap;
+      List.rev !imports_cmi
 
-    let interface_imports (t : t) =
-      List.map convert_cmi_import (Array.to_list t.dynu_imports_cmi)
-    let implementation_imports (t : t) =
-      List.map convert_cmx_import (Array.to_list t.dynu_imports_cmx)
+    let implementation_imports (header : Dynlink_library_header.t) (t : t) =
+      let imports_cmx = ref [] in
+      Misc.Bitmap.iter (fun i ->
+        imports_cmx := header.cmx_imports.(i) :: !imports_cmx)
+        t.dynu_imports_cmx_bitmap;
+      List.rev !imports_cmx
 
     let defined_symbols (t : t) =
       List.map (fun comp_unit ->
@@ -77,6 +99,12 @@ module Native = struct
           |> Symbol.linkage_name
           |> Linkage_name.to_string)
         t.dynu_defines
+
+    let iter_imports_cmx (header : Dynlink_library_header.t) (t : t) f =
+      Misc.Bitmap.iter (fun i -> f i header.cmx_imports.(i))
+        t.dynu_imports_cmx_bitmap
+
+    let imports_cmx_self_index (t : t) = t.dynu_imports_cmx_self_index
 
     let unsafe_module _t = false
   end
@@ -126,14 +154,19 @@ module Native = struct
       Register_dyn_global_duplicate
 
   let load ~filename ~priv =
-    let handle, header =
+    let handle, raw_header =
       try ndl_open filename (not priv)
       with exn -> raise (DT.Error (Cannot_open_dynamic_library exn))
     in
-    if header.dynu_magic <> Config.cmxs_magic_number then begin
+    if raw_header.dynu_magic <> Config.cmxs_magic_number then begin
       raise (DT.Error (Not_a_bytecode_file filename))
     end;
-    handle, header.dynu_units
+    let header : Dynlink_library_header.t = {
+      cmi_imports = Array.map convert_cmi_import raw_header.dynu_imports_cmi;
+      cmx_imports = Array.map convert_cmx_import raw_header.dynu_imports_cmx;
+    } in
+    let unit_headers = raw_header.dynu_units in
+    handle, header, unit_headers
 
   let register handle dynu_units ~priv ~filename =
     let syms =

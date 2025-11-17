@@ -21,6 +21,16 @@ module Make (_ : Dynlink_platform_intf.S) : sig
   val is_native : bool
   val loadfile : string -> unit
   val loadfile_private : string -> unit
+  val loadfile_unsafe :
+    string ->
+    check_dependency_order:bool ->
+    check_imports:bool ->
+    unit
+  val loadfile_private_unsafe :
+    string ->
+    check_dependency_order:bool ->
+    check_imports:bool ->
+    unit
   val unsafe_get_global_value : bytecode_or_asm_symbol:string -> Obj.t option
   val does_symbol_exist : bytecode_or_asm_symbol:string -> bool
   val adapt_filename : string -> string

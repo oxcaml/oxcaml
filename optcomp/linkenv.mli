@@ -35,8 +35,9 @@ type unit_link_info =
     defines : Compilation_unit.t list;
     file_name : string;
     crc : Digest.t;
-    (* for shared libs *)
-    dynunit : Cmxs_format.dynunit option
+    ui_imports_cmi : Import_info.t list;
+    ui_imports_cmx : Import_info.t list;
+    ui_quoted_globals : Compilation_unit.Name.t list
   }
 
 val extract_crc_interfaces : unit -> Import_info.t list

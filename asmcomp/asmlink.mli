@@ -35,7 +35,7 @@ val link_shared :
   string list ->
   string ->
   genfns:Generic_fns.Tbl.t ->
-  units_tolink:Linkenv.unit_link_info list ->
+  dynheader:Cmxs_format.dynheader ->
   ppf_dump:Format.formatter ->
   unit
 

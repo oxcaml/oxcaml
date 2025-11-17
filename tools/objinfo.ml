@@ -390,6 +390,7 @@ let print_cmxa_infos (lib : Cmx_format.library_infos) =
         printf "Force link: %s\n" (if u.li_force_link then "YES" else "no"))
 
 let print_cmxs_infos header =
+  let module B = Misc.Bitmap in
   List.iter
     (fun ui ->
        print_general_infos
@@ -398,8 +399,14 @@ let print_cmxs_infos header =
          ui.dynu_defines
          None
          None
-         (fun f -> Array.iter f ui.dynu_imports_cmi)
-         (fun f -> Array.iter f ui.dynu_imports_cmx)
+         (fun f ->
+           B.iter
+             (fun i -> f header.dynu_imports_cmi.(i))
+             ui.dynu_imports_cmi_bitmap)
+         (fun f ->
+           B.iter
+             (fun i -> f header.dynu_imports_cmx.(i))
+             ui.dynu_imports_cmx_bitmap)
          (fun f -> Array.iter f ui.dynu_quoted_globals);)
     header.dynu_units
 
