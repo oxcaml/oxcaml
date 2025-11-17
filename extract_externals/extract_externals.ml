@@ -35,7 +35,11 @@ let output_file = ref None
 
 let include_dirs = ref []
 
+let include_manifests = ref []
+
 let hidden_include_dirs = ref []
+
+let hidden_include_manifests = ref []
 
 let open_modules = ref []
 
@@ -59,12 +63,24 @@ let spec_list =
           hidden_include_dirs
             := List.rev_append (String.split_on_char ',' s) !hidden_include_dirs),
       "Hidden includes" );
+    ( "-I-manifest",
+      Arg.String (fun file -> include_manifests := file :: !include_manifests),
+      "A manifest file specifying which .cmi files are available." );
+    ( "-H-manifest",
+      Arg.String
+        (fun file -> include_manifests := file :: !hidden_include_manifests),
+      "A manifest file specifying which .cmi files are available, but for \
+       hidden includes." );
     ( "-open",
       Arg.String
         (fun s ->
           open_modules
             := List.rev_append (String.split_on_char ',' s) !open_modules),
-      "Modules to open" ) ]
+      "Modules to open" );
+    ( "-args0",
+      Arg.Expand Arg.read_arg0,
+      "<file> Read additional NUL separated command line arguments from <file>"
+    ) ]
 
 let parse_arguments () =
   Arg.parse spec_list
@@ -129,6 +145,9 @@ let extract_shapes_from_files ~verbose files =
   Clflags.open_modules := !open_modules @ !Clflags.open_modules;
   Clflags.hidden_include_dirs
     := !hidden_include_dirs @ !Clflags.hidden_include_dirs;
+  Clflags.include_manifests := !include_manifests @ !Clflags.include_manifests;
+  Clflags.hidden_include_manifests
+    := !include_manifests @ !Clflags.hidden_include_manifests;
   Compmisc.init_path ();
   let files =
     List.map
