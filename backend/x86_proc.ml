@@ -1103,6 +1103,51 @@ module X86_peephole = struct
       | _, _ -> None)
     | _ -> None
 
+  (* Rewrite rule: optimize MOV followed by ADD (register) to LEA. Pattern: mov
+     %a, %b; add %c, %b Rewrite: lea (%a,%c), %b
+
+     This is safe when: - All operands are Reg64 registers - %b ≠ %c (if %b ==
+     %c, ADD would use the new value of %b after MOV, but LEA would use the old
+     value) - Flags written by ADD are dead (LEA doesn't modify flags)
+
+     Key difference: ADD sets flags (CF, OF, SF, ZF, AF, PF), LEA doesn't. *)
+  let rewrite_mov_add_reg_to_lea cell =
+    match get_cells cell 2 with
+    | [cell1; cell2] -> (
+      match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
+      | Ins (MOV (src1, dst1)), Ins (ADD (src2, dst2)) when equal_args dst1 dst2
+        -> (
+        (* Pattern: mov %a, %b; add %c, %b *)
+        match src1, dst1, src2, dst2 with
+        | Reg64 a, Reg64 b, Reg64 c, Reg64 b'
+          when equal_reg64 b b' && not (equal_reg64 b c) -> (
+          (* Check if flags are dead after the ADD *)
+          match find_next_flag_use cell2 with
+          | WriteFound ->
+            (* Flags are dead (written before read), safe to optimize *)
+            (* Rewrite to: lea (%a,%c), %b *)
+            let mem_operand =
+              Mem
+                { arch = X64;
+                  typ = QWORD;
+                  idx = c;
+                  scale = 1;
+                  base = Some a;
+                  sym = None;
+                  displ = 0
+                }
+            in
+            DLL.set_value cell1 (Ins (LEA (mem_operand, dst1)));
+            DLL.delete_curr cell2;
+            (* Return the cell we modified *)
+            Some (Some cell1)
+          | ReadFound | NotFound ->
+            (* Flags might be live, don't optimize *)
+            None)
+        | _, _, _, _ -> None)
+      | _, _ -> None)
+    | _ -> None
+
   (* Apply all rewrite rules in sequence. Returns Some continuation_cell if a
      rule matched, None otherwise. *)
   let apply_rules cell =
@@ -1124,9 +1169,12 @@ module X86_peephole = struct
               match rewrite_mov_add_to_lea cell with
               | Some cont -> Some cont
               | None -> (
-                match combine_add_rsp cell with
+                match rewrite_mov_add_reg_to_lea cell with
                 | Some cont -> Some cont
-                | None -> None))))))
+                | None -> (
+                  match combine_add_rsp cell with
+                  | Some cont -> Some cont
+                  | None -> None)))))))
 
   (* Main optimization loop for a single asm_program. Iterates through the
      instruction list, applying rewrite rules and respecting hard barriers. *)
