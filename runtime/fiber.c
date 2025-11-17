@@ -996,6 +996,14 @@ static void free_stack_memory(struct stack_info* stack)
 #endif
 }
 
+uintnat caml_cache_stacks_per_class =
+#if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
+  1
+#else
+  128
+#endif
+  ;
+
 void caml_free_stack (struct stack_info* stack)
 {
   CAMLnoalloc;
@@ -1008,13 +1016,19 @@ void caml_free_stack (struct stack_info* stack)
   caml_free_local_arenas(stack->local_arenas);
 
   if (stack->cache_bucket != -1) {
-    stack->exception_ptr =
-      (void*)(cache[stack->cache_bucket]);
-    cache[stack->cache_bucket] = stack;
+    struct stack_info* top = (struct stack_info*)cache[stack->cache_bucket];
+    int64_t count = top ? top->id : 0;
+    if (count < caml_cache_stacks_per_class) {
+      stack->exception_ptr = (void *)top;
+      stack->id = count + 1;
+      cache[stack->cache_bucket] = stack;
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
-    memset(Stack_base(stack), 0x42,
-           (Stack_high(stack)-Stack_base(stack))*sizeof(value));
+      memset(Stack_base(stack), 0x42,
+             (Stack_high(stack)-Stack_base(stack))*sizeof(value));
 #endif
+    } else {
+      free_stack_memory(stack);
+    }
   } else {
     free_stack_memory(stack);
   }
