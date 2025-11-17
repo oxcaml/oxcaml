@@ -262,6 +262,7 @@ struct runtime_events_metadata_header {
 - runtime or user event (1 bit)
 - event type (4 bits)
 - event id (13 bits)
+- performance counters (6 bits)
 */
 
 #define RUNTIME_EVENTS_ITEM_LENGTH(header) \
@@ -270,12 +271,14 @@ struct runtime_events_metadata_header {
 #define RUNTIME_EVENTS_ITEM_IS_USER(header) ((header) & (1ULL << 53))
 #define RUNTIME_EVENTS_ITEM_TYPE(header) (((header) >> 49) & ((1UL << 4) - 1))
 #define RUNTIME_EVENTS_ITEM_ID(header) (((header) >> 36) & ((1UL << 13) - 1))
+#define RUNTIME_EVENTS_ITEM_PERF_COUNTERS(header) (((header) >> 30) & ((1UL << 6) - 1))
 
-#define RUNTIME_EVENTS_HEADER(length, is_runtime, type, event_id) \
+#define RUNTIME_EVENTS_HEADER(length, is_runtime, type, event_id, perf_counters) \
          (((uint64_t)(length)) << 54) | \
          ((is_runtime) ? 0 : (1ULL << 53)) | \
          ((uint64_t)(type)) << 49 | \
-         ((uint64_t)(event_id)) << 36;
+         ((uint64_t)(event_id)) << 36 | \
+         ((uint64_t)(perf_counters) << 30);
 
 /* Set up runtime_events (and check if we need to start it immediately).
    Called from startup* */
@@ -330,6 +333,17 @@ CAMLextern value caml_runtime_events_user_write(
    events. */
 CAMLextern value caml_runtime_events_user_resolve(char* event_name,
    ev_user_ml_type event_type);
+
+/* Hook functions for domain and thread lifecycle management.
+   These centralize the lifecycle events and PMC initialization/cleanup. */
+CAMLextern void caml_runtime_events_domain_start(void);
+CAMLextern void caml_runtime_events_domain_stop(void);
+CAMLextern void caml_runtime_events_thread_start(void);
+CAMLextern void caml_runtime_events_thread_stop(void);
+
+#if defined(__linux__) && (defined(__x86_64__) || defined(__i386__))
+#define PERF_COUNTERS
+#endif
 
 #endif /* CAML_INTERNALS */
 

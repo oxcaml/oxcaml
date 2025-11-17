@@ -43,10 +43,20 @@
 #include <sys/mman.h>
 #endif
 
+#if defined(__linux__) && (defined(__x86_64__) || defined(__i386__))
+#define PERF_COUNTERS
+#endif
+
+/* Maximum number of perf events - must match runtime/runtime_events.c */
+#define MAX_PERF_EVENTS 20
 
 #if defined(HAS_UNISTD)
 #include <unistd.h>
 #endif
+
+/* Extern declaration for unboxed product array allocation */
+CAMLextern value caml_makearray_dynamic_non_scannable_unboxed_product(
+  value v_num_components, value v_is_local, value v_non_unarized_length);
 
 #define RING_FILE_NAME_MAX_LEN 512
 
@@ -64,9 +74,11 @@ struct caml_runtime_events_cursor {
 #endif
   /* callbacks */
   int (*runtime_begin)(int domain_id, void *callback_data, uint64_t timestamp,
-                        ev_runtime_phase phase);
+                        ev_runtime_phase phase, uint64_t header,
+                        uint64_t *buf, int buf_len);
   int (*runtime_end)(int domain_id, void *callback_data, uint64_t timestamp,
-                      ev_runtime_phase phase);
+                      ev_runtime_phase phase, uint64_t header,
+                      uint64_t *buf, int buf_len);
   int (*runtime_counter)(int domain_id, void *callback_data,
                           uint64_t timestamp, ev_runtime_counter counter,
                           uint64_t val);
@@ -77,14 +89,18 @@ struct caml_runtime_events_cursor {
   int (*lost_events)(int domain_id, void *callback_data, int lost_words);
   /* user events: mapped from type to callback */
   int (*user_unit)(int domain_id, void* callback_data, int64_t timestamp,
-                      uintnat event_id, char* event_name);
+                      uintnat event_id, char* event_name,
+                      uint64_t header, uint64_t *buf, int buf_len);
   int (*user_span)(int domain_id, void* callback_data, int64_t timestamp,
-                      uintnat event_id, char* event_name, ev_user_span value);
+                      uintnat event_id, char* event_name, ev_user_span value,
+                      uint64_t header, uint64_t *buf, int buf_len);
   int (*user_int)(int domain_id, void* callback_data, int64_t timestamp,
-                      uintnat event_id, char* event_name, uint64_t val);
+                      uintnat event_id, char* event_name, uint64_t val,
+                      uint64_t header, uint64_t *buf, int buf_len);
   int (*user_custom)(int domain_id, void *callback_data, int64_t timestamp,
                       uintnat event_id, char* event_name,
-                      uintnat event_data_len, uint64_t* event_data);
+                      uintnat event_data_len, uint64_t* event_data,
+                      uint64_t header, uint64_t *buf, int buf_len);
 };
 
 /* C-API for reading from an runtime_events */
@@ -313,7 +329,10 @@ void caml_runtime_events_set_runtime_begin(
                                       int (*f)(int domain_id,
                                                void *callback_data,
                                                uint64_t timestamp,
-                                               ev_runtime_phase phase)) {
+                                               ev_runtime_phase phase,
+                                               uint64_t header,
+                                               uint64_t *buf,
+                                               int buf_len)) {
   cursor->runtime_begin = f;
 }
 
@@ -321,7 +340,10 @@ void caml_runtime_events_set_runtime_end(
                                     struct caml_runtime_events_cursor *cursor,
                                     int (*f)(int domain_id, void *callback_data,
                                              uint64_t timestamp,
-                                             ev_runtime_phase phase)) {
+                                             ev_runtime_phase phase,
+                                             uint64_t header,
+                                             uint64_t *buf,
+                                             int buf_len)) {
   cursor->runtime_end = f;
 }
 
@@ -360,7 +382,9 @@ void caml_runtime_events_set_user_unit(
                                   int (*f)(int domain_id, void *callback_data,
                                             int64_t timestamp,
                                             uintnat event_id,
-                                            char* event_name)) {
+                                            char* event_name,
+                                            uint64_t header,
+                                            uint64_t *buf, int buf_len)) {
   cursor->user_unit = f;
 }
 
@@ -370,7 +394,9 @@ void caml_runtime_events_set_user_span(
                                             int64_t timestamp,
                                             uintnat event_id,
                                             char* event_name,
-                                            ev_user_span span)) {
+                                            ev_user_span span,
+                                            uint64_t header,
+                                            uint64_t *buf, int buf_len)) {
   cursor->user_span = f;
 }
 
@@ -380,7 +406,9 @@ void caml_runtime_events_set_user_int(
                                             int64_t timestamp,
                                             uintnat event_id,
                                             char* event_name,
-                                            uint64_t val)) {
+                                            uint64_t val,
+                                            uint64_t header,
+                                            uint64_t *buf, int buf_len)) {
   cursor->user_int = f;
 }
 
@@ -391,7 +419,9 @@ void caml_runtime_events_set_user_custom(
                                             uintnat event_id,
                                             char* event_name,
                                             uintnat event_data_len,
-                                            uint64_t* event_data)) {
+                                            uint64_t* event_data,
+                                            uint64_t header,
+                                            uint64_t *buf, int buf_len)) {
   cursor->user_custom = f;
 }
 
@@ -550,7 +580,8 @@ caml_runtime_events_read_poll(struct caml_runtime_events_cursor *cursor,
         case EV_BEGIN:
           if (cursor->runtime_begin) {
             if( !cursor->runtime_begin(domain_num, callback_data, buf[1],
-                                        RUNTIME_EVENTS_ITEM_ID(header)) ) {
+                                        RUNTIME_EVENTS_ITEM_ID(header),
+                                        header, buf, msg_length) ) {
                                           early_exit = 1;
                                           continue;
                                         }
@@ -559,7 +590,8 @@ caml_runtime_events_read_poll(struct caml_runtime_events_cursor *cursor,
         case EV_EXIT:
           if (cursor->runtime_end) {
             if( !cursor->runtime_end(domain_num, callback_data, buf[1],
-                                      RUNTIME_EVENTS_ITEM_ID(header)) ) {
+                                      RUNTIME_EVENTS_ITEM_ID(header),
+                                      header, buf, msg_length) ) {
                                         early_exit = 1;
                                         continue;
                                       };
@@ -626,7 +658,8 @@ caml_runtime_events_read_poll(struct caml_runtime_events_cursor *cursor,
           case EV_USER_MSG_TYPE_UNIT:
             if (cursor->user_unit) {
               if( !cursor->user_unit(domain_num, callback_data, buf[1],
-                                      event_id, event_name) ) {
+                                      event_id, event_name,
+                                      header, buf, msg_length) ) {
                                         early_exit = 1;
                                         continue;
                                       }
@@ -643,7 +676,8 @@ caml_runtime_events_read_poll(struct caml_runtime_events_cursor *cursor,
               }
 
               if( !cursor->user_span(domain_num, callback_data, buf[1],
-                                      event_id, event_name, event_span) ) {
+                                      event_id, event_name, event_span,
+                                      header, buf, msg_length) ) {
                                         early_exit = 1;
                                         continue;
                                       }
@@ -656,7 +690,8 @@ caml_runtime_events_read_poll(struct caml_runtime_events_cursor *cursor,
                 return E_CORRUPT_STREAM;
               }
               if( !cursor->user_int(domain_num, callback_data, buf[1],
-                                      event_id, event_name, buf[2]) ) {
+                                      event_id, event_name, buf[2],
+                                      header, buf, msg_length) ) {
                                         early_exit = 1;
                                         continue;
                                       }
@@ -667,7 +702,8 @@ caml_runtime_events_read_poll(struct caml_runtime_events_cursor *cursor,
               /* msg_length could be genuinely 2 here */
               if( !cursor->user_custom(domain_num, callback_data, buf[1],
                                       event_id, event_name,
-                                      msg_length - 2, &buf[2]) ) {
+                                      msg_length - 2, &buf[2],
+                                      header, buf, msg_length) ) {
                                         early_exit = 1;
                                         continue;
                                       }
@@ -723,21 +759,61 @@ struct callbacks_exception_holder {
   value* wrapper;
 };
 
+/* Extract perf counter data from a ring buffer message into an unboxed
+   product array of #{ config: int64#; value: int64# }. Returns an
+   allocated (possibly empty) array. Must be called within a CAMLparam
+   context and the result must be registered as a local root. */
+static value extract_perf_data(uint64_t header, uint64_t *buf, int buf_len) {
+  value perf_data;
+
+  #ifdef PERF_COUNTERS
+  int nperf = RUNTIME_EVENTS_ITEM_PERF_COUNTERS(header);
+  int perf_start_index = buf_len - (2 * nperf);
+
+  if (nperf > 0 && perf_start_index >= 2) {
+    perf_data = caml_makearray_dynamic_non_scannable_unboxed_product(
+        Val_long(2), Val_true, Val_long(nperf));
+    int64_t* data = (int64_t*)perf_data;
+    for (int i = 0; i < nperf; i++) {
+      data[i*2] = buf[perf_start_index + i];
+      data[i*2 + 1] = buf[perf_start_index + nperf + i];
+    }
+  } else {
+    perf_data = caml_makearray_dynamic_non_scannable_unboxed_product(
+        Val_long(2), Val_true, Val_long(0));
+  }
+  #else
+  (void)header; (void)buf; (void)buf_len;
+  perf_data = caml_makearray_dynamic_non_scannable_unboxed_product(
+      Val_long(2), Val_true, Val_long(0));
+  #endif
+
+  return perf_data;
+}
+
 static int ml_runtime_begin(int domain_id, void *callback_data,
-                             uint64_t timestamp, ev_runtime_phase phase) {
+                             uint64_t timestamp, ev_runtime_phase phase,
+                             uint64_t header, uint64_t *buf, int buf_len) {
   CAMLparam0();
-  CAMLlocal5(tmp_callback, ts_val, msg_type, callbacks_root, res);
+  CAMLlocal4(tmp_callback, callbacks_root, res, perf_data);
+  CAMLlocalN(params, 4);
+
+  perf_data = Val_unit;
+
   struct callbacks_exception_holder* holder = callback_data;
 
   callbacks_root = *holder->callbacks_val;
 
   tmp_callback = Field(callbacks_root, 0); /* ev_runtime_begin */
   if (Is_some(tmp_callback)) {
-    ts_val = caml_copy_int64(timestamp);
-    msg_type = Val_long(phase);
+    perf_data = extract_perf_data(header, buf, buf_len);
 
-    res = caml_callback3_exn(Some_val(tmp_callback), Val_long(domain_id),
-                                  ts_val, msg_type);
+    params[0] = Val_long(domain_id);
+    params[1] = caml_copy_int64(timestamp);
+    params[2] = Val_long(phase);
+    params[3] = perf_data;
+
+    res = caml_callbackN_exn(Some_val(tmp_callback), 4, params);
 
     if( Is_exception_result(res) ) {
       res = Extract_exception(res);
@@ -750,20 +826,28 @@ static int ml_runtime_begin(int domain_id, void *callback_data,
 }
 
 static int ml_runtime_end(int domain_id, void *callback_data,
-                           uint64_t timestamp, ev_runtime_phase phase) {
+                           uint64_t timestamp, ev_runtime_phase phase,
+                           uint64_t header, uint64_t *buf, int buf_len) {
   CAMLparam0();
-  CAMLlocal5(tmp_callback, ts_val, msg_type, callbacks_root, res);
+  CAMLlocal4(tmp_callback, callbacks_root, res, perf_data);
+  CAMLlocalN(params, 4);
+
+  perf_data = Val_unit;
+
   struct callbacks_exception_holder* holder = callback_data;
 
   callbacks_root = *holder->callbacks_val;
 
   tmp_callback = Field(callbacks_root, 1); /* ev_runtime_end */
   if (Is_some(tmp_callback)) {
-    ts_val = caml_copy_int64(timestamp);
-    msg_type = Val_long(phase);
+    perf_data = extract_perf_data(header, buf, buf_len);
 
-    res = caml_callback3_exn(Some_val(tmp_callback), Val_long(domain_id),
-                             ts_val, msg_type);
+    params[0] = Val_long(domain_id);
+    params[1] = caml_copy_int64(timestamp);
+    params[2] = Val_long(phase);
+    params[3] = perf_data;
+
+    res = caml_callbackN_exn(Some_val(tmp_callback), 4, params);
 
     if( Is_exception_result(res) ) {
       res = Extract_exception(res);
@@ -935,14 +1019,15 @@ static value user_events_find_callback_list_for_event_type(value callbacks_root,
 
 static int user_events_call_callback_list(
   struct callbacks_exception_holder* holder, value callback_list,
-  value params[4]) {
+  value params[5]) {
   CAMLparam5(callback_list, params[0], params[1], params[2], params[3]);
+  CAMLxparam1(params[4]);
   CAMLlocal2(callback, res);
 
   while (Is_block(callback_list)) {
       // two indirections as callback is a list item wrapped in a gadt
     callback = Field(Field(callback_list, 0), 0);
-    res = caml_callbackN_exn(callback, 4, params);
+    res = caml_callbackN_exn(callback, 5, params);
 
     if( Is_exception_result(res) ) {
       res = Extract_exception(res);
@@ -1022,11 +1107,14 @@ static value caml_runtime_events_user_resolve_cached(
 }
 
 static int ml_user_unit(int domain_id, void *callback_data, int64_t timestamp,
-                           uintnat event_id, char* event_name) {
+                           uintnat event_id, char* event_name,
+                           uint64_t header, uint64_t *buf, int buf_len) {
   CAMLparam0();
-  CAMLlocal3(callback_list, event, callbacks_root);
-  CAMLlocalN(params, 4);
+  CAMLlocal4(callback_list, event, callbacks_root, perf_data);
+  CAMLlocalN(params, 5);
   CAMLlocal1(wrapper_root);
+
+  perf_data = Val_unit;
 
   struct callbacks_exception_holder* holder = callback_data;
   callbacks_root = *holder->callbacks_val;
@@ -1040,15 +1128,14 @@ static int ml_user_unit(int domain_id, void *callback_data, int64_t timestamp,
                                                                 event);
 
   if (Is_block(callback_list)) {
-    // at least one callback is listening for this event type, so we
-    // deserialize the value and prepare the callback payload
+    perf_data = extract_perf_data(header, buf, buf_len);
 
     params[0] = Val_long(domain_id);
     params[1] = caml_copy_int64(timestamp);
     params[2] = event;
     params[3] = Val_unit;
+    params[4] = perf_data;
 
-    // payload is prepared, we call the callbacks sequentially.
     if (user_events_call_callback_list(holder, callback_list, params) == 0) {
       CAMLreturnT(int, 0);
     }
@@ -1059,12 +1146,15 @@ static int ml_user_unit(int domain_id, void *callback_data, int64_t timestamp,
 
 static int ml_user_span(int domain_id, void *callback_data, int64_t timestamp,
                            uintnat event_id, char* event_name,
-                           ev_user_span span)
+                           ev_user_span span,
+                           uint64_t header, uint64_t *buf, int buf_len)
 {
   CAMLparam0();
-  CAMLlocal3(callback_list, event, callbacks_root);
-  CAMLlocalN(params, 4);
+  CAMLlocal4(callback_list, event, callbacks_root, perf_data);
+  CAMLlocalN(params, 5);
   CAMLlocal1(wrapper_root);
+
+  perf_data = Val_unit;
 
   struct callbacks_exception_holder* holder = callback_data;
   callbacks_root = *holder->callbacks_val;
@@ -1078,15 +1168,14 @@ static int ml_user_span(int domain_id, void *callback_data, int64_t timestamp,
                                                                 event);
 
   if (Is_block(callback_list)) {
-    // at least one callback is listening for this event type, so we
-    // deserialize the value and prepare the callback payload
+    perf_data = extract_perf_data(header, buf, buf_len);
 
     params[0] = Val_long(domain_id);
     params[1] = caml_copy_int64(timestamp);
     params[2] = event;
     params[3] = Val_int(span);
+    params[4] = perf_data;
 
-    // payload is prepared, we call the callbacks sequentially.
     if (user_events_call_callback_list(holder, callback_list, params) == 0) {
       CAMLreturnT(int, 0);
     }
@@ -1097,11 +1186,14 @@ static int ml_user_span(int domain_id, void *callback_data, int64_t timestamp,
 
 static int ml_user_int(int domain_id, void *callback_data,
                            int64_t timestamp, uintnat event_id,
-                           char* event_name, uint64_t val) {
+                           char* event_name, uint64_t val,
+                           uint64_t header, uint64_t *buf, int buf_len) {
   CAMLparam0();
-  CAMLlocal3(callback_list, event, callbacks_root);
-  CAMLlocalN(params, 4);
+  CAMLlocal4(callback_list, event, callbacks_root, perf_data);
+  CAMLlocalN(params, 5);
   CAMLlocal1(wrapper_root);
+
+  perf_data = Val_unit;
 
   struct callbacks_exception_holder* holder = callback_data;
   callbacks_root = *holder->callbacks_val;
@@ -1115,15 +1207,14 @@ static int ml_user_int(int domain_id, void *callback_data,
                                                                 event);
 
   if (Is_block(callback_list)) {
-    // at least one callback is listening for this event type, so we
-    // deserialize the value and prepare the callback payload
+    perf_data = extract_perf_data(header, buf, buf_len);
 
     params[0] = Val_long(domain_id);
     params[1] = caml_copy_int64(timestamp);
     params[2] = event;
-    params[3] = Val_int(val);;
+    params[3] = Val_int(val);
+    params[4] = perf_data;
 
-    // payload is prepared, we call the callbacks sequentially.
     if (user_events_call_callback_list(holder, callback_list, params) == 0) {
       CAMLreturnT(int, 0);
     }
@@ -1135,12 +1226,15 @@ static int ml_user_int(int domain_id, void *callback_data,
 static int ml_user_custom(int domain_id, void *callback_data, int64_t timestamp,
                            uintnat event_id, char* event_name,
                            uintnat event_data_len,
-                           uint64_t* event_data) {
+                           uint64_t* event_data,
+                           uint64_t header, uint64_t *buf, int buf_len) {
   CAMLparam0();
   CAMLlocal4(callback_list, event, callbacks_root, event_type);
-  CAMLlocalN(params, 4);
+  CAMLlocalN(params, 5);
   CAMLlocal2(wrapper_root, read_buffer);
-  CAMLlocal3(data, record, deserializer);
+  CAMLlocal4(data, record, deserializer, perf_data);
+
+  perf_data = Val_unit;
 
   struct callbacks_exception_holder* holder = callback_data;
   callbacks_root = *holder->callbacks_val;
@@ -1188,10 +1282,13 @@ static int ml_user_custom(int domain_id, void *callback_data, int64_t timestamp,
 
     data = caml_callback2(deserializer, read_buffer, Val_int(caml_string_len));
 
+    perf_data = extract_perf_data(header, buf, buf_len);
+
     params[0] = Val_long(domain_id);
     params[1] = caml_copy_int64(timestamp);
     params[2] = event;
     params[3] = data;
+    params[4] = perf_data;
 
     // payload is prepared, we call the callbacks sequentially.
     if (user_events_call_callback_list(holder, callback_list, params) == 0) {

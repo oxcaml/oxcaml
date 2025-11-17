@@ -439,14 +439,14 @@ let count_value =
     Runtime_events.User.register "count.value" CustomInt
         Runtime_events.Type.int
 
-let span_event_handler domain_id ts event value =
+let span_event_handler domain_id ts event value _perf_samples =
     (* we're only interested in our CustomSpan event *)
     match Runtime_events.User.tag event, value with
     | CustomSpan, Runtime_events.Type.Begin -> Printf.printf "> count begin\n"
     | CustomSpan, End -> Printf.printf "< count end\n"
     | _ -> ()
 
-let int_event_handler domain_id ts event value =
+let int_event_handler domain_id ts event value _perf_samples =
     (* we're only interested in our CustomInt event *)
     match Runtime_events.User.tag event with
     | CustomInt -> Printf.printf "| count %d\n" value
