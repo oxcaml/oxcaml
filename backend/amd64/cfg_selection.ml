@@ -196,10 +196,8 @@ let pseudoregs_for_operation op arg res =
        and rax and rdx clobbered *)
     [| rcx |], res
   | Specific (Isimd op) -> Simd_selection.pseudoregs_for_operation op arg res
-  | Specific (Isimd_mem (op, _addr)) -> (
-    match Simd_selection.pseudoregs_for_mem_operation op arg res with
-    | None -> raise Use_default_exn
-    | Some (arg, res) -> arg, res)
+  | Specific (Isimd_mem (op, _addr)) ->
+    Simd_selection.pseudoregs_for_mem_operation op arg res
   | Csel _ ->
     (* last arg must be the same as res.(0) *)
     let len = Array.length arg in

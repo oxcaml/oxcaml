@@ -35,12 +35,14 @@ type error =
 
 exception Error of error
 
+let no_such_module = CU.Name.of_string "No_such_module"
+
 let cmi_bundle ~quoted_globals =
   let rec loop cmis missing_globals =
     match missing_globals with
     | [] -> cmis
     | global :: missing_globals ->
-      if CU.Name.Map.mem global cmis
+      if CU.Name.Map.mem global cmis || CU.Name.equal global no_such_module
       then loop cmis missing_globals
       else
         let path =
@@ -66,7 +68,7 @@ let cmx_bundle ~quoted_globals =
     match missing_globals with
     | [] -> cmxs
     | global :: missing_globals ->
-      if CU.Name.Map.mem global cmxs
+      if CU.Name.Map.mem global cmxs || CU.Name.equal global no_such_module
       then loop cmxs missing_globals
       else
         let path =

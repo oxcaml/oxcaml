@@ -25,6 +25,7 @@ let of_simd_class (cl : Simd.operation_class) : Cfg_cse_target_intf.op_class =
   | Pure -> Op_pure
   | Load { is_mutable = true } -> Op_load Mutable
   | Load { is_mutable = false } -> Op_load Immutable
+  | Store -> Op_store true
 
 let class_of_operation (op : Operation.t)
     : Cfg_cse_target_intf.class_of_operation_result =

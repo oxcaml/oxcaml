@@ -500,7 +500,10 @@ end = struct
        preserve backwards compatibility. But we also need [Any] callsites
        to accept nullable jkinds to allow cases like [type ('a : value_or_null) t = 'a]. *)
     | Any -> Jkind.Builtin.any ~why:(if is_named then Unification_var else Wildcard)
-    | Sort -> Jkind.of_new_legacy_sort ~why:(if is_named then Unification_var else Wildcard)
+    | Sort ->
+        let level = get_current_level () in
+        Jkind.of_new_legacy_sort
+          ~why:(if is_named then Unification_var else Wildcard) ~level
 
   let new_any_var loc env jkind = function
     | { unbound_variable_policy = Closed; _ } ->
@@ -644,7 +647,9 @@ let get_type_param_jkind path styp =
       of_annotation jkind None
   | Ptyp_var (name, Some jkind) ->
       of_annotation jkind (Some name)
-  | _ -> Jkind.of_new_legacy_sort ~why:(Unannotated_type_parameter path)
+  | _ ->
+      let level = get_current_level () in
+      Jkind.of_new_legacy_sort ~why:(Unannotated_type_parameter path) ~level
 
 let get_type_param_name styp =
   (* We don't need to check for jkinds here, just to get the name. *)
@@ -1099,10 +1104,14 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let ty = newty (Tof_kind tjkind) in
       ctyp (Ttyp_of_kind jkind) ty
   | Ptyp_quote t ->
+      if not (Language_extension.is_enabled Runtime_metaprogramming) then
+        raise (Error (loc, env, Unsupported_extension Runtime_metaprogramming));
       let new_env = Env.enter_quotation env in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_quote cty) (newty (Tquote cty.ctyp_type))
   | Ptyp_splice t ->
+      if not (Language_extension.is_enabled Runtime_metaprogramming) then
+        raise (Error (loc, env, Unsupported_extension Runtime_metaprogramming));
       let new_env = Env.enter_splice ~loc env in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_splice cty) (newty (Tsplice cty.ctyp_type))
@@ -1635,7 +1644,8 @@ let report_error env ppf =
     fprintf ppf "@[%s types must have layout value.@ %a@]"
       s (Jkind.Violation.report_with_offender
            ~offender:(fun ppf ->
-               Style.as_inline_code Printtyp.type_expr ppf typ)) err
+               Style.as_inline_code Printtyp.type_expr ppf typ)
+           ~level:(get_current_level ())) err
   | Non_sort {vloc; typ; err} ->
     let s =
       match vloc with
@@ -1645,12 +1655,14 @@ let report_error env ppf =
     fprintf ppf "@[%s types must have a representable layout.@ %a@]"
       s (Jkind.Violation.report_with_offender
            ~offender:(fun ppf ->
-               Style.as_inline_code Printtyp.type_expr ppf typ)) err
+               Style.as_inline_code Printtyp.type_expr ppf typ)
+           ~level:(get_current_level ())) err
   | Bad_jkind_annot(ty, violation) ->
     fprintf ppf "@[<b 2>Bad layout annotation:@ %a@]"
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf ->
-             Style.as_inline_code Printtyp.type_expr ppf ty)) violation
+             Style.as_inline_code Printtyp.type_expr ppf ty)
+         ~level:(get_current_level ())) violation
   | Did_you_mean_unboxed lid ->
     fprintf ppf "@[%a isn't a class type.@ \
                  Did you mean the unboxed type %a?@]"

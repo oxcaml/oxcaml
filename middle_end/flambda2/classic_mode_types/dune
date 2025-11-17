@@ -16,7 +16,11 @@
    -open
    Flambda2_term_basics))
  (ocamlopt_flags
-  (:standard -O3 -open Int_replace_polymorphic_compare))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)
+   -O3
+   -open
+   Int_replace_polymorphic_compare))
  (libraries
   ocamlcommon
   flambda2_identifiers

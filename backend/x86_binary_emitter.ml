@@ -715,7 +715,7 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
   in
   let enc i =
     match instr.res with
-    | First_arg | Res { enc = Implicit; _ } -> instr.args.(i).enc
+    | Res_none | First_arg | Res { enc = Implicit; _ } -> instr.args.(i).enc
     | Res { enc; _ } when i = 0 -> enc
     | Res _ -> instr.args.(i - 1).enc
   in
