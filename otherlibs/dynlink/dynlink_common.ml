@@ -31,6 +31,7 @@ end
 module Make (P : Dynlink_platform_intf.S) = struct
   module DT = Dynlink_types
   module UH = P.Unit_header
+  module LH = P.Dynlink_library_header
 
   type interface_dep =
     | Name  (* the only use of the interface can be via a module alias *)
@@ -183,8 +184,8 @@ module Make (P : Dynlink_platform_intf.S) = struct
   let set_loaded filename ui (state : State.t) =
     { state with implems = set_loaded_implem filename ui state.implems }
 
-  let check_interface_imports filename ui ifaces =
-    List.fold_left (fun ifaces (name, crc) ->
+  let check_interface_imports filename imports ifaces =
+    Array.fold_left (fun ifaces (name, crc) ->
         match String.Map.find name ifaces with
         | exception Not_found -> begin
             match crc with
@@ -200,10 +201,10 @@ module Make (P : Dynlink_platform_intf.S) = struct
             if old_crc <> crc then raise (DT.Error (Inconsistent_import name))
             else ifaces)
       ifaces
-      (UH.interface_imports ui)
+      imports
 
-  let check_implementation_imports ~allowed_units filename ui implems =
-    List.iter (fun (name, crc) ->
+  let check_implementation_imports ~allowed_units filename imports implems =
+    Array.iter (fun (name, crc) ->
       if not (String.Set.mem name allowed_units) then begin
         raise (DT.Error (Unavailable_unit name))
       end;
@@ -230,7 +231,7 @@ module Make (P : Dynlink_platform_intf.S) = struct
               filename, Uninitialized_global name)))
           end
         | Loaded -> ())
-      (UH.implementation_imports ui)
+      imports
 
   let check_name filename ui priv ifaces implems =
     let name = UH.name ui in
@@ -247,7 +248,7 @@ module Make (P : Dynlink_platform_intf.S) = struct
       raise (DT.Error Unsafe_file)
     end
 
-  let check filename (units : UH.t list) (state : State.t)
+  let check filename (library_header : LH.t) (units : UH.t list) (state : State.t)
       ~unsafe_allowed ~priv =
     List.iter (fun ui -> check_unsafe_module unsafe_allowed ui) units;
     let new_units =
@@ -258,17 +259,32 @@ module Make (P : Dynlink_platform_intf.S) = struct
           check_name filename ui priv state.ifaces implems)
         state.implems units
     in
-    let ifaces =
-      List.fold_left (fun ifaces ui ->
-          check_interface_imports filename ui ifaces)
-        state.ifaces units
-    in
     let allowed_units = String.Set.union state.allowed_units new_units in
-    let (_ : implem String.Map.t) =
-      List.fold_left
-        (fun acc ui ->
-           check_implementation_imports ~allowed_units filename ui acc;
-           set_loaded_implem filename ui acc)
+    let ifaces, implems =
+      match LH.consolidated_imports library_header with
+      | DT.Requires_per_unit_checks ->
+        (* Bytecode: check imports per-unit *)
+        let ifaces =
+          List.fold_left (fun ifaces ui ->
+              let imports = UH.interface_imports library_header ui |> Array.of_list in
+              check_interface_imports filename imports ifaces)
+            state.ifaces units
+        in
+        List.iter (fun ui ->
+            let imports = UH.implementation_imports library_header ui |> Array.of_list in
+            check_implementation_imports ~allowed_units filename imports implems)
+          units;
+        ifaces, implems
+      | DT.Supports_consolidated_imports { cmi_imports; cmx_imports } ->
+        (* Native: check consolidated imports once from header *)
+        let ifaces =
+          check_interface_imports filename cmi_imports state.ifaces
+        in
+        check_implementation_imports ~allowed_units filename cmx_imports implems;
+        ifaces, implems
+    in
+    let implems =
+      List.fold_left (fun acc ui -> set_loaded_implem filename ui acc)
         implems units
     in
     let defined_symbols =
@@ -356,10 +372,10 @@ module Make (P : Dynlink_platform_intf.S) = struct
     let filename = dll_filename filename in
     match P.load ~filename ~priv with
     | exception exn -> raise (DT.Error (Cannot_open_dynamic_library exn))
-    | handle, units ->
+    | handle, library_header, units ->
       try
         with_lock (fun ({unsafe_allowed; _ } as global) ->
-            global.state <- check filename units global.state
+            global.state <- check filename library_header units global.state
                 ~unsafe_allowed
                 ~priv;
             (* [register] must be called after [check]:

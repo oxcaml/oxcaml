@@ -192,6 +192,49 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let not_output_to_dev_null output_name =
     not (String.equal output_name "/dev/null")
 
+
+  (* Based on a similar implementation in optlibrarian.ml *)
+  let dynamic_units ~linkenv units_to_link =
+    let dynu_imports_cmi, dynu_imports_cmx =
+      Linkenv.extract_crc_interfaces linkenv |> Array.of_list,
+      Linkenv.extract_crc_implementations linkenv |> Array.of_list
+    in
+    let cmi_index, cmx_index =
+      Compilation_unit.Name.Tbl.create 42, Compilation_unit.Tbl.create 42
+    in
+    Array.iteri
+      (fun i import ->
+        Compilation_unit.Name.Tbl.add cmi_index (Import_info.name import) i)
+      dynu_imports_cmi;
+    Array.iteri
+      (fun i import ->
+        Compilation_unit.Tbl.add cmx_index (Import_info.cu import) i)
+      dynu_imports_cmx;
+    let mk_bitmap arr ix entries ~find ~get_name =
+      let module B = Misc.Bitmap in
+      let b = B.make (Array.length arr) in
+      List.iter (fun import -> B.set b (find ix (get_name import))) entries;
+      b
+    in
+    let dynunits = List.map
+      (fun unit ->
+        { Cmxs_format.dynu_name = unit.name;
+          dynu_crc = unit.crc;
+          dynu_imports_cmi_bitmap =
+            mk_bitmap dynu_imports_cmi cmi_index unit.ui_imports_cmi
+              ~find:Compilation_unit.Name.Tbl.find
+              ~get_name:Import_info.name;
+          dynu_imports_cmx_bitmap =
+            mk_bitmap dynu_imports_cmx cmx_index unit.ui_imports_cmx
+              ~find:Compilation_unit.Tbl.find ~get_name:Import_info.cu;
+          dynu_quoted_globals = Array.of_list unit.ui_quoted_globals;
+          dynu_defines = unit.defines
+        })
+      units_to_link
+    in
+    dynunits, dynu_imports_cmi, dynu_imports_cmx
+
+
   let link_shared ~ppf_dump linkenv objfiles output_name =
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
         let genfns = Generic_fns.Tbl.make () in
@@ -203,49 +246,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         in
         Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs linkenv;
         Clflags.all_ccopts := Linkenv.lib_ccopts linkenv @ !Clflags.all_ccopts;
-
-        (* Build consolidated import arrays from linkenv *)
-        let dynu_imports_cmi =
-          Linkenv.extract_crc_interfaces linkenv |> Array.of_list
-        in
-        let dynu_imports_cmx =
-          Linkenv.extract_crc_implementations linkenv |> Array.of_list
-        in
-        (* Create index tables for bitmap creation *)
-        let cmi_index = Compilation_unit.Name.Tbl.create 42 in
-        Array.iteri
-          (fun i import ->
-            Compilation_unit.Name.Tbl.add cmi_index (Import_info.name import) i)
-          dynu_imports_cmi;
-        let cmx_index = Compilation_unit.Tbl.create 42 in
-        Array.iteri
-          (fun i import ->
-            Compilation_unit.Tbl.add cmx_index (Import_info.cu import) i)
-          dynu_imports_cmx;
-        (* Helper function to create bitmaps *)
-        let mk_bitmap arr ix entries ~find ~get_name =
-          let module B = Misc.Bitmap in
-          let b = B.make (Array.length arr) in
-          List.iter (fun import -> B.set b (find ix (get_name import))) entries;
-          b
-        in
-        (* Create dynunits with bitmaps *)
-        let dynu_units =
-          List.map
-            (fun unit ->
-              { Cmxs_format.dynu_name = unit.name;
-                dynu_crc = unit.crc;
-                dynu_imports_cmi_bitmap =
-                  mk_bitmap dynu_imports_cmi cmi_index unit.ui_imports_cmi
-                    ~find:Compilation_unit.Name.Tbl.find
-                    ~get_name:Import_info.name;
-                dynu_imports_cmx_bitmap =
-                  mk_bitmap dynu_imports_cmx cmx_index unit.ui_imports_cmx
-                    ~find:Compilation_unit.Tbl.find ~get_name:Import_info.cu;
-                dynu_quoted_globals = Array.of_list unit.ui_quoted_globals;
-                dynu_defines = unit.defines
-              })
-            units_tolink
+        let dynu_units, dynu_imports_cmi, dynu_imports_cmx =
+          dynamic_units ~linkenv units_tolink
         in
         let dynheader : Cmxs_format.dynheader =
           { dynu_magic = Config.cmxs_magic_number;

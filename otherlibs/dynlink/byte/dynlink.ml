@@ -29,16 +29,26 @@ let convert_cmi_import import =
 module Bytecode = struct
   type filename = string
 
+  module Dynlink_library_header = struct
+    (* For bytecode, there is no dedicated whole-library header. Everything is
+       loaded from .cma/.cmo files on a per-unit basis, so we use [unit] as the
+       header type and require per-unit import checks. *)
+    type t = unit
+
+    let consolidated_imports () : DT.consolidated_imports =
+      DT.Requires_per_unit_checks
+  end
+
   module Unit_header = struct
     type t = Cmo_format.compilation_unit_descr
 
     let name (t : t) = Compilation_unit.full_path_as_string t.cu_name
     let crc _t = None
 
-    let interface_imports (t : t) =
+    let interface_imports (_header : Dynlink_library_header.t) (t : t) =
       List.map convert_cmi_import (Array.to_list t.cu_imports)
 
-    let implementation_imports (t : t) =
+    let implementation_imports (_header : Dynlink_library_header.t) (t : t) =
       let required_from_unit =
         t.cu_required_compunits
         |> List.map Compilation_unit.to_global_ident_for_bytecode
@@ -199,7 +209,7 @@ module Bytecode = struct
         let compunit_pos = input_binary_int ic in  (* Go to descriptor *)
         seek_in ic compunit_pos;
         let cu = (input_value ic : Cmo_format.compilation_unit_descr) in
-        handle, [cu]
+        handle, (), [cu]
       end else
       if buffer = Config.cma_magic_number then begin
         let toc_pos = input_binary_int ic in  (* Go to table of contents *)
@@ -207,7 +217,7 @@ module Bytecode = struct
         let lib = (input_value ic : Cmo_format.library) in
         Dll.open_dlls Dll.For_execution
           (List.map Dll.extract_dll_name lib.lib_dllibs);
-        handle, lib.lib_units
+        handle, (), lib.lib_units
       end else begin
         raise (DT.Error (Not_a_bytecode_file file_name))
       end
