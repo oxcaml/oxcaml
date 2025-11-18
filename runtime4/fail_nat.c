@@ -179,7 +179,8 @@ void caml_raise_out_of_memory(void)
 
 void caml_raise_out_of_fibers(void)
 {
-  caml_raise_constant((value) caml_exn_Out_of_memory);
+  /* Note that this is not an async exn. */
+  caml_raise_constant((value) caml_exn_Out_of_fibers);
 }
 
 /* Used by the stack overflow handler -> deactivate ASAN (see
