@@ -1053,7 +1053,7 @@ let num_call_gc_points instr =
           ( Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
           | Inegmulsubf | Isqrtf | Imove32
           | Ishiftarith (_, _)
-          | Ibswap _ | Isignext _ | Isimd _ | Iread_system_reg _ ))
+          | Ibswap _ | Isignext _ | Isimd _ | Iread_system_reg _ | Icrc32 ))
     | Lop
         ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
         | Dls_get | Tls_get | Const_int _ | Const_float32 _ | Const_float _
@@ -1305,6 +1305,7 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour })) -> 1
     | Lop (Specific Imove32) -> 1
     | Lop (Specific (Isignext _)) -> 1
+    | Lop (Specific Icrc32) -> 1
     | Lop (Name_for_debugger _) -> 0
     | Lcall_op (Lprobe _) ->
       fatal_error "Optimized probes not supported on arm64."
@@ -2144,6 +2145,9 @@ let emit_instr i =
          DSL.imm (size - 1)
       |]
   | Lop (Specific (Isimd simd)) -> DSL.simd_instr simd i
+  | Lop (Specific Icrc32) ->
+    DSL.ins I.CRC32
+      [| DSL.emit_reg_w i.res.(0); DSL.emit_reg_w i.arg.(0); DSL.emit_reg i.arg.(1) |]
   | Lop (Specific (Iread_system_reg rn)) ->
     let s : Arm64_ast.System_reg.t =
       match rn with CNTVCT_EL0 -> CNTVCT_EL0
