@@ -252,21 +252,18 @@ module Layout = struct
 
     let rec of_sort_const (s : Sort.Const.t) sa =
       match s with
-      | Base b -> Base (b, sa)
+      | Base b -> Static.of_base b sa
       | Product consts ->
         Product (List.map (fun s -> of_sort_const s sa) consts)
 
-    let set_pointerness_upper_bound t pointerness =
+    let set_root_pointerness t pointerness =
       match t with
       | Any sa -> Any (Scannable_axes.set_pointerness sa pointerness)
-      | Base (b, sa) -> Base (b, Scannable_axes.set_pointerness sa pointerness)
-      (* CR layouts-scannable: This is probably okay but a little suspicious.
-         If a Layout was a product with scannable axes, this would be nicer *)
+      | Base (b, sa) ->
+        Static.of_base b (Scannable_axes.set_pointerness sa pointerness)
       | Product _ -> t
 
-    (* Returns [None] if the root has no meaningful scannable axes.
-       This duplicates some code [Layout] in order to avoid converting a
-       [Layout.Const.t] to a [Layout.t] which requires traversing. *)
+    (* Returns [None] if the root has no meaningful scannable axes. *)
     let get_root_scannable_axes t =
       match t with
       | Any sa -> Some sa
@@ -277,9 +274,10 @@ module Layout = struct
       let rec to_string nested (t : t) =
         match t with
         | Any sa -> String.concat " " ("any" :: Scannable_axes.to_string_list sa)
-        | Base (b, sa) ->
+        | Base (b, sa) when is_value_or_any t ->
           String.concat " "
             (Sort.to_string_base b :: Scannable_axes.to_string_list sa)
+        | Base (b, _) -> Sort.to_string_base b
         | Product ts ->
           String.concat ""
             [ (if nested then "(" else "");
@@ -2160,7 +2158,9 @@ module Const = struct
         Layout.Const.equal_up_to_scannable_axes base.jkind.layout actual.layout
       in
       let scannable_axes =
-        get_scannable_axes ~base:base.jkind.layout actual.layout
+        if Layout.Const.is_value_or_any actual.layout
+        then get_scannable_axes ~base:base.jkind.layout actual.layout
+        else []
       in
       let modal_bounds =
         get_modal_bounds ~base:base.jkind.mod_bounds actual.mod_bounds
@@ -2275,7 +2275,7 @@ module Const = struct
   (*******************************)
   (* converting user annotations *)
 
-  let set_pointerness_upper_bound ~abbrev t = function
+  let set_pointerness ~abbrev t = function
     | None -> t
     | Some (new_ptrness, loc) ->
       (match Layout.Const.get_root_scannable_axes t.layout with
@@ -2284,9 +2284,7 @@ module Const = struct
         if new_ptrness = pointerness
         then
           Location.prerr_warning loc (Warnings.Redundant_kind_modifier abbrev));
-      let new_layout =
-        Layout.Const.set_pointerness_upper_bound t.layout new_ptrness
-      in
+      let new_layout = Layout.Const.set_root_pointerness t.layout new_ptrness in
       { t with layout = new_layout }
 
   let jkind_of_product_annotations (type l r) (jkinds : (l * r) t list) =
@@ -2378,7 +2376,7 @@ module Const = struct
          This should emit a warning if the [jkind_without_sa] already has
          the specified scannable axes. This is why the helper currently
          returns an optional annotation (since none vs default matters). *)
-      set_pointerness_upper_bound ~abbrev:name.txt jkind_without_sa pointerness
+      set_pointerness ~abbrev:name.txt jkind_without_sa pointerness
     | Pjk_mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
       (* for each mode, lower the corresponding modal bound to be that mode *)
@@ -2464,7 +2462,7 @@ module Desc = struct
           ppf
           (sort_var_str :: Scannable_axes.to_string_list sa)
       (* Analyze a product before calling [get_const]: the machinery in
-         ormat] works better for atomic layouts, not products. *)
+         [Const.format] works better for atomic layouts, not products. *)
       | Product lays ->
         let pp_sep ppf () = fprintf ppf "@ & " in
         Misc.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
