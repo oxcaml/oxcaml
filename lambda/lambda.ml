@@ -2419,8 +2419,8 @@ let will_be_reordered (mbe : _ mixed_block_element) =
         match el with
         | Product _ -> assert false
         | Splice_variable _ ->
-          (* Treat variables as potentially both, that causes this function to
-             be maximally pessimistic. *)
+          (* CR layout poly: Treat variables as potentially both, that causes
+             this function to be maximally pessimistic. *)
           { seen_flat = true; last_value_after_flat = acc.seen_flat }
         | Value _ -> { acc with last_value_after_flat = acc.seen_flat }
         | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
