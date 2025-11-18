@@ -1872,7 +1872,19 @@ let rec update_decl_jkind env dpath decl =
          mutable voids : bool;
       }
   end in
-
+  (* The compiler does not like matching on records with mutable fields, so we
+     create an immutable copy for the match below. *)
+  let module Imm_element_rep = struct
+    type element_repr_summary =
+      {  values : bool;
+         floats: bool;
+         atomic_floats : bool;
+         atomic_fields : bool;
+         float64s : bool;
+         non_float64_unboxed_fields : bool;
+         voids : bool;
+    }
+  end in
   (* returns updated labels, updated rep, and updated jkind *)
   let update_record_kind loc lbls rep =
     match lbls, rep with
@@ -1925,7 +1937,14 @@ let rec update_decl_jkind env dpath decl =
         reprs lbls;
       let rep =
         (* CR layouts: improve the readability of this match *)
-        match repr_summary with
+        let { values; floats; atomic_floats; float64s;
+               non_float64_unboxed_fields; atomic_fields; voids} = repr_summary
+        in
+        let summary : Imm_element_rep.element_repr_summary =
+          { values; floats; atomic_floats; float64s;
+            non_float64_unboxed_fields; atomic_fields; voids }
+        in
+        match summary with
         (* We store floats flatly in mixed records if all fields are
            float/float64/void. *)
         | { values = false; floats = true; atomic_floats = false;
