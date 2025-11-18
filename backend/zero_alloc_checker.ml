@@ -1407,10 +1407,10 @@ end = struct
       div = V.apply t.div ~env
     }
 
-  let transform effect v =
-    { nor = V.transform effect v.nor;
-      exn = V.transform effect v.exn;
-      div = V.transform effect v.div
+  let transform effect_ v =
+    { nor = V.transform effect_ v.nor;
+      exn = V.transform effect_ v.exn;
+      div = V.transform effect_ v.div
     }
 
   let replace_witnesses w t =
@@ -2279,42 +2279,42 @@ end = struct
         then resolved callee_info.value
         else unresolved "defined earlier with unresolved dependencies"
 
-  let transform_return ~(effect : V.t) dst =
+  let transform_return ~(effect_ : V.t) dst =
     (* Instead of calling [Value.transform] directly, first check for trivial
        cases to avoid reallocating [dst]. *)
-    V.match_with effect ~bot:Value.bot ~safe:dst
-      ~top:(fun _ -> Value.transform effect dst)
-      ~unresolved:(fun () -> Value.transform effect dst)
+    V.match_with effect_ ~bot:Value.bot ~safe:dst
+      ~top:(fun _ -> Value.transform effect_ dst)
+      ~unresolved:(fun () -> Value.transform effect_ dst)
 
-  let transform_diverge ~(effect : V.t) (dst : Value.t) =
-    let div = V.join effect dst.div in
+  let transform_diverge ~(effect_ : V.t) (dst : Value.t) =
+    let div = V.join effect_ dst.div in
     { dst with div }
 
-  let transform t ~next ~exn ~(effect : Value.t) desc dbg =
-    report t effect ~msg:"transform effect" ~desc dbg;
-    let next = transform_return ~effect:effect.nor next in
-    let exn = transform_return ~effect:effect.exn exn in
+  let transform t ~next ~exn ~(effect_ : Value.t) desc dbg =
+    report t effect_ ~msg:"transform effect" ~desc dbg;
+    let next = transform_return ~effect_:effect_.nor next in
+    let exn = transform_return ~effect_:effect_.exn exn in
     report t next ~msg:"transform new next" ~desc dbg;
     report t exn ~msg:"transform new exn" ~desc dbg;
     let r = Value.join next exn in
     report t r ~msg:"transform join" ~desc dbg;
-    let r = transform_diverge ~effect:effect.div r in
+    let r = transform_diverge ~effect_:effect_.div r in
     report t r ~msg:"transform result" ~desc dbg;
     r
 
   let transform_top t ~next ~exn w desc dbg =
-    let effect =
+    let effect_ =
       match Metadata.assume_value dbg ~can_raise:true w with
       | Some v -> v
       | None -> Value.top w
     in
-    transform t ~next ~exn ~effect desc dbg
+    transform t ~next ~exn ~effect_ desc dbg
 
   let transform_call t ~next ~exn callee (k : Witness.kind) ~desc dbg =
     report t next ~msg:"transform_call next" ~desc dbg;
     report t exn ~msg:"transform_call exn" ~desc dbg;
     let v = find_callee t callee ~desc dbg k in
-    let effect =
+    let effect_ =
       let w = create_witnesses t k dbg in
       match Metadata.assume_value dbg ~can_raise:true w with
       | Some v' ->
@@ -2322,14 +2322,14 @@ end = struct
         if Value.is_resolved v then Value.meet v v' else v'
       | None -> v
     in
-    transform t ~next ~exn ~effect desc dbg
+    transform t ~next ~exn ~effect_ desc dbg
 
   (** Summary of target specific operations. *)
   let transform_specific t s ~next ~exn dbg =
     let desc = "Arch.specific_operation" in
     report t next ~msg:"transform_specific next" ~desc dbg;
     report t exn ~msg:"transform_specific exn" ~desc dbg;
-    let effect =
+    let effect_ =
       let w = create_witnesses t (Arch_specific s) dbg in
       match Metadata.assume_value dbg ~can_raise:false w with
       | Some v -> v
@@ -2342,7 +2342,7 @@ end = struct
         let div = V.bot in
         { Value.nor; exn; div }
     in
-    transform t ~next ~exn ~effect desc dbg
+    transform t ~next ~exn ~effect_ desc dbg
 
   module Env : sig
     type t
@@ -2588,23 +2588,23 @@ end = struct
       let transform_call_indirect t ~next ~exn callees wkind ~desc dbg =
         report t next ~msg:"transform_call_indirect next" ~desc dbg;
         report t exn ~msg:"transform_call_indirect exn" ~desc dbg;
-        let effect =
+        let effect_ =
           List.fold_left
             (fun all_effects { Cmm.sym_name = callee; _ } ->
               let k = wkind callee in
               let v = find_callee t callee ~desc dbg k in
               let w = create_witnesses t k dbg in
-              let effect =
+              let effect_ =
                 match Metadata.assume_value dbg ~can_raise:true w with
                 | Some v' ->
                   assert (Value.is_resolved v');
                   if Value.is_resolved v then Value.meet v v' else v'
                 | None -> v
               in
-              Value.join effect all_effects)
+              Value.join effect_ all_effects)
             Value.bot callees
         in
-        transform t ~next ~exn ~effect desc dbg
+        transform t ~next ~exn ~effect_ desc dbg
 
       let transform_tailcall_imm t func dbg =
         (* Sound to ignore [next] and [exn] because the call never returns. *)
@@ -2648,12 +2648,12 @@ end = struct
         | Alloc { mode = Local; _ } -> next
         | Alloc { mode = Heap; bytes; dbginfo } ->
           let w = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
-          let effect =
+          let effect_ =
             match Metadata.assume_value dbg ~can_raise:false w with
-            | Some effect -> effect
+            | Some effect_ -> effect_
             | None -> Value.{ nor = V.top w; exn = V.bot; div = V.bot }
           in
-          transform t ~effect ~next ~exn:Value.bot "heap allocation" dbg
+          transform t ~effect_ ~next ~exn:Value.bot "heap allocation" dbg
         | Specific s -> transform_specific t s ~next ~exn:Value.bot dbg
         | Dls_get | Tls_get -> next
 

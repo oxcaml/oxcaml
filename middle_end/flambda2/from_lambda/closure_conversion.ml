@@ -1110,16 +1110,16 @@ let close_effect_primitive acc env ~dbg exn_continuation
   let module E = C.Effect in
   match[@ocaml.warning "-fragile-match"] prim, args with
   | Pperform, [[eff]] ->
-    let call_kind = C.effect (E.perform ~eff) in
+    let call_kind = C.effect_ (E.perform ~eff) in
     close call_kind
   | Prunstack, [[stack]; [f]; [arg]] ->
-    let call_kind = C.effect (E.run_stack ~stack ~f ~arg) in
+    let call_kind = C.effect_ (E.run_stack ~stack ~f ~arg) in
     close call_kind
   | Presume, [[stack]; [f]; [arg]; [last_fiber]] ->
-    let call_kind = C.effect (E.resume ~stack ~f ~arg ~last_fiber) in
+    let call_kind = C.effect_ (E.resume ~stack ~f ~arg ~last_fiber) in
     close call_kind
   | Preperform, [[eff]; [cont]; [last_fiber]] ->
-    let call_kind = C.effect (E.reperform ~eff ~cont ~last_fiber) in
+    let call_kind = C.effect_ (E.reperform ~eff ~cont ~last_fiber) in
     close call_kind
   | _ ->
     Misc.fatal_errorf
