@@ -33,6 +33,10 @@ exception Continuation_already_resumed
 (** Exception raised when a continuation is continued or discontinued more
     than once. *)
 
+exception Out_of_fibers
+(** Exception raised by functions that allocate fibers.  Does not
+    necessarily imply that heap memory has been exhausted. *)
+
 external perform : 'a t -> 'a = "%perform"
 (** [perform e] performs an effect [e].
 

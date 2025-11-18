@@ -1,1 +1,1 @@
-Fatal error: exception Sys_error("Cannot allocate memory")
+Fatal error: exception Out_of_fibers

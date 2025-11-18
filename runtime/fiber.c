@@ -382,9 +382,7 @@ value caml_alloc_stack_bind (value hval, value hexn, value heff, value dyn, valu
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
-    /* In this case [alloc_for_stack] should be using [mmap] or
-       [caml_mem_map] and [errno] should be set. */
-    caml_sys_error(NO_ARG);
+    caml_raise_out_of_fibers();
 #else
     caml_raise_out_of_memory();
 #endif
@@ -700,9 +698,7 @@ CAMLprim value caml_alloc_stack_bind(value hval, value hexn, value heff,
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
-    /* In this case [alloc_for_stack] should be using [mmap] or
-       [caml_mem_map] and [errno] should be set. */
-    caml_sys_error(NO_ARG);
+    caml_raise_out_of_fibers();
 #else
     caml_raise_out_of_memory();
 #endif

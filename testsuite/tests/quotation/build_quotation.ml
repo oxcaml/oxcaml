@@ -751,3 +751,8 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 [%%expect {|
 - : <[<[int]> expr]> expr = <[<[$<[42]>]>]>
 |}];;
+
+<[ raise Out_of_fibers ]>;;
+[%%expect {|
+- : 'a expr = <[Stdlib.raise Out_of_fibers]>
+|}];;
