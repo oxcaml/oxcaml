@@ -50,6 +50,7 @@
 (executables
  (names test_arch)
  (modules test_arch)
+ (foreign_stubs (language c) (names perfmon_stubs))
  (enabled_if
    (= %{context_name} "main")))
 
