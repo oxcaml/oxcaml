@@ -35,24 +35,10 @@ type error =
   | Wrong_arity_builtin_primitive of string
   | Wrong_layout_for_peek_or_poke of string
   | Invalid_floatarray_glb
-  | Product_iarrays_unsupported
   | Invalid_array_kind_for_uninitialized_makearray_dynamic
   | Invalid_stack_primitive of invalid_stack_primitive
 
 exception Error of Location.t * error
-
-(* CR layouts v7.1: This is temporary - we should support iarrays of unboxed
-   products. *)
-let unboxed_product_iarray_check loc kind mut =
-  match kind, mut with
-  | (Pgcscannableproductarray _ | Pgcignorableproductarray _),
-    (Immutable | Immutable_unique) ->
-    raise (Error (loc, Product_iarrays_unsupported))
-  | _, Mutable
-  | (Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray
-    | Pfloatarray | Punboxedfloatarray _
-    | Punboxedoruntaggedintarray _ | Punboxedvectorarray _), _  ->
-    ()
 
 let unboxed_product_uninitialized_array_check loc array_kind =
   (* See comments in lambda_to_lambda_transforms.ml in Flambda 2 for more
@@ -1597,8 +1583,6 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
         array_kind_of_elt ~elt_sort:None env loc p2
         |> glb_array_type loc array_kind
       in
-      let array_mut = array_type_mut env rest_ty in
-      unboxed_product_iarray_check loc new_array_kind array_mut;
       if array_kind = new_array_kind then None
       else
         Some (Primitive (Pmakearray_dynamic (
@@ -1611,8 +1595,6 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
         array_type_kind ~elt_sort:None ~elt_ty:None env loc rest_ty
         |> glb_array_type loc array_kind
       in
-      let array_mut = array_type_mut env rest_ty in
-      unboxed_product_iarray_check loc new_array_kind array_mut;
       unboxed_product_uninitialized_array_check loc new_array_kind;
       if array_kind = new_array_kind then None
       else
@@ -2463,9 +2445,6 @@ let report_error ppf = function
       fprintf ppf
         "@[Floatarray primitives can't be used on arrays containing@ \
          unboxed types.@]"
-  | Product_iarrays_unsupported ->
-      fprintf ppf
-        "Immutable arrays of unboxed products are not yet supported."
   | Invalid_array_kind_for_uninitialized_makearray_dynamic ->
       fprintf ppf
         "%%makearray_dynamic_uninit can only be used for GC-ignorable arrays@ \
