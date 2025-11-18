@@ -236,7 +236,7 @@ external signal
 
 let set_signal sig_num sig_beh = ignore(signal sig_num sig_beh)
 
-(* Expose the value of [Config.arch] *)
+(* Expose the value of [Config.architecture] *)
 
 type arch =
   | Amd64
