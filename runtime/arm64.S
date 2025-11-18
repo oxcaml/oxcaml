@@ -1225,14 +1225,26 @@ END_FUNCTION(caml_reperform)
 
 FUNCTION(caml_resume)
         CFI_STARTPROC
-    /*  x0: new fiber
+    /*  x0: continuation
         x1: fun
-        x2: arg
-        x3: last_fiber */
-        sub     x0, x0, 1 /* x0 = Ptr_val(x0) */
-        ldr     x4, [x1]  /* code pointer */
+        x2: arg */
+        CFI_OFFSET(29, -16)
+        CFI_OFFSET(30, -8)
+        stp     x29, x30, [sp, -16]!
+        CFI_ADJUST(16)
+        add     x29, sp, #0
+        ldr     x3, [x0, #8] /* x3 = last_fiber */
+        mov     x22, x2 /* move arg to callee-saved x22 */
+        mov     x23, x3 /* move last_fiber to callee-saved x23 */
+        mov     x24, x1 /* move fun to callee-saved x24 */
+        ADDRGLOBAL(ADDITIONAL_ARG, caml_continuation_use_noexc)
+        bl      G(caml_c_call) /* x0 := stack */
+        sub     x0, x0, 1 /* x0 (new stack) = Ptr_val(x0) */
+        mov     x2, x22 /* x2 := argument */
+        mov     x1, x24 /* x1 := fun */
     /* Check if stack null, then already used */
         cbz     x0, 1f
+        ldr     x4, [x1]  /* code pointer */
 #if defined(WITH_THREAD_SANITIZER)
     /* Save non-callee-saved registers x0, x1, x2, x3 and x4 */
         stp     x0, x1, [sp, -16]!
@@ -1262,10 +1274,13 @@ FUNCTION(caml_resume)
         TSAN_RESTORE_CALLER_REGS
 #endif
     /* Add current stack to the end */
-        sub     x3, x3, 1 /* x3 = Ptr_val(x3) */
-        ldr     x8, Stack_handler(x3)
+        sub     x23, x23, 1 /* x23 = Ptr_val(last_fiber) */
+        ldr     x8, Stack_handler(x23)
         ldr     x9, Caml_state(current_stack)
         str     x9, Handler_parent(x8)
+    /* Pop our frame before stack switch */
+        ldp     x29, x30, [sp], 16
+        CFI_ADJUST(-16)
         SWITCH_OCAML_STACKS x9, x0
         FLUSH_DYNAMIC_CACHE
         mov     x0, x2

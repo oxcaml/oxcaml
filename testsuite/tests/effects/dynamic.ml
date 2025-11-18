@@ -19,7 +19,6 @@ module Dynamic : sig
   val with_temporarily : 'a t -> 'a -> f: (unit -> 'b) -> 'b
 
 end = struct
-  type (-'a, +'b) stack : immediate
   type last_fiber : immediate
   type (-'a, +'b) cont
   type 'a t
@@ -27,20 +26,15 @@ end = struct
   external reperform :
     'a Effect.t -> ('a, 'b) cont -> last_fiber -> 'b = "%reperform"
 
-  module Must_not_enter_gc = struct
-    external alloc_stack_dyn :
-      ('a -> 'b)
-      -> (exn -> 'b)
-      -> ('c Effect.t -> ('c, 'b) cont -> last_fiber -> 'b)
-      -> 'd t
-      -> 'd
-      -> ('a, 'b) stack = "caml_alloc_stack_bind"
-
-    external runstack : ('a, 'b) stack -> ('c -> 'a) -> 'c -> 'b = "%runstack"
-
-    let[@inline never] with_stack_dyn valuec exnc effc d v f x =
-      runstack (alloc_stack_dyn valuec exnc effc d v) f x
-  end
+  external with_stack_bind :
+    ('a -> 'b) ->
+    (exn -> 'b) ->
+    ('c Effect.t -> ('c, 'b) cont -> last_fiber -> 'b) ->
+    'd t ->
+    'd ->
+    ('e -> 'a) ->
+    'e ->
+    'b = "%with_stack_bind" "%with_stack_bind"
 
   external make : 'a -> 'a t = "caml_dynamic_make"
   external get : 'a t -> 'a = "caml_dynamic_get"
@@ -48,7 +42,7 @@ end = struct
 
   let with_temporarily d v ~f =
     let effc eff k last_fiber = reperform eff k last_fiber in
-    Must_not_enter_gc.with_stack_dyn (fun x -> x) (fun e -> raise e) effc d v f ()
+    with_stack_bind (fun x -> x) (fun e -> raise e) effc d v f ()
 end
 
 type _ Effect.t += E : unit -> unit Effect.t
