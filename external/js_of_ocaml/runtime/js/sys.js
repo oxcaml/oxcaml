@@ -305,6 +305,21 @@ function caml_sys_const_runtime5(_unit) {
     return 0;
 }
 
+//Provides: arch
+var arch = globalThis.process?.arch === "arm64?" ? "arm64" : "amd64";
+
+//Provides: caml_sys_const_arch_amd64 const
+//Requires: arch
+function caml_sys_const_arch_amd64(_unit) {
+    return arch === "amd64" ? 1 : 0;
+}
+
+//Provides: caml_sys_const_arch_arm64 const
+//Requires: arch
+function caml_sys_const_arch_arm64(_unit) {
+    return arch === "arm64" ? 1 : 0;
+}
+
 //Provides: caml_runtime_variant
 //Requires: caml_string_of_jsbytes
 function caml_runtime_variant(_unit) {
