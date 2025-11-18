@@ -398,10 +398,10 @@ module Layout = struct
       | Sort (sort, sa1), Any sa2 ->
         (* CR layouts-scannable: If [sort] has not been filled and
            [sa1] </= [sa2], we conservatively say that it is [Not_le].
-           If [sort] gets filled in with anything other than [value], though,
-           they are equal. Unifying [sort] with [value] and returning [Equal]
-           could potentially get better error messages. Another option could
-           be to extend the [Layout_disagreement] type. *)
+           They can still become equal, though, in the case where [sort] is
+           filled in with anything other than [value]. Unifying [sort] with
+           [value] could potentially yield better error messages. Another
+           option could be to add to the [Layout_disagreement] type. *)
         if Sort.is_possibly_scannable sort && not (Scannable_axes.le sa1 sa2)
         then Not_le
         else Less
