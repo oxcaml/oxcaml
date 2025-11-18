@@ -3029,7 +3029,7 @@ let for_boxed_row row =
 
 let for_arrow =
   fresh_jkind
-    { layout = Sort (Base Value, { pointerness = Non_pointer });
+    { layout = Sort (Base Value, { pointerness = Maybe_pointer });
       mod_bounds = Mod_bounds.for_arrow;
       with_bounds = No_with_bounds
     }
