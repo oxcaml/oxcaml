@@ -191,8 +191,8 @@ let mk_I_manifest f =
   \    relative to [$DUNE_MANIFEST_LOAD_PATH_ROOT]."
 
 let mk_H_manifest f =
-  "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given paths\n\
-  \    to the list of \"hidden\" files (see -H for more details)"
+  "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given\n\
+  \    paths to the list of \"hidden\" files (see -H for more details)"
 
 let mk_impl f =
   "-impl", Arg.String f, "<file>  Compile <file> as a .ml file"
