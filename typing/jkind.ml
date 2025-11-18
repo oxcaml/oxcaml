@@ -80,41 +80,47 @@ module Sub_result = struct
 end
 
 module Scannable_axes = struct
-  type t = Jkind_types.Scannable_axes.t
+  type t = Jkind_types.Scannable_axes.t = { pointerness : Pointerness.t }
 
   (* adding in the stubs explicitly so that they can be expanded later *)
 
-  let max = Pointerness.max
+  let max = { pointerness = Pointerness.max }
 
-  let min = Pointerness.min
+  let min = { pointerness = Pointerness.min }
 
-  let legacy = Pointerness.legacy
+  let legacy = { pointerness = Pointerness.legacy }
 
-  let equal sa1 sa2 = Pointerness.equal sa1 sa2
+  let equal { pointerness = p1 } { pointerness = p2 } = Pointerness.equal p1 p2
 
-  let less_or_equal sa1 sa2 = Pointerness.less_or_equal sa1 sa2
+  let less_or_equal { pointerness = p1 } { pointerness = p2 } =
+    Pointerness.less_or_equal p1 p2
 
   let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
 
-  let meet sa1 sa2 = Pointerness.meet sa1 sa2
+  let meet { pointerness = p1 } { pointerness = p2 } =
+    { pointerness = Pointerness.meet p1 p2 }
 
-  let join sa1 sa2 = Pointerness.join sa1 sa2
+  let join { pointerness = p1 } { pointerness = p2 } =
+    { pointerness = Pointerness.join p1 p2 }
 
   let is_max sa = equal sa max
 
-  let print ppf sa = Pointerness.print ppf sa
+  let print ppf { pointerness } = Pointerness.print ppf pointerness
 
-  let to_string_list sa = if is_max sa then [] else [Pointerness.to_string sa]
+  let to_string_list { pointerness } =
+    if Pointerness.is_max pointerness
+    then []
+    else [Pointerness.to_string pointerness]
 
   let set_pointerness sa pointerness =
     (* CR layouts-scannable: Once there are more axes, use [sa]! *)
     ignore sa;
-    pointerness
+    { pointerness }
 
   (* CR layouts-scannable: When more axes get added, I think this should get
      printed like [{ nullability: ...; ... }]. Could also have Caps versions
      of the points on the axis; poke around to see precedent. *)
-  let debug_print ppf sa = Pointerness.print ppf sa
+  let debug_print ppf { pointerness } = Pointerness.print ppf pointerness
 end
 
 (* A *layout* of a type describes the way values of that type are stored at
@@ -156,11 +162,11 @@ module Layout = struct
       | (Base _ | Any _ | Product _), _ -> false
 
     module Static = struct
-      (* CR layouts-scannable: As more scannable axes are added, more
-         combinations should be pre-allocated here. *)
-      let value_non_pointer = Base (Sort.Value, Pointerness.Non_pointer)
+      let value_non_pointer =
+        Base (Sort.Value, { pointerness = Pointerness.Non_pointer })
 
-      let value_maybe_pointer = Base (Sort.Value, Pointerness.Maybe_pointer)
+      let value_maybe_pointer =
+        Base (Sort.Value, { pointerness = Pointerness.Maybe_pointer })
 
       let void = Base (Sort.Void, Scannable_axes.max)
 
@@ -186,10 +192,11 @@ module Layout = struct
 
       let vec512 = Base (Sort.Vec512, Scannable_axes.max)
 
-      let of_base (b : Sort.base) sa =
+      let of_base (b : Sort.base) (sa : Scannable_axes.t) =
         match b, sa with
-        | Value, Pointerness.Non_pointer -> value_non_pointer
-        | Value, Pointerness.Maybe_pointer -> value_maybe_pointer
+        | Value, { pointerness = Pointerness.Non_pointer } -> value_non_pointer
+        | Value, { pointerness = Pointerness.Maybe_pointer } ->
+          value_maybe_pointer
         | Void, _ -> void
         | Untagged_immediate, _ -> untagged_immediate
         | Float64, _ -> float64
@@ -2118,16 +2125,18 @@ module Const = struct
         in
         Some modes
 
+    (* CR zeisbach: refactor so that this logic isn't duplicated across the
+       [to_string_list] function as well... design a nicer helper! *)
     let get_scannable_axes ~base actual =
       let base_sa = Layout.Const.get_root_scannable_axes base in
       let actual_sa = Layout.Const.get_root_scannable_axes actual in
       match base_sa, actual_sa with
       | None, _ | _, None -> []
-      | Some base_sa, Some actual_sa ->
-        (* CR scannable-layouts: compare along each axis as more are added. *)
-        if Scannable_axes.equal base_sa actual_sa
+      | ( Some { pointerness = base_ptrness },
+          Some { pointerness = actual_ptrness } ) ->
+        if Pointerness.equal base_ptrness actual_ptrness
         then []
-        else [Pointerness.to_string actual_sa]
+        else [Pointerness.to_string actual_ptrness]
 
     let modality_to_ignore_axes axes_to_ignore =
       (* The modality is constant along axes to ignore and id along others *)
@@ -2268,16 +2277,15 @@ module Const = struct
 
   let set_pointerness_upper_bound ~abbrev t = function
     | None -> t
-    | Some (pointerness, loc) ->
-      let sa = Layout.Const.get_root_scannable_axes t.layout in
-      (match sa with
+    | Some (new_ptrness, loc) ->
+      (match Layout.Const.get_root_scannable_axes t.layout with
       | None -> ()
-      | Some sa ->
-        if sa = pointerness
+      | Some { pointerness } ->
+        if new_ptrness = pointerness
         then
           Location.prerr_warning loc (Warnings.Redundant_kind_modifier abbrev));
       let new_layout =
-        Layout.Const.set_pointerness_upper_bound t.layout pointerness
+        Layout.Const.set_pointerness_upper_bound t.layout new_ptrness
       in
       { t with layout = new_layout }
 
@@ -2859,7 +2867,7 @@ let for_non_float ~(why : History.value_creation_reason) =
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
-    { layout = Sort (Base Value, Maybe_pointer);
+    { layout = Sort (Base Value, { pointerness = Maybe_pointer });
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -2875,7 +2883,7 @@ let for_or_null_argument ident =
       ~separability:Separability.Maybe_separable
   in
   fresh_jkind
-    { layout = Sort (Base Value, Maybe_pointer);
+    { layout = Sort (Base Value, { pointerness = Maybe_pointer });
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -2981,7 +2989,7 @@ let for_open_boxed_row =
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
-    { layout = Sort (Base Value, Maybe_pointer);
+    { layout = Sort (Base Value, { pointerness = Maybe_pointer });
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -3023,7 +3031,7 @@ let for_boxed_row row =
 
 let for_arrow =
   fresh_jkind
-    { layout = Sort (Base Value, Maybe_pointer);
+    { layout = Sort (Base Value, { pointerness = Non_pointer });
       mod_bounds = Mod_bounds.for_arrow;
       with_bounds = No_with_bounds
     }
@@ -3037,7 +3045,7 @@ let for_object =
   let comonadic = Crossing.Comonadic.legacy in
   let monadic = Crossing.Monadic.max in
   fresh_jkind
-    { layout = Sort (Base Value, Maybe_pointer);
+    { layout = Sort (Base Value, { pointerness = Maybe_pointer });
       mod_bounds =
         Mod_bounds.create { comonadic; monadic } ~externality:Externality.max
           ~nullability:Non_null ~separability:Separability.Non_float;
@@ -3056,7 +3064,7 @@ let for_float ident =
       ~nullability:Nullability.Non_null ~separability:Separability.Separable
   in
   fresh_jkind
-    { layout = Sort (Base Value, Maybe_pointer);
+    { layout = Sort (Base Value, { pointerness = Maybe_pointer });
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -3069,7 +3077,10 @@ let for_array_argument =
       ~nullability:Nullability.Maybe_null ~separability:Separability.Separable
   in
   fresh_jkind
-    { layout = Any Maybe_pointer; mod_bounds; with_bounds = No_with_bounds }
+    { layout = Any { pointerness = Maybe_pointer };
+      mod_bounds;
+      with_bounds = No_with_bounds
+    }
     ~annotation:None ~why:(Any_creation Array_type_argument)
 
 let for_array_element_sort () =

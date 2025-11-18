@@ -98,7 +98,7 @@ module Sort : sig
 end
 
 module Scannable_axes : sig
-  type t = Jkind_axis.Pointerness.t
+  type t = { pointerness : Jkind_axis.Pointerness.t }
 end
 
 module Layout : sig
