@@ -841,7 +841,7 @@ type lambda =
   (* [Lexclave] closes the newest region opened.
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
-  | Lsplice of { splice_loc : scoped_location; slambda : slambda; }
+  | Lsplice of lambda_splice
 
 and slambda = lambda Slambda0.t0
 
@@ -913,6 +913,8 @@ and lambda_event_kind =
   | Lev_after of Types.type_expr
   | Lev_function
   | Lev_pseudo
+
+  and lambda_splice = { splice_loc : scoped_location; slambda : slambda; }
 
 (* A description of a parameter to be passed to the runtime representation of a
    parameterised module, namely a function (called the instantiating functor)

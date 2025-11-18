@@ -873,7 +873,7 @@ type lambda =
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
   | Lexclave of lambda
-  | Lsplice of { splice_loc : scoped_location; slambda : slambda }
+  | Lsplice of lambda_splice
 
 and slambda = lambda SL.t0
 
@@ -940,6 +940,8 @@ and lambda_event_kind =
   | Lev_after of Types.type_expr
   | Lev_function
   | Lev_pseudo
+
+and lambda_splice = { splice_loc : scoped_location; slambda : slambda }
 
 type runtime_param =
   | Rp_argument_block of Global_module.t
