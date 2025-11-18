@@ -31,12 +31,8 @@ jobs:
             config: --enable-runtime5 --enable-poll-insertion
             os: warp-ubuntu-latest-x64-8x
 
-          - name: runtime5 multidomain stack-checks (x86_64-linux)
-            config: --enable-runtime5 --enable-stack-checks --enable-poll-insertion --enable-multidomain
-            os: warp-ubuntu-latest-x64-8x
-
           - name: runtime5 multidomain (x86_64-linux)
-            config: --enable-runtime5 --enable-poll-insertion --enable-multidomain
+            config: --enable-runtime5 --enable-stack-checks --enable-poll-insertion --enable-multidomain
             os: warp-ubuntu-latest-x64-8x
 
           - name: runtime4 dev (x86_64-linux)
@@ -70,7 +66,7 @@ jobs:
           - name: runtime4 O3 metrics (x86_64-linux)
             config: --disable-runtime5
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: ''
+            build_ocamlparam: '_'
             ocamlparam: '_,O3=1'
             collect_metrics: true
 
@@ -237,6 +233,13 @@ jobs:
       - name: Build, install and test OxCaml
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
         run: |
+          if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+            mkdir $GITHUB_WORKSPACE/_profile_csv
+            ORIG_BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM"
+            ORIG_OCAMLPARAM="$OCAMLPARAM"
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+          fi
           if [ "$run_testsuite" = true ]; then target=ci; else target=compiler; fi
           ulimit -c unlimited
           make $target \
@@ -245,6 +248,8 @@ jobs:
           # Install the compiler for metrics_collection configuration to populate _install directory
           # This is needed for the metrics collection step to analyze installed artifacts
           if [ "${{ matrix.collect_metrics }}" = "true" ]; then
+            BUILD_OCAMLPARAM="$ORIG_BUILD_OCAMLPARAM"
+            OCAMLPARAM="$ORIG_OCAMLPARAM"
             make install
           fi
         env:
@@ -414,11 +419,12 @@ jobs:
           fi
 
           # Use the metrics collection script (CSV filename and PR number computed internally)
-          python3 ${{ github.workspace }}/scripts/collect-size-metrics.py \
+          python3 ${{ github.workspace }}/scripts/collect-metrics.py \
             --install-dir "${{ github.workspace }}/_install" \
             --output-dir "metrics-repo/raw-data" \
             --commit-hash "$COMMIT_HASH" \
             --commit-message "$COMMIT_MESSAGE" \
+            --profile-dir "${{ github.workspace }}/_profile_csv" \
             --verbose
 
           # Commit and push metrics
