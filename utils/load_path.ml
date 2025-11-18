@@ -18,7 +18,7 @@ exception Parse_error of string
 
 let split_and_unescape ~buffer line =
   let len = String.length line in
-  let end_current_token current_token tokens =
+  let[@inline] end_current_token current_token tokens =
     let token = Buffer.contents current_token in
     Buffer.clear current_token;
     if token = "" then tokens else token :: tokens
