@@ -1,5 +1,5 @@
 (* TEST
- modules = "out_of_fibers.c";
+ modules = "out_of_fibers_.c";
  exit_status = "2";
  { bytecode; }
  { native; }
