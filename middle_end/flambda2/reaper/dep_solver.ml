@@ -952,7 +952,7 @@ type field_usage =
   | Used_as_top
   | Used_as_vars of unit Code_id_or_name.Map.t
 
-(** For an usage set (argument s), compute the way its fields are used.
+(** For an usage set (coaccessor s), compute the way its fields are used.
     As function slots are transparent for [get_usages], functions slot
     usages are ignored here.
 *)
