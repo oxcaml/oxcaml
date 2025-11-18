@@ -332,7 +332,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
       else
         destroy_neon_reg7
   | Op (Intop (Iadd  | Isub | Imul | Idiv|Imod|Iand|Ior|Ixor|Ilsl
-              |Ilsr|Iasr|Imulh _|Iclz _|Ictz _|Icomp _|Iadd128|Isub128))
+              |Ilsr|Iasr|Imulh _|Iclz _|Ictz _|Icomp _
+              |Iadd128|Isub128|Imul128 _))
   | Op (Specific _
         | Move | Spill | Reload
         | Floatop _
@@ -495,6 +496,7 @@ let operation_supported : Cmm.operation -> bool = function
   | Cpoll
   | Caddi128
   | Csubi128
+  | Cmuli128 _
   | Creinterpret_cast (Int_of_value | Value_of_int |
                        Int64_of_float | Float_of_int64 |
                        Float32_of_float | Float_of_float32 |

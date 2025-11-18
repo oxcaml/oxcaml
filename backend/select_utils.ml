@@ -193,7 +193,7 @@ let oper_result_type = function
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
   | Clsr | Casr | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
     typ_int
-  | Caddi128 | Csubi128 -> typ_int128
+  | Caddi128 | Csubi128 | Cmuli128 _ -> typ_int128
   | Caddv -> typ_val
   | Cadda -> typ_addr
   | Cnegf Float64

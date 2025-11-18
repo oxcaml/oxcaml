@@ -824,7 +824,8 @@ let instr_for_int_operation = function
   | Ilsl -> I.LSL
   | Ilsr -> I.LSR
   | Iasr -> I.ASR
-  | Iclz _ | Ictz _ | Ipopcnt | Icomp _ | Imod | Imulh _ | Iadd128 | Isub128 ->
+  | Iclz _ | Ictz _ | Ipopcnt | Icomp _ | Imod | Imulh _ | Iadd128 | Isub128
+  | Imul128 _ ->
     assert false
 
 (* Decompose an integer constant into four 16-bit shifted fragments. Omit the
@@ -1241,7 +1242,10 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Floatop (Float32, Icompf _)) -> 2
     | Lop (Intop_imm (Icomp _, _)) -> 2
     | Lop (Intop Imod) -> 2
-    | Lop (Intop (Iadd128 | Isub128) | Intop_imm ((Iadd128 | Isub128), _)) -> 2
+    | Lop
+        ( Intop (Iadd128 | Isub128 | Imul128 _)
+        | Intop_imm ((Iadd128 | Isub128 | Imul128 _), _) ) ->
+      2
     | Lop (Intop (Imulh _)) -> 1
     | Lop (Intop (Iclz _)) -> 1
     | Lop (Intop (Ictz _)) -> if !Arch.feat_cssc then 1 else 2
@@ -2013,6 +2017,28 @@ let emit_instr i =
       [| DSL.emit_reg i.res.(1);
          DSL.emit_reg i.arg.(1);
          DSL.emit_reg i.arg.(3)
+      |]
+  | Lop (Intop (Imul128 { signed = true })) ->
+    DSL.ins I.MUL
+      [| DSL.emit_reg i.res.(0);
+         DSL.emit_reg i.arg.(0);
+         DSL.emit_reg i.arg.(1)
+      |];
+    DSL.ins I.SMULH
+      [| DSL.emit_reg i.res.(1);
+         DSL.emit_reg i.arg.(0);
+         DSL.emit_reg i.arg.(1)
+      |]
+  | Lop (Intop (Imul128 { signed = false })) ->
+    DSL.ins I.MUL
+      [| DSL.emit_reg i.res.(0);
+         DSL.emit_reg i.arg.(0);
+         DSL.emit_reg i.arg.(1)
+      |];
+    DSL.ins I.UMULH
+      [| DSL.emit_reg i.res.(1);
+         DSL.emit_reg i.arg.(0);
+         DSL.emit_reg i.arg.(1)
       |]
   | Lop (Intop Ipopcnt) ->
     if !Arch.feat_cssc

@@ -605,9 +605,10 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
        | Stackoffset _
        | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr
-               | Iasr | Ipopcnt | Iclz _ | Ictz _ | Iadd128 | Isub128)
+               | Iasr | Ipopcnt | Iclz _ | Ictz _ | Iadd128 | Isub128 | Imul128 _)
        | Intop_imm ((Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl
-                    | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ | Iadd128 | Isub128),_)
+                    | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ | Iadd128
+                    | Isub128 | Imul128 _),_)
        | Floatop _
        | Csel _
        | Reinterpret_cast _
@@ -747,7 +748,8 @@ let operation_supported = function
     Arch.Extension.enabled_vec512 ()
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Caddi128 | Csubi128
+  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+  | Caddi128 | Csubi128 | Cmuli128 _
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
   | Ccsel _
   | Cbswap _

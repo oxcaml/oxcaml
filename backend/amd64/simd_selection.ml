@@ -1284,7 +1284,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         (* These instructions seem to not have a simd counterpart yet, could
            also implement as a combination of other instructions if needed in
            the future *))
-    | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt | Iadd128 | Isub128 -> None
+    | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt | Iadd128 | Isub128 | Imul128 _ ->
+      None
   in
   match List.hd cfg_ops with
   | Move -> Operation.Move |> make_default ~arg_count ~res_count

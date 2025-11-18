@@ -62,6 +62,7 @@ type integer_operation =
   | Icomp of integer_comparison
   | Iadd128
   | Isub128
+  | Imul128 of { signed : bool }
 
 val string_of_integer_operation : integer_operation -> string
 

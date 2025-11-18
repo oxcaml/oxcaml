@@ -302,6 +302,8 @@ simd_int64x2_t vectors_and_floats_and_ints(
 
 BUILTIN(caml_int128_add);
 BUILTIN(caml_int128_sub);
+BUILTIN(caml_int64_mul128);
+BUILTIN(caml_unsigned_int64_mul128);
 
 BUILTIN(caml_vec128_unreachable);
 BUILTIN(caml_vec128_cast);

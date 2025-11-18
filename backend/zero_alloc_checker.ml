@@ -2585,13 +2585,13 @@ end = struct
         | Load _ | Floatop _
         | Intop_imm
             ( ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iadd128 | Isub128
-              | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _
-              | Ictz _ | Icomp _ ),
+              | Imul128 _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt
+              | Iclz _ | Ictz _ | Icomp _ ),
               _ )
         | Intop
             ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iadd128 | Isub128
-            | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _
-            | Icomp _ )
+            | Imul128 _ | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt
+            | Iclz _ | Ictz _ | Icomp _ )
         | Reinterpret_cast
             ( Float32_of_float | Float_of_float32 | Float_of_int64
             | Int64_of_float | Float32_of_int32 | Int32_of_float32

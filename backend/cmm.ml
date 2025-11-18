@@ -434,6 +434,7 @@ type operation =
   | Cmodi
   | Caddi128
   | Csubi128
+  | Cmuli128 of { signed : bool }
   | Cand
   | Cor
   | Cxor
@@ -652,9 +653,9 @@ let iter_shallow_tail f = function
   | Cvar _ | Ctuple _
   | Cop
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128 | Csubi128
-        | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cpopcnt | Caddv | Cadda
-        | Cpackf32 | Copaque | Cbeginregion | Cendregion | Cdls_get | Ctls_get
-        | Cpoll | Cpause
+        | Cmuli128 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cpopcnt | Caddv
+        | Cadda | Cpackf32 | Copaque | Cbeginregion | Cendregion | Cdls_get
+        | Ctls_get | Cpoll | Cpause
         | Capply (_, _)
         | Cextcall _ | Cload _
         | Cstore (_, _)
@@ -687,9 +688,9 @@ let map_shallow_tail f = function
     | Cvar _ | Ctuple _
     | Cop
         ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128
-          | Csubi128 | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cpopcnt | Caddv
-          | Cadda | Cpackf32 | Copaque | Cbeginregion | Cendregion | Cdls_get
-          | Ctls_get | Cpoll | Cpause
+          | Csubi128 | Cmuli128 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
+          | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
+          | Cendregion | Cdls_get | Ctls_get | Cpoll | Cpause
           | Capply (_, _)
           | Cextcall _ | Cload _
           | Cstore (_, _)
