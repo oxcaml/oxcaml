@@ -1817,9 +1817,6 @@ let instance_prim_layout (desc : Primitive.description) ty =
   then ty, None
   else
   let new_sort = ref None in
-  (* CR layouts-scannable: It would be nice if this didn't have to take in [sa],
-     so [Jkind.get_root_scannable_axes] could be removed. But that would break
-     layout_poly for [any non_pointer]. *)
   let get_jkind jkind sa =
     let sort = match !new_sort with
     | Some sort -> sort
@@ -1839,15 +1836,12 @@ let instance_prim_layout (desc : Primitive.description) ty =
          from an outer scope *)
       if level = generic_level && try_mark_node ty then begin
         begin match get_desc ty with
-        | Tvar ({ jkind; _ } as r) when Jkind.has_layout_any jkind ->
-          (* since we know the layout is [any], [Option.get] is safe here *)
-          let sa = jkind |> Jkind.get_root_scannable_axes |> Option.get in
+        | Tvar ({ jkind = { jkind = { layout = Any sa; _ }; _ }; _ } as r) ->
           For_copy.redirect_desc copy_scope ty
-            (Tvar {r with jkind = get_jkind jkind sa})
-        | Tunivar ({ jkind; _ } as r) when Jkind.has_layout_any jkind ->
-          let sa = jkind |> Jkind.get_root_scannable_axes |> Option.get in
+            (Tvar {r with jkind = get_jkind r.jkind sa})
+        | Tunivar ({ jkind = { jkind = { layout = Any sa; _ }; _ }; _ } as r) ->
           For_copy.redirect_desc copy_scope ty
-            (Tunivar {r with jkind = get_jkind jkind sa})
+            (Tunivar {r with jkind = get_jkind r.jkind sa})
         | _ -> ()
         end;
         iter_type_expr inner ty

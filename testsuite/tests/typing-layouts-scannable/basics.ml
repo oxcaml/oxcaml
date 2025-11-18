@@ -127,8 +127,8 @@ val f : ('a : value non_pointer) 'b. 'a -> 'b = <fun>
 val g : 'a ('b : value non_pointer). 'a -> 'b = <fun>
 |}]
 
-(* CR layouts-separability: as base jkinds become non_pointer, test these!
-   including the interesting cases where annotations don't matter *)
+(* CR layouts-separability: Once [immediate] means [scannable non_pointer],
+   add tests for this behavior! *)
 
 (* unboxed records *)
 
@@ -198,8 +198,8 @@ val f : ('a : float64). 'a -> unit = <fun>
 |}]
 
 let f (type a : value non_pointer) (x : a) =
-  (* here, x is value maybe_pointer *)
-  let g x = () in
+  (* here, y is value maybe_pointer *)
+  let g y = () in
   g x
 [%%expect{|
 val f : ('a : value non_pointer). 'a -> unit = <fun>

@@ -384,12 +384,6 @@ module Layout = struct
     | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
     | Product _ -> t
 
-  (* returns [None] if the root has no meaningful scannable axes *)
-  let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
-    | Any sa -> Some sa
-    | Sort (b, sa) -> if Sort.is_possibly_scannable b then Some sa else None
-    | Product _ -> None
-
   let sub t1 t2 =
     let rec sub t1 t2 : Misc.Le_result.t =
       match t1, t2 with
@@ -3133,8 +3127,6 @@ let sort_of_jkind (t : jkind_l) : sort =
 let get_layout jk : Layout.Const.t option = Layout.get_const jk.jkind.layout
 
 let extract_layout jk = jk.jkind.layout
-
-let get_root_scannable_axes jk = Layout.get_root_scannable_axes jk.jkind.layout
 
 let get_mode_crossing (type l r) ~context (jk : (l * r) jkind) =
   let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :

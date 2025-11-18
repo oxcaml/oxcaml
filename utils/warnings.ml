@@ -595,7 +595,7 @@ let descriptions = [
     names = ["redundant-kind-modifier"];
     (* CR layouts-scannable: as more axes are added, this description (and
        the following description) should be updated in tandem. *)
-    description = "A pointerness axis annotation appears on a layout that \
+    description = "A pointerness axis annotation appears on a kind that \
                    already implies the annotation.";
     since = since 5 2 };
   { number = 184;
@@ -1274,13 +1274,13 @@ let message = function
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
   | Redundant_kind_modifier abbrev ->
-      "This modifier is already implied by the layout \"" ^ abbrev ^ "\"."
+      "This kind modifier is already implied by the kind \"" ^ abbrev ^ "\"."
   | Ignored_kind_modifier (abbrev, modifiers) ->
       Printf.sprintf
-      "The kind modifier(s) \"%s\" have no effect on the layout \"%s\"."
+      "The kind modifier(s) \"%s\" have no effect on the kind \"%s\"."
       (String.concat " " modifiers) abbrev
   | Overridden_kind_modifier overridden_by ->
-      "This modifier is overridden by \"" ^ overridden_by ^ "\" later."
+      "This kind modifier is overridden by \"" ^ overridden_by ^ "\" later."
   | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
   | Incompatible_with_upstream (Immediate_erasure id)  ->
       Printf.sprintf

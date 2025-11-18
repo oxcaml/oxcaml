@@ -122,6 +122,7 @@ type out_jkind_const =
 and out_jkind =
   | Ojkind_const of out_jkind_const
   | Ojkind_var of string * string list
+  (** The [string list] represents the scannable axes on the variable *)
   | Ojkind_product of out_jkind list
 
 (* should be empty if all the jkind annotations are missing *)

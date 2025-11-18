@@ -1369,7 +1369,7 @@ let out_jkind_of_const_jkind jkind =
    be overhauled with [with]-types. Internal ticket 5096. *)
 let rec out_jkind_of_desc (desc : 'd Jkind.Desc.t) =
   match desc.layout with
-  | Sort ((Var n), sa) ->
+  | Sort (Var n, sa) ->
     Ojkind_var ("'_representable_layout_" ^
                 Int.to_string (Jkind.Sort.Var.get_print_number n),
                 Jkind.Scannable_axes.to_string_list sa)
