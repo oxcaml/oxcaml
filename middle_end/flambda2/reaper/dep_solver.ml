@@ -323,6 +323,10 @@ let actual_usages x y = `Only_if ([~~(any_usage x)], usages x y)
 
 let actual_sources x y = `Only_if ([~~(any_source x)], sources x y)
 
+let has_usage = rel1 "has_usage" Cols.[n]
+
+let has_source = rel1 "has_source" Cols.[n]
+
 let datalog_schedule =
   (* Group rules by priority. Rules with (let$) are executed first, then the
      rules with (let$$) are executed. The rule with (let$+$$) is executed as
@@ -341,7 +345,7 @@ let datalog_schedule =
   in
   [ (* Reverse relations, because datalog does not implement a more efficient
        representation yet. Datalog iterates on the first key of a relation
-       first. those reversed relations allows to select a different key. Of
+       first, those reversed relations allows to select a different key. Of
        these, only [alias] has both priorities, because it is the only of those
        relations that is extended after graph construction. *)
     (let$+$$ [to_; from] = ["to_"; "from"] in
@@ -363,6 +367,15 @@ let datalog_schedule =
        intended meaning of this rule. That is an alias if [is_used] is used. *)
     (let$ [if_used; to_; from] = ["if_used"; "to_"; "from"] in
      [any_usage if_used; propagate ~if_used ~to_ ~from] ==> alias ~to_ ~from);
+    (* has_usage/has_source *)
+    (let$ [x] = ["x"] in
+     [any_usage x] ==> has_usage x);
+    (let$ [x; y] = ["x"; "y"] in
+     [usages x y] ==> has_usage x);
+    (let$ [x] = ["x"] in
+     [any_source x] ==> has_source x);
+    (let$ [x; y] = ["x"; "y"] in
+     [sources x y] ==> has_source x);
     (* usages rules:
 
        By convention the Base name applies to something that represents a block
@@ -379,15 +392,10 @@ let datalog_schedule =
        (see [usages] definition comment) *)
     (let$ [to_; from] = ["to_"; "from"] in
      [alias ~to_ ~from; any_usage to_] ==> any_usage from);
-    (let$$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-     [accessor ~to_ relation ~base; usages to_ _var] ==> actual_usages base base);
     (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-     [accessor ~to_ relation ~base; any_usage to_] ==> actual_usages base base);
-    (let$$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-     [sources to_ _var; coaccessor ~to_ relation ~base]
-     ==> actual_usages base base);
+     [accessor ~to_ relation ~base; has_usage to_] ==> actual_usages base base);
     (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-     [any_source to_; coaccessor ~to_ relation ~base]
+     [has_source to_; coaccessor ~to_ relation ~base]
      ==> actual_usages base base);
     (let$$ [to_; from; usage] = ["to_"; "from"; "usage"] in
      [actual_usages to_ usage; alias ~to_ ~from] ==> actual_usages from usage);
@@ -411,11 +419,8 @@ let datalog_schedule =
        accessor ~to_ relation ~base ]
      ==> field_usages base relation to_);
     (* coaccessor-usages *)
-    (let$$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-     [~~(any_usage base); coaccessor ~to_ relation ~base; sources to_ _var]
-     ==> cofield_usages base relation to_);
     (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-     [~~(any_usage base); any_source to_; coaccessor ~to_ relation ~base]
+     [~~(any_usage base); has_source to_; coaccessor ~to_ relation ~base]
      ==> cofield_usages base relation to_);
     (* constructor-usages *)
     (let$$ [base; base_use; relation; from; to_] =
@@ -457,21 +462,11 @@ let datalog_schedule =
     (* sources: see explanation on usage *)
     (let$ [from; to_] = ["from"; "to_"] in
      [rev_alias ~from ~to_; any_source from] ==> any_source to_);
-    (let$$ [from; relation; base; _var] =
-       ["from"; "relation"; "base"; "_var"]
-     in
-     [sources from _var; rev_constructor ~from relation ~base]
+    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+     [has_source from; rev_constructor ~from relation ~base]
      ==> actual_sources base base);
     (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
-     [any_source from; rev_constructor ~from relation ~base]
-     ==> actual_sources base base);
-    (let$$ [from; relation; base; _var] =
-       ["from"; "relation"; "base"; "_var"]
-     in
-     [usages from _var; rev_coconstructor ~from relation ~base]
-     ==> actual_sources base base);
-    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
-     [any_usage from; rev_coconstructor ~from relation ~base]
+     [has_usage from; rev_coconstructor ~from relation ~base]
      ==> actual_sources base base);
     (let$$ [from; to_; source] = ["from"; "to_"; "source"] in
      [actual_sources from source; rev_alias ~from ~to_]
@@ -498,16 +493,9 @@ let datalog_schedule =
        actual_sources from _var ]
      ==> field_sources base relation from);
     (* coaccessor-sources *)
-    (let$$ [from; relation; base; _var] =
-       ["from"; "relation"; "base"; "_var"]
-     in
-     [ ~~(any_source base);
-       rev_coconstructor ~from relation ~base;
-       usages from _var ]
-     ==> cofield_sources base relation from);
     (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
      [ ~~(any_source base);
-       any_usage from;
+       has_usage from;
        rev_coconstructor ~from relation ~base ]
      ==> cofield_sources base relation from);
     (* coconstructor-uses *)
@@ -566,14 +554,10 @@ let datalog_schedule =
        cofield_sources base_source relation from ]
      ==> alias ~to_:from ~from:to_);
     (* use *)
-    (let$ [to_; from; _var] = ["to_"; "from"; "_var"] in
-     [usages to_ _var; use ~to_ ~from] ==> any_usage from);
     (let$ [to_; from] = ["to_"; "from"] in
-     [any_usage to_; use ~to_ ~from] ==> any_usage from);
-    (let$ [from; to_; _var] = ["from"; "to_"; "_var"] in
-     [sources from _var; rev_use ~from ~to_] ==> any_source to_);
+     [has_usage to_; use ~to_ ~from] ==> any_usage from);
     (let$ [from; to_] = ["from"; "to_"] in
-     [any_source from; rev_use ~from ~to_] ==> any_source to_) ]
+     [has_source from; rev_use ~from ~to_] ==> any_source to_) ]
   |> make_schedule
 
 module Fixit : sig
@@ -1111,30 +1095,17 @@ let any_usage_query =
   let^? [x], [] = ["x"], [] in
   [any_usage x]
 
+let has_usage_query =
+  let^? [x], [] = ["x"], [] in
+  [has_usage x]
+
 (* CR pchambart: should rename: mutiple potential top is_used_as_top (should be
    obviously different from has use) *)
 let is_top db x = any_usage_query [x] db
 
 (* CR pchambart: field_used should rename to mean that this is the specific
    field of a given variable. *)
-let has_use, _field_used =
-  let usages_query =
-    let^? [x], [y] = ["x"], ["y"] in
-    [usages x y]
-  in
-  let used_field_top_query =
-    let^? [x; f], [u] = ["x"; "f"], ["u"] in
-    [usages x u; field_usages_top u f]
-  in
-  let used_field_query =
-    let^? [x; f], [u; v] = ["x"; "f"], ["u"; "v"] in
-    [usages x u; field_usages u f v]
-  in
-  ( (fun db x -> any_usage_query [x] db || usages_query [x] db),
-    fun db x field ->
-      any_usage_query [x] db
-      || used_field_top_query [x; field] db
-      || used_field_query [x; field] db )
+let has_use db x = has_usage_query [x] db
 
 let field_used =
   let field_of_constructor_is_used_query =
@@ -1147,12 +1118,11 @@ let any_source_query =
   let^? [x], [] = ["x"], [] in
   [any_source x]
 
-let has_source =
-  let has_source_query =
-    let^? [x], [y] = ["x"], ["y"] in
-    [sources x y]
-  in
-  fun db x -> any_source_query [x] db || has_source_query [x] db
+let has_source_query =
+  let^? [x], [] = ["x"], [] in
+  [has_source x]
+
+let has_source db x = has_source_query [x] db
 
 let cofield_has_use =
   let cofield_query =
@@ -1162,10 +1132,6 @@ let cofield_has_use =
   fun db x cofield -> any_source_query [x] db || cofield_query [x; cofield] db
 
 let not_local_field_has_source =
-  let any_source_query =
-    let^? [x], [] = ["x"], [] in
-    [any_source x]
-  in
   let field_any_source_query =
     let^? [x; f], [s] = ["x"; "f"], ["s"] in
     [sources x s; field_sources_top s f]
@@ -1445,18 +1411,11 @@ let datalog_rules =
       (* If the calling convention of a witness cannot be changed, the calling
          convention of its code_id cannot be either. From now on,
          [cannot_change_witness_calling_convention] should no longer be used. *)
-      (let$ [call_witness; code_id; _v] = ["call_witness"; "code_id"; "_v"] in
-       [ constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
-           ~from:code_id;
-         usages call_witness _v;
-         cannot_change_witness_calling_convention call_witness ]
-       ==> cannot_change_calling_convention code_id);
       (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
        [ constructor ~base:call_witness
            !!Field.code_id_of_call_witness
            ~from:code_id;
-         any_usage call_witness;
+         has_usage call_witness;
          cannot_change_witness_calling_convention call_witness ]
        ==> cannot_change_calling_convention code_id);
       (* CR ncourant: we're preventing changing the calling convention of
@@ -1470,18 +1429,7 @@ let datalog_rules =
        [ rev_constructor ~from:call_witness
            !!(Field.code_of_closure Unknown_arity_code_pointer)
            ~base:set_of_closures;
-         any_usage call_witness;
-         constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
-           ~from:codeid ]
-       ==> cannot_change_calling_convention codeid);
-      (let$ [call_witness; codeid; set_of_closures; _v] =
-         ["call_witness"; "codeid"; "set_of_closures"; "_v"]
-       in
-       [ rev_constructor ~from:call_witness
-           !!(Field.code_of_closure Unknown_arity_code_pointer)
-           ~base:set_of_closures;
-         usages call_witness _v;
+         has_usage call_witness;
          constructor ~base:call_witness
            !!Field.code_id_of_call_witness
            ~from:codeid ]
@@ -1620,14 +1568,9 @@ let datalog_rules =
       (* Compute allocations to unbox or to change representation. This requires
          the rules to be executed in order. *)
       (let$ [x] = ["x"] in
-       [any_usage x; ~~(cannot_unbox x)] ==> to_unbox x);
-      (let$ [x; _y] = ["x"; "_y"] in
-       [usages x _y; ~~(cannot_unbox x)] ==> to_unbox x);
+       [has_usage x; ~~(cannot_unbox x)] ==> to_unbox x);
       (let$ [x] = ["x"] in
-       [any_usage x; ~~(cannot_change_representation x); ~~(to_unbox x)]
-       ==> to_change_representation x);
-      (let$ [x; _y] = ["x"; "_y"] in
-       [usages x _y; ~~(cannot_change_representation x); ~~(to_unbox x)]
+       [has_usage x; ~~(cannot_change_representation x); ~~(to_unbox x)]
        ==> to_change_representation x);
       (let$ [x] = ["x"] in
        [any_source x] ==> multiple_allocation_points x);
