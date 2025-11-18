@@ -5,6 +5,21 @@
     "value": [
       {
         "start": {
+          "line": 39,
+          "col": 0
+        },
+        "end": {
+          "line": 48,
+          "col": 3
+        },
+        "name": "S",
+        "kind": "Signature",
+        "type": null,
+        "children": [],
+        "deprecated": false
+      },
+      {
+        "start": {
           "line": 24,
           "col": 0
         },
@@ -246,6 +261,7 @@
 Check that when we pass "-include-types false", every "type" is null.
   $ $MERLIN single outline -include-types false < foo.ml \
   >   | jq '.value | .. | objects | select(has("type")) | .type'
+  null
   null
   null
   null
