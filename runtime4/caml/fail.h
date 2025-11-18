@@ -124,6 +124,10 @@ CAMLextern void caml_raise_out_of_memory (void)
 CAMLnoreturn_end;
 
 CAMLnoreturn_start
+CAMLextern void caml_raise_out_of_fibers (void)
+CAMLnoreturn_end;
+
+CAMLnoreturn_start
 CAMLextern void caml_raise_stack_overflow (void)
 CAMLnoreturn_end;
 
