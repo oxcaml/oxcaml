@@ -41,6 +41,13 @@ type t_maybeptr : any
 type t_nonptr : any non_pointer
 |}]
 
+type t_maybeptr_val : value maybe_pointer
+type t_nonptr_val : value non_pointer
+[%%expect{|
+type t_maybeptr_val
+type t_nonptr_val : value non_pointer
+|}]
+
 type ('a : any maybe_pointer) accepts_maybeptr
 type ('a : any non_pointer) accepts_nonptr
 [%%expect{|
@@ -48,11 +55,22 @@ type ('a : any) accepts_maybeptr
 type ('a : any non_pointer) accepts_nonptr
 |}]
 
+type ('a : value maybe_pointer) accepts_maybeptr_val
+type ('a : value non_pointer) accepts_nonptr_val
+[%%expect{|
+type 'a accepts_maybeptr_val
+type ('a : value non_pointer) accepts_nonptr_val
+|}]
+
 type succeeds = t_maybeptr accepts_maybeptr
 type succeeds = t_nonptr accepts_maybeptr
+type succeeds = t_maybeptr_val accepts_maybeptr_val
+type succeeds = t_nonptr_val accepts_maybeptr_val
 [%%expect{|
 type succeeds = t_maybeptr accepts_maybeptr
 type succeeds = t_nonptr accepts_maybeptr
+type succeeds = t_maybeptr_val accepts_maybeptr_val
+type succeeds = t_nonptr_val accepts_maybeptr_val
 |}]
 
 type fails = t_maybeptr accepts_nonptr
@@ -72,6 +90,39 @@ type succeeds = t_nonptr accepts_nonptr
 type succeeds = t_nonptr accepts_nonptr
 |}]
 
+type fails = t_maybeptr_val accepts_nonptr_val
+[%%expect{|
+Line 1, characters 13-27:
+1 | type fails = t_maybeptr_val accepts_nonptr_val
+                 ^^^^^^^^^^^^^^
+Error: This type "t_maybeptr_val" should be an instance of type
+         "('a : value non_pointer)"
+       The layout of t_maybeptr_val is value
+         because of the definition of t_maybeptr_val at line 1, characters 0-41.
+       But the layout of t_maybeptr_val must be a sublayout of
+           value non_pointer
+         because of the definition of accepts_nonptr_val at line 2, characters 0-48.
+|}]
+type succeeds = t_nonptr_val accepts_nonptr_val
+[%%expect{|
+type succeeds = t_nonptr_val accepts_nonptr_val
+|}]
+
+type succeeds = t_nonptr_val accepts_nonptr
+type fails = t_nonptr accepts_nonptr_val
+[%%expect{|
+type succeeds = t_nonptr_val accepts_nonptr
+Line 2, characters 13-21:
+2 | type fails = t_nonptr accepts_nonptr_val
+                 ^^^^^^^^
+Error: This type "t_nonptr" should be an instance of type
+         "('a : value non_pointer)"
+       The layout of t_nonptr is any non_pointer
+         because of the definition of t_nonptr at line 2, characters 0-31.
+       But the layout of t_nonptr must be a sublayout of value non_pointer
+         because of the definition of accepts_nonptr_val at line 2, characters 0-48.
+|}]
+
 (* when the layout is not value, the scannable axes should not be relevant *)
 type succeeds = float# accepts_maybeptr
 type succeeds = float# accepts_nonptr
@@ -82,9 +133,13 @@ type succeeds = float# accepts_nonptr
 
 type succeeds = #(t_nonptr * t_maybeptr) accepts_maybeptr
 type succeeds = #(t_nonptr * t_maybeptr) accepts_nonptr
+type succeeds = #(t_nonptr_val * t_nonptr) accepts_nonptr
+type succeeds = #(t_maybeptr_val * t_maybeptr) accepts_nonptr
 [%%expect{|
 type succeeds = #(t_nonptr * t_maybeptr) accepts_maybeptr
 type succeeds = #(t_nonptr * t_maybeptr) accepts_nonptr
+type succeeds = #(t_nonptr_val * t_nonptr) accepts_nonptr
+type succeeds = #(t_maybeptr_val * t_maybeptr) accepts_nonptr
 |}]
 
 (* CR layouts-scannable: There are versions of these tests that use [immediate]
@@ -132,13 +187,6 @@ val g : 'a ('b : value non_pointer). 'a -> 'b = <fun>
 
 (* unboxed records *)
 
-type t_maybeptr_val : value maybe_pointer
-type t_nonptr_val : value non_pointer
-[%%expect{|
-type t_maybeptr_val
-type t_nonptr_val : value non_pointer
-|}]
-
 type fails : value non_pointer = #{ a : t_maybeptr_val }
 [%%expect{|
 Line 1, characters 0-56:
@@ -176,18 +224,13 @@ val f : ('a : value_or_null non_pointer). 'a -> unit = <fun>
 |}]
 
 let f (type a : value maybe_pointer) (x : a) =
-  let g (x : (_ : value non_pointer)) = () in
-  g x
+  let require_np (y : (_ : value non_pointer)) = () in
+  require_np y
 [%%expect{|
-Line 3, characters 4-5:
-3 |   g x
-        ^
-Error: This expression has type "a" but an expression was expected of type
-         "('a : value non_pointer)"
-       The layout of a is value
-         because of the annotation on the abstract type declaration for a.
-       But the layout of a must be a sublayout of value non_pointer
-         because of the definition of g at line 2, characters 8-42.
+Line 3, characters 13-14:
+3 |   require_np y
+                 ^
+Error: Unbound value "y"
 |}]
 
 let f (type a : float64 maybe_pointer) (x : a) =
@@ -208,20 +251,45 @@ val f : ('a : value non_pointer). 'a -> unit = <fun>
 let f (t : (_ : value non_pointer & value)) =
   (* here, x is value maybe_pointer *)
   let g (type a : value non_pointer) (x : a) = () in
-  let #(x, y) = t in
-  g x
+  let #(np, v) = t in
+  g np
 [%%expect{|
 val f : ('a : value non_pointer) 'b. #('a * 'b) -> unit = <fun>
 |}]
 
-let f (t : (_ : value non_pointer & value)) =
-  (* here, x is value maybe_pointer *)
-  let g (type a : value non_pointer) (x : a) = () in
-  let #(x, y) = t in
-  g y
+let f (prod : (_ : value non_pointer & value)) =
+  let should_promote_snd (type a : value non_pointer) (x : a) = () in
+  let #(np, v) = prod in
+  should_promote_snd v
 [%%expect{|
 val f : ('a : value non_pointer) ('b : value non_pointer). #('a * 'b) -> unit =
   <fun>
+|}]
+
+let f (type a1 : value non_pointer) (type a2 : value) (a1 : a1) (a2 : a2) =
+  let make_a_product = #(a1, a2) in
+  let #(np, v) = make_a_product in
+  let g (type b : value non_pointer) (x : b) = () in
+  g np
+[%%expect{|
+val f : ('a1 : value non_pointer) 'a2. 'a1 -> 'a2 -> unit = <fun>
+|}]
+
+let f (type a1 : value non_pointer) (type a2 : value) (a1 : a1) (a2 : a2) =
+  let make_a_product = #(a1, a2) in
+  let #(np, v) = make_a_product in
+  let cant_promote_snd (type a : value non_pointer) (x : a) = () in
+  cant_promote_snd v
+[%%expect{|
+Line 5, characters 19-20:
+5 |   cant_promote_snd v
+                       ^
+Error: This expression has type "a2" but an expression was expected of type
+         "('a : value non_pointer)"
+       The layout of a2 is value
+         because of the annotation on the abstract type declaration for a2.
+       But the layout of a2 must be a sublayout of value non_pointer
+         because of the definition of cant_promote_snd at line 4, characters 23-64.
 |}]
 
 (* modules and module inclusion *)
@@ -258,7 +326,7 @@ end
 module M1 : sig type ('a : value non_pointer) t end
 |}]
 
-module MContravariantFailing : sig
+module FailingTypeParam : sig
   type ('a : value) t : value
 end = struct
   type ('a : value non_pointer) t = int
@@ -284,7 +352,7 @@ Error: Signature mismatch:
          because of the definition of t at line 4, characters 2-39.
 |}]
 
-module MCovariantFailing : sig
+module FailingTypeDecl : sig
   type ('a : value non_pointer) t : value non_pointer
 end = struct
   type ('a : value) t = t_maybeptr_val
