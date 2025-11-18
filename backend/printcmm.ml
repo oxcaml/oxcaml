@@ -278,6 +278,7 @@ let operation d = function
   | Cdivi -> "/"
   | Cmodi -> "mod"
   | Caddi128 -> "+128"
+  | Csubi128 -> "-128"
   | Cand -> "and"
   | Cor -> "or"
   | Cxor -> "xor"

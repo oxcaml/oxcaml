@@ -180,6 +180,8 @@ module Instruction_name : sig
     | ADC
     | ADDS
     | SUB
+    | SUBS
+    | SBC
     | MUL
     | DIV
     | AND

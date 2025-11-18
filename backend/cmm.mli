@@ -401,6 +401,7 @@ type operation =
   | Cdivi
   | Cmodi
   | Caddi128
+  | Csubi128
   | Cand
   | Cor
   | Cxor

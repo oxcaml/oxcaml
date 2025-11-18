@@ -61,6 +61,7 @@ type integer_operation =
   | Ipopcnt
   | Icomp of integer_comparison
   | Iadd128
+  | Isub128
 
 val string_of_integer_operation : integer_operation -> string
 

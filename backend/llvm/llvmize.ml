@@ -871,6 +871,7 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
     emit_ins t (I.convert Trunc ~arg:shifted ~to_:T.i64)
   in
   let do_add128 () = failwith "todo" in
+  let do_sub128 () = failwith "todo" in
   let res =
     match op with
     | Iadd ->
@@ -901,6 +902,7 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
     | Ictz _ -> do_unary_intrinsic_extra_args "cttz" [V.of_int ~typ:T.i1 0]
     | Ipopcnt -> do_unary_intrinsic "ctpop"
     | Iadd128 -> do_add128 ()
+    | Isub128 -> do_sub128 ()
   in
   store_into_reg t i.res.(0) res
 

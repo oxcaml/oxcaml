@@ -910,6 +910,8 @@ let emit_AND = emit_simple_encoding 0x20 4
 
 let emit_SUB = emit_simple_encoding 0x28 5
 
+let emit_SBB = emit_simple_encoding 0x18 3
+
 let emit_XOR = emit_simple_encoding 0x30 6
 
 let emit_CMP = emit_simple_encoding 0x38 7
@@ -1410,6 +1412,7 @@ let assemble_instr b loc = function
   | SAR (src, dst) -> emit_SAR b dst src
   | SHR (src, dst) -> emit_SHR b dst src
   | SUB (src, dst) -> emit_SUB b dst src
+  | SBB (src, dst) -> emit_SBB b dst src
   | SET (condition, dst) -> emit_set b condition dst
   | TEST (src, dst) -> emit_test b dst src
   | XCHG (src, dst) -> emit_XCHG b dst src

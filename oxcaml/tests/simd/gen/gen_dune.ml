@@ -152,7 +152,8 @@ let () =
   in
   List.iter make_ops_u ops;
   let tests =
-    [ "basic", enabled_if_main;
+    [ "int128", enabled_if_main;
+      "basic", enabled_if_main;
       "basic_u", enabled_if_main;
       "basic256", enabled_if_main_amd64_not_macos;
       "basic256_u", enabled_if_main_amd64_not_macos;

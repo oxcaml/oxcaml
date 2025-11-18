@@ -350,6 +350,8 @@ module Instruction_name = struct
     | ADC
     | ADDS
     | SUB
+    | SUBS
+    | SBC
     | MUL
     | DIV
     | AND
@@ -491,6 +493,8 @@ module Instruction_name = struct
     | ADC -> "adc"
     | ADDS -> "adds"
     | SUB -> "sub"
+    | SUBS -> "subs"
+    | SBC -> "sbc"
     | MUL -> "mul"
     | DIV -> "div"
     | AND -> "and"

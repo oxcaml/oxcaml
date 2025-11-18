@@ -214,6 +214,8 @@ module I = struct
 
   let sub x y = emit (SUB (x, y))
 
+  let sbb x y = emit (SBB (x, y))
+
   let test x y = emit (TEST (x, y))
 
   let xchg x y = emit (XCHG (x, y))

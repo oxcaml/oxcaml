@@ -168,6 +168,7 @@ type instruction =
   | SET of condition * arg
   | SHR of arg * arg
   | SUB of arg * arg
+  | SBB of arg * arg
   | TEST of arg * arg
   | XCHG of arg * arg
   | XOR of arg * arg

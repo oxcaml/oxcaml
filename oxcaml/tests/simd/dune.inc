@@ -260,6 +260,29 @@
    (cat "fma_ops.ml")))))
 
 (executable
+ (name int128)
+ (modules int128)
+ (enabled_if (= %{context_name} "main"))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   int128.out
+   (run ./int128.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff empty.expected int128.out)))
+
+(executable
  (name basic)
  (modules basic)
  (enabled_if (= %{context_name} "main"))
@@ -1985,6 +2008,35 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected ops_int8x32_u.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy int128.ml int128_nodynlink.ml)))
+
+(executable
+ (name int128_nodynlink)
+ (modules int128_nodynlink)
+ (enabled_if (= %{context_name} "main"))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   int128_nodynlink.out
+   (run ./int128_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff empty.expected int128_nodynlink.out)))
 
 (rule
  (alias runtest)
@@ -4186,6 +4238,47 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected ops_int8x32_u_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy int128.ml int128_internal_assembler.ml)))
+
+(executable
+ (name int128_internal_assembler)
+ (modules int128_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   int128_internal_assembler.out
+   (run ./int128_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected int128_internal_assembler.out)))
 
 (rule
  (alias runtest)

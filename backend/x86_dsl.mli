@@ -214,6 +214,8 @@ module I : sig
 
   val sub : arg -> arg -> unit
 
+  val sbb : arg -> arg -> unit
+
   val test : arg -> arg -> unit
 
   val xchg : arg -> arg -> unit

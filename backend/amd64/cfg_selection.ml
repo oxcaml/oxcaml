@@ -168,7 +168,7 @@ let pseudoregs_for_operation op arg res =
      rcx. *)
   | Intop Idiv -> [| rax; rcx |], [| rax |]
   | Intop Imod -> [| rax; rcx |], [| rdx |]
-  | Intop Iadd128 -> [| res.(0); res.(1); arg.(2); arg.(3) |], res
+  | Intop (Iadd128 | Isub128) -> [| res.(0); res.(1); arg.(2); arg.(3) |], res
   | Floatop (Float64, Icompf cond) ->
     (* We need to temporarily store the result of the comparison in a float
        register, but we don't want to clobber any of the inputs if they would
@@ -209,7 +209,8 @@ let pseudoregs_for_operation op arg res =
   | Intop_atomic { op = Add | Sub | Land | Lor | Lxor; _ }
   | Intop (Ipopcnt | Iclz _ | Ictz _ | Icomp _)
   | Intop_imm
-      ( (Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz _ | Ictz _ | Iadd128),
+      ( ( Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz _ | Ictz _ | Iadd128
+        | Isub128 ),
         _ )
   | Specific
       ( Isextend32 | Izextend32 | Ilea _

@@ -187,6 +187,7 @@ let print_instr b = function
   | SET (c, arg) -> i1 b ("set" ^ string_of_condition c) arg
   | SHR (arg1, arg2) -> i2_s b "shr" arg1 arg2
   | SUB (arg1, arg2) -> i2_s b "sub" arg1 arg2
+  | SBB (arg1, arg2) -> i2_s b "sbb" arg1 arg2
   | TEST (arg1, arg2) -> i2_s b "test" arg1 arg2
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2_s b "xor" arg1 arg2
