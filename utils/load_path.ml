@@ -18,13 +18,14 @@ exception Parse_error of string
 
 let split_and_unescape ~buffer line =
   let len = String.length line in
+  let end_current_token current_token tokens =
+    let token = Buffer.contents current_token in
+    Buffer.clear current_token;
+    if token = "" then tokens else token :: tokens
+  in
   let rec loop i current_token tokens =
     if i >= len
-    then (
-      let token = Buffer.contents current_token in
-      let tokens = if token = "" then tokens else token :: tokens in
-      Buffer.clear current_token;
-      List.rev tokens)
+    then (List.rev (end_current_token current_token tokens))
     else (
       match String.unsafe_get line i with
       | '\\' when i + 1 < len ->
@@ -41,12 +42,11 @@ let split_and_unescape ~buffer line =
           | 'r' ->
             Buffer.add_char current_token '\r';
             loop (i + 2) current_token tokens
-          | c -> raise (Parse_error (Printf.sprintf "Invalid escape sequence: \\%c" c)))
+          | c -> raise (
+            Parse_error (Printf.sprintf "Invalid escape sequence: \\%c" c)))
       | '\\' -> raise (Parse_error "Trailing backslash")
       | ' ' ->
-        let token = Buffer.contents current_token in
-        let tokens = if token = "" then tokens else token :: tokens in
-        Buffer.clear current_token;
+        let tokens = end_current_token current_token tokens in
         loop (i + 1) current_token tokens
       | c ->
         Buffer.add_char current_token c;
@@ -102,7 +102,11 @@ end = struct
 
     let of_string path = Load_root_relative path
     let to_string (Cwd_relative path) = path
-    let root = lazy (Sys.getenv "DUNE_MANIFEST_LOAD_PATH_ROOT")
+    let root = lazy (
+      let var_name = "DUNE_MANIFEST_LOAD_PATH_ROOT" in
+      match Sys.getenv_opt var_name with
+      | None -> failwith (var_name ^ " not set")
+      | Some path -> path)
 
     let make_cwd_relative (Load_root_relative path) =
       let root = Lazy.force root in
@@ -114,8 +118,10 @@ end = struct
       type t = unit Misc.Stdlib.String.Tbl.t
 
       let create () = Misc.Stdlib.String.Tbl.create 42
-      let mem t (Load_root_relative path) = Misc.Stdlib.String.Tbl.mem t path
-      let add t (Load_root_relative path) = Misc.Stdlib.String.Tbl.add t path ()
+      let mem t (Load_root_relative path) =
+        Misc.Stdlib.String.Tbl.mem t path
+      let add t (Load_root_relative path) =
+        Misc.Stdlib.String.Tbl.add t path ()
     end
   end
 
@@ -132,32 +138,37 @@ end = struct
   ;;
 
   let iter_lines ~f path =
-    let ic = open_in (Path.to_string path) in
-    Misc.try_finally
-      (fun () ->
+    In_channel.with_open_text
+      (Path.to_string path)
+      (fun ic ->
         let rec loop () =
           try
             let line = String.trim (input_line ic) in
-            match line with
-            | "" -> loop ()
-            | line ->
-              f line;
-              loop ()
+            f line;
+            loop ()
           with
           | End_of_file -> ()
         in
         loop ())
-      ~always:(fun () -> close_in ic)
   ;;
+
+  module Entry = struct
+    type t =
+      | File of
+          { filename : string
+          ; location : Path.load_root_relative Path.t
+          }
+      | Manifest of Path.load_root_relative Path.t
+  end
 
   let parse_line ~buffer line =
     match split_and_unescape ~buffer line with
     | [ "file"; filename; location ] ->
       let location = Path.of_string location in
-      `File (filename, location)
+      Entry.File { filename; location }
     | [ "manifest"; _; location ] ->
       let location = Path.of_string location in
-      `Manifest location
+      Entry.Manifest location
     | _ -> raise (Parse_error ("Cannot parse manifest file line: " ^ line))
   ;;
 
@@ -166,9 +177,9 @@ end = struct
     visit t manifest_path ~f:(fun manifest_path ->
       iter_lines manifest_path ~f:(fun line ->
         match parse_line ~buffer line with
-        | `File (filename, location) ->
+        | Entry.File { filename; location } ->
           visit t location ~f:(fun location -> f ~filename ~location)
-        | `Manifest manifest_path -> iter_manifest t ~f ~manifest_path))
+        | Manifest manifest_path -> iter_manifest t ~f ~manifest_path))
   ;;
 end
 
@@ -179,10 +190,10 @@ module For_testing = struct
 end
 
 module Dir : sig
-  type entry =
-    { basename : string
-    ; path : string
-    }
+  type entry = {
+    basename : string;
+    path : string
+  }
 
   type t
 
@@ -190,20 +201,22 @@ module Dir : sig
   val files : t -> entry list
   val basenames : t -> string list
   val hidden : t -> bool
+
   val create : hidden:bool -> string -> t
+
   val find : t -> string -> string option
   val find_normalized : t -> string -> string option
 end = struct
-  type entry =
-    { basename : string
-    ; path : string
-    }
+  type entry = {
+    basename : string;
+    path : string
+  }
 
-  type t =
-    { path : string
-    ; files : entry list
-    ; hidden : bool
-    }
+  type t = {
+    path : string;
+    files : entry list;
+    hidden : bool
+  }
 
   let path t = t.path
   let files t = t.files
@@ -211,14 +224,18 @@ end = struct
   let hidden t = t.hidden
 
   let find t fn =
-    List.find_map
-      (fun { basename; path } -> if String.equal basename fn then Some path else None)
-      t.files
+    List.find_map (fun { basename; path } ->
+      if String.equal basename fn then
+        Some path
+      else None) t.files
 
   let find_normalized t fn =
     let fn = Misc.normalized_unit_filename fn in
     let search { basename; path } =
-      if Misc.normalized_unit_filename basename = fn then Some path else None
+      if Misc.normalized_unit_filename basename = fn then
+        Some path
+      else
+        None
     in
     List.find_map search t.files
 
@@ -232,10 +249,9 @@ end = struct
       [||]
 
   let create ~hidden path =
-    let files =
-      Array.to_list (readdir_compat path)
-      |> List.map (fun basename -> { basename; path = Filename.concat path basename })
-    in
+    let files = Array.to_list (readdir_compat path)
+      |> List.map (
+        fun basename -> { basename; path = Filename.concat path basename }) in
     { path; files; hidden }
 end
 
@@ -269,6 +285,7 @@ end = struct
 
   let visible_files : registry ref = s_table STbl.create 42
   let visible_files_uncap : registry ref = s_table STbl.create 42
+
   let hidden_files : registry ref = s_table STbl.create 42
   let hidden_files_uncap : registry ref = s_table STbl.create 42
 
@@ -295,16 +312,16 @@ end = struct
 
   let add dir =
     let update base fn visible_files hidden_files =
-      if (Dir.hidden dir) && not (STbl.mem !hidden_files base)
-      then STbl.replace !hidden_files base fn
-      else if not (STbl.mem !visible_files base)
-      then STbl.replace !visible_files base fn
+      if (Dir.hidden dir) && not (STbl.mem !hidden_files base) then
+        STbl.replace !hidden_files base fn
+      else if not (STbl.mem !visible_files base) then
+        STbl.replace !visible_files base fn
     in
     List.iter
       (fun ({ basename = base; path = fn } : Dir.entry) ->
-        update base fn visible_files hidden_files;
-        let ubase = Misc.normalized_unit_filename base in
-        update ubase fn visible_files_uncap hidden_files_uncap)
+         update base fn visible_files hidden_files;
+         let ubase = Misc.normalized_unit_filename base in
+         update ubase fn visible_files_uncap hidden_files_uncap)
       (Dir.files dir)
 
   let find fn visible_files hidden_files =
@@ -312,12 +329,14 @@ end = struct
     | Not_found -> (STbl.find !hidden_files fn, Hidden)
 
   let find ~uncap fn =
-    if uncap
-    then find (String.uncapitalize_ascii fn) visible_files_uncap hidden_files_uncap
-    else find fn visible_files hidden_files
+    if uncap then
+      find (String.uncapitalize_ascii fn) visible_files_uncap hidden_files_uncap
+    else
+      find fn visible_files hidden_files
 end
 
-type auto_include_callback = (Dir.t -> string -> string option) -> string -> string
+type auto_include_callback =
+  (Dir.t -> string -> string option) -> string -> string
 
 let visible_dirs = s_ref []
 let visible_basenames = s_ref []
@@ -347,14 +366,12 @@ let get_path_list () =
   Misc.rev_map_end Dir.path !visible_dirs (List.rev_map Dir.path !hidden_dirs)
 
 type paths =
-  { visible : string list
-  ; hidden : string list
-  }
+  { visible : string list;
+    hidden : string list }
 
 let get_paths () =
-  { visible = List.rev_map Dir.path !visible_dirs
-  ; hidden = List.rev_map Dir.path !hidden_dirs
-  }
+  { visible = List.rev_map Dir.path !visible_dirs;
+    hidden = List.rev_map Dir.path !hidden_dirs }
 ;;
 
 let get_visible_path_list () = List.rev_map Dir.path !visible_dirs
@@ -412,6 +429,7 @@ let add (dir : Dir.t) =
     visible_dirs := dir :: !visible_dirs
 
 let append_dir = add
+
 let add_dir ~hidden dir = add (Dir.create ~hidden dir)
 
 (* Add the directory at the start of load path - so basenames are
@@ -445,18 +463,18 @@ let auto_include_otherlibs =
   let expand = Misc.expand_directory Config.standard_library in
   let otherlibs =
     let read_lib lib = lazy (Dir.create ~hidden:false (expand ("+" ^ lib))) in
-    List.map (fun lib -> (lib, read_lib lib)) [ "dynlink"; "str"; "unix" ]
-  in
+    List.map (fun lib -> (lib, read_lib lib)) ["dynlink"; "str"; "unix"] in
   auto_include_libs otherlibs
 
 let find fn =
   assert (not Config.merlin || Local_store.is_bound ());
   try
-    if is_basename fn && not !Sys.interactive
-    then fst (Path_cache.find ~uncap:false fn)
-    else Misc.find_in_path (get_path_list ()) fn
-  with
-Not_found -> !auto_include_callback Dir.find fn
+    if is_basename fn && not !Sys.interactive then
+      fst (Path_cache.find ~uncap:false fn)
+    else
+      Misc.find_in_path (get_path_list ()) fn
+    with Not_found ->
+      !auto_include_callback Dir.find fn
 
 let find_normalized_with_visibility fn =
   assert (not Config.merlin || Local_store.is_bound ());

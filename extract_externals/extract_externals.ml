@@ -68,7 +68,8 @@ let spec_list =
       "A manifest file specifying which .cmi files are available." );
     ( "-H-manifest",
       Arg.String
-        (fun file -> include_manifests := file :: !hidden_include_manifests),
+        (fun file ->
+          hidden_include_manifests := file :: !hidden_include_manifests),
       "A manifest file specifying which .cmi files are available, but for \
        hidden includes." );
     ( "-open",
@@ -147,7 +148,7 @@ let extract_shapes_from_files ~verbose files =
     := !hidden_include_dirs @ !Clflags.hidden_include_dirs;
   Clflags.include_manifests := !include_manifests @ !Clflags.include_manifests;
   Clflags.hidden_include_manifests
-    := !include_manifests @ !Clflags.hidden_include_manifests;
+    := !hidden_include_manifests @ !Clflags.hidden_include_manifests;
   Compmisc.init_path ();
   let files =
     List.map
