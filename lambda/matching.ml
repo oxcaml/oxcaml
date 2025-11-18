@@ -1932,7 +1932,8 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
         Punboxed_product layouts
       | Value _ | Float_boxed _ | Float64 | Float32
       | Bits8 | Bits16 | Bits32 | Bits64
-      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+      | Splice_variable _ ->
         fatal_error "Matching.get_exr_args_constr: non-void layout"
     in
     match cstr.cstr_shape with
@@ -4259,7 +4260,9 @@ let rec map_return f = function
           loc, k )
   | (Lstaticraise _ | Lprim (Praise _, _, _)) as l -> l
   | ( Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ | Lsend _ | Lprim _
-    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ ) as l ->
+    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Lsplice _) as l ->
+      (* CR layout poly: I believe this could inhibit some optimisations in the
+         splice case. We should consider moving this after slambda eval.*)
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)

@@ -479,6 +479,7 @@ and layout =
   | Punboxed_vector of unboxed_vector
   | Punboxed_product of layout list
   | Pbottom
+  | Psplicevar of Ident.t
 
 and block_shape =
   value_kind list option
@@ -498,6 +499,7 @@ and 'a mixed_block_element =
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
+  | Splice_variable of Ident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -574,8 +576,6 @@ and raise_kind =
 val equal_value_kind : value_kind -> value_kind -> bool
 
 val equal_layout : layout -> layout -> bool
-
-val compatible_layout : layout -> layout -> bool
 
 val print_boxed_vector : Format.formatter -> boxed_vector -> unit
 
@@ -843,6 +843,9 @@ type lambda =
   (* [Lexclave] closes the newest region opened.
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
+  | Lsplice of lambda_splice
+
+and slambda = lambda Slambda0.t0
 
 and rec_binding = {
   id : Ident.t;
@@ -913,6 +916,8 @@ and lambda_event_kind =
   | Lev_function
   | Lev_pseudo
 
+  and lambda_splice = { splice_loc : scoped_location; slambda : slambda; }
+
 (* A description of a parameter to be passed to the runtime representation of a
    parameterised module, namely a function (called the instantiating functor)
    that produces an instance when invoked. [-instantiate] reads these as
@@ -953,7 +958,7 @@ type main_module_block_format =
 (* The number of words in the main module block. *)
 val main_module_block_size : main_module_block_format -> int
 
-type 'lam program0 =
+type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
     arg_block_idx : int option;         (* Index of argument block (see
@@ -968,9 +973,8 @@ type 'lam program0 =
     required_globals : Compilation_unit.Set.t;
                                         (* Modules whose initializer side effects
                                            must occur before [code]. *)
-    code : 'lam }
+    code : lambda }
 
-type program = lambda program0
 (* Lambda code for the middle-end. Here [mbf] is the value of the
    [main_module_block_format] field.
    * In the closure case the code is a sequence of assignments to a
@@ -1255,8 +1259,6 @@ val will_be_reordered : _ mixed_block_element -> bool
 val primitive_result_layout : primitive -> layout
 
 val array_ref_kind_result_layout: array_ref_kind -> layout
-
-val compute_expr_layout : (Ident.t -> layout option) -> lambda -> layout
 
 (** The mode will be discarded if unnecessary for the given [array_kind] *)
 val array_ref_kind : locality_mode -> array_kind -> array_ref_kind

@@ -16,6 +16,8 @@
 open Misc
 open Asttypes
 
+module SL = Slambda0
+
 type constant = Typedtree.constant
 
 type mutable_flag = Immutable | Immutable_unique | Mutable
@@ -396,6 +398,7 @@ and layout =
   | Punboxed_vector of unboxed_vector
   | Punboxed_product of layout list
   | Pbottom
+  | Psplicevar of Ident.t
 
 and block_shape =
   value_kind list option
@@ -415,6 +418,7 @@ and 'a mixed_block_element =
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
+  | Splice_variable of Ident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -601,9 +605,11 @@ and equal_mixed_block_element :
   | Product es1, Product es2 ->
     Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
       es1 es2
+  | Splice_variable id1, Splice_variable id2 -> Ident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-     | Vec256 | Vec512 | Word | Untagged_immediate | Product _), _ -> false
+     | Vec256 | Vec512 | Word | Untagged_immediate | Product _
+     | Splice_variable _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
   Misc.Stdlib.Array.equal (equal_mixed_block_element Unit.equal) shape1 shape2
@@ -623,24 +629,6 @@ let equal_layout x y =
   | Ptop, Ptop -> true
   | Pbottom, Pbottom -> true
   | _, _ -> false
-
-let rec compatible_layout x y =
-  match x, y with
-  | Pbottom, _
-  | _, Pbottom -> true
-  | Pvalue _, Pvalue _ -> true
-  | Punboxed_float f1, Punboxed_float f2 -> Primitive.equal_unboxed_float f1 f2
-  | Punboxed_or_untagged_integer bi1, Punboxed_or_untagged_integer bi2 ->
-    Primitive.equal_unboxed_or_untagged_integer bi1 bi2
-  | Punboxed_vector bi1, Punboxed_vector bi2 -> Primitive.equal_unboxed_vector bi1 bi2
-  | Punboxed_product layouts1, Punboxed_product layouts2 ->
-      List.compare_lengths layouts1 layouts2 = 0
-      && List.for_all2 compatible_layout layouts1 layouts2
-  | Ptop, Ptop -> true
-  | Ptop, _ | _, Ptop -> false
-  | (Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ |
-     Punboxed_vector _ | Punboxed_product _), _ ->
-      false
 
 let rec equal_ignorable_product_element_kind k1 k2 =
   match k1, k2 with
@@ -887,6 +875,9 @@ type lambda =
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
   | Lexclave of lambda
+  | Lsplice of lambda_splice
+
+and slambda = lambda SL.t0
 
 and rec_binding = {
   id : Ident.t;
@@ -952,6 +943,8 @@ and lambda_event_kind =
   | Lev_function
   | Lev_pseudo
 
+and lambda_splice = { splice_loc : scoped_location; slambda : slambda }
+
 type runtime_param =
   | Rp_argument_block of Global_module.t
   | Rp_main_module_block of Global_module.t
@@ -969,14 +962,12 @@ let main_module_block_size format =
   | Mb_struct { mb_size } -> mb_size
   | Mb_instantiating_functor _ -> 1
 
-type 'lam program0 =
+type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
     arg_block_idx : int option;
     required_globals : Compilation_unit.Set.t;
-    code : 'lam }
-
-type program = lambda program0
+    code : lambda }
 
 type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
@@ -1201,7 +1192,10 @@ let make_key e =
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
-    | Levent _  ->
+    | Levent _
+    (* CR layout poly: Anything calling this should probably be moved to after
+       slambda eval, we could possibly also make slambda keys. *)
+    | Lsplice _ ->
         raise Not_simple
 
   and tr_recs env es = List.map (tr_rec env) es
@@ -1251,7 +1245,8 @@ let iter_opt f = function
 let shallow_iter ~tail ~non_tail:f = function
     Lvar _
   | Lmutvar _
-  | Lconst _ -> ()
+  | Lconst _
+  | Lsplice _ -> ()
   | Lapply{ap_func = fn; ap_args = args} ->
       f fn; List.iter f args
   | Lfunction{body} ->
@@ -1390,6 +1385,8 @@ let rec free_variables = function
   | Lregion (e, _) ->
       free_variables e
   | Lexclave e ->
+      free_variables e
+  | Lsplice { slambda = (SL.Quote e); _ } ->
       free_variables e
 
 and free_variables_list set exprs =
@@ -1669,6 +1666,8 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lregion (subst s l e, layout)
     | Lexclave e ->
         Lexclave (subst s l e)
+    | Lsplice { splice_loc; slambda = (SL.Quote e) } ->
+        Lsplice { splice_loc; slambda = (SL.Quote (subst s l e)) }
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
@@ -1709,7 +1708,8 @@ let map_lfunction f { kind; params; return; body; attr; loc;
 let shallow_map ~tail ~non_tail:f = function
   | Lvar _
   | Lmutvar _
-  | Lconst _ as lam -> lam
+  | Lconst _
+  | Lsplice _ as lam -> lam
   | Lapply { ap_func; ap_args; ap_result_layout; ap_region_close; ap_mode; ap_loc; ap_tailcall;
              ap_inlined; ap_specialised; ap_probe } ->
       Lapply {
@@ -1901,7 +1901,7 @@ let project_from_mixed_block_shape
         | Value _
         | Float_boxed _
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-        | Untagged_immediate | Vec128 | Vec256 | Vec512 ->
+        | Untagged_immediate | Vec128 | Vec256 | Vec512 | Splice_variable _ ->
           Misc.fatal_error "project_from_mixed_block_element: path too long \
             for mixed block shape")
     in
@@ -1922,6 +1922,10 @@ let mixed_block_projection_may_allocate shape ~path =
           | Some alloc_mode, Some alloc_mode' ->
             Some (join_locality_mode alloc_mode alloc_mode'))
         None shape
+    (* CR layout poly: "At worst" this allocates on the stack because it'll be a
+       Float_boxed. This should probably be computed after slambda eval, but
+       it's currently used by transl. *)
+    | Splice_variable _ -> Some alloc_local
   in
   allocates (project_from_mixed_block_shape shape ~path)
 
@@ -2345,6 +2349,7 @@ let layout_of_mixed_block_shape
     | Product shape ->
       Punboxed_product
         (Array.to_list (Array.map layout_of_mixed_block_element shape))
+    | Splice_variable id -> Psplicevar id
   in
   layout_of_mixed_block_element (project_from_mixed_block_shape shape ~path)
 
@@ -2366,6 +2371,7 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_vector Unboxed_vec256 -> Vec256
   | Punboxed_vector Unboxed_vec512 -> Vec512
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
+  | Psplicevar id -> Splice_variable id
 
 let value_kind_of_value_with_externality ext =
   let open Jkind_axis.Externality in
@@ -2395,6 +2401,7 @@ let rec layout_of_mixed_block_element_for_idx_set
   | Vec256 -> Punboxed_vector Unboxed_vec256
   | Vec512 -> Punboxed_vector Unboxed_vec512
   | Untagged_immediate -> Punboxed_or_untagged_integer Untagged_int
+  | Splice_variable id -> Psplicevar id
 
 let rec mixed_block_element_leaves (el : _ mixed_block_element)
   : _ mixed_block_element list =
@@ -2402,7 +2409,8 @@ let rec mixed_block_element_leaves (el : _ mixed_block_element)
   | Product els ->
     List.concat_map mixed_block_element_leaves (Array.to_list els)
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate ->
+  | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate
+  | Splice_variable _ ->
     [el]
 
 type will_be_reordered_acc = { seen_flat : bool; last_value_after_flat : bool }
@@ -2412,6 +2420,10 @@ let will_be_reordered (mbe : _ mixed_block_element) =
       (fun acc el ->
         match el with
         | Product _ -> assert false
+        | Splice_variable _ ->
+          (* CR layout poly: Treat variables as potentially both, that causes
+             this function to be maximally pessimistic. *)
+          { seen_flat = true; last_value_after_flat = acc.seen_flat }
         | Value _ -> { acc with last_value_after_flat = acc.seen_flat }
         | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
         | Word | Vec128 |  Vec256 | Vec512 | Untagged_immediate ->
@@ -2619,44 +2631,6 @@ let primitive_result_layout (p : primitive) =
   | Pget_ptr (layout, _) -> layout
   | Pset_ptr _ -> layout_unit
 
-let compute_expr_layout free_vars_kind lam =
-  let rec compute_expr_layout kinds = function
-    | Lvar id | Lmutvar id -> begin
-        try Ident.Map.find id kinds
-        with Not_found ->
-        match free_vars_kind id with
-        | Some kind -> kind
-        | None ->
-            Misc.fatal_errorf "Unbound layout for variable %a" Ident.print id
-      end
-    | Lconst cst -> structured_constant_layout cst
-    | Lfunction _ -> layout_function
-    | Lapply { ap_result_layout; _ } -> ap_result_layout
-    | Lsend (_, _, _, _, _, _, _, layout) -> layout
-    | Llet(_, kind, id, _duid, _, body) | Lmutlet(kind, id, _duid, _, body) ->
-      compute_expr_layout (Ident.Map.add id kind kinds) body
-    | Lletrec(defs, body) ->
-      let kinds =
-        List.fold_left (fun kinds { id } -> Ident.Map.add id layout_letrec kinds)
-          kinds defs
-      in
-      compute_expr_layout kinds body
-    | Lprim(p, _, _) ->
-      primitive_result_layout p
-    | Lswitch(_, _, _, kind) | Lstringswitch(_, _, _, _, kind)
-    | Lstaticcatch(_, _, _, _, kind) | Ltrywith(_, _, _, _, kind)
-    | Lifthenelse(_, _, _, kind) | Lregion (_, kind) ->
-      kind
-    | Lstaticraise (_, _) ->
-      layout_bottom
-    | Lsequence(_, body) | Levent(body, _) -> compute_expr_layout kinds body
-    | Lwhile _ | Lfor _ | Lassign _ -> layout_unit
-    | Lifused _ ->
-        assert false
-    | Lexclave e -> compute_expr_layout kinds e
-  in
-  compute_expr_layout Ident.Map.empty lam
-
 let array_ref_kind mode = function
   | Pgenarray -> Pgenarray_ref mode
   | Paddrarray -> Paddrarray_ref
@@ -2727,6 +2701,10 @@ let may_allocate_in_region lam =
         rather, it's in the parent region *)
       ()
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
+    (* CR layout poly: Pessimistically return true, this really should only get
+       called after slambda eval but translcore does some early simplification.
+       We should fix that at some point. *)
+    | Lsplice _ -> raise Exit
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
     | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
       | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
@@ -2767,7 +2745,8 @@ let rec try_to_find_location lam =
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
   | Lsend (_, _, _, _, _, _, loc, _)
-  | Levent (_, { lev_loc = loc; _ }) ->
+  | Levent (_, { lev_loc = loc; _ })
+  | Lsplice { splice_loc = loc; _ }->
     loc
   | Llet (_, _, _, _, lam, _)
   | Lmutlet (_, _, _, lam, _)

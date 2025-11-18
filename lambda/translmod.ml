@@ -899,40 +899,6 @@ and transl_include_functor ~generative modl params scopes loc =
 let _ =
   Translcore.transl_module := transl_module
 
-(* Introduce dependencies on modules referenced only by "external". *)
-
-let scan_used_globals lam =
-  let globals = ref Compilation_unit.Set.empty in
-  let rec scan lam =
-    Lambda.iter_head_constructor scan lam;
-    match lam with
-      Lprim ((Pgetglobal cu), _, _) ->
-        globals := Compilation_unit.Set.add cu !globals
-    | _ -> ()
-  in
-  scan lam; !globals
-
-let required_globals ~flambda body =
-  let globals = scan_used_globals body in
-  let add_global comp_unit req =
-    if not flambda && Compilation_unit.Set.mem comp_unit globals then
-      req
-    else
-      Compilation_unit.Set.add comp_unit req
-  in
-  let required =
-    List.fold_left
-      (fun acc cu -> add_global cu acc)
-      (if flambda then globals else Compilation_unit.Set.empty)
-      (Translprim.get_units_with_used_primitives ())
-  in
-  let required =
-    List.fold_right add_global (Env.get_required_globals ()) required
-  in
-  Env.reset_required_globals ();
-  Translprim.clear_used_primitives ();
-  required
-
 let add_arg_block_to_module_block primary_block_lam size restr =
   let primary_block_id = Ident.create_local "*primary-block*" in
   let primary_block_id_duid = Lambda.debug_uid_none in
@@ -1048,10 +1014,9 @@ let transl_implementation compilation_unit impl =
         in
         body, format
   in
-  { compilation_unit;
+  { SL.compilation_unit;
     main_module_block_format;
     arg_block_idx;
-    required_globals = required_globals ~flambda:true body;
     code = SL.Quote body }
 
 
@@ -1279,11 +1244,6 @@ type runtime_arg =
   | Main_module_block of Compilation_unit.t
   | Unit
 
-let unit_of_runtime_arg arg =
-  match arg with
-  | Argument_block { ra_unit = cu; _ } | Main_module_block cu -> Some cu
-  | Unit -> None
-
 let transl_runtime_arg arg =
   match arg with
   | Argument_block { ra_unit; ra_field_idx; } ->
@@ -1325,17 +1285,12 @@ let transl_instance_impl
     }
   in
   let code = SL.Quote code in
-  let required_globals =
-    base_compilation_unit :: List.filter_map unit_of_runtime_arg runtime_args
-    |> Compilation_unit.Set.of_list
-  in
   let main_module_block_format =
     Mb_struct { mb_size = main_module_block_size }
   in
   {
     compilation_unit;
     code;
-    required_globals;
     main_module_block_format;
     arg_block_idx;
   }
