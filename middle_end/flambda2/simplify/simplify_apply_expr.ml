@@ -1366,7 +1366,7 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
         ~arg:(simplify_simple arg)
         ~last_fiber:(simplify_simple last_fiber)
   in
-  let apply = Apply.with_call_kind apply (Call_kind.effect op) in
+  let apply = Apply.with_call_kind apply (Call_kind.effect_ op) in
   let dacc, use_id =
     match Apply.continuation apply with
     | Never_returns -> dacc, None

@@ -128,4 +128,4 @@ val c_call :
   Alloc_mode.For_applications.t ->
   t
 
-val effect : Effect.t -> t
+val effect_ : Effect.t -> t
