@@ -237,7 +237,8 @@ external signal
 let set_signal sig_num sig_beh = ignore(signal sig_num sig_beh)
 
 (* Expose the value of [Config.architecture] *)
-
+(* CR-someday gyorsh: utils/target_system.ml already has [architecture].
+   Consider moving to [config.ml] or here. *)
 type arch =
   | Amd64
   | Arm64

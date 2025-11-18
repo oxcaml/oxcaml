@@ -2660,6 +2660,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         [ Simple
             (Simple.const_bool machine_width
                (String.equal Sys.os_type "Cygwin")) ]
+      (* CR-someday gyorsh: replace string comparisons with dedicated types for
+         [arch] and [os_type]. *)
       | Arch_amd64 ->
         [ Simple
             (Simple.const_bool machine_width
