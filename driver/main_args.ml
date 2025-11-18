@@ -176,17 +176,19 @@ let mk_H f =
  \     (Like -I, but the program can not directly reference these dependencies)"
 
 let mk_I_manifest f =
-  "-I-manifest", Arg.String f, "<file>  Get paths that the compiler can reference from\n\
-  \    a given manifest file. This option is an alternative to the -I flag, but\n\
-  \    specifies available files directly instead of adding whole directories to the\n\
-  \    search path. Each line of the manifest file should be in the format\n\
-  \    'file|manifest <visible_path> <actual_path>', where 'file' means that the line\n\
-  \    describes a file that the compiler can reference, 'manifest' means that the\n\
-  \    compiler should read the specified manifest file recursively, <visible_path> is\n\
-  \    the path as interpreted by the compiler, <actual_path> is where this file is\n\
-  \    in the filesystem (relative to [$DUNE_MANIFEST_LOAD_PATH_ROOT]). The manifest\n\
-  \    file passed to the [-I-manifest] flag should itself be relative to\n\
-  \    [$DUNE_MANIFEST_LOAD_PATH_ROOT]."
+  "-I-manifest", Arg.String f, "<file>  Get paths that the compiler can\n\
+  \    reference from a given manifest file. This option is an alternative\n\
+  \    to the -I flag, but specifies available files directly instead of\n\
+  \    adding whole directories to the search path. Each line of the\n\
+  \    manifest file should be in the format\n\
+  \    'file|manifest <visible_path> <actual_path>', where 'file' means\n\
+  \    that the line describes a file that the compiler can reference,\n\
+  \    'manifest' means that the compiler should read the specified\n\
+  \    manifest file recursively, <visible_path> is the path as interpreted\n\
+  \    by the compiler, <actual_path> is where this file is in the\n\
+  \    filesystem (relative to [$DUNE_MANIFEST_LOAD_PATH_ROOT]). The\n\
+  \    manifest file passed to the [-I-manifest] flag should itself be\n\
+  \    relative to [$DUNE_MANIFEST_LOAD_PATH_ROOT]."
 
 let mk_H_manifest f =
   "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given paths\n\

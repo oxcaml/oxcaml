@@ -167,8 +167,8 @@ end = struct
       let location = Path.of_string location in
       Some (Entry.File { filename; location })
     | [ "manifest"; _; location ] ->
-      (* [filename] is included in "manifest" entry only for human readability, so we
-         discard them here. *)
+      (* [filename] is included in "manifest" entry only for human
+         readability, so we discard them here. *)
       let location = Path.of_string location in
       Some (Entry.Manifest location)
     | [] -> None
@@ -231,7 +231,8 @@ end = struct
     List.find_map (fun { basename; path } ->
       if String.equal basename fn then
         Some path
-      else None) t.files
+      else
+        None) t.files
 
   let find_normalized t fn =
     let fn = Misc.normalized_unit_filename fn in
@@ -299,14 +300,14 @@ end = struct
     STbl.clear !visible_files;
     STbl.clear !visible_files_uncap
 
-  let prepend_add_single ~hidden basename path =
-    if hidden
-    then (
-      STbl.replace !hidden_files basename path;
-      STbl.replace !hidden_files_uncap (Misc.normalized_unit_filename basename) path)
-    else (
-      STbl.replace !visible_files basename path;
-      STbl.replace !visible_files_uncap (String.uncapitalize_ascii basename) path)
+  let prepend_add_single ~hidden base fn =
+    if hidden then begin
+      STbl.replace !hidden_files base fn;
+      STbl.replace!hidden_files_uncap (Misc.normalized_unit_filename base) fn
+    end else begin
+      STbl.replace !visible_files base fn;
+      STbl.replace !visible_files_uncap (String.uncapitalize_ascii base) fn
+    end
 
   let prepend_add dir =
     List.iter
@@ -364,7 +365,8 @@ type dirs_and_files =
   ; basenames : string list
   }
 
-let get_visible () = { dirs = List.rev !visible_dirs; basenames = !visible_basenames }
+let get_visible () =
+  { dirs = List.rev !visible_dirs; basenames = !visible_basenames }
 
 let get_path_list () =
   Misc.rev_map_end Dir.path !visible_dirs (List.rev_map Dir.path !hidden_dirs)
@@ -396,8 +398,12 @@ let init_manifests () =
             basename
             (Dune_manifests_reader.Path.to_string location))
   in
-  List.iter (load_manifest ~hidden:false ~basenames:visible_basenames) !Clflags.include_manifests;
-  List.iter (load_manifest ~hidden:true ~basenames:hidden_basenames) !Clflags.hidden_include_manifests
+  List.iter
+    (load_manifest ~hidden:false ~basenames:visible_basenames)
+    !Clflags.include_manifests;
+  List.iter
+    (load_manifest ~hidden:true ~basenames:hidden_basenames)
+    !Clflags.hidden_include_manifests
 
 let init ~auto_include ~visible ~hidden =
   reset ();
