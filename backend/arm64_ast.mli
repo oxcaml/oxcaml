@@ -247,6 +247,7 @@ module Instruction_name : sig
     | RET
     | YIELD
     | MRS
+    | CRC32
     (* neon *)
     | MOV
     | MOVI

@@ -63,6 +63,7 @@ type specific_operation =
   | Isimd of Simd.operation
   | Illvm_intrinsic of string
   | Iread_system_reg of system_reg  (* MRS *)
+  | Icrc32
 
 and arith_operation =
     Ishiftadd
