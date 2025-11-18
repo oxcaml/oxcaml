@@ -131,6 +131,7 @@ let i1_call_jmp b s = function
 
 let print_instr b = function
   | ADD (arg1, arg2) -> i2 b "add" arg1 arg2
+  | ADC (arg1, arg2) -> i2 b "adc" arg1 arg2
   | AND (arg1, arg2) -> i2 b "and" arg1 arg2
   | BSF (arg1, arg2) -> i2 b "bsf" arg1 arg2
   | BSR (arg1, arg2) -> i2 b "bsr" arg1 arg2

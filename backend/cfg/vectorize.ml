@@ -799,7 +799,7 @@ end = struct
                   | Intop_imm (Isub, n) -> Some (reg, -n)
                   | Intop_imm
                       ( ( Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-                        | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _
+                        | Iasr | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ | Iadd128
                           ),
                         _ )
                   | Opaque | Begin_region | End_region | Dls_get | Tls_get

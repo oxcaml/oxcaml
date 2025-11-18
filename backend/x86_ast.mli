@@ -117,6 +117,7 @@ type arg =
 
 type instruction =
   | ADD of arg * arg
+  | ADC of arg * arg
   | AND of arg * arg
   | BSF of arg * arg
   | BSR of arg * arg

@@ -824,7 +824,8 @@ let instr_for_int_operation = function
   | Ilsl -> I.LSL
   | Ilsr -> I.LSR
   | Iasr -> I.ASR
-  | Iclz _ | Ictz _ | Ipopcnt | Icomp _ | Imod | Imulh _ -> assert false
+  | Iclz _ | Ictz _ | Ipopcnt | Icomp _ | Imod | Imulh _ | Iadd128 ->
+    assert false
 
 (* Decompose an integer constant into four 16-bit shifted fragments. Omit the
    fragments that are equal to "default" (16 zeros or 16 ones). *)
@@ -1240,6 +1241,7 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Floatop (Float32, Icompf _)) -> 2
     | Lop (Intop_imm (Icomp _, _)) -> 2
     | Lop (Intop Imod) -> 2
+    | Lop (Intop Iadd128 | Intop_imm (Iadd128, _)) -> 2
     | Lop (Intop (Imulh _)) -> 1
     | Lop (Intop (Iclz _)) -> 1
     | Lop (Intop (Ictz _)) -> if !Arch.feat_cssc then 1 else 2
@@ -1989,6 +1991,17 @@ let emit_instr i =
       [| DSL.emit_reg i.res.(0);
          DSL.emit_reg i.arg.(0);
          DSL.emit_reg i.arg.(1)
+      |]
+  | Lop (Intop Iadd128) ->
+    DSL.ins I.ADDS
+      [| DSL.emit_reg i.res.(0);
+         DSL.emit_reg i.arg.(0);
+         DSL.emit_reg i.arg.(2)
+      |];
+    DSL.ins I.ADC
+      [| DSL.emit_reg i.res.(1);
+         DSL.emit_reg i.arg.(1);
+         DSL.emit_reg i.arg.(3)
       |]
   | Lop (Intop Ipopcnt) ->
     if !Arch.feat_cssc

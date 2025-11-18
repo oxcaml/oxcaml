@@ -347,6 +347,8 @@ module Instruction_name = struct
     (* base *)
     | NOP
     | ADD
+    | ADC
+    | ADDS
     | SUB
     | MUL
     | DIV
@@ -486,6 +488,8 @@ module Instruction_name = struct
     match t with
     | NOP -> "nop"
     | ADD -> "add"
+    | ADC -> "adc"
+    | ADDS -> "adds"
     | SUB -> "sub"
     | MUL -> "mul"
     | DIV -> "div"

@@ -902,6 +902,8 @@ let emit_simple_encoding base reg =
 
 let emit_ADD = emit_simple_encoding 0x00 0
 
+let emit_ADC = emit_simple_encoding 0x10 2
+
 let emit_OR = emit_simple_encoding 0x08 1
 
 let emit_AND = emit_simple_encoding 0x20 4
@@ -1358,6 +1360,7 @@ let emit_XCHG b src dst =
 
 let assemble_instr b loc = function
   | ADD (src, dst) -> emit_ADD b dst src
+  | ADC (src, dst) -> emit_ADC b dst src
   | AND (src, dst) -> emit_AND b dst src
   | BSF (src, dst) -> emit_bsf b ~dst ~src
   | BSR (src, dst) -> emit_bsr b ~dst ~src

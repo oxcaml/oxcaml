@@ -52,6 +52,8 @@ let typ_vec256 = [| Vec256 |]
 
 let typ_vec512 = [| Vec512 |]
 
+let typ_int128 = [| Int; Int |]
+
 (** [machtype_component]s are partially ordered as follows:
 
       Addr     Float32     Float     Vec128     Vec256     Vec512   Valx2
@@ -430,6 +432,7 @@ type operation =
   | Cmulhi of { signed : bool }
   | Cdivi
   | Cmodi
+  | Caddi128
   | Cand
   | Cor
   | Cxor
@@ -647,9 +650,10 @@ let iter_shallow_tail f = function
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ | Ctuple _
   | Cop
-      ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Cand | Cor | Cxor
-        | Clsl | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque
-        | Cbeginregion | Cendregion | Cdls_get | Ctls_get | Cpoll | Cpause
+      ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128 | Cand
+        | Cor | Cxor | Clsl | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32
+        | Copaque | Cbeginregion | Cendregion | Cdls_get | Ctls_get | Cpoll
+        | Cpause
         | Capply (_, _)
         | Cextcall _ | Cload _
         | Cstore (_, _)
@@ -681,9 +685,10 @@ let map_shallow_tail f = function
     | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
     | Cvar _ | Ctuple _
     | Cop
-        ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Cand | Cor | Cxor
-          | Clsl | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque
-          | Cbeginregion | Cendregion | Cdls_get | Ctls_get | Cpoll | Cpause
+        ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128 | Cand
+          | Cor | Cxor | Clsl | Clsr | Casr | Cpopcnt | Caddv | Cadda | Cpackf32
+          | Copaque | Cbeginregion | Cendregion | Cdls_get | Ctls_get | Cpoll
+          | Cpause
           | Capply (_, _)
           | Cextcall _ | Cload _
           | Cstore (_, _)

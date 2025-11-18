@@ -70,11 +70,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         false
         (* avoid reordering *)
         (* The remaining operations are simple if their args are *)
-      | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor
-      | Cxor | Clsl | Clsr | Casr | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz _
-      | Cctz _ | Cpopcnt | Cbswap _ | Ccsel _ | Cabsf _ | Caddf _ | Csubf _
-      | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _
-      | Ctuple_field _ | Ccmpf _ | Cdls_get | Ctls_get ->
+      | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Caddi128
+      | Cand | Cor | Cxor | Clsl | Clsr | Casr | Ccmpi _ | Caddv | Cadda
+      | Cnegf _ | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccsel _ | Cabsf _
+      | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _
+      | Cstatic_cast _ | Ctuple_field _ | Ccmpf _ | Cdls_get | Ctls_get ->
         List.for_all is_simple_expr args)
     | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ -> false
 
@@ -126,10 +126,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
         | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
-        | Cand | Cor | Cxor | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cpopcnt
-        | Clsl | Clsr | Casr | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cabsf _
-        | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _
-        | Cstatic_cast _ | Ccmpf _ ->
+        | Caddi128 | Cand | Cor | Cxor | Cbswap _ | Ccsel _ | Cclz _ | Cctz _
+        | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _ | Caddv | Cadda | Cnegf _
+        | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
+        | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ ->
           EC.none
       in
       EC.join from_op (EC.join_list_map args effects_of)
@@ -344,6 +344,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cmulhi { signed } -> select_arith_comm (Imulh { signed }) args
     | Cdivi -> SU.basic_op (Intop Idiv), args
     | Cmodi -> SU.basic_op (Intop Imod), args
+    | Caddi128 -> SU.basic_op (Intop Iadd128), args
     | Cand -> select_arith_comm Iand args
     | Cor -> select_arith_comm Ior args
     | Cxor -> select_arith_comm Ixor args

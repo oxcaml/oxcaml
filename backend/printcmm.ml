@@ -277,6 +277,7 @@ let operation d = function
   | Cmulhi { signed } -> "*h" ^ if signed then "" else "u"
   | Cdivi -> "/"
   | Cmodi -> "mod"
+  | Caddi128 -> "+128"
   | Cand -> "and"
   | Cor -> "or"
   | Cxor -> "xor"

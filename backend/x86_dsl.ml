@@ -96,6 +96,8 @@ let mem64_rip typ ?(ofs = 0) s = Mem64_RIP (typ, s, ofs)
 module I = struct
   let add x y = emit (ADD (x, y))
 
+  let adc x y = emit (ADC (x, y))
+
   let and_ x y = emit (AND (x, y))
 
   let bsf x y = emit (BSF (x, y))

@@ -74,6 +74,8 @@ val typ_vec256 : machtype
 
 val typ_vec512 : machtype
 
+val typ_int128 : machtype
+
 (** Least upper bound of two [machtype_component]s. *)
 val lub_component :
   machtype_component -> machtype_component -> machtype_component
@@ -398,6 +400,7 @@ type operation =
   | Cmulhi of { signed : bool }
   | Cdivi
   | Cmodi
+  | Caddi128
   | Cand
   | Cor
   | Cxor

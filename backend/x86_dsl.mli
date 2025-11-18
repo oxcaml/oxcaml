@@ -96,6 +96,8 @@ module I : sig
 
   val add : arg -> arg -> unit
 
+  val adc : arg -> arg -> unit
+
   val and_ : arg -> arg -> unit
 
   val bsf : arg -> arg -> unit

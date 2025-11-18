@@ -60,6 +60,7 @@ type integer_operation =
   | Ictz of { arg_is_non_zero : bool }
   | Ipopcnt
   | Icomp of integer_comparison
+  | Iadd128
 
 val string_of_integer_operation : integer_operation -> string
 

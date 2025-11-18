@@ -260,8 +260,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     may_use_stack_operand_for_result map instr ~num_args:1
   | Op (Csel _) (* CR gyorsh: optimize *)
   | Op (Specific (Ilfence | Isfence | Imfence))
-  | Op (Intop (Imulh _ | Imul | Idiv | Imod))
-  | Op (Intop_imm ((Imulh _ | Imul | Idiv | Imod), _))
+  | Op (Intop (Imulh _ | Imul | Idiv | Imod | Iadd128))
+  | Op (Intop_imm ((Imulh _ | Imul | Idiv | Imod | Iadd128), _))
   | Op (Specific (Irdtsc | Irdpmc))
   | Op (Intop (Ipopcnt | Iclz _ | Ictz _))
   | Op (Intop_atomic _)

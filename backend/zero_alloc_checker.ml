@@ -2584,12 +2584,13 @@ end = struct
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
         | Load _ | Floatop _
         | Intop_imm
-            ( ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
-              | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ | Icomp _ ),
+            ( ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iadd128 | Iand
+              | Ior | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _
+              | Icomp _ ),
               _ )
         | Intop
-            ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
-            | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ | Icomp _ )
+            ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iadd128 | Iand | Ior
+            | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ | Icomp _ )
         | Reinterpret_cast
             ( Float32_of_float | Float_of_float32 | Float_of_int64
             | Int64_of_float | Float32_of_int32 | Int32_of_float32
