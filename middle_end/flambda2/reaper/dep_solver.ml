@@ -113,9 +113,14 @@ module Syntax = struct
     match l with
     | [] -> []
     | `And l1 :: l2 -> flatten_hypotheses l1 @ flatten_hypotheses l2
+    | `Only_if (l1, x) :: l2 ->
+      (x :: flatten_hypotheses l1) @ flatten_hypotheses l2
     | (#hypothesis as x) :: l -> x :: flatten_hypotheses l
 
-  let ( ==> ) h c = where (flatten_hypotheses h) (deduce c)
+  let ( ==> ) h c =
+    match c with
+    | #deduction as c -> where (flatten_hypotheses h) (deduce c)
+    | `Only_if (l, c) -> where (l @ flatten_hypotheses h) (deduce c)
 
   let ( =>? ) h l = where (flatten_hypotheses h) (yield l)
 
@@ -314,9 +319,9 @@ let reading_field = rel2 "reading_field" Cols.[f; n]
 
 let escaping_field = rel2 "escaping_field" Cols.[f; n]
 
-let actual_usages x y = and_ [~~(any_usage x); usages x y]
+let actual_usages x y = `Only_if ([~~(any_usage x)], usages x y)
 
-let actual_sources x y = and_ [~~(any_source x); sources x y]
+let actual_sources x y = `Only_if ([~~(any_source x)], sources x y)
 
 let datalog_schedule =
   (* Reverse relations, because datalog does not implement a more efficient
@@ -421,28 +426,24 @@ let datalog_schedule =
   in
   let usages_accessor_1 =
     let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [~~(any_usage base); accessor ~to_ relation ~base; usages to_ _var]
-    ==> usages base base
+    [accessor ~to_ relation ~base; usages to_ _var] ==> actual_usages base base
   in
   let usages_accessor_2 =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [~~(any_usage base); accessor ~to_ relation ~base; any_usage to_]
-    ==> usages base base
+    [accessor ~to_ relation ~base; any_usage to_] ==> actual_usages base base
   in
   let usages_coaccessor_1 =
     let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [~~(any_usage base); sources to_ _var; coaccessor ~to_ relation ~base]
-    ==> usages base base
+    [sources to_ _var; coaccessor ~to_ relation ~base]
+    ==> actual_usages base base
   in
   let usages_coaccessor_2 =
     let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [~~(any_usage base); any_source to_; coaccessor ~to_ relation ~base]
-    ==> usages base base
+    [any_source to_; coaccessor ~to_ relation ~base] ==> actual_usages base base
   in
   let usages_alias =
     let$ [to_; from; usage] = ["to_"; "from"; "usage"] in
-    [~~(any_usage from); actual_usages to_ usage; alias ~to_ ~from]
-    ==> usages from usage
+    [actual_usages to_ usage; alias ~to_ ~from] ==> actual_usages from usage
   in
   (* accessor-usage
 
@@ -617,32 +618,28 @@ let datalog_schedule =
   in
   let sources_constructor_1 =
     let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [ ~~(any_source base);
-      sources from _var;
-      rev_constructor ~from relation ~base ]
-    ==> sources base base
+    [sources from _var; rev_constructor ~from relation ~base]
+    ==> actual_sources base base
   in
   let sources_constructor_2 =
     let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [~~(any_source base); any_source from; rev_constructor ~from relation ~base]
-    ==> sources base base
+    [any_source from; rev_constructor ~from relation ~base]
+    ==> actual_sources base base
   in
   let sources_coconstructor_1 =
     let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [ ~~(any_source base);
-      usages from _var;
-      rev_coconstructor ~from relation ~base ]
-    ==> sources base base
+    [usages from _var; rev_coconstructor ~from relation ~base]
+    ==> actual_sources base base
   in
   let sources_coconstructor_2 =
     let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [~~(any_source base); any_usage from; rev_coconstructor ~from relation ~base]
-    ==> sources base base
+    [any_usage from; rev_coconstructor ~from relation ~base]
+    ==> actual_sources base base
   in
   let sources_alias =
     let$ [from; to_; source] = ["from"; "to_"; "source"] in
-    [~~(any_source to_); actual_sources from source; rev_alias ~from ~to_]
-    ==> sources to_ source
+    [actual_sources from source; rev_alias ~from ~to_]
+    ==> actual_sources to_ source
   in
   (* constructor-sources
    field_sources_from_constructor_field_sources_top
