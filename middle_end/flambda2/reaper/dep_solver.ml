@@ -324,583 +324,257 @@ let actual_usages x y = `Only_if ([~~(any_usage x)], usages x y)
 let actual_sources x y = `Only_if ([~~(any_source x)], sources x y)
 
 let datalog_schedule =
-  (* Reverse relations, because datalog does not implement a more efficient
-     representation yet. Datalog iterates on the first key of a relation first.
-     those reversed relations allows to select a different key. *)
-  (*
-   rev_alias
-   * alias To From
-   * => rev_alias From To
+  (* Group rules by priority. Rules with (let$) are executed first, then the
+     rules with (let$$) are executed. The rule with (let$+$$) is executed as
+     part of both of the fixpoints. *)
+  let with_priority p f x = p, ( let$ ) f x in
+  let ( let$ ) f x = with_priority [0] f x in
+  let ( let$$ ) f x = with_priority [1] f x in
+  let ( let$+$$ ) f x = with_priority [0; 1] f x in
+  let make_schedule l =
+    Schedule.fixpoint
+      (List.init 2 (fun i ->
+           Schedule.saturate
+             (List.filter_map
+                (fun (p, r) -> if List.mem i p then Some r else None)
+                l)))
+  in
+  [ (* Reverse relations, because datalog does not implement a more efficient
+       representation yet. Datalog iterates on the first key of a relation
+       first. those reversed relations allows to select a different key. Of
+       these, only [alias] has both priorities, because it is the only of those
+       relations that is extended after graph construction. *)
+    (let$+$$ [to_; from] = ["to_"; "from"] in
+     [alias ~to_ ~from] ==> rev_alias ~from ~to_);
+    (let$ [to_; from] = ["to_"; "from"] in
+     [use ~to_ ~from] ==> rev_use ~from ~to_);
+    (let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [accessor ~to_ relation ~base] ==> rev_accessor ~base relation ~to_);
+    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+     [constructor ~base relation ~from] ==> rev_constructor ~from relation ~base);
+    (let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [coaccessor ~to_ relation ~base] ==> rev_coaccessor ~base relation ~to_);
+    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+     [coconstructor ~base relation ~from]
+     ==> rev_coconstructor ~from relation ~base);
+    (* propagate
 
-   rev_accessor
-   * accessor To Rel Base
-   * => rev_accessor Base Rel To
+       The [propagate] relation is part of the input of the solver, with the
+       intended meaning of this rule. That is an alias if [is_used] is used. *)
+    (let$ [if_used; to_; from] = ["if_used"; "to_"; "from"] in
+     [any_usage if_used; propagate ~if_used ~to_ ~from] ==> alias ~to_ ~from);
+    (* usages rules:
 
-   rev_constructor
-   * constructor Base Rel From
-   * => rev_constructor From Rel Base
+       By convention the Base name applies to something that represents a block
+       value (something on which an accessor or a constructor applies)
 
-   rev_coaccessor
-   * coaccessor To Rel Base
-   * => rev_coaccessor Base Rel To
+       usage_accessor and usage_coaccessor are the relation initialisation: they
+       define what we mean by 'actually using' something. usage_alias
+       propagatess usage to aliases.
 
-   rev_coconstructor
-   * coconstructor Base Rel From
-   * => rev_coconstructor From Rel Base
-   *)
-  let rev_alias_rule =
-    let$ [to_; from] = ["to_"; "from"] in
-    [alias ~to_ ~from] ==> rev_alias ~from ~to_
-  in
-  let rev_use_rule =
-    let$ [to_; from] = ["to_"; "from"] in
-    [use ~to_ ~from] ==> rev_use ~from ~to_
-  in
-  let rev_accessor_rule =
-    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [accessor ~to_ relation ~base] ==> rev_accessor ~base relation ~to_
-  in
-  let rev_constructor_rule =
-    let$ [base; relation; from] = ["base"; "relation"; "from"] in
-    [constructor ~base relation ~from] ==> rev_constructor ~from relation ~base
-  in
-  let rev_coaccessor_rule =
-    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [coaccessor ~to_ relation ~base] ==> rev_coaccessor ~base relation ~to_
-  in
-  let rev_coconstructor_rule =
-    let$ [base; relation; from] = ["base"; "relation"; "from"] in
-    [coconstructor ~base relation ~from]
-    ==> rev_coconstructor ~from relation ~base
-  in
-  (* propagate
+       An 'actual use' comes from either a top (any_usage predicate) or through
+       an accessor (or coaccessor) on an used variable
 
-     The [propagate] relation is part of the input of the solver, with the
-     intended meaning of this rule. That is an alias if [is_used] is used. *)
-  let alias_from_usage_propagate =
-    let$ [if_used; to_; from] = ["if_used"; "to_"; "from"] in
-    [any_usage if_used; propagate ~if_used ~to_ ~from] ==> alias ~to_ ~from
-  in
-  (* usages rules:
-
-     By convention the Base name applies to something that represents a block value
-     (something on which an accessor or a constructor applies)
-
-     usage_accessor and usage_coaccessor are the relation initialisation: they define
-     what we mean by 'actually using' something. usage_alias propagatess usage to aliases.
-
-     An 'actual use' comes from either a top (any_usage predicate) or through an accessor
-     (or coaccessor) on an used variable
-
-     All those rules are constrained not to apply when any_usage is valid. (see [usages]
-     definition comment)
-
-   any_usage_from_alias_any_usage
-   *  alias To From
-   *  /\ any_usage To
-   *  => any_usage From
-
-   usage_accessor (1 & 2)
-   *  not (any_usage Base)
-   *  /\ accessor To Rel Base
-   *  /\ (usages To Var \/ any_usage To)
-   *  => usages Base Base
-
-   usage_coaccessor (1 & 2)
-   *  not (any_usage Base)
-   *  /\ coaccessor To Rel Var
-   *  /\ (sources To Var \/ any_source To)
-   *  => usages Base Base
-
-   usage_alias
-   * not (any_usage From)
-   * /\ not (any_usage To)
-   * /\ usages To Usage
-   * /\ alias To From
-   * => usages From Usage
-
-   *)
-  let any_usage_from_alias_any_usage =
-    let$ [to_; from] = ["to_"; "from"] in
-    [alias ~to_ ~from; any_usage to_] ==> any_usage from
-  in
-  let usages_accessor_1 =
-    let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [accessor ~to_ relation ~base; usages to_ _var] ==> actual_usages base base
-  in
-  let usages_accessor_2 =
-    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [accessor ~to_ relation ~base; any_usage to_] ==> actual_usages base base
-  in
-  let usages_coaccessor_1 =
-    let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [sources to_ _var; coaccessor ~to_ relation ~base]
-    ==> actual_usages base base
-  in
-  let usages_coaccessor_2 =
-    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [any_source to_; coaccessor ~to_ relation ~base] ==> actual_usages base base
-  in
-  let usages_alias =
-    let$ [to_; from; usage] = ["to_"; "from"; "usage"] in
-    [actual_usages to_ usage; alias ~to_ ~from] ==> actual_usages from usage
-  in
-  (* accessor-usage
-
-   field_usages_from_accessor_field_usages_top
-   *  not (any_usage Base)
-   *  /\ any_usage To
-   *  /\ accessor To Rel Base
-   *  => field_usages_top Base Rel
-
-   field_usages_from_accessor_field_usages
-   * not (any_usage Base)
-   * /\ not (any_usage To)
-   * /\ not (field_usages_top Base Rel)
-   * /\ accessor To Rel Base
-   * /\ usages To Var
-   * => field_usages Base Rel To
-
-   *)
-  let field_usages_from_accessor_field_usages_top =
-    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [ ~~(any_usage base);
-      any_usage to_;
-      accessor ~to_ relation ~base;
-      unless1 Field.is_local relation ]
-    ==> field_usages_top base relation
-  in
-  let field_usages_from_accessor_field_usages_top_local =
-    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [ ~~(any_usage base);
-      any_usage to_;
-      accessor ~to_ relation ~base;
-      when1 Field.is_local relation ]
-    ==> field_usages base relation to_
-  in
-  let field_usages_from_accessor_field_usages =
-    let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [ ~~(any_usage base);
-      actual_usages to_ _var;
-      ~~(field_usages_top base relation);
-      accessor ~to_ relation ~base ]
-    ==> field_usages base relation to_
-  in
-  (* coaccessor-usages
-
-   cofield_usages_from_coaccessor (1 & 2)
-   * not (any_usage Base)
-   * /\ coaccessor To Rel Base
-   * /\ (sources To Var \/ any_source To)
-   * => cofield_usages Base Rel To
-
-   *)
-  let cofield_usages_from_coaccessor1 =
-    let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [~~(any_usage base); coaccessor ~to_ relation ~base; sources to_ _var]
-    ==> cofield_usages base relation to_
-  in
-  let cofield_usages_from_coaccessor2 =
-    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [~~(any_usage base); any_source to_; coaccessor ~to_ relation ~base]
-    ==> cofield_usages base relation to_
-  in
-  (* constructor-usages
-
-   alias_from_accessed_constructor_1
-   * not (any_usage From)
-   * /\ not (field_usages_top BaseUse Rel)
-   * /\ not (any_usage Base)
-   * /\ constructor Base Rel From
-   * /\ usages Base BaseUse
-   * /\ field_usages BaseUse Rel To
-   * => alias To From
-
-   *)
-  let alias_from_accessed_constructor_1 =
-    let$ [base; base_use; relation; from; to_] =
-      ["base"; "base_use"; "relation"; "from"; "to_"]
-    in
-    [ ~~(any_usage from);
-      ~~(field_usages_top base_use relation);
-      constructor ~base relation ~from;
-      actual_usages base base_use;
-      field_usages base_use relation to_ ]
-    ==> alias ~to_ ~from
-  in
-  let alias_from_accessed_constructor_1_local =
-    let$ [base; base_use; relation; from; to_] =
-      ["base"; "base_use"; "relation"; "from"; "to_"]
-    in
-    [ when1 Field.is_local relation;
-      constructor ~base relation ~from;
-      usages base base_use;
-      field_usages base_use relation to_ ]
-    ==> alias ~to_ ~from
-  in
-  (*
-   any_usage_from_accessed_constructor
-   * constructor Base Rel From
-   * /\ not (any_usage Base)
-   * /\ usages Base BaseUse
-   * /\ field_usages_top BaseUse Rel
-   * => any_usage From
-   *)
-  let any_usage_from_accessed_constructor =
-    let$ [base; base_use; relation; from] =
-      ["base"; "base_use"; "relation"; "from"]
-    in
-    [ constructor ~base relation ~from;
-      actual_usages base base_use;
-      field_usages_top base_use relation ]
-    ==> any_usage from
-  in
-  (*
-   any_usage_from_constructor_any_usage
-   * any_usage Base
-   * /\ constructor Base Rel From
-   * => any_usage From
-
-   any_usage_from_coaccessor_any_source
-   * any_source Base
-   * /\ rev_coaccessor Base Rel To
-   * => any_usage To
-   *)
-  let any_usage_from_constructor_any_usage =
-    let$ [base; relation; from] = ["base"; "relation"; "from"] in
-    [ any_usage base;
-      constructor ~base relation ~from;
-      unless1 Field.is_local relation ]
-    ==> any_usage from
-  in
-  let escaping_local_field =
-    let$ [base; relation; from] = ["base"; "relation"; "from"] in
-    [ any_usage base;
-      constructor ~base relation ~from;
-      when1 Field.is_local relation ]
-    ==> and_
-          [escaping_field relation from (*; field_usages base relation from *)]
-  in
-  let any_usage_from_coaccessor_any_source =
-    let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
-    [any_source base; rev_coaccessor ~base relation ~to_] ==> any_usage to_
-  in
-  (* sources: see explanation on usage
-
-   any_source_from_alias_any_source
-   * rev_alias From To
-   * /\ any_source From
-   * => any_source To
-
-   sources_constructor (1 & 2)
-   *  not (any_source Base)
-   *  /\ rev_constructor From Rel Base
-   *  /\ (sources From Var \/ any_source From)
-   *  => sources Base Base
-
-   sources_coconstructor (1 & 2)
-   *  not (any_source Base)
-   *  /\ rev_coconstructor From Rel Var
-   *  /\ (sources From Var \/ any_source From)
-   *  => sources Base Base
-
-   usage_alias
-   * not (any_source From)
-   * /\ not (any_source From)
-   * /\ sources From Source
-   * /\ rev_alias From To
-   * => sources To Source
-
-   *)
-  let any_source_from_alias_any_source =
-    let$ [from; to_] = ["from"; "to_"] in
-    [rev_alias ~from ~to_; any_source from] ==> any_source to_
-  in
-  let sources_constructor_1 =
-    let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [sources from _var; rev_constructor ~from relation ~base]
-    ==> actual_sources base base
-  in
-  let sources_constructor_2 =
-    let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [any_source from; rev_constructor ~from relation ~base]
-    ==> actual_sources base base
-  in
-  let sources_coconstructor_1 =
-    let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [usages from _var; rev_coconstructor ~from relation ~base]
-    ==> actual_sources base base
-  in
-  let sources_coconstructor_2 =
-    let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [any_usage from; rev_coconstructor ~from relation ~base]
-    ==> actual_sources base base
-  in
-  let sources_alias =
-    let$ [from; to_; source] = ["from"; "to_"; "source"] in
-    [actual_sources from source; rev_alias ~from ~to_]
-    ==> actual_sources to_ source
-  in
-  (* constructor-sources
-   field_sources_from_constructor_field_sources_top
-   * not (any_source Base)
-   * /\ any_source From
-   * /\ rev_constructor From Rel Base
-   * => field_sources_top Base Rel
-
-   field_sources_from_constructor_field_sources
-   * not (any_source Base)
-   * /\ not (any_source From)
-   * /\ not (field_sources_top Base Rel)
-   * /\ rev_constructor From Rel Base
-   * /\ sources From Var
-   * => field_sources Base Rel From
-   *)
-  let field_sources_from_constructor_field_sources_top =
-    let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [ ~~(any_source base);
-      any_source from;
-      rev_constructor ~from relation ~base;
-      unless1 Field.is_local relation ]
-    ==> field_sources_top base relation
-  in
-  let field_sources_from_constructor_field_sources_top_local =
-    let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [ ~~(any_source base);
-      any_source from;
-      rev_constructor ~from relation ~base;
-      when1 Field.is_local relation ]
-    ==> field_sources base relation from
-  in
-  let field_sources_from_constructor_field_sources =
-    let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [ ~~(any_source base);
-      ~~(field_sources_top base relation);
-      rev_constructor ~from relation ~base;
-      actual_sources from _var ]
-    ==> field_sources base relation from
-  in
-  (* coaccessor-sources
-
-   cofield_sources_from_coconstructor (1 & 2)
-   * not (any_source Base)
-   * /\ rev_coconstructor From Rel Base
-   * /\ (usages From Var \/ any_usage From)
-   * => cofield_sources Base Rel From
-
-   *)
-  let cofield_sources_from_coconstrucor1 =
-    let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [ ~~(any_source base);
-      rev_coconstructor ~from relation ~base;
-      usages from _var ]
-    ==> cofield_sources base relation from
-  in
-  let cofield_sources_from_coconstrucor2 =
-    let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [~~(any_source base); any_usage from; rev_coconstructor ~from relation ~base]
-    ==> cofield_sources base relation from
-  in
-  (* coconstructor-uses XXX
-
-   alias_from_coaccessed_coconstructor
-   * not (any_usage Base)
-   * /\ coconstructor Base Rel From
-   * /\ usages Base BaseUse
-   * /\ cofield_usages BaseUse Rel To
-   * => alias From To
-
-   *)
-  let alias_from_coaccessed_coconstructor =
-    let$ [base; base_use; relation; from; to_] =
-      ["base"; "base_use"; "relation"; "from"; "to_"]
-    in
-    [ coconstructor ~base relation ~from;
-      actual_usages base base_use;
-      cofield_usages base_use relation to_ ]
-    ==> alias ~to_:from ~from:to_
-  in
-  (*
-   any_source_from_coconstructor_any_usage
-   * any_usage Base
-   * /\ coconstructor Base Rel From
-   * => any_source From
-   *)
-  let any_source_from_coconstructor_any_usage =
-    let$ [base; relation; from] = ["base"; "relation"; "from"] in
-    [any_usage base; coconstructor ~base relation ~from] ==> any_source from
-  in
-  (* accessor-sources
-   alias_from_accessed_constructor_2
-   * not (any_source To)
-   * /\ not (field_sources_top BaseSource Rel)
-   * /\ not (any_source Base)
-   * /\ rev_accessor Base Rel To
-   * /\ sources Base BaseSource
-   * /\ field_sources BaseSource Rel From
-   * => alias To From
-
-   any_source_from_accessed_constructor
-   * rev_accessor Base Rel To
-   * /\ not (any_source Base)
-   * /\ sources Base BaseSource
-   * /\ field_sources_top BaseSource Rel
-   * => any_source To
-   *)
-  let alias_from_accessed_constructor_2 =
-    let$ [base; base_source; relation; to_; from] =
-      ["base"; "base_source"; "relation"; "to_"; "from"]
-    in
-    [ ~~(any_source to_);
-      ~~(field_sources_top base_source relation);
-      rev_accessor ~base relation ~to_;
-      actual_sources base base_source;
-      field_sources base_source relation from ]
-    ==> alias ~to_ ~from
-  in
-  let alias_from_accessed_constructor_2_local =
-    let$ [base; base_source; relation; to_; from] =
-      ["base"; "base_source"; "relation"; "to_"; "from"]
-    in
-    [ when1 Field.is_local relation;
-      rev_accessor ~base relation ~to_;
-      sources base base_source;
-      field_sources base_source relation from ]
-    ==> alias ~to_ ~from
-  in
-  let any_source_from_accessed_constructor =
-    let$ [base; base_source; relation; to_] =
-      ["base"; "base_source"; "relation"; "to_"]
-    in
-    [ rev_accessor ~base relation ~to_;
-      actual_sources base base_source;
-      field_sources_top base_source relation ]
-    ==> any_source to_
-  in
-  (*
-   any_source_from_accessor_any_source
-   * any_source Base
-   * /\ rev_accessor Base Rel To
-   * => any_source To
-   *)
-  let any_source_from_accessor_any_source =
-    let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
-    [ any_source base;
-      rev_accessor ~base relation ~to_;
-      unless1 Field.is_local relation ]
-    ==> any_source to_
-  in
-  let reading_local_field =
-    let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
-    [ any_source base;
-      rev_accessor ~base relation ~to_;
-      when1 Field.is_local relation ]
-    ==> and_ [reading_field relation to_ (*; field_sources base relation to_*)]
-  in
-  let reading_escaping =
-    let$ [relation; from; to_] = ["relation"; "from"; "to_"] in
-    [escaping_field relation from; reading_field relation to_]
-    ==> alias ~to_ ~from
-  in
-  (* ... *)
-  (*
-   alias_from_coaccessed_coconstructor_2
-   * not (any_source Base)
-   * /\ rev_coaccessor Base Rel To
-   * /\ sources Base BaseSource
-   * /\ cofield_sources BaseSource Rel From
-   * => alias From To
-   *)
-  let alias_from_coaccessed_coconstructor_2 =
-    let$ [base; base_source; relation; to_; from] =
-      ["base"; "base_source"; "relation"; "to_"; "from"]
-    in
-    [ rev_coaccessor ~base relation ~to_;
-      actual_sources base base_source;
-      cofield_sources base_source relation from ]
-    ==> alias ~to_:from ~from:to_
-  in
-  (* use *)
-  (*
-   any_usage_from_use (1 & 2)
-   * use To From
-   * /\ (usages To Var \/ any_usage To)
-   * => any_usage From
-   *)
-  (*
-   any_source_use (1 & 2)
-   * rev_use From To
-   * /\ (sources From Var \/ any_source From)
-   * => any_source To
-   *)
-  let any_usage_from_use_1 =
-    let$ [to_; from; _var] = ["to_"; "from"; "_var"] in
-    [usages to_ _var; use ~to_ ~from] ==> any_usage from
-  in
-  let any_usage_from_use_2 =
-    let$ [to_; from] = ["to_"; "from"] in
-    [any_usage to_; use ~to_ ~from] ==> any_usage from
-  in
-  let any_source_use_1 =
-    let$ [from; to_; _var] = ["from"; "to_"; "_var"] in
-    [sources from _var; rev_use ~from ~to_] ==> any_source to_
-  in
-  let any_source_use_2 =
-    let$ [from; to_] = ["from"; "to_"] in
-    [any_source from; rev_use ~from ~to_] ==> any_source to_
-  in
-  Schedule.fixpoint
-    [ Schedule.saturate
-        [ rev_accessor_rule;
-          rev_constructor_rule;
-          rev_coaccessor_rule;
-          rev_coconstructor_rule;
-          rev_use_rule;
-          any_source_use_1;
-          any_source_use_2;
-          alias_from_usage_propagate;
-          any_usage_from_alias_any_usage;
-          any_source_from_alias_any_source;
-          any_usage_from_constructor_any_usage;
-          any_usage_from_coaccessor_any_source;
-          any_usage_from_use_1;
-          any_usage_from_use_2;
-          any_usage_from_accessed_constructor;
-          any_source_from_accessed_constructor;
-          any_source_from_accessor_any_source;
-          any_source_from_coconstructor_any_usage;
-          escaping_local_field;
-          reading_local_field;
-          reading_escaping;
-          rev_alias_rule ];
-      Schedule.saturate
-        [ alias_from_accessed_constructor_1;
-          alias_from_accessed_constructor_1_local;
-          alias_from_accessed_constructor_2;
-          alias_from_accessed_constructor_2_local;
-          alias_from_coaccessed_coconstructor;
-          alias_from_coaccessed_coconstructor_2;
-          field_usages_from_accessor_field_usages;
-          field_usages_from_accessor_field_usages_top;
-          field_usages_from_accessor_field_usages_top_local;
-          cofield_usages_from_coaccessor1;
-          cofield_usages_from_coaccessor2;
-          field_sources_from_constructor_field_sources;
-          field_sources_from_constructor_field_sources_top;
-          field_sources_from_constructor_field_sources_top_local;
-          cofield_sources_from_coconstrucor1;
-          cofield_sources_from_coconstrucor2;
-          usages_accessor_1;
-          usages_accessor_2;
-          usages_coaccessor_1;
-          usages_coaccessor_2;
-          usages_alias;
-          sources_constructor_1;
-          sources_constructor_2;
-          sources_coconstructor_1;
-          sources_coconstructor_2;
-          sources_alias;
-          rev_alias_rule ] ]
+       All those rules are constrained not to apply when any_usage is valid.
+       (see [usages] definition comment) *)
+    (let$ [to_; from] = ["to_"; "from"] in
+     [alias ~to_ ~from; any_usage to_] ==> any_usage from);
+    (let$$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
+     [accessor ~to_ relation ~base; usages to_ _var] ==> actual_usages base base);
+    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [accessor ~to_ relation ~base; any_usage to_] ==> actual_usages base base);
+    (let$$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
+     [sources to_ _var; coaccessor ~to_ relation ~base]
+     ==> actual_usages base base);
+    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [any_source to_; coaccessor ~to_ relation ~base]
+     ==> actual_usages base base);
+    (let$$ [to_; from; usage] = ["to_"; "from"; "usage"] in
+     [actual_usages to_ usage; alias ~to_ ~from] ==> actual_usages from usage);
+    (* accessor-usage *)
+    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [ ~~(any_usage base);
+       any_usage to_;
+       accessor ~to_ relation ~base;
+       unless1 Field.is_local relation ]
+     ==> field_usages_top base relation);
+    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [ ~~(any_usage base);
+       any_usage to_;
+       accessor ~to_ relation ~base;
+       when1 Field.is_local relation ]
+     ==> field_usages base relation to_);
+    (let$$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
+     [ ~~(any_usage base);
+       actual_usages to_ _var;
+       ~~(field_usages_top base relation);
+       accessor ~to_ relation ~base ]
+     ==> field_usages base relation to_);
+    (* coaccessor-usages *)
+    (let$$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
+     [~~(any_usage base); coaccessor ~to_ relation ~base; sources to_ _var]
+     ==> cofield_usages base relation to_);
+    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [~~(any_usage base); any_source to_; coaccessor ~to_ relation ~base]
+     ==> cofield_usages base relation to_);
+    (* constructor-usages *)
+    (let$$ [base; base_use; relation; from; to_] =
+       ["base"; "base_use"; "relation"; "from"; "to_"]
+     in
+     [ ~~(any_usage from);
+       ~~(field_usages_top base_use relation);
+       constructor ~base relation ~from;
+       actual_usages base base_use;
+       field_usages base_use relation to_ ]
+     ==> alias ~to_ ~from);
+    (let$$ [base; base_use; relation; from; to_] =
+       ["base"; "base_use"; "relation"; "from"; "to_"]
+     in
+     [ when1 Field.is_local relation;
+       constructor ~base relation ~from;
+       usages base base_use;
+       field_usages base_use relation to_ ]
+     ==> alias ~to_ ~from);
+    (let$ [base; base_use; relation; from] =
+       ["base"; "base_use"; "relation"; "from"]
+     in
+     [ constructor ~base relation ~from;
+       actual_usages base base_use;
+       field_usages_top base_use relation ]
+     ==> any_usage from);
+    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+     [ any_usage base;
+       constructor ~base relation ~from;
+       unless1 Field.is_local relation ]
+     ==> any_usage from);
+    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+     [ any_usage base;
+       constructor ~base relation ~from;
+       when1 Field.is_local relation ]
+     ==> escaping_field relation from);
+    (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
+     [any_source base; rev_coaccessor ~base relation ~to_] ==> any_usage to_);
+    (* sources: see explanation on usage *)
+    (let$ [from; to_] = ["from"; "to_"] in
+     [rev_alias ~from ~to_; any_source from] ==> any_source to_);
+    (let$$ [from; relation; base; _var] =
+       ["from"; "relation"; "base"; "_var"]
+     in
+     [sources from _var; rev_constructor ~from relation ~base]
+     ==> actual_sources base base);
+    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+     [any_source from; rev_constructor ~from relation ~base]
+     ==> actual_sources base base);
+    (let$$ [from; relation; base; _var] =
+       ["from"; "relation"; "base"; "_var"]
+     in
+     [usages from _var; rev_coconstructor ~from relation ~base]
+     ==> actual_sources base base);
+    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+     [any_usage from; rev_coconstructor ~from relation ~base]
+     ==> actual_sources base base);
+    (let$$ [from; to_; source] = ["from"; "to_"; "source"] in
+     [actual_sources from source; rev_alias ~from ~to_]
+     ==> actual_sources to_ source);
+    (* constructor-sources *)
+    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+     [ ~~(any_source base);
+       any_source from;
+       rev_constructor ~from relation ~base;
+       unless1 Field.is_local relation ]
+     ==> field_sources_top base relation);
+    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+     [ ~~(any_source base);
+       any_source from;
+       rev_constructor ~from relation ~base;
+       when1 Field.is_local relation ]
+     ==> field_sources base relation from);
+    (let$$ [from; relation; base; _var] =
+       ["from"; "relation"; "base"; "_var"]
+     in
+     [ ~~(any_source base);
+       ~~(field_sources_top base relation);
+       rev_constructor ~from relation ~base;
+       actual_sources from _var ]
+     ==> field_sources base relation from);
+    (* coaccessor-sources *)
+    (let$$ [from; relation; base; _var] =
+       ["from"; "relation"; "base"; "_var"]
+     in
+     [ ~~(any_source base);
+       rev_coconstructor ~from relation ~base;
+       usages from _var ]
+     ==> cofield_sources base relation from);
+    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+     [ ~~(any_source base);
+       any_usage from;
+       rev_coconstructor ~from relation ~base ]
+     ==> cofield_sources base relation from);
+    (* coconstructor-uses *)
+    (let$$ [base; base_use; relation; from; to_] =
+       ["base"; "base_use"; "relation"; "from"; "to_"]
+     in
+     [ coconstructor ~base relation ~from;
+       actual_usages base base_use;
+       cofield_usages base_use relation to_ ]
+     ==> alias ~to_:from ~from:to_);
+    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+     [any_usage base; coconstructor ~base relation ~from] ==> any_source from);
+    (* accessor-sources *)
+    (let$$ [base; base_source; relation; to_; from] =
+       ["base"; "base_source"; "relation"; "to_"; "from"]
+     in
+     [ ~~(any_source to_);
+       ~~(field_sources_top base_source relation);
+       rev_accessor ~base relation ~to_;
+       actual_sources base base_source;
+       field_sources base_source relation from ]
+     ==> alias ~to_ ~from);
+    (let$$ [base; base_source; relation; to_; from] =
+       ["base"; "base_source"; "relation"; "to_"; "from"]
+     in
+     [ when1 Field.is_local relation;
+       rev_accessor ~base relation ~to_;
+       sources base base_source;
+       field_sources base_source relation from ]
+     ==> alias ~to_ ~from);
+    (let$ [base; base_source; relation; to_] =
+       ["base"; "base_source"; "relation"; "to_"]
+     in
+     [ rev_accessor ~base relation ~to_;
+       actual_sources base base_source;
+       field_sources_top base_source relation ]
+     ==> any_source to_);
+    (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
+     [ any_source base;
+       rev_accessor ~base relation ~to_;
+       unless1 Field.is_local relation ]
+     ==> any_source to_);
+    (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
+     [ any_source base;
+       rev_accessor ~base relation ~to_;
+       when1 Field.is_local relation ]
+     ==> and_ [reading_field relation to_ (*; field_sources base relation to_*)]);
+    (let$ [relation; from; to_] = ["relation"; "from"; "to_"] in
+     [escaping_field relation from; reading_field relation to_]
+     ==> alias ~to_ ~from);
+    (let$$ [base; base_source; relation; to_; from] =
+       ["base"; "base_source"; "relation"; "to_"; "from"]
+     in
+     [ rev_coaccessor ~base relation ~to_;
+       actual_sources base base_source;
+       cofield_sources base_source relation from ]
+     ==> alias ~to_:from ~from:to_);
+    (* use *)
+    (let$ [to_; from; _var] = ["to_"; "from"; "_var"] in
+     [usages to_ _var; use ~to_ ~from] ==> any_usage from);
+    (let$ [to_; from] = ["to_"; "from"] in
+     [any_usage to_; use ~to_ ~from] ==> any_usage from);
+    (let$ [from; to_; _var] = ["from"; "to_"; "_var"] in
+     [sources from _var; rev_use ~from ~to_] ==> any_source to_);
+    (let$ [from; to_] = ["from"; "to_"] in
+     [any_source from; rev_use ~from ~to_] ==> any_source to_) ]
+  |> make_schedule
 
 module Fixit : sig
   type (_, _, _) stmt
