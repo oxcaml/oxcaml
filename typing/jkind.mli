@@ -90,7 +90,7 @@ module Scannable_axes : sig
      since most of it goes unused (even internally to this file). *)
   include Jkind_axis.Axis_ops with type t := t
 
-  (** Omits all axes set to top, for printing *)
+  (** Omits all axes that are max, for printing *)
   val to_string_list : t -> string list
 end
 

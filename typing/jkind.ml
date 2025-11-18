@@ -107,10 +107,12 @@ module Scannable_axes = struct
 
   let print ppf { pointerness } = Pointerness.print ppf pointerness
 
-  let to_string_list { pointerness } =
-    if Pointerness.is_max pointerness
+  let to_string_list_diff ~base:{ pointerness = p_against } { pointerness } =
+    if Pointerness.equal p_against pointerness
     then []
     else [Pointerness.to_string pointerness]
+
+  let to_string_list = to_string_list_diff ~base:max
 
   let set_pointerness sa pointerness =
     (* CR layouts-scannable: Once there are more axes, use [sa]! *)
@@ -2123,18 +2125,13 @@ module Const = struct
         in
         Some modes
 
-    (* CR zeisbach: refactor so that this logic isn't duplicated across the
-       [to_string_list] function as well... design a nicer helper! *)
-    let get_scannable_axes ~base actual =
+    let get_scannable_axes_diff ~base actual =
       let base_sa = Layout.Const.get_root_scannable_axes base in
       let actual_sa = Layout.Const.get_root_scannable_axes actual in
       match base_sa, actual_sa with
       | None, _ | _, None -> []
-      | ( Some { pointerness = base_ptrness },
-          Some { pointerness = actual_ptrness } ) ->
-        if Pointerness.equal base_ptrness actual_ptrness
-        then []
-        else [Pointerness.to_string actual_ptrness]
+      | Some base_sa, Some actual_sa ->
+        Scannable_axes.to_string_list_diff ~base:base_sa actual_sa
 
     let modality_to_ignore_axes axes_to_ignore =
       (* The modality is constant along axes to ignore and id along others *)
@@ -2159,7 +2156,7 @@ module Const = struct
       in
       let scannable_axes =
         if Layout.Const.is_value_or_any actual.layout
-        then get_scannable_axes ~base:base.jkind.layout actual.layout
+        then get_scannable_axes_diff ~base:base.jkind.layout actual.layout
         else []
       in
       let modal_bounds =
