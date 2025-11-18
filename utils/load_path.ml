@@ -477,8 +477,8 @@ let find fn =
       fst (Path_cache.find ~uncap:false fn)
     else
       Misc.find_in_path (get_path_list ()) fn
-    with Not_found ->
-      !auto_include_callback Dir.find fn
+  with Not_found ->
+    !auto_include_callback Dir.find fn
 
 let find_normalized_with_visibility fn =
   assert (not Config.merlin || Local_store.is_bound ());
