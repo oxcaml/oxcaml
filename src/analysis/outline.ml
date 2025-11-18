@@ -179,20 +179,18 @@ and get_mod_children ~include_types node =
 
 and remove_mod_indir ~include_types node =
   match node.t_node with
-  | Module_expr _ | Module_type _ ->
-    List.concat_map
-      (Lazy.force node.t_children)
-      ~f:(remove_mod_indir ~include_types)
+  | Module_expr _ | Module_type _ -> get_mod_children ~include_types node
   | _ -> remove_top_indir ~include_types node
 
 and remove_top_indir ~include_types t =
   match t.t_node with
-  | Structure _ | Signature _ ->
-    List.concat_map
-      ~f:(remove_top_indir ~include_types)
-      (Lazy.force t.t_children)
+  | Structure _ | Signature _ -> get_mod_children ~include_types t
   | Signature_item _ | Structure_item _ ->
-    List.filter_map (Lazy.force t.t_children) ~f:(summarize ~include_types)
+    List.concat_map (Lazy.force t.t_children) ~f:(fun child ->
+        match child.t_node with
+        | Include_declaration _ | Include_description _ ->
+          get_mod_children ~include_types child
+        | _ -> summarize ~include_types child |> Option.to_list)
   | _ -> []
 
 let get ~include_types browses =

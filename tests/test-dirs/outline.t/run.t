@@ -15,6 +15,127 @@
         "name": "S",
         "kind": "Signature",
         "type": null,
+        "children": [
+          {
+            "start": {
+              "line": 45,
+              "col": 6
+            },
+            "end": {
+              "line": 45,
+              "col": 20
+            },
+            "name": "y",
+            "kind": "Value",
+            "type": "string",
+            "children": [],
+            "deprecated": false
+          },
+          {
+            "start": {
+              "line": 44,
+              "col": 6
+            },
+            "end": {
+              "line": 44,
+              "col": 12
+            },
+            "name": "u",
+            "kind": "Type",
+            "type": null,
+            "children": [],
+            "deprecated": false
+          },
+          {
+            "start": {
+              "line": 42,
+              "col": 4
+            },
+            "end": {
+              "line": 42,
+              "col": 15
+            },
+            "name": "x",
+            "kind": "Value",
+            "type": "int",
+            "children": [],
+            "deprecated": false
+          },
+          {
+            "start": {
+              "line": 41,
+              "col": 4
+            },
+            "end": {
+              "line": 41,
+              "col": 10
+            },
+            "name": "t",
+            "kind": "Type",
+            "type": null,
+            "children": [],
+            "deprecated": false
+          }
+        ],
+        "deprecated": false
+      },
+      {
+        "start": {
+          "line": 35,
+          "col": 4
+        },
+        "end": {
+          "line": 35,
+          "col": 15
+        },
+        "name": "y",
+        "kind": "Value",
+        "type": "string",
+        "children": [],
+        "deprecated": false
+      },
+      {
+        "start": {
+          "line": 34,
+          "col": 4
+        },
+        "end": {
+          "line": 34,
+          "col": 10
+        },
+        "name": "u",
+        "kind": "Type",
+        "type": null,
+        "children": [],
+        "deprecated": false
+      },
+      {
+        "start": {
+          "line": 32,
+          "col": 2
+        },
+        "end": {
+          "line": 32,
+          "col": 11
+        },
+        "name": "x",
+        "kind": "Value",
+        "type": "int",
+        "children": [],
+        "deprecated": false
+      },
+      {
+        "start": {
+          "line": 31,
+          "col": 2
+        },
+        "end": {
+          "line": 31,
+          "col": 8
+        },
+        "name": "t",
+        "kind": "Type",
+        "type": null,
         "children": [],
         "deprecated": false
       },
@@ -261,6 +382,14 @@
 Check that when we pass "-include-types false", every "type" is null.
   $ $MERLIN single outline -include-types false < foo.ml \
   >   | jq '.value | .. | objects | select(has("type")) | .type'
+  null
+  null
+  null
+  null
+  null
+  null
+  null
+  null
   null
   null
   null
