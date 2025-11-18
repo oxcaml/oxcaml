@@ -455,7 +455,7 @@ val add_local_constraint: Path.t -> type_declaration -> t -> t
 val add_persistent_structure : Ident.t -> t -> t
 
 
-(* Returns the set of persistent structures found in the given
+ (* Returns the set of persistent structures found in the given
    directory. *)
 val persistent_structures_of_dir : Load_path.Dir.t -> Misc.Stdlib.String.Set.t
 

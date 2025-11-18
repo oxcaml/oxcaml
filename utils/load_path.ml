@@ -165,10 +165,13 @@ end = struct
     match split_and_unescape ~buffer line with
     | [ "file"; filename; location ] ->
       let location = Path.of_string location in
-      Entry.File { filename; location }
+      Some (Entry.File { filename; location })
     | [ "manifest"; _; location ] ->
+      (* [filename] is included in "manifest" entry only for human readability, so we
+         discard them here. *)
       let location = Path.of_string location in
-      Entry.Manifest location
+      Some (Entry.Manifest location)
+    | [] -> None
     | _ -> raise (Parse_error ("Cannot parse manifest file line: " ^ line))
   ;;
 
@@ -177,9 +180,10 @@ end = struct
     visit t manifest_path ~f:(fun manifest_path ->
       iter_lines manifest_path ~f:(fun line ->
         match parse_line ~buffer line with
-        | Entry.File { filename; location } ->
+        | None -> ()
+        | Some (Entry.File { filename; location }) ->
           visit t location ~f:(fun location -> f ~filename ~location)
-        | Manifest manifest_path -> iter_manifest t ~f ~manifest_path))
+        | Some (Manifest manifest_path) -> iter_manifest t ~f ~manifest_path))
   ;;
 end
 
