@@ -263,7 +263,11 @@ let count_duplicate_spills_reloads_in_block (block : Cfg.basic_block) =
   in
   dup_spills, dup_reloads
 
-type spills_reloads_moves = { spills : int; reloads : int; moves : int }
+type spills_reloads_moves =
+  { spills : int;
+    reloads : int;
+    moves : int
+  }
 
 let count_spills_reloads_moves (block : Cfg.basic_block) =
   let f (acc : spills_reloads_moves) (instr : Cfg.basic Cfg.instruction) =
