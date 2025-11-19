@@ -412,12 +412,15 @@ let value_kind_of_value_jkind env jkind =
     Jkind.get_externality_upper_bound ~context jkind
   in
   match layout with
-  | Base Value ->
+  (* CR layouts-scannable: use scannable axes to improve codegen *)
+  | Base (Value, _) ->
     value_kind_of_value_with_externality externality_upper_bound
-  | Any
+  | Any _
   | Product _
-  | Base (Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 |
-          Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
+  | Base
+    ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
+      | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512),
+      _ ) ->
     Misc.fatal_error "expected a layout of value"
 
 (* [value_kind] has a pre-condition that it is only called on values.  With the

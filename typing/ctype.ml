@@ -1848,7 +1848,7 @@ let instance_prim_layout (desc : Primitive.description) ty =
   then ty, None
   else
   let new_sort = ref None in
-  let get_jkind jkind =
+  let get_jkind jkind sa =
     let sort = match !new_sort with
     | Some sort -> sort
     | None ->
@@ -1856,7 +1856,7 @@ let instance_prim_layout (desc : Primitive.description) ty =
       new_sort := Some sort;
       sort
     in
-    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort sort) in
+    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort (sort, sa)) in
     Jkind.History.update_reason
       jkind (Concrete_creation Layout_poly_in_external)
   in
@@ -1867,12 +1867,12 @@ let instance_prim_layout (desc : Primitive.description) ty =
          from an outer scope *)
       if level = generic_level && try_mark_node mark ty then begin
         begin match get_desc ty with
-        | Tvar ({ jkind; _ } as r) when Jkind.has_layout_any jkind ->
+        | Tvar ({ jkind = { jkind = { layout = Any sa; _ }; _ }; _ } as r) ->
           For_copy.redirect_desc copy_scope ty
-            (Tvar {r with jkind = get_jkind jkind})
-        | Tunivar ({ jkind; _ } as r) when Jkind.has_layout_any jkind ->
+            (Tvar {r with jkind = get_jkind r.jkind sa})
+        | Tunivar ({ jkind = { jkind = { layout = Any sa; _ }; _ }; _ } as r) ->
           For_copy.redirect_desc copy_scope ty
-            (Tunivar {r with jkind = get_jkind jkind})
+            (Tunivar {r with jkind = get_jkind r.jkind sa})
         | _ -> ()
         end;
         iter_type_expr (inner mark) ty
@@ -2848,7 +2848,7 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
       let ext = Jkind.get_externality_upper_bound ~context jkind in
       Jkind_axis.Externality.le ext External64 &&
       match Jkind.get_layout jkind with
-      | Some (Base Value) | None -> true
+      | Some (Base (Value, _)) | None -> true
       | _ -> false
     in
     if Language_extension.erasable_extensions_only ()
