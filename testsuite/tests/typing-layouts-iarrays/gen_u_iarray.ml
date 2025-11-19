@@ -368,7 +368,11 @@ module Make (M : S0)
       unsafe_set_mutable a_mut i (unsafe_get_mutable a_mut 0);
       trickleup (bubble i 0) e;
     done;
-    if l > 1 then (let e = (unsafe_get_mutable a_mut 1) in unsafe_set_mutable a_mut 1 (unsafe_get_mutable a_mut 0); unsafe_set_mutable a_mut 0 e);
+    if l > 1 then (
+      let e = unsafe_get_mutable a_mut 1 in
+      unsafe_set_mutable a_mut 1 (unsafe_get_mutable a_mut 0);
+      unsafe_set_mutable a_mut 0 e
+    );
     freeze a_mut
 
 end
