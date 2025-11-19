@@ -647,7 +647,8 @@ and print_out_jkind_const ppf ojkind =
     let base, withs = strip_withs ojkind in
     (match base with
     | Ojkind_const_default -> fprintf ppf "_"
-    | Ojkind_const_abbreviation abbrev -> fprintf ppf "%s" abbrev
+    | Ojkind_const_abbreviation (abbrev, sa) ->
+      (pp_print_list ~pp_sep:pp_print_space pp_print_string) ppf (abbrev :: sa)
     | Ojkind_const_mod (base, modes) ->
       let pp_base ppf base =
         match base with
@@ -681,7 +682,8 @@ and print_out_jkind_const ppf ojkind =
 and print_out_jkind ppf ojkind =
   let rec pp_element ~nested ppf ojkind =
     match ojkind with
-    | Ojkind_var v -> fprintf ppf "%s" v
+    | Ojkind_var (v, nts) ->
+      (pp_print_list ~pp_sep:pp_print_space pp_print_string) ppf (v :: nts)
     | Ojkind_const jkind -> print_out_jkind_const ppf jkind
     | Ojkind_product ts ->
       let pp_sep ppf () = Format.fprintf ppf "@ & " in
