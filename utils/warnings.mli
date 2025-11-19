@@ -134,6 +134,7 @@ type t =
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
 (* Oxcaml specific warnings: numbers should go down from 199 *)
+  | Redundant_kind_modifier of string       (* 183 *)
   | Ignored_kind_modifier of string * string list (* 184 *)
   | Overridden_kind_modifier of string      (* 185 *)
   | Unmutated_mutable of string             (* 186 *)

@@ -83,20 +83,31 @@ module Sub_result : sig
   val is_le : t -> bool
 end
 
+module Scannable_axes : sig
+  type t = Jkind_types.Scannable_axes.t
+
+  (* CR layouts-scannable: It might be unnecessary to have this module exposed,
+     since most of it goes unused (even internally to this file). *)
+  include Jkind_axis.Axis_ops with type t := t
+
+  (** Omits all axes that are max, for printing *)
+  val to_string_list : t -> string list
+end
+
 (* The layout of a type describes its memory layout. A layout is either the
    indeterminate [Any] or a sort, which is a concrete memory layout. *)
 module Layout : sig
   type 'sort t = 'sort Jkind_types.Layout.t =
-    | Sort of 'sort
+    | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
-    | Any
+    | Any of Scannable_axes.t
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
 
     val get_sort : t -> Sort.Const.t option
 
-    val of_sort_const : Sort.Const.t -> t
+    val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 
     val to_string : t -> string
   end
@@ -537,7 +548,8 @@ val of_type_decl_default :
 val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 
 (** Choose an appropriate jkind for an unboxed record type. *)
-val for_unboxed_record : Types.label_declaration list -> Types.jkind_l
+val for_unboxed_record :
+  Types.label_declaration list -> sort Layout.t list -> Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed variant type. *)
 val for_boxed_variant :
