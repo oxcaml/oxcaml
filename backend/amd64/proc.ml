@@ -605,7 +605,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
        | Stackoffset _
        | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr
-               | Iasr | Ipopcnt | Iclz _ | Ictz _ | Iadd128 | Isub128 | Imul128 _)
+               | Iasr | Ipopcnt | Iclz _ | Ictz _
+               | Iadd128 | Isub128 | Imul128 _)
        | Intop_imm ((Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl
                     | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ | Iadd128
                     | Isub128 | Imul128 _),_)
