@@ -66,11 +66,18 @@ void caml_accum_alloc_stats(
   acc->major_work_done += s->major_work_done;
 }
 
+static uintnat caml_domain_minor_words_allocated(caml_domain_state *local)
+{
+  return (local->stat_minor_words
+          + (Wsize_bsize((uintnat)local->young_end -
+                         (uintnat)local->young_ptr)));
+}
+
 void caml_collect_alloc_stats_sample(
   caml_domain_state *local,
   struct alloc_stats *sample)
 {
-  sample->minor_words = local->stat_minor_words;
+  sample->minor_words = caml_domain_minor_words_allocated(local);
   sample->promoted_words = local->stat_promoted_words;
   sample->major_words = local->stat_major_words;
   sample->minor_dependent_bytes = local->stat_minor_dependent_bytes;
