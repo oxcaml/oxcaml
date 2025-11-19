@@ -26,3 +26,23 @@ type 'a point =
   ; y : 'a
   ; z : 'a
   }
+
+include struct
+  type t
+  let x = 1
+  include struct
+    type u
+    let y = "y"
+  end
+end
+
+module type S = sig
+  include sig
+    type t
+    val x : int
+    include sig
+      type u
+      val y : string
+    end
+  end
+end
