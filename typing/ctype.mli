@@ -655,7 +655,7 @@ val constrain_decl_jkind :
    the [type_equal] function that must be passed to certain jkind functions. *)
 val type_equal: Env.t -> type_expr -> type_expr -> bool
 
-val check_type_jkind :
+val check_type_jkind : ?ignore_mod_bounds:bool ->
   Env.t -> type_expr -> ('l * allowed) jkind -> (unit, Jkind.Violation.t) result
 val constrain_type_jkind :
   Env.t -> type_expr -> ('l * allowed) jkind -> (unit, Jkind.Violation.t) result

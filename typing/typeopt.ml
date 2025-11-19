@@ -524,7 +524,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     || num_nodes_visited >= 30
   in
   let scty = scrape_ty env ty in
-  (*= begin
+  begin
     (* CR layouts: We want to avoid correcting levels twice, and scrape_ty will
        correct levels for us.  But it may be the case that we could do the
        layout check on the original type but not the scraped type, because of
@@ -542,12 +542,12 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
 
        This should be understood, but for now the simple fall back thing is
        sufficient.  *)
-    match Ctype.check_type_jkind env scty (Jkind.Builtin.value_or_null ~why:V1_safety_check)
+    match Ctype.check_type_jkind ~ignore_mod_bounds:true env scty (Jkind.Builtin.value_or_null ~why:V1_safety_check)
     with
     | Ok _ -> ()
     | Error _ ->
       match
-        Ctype.(check_type_jkind env
+        Ctype.(check_type_jkind ~ignore_mod_bounds:true env
                  (correct_levels ty) (Jkind.Builtin.value_or_null ~why:V1_safety_check))
       with
       | Ok _ -> ()
@@ -555,7 +555,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
         if (Jkind.Violation.is_missing_cmi violation)
         then raise Missing_cmi_fallback
         else raise (Error (loc, Non_value_layout (ty, Some violation)))
-  end; *)
+  end;
   match get_desc scty with
   | Tconstr(p, _, _) when Path.same p Predef.path_int ->
     num_nodes_visited, non_nullable Pintval
