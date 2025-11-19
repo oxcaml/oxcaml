@@ -1,0 +1,25 @@
+Testing float#
+Length: 5
+Elements: 0.0 1.0 2.0 3.0 4.0 
+Unsafe get: 0.0 1.0 2.0 3.0 4.0 
+Out of bounds access raised Invalid_argument
+Testing int32#
+Length: 5
+Elements: 0 1 2 3 4 
+Unsafe get: 0 1 2 3 4 
+Out of bounds access raised Invalid_argument
+Testing int64#
+Length: 5
+Elements: 0 1 2 3 4 
+Unsafe get: 0 1 2 3 4 
+Out of bounds access raised Invalid_argument
+Testing nativeint#
+Length: 5
+Elements: 0 1 2 3 4 
+Unsafe get: 0 1 2 3 4 
+Out of bounds access raised Invalid_argument
+Testing float32#
+Length: 5
+Elements: 0.0 1.0 2.0 3.0 4.0 
+Unsafe get: 0.0 1.0 2.0 3.0 4.0 
+Out of bounds access raised Invalid_argument
