@@ -292,6 +292,13 @@ Error: This expression has type "a2" but an expression was expected of type
          because of the definition of cant_promote_snd at line 4, characters 23-64.
 |}]
 
+let f () =
+  let pass_np (_ : (_ : any non_pointer)) = () in
+  pass_np #1.0
+[%%expect{|
+val f : unit -> unit = <fun>
+|}]
+
 (* modules and module inclusion *)
 
 module M (X : sig type t : any non_pointer end) : sig type t : any end = X
