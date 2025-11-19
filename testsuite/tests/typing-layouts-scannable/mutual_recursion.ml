@@ -51,6 +51,10 @@ Error: The layout of type "a" is value & value
 |}]
 
 (* Same example as above, split across two recursive modules *)
+
+(* CR layouts: This reports the wrong error message, as the layout of type "a"
+   is definitely not [value]. This problem is not unique to scannable axes. *)
+
 module rec M1 : sig
   type a : value non_pointer & value non_pointer = #{ b : M2.b }
 end = struct
