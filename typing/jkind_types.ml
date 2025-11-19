@@ -497,6 +497,9 @@ module Sort = struct
   (* CR layouts v12: Default to void instead. *)
   let default_for_transl_and_get s = default_to_value_and_get s
 
+  let is_possibly_scannable s =
+    match get s with Base Value | Var _ -> true | _ -> false
+
   (***********************)
   (* equality *)
 
@@ -640,19 +643,19 @@ module Sort = struct
 end
 
 module Scannable_axes = struct
-  type t = Jkind_axis.Pointerness.t
+  type t = { pointerness : Jkind_axis.Pointerness.t }
 end
 
 module Layout = struct
   type 'sort t =
-    | Sort of 'sort
+    | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
-    | Any
+    | Any of Scannable_axes.t
 
   module Const = struct
     type t =
-      | Any
-      | Base of Sort.base
+      | Any of Scannable_axes.t
+      | Base of Sort.base * Scannable_axes.t
       | Product of t list
   end
 end
