@@ -263,25 +263,32 @@ let count_duplicate_spills_reloads_in_block (block : Cfg.basic_block) =
   in
   dup_spills, dup_reloads
 
-let count_spills_reloads (block : Cfg.basic_block) =
-  let f ((spills, reloads) as acc) (instr : Cfg.basic Cfg.instruction) =
+type spills_reloads_moves = { spills : int; reloads : int; moves : int }
+
+let count_spills_reloads_moves (block : Cfg.basic_block) =
+  let f (acc : spills_reloads_moves) (instr : Cfg.basic Cfg.instruction) =
     match instr.desc with
-    | Op Spill -> spills + 1, reloads
-    | Op Reload -> spills, reloads + 1
+    | Op Spill -> { acc with spills = acc.spills + 1 }
+    | Op Reload -> { acc with reloads = acc.reloads + 1 }
+    | Op Move -> { acc with moves = acc.moves + 1 }
     | _ -> acc
   in
-  DLL.fold_left ~f ~init:(0, 0) block.body
+  DLL.fold_left ~f ~init:{ spills = 0; reloads = 0; moves = 0 } block.body
 
 (** Returns all CFG counters that work on a single block and are summative over the
     blocks. *)
-let cfg_block_counters block =
+let cfg_block_counters (block : Cfg.basic_block) =
   let dup_spills, dup_reloads = count_duplicate_spills_reloads_in_block block in
-  let spills, reloads = count_spills_reloads block in
+  let { spills; reloads; moves } = count_spills_reloads_moves block in
+  let instructions = DLL.length block.body + 1 in
   Profile.Counters.create ()
   |> Profile.Counters.set "block_duplicate_spill" dup_spills
   |> Profile.Counters.set "block_duplicate_reload" dup_reloads
   |> Profile.Counters.set "spill" spills
   |> Profile.Counters.set "reload" reloads
+  |> Profile.Counters.set "instruction" instructions
+  |> Profile.Counters.set "block" 1
+  |> Profile.Counters.set "move" moves
 
 (** Returns all CFG counters that require the whole CFG to produce a count. *)
 let whole_cfg_counters (_ : Cfg.t) = Profile.Counters.create ()
