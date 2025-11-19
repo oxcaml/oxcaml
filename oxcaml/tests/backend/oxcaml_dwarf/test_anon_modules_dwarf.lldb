@@ -1,0 +1,10 @@
+(lldb) b Test_anon_modules_dwarf.f_start
+(lldb) run
+(lldb) b Test_anon_modules_dwarf.test_anon_module
+(lldb) c
+(lldb) b Test_anon_modules_dwarf.test_anon_module_with_function
+(lldb) c
+(lldb) b Test_anon_modules_dwarf.test_named_vs_anon
+(lldb) c
+(lldb) b Test_anon_modules_dwarf.test_nested_anon_module
+(lldb) c

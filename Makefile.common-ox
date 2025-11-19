@@ -121,10 +121,10 @@ compiler: runtime-stdlib
 # and implement [runtest-upstream-boot] for testing when the final compiler
 # itself is miscompiled.
 runtest: compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest $(ws_main)
+	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_VERSION) $(dune) runtest $(ws_main)
 
 runtest-llvmize: compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-llvmize $(ws_main)
+	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_VERSION) $(dune) build @runtest-llvmize $(ws_main)
 
 runtest-dwarf: compiler
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-dwarf $(ws_main)
@@ -363,6 +363,7 @@ install_for_test: _install
 	ln -s ../_install/bin/ocamlmklib.byte _runtest/tools/ocamlmklib
 	ln -s ../_install/bin/ocamlobjinfo.byte _runtest/tools/ocamlobjinfo
 	ln -s ../_install/bin/dumpobj.byte _runtest/tools/dumpobj
+	ln -s ../_install/bin/ocamlfilt _runtest/tools/ocamlfilt
         # ocamldoc
 	# rm _runtest/ocamldoc
 	# mkdir _runtest/ocamldoc

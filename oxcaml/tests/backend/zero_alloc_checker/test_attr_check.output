@@ -1,5 +1,5 @@
 File "test_attr_check.ml", line 3, characters 5-15:
-Error: Annotation check for zero_alloc failed on function Test_attr_check.test (camlTest_attr_check.test_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Test_attr_check.test (_OM15Test_attr_checkF4test_HIDE_STAMP).
 
 File "test_attr_check.ml", line 3, characters 26-30:
 Error: allocation of 24 bytes

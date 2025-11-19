@@ -1,20 +1,20 @@
 File "fail20.ml", line 10, characters 5-15:
-Error: Annotation check for zero_alloc strict failed on function Fail20.foo1 (camlFail20.foo1_HIDE_STAMP).
+Error: Annotation check for zero_alloc strict failed on function Fail20.foo1 (_OM6Fail20F4foo1_HIDE_STAMP).
 
 File "fail20.ml", line 12, characters 7-18:
 Error: allocation of 32 bytes on a path to exceptional return
 inlined from
-fail20.ml:3,18--30[Fail20.exn][camlFail20.exn_HIDE_STAMP]
+fail20.ml:3,18--30[Fail20.exn][_OM6Fail20F3exn_HIDE_STAMP]
 fail20.ml:12,7--18[Fail20.foo1]
 
 File "fail20.ml", line 17, characters 5-15:
-Error: Annotation check for zero_alloc failed on function Fail20.foo (camlFail20.foo_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Fail20.foo (_OM6Fail20F3foo_HIDE_STAMP).
 
 File "fail20.ml", line 19, characters 6-21:
-Error: called function may allocate (direct call camlFail20.bar_HIDE_STAMP)
+Error: called function may allocate (direct call _OM6Fail20F3fooF3bar_HIDE_STAMP)
 
 File "fail20.ml", line 21, characters 5-15:
-Error: Annotation check for zero_alloc failed on function Fail20.zee (camlFail20.zee_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Fail20.zee (_OM6Fail20F3zee_HIDE_STAMP).
 
 File "fail20.ml", line 21, characters 27-58:
-Error: called function may allocate (direct tailcall camlFail20.foo_HIDE_STAMP)
+Error: called function may allocate (direct tailcall _OM6Fail20F3foo_HIDE_STAMP)

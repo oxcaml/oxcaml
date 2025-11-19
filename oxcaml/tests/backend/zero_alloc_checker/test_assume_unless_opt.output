@@ -1,5 +1,5 @@
 File "test_assume_unless_opt.ml", line 3, characters 36-46:
-Error: Annotation check for zero_alloc failed on function Test_assume_unless_opt.foo (camlTest_assume_unless_opt.foo_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Test_assume_unless_opt.foo (_OM22Test_assume_unless_optF3foo_HIDE_STAMP).
 
 File "test_assume_unless_opt.ml", line 4, characters 8-13:
-Error: called function may allocate (direct call camlTest_assume_unless_opt.bar_HIDE_STAMP)
+Error: called function may allocate (direct call _OM22Test_assume_unless_optF3bar_HIDE_STAMP)

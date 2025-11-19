@@ -1,6 +1,6 @@
 source_filename = "data_decl.ml"
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlData_decl__f_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { i64 } } @_OM9Data_declF1f_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -52,7 +52,7 @@ L105:
   %30 = load i64, ptr %5
   %31 = load i64, ptr %ds
   %32 = load i64, ptr %alloc
-  %33 = call oxcamlcc { { i64, i64 }, { i64 } } @camlData_decl__g_HIDE_STAMP(i64 %31, i64 %32, i64 %29, i64 %30) "statepoint-id"="0"
+  %33 = call oxcamlcc { { i64, i64 }, { i64 } } @_OM9Data_declF1g_HIDE_STAMP(i64 %31, i64 %32, i64 %29, i64 %30) "statepoint-id"="0"
   %34 = extractvalue { { i64, i64 }, { i64 } } %33, 0, 0
   %35 = extractvalue { { i64, i64 }, { i64 } } %33, 0, 1
   store i64 %34, ptr %ds
@@ -74,7 +74,7 @@ L107:
   ret { { i64, i64 }, { i64 } } %44
 }
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlData_decl__g_HIDE_STAMP(i64 %0, i64 %1, i64 %2, i64 %3) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { i64 } } @_OM9Data_declF1g_HIDE_STAMP(i64 %0, i64 %1, i64 %2, i64 %3) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -104,7 +104,7 @@ L113:
   %18 = load i64, ptr %5
   %19 = load i64, ptr %ds
   %20 = load i64, ptr %alloc
-  %21 = call oxcamlcc { { i64, i64 }, { i64 } } @camlData_decl__f_HIDE_STAMP(i64 %19, i64 %20, i64 %18) "statepoint-id"="0"
+  %21 = call oxcamlcc { { i64, i64 }, { i64 } } @_OM9Data_declF1f_HIDE_STAMP(i64 %19, i64 %20, i64 %18) "statepoint-id"="0"
   %22 = extractvalue { { i64, i64 }, { i64 } } %21, 0, 0
   %23 = extractvalue { { i64, i64 }, { i64 } } %21, 0, 1
   store i64 %22, ptr %ds
@@ -122,7 +122,7 @@ L115:
   %28 = load i64, ptr %5
   %29 = load i64, ptr %ds
   %30 = load i64, ptr %alloc
-  %31 = call oxcamlcc { { i64, i64 }, { i64 } } @camlData_decl__f_HIDE_STAMP(i64 %29, i64 %30, i64 %28) "statepoint-id"="0"
+  %31 = call oxcamlcc { { i64, i64 }, { i64 } } @_OM9Data_declF1f_HIDE_STAMP(i64 %29, i64 %30, i64 %28) "statepoint-id"="0"
   %32 = extractvalue { { i64, i64 }, { i64 } } %31, 0, 0
   %33 = extractvalue { { i64, i64 }, { i64 } } %31, 0, 1
   store i64 %32, ptr %ds
@@ -221,7 +221,7 @@ L123:
   store i64 1, ptr %14
   %58 = ptrtoint ptr @camlData_decl__immstring35 to i64
   store i64 %58, ptr %15
-  %59 = ptrtoint ptr @camlStdlib__print_endline_138 to i64
+  %59 = ptrtoint ptr @camlStdlib__print_endline_HIDE_STAMP to i64
   store i64 %59, ptr %16
   %60 = load ptr addrspace(1), ptr %16
   %61 = getelementptr i8, ptr addrspace(1) %60, i64 16
@@ -260,7 +260,7 @@ L125:
   %82 = load ptr addrspace(1), ptr %19
   store ptr addrspace(1) %82, ptr %20
   store i64 21, ptr %21
-  %83 = ptrtoint ptr @camlStdlib__print_endline_138 to i64
+  %83 = ptrtoint ptr @camlStdlib__print_endline_HIDE_STAMP to i64
   store i64 %83, ptr %22
   %84 = load ptr addrspace(1), ptr %22
   %85 = getelementptr i8, ptr addrspace(1) %84, i64 16
@@ -290,7 +290,7 @@ L128:
   store ptr addrspace(1) %99, ptr %25
   %100 = load ptr addrspace(1), ptr %25
   store ptr addrspace(1) %100, ptr %26
-  %101 = ptrtoint ptr @camlStdlib__print_endline_138 to i64
+  %101 = ptrtoint ptr @camlStdlib__print_endline_HIDE_STAMP to i64
   store i64 %101, ptr %27
   %102 = load ptr addrspace(1), ptr %27
   %103 = getelementptr i8, ptr addrspace(1) %102, i64 16
@@ -346,7 +346,7 @@ L134:
   %132 = ptrtoint ptr @camlData_decl__const_block54 to i64
   store i64 %132, ptr %36
   store i64 1, ptr %37
-  %133 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521 to i64
+  %133 = ptrtoint ptr @camlStdlib__Format__fn_HIDE_STAMP to i64
   store i64 %133, ptr %38
   %134 = load i64, ptr %38
   store i64 %134, ptr %4
@@ -359,7 +359,7 @@ L134:
   %139 = load i64, ptr %8
   %140 = load i64, ptr %ds
   %141 = load i64, ptr %alloc
-  %142 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(i64 %140, i64 %141, i64 %137, i64 %138, i64 %139) "statepoint-id"="0"
+  %142 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @_OM18CamlinternalFormatF11make_printf_HIDE_STAMP(i64 %140, i64 %141, i64 %137, i64 %138, i64 %139) "statepoint-id"="0"
   %143 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %142, 0, 0
   %144 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %142, 0, 1
   store i64 %143, ptr %ds
@@ -404,7 +404,7 @@ L136:
   %164 = load i64, ptr %4
   %165 = load i64, ptr %ds
   %166 = load i64, ptr %alloc
-  %167 = call oxcamlcc { { i64, i64 }, { i64 } } @camlData_decl__f_HIDE_STAMP(i64 %165, i64 %166, i64 %164) "statepoint-id"="0"
+  %167 = call oxcamlcc { { i64, i64 }, { i64 } } @_OM9Data_declF1f_HIDE_STAMP(i64 %165, i64 %166, i64 %164) "statepoint-id"="0"
   %168 = extractvalue { { i64, i64 }, { i64 } } %167, 0, 0
   %169 = extractvalue { { i64, i64 }, { i64 } } %167, 0, 1
   store i64 %168, ptr %ds
@@ -420,7 +420,7 @@ L137:
   %173 = ptrtoint ptr @camlData_decl__const_block67 to i64
   store i64 %173, ptr %47
   store i64 1, ptr %48
-  %174 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521 to i64
+  %174 = ptrtoint ptr @camlStdlib__Format__fn_HIDE_STAMP to i64
   store i64 %174, ptr %49
   %175 = load i64, ptr %49
   store i64 %175, ptr %4
@@ -433,7 +433,7 @@ L137:
   %180 = load i64, ptr %8
   %181 = load i64, ptr %ds
   %182 = load i64, ptr %alloc
-  %183 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(i64 %181, i64 %182, i64 %178, i64 %179, i64 %180) "statepoint-id"="0"
+  %183 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @_OM18CamlinternalFormatF11make_printf_HIDE_STAMP(i64 %181, i64 %182, i64 %178, i64 %179, i64 %180) "statepoint-id"="0"
   %184 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %183, 0, 0
   %185 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %183, 0, 1
   store i64 %184, ptr %ds
@@ -499,11 +499,11 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlData_decl__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlData_decl = global i64 4864, section ".data", align 8
-@camlData_decl = global { ptr, ptr, ptr, ptr } { ptr @camlData_decl__float4, ptr @camlData_decl__float327, ptr @camlData_decl__f_2, ptr @camlData_decl__g_3 }, section ".data", align 8
-@header.camlData_decl__g_3 = global i64 7159, section ".data", align 8
-@camlData_decl__g_3 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 144115188075855885, ptr @camlData_decl__g_HIDE_STAMP }, section ".data", align 8
-@header.camlData_decl__f_2 = global i64 4345, section ".data", align 8
-@camlData_decl__f_2 = global { ptr, i64 } { ptr @camlData_decl__f_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlData_decl = global { ptr, ptr, ptr, ptr } { ptr @camlData_decl__float4, ptr @camlData_decl__float327, ptr @camlData_decl__f_HIDE_STAMP, ptr @camlData_decl__g_HIDE_STAMP }, section ".data", align 8
+@header.camlData_decl__g_HIDE_STAMP = global i64 7159, section ".data", align 8
+@camlData_decl__g_HIDE_STAMP = global { ptr, i64, ptr } { ptr @caml_curry2, i64 144115188075855885, ptr @_OM9Data_declF1g_HIDE_STAMP }, section ".data", align 8
+@header.camlData_decl__f_HIDE_STAMP = global i64 4345, section ".data", align 8
+@camlData_decl__f_HIDE_STAMP = global { ptr, i64 } { ptr @_OM9Data_declF1f_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlData_decl__float4 = global i64 2045, section ".data", align 8
 @camlData_decl__float4 = global { double } { double 0x400921fb54442d18 }, section ".data", align 8
 @header.camlData_decl__float327 = global i64 3071, section ".data", align 8
@@ -531,9 +531,9 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @header.camlData_decl__immstring63 = global i64 4092, section ".data", align 8
 @camlData_decl__immstring63 = global { [ 20 x i8 ], [ 3 x i8 ], i8 } { [ 20 x i8 ] c"\6d\75\74\75\61\6c\6c\79\5f\72\65\63\75\72\73\69\76\65\3a\20", [ 3 x i8 ] zeroinitializer, i8 3 }, section ".data", align 8
 @temp.Data_decl.0 = global { ptr } { ptr @caml_format_float32 }, section ".data", align 8
-@camlCamlinternalFormat__make_printf_HIDE_STAMP = external global ptr
-@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521 = external global ptr
-@camlStdlib__print_endline_138 = external global ptr
+@_OM18CamlinternalFormatF11make_printf_HIDE_STAMP = external global ptr
+@camlStdlib__Format__fn_HIDE_STAMP = external global ptr
+@camlStdlib__print_endline_HIDE_STAMP = external global ptr
 @caml_apply2 = external global ptr
 @caml_c_call = external global ptr
 @caml_curry2 = external global ptr

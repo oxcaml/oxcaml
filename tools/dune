@@ -162,3 +162,15 @@
  (name gen_compiler_libs_installation)
  (modes native)
  (modules gen_compiler_libs_installation))
+
+(executable
+ (name ocamlfilt)
+ (modes byte native)
+ (modules ocamlfilt))
+
+(install
+ (files
+  (ocamlfilt.bc as ocamlfilt.byte)
+  (ocamlfilt.exe as ocamlfilt))
+ (section bin)
+ (package ocaml))

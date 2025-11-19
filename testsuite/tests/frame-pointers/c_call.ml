@@ -3,6 +3,7 @@
  frame_pointers;
  readonly_files = "fp_backtrace.c c_call_.c";
  all_modules = "${readonly_files} c_call.ml";
+ legacy-ocaml-name-mangling;
  native;
 *)
 

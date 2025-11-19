@@ -15,6 +15,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets id_fn.output.corrected)
  (deps id_fn.ml)
@@ -28,6 +29,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps id_fn.output id_fn.output.corrected)
@@ -39,6 +41,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets const_val.cmx const_val_ir.output.corrected const_val_main.cmx const_val.output.exe)
  (deps const_val.ml const_val_main.ml)
@@ -54,6 +57,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps const_val.output.exe)
@@ -68,6 +72,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps const_val.output const_val.output.corrected)
@@ -79,6 +84,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps const_val_ir.output const_val_ir.output.corrected)
@@ -90,6 +96,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets int_ops_stub.o int_ops_data.cmx int_ops.cmx int_ops_ir.output.corrected int_ops_main.cmx int_ops.output.exe)
  (deps int_ops_stub.c int_ops_data.ml int_ops.ml int_ops_main.ml)
@@ -107,6 +114,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps int_ops.output.exe)
@@ -121,6 +129,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps int_ops.output int_ops.output.corrected)
@@ -132,6 +141,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps int_ops_ir.output int_ops_ir.output.corrected)
@@ -143,6 +153,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets gcd_data.cmx gcd.cmx gcd_ir.output.corrected gcd_main.cmx gcd.output.exe)
  (deps gcd_data.ml gcd.ml gcd_main.ml)
@@ -159,6 +170,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps gcd.output.exe)
@@ -173,6 +185,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps gcd.output gcd.output.corrected)
@@ -184,6 +197,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps gcd_ir.output gcd_ir.output.corrected)
@@ -195,6 +209,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets array_rev_data.cmx array_rev.cmx array_rev_ir.output.corrected array_rev_main.cmx array_rev.output.exe)
  (deps array_rev_data.ml array_rev.ml array_rev_main.ml)
@@ -211,6 +226,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps array_rev.output.exe)
@@ -225,6 +241,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps array_rev.output array_rev.output.corrected)
@@ -236,6 +253,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps array_rev_ir.output array_rev_ir.output.corrected)
@@ -247,6 +265,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets float_ops.cmx float_ops_ir.output.corrected float_ops_main.cmx float_ops.output.exe)
  (deps float_ops.ml float_ops_main.ml)
@@ -262,6 +281,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps float_ops.output.exe)
@@ -276,6 +296,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps float_ops.output float_ops.output.corrected)
@@ -287,6 +308,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps float_ops_ir.output float_ops_ir.output.corrected)
@@ -298,6 +320,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets many_args_defn.cmx many_args.cmx many_args_ir.output.corrected many_args_main.cmx many_args.output.exe)
  (deps many_args_defn.ml many_args.ml many_args_main.ml)
@@ -314,6 +337,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps many_args.output.exe)
@@ -328,6 +352,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps many_args.output many_args.output.corrected)
@@ -339,6 +364,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps many_args_ir.output many_args_ir.output.corrected)
@@ -350,6 +376,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets multi_ret.cmx multi_ret_ir.output.corrected multi_ret_main.cmx multi_ret.output.exe)
  (deps multi_ret.ml multi_ret_main.ml)
@@ -365,6 +392,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps multi_ret.output.exe)
@@ -379,6 +407,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps multi_ret.output multi_ret.output.corrected)
@@ -390,6 +419,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps multi_ret_ir.output multi_ret_ir.output.corrected)
@@ -401,6 +431,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets indirect_call.cmx indirect_call_ir.output.corrected indirect_call_main.cmx indirect_call.output.exe)
  (deps indirect_call.ml indirect_call_main.ml)
@@ -416,6 +447,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps indirect_call.output.exe)
@@ -430,6 +462,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps indirect_call.output indirect_call.output.corrected)
@@ -441,6 +474,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps indirect_call_ir.output indirect_call_ir.output.corrected)
@@ -452,6 +486,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets extcalls_defn.o extcalls.cmx extcalls_ir.output.corrected extcalls_main.cmx extcalls.output.exe)
  (deps extcalls_defn.c extcalls.ml extcalls_main.ml)
@@ -468,6 +503,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps extcalls.output.exe)
@@ -482,6 +518,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps extcalls.output extcalls.output.corrected)
@@ -493,6 +530,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps extcalls_ir.output extcalls_ir.output.corrected)
@@ -504,6 +542,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets data_decl.cmx data_decl_ir.output.corrected data_decl.output.exe)
  (deps data_decl.ml)
@@ -518,6 +557,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps data_decl.output.exe)
@@ -532,6 +572,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps data_decl.output data_decl.output.corrected)
@@ -543,6 +584,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps data_decl_ir.output data_decl_ir.output.corrected)
@@ -554,6 +596,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets exn_part1.cmx exn_part2.cmx exn_part2_ir.output.corrected exn_part3.cmx exn.output.exe)
  (deps exn_part1.ml exn_part2.ml exn_part3.ml)
@@ -570,6 +613,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps exn.output.exe)
@@ -584,6 +628,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps exn.output exn.output.corrected)
@@ -595,6 +640,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps exn_part2_ir.output exn_part2_ir.output.corrected)
@@ -606,6 +652,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets alloc.cmx alloc_ir.output.corrected alloc.output.exe)
  (deps alloc.ml)
@@ -620,6 +667,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps alloc.output.exe)
@@ -634,6 +682,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps alloc.output alloc.output.corrected)
@@ -645,6 +694,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps alloc_ir.output alloc_ir.output.corrected)
@@ -656,6 +706,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets tailcall2.cmx tailcall.cmx tailcall_ir.output.corrected tailcall.output.exe)
  (deps tailcall2.ml tailcall.ml)
@@ -671,6 +722,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps tailcall.output.exe)
@@ -685,6 +737,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps tailcall.output tailcall.output.corrected)
@@ -696,6 +749,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps tailcall_ir.output tailcall_ir.output.corrected)
@@ -707,6 +761,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets switch.cmx switch_ir.output.corrected switch.output.exe)
  (deps switch.ml)
@@ -721,6 +776,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps switch.output.exe)
@@ -735,6 +791,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps switch.output switch.output.corrected)
@@ -746,6 +803,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps switch_ir.output switch_ir.output.corrected)
@@ -757,6 +815,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (targets csel_stub.o csel.cmx csel_ir.output.corrected csel.output.exe)
  (deps csel_stub.c csel.ml)
@@ -772,6 +831,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps csel.output.exe)
@@ -786,6 +846,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps csel.output csel.output.corrected)
@@ -797,6 +858,7 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))
  (alias runtest-llvmize)
  (deps csel_ir.output csel_ir.output.corrected)

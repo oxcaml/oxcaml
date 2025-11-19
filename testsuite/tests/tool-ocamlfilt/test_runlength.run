@@ -1,0 +1,70 @@
+# Test runlength mangling with real symbols from compiled OCaml code
+# Symbols are organized by language construct they represent
+
+{
+# Simple modules and functions
+echo "=== Modules and Functions ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format run-length \
+  __OM11Stdlib__IntF3abs_9_code \
+  __OM11Stdlib__IntF3max_12_code \
+  __OM11Stdlib__FunF4flip_9_code \
+  __OM11Stdlib__FunF7compose_8_code
+
+# Nested modules (Module.Submodule.function)
+echo ""
+echo "=== Nested Modules ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format run-length \
+  __OM11Stdlib__ObjM9EphemeronF6create_41_code \
+  __OM11Stdlib__ObjM9EphemeronF7get_key_44_code \
+  __OM11Stdlib__ObjM21Extension_constructorF4name_39_code \
+  __OM11Stdlib__ObjM16Uniform_or_mixedF10is_uniform_51_code
+
+# Partial applications
+echo ""
+echo "=== Partial Applications ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format run-length \
+  __OM11Stdlib__IntF5equalP_2_code \
+  __OM11Stdlib__IntF7compareP_3_code \
+  __OM11Stdlib__ObjP_29_code \
+  __OM11Stdlib__ObjP_30_code
+
+# Anonymous functions with location info
+echo ""
+echo "=== Anonymous Functions ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format run-length \
+  __OM11Stdlib__FunLu17D2e_funml_29_1374_11_code \
+  __OM18CamlinternalFormatF11make_customLu35S2e_camlinternalFormatml_1789_73305_456_code
+
+# Unicode-encoded identifiers
+echo ""
+echo "=== Unicode Identifiers ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format run-length \
+  __OM18CamlinternalFormatF11make_printfFu5B27_k_412_code \
+  __OM18CamlinternalFormatF11make_printfFu5B27_k_413_code
+
+# Complex nested anonymous functions
+echo ""
+echo "=== Complex Nested Anonymous Functions ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format run-length \
+  __OM11Stdlib__SeqF11map_productLu19D2e_seqml_675_16613Lu19D2e_seqml_676_16635_236_code \
+  __OM11Stdlib__SeqF11map_productLu19D2e_seqml_675_16613_136_code
+
+# Anonymous modules with location info
+echo ""
+echo "=== Anonymous Modules ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format run-length \
+  __OM23Test_anon_modules_dwarfF30test_anon_module_with_functionSu77G2fF2fH2fM2fX2e_oxcamltestsbackendoxcaml_dwarftest_anon_modules_dwarfml_14_13F10inner_func_13_code \
+  __OM23Test_anon_modules_dwarfF23test_nested_anon_moduleSu77G2fF2fH2fM2fX2e_oxcamltestsbackendoxcaml_dwarftest_anon_modules_dwarfml_37_13F10outer_func_18_code \
+  __OM23Test_anon_modules_dwarfF23test_nested_anon_moduleSu77G2fF2fH2fM2fX2e_oxcamltestsbackendoxcaml_dwarftest_anon_modules_dwarfml_37_13F10outer_funcSu77G2fF2fH2fM2fX2e_oxcamltestsbackendoxcaml_dwarftest_anon_modules_dwarfml_39_17F10inner_func_19_code
+
+# Basic test cases (original)
+echo ""
+echo "=== Basic Test Cases ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format run-length \
+  _OM6Module \
+  _OM6ModuleF8function \
+  __OM4TestF3foo \
+  _OL15myfile_ml_10_20 \
+  _OP
+
+} > "${output}"

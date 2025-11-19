@@ -1,0 +1,41 @@
+=== Modules and Functions ===
+Stdlib__Int.abs
+Stdlib__Int.max
+Stdlib__Fun.flip
+Stdlib__Fun.compose
+
+=== Nested Modules ===
+Stdlib__Obj.Ephemeron.create
+Stdlib__Obj.Ephemeron.get_key
+Stdlib__Obj.Extension_constructor.name
+Stdlib__Obj.Uniform_or_mixed.is_uniform
+
+=== Partial Applications ===
+Stdlib__Int.equal(partially_applied)
+Stdlib__Int.compare(partially_applied)
+Stdlib__Obj(partially_applied)
+Stdlib__Obj(partially_applied)
+
+=== Anonymous Functions ===
+Stdlib__Fun.fn(fun.ml:29:1374)
+CamlinternalFormat.make_custom.fn(camlinternalFormat.ml:1789:73305)
+
+=== Unicode Identifiers ===
+CamlinternalFormat.make_printf.k'
+CamlinternalFormat.make_printf.k'
+
+=== Complex Nested Anonymous Functions ===
+Stdlib__Seq.map_product.fn(seq.ml:675:16613).fn(seq.ml:676:16635)
+Stdlib__Seq.map_product.fn(seq.ml:675:16613)
+
+=== Anonymous Modules ===
+Test_anon_modules_dwarf.test_anon_module_with_function.mod(oxcaml/tests/backend/oxcaml_dwarf/test_anon_modules_dwarf.ml:14:13).inner_func
+Test_anon_modules_dwarf.test_nested_anon_module.mod(oxcaml/tests/backend/oxcaml_dwarf/test_anon_modules_dwarf.ml:37:13).outer_func
+Test_anon_modules_dwarf.test_nested_anon_module.mod(oxcaml/tests/backend/oxcaml_dwarf/test_anon_modules_dwarf.ml:37:13).outer_func.mod(oxcaml/tests/backend/oxcaml_dwarf/test_anon_modules_dwarf.ml:39:17).inner_func
+
+=== Basic Test Cases ===
+Module
+Module.function
+Test.foo
+fn(myfile_ml:10:20)
+(partially_applied)

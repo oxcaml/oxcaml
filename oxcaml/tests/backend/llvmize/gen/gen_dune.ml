@@ -160,6 +160,7 @@ let print_rule ~extra_subst ~buf rule_template =
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")
+   (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "RunLengthEncoding")
    (<> %{env:OXCAML_CLANG=} "")))|}
   in
   let enabled_if_without_llvm =

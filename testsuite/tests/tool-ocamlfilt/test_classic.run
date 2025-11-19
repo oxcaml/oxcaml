@@ -1,0 +1,336 @@
+# Test classic mangling with real symbols from OCaml 5.3 compiled code
+# Symbols are organized by language construct they represent
+
+{
+# Simple modules and functions
+echo "=== Simple Modules and Functions ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.square \
+  camlDemo.cube \
+  camlDemo.double \
+  camlDemo.half \
+  camlMath.square \
+  camlPositive.make \
+  camlPositive.to_int \
+  camlPositive.add
+
+# Operators with special characters (hex-encoded)
+echo ""
+echo "=== Operators (Special Characters) ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.id \
+  camlDemo.const \
+  camlDemo.flip \
+  'camlDemo.$7c$3e' \
+  'camlDemo.$3c$7c' \
+  'camlDemo.$3e$3e' \
+  'camlDemo.$3c$3c' \
+  'camlDemo.$3e$3e$3d' \
+  'camlDemo.$3e$3e$7c'
+
+# Functors
+echo ""
+echo "=== Functors ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.MakeSort \
+  camlDemo.MakeSet \
+  camlDemo.MakeCollection \
+  camlIntSort.sort \
+  camlIntSort.insert \
+  camlStringSort.sort
+
+# First-class functions
+echo ""
+echo "=== First-Class Functions ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.apply_twice \
+  camlDemo.compose \
+  camlDemo.curry \
+  camlDemo.uncurry \
+  camlDemo.curry3 \
+  camlDemo.uncurry3 \
+  camlDemo.apply_first \
+  camlDemo.apply_second \
+  camlDemo.compose_left \
+  camlDemo.compose_right \
+  camlDemo.make_adder \
+  camlDemo.make_multiplier \
+  camlDemo.make_power
+
+# Partial applications and closures
+echo ""
+echo "=== Partial Applications and Closures ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.apply_n_times \
+  camlDemo.apply_to_list \
+  camlDemo.map_pair \
+  camlDemo.creer_additionneur \
+  camlDemo.creer_multiplicateur \
+  camlDemo.appliquer_repete \
+  camlDemo.composer_fonctions \
+  camlDemo.transformer_paire \
+  camlDemo.appliquer_a_tous \
+  camlDemo.reduire \
+  camlDemo.filtrer_et_transformer
+
+# Anonymous functions
+echo ""
+echo "=== Anonymous Functions ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.fun_4504 \
+  camlDemo.fun_4534 \
+  camlDemo.fun_4540 \
+  camlDemo.fun_4543 \
+  camlDemo.fun_4549 \
+  camlDemo.fun_4621 \
+  camlDemo.fun_4626 \
+  camlDemo.fun_5010 \
+  camlDemo.fun_5032
+
+# Helper functions (aux)
+echo ""
+echo "=== Helper Functions (aux) ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.aux_487 \
+  camlDemo.aux_959 \
+  camlDemo.aux_1202 \
+  camlDemo.aux_1234
+
+# Classes and object initialization
+echo ""
+echo "=== Classes and Objects ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.point_class_init_4137 \
+  camlDemo.point_with_init_init_4161 \
+  camlDemo.stack_class_init_4184 \
+  camlDemo.colored_point_init_4210 \
+  camlDemo.rectangle_init_4258 \
+  camlDemo.circle_init_4283 \
+  camlDemo.circle_object_1911 \
+  camlDemo.bank_account_init_4309 \
+  camlDemo.mutable_counter_init_4336 \
+  camlDemo.queue_class_init_4362 \
+  camlDemo.initialized_point_init_4384 \
+  camlDemo.compteur_init_4410 \
+  camlDemo.personne_init_4436
+
+# Monadic bind operations
+echo ""
+echo "=== Monadic Operations ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.bind_1340 \
+  camlDemo.bind_1354 \
+  camlDemo.return_1337 \
+  camlDemo.return_1351 \
+  camlDemo.return_1611 \
+  camlDemo.return_1671 \
+  camlDemo.return_1700 \
+  camlDemo.return_1723 \
+  camlDemo.return_1762
+
+# Extended indexing operators
+echo ""
+echo "=== Extended Indexing Operators ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  'camlDemo..$25$28$29_1371' \
+  'camlDemo..$25$28$29$3c$2d_1375' \
+  'camlDemo..$25$5b$5d_1381' \
+  'camlDemo..$25$5b$5d$3c$2d_1385' \
+  'camlDemo..$25$7b$7d_1489' \
+  'camlDemo..$25$7b$7d$3c$2d_1493' \
+  'camlDemo..$40$28$29_1501'
+
+# Records and variants
+echo ""
+echo "=== Records and Data Structures ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.make_person_1515 \
+  camlDemo.make_coords_1520 \
+  camlDemo.get_person_info_1525 \
+  camlDemo.make_address_1581 \
+  camlDemo.make_employee_1586 \
+  camlDemo.process_employee_1591 \
+  camlDemo.create_packed_int_2477 \
+  camlDemo.create_packed_string_2491
+
+# Pattern matching and options
+echo ""
+echo "=== Pattern Matching and Options ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.safe_div_1614 \
+  camlDemo.safe_sqrt_1618 \
+  camlDemo.safe_log_1621 \
+  camlDemo.parse_int_1674 \
+  camlDemo.validate_positive_1677 \
+  camlDemo.validate_range_1680 \
+  camlDemo.parse_and_validate_1685
+
+# List operations
+echo ""
+echo "=== List Operations ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.take_546 \
+  camlDemo.drop_552 \
+  camlDemo.split_at_557 \
+  camlDemo.max_elem_564 \
+  camlDemo.min_elem_567 \
+  camlDemo.range_581 \
+  camlDemo.cartesian_product_1708 \
+  camlDemo.serialize_list_2447 \
+  camlDemo.deserialize_list_2459
+
+# Higher-order functions
+echo ""
+echo "=== Higher-Order Functions ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.filter_and_map_1216 \
+  camlDemo.process_pairs_1310 \
+  camlDemo.nested_functions_1316 \
+  camlDemo.apply_op_1321 \
+  camlDemo.pipeline_example_1363 \
+  camlDemo.sort_with_2514 \
+  camlDemo.max_with_2526 \
+  camlDemo.min_with_2542 \
+  camlDemo.trier_avec_2573 \
+  camlDemo.apply_serializer_2585
+
+# Mathematical operations
+echo ""
+echo "=== Mathematical Operations ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.factorial_942 \
+  camlDemo.fibonacci_944 \
+  camlDemo.gcd_935 \
+  camlDemo.lcm_938 \
+  camlDemo.power_1185 \
+  camlDemo.pow_1279 \
+  camlDemo.mean_999 \
+  camlDemo.variance_1004 \
+  camlDemo.std_dev_1010 \
+  camlDemo.covariance_1014 \
+  camlDemo.correlation_1025 \
+  camlDemo.mediane_1034 \
+  camlDemo.quartiles_1045
+
+# Geometry calculations
+echo ""
+echo "=== Geometry Calculations ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.perimetre_1054 \
+  camlDemo.aire_1057 \
+  camlDemo.diametre_1060 \
+  camlDemo.perimetre_1064 \
+  camlDemo.aire_1069 \
+  camlDemo.est_equilateral_1073 \
+  camlDemo.perimetre_1079 \
+  camlDemo.aire_1082 \
+  camlDemo.diagonale_1085
+
+# Data structure implementations
+echo ""
+echo "=== Data Structure Implementations ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlStack.empty \
+  camlStack.push \
+  camlStack.pop \
+  camlStack.size \
+  camlDemo.node_663 \
+  camlDemo.singleton_668 \
+  camlDemo.height_676 \
+  camlDemo.map_680 \
+  camlDemo.fold_686 \
+  camlDemo.enqueue_702 \
+  camlDemo.dequeue_706 \
+  camlDemo.push_front_719 \
+  camlDemo.push_back_725 \
+  camlDemo.pop_front_731 \
+  camlDemo.pop_back_740
+
+# Hash tables and collections
+echo ""
+echo "=== Hash Tables and Collections ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.create_752 \
+  camlDemo.hash_function_755 \
+  camlDemo.find_809 \
+  camlDemo.insert_820 \
+  camlDemo.search_830 \
+  camlDemo.mem_1145 \
+  camlDemo.to_list_1151 \
+  camlDemo.insert_1099
+
+# State and writer monads
+echo ""
+echo "=== State and Writer Monads ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.get_1727 \
+  camlDemo.put_1730 \
+  camlDemo.modify_1734 \
+  camlDemo.run_state_1738 \
+  camlDemo.tell_1765 \
+  camlDemo.run_writer_1768 \
+  camlDemo.logged_add_1773 \
+  camlDemo.logged_multiply_1778
+
+# Parallel and computation examples
+echo ""
+echo "=== Parallel and Computation Examples ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.computation_1783 \
+  camlDemo.example_1798 \
+  camlDemo.parallel_example_1804 \
+  camlDemo.parse_and_process_1815 \
+  camlDemo.complex_calculation_1624 \
+  camlDemo.simple_calc_1632
+
+# Comparison and serialization
+echo ""
+echo "=== Comparison and Serialization ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo.compare_1113 \
+  camlDemo.compare_1163 \
+  camlDemo.compare_2325 \
+  camlDemo.compare_2335 \
+  camlDemo.to_string_2330 \
+  camlDemo.print_element_2338 \
+  camlDemo.serialize_2440 \
+  camlDemo.deserialize_2435 \
+  camlDemo.deserialize_2443 \
+  camlDemo.print_packed_2505 \
+  camlDemo.comparer_2564 \
+  camlDemo.vers_chaine_2569
+
+# String operations
+echo ""
+echo "=== String Operations ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlStringOps.uppercase \
+  camlStringOps.lowercase \
+  camlStringOps.reverse \
+  camlStringOps.concat_with \
+  camlDemo.uppercase_391 \
+  camlDemo.lowercase_463
+
+# Module metadata
+echo ""
+echo "=== Module Metadata ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlDemo \
+  camlDemo.code_begin \
+  camlDemo.code_end \
+  camlDemo.data_begin \
+  camlDemo.data_end \
+  camlDemo.frametable \
+  camlDemo.gc_roots \
+  camlDemo.entry
+
+# Basic test cases (original)
+echo ""
+echo "=== Basic Test Cases ==="
+"${ocamlsrcdir}/tools/ocamlfilt" -format classic \
+  camlFoo.bar \
+  camlTest.Module.function \
+  camlHello \
+  camlFoo
+
+} > "${output}"

@@ -151,3 +151,6 @@ val naked_pointers : bool
 
 val tsan : bool
 (** Whether ThreadSanitizer support has been enabled at configure time *)
+
+val legacy_ocaml_name_mangling : bool
+(** Whether the compiler was configured to use legacy OCaml name mangling *)

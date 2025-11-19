@@ -1,0 +1,9 @@
+    frame #N: <ADDRESS> test_custom_blocks_dwarf.exe`Test_custom_blocks_dwarf.f_start(param=0 : ocaml_value)
+    frame #N: <ADDRESS> test_custom_blocks_dwarf.exe`Test_custom_blocks_dwarf.f_simple_closure(param=0 : ocaml_value)
+    frame #N: <ADDRESS> test_custom_blocks_dwarf.exe`Test_custom_blocks_dwarf.f_simple_lazy(x=42 : int lazy_t @ value)
+    frame #N: <ADDRESS> test_custom_blocks_dwarf.exe`Test_custom_blocks_dwarf.f_simple_lazy(x=<lazy|<+0>
+    frame #N: <ADDRESS> test_custom_blocks_dwarf.exe`Test_custom_blocks_dwarf.f_int_reference(x=[0] : int ref @ value)
+    frame #N: <ADDRESS> test_custom_blocks_dwarf.exe`Test_custom_blocks_dwarf.f_int_reference(x=[123] : int ref @ value)
+    frame #N: <ADDRESS> test_custom_blocks_dwarf.exe`Test_custom_blocks_dwarf.f_int_reference(x=[-456] : int ref @ value)
+    frame #N: <ADDRESS> test_custom_blocks_dwarf.exe`Test_custom_blocks_dwarf.f_mutable_record(p={ x = 0; y = 0 } : mutable_point @ value)
+    frame #N: <ADDRESS> test_custom_blocks_dwarf.exe`Test_custom_blocks_dwarf.f_mutable_record(p={ x = 10; y = 20 } : mutable_point @ value)

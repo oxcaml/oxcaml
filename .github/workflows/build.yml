@@ -17,75 +17,75 @@ jobs:
       matrix:
         include:
           - name: flambda2_runtime5
-            config: --enable-middle-end=flambda2 --enable-runtime5
+            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
 
           - name: flambda2_stack_checks
-            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-stack-checks
+            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-stack-checks --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
 
           - name: flambda2_poll_insertion
-            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-poll-insertion
+            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-poll-insertion --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
 
           - name: flambda2_multidomain
-            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-stack-checks --enable-poll-insertion --enable-multidomain
+            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-stack-checks --enable-poll-insertion --enable-multidomain --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
 
           - name: flambda2_dev
-            config: --enable-middle-end=flambda2 --enable-dev
+            config: --enable-middle-end=flambda2 --enable-dev --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
 
           - name: flambda2_dev_runtime5
-            config: --enable-middle-end=flambda2 --enable-dev --enable-runtime5
+            config: --enable-middle-end=flambda2 --enable-dev --enable-runtime5 --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
 
           - name: flambda2_debug_runtime5
-            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-stack-checks
+            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-stack-checks --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
             build_ocamlparam: ''
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
 
           - name: flambda2_debug_runtime
-            config: --enable-middle-end=flambda2
+            config: --enable-middle-end=flambda2 --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
             build_ocamlparam: ''
             use_runtime: d
             ocamlrunparam: "v=0,V=1"
 
           - name: flambda2_o3
-            config: --enable-middle-end=flambda2
+            config: --enable-middle-end=flambda2 --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
 
           - name: metrics_collection
-            config: --enable-middle-end=flambda2
+            config: --enable-middle-end=flambda2 --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
 
           - name: flambda2_frame_pointers_oclassic_polling
-            config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
+            config: --enable-middle-end=flambda2 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
             build_ocamlparam: ''
             ocamlparam: '_,Oclassic=1'
             disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml'
 
           - name: flambda2_macos_arm64
-            config: --enable-middle-end=flambda2 --disable-warn-error
+            config: --enable-middle-end=flambda2 --disable-warn-error --enable-name-mangling=RunLengthEncoding
             os: macos-latest
 
           - name: flambda2_macos_arm64_runtime5_regalloc
-            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
+            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error --enable-name-mangling=RunLengthEncoding
             os: macos-latest
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
 
           - name: flambda2_macos_arm64_debug_runtime5_regalloc
-            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
+            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error --enable-name-mangling=RunLengthEncoding
             os: macos-latest
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
@@ -94,14 +94,14 @@ jobs:
             run_regalloc_tool: true
 
           - name: flambda2_ubuntu_arm64_runtime5_regalloc
-            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error
+            config: --enable-middle-end=flambda2 --enable-runtime5 --disable-warn-error --enable-name-mangling=RunLengthEncoding
             os: ubuntu-24.04-arm
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             run_regalloc_tool: true
 
           - name: regalloc
-            config: --enable-middle-end=flambda2
+            config: --enable-middle-end=flambda2 --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation'
@@ -109,45 +109,45 @@ jobs:
             run_regalloc_tool: true
 
           - name: irc_frame_pointers
-            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-frame-pointers
+            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-frame-pointers --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
             build_ocamlparam: '_,w=-46,regalloc=irc'
             ocamlparam: '_,w=-46,regalloc=irc'
             check_arch: true
 
           - name: cfg-invariants
-            config: --enable-middle-end=flambda2 --enable-runtime5
+            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
             build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
             check_arch: true
 
           - name: vectorizer
-            config: --enable-middle-end=flambda2 --enable-runtime5
+            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
             build_ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
             check_arch: true
 
           - name: address_sanitizer
-            config: --enable-middle-end=flambda2 --enable-address-sanitizer
+            config: --enable-middle-end=flambda2 --enable-address-sanitizer --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
             cc: clang
 
           - name: address_sanitizer_runtime5
-            config: --enable-middle-end=flambda2 --enable-address-sanitizer --enable-runtime5
+            config: --enable-middle-end=flambda2 --enable-address-sanitizer --enable-runtime5 --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
             cc: clang
 
           - name: dwarf_tests
-            config: --enable-middle-end=flambda2 --enable-runtime5
+            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
             dwarf_tests_only: true
-            oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus1
-            oxcaml_llvm_source_branch: lldb
+            oxcaml_llvm_tag: oxcaml-name-mangling-experiments-16.0.6-minus0
+            oxcaml_llvm_source_branch: name-mangling-experiments
 
           - name: llvmize_tests
-            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-frame-pointers
+            config: --enable-middle-end=flambda2 --enable-runtime5 --enable-frame-pointers --enable-name-mangling=RunLengthEncoding
             os: ubuntu-latest
             llvmize_tests_only: true
             oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3

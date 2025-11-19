@@ -1,6 +1,6 @@
 source_filename = "tailcall.ml"
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlTailcall__fib_general_HIDE_STAMP(i64 %0, i64 %1, i64 %2, i64 %3, i64 %4) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { i64 } } @_OM8TailcallF11fib_general_HIDE_STAMP(i64 %0, i64 %1, i64 %2, i64 %3, i64 %4) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -111,7 +111,7 @@ L118:
   ret { { i64, i64 }, { i64 } } %67
 }
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlTailcall__collatz_odd_HIDE_STAMP(i64 %0, i64 %1, i64 %2, i64 %3) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { i64 } } @_OM8TailcallF11collatz_odd_HIDE_STAMP(i64 %0, i64 %1, i64 %2, i64 %3) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -214,11 +214,11 @@ L143:
   %64 = load i64, ptr %6
   %65 = load i64, ptr %ds
   %66 = load i64, ptr %alloc
-  %67 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @camlTailcall__collatz_even_HIDE_STAMP(i64 %65, i64 %66, i64 %63, i64 %64) "statepoint-id"="0"
+  %67 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @_OM8TailcallF12collatz_even_HIDE_STAMP(i64 %65, i64 %66, i64 %63, i64 %64) "statepoint-id"="0"
   ret { { i64, i64 }, { i64 } } %67
 }
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlTailcall__collatz_even_HIDE_STAMP(i64 %0, i64 %1, i64 %2, i64 %3) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { i64 } } @_OM8TailcallF12collatz_even_HIDE_STAMP(i64 %0, i64 %1, i64 %2, i64 %3) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -345,11 +345,11 @@ L174:
   %82 = load i64, ptr %6
   %83 = load i64, ptr %ds
   %84 = load i64, ptr %alloc
-  %85 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @camlTailcall__collatz_odd_HIDE_STAMP(i64 %83, i64 %84, i64 %81, i64 %82) "statepoint-id"="0"
+  %85 = musttail call oxcamlcc { { i64, i64 }, { i64 } } @_OM8TailcallF11collatz_odd_HIDE_STAMP(i64 %83, i64 %84, i64 %81, i64 %82) "statepoint-id"="0"
   ret { { i64, i64 }, { i64 } } %85
 }
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlTailcall__tail_call_outside_HIDE_STAMP(i64 %0, i64 %1, i64 %2, ptr addrspace(1) %3) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { i64 } } @_OM8TailcallF17tail_call_outside_HIDE_STAMP(i64 %0, i64 %1, i64 %2, ptr addrspace(1) %3) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -409,7 +409,7 @@ L182:
   ret { { i64, i64 }, { i64 } } %39
 }
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlTailcall__tail_call_outside_prologue_HIDE_STAMP(i64 %0, i64 %1, i64 %2, ptr addrspace(1) %3) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { i64 } } @_OM8TailcallF26tail_call_outside_prologue_HIDE_STAMP(i64 %0, i64 %1, i64 %2, ptr addrspace(1) %3) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -664,7 +664,7 @@ L229:
   %104 = ptrtoint ptr @camlTailcall__const_block89 to i64
   store i64 %104, ptr %28
   store i64 1, ptr %29
-  %105 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521 to i64
+  %105 = ptrtoint ptr @camlStdlib__Format__fn_HIDE_STAMP to i64
   store i64 %105, ptr %30
   %106 = load i64, ptr %30
   store i64 %106, ptr %4
@@ -677,7 +677,7 @@ L229:
   %111 = load i64, ptr %7
   %112 = load i64, ptr %ds
   %113 = load i64, ptr %alloc
-  %114 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(i64 %112, i64 %113, i64 %109, i64 %110, i64 %111) "statepoint-id"="0"
+  %114 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @_OM18CamlinternalFormatF11make_printf_HIDE_STAMP(i64 %112, i64 %113, i64 %109, i64 %110, i64 %111) "statepoint-id"="0"
   %115 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %114, 0, 0
   %116 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %114, 0, 1
   store i64 %115, ptr %ds
@@ -725,7 +725,7 @@ L232:
   %138 = load i64, ptr %6
   %139 = load i64, ptr %ds
   %140 = load i64, ptr %alloc
-  %141 = call oxcamlcc { { i64, i64 }, { i64 } } @camlTailcall__collatz_odd_HIDE_STAMP(i64 %139, i64 %140, i64 %137, i64 %138) "statepoint-id"="0"
+  %141 = call oxcamlcc { { i64, i64 }, { i64 } } @_OM8TailcallF11collatz_odd_HIDE_STAMP(i64 %139, i64 %140, i64 %137, i64 %138) "statepoint-id"="0"
   %142 = extractvalue { { i64, i64 }, { i64 } } %141, 0, 0
   %143 = extractvalue { { i64, i64 }, { i64 } } %141, 0, 1
   store i64 %142, ptr %ds
@@ -741,7 +741,7 @@ L234:
   %147 = ptrtoint ptr @camlTailcall__const_block101 to i64
   store i64 %147, ptr %40
   store i64 1, ptr %41
-  %148 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521 to i64
+  %148 = ptrtoint ptr @camlStdlib__Format__fn_HIDE_STAMP to i64
   store i64 %148, ptr %42
   %149 = load i64, ptr %42
   store i64 %149, ptr %4
@@ -754,7 +754,7 @@ L234:
   %154 = load i64, ptr %7
   %155 = load i64, ptr %ds
   %156 = load i64, ptr %alloc
-  %157 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlCamlinternalFormat__make_printf_HIDE_STAMP(i64 %155, i64 %156, i64 %152, i64 %153, i64 %154) "statepoint-id"="0"
+  %157 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @_OM18CamlinternalFormatF11make_printf_HIDE_STAMP(i64 %155, i64 %156, i64 %152, i64 %153, i64 %154) "statepoint-id"="0"
   %158 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %157, 0, 0
   %159 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %157, 0, 1
   store i64 %158, ptr %ds
@@ -930,17 +930,17 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlTailcall__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlTailcall = global i64 5888, section ".data", align 8
-@camlTailcall = global { ptr, ptr, ptr, ptr, ptr } { ptr @camlTailcall__fib_general_5, ptr @camlTailcall__collatz_odd_6, ptr @camlTailcall__collatz_even_7, ptr @camlTailcall__tail_call_outside_8, ptr @camlTailcall__tail_call_outside_prologue_9 }, section ".data", align 8
-@header.camlTailcall__tail_call_outside_prologue_9 = global i64 4087, section ".data", align 8
-@camlTailcall__tail_call_outside_prologue_9 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlTailcall__tail_call_outside_prologue_HIDE_STAMP }, section ".data", align 8
-@header.camlTailcall__tail_call_outside_8 = global i64 4087, section ".data", align 8
-@camlTailcall__tail_call_outside_8 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlTailcall__tail_call_outside_HIDE_STAMP }, section ".data", align 8
-@header.camlTailcall__collatz_even_7 = global i64 8183, section ".data", align 8
-@camlTailcall__collatz_even_7 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 144115188075855887, ptr @camlTailcall__collatz_even_HIDE_STAMP }, section ".data", align 8
-@header.camlTailcall__collatz_odd_6 = global i64 4345, section ".data", align 8
-@camlTailcall__collatz_odd_6 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlTailcall__collatz_odd_HIDE_STAMP }, section ".data", align 8
-@header.camlTailcall__fib_general_5 = global i64 4087, section ".data", align 8
-@camlTailcall__fib_general_5 = global { ptr, i64, ptr } { ptr @caml_curry3, i64 252201579132747783, ptr @camlTailcall__fib_general_HIDE_STAMP }, section ".data", align 8
+@camlTailcall = global { ptr, ptr, ptr, ptr, ptr } { ptr @camlTailcall__fib_general_HIDE_STAMP, ptr @camlTailcall__collatz_odd_HIDE_STAMP, ptr @camlTailcall__collatz_even_HIDE_STAMP, ptr @camlTailcall__tail_call_outside_HIDE_STAMP, ptr @camlTailcall__tail_call_outside_prologue_HIDE_STAMP }, section ".data", align 8
+@header.camlTailcall__tail_call_outside_prologue_HIDE_STAMP = global i64 4087, section ".data", align 8
+@camlTailcall__tail_call_outside_prologue_HIDE_STAMP = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @_OM8TailcallF26tail_call_outside_prologue_HIDE_STAMP }, section ".data", align 8
+@header.camlTailcall__tail_call_outside_HIDE_STAMP = global i64 4087, section ".data", align 8
+@camlTailcall__tail_call_outside_HIDE_STAMP = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @_OM8TailcallF17tail_call_outside_HIDE_STAMP }, section ".data", align 8
+@header.camlTailcall__collatz_even_HIDE_STAMP = global i64 8183, section ".data", align 8
+@camlTailcall__collatz_even_HIDE_STAMP = global { ptr, i64, ptr } { ptr @caml_curry2, i64 144115188075855887, ptr @_OM8TailcallF12collatz_even_HIDE_STAMP }, section ".data", align 8
+@header.camlTailcall__collatz_odd_HIDE_STAMP = global i64 4345, section ".data", align 8
+@camlTailcall__collatz_odd_HIDE_STAMP = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @_OM8TailcallF11collatz_odd_HIDE_STAMP }, section ".data", align 8
+@header.camlTailcall__fib_general_HIDE_STAMP = global i64 4087, section ".data", align 8
+@camlTailcall__fib_general_HIDE_STAMP = global { ptr, i64, ptr } { ptr @caml_curry3, i64 252201579132747783, ptr @_OM8TailcallF11fib_general_HIDE_STAMP }, section ".data", align 8
 @header.camlTailcall__const_block89 = global i64 2827, section ".data", align 8
 @camlTailcall__const_block89 = global { ptr, ptr } { ptr @camlTailcall__immstring83, ptr @camlTailcall__const_block87 }, section ".data", align 8
 @header.camlTailcall__immstring83 = global i64 3068, section ".data", align 8
@@ -955,8 +955,8 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @camlTailcall__const_block85 = global { i64, i64 } { i64 21, i64 1 }, section ".data", align 8
 @header.camlTailcall__float108 = global i64 2045, section ".data", align 8
 @camlTailcall__float108 = global { double } { double 0x4044a66666666666 }, section ".data", align 8
-@camlCamlinternalFormat__make_printf_HIDE_STAMP = external global ptr
-@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521 = external global ptr
+@_OM18CamlinternalFormatF11make_printf_HIDE_STAMP = external global ptr
+@camlStdlib__Format__fn_HIDE_STAMP = external global ptr
 @camlTailcall2 = external global ptr
 @caml_apply3 = external global ptr
 @caml_curry2 = external global ptr

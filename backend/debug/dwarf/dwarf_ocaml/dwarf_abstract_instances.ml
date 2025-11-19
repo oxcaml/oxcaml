@@ -62,11 +62,15 @@ let add_empty state ~compilation_unit_proto_die ~fun_symbol ~demangled_name =
   abstract_instance_proto_die, abstract_instance_proto_die_symbol
 
 let add_root state ~parent ~demangled_name fun_symbol ~location_attributes =
+  let linkage_name =
+    match demangled_name with
+    | Some linkage_name -> [DAH.create_linkage_name ~linkage_name]
+    | None -> []
+  in
   let attributes =
     [ DAH.create_name (Asm_symbol.encode fun_symbol);
-      DAH.create_linkage_name ~linkage_name:demangled_name;
       DAH.create_external ~is_visible_externally:true ]
-    @ location_attributes
+    @ linkage_name @ location_attributes
   in
   let attribute_values =
     attributes

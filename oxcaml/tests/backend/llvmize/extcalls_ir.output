@@ -1,6 +1,6 @@
 source_filename = "extcalls.ml"
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlExtcalls__call_too_many_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { i64 } } @_OM8ExtcallsF13call_too_many_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -142,7 +142,7 @@ L103:
   ret { { i64, i64 }, { i64 } } %93
 }
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlExtcalls__call_too_many_with_try_HIDE_STAMP(i64 %0, i64 %1, i64 %2) noinline gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { i64 } } @_OM8ExtcallsF22call_too_many_with_try_HIDE_STAMP(i64 %0, i64 %1, i64 %2) noinline gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -211,7 +211,7 @@ L122:
   %52 = icmp eq i64 %51, 0
   br i1 %52, label %L123, label %L108
 L123:
-  store ptr blockaddress(@camlExtcalls__call_too_many_with_try_1_5_code, %L122), ptr @camlExtcalls__call_too_many_with_try_HIDE_STAMP.recover_rbp_var.L122
+  store ptr blockaddress(@_OM8ExtcallsF22call_too_many_with_try_HIDE_STAMP, %L122), ptr @_OM8ExtcallsF22call_too_many_with_try_HIDE_STAMP.recover_rbp_var.L122
   %53 = call  ptr @llvm.stacksave()
   %54 = alloca { i64, i64, i64, i64 }
   %55 = ptrtoint ptr %54 to i64
@@ -225,7 +225,7 @@ L123:
   %63 = inttoptr i64 %62 to ptr
   %64 = load i64, ptr %63
   store ptr %54, ptr %63
-  store ptr @camlExtcalls__call_too_many_with_try_HIDE_STAMP.recover_rbp_asm.L122, ptr %60
+  store ptr @_OM8ExtcallsF22call_too_many_with_try_HIDE_STAMP.recover_rbp_asm.L122, ptr %60
   call void asm sideeffect "mov %rbp, ($0)", "r"(ptr %57) "gc-leaf-function"="true"
   store i64 %64, ptr %54
   store i64 25, ptr %16
@@ -363,7 +363,7 @@ L108:
   ret { { i64, i64 }, { i64 } } %145
 }
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlExtcalls__call_print_and_add_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { i64 } } @_OM8ExtcallsF18call_print_and_add_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -417,7 +417,7 @@ L127:
   ret { { i64, i64 }, { i64 } } %32
 }
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlExtcalls__call_int_and_float_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { i64 } } @_OM8ExtcallsF18call_int_and_float_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -529,22 +529,22 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlExtcalls__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlExtcalls = global i64 4864, section ".data", align 8
-@camlExtcalls = global { ptr, ptr, ptr, ptr } { ptr @camlExtcalls__call_too_many_4, ptr @camlExtcalls__call_too_many_with_try_5, ptr @camlExtcalls__call_print_and_add_6, ptr @camlExtcalls__call_int_and_float_7 }, section ".data", align 8
-@header.camlExtcalls__call_int_and_float_7 = global i64 3063, section ".data", align 8
-@camlExtcalls__call_int_and_float_7 = global { ptr, i64 } { ptr @camlExtcalls__call_int_and_float_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlExtcalls__call_print_and_add_6 = global i64 3063, section ".data", align 8
-@camlExtcalls__call_print_and_add_6 = global { ptr, i64 } { ptr @camlExtcalls__call_print_and_add_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlExtcalls__call_too_many_with_try_5 = global i64 3063, section ".data", align 8
-@camlExtcalls__call_too_many_with_try_5 = global { ptr, i64 } { ptr @camlExtcalls__call_too_many_with_try_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlExtcalls__call_too_many_4 = global i64 3063, section ".data", align 8
-@camlExtcalls__call_too_many_4 = global { ptr, i64 } { ptr @camlExtcalls__call_too_many_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlExtcalls = global { ptr, ptr, ptr, ptr } { ptr @camlExtcalls__call_too_many_HIDE_STAMP, ptr @camlExtcalls__call_too_many_with_try_HIDE_STAMP, ptr @camlExtcalls__call_print_and_add_HIDE_STAMP, ptr @camlExtcalls__call_int_and_float_HIDE_STAMP }, section ".data", align 8
+@header.camlExtcalls__call_int_and_float_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlExtcalls__call_int_and_float_HIDE_STAMP = global { ptr, i64 } { ptr @_OM8ExtcallsF18call_int_and_float_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlExtcalls__call_print_and_add_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlExtcalls__call_print_and_add_HIDE_STAMP = global { ptr, i64 } { ptr @_OM8ExtcallsF18call_print_and_add_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlExtcalls__call_too_many_with_try_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlExtcalls__call_too_many_with_try_HIDE_STAMP = global { ptr, i64 } { ptr @_OM8ExtcallsF22call_too_many_with_try_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlExtcalls__call_too_many_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlExtcalls__call_too_many_HIDE_STAMP = global { ptr, i64 } { ptr @_OM8ExtcallsF13call_too_many_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlExtcalls__float38 = global i64 2045, section ".data", align 8
 @camlExtcalls__float38 = global { double } { double 0x4010000000000000 }, section ".data", align 8
 @header.camlExtcalls__float36 = global i64 2045, section ".data", align 8
 @camlExtcalls__float36 = global { double } { double 0x4000000000000000 }, section ".data", align 8
 @temp.Extcalls.0 = global { ptr, ptr, ptr } { ptr @int_and_float, ptr @too_many, ptr @print_and_add }, section ".data", align 8
-@camlExtcalls__call_too_many_with_try_HIDE_STAMP.recover_rbp_asm.L122 = external global ptr
-@camlExtcalls__call_too_many_with_try_HIDE_STAMP.recover_rbp_var.L122 = global ptr zeroinitializer, section ".data", align 8
+@_OM8ExtcallsF22call_too_many_with_try_HIDE_STAMP.recover_rbp_asm.L122 = external global ptr
+@_OM8ExtcallsF22call_too_many_with_try_HIDE_STAMP.recover_rbp_var.L122 = global ptr zeroinitializer, section ".data", align 8
 @caml_c_call = external global ptr
 @caml_c_call_stack_args = external global ptr
 @int_and_float = external global ptr
@@ -555,10 +555,10 @@ declare void @llvm.stackrestore(ptr)
 declare ptr @llvm.stacksave()
 
 module asm "  .text"
-module asm "camlExtcalls__call_too_many_with_try_HIDE_STAMP.recover_rbp_asm.L122:"
+module asm "_OM8ExtcallsF22call_too_many_with_try_HIDE_STAMP.recover_rbp_asm.L122:"
 module asm "  pop %rbp"
 module asm "  addq $8, %rsp"
-module asm "  movq camlExtcalls__call_too_many_with_try_HIDE_STAMP.recover_rbp_var.L122(%rip), %rbx"
+module asm "  movq _OM8ExtcallsF22call_too_many_with_try_HIDE_STAMP.recover_rbp_var.L122(%rip), %rbx"
 module asm "  jmpq *%rbx"
 
 !0 = !{ i32 1, !"oxcaml_module", !"Extcalls" }

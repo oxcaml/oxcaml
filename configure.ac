@@ -347,6 +347,7 @@ AC_SUBST([no_partial_inlining_cflags])
 AC_SUBST([frame_pointers])
 AC_SUBST([address_sanitizer])
 AC_SUBST([cpp_mangling])
+AC_SUBST([name_mangling_version])
 AC_SUBST([flambda])
 AC_SUBST([flambda2])
 AC_SUBST([flambda_invariants])
@@ -590,6 +591,16 @@ AC_ARG_ENABLE([address-sanitizer],
 AC_ARG_ENABLE([cpp-mangling],
   [AS_HELP_STRING([--enable-cpp-mangling],
     [use cpp mangling for exported symbols])])
+
+AC_ARG_ENABLE([name-mangling],
+  [AS_HELP_STRING([--enable-name-mangling=VERSION],
+    [specify name mangling version (LegacyOCaml or RunLengthEncoding, default: LegacyOCaml)])],
+  [AS_CASE([$enable_name_mangling],
+    [LegacyOCaml], [name_mangling_version=LegacyOCaml],
+    [RunLengthEncoding], [name_mangling_version=RunLengthEncoding],
+    [yes], [name_mangling_version=LegacyOCaml],
+    [*], [AC_MSG_ERROR([Invalid name mangling version: must be 'LegacyOCaml' or 'RunLengthEncoding'])])],
+  [name_mangling_version=LegacyOCaml])
 
 AC_ARG_ENABLE([naked-pointers], [],
   [AS_IF([test "x$enableval" != 'xno'],
@@ -2742,6 +2753,12 @@ AS_IF([test x"$enable_cpp_mangling" = "xyes"],
   [cpp_mangling=true
     AC_DEFINE([WITH_CPP_MANGLING])],
   [cpp_mangling=false])
+
+## Name mangling version
+
+AS_CASE([$name_mangling_version],
+  [LegacyOCaml], [AC_DEFINE([NAME_MANGLING_LEGACY_OCAML])],
+  [RunLengthEncoding], [AC_DEFINE([NAME_MANGLING_RUNLENGTH_ENCODING])])
 
 ## Check for mmap support for huge pages and contiguous heap
 OCAML_MMAP_SUPPORTS_HUGE_PAGES

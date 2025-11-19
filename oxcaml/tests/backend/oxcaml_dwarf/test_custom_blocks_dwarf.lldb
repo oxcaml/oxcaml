@@ -1,0 +1,18 @@
+(lldb) b Test_custom_blocks_dwarf.f_start
+(lldb) run
+(lldb) b Test_custom_blocks_dwarf.f_simple_closure
+(lldb) c
+(lldb) b Test_custom_blocks_dwarf.f_simple_lazy
+(lldb) c
+(lldb) b Test_custom_blocks_dwarf.f_int_reference
+(lldb) c
+(lldb) b Test_custom_blocks_dwarf.f_mutable_record
+(lldb) c
+(lldb) b Test_custom_blocks_dwarf.f_exception
+(lldb) c
+(lldb) b Test_custom_blocks_dwarf.f_first_class_module
+(lldb) c
+(lldb) b Test_custom_blocks_dwarf.f_weak_array
+(lldb) c
+(lldb) b Test_custom_blocks_dwarf.f_hashtable
+(lldb) c

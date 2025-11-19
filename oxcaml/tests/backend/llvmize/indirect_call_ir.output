@@ -1,6 +1,6 @@
 source_filename = "indirect_call.ml"
 
-define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlIndirect_call__apply_HIDE_STAMP(i64 %0, i64 %1, ptr addrspace(1) %2, ptr addrspace(1) %3) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @_OM13Indirect_callF5apply_HIDE_STAMP(i64 %0, i64 %1, ptr addrspace(1) %2, ptr addrspace(1) %3) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -97,9 +97,9 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlIndirect_call__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlIndirect_call = global i64 1792, section ".data", align 8
-@camlIndirect_call = global { ptr } { ptr @camlIndirect_call__apply_1 }, section ".data", align 8
-@header.camlIndirect_call__apply_1 = global i64 4087, section ".data", align 8
-@camlIndirect_call__apply_1 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlIndirect_call__apply_HIDE_STAMP }, section ".data", align 8
+@camlIndirect_call = global { ptr } { ptr @camlIndirect_call__apply_HIDE_STAMP }, section ".data", align 8
+@header.camlIndirect_call__apply_HIDE_STAMP = global i64 4087, section ".data", align 8
+@camlIndirect_call__apply_HIDE_STAMP = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @_OM13Indirect_callF5apply_HIDE_STAMP }, section ".data", align 8
 @caml_curry2 = external global ptr
 
 

@@ -201,6 +201,7 @@ ASM_CFI_SUPPORTED=@asm_cfi_supported@
 WITH_FRAME_POINTERS=@frame_pointers@
 WITH_ADDRESS_SANITIZER=@address_sanitizer@
 WITH_CPP_MANGLING=@cpp_mangling@
+NAME_MANGLING_VERSION=@name_mangling_version@
 WITH_PROFINFO=@profinfo@
 PROFINFO_WIDTH=@profinfo_width@
 HEADER_RESERVED_BITS=@reserved_header_bits@

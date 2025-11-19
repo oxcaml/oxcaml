@@ -33,6 +33,7 @@ let set_imm (r : int atomic) v =
    (* frame_pointers causes different, unstable CMM output, so we skip this test
       when it's enabled *)
    no-frame_pointers;
+   legacy-ocaml-name-mangling;
 
    flags = "-c -dcmm -dno-locations -dno-unique-ids";
 

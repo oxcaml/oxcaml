@@ -265,6 +265,7 @@
   printlambda
   runtimedef
   runtimetags
+  runlength_mangling
   tmc
   simplif
   switch

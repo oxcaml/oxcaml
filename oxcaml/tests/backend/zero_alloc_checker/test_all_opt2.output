@@ -1,11 +1,11 @@
 File "test_all_opt2.ml", line 5, characters 5-15:
-Error: Annotation check for zero_alloc failed on function Test_all_opt2.foo (camlTest_all_opt2.foo_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Test_all_opt2.foo (_OM13Test_all_opt2F3foo_HIDE_STAMP).
 
 File "test_all_opt2.ml", line 5, characters 29-33:
 Error: allocation of 24 bytes
 
 File "test_all_opt2.ml", line 9, characters 5-15:
-Error: Annotation check for zero_alloc failed on function Test_all_opt2.bar (camlTest_all_opt2.bar_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Test_all_opt2.bar (_OM13Test_all_opt2F3bar_HIDE_STAMP).
 
 File "test_all_opt2.ml", line 9, characters 25-31:
 Error: allocation of 24 bytes
@@ -14,7 +14,7 @@ File "test_all_opt2.ml", line 9, characters 29-31:
 Error: allocation of 24 bytes
 
 File "test_all_opt2.ml", line 11, characters 8-26:
-Error: Annotation check for zero_alloc failed on function Test_all_opt2.baz (camlTest_all_opt2.baz_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Test_all_opt2.baz (_OM13Test_all_opt2F3baz_HIDE_STAMP).
 
 File "test_all_opt2.ml", line 11, characters 12-26:
 Error: allocation of 24 bytes

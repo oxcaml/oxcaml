@@ -1,6 +1,6 @@
 source_filename = "gcd.ml"
 
-define  oxcamlcc { { i64, i64 }, { i64 } } @camlGcd__gcd_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
+define  oxcamlcc { { i64, i64 }, { i64 } } @_OM3GcdF3gcd_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
   %ds = alloca i64
   store i64 %0, ptr %ds
   %alloc = alloca i64
@@ -226,9 +226,9 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlGcd__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlGcd = global i64 1792, section ".data", align 8
-@camlGcd = global { ptr } { ptr @camlGcd__gcd_1 }, section ".data", align 8
-@header.camlGcd__gcd_1 = global i64 3063, section ".data", align 8
-@camlGcd__gcd_1 = global { ptr, i64 } { ptr @camlGcd__gcd_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlGcd = global { ptr } { ptr @camlGcd__gcd_HIDE_STAMP }, section ".data", align 8
+@header.camlGcd__gcd_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlGcd__gcd_HIDE_STAMP = global { ptr, i64 } { ptr @_OM3GcdF3gcd_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @camlGcd_data = external global ptr
 @caml_exn_Division_by_zero = external global ptr
 @caml_raise_exn = external global ptr

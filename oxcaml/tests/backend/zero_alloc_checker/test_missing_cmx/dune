@@ -1,5 +1,5 @@
 (rule
- (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "LegacyOCaml"))) )
  (targets test.output.corrected a.o b.o a.cmi b.cmx)
  (deps a.mli a.ml b.ml c.ml ../filter.sh)
  (action
@@ -19,6 +19,6 @@
 
 (rule
  (alias   runtest)
- (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (enabled_if (and (= %{context_name} "main") (and (= %{architecture} "amd64") (= %{env:OXCAML_NAME_MANGLING=LegacyOCaml} "LegacyOCaml"))) )
  (deps test.output test.output.corrected)
  (action (diff test.output test.output.corrected)))

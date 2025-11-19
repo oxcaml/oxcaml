@@ -1,18 +1,18 @@
 File "fail19.ml", line 6, characters 5-15:
-Error: Annotation check for zero_alloc failed on function Fail19.foo (camlFail19.foo_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Fail19.foo (_OM6Fail19F3foo_HIDE_STAMP).
 
 File "fail19.ml", line 10, characters 9-13:
 Error: allocation of 24 bytes
 
 File "fail19.ml", line 12, characters 12-17:
-Error: called function may allocate (direct call camlFail19.bar_HIDE_STAMP)
+Error: called function may allocate (direct call _OM6Fail19F3bar_HIDE_STAMP)
 
 File "fail19.ml", line 13, characters 15-18:
 Error: called function may allocate (indirect call)
 
 File "fail19.ml", line 15, characters 8-37:
 Error: expression may allocate
-       (probe "test" handler camlFail19.probe_handler_test_HIDE_STAMP)
+       (probe "test" handler _OM6Fail19F3fooF18probe_handler_test_HIDE_STAMP)
 
 File "fail19.ml", line 16, characters 8-16:
 Error: allocation of 24 bytes
@@ -29,5 +29,5 @@ Error: allocation of 24 bytes
 File "fail19.ml", line 20, characters 5-26:
 Error: called function may allocate (external call to caml_make_vect)
 inlined from
-dep19.ml:1,38--74[Dep19.inline_always][camlDep19.inline_always_HIDE_STAMP]
+dep19.ml:1,38--74[Dep19.inline_always][_OM5Dep19F13inline_always_HIDE_STAMP]
 fail19.ml:20,5--26[Fail19.foo]
