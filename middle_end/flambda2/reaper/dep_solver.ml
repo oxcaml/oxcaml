@@ -13,6 +13,80 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* This file performs an analysis where, for each variable, we track how it is
+   used and what sources it can have. It then uses the results of this analysis
+   to compute the transformations we want to do: removing unused arguments of
+   constructors, continuations, and even functions when possible, unboxing
+   values which do not escape, and changing the representation of some values.
+
+   # Core analysis
+
+   At its core, we have a graph with a given number of nodes (corresponding to
+   variables in the input program), and three types of arrows between nodes:
+
+   - [alias], which means that a variable can flow to another variable,
+
+   - [constructor], which means that a variable can flow to a given field of
+   another variable,
+
+   - and [accessor], which means that a given field of a variable can flow to
+   another variable.
+
+   Some nodes are also labelled as having unknown sources (for variables outside
+   the compilation unit, for instance), or unknown usages (for arguments to
+   functions outside the compilation unit, for instance).
+
+   The analysis then tracks, for each node in the graph, what sources that node
+   can have (unknown sources, or for each field, what is the source of each of
+   its fields), and how it could be used (unknown usages, or for each field, how
+   that field could be used).
+
+   With this presentation, sources and usages are symmetrical, up to reversing
+   the direction of arrows and exchanging constructors and accessors, so let us
+   focus on usages for the moment. The result we want is for each node $x$, the
+   sequences of field accesses for which the result has unknown usages. We can
+   specify this as a language $Lₓ$ of words over the alphabet of fields. Then,
+   the result we want is the least fixed point of the equations:
+
+   - for each node $x$ with unknown usages, $ε ∈ Lₓ$,
+
+   - for each alias $s → t$, $Lₜ ⊆ Lₛ$ (the source has at least as many uses as
+   the target)
+
+   - for each accessor $s → t$ with field $f$, $f ⋅ Lₜ ⊆ Lₛ$ (each access to the
+   target corresponds to an access to the source after taking the field $f$)
+
+   - for each constructor $s → t$ with field $f$, $f⁻¹ ⋅ Lₜ ⊆ Lₛ$ (each access
+   to the target that starts with $f$ corresponds to an access to the sources
+   after removing the initial $f$), where $f⁻¹ ⋅ Lₜ$ is the Brzozowski
+   derivative of $Lₜ$ with respect to $f$, i.e. { u / f ⋅ u ∈ Lₜ }.
+
+   Given all these operations preserve regular languages, it is easy to see the
+   output will be a regular language as well. In practice, we will represent the
+   result by saying that for each variable, its usages are either unknown, or
+   that for each field, the usages for that field correspond to the union of the
+   usages of a given set of variables, essentially specifying the language $Lₓ$
+   by its Brzozowski derivatives.
+
+   # Implementation of the core analysis
+
+   We still consider only usages, as sources are symmetrical. One problem we
+   have is, in an alias chain, the $Lₓ$ will be repeated a large number of
+   times, leading to quadratic behaviour. To avoid this, we only represent
+   explicitely $Lₓ$ when $x$ is the source of an accessor. For other variables,
+   we represent it implicitely with a set $Uₓ$ of usages of $x$, corresponding
+   to accessors only, and such that $Lₓ = ⋃_{t ∈ Uₓ} Lₜ$. However, if a variable
+   has unknown usages, we do not represent $Uₓ$, as it would be useless once the
+   variable has unknown usages.
+
+   In practice we have several Datalog relations to represent this: first,
+   [any_usage x] means that [x] has unknown usages. Then, [usages x y] means
+   that [y] is a point where [x] is accessed, corresponding to $y ∈ Uₓ$.
+   Finally, we have, for [s] the source of an accessor the relations
+   [field_usages s f t], which mean $f ⋅ Lₜ ⊆ Lₛ$. For performance, we also have
+   an additionnal relation [field_usages_top s f], which means $f ⋅ ε ∈ Lₛ$,
+   that is, the field [f] of [s] has unknown usages. *)
+
 (* Disable [not-principal] warning in this file. We often write code that looks
    like [let@ [x; y] = a in b] where the list constructor is an [hlist], and [a]
    is used to determine the type of that [hlist]. Unfortunately, due to how
@@ -208,11 +282,13 @@ let field_usages = rel3 "field_usages" Cols.[n; f; n]
 (** [any_usage x] x is used in an uncontrolled way *)
 let any_usage = any_usage
 
-(** [field_usages_top x f] the field f of x is used in an uncontroled way.
+(** [field_usages_top x f] the field f of x is used in an uncontrolled way.
     It could be for instance, a value escaping the current compilation unit,
     or passed as argument to an non axiomatized function or primitive.
-    Exists only if [accessor y f x] for some y.
-    (this avoids propagating large number of fields properties on many variables)
+    Exists only if [accessor y f x] for some y (this avoids propagating large
+    number of fields properties on many variables).
+
+    For local fields, this relation is not used.
 *)
 let field_usages_top = rel2 "field_usages_top" Cols.[n; f]
 
@@ -319,36 +395,38 @@ let reading_field = rel2 "reading_field" Cols.[f; n]
 
 let escaping_field = rel2 "escaping_field" Cols.[f; n]
 
-let actual_usages x y = `Only_if ([~~(any_usage x)], usages x y)
+let nontop_usages x y = `Only_if ([~~(any_usage x)], usages x y)
 
-let actual_sources x y = `Only_if ([~~(any_source x)], sources x y)
+let nontop_sources x y = `Only_if ([~~(any_source x)], sources x y)
 
+(* [has_usage x] means that we have either [any_usage x] or [usages x y] for
+   some [y]. *)
 let has_usage = rel1 "has_usage" Cols.[n]
 
+(* Likewise, [has_source x] means that we have either [any_source x] or [sources
+   x y] for some [y]. *)
 let has_source = rel1 "has_source" Cols.[n]
 
 let datalog_schedule =
   (* Group rules by priority. Rules with (let$) are executed first, then the
-     rules with (let$$) are executed. The rule with (let$+$$) is executed as
-     part of both of the fixpoints. *)
-  let with_priority p f x = p, ( let$ ) f x in
-  let ( let$ ) f x = with_priority [0] f x in
-  let ( let$$ ) f x = with_priority [1] f x in
-  let ( let$+$$ ) f x = with_priority [0; 1] f x in
+     rules with (let$$) are executed. *)
+  let with_priority p x f = p, ( let$ ) x f in
+  let ( let$ ) x f = with_priority 0 x f in
+  let ( let$$ ) x f = with_priority 1 x f in
   let make_schedule l =
     Schedule.fixpoint
       (List.init 2 (fun i ->
            Schedule.saturate
-             (List.filter_map
-                (fun (p, r) -> if List.mem i p then Some r else None)
-                l)))
+             (List.filter_map (fun (p, r) -> if i = p then Some r else None) l)))
   in
   [ (* Reverse relations, because datalog does not implement a more efficient
        representation yet. Datalog iterates on the first key of a relation
        first, those reversed relations allows to select a different key. Of
        these, only [alias] has both priorities, because it is the only of those
        relations that is extended after graph construction. *)
-    (let$+$$ [to_; from] = ["to_"; "from"] in
+    (let$ [to_; from] = ["to_"; "from"] in
+     [alias ~to_ ~from] ==> rev_alias ~from ~to_);
+    (let$$ [to_; from] = ["to_"; "from"] in
      [alias ~to_ ~from] ==> rev_alias ~from ~to_);
     (let$ [to_; from] = ["to_"; "from"] in
      [use ~to_ ~from] ==> rev_use ~from ~to_);
@@ -361,25 +439,23 @@ let datalog_schedule =
     (let$ [base; relation; from] = ["base"; "relation"; "from"] in
      [coconstructor ~base relation ~from]
      ==> rev_coconstructor ~from relation ~base);
-    (* propagate
-
-       The [propagate] relation is part of the input of the solver, with the
-       intended meaning of this rule. That is an alias if [is_used] is used. *)
+    (* The [propagate] relation is part of the input of the solver, with the
+       intended meaning of this rule, that is, an alias if [is_used] is used. *)
     (let$ [if_used; to_; from] = ["if_used"; "to_"; "from"] in
      [any_usage if_used; propagate ~if_used ~to_ ~from] ==> alias ~to_ ~from);
     (* has_usage/has_source *)
     (let$ [x] = ["x"] in
      [any_usage x] ==> has_usage x);
-    (let$ [x; y] = ["x"; "y"] in
+    (let$$ [x; y] = ["x"; "y"] in
      [usages x y] ==> has_usage x);
     (let$ [x] = ["x"] in
      [any_source x] ==> has_source x);
-    (let$ [x; y] = ["x"; "y"] in
+    (let$$ [x; y] = ["x"; "y"] in
      [sources x y] ==> has_source x);
     (* usages rules:
 
-       By convention the Base name applies to something that represents a block
-       value (something on which an accessor or a constructor applies)
+       By convention the [base] name applies to something that represents a
+       block value (something on which an accessor or a constructor applies)
 
        usage_accessor and usage_coaccessor are the relation initialisation: they
        define what we mean by 'actually using' something. usage_alias
@@ -393,12 +469,12 @@ let datalog_schedule =
     (let$ [to_; from] = ["to_"; "from"] in
      [alias ~to_ ~from; any_usage to_] ==> any_usage from);
     (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-     [accessor ~to_ relation ~base; has_usage to_] ==> actual_usages base base);
+     [accessor ~to_ relation ~base; has_usage to_] ==> nontop_usages base base);
     (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
      [has_source to_; coaccessor ~to_ relation ~base]
-     ==> actual_usages base base);
+     ==> nontop_usages base base);
     (let$$ [to_; from; usage] = ["to_"; "from"; "usage"] in
-     [actual_usages to_ usage; alias ~to_ ~from] ==> actual_usages from usage);
+     [nontop_usages to_ usage; alias ~to_ ~from] ==> nontop_usages from usage);
     (* accessor-usage *)
     (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
      [ ~~(any_usage base);
@@ -414,7 +490,7 @@ let datalog_schedule =
      ==> field_usages base relation to_);
     (let$$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
      [ ~~(any_usage base);
-       actual_usages to_ _var;
+       nontop_usages to_ _var;
        ~~(field_usages_top base relation);
        accessor ~to_ relation ~base ]
      ==> field_usages base relation to_);
@@ -429,7 +505,7 @@ let datalog_schedule =
      [ ~~(any_usage from);
        ~~(field_usages_top base_use relation);
        constructor ~base relation ~from;
-       actual_usages base base_use;
+       nontop_usages base base_use;
        field_usages base_use relation to_ ]
      ==> alias ~to_ ~from);
     (let$$ [base; base_use; relation; from; to_] =
@@ -444,7 +520,7 @@ let datalog_schedule =
        ["base"; "base_use"; "relation"; "from"]
      in
      [ constructor ~base relation ~from;
-       actual_usages base base_use;
+       nontop_usages base base_use;
        field_usages_top base_use relation ]
      ==> any_usage from);
     (let$ [base; relation; from] = ["base"; "relation"; "from"] in
@@ -464,13 +540,13 @@ let datalog_schedule =
      [rev_alias ~from ~to_; any_source from] ==> any_source to_);
     (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
      [has_source from; rev_constructor ~from relation ~base]
-     ==> actual_sources base base);
+     ==> nontop_sources base base);
     (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
      [has_usage from; rev_coconstructor ~from relation ~base]
-     ==> actual_sources base base);
+     ==> nontop_sources base base);
     (let$$ [from; to_; source] = ["from"; "to_"; "source"] in
-     [actual_sources from source; rev_alias ~from ~to_]
-     ==> actual_sources to_ source);
+     [nontop_sources from source; rev_alias ~from ~to_]
+     ==> nontop_sources to_ source);
     (* constructor-sources *)
     (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
      [ ~~(any_source base);
@@ -490,7 +566,7 @@ let datalog_schedule =
      [ ~~(any_source base);
        ~~(field_sources_top base relation);
        rev_constructor ~from relation ~base;
-       actual_sources from _var ]
+       nontop_sources from _var ]
      ==> field_sources base relation from);
     (* coaccessor-sources *)
     (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
@@ -503,7 +579,7 @@ let datalog_schedule =
        ["base"; "base_use"; "relation"; "from"; "to_"]
      in
      [ coconstructor ~base relation ~from;
-       actual_usages base base_use;
+       nontop_usages base base_use;
        cofield_usages base_use relation to_ ]
      ==> alias ~to_:from ~from:to_);
     (let$ [base; relation; from] = ["base"; "relation"; "from"] in
@@ -515,7 +591,7 @@ let datalog_schedule =
      [ ~~(any_source to_);
        ~~(field_sources_top base_source relation);
        rev_accessor ~base relation ~to_;
-       actual_sources base base_source;
+       nontop_sources base base_source;
        field_sources base_source relation from ]
      ==> alias ~to_ ~from);
     (let$$ [base; base_source; relation; to_; from] =
@@ -530,7 +606,7 @@ let datalog_schedule =
        ["base"; "base_source"; "relation"; "to_"]
      in
      [ rev_accessor ~base relation ~to_;
-       actual_sources base base_source;
+       nontop_sources base base_source;
        field_sources_top base_source relation ]
      ==> any_source to_);
     (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
@@ -550,7 +626,7 @@ let datalog_schedule =
        ["base"; "base_source"; "relation"; "to_"; "from"]
      in
      [ rev_coaccessor ~base relation ~to_;
-       actual_sources base base_source;
+       nontop_sources base base_source;
        cofield_sources base_source relation from ]
      ==> alias ~to_:from ~from:to_);
     (* use *)
