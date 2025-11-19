@@ -1164,8 +1164,8 @@ module X86_peephole = struct
       | _, _ -> None)
     | _ -> None
 
-  (* Find a redundant CMP instruction with the same operands.
-     Returns Some cell if found, None otherwise. *)
+  (* Find a redundant CMP instruction with the same operands. Returns Some cell
+     if found, None otherwise. *)
   let find_redundant_cmp src dst start_cell =
     let rec loop cell_opt =
       match cell_opt with
@@ -1177,7 +1177,8 @@ module X86_peephole = struct
           then None
           else
             match[@warning "-4"] instr with
-            | CMP (src2, dst2) when equal_args src src2 && equal_args dst dst2 ->
+            | CMP (src2, dst2) when equal_args src src2 && equal_args dst dst2
+              ->
               (* Found a redundant CMP! *)
               Some cell
             | _ ->
@@ -1194,15 +1195,14 @@ module X86_peephole = struct
     in
     loop (DLL.next start_cell)
 
-  (* Rewrite rule: remove redundant CMP with identical operands.
-     Pattern: cmp A, B; ...; cmp A, B (where ... doesn't write flags or modify A or B)
-     Rewrite: cmp A, B; ...
+  (* Rewrite rule: remove redundant CMP with identical operands. Pattern: cmp A,
+     B; ...; cmp A, B (where ... doesn't write flags or modify A or B) Rewrite:
+     cmp A, B; ...
 
-     This is safe when:
-     - Both operands are registers (to avoid memory aliasing issues)
-     - Neither operand is modified between the two CMPs
-     - Flags are not written between the two CMPs (but can be read)
-     - No control flow or hard barriers between the CMPs *)
+     This is safe when: - Both operands are registers (to avoid memory aliasing
+     issues) - Neither operand is modified between the two CMPs - Flags are not
+     written between the two CMPs (but can be read) - No control flow or hard
+     barriers between the CMPs *)
   let remove_redundant_cmp cell =
     match[@warning "-4"] DLL.value cell with
     | Ins (CMP (src, dst)) -> (
