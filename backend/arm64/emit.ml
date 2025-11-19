@@ -1998,7 +1998,7 @@ let emit_instr i =
       |]
   | Lop (Intop Iadd128) ->
     DSL.ins I.ADDS
-      [| DSL.emit_reg i.res.(0);
+      [| DSL.emit_reg reg_tmp1;
          DSL.emit_reg i.arg.(0);
          DSL.emit_reg i.arg.(2)
       |];
@@ -2006,10 +2006,11 @@ let emit_instr i =
       [| DSL.emit_reg i.res.(1);
          DSL.emit_reg i.arg.(1);
          DSL.emit_reg i.arg.(3)
-      |]
+      |];
+    DSL.ins I.MOV [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_tmp1 |]
   | Lop (Intop Isub128) ->
     DSL.ins I.SUBS
-      [| DSL.emit_reg i.res.(0);
+      [| DSL.emit_reg reg_tmp1;
          DSL.emit_reg i.arg.(0);
          DSL.emit_reg i.arg.(2)
       |];
@@ -2017,7 +2018,8 @@ let emit_instr i =
       [| DSL.emit_reg i.res.(1);
          DSL.emit_reg i.arg.(1);
          DSL.emit_reg i.arg.(3)
-      |]
+      |];
+    DSL.ins I.MOV [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_tmp1 |]
   | Lop (Intop (Imul128 { signed = true })) ->
     DSL.ins I.MUL
       [| DSL.emit_reg reg_tmp1;

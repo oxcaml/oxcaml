@@ -252,9 +252,6 @@ let pseudoregs_for_operation op arg res =
   match (op : Operation.t) with
   | Specific (Isimd simd_op) ->
     Simd_selection.pseudoregs_for_operation simd_op arg res
-  | Intop (Iadd128 | Isub128) ->
-    (* Avoids clobbering inputs. *)
-    [| res.(0); res.(1); arg.(2); arg.(3) |], res
   | Specific
       ( Ifar_poll | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
       | Imulsubf | Inegmulsubf | Isqrtf | Imove32 | Ifar_alloc _
@@ -265,9 +262,7 @@ let pseudoregs_for_operation op arg res =
   | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
   | Stackoffset _ | Load _
   | Store (_, _, _)
-  | Intop
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ | Imul128 _ )
+  | Intop _
   | Intop_imm (_, _)
   | Intop_atomic _
   | Floatop (_, _)
