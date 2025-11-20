@@ -431,6 +431,50 @@ let reset_asm_code () =
    infrastructure and rules. *)
 
 module X86_peephole = struct
+  (* Statistics for peephole optimizations *)
+  type peephole_stats =
+    { mutable remove_mov_x_x : int;
+      mutable remove_useless_mov : int;
+      mutable remove_mov_chain : int;
+      mutable remove_mov_to_dead_register : int;
+      mutable rewrite_mov_sequence_to_xchg : int;
+      mutable rewrite_mov_add_to_lea : int;
+      mutable rewrite_mov_add_reg_to_lea : int;
+      mutable remove_redundant_cmp : int;
+      mutable combine_add_rsp : int
+    }
+
+  let create_peephole_stats () =
+    { remove_mov_x_x = 0;
+      remove_useless_mov = 0;
+      remove_mov_chain = 0;
+      remove_mov_to_dead_register = 0;
+      rewrite_mov_sequence_to_xchg = 0;
+      rewrite_mov_add_to_lea = 0;
+      rewrite_mov_add_reg_to_lea = 0;
+      remove_redundant_cmp = 0;
+      combine_add_rsp = 0
+    }
+
+  let peephole_stats_to_counters stats =
+    Profile.Counters.create ()
+    |> Profile.Counters.set "x86_peephole.remove_mov_x_x" stats.remove_mov_x_x
+    |> Profile.Counters.set "x86_peephole.remove_useless_mov"
+         stats.remove_useless_mov
+    |> Profile.Counters.set "x86_peephole.remove_mov_chain"
+         stats.remove_mov_chain
+    |> Profile.Counters.set "x86_peephole.remove_mov_to_dead_register"
+         stats.remove_mov_to_dead_register
+    |> Profile.Counters.set "x86_peephole.rewrite_mov_sequence_to_xchg"
+         stats.rewrite_mov_sequence_to_xchg
+    |> Profile.Counters.set "x86_peephole.rewrite_mov_add_to_lea"
+         stats.rewrite_mov_add_to_lea
+    |> Profile.Counters.set "x86_peephole.rewrite_mov_add_reg_to_lea"
+         stats.rewrite_mov_add_reg_to_lea
+    |> Profile.Counters.set "x86_peephole.remove_redundant_cmp"
+         stats.remove_redundant_cmp
+    |> Profile.Counters.set "x86_peephole.combine_add_rsp" stats.combine_add_rsp
+
   (* Equality functions for x86_ast types, avoiding polymorphic equality *)
 
   let equal_reg64 left right =
@@ -882,7 +926,7 @@ module X86_peephole = struct
      effects. On x86-64: - 32-bit moves (Reg32) zero the upper 32 bits - SIMD
      moves (Regf) may zero upper bits depending on instruction encoding So we
      only optimize 8/16/64-bit integer register self-moves. *)
-  let remove_mov_x_x cell =
+  let remove_mov_x_x stats cell =
     match[@warning "-4"] DLL.value cell with
     | Ins (MOV (src, dst)) when equal_args src dst && is_safe_self_move_arg src
       ->
@@ -890,11 +934,12 @@ module X86_peephole = struct
       let next = DLL.next cell in
       (* Delete the redundant instruction *)
       DLL.delete_curr cell;
+      stats.remove_mov_x_x <- stats.remove_mov_x_x + 1;
       (* Continue from the next cell *) Some next
     | _ -> None
 
   (* Rewrite rule: remove useless MOV x, y; MOV y, x pattern *)
-  let remove_useless_mov cell =
+  let remove_useless_mov stats cell =
     match get_cells cell 2 with
     | [cell1; cell2] -> (
       match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
@@ -904,6 +949,7 @@ module X86_peephole = struct
         let after_cell2 = DLL.next cell2 in
         (* Delete the second MOV (the first one is still useful) *)
         DLL.delete_curr cell2;
+        stats.remove_useless_mov <- stats.remove_useless_mov + 1;
         (* Continue from the cell after the deleted one *)
         Some after_cell2
       | _, _ -> None)
@@ -916,7 +962,7 @@ module X86_peephole = struct
 
      This only applies when d1 = -n1 and d2 = -n2 (i.e., the CFI offsets
      correctly track the stack adjustment). *)
-  let combine_add_rsp cell =
+  let combine_add_rsp stats cell =
     match get_cells cell 4 with
     | [cell1; cell2; cell3; cell4] -> (
       match[@warning "-4"]
@@ -942,6 +988,7 @@ module X86_peephole = struct
         (* Delete the redundant cells *)
         DLL.delete_curr cell3;
         DLL.delete_curr cell4;
+        stats.combine_add_rsp <- stats.combine_add_rsp + 1;
         (* Return cell1 to allow iterative combination of multiple ADDs *)
         Some (Some cell1)
       | _, _, _, _ -> None)
@@ -955,7 +1002,7 @@ module X86_peephole = struct
 
      Additionally, both x and y must be registers to ensure the rewritten
      instruction mov A, y is valid (x86 cannot have both operands as memory). *)
-  let remove_mov_chain cell =
+  let remove_mov_chain stats cell =
     match get_cells cell 3 with
     | [cell1; cell2; cell3] -> (
       match[@warning "-4"]
@@ -971,6 +1018,7 @@ module X86_peephole = struct
         DLL.set_value cell1 (Ins (MOV (src1, dst2)));
         DLL.set_value cell2 (Ins (MOV (src3, dst3)));
         DLL.delete_curr cell3;
+        stats.remove_mov_chain <- stats.remove_mov_chain + 1;
         (* Return cell1 to allow iterative combination of MOV chains *)
         Some (Some cell1)
       | _, _, _ -> None)
@@ -992,7 +1040,7 @@ module X86_peephole = struct
      semantics: y gets the value of A, and x is overwritten before being read.
 
      We restrict x to Reg64 to avoid register aliasing issues. *)
-  let remove_mov_to_dead_register cell =
+  let remove_mov_to_dead_register stats cell =
     match get_cells cell 2 with
     | [cell1; cell2] -> (
       match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
@@ -1007,6 +1055,8 @@ module X86_peephole = struct
           (* Rewrite to: mov A, y *)
           DLL.set_value cell1 (Ins (MOV (src1, dst2)));
           DLL.delete_curr cell2;
+          stats.remove_mov_to_dead_register
+            <- stats.remove_mov_to_dead_register + 1;
           (* Return cell1 to allow iterative combination *)
           Some (Some cell1)
         | ReadFound | NotFound ->
@@ -1023,7 +1073,7 @@ module X86_peephole = struct
      sequence (not read before next write)
 
      The transformation changes %b's final value, so %b must not be read. *)
-  let rewrite_mov_sequence_to_xchg cell =
+  let rewrite_mov_sequence_to_xchg stats cell =
     match get_cells cell 3 with
     | [cell1; cell2; cell3] -> (
       match[@warning "-4"]
@@ -1047,6 +1097,8 @@ module X86_peephole = struct
             DLL.set_value cell1 (Ins (XCHG (src1, src2)));
             DLL.delete_curr cell2;
             DLL.delete_curr cell3;
+            stats.rewrite_mov_sequence_to_xchg
+              <- stats.rewrite_mov_sequence_to_xchg + 1;
             (* Return the cell we modified *)
             Some (Some cell1)
           | NotFound | ReadFound -> None)
@@ -1092,7 +1144,7 @@ module X86_peephole = struct
 
      Key difference: ADD/SUB/INC/DEC set flags (CF, OF, SF, ZF, AF, PF), LEA
      doesn't. *)
-  let rewrite_mov_add_to_lea cell =
+  let rewrite_mov_add_to_lea stats cell =
     match get_cells cell 2 with
     | [cell1; cell2] -> (
       match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
@@ -1106,7 +1158,10 @@ module X86_peephole = struct
                && Int64.compare imm (Int64.of_int32 Int32.max_int) <= 0 ->
           (* Convert int64 to int - safe because we checked range *)
           let displ = Int64.to_int imm in
-          apply_lea_optimization cell1 cell2 dst1 a None displ
+          let result = apply_lea_optimization cell1 cell2 dst1 a None displ in
+          if Option.is_some result
+          then stats.rewrite_mov_add_to_lea <- stats.rewrite_mov_add_to_lea + 1;
+          result
         | _, _, _, _ -> None)
       | Ins (MOV (src1, dst1)), Ins (SUB (src2, dst2)) when equal_args dst1 dst2
         -> (
@@ -1120,19 +1175,28 @@ module X86_peephole = struct
                && Int64.compare imm (Int64.of_int32 Int32.max_int) <= 0 ->
           (* Negate the immediate: sub $CONST, %b becomes lea -CONST(%a), %b *)
           let displ = Int64.to_int (Int64.neg imm) in
-          apply_lea_optimization cell1 cell2 dst1 a None displ
+          let result = apply_lea_optimization cell1 cell2 dst1 a None displ in
+          if Option.is_some result
+          then stats.rewrite_mov_add_to_lea <- stats.rewrite_mov_add_to_lea + 1;
+          result
         | _, _, _, _ -> None)
       | Ins (MOV (src1, dst1)), Ins (INC dst2) when equal_args dst1 dst2 -> (
         (* Pattern: mov %a, %b; inc %b *)
         match src1, dst1, dst2 with
         | Reg64 a, Reg64 b, Reg64 b' when equal_reg64 b b' ->
-          apply_lea_optimization cell1 cell2 dst1 a None 1
+          let result = apply_lea_optimization cell1 cell2 dst1 a None 1 in
+          if Option.is_some result
+          then stats.rewrite_mov_add_to_lea <- stats.rewrite_mov_add_to_lea + 1;
+          result
         | _, _, _ -> None)
       | Ins (MOV (src1, dst1)), Ins (DEC dst2) when equal_args dst1 dst2 -> (
         (* Pattern: mov %a, %b; dec %b *)
         match src1, dst1, dst2 with
         | Reg64 a, Reg64 b, Reg64 b' when equal_reg64 b b' ->
-          apply_lea_optimization cell1 cell2 dst1 a None (-1)
+          let result = apply_lea_optimization cell1 cell2 dst1 a None (-1) in
+          if Option.is_some result
+          then stats.rewrite_mov_add_to_lea <- stats.rewrite_mov_add_to_lea + 1;
+          result
         | _, _, _ -> None)
       | _, _ -> None)
     | _ -> None
@@ -1149,7 +1213,7 @@ module X86_peephole = struct
      scale = -1, which is not supported by x86-64.
 
      Key difference: ADD sets flags (CF, OF, SF, ZF, AF, PF), LEA doesn't. *)
-  let rewrite_mov_add_reg_to_lea cell =
+  let rewrite_mov_add_reg_to_lea stats cell =
     match get_cells cell 2 with
     | [cell1; cell2] -> (
       match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
@@ -1159,7 +1223,12 @@ module X86_peephole = struct
         match src1, dst1, src2, dst2 with
         | Reg64 a, Reg64 b, Reg64 c, Reg64 b'
           when equal_reg64 b b' && not (equal_reg64 b c) ->
-          apply_lea_optimization cell1 cell2 dst1 c (Some a) 0
+          let result = apply_lea_optimization cell1 cell2 dst1 c (Some a) 0 in
+          if Option.is_some result
+          then
+            stats.rewrite_mov_add_reg_to_lea
+              <- stats.rewrite_mov_add_reg_to_lea + 1;
+          result
         | _, _, _, _ -> None)
       | _, _ -> None)
     | _ -> None
@@ -1203,7 +1272,7 @@ module X86_peephole = struct
      issues) - Neither operand is modified between the two CMPs - Flags are not
      written between the two CMPs (but can be read) - No control flow or hard
      barriers between the CMPs *)
-  let remove_redundant_cmp cell =
+  let remove_redundant_cmp stats cell =
     match[@warning "-4"] DLL.value cell with
     | Ins (CMP (src, dst)) -> (
       (* Only optimize register-register comparisons to avoid aliasing issues *)
@@ -1215,6 +1284,7 @@ module X86_peephole = struct
         | Some redundant_cell ->
           (* Delete the redundant CMP *)
           DLL.delete_curr redundant_cell;
+          stats.remove_redundant_cmp <- stats.remove_redundant_cmp + 1;
           (* Return the first CMP cell to allow iterative removal *)
           Some (Some cell)
         | None -> None)
@@ -1223,38 +1293,38 @@ module X86_peephole = struct
 
   (* Apply all rewrite rules in sequence. Returns Some continuation_cell if a
      rule matched, None otherwise. *)
-  let apply_rules cell =
-    match remove_mov_x_x cell with
+  let apply_rules stats cell =
+    match remove_mov_x_x stats cell with
     | Some cont -> Some cont
     | None -> (
-      match remove_useless_mov cell with
+      match remove_useless_mov stats cell with
       | Some cont -> Some cont
       | None -> (
-        match remove_mov_chain cell with
+        match remove_mov_chain stats cell with
         | Some cont -> Some cont
         | None -> (
-          match remove_mov_to_dead_register cell with
+          match remove_mov_to_dead_register stats cell with
           | Some cont -> Some cont
           | None -> (
-            match rewrite_mov_sequence_to_xchg cell with
+            match rewrite_mov_sequence_to_xchg stats cell with
             | Some cont -> Some cont
             | None -> (
-              match rewrite_mov_add_to_lea cell with
+              match rewrite_mov_add_to_lea stats cell with
               | Some cont -> Some cont
               | None -> (
-                match rewrite_mov_add_reg_to_lea cell with
+                match rewrite_mov_add_reg_to_lea stats cell with
                 | Some cont -> Some cont
                 | None -> (
-                  match remove_redundant_cmp cell with
+                  match remove_redundant_cmp stats cell with
                   | Some cont -> Some cont
                   | None -> (
-                    match combine_add_rsp cell with
+                    match combine_add_rsp stats cell with
                     | Some cont -> Some cont
                     | None -> None))))))))
 
   (* Main optimization loop for a single asm_program. Iterates through the
      instruction list, applying rewrite rules and respecting hard barriers. *)
-  let peephole_optimize_asm_program asm_program =
+  let peephole_optimize_asm_program stats asm_program =
     let rec optimize_from cell_opt =
       match cell_opt with
       | None -> ()
@@ -1264,7 +1334,7 @@ module X86_peephole = struct
           (* Skip hard barriers and continue after them *)
           optimize_from (DLL.next cell)
         else
-          match apply_rules cell with
+          match apply_rules stats cell with
           | Some continuation_cell ->
             (* A rule was applied, continue from the continuation point *)
             optimize_from continuation_cell
@@ -1277,15 +1347,22 @@ end
 
 let generate_code asm =
   (* Apply peephole optimizations to all sections *)
-  if !Oxcaml_flags.x86_peephole_optimize
-  then (
-    X86_peephole.peephole_optimize_asm_program asm_code;
-    Section_name.Tbl.iter
-      (fun _name section -> X86_peephole.peephole_optimize_asm_program section)
-      asm_code_by_section;
-    Section_name.Tbl.iter
-      (fun _name section -> X86_peephole.peephole_optimize_asm_program section)
-      delayed_sections);
+  (if !Oxcaml_flags.x86_peephole_optimize
+  then
+    let stats = X86_peephole.create_peephole_stats () in
+    let counter_f () = X86_peephole.peephole_stats_to_counters stats in
+    Profile.record_with_counters ~accumulate:true ~counter_f "x86_peephole"
+      (fun () ->
+        X86_peephole.peephole_optimize_asm_program stats asm_code;
+        Section_name.Tbl.iter
+          (fun _name section ->
+            X86_peephole.peephole_optimize_asm_program stats section)
+          asm_code_by_section;
+        Section_name.Tbl.iter
+          (fun _name section ->
+            X86_peephole.peephole_optimize_asm_program stats section)
+          delayed_sections)
+      ());
   (match asm with
   | Some f -> Profile.record ~accumulate:true "write_asm" f asm_code
   | None -> ());
