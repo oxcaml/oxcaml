@@ -740,7 +740,7 @@ and transl_structure ~scopes loc
       | Tstr_value(rec_flag, pat_expr_list) ->
           (* Translate bindings first *)
           let mk_lam_let =
-            transl_let ~scopes ~return_layout:Lambda.layout_unit
+            transl_let ~scopes ~return_layout:Lambda.layout_module
               ~in_structure:true rec_flag pat_expr_list
           in
           let ext_fields =
