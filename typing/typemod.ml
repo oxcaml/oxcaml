@@ -51,16 +51,6 @@ type functor_dependency_error =
     Functor_applied
   | Functor_included
 
-type legacy_module =
-  | Compilation_unit
-  | Toplevel
-  | Functor_body
-
-let print_legacy_module ppf = function
-  | Compilation_unit -> Format.fprintf ppf "compilation unit"
-  | Functor_body -> Format.fprintf ppf "functor body"
-  | Toplevel -> Format.fprintf ppf "toplevel"
-
 type unsupported_modal_module =
   | Functor_param
   | Functor_res
@@ -122,18 +112,10 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
-  | Submode_failed of Mode.Value.error
-  | Item_weaker_than_structure of Mode.Value.error
   | Unsupported_modal_module of unsupported_modal_module
-  | Legacy_module of legacy_module * Mode.Value.error
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
-
-let submode ~loc ~env mode expected_mode =
-  match Value.submode mode expected_mode with
-  | Ok () -> ()
-  | Error e -> raise (Error (loc, env, Submode_failed e))
 
 let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   let mode = Mode.Value.newvar () in
@@ -2018,14 +2000,10 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
     let loc = item.psig_loc in
     match item.psig_desc with
     | Psig_value sdesc ->
-        let modalities =
-          match sdesc.pval_modalities with
-          | [] -> sig_modalities
-          | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
-        in
-        let modalities = Mode.Modality.of_const modalities in
-        let (tdesc, newenv) =
-          Typedecl.transl_value_decl env ~modalities item.psig_loc sdesc
+        let (tdesc, _, newenv) =
+          Typedecl.transl_value_decl
+            (Sig_value (Value.(disallow_right legacy), sig_modalities))
+            env item.psig_loc sdesc
         in
         Signature_names.check_value names tdesc.val_loc tdesc.val_id;
         mksig (Tsig_value tdesc) env loc,
@@ -2828,7 +2806,10 @@ let simplify_app_summary app_view = match app_view.arg with
     | false, Some p -> Includemod.Error.Named p, mty, mode
     | false, None   -> Includemod.Error.Anonymous, mty, mode
 
-let infer_modalities ~loc ~env ~md_mode ~mode =
+(** [pp] is the [pinpoint] of some value, while [is_contained_by] describes how
+      that value is contained in a structure. [md_mode] is the mode of the
+      structure and [mode] is the mode of the value. *)
+let infer_modalities pp is_contained_by ~md_mode ~mode =
     (* Values are packed into a structure at modes weaker than they actually
       are. This is to allow our legacy zapping behavior. For example:
 
@@ -2850,48 +2831,52 @@ let infer_modalities ~loc ~env ~md_mode ~mode =
     For monadic (descriptive) axes, the restriction is not on the
     construction but on the projection, which is modelled by the
     [Diff] modality in [mode.ml]. *)
-    begin match Mode.Value.Comonadic.submode
-      mode.Mode.comonadic
-      md_mode.Mode.comonadic with
-      | Ok () -> ()
-      | Error e ->
-          raise (Error (loc, env, Item_weaker_than_structure (Comonadic e)))
-    end;
+    let mode' = Mode.(
+      md_mode.comonadic |>
+      Value.Comonadic.apply_hint (Is_contained_by (Comonadic, is_contained_by)))
+    in
+    Mode.Value.Comonadic.submode_err pp
+
+      mode.Mode.comonadic mode';
     Mode.Modality.infer ~md_mode ~mode
 
-(** Given a signature [sg] to be included in a structure. The signature contains
-  modalities relative to [mode], this function returns a signature with
-  modalities relative to [md_mode].  *)
-let rebase_modalities ~loc ~env ~md_mode ~mode sg =
+(** Given the signature [sg] of a structure (at [loc]) at mode [mode], where the
+  structure is to be included in another structure (at [loc_md]) at mode
+  [md_mode], return a copy of [sg] where the modalities are rebased from
+  [mode] to [md_mode]. *)
+let rebase_modalities ~loc ~loc_md ~md_mode ~mode sg =
   List.map (function
     | Sig_value (id, vd, vis) ->
         let mode = Mode.Modality.apply vd.val_modalities mode in
-        let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
+        let pp : Mode.Hint.pinpoint = (loc, Structure_item (Value, id)) in
+        let is_contained_by : Mode.Hint.is_contained_by = {containing = Structure (Value, id); container = loc_md} in
+        let val_modalities = infer_modalities pp is_contained_by ~md_mode ~mode in
         let vd = {vd with val_modalities} in
         Sig_value (id, vd, vis)
     | Sig_module (id, pres, md, rec_, vis) ->
         let mode = Mode.Modality.apply md.md_modalities mode in
-        let md_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
+        let pp : Mode.Hint.pinpoint = (loc, Structure_item (Module, id)) in
+        let is_contained_by : Mode.Hint.is_contained_by = {containing = Structure (Module, id); container = loc_md} in
+        let md_modalities = infer_modalities pp is_contained_by ~md_mode ~mode in
         let md = {md with md_modalities} in
         Sig_module (id, pres, md, rec_, vis)
     | item -> item
     ) sg
 
-let rec type_module ?alias sttn funct_body anchor env ?expected_mode smod =
+let rec type_module ?alias sttn funct_body anchor env smod =
   let md, shape =
     type_module_maybe_hold_locks ?alias ~hold_locks:false sttn funct_body anchor
-      env ?expected_mode smod
+      env smod
   in
   md, shape
 
 and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body
-  anchor env ?expected_mode smod =
+  anchor env smod =
   Builtin_attributes.warning_scope smod.pmod_attributes
     (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env
-      ?expected_mode smod)
+      smod)
 
-and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
-  ?expected_mode smod =
+and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
   (* If the module is an identifier, there might be locks between the
   declaration site and the use site.
   - If [hold_locks] is [true], the locks are held and stored in [mod_mode].
@@ -2908,7 +2893,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
   | Pmod_structure sstr ->
       Env.check_no_open_quotations smod.pmod_loc env Env.Struct_qt;
       let (str, sg, mode, names, shape, _finalenv) =
-        type_structure funct_body anchor env ?expected_mode sstr in
+        type_structure funct_body anchor env sstr in
       let md =
         { mod_desc = Tmod_structure str;
           mod_type = Mty_signature sg;
@@ -2926,7 +2911,6 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
       let _, mode = register_allocation () in
-      Option.iter (fun x -> Value.submode mode x |> ignore) expected_mode;
       let newenv =
         Env.add_closure_lock (smod.pmod_loc, Functor) mode.comonadic env
       in
@@ -2962,18 +2946,10 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
           Named (id, param, mty), Types.Named (id, mty.mty_type), newenv,
           var, true
       in
-      let expected_mode =
-        alloc_as_value Types.functor_res_mode |> Value.disallow_left
-      in
-      let body, body_shape =
-        type_module true funct_body None newenv ~expected_mode sbody
-      in
+      let body, body_shape = type_module true funct_body None newenv sbody in
       let body_mode = mode_without_locks_exn body.mod_mode in
-      begin match Value.submode body_mode  expected_mode with
-      | Ok () -> ()
-      | Error e -> raise (Error (sbody.pmod_loc, newenv,
-          Legacy_module (Functor_body, e)))
-      end;
+      Value.submode_err (body.mod_loc, Module) body_mode
+        (alloc_as_value Types.functor_res_mode);
       { mod_desc = Tmod_functor(t_arg, body);
         mod_type = Mty_functor(ty_arg, body.mod_type);
         mod_mode = Value.disallow_right mode, None;
@@ -2992,7 +2968,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       in
       let arg, arg_shape =
         type_module_maybe_hold_locks ~alias ~hold_locks true funct_body
-          anchor env ~expected_mode:(mode |> Value.disallow_left) sarg
+          anchor env sarg
       in
       let md, final_shape =
         match smty with
@@ -3003,7 +2979,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
             currently impossible because inferred modalities can't be on the
             RHS. *)
             let arg_mode = Typedtree.mode_without_locks_exn arg.mod_mode in
-            submode ~loc:sarg.pmod_loc ~env arg_mode mode;
+            Value.submode_err (sarg.pmod_loc, Module) arg_mode mode;
             { arg with mod_mode = (Mode.Value.disallow_right mode, None)},
             arg_shape
         | Some smty ->
@@ -3335,12 +3311,16 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     } in
     open_descr, mode, sg, newenv
 
-and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
-  sstr =
+and type_structure ?(toplevel = None) funct_body anchor env sstr =
   let names = Signature_names.create () in
   let _, md_mode = register_allocation () in
-  Option.iter (fun x -> Value.submode md_mode x |> ignore)
-    expected_mode;
+  let loc_md =
+    sstr
+    |> List.map (fun {pstr_loc; _} -> pstr_loc)
+    |> function
+    | [] -> Location.none
+    | (_ :: _) as xs -> Location.merge xs
+  in
 
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
@@ -3367,7 +3347,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
       Env.enter_signature_and_shape ~scope ~parent_shape:shape_map
         modl_shape sg ~mode env
     in
-    let sg = rebase_modalities ~loc ~env ~md_mode ~mode sg in
+    let sg = rebase_modalities ~loc ~loc_md ~md_mode ~mode sg in
     Signature_group.iter (Signature_names.check_sig_item names loc) sg;
     let incl =
       { incl_mod = modl;
@@ -3470,8 +3450,12 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
               Signature_names.check_value names first_loc id;
               let vd, mode =  Env.find_value_no_locks_exn id newenv in
               let vd = Subst.Lazy.force_value_description vd in
+              let pp : Mode.Hint.pinpoint = (first_loc, Expression) in
+              let is_contained_by : Mode.Hint.is_contained_by =
+                {containing = Structure (Value, id); container = loc_md}
+              in
               let modalities =
-                infer_modalities ~loc:first_loc ~env ~md_mode ~mode
+                infer_modalities pp is_contained_by ~md_mode ~mode
               in
               let vd =
                 { vd with
@@ -3489,21 +3473,17 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         shape_map,
         newenv
     | Pstr_primitive sdesc ->
-        (* primitive in structure still carries modalities, which doesn't make
-        sense. We convert them to modes. *)
-        (* CR zqian: remove this hack *)
-        let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
-        let modes = List.map modality_to_mode sdesc.pval_modalities in
-        let mode =
-          modes
-          |> Typemode.transl_alloc_mode
-          |> Alloc.of_const
-          |> alloc_as_value
+        let (desc, mode, newenv) =
+          Typedecl.transl_value_decl Str_primitive env loc sdesc
         in
-        let modalities = infer_modalities ~loc ~env ~md_mode ~mode in
-        let (desc, newenv) =
-          Typedecl.transl_value_decl env ~modalities loc sdesc
+        let pp : Mode.Hint.pinpoint = (desc.val_loc, Expression) in
+        let is_contained_by : Mode.Hint.is_contained_by =
+          {containing = Structure (Value, desc.val_id); container = loc_md}
         in
+        (* [val_modalities] is trivially [id], we rebase it on top of the structure's mode. *)
+        let val_modalities = infer_modalities pp is_contained_by ~md_mode ~mode in
+        let val_val = {desc.val_val with val_modalities} in
+        let desc = {desc with val_val} in
         Signature_names.check_value names desc.val_loc desc.val_id;
         Tstr_primitive desc,
         [Sig_value(desc.val_id, desc.val_val, Exported)],
@@ -3580,10 +3560,9 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         in
         let md_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
         let mode = mode_without_locks_exn modl.mod_mode in
-        let md_modalities = infer_modalities ~loc:pmb_loc ~env ~md_mode ~mode in
         let md =
           { md_type = enrich_module_type anchor name.txt modl.mod_type env;
-            md_modalities;
+            md_modalities = Modality.id;
             md_attributes = attrs;
             md_loc = pmb_loc;
             md_uid;
@@ -3597,9 +3576,16 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
           | None -> None, env, []
           | Some name ->
             let id, e = Env.enter_module_declaration
-              ~scope ~shape:md_shape name pres md ~mode:md_mode env
+              ~scope ~shape:md_shape name pres md ~mode env
             in
             Signature_names.check_module names pmb_loc id;
+            let pp : Mode.Hint.pinpoint = (modl.mod_loc, Module) in
+            let is_contained_by : Mode.Hint.is_contained_by =
+              {containing = Structure (Module, id); container = loc_md}
+            in
+            let md_modalities =
+              infer_modalities pp is_contained_by ~md_mode ~mode
+            in
             Some id, e,
             [Sig_module(id, pres,
                         {md_type = modl.mod_type;
@@ -3699,8 +3685,12 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         Tstr_recmodule (List.map (fun (mb, _, _) -> mb) bindings2),
         map_rec (fun rs (id, mb, uid, _shape) ->
             let mode = mode_without_locks_exn mb.mb_expr.mod_mode in
+            let pp : Mode.Hint.pinpoint = (mb.mb_expr.mod_loc, Module) in
+            let is_contained_by : Mode.Hint.is_contained_by =
+              {containing = Structure (Module, id); container = loc_md}
+            in
             let md_modalities =
-              infer_modalities ~loc:mb.mb_loc ~env ~md_mode ~mode
+              infer_modalities pp is_contained_by ~md_mode ~mode
             in
             Sig_module(id, Mp_present, {
                 md_type=mb.mb_expr.mod_type;
@@ -3724,15 +3714,28 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         let (od, mode, sg, newenv) =
           type_open_decl ~toplevel funct_body names env sod
         in
-        let sg = rebase_modalities ~loc ~env ~md_mode ~mode sg in
+        let sg = rebase_modalities ~loc ~loc_md ~md_mode ~mode sg in
         Tstr_open od, sg, shape_map, newenv
     | Pstr_class cl ->
-        begin match Mode.Value.submode Value.legacy md_mode with
-          | Ok () -> ()
-          | Error e ->
-              raise (Error (loc, env, Item_weaker_than_structure e))
-        end;
         let (classes, new_env) = Typeclass.class_declarations env cl in
+        let first_id, first_loc =
+          classes |> List.hd
+          |> fun (cls : _ Typeclass.class_info) -> cls.cls_id, cls.cls_decl.cty_loc
+        in
+        let {monadic; comonadic} = md_mode in
+        let is_contained_by : Mode.Hint.is_contained_by =
+          {containing = Structure (Class, first_id); container = loc_md}
+        in
+        let monadic =
+          monadic
+          |> Value.Monadic.apply_hint (Is_contained_by (Monadic, is_contained_by))
+        in
+        let comonadic =
+          comonadic
+          |> Value.Comonadic.apply_hint (Is_contained_by (Comonadic, is_contained_by))
+        in
+        Mode.Value.submode_err (first_loc, Class)
+          Types.class_mode {monadic; comonadic};
         let shape_map = List.fold_left (fun acc cls ->
             let open Typeclass in
             let loc = cls.cls_id_loc.Location.loc in
@@ -3851,13 +3854,11 @@ let type_toplevel_phrase env sig_acc s =
   Env.reset_required_globals ();
   Env.reset_probes ();
   Typecore.reset_allocations ();
-  let expected_mode = Value.(legacy |> disallow_left) in
+  let hint : _ Hint.const = Legacy Toplevel in
+  let expected_mode = Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy) in
   let (str, sg, mode, to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) false None env ~expected_mode s in
-  begin match Value.submode mode Value.legacy with
-  | Ok () -> ()
-  | Error e -> raise (Error (Location.none, env, (Legacy_module (Toplevel, e))))
-  end;
+    type_structure ~toplevel:(Some sig_acc) false None env s in
+  Value.submode_err (Location.none, Structure) mode expected_mode;
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
   Typecore.optimise_allocations ();
@@ -4152,14 +4153,11 @@ let type_implementation target modulename initial_env ast =
         ignore @@ Warnings.parse_options false "-32-34-37-38-60";
       if !Clflags.as_parameter then
         error Cannot_compile_implementation_as_parameter;
-      let expected_mode = Env.mode_unit |> Value.disallow_left in
       let (str, sg, mode, names, shape, finalenv) =
-        Profile.record_call "infer" (fun () ->
-          type_structure initial_env ~expected_mode ast) in
-      begin match Value.submode mode Env.mode_unit with
-      | Ok () -> ()
-      | Error e -> error (Legacy_module (Compilation_unit, e))
-      end;
+        Profile.record_call "infer" (fun () -> type_structure initial_env ast)
+      in
+      Value.submode_err (Location.in_file sourcefile, Structure)
+        mode Env.mode_unit;
       let uid = Uid.of_compilation_unit_id modulename in
       let shape = Shape.set_uid_if_none shape uid in
       if !Clflags.binary_annotations_cms then
@@ -4809,37 +4807,10 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
-  | Item_weaker_than_structure e ->
-      let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
-      let d =
-        match ax with
-        | Comonadic Areality -> Format.dprintf "a structure"
-        | _ ->
-            Format.dprintf "a %a structure"
-              (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
-      in
-      Location.errorf ~loc
-        "This is %a, but expected to be %a because it is inside %t."
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
-        d
-  | Submode_failed e ->
-      let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
-      Location.errorf ~loc
-        "This is %a, but expected to be %a."
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
   | Unsupported_modal_module e ->
       Location.errorf ~loc
         "Mode annotations on %a are not supported yet."
         print_unsupported_modal_module e
-  | Legacy_module (reason, e) ->
-      let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
-      Location.errorf ~loc
-        "This is %a, but expected to be %a because it is a %a."
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
-        print_legacy_module reason
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env_error env

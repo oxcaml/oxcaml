@@ -34,9 +34,19 @@ val transl_type_extension:
     bool -> Env.t -> Location.t -> Parsetree.type_extension ->
     Typedtree.type_extension * Env.t * Shape.t list
 
+type transl_value_decl_kind =
+  | Str_primitive
+  (** A primitive in structure, in which case the modalities are treated as
+    modes. *)
+  (* CR zqian: avoid this hack *)
+  | Sig_value of Mode.Value.l * Mode.Modality.Const.t
+  (** A value description in a signature, in which case we require the mode of
+      the structure that the modalities are based on, as well as the default
+      modalities of the signature. *)
+
 val transl_value_decl:
-    Env.t -> modalities:Mode.Modality.t -> Location.t ->
-    Parsetree.value_description -> Typedtree.value_description * Env.t
+    transl_value_decl_kind -> Env.t -> Location.t ->
+    Parsetree.value_description -> Typedtree.value_description * Mode.Value.l * Env.t
 
 (* If the [fixed_row_path] optional argument is provided,
    the [Parsetree.type_declaration] argument should satisfy [is_fixed_type] *)

@@ -1239,3 +1239,4 @@ val set_commu_ok: commutable -> unit
 
 val functor_param_mode : Mode.Alloc.lr
 val functor_res_mode : Mode.Alloc.lr
+val class_mode : Mode.Value.lr

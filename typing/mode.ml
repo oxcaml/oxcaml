@@ -190,31 +190,29 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         fun (type l r) (h : (allowed * r) t) : (l * r) t ->
          match h with
          | Unknown -> Unknown
-         | Class_legacy_comonadic -> Class_legacy_comonadic
          | Stack_expression -> Stack_expression
          | Mutable_read m -> Mutable_read m
          | Mutable_write m -> Mutable_write m
          | Lazy_forced -> Lazy_forced
+         | Legacy x -> Legacy x
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
         fun (type l r) (h : (l * allowed) t) : (l * r) t ->
          match h with
          | Unknown -> Unknown
-         | Class_legacy_monadic -> Class_legacy_monadic
          | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
          | Tailcall_function -> Tailcall_function
          | Tailcall_argument -> Tailcall_argument
          | Function_return -> Function_return
          | Module_allocated_on_heap -> Module_allocated_on_heap
          | Is_used_in pp -> Is_used_in pp
+         | Legacy x -> Legacy x
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
         fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
          match h with
          | Unknown -> Unknown
          | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
-         | Class_legacy_comonadic -> Class_legacy_comonadic
-         | Class_legacy_monadic -> Class_legacy_monadic
          | Tailcall_function -> Tailcall_function
          | Tailcall_argument -> Tailcall_argument
          | Mutable_read m -> Mutable_read m
@@ -224,14 +222,13 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Stack_expression -> Stack_expression
          | Module_allocated_on_heap -> Module_allocated_on_heap
          | Is_used_in pp -> Is_used_in pp
+         | Legacy x -> Legacy x
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
         fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
          match h with
          | Unknown -> Unknown
          | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
-         | Class_legacy_comonadic -> Class_legacy_comonadic
-         | Class_legacy_monadic -> Class_legacy_monadic
          | Tailcall_function -> Tailcall_function
          | Tailcall_argument -> Tailcall_argument
          | Mutable_read m -> Mutable_read m
@@ -241,6 +238,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Stack_expression -> Stack_expression
          | Module_allocated_on_heap -> Module_allocated_on_heap
          | Is_used_in pp -> Is_used_in pp
+         | Legacy x -> Legacy x
     end)
   end
 end
@@ -2052,6 +2050,12 @@ module Report = struct
     | Value -> print_article_noun Consonant "value"
     | Constructor -> print_article_noun Consonant "constructor"
 
+  let print_structure_item : structure_item -> _ =
+   fun (category, id) ~capitalize ->
+    dprintf "%t %a"
+      (print_lock_item ~definite:true ~capitalize category)
+      Misc.Style.inline_code (Ident.name id)
+
   let print_pinpoint_desc : pinpoint_desc -> _ = function
     | Unknown -> None
     | Ident { category; lid } ->
@@ -2070,6 +2074,15 @@ module Report = struct
     | Object -> Some (print_article_noun Vowel "object")
     | Loop -> Some (print_article_noun Consonant "loop")
     | Letop -> Some (print_article_noun Consonant "letop")
+    | Module -> Some (print_article_noun Consonant "module")
+    | Structure -> Some (print_article_noun Consonant "structure")
+    | Structure_item x ->
+      Some
+        (fun ~definite ~capitalize ->
+          dprintf "%t in %t"
+            (print_structure_item ~capitalize x)
+            (print_article_noun ~definite ~capitalize:false Consonant
+               "structure"))
 
   let print_pinpoint : pinpoint -> _ =
    fun (loc, desc) ->
@@ -2090,9 +2103,16 @@ module Report = struct
     | Record_field s -> fprintf ppf "mutable field %a" Misc.Style.inline_code s
     | Array_elements -> fprintf ppf "array elements"
 
+  let print_legacy = function
+    | Functor_return -> print_article_noun Consonant "functor return"
+    | Toplevel -> print_article_noun Consonant "top-level clause"
+    | Compilation_unit -> print_article_noun Consonant "compilation unit"
+    | Class -> print_article_noun Consonant "class"
+
   (** Given a pinpoint and a const, where the pinpoint has been expressed,
   prints the const to explain the mode on the pinpoint. *)
-  let print_const (type l r) (_, pp_desc) ppf : (l * r) const -> unit = function
+  let print_const (type l r) ((_, pp_desc) : pinpoint) ppf :
+      (l * r) const -> unit = function
     | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
     | Lazy_allocated_on_heap ->
       (match pp_desc with
@@ -2101,13 +2121,6 @@ module Report = struct
         pp_print_string ppf "lazy expressions always need"
       | _ -> pp_print_string ppf "it is a lazy expression and thus needs");
       pp_print_string ppf " to be allocated on the heap"
-    | Class_legacy_monadic | Class_legacy_comonadic ->
-      (match pp_desc with
-      | Ident { category = Class; _ } ->
-        (* if we already said it's a class, we don't need to emphasize it again. *)
-        pp_print_string ppf "classes are always"
-      | _ -> pp_print_string ppf "it is a class and thus");
-      pp_print_string ppf " at the legacy modes"
     | Tailcall_function ->
       pp_print_string ppf "it is the function in a tail call"
     | Tailcall_argument ->
@@ -2138,6 +2151,14 @@ module Report = struct
       let print_pp = print_pinpoint pp |> Option.get in
       fprintf ppf "it is used in %t"
         (print_pp ~definite:false ~capitalize:false)
+    | Legacy m -> (
+      match pp_desc, m with
+      | (Ident { category = Class; _ } | Class), Class ->
+        (* if we already said it's a class, we don't need to emphasize it again. *)
+        pp_print_string ppf "classes are always at the legacy modes"
+      | _ ->
+        fprintf ppf "it is %t and thus always at the legacy modes"
+          (print_legacy m ~definite:false ~capitalize:false))
 
   let print_allocation_l : allocation -> formatter -> unit =
    fun { txt; loc } ->
@@ -2186,6 +2207,10 @@ module Report = struct
              | Constructor s ->
                dprintf "contains (via constructor %a) %t" Misc.Style.inline_code
                  s print_pp
+             | Structure x ->
+               dprintf "is a structure that contains %t defined as %t"
+                 (print_structure_item ~capitalize:false x)
+                 print_pp
            in
            pr, contained)
 
@@ -2204,6 +2229,10 @@ module Report = struct
       | Constructor s ->
         dprintf "is contained (via constructor %a) in the value at %a"
           Misc.Style.inline_code s Location.print_loc container
+      | Structure x ->
+        dprintf "is %t in the structure at %a"
+          (print_structure_item ~capitalize:false x)
+          Location.print_loc container
     in
     let pp = container, Expression in
     pr, pp
