@@ -559,9 +559,9 @@
   linear
   internal_assembler
   operation
-  peephole_optimize
-  peephole_rules
-  peephole_utils
+  cfg_peephole_optimize
+  cfg_peephole_rules
+  cfg_peephole_utils
   printcmm
   printlinear
   printoperation

@@ -2,7 +2,7 @@
 
 open! Int_replace_polymorphic_compare
 module DLL = Oxcaml_utils.Doubly_linked_list
-module R = Peephole_rules
+module R = Cfg_peephole_rules
 
 (* We currently don't check that the peephole optimizer terminates. In the case
    that the peephole optimization does not terminate we limit the number of

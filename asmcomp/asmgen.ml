@@ -422,7 +422,7 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
      the CI because the liveness_analysis algorithm does not work properly after
      register allocation. *)
   ++ cfg_with_layout_profile ~accumulate:true "peephole_optimize_cfg"
-       Peephole_optimize.peephole_optimize_cfg
+       Cfg_peephole_optimize.peephole_optimize_cfg
   ++ (fun (cfg_with_layout : Cfg_with_layout.t) ->
        match !Oxcaml_flags.cfg_stack_checks with
        | false -> cfg_with_layout
