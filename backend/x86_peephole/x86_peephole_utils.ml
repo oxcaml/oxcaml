@@ -128,7 +128,7 @@ let get_cells cell n =
   loop [] n (Some cell)
 
 let equal_args arg1 arg2 =
-  match[@warning "-4"] arg1, arg2 with
+  match arg1, arg2 with
   | Imm i1, Imm i2 -> Int64.equal i1 i2
   | Sym s1, Sym s2 -> String.equal s1 s2
   | Reg8L r1, Reg8L r2 -> equal_reg64 r1 r2
@@ -140,24 +140,29 @@ let equal_args arg1 arg2 =
   | Mem addr1, Mem addr2 -> equal_addr addr1 addr2
   | Mem64_RIP (t1, s1, i1), Mem64_RIP (t2, s2, i2) ->
     equal_data_type t1 t2 && String.equal s1 s2 && i1 = i2
-  | _, _ -> false
+  | ( (Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
+      | Mem _ | Mem64_RIP _),
+      _ ) ->
+    false
 
 let is_register = function
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ -> true
   | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
 
-let is_safe_self_move_arg = function[@warning "-4"]
+let is_safe_self_move_arg = function
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg64 _ -> true
-  | _ -> false
+  | Imm _ | Sym _ | Reg32 _ | Regf _ | Mem _ | Mem64_RIP _ -> false
 
-let is_safe_for_dead_register_opt = function[@warning "-4"]
+let is_safe_for_dead_register_opt = function
   | Reg64 _ -> true
-  | _ -> false
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Regf _ | Mem _
+  | Mem64_RIP _ ->
+    false
 
-let underlying_reg64 = function[@warning "-4"]
+let underlying_reg64 = function
   | Reg64 r | Reg32 r | Reg16 r | Reg8L r -> Some r
   | Reg8H h -> (
-    match[@warning "-4"] h with
+    match h with
     | AH -> Some RAX
     | BH -> Some RBX
     | CH -> Some RCX
@@ -173,26 +178,28 @@ let reg_appears_in_arg target arg =
   if registers_alias target arg
   then true
   else
-    match[@warning "-4"] arg with
+    match arg with
     | Mem addr -> (
-      match[@warning "-4"] target with
+      match target with
       | Reg64 r | Reg32 r | Reg16 r | Reg8L r ->
         (match addr.base with
         | Some base when equal_reg64 r base -> true
         | _ -> false)
         || (addr.scale <> 0 && equal_reg64 r addr.idx)
-      | _ -> false)
-    | _ -> false
+      | Imm _ | Sym _ | Reg8H _ | Regf _ | Mem _ | Mem64_RIP _ -> false)
+    | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
+    | Mem64_RIP _ ->
+      false
 
 let reg_is_written_by_arg target arg =
-  match[@warning "-4"] arg with
+  match arg with
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ ->
     registers_alias target arg
   | Regf _ -> equal_args target arg
   | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
 
 let reg_in_memory_address target arg =
-  match[@warning "-4"] arg with
+  match arg with
   | Mem addr -> (
     match underlying_reg64 target with
     | Some target_r64 ->
@@ -205,11 +212,18 @@ let reg_in_memory_address target arg =
   | Mem64_RIP _ ->
     false
 
-let is_control_flow = function[@warning "-4"]
+let is_control_flow = function
   | J _ | JMP _ | CALL _ | RET -> true
-  | _ -> false
+  | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | ADD _
+  | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _ | SAR _
+  | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | SET _ | CMOV _
+  | BSF _ | BSR _ | BSWAP _ | POPCNT _ | TZCNT _ | LZCNT _ | XCHG _
+  | LOCK_CMPXCHG _ | LOCK_XADD _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _
+  | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | HLT | LEAVE
+  | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _ ->
+    false
 
-let writes_to_arg target = function[@warning "-4"]
+let writes_to_arg target = function
   | MOV (_, dst)
   | MOVSX (_, dst)
   | MOVSXD (_, dst)
@@ -244,9 +258,13 @@ let writes_to_arg target = function[@warning "-4"]
   | CQO -> equal_args target (Reg64 RDX)
   | LOCK_CMPXCHG (_, dst) ->
     reg_is_written_by_arg target dst || equal_args target (Reg64 RAX)
-  | _ -> false
+  | PUSH _ | CMP _ | TEST _ | J _ | JMP _ | CALL _ | RET | LOCK_ADD _
+  | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _
+  | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _
+    ->
+    false
 
-let reads_from_arg target = function[@warning "-4"]
+let reads_from_arg target = function
   | MOV (src, dst) | MOVSX (src, dst) | MOVSXD (src, dst) | MOVZX (src, dst) ->
     reg_appears_in_arg target src || reg_in_memory_address target dst
   | PUSH src -> reg_appears_in_arg target src
@@ -299,7 +317,10 @@ let reads_from_arg target = function[@warning "-4"]
   | POP dst -> reg_in_memory_address target dst
   | CLDEMOTE arg -> reg_appears_in_arg target arg
   | PREFETCH (_, _, arg) -> reg_appears_in_arg target arg
-  | _ -> true
+  (* Conservative: assume SIMD, fences, and other instructions may read from target *)
+  | RET | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE
+  | SIMD _ ->
+    true
 
 let find_next_occurrence_of_register target start_cell =
   let rec loop cell_opt =
@@ -322,17 +343,28 @@ let find_next_occurrence_of_register target start_cell =
   in
   loop (DLL.next start_cell)
 
-let reads_flags = function[@warning "-4"]
+let reads_flags = function
   | J _ | CMOV _ | SET _ -> true
-  | _ -> false
+  | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | ADD _
+  | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _ | SAR _
+  | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | BSF _ | BSR _
+  | BSWAP _ | POPCNT _ | TZCNT _ | LZCNT _ | JMP _ | CALL _ | RET | XCHG _
+  | LOCK_CMPXCHG _ | LOCK_XADD _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _
+  | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | HLT | LEAVE
+  | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _ ->
+    false
 
-let writes_flags = function[@warning "-4"]
+let writes_flags = function
   | ADD _ | SUB _ | AND _ | OR _ | XOR _ | CMP _ | TEST _ | INC _ | DEC _
   | NEG _ | MUL _ | IMUL _ | IDIV _ | BSF _ | BSR _ | SAL _ | SAR _ | SHR _
   | POPCNT _ | TZCNT _ | LZCNT _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _
   | LOCK_OR _ | LOCK_XOR _ | LOCK_XADD _ | LOCK_CMPXCHG _ ->
     true
-  | _ -> false
+  | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ | CQO
+  | SET _ | CMOV _ | BSWAP _ | J _ | JMP _ | CALL _ | RET | XCHG _ | CLDEMOTE _
+  | PREFETCH _ | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE
+  | MFENCE | SIMD _ ->
+    false
 
 let find_next_flag_use start_cell =
   let rec loop cell_opt =
