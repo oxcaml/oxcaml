@@ -47,7 +47,7 @@ struct filedescr {
     SOCKET socket;
   } fd;                   /* Real windows handle */
   enum { KIND_HANDLE, KIND_SOCKET } kind;
-  _Atomic int crt_fd;     /* C runtime descriptor */
+  atomic_int crt_fd;      /* C runtime descriptor */
   unsigned int flags_fd;  /* See FLAGS_FD_* */
 };
 
