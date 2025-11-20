@@ -2745,7 +2745,8 @@ let simple_prim_on_values ~name ~arity ~alloc =
     ~native_repr_args:
       (Primitive.make_prim_repr_args arity
         (Primitive.Prim_global,Same_as_ocaml_repr Jkind.Sort.Const.scannable))
-    ~native_repr_res:(Prim_global, Same_as_ocaml_repr Jkind.Sort.Const.scannable)
+    ~native_repr_res:
+      (Prim_global, Same_as_ocaml_repr Jkind.Sort.Const.scannable)
     ~is_layout_poly:false
 
 let rec try_to_find_location lam =
