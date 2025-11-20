@@ -1716,10 +1716,11 @@ let instance_poly_for_jkind univars sch =
       type, so it's sound to give it "best".
 
       But it's also plausible that in the future we will decide to assign
-      mod-bounds to the jkind of a [Tunivar]. Since we do not do this but still
-      mark "best", this change could cause some programs to stop type-checking.
-      But we think the probability of people writing such programs is low, so
-      it should be easy to cross that bridge if/when we come to it. *)
+      mod-bounds to the jkind of a [Tunivar] (internal ticket 5746). Since we do
+      not do this but still mark "best", this change could cause some programs
+      to stop type-checking. But we think the probability of people writing such
+      programs is low, so it should be easy to cross that bridge if/when we come
+      to it. *)
   (* Replace a univar in [sch] with a [Tof_jkind]s. *)
   let copy_var ty =
     match get_desc ty with
@@ -2300,7 +2301,6 @@ let unbox_once env ty =
       in
       begin match find_unboxed_type decl with
       | Some (ty2, modality) ->
-        let ty2 = match get_desc ty2 with Tpoly (t, _) -> t | _ -> ty2 in
         (* We need to ensure that existential variables do not escape their
            scope. To do so, we substitute them with [Tof_kind]s. *)
         let existentials =
