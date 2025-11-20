@@ -16,30 +16,27 @@
 
 [@@@ocaml.warning "+a-30-40-41-42"]
 
-type t =
+type t_simplified =
   { simplified_named : Simplified_named.t Or_invalid.t;
-    extra_bindings : Expr_builder.binding_to_place list;
     try_reify : bool;
     dacc : Downwards_acc.t
   }
 
-let create ?(extra_bindings = []) named ~try_reify dacc =
+type t = t_simplified Simplified_named.or_rewritten
+
+let create named ~try_reify dacc : t =
   let machine_width = Downwards_env.machine_width (Downwards_acc.denv dacc) in
-  { simplified_named = Ok (Simplified_named.create ~machine_width named);
-    try_reify;
-    dacc;
-    extra_bindings
-  }
+  Simplified
+    { simplified_named = Ok (Simplified_named.create ~machine_width named);
+      try_reify;
+      dacc
+    }
 
-let create_simplified simplified_named ~try_reify dacc =
-  { simplified_named = Ok simplified_named;
-    try_reify;
-    dacc;
-    extra_bindings = []
-  }
+let create_simplified simplified_named ~try_reify dacc : t =
+  Simplified { simplified_named = Ok simplified_named; try_reify; dacc }
 
-let create_invalid dacc =
-  { simplified_named = Invalid; try_reify = false; dacc; extra_bindings = [] }
+let create_invalid dacc : t =
+  Simplified { simplified_named = Invalid; try_reify = false; dacc }
 
 let create_unit dacc ~result_var ~original_term =
   (* CR gbury: would it make sense to have a Flambda2_types.unit instead of this
@@ -56,4 +53,14 @@ let create_unknown dacc ~result_var kind ~original_term =
   let dacc = Downwards_acc.add_variable dacc result_var ty in
   create original_term ~try_reify:false dacc
 
-let with_dacc t dacc = { t with dacc }
+let create_rewritten f : t = Rewritten f
+
+let is_invalid (t : t) =
+  match t with
+  | Simplified { simplified_named = Invalid; _ } -> true
+  | Simplified { simplified_named = Ok _; _ } | Rewritten _ -> false
+
+let map_dacc (t : t) f : t =
+  match t with
+  | Simplified t -> Simplified { t with dacc = f t.dacc }
+  | Rewritten _ -> t

@@ -8,6 +8,7 @@ Interfaces imported:
 	00000000000000000000000000000000	Question
 	00000000000000000000000000000000	CamlinternalFormatBasics
 Implementations imported:
+Globals used in quotations:
 File question.cmx
 Name: Question
 CRC of implementation: 00000000000000000000000000000000
@@ -18,6 +19,7 @@ Interfaces imported:
 	00000000000000000000000000000000	Question
 	00000000000000000000000000000000	CamlinternalFormatBasics
 Implementations imported:
+Globals used in quotations:
 Flambda 2 unit with export information
 Currying functions:
 Apply functions:
@@ -33,6 +35,7 @@ Interfaces imported:
 	00000000000000000000000000000000	Question
 	00000000000000000000000000000000	CamlinternalFormatBasics
 Implementations imported:
+Globals used in quotations:
 Flambda 2 export information:
 Original unit: Question
 Typing env:

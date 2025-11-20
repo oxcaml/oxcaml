@@ -16,7 +16,9 @@ open! Flambda.Import
 
 type t
 
-val create : Downwards_acc.t -> Expr_builder.binding_to_place list -> t
+val create : Downwards_acc.t -> Expr_builder.binding_to_place -> t
+
+val create_empty : Downwards_acc.t -> t
 
 val create_have_lifted_set_of_closures :
   Downwards_acc.t ->

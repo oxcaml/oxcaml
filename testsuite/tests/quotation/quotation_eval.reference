@@ -1,0 +1,24 @@
+
+Test simple eval
+Output: 42
+
+Test complex return type
+Output: [42; 43]
+
+Test side effects
+Compiling...
+Outside
+Running...
+Inside
+Done
+
+Test reference to global
+Output: Hello world!
+
+Test late compilation error
+Output: This quote should fail to compile. If it's started working but you
+aren't running quotes through transl then you may need to find a new way
+to trigger this.
+
+Test warnings emitted during eval
+Done

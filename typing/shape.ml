@@ -257,6 +257,7 @@ module Predef = struct
       | Int16x8
       | Int32x4
       | Int64x2
+      | Float16x8
       | Float32x4
       | Float64x2
       (* 256 bit *)
@@ -264,6 +265,7 @@ module Predef = struct
       | Int16x16
       | Int32x8
       | Int64x4
+      | Float16x16
       | Float32x8
       | Float64x4
       (* 512 bit *)
@@ -271,6 +273,7 @@ module Predef = struct
       | Int16x32
       | Int32x16
       | Int64x8
+      | Float16x32
       | Float32x16
       | Float64x8
 
@@ -309,18 +312,21 @@ module Predef = struct
       | Int16x8 -> "int16x8"
       | Int32x4 -> "int32x4"
       | Int64x2 -> "int64x2"
+      | Float16x8 -> "float16x8"
       | Float32x4 -> "float32x4"
       | Float64x2 -> "float64x2"
       | Int8x32 -> "int8x32"
       | Int16x16 -> "int16x16"
       | Int32x8 -> "int32x8"
       | Int64x4 -> "int64x4"
+      | Float16x16 -> "float16x16"
       | Float32x8 -> "float32x8"
       | Float64x4 -> "float64x4"
       | Int8x64 -> "int8x64"
       | Int16x32 -> "int16x32"
       | Int32x16 -> "int32x16"
       | Int64x8 -> "int64x8"
+      | Float16x32 -> "float16x32"
       | Float32x16 -> "float32x16"
       | Float64x8 -> "float64x8"
 
@@ -329,18 +335,21 @@ module Predef = struct
       | Int16x8
       | Int32x4
       | Int64x2
+      | Float16x8
       | Float32x4
       | Float64x2 -> 16
       | Int8x32
       | Int16x16
       | Int32x8
       | Int64x4
+      | Float16x16
       | Float32x8
       | Float64x4 -> 32
       | Int8x64
       | Int16x32
       | Int32x16
       | Int64x8
+      | Float16x32
       | Float32x16
       | Float64x8 -> 64
 
@@ -385,18 +394,21 @@ module Predef = struct
       | Int16x8 -> Vec128
       | Int32x4 -> Vec128
       | Int64x2 -> Vec128
+      | Float16x8 -> Vec128
       | Float32x4 -> Vec128
       | Float64x2 -> Vec128
       | Int8x32 -> Vec256
       | Int16x16 -> Vec256
       | Int32x8 -> Vec256
       | Int64x4 -> Vec256
+      | Float16x16 -> Vec256
       | Float32x8 -> Vec256
       | Float64x4 -> Vec256
       | Int8x64 -> Vec512
       | Int16x32 -> Vec512
       | Int32x16 -> Vec512
       | Int64x8 -> Vec512
+      | Float16x32 -> Vec512
       | Float32x16 -> Vec512
       | Float64x8 -> Vec512
 
@@ -437,23 +449,27 @@ module Predef = struct
       | Int16x8, Int16x8
       | Int32x4, Int32x4
       | Int64x2, Int64x2
+      | Float16x8, Float16x8
       | Float32x4, Float32x4
       | Float64x2, Float64x2
       | Int8x32, Int8x32
       | Int16x16, Int16x16
       | Int32x8, Int32x8
       | Int64x4, Int64x4
+      | Float16x16, Float16x16
       | Float32x8, Float32x8
       | Float64x4, Float64x4
       | Int8x64, Int8x64
       | Int16x32, Int16x32
       | Int32x16, Int32x16
       | Int64x8, Int64x8
+      | Float16x32, Float16x32
       | Float32x16, Float32x16
       | Float64x8, Float64x8 -> true
-      | (Int8x16 | Int16x8 | Int32x4 | Int64x2 | Float32x4 | Float64x2
-        | Int8x32 | Int16x16 | Int32x8 | Int64x4 | Float32x8 | Float64x4
-        | Int8x64 | Int16x32 | Int32x16 | Int64x8 | Float32x16 | Float64x8), _
+      | (Int8x16 | Int16x8 | Int32x4 | Int64x2 | Float16x8 | Float32x4
+        | Float64x2 | Int8x32 | Int16x16 | Int32x8 | Int64x4 | Float16x16
+        | Float32x8 | Float64x4 | Int8x64 | Int16x32 | Int32x16 | Int64x8
+        | Float16x32 | Float32x16 | Float64x8), _
         -> false
 
     let equal_unboxed u1 u2 =

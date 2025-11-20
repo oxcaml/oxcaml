@@ -26,7 +26,6 @@
  ******************************************************************************)
 
 open Path
-open Str
 open Dummy
 open Cmt_format
 open Typedtree
@@ -196,10 +195,28 @@ let extract_cmt = function
   | Partial_implementation _ | Packed _ | Interface _ | Partial_interface _ ->
       raise Not_implemented
 
-let rep_sth = global_replace (regexp_string "*sth*") "__sth__"
-let rep_opt = global_replace (regexp_string "*opt*") "__opt__"
-let rep_predef = global_replace (regexp_string "( *predef* ).") ""
-let rep_def = global_replace (regexp_string "[@#default ]") ""
+let replace_all src dst s =
+  (* Simple implementation of [replace_all] to avoid a dependency on [Str]. *)
+  if String.length src <= 0 then s
+  else
+    let buffer = Buffer.create (String.length s) in
+    let i = ref 0 and buf_pos = ref 0 in
+    let bound = String.length s - String.length src in
+    while !i < bound do
+      if String.equal (String.sub s !i (String.length src)) src then (
+        Buffer.add_substring buffer s !buf_pos (!i - !buf_pos);
+        Buffer.add_string buffer dst;
+        i := !i + String.length src;
+        buf_pos := !i)
+      else incr i
+    done;
+    Buffer.add_substring buffer s !buf_pos (String.length s - !buf_pos);
+    Buffer.contents buffer
+
+let rep_sth = replace_all "*sth*" "__sth__"
+let rep_opt = replace_all "*opt*" "__opt__"
+let rep_predef = replace_all "( *predef* )." ""
+let rep_def = replace_all "[@#default ]" ""
 let fix s = rep_def (rep_predef (rep_opt (rep_sth s)))
 
 let update_single name str =

@@ -26,6 +26,8 @@ open Translcore
 open Translclass
 open Debuginfo.Scoped_location
 
+module SL = Slambda
+
 let const_int i = Lambda.const_int i
 
 type unsafe_component =
@@ -1004,7 +1006,6 @@ let transl_implementation compilation_unit impl =
   reset_labels ();
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
-  Translcore.clear_probe_handlers ();
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
   let body, (size, arg_block_idx) =
     Translobj.transl_label_init (fun () ->
@@ -1012,7 +1013,7 @@ let transl_implementation compilation_unit impl =
         transl_implementation_module ~scopes compilation_unit
           impl
       in
-      Translcore.declare_probe_handlers body, (size, arg_block_idx))
+      body, (size, arg_block_idx))
   in
   let body, main_module_block_format =
     match has_parameters () with
@@ -1051,7 +1052,7 @@ let transl_implementation compilation_unit impl =
     main_module_block_format;
     arg_block_idx;
     required_globals = required_globals ~flambda:true body;
-    code = body }
+    code = SL.Quote body }
 
 
 (* Compile a toplevel phrase *)
@@ -1239,11 +1240,10 @@ let transl_toplevel_item_and_close ~scopes itm =
     (transl_label_init
        (fun () ->
           let expr = transl_toplevel_item ~scopes itm
-          in Translcore.declare_probe_handlers expr, ()))
+          in expr, ()))
 
 let transl_toplevel_definition str =
   reset_labels ();
-  Translcore.clear_probe_handlers ();
   Translprim.clear_used_primitives ();
   make_sequence
     (transl_toplevel_item_and_close ~scopes:empty_scopes)
@@ -1298,7 +1298,7 @@ let transl_runtime_arg arg =
 let transl_instance_impl
       compilation_unit ~runtime_args ~main_module_block_size
       ~arg_block_idx
-    : Lambda.program =
+    : SL.program =
   let base_compilation_unit, _args =
     Compilation_unit.split_instance_exn compilation_unit
   in
@@ -1324,6 +1324,7 @@ let transl_instance_impl
       ap_probe = None;
     }
   in
+  let code = SL.Quote code in
   let required_globals =
     base_compilation_unit :: List.filter_map unit_of_runtime_arg runtime_args
     |> Compilation_unit.Set.of_list

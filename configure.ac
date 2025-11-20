@@ -29,8 +29,6 @@ AC_INIT([OxCaml],
 # argv
 CONFIGURE_ARGS="$*"
 
-DUNE_MAX_VERSION=[3.15]
-
 AC_MSG_NOTICE([Configuring OxCaml version AC_PACKAGE_VERSION])
 
 m4_include([build-aux/ax_compare_version.m4])
@@ -51,11 +49,6 @@ dune_version=`$dune --version | sed -e 's/^\([[0-9]]\.[[0-9]]\).*/\1/'`
 
 AS_IF([test x"$dune_version" = "x"],
   [AC_MSG_ERROR([unable to execute dune at $dune])])
-
-dnl If dune is too new, keep going but warn at the end
-AX_COMPARE_VERSION([$dune_version], [le], [$DUNE_MAX_VERSION],
-  [dune_version_good=true],
-  [dune_version_good=false])
 
 AC_MSG_NOTICE([Using dune executable: $dune])
 
@@ -407,6 +400,7 @@ AC_CONFIG_FILES([otherlibs/stdlib_beta/META])
 AC_CONFIG_FILES([otherlibs/stdlib_alpha/META])
 AC_CONFIG_FILES([otherlibs/dynlink/META])
 AC_CONFIG_FILES([otherlibs/runtime_events/META])
+AC_CONFIG_FILES([otherlibs/camlinternaleval/META])
 AC_CONFIG_FILES([stdlib/META])
 
 # Definitions related to the version of OCaml
@@ -2650,6 +2644,33 @@ AC_LINK_IFELSE(
     AC_DEFINE([HAS_BSD_GETAFFINITY_NP])],
     [AC_MSG_RESULT([pthread_getaffinity_np not found])])])
 
+## prctl
+AC_CHECK_FUNCS(
+  [prctl],
+  [AC_DEFINE([HAS_PRCTL], [1])])
+
+## pthread_setname_np
+AC_CHECK_FUNCS(
+  [pthread_setname_np],
+  [AC_DEFINE([HAS_PTHREAD_SETNAME_NP], [1])])
+
+## pthread_set_name_np
+AC_CHECK_FUNCS(
+  [pthread_set_name_np],
+  [AC_DEFINE([HAS_PTHREAD_SET_NAME_NP], [1])])
+
+## SetThreadDescription
+AC_CHECK_FUNCS(
+  [SetThreadDescription],
+  [AC_DEFINE([HAS_SETTHREADDESCRIPTION], [1])
+  AC_CHECK_DECL(
+    [SetThreadDescription],
+    [AC_DEFINE([HAS_DECL_SETTHREADDESCRIPTION], [1])],
+    [],
+    [[#define WIN32_LEAN_AND_MEAN
+      #include <windows.h>
+      #include <processthreadsapi.h>]])])
+
 ## Activate the systhread library
 
 AS_IF(
@@ -3063,6 +3084,29 @@ int main(void) {
 }
 ]])], AC_DEFINE([HAS_AVX2]) has_avx2=yes, [])
 
+AC_SUBST([has_f16c])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <cpuid.h>
+int main(void) {
+    // Old versions of gcc don't accept "f16c" in __builtin_cpu_supports
+    unsigned int eax, ebx, ecx, edx;
+    if (!__get_cpuid(1, &eax, &ebx, &ecx, &edx)) return 1;
+    return (ecx & bit_F16C) == 0;
+}
+]])], AC_DEFINE([HAS_F16C]) has_f16c=yes, [])
+
+AC_SUBST([has_fma])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("fma")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_FMA]) has_fma=yes, [])
+
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"
 ocamlc_cflags="$ocamlc_cflags $common_cflags $sharedlib_cflags $CFLAGS"
@@ -3231,6 +3275,3 @@ ${mkdll_ldflags}"
 ])
 
 AC_OUTPUT
-
-AS_IF([test x"$dune_version_good" = "xfalse"],
-  [AC_MSG_WARN([dune $dune_version found; only dune up to $DUNE_MAX_VERSION known to work])])

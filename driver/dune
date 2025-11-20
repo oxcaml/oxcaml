@@ -10,11 +10,3 @@
  (targets optmain_native.ml)
  (action
   (copy optmain.ml %{targets})))
-
-(library
- (name oxcaml_driver)
- (modes byte native)
- (ocamlopt_flags
-  (:include %{project_root}/ocamlopt_flags.sexp))
- (libraries ocamloptcomp flambda2 gc_timings jsoo_imports)
- (modules optcompile))

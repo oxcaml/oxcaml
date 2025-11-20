@@ -1,0 +1,5 @@
+File "bad_alias_of_param.ml", line 15, characters 66-70:
+15 | let use_monoid_as_alias (list : List(Monoid).t) : List(Alias).t = list
+                                                                       ^^^^
+Error: This expression has type "List(Monoid).t"
+       but an expression was expected of type "List(Alias).t"

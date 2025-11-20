@@ -93,7 +93,7 @@ Ptop_def
                 Pexp_ident "payload" (//toplevel//[2,1+22]..[2,1+29])
           ]
         ptyext_constructor =
-          extension_constructor (//toplevel//[2,1+0]..[2,1+13])
+          extension_constructor (//toplevel//[2,1+0]..[2,1+30])
             pext_name = "Exn"
             pext_kind =
               Pext_decl

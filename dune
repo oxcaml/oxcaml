@@ -12,6 +12,8 @@
 ;*                                                                        *
 ;**************************************************************************
 
+(vendored_dirs external)
+
 ; set warning as error in release profile
 
 (env
@@ -52,6 +54,8 @@
 (copy_files# driver/*.ml{,i})
 
 (copy_files# asmcomp/*.ml{,i})
+
+(copy_files# optcomp/*.ml{,i})
 
 (copy_files# backend/*.ml{,i})
 
@@ -275,10 +279,15 @@
   mixed_block_shape
   mixed_product_bytes
   printlambda
+  printslambda0
+  printslambda
   runtimedef
   runtimetags
   tmc
   simplif
+  slambda0
+  slambda
+  slambdaeval
   switch
   value_rec_compiler
   translmode
@@ -291,6 +300,7 @@
   translmod
   translobj
   translprim
+  translquote
   ;; bytecomp/
   debug_event
   meta
@@ -314,7 +324,32 @@
   cmj_format
   outcometree
   parsetree
-  debug_event))
+  debug_event
+  ; See note below about camlinternalQuote
+  (:include
+   %{project_root}/duneconf/camlinternalquote_if_missing_from_stdlib)))
+
+; Our system compiler doesn't have CamlInternalQuote in its stdlib, so
+; we need to compile it as an additional target, but only for the first
+; stage build.  See also duneconf/dune.
+
+(rule
+ (targets camlinternalQuote.ml)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy#
+   %{project_root}/stdlib/camlinternalQuote.ml
+   %{project_root}/camlinternalQuote.ml)))
+
+(rule
+ (targets camlinternalQuote.mli)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy#
+   %{project_root}/stdlib/camlinternalQuote.mli
+   %{project_root}/camlinternalQuote.mli)))
 
 (library
  (name ocamlbytecomp)
@@ -366,10 +401,7 @@
  (ocamlopt_flags
   (:include %{project_root}/ocamlopt_flags.sexp))
  (libraries ocamlcommon flambda2)
- (modules
-   jsmaindriver
-   jscompile
-   jslibrarian))
+ (modules jsmaindriver jscompile jslibrarian))
 
 (executable
  (name boot_ocamlj)
@@ -471,8 +503,7 @@
  (files
   Makefile.build_config
   Makefile.config_if_required
-  Makefile.config
-  VERSION)
+  Makefile.config)
  (section lib)
  (package ocaml))
 
@@ -503,10 +534,10 @@
   compilenv
   ;; asmcomp/
   asmgen
-  asminstantiator
-  asmlibrarian
   asmlink
-  asmpackager
+  cm_bundle
+  linkenv
+  optlink
   ;; backend/
   afl_instrument
   arch
@@ -573,6 +604,7 @@
   cfg_available_regs
   cfg_edge
   cfg_intf
+  cfg_reducibility
   cfg_to_linear
   cfg_with_layout
   cfg_with_infos
@@ -644,9 +676,15 @@
   dwarf_state
   dwarf_variables_and_parameters
   dwarf_type
+  ;; optcomp/
+  linkenv
+  optcompile
+  optlibrarian
+  optcomp_intf
+  optlink
+  optpackager
   ;; driver/
   opterrors
-  optcompile
   optmaindriver
   compiler_hooks
   ;; printer/
@@ -694,11 +732,11 @@
  (instrumentation
   (backend bisect_ppx))
  (libraries
-  oxcaml_driver
   memtrace
   flambda2
   flambda2_ui
   flambda2_to_cmm
+  gc_timings
   ocamloptcomp
   ocamlcommon
   unix)
@@ -717,11 +755,11 @@
  (ocamlopt_flags
   (:standard -runtime-variant nnp))
  (libraries
-  oxcaml_driver
   memtrace
   flambda2
   flambda2_ui
   flambda2_to_cmm
+  gc_timings
   ocamloptcomp
   ocamlcommon
   unix)
@@ -739,7 +777,6 @@
  (ocamlc_flags unix.cma)
  (ocamlopt_flags unix.cmxa)
  (libraries
-  oxcaml_driver
   flambda2
   flambda2_ui
   flambda2_to_cmm

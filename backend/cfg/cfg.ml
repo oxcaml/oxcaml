@@ -97,11 +97,14 @@ type t =
     fun_num_stack_slots : int Stack_class.Tbl.t;
     fun_poll : Lambda.poll_attribute;
     next_instruction_id : InstructionId.sequence;
-    fun_ret_type : Cmm.machtype
+    fun_ret_type : Cmm.machtype;
+    mutable allowed_to_be_irreducible : bool;
+    mutable register_locations_are_set : bool
   }
 
 let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
-    ~fun_num_stack_slots ~fun_poll ~next_instruction_id ~fun_ret_type =
+    ~fun_num_stack_slots ~fun_poll ~next_instruction_id ~fun_ret_type
+    ~allowed_to_be_irreducible =
   { fun_name;
     fun_args;
     fun_codegen_options;
@@ -114,7 +117,9 @@ let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
     fun_num_stack_slots;
     fun_poll;
     next_instruction_id;
-    fun_ret_type
+    fun_ret_type;
+    allowed_to_be_irreducible;
+    register_locations_are_set = false
   }
 
 let mem_block t label = Label.Tbl.mem t.blocks label
@@ -410,8 +415,8 @@ let print_basic' ?print_reg ppf (instruction : basic instruction) =
       dbg = Debuginfo.none;
       fdo = None;
       live = Reg.Set.empty;
-      available_before = None;
-      available_across = None
+      available_before = instruction.available_before;
+      available_across = instruction.available_across
     }
   in
   Printlinear.instr' ?print_reg ppf instruction
@@ -522,7 +527,7 @@ let is_noop_move instr =
       | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
       | Opaque | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
       | Specific _ | Name_for_debugger _ | Begin_region | End_region | Dls_get
-      | Poll | Alloc _ | Pause )
+      | Tls_get | Poll | Alloc _ | Pause )
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
     ->
     false
@@ -554,8 +559,9 @@ let string_of_irc_work_list = function
 
 let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     ?(fdo = Fdo_info.none) ?(live = Reg.Set.empty) ~stack_offset ~id
-    ?(irc_work_list = Unknown_list) ?(available_before = None)
-    ?(available_across = None) () =
+    ?(irc_work_list = Unknown_list)
+    ?(available_before = Reg_availability_set.Unreachable)
+    ?(available_across = Reg_availability_set.Unreachable) () =
   { desc;
     arg;
     res;
@@ -607,9 +613,9 @@ let is_poll (instr : basic instruction) =
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Alloc _ | Move | Spill | Reload | Opaque | Pause | Begin_region
-      | End_region | Dls_get | Const_int _ | Const_float32 _ | Const_float _
-      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-      | Stackoffset _ | Load _
+      | End_region | Dls_get | Tls_get | Const_int _ | Const_float32 _
+      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+      | Const_vec512 _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _
       | Intop_imm (_, _)
@@ -625,9 +631,9 @@ let is_alloc (instr : basic instruction) =
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
-      | Dls_get | Pause | Const_int _ | Const_float32 _ | Const_float _
-      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-      | Stackoffset _ | Load _
+      | Dls_get | Tls_get | Pause | Const_int _ | Const_float32 _
+      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+      | Const_vec512 _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _
       | Intop_imm (_, _)
@@ -643,9 +649,9 @@ let is_end_region (b : basic) =
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
       ( Alloc _ | Poll | Move | Spill | Reload | Opaque | Begin_region | Dls_get
-      | Pause | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-      | Load _
+      | Tls_get | Pause | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _
       | Intop_imm (_, _)
@@ -730,7 +736,7 @@ let remove_trap_instructions t removed_trap_handlers =
         | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
         | Csel _ | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _
         | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
-        | Dls_get | Poll | Alloc _ | Pause )
+        | Dls_get | Tls_get | Poll | Alloc _ | Pause )
     | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset
   and update_body r ~stack_offset =

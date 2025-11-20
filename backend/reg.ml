@@ -63,7 +63,7 @@ module For_testing = struct
   let get_stamp () = !currstamp
   let set_state ~stamp ~relocatable_regs =
     currstamp := stamp;
-    all_relocatable_regs := relocatable_regs  
+    all_relocatable_regs := relocatable_regs
 end
 
 let create_gen ~name ~typ ~loc =
@@ -234,6 +234,19 @@ let equal_stack_location left right =
   | Domainstate _, (Local _ | Incoming _ | Outgoing _)->
     false
 
+let compare_stack_location left right =
+  match left, right with
+  | Local left, Local right -> Int.compare left right
+  | Local _, (Incoming _ | Outgoing _ | Domainstate _) -> -1
+  | Incoming _, Local _ -> 1
+  | Incoming left, Incoming right -> Int.compare left right
+  | Incoming _, (Outgoing _ | Domainstate _) -> -1
+  | Outgoing _, (Local _ | Incoming _) -> 1
+  | Outgoing left, Outgoing right -> Int.compare left right
+  | Outgoing _, Domainstate _ -> -1
+  | Domainstate _, (Local _ | Incoming _ | Outgoing _) -> 1
+  | Domainstate left, Domainstate right -> Int.compare left right
+
 let equal_location left right =
   match left, right with
   | Unknown, Unknown -> true
@@ -243,6 +256,16 @@ let equal_location left right =
   | Reg _, (Unknown | Stack _)
   | Stack _, (Unknown | Reg _) ->
     false
+
+let compare_location left right =
+  match left, right with
+  | Unknown, Unknown -> 0
+  | Unknown, (Reg _ | Stack _) -> -1
+  | (Reg _ | Stack _), Unknown -> 1
+  | Reg left, Reg right -> Int.compare left right
+  | Reg _, Stack _ -> -1
+  | Stack _, Reg _ -> 1
+  | Stack left, Stack right -> compare_stack_location left right
 
 let same_loc left right =
   equal_location left.loc right.loc
@@ -257,4 +280,59 @@ let same_loc left right =
 let same_loc_fatal_on_unknown ~fatal_message left right =
   match left.loc with
   | Unknown -> Misc.fatal_error fatal_message
-  | Reg _ | Stack _ -> same_loc left right
+  | Reg _ | Stack _ ->
+    match right.loc with
+    | Unknown -> Misc.fatal_error fatal_message
+    | Reg _ | Stack _ -> same_loc left right
+
+let compare_loc left right =
+  let loc_cmp = compare_location left.loc right.loc in
+  if loc_cmp <> 0 then loc_cmp
+  else
+    match left.loc with
+    | Unknown -> 0
+    | Reg _ ->
+      Stdlib.compare
+        (Reg_class.of_machtype left.typ)
+        (Reg_class.of_machtype right.typ)
+    | Stack _ ->
+      Stdlib.compare
+        (Stack_class.of_machtype left.typ)
+        (Stack_class.of_machtype right.typ)
+
+let compare_loc_fatal_on_unknown ~fatal_message left right =
+  match left.loc with
+  | Unknown -> Misc.fatal_error fatal_message
+  | Reg _ | Stack _ ->
+    match right.loc with
+    | Unknown -> Misc.fatal_error fatal_message
+    | Reg _ | Stack _ -> compare_loc left right
+
+let hash_stack_loc = function 
+  | Local x -> 400 + x
+  | Incoming x -> 200 + x
+  | Outgoing x -> 300 + x
+  | Domainstate x -> 100 + x
+
+let hash_loc = function
+  | Unknown -> -1
+  | Reg r -> r
+  | Stack stack_loc  -> hash_stack_loc stack_loc
+
+let is_of_type_addr t =
+  match t.typ with
+  | Addr -> true
+  | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> false
+
+module UsingLocEquality = struct
+  module RegOrder = struct
+    type t = reg
+    let equal = same_loc
+    let compare = compare_loc
+    let hash r = hash_loc r.loc
+  end
+
+  module Set = Stdlib.Set.Make (RegOrder)
+  module Map = Stdlib.Map.Make (RegOrder)
+  module Tbl = Stdlib.Hashtbl.Make (RegOrder)
+end

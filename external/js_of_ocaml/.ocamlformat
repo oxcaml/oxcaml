@@ -1,0 +1,15 @@
+break-cases=fit-or-vertical
+break-fun-decl=fit-or-vertical
+break-infix=fit-or-vertical
+if-then-else=keyword-first
+parens-tuple=multi-line-only
+type-decl=sparse
+wrap-fun-args=false
+break-infix-before-func
+break-separators=before
+dock-collection-brackets=false
+margin=90
+module-item-spacing=sparse
+parse-docstrings=false
+version=0.27.0
+ocaml-version=4.08.0

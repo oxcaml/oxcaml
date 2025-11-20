@@ -143,6 +143,8 @@ type error =
   | No_unboxed_version of Path.t
   | Atomic_field_must_be_mutable of string
   | Constructor_submode_failed of Mode.Value.error
+  | Atomic_field_in_mixed_block
+  | Non_value_atomic_field
 
 open Typedtree
 
@@ -169,7 +171,9 @@ let make_params env path params =
        have jkind any).  But it might be possible to infer [any] in some
        cases. *)
     let jkind =
-      Jkind.of_new_legacy_sort ~why:(Unannotated_type_parameter path)
+      Jkind.of_new_legacy_sort
+        ~why:(Unannotated_type_parameter path)
+        ~level:(Ctype.get_current_level ())
     in
     try
       (transl_type_param env path jkind sty, v)
@@ -605,7 +609,7 @@ let make_constructor
           let univar_list =
             TyVarEnv.make_poly_univars_jkinds
               ~context:(fun v -> Constructor_type_parameter (cstr_path, v))
-              svars
+              (List.map (fun (v, l) -> (v, l, Env.stage env)) svars)
           in
           let univars = if closed then Some univar_list else None in
           let args, targs =
@@ -971,7 +975,9 @@ let transl_declaration env sdecl (id, uid) =
         let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
         let rep, jkind =
           if unbox then
-            Variant_unboxed, Jkind.of_new_sort ~why:Old_style_unboxed_type
+            Variant_unboxed,
+            Jkind.of_new_sort ~why:Old_style_unboxed_type
+              ~level:(Ctype.get_current_level ())
           else
             (* We mark all arg sorts "void" here.  They are updated later,
                after the circular type checks make it safe to check sorts.
@@ -1002,6 +1008,7 @@ let transl_declaration env sdecl (id, uid) =
             if unbox then
               Record_unboxed,
               Jkind.of_new_sort ~why:Old_style_unboxed_type
+                ~level:(Ctype.get_current_level ())
             else
             (* Note this is inaccurate, using `Record_boxed` in cases where the
                correct representation is [Record_float], [Record_ufloat], or
@@ -1023,6 +1030,7 @@ let transl_declaration env sdecl (id, uid) =
              [update_decl_jkind]. *)
           let jkind =
             Jkind.Builtin.product_of_sorts ~why:Unboxed_record
+              ~level:(Ctype.get_current_level ())
               (List.length lbls)
           in
           Ttype_record_unboxed_product lbls,
@@ -1211,7 +1219,8 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
     in
     (* CR layouts v11: update type_jkind once we have [layout_of] layouts *)
     let jkind =
-      Jkind.Builtin.product_of_sorts ~why:Unboxed_record (List.length lbls) in
+      Jkind.Builtin.product_of_sorts ~why:Unboxed_record
+        ~level:(Ctype.get_current_level ()) (List.length lbls) in
     let kind =
       Type_record_unboxed_product(lbls_unboxed, Record_unboxed_product, umc)
     in
@@ -1505,7 +1514,7 @@ let narrow_to_manifest_jkind env loc decl =
         let context = Ctype.mk_jkind_context_always_principal env in
         match
           Jkind.sub_jkind_l ~type_equal ~context
-            manifest_jkind decl.type_jkind
+            ~level:(Ctype.get_current_level ()) manifest_jkind decl.type_jkind
         with
         | Ok () -> ()
         | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v)))
@@ -1854,6 +1863,7 @@ let rec update_decl_jkind env dpath decl =
             has layout value and is known to be a float.
          *)
          mutable atomic_floats : bool;
+         mutable atomic_fields : bool;
          mutable float64s : bool;
          mutable non_float64_unboxed_fields : bool;
          (* Includes product containing void *)
@@ -1888,12 +1898,14 @@ let rec update_decl_jkind env dpath decl =
       in
       let repr_summary =
         { values = false; floats = false; atomic_floats = false;
-          float64s = false; non_float64_unboxed_fields = false;
-          voids = false;
+          atomic_fields = false; float64s = false;
+          non_float64_unboxed_fields = false; voids = false;
         }
       in
       List.iter2
         (fun ((repr : Element_repr.t), _) lbl ->
+           if Types.is_atomic lbl.Types.ld_mutable
+           then repr_summary.atomic_fields <- true;
            match repr with
            | Float_element ->
                repr_summary.floats <- true;
@@ -1915,7 +1927,8 @@ let rec update_decl_jkind env dpath decl =
         (* We store floats flatly in mixed records if all fields are
            float/float64/void. *)
         | { values = false; floats = true; atomic_floats = false;
-            float64s = true; non_float64_unboxed_fields = false }
+            float64s = true; non_float64_unboxed_fields = false;
+            atomic_fields = false }
            ->
             let shape =
               List.map
@@ -1934,14 +1947,47 @@ let rec update_decl_jkind env dpath decl =
             in
             assert_mixed_product_support loc Record ~value_prefix_len:0;
             Record_mixed shape
+        (* Forbid atomic fields in mixed blocks *)
+        | { values = true; voids = true; atomic_fields = true }
+        | { floats = true; voids = true; atomic_fields = true }
+        | { float64s = true; voids = true; atomic_fields = true }
+        | { values = true; float64s = true; atomic_fields = true }
+        | { non_float64_unboxed_fields = true; atomic_fields = true } -> begin
+            let error =
+              (* Print a different error if an atomic field itself is
+                 non-value *)
+              match
+                List.find_map
+                  (fun ((repr : Element_repr.t), lbl) ->
+                     match repr with
+                     | Value_element | Float_element -> None
+                     | _ ->
+                       if Types.is_atomic lbl.Types.ld_mutable
+                       then Some lbl
+                       else None)
+                  (List.map2 (fun (repr, _) lbl -> repr, lbl) reprs lbls)
+              with
+              | Some lbl ->
+                Error(lbl.ld_loc, Non_value_atomic_field)
+              | None ->
+                (* Find the first atomic field, to get a better location for the
+                   error *)
+                let lbl =
+                  List.find (fun lbl -> Types.is_atomic lbl.Types.ld_mutable)
+                    lbls
+                in
+                Error(lbl.ld_loc, Atomic_field_in_mixed_block)
+            in
+            raise error
+          end
         (* For other mixed blocks, float fields are stored as flat
            only when they're unboxed.
         *)
-        | { values = true; voids = true }
-        | { floats = true; voids = true }
-        | { float64s = true; voids = true }
-        | { values = true; float64s = true }
-        | { non_float64_unboxed_fields = true } ->
+        | { values = true; voids = true; atomic_fields = false }
+        | { floats = true; voids = true; atomic_fields = false }
+        | { float64s = true; voids = true; atomic_fields = false }
+        | { values = true; float64s = true; atomic_fields = false }
+        | { non_float64_unboxed_fields = true; atomic_fields = false } ->
             let shape =
               Element_repr.mixed_product_shape loc reprs Record
             in
@@ -1971,9 +2017,15 @@ let rec update_decl_jkind env dpath decl =
           if floats && not values
           then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
           rep
+        | { voids=false; values=false; floats=true; atomic_floats=false;
+            atomic_fields=true; float64s=true; non_float64_unboxed_fields=false
+          } ->
+          Misc.fatal_error
+            "Typedecl.update_record_kind: invariant broken in repr_summary \
+             (only floats, some atomic fields, no atomic floats?)"
         | { values = false; floats = false; atomic_floats = false;
             float64s = false; non_float64_unboxed_fields = false;
-            voids = _ }
+            voids = _; atomic_fields = _ }
           [@warning "+9"] ->
           Misc.fatal_error "Typedecl.update_record_kind: empty record"
       in
@@ -2120,7 +2172,8 @@ let rec update_decl_jkind env dpath decl =
      other types in a (maybe mutually recursive) type declaration. See Note [Default
      jkinds in transl_declaration]) *)
   match
-    Jkind.Layout.sub new_decl.type_jkind.jkind.layout decl.type_jkind.jkind.layout
+    Jkind.Layout.sub ~level:(Ctype.get_current_level ())
+      new_decl.type_jkind.jkind.layout decl.type_jkind.jkind.layout
   with
   | Not_le reason ->
     let context = Ctype.mk_jkind_context_always_principal env in
@@ -2772,6 +2825,7 @@ let normalize_decl_jkinds env decls =
           ~type_equal
           ~context
           ~allow_any_crossing
+          ~level:(Ctype.get_current_level ())
           decl.type_jkind
           original_decl.type_jkind
       with
@@ -3451,6 +3505,8 @@ let native_repr_of_type env kind ty sort_or_poly =
     Some (Unboxed_vector Boxed_vec128)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int64x2 ->
     Some (Unboxed_vector Boxed_vec128)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float16x8 ->
+    Some (Unboxed_vector Boxed_vec128)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float32x4 ->
     Some (Unboxed_vector Boxed_vec128)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float64x2 ->
@@ -3463,6 +3519,8 @@ let native_repr_of_type env kind ty sort_or_poly =
     Some (Unboxed_vector Boxed_vec256)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int64x4 ->
     Some (Unboxed_vector Boxed_vec256)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float16x16 ->
+    Some (Unboxed_vector Boxed_vec256)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float32x8 ->
     Some (Unboxed_vector Boxed_vec256)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float64x4 ->
@@ -3474,6 +3532,8 @@ let native_repr_of_type env kind ty sort_or_poly =
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int32x16 ->
     Some (Unboxed_vector Boxed_vec512)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_int64x8 ->
+    Some (Unboxed_vector Boxed_vec512)
+  | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float16x32 ->
     Some (Unboxed_vector Boxed_vec512)
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float32x16 ->
     Some (Unboxed_vector Boxed_vec512)
@@ -4353,7 +4413,8 @@ let report_jkind_mismatch_due_to_bad_inference ppf ty violation loc =
      the declaration where this error is reported.@]"
     loc
     (Jkind.Violation.report_with_offender
-       ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) violation
+       ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+       ~level:(Ctype.get_current_level ())) violation
 
 let report_error ppf = function
   | Repeated_parameter ->
@@ -4643,11 +4704,13 @@ let report_error ppf = function
       in
       fprintf ppf "type %a" Style.inline_code path_end
     in
-    Jkind.Violation.report_with_offender ~offender ppf v
+    Jkind.Violation.report_with_offender ~offender
+      ~level:(Ctype.get_current_level ()) ppf v
   | Jkind_mismatch_of_type (ty,v) ->
     let offender ppf = fprintf ppf "type %a"
         (Style.as_inline_code Printtyp.type_expr) ty in
-    Jkind.Violation.report_with_offender ~offender ppf v
+    Jkind.Violation.report_with_offender ~offender
+      ~level:(Ctype.get_current_level ()) ppf v
   | Jkind_sort {kloc; typ; err} ->
     let s =
       match kloc with
@@ -4673,14 +4736,17 @@ let report_error ppf = function
     fprintf ppf "@[%s must have a representable layout%t.@ %a@]" s
       extra
       (Jkind.Violation.report_with_offender
-         ~offender:(fun ppf -> Printtyp.type_expr ppf typ)) err
+         ~offender:(fun ppf -> Printtyp.type_expr ppf typ)
+         ~level:(Ctype.get_current_level ())) err
   | Jkind_empty_record ->
     fprintf ppf "@[Records must contain at least one runtime value.@]"
   | Non_value_in_sig (err, val_name, ty) ->
     let offender ppf = fprintf ppf "type %a" Printtyp.type_expr ty in
     fprintf ppf "@[This type signature for %a is not a value type.@ %a@]"
       Style.inline_code val_name
-      (Jkind.Violation.report_with_offender ~offender) err
+      (Jkind.Violation.report_with_offender ~offender
+         ~level:(Ctype.get_current_level ()))
+      err
   | Invalid_jkind_in_block (typ, sort_const, lloc) ->
     let struct_desc =
       match lloc with
@@ -4833,6 +4899,13 @@ let report_error ppf = function
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right;
       fprintf ppf "@[<hv>@[@{<hint>Hint@}: all argument types must \
         mode-cross for rebinding to succeed.@]"
+  | Atomic_field_in_mixed_block ->
+    fprintf ppf
+      "@[Atomic record fields are not permitted in mixed blocks.@]"
+  | Non_value_atomic_field ->
+    fprintf ppf
+      "@[Atomic record fields must have layout value.@]"
+
 
 let () =
   Location.register_error_of_exn

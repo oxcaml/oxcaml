@@ -532,7 +532,7 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
     | Lprologue | Lepilogue_open | Lepilogue_close
     | Lop
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _
+        | Tls_get | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
         | Load _
         | Store (_, _, _)
@@ -570,6 +570,8 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
     if insert_stack_check
     then
       let fun_body =
+        (* CR mshinwell: These availability sets aren't taking into account any
+           potential clobbers by the stack check. *)
         Linear.instr_cons
           (Lstackcheck { max_frame_size_bytes = max_frame_size })
           [||] [||] ~available_before:fundecl.fun_body.available_before

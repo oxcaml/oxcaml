@@ -80,8 +80,8 @@ end = struct
       |> List.map (fun basename -> { basename; path = Filename.concat path basename }) in
     { path; files; hidden }
 
-  let read_path_list_file' path =
-    let ic = open_in path in
+  let read_path_list_file' path_list_file_path =
+    let ic = open_in path_list_file_path in
     Misc.try_finally
       (fun () ->
         let rec loop acc =
@@ -94,12 +94,12 @@ end = struct
         loop [])
       ~always:(fun () -> close_in ic)
 
-  let read_path_list_file path =
-    let files = read_path_list_file' path in
+  let read_path_list_file path_list_file_path =
+    let files = read_path_list_file' path_list_file_path in
     List.map (fun { basename; path } ->
       let path = if Filename.is_relative path then
         (* Paths are relative to parent directory of path list file *)
-        Filename.concat (Filename.dirname path) path
+        Filename.concat (Filename.dirname path_list_file_path) path
       else
         path
       in

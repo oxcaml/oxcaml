@@ -154,7 +154,11 @@ val set_inlining_state : t -> Inlining_state.t -> t
 val get_inlining_state : t -> Inlining_state.t
 
 val add_cse :
-  t -> Flambda_primitive.Eligible_for_cse.t -> bound_to:Simple.t -> t
+  t ->
+  Flambda_primitive.Eligible_for_cse.t ->
+  bound_to:Simple.t ->
+  name_mode:Name_mode.t ->
+  t
 
 val find_cse : t -> Flambda_primitive.Eligible_for_cse.t -> Simple.t option
 
@@ -237,6 +241,11 @@ val must_inline : t -> bool
 val replay_history : t -> Replay_history.t
 
 val with_replay_history : (Replay_history.t * bool) option -> t -> t
+
+val with_join_analysis :
+  Apply_cont_rewrite_id.t Join_analysis.t option -> t -> t
+
+val join_analysis : t -> Apply_cont_rewrite_id.t Join_analysis.t option
 
 val map_specialization_cost :
   f:(Specialization_cost.t -> Specialization_cost.t) -> t -> t

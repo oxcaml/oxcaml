@@ -12,85 +12,90 @@
 (*                                                                        *)
 (**************************************************************************)
 
-[@@@ocaml.warning "+a-4-9-30-40-41-42"]
-
 open! Int_replace_polymorphic_compare
 module RD = Reg_with_debug_info
+
+module RD_quotient_set =
+  Reg_with_debug_info.Set_distinguishing_names_and_locations
+
 module V = Backend_var
 
 type t =
-  | Ok of RD.Set.t
+  | Ok of RD_quotient_set.t
   | Unreachable
 
-let of_list rds = Ok (RD.Set.of_list rds)
-
-(* CR mshinwell: The implementations below probably aren't really adequate, but
-   will suffice for now. We should aim to improve them soon *)
+let of_list rds = Ok (RD_quotient_set.of_list rds)
 
 let union t1 t2 =
-  (* Since [RD.Set]'s comparison function just looks at the [Reg.t] values, this
-     will arbitrarily pick between debug info values in the case where [t1] and
-     [t2] both contain the same [Reg.t]. That seems ok, at least for now. *)
   match t1, t2 with
-  | Ok avail1, Ok avail2 -> Ok (RD.Set.union avail1 avail2)
+  | Ok avail1, Ok avail2 ->
+    (* CR mshinwell: Seems like this could cause sets with multiple locations
+       for the same name, or vice-versa. *)
+    Ok (RD_quotient_set.union avail1 avail2)
   | Unreachable, _ | _, Unreachable -> Unreachable
 
-(* This is intersection on the [Reg.t] values with the additional semantics that
-   conflicting debug info values are erased (see comment below). *)
 let inter t1 t2 =
+  (* This is for Compute_ranges, not the join in Cfg_available_regs. *)
+  match t1, t2 with
+  | Unreachable, _ -> t2
+  | _, Unreachable -> t1
+  | Ok avail1, Ok avail2 -> Ok (RD_quotient_set.inter avail1 avail2)
+
+let inter_removing_conflicting_debug_info t1 t2 =
+  (* This is for the join in Cfg_available_regs, not for Compute_ranges. *)
   match t1, t2 with
   | Unreachable, _ -> t2
   | _, Unreachable -> t1
   | Ok avail1, Ok avail2 ->
+    (* Conflicting debug info values for the same location need to be cleared,
+       with the register still being put in the output set, otherwise we might
+       completely forget that such register is available. As such this can't
+       just be [RD_quotient_set.inter]. *)
     let result =
-      RD.Set.fold
+      RD_quotient_set.fold
         (fun reg1 result ->
-          match RD.Set.find_reg_exn avail2 (RD.reg reg1) with
-          | exception Not_found -> result
+          match
+            RD_quotient_set.find_reg_with_same_location_exn avail2 (RD.reg reg1)
+          with
+          | exception Not_found ->
+            (* Not in the intersection, even ignoring debug info *)
+            result
           | reg2 ->
-            let debug_info1 = RD.debug_info reg1 in
-            let debug_info2 = RD.debug_info reg2 in
-            let debug_info =
-              match debug_info1, debug_info2 with
-              | None, None -> None
-              (* Example for this next case: the value of a mutable variable x
-                 is copied into another variable y; then there is a conditional
-                 where on one branch x is assigned and on the other branch it is
-                 not. This means that on the former branch we have forgotten
-                 about y holding the value of x; but we have not on the latter.
-                 At the join point we must have forgotten the information. *)
-              | None, Some _ | Some _, None -> None
-              | Some debug_info1, Some debug_info2 ->
-                if RD.Debug_info.compare debug_info1 debug_info2 = 0
-                then Some debug_info1
-                else None
-            in
             let reg =
-              RD.create_with_debug_info ~reg:(RD.reg reg1) ~debug_info
+              (* Clear out any conflicting debug info, but remember that the
+                 register is available. *)
+              if Option.equal RD.Debug_info.equal (RD.debug_info reg1)
+                   (RD.debug_info reg2)
+              then
+                (* [reg1] has the same location and debug info as [reg2] *)
+                reg1
+              else
+                (* Debug info conflict. We arbitrarily pick [reg1]; we know it
+                   has the same location as [reg2]. *)
+                RD.create_without_debug_info ~reg:(RD.reg reg1)
             in
-            RD.Set.add reg result)
-        avail1 RD.Set.empty
+            RD_quotient_set.add reg result)
+        avail1 RD_quotient_set.empty
     in
     Ok result
 
-(* This ignores the debug info values completely. *)
 let diff t1 t2 =
   match t1, t2 with
   | Unreachable, (Ok _ | Unreachable) -> Unreachable
-  | Ok avail1, Ok avail2 -> Ok (RD.Set.diff avail1 avail2)
-  | Ok _, Unreachable -> Ok RD.Set.empty
+  | Ok avail1, Ok avail2 -> Ok (RD_quotient_set.diff avail1 avail2)
+  | Ok _, Unreachable -> Ok RD_quotient_set.empty
 
 let fold f t init =
   match t with
   | Unreachable -> init
-  | Ok availability -> RD.Set.fold f availability init
+  | Ok availability -> RD_quotient_set.fold f availability init
 
 let canonicalise availability =
   match availability with
   | Unreachable -> Unreachable
   | Ok availability ->
     let regs_by_ident = V.Tbl.create 42 in
-    RD.Set.iter
+    RD_quotient_set.iter
       (fun reg ->
         match RD.debug_info reg with
         | None -> ()
@@ -117,8 +122,8 @@ let canonicalise availability =
       availability;
     let result =
       V.Tbl.fold
-        (fun _ident reg availability -> RD.Set.add reg availability)
-        regs_by_ident RD.Set.empty
+        (fun _ident reg availability -> RD_quotient_set.add reg availability)
+        regs_by_ident RD_quotient_set.empty
     in
     Ok result
 
@@ -127,14 +132,14 @@ let equal t1 t2 =
   match t1, t2 with
   | Unreachable, Unreachable -> true
   | Unreachable, Ok _ | Ok _, Unreachable -> false
-  | Ok regs1, Ok regs2 -> RD.Set.equal regs1 regs2
+  | Ok regs1, Ok regs2 -> RD_quotient_set.equal regs1 regs2
 
 let subset t1 t2 =
   match t1, t2 with
   | Unreachable, Unreachable -> true
   | Unreachable, Ok _ -> false
   | Ok _, Unreachable -> false
-  | Ok regs1, Ok regs2 -> RD.Set.subset regs1 regs2
+  | Ok regs1, Ok regs2 -> RD_quotient_set.subset regs1 regs2
 
 let print ~print_reg ppf = function
   | Unreachable -> Format.fprintf ppf "<unreachable>"
@@ -143,4 +148,4 @@ let print ~print_reg ppf = function
       (Format.pp_print_list
          ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
          (Reg_with_debug_info.print ~print_reg))
-      (RD.Set.elements availability)
+      (RD_quotient_set.elements availability)

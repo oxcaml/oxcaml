@@ -60,6 +60,8 @@ type address = Persistent_env.address =
 
 type t
 
+type stage
+
 val empty: t
 
 (* This environment is lazy so that it may depend on the enabled extensions,
@@ -195,19 +197,6 @@ type unbound_value_hint =
   | No_hint
   | Missing_rec of Location.t
 
-type escaping_context =
-  | Letop
-  | Probe
-  | Class
-
-type shared_context =
-  | For_loop
-  | While_loop
-  | Letop
-  | Comprehension
-  | Class
-  | Probe
-
 type mode_with_locks = Mode.Value.l * locks
 (** Sometimes we get the locks for something, but either want to walk them later, or
 walk them for something else. The [Longident.t] and [Location.t] are only for error
@@ -222,6 +211,12 @@ val mode_unit : Mode.Value.lr
 type structure_components_reason =
   | Project
   | Open
+
+type no_open_quotations_context =
+  | Object_qt
+  | Struct_qt
+  | Sig_qt
+  | Open_qt
 
 type lookup_error =
   | Unbound_value of Longident.t * unbound_value_hint
@@ -251,14 +246,13 @@ type lookup_error =
         container_class_type : string
       }
   | Cannot_scrape_alias of Longident.t * Path.t
-  | Local_value_escaping of Mode.Hint.lock_item * Longident.t * escaping_context
-  | Once_value_used_in of Mode.Hint.lock_item * Longident.t * shared_context
   | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
-  | Mutable_value_used_in_closure of
-      [`Escape of escaping_context | `Shared of shared_context | `Closure]
+  | Mutable_value_used_in_closure of Mode.Hint.pinpoint
+  | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
+  | No_constructor_in_stage of Longident.t * Location.t * int
 
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
@@ -275,19 +269,13 @@ val lookup_error: Location.t -> t -> lookup_error -> 'a
    [lookup_foo ~use:true] exactly one time -- otherwise warnings may be
    emitted the wrong number of times. *)
 
-type actual_mode = {
-  mode : Mode.Value.l;
-  context : shared_context option
-  (** Explains why [mode] is high. *)
-}
-
 (** Takes the mode and the type of a value at definition site, walks through the
     list of locks and constrains the mode and the type. Return the access mode
     of the value allowed by the locks. [ty] is optional as the function works on
     modules and classes as well, for which [ty] should be [None]. *)
 val walk_locks : env:t -> loc:Location.t -> Longident.t ->
   item:Mode.Hint.lock_item ->
-  type_expr option -> mode_with_locks -> actual_mode
+  type_expr option -> mode_with_locks -> Mode.Value.l
 
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
@@ -352,12 +340,14 @@ val lookup_settable_variable:
 
 val find_value_by_name:
   Longident.t -> t -> Path.t * value_description
+val find_value_by_name_lazy:
+  Longident.t -> t -> Path.t * Subst.Lazy.value_description
 val find_type_by_name:
   Longident.t -> t -> Path.t * type_declaration
-val find_module_by_name:
-  Longident.t -> t -> Path.t * module_declaration
-val find_modtype_by_name:
-  Longident.t -> t -> Path.t * modtype_declaration
+val find_module_by_name_lazy:
+  Longident.t -> t -> Path.t * Subst.Lazy.module_declaration
+val find_modtype_by_name_lazy:
+  Longident.t -> t -> Path.t * Subst.Lazy.modtype_declaration
 val find_class_by_name:
   Longident.t -> t -> Path.t * class_declaration
 val find_cltype_by_name:
@@ -513,19 +503,25 @@ val enter_unbound_module : string -> module_unbound_reason -> t -> t
 
 (* Lock the environment *)
 
-val add_escape_lock : escaping_context -> t -> t
-
-(** `once` variables beyond the share lock cannot be accessed. Moreover,
-    `unique` variables beyond the lock can still be accessed, but will be
-    relaxed to `shared` *)
-val add_share_lock : shared_context -> t -> t
-(* CR-soon zqian: require [pinpoint] instead of [pinpoint_desc] to include
-   location of the closure. *)
-val add_closure_lock : Mode.Hint.pinpoint_desc
+val add_closure_lock : Mode.Hint.pinpoint
   -> ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
+
+(** A variant of [add_closure_lock] where the mode of the closure is a constant
+due to the nature of the pinpoint. As a result, the mode is not printed in error
+messages. [ghost = true] means the closure is not a value (such as
+a loop) *)
+val add_const_closure_lock : ?ghost:bool -> Mode.Hint.pinpoint ->
+  Mode.Value.Comonadic.Const.t -> t -> t
+
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
+val enter_quotation : t -> t
+val enter_splice : loc:Location.t -> t -> t
+
+val check_no_open_quotations :
+  Location.t -> t -> no_open_quotations_context -> unit
+val stage : t -> stage
 
 (* Initialize the cache of in-core module interfaces. *)
 val reset_cache: preserve_persistent_env:bool -> unit
@@ -565,6 +561,13 @@ val imports: unit -> Import_info.t list
 
 (* may raise Persistent_env.Consistbl.Inconsistency *)
 val import_crcs: source:string -> Import_info.t array -> unit
+
+(* Require that the provided compilation unit will be available at quotation
+   compile time. *)
+val require_global_for_quote: Compilation_unit.Name.t -> unit
+
+(* Return the set of compilation units referenced by quotes *)
+val quoted_globals: unit -> Compilation_unit.Name.t list
 
 (* Return the set of imports represented as runtime parameters (see
    [Persistent_env.runtime_parameter_bindings] for details) *)
@@ -615,14 +618,17 @@ type error =
   | Illegal_value_name of Location.t * string
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t; }
+  | Toplevel_splice of Location.t
+  | Unsupported_inside_quotation of Location.t * no_open_quotations_context
 
 exception Error of error
 
 open Format
 
-val report_error: formatter -> error -> unit
+val report_error: level:int -> formatter -> error -> unit
 
-val report_lookup_error: Location.t -> t -> formatter -> lookup_error -> unit
+val report_lookup_error:
+    level:int -> Location.t -> t -> formatter -> lookup_error -> unit
 
 val in_signature: bool -> t -> t
 
@@ -706,4 +712,7 @@ type address_head =
 
 val address_head : address -> address_head
 
-val sharedness_hint : Format.formatter -> shared_context -> unit
+val print_stage : Format.formatter -> stage -> unit
+
+val print_with_quote_promote :
+  Format.formatter -> (string * stage * stage) -> unit

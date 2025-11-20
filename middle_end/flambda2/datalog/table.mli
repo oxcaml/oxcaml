@@ -46,14 +46,18 @@ module Id : sig
 
   val compare : (_, _, _) t -> (_, _, _) t -> int
 
+  val columns : ('t, 'k, 'v) t -> ('t, 'k, 'v) Column.hlist
+
   val is_trie : ('t, 'k, 'v) t -> ('t, 'k, 'v) Trie.is_trie
+
+  val has_provenance : ('t, 'k, 'v) t -> bool
 
   type ('k, 'v) poly = Id : ('t, 'k, 'v) t -> ('k, 'v) poly
 
   val create :
+    provenance:bool ->
     name:string ->
-    is_trie:('t, 'k, 'v) Trie.is_trie ->
-    print_keys:(Format.formatter -> 'k Constant.hlist -> unit) ->
+    columns:('t, 'k, 'v) Column.hlist ->
     default_value:'v ->
     ('t, 'k, 'v) t
 
@@ -76,4 +80,8 @@ module Map : sig
   val set : ('t, 'k, 'v) Id.t -> 't -> t -> t
 
   val concat : earlier:t -> later:t -> t
+
+  type binding = Binding : ('t, 'k, 'v) Id.t * 't -> binding
+
+  val fold : f:(binding -> 'a -> 'a) -> t -> init:'a -> 'a
 end

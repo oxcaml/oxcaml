@@ -68,6 +68,7 @@ Implementations imported:
 	00000000000000000000000000000000	Fancy__Flourish[P:P_int][Q:Q_impl]
 	00000000000000000000000000000000	Fancy[P:P_string][Q:Q_impl]
 	00000000000000000000000000000000	Fancy[P:P_int][Q:Q_impl]
+Globals used in quotations:
 Flambda 2 unit with export information
 Currying functions:
 Apply functions:

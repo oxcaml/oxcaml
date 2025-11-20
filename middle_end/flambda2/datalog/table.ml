@@ -60,8 +60,9 @@ module Id = struct
     { id : ('t * 'k) Type.Id.t;
       name : string;
       is_trie : ('t, 'k, 'v) Trie.is_trie;
-      print_keys : Format.formatter -> 'k Constant.hlist -> unit;
-      default_value : 'v
+      columns : ('t, 'k, 'v) Column.hlist;
+      default_value : 'v;
+      provenance : bool
     }
 
   let is_trie { is_trie; _ } = is_trie
@@ -91,8 +92,18 @@ module Id = struct
   let compare { id = id1; _ } { id = id2; _ } =
     compare (Type.Id.uid id1) (Type.Id.uid id2)
 
-  let create ~name ~is_trie ~print_keys ~default_value =
-    { id = Type.Id.make (); name; is_trie; print_keys; default_value }
+  let create ~provenance ~name ~columns ~default_value =
+    (* Store the [is_trie] value in order to avoid a double loop to create it
+       when it is used. *)
+    (* CR bclement: most iterations on [is_trie] could probably be replaced with
+       iterations on [columns] instead, at which point we could get rid of
+       [is_trie] entirely. *)
+    let is_trie = Column.is_trie columns in
+    { id = Type.Id.make (); name; is_trie; columns; default_value; provenance }
+
+  let has_provenance { provenance; _ } = provenance
+
+  let[@inline] columns { columns; _ } = columns
 
   let[@inline] uid { id; _ } = Type.Id.uid id
 
@@ -116,12 +127,9 @@ module Id = struct
     send_trie, { values = iterator; names = get_names iterator 0 }, recv_value
 end
 
-module VM = Virtual_machine.Make (Trie.Iterator)
-
 let iter id f table =
-  let send_input, it, recv_output = Id.create_iterator id in
-  Channel.send send_input table;
-  VM.iter (fun keys -> f keys (Channel.recv recv_output)) (VM.iterator it)
+  let is_trie = Id.is_trie id in
+  Trie.iter is_trie f table
 
 let print id ?(pp_sep = Format.pp_print_cut) pp_row ppf table =
   let first = ref true in
@@ -134,7 +142,9 @@ let print id ?(pp_sep = Format.pp_print_cut) pp_row ppf table =
 let print_table (id : (_, _, _) Id.t) ppf table =
   Format.fprintf ppf "@[<v>%a@]"
     (print id (fun keys _ ->
-         Format.fprintf ppf "@[%a(%a).@]" Id.print id id.print_keys keys))
+         Format.fprintf ppf "@[%a(%a).@]" Id.print id
+           (Column.print_keys id.columns)
+           keys))
     table
 
 let print id ppf table =
@@ -179,4 +189,6 @@ module Map = struct
         in
         Some (Binding (id1, table)))
       tables1 tables2
+
+  let fold ~f m ~init = Int.Map.fold (fun _ binding acc -> f binding acc) m init
 end

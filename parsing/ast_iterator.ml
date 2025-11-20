@@ -155,6 +155,8 @@ module T = struct
     | Ptyp_open (mod_ident, t) ->
         iter_loc sub mod_ident;
         sub.typ sub t
+    | Ptyp_quote t -> sub.typ sub t
+    | Ptyp_splice t -> sub.typ sub t
     | Ptyp_of_kind jkind ->
         sub.jkind_annotation sub jkind
     | Ptyp_extension x -> sub.extension sub x
@@ -552,6 +554,8 @@ module E = struct
     | Pexp_stack e -> sub.expr sub e
     | Pexp_comprehension e -> iter_comp_exp sub e
     | Pexp_overwrite (e1, e2) -> sub.expr sub e1; sub.expr sub e2
+    | Pexp_quote e -> sub.expr sub e
+    | Pexp_splice e -> sub.expr sub e
     | Pexp_hole -> ()
 
   let iter_binding_op sub {pbop_op; pbop_pat; pbop_exp; pbop_loc} =

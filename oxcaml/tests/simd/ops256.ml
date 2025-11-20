@@ -153,7 +153,10 @@ module AVX_Util = struct
   let () =
     (failmsg := fun () -> Printf.printf "broadcast");
     let v128 = int64x2_of_int64s 0x1122334455667788L 0x99aabbccddeeff00L in
-    let v256 = broadcast_128 v128 in
+    let v256 =
+      int64x4_of_int64s 0x1122334455667788L 0x99aabbccddeeff00L
+        0x1122334455667788L 0x99aabbccddeeff00L
+    in
     eq4 (word0 v256) (word1 v256) (word2 v256) (word3 v256) 0x1122334455667788L
       0x99aabbccddeeff00L 0x1122334455667788L 0x99aabbccddeeff00L;
     let v256_64 = broadcast_64 v128 in

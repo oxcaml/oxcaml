@@ -1,0 +1,71 @@
+;******************************************************************************
+;*                                  OxCaml                                    *
+;* -------------------------------------------------------------------------- *
+;*                               MIT License                                  *
+;*                                                                            *
+;* Copyright (c) 2025 Jane Street Group LLC                                   *
+;* opensource-contacts@janestreet.com                                         *
+;*                                                                            *
+;* Permission is hereby granted, free of charge, to any person obtaining a    *
+;* copy of this software and associated documentation files (the "Software"), *
+;* to deal in the Software without restriction, including without limitation  *
+;* the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+;* and/or sell copies of the Software, and to permit persons to whom the      *
+;* Software is furnished to do so, subject to the following conditions:       *
+;*                                                                            *
+;* The above copyright notice and this permission notice shall be included    *
+;* in all copies or substantial portions of the Software.                     *
+;*                                                                            *
+;* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+;* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+;* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+;* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+;* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+;* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+;* DEALINGS IN THE SOFTWARE.                                                  *
+;******************************************************************************
+
+; CR metaprogramming jrickard: This file has not been code reviewed
+
+(library
+ (name camlinternaleval)
+ (modes byte native)
+ (libraries jit ocamlcommon)
+ ; CR mshinwell: Enable metaprogramming on arm64.  Needs the binary emitter
+ (enabled_if
+  (= %{architecture} "amd64"))
+ (flags
+  (:standard
+   -strict-sequence
+   -absname
+   -bin-annot
+   -safe-string
+   -strict-formats))
+ (ocamlopt_flags
+  (:include %{project_root}/ocamlopt_flags.sexp))
+ (library_flags
+  (:standard -linkall -ccopt %{read:../../natdynlinkops}))
+ (foreign_stubs
+  (language c)
+  (names eval_stubs)))
+
+(install
+ (enabled_if
+  (= %{architecture} "amd64"))
+ (files
+  (.camlinternaleval.objs/native/camlinternaleval.cmx
+   as
+   camlinternaleval.cmx)
+  camlinternaleval.cmxa
+  camlinternaleval.a
+  libcamlinternaleval_stubs.a
+  camlinternaleval.cmxs
+  camlinternaleval.cma
+  ; (camlinternaleval.mli as camlinternaleval/eval.mli)
+  (.camlinternaleval.objs/byte/camlinternaleval.cmi as camlinternaleval.cmi)
+  (.camlinternaleval.objs/byte/camlinternaleval.cmt as camlinternaleval.cmt)
+  (.camlinternaleval.objs/byte/camlinternaleval.cmti
+   as
+   camlinternaleval.cmti))
+ (section lib)
+ (package ocaml))

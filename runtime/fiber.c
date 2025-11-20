@@ -380,7 +380,12 @@ value caml_alloc_stack_bind (value hval, value hexn, value heff, value dyn, valu
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
                                  hval, hexn, heff, dyn, val, id);
 
-  if (!stack) caml_raise_out_of_memory();
+  if (!stack)
+#if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
+    caml_raise_out_of_fibers();
+#else
+    caml_raise_out_of_memory();
+#endif
 
   fiber_debug_log ("Allocate stack=%p of %" ARCH_INTNAT_PRINTF_FORMAT
                      "u words", stack, caml_fiber_wsz);
@@ -691,7 +696,12 @@ CAMLprim value caml_alloc_stack_bind(value hval, value hexn, value heff,
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
                                  hval, hexn, heff, dyn, val, id);
 
-  if (!stack) caml_raise_out_of_memory();
+  if (!stack)
+#if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
+    caml_raise_out_of_fibers();
+#else
+    caml_raise_out_of_memory();
+#endif
 
   sp = Stack_high(stack);
   sp -= 1;
@@ -996,6 +1006,14 @@ static void free_stack_memory(struct stack_info* stack)
 #endif
 }
 
+uintnat caml_cache_stacks_per_class =
+#if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
+  1
+#else
+  128
+#endif
+  ;
+
 void caml_free_stack (struct stack_info* stack)
 {
   CAMLnoalloc;
@@ -1008,13 +1026,19 @@ void caml_free_stack (struct stack_info* stack)
   caml_free_local_arenas(stack->local_arenas);
 
   if (stack->cache_bucket != -1) {
-    stack->exception_ptr =
-      (void*)(cache[stack->cache_bucket]);
-    cache[stack->cache_bucket] = stack;
+    struct stack_info* top = (struct stack_info*)cache[stack->cache_bucket];
+    int64_t count = top ? top->id : 0;
+    if (count < caml_cache_stacks_per_class) {
+      stack->exception_ptr = (void *)top;
+      stack->id = count + 1;
+      cache[stack->cache_bucket] = stack;
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
-    memset(Stack_base(stack), 0x42,
-           (Stack_high(stack)-Stack_base(stack))*sizeof(value));
+      memset(Stack_base(stack), 0x42,
+             (Stack_high(stack)-Stack_base(stack))*sizeof(value));
 #endif
+    } else {
+      free_stack_memory(stack);
+    }
   } else {
     free_stack_memory(stack);
   }

@@ -207,7 +207,7 @@ let test_join_with_extensions () =
   in
   Format.eprintf "Left:@.%a@." TE.print left_env;
   Format.eprintf "Right:@.%a@." TE.print right_env;
-  let joined_env =
+  let joined_env, _analysis =
     T.cut_and_n_way_join scoped_env
       [ left_env, Apply_cont_rewrite_id.create (), Inlinable;
         right_env, Apply_cont_rewrite_id.create (), Inlinable ]
@@ -298,7 +298,7 @@ let test_join_with_complex_extensions () =
   in
   Format.eprintf "Left:@.%a@." TE.print left_env;
   Format.eprintf "Right:@.%a@." TE.print right_env;
-  let joined_env =
+  let joined_env, _analysis =
     T.cut_and_n_way_join scoped_env
       [ left_env, Apply_cont_rewrite_id.create (), Inlinable;
         right_env, Apply_cont_rewrite_id.create (), Inlinable ]

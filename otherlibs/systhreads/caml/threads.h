@@ -69,6 +69,11 @@ CAMLextern_libthreads int caml_c_thread_unregister(void);
 */
 
 enum caml_thread_type { Thread_type_caml, Thread_type_c_registered };
+
+/* locking scheme version 0 has no send_interrupt field. */
+
+#define CAML_LOCKING_SCHEME_VERSION 1 /* Adds send_interrupt field */
+
 struct caml_locking_scheme {
   void* context;
   void (*lock)(void*);
@@ -77,7 +82,9 @@ struct caml_locking_scheme {
   /* If non-NULL, these functions are called when threads start and stop.
      For threads created by OCaml, that's at creation and termination.
      For threads created by C, that's at caml_c_thread_register/unregister.
-     The lock is not held when these functions are called. */
+     The lock is not held when these functions are called.
+     These functions are not called on the backup thread, even though
+     it uses lock/unlock. */
   void (*thread_start)(void*, enum caml_thread_type);
   void (*thread_stop)(void*, enum caml_thread_type);
 
@@ -89,6 +96,12 @@ struct caml_locking_scheme {
      and expect it held on return */
   int (*can_skip_yield)(void*);
   void (*yield)(void*);
+
+  /* If non-NULL, called without the lock held when the runtime urgently
+     needs to take the lock to service an interrupt, such as for GC */
+  void (*send_interrupt)(void*);
+
+  /* TODO: add magic number including version number, to improve checking */
 };
 
 /* Switch to a new runtime locking scheme.

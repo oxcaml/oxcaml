@@ -3,11 +3,11 @@ include Builtins.Int16x8
 (* Creation / Destruction *)
 
 external low_of : (int[@untagged]) -> (t[@unboxed])
-  = "caml_vec128_unreachable" "caml_int16x8_low_of_int"
+  = "caml_vec128_unreachable" "caml_int16x8_low_of_int16"
   [@@noalloc] [@@builtin]
 
 external low_to : (t[@unboxed]) -> (int[@untagged])
-  = "caml_vec128_unreachable" "caml_int16x8_low_to_int"
+  = "caml_vec128_unreachable" "caml_int16x8_low_to_int16"
   [@@noalloc] [@@builtin]
 
 let () =

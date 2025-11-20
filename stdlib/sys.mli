@@ -515,3 +515,15 @@ module Safe : sig
       The provided [signal_behavior] must be [portable] as it is shared between all
       domains. *)
 end
+
+type arch =
+  | Amd64
+  | Arm64
+
+val arch : arch
+
+val amd64 : bool
+(** True if [Sys.arch = Amd64]. *)
+
+val arm64 : bool
+(** True if [Sys.arch = Arm64]. *)

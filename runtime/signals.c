@@ -52,6 +52,10 @@ CAMLexport atomic_uintnat caml_pending_signals[NSIG_WORDS];
 
 static caml_plat_mutex signal_install_mutex = CAML_PLAT_MUTEX_INITIALIZER;
 
+/* Only used in signals_nat.c, but defined here to avoid link errors
+   on bytecode builds */
+uintnat caml_enable_segv_handler = 1;
+
 /* Check whether there is an unblocked pending signal.
    This is relatively expensive, so only call it once we're sure there's
    at least one pending signal. */
@@ -181,14 +185,10 @@ CAMLexport void caml_record_signal(int signal_number)
 
 static void caml_enter_blocking_section_default(void)
 {
-  caml_bt_exit_ocaml();
-  caml_release_domain_lock();
 }
 
 static void caml_leave_blocking_section_default(void)
 {
-  caml_bt_enter_ocaml();
-  caml_acquire_domain_lock();
 }
 
 CAMLexport void (*caml_enter_blocking_section_hook)(void) =
@@ -201,6 +201,8 @@ static int check_pending_actions(caml_domain_state * dom_st);
 CAMLexport void caml_enter_blocking_section_no_pending(void)
 {
   caml_enter_blocking_section_hook ();
+  caml_bt_exit_ocaml();
+  caml_release_domain_lock();
 }
 
 CAMLexport void caml_enter_blocking_section(void)
@@ -230,6 +232,9 @@ CAMLexport void caml_leave_blocking_section(void)
   int saved_errno;
   /* Save the value of errno (PR#5982). */
   saved_errno = errno;
+
+  caml_acquire_domain_lock();
+  caml_bt_enter_ocaml();
   caml_leave_blocking_section_hook ();
   Caml_check_caml_state();
 

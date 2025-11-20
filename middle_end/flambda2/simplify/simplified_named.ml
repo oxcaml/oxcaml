@@ -85,3 +85,7 @@ let print ppf { named; _ } = Named.print ppf (to_named named)
 let cost_metrics { cost_metrics; _ } = cost_metrics
 
 let update_cost_metrics cost_metrics t = { t with cost_metrics }
+
+type 'a or_rewritten =
+  | Simplified of 'a
+  | Rewritten of (body:Flambda.Expr.t -> Flambda.Expr.t)

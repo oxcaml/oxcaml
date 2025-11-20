@@ -33,6 +33,8 @@ module Extension : sig
     | BMI2
     | AVX
     | AVX2
+    | F16C
+    | FMA
     | AVX512F
 
   val name : t -> string

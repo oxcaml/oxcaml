@@ -69,7 +69,7 @@ let may_trace = ref false (* Global lock on tracing *)
 let load_lambda ppf lam =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
-  let slam = Simplif.simplify_lambda lam in
+  let slam = Simplif.simplify_lambda_for_bytecode lam in
   if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda slam;
   let blam = Blambda_of_lambda.blambda_of_lambda ~compilation_unit:None slam in
   if !Clflags.dump_blambda then fprintf ppf "%a@." Printblambda.blambda blam;

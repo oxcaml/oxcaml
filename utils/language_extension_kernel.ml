@@ -21,6 +21,7 @@ type _ t =
   | Separability : unit t
   | Let_mutable : unit t
   | Layout_poly : maturity t
+  | Runtime_metaprogramming : unit t
 
 (* When you update this, update [pair_of_string] below too. *)
 let to_string : type a. a t -> string = function
@@ -40,3 +41,4 @@ let to_string : type a. a t -> string = function
   | Separability -> "separability"
   | Let_mutable -> "let_mutable"
   | Layout_poly -> "layout_poly"
+  | Runtime_metaprogramming -> "runtime_metaprogramming"

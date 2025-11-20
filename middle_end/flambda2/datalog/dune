@@ -5,9 +5,15 @@
  (wrapped true)
  (instrumentation (backend bisect_ppx))
  (ocamlopt_flags
-  (:standard -O3 -open Int_replace_polymorphic_compare))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)
+   -O3
+   -open
+   Int_replace_polymorphic_compare))
  (flags
   (:standard
    -open
-   Flambda2_algorithms))
- (libraries ocamlcommon flambda2_algorithms))
+   Flambda2_algorithms
+   -open
+   Flambda2_ui))
+ (libraries ocamlcommon flambda2_algorithms flambda2_ui))

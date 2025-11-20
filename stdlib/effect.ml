@@ -14,7 +14,7 @@
 
 type 'a t = ..
 external perform : 'a t -> 'a = "%perform"
-
+exception Out_of_fibers = Out_of_fibers
 type exn += Unhandled: 'a t -> exn
 exception Continuation_already_resumed
 

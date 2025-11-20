@@ -1846,6 +1846,7 @@ and transl_modtype_aux env smty =
       mkmty (Tmty_alias (path, lid)) (Mty_alias path) env loc
         smty.pmty_attributes
   | Pmty_signature ssg ->
+      Env.check_no_open_quotations loc env Env.Sig_qt;
       let sg = transl_signature env ssg in
       mkmty (Tmty_signature sg) (Mty_signature sg.sig_type) env loc
         smty.pmty_attributes
@@ -2905,6 +2906,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       type_module_path_aux ~alias ~hold_locks sttn env path mode_with_locks lid
         smod
   | Pmod_structure sstr ->
+      Env.check_no_open_quotations smod.pmod_loc env Env.Struct_qt;
       let (str, sg, mode, names, shape, _finalenv) =
         type_structure funct_body anchor env ?expected_mode sstr in
       let md =
@@ -2925,7 +2927,9 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
   | Pmod_functor(arg_opt, sbody) ->
       let _, mode = register_allocation () in
       Option.iter (fun x -> Value.submode mode x |> ignore) expected_mode;
-      let newenv = Env.add_closure_lock Functor mode.comonadic env in
+      let newenv =
+        Env.add_closure_lock (smod.pmod_loc, Functor) mode.comonadic env
+      in
       let t_arg, ty_arg, newenv, funct_shape_param, funct_body =
         match arg_opt with
         | Unit ->
@@ -3076,7 +3080,7 @@ and type_module_path_aux ~alias ~hold_locks sttn env path
       let vmode =
         Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Module None (mode, locks)
       in
-      vmode.mode, None
+      vmode, None
   in
   let md = { mod_desc = Tmod_ident (path, lid);
              mod_type = Mty_alias path;

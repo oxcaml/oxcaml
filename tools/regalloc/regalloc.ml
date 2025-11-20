@@ -40,6 +40,7 @@ let stategies =
 type config =
   { strategy : strategy;
     validation : bool;
+    prologue_insertion : bool;
     linscan_threshold : int;
     debug_output : bool;
     csv_output : bool;
@@ -290,6 +291,17 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
   end;
   if config.debug_output
   then Printf.eprintf "  register allocation took %gs...\n%!" duration;
+  if config.prologue_insertion
+  then begin
+    Misc.protect_refs
+      [ Misc.R (Oxcaml_flags.cfg_prologue_shrink_wrap, true);
+        Misc.R (Oxcaml_flags.cfg_prologue_validate, true) ]
+      (fun () ->
+        let (_ : Cfg_with_infos.t) =
+          cfg_with_infos |> Cfg_prologue.run |> Cfg_prologue.validate
+        in
+        ())
+  end;
   ()
 
 let process_file (file : string) (config : config) =
@@ -342,6 +354,7 @@ let parse_command_line () =
     | Some strat -> strategy := Some strat
   in
   let validate = ref false in
+  let insert_prologue = ref false in
   let linscan_threshold = ref !Oxcaml_flags.regalloc_linscan_threshold in
   let csv_output = ref false in
   let debug_output = ref false in
@@ -360,6 +373,7 @@ let parse_command_line () =
         Arg.Set_int linscan_threshold,
         "Select linscan if the number of registers is above the threshold" );
       "-validate", Arg.Set validate, "Enable validation";
+      "-insert-prologue", Arg.Set insert_prologue, "Enable prologue insertion";
       "-csv-output", Arg.Set csv_output, "Enable CSV output";
       "-debug-output", Arg.Set debug_output, "Enable debug output";
       "-summary", Arg.Set print_summary, "Print summary" ]
@@ -371,6 +385,7 @@ let parse_command_line () =
   | Some strategy ->
     { strategy;
       validation = !validate;
+      prologue_insertion = !insert_prologue;
       linscan_threshold = !linscan_threshold;
       csv_output = !csv_output;
       debug_output = !debug_output;

@@ -15,9 +15,10 @@
 
 open Misc
 open Compile_common
+module SL = Slambda
 
 let tool_name = "ocamlj"
-let with_info = Compile_common.with_info ~native:false ~tool_name
+let with_info = Compile_common.with_info ~backend:(Opt Js_of_ocaml) ~tool_name
 
 let interface ~source_file ~output_prefix =
   with_info ~source_file ~output_prefix ~dump_ext:"cmi"
@@ -37,14 +38,18 @@ let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
   | Some _, None -> Misc.fatal_error "No argument field"
   | None, Some _ -> Misc.fatal_error "Unexpected argument field"
 
-let raw_lambda_to_jsir i raw_lambda ~as_arg_for =
-  raw_lambda
-  |> Profile.(record ~accumulate:true generate)
-       (fun (program : Lambda.program) ->
+let slambda_to_jsir i slambda ~as_arg_for =
+  slambda
+  |> Profile.(record ~accumulate:true generate) (fun (program : SL.program) ->
          Builtin_attributes.warn_unused ();
+         program
+         |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program
+         |> Slambdaeval.eval
+         |> fun (program : Lambda.program) ->
          program.code
          |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
-         |> Simplif.simplify_lambda
+         |> Simplif.simplify_lambda ~restrict_to_upstream_dwarf:true
+              ~gdwarf_may_alter_codegen:false
          |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
          |> fun lambda ->
          let arg_descr =
@@ -101,12 +106,12 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
         Some ai_coercion_from_primary
     | None -> None
   in
-  let raw_lambda =
+  let slambda =
     (structure, coercion, argument_coercion)
     |> Profile.(record transl) (Translmod.transl_implementation i.module_name)
   in
   let jsir, main_module_block_format, arg_descr =
-    raw_lambda_to_jsir i raw_lambda ~as_arg_for
+    slambda_to_jsir i slambda ~as_arg_for
   in
   Compilenv.save_unit_info
     (Unit_info.Artifact.filename (Unit_info.cmjx i.target))
@@ -168,7 +173,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
           ~main_module_block_size ~arg_block_idx
       in
       let jsir, main_module_block_format, arg_descr_computed =
-        raw_lambda_to_jsir info impl ~as_arg_for
+        slambda_to_jsir info impl ~as_arg_for
       in
       emit_jsir info jsir;
       Compilenv.save_unit_info

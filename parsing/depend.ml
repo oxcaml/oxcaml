@@ -121,8 +121,10 @@ let rec add_type bv ty =
       add_type bv t
   | Ptyp_package pt -> add_package_type bv pt
   | Ptyp_open (mod_ident, t) ->
-    let bv = open_module bv mod_ident.txt in
-    add_type bv t
+      let bv = open_module bv mod_ident.txt in
+      add_type bv t
+  | Ptyp_quote t -> add_type bv t
+  | Ptyp_splice t -> add_type bv t
   | Ptyp_of_kind jkind -> add_jkind bv jkind
   | Ptyp_extension e -> handle_extension e
 
@@ -321,6 +323,8 @@ let rec add_expr bv exp =
   | Pexp_extension e -> handle_extension e
   | Pexp_stack e -> add_expr bv e
   | Pexp_overwrite (e1, e2) -> add_expr bv e1; add_expr bv e2
+  | Pexp_quote e -> add_expr bv e
+  | Pexp_splice e -> add_expr bv e
   | Pexp_hole -> ()
   | Pexp_unreachable -> ()
   | Pexp_comprehension x -> add_comprehension_expr bv x

@@ -16,6 +16,10 @@
 (lldb) c
 (lldb) c
 (lldb) c
+(lldb) b Test_simd_dwarf.f_float16x8_unboxed
+(lldb) c
+(lldb) c
+(lldb) c
 (lldb) b Test_simd_dwarf.f_int8x16_unboxed
 (lldb) c
 (lldb) c
@@ -38,6 +42,10 @@
 (lldb) c
 (lldb) c
 (lldb) c
+(lldb) b Test_simd_dwarf.f_float16x8_boxed
+(lldb) c
+(lldb) c
+(lldb) c
 (lldb) b Test_simd_dwarf.f_int8x16_boxed
 (lldb) c
 (lldb) c
@@ -49,12 +57,15 @@
 (lldb) c
 (lldb) c
 (lldb) c
+(lldb) c
 (lldb) b Test_simd_dwarf.f_poly_simd_boxed
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
+(lldb) c
 (lldb) b Test_simd_dwarf.f_poly_vec128
+(lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
@@ -75,6 +86,10 @@
 (lldb) c
 (lldb) c
 (lldb) c
+(lldb) b Test_simd_dwarf.f_float16x16_boxed
+(lldb) c
+(lldb) c
+(lldb) c
 (lldb) b Test_simd_dwarf.f_int8x32_boxed
 (lldb) c
 (lldb) c
@@ -82,6 +97,7 @@
 (lldb) c
 (lldb) c
 (lldb) b Test_simd_dwarf.f_poly_simd256_boxed
+(lldb) c
 (lldb) c
 (lldb) c
 (lldb) c

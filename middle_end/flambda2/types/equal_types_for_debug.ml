@@ -301,9 +301,10 @@ let equal_head_of_kind_value_non_null ~equal_type env
 
 let equal_head_of_kind_value ~equal_type env (t1 : TG.head_of_kind_value)
     (t2 : TG.head_of_kind_value) =
+  (* CR bclement: consider [Is_null] vars *)
   match t1.is_null, t2.is_null with
-  | Not_null, Maybe_null | Maybe_null, Not_null -> false
-  | Not_null, Not_null | Maybe_null, Maybe_null ->
+  | Not_null, Maybe_null _ | Maybe_null _, Not_null -> false
+  | Not_null, Not_null | Maybe_null _, Maybe_null _ ->
     Or_unknown_or_bottom.equal
       (equal_head_of_kind_value_non_null ~equal_type env)
       t1.non_null t2.non_null
@@ -389,8 +390,8 @@ let equal_head_of_kind_region (() : TG.head_of_kind_region)
 
 let is_unknown_head_of_kind_value (t : TG.head_of_kind_value) =
   match t.is_null, t.non_null with
-  | Maybe_null, Unknown -> true
-  | (Not_null | Maybe_null), (Unknown | Bottom | Ok _) -> false
+  | Maybe_null _, Unknown -> true
+  | (Not_null | Maybe_null _), (Unknown | Bottom | Ok _) -> false
 
 let is_non_obviously_unknown (t : ET.descr) =
   match t with
@@ -403,7 +404,7 @@ let is_non_obviously_unknown (t : ET.descr) =
 let is_bottom_head_of_kind_value (t : TG.head_of_kind_value) =
   match t.is_null, t.non_null with
   | Not_null, Bottom -> true
-  | (Not_null | Maybe_null), (Unknown | Bottom | Ok _) -> false
+  | (Not_null | Maybe_null _), (Unknown | Bottom | Ok _) -> false
 
 let is_non_obviously_bottom (t : ET.descr) =
   match t with

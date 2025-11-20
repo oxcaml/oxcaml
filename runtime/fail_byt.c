@@ -212,6 +212,12 @@ CAMLexport void caml_raise_out_of_memory(void)
   caml_raise_constant(Field(caml_global_data, OUT_OF_MEMORY_EXN));
 }
 
+CAMLexport void caml_raise_out_of_fibers(void)
+{
+  check_global_data("Out_of_fibers");
+  caml_raise_constant(Field(caml_global_data, OUT_OF_FIBERS_EXN));
+}
+
 CAMLexport void caml_raise_stack_overflow(void)
 {
   check_global_data("Stack_overflow");

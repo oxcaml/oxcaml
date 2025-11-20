@@ -4,7 +4,7 @@
   addressSanitizer ? false,
   dev ? false,
   flambdaInvariants ? false,
-  framePointers ? false,
+  framePointers ? addressSanitizer,
   multidomain ? false,
   ocamltest ? true,
   pollInsertion ? false,
@@ -47,18 +47,18 @@ let
   ocaml = (upstream.ocaml.override { inherit stdenv; }).overrideAttrs {
     # This patch is from oxcaml PR 3960, which fixes an issue in the upstream
     # compiler that we use to bootstrap ourselves on ARM64
-    patches = [ ./arm64-issue-debug-upstream.patch ];
+    patches = [
+      ./tools/ci/local-opam/packages/ocaml-base-compiler/ocaml-base-compiler.4.14.2+oxcaml/files/ocaml-base-compiler.4.14.2+oxcaml.patch
+    ];
   };
 
-  dune = upstream.dune_3.overrideAttrs (
-    new: old: {
-      version = "3.15.2";
-      src = pkgs.fetchurl {
-        url = "https://github.com/ocaml/dune/releases/download/${new.version}/dune-${new.version}.tbz";
-        sha256 = "sha256-+VmYBULKhZCbPz+Om+ZcK4o3XzpOO9g8etegfy4HeTM=";
-      };
-    }
-  );
+  dune = upstream.dune_3.overrideAttrs rec {
+    version = "3.19.1";
+    src = pkgs.fetchurl {
+      url = "https://github.com/ocaml/dune/releases/download/${version}/dune-${version}.tbz";
+      hash = "sha256-oQOG+YDNqUF9FGVGa+1Q3SrvnJO50GoPf+7tsKFUEVg=";
+    };
+  };
 
   menhirLib = upstream.menhirLib.overrideAttrs (
     new: old: rec {
@@ -254,4 +254,8 @@ stdenv.mkDerivation {
       make test-one TEST=...   - Run a single test
     EOF
   '';
+
+  meta =
+    { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
+
 }

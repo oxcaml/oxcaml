@@ -80,16 +80,6 @@ let transl_object =
   ref (fun ~scopes:_ _id _s _cl -> assert false :
        scopes:scopes -> Ident.t -> string list -> class_expr -> lambda)
 
-(* Probe handlers are generated from %probe as closed functions
-   during transl_exp and immediately lifted to top level. *)
-let probe_handlers = ref []
-let clear_probe_handlers () = probe_handlers := []
-let declare_probe_handlers lam =
-  List.fold_left (fun acc (funcid, func_duid, func) ->
-      Llet(Strict, Lambda.layout_function, funcid, func_duid, func, acc))
-    lam
-    !probe_handlers
-
 (* Compile an exception/extension definition *)
 
 let prim_fresh_oo_id =
@@ -1290,19 +1280,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           ap_probe = Some {name; enabled_at_init};
         }
       in
-      begin match Config.flambda || Config.flambda2 with
-      | true ->
-          Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler,
-               Lapply app)
-      | false ->
-        (* Needs to be lifted to top level manually here,
-           because functions that contain other function declarations
-           are not inlined by Closure. For example, adding a probe into
-           the body of function foo will prevent foo from being inlined
-           into another function. *)
-        probe_handlers := (funcid, funcid_duid, handler)::!probe_handlers;
-        Lapply app
-      end
+      Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler,
+            Lapply app)
     end else begin
       lambda_unit
     end
@@ -1330,6 +1309,20 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
   | Texp_hole _ ->
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
+  | Texp_quotation exp ->
+      Translquote.transl_quote (transl_exp ~scopes sort) exp e.exp_loc
+  (* TODO: update scopes *)
+  | Texp_antiquotation exp ->
+      fatal_errorf
+        "@[Cannot unquote expression outside of a quotation context:@ \
+         %a@]"
+        Pprintast.expression (Untypeast.untype_expression exp)
+  | Texp_eval (_, _sort) ->
+    let loc = of_location ~scopes e.exp_loc in
+    Lprim (Pfield (0, Pointer, Reads_agree), [
+      Lprim
+        (Pgetglobal (Compilation_unit.of_string "Camlinternaleval"), [], loc);
+    ], loc)
 
 and pure_module m =
   match m.mod_desc with
@@ -2276,10 +2269,16 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
 and transl_atomic_loc ~scopes arg arg_sort lbl =
   let arg = transl_exp ~scopes arg_sort arg in
   begin match lbl.lbl_repres with
-  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
+  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
+  | Record_float | Record_ufloat
+    ->
       (* Atomic fields not allowed here *)
-      assert false
-  | _ -> ()
+      Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
+  | Record_boxed _
+  | Record_inlined (_, _, ( Variant_boxed _
+                          | Variant_extensible
+                          | Variant_with_null))
+    -> ()
   end;
   let field_offset = field_offset_for_label lbl in
   let lbl = Lconst (Const_base (Const_int field_offset)) in

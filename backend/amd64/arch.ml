@@ -31,6 +31,8 @@ module Extension = struct
       | BMI2
       | AVX
       | AVX2
+      | F16C
+      | FMA
       | AVX512F
 
     let rank = function
@@ -46,7 +48,9 @@ module Extension = struct
       | BMI2 -> 9
       | AVX -> 10
       | AVX2 -> 11
-      | AVX512F -> 12
+      | F16C -> 12
+      | FMA -> 13
+      | AVX512F -> 14
 
     let compare left right = Int.compare (rank left) (rank right)
   end
@@ -67,6 +71,8 @@ module Extension = struct
     | BMI2 -> "BMI2"
     | AVX -> "AVX"
     | AVX2 -> "AVX2"
+    | F16C -> "F16C"
+    | FMA -> "FMA"
     | AVX512F -> "AVX512F"
 
   let generation = function
@@ -82,6 +88,8 @@ module Extension = struct
     | BMI2 -> "Haswell+"
     | AVX -> "Sandybridge+"
     | AVX2 -> "Haswell+"
+    | F16C -> "Ivybridge+"
+    | FMA -> "Haswell+"
     | AVX512F -> "SkylakeXeon+"
 
   let enabled_by_default = function
@@ -98,12 +106,14 @@ module Extension = struct
     | BMI2 -> Config.has_bmi2
     | AVX -> Config.has_avx
     | AVX2 -> Config.has_avx2
+    | F16C -> Config.has_f16c
+    | FMA -> Config.has_fma
     | PREFETCHW | PREFETCHWT1 | AVX512F -> false
 
   let all =
     Set.of_list
       [ POPCNT; PREFETCHW; PREFETCHWT1; SSE3; SSSE3; SSE4_1; SSE4_2; CLMUL;
-        BMI; BMI2; AVX; AVX2; AVX512F ]
+        BMI; BMI2; AVX; AVX2; F16C; FMA; AVX512F ]
 
   let directly_implied_by e1 e2 =
     match e1, e2 with
@@ -114,8 +124,8 @@ module Extension = struct
     | AVX, AVX2
     | AVX2, AVX512F
     | BMI, BMI2 -> true
-    | (POPCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1
-      | SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | AVX512F), _ -> false
+    | (POPCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1 | SSE4_2 |
+       CLMUL | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F), _ -> false
 
   let rec fix set less =
     let closure =
@@ -170,6 +180,8 @@ module Extension = struct
       | BMI2 -> enabled BMI2
       | AVX -> enabled AVX
       | AVX2 -> enabled AVX2
+      | F16C -> enabled F16C
+      | FMA -> enabled FMA
     in
     Array.for_all enabled instr.ext
 end
@@ -404,7 +416,9 @@ let print_specific_operation printreg op ppf arg =
   | Isimd simd ->
       Simd.print_operation printreg simd ppf arg
   | Isimd_mem (simd, addr) ->
-      Simd.Mem.print_operation printreg (print_addressing printreg addr) simd ppf arg
+      Simd.Mem.print_operation printreg 
+        (print_addressing printreg addr) (num_args_addressing addr) 
+        simd ppf arg
   | Icldemote _ ->
       fprintf ppf "cldemote %a" printreg arg.(0)
   | Iprefetch { is_write; locality; _ } ->

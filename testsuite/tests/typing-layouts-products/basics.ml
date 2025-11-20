@@ -957,7 +957,7 @@ let f_external_utuple_mode_crosses_local_1
   : local_ #(int * int) -> #(int * int) = fun x -> x
 [%%expect{|
 val f_external_utuple_mode_crosses_local_1 :
-  local_ #(int * int) -> #(int * int) = <fun>
+  #(int * int) @ local -> #(int * int) = <fun>
 |}]
 
 let f_internal_utuple_does_not_mode_cross_local_1
@@ -966,14 +966,14 @@ let f_internal_utuple_does_not_mode_cross_local_1
 Line 2, characters 57-58:
 2 |   : local_ #(int * string) -> #(int * string) = fun x -> x
                                                              ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let f_external_utuple_mode_crosses_local_2
   : local_ #(int * #(bool * int)) -> #(int * #(bool * int)) = fun x -> x
 [%%expect{|
 val f_external_utuple_mode_crosses_local_2 :
-  local_ #(int * #(bool * int)) -> #(int * #(bool * int)) = <fun>
+  #(int * #(bool * int)) @ local -> #(int * #(bool * int)) = <fun>
 |}]
 
 let f_internal_utuple_does_not_mode_cross_local_2
@@ -982,7 +982,7 @@ let f_internal_utuple_does_not_mode_cross_local_2
 Line 2, characters 77-78:
 2 |   : local_ #(int * #(bool * string)) -> #(int * #(bool * string)) = fun x -> x
                                                                                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 type t = #(int * int)
@@ -991,7 +991,7 @@ let f_external_utuple_mode_crosses_local_3
 [%%expect{|
 type t = #(int * int)
 val f_external_utuple_mode_crosses_local_3 :
-  local_ #(int * #(t * int)) -> #(int * #(t * int)) = <fun>
+  #(int * #(t * int)) @ local -> #(int * #(t * int)) = <fun>
 |}]
 
 type t = #(string * int)
@@ -1002,7 +1002,7 @@ type t = #(string * int)
 Line 3, characters 67-68:
 3 |   : local_ #(int * #(t * bool)) -> #(int * #(t * bool)) = fun x -> x
                                                                        ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (* Unboxed records version of the same test *)
@@ -1013,7 +1013,7 @@ let f_external_urecord_mode_crosses_local_1
 [%%expect{|
 type local_cross1 = #{ i1 : int; i2 : int; }
 val f_external_urecord_mode_crosses_local_1 :
-  local_ local_cross1 -> local_cross1 = <fun>
+  local_cross1 @ local -> local_cross1 = <fun>
 |}]
 
 type local_nocross1 = #{ i : int; s : string }
@@ -1024,7 +1024,7 @@ type local_nocross1 = #{ i : int; s : string; }
 Line 3, characters 55-56:
 3 |   : local_ local_nocross1 -> local_nocross1 = fun x -> x
                                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 type local_cross2_inner = #{ b : bool; i : int }
@@ -1035,7 +1035,7 @@ let f_external_urecord_mode_crosses_local_2
 type local_cross2_inner = #{ b : bool; i : int; }
 type local_cross2 = #{ i : int; inner : local_cross2_inner; }
 val f_external_urecord_mode_crosses_local_2 :
-  local_ local_cross2 -> local_cross2 = <fun>
+  local_cross2 @ local -> local_cross2 = <fun>
 |}]
 
 type local_nocross2_inner = #{ b : bool; s : string }
@@ -1048,7 +1048,7 @@ type local_nocross2 = #{ i : int; inner : local_nocross2_inner; }
 Line 4, characters 55-56:
 4 |   : local_ local_nocross2 -> local_nocross2 = fun x -> x
                                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 type t = #{ i1 : int; i2 : int }
@@ -1061,7 +1061,7 @@ type t = #{ i1 : int; i2 : int; }
 type local_cross3_inner = #{ t : t; i : int; }
 type local_cross3 = #{ i : int; inner : local_cross3_inner; }
 val f_external_urecord_mode_crosses_local_3 :
-  local_ local_cross3 -> local_cross3 = <fun>
+  local_cross3 @ local -> local_cross3 = <fun>
 |}]
 
 type t = #{ s : string; i : int }
@@ -1076,7 +1076,7 @@ type local_nocross3 = #{ i : int; inner : local_nocross3_inner; }
 Line 5, characters 55-56:
 5 |   : local_ local_nocross3 -> local_nocross3 = fun x -> x
                                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (****************************************************)
@@ -1087,7 +1087,7 @@ let f_external_kind_annot_mode_crosses_local_1
   : local_ t -> t = fun x -> x
 [%%expect{|
 type t : float64 mod global & float64 mod global
-val f_external_kind_annot_mode_crosses_local_1 : local_ t -> t = <fun>
+val f_external_kind_annot_mode_crosses_local_1 : t @ local -> t = <fun>
 |}]
 
 type t : float64 & value
@@ -1098,7 +1098,7 @@ type t : float64 & value
 Line 3, characters 29-30:
 3 |   : local_ t -> t = fun x -> x
                                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 type t : immediate & ((float64 mod global) & immediate)
@@ -1108,7 +1108,7 @@ let f_external_kind_annot_mode_crosses_local_2
 type t
   : value mod global non_float
     & (float64 mod global & value mod global non_float)
-val f_external_kind_annot_mode_crosses_local_2 : local_ t -> t = <fun>
+val f_external_kind_annot_mode_crosses_local_2 : t @ local -> t = <fun>
 |}]
 
 type t : immediate & (value & float64)
@@ -1119,7 +1119,7 @@ type t : value & (value & float64)
 Line 3, characters 29-30:
 3 |   : local_ t -> t = fun x -> x
                                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (*********************)
@@ -1945,7 +1945,8 @@ Line 1, characters 19-27:
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
        The kind of string t is
-           immediate with string u & immediate with string u
+           immediate mod dynamic with string u
+           & immediate mod dynamic with string u
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -1976,9 +1977,9 @@ Line 3, characters 9-30:
 Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
-           immediate with int with string
-           & immediate with int with string
-           & immediate with int with string
+           immediate mod dynamic with int with string
+           & immediate mod dynamic with int with string
+           & immediate mod dynamic with int with string
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
            any mod external_
@@ -2015,7 +2016,8 @@ Line 1, characters 19-27:
                        ^^^^^^^^
 Error: This type "string t" should be an instance of type "('a : any mod global)"
        The kind of string t is
-           immediate with string u & immediate with string u
+           immediate mod dynamic with string u
+           & immediate mod dynamic with string u
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2313,4 +2315,77 @@ Lines 1-17, characters 0-3:
 16 |     f255 : string;
 17 |   }
 Error: Mixed records may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+|}]
+
+(****************************************************************)
+(* Test 23: width mismatches against layout any with mod bounds *)
+
+(* This is a regression test for a bug that could cause the compiler to crash.
+
+   [t] doesn't typecheck because the annotation says it's a product of two
+   things, but it's a product of three. However, before we notice that, we
+   notice that the annotation we've given [t] isn't [non_null]. That forces us
+   to do some expansion, and the bit of code that expands assumes we've already
+   checked the width. We had missed the width guard in one of the cases. *)
+type ('a : any mod non_null) s
+
+type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
+[%%expect{|
+type ('a : any mod non_null) s
+Line 3, characters 0-66:
+3 | type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The kind of t is value_or_null & bits32
+         because of the annotation on the declaration of the type t.
+       But the kind of t must be a subkind of any mod non_null
+         because of the definition of s at line 1, characters 0-30.
+|}]
+
+(* modal axes have the same problem *)
+type ('a : any mod portable) s
+
+type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
+[%%expect{|
+type ('a : any mod portable) s
+Line 3, characters 0-66:
+3 | type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The kind of t is value_or_null & bits32
+         because of the annotation on the declaration of the type t.
+       But the kind of t must be a subkind of any mod portable
+         because of the definition of s at line 1, characters 0-30.
+|}]
+
+(* If the kind annotation does cross, you get a more sensible error. *)
+type ('a : any mod non_null) s
+
+type t : (value_or_null & bits32) mod non_null =
+  #{ a : int; b : t s; c : int32 }
+[%%expect{|
+type ('a : any mod non_null) s
+Lines 3-4, characters 0-34:
+3 | type t : (value_or_null & bits32) mod non_null =
+4 |   #{ a : int; b : t s; c : int32 }
+Error: The layout of type "t" is value & value & value
+         because it is an unboxed record.
+       But the layout of type "t" must be a sublayout of value & bits32
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* modal axes have the same problem *)
+type ('a : any mod portable) s
+
+type t : (value_or_null & bits32) mod portable =
+  #{ a : int; b : t s; c : int32 }
+[%%expect{|
+type ('a : any mod portable) s
+Lines 3-4, characters 0-34:
+3 | type t : (value_or_null & bits32) mod portable =
+4 |   #{ a : int; b : t s; c : int32 }
+Error: The layout of type "t" is value & value & value
+         because it is an unboxed record.
+       But the layout of type "t" must be a sublayout of value & bits32
+         because of the annotation on the declaration of the type t.
 |}]

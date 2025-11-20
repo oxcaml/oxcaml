@@ -91,23 +91,23 @@ module type S =
        then call [cont] on that variable, and return the term made of
        the binding and the result of the call. *)
     val bind : arg -> (arg -> act) -> act
-    (* [make_const n] generates a term for the integer constant [n] *)
-    val make_const : int -> arg
-    (* [make_offset arg n] generates a term for adding the constant
+    (* [make_const loc n] generates a term for the integer constant [n] *)
+    val make_const : loc -> int -> arg
+    (* [make_offset loc arg n] generates a term for adding the constant
        integer [n] to the term [arg] *)
-    val make_offset : arg -> int -> arg
-    (* [make_prim p args] generates a test using the primitive operation [p]
+    val make_offset : loc -> arg -> int -> arg
+    (* [make_prim loc p args] generates a test using the primitive operation [p]
        applied to arguments [args] *)
-    val make_prim : primitive -> arg list -> test
-    (* [make_isout h arg] generates a test that holds when [arg] is out of
+    val make_prim : loc -> primitive -> arg list -> test
+    (* [make_isout loc h arg] generates a test that holds when [arg] is out of
        the interval [0, h] *)
-    val make_isout : arg -> arg -> test
-    (* [make_isin h arg] generates a test that holds when [arg] is in
+    val make_isout : loc -> arg -> arg -> test
+    (* [make_isin loc h arg] generates a test that holds when [arg] is in
        the interval [0, h] *)
-    val make_isin : arg -> arg -> test
-    (* [make_is_nonzero arg] generates a test that holds when [arg] is any
+    val make_isin : loc -> arg -> arg -> test
+    (* [make_is_nonzero loc arg] generates a test that holds when [arg] is any
        value except 0 *)
-    val make_is_nonzero : arg -> test
+    val make_is_nonzero : loc -> arg -> test
     (* [arg_as_test arg] casts [arg], known to be either 0 or 1,
        to a boolean test *)
     val arg_as_test : arg -> test
@@ -149,6 +149,7 @@ module Make :
 
 (* Output test sequence, sharing tracked *)
      val test_sequence :
+           Arg.loc ->
            Arg.layout ->
            Arg.arg ->
            (int * int * int) array ->

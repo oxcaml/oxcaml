@@ -29,16 +29,27 @@ let apply_array : t -> Reg.t array -> Reg.t array =
 let apply_set : t -> Reg.Set.t -> Reg.Set.t =
  fun subst set -> Reg.Set.map (fun reg -> apply_reg subst reg) set
 
-(* CR mshinwell: Apply substitution to [Iname_for_debugger] registers. *)
-let apply_instruction_in_place : t -> _ Cfg.instruction -> unit =
+let apply_instruction_in_place0 : t -> _ Cfg.instruction -> unit =
  fun subst instr ->
   apply_array_in_place subst instr.arg;
   apply_array_in_place subst instr.res
 
+let apply_basic_instruction_in_place : t -> Cfg.basic Cfg.instruction -> unit =
+ fun subst instr ->
+  apply_instruction_in_place0 subst instr;
+  match[@ocaml.warning "-fragile-match"] instr.desc with
+  | Op (Name_for_debugger { regs; _ }) -> apply_array_in_place subst regs
+  | _ -> ()
+
+let apply_terminator_instruction_in_place :
+    t -> Cfg.terminator Cfg.instruction -> unit =
+ fun subst instr -> apply_instruction_in_place0 subst instr
+
 let apply_block_in_place : t -> Cfg.basic_block -> unit =
  fun subst block ->
-  DLL.iter block.body ~f:(fun instr -> apply_instruction_in_place subst instr);
-  apply_instruction_in_place subst block.terminator
+  DLL.iter block.body ~f:(fun instr ->
+      apply_basic_instruction_in_place subst instr);
+  apply_terminator_instruction_in_place subst block.terminator
 
 type map = t Label.Tbl.t
 

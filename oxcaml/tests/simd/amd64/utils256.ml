@@ -136,6 +136,28 @@ let eq_float64x4 ~result ~expect =
   eq_float64x2 ~result:result_low ~expect:expect_low;
   eq_float64x2 ~result:result_high ~expect:expect_high
 
+let eq_int64x4 ~result ~expect =
+  eq4
+    (int64x4_first_int64 result)
+    (int64x4_second_int64 result)
+    (int64x4_third_int64 result)
+    (int64x4_fourth_int64 result)
+    (int64x4_first_int64 expect)
+    (int64x4_second_int64 expect)
+    (int64x4_third_int64 expect)
+    (int64x4_fourth_int64 expect)
+
+let eq_int32x8 ~result ~expect =
+  eq4
+    (int32x8_first_int64 result)
+    (int32x8_second_int64 result)
+    (int32x8_third_int64 result)
+    (int32x8_fourth_int64 result)
+    (int32x8_first_int64 expect)
+    (int32x8_second_int64 expect)
+    (int32x8_third_int64 expect)
+    (int32x8_fourth_int64 expect)
+
 module Vector256_casts = struct
   let eq a b c d e f g h =
     if a <> e || b <> f || c <> g || d <> h
@@ -481,6 +503,17 @@ module Float32 = struct
     let low = to_float32x4 a b c d in
     let high = to_float32x4 e f g h in
     float32x8_of_float32x4s low high
+
+  let to_float32x8' t0 t1 t2 t3 t4 t5 t6 t7 =
+    to_float32x8
+      (Stdlib_stable.Float32.to_bits t0)
+      (Stdlib_stable.Float32.to_bits t1)
+      (Stdlib_stable.Float32.to_bits t2)
+      (Stdlib_stable.Float32.to_bits t3)
+      (Stdlib_stable.Float32.to_bits t4)
+      (Stdlib_stable.Float32.to_bits t5)
+      (Stdlib_stable.Float32.to_bits t6)
+      (Stdlib_stable.Float32.to_bits t7)
 end
 
 module Float64 = struct

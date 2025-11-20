@@ -285,6 +285,14 @@ let no_tsan = make
      "tsan not available"
      "tsan available")
 
+let no_address_sanitizer = make
+  ~name:"no-address-sanitizer"
+  ~description:"Pass if address sanitizer is not supported"
+  ~does_something:false
+  (Actions_helpers.predicate (not Ocamltest_config.address_sanitizer)
+     "address-sanitizer not available"
+     "address-sanitizer available")
+
 let has_symlink = make
   ~name:"has_symlink"
   ~description:"Pass if symbolic links are available"
@@ -435,4 +443,5 @@ let init () =
     probes;
     tsan;
     no_tsan;
+    no_address_sanitizer;
   ]

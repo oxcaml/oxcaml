@@ -2,5 +2,6 @@ File "bad_instance_wrong_mode.ml", line 6, characters 10-44:
 6 |   let _ = Monoid_utils_of_list_monoid.concat in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The value "Monoid_utils_of_list_monoid.concat" is "nonportable"
-       but is expected to be "portable" because it is used inside a function
+       but is expected to be "portable"
+       because it is used inside the function at File "bad_instance_wrong_mode.ml", lines 1-7, characters 19-4
        which is expected to be "portable".

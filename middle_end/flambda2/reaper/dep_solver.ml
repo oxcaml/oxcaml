@@ -13,6 +13,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
+let reaperdbg_env = Sys.getenv_opt "REAPERDBG"
+
+let reaperdbg_flags =
+  String.split_on_char ',' (Option.value ~default:"" reaperdbg_env)
+
+let debug = reaperdbg_env <> None
+
+(* This needs to be set before creating any datalog rules. *)
+let () =
+  if debug && List.mem "prov" reaperdbg_flags
+  then Datalog.Schedule.enable_provenance_for_debug ()
+
 module Field = Global_flow_graph.Field
 
 type 'a unboxed_fields =
@@ -84,20 +96,20 @@ module Cols = struct
   let cf = Global_flow_graph.CoField.Encoded.datalog_column_id
 end
 
-let rel1_r name schema =
-  let r = Datalog.create_relation ~name schema in
+let rel1_r ?provenance name schema =
+  let r = Datalog.create_relation ?provenance ~name schema in
   r, fun x -> Datalog.atom r [x]
 
-let rel1 name schema = snd (rel1_r name schema)
+let rel1 ?provenance name schema = snd (rel1_r ?provenance name schema)
 
-let rel2_r name schema =
-  let r = Datalog.create_relation ~name schema in
+let rel2_r ?provenance name schema =
+  let r = Datalog.create_relation ?provenance ~name schema in
   r, fun x y -> Datalog.atom r [x; y]
 
-let rel2 name schema = snd (rel2_r name schema)
+let rel2 ?provenance name schema = snd (rel2_r ?provenance name schema)
 
-let rel3 name schema =
-  let r = Datalog.create_relation ~name schema in
+let rel3 ?provenance name schema =
+  let r = Datalog.create_relation ?provenance ~name schema in
   fun x y z -> Datalog.atom r [x; y; z]
 
 (**
@@ -182,17 +194,18 @@ let cofield_sources_rel = rel3 "cofield_sources" Cols.[n; cf; n]
 
 let cofield_usages_rel = rel3 "cofield_usages" Cols.[n; cf; n]
 
-let rev_alias_rel = rel2 "rev_alias" Cols.[n; n]
+let rev_alias_rel = rel2 ~provenance:false "rev_alias" Cols.[n; n]
 
-let rev_use_rel = rel2 "rev_use" Cols.[n; n]
+let rev_use_rel = rel2 ~provenance:false "rev_use" Cols.[n; n]
 
-let rev_constructor_rel = rel3 "rev_constructor" Cols.[n; f; n]
+let rev_constructor_rel = rel3 ~provenance:false "rev_constructor" Cols.[n; f; n]
 
-let rev_accessor_rel = rel3 "rev_accessor" Cols.[n; f; n]
+let rev_accessor_rel = rel3 ~provenance:false "rev_accessor" Cols.[n; f; n]
 
-let rev_coaccessor_rel = rel3 "rev_coaccessor" Cols.[n; cf; n]
+let rev_coaccessor_rel = rel3 ~provenance:false "rev_coaccessor" Cols.[n; cf; n]
 
-let rev_coconstructor_rel = rel3 "rev_coconstructor" Cols.[n; cf; n]
+let rev_coconstructor_rel =
+  rel3 ~provenance:false "rev_coconstructor" Cols.[n; cf; n]
 
 (* The program is abstracted as a series of relations concerning the reading and
    writing of fields of values.
@@ -781,10 +794,9 @@ let exists_with_parameters cursor params db =
 
 let mk_exists_query params existentials f =
   Datalog.(
-    compile [] (fun [] ->
-        with_parameters params (fun params ->
-            foreach existentials (fun existentials ->
-                where (f params existentials) (yield [])))))
+    compile_with_parameters params [] (fun params [] ->
+        foreach existentials (fun existentials ->
+            where (f params existentials) (yield []))))
 
 let is_function_slot : Field.t -> _ = function[@ocaml.warning "-4"]
   | Function_slot _ -> true
@@ -807,7 +819,7 @@ type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
     This is only necessary if the set of variables can correspond to a closure
     *and* the set of variables contains variables that are not the allocation
     point of the set of closures.
-    
+
     The reason for this is that for a given closure that is called, the
     [usages] do not usually include the uses of the closure inside the code of
     the closure itself. However, when we allocate a set of closures, we include
@@ -931,13 +943,12 @@ let get_set_of_closures_def :
     Datalog.database -> Code_id_or_name.t -> set_of_closures_def =
   let q =
     Datalog.(
-      compile [] (fun [] ->
-          with_parameters ["x"] (fun [x] ->
-              foreach ["field"; "y"] (fun [field; y] ->
-                  where
-                    [ Global_flow_graph.constructor_rel x field y;
-                      filter_field is_function_slot field ]
-                    (yield [field; y])))))
+      compile_with_parameters ["x"] [] (fun [x] [] ->
+          foreach ["field"; "y"] (fun [field; y] ->
+              where
+                [ Global_flow_graph.constructor_rel x field y;
+                  filter_field is_function_slot field ]
+                (yield [field; y]))))
   in
   fun db v ->
     let l =
@@ -1498,8 +1509,6 @@ let rewrite_kind_with_subkind uses var kind =
       (Code_id_or_name.Map.singleton var ())
       kind
 
-let debug = Sys.getenv_opt "REAPERDBG" <> None
-
 let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db usages name_prefix =
   let fields = get_fields db usages in
   Field.Map.filter_map
@@ -1541,7 +1550,7 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db usages name_prefix =
 
 let fixpoint (graph : Global_flow_graph.graph) =
   let datalog = Global_flow_graph.to_datalog graph in
-  let stats = Datalog.Schedule.create_stats () in
+  let stats = Datalog.Schedule.create_stats datalog in
   let db = Datalog.Schedule.run ~stats datalog_schedule datalog in
   let db =
     List.fold_left
@@ -1767,20 +1776,19 @@ let unknown_code_id_actually_directly_called_query =
 let code_id_actually_directly_called_query =
   let open Syntax in
   let open! Global_flow_graph in
-  compile [] (fun [] ->
-      with_parameters ["set_of_closures"] (fun [set_of_closures] ->
-          foreach ["apply_widget"; "call_witness"; "codeid"]
-            (fun [apply_widget; call_witness; codeid] ->
-              where
-                [ rev_accessor_rel set_of_closures
-                    (Term.constant
-                       (Field.encode (Code_of_closure Known_arity_code_pointer)))
-                    apply_widget;
-                  sources_rel apply_widget call_witness;
-                  constructor_rel call_witness
-                    (Term.constant (Field.encode Code_id_of_call_witness))
-                    codeid ]
-                (yield [codeid]))))
+  compile_with_parameters ["set_of_closures"] [] (fun [set_of_closures] [] ->
+      foreach ["apply_widget"; "call_witness"; "codeid"]
+        (fun [apply_widget; call_witness; codeid] ->
+          where
+            [ rev_accessor_rel set_of_closures
+                (Term.constant
+                   (Field.encode (Code_of_closure Known_arity_code_pointer)))
+                apply_widget;
+              sources_rel apply_widget call_witness;
+              constructor_rel call_witness
+                (Term.constant (Field.encode Code_id_of_call_witness))
+                codeid ]
+            (yield [codeid])))
 
 let code_id_actually_directly_called uses v =
   if exists_with_parameters unknown_code_id_actually_directly_called_query

@@ -1,9 +1,7 @@
 (* TEST
  include stdlib_stable;
- include stdlib_beta;
  include stdlib_upstream_compatible;
  modules = "idx_repr.ml stubs.c";
- flags = "-extension simd_beta -extension layouts_alpha";
  flambda2;
  stack-allocation;
  native;
@@ -30,7 +28,6 @@ let int64x2_u_equal i1 i2 =
 
 open Stdlib_upstream_compatible
 open Stdlib_stable
-open Stdlib_beta
 
 external[@layout_poly] makearray_dynamic_local :
   ('a : any mod separable) . int -> 'a -> 'a array @ local =

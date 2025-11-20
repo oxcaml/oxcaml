@@ -17,7 +17,7 @@ let with_unforkable : ((string -> unit) @ local unforkable -> 'a) -> 'a =
 
 [%%expect{|
 val storage : string ref = {contents = ""}
-val with_unforkable : (local_ (string -> unit) -> 'a) -> 'a = <fun>
+val with_unforkable : ((string -> unit) @ local -> 'a) -> 'a = <fun>
 |}]
 
 let () = with_unforkable (fun k -> k "Hello, world!")
@@ -35,7 +35,7 @@ let () = with_unforkable (fun k -> run_unforkable k)
 let _ = !storage
 
 [%%expect{|
-val run_unforkable : local_ (string -> unit) -> unit = <fun>
+val run_unforkable : (string -> unit) @ local -> unit = <fun>
 - : string = "my string"
 |}]
 
@@ -56,7 +56,7 @@ let run_default : (string -> unit) @ local -> unit = fun f -> f "some string"
 let () = with_unforkable (fun k -> run_default k)
 
 [%%expect{|
-val run_default : local_ (string -> unit) -> unit = <fun>
+val run_default : (string -> unit) @ local -> unit = <fun>
 |}]
 
 (* A closure over a [unforkable] value must be [unforkable]. *)
@@ -70,7 +70,8 @@ Line 2, characters 43-44:
 2 |   let closure @ local forkable = fun () -> k () in
                                                ^
 Error: The value "k" is "unforkable" but is expected to be "forkable"
-       because it is used inside a function which is expected to be "forkable".
+       because it is used inside the function at Line 2, characters 33-47
+       which is expected to be "forkable".
 |}]
 
 type 'a t0 = Mk0 of 'a @@ global
@@ -91,10 +92,10 @@ let with_global_unforkable : ((string -> unit) @ unforkable -> 'a) -> 'a =
   fun f -> f ((:=) storage)
 
 [%%expect{|
-type 'a t0 = Mk0 of global_ 'a
-type 'a t1 = Mk1 of global_ 'a
+type 'a t0 = Mk0 of 'a @@ global
+type 'a t1 = Mk1 of 'a @@ global
 type 'a t2 = Mk2 of 'a @@ global unforkable
-type 'a t3 = Mk3 of global_ 'a
+type 'a t3 = Mk3 of 'a @@ global
 type 'a t4 = Mk4 of 'a @@ global yielding
 type 'a t5 = Mk5 of 'a @@ global unforkable
 type 'a t6 = Mk6 of 'a @@ global unforkable yielding
@@ -152,7 +153,7 @@ let _ = ok_unforkable (stack_ (Some "local string"))
 let _ = with_global_unforkable (fun k -> ok_unforkable k)
 
 [%%expect{|
-external ok_unforkable : local_ 'a -> unit = "%ignore"
+external ok_unforkable : 'a @ local -> unit = "%ignore"
 - : unit = ()
 - : unit = ()
 - : unit = ()
@@ -197,9 +198,9 @@ let f4 (x @ local forkable) = exclave_ id x
 [%%expect{|
 external id : ('a [@local_opt]) -> ('a [@local_opt]) = "%identity"
 val f1 : 'a -> 'a = <fun>
-val f2 : local_ 'a -> local_ 'a = <fun>
+val f2 : 'a @ local -> 'a @ local = <fun>
 val f3 : 'a @ unforkable -> 'a @ unforkable = <fun>
-val f4 : 'a @ local forkable -> local_ 'a = <fun>
+val f4 : 'a @ local forkable -> 'a @ local = <fun>
 |}]
 
 (* Test [instance_prim] + mixed mode annots. *)
@@ -231,7 +232,7 @@ Error: This value is "unforkable" but is expected to be "forkable".
 
 let f4 (x @ local forkable) = exclave_ requires_forkable x
 [%%expect{|
-val f4 : 'a @ local forkable -> local_ unit = <fun>
+val f4 : 'a @ local forkable -> unit @ local = <fun>
 |}]
 
 (* [@local_opt] overrides annotations. *)
@@ -240,7 +241,7 @@ external overridden: ('a[@local_opt]) @ local forkable -> unit = "%ignore"
 let succeeds (x @ local) = overridden x
 [%%expect{|
 external overridden : ('a [@local_opt]) @ local forkable -> unit = "%ignore"
-val succeeds : local_ 'a -> unit = <fun>
+val succeeds : 'a @ local -> unit = <fun>
 |}]
 
 (* [mod global] implies [mod forkable] by default. *)

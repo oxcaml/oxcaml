@@ -77,7 +77,7 @@ module Pass = struct
   let print ppf pass =
     match pass with
     | After_closure_conversion ->
-      Format.fprintf ppf "afte@r closure@ conversion"
+      Format.fprintf ppf "after@ closure@ conversion"
     | Before_simplify -> Format.fprintf ppf "before@ simplify"
     | After_simplify -> Format.fprintf ppf "after@ simplify"
 end

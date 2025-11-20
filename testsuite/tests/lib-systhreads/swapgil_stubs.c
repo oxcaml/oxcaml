@@ -8,6 +8,13 @@
 #include <caml/memory.h>
 #include <caml/signals.h>
 
+#include <caml/domain.h>
+#ifndef CAML_RUNTIME_5
+#define caml_bt_is_self() 0
+#else
+int caml_bt_is_self(void);
+#endif
+
 /* should be caml/threads.h, but this is what ocamltest needs */
 #include <threads.h>
 
@@ -66,13 +73,13 @@ static void runtime_lock(void* m)
   timeout.tv_sec = 0;
   timeout.tv_usec = 1;
   select(0, NULL, NULL, NULL, &timeout);
-  if (!started) abort();
+  if (!started && !caml_bt_is_self()) abort();
   if (pthread_mutex_lock(m) != 0) abort();
 }
 
 static void runtime_unlock(void* m)
 {
-  if (!started) abort();
+  if (!started && !caml_bt_is_self()) abort();
   if (pthread_mutex_unlock(m) != 0) abort();
 }
 
@@ -139,6 +146,9 @@ value swap_gil(value unused)
   s->reinitialize_after_fork = runtime_reinitialize;
   s->can_skip_yield = NULL;
   s->yield = runtime_yield;
+#ifdef CAML_RUNTIME_5
+  s->send_interrupt = NULL;
+#endif
   caml_switch_runtime_locking_scheme(s);
   return Val_unit;
 }

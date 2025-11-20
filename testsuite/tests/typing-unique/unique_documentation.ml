@@ -173,9 +173,9 @@ let set_all_zero arr =
 Line 3, characters 21-24:
 3 |     Unique_array.set arr i 0
                          ^^^
-Error: This value is "aliased" but is expected to be "unique".
-  Hint: This identifier cannot be used uniquely,
-  because it was defined outside of the for-loop.
+Error: This value is "aliased"
+       because it is used in a loop (at Lines 2-4, characters 2-6).
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let set_all_zero arr =
@@ -187,7 +187,8 @@ let set_all_zero arr =
 Line 4, characters 4-7:
 4 |     set i 0
         ^^^
-Error: The value "set" is once, so cannot be used inside a for loop
+Error: The value "set" is "once" but is expected to be "many"
+       because it is used in a loop (at Lines 3-5, characters 2-6).
 |}]
 
 let set_all_zero arr =

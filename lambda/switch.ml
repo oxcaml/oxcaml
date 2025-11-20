@@ -122,12 +122,12 @@ sig
   type layout
 
   val bind : arg -> (arg -> act) -> act
-  val make_const : int -> arg
-  val make_offset : arg -> int -> arg
-  val make_prim : primitive -> arg list -> test
-  val make_isout : arg -> arg -> test
-  val make_isin : arg -> arg -> test
-  val make_is_nonzero : arg -> test
+  val make_const : loc -> int -> arg
+  val make_offset : loc -> arg -> int -> arg
+  val make_prim : loc -> primitive -> arg list -> test
+  val make_isout : loc -> arg -> arg -> test
+  val make_isin : loc -> arg -> arg -> test
+  val make_is_nonzero : loc -> arg -> test
   val arg_as_test : arg -> test
 
   val make_if : layout -> test -> act -> act -> act
@@ -668,66 +668,66 @@ let rec pkey chan  = function
 
      In the example above, [a5] would be represented with [off = -5].
   *)
-  type 'a t_ctx =  {off : int ; arg : 'a}
+  type 'a t_ctx =  {off : int ; arg : 'a; loc : Arg.loc}
 
-  let make_if_test kind test arg i ifso ifnot =
+  let make_if_test kind loc test arg i ifso ifnot =
     Arg.make_if kind
-      (Arg.make_prim test [arg ; Arg.make_const i])
+      (Arg.make_prim loc test [arg ; Arg.make_const loc i])
       ifso ifnot
 
-  let make_if_lt kind arg i  ifso ifnot = match i with
+  let make_if_lt kind loc arg i  ifso ifnot = match i with
     | 1 ->
-        make_if_test kind Arg.leint arg 0 ifso ifnot
+        make_if_test kind loc Arg.leint arg 0 ifso ifnot
     | _ ->
-        make_if_test kind Arg.ltint arg i ifso ifnot
+        make_if_test kind loc Arg.ltint arg i ifso ifnot
 
-  and make_if_ge kind arg i  ifso ifnot = match i with
+  and make_if_ge kind loc arg i  ifso ifnot = match i with
     | 1 ->
-        make_if_test kind Arg.gtint arg 0 ifso ifnot
+        make_if_test kind loc Arg.gtint arg 0 ifso ifnot
     | _ ->
-        make_if_test kind Arg.geint arg i ifso ifnot
+        make_if_test kind loc Arg.geint arg i ifso ifnot
 
-  and make_if_eq kind arg i ifso ifnot =
-    make_if_test kind Arg.eqint arg i ifso ifnot
+  and make_if_eq kind loc arg i ifso ifnot =
+    make_if_test kind loc Arg.eqint arg i ifso ifnot
 
-  and make_if_ne kind arg i ifso ifnot =
-    make_if_test kind Arg.neint arg i ifso ifnot
+  and make_if_ne kind loc arg i ifso ifnot =
+    make_if_test kind loc Arg.neint arg i ifso ifnot
 
-  let make_if_nonzero kind arg ifso ifnot =
-    Arg.make_if kind (Arg.make_is_nonzero arg) ifso ifnot
+  let make_if_nonzero kind loc arg ifso ifnot =
+    Arg.make_if kind (Arg.make_is_nonzero loc arg) ifso ifnot
 
   let make_if_bool kind arg ifso ifnot =
     Arg.make_if kind (Arg.arg_as_test arg) ifso ifnot
 
-  let do_make_if_out kind h arg ifso ifno =
-    Arg.make_if kind (Arg.make_isout h arg) ifso ifno
+  let do_make_if_out kind loc h arg ifso ifno =
+    Arg.make_if kind (Arg.make_isout loc h arg) ifso ifno
 
   let make_if_out kind ctx l d mk_ifso mk_ifno = match l with
     | 0 ->
-        do_make_if_out kind
-          (Arg.make_const d) ctx.arg (mk_ifso ctx) (mk_ifno ctx)
+        do_make_if_out kind ctx.loc
+          (Arg.make_const ctx.loc d) ctx.arg (mk_ifso ctx) (mk_ifno ctx)
     | _ ->
         Arg.bind
-          (Arg.make_offset ctx.arg (-l))
+          (Arg.make_offset ctx.loc ctx.arg (-l))
           (fun arg ->
-             let ctx = {off= (-l+ctx.off) ; arg=arg} in
-             do_make_if_out kind
-               (Arg.make_const d) arg (mk_ifso ctx) (mk_ifno ctx))
+             let ctx = {off= (-l+ctx.off) ; arg=arg; loc=ctx.loc} in
+             do_make_if_out kind ctx.loc
+               (Arg.make_const ctx.loc d) arg (mk_ifso ctx) (mk_ifno ctx))
 
-  let do_make_if_in kind h arg ifso ifno =
-    Arg.make_if kind (Arg.make_isin h arg) ifso ifno
+  let do_make_if_in kind loc h arg ifso ifno =
+    Arg.make_if kind (Arg.make_isin loc h arg) ifso ifno
 
   let make_if_in kind ctx l d mk_ifso mk_ifno = match l with
     | 0 ->
-        do_make_if_in kind
-          (Arg.make_const d) ctx.arg (mk_ifso ctx) (mk_ifno ctx)
+        do_make_if_in kind ctx.loc
+          (Arg.make_const ctx.loc d) ctx.arg (mk_ifso ctx) (mk_ifno ctx)
     | _ ->
         Arg.bind
-          (Arg.make_offset ctx.arg (-l))
+          (Arg.make_offset ctx.loc ctx.arg (-l))
           (fun arg ->
-             let ctx = {off= (-l+ctx.off) ; arg=arg} in
-             do_make_if_in kind
-               (Arg.make_const d) arg (mk_ifso ctx) (mk_ifno ctx))
+             let ctx = {off= (-l+ctx.off) ; arg=arg; loc=ctx.loc} in
+             do_make_if_in kind ctx.loc
+               (Arg.make_const ctx.loc d) arg (mk_ifso ctx) (mk_ifno ctx))
 
   (* Generate the code for a good test sequence. *)
   let rec c_test kind ctx ({cases=cases ; actions=actions} as s) =
@@ -755,14 +755,14 @@ let rec pkey chan  = function
           if low=high then begin
             if less_tests coutside cinside then
               make_if_eq
-                kind
+                kind ctx.loc
                 ctx.arg
                 (low+ctx.off)
                 (c_test kind ctx {s with cases=inside})
                 (c_test kind ctx {s with cases=outside})
             else
               make_if_ne
-                kind
+                kind ctx.loc
                 ctx.arg
                 (low+ctx.off)
                 (c_test kind ctx {s with cases=outside})
@@ -800,17 +800,17 @@ let rec pkey chan  = function
                 (c_test kind ctx right) (c_test kind ctx left)
             else
               make_if_nonzero
-                kind
+                kind ctx.loc
                 ctx.arg
                 (c_test kind ctx right) (c_test kind ctx left)
           else if less_tests cright cleft then
             make_if_lt
-              kind
+              kind ctx.loc
               ctx.arg (lim+ctx.off)
               (c_test kind ctx left) (c_test kind ctx right)
           else
             make_if_ge
-              kind
+              kind ctx.loc
               ctx.arg (lim+ctx.off)
               (c_test kind ctx right) (c_test kind ctx left)
 
@@ -918,7 +918,7 @@ let rec pkey chan  = function
        | 0 -> Arg.make_switch loc kind ctx.arg tbl acts
        | _ ->
            Arg.bind
-             (Arg.make_offset ctx.arg (-ll-ctx.off))
+             (Arg.make_offset ctx.loc ctx.arg (-ll-ctx.off))
              (fun arg -> Arg.make_switch loc kind arg tbl acts))
 
   (* Generate code from a clustering choice. *)
@@ -979,7 +979,7 @@ let rec pkey chan  = function
 *)
     let n_clusters,k = comp_clusters s in
     let clusters = make_clusters loc kind s n_clusters k in
-    c_test kind {arg=arg ; off=0} clusters
+    c_test kind {arg=arg ; off=0; loc} clusters
 
   let abstract_shared kind actions =
     let handlers = ref (fun x -> x) in
@@ -1003,7 +1003,7 @@ let rec pkey chan  = function
     hs (do_zyva loc kind lh arg cases actions)
 
   (* Generate code using test sequences only, not Arg.make_switch *)
-  and test_sequence kind arg cases actions =
+  and test_sequence loc kind arg cases actions =
     assert (Array.length cases > 0) ;
     let actions = actions.act_get_shared () in
     let hs,actions = abstract_shared kind actions in
@@ -1018,6 +1018,6 @@ let rec pkey chan  = function
   pcases stderr cases ;
   prerr_endline "" ;
 *)
-    hs (c_test kind {arg=arg ; off=0} s)
+    hs (c_test kind {arg=arg ; off=0; loc} s)
 
 end

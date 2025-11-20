@@ -243,11 +243,16 @@ let initialize_array env loc ~length array_set_kind width ~init creation_expr =
 
 let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
     =
+  let non_empty = String.length name > 0 in
   let name =
-    Printf.sprintf "caml_make%s_%s%svect"
-      (match mode with Alloc_heap -> "" | Alloc_local -> "_local")
+    Printf.sprintf "caml_make%s_%s%svect%s"
+      (match mode with
+      | Alloc_heap -> ""
+      | Alloc_local when !Clflags.jsir -> ""
+      | Alloc_local -> "_local")
       name
-      (if String.length name > 0 then "_" else "")
+      (if non_empty then "_" else "")
+      (if non_empty && !Clflags.jsir then "_bytecode" else "")
   in
   let external_call_desc =
     Primitive.make ~name ~alloc:true (* the C stub may raise an exception *)
@@ -790,6 +795,8 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       | Ostype_cygwin -> "ostype_cygwin"
       | Backend_type -> "backend_type"
       | Runtime5 -> "runtime5"
+      | Arch_amd64 -> "arch_amd64"
+      | Arch_arm64 -> "arch_arm64"
     in
     let name = Format.sprintf "caml_sys_const_%s" name in
     let desc = L.simple_prim_on_values ~name ~arity:1 ~alloc:false in

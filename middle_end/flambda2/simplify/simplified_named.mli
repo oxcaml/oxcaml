@@ -50,3 +50,7 @@ val print : Format.formatter -> t -> unit
 val cost_metrics : t -> Cost_metrics.t
 
 val update_cost_metrics : Cost_metrics.t -> t -> t
+
+type 'a or_rewritten =
+  | Simplified of 'a
+  | Rewritten of (body:Flambda.Expr.t -> Flambda.Expr.t)

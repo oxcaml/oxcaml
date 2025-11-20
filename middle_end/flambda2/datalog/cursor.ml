@@ -15,10 +15,6 @@
 
 open Datalog_imports
 
-type _ value_repr = Int_repr : int value_repr
-
-let int_repr = Int_repr
-
 (* Note: we don't use [with_name] here to avoid the extra indirection during
    execution. *)
 type vm_action =
@@ -34,7 +30,7 @@ type vm_action =
       * 'k option Channel.receiver
       * string
       * string
-      * 'k value_repr
+      * 'k Value.repr
       -> vm_action
   | Filter :
       ('k Constant.hlist -> bool) * 'k Option_receiver.hlist * string list
@@ -362,8 +358,8 @@ let evaluate = function
          (Trie.find_opt is_trie (Option_receiver.recv args) (Channel.recv cell))
     then Virtual_machine.Skip
     else Virtual_machine.Accept
-  | Unless_eq (cell1, cell2, _cell1_name, _cell2_name, Int_repr) ->
-    if Int.equal
+  | Unless_eq (cell1, cell2, _cell1_name, _cell2_name, repr) ->
+    if Value.equal_repr repr
          (Option.get (Channel.recv cell1))
          (Option.get (Channel.recv cell2))
     then Virtual_machine.Skip
@@ -399,7 +395,7 @@ let[@inline] seminaive_run cursor ~previous ~diff ~current =
   loop cursor.cursor_binders
 
 module With_parameters = struct
-  type nonrec ('p, 'v) t =
+  type nonrec ('p, !'v) t =
     { parameters : 'p Option_sender.hlist;
       cursor : 'v t
     }

@@ -74,7 +74,7 @@ let foo (t : t @ local) = use_global t [@nontail]
 Line 1, characters 37-38:
 1 | let foo (t : t @ local) = use_global t [@nontail]
                                          ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (***********************************************************************)
@@ -115,7 +115,7 @@ Lines 1-3, characters 0-61:
 Error: The kind of type "t" is value mod non_float
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of
-           value mod contended portable
+           value mod portable contended
          because of the annotation on the declaration of the type t.
 |}]
 

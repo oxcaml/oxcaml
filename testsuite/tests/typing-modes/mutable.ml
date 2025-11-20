@@ -21,7 +21,7 @@ type r = {mutable s : string @@ local}
 let foo (local_ s) = exclave_ {s}
 [%%expect{|
 type r = { mutable s : string @@ local; }
-val foo : local_ string -> local_ r = <fun>
+val foo : string @ local -> r @ local = <fun>
 |}]
 
 type r = {mutable s : string @@ global}
@@ -72,7 +72,7 @@ type 'a r = { mutable s : 'a @@ local; }
 (* We can now construct a local record using a local field. *)
 let foo (local_ s) = exclave_ {s}
 [%%expect{|
-val foo : local_ 'a -> local_ 'a r = <fun>
+val foo : 'a @ local -> 'a r @ local = <fun>
 |}]
 
 (* Mutation needs to be global *)
@@ -90,13 +90,16 @@ let foo (local_ r) = ref r.s
 Line 1, characters 25-28:
 1 | let foo (local_ r) = ref r.s
                              ^^^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region
+       because it is the field "s" of the record at Line 1, characters 25-26
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let foo (local_ r) =
   r.s <- "hello"
 [%%expect{|
-val foo : local_ string r -> unit = <fun>
+val foo : string r @ local -> unit = <fun>
 |}]
 
 (* We can still add modalities explicitly. But they might be omitted if they are

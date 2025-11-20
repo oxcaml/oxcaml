@@ -220,6 +220,7 @@ CAMLprim value caml_natdynlink_loadsym(value symbol)
 
 CAMLprim value caml_natdynlink_existssym(value symbol)
 {
+  // Note this is marked as "noalloc" in OCaml bindings
   void* sym = caml_globalsym(String_val(symbol));
   return sym != NULL ? Val_true : Val_false;
 }

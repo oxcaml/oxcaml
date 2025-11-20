@@ -251,6 +251,12 @@ let rec core_type i ppf x =
   | Ptyp_open (mod_ident, t) ->
       line i ppf "Ptyp_open \"%a\"\n" fmt_longident_loc mod_ident;
       core_type i ppf t
+  | Ptyp_quote t ->
+      line i ppf "Ptyp_quote\n";
+      core_type i ppf t
+  | Ptyp_splice t ->
+      line i ppf "Ptyp_splice\n";
+      core_type i ppf t
   | Ptyp_of_kind jkind ->
       line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i+1)) jkind
   | Ptyp_extension (s, arg) ->
@@ -497,6 +503,12 @@ and expression i ppf x =
       line i ppf "Pexp_overwrite\n";
       expression i ppf e1;
       expression i ppf e2
+  | Pexp_quote e ->
+      line i ppf "Pexp_quote\n";
+      expression i ppf e
+  | Pexp_splice e ->
+      line i ppf "Pexp_splice\n";
+      expression i ppf e
   | Pexp_hole ->
       line i ppf "Pexp_hole"
   )

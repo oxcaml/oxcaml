@@ -41,6 +41,7 @@
 #define SYS_BLOCKED_IO 9        /* "Sys_blocked_io" */
 #define ASSERT_FAILURE_EXN 10   /* "Assert_failure" */
 #define UNDEFINED_RECURSIVE_MODULE_EXN 11 /* "Undefined_recursive_module" */
+#define OUT_OF_FIBERS_EXN 12    /* "Out_of_fibers" */
 
 #ifdef POSIX_SIGNALS
 struct longjmp_buffer {
@@ -108,6 +109,8 @@ CAMLnoret CAMLextern void caml_invalid_argument (char const *msg);
 CAMLnoret CAMLextern void caml_invalid_argument_value (value msg);
 
 CAMLnoret CAMLextern void caml_raise_out_of_memory (void);
+
+CAMLnoret CAMLextern void caml_raise_out_of_fibers (void);
 
 CAMLnoret CAMLextern void caml_raise_stack_overflow (void);
 

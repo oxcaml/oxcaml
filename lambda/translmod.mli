@@ -19,6 +19,8 @@
 open Typedtree
 open Lambda
 
+module SL := Slambda
+
 (* The triple here is the structure, the coercion from the raw structure to
    the main signature, and the coercion from the main signature to the argument
    signature (corresponding to the [structure], [coercion], and
@@ -32,7 +34,7 @@ open Lambda
    mshinwell: PR4527 has now removed transl_store* *)
 val transl_implementation:
       Compilation_unit.t -> structure * module_coercion * module_coercion option
-        -> Lambda.program
+        -> SL.program
 
 val transl_toplevel_definition: structure -> lambda
 
@@ -54,7 +56,7 @@ type runtime_arg =
 val transl_instance:
       Compilation_unit.t -> runtime_args:runtime_arg list
         -> main_module_block_size:int -> arg_block_idx:int option
-        -> Lambda.program
+        -> SL.program
 
 val toplevel_name: Ident.t -> string
 

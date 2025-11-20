@@ -33,7 +33,7 @@ let () =
  (libraries stdlib_stable)
  (ocamlopt_flags
   (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta))
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic))
  (foreign_archives simd_stubs))
 
 (rule
@@ -79,4 +79,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
   print_dwarf_test "test_simple_functor_dwarf";
   print_dwarf_test "test_parameters_dwarf";
   print_dwarf_test "test_callstack_dwarf";
-  print_dwarf_test "test_stepping_dwarf"
+  print_dwarf_test "test_stepping_dwarf";
+  print_dwarf_test "test_closures_dwarf";
+  print_dwarf_test "test_large_data_dwarf";
+  print_dwarf_test "test_tailrec_dwarf";
+  ()

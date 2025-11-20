@@ -1,0 +1,11 @@
+(test
+ (modes js) ; No env support in wasm_of_ocaml yet
+ (js_of_ocaml
+  (javascript_files setup.js)
+  (flags :standard --setenv JSOO_C=from-jsoo-args))
+ (action
+  (setenv
+   JSOO_B
+   from-env
+   (run node %{test})))
+ (name test))

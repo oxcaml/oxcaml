@@ -402,3 +402,166 @@ let () =
   test ~expect_caml_modifies:1
     (fun () -> unsafe_set_prod t idx #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
+
+external unsafe_set_or_null
+  : ('a : value) ('b : any).
+  'a or_null @ local -> ('a, 'b) idx_mut @ local -> 'b -> unit
+  @@ portable
+  = "%unsafe_set_idx"
+[@@layout_poly]
+
+let () =
+  let open struct
+    type ('base : value, 'data : any) impl =
+      #{ x : 'base or_null
+      ; global_ idx : ('base, 'data) idx_mut
+      }
+
+    type ('data : any) t = T : ('base : value) ('data : any). ('base, 'data) impl -> 'data t
+    [@@unboxed]
+
+    type 'a s = { mutable y : int or_null }
+  end in
+  (* Basic int or_null case without extra indirection *)
+  let t = This { y = This 1 } in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_or_null t (.y) (This 0);
+               let _ = Sys.opaque_identity t in ());
+  (* Two cases with specialization on both concrete and abstract types *)
+  let unsafe_set_or_null_int (t : int or_null t) v =
+    let (T #{ x; idx }) = t in
+    unsafe_set_or_null x idx v
+  in
+  let unsafe_set_or_null_imm64 (type a : immediate64) (t : a or_null t) v =
+    let (T #{ x; idx }) = t in
+    unsafe_set_or_null x idx v
+  in
+  let t : int or_null t = T #{ x = This { y = This 1 }; idx = (.y) } in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_or_null_int t (This 0);
+               let _ = Sys.opaque_identity t in ());
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_or_null_imm64 t (This 0);
+               let _ = Sys.opaque_identity t in ())
+
+(* specialized, but on abstract type with product kind *)
+let () =
+  let open struct
+    type t = { mutable a : #(int * int) }
+  end in
+  let unsafe_set_imm64_imm64 (type a : immediate64 & immediate64) box (idx : (_, a) idx_mut) (v : a) =
+    unsafe_set box idx v
+  in
+  let t = { a = #(1, 2) } in
+  let idx = (.a) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_imm64_imm64 t idx #(0, 0);
+               ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type t = { mutable a : #(int * int) }
+  end in
+  let unsafe_set_imm64_imm (type a : immediate64 & immediate) box (idx : (_, a) idx_mut) (v : a) =
+    unsafe_set box idx v
+  in
+  let t = { a = #(1, 2) } in
+  let idx = (.a) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_imm64_imm t idx #(0, 0);
+               ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type t = { mutable a : #(int * #(int * int)) }
+  end in
+  let unsafe_set_imm_and_imm_imm (type a : immediate & (immediate & immediate)) box (idx : (_, a) idx_mut) (v : a) =
+    unsafe_set box idx v
+  in
+  let t = { a = #(1, #(2, 3)) } in
+  let idx = (.a) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_imm_and_imm_imm t idx #(0, #(0, 0));
+               ignore (Sys.opaque_identity t))
+
+(* Setting an immediate or non-value block index via the ptr primitives should
+   give only the needed number of caml_modifies *)
+
+(* First layout poly versions *)
+external[@layout_poly] unsafe_set_ptr :
+  'a ('b : any).
+  (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  = "%unsafe_set_ptr"
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int }
+  end in
+  let t = { x = "x"; y = 0 } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_ptr #(t, idx) 1; ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int64# }
+  end in
+  let t = { x = "x"; y = #0L } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_ptr #(t, idx) #1L; ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : #(int64# * string * bool)}
+  end in
+  let t = { x = "x"; y = #(#0L, "a", true) } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:1
+    (fun () -> unsafe_set_ptr #(t, idx) #(#1L, "b", false);
+               ignore (Sys.opaque_identity t))
+
+(* Second, specialized versions *)
+external unsafe_set_ptr_imm :
+  'a ('b : immediate).
+  (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  = "%unsafe_set_ptr"
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int }
+  end in
+  let t = { x = "x"; y = 0 } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_ptr_imm #(t, idx) 1; ignore (Sys.opaque_identity t))
+
+external unsafe_set_ptr_i64 :
+  'a ('b : bits64).
+  (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  = "%unsafe_set_ptr"
+
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int64# }
+  end in
+  let t = { x = "x"; y = #0L } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_ptr_i64 #(t, idx) #1L; ignore (Sys.opaque_identity t))
+
+external unsafe_set_ptr_prod :
+  'a ('b : bits64 & value & immediate).
+  (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  = "%unsafe_set_ptr"
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : #(int64# * string * bool)}
+  end in
+  let t = { x = "x"; y = #(#0L, "a", true) } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:1
+    (fun () -> unsafe_set_ptr_prod #(t, idx) #(#1L, "b", false);
+               ignore (Sys.opaque_identity t))

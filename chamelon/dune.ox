@@ -2,7 +2,7 @@
  (name chamelon)
  (public_name chamelon)
  (modes native)
- (libraries ocamlcommon unix str
+ (libraries ocamlcommon
    (select compat.ml from ( -> compat.ox.ml))
  )
  (package ocaml)

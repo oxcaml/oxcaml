@@ -280,7 +280,7 @@ Lines 4-7, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           type t : value mod contended portable = { mutable x : int; }
+           type t : value mod portable contended = { mutable x : int; }
            [@@unsafe_allow_any_mode_crossing]
          end
        is not included in
@@ -289,7 +289,7 @@ Error: Signature mismatch:
            [@@unsafe_allow_any_mode_crossing]
          end
        Type declarations do not match:
-         type t : value mod contended portable = { mutable x : int; }
+         type t : value mod portable contended = { mutable x : int; }
        [@@unsafe_allow_any_mode_crossing]
        is not included in
          type t : value mod contended = { mutable x : int; }
@@ -301,7 +301,7 @@ Error: Signature mismatch:
 |}]
 
 module A : sig
-  type t : value mod external_ global portable many uncontended unique unyielding
+  type t : value mod external_ global portable many uncontended unyielding
 end = struct
   type t = int
 end
@@ -316,7 +316,7 @@ end
 module A : sig type t : value mod global many portable external_ end
 module B :
   sig
-    type t : value mod contended portable = { a : A.t; }
+    type t : value mod portable contended = { a : A.t; }
     [@@unsafe_allow_any_mode_crossing]
     val a : t -> A.t
   end

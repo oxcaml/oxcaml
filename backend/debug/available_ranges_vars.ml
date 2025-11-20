@@ -21,7 +21,7 @@ module Key = struct
 
   type key = t
 
-  module Raw_set = Reg_with_debug_info.Set
+  module Raw_set = Reg_with_debug_info.Set_distinguishing_names_and_locations
 
   module Set = struct
     include Reg_availability_set
@@ -29,11 +29,7 @@ module Key = struct
     let print ppf t = print ~print_reg:Printreg.reg ppf t
   end
 
-  module Map = Map.Make (struct
-    type t = Reg_with_debug_info.t
-
-    let compare = Reg_with_debug_info.compare
-  end)
+  module Map = Reg_with_debug_info.Map_distinguishing_names_and_locations
 
   let print ppf t = Reg_with_debug_info.print ~print_reg:Printreg.reg ppf t
 
@@ -191,12 +187,10 @@ module Vars = struct
     Reg_availability_set.canonicalise avail
 
   let available_before (insn : L.instruction) =
-    Option.map availability_set_to_key_set insn.available_before
+    Some (availability_set_to_key_set insn.available_before)
 
   let available_across (insn : L.instruction) =
-    match insn.available_across with
-    | None -> available_before insn
-    | Some across -> Some (availability_set_to_key_set across)
+    Some (availability_set_to_key_set insn.available_across)
 end
 
 module Subrange_state = Vars.Subrange_state

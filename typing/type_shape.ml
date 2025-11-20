@@ -135,18 +135,21 @@ module Type_shape = struct
       | p when Path.same p Predef.path_int16x8 -> Some Int16x8
       | p when Path.same p Predef.path_int32x4 -> Some Int32x4
       | p when Path.same p Predef.path_int64x2 -> Some Int64x2
+      | p when Path.same p Predef.path_float16x8 -> Some Float16x8
       | p when Path.same p Predef.path_float32x4 -> Some Float32x4
       | p when Path.same p Predef.path_float64x2 -> Some Float64x2
       | p when Path.same p Predef.path_int8x32 -> Some Int8x32
       | p when Path.same p Predef.path_int16x16 -> Some Int16x16
       | p when Path.same p Predef.path_int32x8 -> Some Int32x8
       | p when Path.same p Predef.path_int64x4 -> Some Int64x4
+      | p when Path.same p Predef.path_float16x16 -> Some Float16x16
       | p when Path.same p Predef.path_float32x8 -> Some Float32x8
       | p when Path.same p Predef.path_float64x4 -> Some Float64x4
       | p when Path.same p Predef.path_int8x64 -> Some Int8x64
       | p when Path.same p Predef.path_int16x32 -> Some Int16x32
       | p when Path.same p Predef.path_int32x16 -> Some Int32x16
       | p when Path.same p Predef.path_int64x8 -> Some Int64x8
+      | p when Path.same p Predef.path_float16x32 -> Some Float16x32
       | p when Path.same p Predef.path_float32x16 -> Some Float32x16
       | p when Path.same p Predef.path_float64x8 -> Some Float64x8
       | _ -> None
@@ -156,18 +159,21 @@ module Type_shape = struct
       | p when Path.same p Predef.path_unboxed_int16x8 -> Some Int16x8
       | p when Path.same p Predef.path_unboxed_int32x4 -> Some Int32x4
       | p when Path.same p Predef.path_unboxed_int64x2 -> Some Int64x2
+      | p when Path.same p Predef.path_unboxed_float16x8 -> Some Float16x8
       | p when Path.same p Predef.path_unboxed_float32x4 -> Some Float32x4
       | p when Path.same p Predef.path_unboxed_float64x2 -> Some Float64x2
       | p when Path.same p Predef.path_unboxed_int8x32 -> Some Int8x32
       | p when Path.same p Predef.path_unboxed_int16x16 -> Some Int16x16
       | p when Path.same p Predef.path_unboxed_int32x8 -> Some Int32x8
       | p when Path.same p Predef.path_unboxed_int64x4 -> Some Int64x4
+      | p when Path.same p Predef.path_unboxed_float16x16 -> Some Float16x16
       | p when Path.same p Predef.path_unboxed_float32x8 -> Some Float32x8
       | p when Path.same p Predef.path_unboxed_float64x4 -> Some Float64x4
       | p when Path.same p Predef.path_unboxed_int8x64 -> Some Int8x64
       | p when Path.same p Predef.path_unboxed_int16x32 -> Some Int16x32
       | p when Path.same p Predef.path_unboxed_int32x16 -> Some Int32x16
       | p when Path.same p Predef.path_unboxed_int64x8 -> Some Int64x8
+      | p when Path.same p Predef.path_unboxed_float16x32 -> Some Float16x32
       | p when Path.same p Predef.path_unboxed_float32x16 -> Some Float32x16
       | p when Path.same p Predef.path_unboxed_float64x8 -> Some Float64x8
       | _ -> None
@@ -296,7 +302,7 @@ module Type_shape = struct
                 | Tvariant _ | Tunivar _
                 | Tpoly (_, _)
                 | Tpackage (_, _)
-                | Tof_kind _ ->
+                | Tquote _ | Tsplice _ | Tof_kind _ ->
                   assert false
               in
               Misc.fatal_errorf
@@ -332,6 +338,8 @@ module Type_shape = struct
             in
             Shape.poly_variant row_fields
           | Tarrow (_, _, _, _) -> Shape.arrow ()
+          | Tquote _ -> unknown_shape
+          | Tsplice _ -> unknown_shape
           | Tunivar _ -> unknown_shape
           | Tof_kind _ -> unknown_shape
           | Tpackage _ -> unknown_shape

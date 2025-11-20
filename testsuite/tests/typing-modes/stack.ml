@@ -6,7 +6,7 @@ expect;
 
 let ignore_local : 'a @ local -> unit = fun _ -> ()
 [%%expect{|
-val ignore_local : local_ 'a -> unit = <fun>
+val ignore_local : 'a @ local -> unit = <fun>
 |}]
 
 let f = ref (stack_ fun x -> x)
@@ -38,7 +38,7 @@ Line 2, characters 18-26:
                       ^^^^^^^^
 Error: The allocation is "local"
        because it is "stack_"-allocated.
-       However, the highlighted allocation is expected to be "global".
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 let f () =
@@ -62,7 +62,7 @@ Line 2, characters 18-30:
                       ^^^^^^^^^^^^
 Error: The allocation is "local"
        because it is "stack_"-allocated.
-       However, the highlighted allocation is expected to be "global".
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 let f () =
@@ -222,14 +222,14 @@ Line 1, characters 11-24:
                ^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global"
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
 
 let f () = exclave_ stack_ (3, 5)
 [%%expect{|
-val f : unit -> local_ int * int = <fun>
+val f : unit -> int * int @ local = <fun>
 |}]
 
 let f () =
@@ -241,7 +241,7 @@ Line 3, characters 4-5:
         ^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global"
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is the function in a tail call.
 |}]
 
@@ -253,7 +253,7 @@ Line 2, characters 4-23:
         ^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global"
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is the function in a tail call.
 |}]
 
@@ -289,7 +289,7 @@ Line 3, characters 6-24:
           ^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global"
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is an argument in a tail call.
 |}]
 
@@ -299,7 +299,7 @@ let f4 (local_ x) =
 Line 2, characters 16-17:
 2 |     List.length x
                     ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (* Allocations that are not supported for stack *)
@@ -390,7 +390,7 @@ let mk () =
   let r = stack_ { x = [1;2;3]; y = [4;5;6] } in
   r.y
 [%%expect{|
-type t = { x : int list; global_ y : int list; }
+type t = { x : int list; y : int list @@ global; }
 val mk : unit -> int list = <fun>
 |}]
 
@@ -402,8 +402,10 @@ Line 3, characters 2-5:
 3 |   r.x
       ^^^
 Error: This value is "local"
+       because it is the field "x" of the record at Line 3, characters 2-3
+       which is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be in the parent region or "global"
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]
@@ -419,7 +421,7 @@ external c_func : 'a -> 'a = "foo"
 external fst : ('a * 'b [@local_opt]) -> ('a [@local_opt]) = "%field0_immut"
 external ref : 'a -> ('a ref [@local_opt]) = "%makemutable"
 external ref_heap : 'a -> 'a ref = "%makemutable"
-external ref_stack : 'a -> local_ 'a ref = "%makemutable"
+external ref_stack : 'a -> 'a ref @ local = "%makemutable"
 external id : 'a -> 'a = "%identity"
 external c_func : 'a -> 'a = "foo"
 |}]
@@ -454,7 +456,7 @@ Line 2, characters 17-30:
 2 |   let _ = stack_ (ref_heap 52) in
                      ^^^^^^^^^^^^^
 Error: This primitive always allocates on heap
-       (maybe it should be declared with "[@local_opt]" or "local_"?)
+       (maybe it should be declared with "[@local_opt]" or "@ local"?)
 |}]
 
 let foo () =

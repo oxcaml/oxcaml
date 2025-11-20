@@ -34,6 +34,8 @@ type compile_time_constant =
   | Ostype_cygwin
   | Backend_type
   | Runtime5
+  | Arch_amd64
+  | Arch_arm64
 
 type immediate_or_pointer =
   | Immediate
@@ -363,6 +365,7 @@ type primitive =
      if the value is locally allocated *)
   (* Fetching domain-local state *)
   | Pdls_get
+  | Ptls_get
   (* Poll for runtime actions. May run pending actions such as signal
      handlers, finalizers, memprof callbacks, etc, as well as GCs and
      GC slices, so should not be moved or optimised away. *)
@@ -371,6 +374,8 @@ type primitive =
   | Pcpu_relax
   | Pget_idx of layout * Asttypes.mutable_flag
   | Pset_idx of layout * modify_mode
+  | Pget_ptr of layout * Asttypes.mutable_flag
+  | Pset_ptr of layout * modify_mode
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
     compiled away. *)
@@ -672,7 +677,6 @@ type loop_attribute =
 type regalloc_attribute =
   | Default_regalloc
   | Regalloc of Clflags.Register_allocator.t
-  
 type regalloc_param_attribute =
   | Default_regalloc_params
   | Regalloc_params of string list
@@ -949,7 +953,7 @@ type main_module_block_format =
 (* The number of words in the main module block. *)
 val main_module_block_size : main_module_block_format -> int
 
-type program =
+type 'lam program0 =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
     arg_block_idx : int option;         (* Index of argument block (see
@@ -964,7 +968,9 @@ type program =
     required_globals : Compilation_unit.Set.t;
                                         (* Modules whose initializer side effects
                                            must occur before [code]. *)
-    code : lambda }
+    code : 'lam }
+
+type program = lambda program0
 (* Lambda code for the middle-end. Here [mbf] is the value of the
    [main_module_block_format] field.
    * In the closure case the code is a sequence of assignments to a
@@ -1230,9 +1236,15 @@ val structured_constant_layout : structured_constant -> layout
 
 val mixed_block_element_of_layout : layout -> unit mixed_block_element
 
+(** [Pintval] if a type of [value] jkind is GC-ignorable based on its provided
+    externality, and [Pgenval] otherwise. *)
+val value_kind_of_value_with_externality
+  : Jkind_axis.Externality.t -> value_kind_non_null
+
 (* Translates [Float_boxed] as [Punboxed_float Unboxed_float64], for
    compatibility with block indices. *)
-val layout_of_mixed_block_element_for_idx_set : _ mixed_block_element -> layout
+val layout_of_mixed_block_element_for_idx_set
+  : Jkind_axis.Externality.t -> _ mixed_block_element -> layout
 
 val mixed_block_element_leaves
   : 'a mixed_block_element -> 'a mixed_block_element list

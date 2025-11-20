@@ -26,10 +26,13 @@ type ext =
   | BMI2
   | AVX
   | AVX2
+  | F16C
+  | FMA
 
 (* Fixed machine register location *)
 type reg =
   | RAX
+  | RDI
   | RCX
   | RDX
   | XMM0
@@ -69,6 +72,7 @@ type arg =
   }
 
 type res =
+  | Res_none (* No result *)
   | First_arg (* Result is returned in the first argument operand. *)
   | Res of arg (* Separate operand for result. *)
 
@@ -136,8 +140,8 @@ type 'id instr =
 
 let equal_reg reg0 reg1 =
   match reg0, reg1 with
-  | RAX, RAX | RCX, RCX | RDX, RDX | XMM0, XMM0 -> true
-  | (RAX | RCX | RDX | XMM0), _ -> false
+  | RAX, RAX | RDI, RDI | RCX, RCX | RDX, RDX | XMM0, XMM0 -> true
+  | (RAX | RDI | RCX | RDX | XMM0), _ -> false
 
 let equal_temp temp0 temp1 =
   match temp0, temp1 with
@@ -194,6 +198,8 @@ let ext_to_string : ext -> string = function
   | BMI2 -> "BMI2"
   | AVX -> "AVX"
   | AVX2 -> "AVX2"
+  | F16C -> "F16C"
+  | FMA -> "FMA"
 
 let exts_to_string exts =
   Array.map ext_to_string exts |> Array.to_list |> String.concat ", "
@@ -203,8 +209,10 @@ type bit_width =
   | Sixteen
   | Thirtytwo
   | Sixtyfour
+  | Onetwentyeight
+  | Twofiftysix
 
-let loc_requires_width = function
+let loc_register_width = function
   | Pin _ -> None
   | Temp temps ->
     let width = ref None in
@@ -217,7 +225,29 @@ let loc_requires_width = function
         | R8 -> set Eight
         | R16 -> set Sixteen
         | R32 -> set Thirtytwo
-        | R64 -> set Sixtyfour
-        | M8 | M16 | M32 | M64 | M128 | M256 | MM | XMM | YMM -> ())
+        | R64 | MM -> set Sixtyfour
+        | XMM -> set Onetwentyeight
+        | YMM -> set Twofiftysix
+        | M8 | M16 | M32 | M64 | M128 | M256 -> ())
       temps;
     !width
+
+let loc_memory_width = function
+  | Pin _ -> assert false
+  | Temp temps ->
+    let width = ref None in
+    let set w =
+      assert (Option.is_none !width);
+      width := Some w
+    in
+    Array.iter
+      (function
+        | M8 -> set Eight
+        | M16 -> set Sixteen
+        | M32 -> set Thirtytwo
+        | M64 -> set Sixtyfour
+        | M128 -> set Onetwentyeight
+        | M256 -> set Twofiftysix
+        | R8 | R16 | R32 | R64 | MM | XMM | YMM -> ())
+      temps;
+    Option.get !width

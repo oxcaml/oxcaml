@@ -24,6 +24,8 @@ let [%foo: include S with type t = t ]
   : [%foo: val x : t  val y : t]
   = [%foo: type t = t ]
 
+[%%foo _ ~_ ~_:_ ?_ ?_:_ _]
+
 (* TEST
  flags = "-dparsetree";
  ocamlc_byte_exit_status = "2";

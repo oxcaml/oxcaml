@@ -68,7 +68,37 @@ module Provenance = struct
   let original_ident t = t.original_ident
   let debug_uid t = t.debug_uid
 
-  let equal t1 t2 = Stdlib.compare t1 t2 = 0
+  let compare t1 t2 =
+    let { module_path = module_path1;
+          location = location1;
+          original_ident = original_ident1;
+          debug_uid = debug_uid1
+        } =
+      t1
+    in
+    let { module_path = module_path2;
+          location = location2;
+          original_ident = original_ident2;
+          debug_uid = debug_uid2
+        } =
+      t2
+    in
+    let c = Path.compare module_path1 module_path2 in
+    if c <> 0
+    then c
+    else
+      let c = Debuginfo.compare location1 location2 in
+      if c <> 0
+      then c
+      else
+        let c = Ident.compare original_ident1 original_ident2 in
+        if c <> 0
+        then c
+        else
+          Flambda2_identifiers.Flambda_debug_uid.compare debug_uid1
+            debug_uid2
+
+  let equal t1 t2 = compare t1 t2 = 0
 end
 
 module With_provenance = struct

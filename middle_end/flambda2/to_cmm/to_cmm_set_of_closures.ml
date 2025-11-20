@@ -611,8 +611,10 @@ let layout_for_set_of_closures env set =
     (Set_of_closures.function_decls set |> Function_declarations.funs_in_order)
     (Set_of_closures.value_slots set)
 
+(* CR vlaviron/gbury: This function should not exist; the set of closures itself
+   should have an associated debuginfo *)
 let debuginfo_for_set_of_closures env set =
-  let dbg =
+  let dbgs =
     Set_of_closures.function_decls set
     |> Function_declarations.funs |> Function_slot.Map.data
     |> List.map
@@ -625,7 +627,8 @@ let debuginfo_for_set_of_closures env set =
     |> List.sort Debuginfo.compare
   in
   (* Choose the debuginfo with the earliest source location. *)
-  match dbg with [] -> Debuginfo.none | dbg :: _ -> dbg
+  let dbg = match dbgs with [] -> Debuginfo.none | dbg :: _ -> dbg in
+  Env.add_inlined_debuginfo env dbg
 
 let let_static_set_of_closures0 env res closure_symbols
     (layout : Slot_offsets.Layout.t) set ~prev_updates =

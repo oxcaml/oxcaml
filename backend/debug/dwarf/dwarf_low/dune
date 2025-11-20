@@ -4,6 +4,9 @@
   (name dwarf_low)
   (wrapped true)
   (flags (:standard -w -70))
-  (ocamlopt_flags (:standard -O3))
+  (ocamlopt_flags
+   (:standard
+    (:include %{project_root}/ocamlopt_flags.sexp)
+    -O3))
   (libraries asm_targets)
 )

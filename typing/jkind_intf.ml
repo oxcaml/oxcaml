@@ -176,7 +176,7 @@ module type Sort = sig
   val bits64 : t
 
   (** Create a new sort variable that can be unified. *)
-  val new_var : unit -> t
+  val new_var : level:int -> t
 
   val of_base : base -> t
 
@@ -314,6 +314,7 @@ module History = struct
     | Tuple
     | Row_variable
     | Polymorphic_variant
+    | Polymorphic_variant_too_big
     | Arrow
     | Tfield
     | Tnil
@@ -330,6 +331,10 @@ module History = struct
     | Class_term_argument
     | Debug_printer_argument
     | Recmod_fun_arg
+    | Quotation_result
+    | Antiquotation_result
+    | Tquote
+    | Tsplice
     | Array_type_kind
     | Unknown of string (* CR layouts: get rid of these *)
 

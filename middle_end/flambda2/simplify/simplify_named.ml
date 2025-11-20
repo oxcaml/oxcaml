@@ -67,83 +67,117 @@ let create_lifted_constant (dacc, lifted_constants)
    for such sets. See comment in [Simplify_let_expr], function [rebuild_let]. *)
 
 let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
-    ~simplify_function_body : Simplify_named_result.t Or_invalid.t =
+    ~simplify_function_body =
+  let[@inline] ok (result : Simplify_named_result.t) =
+    Simplified_named.Simplified (Or_invalid.Ok result)
+  in
+  let invalid = Simplified_named.Simplified Or_invalid.Invalid in
+  let machine_width = DE.machine_width (DA.denv dacc) in
   match named with
   | Simple simple ->
     let bound_var = Bound_pattern.must_be_singleton bound_pattern in
     let min_name_mode = Bound_var.name_mode bound_var in
     let ty, new_simple = S.simplify_simple dacc simple ~min_name_mode in
     let dacc = DA.add_variable dacc bound_var ty in
-    let machine_width = DE.machine_width (DA.denv dacc) in
     let defining_expr =
       if simple == new_simple
       then Simplified_named.create ~machine_width named
       else
         Simplified_named.create ~machine_width (Named.create_simple new_simple)
     in
-    Ok
+    ok
       (Simplify_named_result.create dacc
-         [ { Expr_builder.let_bound = bound_pattern;
-             simplified_defining_expr = defining_expr;
-             original_defining_expr = Some named
-           } ])
+         (Expr_builder.Keep_binding
+            { let_bound = bound_pattern;
+              simplified_defining_expr = defining_expr;
+              original_defining_expr = Some named
+            }))
   | Prim (prim, dbg) -> (
-    let bound_var = Bound_pattern.must_be_singleton bound_pattern in
-    let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
-    let { Simplify_primitive_result.simplified_named;
-          extra_bindings;
-          try_reify;
-          dacc
-        } =
-      Simplify_primitive.simplify_primitive dacc prim dbg ~result_var:bound_var
-    in
-    match simplified_named with
-    | Invalid -> Invalid
-    | Ok simplified_named ->
-      if Flambda_features.check_invariants ()
-         && not
-              (TE.mem (DA.typing_env dacc) (Name.var (Bound_var.var bound_var)))
-      then
-        Misc.fatal_errorf "Primitive %a = %a did not yield a result var"
-          Bound_var.print bound_var P.print prim;
-      if not try_reify
-      then
-        Ok
-          (* Any additional bindings apart from the original one being
-             simplified are inserted before such original binding, allowing the
-             simplified version of that binding to reference the new
-             variables. *)
-          (Simplify_named_result.create dacc
-             (extra_bindings
-             @ [ { Expr_builder.let_bound = bound_pattern;
-                   simplified_defining_expr = simplified_named;
-                   original_defining_expr = Some named
-                 } ]))
-      else
-        (* Primitives with generative effects correspond to allocations. Without
-           this check, we could end up lifting definitions that have a type that
-           looks like an allocation but that are instead a projection from a
-           bigger structure. *)
-        let allow_lifting =
-          (* CR mshinwell: Perhaps this could be relaxed to
-             [at_most_generative_effects], but there are concerns about
-             compilation speed *)
-          P.only_generative_effects prim
-          && Name_mode.is_normal (Bound_var.name_mode bound_var)
-        in
-        let defining_expr, dacc =
-          Reification.try_to_reify dacc dbg simplified_named ~bound_to:bound_var
-            ~kind_of_bound_to:(P.result_kind' prim) ~allow_lifting
-        in
-        Or_invalid.map defining_expr ~f:(fun defining_expr ->
-            Simplify_named_result.create dacc
-              (extra_bindings
-              @ [ { Expr_builder.let_bound = bound_pattern;
-                    simplified_defining_expr = defining_expr;
-                    original_defining_expr = Some named
-                  } ])))
+    if not (Name_mode.is_normal (Bound_pattern.name_mode bound_pattern))
+    then
+      let min_name_mode = Bound_pattern.name_mode bound_pattern in
+      let defining_expr =
+        (* CR vlaviron: Pierre suggests to not do the simplification here, as
+           that could keep the primitive closer to its original version. It's
+           not clear whether debuggers would actually be able to show more
+           interesting things with the original version though, so for now we
+           keep the simplification. *)
+        Named.create_prim
+          (P.map_args
+             (fun simple -> snd (S.simplify_simple dacc simple ~min_name_mode))
+             prim)
+          dbg
+      in
+      let bound_var = Bound_pattern.must_be_singleton bound_pattern in
+      let dacc =
+        DA.map_denv dacc ~f:(fun denv ->
+            DE.define_variable denv bound_var (P.result_kind' prim))
+      in
+      ok
+        (Simplify_named_result.create dacc
+           (Expr_builder.Keep_binding
+              { let_bound = bound_pattern;
+                simplified_defining_expr =
+                  Simplified_named.create ~machine_width defining_expr;
+                original_defining_expr = Some named
+              }))
+    else
+      let bound_var = Bound_pattern.must_be_singleton bound_pattern in
+      let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
+      match
+        Simplify_primitive.simplify_primitive dacc prim dbg
+          ~result_var:bound_var
+      with
+      | Rewritten f -> Simplified_named.Rewritten f
+      | Simplified { simplified_named; try_reify; dacc } -> (
+        match simplified_named with
+        | Invalid -> invalid
+        | Ok simplified_named ->
+          if Flambda_features.check_invariants ()
+             && not
+                  (TE.mem (DA.typing_env dacc)
+                     (Name.var (Bound_var.var bound_var)))
+          then
+            Misc.fatal_errorf "Primitive %a = %a did not yield a result var"
+              Bound_var.print bound_var P.print prim;
+          if not try_reify
+          then
+            ok
+              (Simplify_named_result.create dacc
+                 (Expr_builder.Keep_binding
+                    { let_bound = bound_pattern;
+                      simplified_defining_expr = simplified_named;
+                      original_defining_expr = Some named
+                    }))
+          else
+            (* Primitives with generative effects correspond to allocations.
+               Without this check, we could end up lifting definitions that have
+               a type that looks like an allocation but that are instead a
+               projection from a bigger structure. *)
+            let allow_lifting =
+              (* CR mshinwell: Perhaps this could be relaxed to
+                 [at_most_generative_effects], but there are concerns about
+                 compilation speed *)
+              P.only_generative_effects prim
+              && Name_mode.is_normal (Bound_var.name_mode bound_var)
+            in
+            let defining_expr, dacc =
+              Reification.try_to_reify dacc dbg simplified_named
+                ~bound_to:bound_var ~kind_of_bound_to:(P.result_kind' prim)
+                ~allow_lifting
+            in
+            let result =
+              Or_invalid.map defining_expr ~f:(fun defining_expr ->
+                  Simplify_named_result.create dacc
+                    (Expr_builder.Keep_binding
+                       { let_bound = bound_pattern;
+                         simplified_defining_expr = defining_expr;
+                         original_defining_expr = Some named
+                       }))
+            in
+            Simplified_named.Simplified result))
   | Set_of_closures set_of_closures ->
-    Ok
+    ok
       (Simplify_set_of_closures.simplify_non_lifted_set_of_closures dacc
          bound_pattern set_of_closures ~simplify_function_body)
   | Static_consts static_consts ->
@@ -181,7 +215,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
     in
     (* We don't need to return any bindings; [Simplify_expr.simplify_let] will
        create the "let symbol" binding when it sees the lifted constant. *)
-    Ok (Simplify_named_result.create dacc [])
+    ok (Simplify_named_result.create_empty dacc)
   | Rec_info rec_info_expr ->
     (* We could simplify away things like [let depth x = y in ...], but those
        don't actually happen (as of this writing). We could also do CSE,
@@ -200,12 +234,13 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
         Simplified_named.create ~machine_width
           (Named.create_rec_info new_rec_info_expr)
     in
-    Ok
+    ok
       (Simplify_named_result.create dacc
-         [ { Expr_builder.let_bound = bound_pattern;
-             simplified_defining_expr = defining_expr;
-             original_defining_expr = Some named
-           } ])
+         (Expr_builder.Keep_binding
+            { let_bound = bound_pattern;
+              simplified_defining_expr = defining_expr;
+              original_defining_expr = Some named
+            }))
 
 let removed_operations ~(original : Named.t) (result : _ Or_invalid.t) =
   let zero = Removed_operations.zero in
@@ -229,25 +264,33 @@ let removed_operations ~(original : Named.t) (result : _ Or_invalid.t) =
       zero
     | Prim (original_prim, _) ->
       if List.exists
-           (fun ({ simplified_defining_expr; _ } :
-                  Expr_builder.binding_to_place) ->
-             match simplified_defining_expr with
-             | { named = Prim (rewritten_prim, _); _ } ->
+           (fun (binding : Expr_builder.binding_to_place) ->
+             match binding with
+             | Keep_binding
+                 { simplified_defining_expr =
+                     { named = Prim (rewritten_prim, _); _ };
+                   _
+                 } ->
                Flambda_primitive.equal original_prim rewritten_prim
-             | { named = Simple _ | Set_of_closures _ | Rec_info _; _ } -> false)
+             | Keep_binding
+                 { simplified_defining_expr =
+                     { named = Simple _ | Set_of_closures _ | Rec_info _; _ };
+                   _
+                 }
+             | Delete_binding _ ->
+               false)
            (Simplify_named_result.bindings_to_place result)
       then zero
       else Removed_operations.prim original_prim
     | Rec_info _ -> zero)
 
-let simplify_named dacc bound_pattern named ~simplify_function_body =
-  try
-    let simplified_named_or_invalid =
-      simplify_named0 ~simplify_function_body dacc bound_pattern named
-    in
-    ( simplified_named_or_invalid,
-      removed_operations ~original:named simplified_named_or_invalid )
-  with Misc.Fatal_error ->
+let simplify_named dacc bound_pattern named ~simplify_function_body :
+    _ Simplified_named.or_rewritten =
+  match simplify_named0 ~simplify_function_body dacc bound_pattern named with
+  | Rewritten f -> Rewritten f
+  | Simplified result ->
+    Simplified (result, removed_operations ~original:named result)
+  | exception Misc.Fatal_error ->
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf
       "\n\

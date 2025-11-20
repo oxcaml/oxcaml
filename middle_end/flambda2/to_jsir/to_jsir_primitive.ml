@@ -104,6 +104,7 @@ let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
     (* CR selee: we should eventually use this debuginfo *)
     no_op ~env ~res
   | Dls_get -> use_prim' (Extern "caml_domain_dls_get")
+  | Tls_get -> use_prim' (Extern "caml_domain_tls_get")
   | Poll ->
     (* See [parse_bytecode.ml] in jsoo - treated as a noop *)
     no_op ~env ~res
@@ -293,7 +294,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     in
     use_prim' (Extern extern_name)
   | Unbox_number _ | Box_number _ | Untag_immediate | Tag_immediate ->
-    (* everything is boxed and tagged in JS *)
+    (* everything is untagged and "unboxed" in JS: see README *)
     identity ~env ~res x
   | Project_function_slot { move_from = _; move_to } ->
     check_my_closure ~env x;

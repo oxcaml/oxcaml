@@ -40,6 +40,9 @@ val cfg_prologue_validate : bool ref
 val cfg_prologue_shrink_wrap : bool ref
 val cfg_prologue_shrink_wrap_threshold : int ref
 
+val cfg_value_propagation : bool ref
+val cfg_value_propagation_float : bool ref
+
 val reorder_blocks_random : int option ref
 val basic_block_sections : bool ref
 val module_entry_functions_section : bool ref

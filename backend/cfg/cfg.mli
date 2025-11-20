@@ -111,9 +111,15 @@ type t =
         (** Precomputed at register allocation time *)
     fun_poll : Lambda.poll_attribute; (* Whether to insert polling points. *)
     next_instruction_id : InstructionId.sequence; (* Next instruction id. *)
-    fun_ret_type : Cmm.machtype
+    fun_ret_type : Cmm.machtype;
         (** Function return type. As in [fun_args], this value is not used when starting
             from Linear. *)
+    mutable allowed_to_be_irreducible : bool;
+        (* Whether rewrites are allowed to make the CFG irreducible (if the CFG
+           is irreducible, the information about loops cannot be trusted). *)
+    mutable register_locations_are_set : bool
+        (* Whether register allocation has set the locations of the `Reg.t`
+           values. *)
   }
 
 val create :
@@ -126,6 +132,7 @@ val create :
   fun_poll:Lambda.poll_attribute ->
   next_instruction_id:InstructionId.sequence ->
   fun_ret_type:Cmm.machtype ->
+  allowed_to_be_irreducible:bool ->
   t
 
 val fun_name : t -> string
@@ -238,8 +245,8 @@ val make_instruction :
   stack_offset:int ->
   id:InstructionId.t ->
   ?irc_work_list:irc_work_list ->
-  ?available_before:Reg_availability_set.t option ->
-  ?available_across:Reg_availability_set.t option ->
+  ?available_before:Reg_availability_set.t ->
+  ?available_across:Reg_availability_set.t ->
   unit ->
   'a instruction
 

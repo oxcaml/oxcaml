@@ -102,19 +102,19 @@ val use_global : ('a : value & value). 'a -> unit = <fun>
 val cross_global : ('a : value mod global & value mod global). 'a -> unit =
   <fun>
 val use_portable : ('a : value & value). 'a @ portable -> unit = <fun>
-type 'a t = #{ global_ x : 'a; global_ y : 'a; }
+type 'a t = #{ x : 'a @@ global; y : 'a @@ global; }
 |}]
 
 let foo (t : string t @ local) = use_global t
 
 [%%expect{|
-val foo : local_ string t -> unit = <fun>
+val foo : string t @ local -> unit = <fun>
 |}]
 
 let foo (t : string t @ local) = cross_global t
 
 [%%expect{|
-val foo : local_ string t -> unit = <fun>
+val foo : string t @ local -> unit = <fun>
 |}]
 
 let foo (t : string t @ nonportable) = use_portable t

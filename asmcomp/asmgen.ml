@@ -263,25 +263,36 @@ let count_duplicate_spills_reloads_in_block (block : Cfg.basic_block) =
   in
   dup_spills, dup_reloads
 
-let count_spills_reloads (block : Cfg.basic_block) =
-  let f ((spills, reloads) as acc) (instr : Cfg.basic Cfg.instruction) =
+type spills_reloads_moves =
+  { spills : int;
+    reloads : int;
+    moves : int
+  }
+
+let count_spills_reloads_moves (block : Cfg.basic_block) =
+  let f (acc : spills_reloads_moves) (instr : Cfg.basic Cfg.instruction) =
     match instr.desc with
-    | Op Spill -> spills + 1, reloads
-    | Op Reload -> spills, reloads + 1
+    | Op Spill -> { acc with spills = acc.spills + 1 }
+    | Op Reload -> { acc with reloads = acc.reloads + 1 }
+    | Op Move -> { acc with moves = acc.moves + 1 }
     | _ -> acc
   in
-  DLL.fold_left ~f ~init:(0, 0) block.body
+  DLL.fold_left ~f ~init:{ spills = 0; reloads = 0; moves = 0 } block.body
 
 (** Returns all CFG counters that work on a single block and are summative over the
     blocks. *)
-let cfg_block_counters block =
+let cfg_block_counters (block : Cfg.basic_block) =
   let dup_spills, dup_reloads = count_duplicate_spills_reloads_in_block block in
-  let spills, reloads = count_spills_reloads block in
+  let { spills; reloads; moves } = count_spills_reloads_moves block in
+  let instructions = DLL.length block.body + 1 in
   Profile.Counters.create ()
   |> Profile.Counters.set "block_duplicate_spill" dup_spills
   |> Profile.Counters.set "block_duplicate_reload" dup_reloads
   |> Profile.Counters.set "spill" spills
   |> Profile.Counters.set "reload" reloads
+  |> Profile.Counters.set "instruction" instructions
+  |> Profile.Counters.set "block" 1
+  |> Profile.Counters.set "move" moves
 
 (** Returns all CFG counters that require the whole CFG to produce a count. *)
 let whole_cfg_counters (_ : Cfg.t) = Profile.Counters.create ()
@@ -411,6 +422,15 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue_validate"
        Cfg_prologue.validate
+  ++ (fun (cfg_with_infos : Cfg_with_infos.t) ->
+       (* After this point, we no longer rely on loop infos if stack checks are
+          disabled. We can thus perform rewrites that will make the CFG
+          irreducible. *)
+       if not !Oxcaml_flags.cfg_stack_checks
+       then (
+         Cfg_with_infos.invalidate_loop_infos cfg_with_infos;
+         (Cfg_with_infos.cfg cfg_with_infos).allowed_to_be_irreducible <- true);
+       cfg_with_infos)
   ++ Cfg_with_infos.cfg_with_layout
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_prologue"
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
@@ -426,7 +446,12 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ (fun (cfg_with_layout : Cfg_with_layout.t) ->
        match !Oxcaml_flags.cfg_stack_checks with
        | false -> cfg_with_layout
-       | true -> Cfg_stack_checks.cfg cfg_with_layout)
+       | true ->
+         let cfg_with_layout = Cfg_stack_checks.cfg cfg_with_layout in
+         (* After this point, we no longer rely on loop infos. *)
+         (Cfg_with_layout.cfg cfg_with_layout).allowed_to_be_irreducible <- true;
+         cfg_with_layout_profile ~accumulate:true "cfg_simplify"
+           Regalloc_utils.simplify_cfg cfg_with_layout)
   ++ cfg_with_layout_profile ~accumulate:true "save_cfg" save_cfg
   ++ cfg_with_layout_profile ~accumulate:true "cfg_reorder_blocks"
        (reorder_blocks_random ppf_dump)

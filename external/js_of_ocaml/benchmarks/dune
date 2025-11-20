@@ -1,0 +1,7 @@
+(executables
+ (names report run stripdebug)
+ (libraries unix compiler-libs.bytecomp yojson))
+
+(alias
+ (name default)
+ (deps report.exe run.exe))

@@ -976,6 +976,7 @@ let nullary_primitive _env res dbg prim =
        [to_cmm_primitive] but should instead be handled in [to_cmm_expr] to \
        correctly adjust the inlined debuginfo in the env."
   | Dls_get -> None, res, C.dls_get ~dbg
+  | Tls_get -> None, res, C.tls_get ~dbg
   | Poll -> None, res, C.poll ~dbg
   | Cpu_relax -> None, res, C.cpu_relax ~dbg
 

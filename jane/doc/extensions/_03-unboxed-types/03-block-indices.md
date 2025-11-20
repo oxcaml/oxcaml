@@ -12,7 +12,7 @@ through the [layouts](../01-intro#layouts) section of the main document.
 
 As a quick example:
 ```ocaml
-open Stdlib_beta
+open Stdlib_stable
 
 type pt = { x : int; y : int }
 type line = { p : pt#; q : pt# }
@@ -76,7 +76,7 @@ immutable block indices), then an `idx_imm` is created.
 
 **Using indices.** Naturally, block indices can be used to read and write
 within blocks. This can be done via the `Idx_imm.unsafe_get`,
-`Idx_mut.unsafe_get`, and `Idx_mut.unsafe_set` functions in [`Stdlib_beta`](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_beta
+`Idx_mut.unsafe_get`, and `Idx_mut.unsafe_set` functions in [`Stdlib_stable`](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_stable
 ).
 (These functions are unsafe only for array indices, which may be out of range.
 Uses of block indices built without the use of an array-indexing operation are

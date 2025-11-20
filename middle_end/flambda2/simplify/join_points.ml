@@ -108,7 +108,7 @@ let join ?cut_after denv params ~consts_lifted_after_fork ~use_envs_with_ids
     | Some cse_join_result -> cse_join_result.extra_allowed_names
   in
   let cut_after = Option.value cut_after ~default:definition_scope in
-  let handler_env =
+  let handler_env, join_analysis =
     T.cut_and_n_way_join (DE.typing_env denv) use_envs_with_ids'
       ~params:
         (Bound_parameters.append params
@@ -127,7 +127,7 @@ let join ?cut_after denv params ~consts_lifted_after_fork ~use_envs_with_ids
     | None -> denv
     | Some cse_join_result -> DE.with_cse denv cse_join_result.cse_at_join_point
   in
-  denv, extra_params_and_args
+  denv, join_analysis, extra_params_and_args
 
 let add_equations_on_params typing_env ~is_recursive ~params:params'
     ~param_types =
@@ -273,7 +273,7 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
       Flambda_features.join_points ()
       || match use_envs_with_ids with [] | [_] -> true | _ :: _ :: _ -> false
     in
-    let handler_env, extra_params_and_args =
+    let handler_env, join_analysis, extra_params_and_args =
       if should_do_join
       then
         (* No need to add equations, as they will be computed from the use
@@ -291,8 +291,9 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
           DE.add_parameters_with_unknown_types denv ~extra:true
             (EPA.extra_params previous_extra_params_and_args)
         in
-        denv, previous_extra_params_and_args
+        denv, None, previous_extra_params_and_args
     in
+    let handler_env = DE.with_join_analysis join_analysis handler_env in
     let escapes =
       List.exists
         (fun (_, _, (cont_use_kind : Continuation_use_kind.t)) ->

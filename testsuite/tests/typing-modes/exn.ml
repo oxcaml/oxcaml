@@ -69,7 +69,9 @@ let (foo @ portable) (g @ nonportable) =
 Line 2, characters 23-24:
 2 |     raise (Nonportable g)
                            ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is contained (via constructor "Nonportable") in the value at Line 2, characters 10-25
+       which is expected to be "portable".
 |}]
 
 let (foo @ portable) () =
@@ -238,6 +240,142 @@ Error: This constructor is at mode "contended", but expected to be at mode "unco
        Hint: all argument types must mode-cross for rebinding to succeed.
 |}]
 
+(* statefulness axis *)
+
+external raise : exn -> 'a @@ stateless = "%raise"
+
+exception StatefulFun of (unit -> unit)
+exception StatelessFun of (unit -> unit) @@ stateless
+[%%expect{|
+external raise : exn -> 'a = "%raise"
+exception StatefulFun of (unit -> unit)
+exception StatelessFun of (unit -> unit) @@ stateless
+|}]
+
+let (foo @ stateless) f =
+    try f () with
+    | StatefulFun g -> g ()
+    | _ -> ()
+[%%expect{|
+Line 3, characters 6-17:
+3 |     | StatefulFun g -> g ()
+          ^^^^^^^^^^^
+Error: This value is "stateful" but is expected to be "stateless".
+  Hint: All arguments of the constructor "StatefulFun"
+  must cross this axis to use it in this position.
+|}]
+
+let (foo @ stateless) f =
+    try f () with
+    | StatelessFun g -> g ()
+    | _ -> ()
+[%%expect{|
+val foo : (unit -> unit) -> unit = <fun>
+|}]
+
+let (foo @ stateless) () =
+    raise (StatelessFun (fun () -> ()))
+[%%expect{|
+val foo : unit -> 'a = <fun>
+|}]
+
+let (foo @ stateless) () =
+    raise (StatefulFun (fun () -> ()))
+[%%expect{|
+val foo : unit -> 'a = <fun>
+|}]
+
+let (foo @ stateless) () =
+    let x = {contents = 0} in
+    raise (StatefulFun (fun () -> x.contents <- 1))
+[%%expect{|
+Line 3, characters 34-35:
+3 |     raise (StatefulFun (fun () -> x.contents <- 1))
+                                      ^
+Error: This value is "immutable"
+       because it is used inside the function at Line 3, characters 23-50
+       which is expected to be "stateless"
+       because it is contained (via constructor "StatefulFun") in the value at Line 3, characters 10-51
+       which is expected to be "stateless".
+       However, the highlighted expression is expected to be "read_write"
+       because its mutable field "contents" is being written.
+|}]
+
+let (foo @ stateless) () =
+    let x = {contents = 0} in
+    let g () = x.contents <- 1 in
+    raise (StatefulFun g)
+[%%expect{|
+Line 4, characters 23-24:
+4 |     raise (StatefulFun g)
+                           ^
+Error: This value is "stateful"
+       because it contains a usage (of the value "x" at Line 3, characters 15-16)
+       which is expected to be "read_write"
+       because its mutable field "contents" is being written.
+       However, the highlighted expression is expected to be "stateless"
+       because it is contained (via constructor "StatefulFun") in the value at Line 4, characters 10-25
+       which is expected to be "stateless".
+|}]
+
+(* visibility axis *)
+
+exception ReadWriteRef of int ref
+exception ImmutableRef of int ref @@ immutable
+[%%expect{|
+exception ReadWriteRef of int ref
+exception ImmutableRef of int ref @@ immutable
+|}]
+
+let (foo @ stateless) f =
+    try f () with
+    | ReadWriteRef _ -> ()
+    | _ -> ()
+[%%expect{|
+val foo : (unit -> unit) -> unit = <fun>
+|}]
+
+let (foo @ stateless) f =
+    try f () with
+    | ReadWriteRef r -> r.contents <- 1
+    | _ -> ()
+[%%expect{|
+Line 3, characters 24-25:
+3 |     | ReadWriteRef r -> r.contents <- 1
+                            ^
+Error: This value is "immutable" but is expected to be "read_write"
+       because its mutable field "contents" is being written.
+|}]
+
+let (foo @ stateless) f =
+    try f () with
+    | ImmutableRef r -> r.contents <- 1
+    | _ -> ()
+[%%expect{|
+Line 3, characters 24-25:
+3 |     | ImmutableRef r -> r.contents <- 1
+                            ^
+Error: This value is "immutable" but is expected to be "read_write"
+       because its mutable field "contents" is being written.
+|}]
+
+let (foo @ stateless) () =
+    raise (ReadWriteRef {contents = 0})
+[%%expect{|
+Line 2, characters 11-23:
+2 |     raise (ReadWriteRef {contents = 0})
+               ^^^^^^^^^^^^
+Error: This value is "immutable" but is expected to be "read_write".
+  Hint: All arguments of the constructor "ReadWriteRef"
+  must cross this axis to use it in this position.
+|}]
+
+let (foo @ stateless) () =
+    raise (ImmutableRef {contents = 0})
+[%%expect{|
+val foo : unit -> 'a = <fun>
+|}]
+
 
 (* other extensible types are not affected *)
 type t = ..
@@ -257,7 +395,8 @@ Line 8, characters 12-13:
 8 |     ignore (x : _ @ portable)
                 ^
 Error: The value "x" is "nonportable" but is expected to be "portable"
-       because it is used inside a function which is expected to be "portable".
+       because it is used inside the function at Lines 7-8, characters 21-29
+       which is expected to be "portable".
 |}]
 
 module type S = sig

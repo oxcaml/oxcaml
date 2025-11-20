@@ -1026,15 +1026,21 @@ and class_structure cl_num virt self_scope final val_env met_env loc
      - cannot refer to local or once variables in the
      environment
      - access to unique variables will be relaxed to shared *)
-  (* CR zqian: We should add [Env.add_sync_lock] which restricts
-  syncness/contention to legacy, but that lock would be a no-op. However, we
-  should be future-proof for potential axes who legacy is set otherwise. The
-  best is to call [Env.add_legacy_lock] (which can be defined by
-  [Env.add_closure_lock]) that covers all axes. *)
-  let val_env = Env.add_escape_lock Class (Env.add_unboxed_lock val_env) in
-  let val_env = Env.add_share_lock Class val_env in
-  let met_env = Env.add_escape_lock Class (Env.add_unboxed_lock met_env) in
-  let met_env = Env.add_share_lock Class met_env in
+  let pp : Mode.Hint.pinpoint =
+    match final with
+    | Not_final -> (loc, Class)
+    | Final -> (loc, Object)
+  in
+  let val_env =
+    val_env
+    |> Env.add_unboxed_lock
+    |> Env.add_const_closure_lock pp Mode.Value.Comonadic.Const.legacy
+  in
+  let met_env =
+    met_env
+    |> Env.add_unboxed_lock
+    |> Env.add_const_closure_lock pp Mode.Value.Comonadic.Const.legacy
+  in
   let par_env = met_env in
 
   (* Location of self. Used for locations of self arguments *)
@@ -1272,8 +1278,11 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
         Typecore.check_partial val_env pat.pat_type pat.pat_loc
           [{c_lhs = pat; c_guard = None; c_rhs = dummy}]
       in
-      let val_env' = Env.add_escape_lock Class val_env' in
-      let val_env' = Env.add_share_lock Class val_env' in
+      let val_env' =
+        val_env'
+        |> Env.add_const_closure_lock (scl.pcl_loc, Class)
+            Value.Comonadic.Const.legacy
+      in
       let cl =
         Ctype.with_raised_nongen_level
           (fun () -> class_expr cl_num val_env' met_env virt self_scope scl') in
@@ -2384,7 +2393,10 @@ let report_error env ppf =
   | Non_value_binding (nm, err) ->
     fprintf ppf
       "@[Variables bound in a class must have layout value.@ %a@]"
-      (Jkind.Violation.report_with_name ~name:nm) err
+      (Jkind.Violation.report_with_name
+         ~name:nm
+         ~level:(Ctype.get_current_level ()))
+      err
   | Non_value_let_binding (nm, sort) ->
     fprintf ppf
       "@[The types of variables bound by a 'let' in a class function@ \

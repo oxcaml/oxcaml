@@ -374,5 +374,11 @@ val has_avx : bool
 val has_avx2 : bool
 (* Whether the compiler was configured on a machine with AVX2 *)
 
+val has_f16c : bool
+(* Whether the compiler was configured on a machine with F16C *)
+
+val has_fma : bool
+(* Whether the compiler was configured on a machine with FMA *)
+
 val oxcaml_dwarf : bool
 (* Whether OxCaml DWARF is used by default *)
