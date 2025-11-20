@@ -16,6 +16,8 @@ CLEAN_DUNE_WORKSPACES = \
   duneconf/runtime_stdlib.ws \
   duneconf/main.ws
 
+# These are getting rm -rf'd, so be careful with this.
+
 CLEAN_DIRS = \
   _build \
   _build_upstream \
@@ -91,24 +93,35 @@ endif
 
 .PHONY: clean
 clean:
-	$(if $(filter 1,$(V)),,@)set -e; \
-		ws_list="$(CLEAN_DUNE_WORKSPACES)"; \
-		if [ -n "$(strip $(CLEAN_DUNE_BIN))" ]; then \
-		  for ws in $$ws_list; do \
-		    if [ -f $$ws ]; then \
-		      if ! "$(strip $(CLEAN_DUNE_BIN))" clean --root=. --workspace=$$ws; then \
-		        echo "dune clean failed for workspace $$ws, continuing with manual cleanup" >&2; \
-		      fi; \
-		    fi; \
-		  done; \
-		fi
-	$(if $(filter 1,$(V)),,@)rm -rf -- $(CLEAN_DIRS)
-	$(if $(filter 1,$(V)),,@)rm -f -- $(CLEAN_FILES)
+	$(if $(filter 1,$(V)),,@)set -eu; \
+	  dirs="$(CLEAN_DIRS)"; \
+	  if [ -z "$$dirs" ]; then echo "Refusing to clean empty directory list" >&2; exit 1; fi; \
+	  for dir in $$dirs; do \
+	    case "$$dir" in ""|"/"|".") echo "Refusing to clean $$dir" >&2; exit 1;; esac; \
+	  done; \
+	  ws_list="$(CLEAN_DUNE_WORKSPACES)"; \
+	  if [ -n "$(strip $(CLEAN_DUNE_BIN))" ]; then \
+	    for ws in $$ws_list; do \
+	      if [ -f $$ws ]; then \
+	        if ! "$(strip $(CLEAN_DUNE_BIN))" clean --root=. --workspace=$$ws; then \
+	          echo "dune clean failed for workspace $$ws, continuing with manual cleanup" >&2; \
+	        fi; \
+	      fi; \
+	    done; \
+	  fi; \
+	  rm -rf -- $$dirs; \
+	  rm -f -- $(CLEAN_FILES)
 
 .PHONY: distclean
 distclean: clean
-	$(if $(filter 1,$(V)),,@)rm -rf -- $(DISTCLEAN_DIRS)
-	$(if $(filter 1,$(V)),,@)rm -f -- $(DISTCLEAN_FILES)
+	$(if $(filter 1,$(V)),,@)set -eu; \
+	  dirs="$(DISTCLEAN_DIRS)"; \
+	  if [ -z "$$dirs" ]; then echo "Refusing to distclean empty directory list" >&2; exit 1; fi; \
+	  for dir in $$dirs; do \
+	    case "$$dir" in ""|"/"|".") echo "Refusing to distclean $$dir" >&2; exit 1;; esac; \
+	  done; \
+	  rm -rf -- $$dirs; \
+	  rm -f -- $(DISTCLEAN_FILES)
 
 $(ocamldir)/duneconf/ox-extra.inc:
 	echo > $@
@@ -180,7 +193,7 @@ compare: _compare/config.status _install
 	  _install/bin/ocamlobjinfo.opt
 
 _compare/config.status: ocaml/config.status
-	rm -rf _compare
+	set -eu; rm -rf _compare
 	mkdir _compare
 	rsync -a --filter=':- $$(pwd)/ocaml/.gitignore' \
 	  $$(pwd)/ocaml/ $$(pwd)/_compare
@@ -274,7 +287,7 @@ build_and_test_upstream: build_upstream
 
 .PHONY: coverage
 coverage: boot-runtest
-	rm -rf _coverage
+	set -eu; rm -rf _coverage
 	bisect-ppx-report html --tree -o _coverage \
 	  --coverage-path=_build/default \
 		--source-path=. \
