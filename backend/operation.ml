@@ -75,7 +75,7 @@ let string_of_integer_operation = function
   | Iadd -> " + "
   | Isub -> " - "
   | Imul -> " * "
-  | Imulh { signed } -> " *h" ^ (if signed then "" else "u") ^ " "
+  | Imulh { signed } -> " *h" ^ if signed then " " else "u "
   | Idiv -> " div "
   | Imod -> " mod "
   | Iand -> " & "
@@ -92,7 +92,7 @@ let string_of_integer_operation = function
 let string_of_int128_operation = function
   | Iadd128 -> " + "
   | Isub128 -> " - "
-  | Imul64 { signed } -> " *" ^ (if signed then "" else "u") ^ " "
+  | Imul64 { signed } -> " *" ^ if signed then " " else "u "
 
 let is_unary_integer_operation = function
   | Iclz _ | Ictz _ | Ipopcnt -> true
@@ -401,9 +401,9 @@ let intop (op : integer_operation) =
   | Icomp cmp -> intcomp cmp
 
 let int128op = function
-  | Iadd128 -> " +128 "
-  | Isub128 -> " -128 "
-  | Imul64 { signed } -> " *128 " ^ if signed then " " else "u "
+  | Iadd128 -> " + "
+  | Isub128 -> " - "
+  | Imul64 { signed } -> " *" ^ if signed then " " else "u "
 
 let floatop ppf (op : float_operation) =
   match op with
