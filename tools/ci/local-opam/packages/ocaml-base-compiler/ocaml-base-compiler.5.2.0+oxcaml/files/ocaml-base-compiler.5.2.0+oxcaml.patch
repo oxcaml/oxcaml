@@ -1,10 +1,9 @@
 # This patch fixes assembly generation in arm64
-# and also reduces the size of logs generated
 diff --git a/asmcomp/cmm_helpers.ml b/asmcomp/cmm_helpers.ml
 index 7ad42ceaea..0cb43b7ecd 100644
 --- a/asmcomp/cmm_helpers.ml
 +++ b/asmcomp/cmm_helpers.ml
-@@ -137,6 +137,8 @@ let rec add_const c n dbg =
+@@ -148,6 +148,8 @@ let rec add_const c n dbg =
  let incr_int c dbg = add_const c 1 dbg
  let decr_int c dbg = add_const c (-1) dbg
 
@@ -13,23 +12,23 @@ index 7ad42ceaea..0cb43b7ecd 100644
  let rec add_int c1 c2 dbg =
    match (c1, c2) with
    | (Cconst_int (n, _), c) | (c, Cconst_int (n, _)) ->
-@@ -1103,12 +1105,12 @@ let make_unsigned_int bi arg dbg =
+@@ -1100,12 +1102,12 @@ let make_unsigned_int bi arg dbg =
 
  let unaligned_load_16 ptr idx dbg =
    if Arch.allow_unaligned_access
--  then Cop(Cload (Sixteen_unsigned, Mutable), [add_int ptr idx dbg], dbg)
-+  then Cop(Cload (Sixteen_unsigned, Mutable), [add_int_addr ptr idx dbg], dbg)
+-  then Cop(mk_load_mut Sixteen_unsigned, [add_int ptr idx dbg], dbg)
++  then Cop(mk_load_mut Sixteen_unsigned, [add_int_addr ptr idx dbg], dbg)
    else
      let cconst_int i = Cconst_int (i, dbg) in
--    let v1 = Cop(Cload (Byte_unsigned, Mutable), [add_int ptr idx dbg], dbg) in
-+    let v1 = Cop(Cload (Byte_unsigned, Mutable), [add_int_addr ptr idx dbg], dbg) in
-     let v2 = Cop(Cload (Byte_unsigned, Mutable),
+-    let v1 = Cop(mk_load_mut Byte_unsigned, [add_int ptr idx dbg], dbg) in
++    let v1 = Cop(mk_load_mut Byte_unsigned, [add_int_addr ptr idx dbg], dbg) in
+     let v2 = Cop(mk_load_mut Byte_unsigned,
 -                 [add_int (add_int ptr idx dbg) (cconst_int 1) dbg], dbg) in
 +                 [add_int_addr (add_int_addr ptr idx dbg) (cconst_int 1) dbg], dbg) in
      let b1, b2 = if Arch.big_endian then v1, v2 else v2, v1 in
      Cop(Cor, [lsl_int b1 (cconst_int 8) dbg; b2], dbg)
 
-@@ -1116,7 +1118,7 @@ let unaligned_set_16 ptr idx newval dbg =
+@@ -1113,7 +1115,7 @@ let unaligned_set_16 ptr idx newval dbg =
    if Arch.allow_unaligned_access
    then
      Cop(Cstore (Sixteen_unsigned, Assignment),
@@ -38,7 +37,7 @@ index 7ad42ceaea..0cb43b7ecd 100644
    else
      let cconst_int i = Cconst_int (i, dbg) in
      let v1 =
-@@ -1126,24 +1128,24 @@ let unaligned_set_16 ptr idx newval dbg =
+@@ -1123,24 +1125,24 @@ let unaligned_set_16 ptr idx newval dbg =
      let v2 = Cop(Cand, [newval; cconst_int 0xFF], dbg) in
      let b1, b2 = if Arch.big_endian then v1, v2 else v2, v1 in
      Csequence(
@@ -50,27 +49,27 @@ index 7ad42ceaea..0cb43b7ecd 100644
 
  let unaligned_load_32 ptr idx dbg =
    if Arch.allow_unaligned_access
--  then Cop(Cload (Thirtytwo_unsigned, Mutable), [add_int ptr idx dbg], dbg)
-+  then Cop(Cload (Thirtytwo_unsigned, Mutable), [add_int_addr ptr idx dbg], dbg)
+-  then Cop(mk_load_mut Thirtytwo_unsigned, [add_int ptr idx dbg], dbg)
++  then Cop(mk_load_mut Thirtytwo_unsigned, [add_int_addr ptr idx dbg], dbg)
    else
      let cconst_int i = Cconst_int (i, dbg) in
--    let v1 = Cop(Cload (Byte_unsigned, Mutable), [add_int ptr idx dbg], dbg) in
-+    let v1 = Cop(Cload (Byte_unsigned, Mutable), [add_int_addr ptr idx dbg], dbg) in
-     let v2 = Cop(Cload (Byte_unsigned, Mutable),
+-    let v1 = Cop(mk_load_mut Byte_unsigned, [add_int ptr idx dbg], dbg) in
++    let v1 = Cop(mk_load_mut Byte_unsigned, [add_int_addr ptr idx dbg], dbg) in
+     let v2 = Cop(mk_load_mut Byte_unsigned,
 -                 [add_int (add_int ptr idx dbg) (cconst_int 1) dbg], dbg)
 +                 [add_int_addr (add_int_addr ptr idx dbg) (cconst_int 1) dbg], dbg)
      in
-     let v3 = Cop(Cload (Byte_unsigned, Mutable),
+     let v3 = Cop(mk_load_mut Byte_unsigned,
 -                 [add_int (add_int ptr idx dbg) (cconst_int 2) dbg], dbg)
 +                 [add_int_addr (add_int_addr ptr idx dbg) (cconst_int 2) dbg], dbg)
      in
-     let v4 = Cop(Cload (Byte_unsigned, Mutable),
+     let v4 = Cop(mk_load_mut Byte_unsigned,
 -                 [add_int (add_int ptr idx dbg) (cconst_int 3) dbg], dbg)
 +                 [add_int_addr (add_int_addr ptr idx dbg) (cconst_int 3) dbg], dbg)
      in
      let b1, b2, b3, b4 =
        if Arch.big_endian
-@@ -1158,7 +1160,7 @@ let unaligned_load_32 ptr idx dbg =
+@@ -1155,7 +1157,7 @@ let unaligned_load_32 ptr idx dbg =
  let unaligned_set_32 ptr idx newval dbg =
    if Arch.allow_unaligned_access
    then
@@ -79,7 +78,7 @@ index 7ad42ceaea..0cb43b7ecd 100644
        dbg)
    else
      let cconst_int i = Cconst_int (i, dbg) in
-@@ -1179,39 +1181,39 @@ let unaligned_set_32 ptr idx newval dbg =
+@@ -1176,39 +1178,39 @@ let unaligned_set_32 ptr idx newval dbg =
      Csequence(
          Csequence(
              Cop(Cstore (Byte_unsigned, Assignment),
@@ -100,48 +99,60 @@ index 7ad42ceaea..0cb43b7ecd 100644
                  dbg)))
 
  let unaligned_load_64 ptr idx dbg =
-   assert(size_int = 8);
    if Arch.allow_unaligned_access
--  then Cop(Cload (Word_int, Mutable), [add_int ptr idx dbg], dbg)
-+  then Cop(Cload (Word_int, Mutable), [add_int_addr ptr idx dbg], dbg)
+-  then Cop(mk_load_mut Word_int, [add_int ptr idx dbg], dbg)
++  then Cop(mk_load_mut Word_int, [add_int_addr ptr idx dbg], dbg)
    else
      let cconst_int i = Cconst_int (i, dbg) in
--    let v1 = Cop(Cload (Byte_unsigned, Mutable), [add_int ptr idx dbg], dbg) in
-+    let v1 = Cop(Cload (Byte_unsigned, Mutable), [add_int_addr ptr idx dbg], dbg) in
-     let v2 = Cop(Cload (Byte_unsigned, Mutable),
+-    let v1 = Cop(mk_load_mut Byte_unsigned, [add_int ptr idx dbg], dbg) in
++    let v1 = Cop(mk_load_mut Byte_unsigned, [add_int_addr ptr idx dbg], dbg) in
+     let v2 = Cop(mk_load_mut Byte_unsigned,
 -                 [add_int (add_int ptr idx dbg) (cconst_int 1) dbg], dbg) in
 +                 [add_int_addr (add_int_addr ptr idx dbg) (cconst_int 1) dbg], dbg) in
-     let v3 = Cop(Cload (Byte_unsigned, Mutable),
+     let v3 = Cop(mk_load_mut Byte_unsigned,
 -                 [add_int (add_int ptr idx dbg) (cconst_int 2) dbg], dbg) in
 +                 [add_int_addr (add_int_addr ptr idx dbg) (cconst_int 2) dbg], dbg) in
-     let v4 = Cop(Cload (Byte_unsigned, Mutable),
+     let v4 = Cop(mk_load_mut Byte_unsigned,
 -                 [add_int (add_int ptr idx dbg) (cconst_int 3) dbg], dbg) in
 +                 [add_int_addr (add_int_addr ptr idx dbg) (cconst_int 3) dbg], dbg) in
-     let v5 = Cop(Cload (Byte_unsigned, Mutable),
+     let v5 = Cop(mk_load_mut Byte_unsigned,
 -                 [add_int (add_int ptr idx dbg) (cconst_int 4) dbg], dbg) in
 +                 [add_int_addr (add_int_addr ptr idx dbg) (cconst_int 4) dbg], dbg) in
-     let v6 = Cop(Cload (Byte_unsigned, Mutable),
+     let v6 = Cop(mk_load_mut Byte_unsigned,
 -                 [add_int (add_int ptr idx dbg) (cconst_int 5) dbg], dbg) in
 +                 [add_int_addr (add_int_addr ptr idx dbg) (cconst_int 5) dbg], dbg) in
-     let v7 = Cop(Cload (Byte_unsigned, Mutable),
+     let v7 = Cop(mk_load_mut Byte_unsigned,
 -                 [add_int (add_int ptr idx dbg) (cconst_int 6) dbg], dbg) in
 +                 [add_int_addr (add_int_addr ptr idx dbg) (cconst_int 6) dbg], dbg) in
-     let v8 = Cop(Cload (Byte_unsigned, Mutable),
+     let v8 = Cop(mk_load_mut Byte_unsigned,
 -                 [add_int (add_int ptr idx dbg) (cconst_int 7) dbg], dbg) in
 +                 [add_int_addr (add_int_addr ptr idx dbg) (cconst_int 7) dbg], dbg) in
      let b1, b2, b3, b4, b5, b6, b7, b8 =
        if Arch.big_endian
        then v1, v2, v3, v4, v5, v6, v7, v8
-@@ -1233,7 +1235,7 @@ let unaligned_load_64 ptr idx dbg =
+       else v8, v7, v6, v5, v4, v3, v2, v1 in
+     Cop(Cor,
+         [Cop(Cor,
+              [Cop(Cor, [lsl_int b1 (cconst_int (8*7)) dbg;
+                         lsl_int b2 (cconst_int (8*6)) dbg], dbg);
+               Cop(Cor, [lsl_int b3 (cconst_int (8*5)) dbg;
+                         lsl_int b4 (cconst_int (8*4)) dbg], dbg)],
+              dbg);
+          Cop(Cor,
+              [Cop(Cor, [lsl_int b5 (cconst_int (8*3)) dbg;
+                         lsl_int b6 (cconst_int (8*2)) dbg], dbg);
+               Cop(Cor, [lsl_int b7 (cconst_int 8) dbg;
+                         b8], dbg)],
+              dbg)], dbg)
+
  let unaligned_set_64 ptr idx newval dbg =
-   assert(size_int = 8);
    if Arch.allow_unaligned_access
 -  then Cop(Cstore (Word_int, Assignment), [add_int ptr idx dbg; newval], dbg)
 +  then Cop(Cstore (Word_int, Assignment), [add_int_addr ptr idx dbg; newval], dbg)
    else
      let cconst_int i = Cconst_int (i, dbg) in
      let v1 =
-@@ -1273,32 +1275,32 @@ let unaligned_set_64 ptr idx newval dbg =
+@@ -1269,32 +1271,32 @@ let unaligned_set_64 ptr idx newval dbg =
          Csequence(
              Csequence(
                  Cop(Cstore (Byte_unsigned, Assignment),
@@ -182,25 +193,27 @@ index 7ad42ceaea..0cb43b7ecd 100644
                      dbg))))
 
  let max_or_zero a dbg =
-@@ -2279,7 +2281,7 @@ let int_comp_caml cmp arg1 arg2 dbg =
+@@ -2216,7 +2218,7 @@ let int_comp_caml cmp arg1 arg2 dbg =
 
  let stringref_unsafe arg1 arg2 dbg =
-   tag_int(Cop(Cload (Byte_unsigned, Mutable),
+-  tag_int(Cop(mk_load_mut Byte_unsigned,
 -              [add_int arg1 (untag_int arg2 dbg) dbg],
++  tag_int(Cop(mk_load_mut Byte_unsigned,
 +              [add_int_addr arg1 (untag_int arg2 dbg) dbg],
                dbg)) dbg
 
  let stringref_safe arg1 arg2 dbg =
-@@ -2289,7 +2291,7 @@ let stringref_safe arg1 arg2 dbg =
+@@ -2226,7 +2228,7 @@ let stringref_safe arg1 arg2 dbg =
          Csequence(
            make_checkbound dbg [string_length str dbg; idx],
-           Cop(Cload (Byte_unsigned, Mutable),
+-          Cop(mk_load_mut Byte_unsigned,
 -            [add_int str idx dbg], dbg))))) dbg
++          Cop(mk_load_mut Byte_unsigned,
 +            [add_int_addr str idx dbg], dbg))))) dbg
 
  let string_load size unsafe arg1 arg2 dbg =
    box_sized size dbg
-@@ -2397,7 +2399,7 @@ let setfield_computed ptr init arg1 arg2 arg3 dbg =
+@@ -2382,7 +2384,7 @@ let setfield_computed ptr init arg1 arg2 arg3 dbg =
 
  let bytesset_unsafe arg1 arg2 arg3 dbg =
        return_unit dbg (Cop(Cstore (Byte_unsigned, Assignment),
@@ -209,7 +222,7 @@ index 7ad42ceaea..0cb43b7ecd 100644
                         ignore_high_bit_int (untag_int arg3 dbg)], dbg))
 
  let bytesset_safe arg1 arg2 arg3 dbg =
-@@ -2408,7 +2410,7 @@ let bytesset_safe arg1 arg2 arg3 dbg =
+@@ -2393,7 +2395,7 @@ let bytesset_safe arg1 arg2 arg3 dbg =
          Csequence(
            make_checkbound dbg [string_length str dbg; idx],
            Cop(Cstore (Byte_unsigned, Assignment),
@@ -218,24 +231,3 @@ index 7ad42ceaea..0cb43b7ecd 100644
                dbg))))))
 
  let arrayset_unsafe kind arg1 arg2 arg3 dbg =
-diff --git a/runtime/startup_nat.c b/runtime/startup_nat.c
-index b75732596a..0b8f93449b 100644
---- a/runtime/startup_nat.c
-+++ b/runtime/startup_nat.c
-@@ -113,12 +113,14 @@ value caml_startup_common(char_os **argv, int pooling)
-   caml_init_domain();
-   /* Determine options */
- #ifdef DEBUG
--  caml_verb_gc = 0x3F;
-+  /* Silenced for flambda-backend builds to avoid excessively large CI logs */
-+  /* caml_verb_gc = 0x3F; */
- #endif
-   caml_parse_ocamlrunparam();
-   CAML_EVENTLOG_INIT();
- #ifdef DEBUG
--  caml_gc_message (-1, "### OCaml runtime: debug mode ###\n");
-+  /* Silenced for flambda-backend builds to avoid excessively large CI logs */
-+  /* caml_gc_message (-1, "### OCaml runtime: debug mode ###\n"); */
- #endif
-   if (caml_cleanup_on_exit)
-     pooling = 1;
