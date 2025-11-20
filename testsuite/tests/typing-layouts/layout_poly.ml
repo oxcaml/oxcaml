@@ -79,7 +79,7 @@ Line 4, characters 63-68:
                                                                    ^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "('a : float64)"
-       The layout of string is value
+       The layout of string is value non_float
          because it is the primitive type string.
        But the layout of string must be a sublayout of float64
          because of the definition of id' at line 2, characters 10-18.
@@ -303,7 +303,7 @@ Line 1, characters 36-41:
                                         ^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "('a : float64)"
-       The layout of string is value
+       The layout of string is value non_float
          because it is the primitive type string.
        But the layout of string must be a sublayout of float64
          because of the definition of id at line 2, characters 2-35.
@@ -641,7 +641,7 @@ external id : ('a : any mod separable). 'a t -> int = "%array_length"
 let id' x = id x
 
 [%%expect{|
-type ('a : any mod separable) t = 'a array
+type ('a : any separable) t = 'a array
 Line 2, characters 14-51:
 2 | external id : ('a : any mod separable). 'a t -> int = "%array_length"
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -653,17 +653,17 @@ external[@layout_poly] id : ('a : any mod separable). 'a t -> int = "%array_leng
 let id' x = id x
 
 [%%expect{|
-external id : ('a : any mod separable). 'a t -> int = "%array_length"
+external id : ('a : any separable). 'a t -> int = "%array_length"
   [@@layout_poly]
-val id' : ('a : value_or_null mod separable). 'a t -> int = <fun>
+val id' : ('a : value_or_null separable). 'a t -> int = <fun>
 |}]
 
 external id : ('a : any mod separable). 'a t -> int = "%identity"
 let id' x = id x
 
 [%%expect{|
-external id : ('a : any mod separable). 'a t -> int = "%identity"
-val id' : ('a : value_or_null mod separable). 'a t -> int = <fun>
+external id : ('a : any separable). 'a t -> int = "%identity"
+val id' : ('a : value_or_null separable). 'a t -> int = <fun>
 |}]
 
 
@@ -714,7 +714,7 @@ Error: "[@layout_poly]" on this external declaration has no
 external[@layout_poly] makearray_dynamic : ('a : any mod separable). int -> 'a -> 'a array =
   "%makearray_dynamic"
 [%%expect{|
-external makearray_dynamic : ('a : any mod separable). int -> 'a -> 'a array
+external makearray_dynamic : ('a : any separable). int -> 'a -> 'a array
   = "%makearray_dynamic" [@@layout_poly]
 |}]
 
@@ -723,14 +723,14 @@ external[@layout_poly] arrayblit :
   "%arrayblit"
 [%%expect{|
 external arrayblit :
-  ('a : any mod separable). 'a array -> int -> 'a array -> int -> int -> unit
+  ('a : any separable). 'a array -> int -> 'a array -> int -> int -> unit
   = "%arrayblit" [@@layout_poly]
 |}]
 
 external[@layout_poly] makearray_dynamic : ('a : any mod separable). int -> 'a array =
   "%makearray_dynamic_uninit"
 [%%expect{|
-external makearray_dynamic : ('a : any mod separable). int -> 'a array
+external makearray_dynamic : ('a : any separable). int -> 'a array
   = "%makearray_dynamic_uninit" [@@layout_poly]
 |}]
 
@@ -739,8 +739,7 @@ external[@layout_poly] arrayblit_src_immut :
   "%arrayblit_src_immut"
 [%%expect{|
 external arrayblit_src_immut :
-  ('a : any mod separable).
-    'a iarray -> int -> 'a array -> int -> int -> unit
+  ('a : any separable). 'a iarray -> int -> 'a array -> int -> int -> unit
   = "%arrayblit_src_immut" [@@layout_poly]
 |}]
 
@@ -751,9 +750,9 @@ external[@layout_poly] restricted : ('a : any mod separable portable contended).
   'a t -> int = "%array_length"
 
 [%%expect{|
-type ('a : any mod contended portable separable) t = 'a array
+type ('a : any separable mod contended portable) t = 'a array
 external restricted :
-  ('a : any mod contended portable separable). 'a t -> int = "%array_length"
+  ('a : any separable mod contended portable). 'a t -> int = "%array_length"
   [@@layout_poly]
 |}]
 
@@ -770,10 +769,10 @@ Line 1, characters 26-40:
 1 | let fails = restricted [| fun () -> "no" |]
                               ^^^^^^^^^^^^^^
 Error:
-       The kind of 'a -> 'b is value mod aliased immutable non_float
+       The kind of 'a -> 'b is value non_float mod aliased immutable
          because it's a function type.
        But the kind of 'a -> 'b must be a subkind of
-           value_or_null mod contended portable separable
+           value_or_null separable mod contended portable
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).

@@ -3,10 +3,10 @@
  expect;
 *)
 
-type t_maybeptr_val : value maybe_pointer
+type t_maybeptr_val : value maybe_separable
 type t_nonptr_val : value non_pointer
 [%%expect{|
-type t_maybeptr_val
+type t_maybeptr_val : value maybe_separable
 type t_nonptr_val : value non_pointer
 |}]
 
@@ -79,7 +79,7 @@ Error: The layout of type "a" is value
 (* These almost demonstrate the bad mutual recursion behavior, but work. *)
 
 type a : value non_pointer = #{ b : b }
-and b : value maybe_pointer = #{ i : t_nonptr_val }
+and b : value maybe_separable = #{ i : t_nonptr_val }
 [%%expect{|
 type a = #{ b : b; }
 and b = #{ i : t_nonptr_val; }

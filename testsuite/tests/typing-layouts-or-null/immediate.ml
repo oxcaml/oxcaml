@@ -122,7 +122,7 @@ type ('a : value_or_null mod non_float) accepts_nonfloat
 type succeeds = t_immediate_or_null accepts_nonfloat
 
 [%%expect{|
-type ('a : value_or_null mod non_float) accepts_nonfloat
+type ('a : value_or_null non_float) accepts_nonfloat
 type succeeds = t_immediate_or_null accepts_nonfloat
 |}]
 
@@ -230,19 +230,9 @@ Line 1, characters 19-30:
                        ^^^^^^^^^^^
 Error: This type "exn or_null" should be an instance of type
          "('a : immediate64_or_null)"
-       The kind of exn or_null is value_or_null mod contended portable
+       The layout of exn or_null is value
          because it is the primitive type or_null.
-       But the kind of exn or_null must be a subkind of immediate64_or_null
-         because of the definition of accept_immediate64_or_null at line 1, characters 0-58.
-|}, Principal{|
-Line 1, characters 19-30:
-1 | type should_fail = exn or_null accept_immediate64_or_null
-                       ^^^^^^^^^^^
-Error: This type "exn or_null" should be an instance of type
-         "('a : immediate64_or_null)"
-       The kind of exn or_null is value_or_null mod everything with exn
-         because it is the primitive type or_null.
-       But the kind of exn or_null must be a subkind of immediate64_or_null
+       But the layout of exn or_null must be a sublayout of value non_pointer
          because of the definition of accept_immediate64_or_null at line 1, characters 0-58.
 |}]
 
@@ -276,9 +266,8 @@ Error: Signature mismatch:
          type t = string or_null
        is not included in
          type t : immediate64_or_null
-       The kind of the first is
-           value_or_null mod many forkable unyielding stateless immutable
+       The layout of the first is value
          because it is the primitive type or_null.
-       But the kind of the first must be a subkind of immediate64_or_null
+       But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-30.
 |}]

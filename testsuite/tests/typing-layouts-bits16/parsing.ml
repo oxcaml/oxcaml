@@ -95,7 +95,7 @@ Line 1, characters 9-15:
 Error: This type "int16#" should be an instance of type "('a : value)"
        The layout of int16# is bits16
          because it is the unboxed version of the primitive type int16.
-       But the layout of int16# must be a sublayout of value
+       But the layout of int16# must be a sublayout of value separable
          because it's a type argument to a class constructor.
 |}];;
 
@@ -107,7 +107,7 @@ Line 1, characters 11-17:
 Error: This type "int16#" should be an instance of type "('a : value)"
        The layout of int16# is bits16
          because it is the unboxed version of the primitive type int16.
-       But the layout of int16# must be a sublayout of value
+       But the layout of int16# must be a sublayout of value separable
          because it's a type argument to a class constructor.
 |}];;
 
@@ -119,7 +119,7 @@ Line 1, characters 14-20:
 Error: This type "int16#" should be an instance of type "('a : value)"
        The layout of int16# is bits16
          because it is the unboxed version of the primitive type int16.
-       But the layout of int16# must be a sublayout of value
+       But the layout of int16# must be a sublayout of value separable
          because it's a type argument to a class constructor.
 |}];;
 
@@ -131,7 +131,7 @@ Line 1, characters 13-19:
 Error: This type "int16#" should be an instance of type "('a : value)"
        The layout of int16# is bits16
          because it is the unboxed version of the primitive type int16.
-       But the layout of int16# must be a sublayout of value
+       But the layout of int16# must be a sublayout of value separable
          because it's a type argument to a class constructor.
 |}];;
 
@@ -146,7 +146,7 @@ Line 1, characters 9-15:
 Error: This type "int16#" should be an instance of type "('a : value)"
        The layout of int16# is bits16
          because it is the unboxed version of the primitive type int16.
-       But the layout of int16# must be a sublayout of value
+       But the layout of int16# must be a sublayout of value separable
          because it's a type argument to a class constructor.
 |}];;
 
@@ -158,7 +158,7 @@ Line 1, characters 11-17:
 Error: This type "int16#" should be an instance of type "('a : value)"
        The layout of int16# is bits16
          because it is the unboxed version of the primitive type int16.
-       But the layout of int16# must be a sublayout of value
+       But the layout of int16# must be a sublayout of value separable
          because it's a type argument to a class constructor.
 |}];;
 
@@ -170,7 +170,7 @@ Line 1, characters 14-20:
 Error: This type "int16#" should be an instance of type "('a : value)"
        The layout of int16# is bits16
          because it is the unboxed version of the primitive type int16.
-       But the layout of int16# must be a sublayout of value
+       But the layout of int16# must be a sublayout of value separable
          because it's a type argument to a class constructor.
 |}];;
 
@@ -182,7 +182,7 @@ Line 1, characters 13-19:
 Error: This type "int16#" should be an instance of type "('a : value)"
        The layout of int16# is bits16
          because it is the unboxed version of the primitive type int16.
-       But the layout of int16# must be a sublayout of value
+       But the layout of int16# must be a sublayout of value separable
          because it's a type argument to a class constructor.
 |}];;
 

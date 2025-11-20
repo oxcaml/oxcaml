@@ -616,7 +616,7 @@ module Sort = struct
 end
 
 module Scannable_axes = struct
-  type t = { pointerness : Jkind_axis.Pointerness.t }
+  type t = { separability : Jkind_axis.Separability.t }
 end
 
 module Layout = struct

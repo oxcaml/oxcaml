@@ -558,7 +558,7 @@ Line 1, characters 15-27:
 Error: Object field types must have layout value.
        The layout of "t_bits32" is bits32
          because of the definition of t_bits32 at line 1, characters 0-22.
-       But the layout of "t_bits32" must be a sublayout of value
+       But the layout of "t_bits32" must be a sublayout of value separable
          because it's the type of an object field.
 |}];;
 
@@ -570,7 +570,7 @@ Line 1, characters 29-35:
 Error: Object field types must have layout value.
        The layout of "'a" is bits32
          because of the annotation on 'a in the declaration of the type t12_2.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must overlap with value separable
          because it's the type of an object field.
 |}]
 
@@ -583,7 +583,7 @@ Error: The method "x" has type "t_bits32" but is expected to have type
          "('a : value)"
        The layout of t_bits32 is bits32
          because of the definition of t_bits32 at line 1, characters 0-22.
-       But the layout of t_bits32 must be a sublayout of value
+       But the layout of t_bits32 must be a sublayout of value separable
          because it's the type of an object field.
 |}];;
 
@@ -595,7 +595,7 @@ Line 2, characters 13-15:
 2 |   method x : 'a t_bits32_id -> 'a t_bits32_id = assert false
                  ^^
 Error: This type "('a : value)" should be an instance of type "('b : bits32)"
-       The layout of 'a is value
+       The layout of 'a is value separable
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with bits32
          because of the definition of t_bits32_id at line 2, characters 0-35.
@@ -609,7 +609,7 @@ Line 1, characters 25-26:
 Error: Variables bound in a class must have layout value.
        The layout of x is bits32
          because of the definition of t_bits32 at line 1, characters 0-22.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a sublayout of value separable
          because it's the type of a class field.
 |}];;
 
@@ -621,7 +621,7 @@ Line 1, characters 26-43:
 Error: The method "x" has type "int32#" but is expected to have type "('a : value)"
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.
-       But the layout of int32# must be a sublayout of value
+       But the layout of int32# must be a sublayout of value separable
          because it's the type of an object field.
 |}];;
 
@@ -633,7 +633,7 @@ Line 1, characters 26-40:
 Error: Variables bound in a class must have layout value.
        The layout of x is bits32
          because it is the unboxed version of the primitive type int32.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a sublayout of value separable
          because it's the type of an instance variable.
 |}];;
 
@@ -645,7 +645,7 @@ Line 2, characters 10-12:
 2 |   val x : 'a t_bits32_id -> 'a t_bits32_id
               ^^
 Error: This type "('a : value)" should be an instance of type "('b : bits32)"
-       The layout of 'a is value
+       The layout of 'a is value separable
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with bits32
          because of the definition of t_bits32_id at line 2, characters 0-35.
@@ -758,5 +758,5 @@ Error: This expression has type "t_bits32"
        but an expression was expected of type "('a : value)"
        The layout of t_bits32 is bits32
          because of the definition of t_bits32 at line 1, characters 0-22.
-       But the layout of t_bits32 must be a sublayout of value.
+       But the layout of t_bits32 must be a sublayout of value separable.
 |}];;

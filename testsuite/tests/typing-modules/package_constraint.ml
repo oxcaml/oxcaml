@@ -62,9 +62,9 @@ Error: In this "with" constraint, the new definition of "t"
          type t = t_value
        is not included in
          type t : immediate
-       The kind of the first is value
+       The layout of the first is value separable
          because of the definition of t_value at line 1, characters 0-12.
-       But the kind of the first must be a subkind of immediate
+       But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-22.
 |}];;
 
@@ -146,9 +146,9 @@ Line 6, characters 0-16:
 6 | and t2 = t_value;;
     ^^^^^^^^^^^^^^^^
 Error:
-       The kind of t2 is value
+       The layout of t2 is value separable
          because of the definition of t_value at line 1, characters 0-12.
-       But the kind of t2 must be a subkind of immediate
+       But the layout of t2 must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-22.
 |}];;
 
@@ -172,10 +172,10 @@ Error: Layout mismatch in checking consistency of mutually recursive groups.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The kind of 'a t2 is value
+         The layout of 'a t2 is value separable
            because it instantiates an unannotated type parameter of t2,
-           chosen to have kind value.
-         But the kind of 'a t2 must be a subkind of immediate
+           chosen to have layout value.
+         But the layout of 'a t2 must be a sublayout of value non_pointer
            because of the definition of t at line 2, characters 2-22.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
@@ -198,10 +198,10 @@ Error: Layout mismatch in checking consistency of mutually recursive groups.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The kind of 'a t2 is value
+         The layout of 'a t2 is value separable
            because it instantiates an unannotated type parameter of t2,
-           chosen to have kind value.
-         But the kind of 'a t2 must be a subkind of immediate
+           chosen to have layout value.
+         But the layout of 'a t2 must be a sublayout of value non_pointer
            because of the definition of t at line 2, characters 2-22.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
@@ -333,8 +333,8 @@ Line 8, characters 10-17:
 8 | type t2 = t_value t
               ^^^^^^^
 Error: This type "t_value" should be an instance of type "('a : immediate)"
-       The kind of t_value is value
+       The layout of t_value is value separable
          because of the definition of t_value at line 1, characters 0-12.
-       But the kind of t_value must be a subkind of immediate
+       But the layout of t_value must be a sublayout of value non_pointer
          because of the definition of t at line 5, characters 0-39.
 |}];;

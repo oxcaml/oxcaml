@@ -169,7 +169,7 @@ type ('a, 'b) t : immutable_data with 'a = [< `X | `Y of 'a] as 'b
 Line 1, characters 0-66:
 1 | type ('a, 'b) t : immutable_data with 'a = [< `X | `Y of 'a] as 'b
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[< `X | `Y of 'a ]" is value mod non_float
+Error: The kind of type "[< `X | `Y of 'a ]" is value non_float
          because it's a polymorphic variant type.
        But the kind of type "[< `X | `Y of 'a ]" must be a subkind of
            immutable_data with 'a
@@ -180,7 +180,7 @@ type ('a, 'b) u : immutable_data with 'a = [> `X | `Y of 'a] as 'b
 Line 1, characters 0-66:
 1 | type ('a, 'b) u : immutable_data with 'a = [> `X | `Y of 'a] as 'b
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[> `X | `Y of 'a ]" is value mod non_float
+Error: The kind of type "[> `X | `Y of 'a ]" is value non_float
          because it's a polymorphic variant type.
        But the kind of type "[> `X | `Y of 'a ]" must be a subkind of
            immutable_data with 'a
@@ -209,8 +209,7 @@ end
 Line 2, characters 2-83:
 2 |   type 'a t : immutable_data with 'a = private [< `A of 'a | `B of ('a * 'a) | `C ]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[< `A of 'a | `B of 'a * 'a | `C ]" is
-           value mod non_float
+Error: The kind of type "[< `A of 'a | `B of 'a * 'a | `C ]" is value non_float
          because it's a polymorphic variant type.
        But the kind of type "[< `A of 'a | `B of 'a * 'a | `C ]" must be a subkind of
          immutable_data with 'a
@@ -229,7 +228,7 @@ Line 1, characters 64-65:
                                                                     ^
 Error: This alias is bound to type "[> `Foo of int ]"
        but is used as an instance of type "('a : value mod portable)"
-       The kind of [> `Foo of int ] is value mod non_float
+       The kind of [> `Foo of int ] is value non_float
          because it's a polymorphic variant type.
        But the kind of [> `Foo of int ] must be a subkind of
            value mod portable
@@ -244,7 +243,7 @@ Line 1, characters 64-65:
                                                                     ^
 Error: This alias is bound to type "[< `Foo of int ]"
        but is used as an instance of type "('a : value mod portable)"
-       The kind of [< `Foo of int ] is value mod non_float
+       The kind of [< `Foo of int ] is value non_float
          because it's a polymorphic variant type.
        But the kind of [< `Foo of int ] must be a subkind of
            value mod portable
@@ -269,7 +268,7 @@ Line 1, characters 0-71:
 1 | type trec_fails : immutable_data = [ `C | `D of 'a * unit -> 'a ] as 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" is
-           value mod immutable non_float
+           value non_float mod immutable
          because it's a polymorphic variant type.
        But the kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" must be a subkind of
          immutable_data
@@ -291,7 +290,7 @@ Lines 1-2, characters 0-80:
 2 |   [ `X of 'b | `Y of [ `Z of ('a -> 'b) | `W of 'a | `Loop of 'b ] as 'b ] as 'a
 Error: The kind of type "[ `X of
                             [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ] as 'b
-                        | `Y of 'b ] as 'a" is value mod immutable non_float
+                        | `Y of 'b ] as 'a" is value non_float mod immutable
          because it's a polymorphic variant type.
        But the kind of type "[ `X of
                                 [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ]
@@ -313,39 +312,49 @@ type trec_rec_succeeds =
 (* Future tests for when we start adding row variables to with-bounds. *)
 
 type 'a t1 = [< `A of string | `B of int ] as 'a
-type 'a t2 : immediate with 'a t1 = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
+type 'a t2 : immediate non_float with 'a t1 = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
 [%%expect{|
 type 'a t1 = 'a constraint 'a = [< `A of string | `B of int ]
 Line 2, characters 0-47:
 2 | type 'a t2 : immediate with 'a t1 = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t2" is immutable_data
+Error: The layout of type "t2" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of
-           immediate with [< `A of string | `B of int ] t1
+       But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
 |}]
-type t3 : immediate with [ `A of string] t1 = C of string  (* should be accepted *)
+type t3 : immediate non_float with [ `A of string] t1 = C of string  (* should be accepted *)
 [%%expect{|
-type t3 = C of string
+Line 1, characters 0-57:
+1 | type t3 : immediate with [ `A of string] t1 = C of string  (* should be accepted *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "t3" is value non_float
+         because it's a boxed variant type.
+       But the layout of type "t3" must be a sublayout of value non_pointer
+         because of the annotation on the declaration of the type t3.
 |}]
 
 type 'a t1 = [> `A of string | `B of int ] as 'a
-type 'a t2 : immediate with 'a t1 = C of string  (* should be rejected *)
+type 'a t2 : immediate non_float with 'a t1 = C of string  (* should be rejected *)
 [%%expect{|
 type 'a t1 = 'a constraint 'a = [> `A of string | `B of int ]
 Line 2, characters 0-47:
 2 | type 'a t2 : immediate with 'a t1 = C of string  (* should be rejected *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t2" is immutable_data
+Error: The layout of type "t2" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of
-           immediate with [> `A of string | `B of int ] t1
+       But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
 |}]
-type t3 : immediate with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
+type t3 : immediate non_float with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
 [%%expect{|
-type t3 = C of string
+Line 1, characters 0-75:
+1 | type t3 : immediate with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "t3" is value non_float
+         because it's a boxed variant type.
+       But the layout of type "t3" must be a sublayout of value non_pointer
+         because of the annotation on the declaration of the type t3.
 |}]
 
 module type S = sig
@@ -354,26 +363,32 @@ end
 module M1 : S = struct
   type t = [ `A of string ]
 end
-type t2 : immediate with M1.t = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
+type t2 : immediate non_float with M1.t = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
 [%%expect{|
 module type S = sig type t = private [< `A of string | `B of int ] end
 module M1 : S
 Line 7, characters 0-43:
 7 | type t2 : immediate with M1.t = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t2" is immutable_data
+Error: The layout of type "t2" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of immediate with M1.t
+       But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
 |}]
 
 module M2 : S with type t = [ `A of string ] = struct
   type t = [ `A of string ]
 end
-type t3 : immediate with M2.t = C of string (* should be accepted *)
+type t3 : immediate non_float with M2.t = C of string (* should be accepted *)
 [%%expect{|
 module M2 : sig type t = [ `A of string ] end
-type t3 = C of string
+Line 4, characters 0-43:
+4 | type t3 : immediate with M2.t = C of string (* should be accepted *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "t3" is value non_float
+         because it's a boxed variant type.
+       But the layout of type "t3" must be a sublayout of value non_pointer
+         because of the annotation on the declaration of the type t3.
 |}]
 
 type (_, _) eq = Refl : ('a, 'a) eq
@@ -381,16 +396,16 @@ type (_, _) eq = Refl : ('a, 'a) eq
 (* I'm not sure whether module substitution over a non-static private row type preserves the Tvariant structure; so I made this harder case, too *)
 let sneaky (x : (M1.t, [ `A of string ]) eq) = match x with
   | Refl -> let open struct
-    type t4 : immediate with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
+    type t4 : immediate non_float with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
   end in ()
 [%%expect{|
 type (_, _) eq = Refl : ('a, 'a) eq
 Line 6, characters 4-47:
 6 |     type t4 : immediate with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t4" is immutable_data
+Error: The layout of type "t4" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t4" must be a subkind of immediate with M1.t
+       But the layout of type "t4" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t4.
 |}]
 
@@ -400,38 +415,44 @@ end
 module M1 : S = struct
   type t = [ `A of string | `B of int | `C of (int -> int) ref ]
 end
-type t2 : immediate with M1.t = C of string  (* should be rejected *)
+type t2 : immediate non_float with M1.t = C of string  (* should be rejected *)
 [%%expect{|
 module type S = sig type t = private [> `A of string | `B of int ] end
 module M1 : S
 Line 7, characters 0-43:
 7 | type t2 : immediate with M1.t = C of string  (* should be rejected *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t2" is immutable_data
+Error: The layout of type "t2" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of immediate with M1.t
+       But the layout of type "t2" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t2.
 |}]
 
 module M2 : S with type t = [ `A of string | `B of int ] = struct
   type t = [ `A of string | `B of int ]
 end
-type t3 : immediate with M2.t = C of string (* should be accepted *)
+type t3 : immediate non_float with M2.t = C of string (* should be accepted *)
 [%%expect{|
 module M2 : sig type t = [ `A of string | `B of int ] end
-type t3 = C of string
+Line 4, characters 0-43:
+4 | type t3 : immediate with M2.t = C of string (* should be accepted *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "t3" is value non_float
+         because it's a boxed variant type.
+       But the layout of type "t3" must be a sublayout of value non_pointer
+         because of the annotation on the declaration of the type t3.
 |}]
 
 let sneaky (x : (M1.t, [ `A of string | `B of int ]) eq) = match x with
   | Refl -> let open struct
-    type t4 : immediate with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
+    type t4 : immediate non_float with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
   end in ()
 [%%expect{|
 Line 3, characters 4-47:
 3 |     type t4 : immediate with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t4" is immutable_data
+Error: The layout of type "t4" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t4" must be a subkind of immediate with M1.t
+       But the layout of type "t4" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t4.
 |}]

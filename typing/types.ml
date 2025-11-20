@@ -51,13 +51,11 @@ module Jkind_mod_bounds = struct
   module Crossing = Mode.Crossing
   module Externality = Jkind_axis.Externality
   module Nullability = Jkind_axis.Nullability
-  module Separability = Jkind_axis.Separability
 
   type t = {
     crossing : Crossing.t;
     externality: Externality.t;
     nullability: Nullability.t;
-    separability: Separability.t;
   }
 
   let crossing t = t.crossing
@@ -75,24 +73,20 @@ module Jkind_mod_bounds = struct
   let staticity = Crossing.Axis.Monadic Staticity
   let[@inline] externality t = t.externality
   let[@inline] nullability t = t.nullability
-  let[@inline] separability t = t.separability
 
   let[@inline] create
       crossing
       ~externality
-      ~nullability
-      ~separability =
+      ~nullability =
     {
       crossing;
       externality;
       nullability;
-      separability;
     }
 
   let[@inline] set_crossing crossing t = { t with crossing }
   let[@inline] set_externality externality t = { t with externality }
   let[@inline] set_nullability nullability t = { t with nullability }
-  let[@inline] set_separability separability t = { t with separability }
 
   let[@inline] set_max_in_set t max_axes =
     let open Jkind_axis.Axis_set in
@@ -123,11 +117,6 @@ module Jkind_mod_bounds = struct
       then Nullability.max
       else t.nullability
     in
-    let separability =
-      if mem max_axes (Nonmodal Separability)
-      then Separability.max
-      else t.separability
-    in
     let monadic =
       Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
     in
@@ -140,7 +129,6 @@ module Jkind_mod_bounds = struct
       crossing;
       externality;
       nullability;
-      separability;
     }
 
   let[@inline] set_min_in_set t min_axes =
@@ -172,11 +160,6 @@ module Jkind_mod_bounds = struct
       then Nullability.min
       else t.nullability
     in
-    let separability =
-      if mem min_axes (Nonmodal Separability)
-      then Separability.min
-      else t.separability
-    in
     let monadic =
       Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
     in
@@ -189,7 +172,6 @@ module Jkind_mod_bounds = struct
       crossing;
       externality;
       nullability;
-      separability;
     }
 
   let[@inline] is_max_within_set t axes =
@@ -212,28 +194,23 @@ module Jkind_mod_bounds = struct
     (not (mem axes (Nonmodal Externality)) ||
      Externality.(le max (externality t))) &&
     (not (mem axes (Nonmodal Nullability)) ||
-     Nullability.(le max (nullability t))) &&
-    (not (mem axes (Nonmodal Separability)) ||
-     Separability.(le max (separability t)))
+     Nullability.(le max (nullability t)))
 
   let max =
     { crossing = Mode.Crossing.max;
       externality = Externality.max;
-      nullability = Nullability.max;
-      separability = Separability.max }
+      nullability = Nullability.max }
 
   let[@inline] is_max m = m = max
   let debug_print ppf
         { crossing;
           externality;
-          nullability;
-          separability } =
+          nullability } =
     Format.fprintf ppf "@[{ crossing = %a;@ externality = %a;@ \
-      nullability = %a;@ separability = %a }@]"
+      nullability = %a }@]"
       Crossing.print crossing
       Externality.print externality
       Nullability.print nullability
-      Separability.print separability
 end
 
 

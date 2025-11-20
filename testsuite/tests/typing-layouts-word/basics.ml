@@ -558,7 +558,7 @@ Line 1, characters 15-25:
 Error: Object field types must have layout value.
        The layout of "t_word" is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of "t_word" must be a sublayout of value
+       But the layout of "t_word" must be a sublayout of value separable
          because it's the type of an object field.
 |}];;
 
@@ -570,7 +570,7 @@ Line 1, characters 27-33:
 Error: Object field types must have layout value.
        The layout of "'a" is word
          because of the annotation on 'a in the declaration of the type t12_2.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must overlap with value separable
          because it's the type of an object field.
 |}]
 
@@ -582,7 +582,7 @@ Line 1, characters 21-53:
 Error: The method "x" has type "t_word" but is expected to have type "('a : value)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a sublayout of value
+       But the layout of t_word must be a sublayout of value separable
          because it's the type of an object field.
 |}];;
 
@@ -594,7 +594,7 @@ Line 2, characters 13-15:
 2 |   method x : 'a t_word_id -> 'a t_word_id = assert false
                  ^^
 Error: This type "('a : value)" should be an instance of type "('b : word)"
-       The layout of 'a is value
+       The layout of 'a is value separable
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with word
          because of the definition of t_word_id at line 2, characters 0-31.
@@ -608,7 +608,7 @@ Line 1, characters 25-26:
 Error: Variables bound in a class must have layout value.
        The layout of x is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a sublayout of value separable
          because it's the type of a class field.
 |}];;
 
@@ -621,7 +621,7 @@ Error: The method "x" has type "nativeint#" but is expected to have type
          "('a : value)"
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a sublayout of value
+       But the layout of nativeint# must be a sublayout of value separable
          because it's the type of an object field.
 |}];;
 
@@ -633,7 +633,7 @@ Line 1, characters 26-44:
 Error: Variables bound in a class must have layout value.
        The layout of x is word
          because it is the unboxed version of the primitive type nativeint.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a sublayout of value separable
          because it's the type of an instance variable.
 |}];;
 
@@ -645,7 +645,7 @@ Line 2, characters 10-12:
 2 |   val x : 'a t_word_id -> 'a t_word_id
               ^^
 Error: This type "('a : value)" should be an instance of type "('b : word)"
-       The layout of 'a is value
+       The layout of 'a is value separable
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with word
          because of the definition of t_word_id at line 2, characters 0-31.
@@ -758,5 +758,5 @@ Error: This expression has type "t_word" but an expression was expected of type
          "('a : value)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a sublayout of value.
+       But the layout of t_word must be a sublayout of value separable.
 |}];;

@@ -18,14 +18,14 @@ type t : immutable_data non_pointer
 type t : immutable_data non_pointer
 |}]
 
-type ('a : any non_pointer, 'b : any maybe_pointer, 'c : any) t;;
+type ('a : any non_pointer, 'b : any maybe_separable, 'c : any) t;;
 [%%expect{|
 type ('a : any non_pointer, 'b : any, 'c : any) t
 |}]
 
-type t : value non_pointer & value maybe_pointer & float64
+type t : value non_pointer & value maybe_separable & float64
 [%%expect{|
-type t : value non_pointer & value & float64
+type t : value non_pointer & value maybe_separable & float64
 |}]
 
 (* Checking non_pointer annotations, based on [typing-layouts-or-null/separability.ml]
@@ -34,7 +34,7 @@ type t : value non_pointer & value & float64
 
 (* Annotation on type parameters: *)
 
-type t_maybeptr : any maybe_pointer
+type t_maybeptr : any maybe_separable
 type t_nonptr : any non_pointer
 [%%expect{|
 type t_maybeptr : any
@@ -48,7 +48,7 @@ type t_maybeptr_val
 type t_nonptr_val : value non_pointer
 |}]
 
-type ('a : any maybe_pointer) accepts_maybeptr
+type ('a : any maybe_separable) accepts_maybeptr
 type ('a : any non_pointer) accepts_nonptr
 [%%expect{|
 type ('a : any) accepts_maybeptr
@@ -81,7 +81,7 @@ Line 1, characters 13-23:
 Error: This type "t_maybeptr" should be an instance of type
          "('a : any non_pointer)"
        The layout of t_maybeptr is any
-         because of the definition of t_maybeptr at line 1, characters 0-35.
+         because of the definition of t_maybeptr at line 1, characters 0-37.
        But the layout of t_maybeptr must be a sublayout of any non_pointer
          because of the definition of accepts_nonptr at line 2, characters 0-42.
 |}]
@@ -187,6 +187,13 @@ val g : 'a ('b : value non_pointer). 'a -> 'b = <fun>
 
 (* unboxed records *)
 
+type t_maybeptr_val : value maybe_separable
+type t_nonptr_val : value non_pointer
+[%%expect{|
+type t_maybeptr_val : value maybe_separable
+type t_nonptr_val : value non_pointer
+|}]
+
 type fails : value non_pointer = #{ a : t_maybeptr_val }
 [%%expect{|
 Line 1, characters 0-56:
@@ -209,7 +216,7 @@ type succeeds = #{ a : t_nonptr_val; b : t_nonptr_val; }
 
 (* Annotation on types in functions *)
 
-let f (a : (_ : any non_pointer)) (b : (_ : any maybe_pointer)) =
+let f (a : (_ : any non_pointer)) (b : (_ : any maybe_separable)) =
   let _unify_them = [ a; b ] in
   ()
 [%%expect{|
@@ -223,7 +230,7 @@ let f x =
 val f : ('a : value_or_null non_pointer). 'a -> unit = <fun>
 |}]
 
-let f (type a : value maybe_pointer) (x : a) =
+let f (type a : value maybe_separable) (x : a) =
   let require_np (y : (_ : value non_pointer)) = () in
   require_np y
 [%%expect{|
@@ -233,7 +240,7 @@ Line 3, characters 13-14:
 Error: Unbound value "y"
 |}]
 
-let f (type a : float64 maybe_pointer) (x : a) =
+let f (type a : float64 maybe_separable) (x : a) =
   let g (x : (_ : float64 non_pointer)) = () in
   g x
 [%%expect{|
@@ -241,7 +248,7 @@ val f : ('a : float64). 'a -> unit = <fun>
 |}]
 
 let f (type a : value non_pointer) (x : a) =
-  (* here, y is value maybe_pointer *)
+  (* here, y is value maybe_separable *)
   let g y = () in
   g x
 [%%expect{|
@@ -249,7 +256,7 @@ val f : ('a : value non_pointer). 'a -> unit = <fun>
 |}]
 
 let f (t : (_ : value non_pointer & value)) =
-  (* here, x is value maybe_pointer *)
+  (* here, x is value maybe_separable *)
   let g (type a : value non_pointer) (x : a) = () in
   let #(np, v) = t in
   g np
@@ -327,7 +334,7 @@ Error: Signature mismatch:
 module M1 : sig
   type ('a : value non_pointer) t : value
 end = struct
-  type ('a : value maybe_pointer) t = t_nonptr_val
+  type ('a : value maybe_separable) t = t_nonptr_val
 end
 [%%expect{|
 module M1 : sig type ('a : value non_pointer) t end
@@ -353,7 +360,7 @@ Error: Signature mismatch:
        is not included in
          type 'a t
        The problem is in the kinds of a parameter:
-       The layout of 'a is value
+       The layout of 'a is value separable
          because of the definition of t at line 2, characters 2-29.
        But the layout of 'a must be a sublayout of value non_pointer
          because of the definition of t at line 4, characters 2-39.
@@ -379,7 +386,7 @@ Error: Signature mismatch:
        is not included in
          type ('a : value non_pointer) t : value non_pointer
        The layout of the first is value
-         because of the definition of t_maybeptr_val at line 1, characters 0-41.
+         because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-53.
 |}]

@@ -610,7 +610,7 @@ end
 [%%expect{|
 module Result_u :
   sig
-    type ('a, 'b) t : value & value
+    type ('a, 'b) t : value non_pointer & value
     val to_result : ('a, 'b) t -> ('a, 'b) Result.t
     val of_result : ('a, 'b) Result.t -> ('a, 'b) t
   end
@@ -648,7 +648,8 @@ end
 [%%expect{|
 module Result_u_VV :
   sig
-    type ('a : value & value, 'b : value & value) t : value & (value & value)
+    type ('a : value & value, 'b : value & value) t
+      : value non_pointer & (value & value)
     val ok_exn : ('a : value & value) ('b : value & value). ('a, 'b) t -> 'a
     val error_exn :
       ('a : value & value) ('b : value & value). ('a, 'b) t -> 'b
@@ -670,7 +671,7 @@ Line 2, characters 18-20:
                       ^^
 Error: This type "('a : value & value)" should be an instance of type
          "('b : float64)"
-       The layout of 'a is value & value
+       The layout of 'a is value separable & value separable
          because of the annotation on 'a in the declaration of the type tag.
        But the layout of 'a must overlap with float64
          because of the annotation on 'c in the declaration of the type tag.
@@ -689,10 +690,11 @@ Error: Layout mismatch in final type declaration consistency check.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The layout of 'a is value
+         The layout of 'a is value separable
            because it instantiates an unannotated type parameter of tag,
            chosen to have layout value.
-         But the layout of 'a must overlap with value & value
+         But the layout of 'a must overlap with
+             value separable & value separable
            because of the annotation on 'a in the declaration of the type tag.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.

@@ -38,7 +38,7 @@ Error: Layout mismatch in final type declaration consistency check.
            because the .cmi file for my_list is missing.
          But the layout of 'a my_list my_list my_list my_list my_list my_list
                            my_list my_list my_list my_list my_list must be a sublayout of
-           value
+           value separable
            because it instantiates an unannotated type parameter of my_list,
            chosen to have layout value.
          No .cmi file found containing my_list.

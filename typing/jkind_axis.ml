@@ -122,37 +122,45 @@ end
 
 module Separability = struct
   type t =
+    | Non_pointer
     | Non_float
     | Separable
     | Maybe_separable
 
   let max = Maybe_separable
 
-  let min = Non_float
+  let min = Non_pointer
 
   let legacy = Separable
 
-  let equal s1 s2 =
-    match s1, s2 with
+  let equal p1 p2 =
+    match p1, p2 with
+    | Non_pointer, Non_pointer -> true
     | Non_float, Non_float -> true
     | Separable, Separable -> true
     | Maybe_separable, Maybe_separable -> true
-    | (Non_float | Separable | Maybe_separable), _ -> false
+    | (Non_pointer | Non_float | Separable | Maybe_separable), _ -> false
 
   let less_or_equal s1 s2 : Misc.Le_result.t =
     match s1, s2 with
+    | Non_pointer, Non_pointer -> Equal
+    | Non_pointer, (Non_float | Separable | Maybe_separable) -> Less
+    | Non_float, Non_pointer -> Not_le
     | Non_float, Non_float -> Equal
     | Non_float, (Separable | Maybe_separable) -> Less
-    | Separable, Non_float -> Not_le
+    | Separable, (Non_pointer | Non_float) -> Not_le
     | Separable, Separable -> Equal
     | Separable, Maybe_separable -> Less
-    | Maybe_separable, (Non_float | Separable) -> Not_le
+    | Maybe_separable, (Non_pointer | Non_float | Separable) -> Not_le
     | Maybe_separable, Maybe_separable -> Equal
 
-  let le s1 s2 = Misc.Le_result.is_le (less_or_equal s1 s2)
+  let le p1 p2 = Misc.Le_result.is_le (less_or_equal p1 p2)
 
-  let meet s1 s2 =
-    match s1, s2 with
+  let meet p1 p2 =
+    match p1, p2 with
+    | Non_pointer, (Non_pointer | Non_float | Separable | Maybe_separable)
+    | (Non_float | Separable | Maybe_separable), Non_pointer ->
+      Non_pointer
     | Non_float, (Non_float | Separable | Maybe_separable)
     | (Separable | Maybe_separable), Non_float ->
       Non_float
@@ -160,62 +168,22 @@ module Separability = struct
       Separable
     | Maybe_separable, Maybe_separable -> Maybe_separable
 
-  let join s1 s2 =
-    match s1, s2 with
-    | Maybe_separable, (Maybe_separable | Separable | Non_float)
-    | (Separable | Non_float), Maybe_separable ->
-      Maybe_separable
-    | Separable, (Separable | Non_float) | Non_float, Separable -> Separable
-    | Non_float, Non_float -> Non_float
-
-  let print ppf = function
-    | Non_float -> Format.fprintf ppf "non_float"
-    | Separable -> Format.fprintf ppf "separable"
-    | Maybe_separable -> Format.fprintf ppf "maybe_separable"
-end
-
-module Pointerness = struct
-  type t =
-    | Non_pointer
-    | Maybe_pointer
-
-  let max = Maybe_pointer
-
-  let min = Non_pointer
-
-  let legacy = Maybe_pointer
-
-  let equal p1 p2 =
-    match p1, p2 with
-    | Non_pointer, Non_pointer -> true
-    | Maybe_pointer, Maybe_pointer -> true
-    | (Non_pointer | Maybe_pointer), _ -> false
-
-  let less_or_equal p1 p2 : Misc.Le_result.t =
-    match p1, p2 with
-    | Non_pointer, Non_pointer -> Equal
-    | Non_pointer, Maybe_pointer -> Less
-    | Maybe_pointer, Non_pointer -> Not_le
-    | Maybe_pointer, Maybe_pointer -> Equal
-
-  let le p1 p2 = Misc.Le_result.is_le (less_or_equal p1 p2)
-
-  let meet p1 p2 =
-    match p1, p2 with
-    | Non_pointer, (Non_pointer | Maybe_pointer) | Maybe_pointer, Non_pointer ->
-      Non_pointer
-    | Maybe_pointer, Maybe_pointer -> Maybe_pointer
-
   let join p1 p2 =
     match p1, p2 with
-    | Maybe_pointer, (Maybe_pointer | Non_pointer) | Non_pointer, Maybe_pointer
-      ->
-      Maybe_pointer
+    | Maybe_separable, (Maybe_separable | Separable | Non_float | Non_pointer)
+    | (Separable | Non_float | Non_pointer), Maybe_separable ->
+      Maybe_separable
+    | Separable, (Separable | Non_float | Non_pointer)
+    | (Non_float | Non_pointer), Separable ->
+      Separable
+    | Non_float, (Non_float | Non_pointer) | Non_pointer, Non_float -> Non_float
     | Non_pointer, Non_pointer -> Non_pointer
 
   let to_string = function
     | Non_pointer -> "non_pointer"
-    | Maybe_pointer -> "maybe_pointer"
+    | Non_float -> "non_float"
+    | Separable -> "separable"
+    | Maybe_separable -> "maybe_separable"
 
   let print ppf t = Format.fprintf ppf "%s" (to_string t)
 
@@ -227,7 +195,6 @@ module Axis = struct
     type 'a t =
       | Externality : Externality.t t
       | Nullability : Nullability.t t
-      | Separability : Separability.t t
   end
 
   type 'a t =
@@ -249,8 +216,7 @@ module Axis = struct
       Pack (Modal (Monadic Staticity));
       (* CR-soon zqian: call [Mode.Crossing.Axis.all] for modal axes *)
       Pack (Nonmodal Externality);
-      Pack (Nonmodal Nullability);
-      Pack (Nonmodal Separability) ]
+      Pack (Nonmodal Nullability) ]
 
   let name (type a) : a t -> string = function
     | Modal ax ->
@@ -260,7 +226,6 @@ module Axis = struct
       Format.asprintf "%a" Mode.Value.Axis.print ax
     | Nonmodal Externality -> "externality"
     | Nonmodal Nullability -> "nullability"
-    | Nonmodal Separability -> "separability"
 end
 
 module Per_axis = struct
@@ -272,45 +237,38 @@ module Per_axis = struct
     let min : type a. a t -> a = function
       | Externality -> Externality.min
       | Nullability -> Nullability.min
-      | Separability -> Separability.min
 
     let max : type a. a t -> a = function
       | Externality -> Externality.max
       | Nullability -> Nullability.max
-      | Separability -> Separability.max
 
     let le : type a. a t -> a -> a -> bool =
      fun ax a b ->
       match ax with
       | Externality -> Externality.le a b
       | Nullability -> Nullability.le a b
-      | Separability -> Separability.le a b
 
     let meet : type a. a t -> a -> a -> a =
      fun ax a b ->
       match ax with
       | Externality -> Externality.meet a b
       | Nullability -> Nullability.meet a b
-      | Separability -> Separability.meet a b
 
     let join : type a. a t -> a -> a -> a =
      fun ax a b ->
       match ax with
       | Externality -> Externality.join a b
       | Nullability -> Nullability.join a b
-      | Separability -> Separability.join a b
 
     let print : type a. a t -> Format.formatter -> a -> unit = function
       | Externality -> Externality.print
       | Nullability -> Nullability.print
-      | Separability -> Separability.print
 
     let eq_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
      fun a b ->
       match a, b with
       | Externality, Externality -> Some Refl
       | Nullability, Nullability -> Some Refl
-      | Separability, Separability -> Some Refl
       | _ -> None
   end
 
@@ -376,7 +334,6 @@ module Axis_set = struct
     (* CR-soon zqian: call [Mode.Crossing.Axis.index] for modal axes *)
     | Nonmodal Externality -> 10
     | Nonmodal Nullability -> 11
-    | Nonmodal Separability -> 12
 
   let[@inline] axis_mask ax = 1 lsl axis_index ax
 
@@ -408,7 +365,6 @@ module Axis_set = struct
     |> set_axis (Modal (Monadic Staticity))
     |> set_axis (Nonmodal Externality)
     |> set_axis (Nonmodal Nullability)
-    |> set_axis (Nonmodal Separability)
 
   let all = create ~f:(fun ~axis:_ -> true)
 

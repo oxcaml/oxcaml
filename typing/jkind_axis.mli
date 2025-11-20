@@ -44,17 +44,10 @@ end
 
 module Separability : sig
   type t =
+    | Non_pointer
     | Non_float
     | Separable
     | Maybe_separable
-
-  include Axis_ops with type t := t
-end
-
-module Pointerness : sig
-  type t =
-    | Non_pointer
-    | Maybe_pointer
 
   (* CR layouts-scannable: This included module may get refined over time.
      There are more operations that make sense here. But also, this will
@@ -73,7 +66,6 @@ module Axis : sig
     type 'a t =
       | Externality : Externality.t t
       | Nullability : Nullability.t t
-      | Separability : Separability.t t
   end
 
   (** Represents an axis of a jkind *)

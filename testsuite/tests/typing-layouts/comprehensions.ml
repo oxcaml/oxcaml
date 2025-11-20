@@ -20,7 +20,7 @@ Error: This expression has type "Stdlib_upstream_compatible.Float_u.t" = "float#
        but an expression was expected of type "('a : value)"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
        But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
-         value
+         value separable
          because it's the element type of array comprehension.
 |}]
 
@@ -34,7 +34,7 @@ Error: This expression has type "('a : value)"
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
        But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
-         value
+         value separable
          because it's the element type of an array that is iterated over in a comprehension.
 |}]
 
@@ -64,6 +64,6 @@ Error: This expression has type "('a : value)"
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
        But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
-         value
+         value separable
          because it's the element type of a list that is iterated over in a comprehension.
 |}]

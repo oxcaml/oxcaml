@@ -39,7 +39,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "('a0 : void)"
        The layout of 'a is void
          because of the definition of t at line 10, characters 2-20.
-       But the layout of 'a must overlap with value
+       But the layout of 'a must overlap with value separable
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
 |}];;
@@ -58,7 +58,7 @@ Error: In this "with" constraint, the new definition of "s"
          type s
        The layout of the first is void
          because of the definition of t_void at line 5, characters 0-19.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a sublayout of value separable
          because of the definition of s at line 11, characters 2-8.
 |}]
 
@@ -122,9 +122,9 @@ Line 5, characters 25-30:
                              ^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "('a : immediate)"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-25.
 |}]
 
@@ -177,9 +177,9 @@ end;;
 Line 2, characters 2-29:
 2 |   type t : immediate = Bar3.t
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "Bar3.t" is value
+Error: The layout of type "Bar3.t" is value separable
          because of the annotation on the declaration of the type t.
-       But the kind of type "Bar3.t" must be a subkind of immediate
+       But the layout of type "Bar3.t" must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-29.
 |}];;
 
@@ -247,7 +247,7 @@ Line 12, characters 11-17:
 12 |   type s = Foo3.t t
                 ^^^^^^
 Error: This type "Foo3.t" should be an instance of type "('a : void)"
-       The layout of Foo3.t is value
+       The layout of Foo3.t is value separable
          because an abstract type has the value layout by default.
        But the layout of Foo3.t must be a sublayout of void
          because of the definition of t at line 10, characters 2-20.
@@ -300,7 +300,7 @@ Line 1, characters 11-15:
 1 | type t4' = M4.s t4_void;;
                ^^^^
 Error: This type "M4.s" should be an instance of type "('a : void)"
-       The layout of M4.s is value
+       The layout of M4.s is value non_float
          because of the definition of s at line 2, characters 2-21.
        But the layout of M4.s must be a sublayout of void
          because of the definition of t4_void at line 8, characters 0-24.
@@ -330,7 +330,7 @@ Line 1, characters 10-15:
 1 | type t4 = M4'.s t4_void;;
               ^^^^^
 Error: This type "M4'.s" should be an instance of type "('a : void)"
-       The layout of M4'.s is value
+       The layout of M4'.s is value non_pointer
          because of the definition of s at line 2, characters 2-45.
        But the layout of M4'.s must be a sublayout of void
          because of the definition of t4_void at line 8, characters 0-24.
@@ -363,9 +363,9 @@ Line 14, characters 17-23:
                       ^^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "('a : immediate)"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the definition of f at line 3, characters 2-20.
 |}]
 
@@ -385,9 +385,9 @@ Error: In this "with" constraint, the new definition of "t"
          type t = string
        is not included in
          type t : immediate
-       The kind of the first is immutable_data
+       The layout of the first is value non_float
          because it is the primitive type string.
-       But the kind of the first must be a subkind of immediate
+       But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-20.
 |}]
 
@@ -411,7 +411,7 @@ Error: In this "with" constraint, the new definition of "t"
          type t = int
        is not included in
          type t : void
-       The layout of the first is value
+       The layout of the first is value non_pointer
          because it is the primitive type int.
        But the layout of the first must be a sublayout of void
          because of the definition of t at line 2, characters 2-15.
@@ -437,7 +437,7 @@ Error: In this "with" constraint, the new definition of "t"
          type t
        The layout of the first is void
          because of the definition of t_void at line 5, characters 0-19.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a sublayout of value separable
          because of the definition of t at line 2, characters 2-16.
 |}];;
 
@@ -459,9 +459,9 @@ Error: In this "with" constraint, the new definition of "t"
          type t = string
        is not included in
          type t : immediate
-       The kind of the first is immutable_data
+       The layout of the first is value non_float
          because it is the primitive type string.
-       But the kind of the first must be a subkind of immediate
+       But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-20.
 |}];;
 
@@ -479,9 +479,9 @@ Error: In this "with" constraint, the new definition of "t"
          type t = s
        is not included in
          type t : immediate
-       The kind of the first is value
+       The layout of the first is value separable
          because of the definition of s at line 2, characters 2-8.
-       But the kind of the first must be a subkind of immediate
+       But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-20.
 |}];;
 

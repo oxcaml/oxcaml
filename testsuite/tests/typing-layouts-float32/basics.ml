@@ -253,7 +253,7 @@ Error: Layout mismatch in final type declaration consistency check.
        message, so we'll say this instead:
          The layout of 'a is float32
            because of the definition of t_float32_id at line 2, characters 0-37.
-         But the layout of 'a must overlap with value
+         But the layout of 'a must overlap with value separable
            because it instantiates an unannotated type parameter of t5_11,
            chosen to have layout value.
        A good next step is to add a layout annotation on a parameter to
@@ -609,7 +609,7 @@ Line 1, characters 15-28:
 Error: Object field types must have layout value.
        The layout of "t_float32" is float32
          because of the definition of t_float32 at line 1, characters 0-24.
-       But the layout of "t_float32" must be a sublayout of value
+       But the layout of "t_float32" must be a sublayout of value separable
          because it's the type of an object field.
 |}];;
 
@@ -621,7 +621,7 @@ Line 1, characters 30-36:
 Error: Object field types must have layout value.
        The layout of "'a" is float32
          because of the annotation on 'a in the declaration of the type t12_2.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must overlap with value separable
          because it's the type of an object field.
 |}]
 
@@ -634,7 +634,7 @@ Error: The method "x" has type "t_float32" but is expected to have type
          "('a : value)"
        The layout of t_float32 is float32
          because of the definition of t_float32 at line 1, characters 0-24.
-       But the layout of t_float32 must be a sublayout of value
+       But the layout of t_float32 must be a sublayout of value separable
          because it's the type of an object field.
 |}];;
 
@@ -646,7 +646,7 @@ Line 2, characters 13-15:
 2 |   method x : 'a t_float32_id -> 'a t_float32_id = assert false
                  ^^
 Error: This type "('a : value)" should be an instance of type "('b : float32)"
-       The layout of 'a is value
+       The layout of 'a is value separable
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with float32
          because of the definition of t_float32_id at line 2, characters 0-37.
@@ -660,7 +660,7 @@ Line 1, characters 25-26:
 Error: Variables bound in a class must have layout value.
        The layout of x is float32
          because of the definition of t_float32 at line 1, characters 0-24.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a sublayout of value separable
          because it's the type of a class field.
 |}];;
 
@@ -673,7 +673,7 @@ Error: The method "x" has type "float32#" but is expected to have type
          "('a : value)"
        The layout of float32# is float32
          because it is the unboxed version of the primitive type float32.
-       But the layout of float32# must be a sublayout of value
+       But the layout of float32# must be a sublayout of value separable
          because it's the type of an object field.
 |}];;
 
@@ -685,7 +685,7 @@ Line 1, characters 26-42:
 Error: Variables bound in a class must have layout value.
        The layout of x is float32
          because it is the unboxed version of the primitive type float32.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a sublayout of value separable
          because it's the type of an instance variable.
 |}];;
 
@@ -697,7 +697,7 @@ Line 2, characters 10-12:
 2 |   val x : 'a t_float32_id -> 'a t_float32_id
               ^^
 Error: This type "('a : value)" should be an instance of type "('b : float32)"
-       The layout of 'a is value
+       The layout of 'a is value separable
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with float32
          because of the definition of t_float32_id at line 2, characters 0-37.
@@ -810,7 +810,7 @@ Error: This expression has type "t_float32"
        but an expression was expected of type "('a : value)"
        The layout of t_float32 is float32
          because of the definition of t_float32 at line 1, characters 0-24.
-       But the layout of t_float32 must be a sublayout of value.
+       But the layout of t_float32 must be a sublayout of value separable.
 |}];;
 
 (***********************************************************)

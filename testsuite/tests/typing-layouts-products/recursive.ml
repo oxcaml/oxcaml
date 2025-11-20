@@ -53,9 +53,9 @@ Line 2, characters 0-37:
 2 | type bad = #{ bad : (int, bad) pair }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of bad is value & value
+       The layout of bad is value separable & value separable
          because of the definition of pair at line 1, characters 0-41.
-       But the layout of bad must be a sublayout of value
+       But the layout of bad must be a sublayout of value separable
          because of the definition of pair at line 1, characters 0-41.
 |}]
 
@@ -495,8 +495,8 @@ Line 3, characters 0-26:
 3 | and r = #{ x:int; y:bool }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The kind of r is value_or_null & float64
+       The layout of r is value & float64
          because it is an unboxed record.
-       But the kind of r must be a subkind of value & float64
+       But the layout of r must be a sublayout of value separable & float64
          because of the definition of t at line 1, characters 0-29.
 |}]

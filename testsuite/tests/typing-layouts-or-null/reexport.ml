@@ -71,9 +71,9 @@ Line 1, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The kind of 'a Or_null.t is value_or_null mod everything with 'a
+       The layout of 'a Or_null.t is value
          because it is the primitive type or_null.
-       But the kind of 'a Or_null.t must be a subkind of value
+       But the layout of 'a Or_null.t must be a sublayout of value separable
          because of the definition of t at line 2, characters 2-79.
 |}]
 
@@ -92,9 +92,9 @@ Line 4, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The kind of 'a Or_null.t is value_or_null mod everything with 'a
+       The layout of 'a Or_null.t is value
          because it is the primitive type or_null.
-       But the kind of 'a Or_null.t must be a subkind of value
+       But the layout of 'a Or_null.t must be a sublayout of value separable
          because of the definition of t at line 2, characters 2-45.
 |}]
 
@@ -106,9 +106,10 @@ type 'a t : value = 'a or_null [@@or_null_reexport]
 Line 1, characters 0-51:
 1 | type 'a t : value = 'a or_null [@@or_null_reexport]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a or_null" is value_or_null mod everything with 'a
+Error: The layout of type "'a or_null" is value
          because it is the primitive type or_null.
-       But the kind of type "'a or_null" must be a subkind of value
+       But the layout of type "'a or_null" must be a sublayout of
+           value separable
          because of the definition of t at line 1, characters 0-51.
 |}]
 
@@ -131,7 +132,7 @@ Line 1, characters 24-26:
 1 | type ('a : float64) t = 'a or_null [@@or_null_reexport]
                             ^^
 Error: This type "('a : float64)" should be an instance of type
-         "('b : value_or_null mod non_null)"
+         "('b : value maybe_separable)"
        The layout of 'a is float64
          because of the annotation on 'a in the declaration of the type t.
        But the layout of 'a must overlap with value
@@ -149,18 +150,17 @@ let fail = Or_null.This (Or_null.This 5)
 [%%expect{|
 module Or_null :
   sig
-    type ('a : value_or_null mod non_null) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
+    type ('a : value maybe_separable) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
   end
 Line 4, characters 24-40:
 4 | let fail = Or_null.This (Or_null.This 5)
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
-       but an expression was expected of type
-         "('b : value_or_null mod non_null)"
-       The kind of 'a Or_null.t is value_or_null mod everything with 'a
+       but an expression was expected of type "('b : value maybe_separable)"
+       The kind of 'a Or_null.t is immediate_or_null maybe_separable with 'a
          because it is the primitive type or_null.
        But the kind of 'a Or_null.t must be a subkind of
-           value_or_null mod non_null
+           value maybe_separable
          because of the definition of t at line 2, characters 2-63.
 |}]
 

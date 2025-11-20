@@ -94,9 +94,6 @@ module Modifier_axis_pair = struct
       | "internal" -> nonmodal Externality Internal
       | "external64" -> nonmodal Externality External64
       | "external_" -> nonmodal Externality External
-      | "maybe_separable" -> nonmodal Separability Maybe_separable
-      | "separable" -> nonmodal Separability Separable
-      | "non_float" -> nonmodal Separability Non_float
       | _ -> raise Not_found)
 end
 
@@ -121,6 +118,8 @@ module Transled_modifiers = struct
          different type operators applied on mode constants. *)
       externality : Jkind_axis.Externality.t Location.loc option;
       nullability : Jkind_axis.Nullability.t Location.loc option;
+      (* CR zeisbach: this is a temporary fix to support previous syntax,
+         The location is not really being used for anything currently... *)
       separability : Jkind_axis.Separability.t Location.loc option
     }
 
@@ -136,8 +135,8 @@ module Transled_modifiers = struct
       visibility = None;
       externality = None;
       nullability = None;
-      separability = None;
-      staticity = None
+      staticity = None;
+      separability = None
     }
 
   let get (type a) ~(axis : a Axis.t) (t : t) : a Location.loc option =
@@ -154,7 +153,6 @@ module Transled_modifiers = struct
     | Modal (Monadic Staticity) -> t.staticity
     | Nonmodal Externality -> t.externality
     | Nonmodal Nullability -> t.nullability
-    | Nonmodal Separability -> t.separability
 
   let set (type a) ~(axis : a Axis.t) (t : t) (value : a Location.loc option) :
       t =
@@ -171,9 +169,12 @@ module Transled_modifiers = struct
     | Modal (Monadic Staticity) -> { t with staticity = value }
     | Nonmodal Externality -> { t with externality = value }
     | Nonmodal Nullability -> { t with nullability = value }
-    | Nonmodal Separability -> { t with separability = value }
+
+  let set_separability t separability = { t with separability }
 end
 
+(* CR zeisbach: make this temporarily return scannable axes while both syntax
+   are supported, and push it into some jkinds! *)
 let transl_mod_bounds annots =
   let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
     match Modifier_axis_pair.of_string txt with
@@ -193,6 +194,21 @@ let transl_mod_bounds annots =
       Transled_modifiers.set ~axis bounds_so_far (Some { txt = mode; loc })
     | exception Not_found -> (
       match txt with
+      (* CR layouts-scannable: This should be removed once the new syntax for
+         separability is adopted. *)
+      (* CR zeisbach: this does not raise an error (or even a warning) for
+         duplicates. This can't easily be the same error as above (since
+         separability isn't an [Axis]), but we could add the
+         (triple-raised) warning here. Trying to spin something up first. *)
+      | "non_float" ->
+        Transled_modifiers.set_separability bounds_so_far
+          (Some { txt = Non_float; loc })
+      | "separable" ->
+        Transled_modifiers.set_separability bounds_so_far
+          (Some { txt = Separable; loc })
+      | "maybe_separable" ->
+        Transled_modifiers.set_separability bounds_so_far
+          (Some { txt = Maybe_separable; loc })
       | "everything" ->
         Transled_modifiers.
           { areality =
@@ -217,8 +233,7 @@ let transl_mod_bounds annots =
             staticity = None;
             nullability =
               Transled_modifiers.get ~axis:(Nonmodal Nullability) bounds_so_far;
-            separability =
-              Transled_modifiers.get ~axis:(Nonmodal Separability) bounds_so_far
+            separability = bounds_so_far.separability
           }
       | _ -> raise (Error (loc, Unrecognized_modifier (Modifier, txt))))
   in
@@ -302,10 +317,8 @@ let transl_mod_bounds annots =
     Option.fold ~some:Location.get_txt ~none:Nullability.max
       modifiers.nullability
   in
-  let separability =
-    Option.fold ~some:Location.get_txt ~none:Separability.max
-      modifiers.separability
-  in
+  (* CR zeisbach: before this was max, which made more sense because it was a
+     mod bound. but now this is actually setting the thing *)
   let monadic =
     Mode.Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
   in
@@ -314,7 +327,7 @@ let transl_mod_bounds annots =
       ~forkable ~yielding ~statefulness
   in
   let crossing : Crossing.t = { monadic; comonadic } in
-  create crossing ~externality ~nullability ~separability
+  create crossing ~externality ~nullability, modifiers.separability
 
 let default_mode_annots (annots : Alloc.Const.Option.t) =
   (* [forkable] has a different default depending on whether [areality]
