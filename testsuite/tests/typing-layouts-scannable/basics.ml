@@ -3,9 +3,6 @@
  expect;
 *)
 
-(* CR layouts-scannable: These tests should test out the built-ins once they
-   get updated to be appropriately non_pointer *)
-
 (* type declarations *)
 
 type t : value non_pointer
@@ -30,7 +27,7 @@ type t : value non_pointer & value maybe_separable & float64
 
 (* Checking non_pointer annotations, based on [typing-layouts-or-null/separability.ml]
    and [typing-jkind-bounds/annots.ml]. *)
-(* CR layouts-scannable: Once separability is a scannable axis, move these! *)
+(* CR zeisbach: Once separability is a scannable axis, move these! *)
 
 (* Annotation on type parameters: *)
 
@@ -131,6 +128,27 @@ type succeeds = float# accepts_maybeptr
 type succeeds = float# accepts_nonptr
 |}]
 
+(* [int] is in fact [non_pointer], since it is an [immediate] *)
+type succeeds = int accepts_nonptr
+type succeeds = int accepts_nonptr_val
+[%%expect{|
+type succeeds = int accepts_nonptr
+type succeeds = int accepts_nonptr_val
+|}]
+
+type fails = string accepts_nonptr_val
+[%%expect{|
+Line 1, characters 13-19:
+1 | type fails = string accepts_nonptr_val
+                 ^^^^^^
+Error: This type "string" should be an instance of type
+         "('a : value non_pointer)"
+       The layout of string is value non_float
+         because it is the primitive type string.
+       But the layout of string must be a sublayout of value non_pointer
+         because of the definition of accepts_nonptr_val at line 2, characters 0-48.
+|}]
+
 type succeeds = #(t_nonptr * t_maybeptr) accepts_maybeptr
 type succeeds = #(t_nonptr * t_maybeptr) accepts_nonptr
 type succeeds = #(t_nonptr_val * t_nonptr) accepts_nonptr
@@ -142,7 +160,7 @@ type succeeds = #(t_nonptr_val * t_nonptr) accepts_nonptr
 type succeeds = #(t_maybeptr_val * t_maybeptr) accepts_nonptr
 |}]
 
-(* CR layouts-scannable: There are versions of these tests that use [immediate]
+(* CR zeisbach: There are versions of these tests that use [immediate]
    instead of [value non_pointer]. Once [immediate] means that, these will be
    redundant and can probably be removed *)
 type 'a t = 'a accepts_nonptr
@@ -181,9 +199,6 @@ let g : (_ : value) -> (_ : value non_pointer) = fun _ -> assert false
 val f : ('a : value non_pointer) 'b. 'a -> 'b = <fun>
 val g : 'a ('b : value non_pointer). 'a -> 'b = <fun>
 |}]
-
-(* CR layouts-separability: Once [immediate] means [scannable non_pointer],
-   add tests for this behavior! *)
 
 (* unboxed records *)
 
@@ -396,4 +411,66 @@ let id' x = id x
 [%%expect{|
 external id : ('a : any non_pointer). 'a -> 'a = "%identity" [@@layout_poly]
 val id' : ('a : value_or_null non_pointer). 'a -> 'a = <fun>
+|}]
+
+(* legacy syntax for specifying scannable axes via mod bounds *)
+
+module M : sig
+  type t : value non_float
+end = struct
+  type t : value mod non_float
+end
+[%%expect{|
+module M : sig type t : value non_float end
+|}]
+
+(* CR zeisbach: this test used to test with the old mod bounds, since the
+   annotation would only _lower_ things. *)
+
+module M : sig
+  type t : value non_float
+end = struct
+  type t : immediate mod separable
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : immediate mod separable
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : immediate separable end
+       is not included in
+         sig type t : value non_float end
+       Type declarations do not match:
+         type t : immediate separable
+       is not included in
+         type t : value non_float
+       The layout of the first is value separable
+         because of the definition of t at line 4, characters 2-34.
+       But the layout of the first must be a sublayout of value non_float
+         because of the definition of t at line 2, characters 2-26.
+|}]
+
+(* CR zeisbach: mod syntax actually applys on individual components of a
+   product, which might be another change from the existing behavior??
+   but when i tested it, it looked like the existing behavior did this,
+   at least for non-modal axes. but it also seemed to throw some away. *)
+
+module M : sig
+  type t : value non_float & value non_float
+end = struct
+  type t : (value mod non_float) & (value mod non_float)
+end
+[%%expect{|
+module M : sig type t : value non_float & value non_float end
+|}]
+
+module M : sig
+  type t : (value & value) mod non_float
+end = struct
+  type t : (value mod non_float) & value
+end
+[%%expect{|
+module M : sig type t : value & value end
 |}]
