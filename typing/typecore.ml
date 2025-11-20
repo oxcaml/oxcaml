@@ -7112,7 +7112,8 @@ and type_expect_
               | [] ->
                 Jkind.of_new_sort_var ~why:Function_argument
               (* CR layouts v5: eliminate value requirement for tuple elements *)
-              | _ -> Jkind.Builtin.value_or_null ~why:Tuple_element, Jkind.Sort.scannable
+              | _ -> Jkind.Builtin.value_or_null ~why:Tuple_element,
+                     Jkind.Sort.scannable
             in
             loop slet.pbop_pat (newvar initial_jkind) initial_sort sands
           in

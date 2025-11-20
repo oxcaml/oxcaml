@@ -3422,8 +3422,8 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
           (* See comment on [force_toplevel] *)
           List.iter (fun vb ->
             match vb.vb_pat.pat_desc with
-            | Tpat_any ->
-              begin match Jkind.Sort.default_to_scannable_and_get vb.vb_sort with
+            | Tpat_any -> begin
+              match Jkind.Sort.default_to_scannable_and_get vb.vb_sort with
               | Base Scannable -> ()
               | Product _
               | Base (Void | Untagged_immediate | Float64 | Float32 | Word |

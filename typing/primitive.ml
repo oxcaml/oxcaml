@@ -892,10 +892,12 @@ let prim_has_valid_reprs ~loc prim =
       exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.word]
     | "%tag_int" ->
       exactly
-        [Same_as_ocaml_repr C.untagged_immediate; Same_as_ocaml_repr C.scannable]
+        [Same_as_ocaml_repr C.untagged_immediate;
+         Same_as_ocaml_repr C.scannable]
     | "%untag_int" ->
       exactly
-        [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.untagged_immediate]
+        [Same_as_ocaml_repr C.scannable;
+         Same_as_ocaml_repr C.untagged_immediate]
     | "%tag_int8" ->
       exactly [Same_as_ocaml_repr C.bits8; Same_as_ocaml_repr C.scannable]
     | "%untag_int8" ->

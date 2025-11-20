@@ -930,7 +930,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 event_before ~scopes expr2 (transl_exp ~scopes sort expr2))
   | Texp_while {wh_body; wh_body_sort; wh_cond} ->
       let wh_body_sort = Jkind.Sort.default_for_transl_and_get wh_body_sort in
-      let cond = transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable wh_cond in
+      let cond =
+        transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable wh_cond
+      in
       let body = transl_exp ~scopes wh_body_sort wh_body in
       Lwhile {
         wh_cond = maybe_region_layout layout_int cond;
@@ -945,8 +947,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         for_id;
         for_debug_uid;
         for_loc = of_location ~scopes e.exp_loc;
-        for_from = transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable for_from;
-        for_to = transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable for_to;
+        for_from = transl_exp ~scopes
+                     Jkind.Sort.Const.for_predef_scannable for_from;
+        for_to = transl_exp ~scopes
+                   Jkind.Sort.Const.for_predef_scannable for_to;
         for_dir;
         for_body = event_before ~scopes for_body
                      (maybe_region_layout layout_unit body);
@@ -1375,7 +1379,8 @@ and transl_guard ~scopes guard rhs_sort rhs =
   | None -> expr
   | Some cond ->
       event_before ~scopes cond
-        (Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable cond,
+        (Lifthenelse(transl_exp ~scopes
+                       Jkind.Sort.Const.for_predef_scannable cond,
                      expr, staticfail, layout))
 
 and transl_case ~scopes rhs_sort {c_lhs; c_guard; c_rhs} =
