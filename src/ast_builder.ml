@@ -202,8 +202,8 @@ module Default = struct
 
                 These attributes are always fine to drop -- they're a best-effort attempt
                 to encode extra location information -- and usually not fine to move.
-                That's because merlin expects certain invariants to hold between
-                the location encoded by the "merlin.loc" and locations of sub-ASTs.
+                That's because merlin expects certain invariants to hold between the
+                location encoded by the "merlin.loc" and locations of sub-ASTs.
              *)
              String.( <> ) attr.attr_name.txt "merlin.loc")
          in

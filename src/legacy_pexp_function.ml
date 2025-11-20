@@ -25,9 +25,8 @@ let of_pexp_function
   | { pparam_desc = first_param; pparam_loc } :: params, _ ->
     let body =
       match params, body with
-      (* The remaining body is still a valid function: we either
-           have more parameters in the list, or the body is function
-           cases (which implies a parameter).
+      (* The remaining body is still a valid function: we either have more parameters in
+         the list, or the body is function cases (which implies a parameter).
       *)
       | _ :: _, _ | [], Pfunction_cases _ ->
         let body_loc =
@@ -71,8 +70,8 @@ let of_parsetree expression =
     (fun (params, constraint_, body) -> of_pexp_function ~params ~constraint_ ~body)
     (Shim.Pexp_function.of_parsetree
        expression
-       (* This location is just filled in as the [Pfunction_cases] location,
-          and [of_pexp_function] drops that location.
+       (* This location is just filled in as the [Pfunction_cases] location, and
+          [of_pexp_function] drops that location.
        *)
        ~loc:Location.none)
 ;;
