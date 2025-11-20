@@ -140,8 +140,8 @@ let equal_args arg1 arg2 =
   | Mem addr1, Mem addr2 -> equal_addr addr1 addr2
   | Mem64_RIP (t1, s1, i1), Mem64_RIP (t2, s2, i2) ->
     equal_data_type t1 t2 && String.equal s1 s2 && i1 = i2
-  | ( (Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
-      | Mem _ | Mem64_RIP _),
+  | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
+      | Mem _ | Mem64_RIP _ ),
       _ ) ->
     false
 
@@ -260,8 +260,8 @@ let writes_to_arg target = function
     reg_is_written_by_arg target dst || equal_args target (Reg64 RAX)
   | PUSH _ | CMP _ | TEST _ | J _ | JMP _ | CALL _ | RET | LOCK_ADD _
   | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _
-  | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _
-    ->
+  | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE
+  | SIMD _ ->
     false
 
 let reads_from_arg target = function
@@ -317,7 +317,8 @@ let reads_from_arg target = function
   | POP dst -> reg_in_memory_address target dst
   | CLDEMOTE arg -> reg_appears_in_arg target arg
   | PREFETCH (_, _, arg) -> reg_appears_in_arg target arg
-  (* Conservative: assume SIMD, fences, and other instructions may read from target *)
+  (* Conservative: assume SIMD, fences, and other instructions may read from
+     target *)
   | RET | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE
   | SIMD _ ->
     true
