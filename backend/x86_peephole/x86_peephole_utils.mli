@@ -9,6 +9,11 @@ type next_occurrence =
   | ReadFound
   | NotFound
 
+(** Type for the result of applying a peephole rewrite rule *)
+type rule_result =
+  | No_match
+  | Matched of asm_line DLL.cell option
+
 (** Equality functions for x86_ast types *)
 
 val equal_reg64 : reg64 -> reg64 -> bool

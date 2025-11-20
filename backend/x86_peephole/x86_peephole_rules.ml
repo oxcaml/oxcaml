@@ -53,7 +53,7 @@ let peephole_stats_to_counters stats =
    moves (Regf) may zero upper bits depending on instruction encoding So we only
    optimize 8/16/64-bit integer register self-moves. *)
 let remove_mov_x_x stats cell =
-  match[@warning "-4"] DLL.value cell with
+  match DLL.value cell with
   | Ins (MOV (src, dst))
     when U.equal_args src dst && U.is_safe_self_move_arg src ->
     (* Get next cell before deleting *)
@@ -61,14 +61,15 @@ let remove_mov_x_x stats cell =
     (* Delete the redundant instruction *)
     DLL.delete_curr cell;
     stats.remove_mov_x_x <- stats.remove_mov_x_x + 1;
-    (* Continue from the next cell *) Some next
-  | _ -> None
+    (* Continue from the next cell *)
+    U.Matched next
+  | _ -> U.No_match
 
 (* Rewrite rule: remove useless MOV x, y; MOV y, x pattern *)
 let remove_useless_mov stats cell =
   match U.get_cells cell 2 with
   | [cell1; cell2] -> (
-    match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
+    match DLL.value cell1, DLL.value cell2 with
     | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2))
       when U.equal_args src1 dst2 && U.equal_args dst1 src2 ->
       (* Get the cell after cell2 before deleting *)
@@ -77,9 +78,9 @@ let remove_useless_mov stats cell =
       DLL.delete_curr cell2;
       stats.remove_useless_mov <- stats.remove_useless_mov + 1;
       (* Continue from the cell after the deleted one *)
-      Some after_cell2
-    | _, _ -> None)
-  | _ -> None
+      U.Matched after_cell2
+    | _, _ -> U.No_match)
+  | _ -> U.No_match
 
 (* Rewrite rule: combine adjacent ADD to RSP with CFI directives. Pattern: addq
    $n1, %rsp; .cfi_adjust_cfa_offset d1; addq $n2, %rsp; .cfi_adjust_cfa_offset
@@ -90,7 +91,7 @@ let remove_useless_mov stats cell =
 let combine_add_rsp stats cell =
   match U.get_cells cell 4 with
   | [cell1; cell2; cell3; cell4] -> (
-    match[@warning "-4"]
+    match
       DLL.value cell1, DLL.value cell2, DLL.value cell3, DLL.value cell4
     with
     | ( Ins (ADD (Imm n1, Reg64 RSP)),
@@ -115,9 +116,9 @@ let combine_add_rsp stats cell =
       DLL.delete_curr cell4;
       stats.combine_add_rsp <- stats.combine_add_rsp + 1;
       (* Return cell1 to allow iterative combination of multiple ADDs *)
-      Some (Some cell1)
-    | _, _, _, _ -> None)
-  | _ -> None
+      U.Matched (Some cell1)
+    | _, _, _, _ -> U.No_match)
+  | _ -> U.No_match
 
 (* Rewrite rule: optimize MOV chain that writes to intermediate register.
    Pattern: mov A, x; mov x, y; mov B, x Rewrite: mov A, y; mov B, x
@@ -130,7 +131,7 @@ let combine_add_rsp stats cell =
 let remove_mov_chain stats cell =
   match U.get_cells cell 3 with
   | [cell1; cell2; cell3] -> (
-    match[@warning "-4"] DLL.value cell1, DLL.value cell2, DLL.value cell3 with
+    match DLL.value cell1, DLL.value cell2, DLL.value cell3 with
     | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2)), Ins (MOV (src3, dst3))
       when U.equal_args dst1 src2 && U.equal_args dst1 dst3
            && (not (U.equal_args src3 dst3))
@@ -143,9 +144,9 @@ let remove_mov_chain stats cell =
       DLL.delete_curr cell3;
       stats.remove_mov_chain <- stats.remove_mov_chain + 1;
       (* Return cell1 to allow iterative combination of MOV chains *)
-      Some (Some cell1)
-    | _, _, _ -> None)
-  | _ -> None
+      U.Matched (Some cell1)
+    | _, _, _ -> U.No_match)
+  | _ -> U.No_match
 
 (* Rewrite rule: optimize MOV to register that is overwritten before use.
    Pattern: mov A, x; mov x, y where the next occurrence of x is a write.
@@ -159,7 +160,7 @@ let remove_mov_chain stats cell =
 let remove_mov_to_dead_register stats cell =
   match U.get_cells cell 2 with
   | [cell1; cell2] -> (
-    match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
+    match DLL.value cell1, DLL.value cell2 with
     | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2))
       when U.equal_args dst1 src2 && U.is_register dst1 && U.is_register dst2
            && U.is_safe_for_dead_register_opt dst1 -> (
@@ -174,12 +175,12 @@ let remove_mov_to_dead_register stats cell =
         stats.remove_mov_to_dead_register
           <- stats.remove_mov_to_dead_register + 1;
         (* Return cell1 to allow iterative combination *)
-        Some (Some cell1)
+        U.Matched (Some cell1)
       | ReadFound | NotFound ->
         (* x is read before write, or we can't determine - don't optimize *)
-        None)
-    | _, _ -> None)
-  | _ -> None
+        U.No_match)
+    | _, _ -> U.No_match)
+  | _ -> U.No_match
 
 (* Rewrite rule: optimize MOV sequence to XCHG. Pattern: mov %a, %b; mov %c, %a;
    mov %b, %c Rewrite: xchg %a, %c
@@ -192,7 +193,7 @@ let remove_mov_to_dead_register stats cell =
 let rewrite_mov_sequence_to_xchg stats cell =
   match U.get_cells cell 3 with
   | [cell1; cell2; cell3] -> (
-    match[@warning "-4"] DLL.value cell1, DLL.value cell2, DLL.value cell3 with
+    match DLL.value cell1, DLL.value cell2, DLL.value cell3 with
     | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2)), Ins (MOV (src3, dst3))
       -> (
       (* Pattern: mov %a, %b; mov %c, %a; mov %b, %c src1=%a, dst1=%b, src2=%c,
@@ -214,11 +215,11 @@ let rewrite_mov_sequence_to_xchg stats cell =
           stats.rewrite_mov_sequence_to_xchg
             <- stats.rewrite_mov_sequence_to_xchg + 1;
           (* Return the cell we modified *)
-          Some (Some cell1)
-        | NotFound | ReadFound -> None)
-      | _, _, _, _, _, _ -> None)
-    | _, _, _ -> None)
-  | _ -> None
+          U.Matched (Some cell1)
+        | NotFound | ReadFound -> U.No_match)
+      | _, _, _, _, _, _ -> U.No_match)
+    | _, _, _ -> U.No_match)
+  | _ -> U.No_match
 
 (* Helper function: Apply LEA optimization after pattern matching. Checks flag
    liveness, creates LEA instruction, and replaces the instruction sequence. *)
@@ -240,10 +241,10 @@ let apply_lea_optimization cell1 cell2 dst idx_reg base_reg_opt displ =
     DLL.set_value cell1 (Ins (LEA (mem_operand, dst)));
     DLL.delete_curr cell2;
     (* Return the cell we modified *)
-    Some (Some cell1)
+    U.Matched (Some cell1)
   | ReadFound | NotFound ->
     (* Flags might be live, don't optimize *)
-    None
+    U.No_match
 
 (* Rewrite rule: optimize MOV followed by ADD/SUB/INC/DEC to LEA. Patterns: -
    mov %a, %b; add $CONST, %b → lea CONST(%a), %b - mov %a, %b; sub $CONST, %b →
@@ -260,7 +261,7 @@ let apply_lea_optimization cell1 cell2 dst idx_reg base_reg_opt displ =
 let rewrite_mov_add_to_lea stats cell =
   match U.get_cells cell 2 with
   | [cell1; cell2] -> (
-    match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
+    match DLL.value cell1, DLL.value cell2 with
     | Ins (MOV (src1, dst1)), Ins (ADD (src2, dst2)) when U.equal_args dst1 dst2
       -> (
       (* Pattern: mov %a, %b; add $CONST, %b *)
@@ -272,10 +273,12 @@ let rewrite_mov_add_to_lea stats cell =
         (* Convert int64 to int - safe because we checked range *)
         let displ = Int64.to_int imm in
         let result = apply_lea_optimization cell1 cell2 dst1 a None displ in
-        if Option.is_some result
-        then stats.rewrite_mov_add_to_lea <- stats.rewrite_mov_add_to_lea + 1;
+        (match result with
+        | U.Matched _ ->
+          stats.rewrite_mov_add_to_lea <- stats.rewrite_mov_add_to_lea + 1
+        | U.No_match -> ());
         result
-      | _, _, _, _ -> None)
+      | _, _, _, _ -> U.No_match)
     | Ins (MOV (src1, dst1)), Ins (SUB (src2, dst2)) when U.equal_args dst1 dst2
       -> (
       (* Pattern: mov %a, %b; sub $CONST, %b *)
@@ -289,30 +292,36 @@ let rewrite_mov_add_to_lea stats cell =
         (* Negate the immediate: sub $CONST, %b becomes lea -CONST(%a), %b *)
         let displ = Int64.to_int (Int64.neg imm) in
         let result = apply_lea_optimization cell1 cell2 dst1 a None displ in
-        if Option.is_some result
-        then stats.rewrite_mov_add_to_lea <- stats.rewrite_mov_add_to_lea + 1;
+        (match result with
+        | U.Matched _ ->
+          stats.rewrite_mov_add_to_lea <- stats.rewrite_mov_add_to_lea + 1
+        | U.No_match -> ());
         result
-      | _, _, _, _ -> None)
+      | _, _, _, _ -> U.No_match)
     | Ins (MOV (src1, dst1)), Ins (INC dst2) when U.equal_args dst1 dst2 -> (
       (* Pattern: mov %a, %b; inc %b *)
       match src1, dst1, dst2 with
       | Reg64 a, Reg64 b, Reg64 b' when U.equal_reg64 b b' ->
         let result = apply_lea_optimization cell1 cell2 dst1 a None 1 in
-        if Option.is_some result
-        then stats.rewrite_mov_add_to_lea <- stats.rewrite_mov_add_to_lea + 1;
+        (match result with
+        | U.Matched _ ->
+          stats.rewrite_mov_add_to_lea <- stats.rewrite_mov_add_to_lea + 1
+        | U.No_match -> ());
         result
-      | _, _, _ -> None)
+      | _, _, _ -> U.No_match)
     | Ins (MOV (src1, dst1)), Ins (DEC dst2) when U.equal_args dst1 dst2 -> (
       (* Pattern: mov %a, %b; dec %b *)
       match src1, dst1, dst2 with
       | Reg64 a, Reg64 b, Reg64 b' when U.equal_reg64 b b' ->
         let result = apply_lea_optimization cell1 cell2 dst1 a None (-1) in
-        if Option.is_some result
-        then stats.rewrite_mov_add_to_lea <- stats.rewrite_mov_add_to_lea + 1;
+        (match result with
+        | U.Matched _ ->
+          stats.rewrite_mov_add_to_lea <- stats.rewrite_mov_add_to_lea + 1
+        | U.No_match -> ());
         result
-      | _, _, _ -> None)
-    | _, _ -> None)
-  | _ -> None
+      | _, _, _ -> U.No_match)
+    | _, _ -> U.No_match)
+  | _ -> U.No_match
 
 (* Rewrite rule: optimize MOV followed by ADD (register) to LEA. Pattern: mov
    %a, %b; add %c, %b Rewrite: lea (%a,%c), %b
@@ -329,7 +338,7 @@ let rewrite_mov_add_to_lea stats cell =
 let rewrite_mov_add_reg_to_lea stats cell =
   match U.get_cells cell 2 with
   | [cell1; cell2] -> (
-    match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
+    match DLL.value cell1, DLL.value cell2 with
     | Ins (MOV (src1, dst1)), Ins (ADD (src2, dst2)) when U.equal_args dst1 dst2
       -> (
       (* Pattern: mov %a, %b; add %c, %b *)
@@ -337,14 +346,15 @@ let rewrite_mov_add_reg_to_lea stats cell =
       | Reg64 a, Reg64 b, Reg64 c, Reg64 b'
         when U.equal_reg64 b b' && not (U.equal_reg64 b c) ->
         let result = apply_lea_optimization cell1 cell2 dst1 c (Some a) 0 in
-        if Option.is_some result
-        then
+        (match result with
+        | U.Matched _ ->
           stats.rewrite_mov_add_reg_to_lea
-            <- stats.rewrite_mov_add_reg_to_lea + 1;
+            <- stats.rewrite_mov_add_reg_to_lea + 1
+        | U.No_match -> ());
         result
-      | _, _, _, _ -> None)
-    | _, _ -> None)
-  | _ -> None
+      | _, _, _, _ -> U.No_match)
+    | _, _ -> U.No_match)
+  | _ -> U.No_match
 
 (* Find a redundant CMP instruction with the same operands. Returns Some cell if
    found, None otherwise. *)
@@ -358,7 +368,7 @@ let find_redundant_cmp src dst start_cell =
         if U.is_control_flow instr
         then None
         else
-          match[@warning "-4"] instr with
+          match instr with
           | CMP (src2, dst2) when U.equal_args src src2 && U.equal_args dst dst2
             ->
             (* Found a redundant CMP! *)
@@ -386,7 +396,7 @@ let find_redundant_cmp src dst start_cell =
    written between the two CMPs (but can be read) - No control flow or hard
    barriers between the CMPs *)
 let remove_redundant_cmp stats cell =
-  match[@warning "-4"] DLL.value cell with
+  match DLL.value cell with
   | Ins (CMP (src, dst)) -> (
     (* Only optimize register-register comparisons to avoid aliasing issues *)
     match src, dst with
@@ -399,41 +409,22 @@ let remove_redundant_cmp stats cell =
         DLL.delete_curr redundant_cell;
         stats.remove_redundant_cmp <- stats.remove_redundant_cmp + 1;
         (* Return the first CMP cell to allow iterative removal *)
-        Some (Some cell)
-      | None -> None)
-    | _, _ -> None)
-  | _ -> None
+        U.Matched (Some cell)
+      | None -> U.No_match)
+    | _, _ -> U.No_match)
+  | _ -> U.No_match
 
-(* Apply all rewrite rules in sequence. Returns Some continuation_cell if a rule
-   matched, None otherwise. *)
-let apply_rules stats cell =
-  match remove_mov_x_x stats cell with
-  | Some cont -> Some cont
-  | None -> (
-    match remove_useless_mov stats cell with
-    | Some cont -> Some cont
-    | None -> (
-      match remove_mov_chain stats cell with
-      | Some cont -> Some cont
-      | None -> (
-        match remove_mov_to_dead_register stats cell with
-        | Some cont -> Some cont
-        | None -> (
-          match rewrite_mov_sequence_to_xchg stats cell with
-          | Some cont -> Some cont
-          | None -> (
-            match rewrite_mov_add_to_lea stats cell with
-            | Some cont -> Some cont
-            | None -> (
-              match rewrite_mov_add_reg_to_lea stats cell with
-              | Some cont -> Some cont
-              | None -> (
-                match remove_redundant_cmp stats cell with
-                | Some cont -> Some cont
-                | None -> (
-                  match combine_add_rsp stats cell with
-                  | Some cont -> Some cont
-                  | None -> None))))))))
-
-(* Public interface for applying rules *)
-let apply stats cell = apply_rules stats cell
+(* Apply all rewrite rules in sequence using a pipeline. *)
+let apply stats cell =
+  let[@inline always] if_no_match f result =
+    match result with U.Matched _ -> result | U.No_match -> f stats cell
+  in
+  U.No_match |> if_no_match remove_mov_x_x
+  |> if_no_match remove_useless_mov
+  |> if_no_match remove_mov_chain
+  |> if_no_match remove_mov_to_dead_register
+  |> if_no_match rewrite_mov_sequence_to_xchg
+  |> if_no_match rewrite_mov_add_to_lea
+  |> if_no_match rewrite_mov_add_reg_to_lea
+  |> if_no_match remove_redundant_cmp
+  |> if_no_match combine_add_rsp

@@ -1,5 +1,6 @@
 [@@@ocaml.warning "+a-30-40-41-42"]
 
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 module DLL = Oxcaml_utils.Doubly_linked_list
 module R = X86_peephole_rules
 module U = X86_peephole_utils
@@ -17,10 +18,10 @@ let peephole_optimize_asm_program stats asm_program =
         optimize_from (DLL.next cell)
       else
         match R.apply stats cell with
-        | Some continuation_cell ->
+        | U.Matched continuation_cell ->
           (* A rule was applied, continue from the continuation point *)
           optimize_from continuation_cell
-        | None ->
+        | U.No_match ->
           (* No rule matched, move to the next instruction *)
           optimize_from (DLL.next cell))
   in

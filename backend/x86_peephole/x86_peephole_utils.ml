@@ -9,6 +9,10 @@ type next_occurrence =
   | ReadFound
   | NotFound
 
+type rule_result =
+  | No_match
+  | Matched of asm_line DLL.cell option
+
 let equal_reg64 left right =
   match left, right with
   | RAX, RAX
