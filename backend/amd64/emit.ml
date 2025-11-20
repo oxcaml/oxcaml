@@ -734,9 +734,7 @@ let instr_for_intop = function
   | Ilsl -> I.sal
   | Ilsr -> I.shr
   | Iasr -> I.sar
-  | Idiv | Imod | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ | Iadd128
-  | Isub128 | Imul128 _ ->
-    assert false
+  | Idiv | Imod | Ipopcnt | Imulh _ | Iclz _ | Ictz _ | Icomp _ -> assert false
 
 let instr_for_floatop (width : Cmm.float_width) op =
   let open Simd_instrs in
@@ -2153,14 +2151,14 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Intop (Idiv | Imod)) ->
     I.cqo ();
     I.idiv (arg i 1)
-  | Lop (Intop Iadd128) ->
+  | Lop (Int128op Iadd128) ->
     I.add (arg i 2) (res i 0);
     I.adc (arg i 3) (res i 1)
-  | Lop (Intop Isub128) ->
+  | Lop (Int128op Isub128) ->
     I.sub (arg i 2) (res i 0);
     I.sbb (arg i 3) (res i 1)
-  | Lop (Intop (Imul128 { signed = true })) -> I.imul (arg i 1) None
-  | Lop (Intop (Imul128 { signed = false })) -> I.mul (arg i 1)
+  | Lop (Int128op (Imul64 { signed = true })) -> I.imul (arg i 1) None
+  | Lop (Int128op (Imul64 { signed = false })) -> I.mul (arg i 1)
   | Lop (Intop ((Ilsl | Ilsr | Iasr) as op)) ->
     (* We have i.arg.(0) = i.res.(0) and i.arg.(1) = %rcx *)
     instr_for_intop op cl (res i 0)

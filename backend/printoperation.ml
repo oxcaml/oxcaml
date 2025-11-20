@@ -56,6 +56,11 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
       fprintf ppf "%a%s%a" reg arg.(0)
         (Operation.string_of_integer_operation op)
         reg arg.(1))
+  | Int128op op ->
+    assert (Array.length arg = 2);
+    fprintf ppf "%a%s%a" reg arg.(0)
+      (Operation.string_of_int128_operation op)
+      reg arg.(1)
   | Intop_imm (op, n) ->
     fprintf ppf "%a%s%i" reg arg.(0)
       (Operation.string_of_integer_operation op)

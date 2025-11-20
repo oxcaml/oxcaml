@@ -159,6 +159,7 @@ let is_move_basic : Cfg.basic -> bool =
     | Load _ -> false
     | Store _ -> false
     | Intop _ -> false
+    | Int128op _ -> false
     | Intop_imm _ -> false
     | Intop_atomic _ -> false
     | Floatop _ -> false

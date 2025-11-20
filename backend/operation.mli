@@ -60,15 +60,21 @@ type integer_operation =
   | Ictz of { arg_is_non_zero : bool }
   | Ipopcnt
   | Icomp of integer_comparison
+
+type int128_operation =
   | Iadd128
   | Isub128
-  | Imul128 of { signed : bool }
+  | Imul64 of { signed : bool }
 
 val string_of_integer_operation : integer_operation -> string
+
+val string_of_int128_operation : int128_operation -> string
 
 val is_unary_integer_operation : integer_operation -> bool
 
 val equal_integer_operation : integer_operation -> integer_operation -> bool
+
+val equal_int128_operation : int128_operation -> int128_operation -> bool
 
 type float_comparison = Cmm.float_comparison
 
@@ -141,6 +147,7 @@ type t =
       }
   | Store of Cmm.memory_chunk * Arch.addressing_mode * bool
   | Intop of integer_operation
+  | Int128op of int128_operation
   | Intop_imm of integer_operation * int
   | Intop_atomic of
       { op : Cmm.atomic_op;

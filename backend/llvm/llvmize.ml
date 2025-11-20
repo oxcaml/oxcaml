@@ -899,10 +899,6 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
     | Iclz _ -> do_unary_intrinsic_extra_args "ctlz" [V.of_int ~typ:T.i1 0]
     | Ictz _ -> do_unary_intrinsic_extra_args "cttz" [V.of_int ~typ:T.i1 0]
     | Ipopcnt -> do_unary_intrinsic "ctpop"
-    (* CR-soon mslater for gyorsh: implement these in llvm intrinsics *)
-    | Iadd128 -> failwith "TODO"
-    | Isub128 -> failwith "TODO"
-    | Imul128 { signed = _ } -> failwith "TODO"
   in
   store_into_reg t i.res.(0) res
 
@@ -934,6 +930,14 @@ let float_op t (i : Cfg.basic Cfg.instruction) (width : Cmm.float_width)
       emit_ins t (I.convert Zext ~arg:bool_res ~to_:T.i64)
   in
   store_into_reg t i.res.(0) res
+
+let int128_op _t (i : Cfg.basic Cfg.instruction)
+    (op : Operation.int128_operation) =
+  (* CR-soon mslater for gyorsh: implement these in llvm intrinsics *)
+  match op with
+  | Iadd128 -> not_implemented_basic ~msg:"Iadd128" i
+  | Isub128 -> not_implemented_basic ~msg:"Isub128" i
+  | Imul64 { signed = _ } -> not_implemented_basic ~msg:"Imul64" i
 
 (* CR yusumez: add a generic Cfg instruction for bswap *)
 let bswap t (i : Cfg.basic Cfg.instruction) (bitwidth : Arch.bswap_bitwidth) =
@@ -1229,6 +1233,7 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
   | Store (memory_chunk, addressing_mode, _is_modify) ->
     store t i memory_chunk addressing_mode
   | Intop op -> int_op t i op ~imm:None
+  | Int128op op -> int128_op t i op
   | Intop_imm (op, n) -> int_op t i op ~imm:(Some n)
   | Floatop (width, op) -> float_op t i width op
   | Begin_region ->

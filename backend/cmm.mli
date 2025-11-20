@@ -402,7 +402,7 @@ type operation =
   | Cmodi
   | Caddi128
   | Csubi128
-  | Cmuli128 of { signed : bool }
+  | Cmuli64 of { signed : bool }
   | Cand
   | Cor
   | Cxor

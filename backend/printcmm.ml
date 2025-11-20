@@ -279,7 +279,7 @@ let operation d = function
   | Cmodi -> "mod"
   | Caddi128 -> "+128"
   | Csubi128 -> "-128"
-  | Cmuli128 { signed } -> "*128" ^ if signed then "" else "u"
+  | Cmuli64 { signed } -> "*128" ^ if signed then "" else "u"
   | Cand -> "and"
   | Cor -> "or"
   | Cxor -> "xor"

@@ -824,9 +824,7 @@ let instr_for_int_operation = function
   | Ilsl -> I.LSL
   | Ilsr -> I.LSR
   | Iasr -> I.ASR
-  | Iclz _ | Ictz _ | Ipopcnt | Icomp _ | Imod | Imulh _ | Iadd128 | Isub128
-  | Imul128 _ ->
-    assert false
+  | Iclz _ | Ictz _ | Ipopcnt | Icomp _ | Imod | Imulh _ -> assert false
 
 (* Decompose an integer constant into four 16-bit shifted fragments. Omit the
    fragments that are equal to "default" (16 zeros or 16 ones). *)
@@ -1061,7 +1059,7 @@ let num_call_gc_points instr =
         | Dls_get | Tls_get | Const_int _ | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
         | Store (_, _, _)
-        | Intop _
+        | Intop _ | Int128op _
         | Intop_imm (_, _)
         | Intop_atomic _
         | Floatop (_, _)
@@ -1134,7 +1132,7 @@ module BR = Branch_relaxation.Make (struct
           | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
           | Load _
           | Store (_, _, _)
-          | Intop _
+          | Intop _ | Int128op _
           | Intop_imm (_, _)
           | Intop_atomic _
           | Floatop (_, _)
@@ -1241,11 +1239,8 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Floatop (Float64, Icompf _)) -> 2
     | Lop (Floatop (Float32, Icompf _)) -> 2
     | Lop (Intop_imm (Icomp _, _)) -> 2
+    | Lop (Int128op (Iadd128 | Isub128 | Imul64 _)) -> 2
     | Lop (Intop Imod) -> 2
-    | Lop
-        ( Intop (Iadd128 | Isub128 | Imul128 _)
-        | Intop_imm ((Iadd128 | Isub128 | Imul128 _), _) ) ->
-      2
     | Lop (Intop (Imulh _)) -> 1
     | Lop (Intop (Iclz _)) -> 1
     | Lop (Intop (Ictz _)) -> if !Arch.feat_cssc then 1 else 2
@@ -1996,7 +1991,7 @@ let emit_instr i =
          DSL.emit_reg i.arg.(0);
          DSL.emit_reg i.arg.(1)
       |]
-  | Lop (Intop Iadd128) ->
+  | Lop (Int128op Iadd128) ->
     DSL.ins I.ADDS
       [| DSL.emit_reg reg_tmp1;
          DSL.emit_reg i.arg.(0);
@@ -2008,7 +2003,7 @@ let emit_instr i =
          DSL.emit_reg i.arg.(3)
       |];
     DSL.ins I.MOV [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_tmp1 |]
-  | Lop (Intop Isub128) ->
+  | Lop (Int128op Isub128) ->
     DSL.ins I.SUBS
       [| DSL.emit_reg reg_tmp1;
          DSL.emit_reg i.arg.(0);
@@ -2020,7 +2015,7 @@ let emit_instr i =
          DSL.emit_reg i.arg.(3)
       |];
     DSL.ins I.MOV [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_tmp1 |]
-  | Lop (Intop (Imul128 { signed = true })) ->
+  | Lop (Int128op (Imul64 { signed = true })) ->
     DSL.ins I.MUL
       [| DSL.emit_reg reg_tmp1;
          DSL.emit_reg i.arg.(0);
@@ -2032,7 +2027,7 @@ let emit_instr i =
          DSL.emit_reg i.arg.(1)
       |];
     DSL.ins I.MOV [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_tmp1 |]
-  | Lop (Intop (Imul128 { signed = false })) ->
+  | Lop (Int128op (Imul64 { signed = false })) ->
     DSL.ins I.MUL
       [| DSL.emit_reg reg_tmp1;
          DSL.emit_reg i.arg.(0);

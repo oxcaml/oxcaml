@@ -606,10 +606,10 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Stackoffset _
        | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr
                | Iasr | Ipopcnt | Iclz _ | Ictz _
-               | Iadd128 | Isub128 | Imul128 _)
+               )
+       | Int128op (Iadd128 | Isub128 | Imul64 _)
        | Intop_imm ((Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl
-                    | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ | Iadd128
-                    | Isub128 | Imul128 _),_)
+                    | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ ),_)
        | Floatop _
        | Csel _
        | Reinterpret_cast _
@@ -750,7 +750,7 @@ let operation_supported = function
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
-  | Caddi128 | Csubi128 | Cmuli128 _
+  | Caddi128 | Csubi128 | Cmuli64 _
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
   | Ccsel _
   | Cbswap _
