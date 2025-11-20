@@ -160,6 +160,23 @@ type succeeds = #(t_nonptr_val * t_nonptr) accepts_nonptr
 type succeeds = #(t_maybeptr_val * t_maybeptr) accepts_nonptr
 |}]
 
+type succeeds = t_nonptr array
+type succeeds = t_nonptr_val array
+type fails = t_maybeptr_val array
+[%%expect{|
+type succeeds = t_nonptr array
+type succeeds = t_nonptr_val array
+Line 3, characters 13-27:
+3 | type fails = t_maybeptr_val array
+                 ^^^^^^^^^^^^^^
+Error: This type "t_maybeptr_val" should be an instance of type
+         "('a : any separable)"
+       The layout of t_maybeptr_val is value
+         because of the definition of t_maybeptr_val at line 1, characters 0-43.
+       But the layout of t_maybeptr_val must be a sublayout of any separable
+         because it's the type argument to the array type.
+|}]
+
 (* CR zeisbach: There are versions of these tests that use [immediate]
    instead of [value non_pointer]. Once [immediate] means that, these will be
    redundant and can probably be removed *)
