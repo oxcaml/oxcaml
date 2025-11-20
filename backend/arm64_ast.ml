@@ -560,7 +560,7 @@ module Instruction_name = struct
     | RET -> "ret"
     | YIELD -> "yield"
     | MRS -> "mrs"
-    | CRC32 -> "crc32"
+    | CRC32 -> "crc32cx"
     (* neon *)
     | MOV -> "mov"
     | MOVI -> "movi"
