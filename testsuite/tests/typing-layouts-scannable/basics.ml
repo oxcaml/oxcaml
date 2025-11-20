@@ -491,3 +491,12 @@ end
 [%%expect{|
 module M : sig type t : value & value end
 |}]
+
+module M : sig
+  type t : value non_float
+end = struct
+  type t : value mod separable mod non_float
+end
+[%%expect{|
+module M : sig type t : value non_float end
+|}]

@@ -537,7 +537,7 @@ and type_origin =
   | Existential of string
 
 and mixed_block_element =
-  | Value
+  | Scannable
   | Float_boxed
   | Float64
   | Float32
@@ -876,7 +876,7 @@ let compare_tag t1 t2 =
 
 let rec equal_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Value, Value | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
+  | Scannable, Scannable | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16
   | Bits32, Bits32 | Bits64, Bits64
@@ -885,14 +885,14 @@ let rec equal_mixed_block_element e1 e2 =
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
-  | ( Value | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
+  | ( Scannable | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
     | Product _ | Void ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Value, Value | Float_boxed, Float_boxed
+  | Scannable, Scannable | Float_boxed, Float_boxed
   | Float64, Float64 | Float32, Float32
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
@@ -901,8 +901,8 @@ let rec compare_mixed_block_element e1 e2 =
     -> 0
   | Product es1, Product es2
     -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
-  | Value, _ -> -1
-  | _, Value -> 1
+  | Scannable, _ -> -1
+  | _, Scannable -> 1
   | Float_boxed, _ -> -1
   | _, Float_boxed -> 1
   | Float64, _ -> -1
@@ -1069,7 +1069,7 @@ let signature_item_id = function
     -> id
 
 let rec mixed_block_element_to_string = function
-  | Value -> "Value"
+  | Scannable -> "Scannable"
   | Float_boxed -> "Float_boxed"
   | Float32 -> "Float32"
   | Float64 -> "Float64"
@@ -1090,7 +1090,7 @@ let rec mixed_block_element_to_string = function
   | Void -> "Void"
 
 let mixed_block_element_to_lowercase_string = function
-  | Value -> "value"
+  | Scannable -> "scannable"
   | Float_boxed -> "float"
   | Float32 -> "float32"
   | Float64 -> "float64"

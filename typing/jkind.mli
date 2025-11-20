@@ -622,19 +622,19 @@ end
 (** Get a description of a jkind. *)
 val get : 'd Types.jkind -> 'd Desc.t
 
-(** [get_layout_defaulting_to_value] extracts a constant layout, defaulting
-    any sort variable to [value]. *)
-val get_layout_defaulting_to_value : 'd Types.jkind -> Layout.Const.t
+(** [get_layout_defaulting_to_scannable] extracts a constant layout, defaulting
+    any sort variable to [scannable]. *)
+val get_layout_defaulting_to_scannable : 'd Types.jkind -> Layout.Const.t
 
 (** [get_const] returns a [Const.t] if the layout has no sort variables,
     returning [None] otherwise *)
 val get_const : 'd Types.jkind -> 'd Const.t option
 
-(** [default_to_value t] is [ignore (get_layout_defaulting_to_value t)] *)
-val default_to_value : 'd Types.jkind -> unit
+(** [default_to_scannable t] is [ignore (get_layout_defaulting_to_scannable t)] *)
+val default_to_scannable : 'd Types.jkind -> unit
 
-(** [is_void t] is [Void = get_layout_defaulting_to_value t].  In particular, it
-    will default the jkind to value if needed to make this false. *)
+(** [is_void t] is [Void = get_layout_defaulting_to_scannable t].  In particular, it
+    will default the jkind to scannable if needed to make this false. *)
 val is_void_defaulting : 'd Types.jkind -> bool
 (* CR layouts v5: When we have proper support for void, we'll want to change
    these three functions to default to void - it's the most efficient thing

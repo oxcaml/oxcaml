@@ -3403,8 +3403,8 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         in
         if force_toplevel then
           (* See comment on [force_toplevel]. *)
-          begin match Jkind.Sort.default_to_value_and_get sort with
-          | Base Value -> ()
+          begin match Jkind.Sort.default_to_scannable_and_get sort with
+          | Base Scannable -> ()
           | Product _
           | Base (Void | Untagged_immediate | Float64 | Float32 | Word |
                  Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
@@ -3423,8 +3423,8 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
           List.iter (fun vb ->
             match vb.vb_pat.pat_desc with
             | Tpat_any ->
-              begin match Jkind.Sort.default_to_value_and_get vb.vb_sort with
-              | Base Value -> ()
+              begin match Jkind.Sort.default_to_scannable_and_get vb.vb_sort with
+              | Base Scannable -> ()
               | Product _
               | Base (Void | Untagged_immediate | Float64 | Float32 | Word |
                      Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 |
@@ -3444,7 +3444,7 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
                    (* CR layouts v5: this jkind check has the effect of
                       defaulting the sort of top-level bindings to value, which
                       will change. *)
-                   if not Jkind.Sort.(equate sort value)
+                   if not Jkind.Sort.(equate sort scannable)
                    then raise (Error (loc, env,
                                    Toplevel_nonvalue (Ident.name id,sort)))
                 )

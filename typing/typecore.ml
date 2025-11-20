@@ -3028,7 +3028,7 @@ and type_pat_aux
       let p = if c1 <= c2 then loop c1 c2 else loop c2 c1 in
       let p = {p with ppat_loc=loc} in
       type_pat tps category p expected_ty
-        Jkind.Sort.(of_const Const.for_predef_value)
+        Jkind.Sort.(of_const Const.for_predef_scannable)
         (* TODO: record 'extra' to remember about interval *)
   | Ppat_interval _ ->
       raise (Error (loc, !!penv, Invalid_interval))
@@ -6390,7 +6390,7 @@ and type_expect_
           | Record_mixed mixed -> begin
               match mixed.(label.lbl_pos) with
               | Float_boxed -> true
-              | Float64 | Float32 | Value | Bits8 | Bits16 | Bits32 | Bits64
+              | Float64 | Float32 | Scannable | Bits8 | Bits16 | Bits32 | Bits64
               | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Void
               | Product _ ->
                 false
@@ -7097,7 +7097,7 @@ and type_expect_
             let loc = Location.ghostify slet.pbop_op.loc in
             let spat_acc = Ast_helper.Pat.tuple ~loc [None, spat_acc; None, spat] Closed in
             let ty_acc = newty (Ttuple [None, ty_acc; None, ty]) in
-            loop spat_acc ty_acc Jkind.Sort.value rest
+            loop spat_acc ty_acc Jkind.Sort.scannable rest
       in
       let op_path, op_desc, op_type, spat_params, ty_params, param_sort,
           ty_func_result, body_sort, ty_result, op_result_sort,
@@ -7112,7 +7112,7 @@ and type_expect_
               | [] ->
                 Jkind.of_new_sort_var ~why:Function_argument
               (* CR layouts v5: eliminate value requirement for tuple elements *)
-              | _ -> Jkind.Builtin.value_or_null ~why:Tuple_element, Jkind.Sort.value
+              | _ -> Jkind.Builtin.value_or_null ~why:Tuple_element, Jkind.Sort.scannable
             in
             loop slet.pbop_pat (newvar initial_jkind) initial_sort sands
           in
@@ -7513,7 +7513,7 @@ and type_block_access env expected_base_ty principal
       | Record_mixed mixed ->
         begin match mixed.(label.lbl_pos) with
         | Float_boxed -> true
-        | Float64 | Float32 | Value | Bits8 | Bits16 | Bits32 | Bits64
+        | Float64 | Float32 | Scannable | Bits8 | Bits16 | Bits32 | Bits64
         | Vec128 | Vec256 | Vec512 | Word | Product _ | Void
         | Untagged_immediate ->
           false
@@ -8672,10 +8672,10 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
             in
             (* CR layouts v5: change value assumption below when we allow
                non-values in structures. *)
-            make_args ((l, Arg (ty, Jkind.Sort.value)) :: args) ty_fun
+            make_args ((l, Arg (ty, Jkind.Sort.scannable)) :: args) ty_fun
         | Tarrow ((l,_marg,_mret),_,ty_fun,_) when is_position l ->
             let arg = src_pos (Location.ghostify sarg.pexp_loc) [] env in
-            make_args ((l, Arg (arg, Jkind.Sort.value)) :: args) ty_fun
+            make_args ((l, Arg (arg, Jkind.Sort.scannable)) :: args) ty_fun
         | Tarrow ((l,_,_),_,ty_res',_) when l = Nolabel || !Clflags.classic ->
             List.rev args, ty_fun, no_labels ty_res'
         | Tvar _ ->  List.rev args, ty_fun, false
@@ -8796,7 +8796,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         (* The sort of the let-bound variable, which here is always a function
            (observe it is passed to [func], which builds an application of
            it). *)
-        Jkind.Sort.value
+        Jkind.Sort.scannable
       in
       re { texp with exp_type = ty_fun;
              exp_desc =
@@ -9304,7 +9304,7 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
     let expected_ty = instance Predef.type_unit in
     with_explanation explanation (fun () ->
       unify_exp env exp expected_ty);
-    exp, Jkind.Sort.value
+    exp, Jkind.Sort.scannable
   else begin
     (* We're requiring the statement to have a representable jkind.  But that
        doesn't actually rule out things like "assert false"---we'll just end up

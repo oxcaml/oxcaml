@@ -47,7 +47,7 @@ module Sort : sig
   (* Comments in [Jkind_intf.ml] *)
   type base =
     | Void
-    | Value
+    | Scannable
     | Untagged_immediate
     | Float64
     | Float32

@@ -138,7 +138,7 @@ type 'a classification =
 let classify ~classify_product env ty sort : _ classification =
   let ty = scrape_ty env ty in
   match (sort : Jkind.Sort.Const.t) with
-  | Base Value -> begin
+  | Base Scannable -> begin
   (* CR or_null: [immediate_or_null] arrays can be intarrays once that is
      supported by the middle-end *)
   if Ctype.is_always_gc_ignorable env ty
@@ -220,7 +220,7 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
      this to traverse the type, rather than just the kind, or to add product
      kinds. *)
   match s with
-  | Base Value -> Paddr_scannable
+  | Base Scannable -> Paddr_scannable
   | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word |
           Untagged_immediate | Vec128 | Vec256 | Vec512) as c ->
     raise (Error (loc, Mixed_product_array (c, elt_ty_for_error)))
@@ -234,7 +234,7 @@ let rec ignorable_product_array_kind loc sorts =
 
 and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
   match s with
-  | Base Value -> Pint_ignorable
+  | Base Scannable -> Pint_ignorable
   | Base Float64 -> Punboxedfloat_ignorable Unboxed_float64
   | Base Float32 -> Punboxedfloat_ignorable Unboxed_float32
   | Base Bits8 -> Punboxedoruntaggedint_ignorable Untagged_int8
@@ -401,7 +401,7 @@ let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
       (kind, layout)
 
 let value_kind_of_value_jkind env jkind =
-  let layout = Jkind.get_layout_defaulting_to_value jkind in
+  let layout = Jkind.get_layout_defaulting_to_scannable jkind in
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
      the principality check, as we're just trying to compute optimizations. *)
   let context = Ctype.mk_jkind_context_always_principal env in
@@ -410,7 +410,7 @@ let value_kind_of_value_jkind env jkind =
   in
   match layout with
   (* CR layouts-scannable: use scannable axes to improve codegen *)
-  | Base (Value, _) ->
+  | Base (Scannable, _) ->
     value_kind_of_value_with_externality externality_upper_bound
   | Any _
   | Product _
@@ -707,7 +707,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty
   : int * unit Lambda.mixed_block_element =
   match field with
-  | Value ->
+  | Scannable ->
     begin match ty with
     | Some ty ->
       let num_nodes_visited, kind =
@@ -1016,7 +1016,7 @@ let transl_mixed_block_element env loc ty mbe =
 
 let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   : Jkind.Sort.Const.t -> _ = function
-  | Base Value -> Lambda.Pvalue (Lazy.force value_kind)
+  | Base Scannable -> Lambda.Pvalue (Lazy.force value_kind)
   | Base Float64 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_float Unboxed_float64
   | Base Word when Language_extension.(is_at_least Layouts Stable) ->
@@ -1064,7 +1064,7 @@ let layout env loc sort ty =
   layout_of_const_sort_generic sort
     ~value_kind:(lazy (value_kind env loc ty))
     ~error:(function
-      | Base Value -> assert false
+      | Base Scannable -> assert false
       | Base Void as const ->
         raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                    Alpha,
@@ -1086,7 +1086,7 @@ let layout env loc sort ty =
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)
     ~error:(function
-    | Base Value -> assert false
+    | Base Scannable -> assert false
     | Base Void as const ->
       raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                  Alpha,

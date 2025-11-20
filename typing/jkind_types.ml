@@ -15,7 +15,7 @@
 module Sort = struct
   type base =
     | Void
-    | Value
+    | Scannable
     | Untagged_immediate
     | Float64
     | Float32
@@ -41,7 +41,7 @@ module Sort = struct
   let equal_base b1 b2 =
     match b1, b2 with
     | Void, Void
-    | Value, Value
+    | Scannable, Scannable
     | Untagged_immediate, Untagged_immediate
     | Float64, Float64
     | Float32, Float32
@@ -54,13 +54,13 @@ module Sort = struct
     | Vec256, Vec256
     | Vec512, Vec512 ->
       true
-    | ( ( Void | Value | Untagged_immediate | Float64 | Float32 | Word | Bits8
-        | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ),
+    | ( ( Void | Scannable | Untagged_immediate | Float64 | Float32 | Word
+        | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ),
         _ ) ->
       false
 
   let to_string_base = function
-    | Value -> "value"
+    | Scannable -> "scannable"
     | Void -> "void"
     | Untagged_immediate -> "untagged_immediate"
     | Float64 -> "float64"
@@ -97,12 +97,12 @@ module Sort = struct
     let rec all_void = function
       | Base Void -> true
       | Base
-          ( Value | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
+          ( Scannable | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
           | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 ) ->
         false
       | Product ts -> List.for_all all_void ts
 
-    let value = Base Value
+    let scannable = Base Scannable
 
     let untagged_immediate = Base Untagged_immediate
 
@@ -135,7 +135,7 @@ module Sort = struct
             Format.fprintf ppf "%s"
               (match b with
               | Void -> "Void"
-              | Value -> "Value"
+              | Scannable -> "Scannable"
               | Untagged_immediate -> "Untagged_immediate"
               | Float64 -> "Float64"
               | Float32 -> "Float32"
@@ -156,55 +156,55 @@ module Sort = struct
         pp_element ~nested:false ppf c
     end
 
-    let for_function = value
+    let for_function = scannable
 
-    let for_predef_value = value
+    let for_predef_scannable = scannable
 
-    let for_block_element = value
+    let for_block_element = scannable
 
-    let for_probe_body = value
+    let for_probe_body = scannable
 
-    let for_poly_variant = value
+    let for_poly_variant = scannable
 
-    let for_boxed_record = value
+    let for_boxed_record = scannable
 
-    let for_object = value
+    let for_object = scannable
 
-    let for_lazy_body = value
+    let for_lazy_body = scannable
 
-    let for_tuple_element = value
+    let for_tuple_element = scannable
 
-    let for_variant_arg = value
+    let for_variant_arg = scannable
 
-    let for_instance_var = value
+    let for_instance_var = scannable
 
-    let for_class_arg = value
+    let for_class_arg = scannable
 
-    let for_method = value
+    let for_method = scannable
 
-    let for_initializer = value
+    let for_initializer = scannable
 
-    let for_module = value
+    let for_module = scannable
 
-    let for_tuple = value
+    let for_tuple = scannable
 
-    let for_array_get_result = value
+    let for_array_get_result = scannable
 
-    let for_array_comprehension_element = value
+    let for_array_comprehension_element = scannable
 
-    let for_list_element = value
+    let for_list_element = scannable
 
     let for_idx = bits64
 
-    let for_loop_index = value
+    let for_loop_index = scannable
 
-    let for_constructor = value
+    let for_constructor = scannable
 
-    let for_module_field = value
+    let for_module_field = scannable
 
-    let for_boxed_variant = value
+    let for_boxed_variant = scannable
 
-    let for_exception = value
+    let for_exception = scannable
   end
 
   module Var = struct
@@ -238,7 +238,7 @@ module Sort = struct
       fprintf ppf "%s"
         (match b with
         | Void -> "Void"
-        | Value -> "Value"
+        | Scannable -> "Scannable"
         | Untagged_immediate -> "Untagged_immediate"
         | Float64 -> "Float64"
         | Float32 -> "Float32"
@@ -291,7 +291,7 @@ module Sort = struct
     module T = struct
       let void = Base Void
 
-      let value = Base Value
+      let scannable = Base Scannable
 
       let untagged_immediate = Base Untagged_immediate
 
@@ -317,7 +317,7 @@ module Sort = struct
 
       let of_base = function
         | Void -> void
-        | Value -> value
+        | Scannable -> scannable
         | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
         | Float32 -> float32
@@ -336,7 +336,7 @@ module Sort = struct
     end
 
     module T_option = struct
-      let value = Some T.value
+      let scannable = Some T.scannable
 
       let void = Some T.void
 
@@ -364,7 +364,7 @@ module Sort = struct
 
       let of_base = function
         | Void -> void
-        | Value -> value
+        | Scannable -> scannable
         | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
         | Float32 -> float32
@@ -388,7 +388,7 @@ module Sort = struct
     module Const = struct
       open Const
 
-      let value = Base Value
+      let scannable = Base Scannable
 
       let void = Base Void
 
@@ -415,7 +415,7 @@ module Sort = struct
       let vec512 = Base Vec512
 
       let of_base : base -> Const.t = function
-        | Value -> value
+        | Scannable -> scannable
         | Void -> void
         | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
@@ -453,25 +453,25 @@ module Sort = struct
         (* path compression *)
         result)
 
-  let rec default_to_value_and_get : t -> Const.t = function
+  let rec default_to_scannable_and_get : t -> Const.t = function
     | Base b -> Static.Const.of_base b
-    | Product ts -> Product (List.map default_to_value_and_get ts)
+    | Product ts -> Product (List.map default_to_scannable_and_get ts)
     | Var r -> (
       match r.contents with
       | None ->
-        set r Static.T_option.value;
-        Static.Const.value
+        set r Static.T_option.scannable;
+        Static.Const.scannable
       | Some s ->
-        let result = default_to_value_and_get s in
+        let result = default_to_scannable_and_get s in
         set r (Static.T_option.of_const result);
         (* path compression *)
         result)
 
   (* CR layouts v12: Default to void instead. *)
-  let default_for_transl_and_get s = default_to_value_and_get s
+  let default_for_transl_and_get s = default_to_scannable_and_get s
 
   let is_possibly_scannable s =
-    match get s with Base Value | Var _ -> true | _ -> false
+    match get s with Base Scannable | Var _ -> true | _ -> false
 
   (***********************)
   (* equality *)
@@ -587,11 +587,11 @@ module Sort = struct
 
   let is_void_defaulting t =
     (* CR layouts v5: this should probably default to void now *)
-    match default_to_value_and_get t with
+    match default_to_scannable_and_get t with
     | Base Void -> true
     | Base
-        ( Value | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
-        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
+        ( Scannable | Untagged_immediate | Float64 | Float32 | Word | Bits8
+        | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
       false
     | Product _ -> false
 
