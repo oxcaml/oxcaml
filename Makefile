@@ -73,6 +73,10 @@ DISTCLEAN_FILES = \
   stdlib/runtime.info \
   stdlib/target_runtime.info \
   stdlib/sys.ml \
+  runtime/caml/exec.h \
+  runtime/caml/m.h \
+  runtime/caml/s.h \
+  runtime/caml/version.h \
   runtime4/caml/exec.h \
   runtime4/caml/m.h \
   runtime4/caml/s.h \
