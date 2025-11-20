@@ -73,7 +73,7 @@
 
 (copy_files# backend/llvm/*.ml{,i})
 
-(copy_files# backend/peephole/*.ml{,i})
+(copy_files# backend/cfg_peephole/*.ml{,i})
 
 (copy_files# backend/x86_peephole/*.ml{,i})
 
