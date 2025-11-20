@@ -1276,10 +1276,16 @@ module X86_peephole = struct
 end
 
 let generate_code asm =
-  (* Apply peephole optimizations to asm_code. TODO: Extend this to optimize all
-     sections in asm_code_by_section, not just asm_code. *)
+  (* Apply peephole optimizations to all sections *)
   if !Oxcaml_flags.x86_peephole_optimize
-  then X86_peephole.peephole_optimize_asm_program asm_code;
+  then (
+    X86_peephole.peephole_optimize_asm_program asm_code;
+    Section_name.Tbl.iter
+      (fun _name section -> X86_peephole.peephole_optimize_asm_program section)
+      asm_code_by_section;
+    Section_name.Tbl.iter
+      (fun _name section -> X86_peephole.peephole_optimize_asm_program section)
+      delayed_sections);
   (match asm with
   | Some f -> Profile.record ~accumulate:true "write_asm" f asm_code
   | None -> ());
