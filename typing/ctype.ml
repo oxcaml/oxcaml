@@ -1703,6 +1703,23 @@ let instance_poly ?(keep_names=false) univars sch =
     vars escape the scope. To resolve this, we substitute all occurrences of
     them with a [Tof_kind]. *)
 let instance_poly_for_jkind univars sch =
+  (* Note [Tunivar best-ness]
+     ~~~~~~~~~~~~~~~~~~~~~~~~
+     [Tof_kind]s are always treated as having "best" quality. We've exhaustively
+     looked through all the ways in which [Tpoly] is used in the compiler, and
+     as of the time of writing this comment, it can only occur as the type of:
+      - a let binding / value description
+      - a function parameter
+      - a record field
+      - a method of a class/object
+      In all these cases, it is true that we can never learn more about the
+      type, so it's sound to give it "best".
+
+      But it's also plausible that in the future we will decide to assign
+      mod-bounds to the jkind of a [Tunivar]. Since we do not do this but still
+      mark "best", this change could cause some programs to stop type-checking.
+      But we think the probability of people writing such programs is low, so
+      it should be easy to cross that bridge if/when we come to it. *)
   (* Replace a univar in [sch] with a [Tof_jkind]s. *)
   let copy_var ty =
     match get_desc ty with
@@ -2483,7 +2500,12 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
        [Tof_kind]s. *)
     instance_poly_for_jkind univars ty
     |> estimate_type_jkind ~expand_component ~ignore_mod_bounds env
-  | Tof_kind jkind -> Jkind.mark_best jkind
+  | Tof_kind jkind ->
+    (* A [Tof_kind] is substitued for existential [Tvar]s or [Tunivar]s bound in
+       a [Tpoly] that would escape their scope. In both cases, we can never
+       learn more about about the type of the [Tvar] or [Tunivar] (see note
+       [Tunivar best-ness]), so it is safe to mark is as best. *)
+    Jkind.mark_best jkind
   | Tpackage _ -> Jkind.for_non_float ~why:First_class_module
 
 let estimate_type_jkind_unwrapped
