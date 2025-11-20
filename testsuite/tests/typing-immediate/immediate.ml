@@ -143,9 +143,10 @@ end;;
 Line 2, characters 2-31:
 2 |   type t = string [@@immediate]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "string" is value non_float
+Error: The layout of type "string" is scannable non_float
          because it is the primitive type string.
-       But the layout of type "string" must be a sublayout of value non_pointer
+       But the layout of type "string" must be a sublayout of
+           scannable non_pointer
          because of the definition of t at line 2, characters 2-31.
 |}];;
 (* CR layouts v2.9: The "of the definition of t ..." part is not great and it
@@ -160,9 +161,9 @@ end;;
 Line 2, characters 2-41:
 2 |   type t = Foo of int | Bar [@@immediate]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t" is value non_float
+Error: The layout of type "t" is scannable non_float
          because it's a boxed variant type.
-       But the layout of type "t" must be a sublayout of value non_pointer
+       But the layout of type "t" must be a sublayout of scannable non_pointer
          because of the annotation on the declaration of the type t.
 |}];;
 
@@ -174,9 +175,9 @@ end;;
 Line 2, characters 2-38:
 2 |   type t = { foo : int } [@@immediate]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t" is value non_float
+Error: The layout of type "t" is scannable non_float
          because it's a boxed record type.
-       But the layout of type "t" must be a sublayout of value non_pointer
+       But the layout of type "t" must be a sublayout of scannable non_pointer
          because of the annotation on the declaration of the type t.
 |}];;
 
@@ -189,9 +190,9 @@ end;;
 Line 3, characters 2-26:
 3 |   type s = t [@@immediate]
       ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t" is value separable
+Error: The layout of type "t" is scannable separable
          because of the definition of t at line 2, characters 2-8.
-       But the layout of type "t" must be a sublayout of value non_pointer
+       But the layout of type "t" must be a sublayout of scannable non_pointer
          because of the definition of s at line 3, characters 2-26.
 |}];;
 
@@ -213,9 +214,10 @@ Error: Signature mismatch:
          type t = string
        is not included in
          type t : immediate
-       The layout of the first is value non_float
+       The layout of the first is scannable non_float
          because it is the primitive type string.
-       But the layout of the first must be a sublayout of value non_pointer
+       But the layout of the first must be a sublayout of
+           scannable non_pointer
          because of the definition of t at line 1, characters 15-35.
 |}];;
 
@@ -231,9 +233,10 @@ Error: Signature mismatch:
          type t = string
        is not included in
          type t : immediate
-       The layout of the first is value non_float
+       The layout of the first is scannable non_float
          because it is the primitive type string.
-       But the layout of the first must be a sublayout of value non_pointer
+       But the layout of the first must be a sublayout of
+           scannable non_pointer
          because of the definition of t at line 1, characters 20-40.
 |}];;
 
@@ -248,9 +251,9 @@ Error: Modules do not match: sig type t = string end is not included in
        type t = string
      is not included in
        type t : immediate
-     The layout of the first is value non_float
+     The layout of the first is scannable non_float
        because it is the primitive type string.
-     But the layout of the first must be a sublayout of value non_pointer
+     But the layout of the first must be a sublayout of scannable non_pointer
        because of the definition of t at line 1, characters 20-40.
 |}];;
 
@@ -263,9 +266,9 @@ end;;
 Line 2, characters 2-26:
 2 |   type t = s [@@immediate]
       ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "s" is value non_float
+Error: The layout of type "s" is scannable non_float
          because it is the primitive type string.
-       But the layout of type "s" must be a sublayout of value non_pointer
+       But the layout of type "s" must be a sublayout of scannable non_pointer
          because of the definition of t at line 2, characters 2-26.
 |}];;
 

@@ -77,7 +77,7 @@ Line 1, characters 4-14:
 1 | let disallowed = #{ f = #3.14; i = 0 }
         ^^^^^^^^^^
 Error: Types of top-level module bindings must have layout "value", but
-       the type of "disallowed" has layout "float64 & value".
+       the type of "disallowed" has layout "float64 & scannable".
 |}]
 
 ;;
@@ -87,7 +87,7 @@ Line 1, characters 0-20:
 1 | #{ f = #3.14; i = 0};;
     ^^^^^^^^^^^^^^^^^^^^
 Error: Types of unnamed expressions must have layout value when using
-       the toplevel, but this expression has layout "float64 & value".
+       the toplevel, but this expression has layout "float64 & scannable".
 |}]
 
 (* However, we can have a top-level unboxed record if its kind is value *)
@@ -253,7 +253,7 @@ Error:
            '_representable_layout_1 & '_representable_layout_2
          because it is an unboxed record.
        But the layout of r_bad must be a sublayout of
-           value separable & float64 & value separable
+           scannable separable & float64 & scannable separable
          because of the definition of t1 at line 1, characters 0-38.
 |}]
 
@@ -339,9 +339,9 @@ Error: Signature mismatch:
          type t = #{ s : string; r : string; }
        is not included in
          type t
-       The layout of the first is value non_float & value non_float
+       The layout of the first is scannable non_float & scannable non_float
          because of the definition of t at line 4, characters 2-36.
-       But the layout of the first must be a sublayout of value separable
+       But the layout of the first must be a sublayout of scannable separable
          because of the definition of t at line 2, characters 2-8.
 |}]
 
@@ -439,7 +439,7 @@ Error: Layout mismatch in final type declaration consistency check.
        message, so we'll say this instead:
          The layout of 'a is float64
            because of the definition of t_float64_id at line 1, characters 0-37.
-         But the layout of 'a must overlap with value separable
+         But the layout of 'a must overlap with scannable separable
            because it instantiates an unannotated type parameter of t,
            chosen to have layout value.
        A good next step is to add a layout annotation on a parameter to

@@ -261,9 +261,9 @@ type t : immediate_or_null maybe_separable
 Line 2, characters 0-20:
 2 | type bad : value = t
     ^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t" is value
+Error: The layout of type "t" is scannable
          because of the definition of t at line 1, characters 0-37.
-       But the layout of type "t" must be a sublayout of value separable
+       But the layout of type "t" must be a sublayout of scannable separable
          because of the definition of bad at line 2, characters 0-20.
 |}]
 

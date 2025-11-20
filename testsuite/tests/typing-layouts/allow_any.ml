@@ -48,7 +48,7 @@ type t : float64 mod contended = { mutable contents : string }
 Lines 1-2, characters 0-34:
 1 | type t : float64 mod contended = { mutable contents : string }
 2 | [@@unsafe_allow_any_mode_crossing]
-Error: The layout of type "t" is value non_float
+Error: The layout of type "t" is scannable non_float
          because it's a boxed record type.
        But the layout of type "t" must be a sublayout of float64
          because of the annotation on the declaration of the type t.

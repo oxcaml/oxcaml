@@ -112,7 +112,7 @@ Error: This expression has type "t_vec128"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_vec128 is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of t_vec128 must be a sublayout of value
+       But the layout of t_vec128 must be a sublayout of scannable
          because it's the type of a tuple element.
 |}];;
 
@@ -125,7 +125,7 @@ Error: This expression has type "'a t_vec128_id" = "('a : vec128)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_vec128_id is vec128
          because of the definition of t_vec128_id at line 2, characters 0-35.
-       But the layout of 'a t_vec128_id must be a sublayout of value
+       But the layout of 'a t_vec128_id must be a sublayout of scannable
          because it's the type of a tuple element.
 |}];;
 
@@ -138,7 +138,7 @@ Error: This expression has type "int64x2#"
        but an expression was expected of type "('a : value_or_null)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of value
+       But the layout of int64x2# must be a sublayout of scannable
          because it's the type of a tuple element.
 |}];;
 
@@ -150,7 +150,7 @@ Line 1, characters 12-20:
 Error: Tuple element types must have layout value.
        The layout of "t_vec128" is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of "t_vec128" must be a sublayout of value
+       But the layout of "t_vec128" must be a sublayout of scannable
          because it's the type of a tuple element.
 |}];;
 
@@ -162,7 +162,7 @@ Line 1, characters 18-26:
 Error: Tuple element types must have layout value.
        The layout of "int64x2#" is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of "int64x2#" must be a sublayout of value
+       But the layout of "int64x2#" must be a sublayout of scannable
          because it's the type of a tuple element.
 |}];;
 
@@ -174,7 +174,7 @@ Line 1, characters 26-28:
 Error: Tuple element types must have layout value.
        The layout of "'a" is vec128
          because of the annotation on 'a in the declaration of the type t4_6.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must overlap with scannable
          because it's the type of a tuple element.
 |}];;
 
@@ -187,7 +187,7 @@ Line 1, characters 45-47:
 Error: Tuple element types must have layout value.
        The layout of "'a" is vec128
          because of the annotation on 'a in the declaration of the type t4_7.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must overlap with scannable
          because it's the type of a tuple element.
 |}]
 
@@ -262,7 +262,7 @@ Line 1, characters 31-39:
 Error: This type signature for "x" is not a value type.
        The layout of type t_vec128 is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of type t_vec128 must be a sublayout of value
+       But the layout of type t_vec128 must be a sublayout of scannable
          because it's the type of something stored in a module structure.
 |}];;
 
@@ -274,7 +274,7 @@ Line 1, characters 31-45:
 Error: This type signature for "x" is not a value type.
        The layout of type 'a t_vec128_id is vec128
          because of the definition of t_vec128_id at line 2, characters 0-35.
-       But the layout of type 'a t_vec128_id must be a sublayout of value
+       But the layout of type 'a t_vec128_id must be a sublayout of scannable
          because it's the type of something stored in a module structure.
 |}];;
 
@@ -286,7 +286,7 @@ Line 1, characters 31-39:
 Error: This type signature for "x" is not a value type.
        The layout of type int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of type int64x2# must be a sublayout of value
+       But the layout of type int64x2# must be a sublayout of scannable
          because it's the type of something stored in a module structure.
 |}];;
 
@@ -302,7 +302,7 @@ Error: This expression has type "t_vec128"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_vec128 is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of t_vec128 must be a sublayout of value
+       But the layout of t_vec128 must be a sublayout of scannable
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -315,7 +315,7 @@ Error: This expression has type "'a t_vec128_id" = "('a : vec128)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_vec128_id is vec128
          because of the definition of t_vec128_id at line 2, characters 0-35.
-       But the layout of 'a t_vec128_id must be a sublayout of value
+       But the layout of 'a t_vec128_id must be a sublayout of scannable
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -328,7 +328,7 @@ Error: This expression has type "int64x2#"
        but an expression was expected of type "('a : value_or_null)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of value
+       But the layout of int64x2# must be a sublayout of scannable
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -340,7 +340,7 @@ Line 1, characters 20-28:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "t_vec128" is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of "t_vec128" must be a sublayout of value
+       But the layout of "t_vec128" must be a sublayout of scannable
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -352,7 +352,7 @@ Line 1, characters 34-36:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "'a" is vec128
          because of the annotation on 'a in the declaration of the type f7_5.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must overlap with scannable
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -380,7 +380,7 @@ Error: This expression has type "t_vec128"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_vec128 is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of t_vec128 must be a sublayout of value
+       But the layout of t_vec128 must be a sublayout of scannable
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -393,7 +393,7 @@ Error: This expression has type "'a t_vec128_id" = "('a : vec128)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_vec128_id is vec128
          because of the definition of t_vec128_id at line 2, characters 0-35.
-       But the layout of 'a t_vec128_id must be a sublayout of value
+       But the layout of 'a t_vec128_id must be a sublayout of scannable
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -406,7 +406,7 @@ Error: This expression has type "int64x2#"
        but an expression was expected of type "('a : value_or_null)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of value
+       But the layout of int64x2# must be a sublayout of scannable
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -555,7 +555,7 @@ Line 1, characters 15-27:
 Error: Object field types must have layout value.
        The layout of "t_vec128" is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of "t_vec128" must be a sublayout of value separable
+       But the layout of "t_vec128" must be a sublayout of scannable separable
          because it's the type of an object field.
 |}];;
 
@@ -567,7 +567,7 @@ Line 1, characters 29-35:
 Error: Object field types must have layout value.
        The layout of "'a" is vec128
          because of the annotation on 'a in the declaration of the type t12_2.
-       But the layout of "'a" must overlap with value separable
+       But the layout of "'a" must overlap with scannable separable
          because it's the type of an object field.
 |}]
 
@@ -580,7 +580,7 @@ Error: The method "x" has type "t_vec128" but is expected to have type
          "('a : value)"
        The layout of t_vec128 is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of t_vec128 must be a sublayout of value separable
+       But the layout of t_vec128 must be a sublayout of scannable separable
          because it's the type of an object field.
 |}];;
 
@@ -592,7 +592,7 @@ Line 2, characters 13-15:
 2 |   method x : 'a t_vec128_id -> 'a t_vec128_id = assert false
                  ^^
 Error: This type "('a : value)" should be an instance of type "('b : vec128)"
-       The layout of 'a is value separable
+       The layout of 'a is scannable separable
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with vec128
          because of the definition of t_vec128_id at line 2, characters 0-35.
@@ -606,7 +606,7 @@ Line 1, characters 25-26:
 Error: Variables bound in a class must have layout value.
        The layout of x is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of x must be a sublayout of value separable
+       But the layout of x must be a sublayout of scannable separable
          because it's the type of a class field.
 |}];;
 
@@ -619,7 +619,7 @@ Error: The method "x" has type "int64x2#" but is expected to have type
          "('a : value)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of value separable
+       But the layout of int64x2# must be a sublayout of scannable separable
          because it's the type of an object field.
 |}];;
 
@@ -631,7 +631,7 @@ Line 1, characters 26-42:
 Error: Variables bound in a class must have layout value.
        The layout of x is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of x must be a sublayout of value separable
+       But the layout of x must be a sublayout of scannable separable
          because it's the type of an instance variable.
 |}];;
 
@@ -643,7 +643,7 @@ Line 2, characters 10-12:
 2 |   val x : 'a t_vec128_id -> 'a t_vec128_id
               ^^
 Error: This type "('a : value)" should be an instance of type "('b : vec128)"
-       The layout of 'a is value separable
+       The layout of 'a is scannable separable
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with vec128
          because of the definition of t_vec128_id at line 2, characters 0-35.
@@ -684,7 +684,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "t_vec128"
        The layout of t_vec128 is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of t_vec128 must be a sublayout of value
+       But the layout of t_vec128 must be a sublayout of scannable
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -701,7 +701,7 @@ Line 3, characters 17-19:
 Error: "m1" must have a type of layout value because it is captured by an object.
        The layout of t_vec128 is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of t_vec128 must be a sublayout of value
+       But the layout of t_vec128 must be a sublayout of scannable
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -720,7 +720,7 @@ Error: This expression has type "t_vec128"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_vec128 is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of t_vec128 must be a sublayout of value.
+       But the layout of t_vec128 must be a sublayout of scannable.
 |}];;
 
 let f13_2 (x : t_vec128) = compare x x;;
@@ -732,7 +732,7 @@ Error: This expression has type "t_vec128"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_vec128 is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of t_vec128 must be a sublayout of value.
+       But the layout of t_vec128 must be a sublayout of scannable.
 |}];;
 
 let f13_3 (x : t_vec128) = Marshal.to_bytes x;;
@@ -744,7 +744,7 @@ Error: This expression has type "t_vec128"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_vec128 is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of t_vec128 must be a sublayout of value.
+       But the layout of t_vec128 must be a sublayout of scannable.
 |}];;
 
 let f13_4 (x : t_vec128) = Hashtbl.hash x;;
@@ -756,5 +756,5 @@ Error: This expression has type "t_vec128"
        but an expression was expected of type "('a : value)"
        The layout of t_vec128 is vec128
          because of the definition of t_vec128 at line 1, characters 0-22.
-       But the layout of t_vec128 must be a sublayout of value separable.
+       But the layout of t_vec128 must be a sublayout of scannable separable.
 |}];;

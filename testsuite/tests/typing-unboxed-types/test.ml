@@ -671,7 +671,7 @@ Line 2, characters 18-20:
                       ^^
 Error: This type "('a : value & value)" should be an instance of type
          "('b : float64)"
-       The layout of 'a is value separable & value separable
+       The layout of 'a is scannable separable & scannable separable
          because of the annotation on 'a in the declaration of the type tag.
        But the layout of 'a must overlap with float64
          because of the annotation on 'c in the declaration of the type tag.
@@ -690,11 +690,11 @@ Error: Layout mismatch in final type declaration consistency check.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The layout of 'a is value separable
+         The layout of 'a is scannable separable
            because it instantiates an unannotated type parameter of tag,
            chosen to have layout value.
          But the layout of 'a must overlap with
-             value separable & value separable
+             scannable separable & scannable separable
            because of the annotation on 'a in the declaration of the type tag.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.

@@ -71,9 +71,10 @@ Line 1, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The layout of 'a Or_null.t is value
+       The layout of 'a Or_null.t is scannable
          because it is the primitive type or_null.
-       But the layout of 'a Or_null.t must be a sublayout of value separable
+       But the layout of 'a Or_null.t must be a sublayout of
+           scannable separable
          because of the definition of t at line 2, characters 2-79.
 |}]
 
@@ -92,9 +93,10 @@ Line 4, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The layout of 'a Or_null.t is value
+       The layout of 'a Or_null.t is scannable
          because it is the primitive type or_null.
-       But the layout of 'a Or_null.t must be a sublayout of value separable
+       But the layout of 'a Or_null.t must be a sublayout of
+           scannable separable
          because of the definition of t at line 2, characters 2-45.
 |}]
 
@@ -106,10 +108,10 @@ type 'a t : value = 'a or_null [@@or_null_reexport]
 Line 1, characters 0-51:
 1 | type 'a t : value = 'a or_null [@@or_null_reexport]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "'a or_null" is value
+Error: The layout of type "'a or_null" is scannable
          because it is the primitive type or_null.
        But the layout of type "'a or_null" must be a sublayout of
-           value separable
+           scannable separable
          because of the definition of t at line 1, characters 0-51.
 |}]
 
@@ -119,7 +121,7 @@ type 'a t : float64 = 'a or_null [@@or_null_reexport]
 Line 1, characters 0-53:
 1 | type 'a t : float64 = 'a or_null [@@or_null_reexport]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "'a or_null" is value
+Error: The layout of type "'a or_null" is scannable
          because it is the primitive type or_null.
        But the layout of type "'a or_null" must be a sublayout of float64
          because of the definition of t at line 1, characters 0-53.
@@ -135,7 +137,7 @@ Error: This type "('a : float64)" should be an instance of type
          "('b : value maybe_separable)"
        The layout of 'a is float64
          because of the annotation on 'a in the declaration of the type t.
-       But the layout of 'a must overlap with value
+       But the layout of 'a must overlap with scannable
          because the type argument of or_null has layout value.
 |}]
 

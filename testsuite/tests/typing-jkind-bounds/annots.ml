@@ -222,7 +222,7 @@ Line 1, characters 16-18:
                     ^^
 Error: This alias is bound to type "int" but is used as an instance of type
          "('a : float64)"
-       The layout of int is value non_pointer
+       The layout of int is scannable non_pointer
          because it is the primitive type int.
        But the layout of int must be a sublayout of float64
          because of the annotation on the type variable 'a.
@@ -242,9 +242,10 @@ Line 1, characters 21-23:
                          ^^
 Error: This alias is bound to type "int list"
        but is used as an instance of type "('a : immediate)"
-       The layout of int list is value non_float
+       The layout of int list is scannable non_float
          because it's a boxed variant type.
-       But the layout of int list must be a sublayout of value non_pointer
+       But the layout of int list must be a sublayout of
+           scannable non_pointer
          because of the annotation on the type variable 'a.
 |}]
 (* CR layouts: error message could be phrased better *)
@@ -395,9 +396,9 @@ Line 1, characters 9-15:
 1 | type t = string t2_imm
              ^^^^^^
 Error: This type "string" should be an instance of type "('a : immediate)"
-       The layout of string is value non_float
+       The layout of string is scannable non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of value non_pointer
+       But the layout of string must be a sublayout of scannable non_pointer
          because of the definition of t2_imm at line 1, characters 0-28.
 |}]
 
@@ -646,9 +647,9 @@ Line 1, characters 24-31:
                             ^^^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "('a : immediate)"
-       The layout of string is value non_float
+       The layout of string is scannable non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of value non_pointer
+       But the layout of string must be a sublayout of scannable non_pointer
          because of the definition of r at line 1, characters 0-47.
 |}]
 
@@ -674,7 +675,7 @@ Line 1, characters 26-33:
                               ^^^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "('a : word mod aliased many external_)"
-       The layout of string is value non_float
+       The layout of string is scannable non_float
          because it is the primitive type string.
        But the layout of string must be a sublayout of word
          because of the definition of rc at line 1, characters 0-71.
@@ -712,9 +713,9 @@ Line 2, characters 18-55:
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This field value has type "'b -> 'b" which is less general than
          "'a. 'a -> 'a"
-       The layout of 'a is value separable
+       The layout of 'a is scannable separable
          because of the definition of r_value at line 1, characters 0-39.
-       But the layout of 'a must be a sublayout of value non_pointer
+       But the layout of 'a must be a sublayout of scannable non_pointer
          because of the annotation on the abstract type declaration for a.
 |}]
 (* CR layouts v1.5: that's a pretty awful error message *)
@@ -748,9 +749,9 @@ Error: Layout mismatch in final type declaration consistency check.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The layout of 'a is value separable
+         The layout of 'a is scannable separable
            because of the annotation on the universal variable 'a.
-         But the layout of 'a must be a sublayout of value non_pointer
+         But the layout of 'a must be a sublayout of scannable non_pointer
            because of the definition of t_imm at line 1, characters 0-27.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
@@ -960,7 +961,7 @@ Line 2, characters 24-26:
                             ^^
 Error: This type "('a : value)" should be an instance of type
          "('b : word mod aliased many external_)"
-       The layout of 'a is value separable
+       The layout of 'a is scannable separable
          because of the annotation on the universal variable 'a.
        But the layout of 'a must overlap with word
          because of the definition of t2_complex at line 10, characters 0-54.
@@ -1061,9 +1062,9 @@ Line 1, characters 43-51:
                                                ^^^^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "('a : immediate)"
-       The layout of string is value non_float
+       The layout of string is scannable non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of value non_pointer
+       But the layout of string must be a sublayout of scannable non_pointer
          because of the annotation on the universal variable 'a.
 |}]
 
@@ -1683,9 +1684,9 @@ Line 1, characters 37-53:
                                          ^^^^^^^^^^^^^^^^
 Error: This definition has type "'b -> 'b" which is less general than
          "'a. 'a -> 'a"
-       The layout of 'a is value separable
+       The layout of 'a is scannable separable
          because of the annotation on the universal variable 'a.
-       But the layout of 'a must be a sublayout of value non_pointer
+       But the layout of 'a must be a sublayout of scannable non_pointer
          because of the definition of f_imm at line 1, characters 4-9.
 |}]
 
@@ -1741,6 +1742,6 @@ Error: This expression has type "a" but an expression was expected of type
          "('a : value_or_null)"
        The layout of a is float64
          because of the annotation on the existential variable a.
-       But the layout of a must be a sublayout of value
+       But the layout of a must be a sublayout of scannable
          because the type argument of option has layout value_or_null.
 |}]

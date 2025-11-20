@@ -40,9 +40,10 @@ Error: Signature mismatch:
          type 'a t = Foo of 'a constraint 'a = int
        is not included in
          type 'a t : immediate constraint 'a = int
-       The layout of the first is value non_float
+       The layout of the first is scannable non_float
          because of the definition of t at line 4, characters 2-43.
-       But the layout of the first must be a sublayout of value non_pointer
+       But the layout of the first must be a sublayout of
+           scannable non_pointer
          because of the definition of t at line 2, characters 2-43.
 |}]
 

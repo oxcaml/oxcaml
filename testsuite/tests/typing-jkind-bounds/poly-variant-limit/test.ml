@@ -28,9 +28,9 @@ type foo : immutable_data = Types.poly_variant_with_101
 Line 1, characters 0-55:
 1 | type foo : immutable_data = Types.poly_variant_with_101
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "Types.poly_variant_with_101" is value separable
+Error: The layout of type "Types.poly_variant_with_101" is scannable separable
          because it's a polymorphic variant type that has more than 100 entries.
        But the layout of type "Types.poly_variant_with_101" must be a sublayout of
-         value non_float
+         scannable non_float
          because of the definition of foo at line 1, characters 0-55.
 |}]

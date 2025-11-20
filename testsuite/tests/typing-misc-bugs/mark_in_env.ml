@@ -96,7 +96,8 @@ Error: Non-value detected in [value_kind].
        Please report this error to the Jane Street compilers team.
        The layout of int Row_id_part.Map.t is any
          because the .cmi file for Row_id_part.Map.t is missing.
-       But the layout of int Row_id_part.Map.t must be a sublayout of value
+       But the layout of int Row_id_part.Map.t must be a sublayout of
+           scannable
          because it has to be value for the V1 safety check.
        No .cmi file found containing Row_id_part.Map.t.
        Hint: Adding "row_id_part" to your dependencies might help.

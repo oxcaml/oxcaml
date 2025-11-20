@@ -2157,7 +2157,7 @@ Line 5, characters 6-7:
 Error: This expression has type "#(float# * a * int * int64#) array"
        but an expression was expected of type "'a array"
        The layout of #(float# * a * int * int64#) is
-           float64 & any separable & value non_pointer & bits64
+           float64 & any separable & scannable non_pointer & bits64
          because it is an unboxed tuple.
        But the layout of #(float# * a * int * int64#) must be representable
          because it's the layout polymorphic type in an external declaration
@@ -2174,7 +2174,7 @@ Line 2, characters 6-7:
 Error: This expression has type "#(string * a * bool option) array"
        but an expression was expected of type "'a array"
        The layout of #(string * a * bool option) is
-           value non_float & any separable & value non_float
+           scannable non_float & any separable & scannable non_float
          because it is an unboxed tuple.
        But the layout of #(string * a * bool option) must be representable
          because it's the layout polymorphic type in an external declaration
@@ -2191,7 +2191,7 @@ Line 2, characters 53-54:
 Error: This expression has type "#(float# * a * int * int64#) array"
        but an expression was expected of type "'a array"
        The layout of #(float# * a * int * int64#) is
-           float64 & any separable & value non_pointer & bits64
+           float64 & any separable & scannable non_pointer & bits64
          because it is an unboxed tuple.
        But the layout of #(float# * a * int * int64#) must be representable
          because it's the layout polymorphic type in an external declaration
@@ -2208,7 +2208,7 @@ Line 2, characters 52-53:
 Error: This expression has type "#(string * a * bool option) array"
        but an expression was expected of type "'a array"
        The layout of #(string * a * bool option) is
-           value non_float & any separable & value non_float
+           scannable non_float & any separable & scannable non_float
          because it is an unboxed tuple.
        But the layout of #(string * a * bool option) must be representable
          because it's the layout polymorphic type in an external declaration

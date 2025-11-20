@@ -57,7 +57,7 @@ Error: This type signature for "x" is not a value type.
        The layout of type t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of type t_any_mod_separable must be a sublayout of
-           value
+           scannable
          because it's the type of something stored in a module structure.
 |}]
 
@@ -213,10 +213,10 @@ Line 1, characters 9-24:
 1 | type t = t_value_or_null id_value
              ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type "('a : value)"
-       The layout of t_value_or_null is value
+       The layout of t_value_or_null is scannable
          because of the definition of t_value_or_null at line 3, characters 0-36.
        But the layout of t_value_or_null must be a sublayout of
-           value separable
+           scannable separable
          because of the definition of id_value at line 4, characters 0-31.
 |}]
 
@@ -232,9 +232,9 @@ Error: Signature mismatch:
        is not included in
          sig type t end
        Type declarations do not match: type t = X.t is not included in type t
-       The layout of the first is value
+       The layout of the first is scannable
          because of the definition of t at line 1, characters 18-40.
-       But the layout of the first must be a sublayout of value separable
+       But the layout of the first must be a sublayout of scannable separable
          because of the definition of t at line 1, characters 52-66.
 |}]
 
@@ -262,7 +262,7 @@ Line 1, characters 9-24:
              ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type
          "('a : any separable)"
-       The layout of t_value_or_null is value
+       The layout of t_value_or_null is scannable
          because of the definition of t_value_or_null at line 3, characters 0-36.
        But the layout of t_value_or_null must be a sublayout of any separable
          because of the definition of id_any_mod_separable at line 2, characters 0-55.
@@ -283,7 +283,7 @@ Error: Signature mismatch:
          type t = X.t
        is not included in
          type t : any separable
-       The layout of the first is value
+       The layout of the first is scannable
          because of the definition of t at line 1, characters 18-40.
        But the layout of the first must be a sublayout of any separable
          because of the definition of t at line 1, characters 52-78.
@@ -332,7 +332,7 @@ Error: This type "t_any_mod_separable" should be an instance of type
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of t_any_mod_separable must be a sublayout of
-           value separable
+           scannable separable
          because of the definition of id_value at line 4, characters 0-31.
 |}]
 
@@ -350,7 +350,7 @@ Error: Signature mismatch:
        Type declarations do not match: type t = X.t is not included in type t
        The layout of the first is any separable
          because of the definition of t at line 1, characters 18-44.
-       But the layout of the first must be a sublayout of value separable
+       But the layout of the first must be a sublayout of scannable separable
          because of the definition of t at line 1, characters 56-70.
 |}]
 
@@ -366,7 +366,7 @@ Error: This type "t_any_mod_separable" should be an instance of type
          "('a : value_or_null)"
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
-       But the layout of t_any_mod_separable must be a sublayout of value
+       But the layout of t_any_mod_separable must be a sublayout of scannable
          because of the definition of id_value_or_null at line 3, characters 0-47.
 |}]
 
@@ -387,7 +387,7 @@ Error: Signature mismatch:
          type t : value_or_null
        The layout of the first is any separable
          because of the definition of t at line 1, characters 18-44.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a sublayout of scannable
          because of the definition of t at line 1, characters 56-78.
 |}]
 
@@ -449,10 +449,10 @@ Line 1, characters 19-34:
 1 | type should_fail = t_value_or_null t1
                        ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type "('a : value)"
-       The layout of t_value_or_null is value
+       The layout of t_value_or_null is scannable
          because of the definition of t_value_or_null at line 3, characters 0-36.
        But the layout of t_value_or_null must be a sublayout of
-           value separable
+           scannable separable
          because of the definition of t1 at line 3, characters 0-71.
 |}]
 
@@ -467,7 +467,7 @@ Error: This type "t_any_mod_separable" should be an instance of type
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of t_any_mod_separable must be a sublayout of
-           value separable
+           scannable separable
          because of the definition of t1 at line 3, characters 0-71.
 |}]
 

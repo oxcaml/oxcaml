@@ -87,7 +87,7 @@ Error: This expression has type "float# array"
        but an expression was expected of type "'a array"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value separable.
+       But the layout of float# must be a sublayout of scannable separable.
 |}];;
 
 let f (x : float# array) = Array.length x
@@ -99,7 +99,7 @@ Error: This expression has type "float# array"
        but an expression was expected of type "'a array"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value separable.
+       But the layout of float# must be a sublayout of scannable separable.
 |}];;
 
 (*****************************************************************)
@@ -288,7 +288,7 @@ Error: This expression has type "float#" but an expression was expected of type
          "('a : value_or_null separable)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value separable
+       But the layout of float# must be a sublayout of scannable separable
          because it's the type of an array element.
 |}]
 
@@ -304,7 +304,7 @@ Error: This expression has type "int32#" but an expression was expected of type
          "('a : value_or_null separable)"
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.
-       But the layout of int32# must be a sublayout of value separable
+       But the layout of int32# must be a sublayout of scannable separable
          because it's the type of an array element.
 |}]
 
@@ -320,7 +320,7 @@ Error: This expression has type "int64#" but an expression was expected of type
          "('a : value_or_null separable)"
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of value separable
+       But the layout of int64# must be a sublayout of scannable separable
          because it's the type of an array element.
 |}]
 
@@ -336,7 +336,8 @@ Error: This expression has type "nativeint#"
        but an expression was expected of type "('a : value_or_null separable)"
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a sublayout of value separable
+       But the layout of nativeint# must be a sublayout of
+           scannable separable
          because it's the type of an array element.
 |}]
 
@@ -352,7 +353,7 @@ Error: This expression has type "float32#"
        but an expression was expected of type "('a : value_or_null separable)"
        The layout of float32# is float32
          because it is the unboxed version of the primitive type float32.
-       But the layout of float32# must be a sublayout of value separable
+       But the layout of float32# must be a sublayout of scannable separable
          because it's the type of an array element.
 |}]
 

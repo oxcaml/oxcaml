@@ -44,9 +44,10 @@ Line 1, characters 23-39:
 1 | type t_nope = string * #(string * bool)
                            ^^^^^^^^^^^^^^^^
 Error: Tuple element types must have layout value.
-       The layout of "#(string * bool)" is value non_float & value non_pointer
+       The layout of "#(string * bool)" is
+           scannable non_float & scannable non_pointer
          because it is an unboxed tuple.
-       But the layout of "#(string * bool)" must be a sublayout of value
+       But the layout of "#(string * bool)" must be a sublayout of scannable
          because it's the type of a tuple element.
 |}]
 
@@ -58,9 +59,10 @@ Line 2, characters 23-35:
 2 | type t_nope = string * t_nope_inner
                            ^^^^^^^^^^^^
 Error: Tuple element types must have layout value.
-       The layout of "t_nope_inner" is value non_float & value non_pointer
+       The layout of "t_nope_inner" is
+           scannable non_float & scannable non_pointer
          because of the definition of t_nope_inner at line 1, characters 0-45.
-       But the layout of "t_nope_inner" must be a sublayout of value
+       But the layout of "t_nope_inner" must be a sublayout of scannable
          because it's the type of a tuple element.
 |}]
 
@@ -87,10 +89,10 @@ Line 1, characters 0-63:
 1 | type t2_wrong : value & float64 & value = #(string option * t1)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "#(string option * t1)" is
-           value non_float & (float64 & value non_pointer)
+           scannable non_float & (float64 & scannable non_pointer)
          because it is an unboxed tuple.
        But the layout of type "#(string option * t1)" must be a sublayout of
-           value separable & float64 & value separable
+           scannable separable & float64 & scannable separable
          because of the definition of t2_wrong at line 1, characters 0-63.
 |}]
 
@@ -100,10 +102,10 @@ Line 1, characters 0-74:
 1 | type t2_wrong : value & float64 & value = #{ so : string option; t1 : t1 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "t2_wrong" is
-           value non_float & (float64 & value non_pointer)
+           scannable non_float & (float64 & scannable non_pointer)
          because it is an unboxed record.
        But the layout of type "t2_wrong" must be a sublayout of
-           value separable & float64 & value separable
+           scannable separable & float64 & scannable separable
          because of the annotation on the declaration of the type t2_wrong.
 |}]
 
@@ -134,10 +136,11 @@ Line 1, characters 16-28:
                     ^^^^^^^^^^^^
 Error: This type "#(int * int)" should be an instance of type
          "('a : value & bits64)"
-       The layout of #(int * int) is value non_pointer & value non_pointer
+       The layout of #(int * int) is
+           scannable non_pointer & scannable non_pointer
          because it is an unboxed tuple.
        But the layout of #(int * int) must be a sublayout of
-           value separable & bits64
+           scannable separable & bits64
          because of the definition of t3 at line 1, characters 0-34.
 |}]
 (* CR layouts v7.1: The above error should identify the component of the product
@@ -152,10 +155,11 @@ Line 2, characters 16-30:
                     ^^^^^^^^^^^^^^
 Error: This type "t4_wrong_inner" should be an instance of type
          "('a : value & bits64)"
-       The layout of t4_wrong_inner is value non_pointer & value non_pointer
+       The layout of t4_wrong_inner is
+           scannable non_pointer & scannable non_pointer
          because of the definition of t4_wrong_inner at line 1, characters 0-45.
        But the layout of t4_wrong_inner must be a sublayout of
-           value separable & bits64
+           scannable separable & bits64
          because of the definition of t3 at line 1, characters 0-34.
 |}]
 
@@ -176,9 +180,10 @@ Line 2, characters 11-15:
 2 | type t10 = bool t6
                ^^^^
 Error: This type "bool" should be an instance of type "('a : value & bits64)"
-       The layout of bool is value non_pointer
+       The layout of bool is scannable non_pointer
          because it is the primitive type bool.
-       But the layout of bool must be a sublayout of value separable & bits64
+       But the layout of bool must be a sublayout of
+           scannable separable & bits64
          because of the definition of t6 at line 1, characters 0-37.
 |}]
 
@@ -199,9 +204,10 @@ Line 3, characters 11-15:
 3 | type t10 = bool t6
                ^^^^
 Error: This type "bool" should be an instance of type "('a : value & bits64)"
-       The layout of bool is value non_pointer
+       The layout of bool is scannable non_pointer
          because it is the primitive type bool.
-       But the layout of bool must be a sublayout of value separable & bits64
+       But the layout of bool must be a sublayout of
+           scannable separable & bits64
          because of the definition of t6 at line 1, characters 0-37.
 |}]
 
@@ -213,10 +219,11 @@ Line 2, characters 24-38:
                             ^^^^^^^^^^^^^^
 Error: This type "#(int * int64)" should be an instance of type
          "('a : value & bits64)"
-       The layout of #(int * int64) is value non_pointer & value non_float
+       The layout of #(int * int64) is
+           scannable non_pointer & scannable non_float
          because it is an unboxed tuple.
        But the layout of #(int * int64) must be a sublayout of
-           value separable & bits64
+           scannable separable & bits64
          because of the annotation on 'a in the declaration of the type
                                       t6_wrong.
 |}]
@@ -231,10 +238,10 @@ Line 1, characters 0-54:
 1 | type t6_wrong_inner_record = #{ i : int; i64 : int64 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of t6_wrong_inner_record is value & bits64
+       The layout of t6_wrong_inner_record is scannable & bits64
          because it is an unboxed record.
        But the layout of t6_wrong_inner_record must be a sublayout of
-           value separable & bits64
+           scannable separable & bits64
          because of the annotation on 'a in the declaration of the type
                                       t6_wrong.
 |}]
@@ -273,9 +280,9 @@ Line 6, characters 28-30:
                                 ^^
 Error: This type "('a : value)" should be an instance of type
          "('b : float64 & value)"
-       The layout of 'a is value separable
+       The layout of 'a is scannable separable
          because it is or unifies with an unannotated universal variable.
-       But the layout of 'a must overlap with float64 & value separable
+       But the layout of 'a must overlap with float64 & scannable separable
          because of the definition of t at line 1, characters 0-34.
 |}]
 
@@ -452,9 +459,10 @@ Line 1, characters 31-44:
 1 | type poly_var_type = [ `Foo of #(int * bool) ]
                                    ^^^^^^^^^^^^^
 Error: Polymorphic variant constructor argument types must have layout value.
-       The layout of "#(int * bool)" is value non_pointer & value non_pointer
+       The layout of "#(int * bool)" is
+           scannable non_pointer & scannable non_pointer
          because it is an unboxed tuple.
-       But the layout of "#(int * bool)" must be a sublayout of value
+       But the layout of "#(int * bool)" must be a sublayout of scannable
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -468,7 +476,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_1 & '_representable_layout_2
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a sublayout of scannable
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -478,9 +486,9 @@ Line 1, characters 25-41:
 1 | type tuple_type = (int * #(bool * float#))
                              ^^^^^^^^^^^^^^^^
 Error: Tuple element types must have layout value.
-       The layout of "#(bool * float#)" is value non_pointer & float64
+       The layout of "#(bool * float#)" is scannable non_pointer & float64
          because it is an unboxed tuple.
-       But the layout of "#(bool * float#)" must be a sublayout of value
+       But the layout of "#(bool * float#)" must be a sublayout of scannable
          because it's the type of a tuple element.
 |}]
 
@@ -494,7 +502,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_3 & '_representable_layout_4
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a sublayout of scannable
          because it's the type of a tuple element.
 |}]
 
@@ -522,9 +530,9 @@ Line 2, characters 10-23:
               ^^^^^^^^^^^^^
 Error: This type signature for "x" is not a value type.
        The layout of type #(int * bool) is
-           value non_pointer & value non_pointer
+           scannable non_pointer & scannable non_pointer
          because it is an unboxed tuple.
-       But the layout of type #(int * bool) must be a sublayout of value
+       But the layout of type #(int * bool) must be a sublayout of scannable
          because it's the type of something stored in a module structure.
 |}]
 
@@ -536,7 +544,7 @@ Line 2, characters 6-7:
 2 |   let x = #(1, 2)
           ^
 Error: Types of top-level module bindings must have layout "value", but
-       the type of "x" has layout "value & value".
+       the type of "x" has layout "scannable & scannable".
 |}]
 
 type object_type = < x : #(int * bool) >
@@ -545,9 +553,11 @@ Line 1, characters 21-38:
 1 | type object_type = < x : #(int * bool) >
                          ^^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
-       The layout of "#(int * bool)" is value non_pointer & value non_pointer
+       The layout of "#(int * bool)" is
+           scannable non_pointer & scannable non_pointer
          because it is an unboxed tuple.
-       But the layout of "#(int * bool)" must be a sublayout of value separable
+       But the layout of "#(int * bool)" must be a sublayout of
+           scannable separable
          because it's the type of an object field.
 |}]
 
@@ -557,9 +567,9 @@ Line 1, characters 29-30:
 1 | let object_term = object val x = #(1, 2) end
                                  ^
 Error: Variables bound in a class must have layout value.
-       The layout of x is value non_pointer & value non_pointer
+       The layout of x is scannable non_pointer & scannable non_pointer
          because it is an unboxed tuple.
-       But the layout of x must be a sublayout of value separable
+       But the layout of x must be a sublayout of scannable separable
          because it's the type of a class field.
 |}]
 
@@ -576,7 +586,8 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_5 & '_representable_layout_6
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value separable
+       But the layout of #('a * 'b) must be a sublayout of
+           scannable separable
          because it's the type of an object field.
 |}]
 
@@ -594,7 +605,7 @@ Error: This expression has type "('a : value_or_null)"
        The layout of #('a * 'b) is
            '_representable_layout_7 & '_representable_layout_8
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a sublayout of scannable
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -608,9 +619,10 @@ Line 2, characters 31-45:
 2 | type poly_var_type = [ `Foo of poly_var_inner ]
                                    ^^^^^^^^^^^^^^
 Error: Polymorphic variant constructor argument types must have layout value.
-       The layout of "poly_var_inner" is value non_pointer & value non_pointer
+       The layout of "poly_var_inner" is
+           scannable non_pointer & scannable non_pointer
          because of the definition of poly_var_inner at line 1, characters 0-44.
-       But the layout of "poly_var_inner" must be a sublayout of value
+       But the layout of "poly_var_inner" must be a sublayout of scannable
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -624,9 +636,10 @@ Line 2, characters 25-43:
 Error: This expression has type "poly_var_term_record"
        but an expression was expected of type "('a : value_or_null)"
        The layout of poly_var_term_record is
-           value non_pointer & value non_pointer
+           scannable non_pointer & scannable non_pointer
          because of the definition of poly_var_term_record at line 1, characters 0-50.
-       But the layout of poly_var_term_record must be a sublayout of value
+       But the layout of poly_var_term_record must be a sublayout of
+           scannable
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -638,9 +651,9 @@ Line 2, characters 25-37:
 2 | type tuple_type = (int * record_inner)
                              ^^^^^^^^^^^^
 Error: Tuple element types must have layout value.
-       The layout of "record_inner" is value non_pointer & float64
+       The layout of "record_inner" is scannable non_pointer & float64
          because of the definition of record_inner at line 1, characters 0-45.
-       But the layout of "record_inner" must be a sublayout of value
+       But the layout of "record_inner" must be a sublayout of scannable
          because it's the type of a tuple element.
 |}]
 
@@ -653,9 +666,9 @@ Line 2, characters 24-42:
                             ^^^^^^^^^^^^^^^^^^
 Error: This expression has type "record" but an expression was expected of type
          "('a : value_or_null)"
-       The layout of record is value non_pointer & value non_pointer
+       The layout of record is scannable non_pointer & scannable non_pointer
          because of the definition of record at line 1, characters 0-36.
-       But the layout of record must be a sublayout of value
+       But the layout of record must be a sublayout of scannable
          because it's the type of a tuple element.
 |}]
 
@@ -690,9 +703,10 @@ Line 3, characters 10-19:
 3 |   val x : sig_inner
               ^^^^^^^^^
 Error: This type signature for "x" is not a value type.
-       The layout of type sig_inner is value non_pointer & value non_pointer
+       The layout of type sig_inner is
+           scannable non_pointer & scannable non_pointer
          because of the definition of sig_inner at line 1, characters 0-39.
-       But the layout of type sig_inner must be a sublayout of value
+       But the layout of type sig_inner must be a sublayout of scannable
          because it's the type of something stored in a module structure.
 |}]
 
@@ -706,7 +720,7 @@ Line 3, characters 6-7:
 3 |   let x = #{ i1 = 1; i2 = 2 }
           ^
 Error: Types of top-level module bindings must have layout "value", but
-       the type of "x" has layout "value & value".
+       the type of "x" has layout "scannable & scannable".
 |}]
 
 type object_inner = #{ i : int; b : bool }
@@ -717,9 +731,11 @@ Line 2, characters 21-37:
 2 | type object_type = < x : object_inner >
                          ^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
-       The layout of "object_inner" is value non_pointer & value non_pointer
+       The layout of "object_inner" is
+           scannable non_pointer & scannable non_pointer
          because of the definition of object_inner at line 1, characters 0-42.
-       But the layout of "object_inner" must be a sublayout of value separable
+       But the layout of "object_inner" must be a sublayout of
+           scannable separable
          because it's the type of an object field.
 |}]
 
@@ -731,9 +747,9 @@ Line 2, characters 29-30:
 2 | let object_term = object val x = #{ i1 = 1; i2 = 2 } end
                                  ^
 Error: Variables bound in a class must have layout value.
-       The layout of x is value non_pointer & value non_pointer
+       The layout of x is scannable non_pointer & scannable non_pointer
          because of the definition of object_term_record at line 1, characters 0-49.
-       But the layout of x must be a sublayout of value separable
+       But the layout of x must be a sublayout of scannable separable
          because it's the type of a class field.
 |}]
 
@@ -749,9 +765,11 @@ Line 4, characters 15-34:
                    ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "class_record"
        but an expression was expected of type "('a : value)"
-       The layout of class_record is value non_pointer & value non_pointer
+       The layout of class_record is
+           scannable non_pointer & scannable non_pointer
          because of the definition of class_record at line 1, characters 0-43.
-       But the layout of class_record must be a sublayout of value separable
+       But the layout of class_record must be a sublayout of
+           scannable separable
          because it's the type of an object field.
 |}]
 
@@ -768,9 +786,10 @@ Line 4, characters 20-24:
                         ^^^^
 Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "capture_record"
-       The layout of capture_record is value non_pointer & value non_pointer
+       The layout of capture_record is
+           scannable non_pointer & scannable non_pointer
          because of the definition of capture_record at line 1, characters 0-43.
-       But the layout of capture_record must be a sublayout of value
+       But the layout of capture_record must be a sublayout of scannable
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -1433,7 +1452,7 @@ Line 1, characters 28-53:
                                 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Types in an external must have a representable layout.
        The layout of #(string * 'a * float#) is
-           value non_float & any & float64
+           scannable non_float & any & float64
          because it is an unboxed tuple.
        But the layout of #(string * 'a * float#) must be representable
          because it's the type of an argument in an external declaration.
@@ -1446,7 +1465,7 @@ Line 1, characters 35-60:
                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Types in an external must have a representable layout.
        The layout of #(string * 'a * float#) is
-           value non_float & any & float64
+           scannable non_float & any & float64
          because it is an unboxed tuple.
        But the layout of #(string * 'a * float#) must be representable
          because it's the type of the result of an external declaration.
@@ -1468,7 +1487,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_9 & '_representable_layout_10
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a sublayout of scannable
          because it's the type of the recursive variable x.
 |}]
 
@@ -1484,9 +1503,10 @@ Line 4, characters 37-56:
                                          ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "letrec_record"
        but an expression was expected of type "('a : value_or_null)"
-       The layout of letrec_record is value non_pointer & value non_pointer
+       The layout of letrec_record is
+           scannable non_pointer & scannable non_pointer
          because of the definition of letrec_record at line 3, characters 0-44.
-       But the layout of letrec_record must be a sublayout of value
+       But the layout of letrec_record must be a sublayout of scannable
          because it's the type of the recursive variable x.
 |}]
 
@@ -1514,7 +1534,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_11 & '_representable_layout_12
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a sublayout of scannable
          because it's the type of the recursive variable _x.
 |}]
 
@@ -1527,9 +1547,10 @@ Line 2, characters 21-41:
                          ^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "letrec_simple"
        but an expression was expected of type "('a : value_or_null)"
-       The layout of letrec_simple is value non_pointer & value non_pointer
+       The layout of letrec_simple is
+           scannable non_pointer & scannable non_pointer
          because of the definition of letrec_simple at line 1, characters 0-44.
-       But the layout of letrec_simple must be a sublayout of value
+       But the layout of letrec_simple must be a sublayout of scannable
          because it's the type of the recursive variable _x.
 |}]
 
@@ -1620,7 +1641,8 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_13 & '_representable_layout_14
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value separable.
+       But the layout of #('a * 'b) must be a sublayout of
+           scannable separable.
 |}]
 
 external make : ('a : value & value) . int -> 'a -> 'a array =
@@ -1702,10 +1724,10 @@ Line 2, characters 31-50:
 Error: This expression has type "array_init_record"
        but an expression was expected of type "('a : value)"
        The layout of array_init_record is
-           value non_pointer & value non_pointer
+           scannable non_pointer & scannable non_pointer
          because of the definition of array_init_record at line 1, characters 0-48.
        But the layout of array_init_record must be a sublayout of
-           value separable.
+           scannable separable.
 |}]
 
 (* Arrays of unboxed records of kind value *are* allowed in all cases *)
@@ -1738,7 +1760,8 @@ Error: This expression has type "('a : value)"
        The layout of #('a * 'b) is
            '_representable_layout_15 & '_representable_layout_16
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value separable
+       But the layout of #('a * 'b) must be a sublayout of
+           scannable separable
          because it's the type of a term-level argument to a class constructor.
 |}]
 
@@ -1756,10 +1779,10 @@ Line 3, characters 28-29:
 Error: This expression has type "('a : value)"
        but an expression was expected of type "class_arg_record"
        The layout of class_arg_record is
-           value non_pointer & value non_pointer
+           scannable non_pointer & scannable non_pointer
          because of the definition of class_arg_record at line 1, characters 0-45.
        But the layout of class_arg_record must be a sublayout of
-           value separable
+           scannable separable
          because it's the type of a term-level argument to a class constructor.
 |}]
 
@@ -1790,7 +1813,8 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_17 & '_representable_layout_18
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value separable
+       But the layout of #('a * 'b) must be a sublayout of
+           scannable separable
          because it's the type of a lazy expression.
 |}]
 
@@ -1801,9 +1825,11 @@ Line 1, characters 9-21:
 1 | type t = #(int * int) lazy_t
              ^^^^^^^^^^^^
 Error: This type "#(int * int)" should be an instance of type "('a : value)"
-       The layout of #(int * int) is value non_pointer & value non_pointer
+       The layout of #(int * int) is
+           scannable non_pointer & scannable non_pointer
          because it is an unboxed tuple.
-       But the layout of #(int * int) must be a sublayout of value separable
+       But the layout of #(int * int) must be a sublayout of
+           scannable separable
          because the type argument of lazy_t has layout value.
 |}]
 
@@ -1816,9 +1842,11 @@ Line 2, characters 13-32:
                  ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "lazy_record"
        but an expression was expected of type "('a : value)"
-       The layout of lazy_record is value non_pointer & value non_pointer
+       The layout of lazy_record is
+           scannable non_pointer & scannable non_pointer
          because of the definition of lazy_record at line 1, characters 0-42.
-       But the layout of lazy_record must be a sublayout of value separable
+       But the layout of lazy_record must be a sublayout of
+           scannable separable
          because it's the type of a lazy expression.
 |}]
 
@@ -1830,9 +1858,11 @@ Line 2, characters 9-22:
 2 | type t = lazy_t_record lazy_t
              ^^^^^^^^^^^^^
 Error: This type "lazy_t_record" should be an instance of type "('a : value)"
-       The layout of lazy_t_record is value non_pointer & value non_pointer
+       The layout of lazy_t_record is
+           scannable non_pointer & scannable non_pointer
          because of the definition of lazy_t_record at line 1, characters 0-44.
-       But the layout of lazy_t_record must be a sublayout of value separable
+       But the layout of lazy_t_record must be a sublayout of
+           scannable separable
          because the type argument of lazy_t has layout value.
 |}]
 
@@ -1903,7 +1933,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_19 & '_representable_layout_20
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a sublayout of scannable
          because the type argument of option has layout value_or_null.
 |}]
 
@@ -1916,9 +1946,10 @@ Line 2, characters 29-48:
                                  ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "optional_record"
        but an expression was expected of type "('a : value_or_null)"
-       The layout of optional_record is value non_pointer & value non_pointer
+       The layout of optional_record is
+           scannable non_pointer & scannable non_pointer
          because of the definition of optional_record at line 1, characters 0-46.
-       But the layout of optional_record must be a sublayout of value
+       But the layout of optional_record must be a sublayout of scannable
          because the type argument of option has layout value_or_null.
 |}]
 
@@ -2093,7 +2124,7 @@ Line 3, characters 30-31:
                                   ^
 Error: This expression has type "a" but an expression was expected of type
          "('a : '_representable_layout_21 separable & value_or_null separable)"
-       The layout of a is value separable
+       The layout of a is scannable separable
          because it is or unifies with an unannotated universal variable.
        But the layout of a must be representable
          because we must know concretely how to pass a function argument.
@@ -2385,9 +2416,9 @@ Lines 3-4, characters 0-34:
 3 | type t : (value_or_null & bits32) mod non_null =
 4 |   #{ a : int; b : t s; c : int32 }
 Error: The layout of type "t" is
-           value non_pointer & value separable & value non_float
+           scannable non_pointer & scannable separable & scannable non_float
          because it is an unboxed record.
-       But the layout of type "t" must be a sublayout of value & bits32
+       But the layout of type "t" must be a sublayout of scannable & bits32
          because of the annotation on the declaration of the type t.
 |}]
 
@@ -2402,8 +2433,8 @@ Lines 3-4, characters 0-34:
 3 | type t : (value_or_null & bits32) mod portable =
 4 |   #{ a : int; b : t s; c : int32 }
 Error: The layout of type "t" is
-           value non_pointer & value separable & value non_float
+           scannable non_pointer & scannable separable & scannable non_float
          because it is an unboxed record.
-       But the layout of type "t" must be a sublayout of value & bits32
+       But the layout of type "t" must be a sublayout of scannable & bits32
          because of the annotation on the declaration of the type t.
 |}]

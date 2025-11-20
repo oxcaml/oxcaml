@@ -733,9 +733,9 @@ Line 1, characters 40-46:
                                             ^^^^^^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
-       The layout of float is value separable
+       The layout of float is scannable separable
          because it is the primitive type float.
-       But the layout of float must be a sublayout of value non_float
+       But the layout of float must be a sublayout of scannable non_float
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]
@@ -756,9 +756,9 @@ Line 2, characters 43-49:
                                                ^^^^^^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(abstract array, 'b) idx_mut"
-       The layout of abstract is value separable
+       The layout of abstract is scannable separable
          because of the definition of abstract at line 1, characters 0-13.
-       But the layout of abstract must be a sublayout of value non_float
+       But the layout of abstract must be a sublayout of scannable non_float
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]
@@ -770,9 +770,9 @@ Line 1, characters 41-48:
                                              ^^^^^^^
 Error: This expression has type "('a iarray, 'a) idx_imm"
        but an expression was expected of type "(float iarray, 'b) idx_imm"
-       The layout of float is value separable
+       The layout of float is scannable separable
          because it is the primitive type float.
-       But the layout of float must be a sublayout of value non_float
+       But the layout of float must be a sublayout of scannable non_float
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]
@@ -787,9 +787,9 @@ Line 3, characters 23-24:
                            ^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
-       The layout of float is value separable
+       The layout of float is scannable separable
          because it is the primitive type float.
-       But the layout of float must be a sublayout of value non_float
+       But the layout of float must be a sublayout of scannable non_float
          because of the definition of y at line 2, characters 10-17.
 |}]
 
@@ -809,9 +809,9 @@ Line 2, characters 44-51:
                                                 ^^^^^^^
 Error: This expression has type "('a iarray, 'a) idx_imm"
        but an expression was expected of type "(abstract iarray, 'b) idx_imm"
-       The layout of abstract is value separable
+       The layout of abstract is scannable separable
          because of the definition of abstract at line 1, characters 0-13.
-       But the layout of abstract must be a sublayout of value non_float
+       But the layout of abstract must be a sublayout of scannable non_float
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]

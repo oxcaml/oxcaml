@@ -27,7 +27,7 @@ Error: This expression has type "float#" but an expression was expected of type
          "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value separable
+       But the layout of float# must be a sublayout of scannable separable
          because of the annotation on the wildcard _ at line 1, characters 20-31.
 |}]
 
@@ -46,7 +46,7 @@ Error: This expression has type "float#" but an expression was expected of type
          "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value separable
+       But the layout of float# must be a sublayout of scannable separable
          because of the annotation on the wildcard _ at line 1, characters 20-31.
 |}]
 
@@ -60,7 +60,7 @@ Error: This expression has type "float#" but an expression was expected of type
          "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value separable
+       But the layout of float# must be a sublayout of scannable separable
          because of the annotation on the wildcard _ at line 1, characters 20-31.
          Custom message
 |}]
@@ -75,7 +75,7 @@ Line 3, characters 19-20:
 Error: This expression has type "('a : value)"
        but an expression was expected of type "Float_u.t" = "float#"
        The layout of Float_u.t is float64.
-       But the layout of Float_u.t must be a sublayout of value separable
+       But the layout of Float_u.t must be a sublayout of scannable separable
          because of the annotation on the wildcard _ at line 2, characters 15-26.
          Custom message
 |}]
@@ -91,7 +91,7 @@ Line 3, characters 61-63:
 3 |   val f : (('a : value)[@error_message "Custom message"]) -> 'a t
                                                                  ^^
 Error: This type "('a : value)" should be an instance of type "('b : float64)"
-       The layout of 'a is value separable
+       The layout of 'a is scannable separable
          because of the annotation on the type variable 'a.
          Custom message
        But the layout of 'a must overlap with float64
@@ -113,7 +113,7 @@ Line 3, characters 33-38:
 Error: Bad layout annotation:
          The layout of "t" is float64
            because of the definition of t at line 2, characters 2-18.
-         But the layout of "t" must be a sublayout of value separable
+         But the layout of "t" must be a sublayout of scannable separable
            because of the annotation on the type variable 'a.
            Custom message
 |}]
@@ -132,7 +132,7 @@ Error: This alias is bound to type "t" but is used as an instance of type
          "('a : value)"
        The layout of t is float64
          because of the definition of t at line 2, characters 2-18.
-       But the layout of t must be a sublayout of value separable
+       But the layout of t must be a sublayout of scannable separable
          because of the annotation on the type variable 'a.
          Custom message
 |}]
@@ -150,7 +150,7 @@ Line 3, characters 26-31:
 Error: Bad layout annotation:
          The layout of "t/2" is float64
            because of the definition of t at line 2, characters 2-18.
-         But the layout of "t/2" must be a sublayout of value separable
+         But the layout of "t/2" must be a sublayout of scannable separable
            because of the annotation on the wildcard _ at line 3, characters 26-31.
            Custom message
 |}]
@@ -231,9 +231,9 @@ Line 1, characters 22-23:
 Error: This expression has type "string" but an expression was expected of type
          "('a : immediate)"
        custom message
-       The layout of string is value non_float
+       The layout of string is scannable non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of value non_pointer
+       But the layout of string must be a sublayout of scannable non_pointer
          because of the annotation on the wildcard _ at line 1, characters 26-41.
 |}]
 

@@ -10,9 +10,9 @@ type t : immediate = A of int
 Line 1, characters 0-29:
 1 | type t : immediate = A of int
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t" is value non_float
+Error: The layout of type "t" is scannable non_float
          because it's a boxed variant type.
-       But the layout of type "t" must be a sublayout of value non_pointer
+       But the layout of type "t" must be a sublayout of scannable non_pointer
          because of the annotation on the declaration of the type t.
 |}]
 
@@ -153,9 +153,9 @@ Line 3, characters 11-12:
 3 | let f () : a t = failwith ""
                ^
 Error: This type "a" should be an instance of type "('a : immutable_data)"
-       The layout of a is value separable
+       The layout of a is scannable separable
          because of the definition of a at line 1, characters 0-6.
-       But the layout of a must be a sublayout of value non_float
+       But the layout of a must be a sublayout of scannable non_float
          because of the definition of t at line 2, characters 0-28.
 |}]
 

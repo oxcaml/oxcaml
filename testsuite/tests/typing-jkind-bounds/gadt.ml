@@ -206,9 +206,9 @@ type 'x u : immediate =
 Lines 1-2, characters 0-27:
 1 | type 'x u : immediate =
 2 | | P1 : ('b, 'a1) t -> 'a1 u
-Error: The layout of type "u" is value non_float
+Error: The layout of type "u" is scannable non_float
          because it's a boxed variant type.
-       But the layout of type "u" must be a sublayout of value non_pointer
+       But the layout of type "u" must be a sublayout of scannable non_pointer
          because of the annotation on the declaration of the type u.
 |}]
 
@@ -246,9 +246,9 @@ type 'a t : immediate =
 Lines 1-2, characters 0-25:
 1 | type 'a t : immediate =
 2 |   | A : 'b -> 'b option t
-Error: The layout of type "t" is value non_float
+Error: The layout of type "t" is scannable non_float
          because it's a boxed variant type.
-       But the layout of type "t" must be a sublayout of value non_pointer
+       But the layout of type "t" must be a sublayout of scannable non_pointer
          because of the annotation on the declaration of the type t.
 |}]
 
@@ -271,9 +271,9 @@ type 'a t : immediate =
 Lines 1-2, characters 0-48:
 1 | type 'a t : immediate =
 2 |   | A : ('b : immutable_data). 'b -> 'b option t
-Error: The layout of type "t" is value non_float
+Error: The layout of type "t" is scannable non_float
          because it's a boxed variant type.
-       But the layout of type "t" must be a sublayout of value non_pointer
+       But the layout of type "t" must be a sublayout of scannable non_pointer
          because of the annotation on the declaration of the type t.
 |}]
 
@@ -350,10 +350,10 @@ type 'a abstract : value mod portable
 Lines 2-3, characters 0-70:
 2 | type existential_abstract : immediate =
 3 |   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-Error: The layout of type "existential_abstract" is value non_float
+Error: The layout of type "existential_abstract" is scannable non_float
          because it's a boxed variant type.
        But the layout of type "existential_abstract" must be a sublayout of
-           value non_pointer
+           scannable non_pointer
          because of the annotation on the declaration of the type existential_abstract.
 |}]
 
@@ -567,10 +567,10 @@ type show_me_the_kind : immediate = (int ref, int ref) box2
 Line 1, characters 0-59:
 1 | type show_me_the_kind : immediate = (int ref, int ref) box2
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "(int ref, int ref) box2" is value non_float
+Error: The layout of type "(int ref, int ref) box2" is scannable non_float
          because of the definition of box2 at line 1, characters 0-45.
        But the layout of type "(int ref, int ref) box2" must be a sublayout of
-           value non_pointer
+           scannable non_pointer
          because of the definition of show_me_the_kind at line 1, characters 0-59.
 |}]
 
@@ -581,9 +581,10 @@ type _ box : immediate = Box : 'a -> 'a box
 Line 1, characters 0-43:
 1 | type _ box : immediate = Box : 'a -> 'a box
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "box" is value non_float
+Error: The layout of type "box" is scannable non_float
          because it's a boxed variant type.
-       But the layout of type "box" must be a sublayout of value non_pointer
+       But the layout of type "box" must be a sublayout of
+           scannable non_pointer
          because of the annotation on the declaration of the type box.
 |}]
 
@@ -634,9 +635,9 @@ type 'a t constraint 'a = 'b option
 Lines 2-3, characters 0-21:
 2 | type 'c t2 : immediate =
 3 |   | K : 'd t -> 'd t2
-Error: The layout of type "t2" is value non_float
+Error: The layout of type "t2" is scannable non_float
          because it's a boxed variant type.
-       But the layout of type "t2" must be a sublayout of value non_pointer
+       But the layout of type "t2" must be a sublayout of scannable non_pointer
          because of the annotation on the declaration of the type t2.
 |}]
 
@@ -652,10 +653,10 @@ type show_me_the_kind : immediate = exist_row1
 Line 1, characters 0-46:
 1 | type show_me_the_kind : immediate = exist_row1
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "exist_row1" is value non_float
+Error: The layout of type "exist_row1" is scannable non_float
          because of the definition of exist_row1 at line 1, characters 0-67.
        But the layout of type "exist_row1" must be a sublayout of
-           value non_pointer
+           scannable non_pointer
          because of the definition of show_me_the_kind at line 1, characters 0-46.
 |}]
 
@@ -686,10 +687,10 @@ type show_me_the_kind : immediate = exist_row2
 Line 1, characters 0-46:
 1 | type show_me_the_kind : immediate = exist_row2
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "exist_row2" is value non_float
+Error: The layout of type "exist_row2" is scannable non_float
          because of the definition of exist_row2 at line 1, characters 0-67.
        But the layout of type "exist_row2" must be a sublayout of
-           value non_pointer
+           scannable non_pointer
          because of the definition of show_me_the_kind at line 1, characters 0-46.
 |}]
 
@@ -720,10 +721,10 @@ type 'a show_me_the_kind : immediate = 'a option exist_row3
 Line 1, characters 0-59:
 1 | type 'a show_me_the_kind : immediate = 'a option exist_row3
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "'a option exist_row3" is value non_float
+Error: The layout of type "'a option exist_row3" is scannable non_float
          because of the definition of exist_row3 at line 1, characters 0-80.
        But the layout of type "'a option exist_row3" must be a sublayout of
-           value non_pointer
+           scannable non_pointer
          because of the definition of show_me_the_kind at line 1, characters 0-59.
 |}]
 
