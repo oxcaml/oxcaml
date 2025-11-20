@@ -5399,8 +5399,9 @@ let type_approx_fun_one_param
   in
   let loc_fun, ty_fun = in_function in
   let { ty_param; arg_mode; ty_ret; _ } =
-    try filter_arrow env ty_expected label ~param_hole:has_poly
-    with Filter_arrow_failed err ->
+    match filter_arrow env ty_expected label ~param_hole:has_poly with
+    | Ok filtered_arrow -> filtered_arrow
+    | Error err ->
       let err =
         error_of_filter_arrow_failure ~explanation:None ty_fun err ~first
       in
@@ -6062,9 +6063,12 @@ let split_function_ty
     with_local_level_generalize_structure_if separate begin fun () ->
       (* If [has_poly] is true then we rely on the later call to type_pat to
          enforce the invariant that the parameter type be a [Tpoly] node *)
-      try filter_arrow env (instance ty_expected) arg_label
-            ~param_hole:has_poly
-      with Filter_arrow_failed err ->
+      match
+        filter_arrow env (instance ty_expected) arg_label
+          ~param_hole:has_poly
+      with
+      | Ok filtered_arrow -> filtered_arrow
+      | Error err ->
         let err =
           error_of_filter_arrow_failure ~explanation ~first:is_first_val_param
             ty_fun err
@@ -9941,8 +9945,8 @@ and type_application env app_loc expected_mode position_and_mode
   let exception Filter_arrow_mono_failed in
   let filter_arrow_mono env t l =
     match filter_arrow env t l ~param_hole:false with
-    | exception Filter_arrow_failed _ -> raise Filter_arrow_mono_failed
-    | {ty_param; _} as farr ->
+    | Error _ -> raise Filter_arrow_mono_failed
+    | Ok ({ty_param; _} as farr)  ->
         match tpoly_get_mono_opt ty_param with
         | None -> raise Filter_arrow_mono_failed
         | Some ty_param -> { farr with ty_param }
@@ -11356,8 +11360,8 @@ and type_n_ary_function
         (* Assert that [ty] is a function, and return its return type. *)
         let filter_ty_ret_exn ty arg_label ~param_hole =
           match filter_arrow env ty arg_label ~param_hole with
-          | { ty_ret; _ } -> ty_ret
-          | exception (Filter_arrow_failed error) ->
+          | Ok { ty_ret; _ } -> ty_ret
+          | Error error ->
               let trace =
                 match error with
                 | Unification_error trace -> trace

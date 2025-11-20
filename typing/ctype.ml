@@ -5453,8 +5453,6 @@ type filter_arrow_failure =
   | Not_a_function
   | Jkind_error of type_expr * Jkind.Violation.t
 
-exception Filter_arrow_failed of filter_arrow_failure
-
 type filtered_arrow =
   { ty_param : type_expr;
     arg_mode : Mode.Alloc.lr;
@@ -5496,40 +5494,39 @@ let filter_arrow env t l ~param_hole =
     in
     t', { ty_param; arg_mode; ty_ret; ret_mode }
   in
-  let t =
-    try expand_head_trace env t
-    with Unify_trace trace ->
+  match expand_head_trace env t with
+  | t ->
+    begin
+      match get_desc t with
+      | Tvar { jkind } ->
+          let t', arrow_desc = function_type (get_level t) in
+          begin match
+            constrain_type_jkind env t' (Jkind.disallow_left jkind)
+          with
+          | Ok _ ->
+              link_type t t';
+              Ok arrow_desc
+          | Error err ->
+              Error (Unification_error
+                       (expand_to_unification_error
+                          env
+                          [Bad_jkind (t', err)]))
+          end
+      | Tarrow((l', arg_mode, ret_mode), ty_param, ty_ret, _) ->
+          if l = l' || !Clflags.classic && l = Nolabel &&
+            equivalent_with_nolabels l l'
+          then Ok { ty_param; arg_mode; ty_ret; ret_mode }
+          else Error (Label_mismatch
+                          { got = l; expected = l'; expected_type = t })
+      | _ ->
+          Error Not_a_function
+    end
+  | exception Unify_trace trace ->
       let t', _ = function_type (get_level t) in
-      raise (Filter_arrow_failed
-               (Unification_error
-                  (expand_to_unification_error
-                     env
-                     (Diff { got = t'; expected = t } :: trace))))
-  in
-  match get_desc t with
-    Tvar { jkind } ->
-      let t', arrow_desc = function_type (get_level t) in
-      begin match constrain_type_jkind env t' (Jkind.disallow_left jkind) with
-      | Ok _ -> ()
-      | Error err ->
-        raise (Filter_arrow_failed
-                 (Unification_error
-                    (expand_to_unification_error
-                       env
-                       [Bad_jkind (t',err)])))
-      end;
-      link_type t t';
-      arrow_desc
-  | Tarrow((l', arg_mode, ret_mode), ty_param, ty_ret, _) ->
-      if l = l' || !Clflags.classic && l = Nolabel &&
-        equivalent_with_nolabels l l'
-      then
-        { ty_param; arg_mode; ty_ret; ret_mode }
-      else raise (Filter_arrow_failed
-                    (Label_mismatch
-                       { got = l; expected = l'; expected_type = t }))
-  | _ ->
-      raise (Filter_arrow_failed Not_a_function)
+      Error (Unification_error
+              (expand_to_unification_error
+                  env
+                  (Diff { got = t'; expected = t } :: trace)))
 
 let is_really_poly env ty =
   let snap = Btype.snapshot () in
