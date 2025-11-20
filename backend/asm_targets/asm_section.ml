@@ -43,6 +43,7 @@ type dwarf_section =
 type t =
   | DWARF of dwarf_section
   | Data
+  | Lrodata
   | Read_only_data
   | Eight_byte_literals
   | Sixteen_byte_literals
@@ -77,9 +78,9 @@ let is_delayed = function
   | DWARF
       ( Debug_info | Debug_abbrev | Debug_aranges | Debug_str | Debug_loclists
       | Debug_rnglists | Debug_addr | Debug_loc | Debug_ranges )
-  | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
-  | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | Text
-  | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh ->
+  | Data | Lrodata | Read_only_data | Eight_byte_literals
+  | Sixteen_byte_literals | Thirtytwo_byte_literals | Sixtyfour_byte_literals
+  | Jump_tables | Text | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh ->
     false
 
 let print ppf t =
@@ -96,6 +97,7 @@ let print ppf t =
     | DWARF Debug_str -> "(DWARF Debug_str)"
     | DWARF Debug_line -> "(DWARF Debug_line)"
     | Data -> "Data"
+    | Lrodata -> "Lrodata"
     | Read_only_data -> "Read_only_data"
     | Eight_byte_literals -> "Eight_byte_literals"
     | Sixteen_byte_literals -> "Sixteen_byte_literals"
@@ -116,9 +118,10 @@ let equal t1 t2 = Stdlib.compare t1 t2 = 0
 
 let section_is_text = function
   | Text -> true
-  | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
-  | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | DWARF _
-  | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh ->
+  | Data | Lrodata | Read_only_data | Eight_byte_literals
+  | Sixteen_byte_literals | Thirtytwo_byte_literals | Sixtyfour_byte_literals
+  | Jump_tables | DWARF _ | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh
+    ->
     false
 
 type section_details =
@@ -131,12 +134,14 @@ type section_details =
 let details t ~first_occurrence =
   let text () = [".text"], None, [] in
   let data () = [".data"], None, [] in
+  let lrodata () = [".lrodata"], None, [] in
   let rodata () = [".rodata"], None, [] in
   let system = Target_system.derived_system () in
   let names, flags, args =
     match t, Target_system.architecture (), system with
     | Text, _, _ -> text ()
     | Data, _, _ -> data ()
+    | Lrodata, _, _ -> lrodata ()
     | DWARF dwarf, _, MacOS_like ->
       let name =
         match dwarf with
