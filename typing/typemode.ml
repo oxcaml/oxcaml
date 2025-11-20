@@ -118,8 +118,8 @@ module Transled_modifiers = struct
          different type operators applied on mode constants. *)
       externality : Jkind_axis.Externality.t Location.loc option;
       nullability : Jkind_axis.Nullability.t Location.loc option;
-      (* CR zeisbach: this is a temporary fix to support previous syntax,
-         The location is not really being used for anything currently... *)
+      (* CR layouts-scannable: This is a temporary hack to support the previous
+         syntax. The location is not being used for anything currently. *)
       separability : Jkind_axis.Separability.t Location.loc option
     }
 
@@ -173,8 +173,6 @@ module Transled_modifiers = struct
   let set_separability t separability = { t with separability }
 end
 
-(* CR zeisbach: make this temporarily return scannable axes while both syntax
-   are supported, and push it into some jkinds! *)
 let transl_mod_bounds annots =
   let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
     match Modifier_axis_pair.of_string txt with
@@ -317,8 +315,6 @@ let transl_mod_bounds annots =
     Option.fold ~some:Location.get_txt ~none:Nullability.max
       modifiers.nullability
   in
-  (* CR zeisbach: before this was max, which made more sense because it was a
-     mod bound. but now this is actually setting the thing *)
   let monadic =
     Mode.Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
   in

@@ -398,7 +398,7 @@ module Layout = struct
     | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
     | Product _ -> t
 
-  (* CR zeisbach: I would really like to try to remove this guy *)
+  (* CR zeisbach: I don't think I can get rid of this guy, but revisit this! *)
   let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
     | Any sa -> Some sa
     | Sort (b, sa) -> if Sort.is_possibly_scannable b then Some sa else None
@@ -1553,9 +1553,7 @@ module Const = struct
     let value_or_null =
       { jkind =
           mk_jkind
-            (* CR zeisbach: should this behavior change now?
-               It was maybe_separable before... *)
-            (Base (Value, Scannable_axes.max))
+            (Base (Value, { separability = Maybe_separable }))
             ~crossing:Crossing.max ~externality:Externality.max
             ~nullability:Maybe_null;
         name = "value_or_null"
@@ -1564,7 +1562,7 @@ module Const = struct
     let value_or_null_mod_everything =
       { jkind =
           mk_jkind
-            (Base (Value, Scannable_axes.max))
+            (Base (Value, { separability = Maybe_separable }))
             ~crossing:cross_all_except_staticity ~externality:Externality.min
             ~nullability:Maybe_null;
         name = "value_or_null mod everything"
@@ -2533,8 +2531,8 @@ module Jkind_desc = struct
   let map_type_expr f t = Layout_and_axes.map_type_expr f t
 
   (* CR zeisbach: watch out for call sites of this function! *)
-  let of_new_sort_var nullability_upper_bound separability_upper_bound =
-    let layout, sort = Layout.of_new_sort_var separability_upper_bound in
+  let of_new_sort_var nullability_upper_bound sa =
+    let layout, sort = Layout.of_new_sort_var sa in
     ( { layout;
         mod_bounds =
           Mod_bounds.max |> Mod_bounds.set_nullability nullability_upper_bound;
@@ -2565,7 +2563,8 @@ module Jkind_desc = struct
   let product tys_modalities layouts =
     let layout = Layout.product layouts in
     let relevant_for_shallow =
-      (* CR zeisbach: remove this once nullability is gone too! *)
+      (* CR layouts-scannable: Remove this once [Nullability] is a
+         scannable axis. *)
       (* Shallow axes like nullability or separability are relevant for
          1-field unboxed records and irrelevant for everything else. *)
       match List.length layouts with 1 -> `Relevant | _ -> `Irrelevant
