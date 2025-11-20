@@ -2625,10 +2625,13 @@ let constrain_type_jkind ~fixed env ty jkind =
     (* Handle the [Tpoly] case out here so [Tvar]s wrapped in [Tpoly]s can get
        the treatment above. *)
     | Tpoly (t, _) ->
-      (* [t] probably contains variables that will escapes their scope here. But comparing
-         these variables in jkinds is fine, and they can't escape from this function
-         (except harmlessly in error messages), so we don't do anything special to handle
-         them. *)
+      (* [t] probably contains variables that will escapes their scope here. But
+         comparing these variables in jkinds is fine, and they can't escape from
+         this function (except harmlessly in error messages), so we don't do
+         anything special to handle them.
+
+         But if we ever choose to substitute min mod-bounds for [Tunivar]s, we
+         must do so here. Internal ticket 5746. *)
       loop ~fuel ~expanded:false t ty's_jkind jkind
 
     | _ ->
