@@ -40,7 +40,7 @@ url {
   checksum: "sha256=eb9eab2f21758d3cfb1e78c7f83f0b4dd6302824316aba4abee047a5a4f85029"
 }
 extra-files: [
-  ["ocaml-base-compiler.5.3.0+oxcaml.patch" "sha256=2b0f54104308b7d93463ba28fcf98f1a7d580cc9cbe2a716d2d7b62b57f4ddd9"]
+  ["ocaml-base-compiler.5.3.0+oxcaml.patch" "sha256=0eb6a6902a4ad0551154d31476aef45d70480b04fdc8b0b8bc3f1f89e51faf2c"]
 ]
 extra-source "ocaml-base-compiler.install" {
   src: "https://raw.githubusercontent.com/ocaml/opam-source-archives/main/patches/ocaml-base-compiler/ocaml-base-compiler.install"
