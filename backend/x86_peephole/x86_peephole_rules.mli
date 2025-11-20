@@ -23,6 +23,4 @@ val peephole_stats_to_counters : peephole_stats -> Profile.Counters.t
 (** Apply all peephole rewrite rules to a cell.
     Returns Some continuation_cell if a rule was applied, None otherwise. *)
 val apply :
-  peephole_stats ->
-  asm_line DLL.cell ->
-  asm_line DLL.cell option option
+  peephole_stats -> asm_line DLL.cell -> asm_line DLL.cell option option

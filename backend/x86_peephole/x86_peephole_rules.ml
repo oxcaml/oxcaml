@@ -34,8 +34,7 @@ let peephole_stats_to_counters stats =
   |> Profile.Counters.set "x86_peephole.remove_mov_x_x" stats.remove_mov_x_x
   |> Profile.Counters.set "x86_peephole.remove_useless_mov"
        stats.remove_useless_mov
-  |> Profile.Counters.set "x86_peephole.remove_mov_chain"
-       stats.remove_mov_chain
+  |> Profile.Counters.set "x86_peephole.remove_mov_chain" stats.remove_mov_chain
   |> Profile.Counters.set "x86_peephole.remove_mov_to_dead_register"
        stats.remove_mov_to_dead_register
   |> Profile.Counters.set "x86_peephole.rewrite_mov_sequence_to_xchg"
@@ -51,12 +50,12 @@ let peephole_stats_to_counters stats =
 (* Rewrite rule: remove MOV x, x (moving a value to itself) Note: We can only
    safely remove self-moves for registers that don't have zero-extension side
    effects. On x86-64: - 32-bit moves (Reg32) zero the upper 32 bits - SIMD
-   moves (Regf) may zero upper bits depending on instruction encoding So we
-   only optimize 8/16/64-bit integer register self-moves. *)
+   moves (Regf) may zero upper bits depending on instruction encoding So we only
+   optimize 8/16/64-bit integer register self-moves. *)
 let remove_mov_x_x stats cell =
   match[@warning "-4"] DLL.value cell with
-  | Ins (MOV (src, dst)) when U.equal_args src dst && U.is_safe_self_move_arg src
-    ->
+  | Ins (MOV (src, dst))
+    when U.equal_args src dst && U.is_safe_self_move_arg src ->
     (* Get next cell before deleting *)
     let next = DLL.next cell in
     (* Delete the redundant instruction *)
@@ -82,13 +81,12 @@ let remove_useless_mov stats cell =
     | _, _ -> None)
   | _ -> None
 
-(* Rewrite rule: combine adjacent ADD to RSP with CFI directives. Pattern:
-   addq $n1, %rsp; .cfi_adjust_cfa_offset d1; addq $n2, %rsp;
-   .cfi_adjust_cfa_offset d2 Rewrite: addq $(n1+n2), %rsp;
-   .cfi_adjust_cfa_offset (d1+d2)
+(* Rewrite rule: combine adjacent ADD to RSP with CFI directives. Pattern: addq
+   $n1, %rsp; .cfi_adjust_cfa_offset d1; addq $n2, %rsp; .cfi_adjust_cfa_offset
+   d2 Rewrite: addq $(n1+n2), %rsp; .cfi_adjust_cfa_offset (d1+d2)
 
-   This only applies when d1 = -n1 and d2 = -n2 (i.e., the CFI offsets
-   correctly track the stack adjustment). *)
+   This only applies when d1 = -n1 and d2 = -n2 (i.e., the CFI offsets correctly
+   track the stack adjustment). *)
 let combine_add_rsp stats cell =
   match U.get_cells cell 4 with
   | [cell1; cell2; cell3; cell4] -> (
@@ -132,9 +130,7 @@ let combine_add_rsp stats cell =
 let remove_mov_chain stats cell =
   match U.get_cells cell 3 with
   | [cell1; cell2; cell3] -> (
-    match[@warning "-4"]
-      DLL.value cell1, DLL.value cell2, DLL.value cell3
-    with
+    match[@warning "-4"] DLL.value cell1, DLL.value cell2, DLL.value cell3 with
     | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2)), Ins (MOV (src3, dst3))
       when U.equal_args dst1 src2 && U.equal_args dst1 dst3
            && (not (U.equal_args src3 dst3))
@@ -185,8 +181,8 @@ let remove_mov_to_dead_register stats cell =
     | _, _ -> None)
   | _ -> None
 
-(* Rewrite rule: optimize MOV sequence to XCHG. Pattern: mov %a, %b; mov %c,
-   %a; mov %b, %c Rewrite: xchg %a, %c
+(* Rewrite rule: optimize MOV sequence to XCHG. Pattern: mov %a, %b; mov %c, %a;
+   mov %b, %c Rewrite: xchg %a, %c
 
    This is safe when: - All operands are Reg64 registers (to avoid aliasing
    issues) - %a, %b, %c are all distinct registers - %b is dead after the
@@ -196,13 +192,11 @@ let remove_mov_to_dead_register stats cell =
 let rewrite_mov_sequence_to_xchg stats cell =
   match U.get_cells cell 3 with
   | [cell1; cell2; cell3] -> (
-    match[@warning "-4"]
-      DLL.value cell1, DLL.value cell2, DLL.value cell3
-    with
+    match[@warning "-4"] DLL.value cell1, DLL.value cell2, DLL.value cell3 with
     | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2)), Ins (MOV (src3, dst3))
       -> (
-      (* Pattern: mov %a, %b; mov %c, %a; mov %b, %c src1=%a, dst1=%b,
-         src2=%c, dst2=%a, src3=%b, dst3=%c *)
+      (* Pattern: mov %a, %b; mov %c, %a; mov %b, %c src1=%a, dst1=%b, src2=%c,
+         dst2=%a, src3=%b, dst3=%c *)
       match src1, dst1, src2, dst2, src3, dst3 with
       | Reg64 a, Reg64 b, Reg64 c, Reg64 a', Reg64 b', Reg64 c'
         when U.equal_reg64 a a' && U.equal_reg64 b b' && U.equal_reg64 c c'
@@ -227,8 +221,7 @@ let rewrite_mov_sequence_to_xchg stats cell =
   | _ -> None
 
 (* Helper function: Apply LEA optimization after pattern matching. Checks flag
-   liveness, creates LEA instruction, and replaces the instruction
-   sequence. *)
+   liveness, creates LEA instruction, and replaces the instruction sequence. *)
 let apply_lea_optimization cell1 cell2 dst idx_reg base_reg_opt displ =
   match U.find_next_flag_use cell2 with
   | WriteFound ->
@@ -253,14 +246,14 @@ let apply_lea_optimization cell1 cell2 dst idx_reg base_reg_opt displ =
     None
 
 (* Rewrite rule: optimize MOV followed by ADD/SUB/INC/DEC to LEA. Patterns: -
-   mov %a, %b; add $CONST, %b → lea CONST(%a), %b - mov %a, %b; sub $CONST, %b
-   → lea -CONST(%a), %b - mov %a, %b; inc %b → lea 1(%a), %b - mov %a, %b; dec
-   %b → lea -1(%a), %b
+   mov %a, %b; add $CONST, %b → lea CONST(%a), %b - mov %a, %b; sub $CONST, %b →
+   lea -CONST(%a), %b - mov %a, %b; inc %b → lea 1(%a), %b - mov %a, %b; dec %b
+   → lea -1(%a), %b
 
-   This is safe when: - Both operands are Reg64 registers - For ADD: CONST
-   fits in 32-bit signed immediate - For SUB: CONST > Int32.min_int (so -CONST
-   fits in 32-bit signed) - For INC/DEC: always safe (±1 always fits) - Flags
-   written by ADD/SUB/INC/DEC are dead (LEA doesn't modify flags)
+   This is safe when: - Both operands are Reg64 registers - For ADD: CONST fits
+   in 32-bit signed immediate - For SUB: CONST > Int32.min_int (so -CONST fits
+   in 32-bit signed) - For INC/DEC: always safe (±1 always fits) - Flags written
+   by ADD/SUB/INC/DEC are dead (LEA doesn't modify flags)
 
    Key difference: ADD/SUB/INC/DEC set flags (CF, OF, SF, ZF, AF, PF), LEA
    doesn't. *)
@@ -324,13 +317,13 @@ let rewrite_mov_add_to_lea stats cell =
 (* Rewrite rule: optimize MOV followed by ADD (register) to LEA. Pattern: mov
    %a, %b; add %c, %b Rewrite: lea (%a,%c), %b
 
-   This is safe when: - All operands are Reg64 registers - %b ≠ %c (if %b ==
-   %c, ADD would use the new value of %b after MOV, but LEA would use the old
-   value) - Flags written by ADD are dead (LEA doesn't modify flags)
+   This is safe when: - All operands are Reg64 registers - %b ≠ %c (if %b == %c,
+   ADD would use the new value of %b after MOV, but LEA would use the old value)
+   - Flags written by ADD are dead (LEA doesn't modify flags)
 
-   Note: SUB cannot be optimized here because LEA computes base + index *
-   scale + disp where scale ∈ {1,2,4,8}. To compute %a - %c would require
-   scale = -1, which is not supported by x86-64.
+   Note: SUB cannot be optimized here because LEA computes base + index * scale
+   + disp where scale ∈ {1,2,4,8}. To compute %a - %c would require scale = -1,
+   which is not supported by x86-64.
 
    Key difference: ADD sets flags (CF, OF, SF, ZF, AF, PF), LEA doesn't. *)
 let rewrite_mov_add_reg_to_lea stats cell =
@@ -353,8 +346,8 @@ let rewrite_mov_add_reg_to_lea stats cell =
     | _, _ -> None)
   | _ -> None
 
-(* Find a redundant CMP instruction with the same operands. Returns Some cell
-   if found, None otherwise. *)
+(* Find a redundant CMP instruction with the same operands. Returns Some cell if
+   found, None otherwise. *)
 let find_redundant_cmp src dst start_cell =
   let rec loop cell_opt =
     match cell_opt with
@@ -411,8 +404,8 @@ let remove_redundant_cmp stats cell =
     | _, _ -> None)
   | _ -> None
 
-(* Apply all rewrite rules in sequence. Returns Some continuation_cell if a
-   rule matched, None otherwise. *)
+(* Apply all rewrite rules in sequence. Returns Some continuation_cell if a rule
+   matched, None otherwise. *)
 let apply_rules stats cell =
   match remove_mov_x_x stats cell with
   | Some cont -> Some cont
@@ -441,7 +434,6 @@ let apply_rules stats cell =
                   match combine_add_rsp stats cell with
                   | Some cont -> Some cont
                   | None -> None))))))))
-
 
 (* Public interface for applying rules *)
 let apply stats cell = apply_rules stats cell

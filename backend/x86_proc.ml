@@ -382,12 +382,10 @@ let reset_asm_code () =
 
 let generate_code asm =
   (* Apply peephole optimizations to all sections *)
-  (if !Oxcaml_flags.x86_peephole_optimize
+  if !Oxcaml_flags.x86_peephole_optimize
   then
-    X86_peephole_optimize.optimize_all_sections
-      asm_code
-      asm_code_by_section
-      delayed_sections);
+    X86_peephole_optimize.optimize_all_sections asm_code asm_code_by_section
+      delayed_sections;
   (match asm with
   | Some f -> Profile.record ~accumulate:true "write_asm" f asm_code
   | None -> ());

@@ -44,9 +44,7 @@ let equal_regf left right =
   | (XMM _ | YMM _ | ZMM _), _ -> false
 
 let equal_arch left right =
-  match left, right with
-  | X64, X64 | X86, X86 -> true
-  | (X64 | X86), _ -> false
+  match left, right with X64, X64 | X86, X86 -> true | (X64 | X86), _ -> false
 
 let equal_data_type left right =
   match left, right with
@@ -184,7 +182,8 @@ let reg_appears_in_arg target arg =
 
 let reg_is_written_by_arg target arg =
   match[@warning "-4"] arg with
-  | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ -> registers_alias target arg
+  | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ ->
+    registers_alias target arg
   | Regf _ -> equal_args target arg
   | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
 
@@ -269,8 +268,7 @@ let reads_from_arg target = function[@warning "-4"]
   | INC dst | DEC dst | NEG dst | BSWAP dst -> reg_appears_in_arg target dst
   | IMUL (op1, Some op2) ->
     reg_appears_in_arg target op1 || reg_appears_in_arg target op2
-  | MUL op ->
-    reg_appears_in_arg target op || equal_args target (Reg64 RAX)
+  | MUL op -> reg_appears_in_arg target op || equal_args target (Reg64 RAX)
   | IMUL (op, None) ->
     reg_appears_in_arg target op || equal_args target (Reg64 RAX)
   | IDIV op ->
