@@ -19,7 +19,7 @@ setenv: CAML_LD_LIBRARY_PATH = "%{lib}%/stublibs"
 x-env-path-rewrite: [
   [CAML_LD_LIBRARY_PATH (";" {os = "win32"} ":" {os != "win32"}) "target"]
 ]
-patches: ["ocaml-base-compiler.5.2.0+oxcaml.patch"]
+patches: ["ocaml-base-compiler.5.3.0+oxcaml.patch"]
 build: [
   [
     "./configure"
@@ -40,7 +40,7 @@ url {
   checksum: "sha256=eb9eab2f21758d3cfb1e78c7f83f0b4dd6302824316aba4abee047a5a4f85029"
 }
 extra-files: [
-  ["ocaml-base-compiler.5.2.0+oxcaml.patch" "sha256=2b0f54104308b7d93463ba28fcf98f1a7d580cc9cbe2a716d2d7b62b57f4ddd9"]
+  ["ocaml-base-compiler.5.3.0+oxcaml.patch" "sha256=2b0f54104308b7d93463ba28fcf98f1a7d580cc9cbe2a716d2d7b62b57f4ddd9"]
 ]
 extra-source "ocaml-base-compiler.install" {
   src: "https://raw.githubusercontent.com/ocaml/opam-source-archives/main/patches/ocaml-base-compiler/ocaml-base-compiler.install"

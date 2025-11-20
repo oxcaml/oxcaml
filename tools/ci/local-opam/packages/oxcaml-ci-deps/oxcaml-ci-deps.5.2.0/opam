@@ -7,7 +7,7 @@ homepage: "https://github.com/oxcaml/oxcaml"
 bug-reports: "https://github.com/oxcaml/oxcaml/issues"
 dev-repo: "git+https://github.com/oxcaml/oxcaml"
 depends: [
-  "ocaml-base-compiler" {= "5.2.0+oxcaml"}
+  "ocaml-base-compiler" {= "5.3.0+oxcaml"}
   "menhir" {= "20231231"}
   "ocamlformat" {= "0.28.1"}
   "re" {>= "1.10.0"}
