@@ -75,6 +75,8 @@
 
 (copy_files# backend/peephole/*.ml{,i})
 
+(copy_files# backend/x86_peephole/*.ml{,i})
+
 (copy_files# backend/regalloc/*.ml{,i})
 
 (copy_files# file_formats/*.ml{,i})
@@ -590,6 +592,9 @@
   x86_dsl
   x86_gas
   x86_masm
+  x86_peephole_optimize
+  x86_peephole_rules
+  x86_peephole_utils
   x86_proc
   arm64_ast
   zero_alloc_checker
