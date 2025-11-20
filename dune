@@ -595,6 +595,7 @@
   x86_peephole_optimize
   x86_peephole_rules
   x86_peephole_utils
+  x86_section
   x86_proc
   arm64_ast
   zero_alloc_checker
