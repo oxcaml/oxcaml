@@ -69,7 +69,7 @@ end
 Line 2, characters 2-64:
 2 |   type a : value non_pointer & value non_pointer = #{ b : M2.b }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "a" is value
+Error: The layout of type "a" is value separable
          because it is an unboxed record.
        But the layout of type "a" must be a sublayout of
            value non_pointer & value non_pointer

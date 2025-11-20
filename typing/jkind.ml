@@ -80,7 +80,7 @@ module Sub_result = struct
 end
 
 module Scannable_axes = struct
-  type t = Jkind_types.Scannable_axes.t = { pointerness : Pointerness.t }
+  type t = Jkind_types.Scannable_axes.t = { separability : Separability.t }
 
   (* adding in the stubs explicitly so that they can be expanded later *)
 
@@ -123,7 +123,7 @@ module Scannable_axes = struct
   (* CR layouts-scannable: When more axes get added, I think this should get
      printed like [{ nullability: ...; ... }]. Could also have Caps versions
      of the points on the axis; poke around to see precedent. *)
-  let debug_print ppf { separability } = Separability.print ppf pointerness
+  let debug_print ppf { separability } = Separability.print ppf separability
 end
 
 (* A *layout* of a type describes the way values of that type are stored at
@@ -397,6 +397,12 @@ module Layout = struct
     | Any sa' -> Any (Scannable_axes.meet sa sa')
     | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
     | Product _ -> t
+
+  (* CR zeisbach: I would really like to try to remove this guy *)
+  let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
+    | Any sa -> Some sa
+    | Sort (b, sa) -> if Sort.is_possibly_scannable b then Some sa else None
+    | Product _ -> None
 
   (* CR zeisbach: the existance of this function is a bit suspicious... *)
   (* identity if the root has no meaningful scannable axes *)
@@ -1532,14 +1538,14 @@ module Const = struct
 
     let any =
       { jkind =
-          mk_jkind (Any Maybe_separable) ~crossing:Crossing.max
+          mk_jkind (Any Scannable_axes.max) ~crossing:Crossing.max
             ~externality:Externality.max ~nullability:Maybe_null;
         name = "any"
       }
 
     let any_mod_everything =
       { jkind =
-          mk_jkind (Any Maybe_separable) ~crossing:cross_all_except_staticity
+          mk_jkind (Any Scannable_axes.max) ~crossing:cross_all_except_staticity
             ~externality:Externality.min ~nullability:Maybe_null;
         name = "any mod everything"
       }
@@ -1549,7 +1555,7 @@ module Const = struct
           mk_jkind
             (* CR zeisbach: should this behavior change now?
                It was maybe_separable before... *)
-            (Base (Value, Maybe_separable))
+            (Base (Value, Scannable_axes.max))
             ~crossing:Crossing.max ~externality:Externality.max
             ~nullability:Maybe_null;
         name = "value_or_null"
@@ -1558,7 +1564,7 @@ module Const = struct
     let value_or_null_mod_everything =
       { jkind =
           mk_jkind
-            (Base (Value, Maybe_separable))
+            (Base (Value, Scannable_axes.max))
             ~crossing:cross_all_except_staticity ~externality:Externality.min
             ~nullability:Maybe_null;
         name = "value_or_null mod everything"
@@ -1567,7 +1573,7 @@ module Const = struct
     let value =
       { jkind =
           mk_jkind
-            (Base (Value, Separable))
+            (Base (Value, { separability = Separable }))
             ~crossing:Crossing.max ~externality:Externality.max
             ~nullability:Non_null;
         name = "value"
@@ -1575,7 +1581,7 @@ module Const = struct
 
     let immutable_data =
       { jkind =
-          { layout = Base (Value, Non_float);
+          { layout = Base (Value, { separability = Non_float });
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
@@ -1592,7 +1598,7 @@ module Const = struct
 
     let exn =
       { jkind =
-          { layout = Base (Value, Non_float);
+          { layout = Base (Value, { separability = Non_float });
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:false
@@ -1609,7 +1615,7 @@ module Const = struct
 
     let sync_data =
       { jkind =
-          { layout = Base (Value, Non_float);
+          { layout = Base (Value, { separability = Non_float });
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
@@ -1626,7 +1632,7 @@ module Const = struct
 
     let mutable_data =
       { jkind =
-          { layout = Base (Value, Non_float);
+          { layout = Base (Value, { separability = Non_float });
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
@@ -1662,7 +1668,7 @@ module Const = struct
     let immediate =
       { jkind =
           mk_jkind
-            (Base (Value, Non_pointer))
+            (Base (Value, { separability = Non_pointer }))
             ~crossing:cross_all_except_staticity ~externality:Externality.min
             ~nullability:Non_null;
         name = "immediate"
@@ -1671,7 +1677,7 @@ module Const = struct
     let immediate_or_null =
       { jkind =
           mk_jkind
-            (Base (Value, Non_pointer))
+            (Base (Value, { separability = Non_pointer }))
             ~crossing:cross_all_except_staticity ~externality:Externality.min
             ~nullability:Maybe_null;
         name = "immediate_or_null"
@@ -2254,7 +2260,7 @@ module Const = struct
   (*******************************)
   (* converting user annotations *)
 
-  let set_separability_upper_bound ~abbrev t = function
+  let set_separability ~abbrev t = function
     | None -> t
     | Some (new_sep, loc) ->
       (match Layout.Const.get_root_scannable_axes t.layout with
@@ -2263,9 +2269,7 @@ module Const = struct
         if new_sep = separability
         then
           Location.prerr_warning loc (Warnings.Redundant_kind_modifier abbrev));
-      let new_layout =
-        Layout.Const.set_root_separability t.layout separability
-      in
+      let new_layout = Layout.Const.set_root_separability t.layout new_sep in
       { t with layout = new_layout }
 
   let jkind_of_product_annotations (type l r) (jkinds : (l * r) t list) =
@@ -2370,7 +2374,7 @@ module Const = struct
         match separability with
         | None -> base.layout
         | Some separability ->
-          Layout.Const.set_separability_upper_bound base.layout
+          Layout.Const.set_root_separability base.layout
             (Location.get_txt separability)
       in
       { layout; mod_bounds; with_bounds = No_with_bounds }
@@ -2725,20 +2729,26 @@ let has_with_bounds (type r) (t : (_ * r) jkind) =
    carefully. Creating sort variables and setting the scannable axes in
    this way might not be what I'm actually trying to do... *)
 let of_new_sort_var ~why =
-  let jkind, sort = Jkind_desc.of_new_sort_var Maybe_null Maybe_separable in
+  let jkind, sort =
+    Jkind_desc.of_new_sort_var Maybe_null { separability = Maybe_separable }
+  in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
 let of_new_sort ~why = fst (of_new_sort_var ~why)
 
 let of_new_legacy_sort_var ~why =
-  let jkind, sort = Jkind_desc.of_new_sort_var Non_null Separable in
+  let jkind, sort =
+    Jkind_desc.of_new_sort_var Non_null { separability = Separable }
+  in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_legacy_creation why), sort
 
 (* CR zeisbach: this now is a precise bound and not an upper bound. Might this
    be a problem when we put non_pointer things in arrays? Or should the sub
    relationship stuff already work? Again, look at call sites to debug! *)
 let of_new_non_float_sort_var ~why =
-  let jkind, sort = Jkind_desc.of_new_sort_var Maybe_null Non_float in
+  let jkind, sort =
+    Jkind_desc.of_new_sort_var Maybe_null { separability = Non_float }
+  in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
 let of_new_legacy_sort ~why = fst (of_new_legacy_sort_var ~why)
@@ -3082,7 +3092,9 @@ let for_array_argument =
     ~annotation:None ~why:(Any_creation Array_type_argument)
 
 let for_array_element_sort () =
-  let jkind_desc, sort = Jkind_desc.of_new_sort_var Maybe_null Separable in
+  let jkind_desc, sort =
+    Jkind_desc.of_new_sort_var Maybe_null { separability = Separable }
+  in
   let jkind = { for_array_argument.jkind with layout = jkind_desc.layout } in
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
     sort )
@@ -3136,6 +3148,8 @@ let sort_of_jkind (t : jkind_l) : sort =
 let get_layout jk : Layout.Const.t option = Layout.get_const jk.jkind.layout
 
 let extract_layout jk = jk.jkind.layout
+
+let get_root_scannable_axes jk = Layout.get_root_scannable_axes jk.jkind.layout
 
 let get_mode_crossing (type l r) ~context (jk : (l * r) jkind) =
   let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :
@@ -3205,10 +3219,7 @@ let set_root_separability jk separability =
   { jk with
     jkind =
       { jk.jkind with
-        layout =
-          (* CR zeisbach: three conflicting names here chosen almost randomly:
-             scannable_axes, separability, separability. Fix (or kill) this! *)
-          Layout.set_root_scannable_axes jk.jkind.layout separability
+        layout = Layout.set_root_scannable_axes jk.jkind.layout { separability }
       }
   }
 
@@ -3250,9 +3261,9 @@ let apply_or_null_l jkind =
          maybe_separable staying the same but being in the branch
          with separable was how this was done before. None is weird... *)
       match get_root_scannable_axes jkind with
-      | Some (Maybe_separable | Separable) ->
+      | Some { separability = Maybe_separable | Separable } ->
         set_root_separability jkind Maybe_separable
-      | Some (Non_float | Non_pointer) -> jkind
+      | Some { separability = Non_float | Non_pointer } -> jkind
       | None -> jkind
     in
     Ok jkind
@@ -3265,11 +3276,12 @@ let apply_or_null_r jkind =
     let jkind =
       (* CR zeisbach: how should this be written, style-wise? *)
       match get_root_scannable_axes jkind with
-      | Some Maybe_separable -> jkind
-      | Some Separable -> set_root_separability jkind Non_float
+      | Some { separability = Maybe_separable } -> jkind
+      | Some { separability = Separable } ->
+        set_root_separability jkind Non_float
       (* CR zeisbach: what is the right interaction here? Is null a non_pointer?
          I would assume that's okay, and that it shouldn't change at all. *)
-      | Some (Non_float | Non_pointer) -> jkind
+      | Some { separability = Non_float | Non_pointer } -> jkind
       | None -> jkind
     in
     Ok jkind

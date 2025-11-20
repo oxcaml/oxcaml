@@ -41,10 +41,10 @@ type t_maybeptr : any
 type t_nonptr : any non_pointer
 |}]
 
-type t_maybeptr_val : value maybe_pointer
+type t_maybeptr_val : value maybe_separable
 type t_nonptr_val : value non_pointer
 [%%expect{|
-type t_maybeptr_val
+type t_maybeptr_val : value maybe_separable
 type t_nonptr_val : value non_pointer
 |}]
 
@@ -55,10 +55,10 @@ type ('a : any) accepts_maybeptr
 type ('a : any non_pointer) accepts_nonptr
 |}]
 
-type ('a : value maybe_pointer) accepts_maybeptr_val
+type ('a : value maybe_separable) accepts_maybeptr_val
 type ('a : value non_pointer) accepts_nonptr_val
 [%%expect{|
-type 'a accepts_maybeptr_val
+type ('a : value maybe_separable) accepts_maybeptr_val
 type ('a : value non_pointer) accepts_nonptr_val
 |}]
 
@@ -98,7 +98,7 @@ Line 1, characters 13-27:
 Error: This type "t_maybeptr_val" should be an instance of type
          "('a : value non_pointer)"
        The layout of t_maybeptr_val is value
-         because of the definition of t_maybeptr_val at line 1, characters 0-41.
+         because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of t_maybeptr_val must be a sublayout of
            value non_pointer
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
@@ -293,7 +293,7 @@ Line 5, characters 19-20:
                        ^
 Error: This expression has type "a2" but an expression was expected of type
          "('a : value non_pointer)"
-       The layout of a2 is value
+       The layout of a2 is value separable
          because of the annotation on the abstract type declaration for a2.
        But the layout of a2 must be a sublayout of value non_pointer
          because of the definition of cant_promote_snd at line 4, characters 23-64.

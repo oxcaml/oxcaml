@@ -59,17 +59,17 @@ type t : immediate non_pointer
 Line 1, characters 19-30:
 1 | type t : immediate non_pointer
                        ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This modifier is already implied by the layout "immediate".
+Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "immediate".
 
 Line 1, characters 19-30:
 1 | type t : immediate non_pointer
                        ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This modifier is already implied by the layout "immediate".
+Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "immediate".
 
 Line 1, characters 19-30:
 1 | type t : immediate non_pointer
                        ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This modifier is already implied by the layout "immediate".
+Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by the kind "immediate".
 
 type t : immediate
 |}]
