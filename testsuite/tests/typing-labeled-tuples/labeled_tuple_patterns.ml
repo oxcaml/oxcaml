@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension labeled_tuples";
+ flags = "-extension labeled_tuples -ikinds";
  expect;
 *)
 

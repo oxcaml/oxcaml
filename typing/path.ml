@@ -186,3 +186,26 @@ module T = struct
 end
 module Set = Set.Make(T)
 module Map = Map.Make(T)
+
+let rec hash_aux acc p =
+  let combine acc x = Hashtbl.seeded_hash acc x in
+  match p with
+  | Pident id -> combine acc (Ident.hash id)
+  | Pdot (p', name) ->
+      let acc = combine acc 1 in
+      let acc = hash_aux acc p' in
+      combine acc name
+  | Papply (p1, p2) ->
+      let acc = combine acc 2 in
+      let acc = hash_aux acc p1 in
+      hash_aux acc p2
+  | Pextra_ty (p', extra) ->
+      let acc = combine acc 3 in
+      let acc = hash_aux acc p' in
+      begin match extra with
+      | Pcstr_ty s -> combine (combine acc 0) s
+      | Pext_ty -> combine acc 1
+      | Punboxed_ty -> combine acc 2
+      end
+
+let hash p = hash_aux 0 p

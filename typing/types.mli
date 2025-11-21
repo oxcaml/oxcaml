@@ -122,6 +122,15 @@ module Jkind_mod_bounds : sig
   val is_max_within_set : t -> Jkind_axis.Axis_set.t -> bool
   val is_max : t -> bool
 
+  val areality_const : t -> Mode.Regionality.Const.t
+  val linearity_const : t -> Mode.Linearity.Const.t
+  val uniqueness_const : t -> Mode.Uniqueness.Const.t
+  val portability_const : t -> Mode.Portability.Const.t
+  val contention_const : t -> Mode.Contention.Const.t
+  val yielding_const : t -> Mode.Yielding.Const.t
+  val statefulness_const : t -> Mode.Statefulness.Const.t
+  val visibility_const : t -> Mode.Visibility.Const.t
+
   val debug_print : Format.formatter -> t -> unit
 end
 
@@ -137,6 +146,18 @@ type row_desc
 type row_field
 type field_kind
 type commutable
+
+(* CR jujacobs: temporary hack to avoid dependency cycle *)
+type constructor_ikind =
+  { base : Ikind.Ldd.node;
+    coeffs : Ikind.Ldd.node array;
+  }
+
+type constructor_ikind_entry =
+  | Constructor_ikind of constructor_ikind
+  | No_constructor_ikind of string
+
+type type_ikind = constructor_ikind_entry
 
 and type_desc =
   | Tvar of { name : string option; jkind : jkind_lr }
@@ -381,6 +402,10 @@ and jkind_l = (allowed * disallowed) jkind  (* the jkind of an actual type *)
 and jkind_r = (disallowed * allowed) jkind  (* the jkind expected of a type *)
 and jkind_lr = (allowed * allowed) jkind    (* the jkind of a variable *)
 and jkind_packed = Pack_jkind : ('l * 'r) jkind -> jkind_packed
+
+val ikind_reset : string -> type_ikind
+
+val ikind_debug : bool ref
 
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
@@ -748,6 +773,10 @@ type type_declaration =
        the jkind stored here might be a subjkind of the jkind that would
        be computed from the decl kind. This happens in
        Ctype.add_jkind_equation. *)
+
+    type_ikind: constructor_ikind_entry;
+    (* Cached constructor ikind polynomial (opaque) populated when jkinds are
+       normalized under [-ikinds]; carries a reason when absent. *)
 
     type_private: private_flag;
     type_manifest: type_expr option;

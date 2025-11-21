@@ -608,6 +608,16 @@ let rec type_declaration' copy_scope s decl =
         in
         Jkind.map_type_expr (typexp copy_scope s decl.type_loc) jkind
       end;
+    type_ikind = (
+      (* Preserve constructor ikinds via [s.types] (path rename or identity-env inlined type functions), avoiding Env; ideally we'd use a real Env but we use this identity-env approach instead. *)
+      let lookup (p : Path.t) =
+        match Path.Map.find p s.types with
+        | Path p' -> Some (`Path p')
+        | Type_function { params; body } -> Some (`Type_fun (params, body))
+        | exception Not_found -> None
+      in
+      Ikinds.substitute_decl_ikind_with_lookup ~lookup decl.type_ikind
+    );
     type_private = decl.type_private;
     type_variance = decl.type_variance;
     type_separability = decl.type_separability;

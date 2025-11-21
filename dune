@@ -49,6 +49,9 @@
 
 (copy_files# typing/*.ml{,i})
 
+; Include ikinds sources under typing/
+(copy_files# typing/ikinds/*.ml{,i})
+
 (copy_files# bytecomp/*.ml{,i})
 
 (copy_files# driver/*.ml{,i})
@@ -202,7 +205,7 @@
   ast_invariants
   depend
   parser_types ; manual update: mli only files asttypes parsetree
-  ;; TYPING
+ ;; TYPING
   ident
   path
   jkind
@@ -246,6 +249,22 @@
   includemod_errorprinter
   typemode
   jkind_axis
+  ;; IKINDS
+  global_counters
+  product_lattice
+  ldd_memo
+  ldd_cached_down0
+  ldd
+  ldd_no_memo
+  ldd_unboxed
+  ldd_no_fast_path
+  ldd_leaf_specialized
+  axis_lattice
+  axis_lattice_conv
+  axis_lattice_array
+  axis_lattice_array_conv
+  ikind
+  ikinds
   typetexp
   patterns
   printpat

@@ -128,7 +128,23 @@
   types
   oprint
   typemode
-  jkind
+ jkind
+  ;; IKINDS
+  global_counters
+  product_lattice
+  ldd_memo
+  ldd_cached_down0
+  ldd
+  ldd_no_memo
+  ldd_unboxed
+  ldd_no_fast_path
+  ldd_leaf_specialized
+  axis_lattice
+  axis_lattice_conv
+  axis_lattice_array
+  axis_lattice_array_conv
+  ikind
+  ikinds
   value_rec_types
   btype
   lazy_backtrack
@@ -310,6 +326,7 @@
 (copy_files ../../typing/type_shape.ml)
 
 (copy_files ../../typing/subst.ml)
+(copy_files ../../typing/ikinds/*.ml{,i})
 
 (copy_files ../../typing/signature_with_global_bindings.ml)
 
