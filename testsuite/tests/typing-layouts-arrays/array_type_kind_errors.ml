@@ -59,7 +59,7 @@ Error: This array operation cannot tell whether int64# t is an array type,
 
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of scannable separable
+       But the layout of int64# must be a sublayout of value
          because it's the element type for an array operation with an opaque
          array type.
 |}]
@@ -81,7 +81,7 @@ Error: This array operation cannot tell whether int64# t is an array type,
 
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of scannable separable
+       But the layout of int64# must be a sublayout of value
          because it's the element type for an array operation with an opaque
          array type.
 |}]
@@ -104,7 +104,7 @@ Error: This array operation cannot tell whether int64# t is an array type,
 
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of scannable separable
+       But the layout of int64# must be a sublayout of value
          because it's the element type for an array operation with an opaque
          array type.
 |}]
@@ -126,7 +126,7 @@ Error: This array operation cannot tell whether int64# t is an array type,
 
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of scannable separable
+       But the layout of int64# must be a sublayout of value
          because it's the element type for an array operation with an opaque
          array type.
 |}]
@@ -179,7 +179,7 @@ Error: This array operation cannot tell whether M.t is an array type,
 
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of scannable separable
+       But the layout of int64# must be a sublayout of value
          because it's the element type for an array operation with an opaque
          array type.
 |}]

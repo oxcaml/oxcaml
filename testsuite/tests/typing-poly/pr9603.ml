@@ -32,7 +32,7 @@ Error: Object field types must have layout value.
            any
          because the .cmi file for pair is missing.
        But the layout of "'left 'right. < left : 'left; right : 'right > pair" must be a sublayout of
-         scannable separable
+         value
          because it's the type of an object field.
        No .cmi file found containing pair.
 |}]

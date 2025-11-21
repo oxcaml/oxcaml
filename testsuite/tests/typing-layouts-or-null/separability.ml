@@ -109,7 +109,7 @@ Line 1, characters 13-18:
 1 | type fails = t_von accepts_sep
                  ^^^^^
 Error: This type "t_von" should be an instance of type "('a : any separable)"
-       The layout of t_von is scannable
+       The layout of t_von is value maybe_separable
          because of the definition of t_von at line 1, characters 0-26.
        But the layout of t_von must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -122,7 +122,7 @@ Line 1, characters 13-18:
 1 | type fails = t_von accepts_nonfloat
                  ^^^^^
 Error: This type "t_von" should be an instance of type "('a : any non_float)"
-       The layout of t_von is scannable
+       The layout of t_von is value maybe_separable
          because of the definition of t_von at line 1, characters 0-26.
        But the layout of t_von must be a sublayout of any non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
@@ -147,7 +147,7 @@ Line 1, characters 13-18:
 1 | type fails = t_val accepts_nonfloat
                  ^^^^^
 Error: This type "t_val" should be an instance of type "('a : any non_float)"
-       The layout of t_val is scannable separable
+       The layout of t_val is value
          because of the definition of t_val at line 1, characters 0-18.
        But the layout of t_val must be a sublayout of any non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
@@ -383,7 +383,7 @@ Line 1, characters 13-18:
 1 | type fails = float accepts_nonfloat
                  ^^^^^
 Error: This type "float" should be an instance of type "('a : any non_float)"
-       The layout of float is scannable separable
+       The layout of float is value
          because it is the primitive type float.
        But the layout of float must be a sublayout of any non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
@@ -504,7 +504,7 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "t_val or_null" should be an instance of type
          "('a : any separable)"
-       The layout of t_val or_null is scannable
+       The layout of t_val or_null is value maybe_separable
          because it is the primitive type or_null.
        But the layout of t_val or_null must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -520,7 +520,7 @@ Error: This type "t_b64" should be an instance of type
          "('a : value maybe_separable)"
        The layout of t_b64 is bits64
          because of the definition of t_b64 at line 1, characters 0-19.
-       But the layout of t_b64 must be a sublayout of scannable
+       But the layout of t_b64 must be a sublayout of value maybe_separable
          because the type argument of or_null has layout value.
 |}]
 
@@ -559,7 +559,7 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is scannable
+       The layout of float or_null is value maybe_separable
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -577,7 +577,7 @@ Line 1, characters 13-27:
                  ^^^^^^^^^^^^^^
 Error: This type "t_maybesep_val" should be an instance of type
          "('a : any separable)"
-       The layout of t_maybesep_val is scannable
+       The layout of t_maybesep_val is value maybe_separable
          because of the definition of t_maybesep_val at line 1, characters 0-48.
        But the layout of t_maybesep_val must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -613,7 +613,7 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is scannable
+       The layout of float or_null is value maybe_separable
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -704,9 +704,9 @@ type a : value = #{ a : t_maybesep_val }
 Line 1, characters 0-40:
 1 | type a : value = #{ a : t_maybesep_val }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "a" is scannable
+Error: The layout of type "a" is value maybe_separable
          because it is an unboxed record.
-       But the layout of type "a" must be a sublayout of scannable separable
+       But the layout of type "a" must be a sublayout of value
          because of the annotation on the declaration of the type a.
 |}]
 
@@ -730,10 +730,9 @@ Line 3, characters 83-89:
                                                                                        ^^^^^^
 Error: The type constraints are not consistent.
        Type "('b : value & value & float64)" is not compatible with type "b"
-       The layout of b is scannable non_pointer & scannable & float64
+       The layout of b is immediate & value maybe_separable & float64
          because of the definition of b at line 1, characters 0-51.
-       But the layout of b must be a sublayout of
-           scannable separable & scannable separable & float64
+       But the layout of b must be a sublayout of value & value & float64
          because of the annotation on 'b in the declaration of the type fails.
 |}]
 
@@ -749,10 +748,9 @@ Line 3, characters 83-89:
 Error: The type constraints are not consistent.
        Type "('c : value & value & float64)" is not compatible with type
          "c" = "#(float * float or_null * float#)"
-       The layout of c is scannable separable & scannable & float64
+       The layout of c is value & value maybe_separable & float64
          because it is an unboxed tuple.
-       But the layout of c must be a sublayout of
-           scannable separable & scannable separable & float64
+       But the layout of c must be a sublayout of value & value & float64
          because of the annotation on 'c in the declaration of the type fails.
 |}]
 
@@ -810,7 +808,7 @@ Line 1, characters 13-37:
                  ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type "float Or_null_reexport.t" = "float or_null"
        should be an instance of type "('a : any non_float)"
-       The layout of float Or_null_reexport.t is scannable
+       The layout of float Or_null_reexport.t is value maybe_separable
          because it is the primitive type or_null.
        But the layout of float Or_null_reexport.t must be a sublayout of
            any non_float
@@ -825,7 +823,7 @@ Line 1, characters 13-37:
                  ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type "float Or_null_reexport.t" = "float or_null"
        should be an instance of type "('a : any separable)"
-       The layout of float Or_null_reexport.t is scannable
+       The layout of float Or_null_reexport.t is value maybe_separable
          because it is the primitive type or_null.
        But the layout of float Or_null_reexport.t must be a sublayout of
            any separable
@@ -856,7 +854,7 @@ Line 1, characters 13-31:
                  ^^^^^^^^^^^^^^^^^^
 Error: This type "float unbx or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float unbx or_null is scannable
+       The layout of float unbx or_null is value maybe_separable
          because it is the primitive type or_null.
        But the layout of float unbx or_null must be a sublayout of
            any separable
@@ -886,9 +884,9 @@ Line 1, characters 30-32:
                                   ^^
 Error: This expression has type "float" but an expression was expected of type
          "('a : value non_float)"
-       The layout of float is scannable separable
+       The layout of float is value
          because it is the primitive type float.
-       But the layout of float must be a sublayout of scannable non_float
+       But the layout of float must be a sublayout of value non_float
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -936,9 +934,9 @@ Error: Signature mismatch:
          type 'a t = float or_null
        is not included in
          type ('a : value non_float) t : value_or_null non_float
-       The layout of the first is scannable
+       The layout of the first is value maybe_separable
          because it is the primitive type or_null.
-       But the layout of the first must be a sublayout of scannable non_float
+       But the layout of the first must be a sublayout of value non_float
          because of the definition of t at line 2, characters 2-65.
 |}]
 
@@ -992,9 +990,9 @@ Error: Signature mismatch:
          type t = float or_null
        is not included in
          type t : value_or_null separable
-       The layout of the first is scannable
+       The layout of the first is value maybe_separable
          because it is the primitive type or_null.
-       But the layout of the first must be a sublayout of scannable separable
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 2, characters 2-38.
 |}]
 

@@ -62,10 +62,9 @@ Error: In this "with" constraint, the new definition of "t"
          type t = t_value
        is not included in
          type t : immediate
-       The layout of the first is scannable separable
+       The layout of the first is value
          because of the definition of t_value at line 1, characters 0-12.
-       But the layout of the first must be a sublayout of
-           scannable non_pointer
+       But the layout of the first must be a sublayout of immediate
          because of the definition of t at line 2, characters 2-22.
 |}];;
 
@@ -147,9 +146,9 @@ Line 6, characters 0-16:
 6 | and t2 = t_value;;
     ^^^^^^^^^^^^^^^^
 Error:
-       The layout of t2 is scannable separable
+       The layout of t2 is value
          because of the definition of t_value at line 1, characters 0-12.
-       But the layout of t2 must be a sublayout of scannable non_pointer
+       But the layout of t2 must be a sublayout of immediate
          because of the definition of t at line 2, characters 2-22.
 |}];;
 
@@ -173,10 +172,10 @@ Error: Layout mismatch in checking consistency of mutually recursive groups.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The layout of 'a t2 is scannable separable
+         The layout of 'a t2 is value
            because it instantiates an unannotated type parameter of t2,
            chosen to have layout value.
-         But the layout of 'a t2 must be a sublayout of scannable non_pointer
+         But the layout of 'a t2 must be a sublayout of immediate
            because of the definition of t at line 2, characters 2-22.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
@@ -199,10 +198,10 @@ Error: Layout mismatch in checking consistency of mutually recursive groups.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The layout of 'a t2 is scannable separable
+         The layout of 'a t2 is value
            because it instantiates an unannotated type parameter of t2,
            chosen to have layout value.
-         But the layout of 'a t2 must be a sublayout of scannable non_pointer
+         But the layout of 'a t2 must be a sublayout of immediate
            because of the definition of t at line 2, characters 2-22.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
@@ -334,8 +333,8 @@ Line 8, characters 10-17:
 8 | type t2 = t_value t
               ^^^^^^^
 Error: This type "t_value" should be an instance of type "('a : immediate)"
-       The layout of t_value is scannable separable
+       The layout of t_value is value
          because of the definition of t_value at line 1, characters 0-12.
-       But the layout of t_value must be a sublayout of scannable non_pointer
+       But the layout of t_value must be a sublayout of immediate
          because of the definition of t at line 5, characters 0-39.
 |}];;

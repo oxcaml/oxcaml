@@ -30,7 +30,7 @@ Line 3, characters 19-34:
                        ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type
          "('a : any separable)"
-       The layout of t_value_or_null is scannable
+       The layout of t_value_or_null is value maybe_separable
          because of the definition of t_value_or_null at line 1, characters 0-36.
        But the layout of t_value_or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -76,7 +76,7 @@ Line 1, characters 19-32:
                        ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is scannable
+       The layout of float or_null is value maybe_separable
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -92,9 +92,9 @@ Line 1, characters 32-35:
                                     ^^^
 Error: This expression has type "float" but an expression was expected of type
          "('a : value non_float)"
-       The layout of float is scannable separable
+       The layout of float is value
          because it is the primitive type float.
-       But the layout of float must be a sublayout of scannable non_float
+       But the layout of float must be a sublayout of value non_float
          because it's the type of an array element.
 |}]
 
@@ -125,7 +125,7 @@ Line 3, characters 19-34:
                        ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type
          "('a : any separable)"
-       The layout of t_value_or_null is scannable
+       The layout of t_value_or_null is value maybe_separable
          because of the definition of t_value_or_null at line 1, characters 0-36.
        But the layout of t_value_or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -171,7 +171,7 @@ Line 1, characters 19-32:
                        ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is scannable
+       The layout of float or_null is value maybe_separable
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -186,9 +186,9 @@ Line 1, characters 39-42:
                                            ^^^
 Error: This expression has type "float" but an expression was expected of type
          "('a : value non_float)"
-       The layout of float is scannable separable
+       The layout of float is value
          because it is the primitive type float.
-       But the layout of float must be a sublayout of scannable non_float
+       But the layout of float must be a sublayout of value non_float
          because it's the type of an array element.
 |}]
 
@@ -205,7 +205,7 @@ Line 3, characters 19-24:
 Error: This type "t_any" should be an instance of type "('a : value_or_null)"
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
-       But the layout of t_any must be a sublayout of scannable
+       But the layout of t_any must be a sublayout of value maybe_separable
          because the type argument of list has layout value_or_null.
 |}]
 
@@ -231,7 +231,8 @@ Error: This type "t_any_mod_separable" should be an instance of type
          "('a : value_or_null)"
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 1, characters 0-44.
-       But the layout of t_any_mod_separable must be a sublayout of scannable
+       But the layout of t_any_mod_separable must be a sublayout of
+           value maybe_separable
          because the type argument of list has layout value_or_null.
 |}]
 
@@ -271,7 +272,7 @@ Line 3, characters 19-24:
 Error: This type "t_any" should be an instance of type "('a : value_or_null)"
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
-       But the layout of t_any must be a sublayout of scannable
+       But the layout of t_any must be a sublayout of value maybe_separable
          because the type argument of option has layout value_or_null.
 |}]
 
@@ -297,7 +298,8 @@ Error: This type "t_any_mod_separable" should be an instance of type
          "('a : value_or_null)"
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 1, characters 0-44.
-       But the layout of t_any_mod_separable must be a sublayout of scannable
+       But the layout of t_any_mod_separable must be a sublayout of
+           value maybe_separable
          because the type argument of option has layout value_or_null.
 |}]
 

@@ -230,10 +230,9 @@ Line 1, characters 19-30:
                        ^^^^^^^^^^^
 Error: This type "exn or_null" should be an instance of type
          "('a : immediate64_or_null)"
-       The layout of exn or_null is scannable
+       The layout of exn or_null is value maybe_separable
          because it is the primitive type or_null.
-       But the layout of exn or_null must be a sublayout of
-           scannable non_pointer
+       But the layout of exn or_null must be a sublayout of immediate
          because of the definition of accept_immediate64_or_null at line 1, characters 0-58.
 |}]
 
@@ -267,9 +266,8 @@ Error: Signature mismatch:
          type t = string or_null
        is not included in
          type t : immediate64_or_null
-       The layout of the first is scannable
+       The layout of the first is value maybe_separable
          because it is the primitive type or_null.
-       But the layout of the first must be a sublayout of
-           scannable non_pointer
+       But the layout of the first must be a sublayout of immediate
          because of the definition of t at line 2, characters 2-30.
 |}]

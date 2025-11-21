@@ -24,9 +24,9 @@ Error: Signature mismatch:
          type 'a t
        is not included in
          type 'a t : immutable_data with 'a
-       The layout of the first is scannable separable
+       The layout of the first is value
          because of the definition of t at line 4, characters 2-11.
-       But the layout of the first must be a sublayout of scannable non_float
+       But the layout of the first must be a sublayout of value non_float
          because of the definition of t at line 2, characters 2-36.
 |}]
 

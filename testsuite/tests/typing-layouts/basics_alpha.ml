@@ -204,7 +204,8 @@ Line 1, characters 27-33:
 Error: This type signature for "x" is not a value type.
        The layout of type t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of type t_void must be a sublayout of scannable
+       But the layout of type t_void must be a sublayout of
+           value maybe_separable
          because it's the type of something stored in a module structure.
 |}];;
 (* CR layouts v5: the test above should be made to work *)
@@ -242,9 +243,9 @@ Line 1, characters 19-25:
 1 | let string_id (x : string imm_id) = x;;
                        ^^^^^^
 Error: This type "string" should be an instance of type "('a : immediate)"
-       The layout of string is scannable non_float
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of scannable non_pointer
+       But the layout of string must be a sublayout of immediate
          because of the definition of imm_id at line 1, characters 0-33.
 |}];;
 
@@ -265,9 +266,9 @@ Line 1, characters 33-46:
                                      ^^^^^^^^^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "'a imm_id" = "('a : immediate)"
-       The layout of string is scannable non_float
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of scannable non_pointer
+       But the layout of string must be a sublayout of immediate
          because of the definition of id_for_imms at line 1, characters 16-35.
 |}]
 
@@ -281,9 +282,9 @@ Line 2, characters 9-15:
 2 | and s4 = string t4;;
              ^^^^^^
 Error: This type "string" should be an instance of type "('a : immediate)"
-       The layout of string is scannable non_float
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of scannable non_pointer
+       But the layout of string must be a sublayout of immediate
          because of the annotation on 'a in the declaration of the type t4.
 |}];;
 
@@ -295,9 +296,9 @@ Line 1, characters 10-16:
 1 | type s4 = string t4
               ^^^^^^
 Error: This type "string" should be an instance of type "('a : immediate)"
-       The layout of string is scannable non_float
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of scannable non_pointer
+       But the layout of string must be a sublayout of immediate
          because of the annotation on 'a in the declaration of the type t4.
 |}]
 
@@ -328,9 +329,9 @@ Line 3, characters 0-15:
 3 | and s5 = string;;
     ^^^^^^^^^^^^^^^
 Error:
-       The layout of s5 is scannable non_float
+       The layout of s5 is value non_float
          because it is the primitive type string.
-       But the layout of s5 must be a sublayout of scannable non_pointer
+       But the layout of s5 must be a sublayout of immediate
          because of the annotation on 'a in the declaration of the type t4.
 |}]
 
@@ -386,7 +387,7 @@ Line 1, characters 12-15:
 1 | let h5 (x : int void5) = f5 x
                 ^^^
 Error: This type "int" should be an instance of type "('a : void)"
-       The layout of int is scannable non_pointer
+       The layout of int is immediate
          because it is the primitive type int.
        But the layout of int must be a sublayout of void
          because of the definition of void5 at line 1, characters 0-37.
@@ -399,7 +400,7 @@ Line 1, characters 26-27:
                               ^
 Error: This expression has type "int" but an expression was expected of type
          "('a : void)"
-       The layout of int is scannable non_pointer
+       The layout of int is immediate
          because it is the primitive type int.
        But the layout of int must be a sublayout of void
          because of the definition of void5 at line 1, characters 0-37.
@@ -436,9 +437,9 @@ Line 2, characters 2-32:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This definition has type "'b -> unit" which is less general than
          "'a. 'a -> unit"
-       The layout of 'a is scannable separable
+       The layout of 'a is value
          because it is or unifies with an unannotated universal variable.
-       But the layout of 'a must be a sublayout of scannable non_pointer
+       But the layout of 'a must be a sublayout of immediate
          because of the definition of t6_imm at line 1, characters 0-42.
 |}];;
 
@@ -452,9 +453,9 @@ Line 3, characters 4-34:
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This method has type "'b -> unit" which is less general than
          "'a. 'a -> unit"
-       The layout of 'a is scannable separable
+       The layout of 'a is value
          because it is or unifies with an unannotated universal variable.
-       But the layout of 'a must be a sublayout of scannable non_pointer
+       But the layout of 'a must be a sublayout of immediate
          because of the definition of t6_imm at line 1, characters 0-42.
 |}];;
 
@@ -474,10 +475,9 @@ Line 3, characters 12-21:
 3 | type t7' = (int * int) t7;;
                 ^^^^^^^^^
 Error: This type "int * int" should be an instance of type "('a : immediate)"
-       The layout of int * int is scannable non_float
+       The layout of int * int is value non_float
          because it's a tuple type.
-       But the layout of int * int must be a sublayout of
-           scannable non_pointer
+       But the layout of int * int must be a sublayout of immediate
          because of the definition of t7 at line 1, characters 0-37.
 |}]
 
@@ -496,7 +496,7 @@ Line 2, characters 40-46:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "t_void" is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of "t_void" must be a sublayout of scannable
+       But the layout of "t_void" must be a sublayout of value maybe_separable
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -529,7 +529,7 @@ Line 4, characters 13-19:
 Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable separable
+       But the layout of t_void must be a sublayout of value
          because of the definition of t at line 2, characters 2-42.
 |}];;
 
@@ -544,8 +544,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "void_unboxed_record"
        The layout of void_unboxed_record is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of void_unboxed_record must be a sublayout of
-           scannable separable
+       But the layout of void_unboxed_record must be a sublayout of value
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
 |}];;
@@ -560,7 +559,7 @@ Line 2, characters 17-23:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "t_void" is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of "t_void" must be a sublayout of scannable
+       But the layout of "t_void" must be a sublayout of value maybe_separable
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -578,7 +577,7 @@ Line 2, characters 20-26:
 Error: Tuple element types must have layout value.
        The layout of "t_void" is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of "t_void" must be a sublayout of scannable
+       But the layout of "t_void" must be a sublayout of value maybe_separable
          because it's the type of a tuple element.
 |}];;
 
@@ -592,7 +591,8 @@ Line 2, characters 31-50:
 Error: Tuple element types must have layout value.
        The layout of "void_unboxed_record" is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of "void_unboxed_record" must be a sublayout of scannable
+       But the layout of "void_unboxed_record" must be a sublayout of
+           value maybe_separable
          because it's the type of a tuple element.
 |}];;
 
@@ -612,7 +612,8 @@ Error: This expression has type "void_unboxed_record"
        but an expression was expected of type "('a : value_or_null)"
        The layout of void_unboxed_record is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of void_unboxed_record must be a sublayout of scannable
+       But the layout of void_unboxed_record must be a sublayout of
+           value maybe_separable
          because it's the type of a tuple element.
 |}];;
 
@@ -630,7 +631,8 @@ Error: This pattern matches values of type "void_unboxed_record"
          "('a : value_or_null)"
        The layout of void_unboxed_record is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of void_unboxed_record must be a sublayout of scannable
+       But the layout of void_unboxed_record must be a sublayout of
+           value maybe_separable
          because it's the type of a tuple element.
 |}];;
 
@@ -646,7 +648,7 @@ Line 4, characters 13-19:
 Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable separable
+       But the layout of t_void must be a sublayout of value
          because of the definition of t at line 2, characters 2-24.
 |}];;
 
@@ -661,8 +663,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "void_unboxed_record"
        The layout of void_unboxed_record is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of void_unboxed_record must be a sublayout of
-           scannable separable
+       But the layout of void_unboxed_record must be a sublayout of value
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
 |}];;
@@ -677,7 +678,7 @@ Line 2, characters 16-22:
 Error: Tuple element types must have layout value.
        The layout of "t_void" is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of "t_void" must be a sublayout of scannable
+       But the layout of "t_void" must be a sublayout of value maybe_separable
          because it's the type of a tuple element.
 |}];;
 
@@ -696,7 +697,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable
+       But the layout of t_void must be a sublayout of value maybe_separable
          because it's the type of a tuple element.
 |}];;
 
@@ -737,9 +738,9 @@ Error: Signature mismatch:
        is not included in
          val x : string
        The type "('a : immediate)" is not compatible with the type "string"
-       The layout of string is scannable non_float
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of scannable non_pointer
+       But the layout of string must be a sublayout of immediate
          because of the definition of x at line 8, characters 10-26.
 |}];;
 
@@ -778,9 +779,9 @@ Error: Signature mismatch:
          val x : string
        The type "'a t" = "('a : immediate)" is not compatible with the type
          "string"
-       The layout of string is scannable non_float
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of scannable non_pointer
+       But the layout of string must be a sublayout of immediate
          because of the definition of x at line 8, characters 10-26.
 |}]
 
@@ -799,8 +800,7 @@ Line 5, characters 4-7:
 Error: Object types must have layout value.
        The layout of the type of this expression is void
          because of the definition of t at line 2, characters 2-42.
-       But the layout of the type of this expression must overlap with
-           scannable separable
+       But the layout of the type of this expression must overlap with value
          because it's the type of an object.
 |}]
 
@@ -815,7 +815,7 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable separable
+       But the layout of t_void must be a sublayout of value
          because it's the type of an object field.
 |}];;
 
@@ -842,7 +842,7 @@ Line 2, characters 12-22:
 Error: Object field types must have layout value.
        The layout of "t_void" is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of "t_void" must be a sublayout of scannable separable
+       But the layout of "t_void" must be a sublayout of value
          because it's the type of an object field.
 |}];;
 
@@ -857,7 +857,7 @@ Line 3, characters 2-24:
 Error:
        The layout of 'a s is void
          because of the annotation on 'a in the declaration of the type s.
-       But the layout of 'a s must be a sublayout of scannable separable
+       But the layout of 'a s must be a sublayout of value
          because it's the type of an object field.
 |}];;
 
@@ -872,7 +872,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable separable
+       But the layout of t_void must be a sublayout of value
          because it's the type of an object field.
 |}];;
 
@@ -909,7 +909,7 @@ Line 4, characters 10-13:
 Error: Variables bound in a class must have layout value.
        The layout of bar is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of bar must be a sublayout of scannable separable
+       But the layout of bar must be a sublayout of value
          because it's the type of a class field.
 |}];;
 
@@ -927,7 +927,7 @@ Line 4, characters 18-21:
 Error: Variables bound in a class must have layout value.
        The layout of bar is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of bar must be a sublayout of scannable separable
+       But the layout of bar must be a sublayout of value
          because it's the type of a class field.
 |}];;
 
@@ -944,7 +944,7 @@ Line 6, characters 24-26:
 6 |       val virtual baz : 'a t
                             ^^
 Error: This type "('a : value)" should be an instance of type "('b : void)"
-       The layout of 'a is scannable separable
+       The layout of 'a is value
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with void
          because of the definition of t at line 2, characters 2-20.
@@ -963,7 +963,7 @@ Line 6, characters 29-31:
 6 |       method void_id (A a) : 'a t = a
                                  ^^
 Error: This type "('a : value)" should be an instance of type "('b : void)"
-       The layout of 'a is scannable separable
+       The layout of 'a is value
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with void
          because of the definition of t at line 2, characters 2-30.
@@ -983,7 +983,7 @@ Line 5, characters 4-6:
 5 |     'a t ->
         ^^
 Error: This type "('a : value)" should be an instance of type "('b : void)"
-       The layout of 'a is scannable separable
+       The layout of 'a is value
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with void
          because of the definition of t at line 2, characters 2-30.
@@ -1002,7 +1002,7 @@ Line 4, characters 6-22:
 Error: Variables bound in a class must have layout value.
        The layout of baz is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of baz must be a sublayout of scannable separable
+       But the layout of baz must be a sublayout of value
          because it's the type of an instance variable.
 |}];;
 
@@ -1018,7 +1018,7 @@ Line 1, characters 11-17:
 Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable separable
+       But the layout of t_void must be a sublayout of value
          because the type argument of Lazy.t has this layout.
 |}];;
 
@@ -1031,7 +1031,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable separable
+       But the layout of t_void must be a sublayout of value
          because it's the type of a lazy expression.
 |}];;
 
@@ -1046,7 +1046,7 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable separable
+       But the layout of t_void must be a sublayout of value
          because it's the type of a lazy expression.
 |}];;
 
@@ -1060,7 +1060,7 @@ Line 1, characters 11-17:
 Error: This type "t_void" should be an instance of type "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable
+       But the layout of t_void must be a sublayout of value maybe_separable
          because the type argument of option has layout value_or_null.
 |}];;
 
@@ -1073,7 +1073,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable
+       But the layout of t_void must be a sublayout of value maybe_separable
          because the type argument of option has layout value_or_null.
 |}];;
 
@@ -1089,7 +1089,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable
+       But the layout of t_void must be a sublayout of value maybe_separable
          because the type argument of option has layout value_or_null.
 |}];;
 
@@ -1103,7 +1103,7 @@ Line 1, characters 11-17:
 Error: This type "t_void" should be an instance of type "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable
+       But the layout of t_void must be a sublayout of value maybe_separable
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -1116,7 +1116,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable
+       But the layout of t_void must be a sublayout of value maybe_separable
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -1132,7 +1132,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of scannable
+       But the layout of t_void must be a sublayout of value maybe_separable
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -1180,7 +1180,7 @@ Line 2, characters 0-18:
 Error:
        The layout of foo14 is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of foo14 must be a sublayout of scannable
+       But the layout of foo14 must be a sublayout of value maybe_separable
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -1318,7 +1318,7 @@ Error: This pattern matches values of type "(M.t_void, M.t_void) eq"
          "(M.t_void, M.t_imm) eq"
        The layout of M.t_void is void
          because of the definition of t_void at line 4, characters 2-20.
-       But the layout of M.t_void must overlap with scannable non_pointer
+       But the layout of M.t_void must overlap with immediate
          because of the definition of t_imm at line 5, characters 2-24.
 |}]
 
@@ -1349,7 +1349,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
-       But the layout of t_void must be a sublayout of scannable
+       But the layout of t_void must be a sublayout of value maybe_separable
          because the type argument of option has layout value_or_null.
 |}]
 
@@ -1577,7 +1577,7 @@ Error: This pattern matches values of type "t_void"
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
-       But the layout of t_void must be a sublayout of scannable
+       But the layout of t_void must be a sublayout of value maybe_separable
          because it's the type of a tuple element.
 |}]
 
@@ -1600,7 +1600,8 @@ Error: This pattern matches values of type "t_float64"
          "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
-       But the layout of t_float64 must be a sublayout of scannable
+       But the layout of t_float64 must be a sublayout of
+           value maybe_separable
          because it's the type of a tuple element.
 |}]
 
@@ -1626,7 +1627,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
-       But the layout of t_void must be a sublayout of scannable separable
+       But the layout of t_void must be a sublayout of value
          because of the definition of eq at line 2, characters 2-43.
 |}]
 
@@ -1655,7 +1656,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
-       But the layout of t_void must be a sublayout of scannable separable
+       But the layout of t_void must be a sublayout of value
          because of the definition of f at line 3, characters 4-20.
 |}]
 
@@ -1674,7 +1675,7 @@ Error: Tuple element types must have layout value.
        The layout of "'a" is void
          because of the annotation on 'a in the declaration of the type
                                       poly_var.
-       But the layout of "'a" must overlap with scannable
+       But the layout of "'a" must overlap with value maybe_separable
          because it's the type of a tuple element.
 |}]
 
@@ -1696,7 +1697,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
-       But the layout of t_void must be a sublayout of scannable
+       But the layout of t_void must be a sublayout of value maybe_separable
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -1711,7 +1712,8 @@ Line 1, characters 17-22:
 Error: This type signature for "foo33" is not a value type.
        The layout of type t_any is any
          because of the definition of t_any at line 1, characters 0-18.
-       But the layout of type t_any must be a sublayout of scannable
+       But the layout of type t_any must be a sublayout of
+           value maybe_separable
          because it's the type of something stored in a module structure.
 |}]
 
@@ -1733,10 +1735,9 @@ Line 2, characters 19-31:
 2 | let f35 : 'a t35 = fun () -> ()
                        ^^^^^^^^^^^^
 Error:
-       The layout of 'a -> 'b is scannable non_float
+       The layout of 'a -> 'b is value non_float
          because it's a function type.
-       But the layout of 'a -> 'b must be a sublayout of
-           scannable non_pointer
+       But the layout of 'a -> 'b must be a sublayout of immediate
          because of the definition of t35 at line 1, characters 0-30.
 |}]
 

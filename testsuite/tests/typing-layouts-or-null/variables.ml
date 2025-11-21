@@ -24,10 +24,9 @@ Line 3, characters 23-38:
 3 | type should_not_work = t_value_or_null should_not_accept_or_null
                            ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type "('a : value)"
-       The layout of t_value_or_null is scannable
+       The layout of t_value_or_null is value maybe_separable
          because of the definition of t_value_or_null at line 1, characters 0-36.
-       But the layout of t_value_or_null must be a sublayout of
-           scannable separable
+       But the layout of t_value_or_null must be a sublayout of value
          because of the definition of should_not_accept_or_null at line 1, characters 0-55.
 |}]
 
@@ -64,9 +63,9 @@ Error: Signature mismatch:
        is not included in
          val should_not_work : 'a -> unit
        The type "'a -> unit" is not compatible with the type "'b -> unit"
-       The layout of 'a is scannable
+       The layout of 'a is value maybe_separable
          because of the definition of should_not_work at line 6, characters 2-57.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of should_not_work at line 2, characters 2-34.
 |}]
 
@@ -88,9 +87,9 @@ Error: Signature mismatch:
        is not included in
          type ('a : value_or_null) t
        The problem is in the kinds of a parameter:
-       The layout of 'a is scannable
+       The layout of 'a is value maybe_separable
          because of the definition of t at line 1, characters 39-66.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of t at line 1, characters 18-27.
 |}]
 
@@ -107,10 +106,9 @@ Line 4, characters 12-27:
 4 |   type t2 = t_value_or_null t
                 ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type "('a : value)"
-       The layout of t_value_or_null is scannable
+       The layout of t_value_or_null is value maybe_separable
          because of the definition of t_value_or_null at line 1, characters 0-36.
-       But the layout of t_value_or_null must be a sublayout of
-           scannable separable
+       But the layout of t_value_or_null must be a sublayout of value
          because of the definition of t at line 2, characters 2-16.
 |}]
 
@@ -137,10 +135,9 @@ Line 4, characters 12-27:
 4 |   type t2 = t_value_or_null t
                 ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type "('a : value)"
-       The layout of t_value_or_null is scannable
+       The layout of t_value_or_null is value maybe_separable
          because of the definition of t_value_or_null at line 1, characters 0-36.
-       But the layout of t_value_or_null must be a sublayout of
-           scannable separable
+       But the layout of t_value_or_null must be a sublayout of value
          because of the definition of t at line 2, characters 2-25.
 |}]
 
@@ -167,9 +164,9 @@ Error: Signature mismatch:
        is not included in
          val f : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The layout of 'a is scannable
+       The layout of 'a is value maybe_separable
          because of the definition of f at line 2, characters 2-40.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of f at line 4, characters 8-28.
 |}]
 
@@ -194,9 +191,9 @@ Error: Signature mismatch:
        is not included in
          val f : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The layout of 'a is scannable
+       The layout of 'a is value maybe_separable
          because of the definition of f at line 2, characters 2-40.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of f at line 4, characters 6-7.
 |}]
 
@@ -222,9 +219,9 @@ Error: Signature mismatch:
        is not included in
          val f : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The layout of 'a is scannable
+       The layout of 'a is value maybe_separable
          because of the definition of f at line 2, characters 2-41.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of f at line 4, characters 6-7.
 |}]
 
@@ -250,9 +247,9 @@ Error: Signature mismatch:
        is not included in
          val f : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The layout of 'a is scannable
+       The layout of 'a is value maybe_separable
          because of the definition of f at line 2, characters 2-41.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of f at line 4, characters 6-7.
 |}]
 
@@ -279,9 +276,9 @@ Error: Signature mismatch:
        is not included in
          val f : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The layout of 'a is scannable
+       The layout of 'a is value maybe_separable
          because of the definition of f at line 2, characters 2-41.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of f at line 4, characters 6-7.
 |}]
 
@@ -349,10 +346,9 @@ Line 1, characters 14-35:
 1 | type fails = (t_value_or_null dummy) constrained
                   ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null dummy" should be an instance of type "'a dummy"
-       The layout of t_value_or_null is scannable
+       The layout of t_value_or_null is value maybe_separable
          because of the definition of t_value_or_null at line 1, characters 0-36.
-       But the layout of t_value_or_null must be a sublayout of
-           scannable separable
+       But the layout of t_value_or_null must be a sublayout of value
          because of the definition of constrained at line 1, characters 0-49.
 |}]
 
@@ -379,10 +375,9 @@ Line 1, characters 14-35:
 1 | type fails = (t_value_or_null dummy) constrained'
                   ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null dummy" should be an instance of type "'a dummy"
-       The layout of t_value_or_null is scannable
+       The layout of t_value_or_null is value maybe_separable
          because of the definition of t_value_or_null at line 1, characters 0-36.
-       But the layout of t_value_or_null must be a sublayout of
-           scannable separable
+       But the layout of t_value_or_null must be a sublayout of value
          because of the definition of constrained' at lines 1-2, characters 0-44.
 |}]
 

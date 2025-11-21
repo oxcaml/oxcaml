@@ -64,7 +64,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "('a0 : float64)"
        The layout of 'a is float64
          because of the definition of t at line 2, characters 2-23.
-       But the layout of 'a must overlap with scannable separable
+       But the layout of 'a must overlap with value
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
 |}];;
@@ -83,7 +83,7 @@ Error: In this "with" constraint, the new definition of "s"
          type s
        The layout of the first is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of the first must be a sublayout of scannable separable
+       But the layout of the first must be a sublayout of value
          because of the definition of s at line 3, characters 2-8.
 |}]
 
@@ -154,9 +154,9 @@ Line 5, characters 25-30:
                              ^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "('a : immediate)"
-       The layout of string is scannable non_float
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of scannable non_pointer
+       But the layout of string must be a sublayout of immediate
          because of the definition of t at line 2, characters 2-25.
 |}]
 
@@ -228,10 +228,9 @@ end;;
 Line 2, characters 2-29:
 2 |   type t : immediate = Bar3.t
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "Bar3.t" is scannable separable
+Error: The layout of type "Bar3.t" is value
          because of the annotation on the declaration of the type t.
-       But the layout of type "Bar3.t" must be a sublayout of
-           scannable non_pointer
+       But the layout of type "Bar3.t" must be a sublayout of immediate
          because of the definition of t at line 2, characters 2-29.
 |}];;
 
@@ -270,7 +269,7 @@ Error: This type "('a : float64)" should be an instance of type
          "('b : value_or_null)"
        The layout of 'a is float64
          because of the annotation on 'a in the declaration of the type t.
-       But the layout of 'a must overlap with scannable
+       But the layout of 'a must overlap with value maybe_separable
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -296,7 +295,7 @@ Line 12, characters 11-18:
 12 |   type s = Foo3f.t t
                 ^^^^^^^
 Error: This type "Foo3f.t" should be an instance of type "('a : float64)"
-       The layout of Foo3f.t is scannable separable
+       The layout of Foo3f.t is value
          because an abstract type has the value layout by default.
        But the layout of Foo3f.t must be a sublayout of float64
          because of the definition of t at line 10, characters 2-23.
@@ -351,7 +350,7 @@ Line 2, characters 12-16:
 2 | type t4f' = M4.s t4_float64;;
                 ^^^^
 Error: This type "M4.s" should be an instance of type "('a : float64)"
-       The layout of M4.s is scannable non_float
+       The layout of M4.s is value non_float
          because of the definition of s at line 2, characters 2-21.
        But the layout of M4.s must be a sublayout of float64
          because of the definition of t4_float64 at line 1, characters 0-30.
@@ -381,7 +380,7 @@ Line 1, characters 10-15:
 1 | type t4 = M4'.s t4_float64;;
               ^^^^^
 Error: This type "M4'.s" should be an instance of type "('a : float64)"
-       The layout of M4'.s is scannable non_pointer
+       The layout of M4'.s is immediate
          because of the definition of s at line 2, characters 2-45.
        But the layout of M4'.s must be a sublayout of float64
          because of the definition of t4_float64 at line 1, characters 0-30.
@@ -415,9 +414,9 @@ Line 14, characters 17-23:
                       ^^^^^^
 Error: This expression has type "string" but an expression was expected of type
          "('a : immediate)"
-       The layout of string is scannable non_float
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of scannable non_pointer
+       But the layout of string must be a sublayout of immediate
          because of the definition of f at line 3, characters 2-20.
 |}]
 
@@ -437,10 +436,9 @@ Error: In this "with" constraint, the new definition of "t"
          type t = string
        is not included in
          type t : immediate
-       The layout of the first is scannable non_float
+       The layout of the first is value non_float
          because it is the primitive type string.
-       But the layout of the first must be a sublayout of
-           scannable non_pointer
+       But the layout of the first must be a sublayout of immediate
          because of the definition of t at line 2, characters 2-20.
 |}]
 
@@ -473,7 +471,7 @@ Error: In this "with" constraint, the new definition of "t"
          type t = int
        is not included in
          type t : float64
-       The layout of the first is scannable non_pointer
+       The layout of the first is immediate
          because it is the primitive type int.
        But the layout of the first must be a sublayout of float64
          because of the definition of t at line 2, characters 2-18.
@@ -499,7 +497,7 @@ Error: In this "with" constraint, the new definition of "t"
          type t
        The layout of the first is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of the first must be a sublayout of scannable separable
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 2, characters 2-16.
 |}];;
 
@@ -521,10 +519,9 @@ Error: In this "with" constraint, the new definition of "t"
          type t = string
        is not included in
          type t : immediate
-       The layout of the first is scannable non_float
+       The layout of the first is value non_float
          because it is the primitive type string.
-       But the layout of the first must be a sublayout of
-           scannable non_pointer
+       But the layout of the first must be a sublayout of immediate
          because of the definition of t at line 2, characters 2-20.
 |}];;
 
@@ -542,10 +539,9 @@ Error: In this "with" constraint, the new definition of "t"
          type t = s
        is not included in
          type t : immediate
-       The layout of the first is scannable separable
+       The layout of the first is value
          because of the definition of s at line 2, characters 2-8.
-       But the layout of the first must be a sublayout of
-           scannable non_pointer
+       But the layout of the first must be a sublayout of immediate
          because of the definition of t at line 2, characters 2-20.
 |}];;
 
@@ -583,7 +579,8 @@ Line 1, characters 28-33:
 Error: This type signature for "x" is not a value type.
        The layout of type t_any is any
          because of the definition of t_any at line 5, characters 0-18.
-       But the layout of type t_any must be a sublayout of scannable
+       But the layout of type t_any must be a sublayout of
+           value maybe_separable
          because it's the type of something stored in a module structure.
 |}]
 
@@ -800,7 +797,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-19.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of t at line 4, characters 2-11.
 |}]
 
@@ -838,7 +835,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-19.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of t at line 4, characters 2-16.
 |}]
 
@@ -901,7 +898,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-24.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of t at line 4, characters 2-26.
 |}]
 
@@ -943,7 +940,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t2 at line 2, characters 2-20.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of t2 at line 6, characters 2-29.
 |}]
 
@@ -980,7 +977,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-38.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of t at line 4, characters 2-40.
 |}]
 
@@ -1017,7 +1014,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-38.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of t at line 4, characters 2-40.
 |}]
 
@@ -1054,7 +1051,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-44.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of t at line 4, characters 2-46.
 |}]
 
@@ -1091,7 +1088,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of _ is any
          because of the definition of t at line 2, characters 2-40.
-       But the layout of _ must be a sublayout of scannable separable
+       But the layout of _ must be a sublayout of value
          because of the definition of t at line 4, characters 2-32.
 |}]
 
@@ -1355,7 +1352,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-32.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of t at line 4, characters 2-26.
 |}]
 
@@ -1392,7 +1389,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-32.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of t at line 4, characters 2-34.
 |}]
 
@@ -1435,6 +1432,6 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-32.
-       But the layout of 'a must be a sublayout of scannable separable
+       But the layout of 'a must be a sublayout of value
          because of the definition of t at line 4, characters 2-31.
 |}]

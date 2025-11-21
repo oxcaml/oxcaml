@@ -115,7 +115,7 @@ Line 2, characters 0-18:
     ^^^^^^^^^^^^^^^^^^
 Error: The layout of type "a" is any
          because of the definition of a at line 1, characters 0-12.
-       But the layout of type "a" must be a sublayout of scannable separable
+       But the layout of type "a" must be a sublayout of value
          because of the definition of b at line 2, characters 0-18.
 |}]
 
@@ -207,7 +207,7 @@ type a : value mod global
 Line 2, characters 0-30:
 2 | type b : float32 mod local = a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "a" is scannable separable
+Error: The layout of type "a" is value
          because of the definition of a at line 1, characters 0-25.
        But the layout of type "a" must be a sublayout of float32
          because of the definition of b at line 2, characters 0-30.
@@ -590,10 +590,9 @@ module A : sig type t end
 Line 7, characters 0-24:
 7 | type t : immediate = A.t
     ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "A.t" is scannable separable
+Error: The layout of type "A.t" is value
          because of the definition of t at line 2, characters 2-16.
-       But the layout of type "A.t" must be a sublayout of
-           scannable non_pointer
+       But the layout of type "A.t" must be a sublayout of immediate
          because of the definition of t at line 7, characters 0-24.
 |}]
 
@@ -1164,10 +1163,10 @@ type 'a t : value mod global immutable stateless many aliased unyielding non_flo
 Lines 1-2, characters 0-66:
 1 | type 'a t : value mod global immutable stateless many aliased unyielding non_float =
 2 |   Foo of 'a @@ global immutable stateless many aliased [@@unboxed]
-Error: The layout of type "t" is scannable separable
+Error: The layout of type "t" is value
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
-       But the layout of type "t" must be a sublayout of scannable non_float
+       But the layout of type "t" must be a sublayout of value non_float
          because of the annotation on the declaration of the type t.
 |}]
 (* CR layouts v2.8: this could be accepted, if we infer ('a : value mod
@@ -1212,9 +1211,9 @@ type ('a : value mod external_) t : immediate =
 Lines 1-2, characters 0-65:
 1 | type ('a : value mod external_) t : immediate =
 2 |   Foo of 'a @@ global portable contended many aliased [@@unboxed]
-Error: The layout of type "t" is scannable separable
+Error: The layout of type "t" is value
          because of the annotation on 'a in the declaration of the type t.
-       But the layout of type "t" must be a sublayout of scannable non_pointer
+       But the layout of type "t" must be a sublayout of immediate
          because of the annotation on the declaration of the type t.
 |}]
 (* CR layouts v2.8: this should be accepted. Internal ticket 5120. *)
@@ -1309,7 +1308,7 @@ Line 1, characters 29-36:
 1 | let f : ('a : value) -> ('a: float32) = fun x -> x
                                  ^^^^^^^
 Error: Bad layout annotation:
-         The layout of "'a" is scannable separable
+         The layout of "'a" is value
            because of the annotation on the type variable 'a.
          But the layout of "'a" must overlap with float32
            because of the annotation on the type variable 'a.
@@ -1394,9 +1393,9 @@ Line 17, characters 6-7:
            ^
 Error: This expression has type "a" but an expression was expected of type
          "('a : immediate)"
-       The layout of a is scannable separable
+       The layout of a is value
          because of the annotation on the abstract type declaration for a.
-       But the layout of a must be a sublayout of scannable non_pointer
+       But the layout of a must be a sublayout of immediate
          because of the definition of f at line 16, characters 10-41.
 |}]
 
@@ -1503,7 +1502,7 @@ type 'a t : word = 'a
 Line 1, characters 0-21:
 1 | type 'a t : word = 'a
     ^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "'a" is scannable separable
+Error: The layout of type "'a" is value
          because of the definition of t at line 1, characters 0-21.
        But the layout of type "'a" must overlap with word
          because of the definition of t at line 1, characters 0-21.
@@ -1531,7 +1530,7 @@ type 'a t : word = private 'a
 Line 1, characters 0-29:
 1 | type 'a t : word = private 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "'a" is scannable separable
+Error: The layout of type "'a" is value
          because of the definition of t at line 1, characters 0-29.
        But the layout of type "'a" must overlap with word
          because of the definition of t at line 1, characters 0-29.
@@ -1828,9 +1827,9 @@ Error: Signature mismatch:
          type 'a t : immediate_or_null maybe_separable
        is not included in
          type 'a t : immediate_or_null separable
-       The layout of the first is scannable
+       The layout of the first is value maybe_separable
          because of the definition of t at line 4, characters 2-42.
-       But the layout of the first must be a sublayout of scannable separable
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 2, characters 2-52.
 |}]
 

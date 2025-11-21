@@ -123,9 +123,9 @@ Line 1, characters 23-31:
                            ^^^^^^^^
 Error: This expression has type "'a t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The layout of 'a t is scannable
+       The layout of 'a t is value maybe_separable
          because it is the primitive type or_null.
-       But the layout of 'a t must be a sublayout of scannable separable
+       But the layout of 'a t must be a sublayout of value
          because of the definition of t at line 1, characters 0-69.
 |}]
 
@@ -137,9 +137,9 @@ Line 1, characters 28-32:
                                 ^^^^
 Error: This expression has type "'a t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The layout of 'a t is scannable
+       The layout of 'a t is value maybe_separable
          because it is the primitive type or_null.
-       But the layout of 'a t must be a sublayout of scannable separable
+       But the layout of 'a t must be a sublayout of value
          because of the definition of t at line 1, characters 0-69.
 |}]
 
@@ -208,9 +208,9 @@ Line 1, characters 26-28:
                               ^^
 Error: This expression has type "float" but an expression was expected of type
          "('a : value non_float)"
-       The layout of float is scannable separable
+       The layout of float is value
          because it is the primitive type float.
-       But the layout of float must be a sublayout of scannable non_float
+       But the layout of float must be a sublayout of value non_float
          because it's the type of an array element.
 |}]
 
@@ -228,7 +228,7 @@ Line 1, characters 19-32:
                        ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is scannable
+       The layout of float or_null is value maybe_separable
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -263,9 +263,9 @@ Line 1, characters 32-34:
                                     ^^
 Error: This expression has type "float" but an expression was expected of type
          "('a : value non_float)"
-       The layout of float is scannable separable
+       The layout of float is value
          because it is the primitive type float.
-       But the layout of float must be a sublayout of scannable non_float
+       But the layout of float must be a sublayout of value non_float
          because it's the type of an array element.
 |}]
 
@@ -283,7 +283,7 @@ Line 1, characters 19-32:
                        ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is scannable
+       The layout of float or_null is value maybe_separable
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -297,10 +297,9 @@ Line 1, characters 26-42:
 1 | type object_with_null = < x : int or_null; .. >
                               ^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
-       The layout of "int or_null" is scannable
+       The layout of "int or_null" is value maybe_separable
          because it is the primitive type or_null.
-       But the layout of "int or_null" must be a sublayout of
-           scannable separable
+       But the layout of "int or_null" must be a sublayout of value
          because it's the type of an object field.
 |}]
 
@@ -315,9 +314,9 @@ Line 3, characters 8-9:
 3 |     val x = Null
             ^
 Error: Variables bound in a class must have layout value.
-       The layout of x is scannable
+       The layout of x is value maybe_separable
          because it is the primitive type or_null.
-       But the layout of x must be a sublayout of scannable separable
+       But the layout of x must be a sublayout of value
          because it's the type of a class field.
 |}]
 
@@ -378,10 +377,9 @@ Line 1, characters 45-55:
 1 | type (_, _) fail = Fail : 'a or_null -> ('a, 'a or_null) fail [@@unboxed]
                                                  ^^^^^^^^^^
 Error: This type "'a or_null" should be an instance of type "('b : value)"
-       The layout of 'a or_null is scannable
+       The layout of 'a or_null is value maybe_separable
          because it is the primitive type or_null.
-       But the layout of 'a or_null must be a sublayout of
-           scannable separable
+       But the layout of 'a or_null must be a sublayout of value
          because it instantiates an unannotated type parameter of fail,
          chosen to have layout value.
 |}]
@@ -419,10 +417,9 @@ Line 1, characters 35-51:
                                        ^^^^^^^^^^^^^^^^
 Error: This expression has type "unboxed_rec"
        but an expression was expected of type "('a : value)"
-       The layout of unboxed_rec is scannable
+       The layout of unboxed_rec is value maybe_separable
          because it is the primitive type or_null.
-       But the layout of unboxed_rec must be a sublayout of
-           scannable separable
+       But the layout of unboxed_rec must be a sublayout of value
          because of the definition of t at line 1, characters 0-69.
 |}]
 
@@ -434,10 +431,9 @@ Line 1, characters 35-46:
                                        ^^^^^^^^^^^
 Error: This expression has type "unboxed_var"
        but an expression was expected of type "('a : value)"
-       The layout of unboxed_var is scannable
+       The layout of unboxed_var is value maybe_separable
          because it is the primitive type or_null.
-       But the layout of unboxed_var must be a sublayout of
-           scannable separable
+       But the layout of unboxed_var must be a sublayout of value
          because of the definition of t at line 1, characters 0-69.
 |}]
 
@@ -449,9 +445,8 @@ Line 1, characters 36-47:
                                         ^^^^^^^^^^^
 Error: This expression has type "('a, 'a or_null) gadt"
        but an expression was expected of type "('b : value)"
-       The layout of ('a, 'a or_null) gadt is scannable
+       The layout of ('a, 'a or_null) gadt is value maybe_separable
          because it is the primitive type or_null.
-       But the layout of ('a, 'a or_null) gadt must be a sublayout of
-           scannable separable
+       But the layout of ('a, 'a or_null) gadt must be a sublayout of value
          because of the definition of t at line 1, characters 0-69.
 |}]

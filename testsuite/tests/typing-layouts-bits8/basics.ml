@@ -115,7 +115,7 @@ Error: This expression has type "t_bits8"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of t_bits8 must be a sublayout of scannable
+       But the layout of t_bits8 must be a sublayout of value maybe_separable
          because it's the type of a tuple element.
 |}];;
 
@@ -128,7 +128,8 @@ Error: This expression has type "'a t_bits8_id" = "('a : bits8)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_bits8_id is bits8
          because of the definition of t_bits8_id at line 2, characters 0-33.
-       But the layout of 'a t_bits8_id must be a sublayout of scannable
+       But the layout of 'a t_bits8_id must be a sublayout of
+           value maybe_separable
          because it's the type of a tuple element.
 |}];;
 
@@ -141,7 +142,7 @@ Error: This expression has type "int8#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of scannable
+       But the layout of int8# must be a sublayout of value maybe_separable
          because it's the type of a tuple element.
 |}];;
 
@@ -153,7 +154,7 @@ Line 1, characters 12-19:
 Error: Tuple element types must have layout value.
        The layout of "t_bits8" is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of "t_bits8" must be a sublayout of scannable
+       But the layout of "t_bits8" must be a sublayout of value maybe_separable
          because it's the type of a tuple element.
 |}];;
 
@@ -165,7 +166,7 @@ Line 1, characters 18-23:
 Error: Tuple element types must have layout value.
        The layout of "int8#" is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of "int8#" must be a sublayout of scannable
+       But the layout of "int8#" must be a sublayout of value maybe_separable
          because it's the type of a tuple element.
 |}];;
 
@@ -177,7 +178,7 @@ Line 1, characters 25-27:
 Error: Tuple element types must have layout value.
        The layout of "'a" is bits8
          because of the annotation on 'a in the declaration of the type t4_6.
-       But the layout of "'a" must overlap with scannable
+       But the layout of "'a" must overlap with value maybe_separable
          because it's the type of a tuple element.
 |}];;
 
@@ -190,7 +191,7 @@ Line 1, characters 44-46:
 Error: Tuple element types must have layout value.
        The layout of "'a" is bits8
          because of the annotation on 'a in the declaration of the type t4_7.
-       But the layout of "'a" must overlap with scannable
+       But the layout of "'a" must overlap with value maybe_separable
          because it's the type of a tuple element.
 |}]
 
@@ -265,7 +266,8 @@ Line 1, characters 31-38:
 Error: This type signature for "x" is not a value type.
        The layout of type t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of type t_bits8 must be a sublayout of scannable
+       But the layout of type t_bits8 must be a sublayout of
+           value maybe_separable
          because it's the type of something stored in a module structure.
 |}];;
 
@@ -277,7 +279,8 @@ Line 1, characters 31-44:
 Error: This type signature for "x" is not a value type.
        The layout of type 'a t_bits8_id is bits8
          because of the definition of t_bits8_id at line 2, characters 0-33.
-       But the layout of type 'a t_bits8_id must be a sublayout of scannable
+       But the layout of type 'a t_bits8_id must be a sublayout of
+           value maybe_separable
          because it's the type of something stored in a module structure.
 |}];;
 
@@ -289,7 +292,8 @@ Line 1, characters 31-36:
 Error: This type signature for "x" is not a value type.
        The layout of type int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of type int8# must be a sublayout of scannable
+       But the layout of type int8# must be a sublayout of
+           value maybe_separable
          because it's the type of something stored in a module structure.
 |}];;
 
@@ -305,7 +309,7 @@ Error: This expression has type "t_bits8"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of t_bits8 must be a sublayout of scannable
+       But the layout of t_bits8 must be a sublayout of value maybe_separable
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -318,7 +322,8 @@ Error: This expression has type "'a t_bits8_id" = "('a : bits8)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_bits8_id is bits8
          because of the definition of t_bits8_id at line 2, characters 0-33.
-       But the layout of 'a t_bits8_id must be a sublayout of scannable
+       But the layout of 'a t_bits8_id must be a sublayout of
+           value maybe_separable
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -331,7 +336,7 @@ Error: This expression has type "int8#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of scannable
+       But the layout of int8# must be a sublayout of value maybe_separable
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -343,7 +348,7 @@ Line 1, characters 20-27:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "t_bits8" is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of "t_bits8" must be a sublayout of scannable
+       But the layout of "t_bits8" must be a sublayout of value maybe_separable
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -355,7 +360,7 @@ Line 1, characters 33-35:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "'a" is bits8
          because of the annotation on 'a in the declaration of the type f7_5.
-       But the layout of "'a" must overlap with scannable
+       But the layout of "'a" must overlap with value maybe_separable
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -383,7 +388,7 @@ Error: This expression has type "t_bits8"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of t_bits8 must be a sublayout of scannable
+       But the layout of t_bits8 must be a sublayout of value maybe_separable
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -396,7 +401,8 @@ Error: This expression has type "'a t_bits8_id" = "('a : bits8)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_bits8_id is bits8
          because of the definition of t_bits8_id at line 2, characters 0-33.
-       But the layout of 'a t_bits8_id must be a sublayout of scannable
+       But the layout of 'a t_bits8_id must be a sublayout of
+           value maybe_separable
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -409,7 +415,7 @@ Error: This expression has type "int8#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of scannable
+       But the layout of int8# must be a sublayout of value maybe_separable
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -556,7 +562,7 @@ Line 1, characters 15-26:
 Error: Object field types must have layout value.
        The layout of "t_bits8" is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of "t_bits8" must be a sublayout of scannable separable
+       But the layout of "t_bits8" must be a sublayout of value
          because it's the type of an object field.
 |}];;
 
@@ -568,7 +574,7 @@ Line 1, characters 28-34:
 Error: Object field types must have layout value.
        The layout of "'a" is bits8
          because of the annotation on 'a in the declaration of the type t12_2.
-       But the layout of "'a" must overlap with scannable separable
+       But the layout of "'a" must overlap with value
          because it's the type of an object field.
 |}]
 
@@ -581,7 +587,7 @@ Error: The method "x" has type "t_bits8" but is expected to have type
          "('a : value)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of t_bits8 must be a sublayout of scannable separable
+       But the layout of t_bits8 must be a sublayout of value
          because it's the type of an object field.
 |}];;
 
@@ -593,7 +599,7 @@ Line 2, characters 13-15:
 2 |   method x : 'a t_bits8_id -> 'a t_bits8_id = assert false
                  ^^
 Error: This type "('a : value)" should be an instance of type "('b : bits8)"
-       The layout of 'a is scannable separable
+       The layout of 'a is value
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with bits8
          because of the definition of t_bits8_id at line 2, characters 0-33.
@@ -607,7 +613,7 @@ Line 1, characters 25-26:
 Error: Variables bound in a class must have layout value.
        The layout of x is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of x must be a sublayout of scannable separable
+       But the layout of x must be a sublayout of value
          because it's the type of a class field.
 |}];;
 
@@ -619,7 +625,7 @@ Line 1, characters 26-42:
 Error: The method "x" has type "int8#" but is expected to have type "('a : value)"
        The layout of int8# is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of int8# must be a sublayout of scannable separable
+       But the layout of int8# must be a sublayout of value
          because it's the type of an object field.
 |}];;
 
@@ -631,7 +637,7 @@ Line 1, characters 26-39:
 Error: Variables bound in a class must have layout value.
        The layout of x is bits8
          because it is the unboxed version of the primitive type int8.
-       But the layout of x must be a sublayout of scannable separable
+       But the layout of x must be a sublayout of value
          because it's the type of an instance variable.
 |}];;
 
@@ -643,7 +649,7 @@ Line 2, characters 10-12:
 2 |   val x : 'a t_bits8_id -> 'a t_bits8_id
               ^^
 Error: This type "('a : value)" should be an instance of type "('b : bits8)"
-       The layout of 'a is scannable separable
+       The layout of 'a is value
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with bits8
          because of the definition of t_bits8_id at line 2, characters 0-33.
@@ -684,7 +690,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "t_bits8"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of t_bits8 must be a sublayout of scannable
+       But the layout of t_bits8 must be a sublayout of value maybe_separable
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -701,7 +707,7 @@ Line 3, characters 17-19:
 Error: "m1" must have a type of layout value because it is captured by an object.
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of t_bits8 must be a sublayout of scannable
+       But the layout of t_bits8 must be a sublayout of value maybe_separable
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -720,7 +726,7 @@ Error: This expression has type "t_bits8"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of t_bits8 must be a sublayout of scannable.
+       But the layout of t_bits8 must be a sublayout of value maybe_separable.
 |}];;
 
 let f13_2 (x : t_bits8) = compare x x;;
@@ -732,7 +738,7 @@ Error: This expression has type "t_bits8"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of t_bits8 must be a sublayout of scannable.
+       But the layout of t_bits8 must be a sublayout of value maybe_separable.
 |}];;
 
 let f13_3 (x : t_bits8) = Marshal.to_bytes x;;
@@ -744,7 +750,7 @@ Error: This expression has type "t_bits8"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of t_bits8 must be a sublayout of scannable.
+       But the layout of t_bits8 must be a sublayout of value maybe_separable.
 |}];;
 
 let f13_4 (x : t_bits8) = Hashtbl.hash x;;
@@ -756,5 +762,5 @@ Error: This expression has type "t_bits8"
        but an expression was expected of type "('a : value)"
        The layout of t_bits8 is bits8
          because of the definition of t_bits8 at line 1, characters 0-20.
-       But the layout of t_bits8 must be a sublayout of scannable separable.
+       But the layout of t_bits8 must be a sublayout of value.
 |}];;

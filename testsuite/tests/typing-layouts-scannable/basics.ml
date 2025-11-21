@@ -94,10 +94,9 @@ Line 1, characters 13-27:
                  ^^^^^^^^^^^^^^
 Error: This type "t_maybeptr_val" should be an instance of type
          "('a : value non_pointer)"
-       The layout of t_maybeptr_val is scannable
+       The layout of t_maybeptr_val is value maybe_separable
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
-       But the layout of t_maybeptr_val must be a sublayout of
-           scannable non_pointer
+       But the layout of t_maybeptr_val must be a sublayout of immediate
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
 |}]
 type succeeds = t_nonptr_val accepts_nonptr_val
@@ -116,8 +115,7 @@ Error: This type "t_nonptr" should be an instance of type
          "('a : value non_pointer)"
        The layout of t_nonptr is any non_pointer
          because of the definition of t_nonptr at line 2, characters 0-31.
-       But the layout of t_nonptr must be a sublayout of
-           scannable non_pointer
+       But the layout of t_nonptr must be a sublayout of immediate
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
 |}]
 
@@ -144,9 +142,9 @@ Line 1, characters 13-19:
                  ^^^^^^
 Error: This type "string" should be an instance of type
          "('a : value non_pointer)"
-       The layout of string is scannable non_float
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of scannable non_pointer
+       But the layout of string must be a sublayout of immediate
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
 |}]
 
@@ -172,7 +170,7 @@ Line 3, characters 13-27:
                  ^^^^^^^^^^^^^^
 Error: This type "t_maybeptr_val" should be an instance of type
          "('a : any separable)"
-       The layout of t_maybeptr_val is scannable
+       The layout of t_maybeptr_val is value maybe_separable
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of t_maybeptr_val must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -232,10 +230,9 @@ type fails : value non_pointer = #{ a : t_maybeptr_val }
 Line 1, characters 0-56:
 1 | type fails : value non_pointer = #{ a : t_maybeptr_val }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "fails" is scannable
+Error: The layout of type "fails" is value maybe_separable
          because it is an unboxed record.
-       But the layout of type "fails" must be a sublayout of
-           scannable non_pointer
+       But the layout of type "fails" must be a sublayout of immediate
          because of the annotation on the declaration of the type fails.
 |}]
 type succeeds : value non_pointer = #{ a : t_nonptr_val }
@@ -327,9 +324,9 @@ Line 5, characters 19-20:
                        ^
 Error: This expression has type "a2" but an expression was expected of type
          "('a : value non_pointer)"
-       The layout of a2 is scannable separable
+       The layout of a2 is value
          because of the annotation on the abstract type declaration for a2.
-       But the layout of a2 must be a sublayout of scannable non_pointer
+       But the layout of a2 must be a sublayout of immediate
          because of the definition of cant_promote_snd at line 4, characters 23-64.
 |}]
 
@@ -394,9 +391,9 @@ Error: Signature mismatch:
        is not included in
          type 'a t
        The problem is in the kinds of a parameter:
-       The layout of 'a is scannable separable
+       The layout of 'a is value
          because of the definition of t at line 2, characters 2-29.
-       But the layout of 'a must be a sublayout of scannable non_pointer
+       But the layout of 'a must be a sublayout of immediate
          because of the definition of t at line 4, characters 2-39.
 |}]
 
@@ -419,10 +416,9 @@ Error: Signature mismatch:
          type 'a t = t_maybeptr_val
        is not included in
          type ('a : value non_pointer) t : value non_pointer
-       The layout of the first is scannable
+       The layout of the first is value maybe_separable
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
-       But the layout of the first must be a sublayout of
-           scannable non_pointer
+       But the layout of the first must be a sublayout of immediate
          because of the definition of t at line 2, characters 2-53.
 |}]
 
@@ -466,9 +462,9 @@ Error: Signature mismatch:
          type t : immediate separable
        is not included in
          type t : value non_float
-       The layout of the first is scannable separable
+       The layout of the first is value
          because of the definition of t at line 4, characters 2-34.
-       But the layout of the first must be a sublayout of scannable non_float
+       But the layout of the first must be a sublayout of value non_float
          because of the definition of t at line 2, characters 2-26.
 |}]
 

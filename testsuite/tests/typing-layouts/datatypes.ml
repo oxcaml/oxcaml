@@ -335,9 +335,9 @@ Line 8, characters 32-36:
                                     ^^^^
 Error: This expression has type "float" but an expression was expected of type
          "('a : immediate)"
-       The layout of float is scannable separable
+       The layout of float is value
          because it is the primitive type float.
-       But the layout of float must be a sublayout of scannable non_pointer
+       But the layout of float must be a sublayout of immediate
          because of the definition of s6 at line 2, characters 0-35.
 |}];;
 
@@ -389,7 +389,7 @@ Error: Layout mismatch in final type declaration consistency check.
        message, so we'll say this instead:
          The layout of 'a is float64
            because of the definition of float64_t at line 2, characters 0-29.
-         But the layout of 'a must overlap with scannable separable
+         But the layout of 'a must overlap with value
            because it instantiates an unannotated type parameter of t8_5,
            chosen to have layout value.
        A good next step is to add a layout annotation on a parameter to
@@ -453,7 +453,7 @@ Line 10, characters 10-20:
 Error: This type "t_any M.t2" should be an instance of type "'a M.t2"
        The layout of t_any is any
          because of the definition of t_any at line 3, characters 0-16.
-       But the layout of t_any must be a sublayout of scannable separable
+       But the layout of t_any must be a sublayout of value
          because of the definition of t1 at line 2, characters 2-42.
 |}]
 
@@ -477,7 +477,7 @@ Line 10, characters 10-20:
 Error: This type "t_any M.t2" should be an instance of type "'a M.t2"
        The layout of t_any is any
          because of the definition of t_any at line 3, characters 0-16.
-       But the layout of t_any must be a sublayout of scannable separable
+       But the layout of t_any must be a sublayout of value
          because of the definition of t1 at line 3, characters 2-41.
 |}]
 
@@ -501,7 +501,7 @@ Line 10, characters 10-20:
 Error: This type "t_any M.t2" should be an instance of type "'a M.t2"
        The layout of t_any is any
          because of the definition of t_any at line 3, characters 0-16.
-       But the layout of t_any must be a sublayout of scannable separable
+       But the layout of t_any must be a sublayout of value
          because of the definition of t1 at line 3, characters 2-42.
 |}]
 

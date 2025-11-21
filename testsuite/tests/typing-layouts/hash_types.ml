@@ -454,10 +454,9 @@ Line 2, characters 0-23:
 2 | and r = {x:int; y:bool}
     ^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of r# is scannable & float64
+       The layout of r# is value maybe_separable & float64
          because it is an unboxed record.
-       But the layout of r# must be a sublayout of
-           scannable separable & float64
+       But the layout of r# must be a sublayout of value & float64
          because of the definition of t at line 1, characters 0-29.
 |}]
 
@@ -469,10 +468,9 @@ Line 3, characters 0-10:
 3 | and q = r#
     ^^^^^^^^^^
 Error:
-       The layout of q is scannable & float64
+       The layout of q is value maybe_separable & float64
          because it is an unboxed record.
-       But the layout of q must be a sublayout of
-           scannable separable & float64
+       But the layout of q must be a sublayout of value & float64
          because of the definition of t at line 1, characters 0-29.
 |}]
 
@@ -717,7 +715,7 @@ Error: In this "with" constraint, the new definition of "t"
          type t
        The layout of the first is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of the first must be a sublayout of scannable separable
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 2, characters 2-8.
 |}]
 

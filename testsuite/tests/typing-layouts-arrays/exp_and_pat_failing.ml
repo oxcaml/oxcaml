@@ -53,6 +53,6 @@ Line 25, characters 13-29:
 Error: This expression has type "Float_u.t" = "float#"
        but an expression was expected of type "('a : value)"
        The layout of Float_u.t is float64.
-       But the layout of Float_u.t must be a sublayout of scannable separable
+       But the layout of Float_u.t must be a sublayout of value
          because it's the element type of array comprehension.
 |}];;
