@@ -47,7 +47,7 @@ Error: Tuple element types must have layout value.
        The layout of "#(string * bool)" is value non_float & immediate
          because it is an unboxed tuple.
        But the layout of "#(string * bool)" must be a sublayout of
-           value maybe_separable
+           a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -61,8 +61,7 @@ Line 2, characters 23-35:
 Error: Tuple element types must have layout value.
        The layout of "t_nope_inner" is value non_float & immediate
          because of the definition of t_nope_inner at line 1, characters 0-45.
-       But the layout of "t_nope_inner" must be a sublayout of
-           value maybe_separable
+       But the layout of "t_nope_inner" must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -452,8 +451,7 @@ Line 1, characters 31-44:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "#(int * bool)" is immediate & immediate
          because it is an unboxed tuple.
-       But the layout of "#(int * bool)" must be a sublayout of
-           value maybe_separable
+       But the layout of "#(int * bool)" must be a sublayout of a value layout
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -467,8 +465,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_1 & '_representable_layout_2
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of
-           value maybe_separable
+       But the layout of #('a * 'b) must be a sublayout of a value layout
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -481,7 +478,7 @@ Error: Tuple element types must have layout value.
        The layout of "#(bool * float#)" is immediate & float64
          because it is an unboxed tuple.
        But the layout of "#(bool * float#)" must be a sublayout of
-           value maybe_separable
+           a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -495,8 +492,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_3 & '_representable_layout_4
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of
-           value maybe_separable
+       But the layout of #('a * 'b) must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -526,7 +522,7 @@ Error: This type signature for "x" is not a value type.
        The layout of type #(int * bool) is immediate & immediate
          because it is an unboxed tuple.
        But the layout of type #(int * bool) must be a sublayout of
-           value maybe_separable
+           a value layout
          because it's the type of something stored in a module structure.
 |}]
 
@@ -549,7 +545,7 @@ Line 1, characters 21-38:
 Error: Object field types must have layout value.
        The layout of "#(int * bool)" is immediate & immediate
          because it is an unboxed tuple.
-       But the layout of "#(int * bool)" must be a sublayout of value
+       But the layout of "#(int * bool)" must be a sublayout of a value layout
          because it's the type of an object field.
 |}]
 
@@ -561,7 +557,7 @@ Line 1, characters 29-30:
 Error: Variables bound in a class must have layout value.
        The layout of x is immediate & immediate
          because it is an unboxed tuple.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a sublayout of a value layout
          because it's the type of a class field.
 |}]
 
@@ -578,7 +574,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_5 & '_representable_layout_6
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a sublayout of a value layout
          because it's the type of an object field.
 |}]
 
@@ -596,8 +592,7 @@ Error: This expression has type "('a : value_or_null)"
        The layout of #('a * 'b) is
            '_representable_layout_7 & '_representable_layout_8
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of
-           value maybe_separable
+       But the layout of #('a * 'b) must be a sublayout of a value layout
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -613,8 +608,7 @@ Line 2, characters 31-45:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "poly_var_inner" is immediate & immediate
          because of the definition of poly_var_inner at line 1, characters 0-44.
-       But the layout of "poly_var_inner" must be a sublayout of
-           value maybe_separable
+       But the layout of "poly_var_inner" must be a sublayout of a value layout
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -630,7 +624,7 @@ Error: This expression has type "poly_var_term_record"
        The layout of poly_var_term_record is immediate & immediate
          because of the definition of poly_var_term_record at line 1, characters 0-50.
        But the layout of poly_var_term_record must be a sublayout of
-           value maybe_separable
+           a value layout
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -644,8 +638,7 @@ Line 2, characters 25-37:
 Error: Tuple element types must have layout value.
        The layout of "record_inner" is immediate & float64
          because of the definition of record_inner at line 1, characters 0-45.
-       But the layout of "record_inner" must be a sublayout of
-           value maybe_separable
+       But the layout of "record_inner" must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -660,7 +653,7 @@ Error: This expression has type "record" but an expression was expected of type
          "('a : value_or_null)"
        The layout of record is immediate & immediate
          because of the definition of record at line 1, characters 0-36.
-       But the layout of record must be a sublayout of value maybe_separable
+       But the layout of record must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -697,8 +690,7 @@ Line 3, characters 10-19:
 Error: This type signature for "x" is not a value type.
        The layout of type sig_inner is immediate & immediate
          because of the definition of sig_inner at line 1, characters 0-39.
-       But the layout of type sig_inner must be a sublayout of
-           value maybe_separable
+       But the layout of type sig_inner must be a sublayout of a value layout
          because it's the type of something stored in a module structure.
 |}]
 
@@ -725,7 +717,7 @@ Line 2, characters 21-37:
 Error: Object field types must have layout value.
        The layout of "object_inner" is immediate & immediate
          because of the definition of object_inner at line 1, characters 0-42.
-       But the layout of "object_inner" must be a sublayout of value
+       But the layout of "object_inner" must be a sublayout of a value layout
          because it's the type of an object field.
 |}]
 
@@ -739,7 +731,7 @@ Line 2, characters 29-30:
 Error: Variables bound in a class must have layout value.
        The layout of x is immediate & immediate
          because of the definition of object_term_record at line 1, characters 0-49.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a sublayout of a value layout
          because it's the type of a class field.
 |}]
 
@@ -757,7 +749,7 @@ Error: This expression has type "class_record"
        but an expression was expected of type "('a : value)"
        The layout of class_record is immediate & immediate
          because of the definition of class_record at line 1, characters 0-43.
-       But the layout of class_record must be a sublayout of value
+       But the layout of class_record must be a sublayout of a value layout
          because it's the type of an object field.
 |}]
 
@@ -776,8 +768,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "capture_record"
        The layout of capture_record is immediate & immediate
          because of the definition of capture_record at line 1, characters 0-43.
-       But the layout of capture_record must be a sublayout of
-           value maybe_separable
+       But the layout of capture_record must be a sublayout of a value layout
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -1475,8 +1466,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_9 & '_representable_layout_10
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of
-           value maybe_separable
+       But the layout of #('a * 'b) must be a sublayout of a value layout
          because it's the type of the recursive variable x.
 |}]
 
@@ -1494,8 +1484,7 @@ Error: This expression has type "letrec_record"
        but an expression was expected of type "('a : value_or_null)"
        The layout of letrec_record is immediate & immediate
          because of the definition of letrec_record at line 3, characters 0-44.
-       But the layout of letrec_record must be a sublayout of
-           value maybe_separable
+       But the layout of letrec_record must be a sublayout of a value layout
          because it's the type of the recursive variable x.
 |}]
 
@@ -1523,8 +1512,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_11 & '_representable_layout_12
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of
-           value maybe_separable
+       But the layout of #('a * 'b) must be a sublayout of a value layout
          because it's the type of the recursive variable _x.
 |}]
 
@@ -1539,8 +1527,7 @@ Error: This expression has type "letrec_simple"
        but an expression was expected of type "('a : value_or_null)"
        The layout of letrec_simple is immediate & immediate
          because of the definition of letrec_simple at line 1, characters 0-44.
-       But the layout of letrec_simple must be a sublayout of
-           value maybe_separable
+       But the layout of letrec_simple must be a sublayout of a value layout
          because it's the type of the recursive variable _x.
 |}]
 
@@ -1631,7 +1618,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_13 & '_representable_layout_14
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value.
+       But the layout of #('a * 'b) must be a sublayout of a value layout.
 |}]
 
 external make : ('a : value & value) . int -> 'a -> 'a array =
@@ -1714,7 +1701,8 @@ Error: This expression has type "array_init_record"
        but an expression was expected of type "('a : value)"
        The layout of array_init_record is immediate & immediate
          because of the definition of array_init_record at line 1, characters 0-48.
-       But the layout of array_init_record must be a sublayout of value.
+       But the layout of array_init_record must be a sublayout of
+           a value layout.
 |}]
 
 (* Arrays of unboxed records of kind value *are* allowed in all cases *)
@@ -1747,7 +1735,7 @@ Error: This expression has type "('a : value)"
        The layout of #('a * 'b) is
            '_representable_layout_15 & '_representable_layout_16
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a sublayout of a value layout
          because it's the type of a term-level argument to a class constructor.
 |}]
 
@@ -1766,7 +1754,8 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type "class_arg_record"
        The layout of class_arg_record is immediate & immediate
          because of the definition of class_arg_record at line 1, characters 0-45.
-       But the layout of class_arg_record must be a sublayout of value
+       But the layout of class_arg_record must be a sublayout of
+           a value layout
          because it's the type of a term-level argument to a class constructor.
 |}]
 
@@ -1797,7 +1786,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_17 & '_representable_layout_18
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a sublayout of a value layout
          because it's the type of a lazy expression.
 |}]
 
@@ -1810,7 +1799,7 @@ Line 1, characters 9-21:
 Error: This type "#(int * int)" should be an instance of type "('a : value)"
        The layout of #(int * int) is immediate & immediate
          because it is an unboxed tuple.
-       But the layout of #(int * int) must be a sublayout of value
+       But the layout of #(int * int) must be a sublayout of a value layout
          because the type argument of lazy_t has layout value.
 |}]
 
@@ -1825,7 +1814,7 @@ Error: This expression has type "lazy_record"
        but an expression was expected of type "('a : value)"
        The layout of lazy_record is immediate & immediate
          because of the definition of lazy_record at line 1, characters 0-42.
-       But the layout of lazy_record must be a sublayout of value
+       But the layout of lazy_record must be a sublayout of a value layout
          because it's the type of a lazy expression.
 |}]
 
@@ -1839,7 +1828,7 @@ Line 2, characters 9-22:
 Error: This type "lazy_t_record" should be an instance of type "('a : value)"
        The layout of lazy_t_record is immediate & immediate
          because of the definition of lazy_t_record at line 1, characters 0-44.
-       But the layout of lazy_t_record must be a sublayout of value
+       But the layout of lazy_t_record must be a sublayout of a value layout
          because the type argument of lazy_t has layout value.
 |}]
 
@@ -1910,8 +1899,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_19 & '_representable_layout_20
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of
-           value maybe_separable
+       But the layout of #('a * 'b) must be a sublayout of a value layout
          because the type argument of option has layout value_or_null.
 |}]
 
@@ -1927,7 +1915,7 @@ Error: This expression has type "optional_record"
        The layout of optional_record is immediate & immediate
          because of the definition of optional_record at line 1, characters 0-46.
        But the layout of optional_record must be a sublayout of
-           value maybe_separable
+           a value layout
          because the type argument of option has layout value_or_null.
 |}]
 

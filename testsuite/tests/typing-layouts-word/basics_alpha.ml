@@ -115,7 +115,7 @@ Error: This expression has type "t_word" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a sublayout of value maybe_separable
+       But the layout of t_word must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -128,8 +128,7 @@ Error: This expression has type "'a t_word_id" = "('a : word)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_word_id is word
          because of the definition of t_word_id at line 2, characters 0-31.
-       But the layout of 'a t_word_id must be a sublayout of
-           value maybe_separable
+       But the layout of 'a t_word_id must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -142,8 +141,7 @@ Error: This expression has type "nativeint#"
        but an expression was expected of type "('a : value_or_null)"
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a sublayout of
-           value maybe_separable
+       But the layout of nativeint# must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -155,7 +153,7 @@ Line 1, characters 12-18:
 Error: Tuple element types must have layout value.
        The layout of "t_word" is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of "t_word" must be a sublayout of value maybe_separable
+       But the layout of "t_word" must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -167,8 +165,7 @@ Line 1, characters 18-28:
 Error: Tuple element types must have layout value.
        The layout of "nativeint#" is word
          because it is the unboxed version of the primitive type nativeint.
-       But the layout of "nativeint#" must be a sublayout of
-           value maybe_separable
+       But the layout of "nativeint#" must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -180,7 +177,7 @@ Line 1, characters 24-26:
 Error: Tuple element types must have layout value.
        The layout of "'a" is word
          because of the annotation on 'a in the declaration of the type t4_6.
-       But the layout of "'a" must overlap with value maybe_separable
+       But the layout of "'a" must overlap with a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -193,7 +190,7 @@ Line 1, characters 43-45:
 Error: Tuple element types must have layout value.
        The layout of "'a" is word
          because of the annotation on 'a in the declaration of the type t4_7.
-       But the layout of "'a" must overlap with value maybe_separable
+       But the layout of "'a" must overlap with a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -262,8 +259,7 @@ Line 1, characters 31-37:
 Error: This type signature for "x" is not a value type.
        The layout of type t_word is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of type t_word must be a sublayout of
-           value maybe_separable
+       But the layout of type t_word must be a sublayout of a value layout
          because it's the type of something stored in a module structure.
 |}];;
 
@@ -276,7 +272,7 @@ Error: This type signature for "x" is not a value type.
        The layout of type 'a t_word_id is word
          because of the definition of t_word_id at line 2, characters 0-31.
        But the layout of type 'a t_word_id must be a sublayout of
-           value maybe_separable
+           a value layout
          because it's the type of something stored in a module structure.
 |}];;
 
@@ -289,7 +285,7 @@ Error: This type signature for "x" is not a value type.
        The layout of type nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
        But the layout of type nativeint# must be a sublayout of
-           value maybe_separable
+           a value layout
          because it's the type of something stored in a module structure.
 |}];;
 
@@ -305,7 +301,7 @@ Error: This expression has type "t_word" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a sublayout of value maybe_separable
+       But the layout of t_word must be a sublayout of a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -318,8 +314,7 @@ Error: This expression has type "'a t_word_id" = "('a : word)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_word_id is word
          because of the definition of t_word_id at line 2, characters 0-31.
-       But the layout of 'a t_word_id must be a sublayout of
-           value maybe_separable
+       But the layout of 'a t_word_id must be a sublayout of a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -332,8 +327,7 @@ Error: This expression has type "nativeint#"
        but an expression was expected of type "('a : value_or_null)"
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a sublayout of
-           value maybe_separable
+       But the layout of nativeint# must be a sublayout of a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -345,7 +339,7 @@ Line 1, characters 20-26:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "t_word" is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of "t_word" must be a sublayout of value maybe_separable
+       But the layout of "t_word" must be a sublayout of a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -357,7 +351,7 @@ Line 1, characters 32-34:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "'a" is word
          because of the annotation on 'a in the declaration of the type f7_5.
-       But the layout of "'a" must overlap with value maybe_separable
+       But the layout of "'a" must overlap with a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -385,7 +379,7 @@ Error: This expression has type "t_word" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a sublayout of value maybe_separable
+       But the layout of t_word must be a sublayout of a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -398,8 +392,7 @@ Error: This expression has type "'a t_word_id" = "('a : word)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_word_id is word
          because of the definition of t_word_id at line 2, characters 0-31.
-       But the layout of 'a t_word_id must be a sublayout of
-           value maybe_separable
+       But the layout of 'a t_word_id must be a sublayout of a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -412,8 +405,7 @@ Error: This expression has type "nativeint#"
        but an expression was expected of type "('a : value_or_null)"
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a sublayout of
-           value maybe_separable
+       But the layout of nativeint# must be a sublayout of a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -561,7 +553,7 @@ Line 1, characters 15-25:
 Error: Object field types must have layout value.
        The layout of "t_word" is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of "t_word" must be a sublayout of value
+       But the layout of "t_word" must be a sublayout of a value layout
          because it's the type of an object field.
 |}];;
 
@@ -573,7 +565,7 @@ Line 1, characters 27-33:
 Error: Object field types must have layout value.
        The layout of "'a" is word
          because of the annotation on 'a in the declaration of the type t12_2.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must overlap with a value layout
          because it's the type of an object field.
 |}]
 
@@ -585,7 +577,7 @@ Line 1, characters 21-53:
 Error: The method "x" has type "t_word" but is expected to have type "('a : value)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a sublayout of value
+       But the layout of t_word must be a sublayout of a value layout
          because it's the type of an object field.
 |}];;
 
@@ -611,7 +603,7 @@ Line 1, characters 25-26:
 Error: Variables bound in a class must have layout value.
        The layout of x is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a sublayout of a value layout
          because it's the type of a class field.
 |}];;
 
@@ -624,7 +616,7 @@ Error: The method "x" has type "nativeint#" but is expected to have type
          "('a : value)"
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a sublayout of value
+       But the layout of nativeint# must be a sublayout of a value layout
          because it's the type of an object field.
 |}];;
 
@@ -636,7 +628,7 @@ Line 1, characters 26-44:
 Error: Variables bound in a class must have layout value.
        The layout of x is word
          because it is the unboxed version of the primitive type nativeint.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a sublayout of a value layout
          because it's the type of an instance variable.
 |}];;
 
@@ -689,7 +681,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "t_word"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a sublayout of value maybe_separable
+       But the layout of t_word must be a sublayout of a value layout
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -706,7 +698,7 @@ Line 3, characters 17-19:
 Error: "m1" must have a type of layout value because it is captured by an object.
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a sublayout of value maybe_separable
+       But the layout of t_word must be a sublayout of a value layout
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -725,7 +717,7 @@ Error: This expression has type "t_word" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a sublayout of value maybe_separable.
+       But the layout of t_word must be a sublayout of a value layout.
 |}];;
 
 let f13_2 (x : t_word) = compare x x;;
@@ -737,7 +729,7 @@ Error: This expression has type "t_word" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a sublayout of value maybe_separable.
+       But the layout of t_word must be a sublayout of a value layout.
 |}];;
 
 let f13_3 (x : t_word) = Marshal.to_bytes x;;
@@ -749,7 +741,7 @@ Error: This expression has type "t_word" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a sublayout of value maybe_separable.
+       But the layout of t_word must be a sublayout of a value layout.
 |}];;
 
 let f13_4 (x : t_word) = Hashtbl.hash x;;
@@ -761,5 +753,5 @@ Error: This expression has type "t_word" but an expression was expected of type
          "('a : value)"
        The layout of t_word is word
          because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a sublayout of value.
+       But the layout of t_word must be a sublayout of a value layout.
 |}];;

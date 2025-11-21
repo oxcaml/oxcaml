@@ -520,7 +520,7 @@ Error: This type "t_b64" should be an instance of type
          "('a : value maybe_separable)"
        The layout of t_b64 is bits64
          because of the definition of t_b64 at line 1, characters 0-19.
-       But the layout of t_b64 must be a sublayout of value maybe_separable
+       But the layout of t_b64 must be a sublayout of a value layout
          because the type argument of or_null has layout value.
 |}]
 

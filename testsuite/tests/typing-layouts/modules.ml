@@ -64,7 +64,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "('a0 : float64)"
        The layout of 'a is float64
          because of the definition of t at line 2, characters 2-23.
-       But the layout of 'a must overlap with value
+       But the layout of 'a must overlap with a value layout
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
 |}];;
@@ -83,7 +83,7 @@ Error: In this "with" constraint, the new definition of "s"
          type s
        The layout of the first is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a sublayout of a value layout
          because of the definition of s at line 3, characters 2-8.
 |}]
 
@@ -269,7 +269,7 @@ Error: This type "('a : float64)" should be an instance of type
          "('b : value_or_null)"
        The layout of 'a is float64
          because of the annotation on 'a in the declaration of the type t.
-       But the layout of 'a must overlap with value maybe_separable
+       But the layout of 'a must overlap with a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -497,7 +497,7 @@ Error: In this "with" constraint, the new definition of "t"
          type t
        The layout of the first is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a sublayout of a value layout
          because of the definition of t at line 2, characters 2-16.
 |}];;
 

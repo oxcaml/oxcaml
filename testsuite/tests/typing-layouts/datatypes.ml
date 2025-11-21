@@ -389,7 +389,7 @@ Error: Layout mismatch in final type declaration consistency check.
        message, so we'll say this instead:
          The layout of 'a is float64
            because of the definition of float64_t at line 2, characters 0-29.
-         But the layout of 'a must overlap with value
+         But the layout of 'a must overlap with a value layout
            because it instantiates an unannotated type parameter of t8_5,
            chosen to have layout value.
        A good next step is to add a layout annotation on a parameter to

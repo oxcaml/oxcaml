@@ -429,6 +429,11 @@ module Layout = struct
     | Sort (b, _) -> if Sort.is_possibly_scannable b then Sort (b, sa) else t
     | Product _ -> t
 
+  let is_possibly_scannable t = t |> get_root_scannable_axes |> Option.is_some
+
+  let is_definitely_scannable t =
+    match get t with Sort (Base Scannable, _) -> true | _ -> false
+
   let sub t1 t2 =
     let rec sub t1 t2 : Misc.Le_result.t =
       match t1, t2 with
@@ -3772,7 +3777,11 @@ module Violation = struct
 
   type locale =
     | Mode
-    | Layout
+    (* Sometimes, when reporting a layout conflict, the scannable axes of
+       the expected jkind need not be shown, even when it is scannable.
+       For now, this condition is when the type on the left is known to
+       not be scannable. *)
+    | Layout of { can_omit_right_sa : bool }
 
   let report_reason ppf violation =
     (* Print out per-axis information about why the error occurred. This only
@@ -3871,32 +3880,48 @@ module Violation = struct
     let mismatch_type =
       match t.violation with
       | Not_a_subjkind (k1, k2, _) ->
-        if Sub_result.is_le (Layout.sub k1.jkind.layout k2.jkind.layout)
+        let l1, l2 = k1.jkind.layout, k2.jkind.layout in
+        if Sub_result.is_le (Layout.sub l1 l2)
         then Mode
-        else Layout
-      | No_intersection _ -> Layout
+        else
+          (* If the type on the left is known to be not scannable, there
+             is no need to report the scannable axes on the right. *)
+          Layout { can_omit_right_sa = not (Layout.is_possibly_scannable l1) }
+      | No_intersection (k1, _k2) ->
+        Layout
+          { can_omit_right_sa =
+              not (Layout.is_possibly_scannable k1.jkind.layout)
+          }
     in
     let layout_or_kind =
-      match mismatch_type with Mode -> "kind" | Layout -> "layout"
+      match mismatch_type with Mode -> "kind" | Layout _ -> "layout"
     in
     let rec has_sort_var : Sort.Flat.t Layout.t -> bool = function
       | Sort (Var _, _) -> true
       | Product layouts -> List.exists has_sort_var layouts
       | Sort (Base _, _) | Any _ -> false
     in
-    let format_layout_or_kind ppf jkind =
-      let indent =
-        pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "")
-      in
+    let indent = pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "") in
+    (* On the left / for actual kinds, always print out the entire thing *)
+    let format_full_layout_or_kind ppf jkind =
       match mismatch_type with
       | Mode -> fprintf ppf "%t%a" indent format jkind
-      | Layout -> fprintf ppf "%t%a" indent Layout.format jkind.jkind.layout
+      | Layout _ -> fprintf ppf "%t%a" indent Layout.format jkind.jkind.layout
+    in
+    (* On the right / for expected kinds, we may omit the scannable axes. *)
+    let format_layout_or_kind ppf jkind =
+      match mismatch_type with
+      | Layout { can_omit_right_sa = true }
+        when Layout.is_definitely_scannable jkind.jkind.layout ->
+        fprintf ppf "%ta value layout" indent
+      | _ -> format_full_layout_or_kind ppf jkind
     in
     let subjkind_format verb k2 =
       if has_sort_var (get k2).layout
       then dprintf "%s representable" verb
       else
-        dprintf "%s a sub%s of@ %a" verb layout_or_kind format_layout_or_kind k2
+        dprintf "%s a sub%s of@ %a" verb layout_or_kind
+          format_full_layout_or_kind k2
     in
     let Pack_jkind k1, Pack_jkind k2, fmt_k1, fmt_k2, missing_cmi_option =
       match t with
@@ -3914,7 +3939,7 @@ module Violation = struct
         | None ->
           ( Pack_jkind k1,
             Pack_jkind k2,
-            dprintf "%s@ %a" layout_or_kind format_layout_or_kind k1,
+            dprintf "%s@ %a" layout_or_kind format_full_layout_or_kind k1,
             subjkind_format "is not" k2,
             None )
         | Some p ->
@@ -3927,7 +3952,7 @@ module Violation = struct
         assert (Option.is_none missing_cmi);
         ( Pack_jkind k1,
           Pack_jkind k2,
-          dprintf "%s@ %a" layout_or_kind format_layout_or_kind k1,
+          dprintf "%s@ %a" layout_or_kind format_full_layout_or_kind k1,
           dprintf "does not overlap with@ %a" format_layout_or_kind k2,
           None )
     in
@@ -3945,7 +3970,7 @@ module Violation = struct
         (Format_history.format_history
            ~intro:
              (dprintf "@[<hov 2>The %s of %a is@ %a@]" layout_or_kind pp_former
-                former format_layout_or_kind k1)
+                former format_full_layout_or_kind k1)
            ~layout_or_kind)
         k1
         (Format_history.format_history

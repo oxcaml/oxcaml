@@ -340,7 +340,7 @@ Error: Signature mismatch:
          type t
        The layout of the first is value non_float & value non_float
          because of the definition of t at line 4, characters 2-36.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a sublayout of a value layout
          because of the definition of t at line 2, characters 2-8.
 |}]
 
@@ -438,7 +438,7 @@ Error: Layout mismatch in final type declaration consistency check.
        message, so we'll say this instead:
          The layout of 'a is float64
            because of the definition of t_float64_id at line 1, characters 0-37.
-         But the layout of 'a must overlap with value
+         But the layout of 'a must overlap with a value layout
            because it instantiates an unannotated type parameter of t,
            chosen to have layout value.
        A good next step is to add a layout annotation on a parameter to

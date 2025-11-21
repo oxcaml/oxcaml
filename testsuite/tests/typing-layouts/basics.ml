@@ -258,7 +258,7 @@ Error: This expression has type "('a : value)"
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
        But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
-         value
+         a value layout
          because of the definition of s at line 2, characters 2-55.
 |}]
 
@@ -293,7 +293,7 @@ Error: This expression has type "('a : value)"
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
        But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
-         value
+         a value layout
          because of the definition of s at line 2, characters 2-50.
 |}]
 
@@ -312,7 +312,7 @@ Error: This expression has type "('a : value)"
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
        But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
-         value
+         a value layout
          because of the definition of s at line 2, characters 2-70.
 |}]
 
@@ -331,7 +331,7 @@ Error: This expression has type "('a : value)"
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
        But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
-         value
+         a value layout
          because of the definition of s at line 2, characters 2-65.
 |}]
 
@@ -461,8 +461,7 @@ Line 1, characters 27-36:
 Error: This type signature for "x" is not a value type.
        The layout of type t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of type t_float64 must be a sublayout of
-           value maybe_separable
+       But the layout of type t_float64 must be a sublayout of a value layout
          because it's the type of something stored in a module structure.
 |}];;
 (* CR layouts v5: the test above should be made to work *)
@@ -703,8 +702,7 @@ Line 2, characters 40-49:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "t_float64" is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a sublayout of
-           value maybe_separable
+       But the layout of "t_float64" must be a sublayout of a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -724,7 +722,7 @@ Error: This expression has type "('a : value_or_null)"
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
        But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
-         value maybe_separable
+         a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -740,7 +738,7 @@ Line 4, characters 13-22:
 Error: This type "t_float64" should be an instance of type "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a sublayout of a value layout
          because of the definition of t at line 2, characters 2-42.
 |}];;
 
@@ -755,7 +753,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "t_float64"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a sublayout of a value layout
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
 |}];;
@@ -770,8 +768,7 @@ Line 2, characters 17-26:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "t_float64" is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a sublayout of
-           value maybe_separable
+       But the layout of "t_float64" must be a sublayout of a value layout
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -789,8 +786,7 @@ Line 2, characters 20-29:
 Error: Tuple element types must have layout value.
        The layout of "t_float64" is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a sublayout of
-           value maybe_separable
+       But the layout of "t_float64" must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -804,8 +800,7 @@ Line 2, characters 31-40:
 Error: Tuple element types must have layout value.
        The layout of "t_float64" is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a sublayout of
-           value maybe_separable
+       But the layout of "t_float64" must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -824,7 +819,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "float#"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value maybe_separable
+       But the layout of float# must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -840,7 +835,7 @@ Line 4, characters 13-22:
 Error: This type "t_float64" should be an instance of type "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a sublayout of a value layout
          because of the definition of t at line 2, characters 2-24.
 |}];;
 
@@ -855,7 +850,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "t_float64"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a sublayout of a value layout
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
 |}];;
@@ -870,8 +865,7 @@ Line 2, characters 16-25:
 Error: Tuple element types must have layout value.
        The layout of "t_float64" is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a sublayout of
-           value maybe_separable
+       But the layout of "t_float64" must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -976,7 +970,8 @@ Line 5, characters 4-7:
 Error: Object types must have layout value.
        The layout of the type of this expression is void
          because of the definition of t at line 2, characters 2-42.
-       But the layout of the type of this expression must overlap with value
+       But the layout of the type of this expression must overlap with
+           a value layout
          because it's the type of an object.
 |}]
 
@@ -993,7 +988,8 @@ Line 5, characters 4-5:
 Error: Object types must have layout value.
        The layout of the type of this expression is float64
          because of the definition of t at line 2, characters 2-28.
-       But the layout of the type of this expression must overlap with value
+       But the layout of the type of this expression must overlap with
+           a value layout
          because it's the type of an object.
 |}]
 
@@ -1010,7 +1006,7 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type "'b t" = "('b : float64)"
        The layout of 'a t is float64
          because of the definition of t at line 2, characters 2-28.
-       But the layout of 'a t must be a sublayout of value
+       But the layout of 'a t must be a sublayout of a value layout
          because it's the type of an object field.
 |}];;
 
@@ -1037,7 +1033,7 @@ Line 2, characters 12-25:
 Error: Object field types must have layout value.
        The layout of "t_float64" is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a sublayout of value
+       But the layout of "t_float64" must be a sublayout of a value layout
          because it's the type of an object field.
 |}];;
 
@@ -1052,7 +1048,7 @@ Line 3, characters 2-27:
 Error:
        The layout of 'a s is float64
          because of the annotation on 'a in the declaration of the type s.
-       But the layout of 'a s must be a sublayout of value
+       But the layout of 'a s must be a sublayout of a value layout
          because it's the type of an object field.
 |}];;
 
@@ -1067,7 +1063,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "t_float64"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a sublayout of a value layout
          because it's the type of an object field.
 |}];;
 
@@ -1108,7 +1104,7 @@ Line 5, characters 10-13:
 Error: Variables bound in a class must have layout value.
        The layout of bar is float64
          because of the definition of f at line 2, characters 6-7.
-       But the layout of bar must overlap with value
+       But the layout of bar must overlap with a value layout
          because it's the type of a class field.
 |}];;
 
@@ -1126,7 +1122,7 @@ Line 4, characters 18-21:
 Error: Variables bound in a class must have layout value.
        The layout of bar is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of bar must be a sublayout of value
+       But the layout of bar must be a sublayout of a value layout
          because it's the type of a class field.
 |}];;
 
@@ -1201,7 +1197,7 @@ Line 4, characters 6-25:
 Error: Variables bound in a class must have layout value.
        The layout of baz is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of baz must be a sublayout of value
+       But the layout of baz must be a sublayout of a value layout
          because it's the type of an instance variable.
 |}];;
 
@@ -1219,7 +1215,7 @@ Line 1, characters 12-21:
 Error: This type "t_float64" should be an instance of type "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a sublayout of a value layout
          because the type argument of Lazy.t has this layout.
 |}];;
 
@@ -1232,7 +1228,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a sublayout of a value layout
          because it's the type of a lazy expression.
 |}];;
 
@@ -1249,7 +1245,7 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type "t_float64"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a sublayout of a value layout
          because it's the type of a lazy expression.
 |}];;
 
@@ -1263,8 +1259,7 @@ Line 1, characters 12-21:
 Error: This type "t_float64" should be an instance of type "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of
-           value maybe_separable
+       But the layout of t_float64 must be a sublayout of a value layout
          because the type argument of option has layout value_or_null.
 |}];;
 
@@ -1277,8 +1272,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of
-           value maybe_separable
+       But the layout of t_float64 must be a sublayout of a value layout
          because the type argument of option has layout value_or_null.
 |}];;
 
@@ -1294,8 +1288,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "t_float64"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of
-           value maybe_separable
+       But the layout of t_float64 must be a sublayout of a value layout
          because the type argument of option has layout value_or_null.
 |}];;
 
@@ -1308,8 +1301,7 @@ Line 1, characters 12-21:
 Error: This type "t_float64" should be an instance of type "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of
-           value maybe_separable
+       But the layout of t_float64 must be a sublayout of a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -1322,8 +1314,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of
-           value maybe_separable
+       But the layout of t_float64 must be a sublayout of a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -1339,8 +1330,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "t_float64"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of
-           value maybe_separable
+       But the layout of t_float64 must be a sublayout of a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -1384,7 +1374,7 @@ Line 2, characters 0-21:
 Error:
        The layout of foo14 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of foo14 must be a sublayout of value maybe_separable
+       But the layout of foo14 must be a sublayout of a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -1536,7 +1526,7 @@ Error: This pattern matches values of type "(Mf.t_float64, Mf.t_float64) eq"
          "(Mf.t_float64, Mf.t_imm) eq"
        The layout of Mf.t_float64 is float64
          because of the definition of t_float64 at line 4, characters 2-26.
-       But the layout of Mf.t_float64 must overlap with immediate
+       But the layout of Mf.t_float64 must overlap with a value layout
          because of the definition of t_imm at line 5, characters 2-24.
 |}]
 
@@ -1570,8 +1560,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of
-           value maybe_separable
+       But the layout of t_float64 must be a sublayout of a value layout
          because the type argument of option has layout value_or_null.
 |}]
 
@@ -1715,8 +1704,7 @@ Error: This pattern matches values of type "t_float64"
          "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of
-           value maybe_separable
+       But the layout of t_float64 must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -1739,7 +1727,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a sublayout of a value layout
          because of the definition of eq at line 1, characters 0-41.
 |}]
 
@@ -1765,7 +1753,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a sublayout of a value layout
          because of the definition of f at line 2, characters 2-18.
 |}]
 
@@ -1786,7 +1774,7 @@ Error: Tuple element types must have layout value.
        The layout of "'a" is float64
          because of the annotation on 'a in the declaration of the type
                                       poly_var.
-       But the layout of "'a" must overlap with value maybe_separable
+       But the layout of "'a" must overlap with a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -1805,8 +1793,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of
-           value maybe_separable
+       But the layout of t_float64 must be a sublayout of a value layout
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -2061,7 +2048,7 @@ Error: Signature mismatch:
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The layout of 'a is float64
          because of the definition of f at line 10, characters 2-34.
-       But the layout of 'a must be a sublayout of value
+       But the layout of 'a must be a sublayout of a value layout
          because of the definition of f at line 6, characters 2-18.
 |}]
 
@@ -2357,7 +2344,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "'a t40" = "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
+       But the layout of t_float64 must be a sublayout of a value layout
          because of the definition of t40 at line 1, characters 0-16.
 |}]
 
@@ -2866,7 +2853,7 @@ Error: This expression has type "float#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value maybe_separable
+       But the layout of float# must be a sublayout of a value layout
          because it's the type of the recursive variable x.
 |}]
 
