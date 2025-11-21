@@ -590,30 +590,42 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
         ~returns:return_args ~exn:exn_arg
     in
+    let callee = Apply.callee apply in
+    let is_external =
+      not (Compilation_unit.is_current (Code_id.get_compilation_unit code_id))
+    in
     let[@local] add_apply acc =
-      if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
-      then
+      if is_external
+      then default_acc acc
+      else
         let apply_dep =
           { Traverse_acc.function_containing_apply_expr = denv.current_code_id;
             apply_code_id = code_id;
-            apply_closure = Apply.callee apply;
+            apply_closure = callee;
             apply_call_witness = call_widget
           }
         in
         Acc.add_apply apply_dep acc
-      else default_acc acc
     in
-    match Apply.callee apply with
+    match callee with
     | None -> add_apply acc
-    | Some callee -> (
-      (let closure = Acc.simple_to_name acc ~denv callee in
-       Graph.add_accessor_dep (Acc.graph acc) ~to_:call_widget
-         (Code_of_closure Known_arity_code_pointer)
-         ~base:(Code_id_or_name.name closure));
-      match denv.should_preserve_direct_calls with
-      | Yes -> add_apply acc
-      | No -> ()
-      | Auto -> failwith "todo"))
+    | Some callee ->
+      if is_external
+      then
+        (* External call. We always want to escape the closure here, as we will
+           not be able to recover the code_id from the sources of the closure.
+           [default_acc] escapes everything, including the witness of the
+           closure if it was not, in fact, an external call. *)
+        default_acc acc
+      else (
+        (let closure = Acc.simple_to_name acc ~denv callee in
+         Graph.add_accessor_dep (Acc.graph acc) ~to_:call_widget
+           (Code_of_closure Known_arity_code_pointer)
+           ~base:(Code_id_or_name.name closure));
+        match denv.should_preserve_direct_calls with
+        | Yes -> add_apply acc
+        | No -> ()
+        | Auto -> failwith "todo"))
   | Function { function_call = Indirect_known_arity; _ } ->
     let call_widget =
       Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
