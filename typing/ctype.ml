@@ -2373,8 +2373,13 @@ let mk_jkind_context_check_principal_ref env =
 
 (* We parameterize [estimate_type_jkind] by a function
    [expand_component] because some callers want expansion of types and others
-   don't. *)
-let rec estimate_type_jkind ~expand_component env ty =
+   don't.
+
+   [ignore_mod_bounds] is for an optimization in [constrain_type_jkind]. When
+   [true], [constrain_type_jkind] only cares about the layout of the jkind and
+   not its mod-bounds, so we don't perform a substitution into the
+   with-bounds. *)
+let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   match get_desc ty with
   | Tvar { jkind } -> Jkind.disallow_right jkind
   | Tarrow _ -> Jkind.for_arrow
@@ -2392,7 +2397,7 @@ let rec estimate_type_jkind ~expand_component env ty =
         Internal ticket 2912. *)
      let layouts =
        List.map (fun (ty, _modality (* ignore; we just care about layout *)) ->
-         estimate_type_jkind ~expand_component env ty |>
+         estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty |>
          Jkind.extract_layout)
          tys_modalities
      in
@@ -2405,7 +2410,9 @@ let rec estimate_type_jkind ~expand_component env ty =
       (* Checking [has_with_bounds] here is needed for correctness, because
          intersection types sometimes do not unify with themselves. Removing
          this check causes typing-misc/pr7937.ml to fail. *)
-      if Jkind.has_with_bounds jkind && List.compare_length_with args 0 <> 0
+      if not ignore_mod_bounds
+         && Jkind.has_with_bounds jkind
+         && List.compare_length_with args 0 <> 0
       then
         let level = get_level ty in
         (* CR layouts v2.8: We could possibly skip this substitution if we're
@@ -2431,7 +2438,7 @@ let rec estimate_type_jkind ~expand_component env ty =
   | Tunivar { jkind } -> Jkind.disallow_right jkind
   | Tpoly (ty, _) ->
     let context = mk_jkind_context_check_principal_ref env in
-    estimate_type_jkind ~expand_component env ty |>
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty |>
     (* The jkind of [ty] might mention the variables bound in this [Tpoly]
        node, and so just returning it here would be wrong. Instead, we need
        to eliminate these variables. For now, we just [round_up] to eliminate
@@ -2451,13 +2458,15 @@ and close_open_jkind ~expand_component ~is_open env jkind =
        rounding only those variables up. Internal ticket 5110. *)
   then
     let context = mk_jkind_context env (fun ty ->
-      Some (estimate_type_jkind ~expand_component env ty)) in
+      Some
+        (estimate_type_jkind ~expand_component ~ignore_mod_bounds:false env ty))
+    in
     Jkind.round_up ~context jkind |> Jkind.disallow_right
   else jkind
 
 let estimate_type_jkind_unwrapped
       ~expand_component env { ty; is_open; modality } =
-  estimate_type_jkind ~expand_component env ty |>
+  estimate_type_jkind ~expand_component ~ignore_mod_bounds:false env ty |>
   close_open_jkind ~expand_component ~is_open env |>
   Jkind.apply_modality_l modality
 
@@ -2536,7 +2545,7 @@ let constrain_type_jkind ~fixed env ty jkind =
      more than necessary.  *)
   let rec loop ~fuel ~expanded ty ~is_open ty's_jkind jkind =
     (* Just succeed if we're comparing against [any] *)
-    if Jkind.is_obviously_max jkind then Ok () else
+    if Jkind.is_max jkind then Ok () else
     if fuel < 0 then
       Error (
         Jkind.Violation.of_ ~context (
@@ -2645,8 +2654,7 @@ let constrain_type_jkind ~fixed env ty jkind =
             with
             | Ok jkind ->
               (match
-                loop ~fuel ~expanded:false ty ~is_open
-                  (estimate_type_jkind env ty) jkind
+                estimate_jkind_and_loop ~fuel ~expanded:false ty ~is_open jkind
               with
               | Ok () -> Ok ()
               | Error _ ->
@@ -2667,8 +2675,7 @@ let constrain_type_jkind ~fixed env ty jkind =
              if not expanded
              then
                let ty = expand_head_opt env ty in
-               loop ~fuel ~expanded:true ty ~is_open
-                 (estimate_type_jkind env ty) jkind
+               estimate_jkind_and_loop ~fuel ~expanded:true ty ~is_open jkind
              else
                begin match unbox_once env ty with
                | Missing path -> Error (Jkind.Violation.of_
@@ -2682,8 +2689,8 @@ let constrain_type_jkind ~fixed env ty jkind =
                | Stepped { ty; is_open = is_open2; modality } ->
                  let is_open = is_open || is_open2 in
                  let jkind = Jkind.apply_modality_r modality jkind in
-                 loop ~fuel:(fuel - 1) ~expanded:false ty ~is_open
-                   (estimate_type_jkind env ty) jkind
+                 estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false ty
+                    ~is_open jkind
                | Stepped_or_null { ty; is_open = is_open2; modality } ->
                  or_null ~fuel:(fuel - 1) ty (is_open || is_open2) modality
                | Stepped_record_unboxed_product tys_modalities ->
@@ -2699,9 +2706,21 @@ let constrain_type_jkind ~fixed env ty jkind =
           | _ ->
             Error (Jkind.Violation.of_ ~context
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+  and estimate_jkind_and_loop ~fuel ~expanded ty ~is_open jkind : _ result =
+    (* If [jkind]'s bound's are all max, then we immediately know that the
+       mod-bounds already agree. But in such a case, we may still need to
+       constrain layouts. So we still continue, but we avoid performing any
+       substitutions into the with-bounds while in [estimate_type_jkind]. These
+       substitutions can be expensive if there are many with-bounds, and this
+       case gets hit a lot (the v1 safety check always hits this case). *)
+    let ignore_mod_bounds = Jkind.mod_bounds_are_max jkind in
+    let ty's_jkind = estimate_type_jkind ~ignore_mod_bounds env ty in
+    loop ~fuel ~expanded ty ~is_open ty's_jkind jkind
   in
-  loop ~fuel:100 ~expanded:false ty ~is_open:false
-    (estimate_type_jkind env ty) (Jkind.disallow_left jkind)
+  estimate_jkind_and_loop ~fuel:100 ~expanded:false ty ~is_open:false
+    (Jkind.disallow_left jkind)
+
+let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
 
 let type_sort ~why ~fixed env ty =
   let jkind, sort = Jkind.of_new_sort_var ~why in
