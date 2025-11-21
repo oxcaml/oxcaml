@@ -415,14 +415,14 @@ module Layout = struct
     | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
     | Product _ -> t
 
-  (* CR zeisbach: I don't think I can get rid of this guy, but revisit this! *)
   let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
     | Any sa -> Some sa
     | Sort (b, sa) -> if Sort.is_possibly_scannable b then Some sa else None
     | Product _ -> None
 
-  (* CR zeisbach: the existance of this function is a bit suspicious... *)
-  (* identity if the root has no meaningful scannable axes *)
+  (* CR layouts-scannable: Once nullability becomes a scannable axis, reconsider
+     whether this function is needed. *)
+  (* If [t] has no meaningful scannable axes, returns [t] unchanged *)
   let set_root_scannable_axes t sa =
     match t with
     | Any _ -> Any sa
@@ -511,30 +511,23 @@ module Layout = struct
 
   let format ppf layout =
     let open Format in
+    let pp_string_list ppf lst =
+      pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string ppf lst
+    in
     let rec pp_element ~nested ppf : _ Layout.t -> unit = function
-      | Any sa ->
-        (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
-          ppf
-          ("any" :: Scannable_axes.to_string_list sa)
+      | Any sa -> pp_string_list ppf ("any" :: Scannable_axes.to_string_list sa)
       | Sort (s, sa) -> (
         match Sort.get s with
-        (* CR zeisbach: ways to cut down on duplication? between here and also
-           maybe the const layout [to_string] above...? *)
         | Base Scannable when Scannable_axes.(equal sa immediate_axes) ->
           fprintf ppf "immediate"
         | Base Scannable ->
-          (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
-            ppf
-            ("value"
-             (* CR zeisbach: should there be a helper to do this? should there
-                not be a helper to compare against max? *)
-            :: Scannable_axes.to_string_list_diff
-                 ~base:Scannable_axes.value_axes sa)
+          let value_axes_diff =
+            Scannable_axes.(to_string_list_diff ~base:value_axes sa)
+          in
+          pp_string_list ppf ("value" :: value_axes_diff)
         | Var _ ->
           let sort_var_str = Format.asprintf "%a" Sort.format s in
-          (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
-            ppf
-            (sort_var_str :: Scannable_axes.to_string_list sa)
+          pp_string_list ppf (sort_var_str :: Scannable_axes.to_string_list sa)
         (* definitely never scannable *)
         | Base _ | Product _ -> fprintf ppf "%a" Sort.format s)
       | Product ts ->
@@ -2233,9 +2226,12 @@ module Const = struct
             convert_with_base
               ~base:
                 { jkind =
-                    (* CR zeisbach: maybe this should set to Separable? That's
-                       how things worked previously. Think about which layouts
-                       this could possibly matter for! *)
+                    (* CR layouts-scannable: Before overwriting semantics, this
+                       function used [Separable] as a mod bound. This is no
+                       longer needed (as scannable axes currently override),
+                       but if that behavior is changed then this must as well.
+                       The second call to [convert_with_base] should be replaced
+                       by one once nullability is a scannable axis. *)
                     { layout = jkind.layout;
                       mod_bounds =
                         Mod_bounds.set_nullability Nullability.Non_null
@@ -2384,20 +2380,16 @@ module Const = struct
         Location.prerr_warning jkind.pjkind_loc
           (Warnings.Ignored_kind_modifier
              (name.txt, List.map Location.get_txt sa_annot));
-      (* CR layouts-scannable: The correct behavior is to make a new jkind that
-         differs only in the layout by adding in the non-[None] scannable axes.
-         For inspiration, see [set_nullability_upper_bound].
-         This should emit a warning if the [jkind_without_sa] already has
-         the specified scannable axes. This is why the helper currently
-         returns an optional annotation (since none vs default matters). *)
       set_separability ~abbrev:name.txt jkind_without_sa separability
     | Pjk_mod (base, modifiers) ->
       let base = of_user_written_annotation_unchecked_level context base in
       (* for each mode, lower the corresponding modal bound to be that mode *)
       let mod_bounds, separability = Typemode.transl_mod_bounds modifiers in
       let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
-      (* CR zeisbach: we won't get any warnings from this one. Make an active
-         decision about what to do here before trying to get this merged. *)
+      (* CR layouts-scannable: There are no warnings that are raised when these
+         annotations are redundant/etc, since any warnings would be reported
+         3 times. If callers only call this function once before the old syntax
+         is deprecated, additional warnings should be added here. *)
       let layout =
         match separability with
         | None -> base.layout
@@ -2560,7 +2552,6 @@ module Jkind_desc = struct
 
   let map_type_expr f t = Layout_and_axes.map_type_expr f t
 
-  (* CR zeisbach: watch out for call sites of this function! *)
   let of_new_sort_var nullability_upper_bound sa =
     let layout, sort = Layout.of_new_sort_var sa in
     ( { layout;
@@ -2718,10 +2709,6 @@ module Builtin = struct
     let layout =
       Layout.product
         (List.init arity (fun _ ->
-             (* CR zeisbach: what is a good default here? the builtins use
-                Non_float (maybe Non_pointer, shouldn't matter); could use
-                legacy or max. try some of them out to see if it matters!
-                And think harder about how these could change when unifying *)
              fst (Layout.of_new_sort_var Scannable_axes.max)))
     in
     let desc : _ jkind_desc =
@@ -2754,26 +2741,18 @@ let has_with_bounds (type r) (t : (_ * r) jkind) =
 (******************************)
 (* construction *)
 
-(* CR zeisbach: these functions are pretty weird and should be looked at
-   carefully. Creating sort variables and setting the scannable axes in
-   this way might not be what I'm actually trying to do... *)
 let of_new_sort_var ~why =
-  let jkind, sort =
-    Jkind_desc.of_new_sort_var Maybe_null { separability = Maybe_separable }
-  in
+  let jkind, sort = Jkind_desc.of_new_sort_var Maybe_null Scannable_axes.max in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
 let of_new_sort ~why = fst (of_new_sort_var ~why)
 
 let of_new_legacy_sort_var ~why =
   let jkind, sort =
-    Jkind_desc.of_new_sort_var Non_null { separability = Separable }
+    Jkind_desc.of_new_sort_var Non_null Scannable_axes.value_axes
   in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_legacy_creation why), sort
 
-(* CR zeisbach: this now is a precise bound and not an upper bound. Might this
-   be a problem when we put non_pointer things in arrays? Or should the sub
-   relationship stuff already work? Again, look at call sites to debug! *)
 let of_new_non_float_sort_var ~why =
   let jkind, sort =
     Jkind_desc.of_new_sort_var Maybe_null { separability = Non_float }
@@ -3286,11 +3265,9 @@ let apply_or_null_l jkind =
   | Non_null ->
     let jkind = set_nullability_upper_bound jkind Maybe_null in
     let jkind =
-      (* CR zeisbach: not sure how best to write this.
-         maybe_separable staying the same but being in the branch
-         with separable was how this was done before. None is weird... *)
       match get_root_scannable_axes jkind with
-      | Some { separability = Maybe_separable | Separable } ->
+      | Some { separability = Maybe_separable } -> jkind
+      | Some { separability = Separable } ->
         set_root_separability jkind Maybe_separable
       | Some { separability = Non_float | Non_pointer } -> jkind
       | None -> jkind
@@ -3303,13 +3280,10 @@ let apply_or_null_r jkind =
   | Maybe_null ->
     let jkind = set_nullability_upper_bound jkind Non_null in
     let jkind =
-      (* CR zeisbach: how should this be written, style-wise? *)
       match get_root_scannable_axes jkind with
       | Some { separability = Maybe_separable } -> jkind
       | Some { separability = Separable } ->
         set_root_separability jkind Non_float
-      (* CR zeisbach: what is the right interaction here? Is null a non_pointer?
-         I would assume that's okay, and that it shouldn't change at all. *)
       | Some { separability = Non_float | Non_pointer } -> jkind
       | None -> jkind
     in

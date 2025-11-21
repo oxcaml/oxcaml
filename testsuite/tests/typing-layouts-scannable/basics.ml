@@ -26,8 +26,8 @@ type t : value non_pointer & value maybe_separable & float64
 |}]
 
 (* Checking non_pointer annotations, based on [typing-layouts-or-null/separability.ml]
-   and [typing-jkind-bounds/annots.ml]. *)
-(* CR zeisbach: Once separability is a scannable axis, move these! *)
+   and [typing-jkind-bounds/annots.ml]. Since separability is now a scannable axis,
+   these different files are actually testing very similar code paths. *)
 
 (* Annotation on type parameters: *)
 
@@ -174,46 +174,6 @@ Error: This type "t_maybeptr_val" should be an instance of type
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of t_maybeptr_val must be a sublayout of any separable
          because it's the type argument to the array type.
-|}]
-
-(* CR zeisbach: There are versions of these tests that use [immediate]
-   instead of [value non_pointer]. Once [immediate] means that, these will be
-   redundant and can probably be removed *)
-type 'a t = 'a accepts_nonptr
-type ('a : value) t = 'a accepts_nonptr
-[%%expect{|
-type ('a : value non_pointer) t = 'a accepts_nonptr
-type ('a : value non_pointer) t = 'a accepts_nonptr
-|}]
-
-let f : ('a : value non_pointer) accepts_nonptr -> ('a : value) accepts_nonptr = fun x -> x
-let f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
-let f : ('a : value). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
-[%%expect{|
-val f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr =
-  <fun>
-val f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr =
-  <fun>
-Line 3, characters 8-60:
-3 | let f : ('a : value). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The universal type variable 'a was declared to have kind value.
-       But it was inferred to have kind value non_pointer
-         because of the definition of accepts_nonptr at line 2, characters 0-42.
-|}]
-
-let f : (_ : value) accepts_nonptr -> unit = fun _ -> ()
-let g : (_ : value non_pointer) accepts_nonptr -> unit = fun _ -> ()
-[%%expect{|
-val f : ('a : value non_pointer). 'a accepts_nonptr -> unit = <fun>
-val g : ('a : value non_pointer). 'a accepts_nonptr -> unit = <fun>
-|}]
-
-let f : (_ : value non_pointer) -> (_ : value) = fun _ -> assert false
-let g : (_ : value) -> (_ : value non_pointer) = fun _ -> assert false
-[%%expect{|
-val f : ('a : value non_pointer) 'b. 'a -> 'b = <fun>
-val g : 'a ('b : value non_pointer). 'a -> 'b = <fun>
 |}]
 
 (* unboxed records *)
@@ -440,9 +400,14 @@ end
 module M : sig type t : value non_float end
 |}]
 
-(* CR zeisbach: this test used to test with the old mod bounds, since the
-   annotation would only _lower_ things. *)
+(* This test demonstrates a change in behavior now that the mod bound syntax
+   gets parsed into scannable axes: before, mod bounds could only make non-modal
+   axes lower (so [mod separable] would be a no-op, since [immediate] already
+   meant [non_float]). But these now (currently, at least) override the
+   existing scannable axes! *)
 
+(* CR layouts-scannable: as we deprecate the old syntax, this small collection
+   of tests should be removed. *)
 module M : sig
   type t : value non_float
 end = struct
