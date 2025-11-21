@@ -8,14 +8,15 @@ module T = Product_lattice.Make (struct
      2 Uniqueness (monadic): Aliased, Unique -> 2
      3 Portability: Portable, Nonportable -> 2
      4 Contention (monadic): Contended, Shared, Uncontended -> 3
-     5 Yielding: Unyielding, Yielding -> 2
-     6 Statefulness: Stateless, Observing, Stateful -> 3
-     7 Visibility (monadic): Immutable, Read, Read_write -> 3
-     8 Externality: External, External64, Internal -> 3
-     9 Nullability: Non_null, Maybe_null -> 2
-     10 Separability: Non_float, Separable, Maybe_separable -> 3
+     5 Forkable: Forkable, Unforkable -> 2
+     6 Yielding: Unyielding, Yielding -> 2
+     7 Statefulness: Stateless, Observing, Stateful -> 3
+     8 Visibility (monadic): Immutable, Read, Read_write -> 3
+     9 Externality: External, External64, Internal -> 3
+     10 Nullability: Non_null, Maybe_null -> 2
+     11 Separability: Non_float, Separable, Maybe_separable -> 3
   *)
-  let axis_sizes = [| 3; 2; 2; 2; 3; 2; 3; 3; 3; 2; 3 |]
+  let axis_sizes = [| 3; 2; 2; 2; 3; 2; 2; 3; 3; 3; 2; 3 |]
 end)
 
 include T
@@ -42,12 +43,13 @@ let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
       | "uniqueness" -> Some 2
       | "portability" -> Some 3
       | "contention" -> Some 4
-      | "yielding" -> Some 5
-      | "statefulness" -> Some 6
-      | "visibility" -> Some 7
-      | "externality" -> Some 8
-      | "nullability" -> Some 9
-      | "separability" -> Some 10
+      | "forkable" -> Some 5
+      | "yielding" -> Some 6
+      | "statefulness" -> Some 7
+      | "visibility" -> Some 8
+      | "externality" -> Some 9
+      | "nullability" -> Some 10
+      | "separability" -> Some 11
       | _ -> None
     in
     match idx with None -> () | Some i -> levels.(i) <- top i
@@ -117,6 +119,11 @@ module Levels = struct
     | Mode.Contention.Const.Shared -> 1
     | Mode.Contention.Const.Uncontended -> 2
 
+  let level_of_forkable (x : Mode.Forkable.Const.t) : int =
+    match x with
+    | Mode.Forkable.Const.Forkable -> 0
+    | Mode.Forkable.Const.Unforkable -> 1
+
   let level_of_yielding (x : Mode.Yielding.Const.t) : int =
     match x with
     | Mode.Yielding.Const.Unyielding -> 0
@@ -178,6 +185,11 @@ module Levels = struct
     | 2 -> Mode.Contention.Const.Uncontended
     | _ -> invalid_arg "Axis_lattice_array.contention_of_level_monadic"
 
+  let forkable_of_level = function
+    | 0 -> Mode.Forkable.Const.Forkable
+    | 1 -> Mode.Forkable.Const.Unforkable
+    | _ -> invalid_arg "Axis_lattice_array.forkable_of_level"
+
   let yielding_of_level = function
     | 0 -> Mode.Yielding.Const.Unyielding
     | 1 -> Mode.Yielding.Const.Yielding
@@ -215,7 +227,7 @@ end
 
 let const_of_levels
     ~areality ~linearity ~uniqueness ~portability
-    ~contention ~yielding ~statefulness ~visibility
+    ~contention ~forkable ~yielding ~statefulness ~visibility
     ~externality ~nullability ~separability =
   let open Levels in
   encode
@@ -225,6 +237,7 @@ let const_of_levels
          level_of_uniqueness_monadic uniqueness;
          level_of_portability portability;
          level_of_contention_monadic contention;
+         level_of_forkable forkable;
          level_of_yielding yielding;
          level_of_statefulness statefulness;
          level_of_visibility_monadic visibility;
@@ -241,6 +254,7 @@ let nonfloat_value : t =
     ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.max
     ~contention:Mode.Contention.Const.Uncontended
+    ~forkable:Mode.Forkable.Const.max
     ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
@@ -257,6 +271,7 @@ let immutable_data : t =
     ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.min
     ~contention:Mode.Contention.Const.Contended
+    ~forkable:Mode.Forkable.Const.max
     ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable
@@ -271,6 +286,7 @@ let mutable_data : t =
     ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.min
     ~contention:Mode.Contention.Const.Uncontended
+    ~forkable:Mode.Forkable.Const.max
     ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
@@ -287,6 +303,7 @@ let value : t =
     ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.max
     ~contention:Mode.Contention.Const.Uncontended
+    ~forkable:Mode.Forkable.Const.max
     ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
@@ -301,6 +318,7 @@ let arrow : t =
     ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability:Mode.Portability.Const.max
     ~contention:Mode.Contention.Const.Contended
+    ~forkable:Mode.Forkable.Const.max
     ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Immutable
@@ -317,6 +335,7 @@ let immediate : t =
     ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability:Mode.Portability.Const.min
     ~contention:Mode.Contention.Const.Contended
+    ~forkable:Mode.Forkable.Const.max
     ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable
@@ -327,7 +346,7 @@ let immediate : t =
 (* Matches JK for_object: legacy on comonadic axes, max on monadic axes;
    Non_null, Non_float. *)
 let object_legacy : t =
-  let ({ linearity; areality; portability; yielding; statefulness }
+  let ({ linearity; areality; portability; forkable; yielding; statefulness }
         : Mode.Value.Comonadic.Const.t) =
     Mode.Value.Comonadic.Const.legacy
   in
@@ -337,6 +356,7 @@ let object_legacy : t =
     ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability
     ~contention:Mode.Contention.Const.Uncontended
+    ~forkable
     ~yielding
     ~statefulness
     ~visibility:Mode.Visibility.Const.Read_write
@@ -353,16 +373,17 @@ let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =
   | 2 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Uniqueness))
   | 3 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Portability))
   | 4 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Contention))
-  | 5 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Yielding))
-  | 6 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Statefulness))
-  | 7 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Visibility))
-  | 8 ->
-    Jkind_axis.Axis.Pack
-      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality)
+  | 5 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Forkable))
+  | 6 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Yielding))
+  | 7 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Statefulness))
+  | 8 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Visibility))
   | 9 ->
     Jkind_axis.Axis.Pack
-      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability)
+      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality)
   | 10 ->
+    Jkind_axis.Axis.Pack
+      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability)
+  | 11 ->
     Jkind_axis.Axis.Pack
       (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Separability)
   | _ -> failwith "axis_number_to_axis_packed: invalid axis number"

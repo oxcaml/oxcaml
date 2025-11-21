@@ -300,6 +300,9 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
     | Types.Tnil ->
       failwith "Tnil shouldn't appear in kind_of"
       (* Ldd.const Axis_lattice.value *)
+    | Types.Tquote _ | Types.Tsplice _ ->
+      (* Treat quoted/spliced types conservatively as boxed values. *)
+      Ldd.const Axis_lattice.value
     | Types.Tvariant row ->
       if Btype.tvariant_not_immediate row
       then
@@ -674,7 +677,7 @@ let rec max_arity_in_type (acc : int Path.Map.t) (ty : Types.type_expr) =
   | Tobject (t, _) -> max_arity_in_type acc t
   | Tfield (_, _, t1, t2) -> max_arity_in_type (max_arity_in_type acc t1) t2
   | Tvar _ | Tunivar _ | Tlink _ | Tsubst _ | Tnil | Tvariant _ | Tpackage _
-  | Tof_kind _ -> acc
+  | Tquote _ | Tsplice _ | Tof_kind _ -> acc
 
 let identity_lookup_from_arity_map (arity : int Path.Map.t) (p : Path.t)
     : JK.constr_decl =
