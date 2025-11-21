@@ -1599,7 +1599,7 @@ module Const = struct
     let value =
       { jkind =
           mk_jkind
-            (Base (Scannable, { separability = Separable }))
+            (Base (Scannable, Scannable_axes.value_axes))
             ~crossing:Crossing.max ~externality:Externality.max
             ~nullability:Non_null;
         name = "value"
@@ -1694,7 +1694,7 @@ module Const = struct
     let immediate =
       { jkind =
           mk_jkind
-            (Base (Scannable, { separability = Non_pointer }))
+            (Base (Scannable, Scannable_axes.immediate_axes))
             ~crossing:cross_all_except_staticity ~externality:Externality.min
             ~nullability:Non_null;
         name = "immediate"
