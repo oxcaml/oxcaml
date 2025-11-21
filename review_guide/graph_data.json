@@ -1,0 +1,997 @@
+{
+  "graph": {
+    "width": 22.593,
+    "height": 4.75
+  },
+  "nodes": [
+    {
+      "id": "typing/ikinds/ikinds.ml",
+      "x": 6.457,
+      "y": 1.75,
+      "width": 2.7059,
+      "height": 0.5,
+      "label": "typing/ikinds/ikinds.ml",
+      "info": "Ikinds facade: builds the LDD solver, normalizes jkinds, and exposes subkind/substitution APIs consumed by typing.*"
+    },
+    {
+      "id": "typing/ikinds/ikind.ml",
+      "x": 10.729,
+      "y": 1.75,
+      "width": 2.6064,
+      "height": 0.5,
+      "label": "typing/ikinds/ikind.ml",
+      "info": "Ikind core layer: defines rigid atoms and instantiates Ikind.Ldd over Axis_lattice and the chosen backend."
+    },
+    {
+      "id": "typing/ikinds/axis_lattice.ml",
+      "x": 15.803,
+      "y": 1.8611,
+      "width": 3.7438,
+      "height": 0.5,
+      "label": "typing/ikinds/axis_lattice.ml",
+      "info": "Bitset-backed axis lattice with modality masks and canned constants; conversions live in Axis_lattice_conv."
+    },
+    {
+      "id": "typing/jkind.ml",
+      "x": 15.803,
+      "y": 1.1111,
+      "width": 1.9098,
+      "height": 0.5,
+      "label": "typing/jkind.ml",
+      "info": "Jkind definitions, allowance helpers, and normalization logic that Ikinds reuses."
+    },
+    {
+      "id": "typing/types.mli",
+      "x": 20.785,
+      "y": 0.72222,
+      "width": 1.9951,
+      "height": 0.5,
+      "label": "typing/types.mli",
+      "info": "Types interface defining constructor_ikind records alongside ikind reset helpers."
+    },
+    {
+      "id": "typing/ikinds/ldd.ml",
+      "x": 15.803,
+      "y": 4.3194,
+      "width": 2.4074,
+      "height": 0.5,
+      "label": "typing/ikinds/ldd.ml",
+      "info": "Backend switchboard currently aliasing Ikind.Ldd to the unboxed non-memoized implementation."
+    },
+    {
+      "id": "typing/ikinds/ldd_unboxed.ml",
+      "x": 20.785,
+      "y": 4.5,
+      "width": 3.5874,
+      "height": 0.5,
+      "label": "typing/ikinds/ldd_unboxed.ml",
+      "info": "Non-memoized lattice decision diagram backend with unboxed leaves for constructor coefficients."
+    },
+    {
+      "id": "typing/ikinds/ldd_no_fast_path.ml",
+      "x": 20.785,
+      "y": 5.0,
+      "width": 4.1182,
+      "height": 0.5,
+      "label": "typing/ikinds/ldd_no_fast_path.ml",
+      "info": "Unboxed backend variant with fast-path simplifications disabled for experimentation."
+    },
+    {
+      "id": "typing/ikinds/ldd_memo.ml",
+      "x": 1.6018,
+      "y": 4.0,
+      "width": 3.2035,
+      "height": 0.5,
+      "label": "typing/ikinds/ldd_memo.ml",
+      "info": "Memoizing LDD backend with unique tables and global counter instrumentation hooks."
+    },
+    {
+      "id": "typing/ikinds/global_counters.ml",
+      "x": 6.457,
+      "y": 4.0,
+      "width": 3.7153,
+      "height": 0.5,
+      "label": "typing/ikinds/global_counters.ml",
+      "info": "Global counter table used for lightweight solver profiling/instrumentation."
+    },
+    {
+      "id": "typing/ikinds/axis_lattice_array.ml",
+      "x": 15.803,
+      "y": 3.2222,
+      "width": 3.2462,
+      "height": 0.5,
+      "label": "typing/ikinds/axis_lattice_array.ml",
+      "info": "Array-based axis lattice mirroring Jkind axis order and wrapping the generic product lattice; conversions live in Axis_lattice_array_conv."
+    },
+    {
+      "id": "typing/ikinds/product_lattice.ml",
+      "x": 20.785,
+      "y": 3.75,
+      "width": 3.6158,
+      "height": 0.5,
+      "label": "typing/ikinds/product_lattice.ml",
+      "info": "Generic product lattice functor providing join/meet/co_sub over fixed axis shapes."
+    },
+    {
+      "id": "typing/jkind_axis.ml",
+      "x": 20.785,
+      "y": 2.7083,
+      "width": 2.45,
+      "height": 0.5,
+      "label": "typing/jkind_axis.ml",
+      "info": "Axis metadata (modal and nonmodal) shared by jkinds and the lattice encoders."
+    },
+    {
+      "id": "typing/mode.ml",
+      "x": 20.785,
+      "y": 1.6667,
+      "width": 1.9667,
+      "height": 0.5,
+      "label": "typing/mode.ml",
+      "info": "Mode and modality crossing definitions supplying per-axis constants."
+    },
+    {
+      "id": "typing/ctype.ml",
+      "x": 1.6018,
+      "y": 3.25,
+      "width": 1.9382,
+      "height": 0.5,
+      "label": "typing/ctype.ml",
+      "info": "Type checker routines that defer subjkind/intersection and crossing logic to Ikinds."
+    },
+    {
+      "id": "typing/typedecl.ml",
+      "x": 1.6018,
+      "y": 2.5,
+      "width": 2.251,
+      "height": 0.5,
+      "label": "typing/typedecl.ml",
+      "info": "Type declaration processing that normalizes jkinds and caches constructor polynomials via Ikinds."
+    },
+    {
+      "id": "typing/typemod.ml",
+      "x": 1.6018,
+      "y": 1.75,
+      "width": 2.2937,
+      "height": 0.5,
+      "label": "typing/typemod.ml",
+      "info": "Module typing entry that precomputes constructor ikinds for predefs when -ikinds is enabled."
+    },
+    {
+      "id": "typing/includecore.ml",
+      "x": 1.6018,
+      "y": 1.0,
+      "width": 2.578,
+      "height": 0.5,
+      "label": "typing/includecore.ml",
+      "info": "Signature inclusion checks that call Ikinds with origin tagging for diagnostics."
+    },
+    {
+      "id": "typing/subst.ml",
+      "x": 1.6018,
+      "y": 0.25,
+      "width": 1.9098,
+      "height": 0.5,
+      "label": "typing/subst.ml",
+      "info": "Substitution utilities that preserve constructor ikinds by remapping rigid atoms without Env access."
+    }
+  ],
+  "edges": [
+    {
+      "source": "typing/ikinds/ikinds.ml",
+      "target": "typing/ikinds/ikind.ml",
+      "points": [
+        [
+          7.8138,
+          1.75
+        ],
+        [
+          8.2753,
+          1.75
+        ],
+        [
+          8.7938,
+          1.75
+        ],
+        [
+          9.2635,
+          1.75
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Ikinds builds on Ikind.Ldd for lattice nodes and rigid-name helpers."
+    },
+    {
+      "source": "typing/ikinds/ikinds.ml",
+      "target": "typing/ikinds/axis_lattice.ml",
+      "points": [
+        [
+          6.8477,
+          1.9953
+        ],
+        [
+          7.2977,
+          2.2723
+        ],
+        [
+          8.0833,
+          2.7063
+        ],
+        [
+          8.8286,
+          2.875
+        ],
+        [
+          10.476,
+          3.2479
+        ],
+        [
+          10.96,
+          3.1362
+        ],
+        [
+          12.629,
+          2.875
+        ],
+        [
+          13.494,
+          2.7397
+        ],
+        [
+          14.444,
+          2.4083
+        ],
+        [
+          15.075,
+          2.1609
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Ikinds calls Axis_lattice for masks/constants when translating jkinds."
+    },
+    {
+      "source": "typing/ikinds/ikinds.ml",
+      "target": "typing/jkind.ml",
+      "points": [
+        [
+          7.4254,
+          1.5715
+        ],
+        [
+          7.8531,
+          1.4985
+        ],
+        [
+          8.3646,
+          1.4205
+        ],
+        [
+          8.8286,
+          1.375
+        ],
+        [
+          10.892,
+          1.1725
+        ],
+        [
+          13.314,
+          1.1229
+        ],
+        [
+          14.689,
+          1.1122
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Ikinds consumes Jkind APIs (disallow/with_bounds/modality) while constructing ckinds."
+    },
+    {
+      "source": "typing/ikinds/ikinds.ml",
+      "target": "typing/types.mli",
+      "points": [
+        [
+          7.1336,
+          1.5285
+        ],
+        [
+          7.6018,
+          1.3814
+        ],
+        [
+          8.2468,
+          1.1976
+        ],
+        [
+          8.8286,
+          1.0972
+        ],
+        [
+          12.823,
+          0.40799
+        ],
+        [
+          13.874,
+          0.5896
+        ],
+        [
+          17.925,
+          0.44444
+        ],
+        [
+          18.281,
+          0.43168
+        ],
+        [
+          18.372,
+          0.42039
+        ],
+        [
+          18.727,
+          0.44444
+        ],
+        [
+          19.074,
+          0.46792
+        ],
+        [
+          19.452,
+          0.51356
+        ],
+        [
+          19.788,
+          0.56117
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Ikinds stores constructor polynomials directly through the shared constructor_ikind record."
+    },
+    {
+      "source": "typing/ikinds/ikind.ml",
+      "target": "typing/ikinds/axis_lattice.ml",
+      "points": [
+        [
+          12.029,
+          1.7783
+        ],
+        [
+          12.564,
+          1.7901
+        ],
+        [
+          13.197,
+          1.804
+        ],
+        [
+          13.79,
+          1.8171
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Ikind.Ldd uses the bitset lattice as its coefficient domain."
+    },
+    {
+      "source": "typing/ikinds/ikind.ml",
+      "target": "typing/ikinds/ldd.ml",
+      "points": [
+        [
+          11.908,
+          1.8591
+        ],
+        [
+          12.157,
+          1.9153
+        ],
+        [
+          12.411,
+          1.9994
+        ],
+        [
+          12.629,
+          2.125
+        ],
+        [
+          13.387,
+          2.5601
+        ],
+        [
+          13.215,
+          3.0977
+        ],
+        [
+          13.931,
+          3.5972
+        ],
+        [
+          14.221,
+          3.7988
+        ],
+        [
+          14.574,
+          3.9543
+        ],
+        [
+          14.894,
+          4.0685
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Ikind.Ldd delegates diagram operations to the selected backend from Ldd."
+    },
+    {
+      "source": "typing/ikinds/axis_lattice_array.ml",
+      "target": "typing/types.mli",
+      "points": [
+        [
+          16.89,
+          1.6528
+        ],
+        [
+          17.147,
+          1.6005
+        ],
+        [
+          17.421,
+          1.543
+        ],
+        [
+          17.675,
+          1.4861
+        ],
+        [
+          18.44,
+          1.3147
+        ],
+        [
+          19.305,
+          1.0994
+        ],
+        [
+          19.926,
+          0.9411
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Axis_lattice reads/writes Types.Jkind_mod_bounds for conversions."
+    },
+    {
+      "source": "typing/ikinds/axis_lattice_array.ml",
+      "target": "typing/jkind_axis.ml",
+      "points": [
+        [
+          16.453,
+          2.1005
+        ],
+        [
+          16.867,
+          2.2454
+        ],
+        [
+          17.42,
+          2.4198
+        ],
+        [
+          17.925,
+          2.5139
+        ],
+        [
+          18.402,
+          2.6028
+        ],
+        [
+          18.93,
+          2.6521
+        ],
+        [
+          19.401,
+          2.6791
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Axis_lattice iterates Jkind_axis metadata to map axes to bit positions."
+    },
+    {
+      "source": "typing/ikinds/axis_lattice_array.ml",
+      "target": "typing/mode.ml",
+      "points": [
+        [
+          17.609,
+          1.7908
+        ],
+        [
+          18.291,
+          1.764
+        ],
+        [
+          19.047,
+          1.7343
+        ],
+        [
+          19.65,
+          1.7107
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Axis_lattice_array queries Mode.Modality constants to determine relevant axes."
+    },
+    {
+      "source": "typing/jkind.ml",
+      "target": "typing/types.mli",
+      "points": [
+        [
+          16.399,
+          0.91176
+        ],
+        [
+          16.818,
+          0.77932
+        ],
+        [
+          17.399,
+          0.61756
+        ],
+        [
+          17.925,
+          0.54861
+        ],
+        [
+          18.537,
+          0.46836
+        ],
+        [
+          19.228,
+          0.50747
+        ],
+        [
+          19.776,
+          0.56871
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Jkind reads Types constructor metadata (allowances and mod_bounds) via the shared record accessors."
+    },
+    {
+      "source": "typing/jkind.ml",
+      "target": "typing/jkind_axis.ml",
+      "points": [
+        [
+          16.636,
+          1.239
+        ],
+        [
+          16.963,
+          1.2998
+        ],
+        [
+          17.34,
+          1.3821
+        ],
+        [
+          17.675,
+          1.4861
+        ],
+        [
+          17.825,
+          1.5328
+        ],
+        [
+          18.831,
+          1.9834
+        ],
+        [
+          18.977,
+          2.0417
+        ],
+        [
+          19.314,
+          2.1761
+        ],
+        [
+          19.69,
+          2.3172
+        ],
+        [
+          20.011,
+          2.4347
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Jkind relies on Jkind_axis metadata when tracking with-bound relevance."
+    },
+    {
+      "source": "typing/jkind.ml",
+      "target": "typing/mode.ml",
+      "points": [
+        [
+          16.691,
+          1.2092
+        ],
+        [
+          17.537,
+          1.3039
+        ],
+        [
+          18.818,
+          1.4476
+        ],
+        [
+          19.718,
+          1.5486
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Jkind manipulates Mode.Crossing/Mod_bounds for modality reasoning."
+    },
+    {
+      "source": "typing/ikinds/ldd.ml",
+      "target": "typing/ikinds/ldd_unboxed.ml",
+      "points": [
+        [
+          16.991,
+          4.3622
+        ],
+        [
+          17.557,
+          4.3829
+        ],
+        [
+          18.249,
+          4.4081
+        ],
+        [
+          18.886,
+          4.4313
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Ldd.Make routes to the unboxed non-memoized backend."
+    },
+    {
+      "source": "typing/ikinds/ldd.ml",
+      "target": "typing/ikinds/ldd_no_fast_path.ml",
+      "points": [
+        [
+          16.991,
+          4.3622
+        ],
+        [
+          17.557,
+          4.3829
+        ],
+        [
+          18.249,
+          4.5581
+        ],
+        [
+          18.886,
+          4.5813
+        ]
+      ],
+      "style": "dotted",
+      "label": "No_fast_path",
+      "info": "Alternate backend without join/meet fast paths."
+    },
+    {
+      "source": "typing/ikinds/ldd_memo.ml",
+      "target": "typing/ikinds/global_counters.ml",
+      "points": [
+        [
+          3.2097,
+          4.0
+        ],
+        [
+          3.603,
+          4.0
+        ],
+        [
+          4.0293,
+          4.0
+        ],
+        [
+          4.4393,
+          4.0
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Memo backend bumps Global_counters to track solver statistics."
+    },
+    {
+      "source": "typing/ikinds/axis_lattice_array.ml",
+      "target": "typing/types.mli",
+      "points": [
+        [
+          16.335,
+          2.9793
+        ],
+        [
+          16.941,
+          2.6825
+        ],
+        [
+          17.958,
+          2.1431
+        ],
+        [
+          18.727,
+          1.5278
+        ],
+        [
+          18.847,
+          1.4323
+        ],
+        [
+          18.846,
+          1.3692
+        ],
+        [
+          18.977,
+          1.2917
+        ],
+        [
+          19.246,
+          1.1335
+        ],
+        [
+          19.563,
+          1.0142
+        ],
+        [
+          19.856,
+          0.9267
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Axis_lattice_array encodes/decodes Types.Jkind_mod_bounds values."
+    },
+    {
+      "source": "typing/ikinds/axis_lattice_array.ml",
+      "target": "typing/ikinds/product_lattice.ml",
+      "points": [
+        [
+          17.158,
+          3.365
+        ],
+        [
+          17.78,
+          3.4313
+        ],
+        [
+          18.524,
+          3.5106
+        ],
+        [
+          19.175,
+          3.58
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Axis_lattice_array is instantiated from the generic product lattice functor."
+    },
+    {
+      "source": "typing/ikinds/axis_lattice_array.ml",
+      "target": "typing/jkind_axis.ml",
+      "points": [
+        [
+          17.388,
+          3.2821
+        ],
+        [
+          17.823,
+          3.2804
+        ],
+        [
+          18.295,
+          3.2615
+        ],
+        [
+          18.727,
+          3.2083
+        ],
+        [
+          19.129,
+          3.159
+        ],
+        [
+          19.565,
+          3.0588
+        ],
+        [
+          19.931,
+          2.961
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Axis_lattice_array reuses Jkind_axis metadata for naming/ordering."
+    },
+    {
+      "source": "typing/ikinds/axis_lattice_array.ml",
+      "target": "typing/mode.ml",
+      "points": [
+        [
+          16.543,
+          2.9944
+        ],
+        [
+          17.466,
+          2.7046
+        ],
+        [
+          19.053,
+          2.2063
+        ],
+        [
+          19.998,
+          1.9095
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Axis_lattice_array queries Mode.Modality to compute relevant-axis masks."
+    },
+    {
+      "source": "typing/ctype.ml",
+      "target": "typing/ikinds/ikinds.ml",
+      "points": [
+        [
+          2.363,
+          3.0901
+        ],
+        [
+          2.6298,
+          3.0286
+        ],
+        [
+          2.9316,
+          2.9541
+        ],
+        [
+          3.2035,
+          2.875
+        ],
+        [
+          4.0707,
+          2.6228
+        ],
+        [
+          5.0476,
+          2.2745
+        ],
+        [
+          5.6998,
+          2.0325
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Type checker defers subjkind/intersection and crossing checks to Ikinds."
+    },
+    {
+      "source": "typing/typedecl.ml",
+      "target": "typing/ikinds/ikinds.ml",
+      "points": [
+        [
+          2.535,
+          2.3572
+        ],
+        [
+          3.3051,
+          2.2375
+        ],
+        [
+          4.4096,
+          2.0659
+        ],
+        [
+          5.2482,
+          1.9357
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Type declarations normalize jkinds and cache constructor polynomials through Ikinds."
+    },
+    {
+      "source": "typing/typemod.ml",
+      "target": "typing/ikinds/ikinds.ml",
+      "points": [
+        [
+          2.7536,
+          1.75
+        ],
+        [
+          3.4067,
+          1.75
+        ],
+        [
+          4.2346,
+          1.75
+        ],
+        [
+          4.9406,
+          1.75
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Typemod precomputes constructor ikinds via Ikinds when bootstrapping environments."
+    },
+    {
+      "source": "typing/includecore.ml",
+      "target": "typing/ikinds/ikinds.ml",
+      "points": [
+        [
+          2.6218,
+          1.1563
+        ],
+        [
+          3.3876,
+          1.2753
+        ],
+        [
+          4.444,
+          1.4394
+        ],
+        [
+          5.252,
+          1.5649
+        ]
+      ],
+      "style": "solid",
+      "label": null,
+      "info": "Inclusion checks call Ikinds with origin tags for better diagnostics."
+    },
+    {
+      "source": "typing/subst.ml",
+      "target": "typing/ikinds/ikinds.ml",
+      "points": [
+        [
+          2.3544,
+          0.40995
+        ],
+        [
+          2.6231,
+          0.47194
+        ],
+        [
+          2.9283,
+          0.54681
+        ],
+        [
+          3.2035,
+          0.625
+        ],
+        [
+          4.0749,
+          0.87258
+        ],
+        [
+          5.0548,
+          1.2233
+        ],
+        [
+          5.7065,
+          1.467
+        ]
+      ],
+      "style": "dashed",
+      "label": "identity env",
+      "info": "Identity-env edge: substitution uses Ikinds.poly_of_type_function_in_identity_env to remap polynomials."
+    }
+  ]
+}

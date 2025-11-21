@@ -26,3 +26,16 @@ type_shape.mli
 type_shape.ml
 scalar.ml
 scalar.mli
+ikinds/axis_lattice.ml
+ikinds/global_counters.ml
+ikinds/global_counters.mli
+ikinds/lattice_intf.ml
+ikinds/lattice_polynomial.ml
+ikinds/lattice_polynomial.mli
+ikinds/ldd.ml
+ikinds/ldd.mli
+ikinds/ldd_jkind_solver.ml
+ikinds/ldd_jkind_solver.mli
+ikinds/ikind.ml
+ikinds/product_lattice.ml
+ikinds/product_lattice.mli

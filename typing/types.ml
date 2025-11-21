@@ -18,6 +18,23 @@
 open Allowance
 open Asttypes
 
+type constructor_ikind =
+  { base : Ikind.Ldd.node;
+    coeffs : Ikind.Ldd.node array;
+  }
+
+type constructor_ikind_entry =
+  | Constructor_ikind of constructor_ikind
+  | No_constructor_ikind of string
+
+type type_ikind = constructor_ikind_entry
+
+let ikind_debug : bool ref = ref false
+
+let ikind_reset (message : string) : type_ikind =
+  if !ikind_debug then Format.eprintf "[ikind-reset] %s@." message;
+  No_constructor_ikind message
+
 type atomic =
   | Nonatomic
   | Atomic
@@ -215,6 +232,36 @@ module Jkind_mod_bounds = struct
      Nullability.(le max (nullability t))) &&
     (not (mem axes (Nonmodal Separability)) ||
      Separability.(le max (separability t)))
+
+  let extract_monadic axis t =
+    let (Crossing.Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_with value)) = modal axis t
+    in
+    value
+
+  let extract_comonadic axis t =
+    let (Crossing.Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_with value)) = modal axis t
+    in
+    value
+
+  let areality_const t = extract_comonadic areality t
+
+  let linearity_const t = extract_comonadic linearity t
+
+  let uniqueness_const t = extract_monadic uniqueness t
+
+  let portability_const t = extract_comonadic portability t
+
+  let contention_const t = extract_monadic contention t
+
+  let forkable_const t = extract_comonadic forkable t
+
+  let yielding_const t = extract_comonadic yielding t
+
+  let statefulness_const t = extract_comonadic statefulness t
+
+  let visibility_const t = extract_monadic visibility t
 
   let max =
     { crossing = Mode.Crossing.max;
@@ -524,6 +571,7 @@ type type_declaration =
     type_arity: int;
     type_kind: type_decl_kind;
     type_jkind: jkind_l;
+    type_ikind: constructor_ikind_entry;
     type_private: private_flag;
     type_manifest: type_expr option;
     type_variance: Variance.t list;

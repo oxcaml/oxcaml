@@ -128,6 +128,13 @@ module With_bounds : sig
     ('l * 'r) Types.with_bounds
 
   val format : Format.formatter -> ('l * 'r) Types.with_bounds -> unit
+
+  val to_seq :
+    ('l * 'r) Types.with_bounds ->
+    (Types.type_expr * Types.With_bounds_type_info.t) Seq.t
+
+  val type_info_relevant_axes :
+    Types.With_bounds_type_info.t -> Jkind_axis.Axis_set.t
 end
 
 (** A [jkind] is a full description of the runtime representation of values
@@ -180,8 +187,12 @@ end
 (** Context for jkind operations. *)
 type jkind_context =
   { jkind_of_type : Types.type_expr -> Types.jkind_l option;
-    is_abstract : Path.t -> bool
+    is_abstract : Path.t -> bool;
         (* Check if a type path refers to an abstract type *)
+    lookup_type : Path.t -> Types.type_declaration option;
+        (* Lookup a type in the environment. Returns the full
+           [Types.type_declaration] if found, or [None] otherwise. *)
+    debug_print_env : Format.formatter -> unit
   }
 
 (******************************)
@@ -845,6 +856,15 @@ val sub_or_error :
   level:int ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
+  (unit, Violation.t) result
+
+(** Compares the layouts of two jkinds.
+*)
+val sub_jkind_l_layout :
+  context:jkind_context ->
+  level:int ->
+  Types.jkind_l ->
+  Types.jkind_l ->
   (unit, Violation.t) result
 
 (** Like [sub], but compares a left jkind against another left jkind.

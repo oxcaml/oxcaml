@@ -1507,6 +1507,11 @@ and find_type_unboxed_version path env seen =
       type_arity = decl.type_arity;
       type_kind = decl.type_kind;
       type_jkind = jkind;
+      type_ikind =
+        Types.ikind_reset
+          (Format.asprintf "env unboxed alias path=%a" Path.print path);
+      (* CR jujacobs: check if we can keep the ikind up to date here
+         Building aliased unboxed version in the environment. *)
       type_private = decl.type_private;
       type_manifest = Some man;
       type_variance = decl.type_variance;

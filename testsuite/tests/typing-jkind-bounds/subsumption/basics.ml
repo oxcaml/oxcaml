@@ -36,23 +36,13 @@ end = struct
   type t : immediate with string
 end
 [%%expect {|
-Lines 3-5, characters 6-3:
-3 | ......struct
+Line 4, characters 2-32:
 4 |   type t : immediate with string
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t : immutable_data end
-       is not included in
-         sig type t : immediate end
-       Type declarations do not match:
-         type t : immutable_data
-       is not included in
-         type t : immediate
-       The kind of the first is immutable_data
-         because of the definition of t at line 4, characters 2-32.
-       But the kind of the first must be a subkind of immediate
-         because of the definition of t at line 2, characters 2-20.
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data
+         because of the annotation on the declaration of the type t.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
 |}]
 
 module M : sig
@@ -261,13 +251,7 @@ type v : immutable_data with u = { value : t }
 [%%expect {|
 type u
 type t = private u
-Line 3, characters 0-46:
-3 | type v : immutable_data with u = { value : t }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "v" is immutable_data with t
-         because it's a boxed record type.
-       But the kind of type "v" must be a subkind of immutable_data with u
-         because of the annotation on the declaration of the type v.
+type v = { value : t; }
 |}]
 
 type t : immediate with t = [`foo | `bar]
@@ -349,37 +333,283 @@ Error: Signature mismatch:
          because of the definition of t at line 2, characters 2-36.
 |}]
 
-module Foo : sig
-  type ('a, 'b) u : value mod portable with 'b
-
-  type ('a
-       , 'b
-       , 'c)
-         t :
-         value mod portable with 'a with 'b with ('b, 'c) u with ('a * 'b, 'c) u
-end = struct
-  type ('a, 'b) u : value mod portable with 'b
-
-  type ('a
-       , 'b
-       , 'c)
-         t :
-         value mod portable with 'a with 'b with ('b, 'c) u with ('a * 'b, 'c) u
+(* Benjamin's example *)
+module type S = sig
+  type 'a t1
+  type 'a t2
+  type 'a t : immutable_data with 'a t1 t2 * unit t1
 end
 
+module M : S = struct
+  type 'a t1
+  type 'a t2
+  type 'a t = 'a t2 t1 * unit t2
+end
 [%%expect{|
-module Foo :
+module type S =
   sig
-    type ('a, 'b) u : value mod portable with 'b
-    type ('a, 'b, 'c) t
-      : value
-          mod portable
-          with 'a
-
-          with 'b
-
-          with ('a * 'b, 'c) u
-
-          with ('b, 'c) u
+    type 'a t1
+    type 'a t2
+    type 'a t : immutable_data with 'a t1 t2 with unit t1
   end
+module M : S
+|}]
+
+
+(* Benjamin's example failing version *)
+module type S = sig
+  type 'a t1
+  type 'a t2
+  type 'a t : immutable_data with 'a t1 t2 * unit t2
+end
+
+module M : S = struct
+  type 'a t1
+  type 'a t2
+  type 'a t = 'a t2 t1 * unit t1
+end
+[%%expect{|
+module type S =
+  sig
+    type 'a t1
+    type 'a t2
+    type 'a t : immutable_data with 'a t1 t2 with unit t2
+  end
+Lines 7-11, characters 15-3:
+ 7 | ...............struct
+ 8 |   type 'a t1
+ 9 |   type 'a t2
+10 |   type 'a t = 'a t2 t1 * unit t1
+11 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t1 type 'a t2 type 'a t = 'a t2 t1 * unit t1 end
+       is not included in
+         S
+       Type declarations do not match:
+         type 'a t = 'a t2 t1 * unit t1
+       is not included in
+         type 'a t : immutable_data with 'a t1 t2 with unit t2
+       The kind of the first is immutable_data with 'a t2 t1 with unit t1
+         because it's a tuple type.
+       But the kind of the first must be a subkind of
+           immutable_data with 'a t1 t2 with unit t2
+         because of the definition of t at line 4, characters 2-52.
+|}]
+
+(* Benjamin's example failing version 2 *)
+module type S = sig
+  type 'a t1
+  type 'a t2
+  type 'a t : immutable_data with 'a t1 t2
+end
+
+module M : S = struct
+  type 'a t1
+  type 'a t2
+  type 'a t = 'a t2 t1
+end
+[%%expect{|
+module type S =
+  sig type 'a t1 type 'a t2 type 'a t : immutable_data with 'a t1 t2 end
+Lines 7-11, characters 15-3:
+ 7 | ...............struct
+ 8 |   type 'a t1
+ 9 |   type 'a t2
+10 |   type 'a t = 'a t2 t1
+11 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t1 type 'a t2 type 'a t = 'a t2 t1 end
+       is not included in
+         S
+       Type declarations do not match:
+         type 'a t = 'a t2 t1
+       is not included in
+         type 'a t : immutable_data with 'a t1 t2
+       The kind of the first is value
+         because of the definition of t1 at line 8, characters 2-12.
+       But the kind of the first must be a subkind of
+           immutable_data with 'a t1 t2
+         because of the definition of t at line 4, characters 2-42.
+|}]
+
+
+(* Various types of rose trees *)
+module type S = sig
+  type 'a rose : immutable_data with 'a
+  type 'a lily : immutable_data with 'a
+  type 'a tulip : immutable_data
+end
+
+module M : S = struct
+  type 'a rose = Leaf of 'a | Node of ('a * 'a) rose
+  type 'a lily = Node of ('a * ('a list) lily) list
+  type 'a tulip = Node of ('a list) tulip list
+end
+[%%expect{|
+module type S =
+  sig
+    type 'a rose : immutable_data with 'a
+    type 'a lily : immutable_data with 'a
+    type 'a tulip : immutable_data
+  end
+module M : S
+|}]
+
+
+type fails : immutable_data = int -> int
+[%%expect{|
+Line 1, characters 0-40:
+1 | type fails : immutable_data = int -> int
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "int -> int" is value mod aliased immutable non_float
+         because it's a function type.
+       But the kind of type "int -> int" must be a subkind of immutable_data
+         because of the definition of fails at line 1, characters 0-40.
+|}]
+
+type should_fail : immutable_data = [`A of int -> int]
+[%%expect{|
+Line 1, characters 0-54:
+1 | type should_fail : immutable_data = [`A of int -> int]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `A of int -> int ]" is value mod immutable non_float
+         because it's a polymorphic variant type.
+       But the kind of type "[ `A of int -> int ]" must be a subkind of
+           immutable_data
+         because of the definition of should_fail at line 1, characters 0-54.
+|}]
+
+type should_also_fail : immutable_data = [`A of int -> int | `B of 'a] as 'a
+[%%expect{|
+Line 1, characters 0-76:
+1 | type should_also_fail : immutable_data = [`A of int -> int | `B of 'a] as 'a
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `A of int -> int | `B of 'a ] as 'a" is
+           value mod immutable non_float
+         because it's a polymorphic variant type.
+       But the kind of type "[ `A of int -> int | `B of 'a ] as 'a" must be a subkind of
+         immutable_data
+         because of the definition of should_also_fail at line 1, characters 0-76.
+|}]
+
+type r
+
+type should_fail_too : immutable_data with r = [`A of int ref]
+[%%expect{|
+type r
+Line 3, characters 0-62:
+3 | type should_fail_too : immutable_data with r = [`A of int ref]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `A of int ref ]" is mutable_data
+         because it's a polymorphic variant type.
+       But the kind of type "[ `A of int ref ]" must be a subkind of
+           immutable_data with r
+         because of the definition of should_fail_too at line 3, characters 0-62.
+|}]
+
+type should_likewise_fail : immutable_data = (int ref * (int -> int))
+[%%expect{|
+Line 1, characters 0-69:
+1 | type should_likewise_fail : immutable_data = (int ref * (int -> int))
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "int ref * (int -> int)" is value mod non_float
+         because it's a tuple type.
+       But the kind of type "int ref * (int -> int)" must be a subkind of
+           immutable_data
+         because of the definition of should_likewise_fail at line 1, characters 0-69.
+|}]
+
+type and_even_this_should_fail : immutable_data = [`A of [`B of int ref]]
+[%%expect{|
+Line 1, characters 0-73:
+1 | type and_even_this_should_fail : immutable_data = [`A of [`B of int ref]]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `A of [ `B of int ref ] ]" is mutable_data
+         because it's a polymorphic variant type.
+       But the kind of type "[ `A of [ `B of int ref ] ]" must be a subkind of
+           immutable_data
+         because of the definition of and_even_this_should_fail at line 1, characters 0-73.
+|}]
+
+type this_should_succeed : immutable_data = ((int * int) * (int * int))
+[%%expect{|
+type this_should_succeed = (int * int) * (int * int)
+|}]
+
+type this_too : immutable_data = (int * int) list
+[%%expect{|
+type this_too = (int * int) list
+|}]
+
+type this_fails : immutable_data = (int -> int) list
+[%%expect{|
+Line 1, characters 0-52:
+1 | type this_fails : immutable_data = (int -> int) list
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "(int -> int) list" is value mod immutable non_float
+         because it's a boxed variant type.
+       But the kind of type "(int -> int) list" must be a subkind of
+           immutable_data
+         because of the definition of this_fails at line 1, characters 0-52.
+|}]
+
+
+(* ok *)
+type 'a t1 : value mod portable =
+  | A
+  | B of 'a t1
+[%%expect{|
+type 'a t1 = A | B of 'a t1
+|}]
+
+(* ok *)
+type 'a t2 : value mod portable =
+  | A
+  | B of t2__unit
+
+and t2__unit = unit t2
+[%%expect{|
+type 'a t2 = A | B of t2__unit
+and t2__unit = unit t2
+|}]
+
+(* out of fuel *)
+type 'a t3 : value mod portable =
+  | A
+  | B of unit t3
+[%%expect{|
+type 'a t3 = A | B of unit t3
+|}]
+
+(* out of fuel (reported by alamoreaux) *)
+type 'number t : immutable_data with 'number =
+  [ `Null
+  | `False
+  | `True
+  | `String of string
+  | `Number of 'number
+  | `Object of (string * 'number t) list
+  | `Array of 'number t list
+  ]
+[%%expect{|
+type 'number t =
+    [ `Array of 'number t list
+    | `False
+    | `Null
+    | `Number of 'number
+    | `Object of (string * 'number t) list
+    | `String of string
+    | `True ]
+|}]
+
+(* simplified version of the above that still runs out of fuel (minimized by mdelvecchio) *)
+type 'number t : immutable_data with 'number =
+  [ `Object of (string * 'number t) list
+  | `Array of 'number t list
+  ]
+[%%expect{|
+type 'number t =
+    [ `Array of 'number t list | `Object of (string * 'number t) list ]
 |}]

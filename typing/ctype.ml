@@ -1414,6 +1414,9 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_arity = 0;
     type_kind = Type_abstract origin;
     type_jkind = Jkind.disallow_right jkind;
+    type_ikind = Types.ikind_reset "new_local_type";
+    (* CR jujacobs: check if we can keep the ikind up to date here
+       Creating fresh local type for constraint solving. *)
     type_private = Public;
     type_manifest = manifest;
     type_variance = [];
@@ -2404,7 +2407,53 @@ let mk_is_abstract env p =
   -> false
 
 let mk_jkind_context env jkind_of_type =
-  { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
+  let lookup_type p =
+    match Env.find_type p env with
+    | decl -> Some decl
+    | exception Not_found -> None
+  in
+  let debug_print_env ppf =
+    (* Print a bounded snapshot of types in the environment *)
+    let max_items = 120 in
+    let count = ref 0 in
+    let items = ref [] in
+    let add_item name path (decl : Types.type_declaration) acc =
+      if !count < max_items then begin
+        incr count;
+        items := (name, path, decl) :: !items
+      end;
+      acc
+    in
+    ignore (Env.fold_types add_item None env ());
+    let pp_kind ppf (decl : Types.type_declaration) =
+      match decl.type_kind, decl.type_manifest with
+      | Types.Type_abstract _, None -> Format.fprintf ppf "abstract"
+      | Types.Type_abstract _, Some _ -> Format.fprintf ppf "abbrev"
+      | Types.Type_variant _, _ -> Format.fprintf ppf "variant"
+      | Types.Type_record _, _ -> Format.fprintf ppf "record"
+      | Types.Type_record_unboxed_product _, _ ->
+        Format.fprintf ppf "record(unboxed)"
+      | Types.Type_open, _ -> Format.fprintf ppf "open"
+    in
+    let pp_item ppf (name, path, decl) =
+      Format.fprintf ppf "- %s (%a): %a"
+        name Path.print path pp_kind decl
+    in
+    let items = List.rev !items in
+    Format.fprintf ppf
+      "@[<v2>Environment types (showing %d/%d):@,%a@]@."
+      (List.length items)
+      !count
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,")
+         pp_item)
+      items
+  in
+  { Jkind.jkind_of_type;
+    is_abstract = mk_is_abstract env;
+    lookup_type;
+    debug_print_env;
+  }
 
 (* We parameterize [estimate_type_jkind] by a function
    [expand_component] because some callers want expansion of types and others
@@ -2612,7 +2661,7 @@ let constrain_type_jkind ~fixed env ty jkind =
 
     | _ ->
        match
-         Jkind.sub_or_intersect ~type_equal ~context ~level:!current_level
+         Ikinds.sub_or_intersect ~type_equal ~context ~level:!current_level
            ty's_jkind jkind
        with
        | Sub -> Ok ()
@@ -5303,7 +5352,7 @@ let zap_modalities_to_floor_if_at_least level =
 
 let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
-  Jkind.get_mode_crossing ~context jkind
+  Ikinds.crossing_of_jkind ~context jkind
 
 let crossing_of_ty env ?modalities ty =
   let crossing =
@@ -7329,6 +7378,9 @@ let rec nondep_type_decl env mid is_covariant decl =
       type_arity = decl.type_arity;
       type_kind = tk;
       type_jkind = jkind;
+      type_ikind = Types.ikind_reset "nondep_type_decl";
+      (* CR jujacobs: check if we can keep the ikind up to date here
+         Producing non-dependent copy of declaration. *)
       type_manifest = tm;
       type_private = priv;
       type_variance = decl.type_variance;
@@ -7569,8 +7621,10 @@ let check_decl_jkind env decl jkind =
     | _ -> decl.type_jkind
   in
   match
-    Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level
-      decl_jkind jkind
+    Ikinds.sub_jkind_l
+      ~origin:
+        (Format.asprintf "ctype:decl %a" Location.print_loc decl.type_loc)
+      ~type_equal ~context ~level:!current_level decl_jkind jkind
   with
   | Ok () -> Ok ()
   | Error _ as err ->
@@ -7579,8 +7633,11 @@ let check_decl_jkind env decl jkind =
     | Some ty ->
       let ty_jkind = type_jkind env ty in
       match
-        Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level ty_jkind
-          jkind
+        Ikinds.sub_jkind_l
+          ~origin:
+            (Format.asprintf "ctype:manifest %a"
+               Location.print_loc decl.type_loc)
+          ~type_equal ~context ~level:!current_level ty_jkind jkind
       with
       | Ok () -> Ok ()
       | Error _ as err -> err
@@ -7592,12 +7649,13 @@ let constrain_decl_jkind env decl jkind =
   (* This case is sad, because it can't refine type variables. Hence
      the need for reimplementation. Hopefully no one hits this for
      a while. *)
-  | None -> check_decl_jkind env decl jkind
+  | None ->
+    check_decl_jkind env decl jkind
   | Some jkind ->
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
     match
-      Jkind.sub_or_error ~type_equal ~context ~level:!current_level
+      Ikinds.sub_or_error ~type_equal ~context ~level:!current_level
         decl.type_jkind jkind
     with
     | Ok () as ok -> ok
