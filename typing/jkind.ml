@@ -298,15 +298,11 @@ module Layout = struct
         (* To avoid error messages containing "scannable", we print out all
            layouts with a scannable base in terms of [value], with a special
            case for the (common) immediate. There is room for improvement. *)
-        (* CR zeisbach: leave a CR here? find concrete things to improve? *)
-        (* CR zeisbach: also: style for match here? seems a bit muddy rn *)
         | Base (Scannable, sa) when Scannable_axes.(equal sa immediate_axes) ->
           "immediate"
         | Base (Scannable, sa) ->
           String.concat " "
             ("value" :: Scannable_axes.(to_string_list_diff ~base:value_axes) sa)
-        (* CR zeisbach: this seems fine, but the alternative would be to write
-           out all of the possibilities here for b instead... unsure. *)
         | Base (b, _) -> Sort.to_string_base b
         | Product ts ->
           String.concat ""
@@ -513,9 +509,6 @@ module Layout = struct
       Const.of_sort_const (Sort.default_to_scannable_and_get s) sa
     | Product p -> Product (List.map default_to_scannable_and_get p)
 
-  (* CR zeisbach: introduce helpers, consider refactoring elsewhere.
-     look at this file and others to determine best course of action.
-     also holy ugly formatting *)
   let format ppf layout =
     let open Format in
     let rec pp_element ~nested ppf : _ Layout.t -> unit = function
@@ -527,9 +520,9 @@ module Layout = struct
         match Sort.get s with
         (* CR zeisbach: ways to cut down on duplication? between here and also
            maybe the const layout [to_string] above...? *)
-        | Sort.Base Scannable when Scannable_axes.(equal sa immediate_axes) ->
+        | Base Scannable when Scannable_axes.(equal sa immediate_axes) ->
           fprintf ppf "immediate"
-        | Sort.Base Scannable ->
+        | Base Scannable ->
           (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
             ppf
             ("value"
@@ -537,13 +530,13 @@ module Layout = struct
                 not be a helper to compare against max? *)
             :: Scannable_axes.to_string_list_diff
                  ~base:Scannable_axes.value_axes sa)
-        | Sort.Var _ ->
+        | Var _ ->
           let sort_var_str = Format.asprintf "%a" Sort.format s in
           (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
             ppf
             (sort_var_str :: Scannable_axes.to_string_list sa)
         (* definitely never scannable *)
-        | _ -> fprintf ppf "%a" Sort.format s)
+        | Base _ | Product _ -> fprintf ppf "%a" Sort.format s)
       | Product ts ->
         let pp_sep ppf () = Format.fprintf ppf "@ & " in
         Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
