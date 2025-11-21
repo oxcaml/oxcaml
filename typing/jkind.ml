@@ -88,7 +88,13 @@ module Scannable_axes = struct
 
   let min = { separability = Separability.min }
 
+  (* CR zeisbach: this is going to go away when we rebase,
+     hence the introduction of [value_axes] *)
   let legacy = { separability = Separability.legacy }
+
+  let value_axes = { separability = Separable }
+
+  let immediate_axes = { separability = Non_pointer }
 
   let equal { separability = s1 } { separability = s2 } =
     Separability.equal s1 s2
@@ -289,9 +295,18 @@ module Layout = struct
       let rec to_string nested (t : t) =
         match t with
         | Any sa -> String.concat " " ("any" :: Scannable_axes.to_string_list sa)
-        | Base (b, sa) when is_possibly_scannable t ->
+        (* To avoid error messages containing "scannable", we print out all
+           layouts with a scannable base in terms of [value], with a special
+           case for the (common) immediate. There is room for improvement. *)
+        (* CR zeisbach: leave a CR here? find concrete things to improve? *)
+        (* CR zeisbach: also: style for match here? seems a bit muddy rn *)
+        | Base (Scannable, sa) when Scannable_axes.(equal sa immediate_axes) ->
+          "immediate"
+        | Base (Scannable, sa) ->
           String.concat " "
-            (Sort.to_string_base b :: Scannable_axes.to_string_list sa)
+            ("value" :: Scannable_axes.(to_string_list_diff ~base:value_axes) sa)
+        (* CR zeisbach: this seems fine, but the alternative would be to write
+           out all of the possibilities here for b instead... unsure. *)
         | Base (b, _) -> Sort.to_string_base b
         | Product ts ->
           String.concat ""
@@ -498,6 +513,9 @@ module Layout = struct
       Const.of_sort_const (Sort.default_to_scannable_and_get s) sa
     | Product p -> Product (List.map default_to_scannable_and_get p)
 
+  (* CR zeisbach: introduce helpers, consider refactoring elsewhere.
+     look at this file and others to determine best course of action.
+     also holy ugly formatting *)
   let format ppf layout =
     let open Format in
     let rec pp_element ~nested ppf : _ Layout.t -> unit = function
@@ -505,14 +523,20 @@ module Layout = struct
         (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
           ppf
           ("any" :: Scannable_axes.to_string_list sa)
-      (* To ensure that scannable axes aren't printed on non-values, we
-         just check before printing. This is easier than maintaining the
-         invariant that [sa] = [Scannable_axes.max] in non-value cases. *)
-      | Sort (s, sa) when Sort.is_possibly_scannable s ->
-        let sort_str = asprintf "%a" Sort.format s in
+      | Sort (Sort.Base Scannable, sa) ->
         (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
           ppf
-          (sort_str :: Scannable_axes.to_string_list sa)
+          ("value"
+           (* CR zeisbach: should there be a helper to do this? should there
+              not be a helper to compare against max? *)
+          :: Scannable_axes.to_string_list_diff ~base:Scannable_axes.value_axes
+               sa)
+      | Sort ((Sort.Var _ as s), sa) ->
+        let sort_var_str = Format.asprintf "%a" Sort.format s in
+        (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
+          ppf
+          (sort_var_str :: Scannable_axes.to_string_list sa)
+      (* definitely never scannable *)
       | Sort (s, _) -> fprintf ppf "%a" Sort.format s
       | Product ts ->
         let pp_sep ppf () = Format.fprintf ppf "@ & " in
