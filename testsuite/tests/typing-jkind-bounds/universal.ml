@@ -36,10 +36,8 @@ type 'a t = { f : 'b. 'b t; }
 
 let rec v : 'a. 'a t = { f = v }
 let () = require_immutable_data v
-(* CR layouts v2.8: This should be accepted in principal mode. *)
+(* CR layouts v2.8: This should be accepted. *)
 [%%expect {|
-val v : 'a t = {f = <cycle>}
-|}, Principal{|
 val v : 'a t = {f = <cycle>}
 Line 2, characters 32-33:
 2 | let () = require_immutable_data v
@@ -57,16 +55,6 @@ Error: This expression has type "'a t" but an expression was expected of type
 type 'a t : immutable_data = { f : 'b. 'b t }
 (* CR layouts v2.8: This should be accepted. Internal ticket 5746. *)
 [%%expect {|
-Line 1, characters 0-45:
-1 | type 'a t : immutable_data = { f : 'b. 'b t }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'b. 'b t
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
-|}, Principal{|
 Line 1, characters 0-45:
 1 | type 'a t : immutable_data = { f : 'b. 'b t }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
