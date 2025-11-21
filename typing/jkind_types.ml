@@ -60,7 +60,12 @@ module Sort = struct
       false
 
   let to_string_base = function
-    | Scannable -> "scannable"
+    (* The word "scannable" should not get exposed to a user. The printing of
+       layouts handles this (which rewrite using scannable axes), but sorts
+       have no such scannable axes; we print "value" to stay consistent.
+       [Sort]s aren't frequently printed, and if these error messages aren't
+       descriptive enough then printing [Layout]s should be considered. *)
+    | Scannable -> "value"
     | Void -> "void"
     | Untagged_immediate -> "untagged_immediate"
     | Float64 -> "float64"
@@ -604,14 +609,6 @@ module Sort = struct
   let format ppf t =
     let rec pp_element ~nested ppf t =
       match get t with
-      (* The word "scannable" should not get exposed to a user. The printing of
-         layouts handles this (which rewrite using scannable axes), but sorts
-         have no such scannable axes; we print "value" to stay consistent.
-         [Sort]s aren't frequently printed, and if these error messages aren't
-         descriptive enough then printing [Layout]s should be considered. *)
-      | Base Scannable -> Format.fprintf ppf "value"
-      (* CR zeisbach: match on other cases here? i think the question is whether
-         we expect any other scannable sorts, which seems unlikely! *)
       | Base b -> Format.fprintf ppf "%s" (to_string_base b)
       | Var v -> Format.fprintf ppf "%s" (Var.name v)
       | Product ts ->
