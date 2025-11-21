@@ -262,7 +262,10 @@
 (executable
  (name int128)
  (modules int128)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -270,7 +273,10 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
  (action
   (with-outputs-to
    int128.out
@@ -278,7 +284,10 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
  (action
    (diff empty.expected int128.out)))
 
@@ -2011,14 +2020,20 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
  (action
   (copy int128.ml int128_nodynlink.ml)))
 
 (executable
  (name int128_nodynlink)
  (modules int128_nodynlink)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -2026,7 +2041,10 @@
 
 (rule
  (alias   runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
  (action
   (with-outputs-to
    int128_nodynlink.out
@@ -2034,7 +2052,10 @@
 
 (rule
  (alias runtest)
- (enabled_if (= %{context_name} "main"))
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
  (action
    (diff empty.expected int128_nodynlink.out)))
 
