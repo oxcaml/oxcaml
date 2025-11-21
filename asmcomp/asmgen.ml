@@ -22,7 +22,7 @@ open Config
 open Clflags
 open Misc
 open Cmm
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 module String = Misc.Stdlib.String
 
 type error =
@@ -46,11 +46,11 @@ let cmm_invariants ppf fd_cmm =
 
 let cfg_invariants ppf cfg =
   let print_fundecl ppf c =
-    if !Flambda_backend_flags.dump_cfg
+    if !Oxcaml_flags.dump_cfg
     then Cfg_with_layout.dump ppf c ~msg:"*** Cfg invariant check failed"
     else Format.fprintf ppf "%s" (Cfg_with_layout.cfg c).fun_name
   in
-  if !Flambda_backend_flags.cfg_invariants && Cfg_invariants.run ppf cfg
+  if !Oxcaml_flags.cfg_invariants && Cfg_invariants.run ppf cfg
   then
     Misc.fatal_errorf "Cfg invariants failed on following fundecl:@.%a@."
       print_fundecl cfg;
@@ -66,8 +66,7 @@ let pass_dump_cfg_if ppf flag message c =
   c
 
 let should_vectorize () =
-  !Flambda_backend_flags.vectorize
-  && not (Flambda2_ui.Flambda_features.classic_mode ())
+  !Oxcaml_flags.vectorize && not (Flambda2_ui.Flambda_features.classic_mode ())
 
 let start_from_emit = ref true
 
@@ -77,6 +76,9 @@ let should_save_before_emit () =
 let should_save_cfg_before_emit () =
   should_save_ir_after Compiler_pass.Simplify_cfg && not !start_from_emit
 
+let should_save_cfg_before_regalloc () =
+  should_save_ir_before Compiler_pass.Register_allocation
+
 let linear_unit_info =
   { Linear_format.unit = Compilation_unit.dummy; items = [] }
 
@@ -84,6 +86,8 @@ let new_cfg_unit_info () =
   { Cfg_format.unit = Compilation_unit.dummy; items = [] }
 
 let cfg_unit_info = new_cfg_unit_info ()
+
+let cfg_before_regalloc_unit_info = new_cfg_unit_info ()
 
 module Compiler_pass_map = Map.Make (Compiler_pass)
 
@@ -96,10 +100,13 @@ let reset () =
   start_from_emit := false;
   Compiler_pass_map.iter
     (fun pass (cfg_unit_info : Cfg_format.cfg_unit_info) ->
-      if should_save_ir_after pass
+      if should_save_ir_after pass || should_save_ir_before pass
       then (
         cfg_unit_info.unit <- Compilation_unit.get_current_or_dummy ();
-        cfg_unit_info.items <- []))
+        cfg_unit_info.items <- [];
+        cfg_before_regalloc_unit_info.unit
+          <- Compilation_unit.get_current_or_dummy ();
+        cfg_before_regalloc_unit_info.items <- []))
     pass_to_cfg;
   if should_save_before_emit ()
   then (
@@ -134,6 +141,25 @@ let save_cfg f =
   then cfg_unit_info.items <- Cfg_format.(Cfg f) :: cfg_unit_info.items;
   f
 
+let save_cfg_before_regalloc (cfg_with_infos : Cfg_with_infos.t) =
+  (if should_save_cfg_before_regalloc ()
+  then
+    (* CFGs and registers are mutable, so make sure what we will save is a
+       snapshot of the current state. *)
+    let copy x = Marshal.from_string (Marshal.to_string x []) 0 in
+    cfg_before_regalloc_unit_info.items
+      <- Cfg_format.(
+           Cfg_before_regalloc
+             { cfg_with_layout_and_relocatable_regs =
+                 copy
+                   ( Cfg_with_infos.cfg_with_layout cfg_with_infos,
+                     Reg.all_relocatable_regs () );
+               cmm_label = Cmm.cur_label ();
+               reg_stamp = Reg.For_testing.get_stamp ()
+             })
+         :: cfg_before_regalloc_unit_info.items);
+  cfg_with_infos
+
 let write_ir prefix =
   Compiler_pass_map.iter
     (fun pass (cfg_unit_info : Cfg_format.cfg_unit_info) ->
@@ -152,29 +178,53 @@ let write_ir prefix =
   then (
     let filename = Compiler_pass.(to_output_filename Simplify_cfg ~prefix) in
     cfg_unit_info.items <- List.rev cfg_unit_info.items;
-    Cfg_format.save filename cfg_unit_info)
+    Cfg_format.save filename cfg_unit_info);
+  if should_save_cfg_before_regalloc ()
+  then (
+    let filename =
+      Compiler_pass.(to_output_filename Register_allocation ~prefix)
+    in
+    cfg_before_regalloc_unit_info.items
+      <- List.rev cfg_before_regalloc_unit_info.items;
+    Cfg_format.save filename cfg_before_regalloc_unit_info)
 
 let should_emit () = not (should_stop_after Compiler_pass.Linearization)
 
-let should_use_linscan fun_codegen_options =
-  !use_linscan || List.mem Cmm.Use_linscan_regalloc fun_codegen_options
+(* note: `should_use_linscan` relies on the state of the `Reg` module, as the
+   list of temporaries is retrieved to be compared to the threshold. *)
+let should_use_linscan fd =
+  !use_linscan
+  || List.mem Cmm.Use_linscan_regalloc fd.fun_codegen_options
+  || List.compare_length_with
+       (Reg.all_relocatable_regs ())
+       !Oxcaml_flags.regalloc_linscan_threshold
+     > 0
 
 let if_emit_do f x = if should_emit () then f x else ()
 
-let emit_begin_assembly unix = if_emit_do Emit.begin_assembly unix
+let emit_begin_assembly ~sourcefile unix =
+  if !Clflags.llvm_backend
+  then Llvmize.begin_assembly ~is_startup:false ~sourcefile
+  else if_emit_do (fun () -> Emit.begin_assembly unix) ()
 
 let emit_end_assembly ~sourcefile () =
-  if_emit_do
-    (fun () ->
-      try Emit.end_assembly ()
-      with Emitaux.Error e ->
-        let sourcefile = Option.value ~default:"*none*" sourcefile in
-        raise (Error (Asm_generation (sourcefile, e))))
-    ()
+  if !Clflags.llvm_backend
+  then Llvmize.end_assembly ()
+  else
+    if_emit_do
+      (fun () ->
+        try Emit.end_assembly ()
+        with Emitaux.Error e ->
+          let sourcefile = Option.value ~default:"*none*" sourcefile in
+          raise (Error (Asm_generation (sourcefile, e))))
+      ()
 
-let emit_data dl = if_emit_do Emit.data dl
+let emit_data dl =
+  if !Clflags.llvm_backend then Llvmize.data dl else if_emit_do Emit.data dl
 
 let emit_fundecl f =
+  if !Clflags.llvm_backend
+  then Misc.fatal_error "Linear IR not supported with llvm backend";
   if_emit_do
     (fun (fundecl : Linear.fundecl) ->
       try Profile.record ~accumulate:true "emit" Emit.fundecl fundecl
@@ -270,7 +320,7 @@ let cfg_with_infos_profile ?accumulate pass f x =
 let ( ++ ) x f = f x
 
 let reorder_blocks_random ppf_dump cl =
-  match !Flambda_backend_flags.reorder_blocks_random with
+  match !Oxcaml_flags.reorder_blocks_random with
   | None -> cl
   | Some seed ->
     (* Initialize random state based on user-provided seed and function name.
@@ -280,24 +330,41 @@ let reorder_blocks_random ppf_dump cl =
     let fun_name = (Cfg_with_layout.cfg cl).fun_name in
     let random_state = Random.State.make [| seed; Hashtbl.hash fun_name |] in
     Cfg_with_layout.reorder_blocks_random ~random_state cl;
-    pass_dump_cfg_if ppf_dump Flambda_backend_flags.dump_cfg
+    pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg
       "After reorder_blocks_random" cl
 
-type register_allocator =
-  | GI
-  | IRC
-  | LS
+let register_allocator_gi cfg_with_infos =
+  cfg_with_infos_profile ~accumulate:true "cfg_gi" Regalloc_gi.run
+    cfg_with_infos
 
-let default_allocator = IRC
+let register_allocator_irc cfg_with_infos =
+  cfg_with_infos_profile ~accumulate:true "cfg_irc" Regalloc_irc.run
+    cfg_with_infos
 
-let register_allocator fd : register_allocator =
-  match String.lowercase_ascii !Flambda_backend_flags.regalloc with
-  | "cfg" -> if should_use_linscan fd.fun_codegen_options then LS else IRC
-  | "gi" -> GI
-  | "irc" -> IRC
-  | "ls" -> LS
-  | "" -> default_allocator
-  | other -> Misc.fatal_errorf "unknown register allocator (%S)" other
+let register_allocator_ls cfg_with_infos =
+  cfg_with_infos_profile ~accumulate:true "cfg_ls" Regalloc_ls.run
+    cfg_with_infos
+
+let register_allocator fd : Cfg_with_infos.t -> Cfg_with_infos.t =
+  (* First check for per-function regalloc attribute in codegen_options *)
+  let rec find_regalloc_option = function
+    | [] -> None
+    | Cmm.Use_regalloc regalloc :: _ -> Some regalloc
+    | _ :: rest -> find_regalloc_option rest
+  in
+  let regalloc =
+    Option.value
+      (find_regalloc_option fd.fun_codegen_options)
+      ~default:!Oxcaml_flags.regalloc
+  in
+  match (regalloc : Clflags.Register_allocator.t) with
+  | Cfg ->
+    if should_use_linscan fd
+    then register_allocator_ls
+    else register_allocator_irc
+  | Irc -> register_allocator_irc
+  | Ls -> register_allocator_ls
+  | Gi -> register_allocator_gi
 
 let available_regs ~stack_slots ~f x =
   (* Skip DWARF variable range generation for complicated functions to avoid
@@ -312,48 +379,40 @@ let available_regs ~stack_slots ~f x =
   else f x
 
 let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
-  let register_allocator = register_allocator fd_cmm in
   let module CSE = Cfg_cse.Cse_generic (CSE) in
-  let cfg_with_infos =
-    cfg_with_layout
-    ++ (fun cfg_with_layout ->
-         match should_vectorize () with
-         | false -> cfg_with_layout
-         | true ->
-           cfg_with_layout
-           ++ cfg_with_layout_profile ~accumulate:true "vectorize"
-                (Vectorize.cfg ppf_dump)
-           ++ pass_dump_cfg_if ppf_dump Flambda_backend_flags.dump_cfg
-                "After vectorize")
-    ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
-         (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
-    ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
-         (Zero_alloc_checker.cfg ~future_funcnames:funcnames ppf_dump)
-    ++ cfg_with_layout_profile ~accumulate:true "cfg_comballoc"
-         Cfg_comballoc.run
-    ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_combine
-    ++ cfg_with_layout_profile ~accumulate:true "cfg_cse" CSE.cfg_with_layout
-    ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_cse
-    ++ Cfg_with_infos.make
-    ++ cfg_with_infos_profile ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
-  in
-  let cfg_description =
-    Regalloc_validate.Description.create
-      (Cfg_with_infos.cfg_with_layout cfg_with_infos)
-  in
-  cfg_with_infos
-  ++ (match register_allocator with
-     | GI -> cfg_with_infos_profile ~accumulate:true "cfg_gi" Regalloc_gi.run
-     | IRC -> cfg_with_infos_profile ~accumulate:true "cfg_irc" Regalloc_irc.run
-     | LS -> cfg_with_infos_profile ~accumulate:true "cfg_ls" Regalloc_ls.run)
+  cfg_with_layout
+  ++ (fun cfg_with_layout ->
+       match should_vectorize () with
+       | false -> cfg_with_layout
+       | true ->
+         cfg_with_layout
+         ++ cfg_with_layout_profile ~accumulate:true "vectorize"
+              (Vectorize.cfg ppf_dump)
+         ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After vectorize")
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
+       (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
+       (Zero_alloc_checker.cfg ~future_funcnames:funcnames ppf_dump)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_comballoc" Cfg_comballoc.run
+  ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_combine
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_cse" CSE.cfg_with_layout
+  ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_cse
+  ++ Cfg_with_infos.make
+  ++ cfg_with_infos_profile ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
+  ++ save_cfg_before_regalloc
+  ++ Profile.record ~accumulate:true "regalloc" (fun cfg_with_infos ->
+         let cfg_description =
+           Regalloc_validate.Description.create
+             (Cfg_with_infos.cfg_with_layout cfg_with_infos)
+         in
+         cfg_with_infos ++ register_allocator fd_cmm
+         ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
+              (Regalloc_validate.run cfg_description))
+  ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
+  ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue_validate"
+       Cfg_prologue.validate
   ++ Cfg_with_infos.cfg_with_layout
-  ++ Profile.record ~accumulate:true "cfg_available_regs"
-       (available_regs
-          ~stack_slots:(fun x ->
-            (Cfg_with_layout.cfg x).Cfg.fun_num_stack_slots)
-          ~f:Cfg_available_regs.run)
-  ++ cfg_with_layout_profile ~accumulate:true "cfg_validate_description"
-       (Regalloc_validate.run cfg_description)
+  ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_prologue"
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_simplify"
        Regalloc_utils.simplify_cfg
@@ -365,38 +424,58 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ cfg_with_layout_profile ~accumulate:true "peephole_optimize_cfg"
        Peephole_optimize.peephole_optimize_cfg
   ++ (fun (cfg_with_layout : Cfg_with_layout.t) ->
-       match !Flambda_backend_flags.cfg_stack_checks with
+       match !Oxcaml_flags.cfg_stack_checks with
        | false -> cfg_with_layout
        | true -> Cfg_stack_checks.cfg cfg_with_layout)
   ++ cfg_with_layout_profile ~accumulate:true "save_cfg" save_cfg
   ++ cfg_with_layout_profile ~accumulate:true "cfg_reorder_blocks"
        (reorder_blocks_random ppf_dump)
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
+  ++ Profile.record ~accumulate:true "cfg_available_regs"
+       (available_regs
+          ~stack_slots:(fun x ->
+            (Cfg_with_layout.cfg x).Cfg.fun_num_stack_slots)
+          ~f:Cfg_available_regs.run)
   ++ Profile.record ~accumulate:true "cfg_to_linear" Cfg_to_linear.run
 
-let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
-  let module Cfg_selection = Cfg_selectgen.Make (Cfg_selection) in
-  Proc.init ();
-  Reg.reset ();
-  fd_cmm
-  ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
-  ++ (fun (fd_cmm : Cmm.fundecl) ->
-       Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
-       ++ pass_dump_cfg_if ppf_dump Flambda_backend_flags.dump_cfg
-            "After selection")
-  ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
-  ++ Profile.record ~accumulate:true "regalloc" (fun cfg_with_layout ->
-         cfg_with_layout
-         ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
-                compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout))
+let compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout =
+  (* missing pass: stack checks *)
+  cfg_with_layout
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_polling"
+       (Cfg_polling.instrument_fundecl ~future_funcnames:funcnames)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_zero_alloc_checker"
+       (Zero_alloc_checker.cfg ~future_funcnames:funcnames ppf_dump)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_comballoc" Cfg_comballoc.run
+  ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_combine
+  ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After comballoc"
+  ++ Profile.record ~accumulate:true "save_cfg" save_cfg
+  ++ Profile.record ~accumulate:true "llvmize" Llvmize.cfg
+
+let compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout =
+  cfg_with_layout
+  ++ compile_cfg ppf_dump ~funcnames fd_cmm
   ++ pass_dump_linear_if ppf_dump dump_linear "Linearized code"
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Linear
   ++ Profile.record ~accumulate:true "save_linear" save_linear
   ++ (fun (fd : Linear.fundecl) ->
-       match !Flambda_backend_flags.cfg_stack_checks with
+       match !Oxcaml_flags.cfg_stack_checks with
        | false -> Stack_check.linear fd
        | true -> fd)
   ++ Profile.record ~accumulate:true "emit_fundecl" emit_fundecl
+
+let compile_fundecl ~ppf_dump ~funcnames fd_cmm =
+  let module Cfg_selection = Cfg_selectgen.Make (Cfg_selection) in
+  Reg.clear_relocatable_regs ();
+  fd_cmm
+  ++ Profile.record ~accumulate:true "cmm_invariants" (cmm_invariants ppf_dump)
+  ++ (fun (fd_cmm : Cmm.fundecl) ->
+       Cfg_selection.emit_fundecl ~future_funcnames:funcnames fd_cmm
+       ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After selection")
+  ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
+  ++ Profile.record ~accumulate:true "cfg" (fun cfg_with_layout ->
+         if !Clflags.llvm_backend
+         then compile_via_llvm ~ppf_dump ~funcnames cfg_with_layout
+         else compile_via_linear ~ppf_dump ~funcnames fd_cmm cfg_with_layout)
 
 let compile_data dl = dl ++ save_data ++ emit_data
 
@@ -443,7 +522,7 @@ let compile_genfuns ~ppf_dump f =
       | Cfunction { fun_name = name } as ph when f name.sym_name ->
         compile_phrase ~ppf_dump ph
       | _ -> ())
-    (Generic_fns.compile ~shared:true
+    (Generic_fns.compile ~cache:false ~shared:true
        (Generic_fns.Tbl.of_fns (Compilenv.current_unit_infos ()).ui_generic_fns))
 
 let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
@@ -458,10 +537,43 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
        (empty) temporary file should be deleted. *)
     if (not create_asm) || not keep_asm then remove_file asm_filename
   in
+  if !Clflags.llvm_backend then Llvmize.init ~output_prefix ~ppf_dump;
+  let open_asm_file () =
+    if create_asm
+    then
+      if !Clflags.llvm_backend
+      then Llvmize.open_out ~asm_filename
+      else Emitaux.output_channel := open_out asm_filename
+  in
+  let close_asm_file () =
+    if create_asm
+    then
+      if !Clflags.llvm_backend
+      then Llvmize.close_out ()
+      else close_out !Emitaux.output_channel
+  in
+  let assemble_file () =
+    if !Clflags.llvm_backend
+    then Llvmize.assemble_file ~asm_filename ~obj_filename
+    else if not (should_emit ())
+    then 0
+    else (
+      if may_reduce_heap
+      then
+        Emitaux.reduce_heap_size ~reset:(fun () ->
+            reset ();
+            (* note: we need to preserve the persistent env, because it is used
+               to populate fields of the record written as the cmx file
+               afterwards. *)
+            Typemod.reset ~preserve_persistent_env:true;
+            Emitaux.reset ();
+            Reg.clear_relocatable_regs ());
+      Proc.assemble_file asm_filename obj_filename)
+  in
   Misc.try_finally
     ~exceptionally:(fun () -> remove_file obj_filename)
     (fun () ->
-      if create_asm then Emitaux.output_channel := open_out asm_filename;
+      open_asm_file ();
       Misc.try_finally
         (fun () ->
           gen ();
@@ -469,32 +581,15 @@ let compile_unit ~output_prefix ~asm_filename ~keep_asm ~obj_filename
           Compiler_hooks.execute Compiler_hooks.Check_allocations
             Zero_alloc_checker.iter_witnesses;
           write_ir output_prefix)
-        ~always:(fun () -> if create_asm then close_out !Emitaux.output_channel)
+        ~always:(fun () -> close_asm_file ())
         ~exceptionally:remove_asm_file;
-      if should_emit ()
-      then (
-        if may_reduce_heap
-        then
-          Emitaux.reduce_heap_size ~reset:(fun () ->
-              reset ();
-              (* note: we need to preserve the persistent env, because it is
-                 used to populate fields of the record written as the cmx file
-                 afterwards. *)
-              Typemod.reset ~preserve_persistent_env:true;
-              Emitaux.reset ();
-              Reg.reset ());
-        let assemble_result =
-          Profile.record "assemble"
-            (Proc.assemble_file asm_filename)
-            obj_filename
-        in
-        if assemble_result <> 0
-        then raise (Error (Assembler_error asm_filename)));
+      let assemble_result = Profile.record_call "assemble" assemble_file in
+      if assemble_result <> 0 then raise (Error (Assembler_error asm_filename));
       remove_asm_file ())
 
 let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
-  Emitaux.Dwarf_helpers.init ~disable_dwarf:false ~sourcefile;
-  emit_begin_assembly unix;
+  Emitaux.Dwarf_helpers.init ~ppf_dump ~disable_dwarf:false ~sourcefile;
+  emit_begin_assembly ~sourcefile unix;
   ( make_cmm ()
   ++ (fun x ->
        if Clflags.should_stop_after Compiler_pass.Middle_end then exit 0 else x)
@@ -544,7 +639,7 @@ let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
         end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
             cmm_phrases))
 
-let linear_gen_implementation unix filename =
+let linear_gen_implementation ~ppf_dump unix filename =
   let open Linear_format in
   let linear_unit_info, _ = restore filename in
   let current_package = Compilation_unit.Prefix.from_clflags () in
@@ -558,16 +653,16 @@ let linear_gen_implementation unix filename =
   start_from_emit := true;
   (* CR mshinwell: set [sourcefile] properly; [filename] isn't a .ml file *)
   let sourcefile = Some filename in
-  Emitaux.Dwarf_helpers.init ~disable_dwarf:false ~sourcefile;
-  emit_begin_assembly unix;
+  Emitaux.Dwarf_helpers.init ~ppf_dump ~disable_dwarf:false ~sourcefile;
+  emit_begin_assembly ~sourcefile unix;
   Profile.record "Emit" (List.iter emit_item) linear_unit_info.items;
   emit_end_assembly ~sourcefile ()
 
-let compile_implementation_linear unix output_prefix ~progname =
-  compile_unit ~may_reduce_heap:true ~output_prefix
+let compile_implementation_linear unix output_prefix ~progname ~ppf_dump =
+  compile_unit ~ppf_dump ~may_reduce_heap:true ~output_prefix
     ~asm_filename:(asm_filename output_prefix)
     ~keep_asm:!keep_asm_file ~obj_filename:(output_prefix ^ ext_obj) (fun () ->
-      linear_gen_implementation unix progname)
+      linear_gen_implementation ~ppf_dump unix progname)
 
 (* Error report *)
 

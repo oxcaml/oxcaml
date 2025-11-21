@@ -14,42 +14,25 @@ val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t
 val transl_modalities :
   maturity:Language_extension.maturity ->
   Types.mutability ->
-  Parsetree.attributes ->
   Parsetree.modalities ->
-  Mode.Modality.Value.Const.t
+  Mode.Modality.Const.t
 
-val untransl_modality : Mode.Modality.t -> Parsetree.modality Location.loc
+val let_mutable_modalities : Mode.Modality.Const.t
+
+(** The (default) modalities for an atomic mutable field *)
+val atomic_mutable_modalities : Mode.Modality.Const.t
+
+val untransl_modality : Mode.Modality.atom -> Parsetree.modality Location.loc
 
 (** Un-interpret modalities back to parsetree. Takes the mutability and
     attributes on the field and remove mutable-implied modalities accordingly.
     *)
 val untransl_modalities :
-  Types.mutability ->
-  Parsetree.attributes ->
-  Mode.Modality.Value.Const.t ->
-  Parsetree.modalities
+  Types.mutability -> Mode.Modality.Const.t -> Parsetree.modalities
 
-module Transled_modifiers : sig
-  type t =
-    { locality : Mode.Locality.Const.t Location.loc option;
-      linearity : Mode.Linearity.Const.t Location.loc option;
-      uniqueness : Mode.Uniqueness.Const.t Location.loc option;
-      portability : Mode.Portability.Const.t Location.loc option;
-      contention : Mode.Contention.Const.t Location.loc option;
-      yielding : Mode.Yielding.Const.t Location.loc option;
-      statefulness : Mode.Statefulness.Const.t Location.loc option;
-      visibility : Mode.Visibility.Const.t Location.loc option;
-      externality : Jkind_axis.Externality.t Location.loc option;
-      nullability : Jkind_axis.Nullability.t Location.loc option
-    }
+(** Interpret a mod-bounds. *)
+val transl_mod_bounds : Parsetree.modes -> Types.Jkind_mod_bounds.t
 
-  val empty : t
+val untransl_mod_bounds : Types.Jkind_mod_bounds.t -> Parsetree.modes
 
-  val get : axis:'a Jkind_axis.Axis.t -> t -> 'a Location.loc option
-
-  val set : axis:'a Jkind_axis.Axis.t -> t -> 'a Location.loc option -> t
-end
-
-(** Interpret a list of modifiers.
-    A "modifier" is any keyword coming after a `mod` in a jkind *)
-val transl_modifier_annots : Parsetree.modes -> Transled_modifiers.t
+val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t

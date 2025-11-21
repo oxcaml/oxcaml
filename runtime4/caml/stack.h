@@ -86,6 +86,10 @@ struct caml_context {
 };
 
 /* Structure of frame descriptors */
+/* Warning: The live offsets of frame descriptors are declared as unsigned integers below.
+   However, on runtime 4, they can also be negative, so values above 0x7f...ff should be
+   interpreted as negative.  */
+
 typedef struct {
   int32_t retaddr_rel;
   unsigned short frame_size;
@@ -141,7 +145,7 @@ extern frame_descr ** caml_frame_descriptors;
 extern uintnat caml_frame_descriptors_mask;
 
 #define Hash_retaddr(addr) \
-  (((uintnat)(addr) >> 3) & caml_frame_descriptors_mask)
+  ((((uintnat)(addr) * 52437813) >> 5) & caml_frame_descriptors_mask)
 
 #define Retaddr_frame(d) \
   ((uintnat)&(d)->retaddr_rel + \

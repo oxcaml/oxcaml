@@ -27,14 +27,16 @@
 
     @since 5.0 *)
 
-type !'a t
+type !'a t : value mod portable contended with 'a
 (** A domain of type ['a t] runs independently, eventually producing a
     result of type 'a, or an exception *)
 
 val spawn : (unit -> 'a) -> 'a t @@ nonportable
-[@@alert unsafe_parallelism
-           "This function is unsafe and should not be used in production \
-            code.\nA safe interface for parallelism is forthcoming."]
+[@@alert do_not_spawn_domains
+   "User programs should never spawn domains. To execute a function on a \
+    domain, use [Multicore] from the threading library. This is because \
+    spawning more than [recommended_domain_count] domains (the CPU core count) \
+    will significantly degrade GC performance."]
 [@@alert unsafe_multidomain "Use [Domain.Safe.spawn]."]
 (** [spawn f] creates a new domain that runs in parallel with the
     current domain.
@@ -56,7 +58,7 @@ val get_id : 'a t -> id @@ portable
 val self : unit -> id @@ portable
 (** [self ()] is the identifier of the currently running domain *)
 
-val cpu_relax : unit -> unit @@ portable
+external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
 (** If busy-waiting, calling cpu_relax () between iterations
     will improve performance on some CPU architectures *)
 
@@ -68,6 +70,18 @@ val recommended_domain_count : unit -> int @@ portable
     simultaneously (including domains already running).
 
     The value returned is at least [1]. *)
+
+val self_index : unit -> int
+(** The index of the current domain. It is an integer unique among
+    currently-running domains, in the interval [0; N-1] where N is the
+    peak number of domains running simultaneously so far.
+
+    The index of a terminated domain may be reused for a new
+    domain. Use [(Domain.self () :> int)] instead for an identifier
+    unique among all domains ever created by the program.
+
+    @since 5.3
+*)
 
 val before_first_spawn : (unit -> unit) -> unit @@ nonportable
 (** [before_first_spawn f] registers [f] to be called before the first domain
@@ -96,13 +110,14 @@ let temp_file_key = Domain.DLS.new_key (fun _ ->
     to close it, thus guaranteeing the descriptor is not leaked in
     case the current domain exits. *)
 
-module DLS : sig
 (** Domain-local Storage *)
+module DLS : sig
 
     type 'a key : value mod portable contended
     (** Type of a DLS key *)
 
-    val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key @@ nonportable
+    val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
+      @@ nonportable
     [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.new_key]."]
     (** [new_key f] returns a new key bound to initialiser [f] for accessing
 ,        domain-local variables.
@@ -147,133 +162,108 @@ module DLS : sig
     *)
 
     val get : 'a key -> 'a @@ nonportable
+    [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.get]."]
     (** [get k] returns [v] if a value [v] is associated to the key [k] on
         the calling domain's domain-local state. Sets [k]'s value with its
         initialiser and returns it otherwise. *)
 
     val set : 'a key -> 'a -> unit @@ nonportable
+    [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.set]."]
     (** [set k v] updates the calling domain's domain-local state to associate
         the key [k] with value [v]. It overwrites any previous values associated
         to [k], which cannot be restored later. *)
+end
 
+(** Thread-local storage. Like {!DLS}, but stores a distinct value for each
+    thread. Domains can contain multiple threads, so [TLS] should be preferred
+    in nearly all cases. *)
+module TLS : sig
+
+    type 'a key : value mod portable contended
+    (** Type of a TLS key *)
+
+    val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
+        @@ nonportable
+    [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.new_key]."]
+    (** Like {!DLS.new_key}, but represents a distinct value in every thread. *)
+
+    val get : 'a key -> 'a @@ nonportable
+    [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.get]."]
+    (** Like {!DLS.get}, but reads the value for the current thread. *)
+
+    val set : 'a key -> 'a -> unit @@ nonportable
+    [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.set]."]
+    (** Like {!DLS.set}, but sets the value for the current thread. *)
+
+    (** For use by the threading library. *)
+    module Private : sig @@ portable
+        type keys
+        val init : unit -> unit
+        val get_initial_keys : unit -> keys
+        val set_initial_keys : keys -> unit
+    end
 end
 
 (** Submodule containing non-backwards-compatible functions which enforce thread safety
     via modes. *)
-module Safe : sig
+module Safe : sig @@ portable
 
-  (** Like {!DLS}, but uses modes to enforce properties necessary for data-race freedom.
-
-      The data in the DLS may only be accessed when the user has an ([uncontended])
-      {!DLS.Access.t}. This value acts as a witness that the currently executing function
-      is running in the (conceptual) capsule of the current domain, and so will not
-      transfer data unsafely between capsule boundaries. A user can get a temporary
-      [Access.t] with {!DLS.access}. *)
+  (** Like {!DLS}, but uses modes to enforce properties necessary for data-race
+      freedom. *)
   module DLS : sig
 
-    (** An {!Access.t} acts as a witness that the currently executing function is
-        running in the (conceptual) capsule of the current domain. *)
-    module Access : sig
-
-      (* CR layouts v5: this should have layout [void]. *)
-      type t : value mod external_ global portable many unique
-      (** [t] represents access to the current domain's capsule, allowing interaction with
-          data in its DLS. *)
-
-      val for_initial_domain : t @@ nonportable
-      (** [for_initial_domain] is a permanently available [t] that can be used by any
-          top-level [nonportable] function safely, as such functions can only ever be
-          executed on the primary domain. *)
-    end
-
-    type 'a key : value mod portable contended = 'a DLS.key
-    (** See {!DLS.key}. *)
-
-    (* CR: Update this to use the Capsule API when that is merged into stdlib. *)
-    exception Encapsulated of string
-    (** If a function passed to {!access} raises an exception, it is wrapped in
-        [Encapsulated] to avoid leaking access to data in the DLS. *)
-
-    val access
-      :  (Access.t -> 'a @ portable contended) @ local portable
-      -> 'a @ portable contended
-      @@ portable
-    (** [access f] scopes the computation [f] to (conceptually) run it in the current
-        domain's capsule, even if called from an explicit capsule. During its execution,
-        [f] may access the current domain's DLS.
-
-        If [f] raises an exception during its execution, the exception is converted to
-        a string and wrapped in {!Encapsulated} to avoid leaking access to data in the
-        DLS. *)
-
-    val new_key'
-      :  ?split_from_parent:('a -> (Access.t -> 'a) @ portable) @ portable
-      -> (Access.t -> 'a) @ portable
-      -> 'a key
-      @@ portable
-    (** Like {!DLS.new_key}, but is safe to use in the presence of multiple domains.
-
-        When a new domain is spawned, if [split_from_parent] is provided, then each entry
-        in the DLS is forced in the parent domain, and [split_from_parent] is called on
-        each of those values; then, in the child domain, the resulting closure is called
-        (with {!Access.t} to the new domain) to generate an initial value for that DLS
-        entry in the child domain. This inner closure must be [portable] as it may not
-        unsafely close over any data from the parent domain.
-
-        If {!get} is called on an entry that is not populated for the current domain, then
-        the provided closure is called with {!Access.t} to the rest of the DLS.
-
-        Both provided arguments must be [portable] as they may be called from any domain,
-        not just the current one. *)
+    type 'a key = 'a DLS.key
+    (** Type of a DLS key *)
 
     val new_key
-      : ?split_from_parent:('a -> (unit -> 'a) @ portable) @ portable
+      : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
       -> (unit -> 'a) @ portable
       -> 'a key
-      @@ portable
-    (** Like {!new_key'}, but does not provide an {!Access.t}. This is slightly simpler to
-        use in cases where you don't need to access other parts of the DLS while
-        initializing the DLS entry. *)
+    (** Like {!DLS.new_key}, but safe to use in the presence of multiple
+        domains. *)
 
-    val get : Access.t -> 'a key -> 'a @@ portable
-    (** Like {!DLS.get}, but can be called from any domain.
+    val get : ('a : value mod portable). 'a key -> 'a @ contended
+    (** Like {!DLS.get}, but safe to use in the presence of multiple domains. *)
 
-        An additional {!Access.t} argument is taken as a witness that the returned value
-        does not escape the current domain's capsule. *)
-
-    val set : Access.t -> 'a key -> 'a -> unit @@ portable
-    (** Like {!DLS.set}, but can be called from any domain.
-
-        An additional {!Access.t} argument is taken as a witness that the provided value
-        does not unsafely close over data from the current capsule. *)
+    val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
+    (** Like {!DLS.set}, but safe to use in the presence of multiple domains. *)
   end
 
-  val spawn : (unit -> 'a) @ portable once -> 'a t @@ portable
-  [@@alert unsafe_parallelism
-             "This function is unsafe and should not be used in production \
-              code.\nA safe interface for parallelism is forthcoming."]
+  (** Like {!TLS}, but uses modes to enforce properties necessary for data-race
+      freedom. *)
+  module TLS : sig
+
+    type 'a key = 'a TLS.key
+    (** Type of a TLS key *)
+
+    val new_key
+      : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
+      -> (unit -> 'a) @ portable
+      -> 'a key
+    (** Like {!TLS.new_key}, but safe to use in the presence of multiple
+        domains. *)
+
+    val get : ('a : value mod portable). 'a key -> 'a @ contended
+    (** Like {!TLS.get}, but safe to use in the presence of multiple domains. *)
+
+    val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
+    (** Like {!TLS.set}, but safe to use in the presence of multiple domains. *)
+  end
+
+  val spawn : (unit -> 'a) @ portable once -> 'a t
+  [@@alert do_not_spawn_domains
+     "User programs should never spawn domains. To execute a function on a \
+      domain, use [Multicore] from the threading library. This is because \
+      spawning more than [recommended_domain_count] domains (the CPU core \
+      count) will significantly degrade GC performance."]
   (** Like {!spawn}, but enforces thread-safety via modes. In particular, the provided
       computation must be [portable], and so cannot close over and interact with any
       unsynchronized mutable data in the current domain. *)
 
-  val spawn' : (DLS.Access.t -> 'a) @ portable once -> 'a t @@ portable
-  [@@alert unsafe_parallelism
-             "This function is unsafe and should not be used in production \
-              code.\nA safe interface for parallelism is forthcoming."]
-  (** Like {!spawn}, but additionally provides the user with a witness that the provided
-      computation is running in the new domain's capsule, and so may {!Access.t} the DLS.
-  *)
-
-  val at_exit : (unit -> unit) @ portable -> unit @@ portable
+  val at_exit : (unit -> unit) @ portable -> unit
   (** Like {!at_exit}, but can be called from any domain.
 
       The provided closure must be [portable] to enforce that it does not unsafely close
       over any data in the current capsule, which the current domain may not have
       uncontended access to at exit. *)
-
-  val at_exit' : DLS.Access.t -> (unit -> unit) -> unit @@ portable
-  (** Like {!at_exit}, but can be called from any domain.
-
-      An additional {!DLS.Access.t} is taken as a witness that the provided closure only
-      closes over mutable data from the current domain. *)
 end

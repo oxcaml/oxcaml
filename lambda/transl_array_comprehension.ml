@@ -201,7 +201,11 @@ module Precompute_array_size : sig
       due to the overflow check; the optional argument [variable_name]
       customizes the string used to name these variables. *)
   val safe_product_pos :
-    ?variable_name:string -> loc:scoped_location -> lambda list -> lambda
+    ?variable_name:string ->
+    debug_uid:debug_uid ->
+    loc:scoped_location ->
+    lambda list ->
+    lambda
 end = struct
   (* Modeled after [Translcore.assert_failed] *)
   let raise_overflow_exn ~loc =
@@ -234,7 +238,8 @@ end = struct
     let y = y.Let_binding.var in
     let open (val Lambda_utils.int_ops ~loc) in
     let product =
-      Let_binding.make (Immutable Alias) layout_int "product" (x * y)
+      Let_binding.make (Immutable Alias) layout_int "product"
+        Lambda.debug_uid_none (x * y)
     in
     (* [x * y] is safe, for strictly positive [x] and [y], iff you can undo the
        multiplication: [(x * y)/y = x].  We assume the inputs are values, so we
@@ -259,10 +264,10 @@ end = struct
   (* The inputs are *not* required to be values, as we save them in variables.
      We could avoid making let-bindings for lambda-terms that are already
      variables, but we assume the optimizer can deal with that case nicely. *)
-  let safe_product_pos ?(variable_name = "x") ~loc factors =
+  let safe_product_pos ?(variable_name = "x") ~debug_uid ~loc factors =
     let factors =
       List.map
-        (Let_binding.make (Immutable Strict) layout_int variable_name)
+        (Let_binding.make (Immutable Strict) layout_int variable_name debug_uid)
         factors
     in
     Let_binding.let_all factors (safe_product_pos_vals ~loc factors)
@@ -366,6 +371,7 @@ module Iterator_bindings = struct
            still might overflow *)
         let range_size =
           Let_binding.make (Immutable Alias) layout_int "range_size"
+            Lambda.debug_uid_none
             (high - low + l1)
         in
         Let_binding.let_one range_size
@@ -386,7 +392,8 @@ module Iterator_bindings = struct
         a nonempty fixed-size array; check against [are_any_empty] first to
         address the case of fixedly-empty array. *)
     let total_size_nonempty ~loc iterators =
-      Precompute_array_size.safe_product_pos ~variable_name:"iterator_size" ~loc
+      Precompute_array_size.safe_product_pos ~variable_name:"iterator_size"
+        ~debug_uid:Lambda.debug_uid_none ~loc
         (List.map (size_nonempty ~loc) iterators)
   end
 end
@@ -441,16 +448,18 @@ end
 let iterator ~transl_exp ~scopes ~loc :
     comprehension_iterator -> (lambda -> lambda) * Iterator_bindings.t =
   function
-  | Texp_comp_range { ident; pattern = _; start; stop; direction } ->
-    let bound name value =
-      Let_binding.make (Immutable Strict) layout_int name
+  | Texp_comp_range
+      { ident; ident_debug_uid; pattern = _; start; stop; direction } ->
+    let bound name debug_uid value =
+      Let_binding.make (Immutable Strict) layout_int name debug_uid
         (transl_exp ~scopes Jkind.Sort.Const.for_predef_value value)
     in
-    let start = bound "start" start in
-    let stop = bound "stop" stop in
+    let start = bound "start" Lambda.debug_uid_none start in
+    let stop = bound "stop" Lambda.debug_uid_none stop in
     let mk_iterator body =
       Lfor
         { for_id = ident;
+          for_debug_uid = ident_debug_uid;
           for_loc = loc;
           for_from = start.var;
           for_to = stop.var;
@@ -462,14 +471,15 @@ let iterator ~transl_exp ~scopes ~loc :
   | Texp_comp_in { pattern; sequence = iter_arr_exp } ->
     let iter_arr =
       Let_binding.make (Immutable Strict) layout_any_value "iter_arr"
+        Lambda.debug_uid_none
         (transl_exp ~scopes Jkind.Sort.Const.for_predef_value iter_arr_exp)
     in
     let iter_arr_kind =
       (* CR layouts v4: [~elt_sort:None] here is not ideal and
          should be fixed. To do that, we will need to store a sort
          on [Texp_comp_in]. *)
-      Typeopt.array_type_kind ~elt_sort:None iter_arr_exp.exp_env
-        iter_arr_exp.exp_loc iter_arr_exp.exp_type
+      Typeopt.array_type_kind ~elt_sort:None ~elt_ty:(Some pattern.pat_type)
+        iter_arr_exp.exp_env iter_arr_exp.exp_loc iter_arr_exp.exp_type
     in
     let iter_arr_mut =
       Typeopt.array_type_mut iter_arr_exp.exp_env iter_arr_exp.exp_type
@@ -478,15 +488,18 @@ let iterator ~transl_exp ~scopes ~loc :
       (* Extra let-binding if we're not in the fixed-size array case; the
          middle-end will simplify this for us *)
       Let_binding.make (Immutable Alias) layout_int "iter_len"
+        Lambda.debug_uid_none
         (Lprim (Parraylength iter_arr_kind, [iter_arr.var], loc))
     in
     let iter_ix = Ident.create_local "iter_ix" in
+    let iter_ix_duid = Lambda.debug_uid_none in
     let mk_iterator body =
       let open (val Lambda_utils.int_ops ~loc) in
       (* for iter_ix = 0 to Array.length iter_arr - 1 ... *)
       (* CR layouts v4: will need updating when we allow non-values in arrays. *)
       Lfor
         { for_id = iter_ix;
+          for_debug_uid = iter_ix_duid;
           for_loc = loc;
           for_from = l0;
           for_to = iter_len.var - l1;
@@ -502,7 +515,7 @@ let iterator ~transl_exp ~scopes ~loc :
                        iter_arr_mut ),
                    [iter_arr.var; Lvar iter_ix],
                    loc ))
-              pattern body
+              Immutable pattern body
         }
     in
     mk_iterator, Array { iter_arr; iter_len }
@@ -627,6 +640,7 @@ let clauses ~transl_exp ~scopes ~loc = function
     in
     let array_size =
       Let_binding.make (Immutable Alias) layout_int "array_size"
+        Lambda.debug_uid_none
         (Iterator_bindings.Fixed_size_array.total_size_nonempty ~loc
            var_bindings)
     in
@@ -636,7 +650,7 @@ let clauses ~transl_exp ~scopes ~loc = function
     }
   | clauses ->
     let array_size =
-      Let_binding.make Mutable layout_int "array_size"
+      Let_binding.make Mutable layout_int "array_size" Lambda.debug_uid_none
         (int Resizable_array.starting_size)
     in
     let make_comprehension =
@@ -702,13 +716,17 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       Immutable StrictOpt, make_float_vect ~loc array_size.var
     | Fixed_size, Punboxedfloatarray Unboxed_float32 ->
       Immutable StrictOpt, make_unboxed_float32_vect ~loc array_size.var
-    | Fixed_size, Punboxedintarray Unboxed_int32 ->
+    | Fixed_size, Punboxedoruntaggedintarray Unboxed_int32 ->
       Immutable StrictOpt, make_unboxed_int32_vect ~loc array_size.var
-    | Fixed_size, Punboxedintarray Unboxed_int64 ->
+    | Fixed_size, Punboxedoruntaggedintarray Unboxed_int64 ->
       Immutable StrictOpt, make_unboxed_int64_vect ~loc array_size.var
-    | Fixed_size, Punboxedintarray Unboxed_nativeint ->
+    | Fixed_size, Punboxedoruntaggedintarray Unboxed_nativeint ->
       Immutable StrictOpt, make_unboxed_nativeint_vect ~loc array_size.var
     | Fixed_size, Punboxedvectorarray Unboxed_vec128 ->
+      Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
+    | Fixed_size, Punboxedvectorarray Unboxed_vec256 ->
+      Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
+    | Fixed_size, Punboxedvectorarray Unboxed_vec512 ->
       Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
     (* Case 3: Unknown size, known array kind *)
     | Dynamic_size, (Pintarray | Paddrarray) ->
@@ -719,23 +737,30 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       Mutable, Resizable_array.make ~loc array_kind (unboxed_float 0.)
     | Dynamic_size, Punboxedfloatarray Unboxed_float32 ->
       Mutable, Resizable_array.make ~loc array_kind (unboxed_float32 0.)
-    | Dynamic_size, Punboxedintarray Unboxed_int32 ->
+    | Dynamic_size, Punboxedoruntaggedintarray Unboxed_int32 ->
       Mutable, Resizable_array.make ~loc array_kind (unboxed_int32 0l)
-    | Dynamic_size, Punboxedintarray Unboxed_int64 ->
+    | Dynamic_size, Punboxedoruntaggedintarray Unboxed_int64 ->
       Mutable, Resizable_array.make ~loc array_kind (unboxed_int64 0L)
-    | Dynamic_size, Punboxedintarray Unboxed_nativeint ->
+    | Dynamic_size, Punboxedoruntaggedintarray Unboxed_nativeint ->
       ( Mutable,
         Resizable_array.make ~loc array_kind (unboxed_nativeint Targetint.zero)
       )
-    | Dynamic_size, Punboxedvectorarray Unboxed_vec128 ->
+    | ( _,
+        Punboxedoruntaggedintarray
+          (Untagged_int8 | Untagged_int16 | Untagged_int) ) ->
+      Misc.unboxed_small_int_arrays_are_not_implemented ()
+    | Dynamic_size, Punboxedvectorarray Unboxed_vec128
+    | Dynamic_size, Punboxedvectorarray Unboxed_vec256
+    | Dynamic_size, Punboxedvectorarray Unboxed_vec512 ->
       (* The above cases are not actually allowed/tested yet. *)
       Misc.fatal_error
-        "Comprehensions on arrays of unboxed types are not yet supported."
+        "Comprehensions on arrays of unboxed vectors are not yet supported."
     | _, (Pgcscannableproductarray _ | Pgcignorableproductarray _) ->
       Misc.fatal_error
         "Transl_array_comprehension.initial_array: unboxed product array"
   in
-  Let_binding.make array_let_kind layout_any_value "array" array_value
+  Let_binding.make array_let_kind layout_any_value "array" Lambda.debug_uid_none
+    array_value
 
 (** Generate the code for the body of an array comprehension.  This involves
     translating the body expression (a [Typedtree.expression], which is the
@@ -805,7 +830,8 @@ let body ~loc ~array_kind ~array_size ~array_sizing ~array ~index ~body =
     | Pgenarray ->
       let is_first_iteration = index.var = l0 in
       let elt =
-        Let_binding.make (Immutable Strict) layout_any_value "elt" body
+        Let_binding.make (Immutable Strict) layout_any_value "elt"
+          Lambda.debug_uid_none body
       in
       let make_array =
         match array_sizing with
@@ -820,7 +846,7 @@ let body ~loc ~array_kind ~array_size ~array_sizing ~array ~index ~body =
              layout_unit ))
     | Pintarray | Paddrarray | Pfloatarray
     | Punboxedfloatarray (Unboxed_float64 | Unboxed_float32)
-    | Punboxedintarray _ | Punboxedvectorarray _ ->
+    | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ ->
       set_element_in_bounds body
     | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
       Misc.fatal_error "Transl_array_comprehension.body: unboxed product array"
@@ -832,7 +858,8 @@ let comprehension ~transl_exp ~scopes ~loc ~(array_kind : Lambda.array_kind)
     { comp_body; comp_clauses } =
   (match array_kind with
   | Pgenarray | Paddrarray | Pintarray | Pfloatarray -> ()
-  | Punboxedfloatarray _ | Punboxedintarray _ | Punboxedvectorarray _ ->
+  | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
+    ->
     if not !Clflags.native_code
     then
       Misc.fatal_errorf
@@ -856,7 +883,9 @@ let comprehension ~transl_exp ~scopes ~loc ~(array_kind : Lambda.array_kind)
     | Dynamic_size_info -> Dynamic_size
   in
   let array = initial_array ~loc ~array_kind ~array_size ~array_sizing in
-  let index = Let_binding.make Mutable layout_int "index" (int 0) in
+  let index =
+    Let_binding.make Mutable layout_int "index" Lambda.debug_uid_none (int 0)
+  in
   (* The core of the comprehension: the array, the index, and the iteration that
      fills everything in.  The translation of the clauses will produce a check
      to see if we can avoid doing the hard work of growing the array, which is

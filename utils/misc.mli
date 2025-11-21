@@ -31,6 +31,9 @@ val fatal_errorf: ('a, Format.formatter, unit, 'b) format4 -> 'a
   (** Format the arguments according to the given format string
       and raise [Fatal_error] with the resulting string. *)
 
+val unboxed_small_int_arrays_are_not_implemented : unit -> _
+  (** Unboxed small int arrays are not implemented. *)
+
 exception Fatal_error
 
 (** {1 Exceptions and finalization} *)
@@ -300,17 +303,29 @@ module Stdlib : sig
         [f e == e] then [map_sharing f a == a] *)
 
     val of_list_map : ('a -> 'b) -> 'a list -> 'b array
+
+    val concat_arrays : 'a array array -> 'a array
+    (** Concatenate an array of arrays into a single array. *)
   end
 
-(** {2 Extensions to the Iarray module} *)
+  (** {2 Extensions to the Iarray module} *)
   module Iarray : sig
+    val update : 'a iarray -> int -> 'a -> 'a iarray
+    (* Functional update of iarray *)
+
     val equal : ('a -> 'a -> bool) -> 'a iarray -> 'a iarray -> bool
     (** Compare two arrays for equality, using the supplied predicate for
         element equality *)
 
+    val compare : ('a -> 'a -> int) -> 'a iarray -> 'a iarray -> int
+    (** Compare two arrays, using the supplied predicate for element equality *)
+
     val all_somes : 'a option iarray -> 'a iarray option
 
     val of_list_map : ('a -> 'b) -> 'a list -> 'b iarray
+
+    val concat_iarrays : 'a iarray iarray -> 'a iarray
+    (** Concatenate an array of arrays into a single array. *)
   end
 
 (** {2 Extensions to the String module} *)
@@ -453,6 +468,10 @@ val remove_file: string -> unit
            Does nothing for other kinds of files.
            Never raises an error. *)
 
+val remove_dir: string -> unit
+       (** Delete the given directory if it exists, is a directory, and is
+           empty. Never raises an error. *)
+
 val expand_directory: string -> string -> string
        (** [expand_directory alt file] eventually expands a [+] at the
            beginning of file into [alt] (an alternate root directory) *)
@@ -495,6 +514,9 @@ val protect_writing_to_file
           the [out_channel] to the given function, then close the
           channel. If the function raises an exception then [filename]
           will be removed. *)
+
+val mk_temp_dir : ?perms: int -> string -> string -> string
+       (** Create a temporary directory with a random number in the name. *)
 
 val concat_null_terminated : string list -> string
 (** [concat_null_terminated [x1;x2; ... xn]] is
@@ -553,6 +575,12 @@ module Int_literal_converter : sig
     (** Convert a string to an integer.  Unlike {!Stdlib.int_of_string},
         this function accepts the string representation of [max_int + 1]
         and returns [min_int] in this case. *)
+
+  val int8 : string -> int
+    (** Likewise, at type [int8] *)
+
+  val int16 : string -> int
+    (** Likewise, at type [int16] *)
 
   val int32 : string -> int32
     (** Likewise, at type [int32] *)
@@ -797,7 +825,8 @@ end
 
 val print_if :
   Format.formatter -> bool ref -> (Format.formatter -> 'a -> unit) -> 'a -> 'a
-(** [print_if ppf flag fmt x] prints [x] with [fmt] on [ppf] if [b] is true. *)
+(** [print_if ppf flag fmt x] prints [x] with [fmt] on [ppf]
+    if [flag] is true. *)
 
 val pp_two_columns :
   ?sep:string -> ?max_lines:int ->
@@ -824,6 +853,11 @@ val pp_two_columns :
     bb  | dddddd
     v}
 *)
+
+val pp_table : Format.formatter -> (string * string list) list -> unit
+(** [pp_table ppf l] prints the table [l], a list of columns with their
+    header. The function fails with a fatal error if the columns have
+    different length. *)
 
 val pp_parens_if :
      bool
@@ -1137,6 +1171,39 @@ type alerts = string Stdlib.String.Map.t
 
 val remove_double_underscores : string -> string
 
+(** {1 JSON utilities} *)
+module Json : sig
+  (** Simple (and not very robust) JSON generation utilities.
+
+      Everything is string based, creating lots of intermediate strings.
+      Moreover, [Json.string] uses a custom string encoding based on the code
+      for the format specifier [%S], but with escapes for [\u00HH] instead of
+      OCaml's [\DDD]. *)
+
+  val field : string -> string -> string
+  (** [field name value] creates a JSON field with the given name and value. *)
+
+  val string : string -> string
+  (** [string value] formats a string value as a JSON string. *)
+
+  val int : int -> string
+  (** [int value] formats an integer value as a JSON number. *)
+
+  val object_ : string list -> string
+  (** [object_ fields] creates a JSON object from a list of field strings. *)
+
+  val array : string list -> string
+  (** [array items] creates a JSON array from a list of item strings. *)
+
+  val null : string
+  (** [null] is the JSON null literal. *)
+
+  val option : ('a -> string) -> 'a option -> string
+  (** [option f opt] formats an optional value as JSON.
+      Returns the JSON [null] literal for [None],
+      or applies [f] to the value for [Some v]. *)
+end
+
 (** Non-empty lists *)
 module Nonempty_list : sig
   type nonrec 'a t = ( :: ) of 'a * 'a list
@@ -1153,4 +1220,41 @@ module Nonempty_list : sig
     unit
 
   val (@) : 'a t -> 'a t -> 'a t
+end
+
+(** A bounded non-negative integer. The possible ranges are [0 ..< n],
+    represented by [Bounded { bound = n}] and [0 ..< ∞] represented by
+    [Unbounded]. *)
+module Maybe_bounded : sig
+  type t =
+    | Unbounded
+    | Bounded of { mutable bound: int }
+    (** The [bound] is not included. *)
+
+  (** [decr] decreases the current bound and truncates at zero. As such, [decr]
+      and then [incr] is not always a no-op. *)
+  val decr : t -> unit
+
+  (** [incr] increases the current bound. Raises an exception when attempting
+      to increment [max_int]. *)
+  val incr : t -> unit
+
+  val is_depleted : t -> bool
+
+  (** [is_in_bounds n t] returns [true] if [n] is in bounds.
+      A number counts as in bounds if it is non-negative and strictly smaller
+      than the bound. For [Unbounded], returns [true] if [n >= 0]. *)
+  val is_in_bounds : int -> t -> bool
+
+  (** [is_out_of_bounds n t] returns [true] if [n] is out of bounds. A number is
+      out of bounds if it is negative or greater than or equal to the bound. For
+      [Unbounded], returns [false] if [n < 0] and [true] otherwise. *)
+  val is_out_of_bounds : int -> t -> bool
+
+  (** [of_option opt] maps [None] to no bound and [Some n] to the bound [n]
+      (not inclusive). *)
+  val of_option : int option -> t
+
+  (** [of_int n] creates a bounded integer with bound [n] (not inclusive). *)
+  val of_int : int -> t
 end

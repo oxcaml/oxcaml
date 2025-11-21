@@ -26,7 +26,7 @@
 
 (* Operations common to CFG and Linear. *)
 
-[@@@ocaml.warning "+a-4-9-40-41-42"]
+[@@@ocaml.warning "+a-40-41-42"]
 
 type trap_stack =
   | Uncaught  (** Exceptions escape the current function *)
@@ -35,9 +35,7 @@ type trap_stack =
 
 val equal_trap_stack : trap_stack -> trap_stack -> bool
 
-type integer_comparison =
-  | Isigned of Cmm.integer_comparison
-  | Iunsigned of Cmm.integer_comparison
+type integer_comparison = Cmm.integer_comparison
 
 val string_of_integer_comparison : integer_comparison -> string
 
@@ -129,6 +127,8 @@ type t =
   | Const_float of int64
   | Const_symbol of Cmm.symbol
   | Const_vec128 of Cmm.vec128_bits
+  | Const_vec256 of Cmm.vec256_bits
+  | Const_vec512 of Cmm.vec512_bits
   | Stackoffset of int
   | Load of
       { memory_chunk : Cmm.memory_chunk;
@@ -157,11 +157,12 @@ type t =
       { ident : Ident.t;
         which_parameter : int option;
         provenance : Backend_var.Provenance.t option;
-        is_assignment : bool;
         regs : Reg.t array
       }
   | Dls_get
+  | Tls_get
   | Poll
+  | Pause
   | Alloc of
       { bytes : int;
         dbginfo : Cmm.alloc_dbginfo;

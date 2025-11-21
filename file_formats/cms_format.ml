@@ -17,6 +17,8 @@
 
 (** cms and cmsi files format. *)
 
+module Uid = Shape.Uid
+
 let read_magic_number ic =
   let len_magic_number = String.length Config.cms_magic_number in
   really_input_string ic len_magic_number
@@ -30,9 +32,13 @@ type cms_infos = {
   cms_initial_env : Env.t option;
   cms_uid_to_loc : string Location.loc Shape.Uid.Tbl.t;
   cms_uid_to_attributes : Parsetree.attributes Shape.Uid.Tbl.t;
+  cms_shape_format : Clflags.shape_format;
   cms_impl_shape : Shape.t option; (* None for mli *)
   cms_ident_occurrences :
-    (Longident.t Location.loc * Shape_reduce.result) array
+    (Longident.t Location.loc * Shape_reduce.result) array;
+  cms_declaration_dependencies :
+    (Cmt_format.dependency_kind * Uid.t * Uid.t) list;
+  cms_externals: Vicuna_value_shapes.extfun array;
 }
 
 type error =
@@ -94,13 +100,24 @@ let uid_tables_of_binary_annots binary_annots =
     );
   cms_uid_to_loc, cms_uid_to_attributes
 
-let save_cms target modname binary_annots initial_env shape =
+let externals_of_binary_annots binary_annots =
+  match binary_annots with
+  | Cmt_format.Implementation str ->
+    Vicuna_traverse_typed_tree.extract_from_typed_tree str |> Array.of_list
+  | _ -> [| |]
+
+let save_cms target modname binary_annots initial_env shape
+  cms_declaration_dependencies =
   if (!Clflags.binary_annotations_cms && not !Clflags.print_types) then begin
     Misc.output_to_file_via_temporary
        ~mode:[Open_binary] (Unit_info.Artifact.filename target)
        (fun _temp_file_name oc ->
-
-        let sourcefile = Unit_info.Artifact.source_file target in
+        (* We use the raw_source_file because the original_source_file may not
+           exist (or may have changed), so computing the digest may fail or
+           produce inconsistent results. Merlin expects the cms_sourcefile to be
+           the file we computed the digest of, which is why we use the
+           raw_source_file for that as well. *)
+        let sourcefile = Unit_info.Artifact.raw_source_file target in
         let source_digest = Option.map Digest.file sourcefile in
         let cms_ident_occurrences, cms_initial_env =
           if !Clflags.store_occurrences then
@@ -114,6 +131,7 @@ let save_cms target modname binary_annots initial_env shape =
         let cms_uid_to_loc, cms_uid_to_attributes =
           uid_tables_of_binary_annots binary_annots
         in
+        let cms_externals = externals_of_binary_annots binary_annots in
         let cms =
           {
             cms_modname = modname;
@@ -124,11 +142,19 @@ let save_cms target modname binary_annots initial_env shape =
             cms_initial_env;
             cms_uid_to_loc;
             cms_uid_to_attributes;
+            cms_shape_format = !Clflags.shape_format;
             cms_impl_shape = shape;
-            cms_ident_occurrences
+            cms_ident_occurrences;
+            cms_declaration_dependencies;
+            cms_externals;
           }
         in
         output_cms oc cms)
   end
 
 let clear () = ()
+
+let shape_format_to_string =
+  function
+  | Clflags.Old_merlin -> "old-merlin"
+  | Clflags.Debugging_shapes -> "debugging-shapes"

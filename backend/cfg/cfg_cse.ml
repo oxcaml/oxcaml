@@ -18,7 +18,7 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 module List = ListLabels
 module Array = ArrayLabels
 
@@ -258,19 +258,17 @@ let debug = false
 module State : sig
   type t
 
-  val make : last_used:InstructionId.t -> t
+  val make : InstructionId.sequence -> t
 
   val get_and_incr_instruction_id : t -> InstructionId.t
 end = struct
   (* CR-soon xclerc for xclerc: factor out with the state of GI, IRC, LS. *)
   type t = { instruction_id : InstructionId.sequence }
 
-  let make ~last_used =
-    let instruction_id = InstructionId.make_sequence ~last_used () in
-    { instruction_id }
+  let make instruction_id = { instruction_id }
 
   let get_and_incr_instruction_id state =
-    InstructionId.get_next state.instruction_id
+    InstructionId.get_and_incr state.instruction_id
 end
 
 let insert_single_move :
@@ -298,7 +296,7 @@ let insert_move :
   | 0 -> ()
   | 1 -> insert_single_move state srcs.(0) dsts.(0) cell
   | _ ->
-    let tmps = Reg.createv_like srcs in
+    let tmps = Reg.createv_with_typs srcs in
     let insert_single_move src dst = insert_single_move state src dst cell in
     Array.iter2 tmps dsts ~f:insert_single_move;
     Array.iter2 srcs tmps ~f:insert_single_move
@@ -307,9 +305,9 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
   let class_of_operation0 : Operation.t -> op_class = function
     | Move | Spill | Reload -> assert false (* treated specially *)
     | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-    | Const_vec128 _ ->
+    | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
       Op_pure
-    | Opaque -> assert false (* treated specially *)
+    | Opaque | Pause -> assert false (* treated specially *)
     | Stackoffset _ -> Op_other
     | Load { mutability; is_atomic; memory_chunk = _; addressing_mode = _ } ->
       (* #12173: disable CSE for atomic loads. *)
@@ -328,7 +326,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Name_for_debugger _ -> Op_other
     | Probe_is_enabled _ -> Op_other
     | Begin_region | End_region -> Op_other
-    | Dls_get -> Op_load Mutable
+    | Dls_get | Tls_get -> Op_load Mutable
 
   let class_of_operation op =
     match Target.class_of_operation op with
@@ -338,12 +336,12 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
   let is_cheap_operation : Operation.t -> bool = function
     | Const_int _ -> true
     | Move | Spill | Reload | Const_float32 _ | Const_float _ | Const_symbol _
-    | Const_vec128 _ | Opaque | Stackoffset _ | Load _ | Store _ | Alloc _
-    | Poll | Intop _
+    | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Opaque | Stackoffset _
+    | Load _ | Store _ | Alloc _ | Poll | Pause | Intop _
     | Intop_imm (_, _)
     | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
     | Specific _ | Name_for_debugger _ | Probe_is_enabled _ | Begin_region
-    | End_region | Dls_get ->
+    | End_region | Dls_get | Tls_get ->
       false
 
   let kill_loads (n : numbering) : numbering = remove_mutable_load_numbering n
@@ -353,15 +351,21 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
    fun state n cell ->
     let i = DLL.value cell in
     match i.desc with
-    | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ -> n
+    | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+    | Stack_check _ ->
+      n
     | Op (Move | Spill | Reload) ->
       (* For moves, we associate the same value number to the result reg as to
          the argument reg. *)
       let n1 = set_move n i.arg.(0) i.res.(0) in
       n1
     | Op Opaque ->
-      (* Assume arbitrary side effects from Iopaque *)
+      (* Assume arbitrary side effects from Opaque *)
       empty_numbering
+    | Op Pause ->
+      (* We don't want to reorder loads across Pause, since it's used to spin on
+         memory locations. *)
+      kill_loads n
     | Op (Alloc _) | Op Poll ->
       (* For allocations, we must avoid extending the live range of a
          pseudoregister across the allocation if this pseudoreg is a derived
@@ -376,9 +380,9 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
       let n2 = set_unknown_regs n1 i.res in
       n2
     | Op
-        (( Const_int _ | Begin_region | End_region | Dls_get | Const_float32 _
-         | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
-         | Load _
+        (( Const_int _ | Begin_region | End_region | Dls_get | Tls_get
+         | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+         | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
          | Store (_, _, _)
          | Intop _
          | Intop_imm (_, _)
@@ -521,8 +525,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     let cfg = Cfg_with_layout.cfg cfg_with_layout in
     (if not (List.mem ~set:cfg.fun_codegen_options Cfg.No_CSE)
     then
-      let cfg_infos = Regalloc_utils.collect_cfg_infos cfg_with_layout in
-      let state = State.make ~last_used:cfg_infos.max_instruction_id in
+      let state = State.make cfg.next_instruction_id in
       cse_blocks state cfg);
     cfg_with_layout
 end

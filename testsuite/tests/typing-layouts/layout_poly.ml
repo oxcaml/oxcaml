@@ -73,8 +73,6 @@ module M = struct
   let () = Format.printf "%f %s\n" (F.to_float (id' #1.)) (id' "abc")
 end
 
-(* CR layouts v2.8: The jkind in the error message is wrong. It should really be
-   ('a : layout float64) *)
 [%%expect{|
 Line 4, characters 63-68:
 4 |   let () = Format.printf "%f %s\n" (F.to_float (id' #1.)) (id' "abc")
@@ -532,8 +530,6 @@ Error: Attribute "[@layout_poly]" can only be used on built-in primitives.
 external[@layout_poly] id : ('a : any) ('b : any). 'a -> 'b = "%identity"
 let f (x: float#): int64# = id x
 
-(* CR layouts v2.8: The jkind in the error message is wrong. It should really be
-   ('a : layout float64) *)
 [%%expect{|
 external id : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
 Line 2, characters 28-32:
@@ -570,8 +566,8 @@ external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity" [@@untagged]
 Line 1, characters 40-42:
 1 | external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity" [@@untagged]
                                             ^^
-Error: Don't know how to untag this type. Only "int"
-       and other immediate types can be untagged.
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}]
 
 external[@layout_poly] id : ('a : any). 'a -> 'a =
@@ -640,33 +636,34 @@ let f (): int32# M_any.t r = id (assert false : int32# M_any.t r) *)
 (********************************************)
 (* Some primitives require layout_poly to work *)
 
-type ('a : any) t
-external id : ('a : any). 'a t -> int = "%array_length"
+type ('a : any mod separable) t = 'a array
+external id : ('a : any mod separable). 'a t -> int = "%array_length"
 let id' x = id x
 
 [%%expect{|
-type ('a : any) t
-Line 2, characters 14-37:
-2 | external id : ('a : any). 'a t -> int = "%array_length"
-                  ^^^^^^^^^^^^^^^^^^^^^^^
+type ('a : any mod separable) t = 'a array
+Line 2, characters 14-51:
+2 | external id : ('a : any mod separable). 'a t -> int = "%array_length"
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive "%array_length" doesn't work well with type variables of
        layout any. Consider using "[@layout_poly]".
 |}]
 
-external[@layout_poly] id : ('a : any). 'a t -> int = "%array_length"
+external[@layout_poly] id : ('a : any mod separable). 'a t -> int = "%array_length"
 let id' x = id x
 
 [%%expect{|
-external id : ('a : any). 'a t -> int = "%array_length" [@@layout_poly]
-val id' : 'a t -> int = <fun>
+external id : ('a : any mod separable). 'a t -> int = "%array_length"
+  [@@layout_poly]
+val id' : ('a : value_or_null mod separable). 'a t -> int = <fun>
 |}]
 
-external id : ('a : any). 'a t -> int = "%identity"
+external id : ('a : any mod separable). 'a t -> int = "%identity"
 let id' x = id x
 
 [%%expect{|
-external id : ('a : any). 'a t -> int = "%identity"
-val id' : ('a : any). 'a t -> int = <fun>
+external id : ('a : any mod separable). 'a t -> int = "%identity"
+val id' : ('a : value_or_null mod separable). 'a t -> int = <fun>
 |}]
 
 
@@ -714,34 +711,70 @@ Error: "[@layout_poly]" on this external declaration has no
 (*********************************************)
 (* Tuple array prims no longer gated to beta *)
 
-external[@layout_poly] makearray_dynamic : ('a : any_non_null). int -> 'a -> 'a array =
+external[@layout_poly] makearray_dynamic : ('a : any mod separable). int -> 'a -> 'a array =
   "%makearray_dynamic"
 [%%expect{|
-external makearray_dynamic : ('a : any_non_null). int -> 'a -> 'a array
+external makearray_dynamic : ('a : any mod separable). int -> 'a -> 'a array
   = "%makearray_dynamic" [@@layout_poly]
 |}]
 
 external[@layout_poly] arrayblit :
-  ('a : any_non_null). 'a array -> int -> 'a array -> int -> int -> unit =
+  ('a : any mod separable). 'a array -> int -> 'a array -> int -> int -> unit =
   "%arrayblit"
 [%%expect{|
 external arrayblit :
-  ('a : any_non_null). 'a array -> int -> 'a array -> int -> int -> unit
+  ('a : any mod separable). 'a array -> int -> 'a array -> int -> int -> unit
   = "%arrayblit" [@@layout_poly]
 |}]
 
-external[@layout_poly] makearray_dynamic : ('a : any_non_null). int -> 'a array =
+external[@layout_poly] makearray_dynamic : ('a : any mod separable). int -> 'a array =
   "%makearray_dynamic_uninit"
 [%%expect{|
-external makearray_dynamic : ('a : any_non_null). int -> 'a array
+external makearray_dynamic : ('a : any mod separable). int -> 'a array
   = "%makearray_dynamic_uninit" [@@layout_poly]
 |}]
 
 external[@layout_poly] arrayblit_src_immut :
-  ('a : any_non_null). 'a iarray -> int -> 'a array -> int -> int -> unit =
+  ('a : any mod separable). 'a iarray -> int -> 'a array -> int -> int -> unit =
   "%arrayblit_src_immut"
 [%%expect{|
 external arrayblit_src_immut :
-  ('a : any_non_null). 'a iarray -> int -> 'a array -> int -> int -> unit
+  ('a : any mod separable).
+    'a iarray -> int -> 'a array -> int -> int -> unit
   = "%arrayblit_src_immut" [@@layout_poly]
+|}]
+
+(** [@@layout_poly] handles [mod] constraints correctly. *)
+
+type ('a : any mod separable portable contended) t = 'a array
+external[@layout_poly] restricted : ('a : any mod separable portable contended).
+  'a t -> int = "%array_length"
+
+[%%expect{|
+type ('a : any mod portable contended separable) t = 'a array
+external restricted :
+  ('a : any mod portable contended separable). 'a t -> int = "%array_length"
+  [@@layout_poly]
+|}]
+
+let succeeds = restricted [| "a"; "bc" |]
+
+[%%expect{|
+val succeeds : int = 2
+|}]
+
+let fails = restricted [| fun () -> "no" |]
+
+[%%expect{|
+Line 1, characters 26-40:
+1 | let fails = restricted [| fun () -> "no" |]
+                              ^^^^^^^^^^^^^^
+Error:
+       The kind of 'a -> 'b is value mod aliased immutable non_float
+         because it's a function type.
+       But the kind of 'a -> 'b must be a subkind of
+           value_or_null mod portable contended separable
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
 |}]

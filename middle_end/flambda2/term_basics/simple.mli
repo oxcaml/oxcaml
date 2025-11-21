@@ -40,39 +40,40 @@ val must_be_name : t -> (Name.t * Coercion.t) option
 val must_be_const : t -> Reg_width_const.t option
 
 (** The constant representating the given number of type "int". *)
-val const_int : Targetint_31_63.t -> t
+val const_int : Target_ocaml_int.t -> t
 
 (** The constant representating the given boolean value. *)
-val const_bool : bool -> t
+val const_bool : Target_system.Machine_width.t -> bool -> t
 
 (** The naked immediate constant representating the given boolean value. *)
-val untagged_const_bool : bool -> t
+val untagged_const_bool : Target_system.Machine_width.t -> bool -> t
 
 (** The constant representating boolean true. *)
-val const_true : t
+val const_true : Target_system.Machine_width.t -> t
 
-val untagged_const_true : t
+val untagged_const_true : Target_system.Machine_width.t -> t
 
 (** The constant representating boolean false. *)
-val const_false : t
+val const_false : Target_system.Machine_width.t -> t
 
-val untagged_const_false : t
+val untagged_const_false : Target_system.Machine_width.t -> t
 
 (** The constant representating the number zero of type "int". *)
-val const_zero : t
+val const_zero : Target_system.Machine_width.t -> t
 
-val untagged_const_zero : t
+val untagged_const_zero : Target_system.Machine_width.t -> t
 
-val untagged_const_int : Targetint_31_63.t -> t
+val untagged_const_int : Target_ocaml_int.t -> t
 
-val const_one : t
+val const_one : Target_system.Machine_width.t -> t
 
 (** The constant representing the unit value. *)
-val const_unit : t
+val const_unit : Target_system.Machine_width.t -> t
 
 val const_from_descr : Reg_width_const.Descr.t -> t
 
-val const_int_of_kind : Flambda_kind.t -> int -> t
+val const_int_of_kind :
+  machine_width:Target_system.Machine_width.t -> Flambda_kind.t -> int -> t
 
 val is_const : t -> bool
 
@@ -90,6 +91,8 @@ val pattern_match' :
   symbol:(Symbol.t -> coercion:Coercion.t -> 'a) ->
   const:(Reg_width_const.t -> 'a) ->
   'a
+
+val kind : t -> Flambda_kind.t
 
 module List : sig
   type nonrec t = t list

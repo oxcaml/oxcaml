@@ -74,8 +74,8 @@ end
 [%%expect{|
 module M :
   sig
-    type ('b : value mod contended portable, 'a) t
-      : value mod contended portable constraint 'a = 'b
+    type ('b : value mod portable contended, 'a) t
+      : value mod portable contended constraint 'a = 'b
   end
 |}]
 
@@ -92,21 +92,21 @@ Lines 3-5, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           type ('b : value mod contended portable, 'a) t = 'b
+           type ('b : value mod portable contended, 'a) t = 'b
              constraint 'a = 'b
          end
        is not included in
          sig
-           type ('b : value mod contended portable, 'a) t : value mod many
+           type ('b : value mod portable contended, 'a) t : value mod many
              constraint 'a = 'b
          end
        Type declarations do not match:
-         type ('b : value mod contended portable, 'a) t = 'b
+         type ('b : value mod portable contended, 'a) t = 'b
            constraint 'a = 'b
        is not included in
-         type ('b : value mod contended portable, 'a) t : value mod many
+         type ('b : value mod portable contended, 'a) t : value mod many
            constraint 'a = 'b
-       The kind of the first is value mod contended portable
+       The kind of the first is value mod portable contended
          because of the definition of t at line 2, characters 2-96.
        But the kind of the first must be a subkind of value mod many
          because of the definition of t at line 2, characters 2-96.
@@ -141,7 +141,8 @@ Error: Signature mismatch:
          type 'a t = Foo of 'a constraint 'a = 'b ref
        is not included in
          type 'a t : immutable_data with 'b constraint 'a = 'b ref
-       The kind of the first is mutable_data with 'b @@ many unyielding
+       The kind of the first is
+           mutable_data with 'b @@ forkable unyielding many
          because of the definition of t at line 4, characters 2-46.
        But the kind of the first must be a subkind of immutable_data with 'b
          because of the definition of t at line 2, characters 2-59.

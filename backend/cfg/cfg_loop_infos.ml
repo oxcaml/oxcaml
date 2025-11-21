@@ -7,25 +7,9 @@ let fatal = Misc.fatal_errorf
 
 let debug = false
 
-module Edge = struct
-  type t =
-    { src : Label.t;
-      dst : Label.t
-    }
-
-  let compare { src = left_src; dst = left_dst }
-      { src = right_src; dst = right_dst } =
-    match Label.compare left_src right_src with
-    | 0 -> Label.compare left_dst right_dst
-    | c -> c
-end
-
-module EdgeMap : Map.S with type key = Edge.t = Map.Make (Edge)
-
-module EdgeSet : Set.S with type elt = Edge.t = Set.Make (Edge)
-
 let compute_back_edges cfg dominators =
-  Cfg.fold_blocks cfg ~init:EdgeSet.empty ~f:(fun src_label src_block acc ->
+  Cfg.fold_blocks cfg ~init:Cfg_edge.Set.empty
+    ~f:(fun src_label src_block acc ->
       let dst_labels =
         (* CR-soon xclerc for xclerc: probably safe to pass `~exn:false`. *)
         Cfg.successor_labels ~normal:true ~exn:true src_block
@@ -36,13 +20,14 @@ let compute_back_edges cfg dominators =
             Cfg_dominators.is_dominating dominators dst_label src_label
           in
           if is_back_edge
-          then EdgeSet.add { Edge.src = src_label; dst = dst_label } acc
+          then
+            Cfg_edge.Set.add { Cfg_edge.src = src_label; dst = dst_label } acc
           else acc)
         dst_labels acc)
 
 type loop = Label.Set.t
 
-let compute_loop_of_back_edge cfg { Edge.src; dst } =
+let compute_loop_of_back_edge cfg { Cfg_edge.src; dst } =
   let rec visit stack acc =
     match stack with
     | [] -> acc
@@ -58,23 +43,43 @@ let compute_loop_of_back_edge cfg { Edge.src; dst } =
       in
       visit stack acc
   in
-  visit [src] (Label.Set.add src (Label.Set.singleton dst))
+  if Label.equal src dst
+  then Label.Set.singleton src
+  else visit [src] (Label.Set.add src (Label.Set.singleton dst))
 
-type loops = loop EdgeMap.t
+type loops = loop Cfg_edge.Map.t
 
 let compute_loops_of_back_edges cfg back_edges =
-  EdgeSet.fold
-    (fun edge acc -> EdgeMap.add edge (compute_loop_of_back_edge cfg edge) acc)
-    back_edges EdgeMap.empty
+  Cfg_edge.Set.fold
+    (fun edge acc ->
+      Cfg_edge.Map.add edge (compute_loop_of_back_edge cfg edge) acc)
+    back_edges Cfg_edge.Map.empty
 
 type header_map = loop list Label.Map.t
 
+let invariant_header_map dominators header_map =
+  Label.Map.iter
+    (fun header_label loops ->
+      List.iter loops ~f:(fun loop ->
+          Label.Set.iter
+            (fun loop_label ->
+              if not
+                   (Cfg_dominators.is_dominating dominators header_label
+                      loop_label)
+              then
+                fatal
+                  "Cfg_loop_infos.invariant_header_map: block %a is not \
+                   dominated by the loop header (%a)"
+                  Label.print loop_label Label.print header_label)
+            loop))
+    header_map
+
+let compare_loop_by_cardinal left right =
+  Int.compare (Label.Set.cardinal left) (Label.Set.cardinal right)
+
 let compute_header_map loops =
-  let compare_loop_by_cardinal left right =
-    Int.compare (Label.Set.cardinal left) (Label.Set.cardinal right)
-  in
-  EdgeMap.fold
-    (fun { Edge.src = _; dst = header } labels acc ->
+  Cfg_edge.Map.fold
+    (fun { Cfg_edge.src = _; dst = header } labels acc ->
       Label.Map.update header
         (function
           | None -> Some [labels]
@@ -119,8 +124,11 @@ let compute_loop_depths cfg header_map =
     (Label.Map.map merge_loops header_map)
     init
 
+(* CR-someday xclerc for xclerc: all uses of `header_map` do merge the loops, so
+   we should consider having the "merged" version in `header_map`, and maybe
+   also sort them. *)
 type t =
-  { back_edges : EdgeSet.t;
+  { back_edges : Cfg_edge.Set.t;
     loops : loops;
     header_map : header_map;
     loop_depths : loop_depths
@@ -131,22 +139,43 @@ let build : Cfg.t -> Cfg_dominators.t -> t =
   let back_edges = compute_back_edges cfg doms in
   let loops = compute_loops_of_back_edges cfg back_edges in
   let header_map = compute_header_map loops in
+  if debug then invariant_header_map doms header_map;
   let loop_depths = compute_loop_depths cfg header_map in
   if debug
   then (
     Format.eprintf "*** Cfg_loop_infos.build for %S\n" cfg.Cfg.fun_name;
     Format.eprintf "back edges:\n";
-    EdgeSet.iter
-      (fun { Edge.src; dst } ->
+    Cfg_edge.Set.iter
+      (fun { Cfg_edge.src; dst } ->
         Format.eprintf "- %a -> %a\n" Label.format src Label.format dst)
       back_edges;
-    EdgeMap.iter
-      (fun { Edge.src; dst } labels ->
+    Cfg_edge.Map.iter
+      (fun { Cfg_edge.src; dst } labels ->
         Format.eprintf "loop for back edge %a -> %a:\n" Label.format src
           Label.format dst;
         Label.Set.iter (Format.eprintf "- %a:\n" Label.format) labels)
       loops;
     Label.Map.iter
       (Format.eprintf "loop depth for %a is %d\n" Label.format)
-      loop_depths);
+      loop_depths;
+    Format.eprintf "headers:\n";
+    Label.Map.iter
+      (fun header_label loops ->
+        let block = Cfg.get_block_exn cfg header_label in
+        let num_predecessors = Label.Set.cardinal block.predecessors in
+        Format.eprintf "- %a (#predecessors = %d):\n" Label.print header_label
+          num_predecessors;
+        List.iter loops ~f:(fun loop ->
+            Format.eprintf "  . ";
+            Label.Set.iter
+              (fun loop_label -> Format.eprintf "  %a" Label.print loop_label)
+              loop;
+            Format.eprintf "  \n"))
+      header_map);
   { back_edges; loops; header_map; loop_depths }
+
+let is_in_loop : t -> Label.t -> bool =
+ fun loops label ->
+  Cfg_edge.Map.exists
+    (fun _ (loop : loop) -> Label.Set.mem label loop)
+    loops.loops

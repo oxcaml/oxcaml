@@ -95,8 +95,6 @@ let rcx = phys_reg Int 5
 
 let rdx = phys_reg Int 4
 
-let _xmm0v () = phys_reg Vec128 100
-
 let select_locality (l : Cmm.prefetch_temporal_locality_hint) :
     Arch.prefetch_temporal_locality_hint =
   match l with
@@ -130,9 +128,13 @@ let specific x : Cfg.basic_or_terminator = Basic (Op (Specific x))
 let pseudoregs_for_operation op arg res =
   match (op : Operation.t) with
   (* Two-address binary operations: arg.(0) and res.(0) must be the same *)
-  | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor)
-  | Floatop ((Float32 | Float64), (Iaddf | Isubf | Imulf | Idivf)) ->
+  | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor) | Specific Ipackf32 ->
     [| res.(0); arg.(1) |], res
+  | Floatop ((Float32 | Float64), (Iaddf | Isubf | Imulf | Idivf))
+  | Specific (Ifloatarithmem (_, _, _)) ->
+    if Proc.has_three_operand_float_ops ()
+    then raise Use_default_exn
+    else [| res.(0); arg.(1) |], res
   | Intop_atomic { op = Compare_set; size = _; addr = _ } ->
     (* first arg must be rax *)
     let arg = Array.copy arg in
@@ -159,10 +161,6 @@ let pseudoregs_for_operation op arg res =
   (* For imulh, first arg must be in rax, rax is clobbered, and result is in
      rdx. *)
   | Intop (Imulh _) -> [| rax; arg.(1) |], [| rdx |]
-  | Specific (Ifloatarithmem (_, _, _)) ->
-    let arg' = Array.copy arg in
-    arg'.(0) <- res.(0);
-    arg', res
   (* For shifts with variable shift count, second arg must be in rcx *)
   | Intop (Ilsl | Ilsr | Iasr) -> [| res.(0); rcx |], res
   (* For div and mod, first arg must be in rax, rdx is clobbered, and result is
@@ -171,7 +169,6 @@ let pseudoregs_for_operation op arg res =
   | Intop Idiv -> [| rax; rcx |], [| rax |]
   | Intop Imod -> [| rax; rcx |], [| rdx |]
   | Floatop (Float64, Icompf cond) ->
-    (* CR gyorsh: make this optimization as a separate PR. *)
     (* We need to temporarily store the result of the comparison in a float
        register, but we don't want to clobber any of the inputs if they would
        still be live after this operation -- so we add a fresh register as both
@@ -179,27 +176,28 @@ let pseudoregs_for_operation op arg res =
        forces us to choose a fixed register, which makes it more likely an extra
        mov would be added to transfer the argument to the fixed register. *)
     let treg = Reg.create Float in
-    let _, is_swapped = float_cond_and_need_swap cond in
-    ( (if is_swapped then [| arg.(0); treg |] else [| treg; arg.(1) |]),
-      [| res.(0); treg |] )
+    if Proc.has_three_operand_float_ops ()
+    then arg, [| res.(0); treg |]
+    else
+      let _, is_swapped = float_cond_and_need_swap cond in
+      ( (if is_swapped then [| arg.(0); treg |] else [| treg; arg.(1) |]),
+        [| res.(0); treg |] )
   | Floatop (Float32, Icompf cond) ->
     let treg = Reg.create Float32 in
-    let _, is_swapped = float_cond_and_need_swap cond in
-    ( (if is_swapped then [| arg.(0); treg |] else [| treg; arg.(1) |]),
-      [| res.(0); treg |] )
+    if Proc.has_three_operand_float_ops ()
+    then arg, [| res.(0); treg |]
+    else
+      let _, is_swapped = float_cond_and_need_swap cond in
+      ( (if is_swapped then [| arg.(0); treg |] else [| treg; arg.(1) |]),
+        [| res.(0); treg |] )
   | Specific Irdpmc ->
     (* For rdpmc instruction, the argument must be in ecx and the result is in
        edx (high) and eax (low). Make it simple and force the argument in rcx,
        and rax and rdx clobbered *)
     [| rcx |], res
-  | Specific (Isimd op) ->
-    Simd_selection.pseudoregs_for_operation
-      (Simd_proc.register_behavior op)
-      arg res
+  | Specific (Isimd op) -> Simd_selection.pseudoregs_for_operation op arg res
   | Specific (Isimd_mem (op, _addr)) ->
-    Simd_selection.pseudoregs_for_operation
-      (Simd_proc.Mem.register_behavior op)
-      arg res
+    Simd_selection.pseudoregs_for_mem_operation op arg res
   | Csel _ ->
     (* last arg must be the same as res.(0) *)
     let len = Array.length arg in
@@ -213,16 +211,19 @@ let pseudoregs_for_operation op arg res =
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
       | Istore_int (_, _, _)
-      | Ipause | Ilfence | Isfence | Imfence
+      | Ilfence | Isfence | Imfence
       | Ioffset_loc (_, _)
       | Irdtsc | Icldemote _ | Iprefetch _ )
   | Move | Spill | Reload | Reinterpret_cast _ | Static_cast _ | Const_int _
-  | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_symbol _
-  | Stackoffset _ | Load _
+  | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_vec256 _
+  | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
-  | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Begin_region
-  | End_region | Poll | Dls_get ->
+  | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
+  | Begin_region | End_region | Poll | Dls_get | Tls_get ->
     raise Use_default_exn
+  | Specific (Illvm_intrinsic intr) ->
+    Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
+      intr
 
 let is_immediate (op : Operation.integer_operation) n :
     Cfg_selectgen_target_intf.is_immediate_result =
@@ -249,7 +250,7 @@ let effects_of (expr : Cmm.expression) :
     Effects_of_all_expressions args
   | _ -> Use_default
 
-let select_addressing (_chunk : Cmm.memory_chunk) exp :
+let select_addressing' (_chunk : Cmm.memory_chunk) exp :
     addressing_mode * Cmm.expression =
   let a, d = select_addr exp in
   (* PR#4625: displacement must be a signed 32-bit immediate *)
@@ -267,7 +268,12 @@ let select_addressing (_chunk : Cmm.memory_chunk) exp :
     | Ascale (e, scale) -> Iscaled (scale, d), e
     | Ascaledadd (e1, e2, scale) -> Iindexed2scaled (scale, d), Ctuple [e1; e2]
 
-let select_store ~is_assign addr (exp : Cmm.expression) :
+let select_addressing chunk exp : addressing_mode * Cmm.expression =
+  if !Clflags.llvm_backend (* Llvmize only expects [Iindexed] *)
+  then Iindexed 0, exp
+  else select_addressing' chunk exp
+
+let select_store' ~is_assign addr (exp : Cmm.expression) :
     Cfg_selectgen_target_intf.select_store_result =
   match exp with
   | Cconst_int (n, _dbg) when int_is_immediate n ->
@@ -275,7 +281,7 @@ let select_store ~is_assign addr (exp : Cmm.expression) :
       (Specific (Istore_int (Nativeint.of_int n, addr, is_assign)), Ctuple [])
   | Cconst_natint (n, _dbg) when is_immediate_natint n ->
     Rewritten (Specific (Istore_int (n, addr, is_assign)), Ctuple [])
-  | Cconst_int _ | Cconst_vec128 _
+  | Cconst_int _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
   | Cconst_natint (_, _)
   | Cconst_float32 (_, _)
   | Cconst_float (_, _)
@@ -291,6 +297,15 @@ let select_store ~is_assign addr (exp : Cmm.expression) :
   | Ccatch (_, _, _)
   | Cexit (_, _, _) ->
     Use_default
+
+let select_store ~is_assign addr (exp : Cmm.expression) :
+    Cfg_selectgen_target_intf.select_store_result =
+  if !Clflags.llvm_backend
+  then
+    Use_default
+    (* LLVM backend doesn't need target-specific instructons/operands since they
+       will be generated by LLVM itself anyways. *)
+  else select_store' ~is_assign addr exp
 
 let is_store_out_of_range _chunk ~byte_offset:_ :
     Cfg_selectgen_target_intf.is_store_out_of_range_result =
@@ -329,7 +344,7 @@ let select_floatarith commutative width (regular_op : Operation.float_operation)
     Rewritten (Basic (Op (Floatop (width, regular_op))), [arg1; arg2])
   | _ -> assert false
 
-let select_operation
+let select_operation'
     ~(generic_select_condition :
        Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
     (args : Cmm.expression list) dbg ~label_after:_ :
@@ -351,7 +366,7 @@ let select_operation
        a float stack slot, the resulting UNPCKLPS instruction would enforce the
        validity of loading it as a 128-bit memory location, even though it only
        loads 64 bits. *)
-    Rewritten (specific (Isimd (SSE Interleave_low_32_regs)), args)
+    Rewritten (specific Ipackf32, args)
   (* Special cases overriding C implementations (regardless of [@@builtin]). *)
   | Cextcall { func = "sqrt" as func; _ }
   (* x86 intrinsics ([@@builtin]) *)
@@ -359,7 +374,6 @@ let select_operation
     match func with
     | "caml_rdtsc_unboxed" -> Rewritten (specific Irdtsc, args)
     | "caml_rdpmc_unboxed" -> Rewritten (specific Irdpmc, args)
-    | "caml_pause_hint" -> Rewritten (specific Ipause, args)
     | "caml_load_fence" -> Rewritten (specific Ilfence, args)
     | "caml_store_fence" -> Rewritten (specific Isfence, args)
     | "caml_memory_fence" -> Rewritten (specific Imfence, args)
@@ -367,7 +381,7 @@ let select_operation
       let addr, eloc = select_addressing Word_int (one_arg "cldemote" args) in
       Rewritten (specific (Icldemote addr), [eloc])
     | _ -> (
-      match Simd_selection.select_operation_cfg func args with
+      match Simd_selection.select_operation_cfg ~dbg func args with
       | Some (op, args) -> Rewritten (Basic (Op op), args)
       | None -> Use_default))
   (* Recognize store instructions *)
@@ -432,9 +446,29 @@ let select_operation
     Rewritten (specific (Iprefetch { is_write; addr; locality }), [eloc])
   | _ -> Use_default
 
+let select_operation
+    ~(generic_select_condition :
+       Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
+    (args : Cmm.expression list) dbg ~label_after :
+    Cfg_selectgen_target_intf.select_operation_result =
+  if !Clflags.llvm_backend
+  then
+    match op with
+    | Cbswap { bitwidth } ->
+      let bitwidth = select_bitwidth bitwidth in
+      Rewritten (specific (Ibswap { bitwidth }), args)
+    | Cextcall { func; builtin = true; _ } ->
+      (* Illvm_intrinsic must not allocate on the OCaml heap. See
+         [Arch.operation_allocates]. *)
+      Rewritten (specific (Illvm_intrinsic func), args)
+    | _ -> Use_default
+    (* LLVM backend doesn't need target-specific instructons/operands since they
+       will be generated by LLVM itself anyways. *)
+  else select_operation' ~generic_select_condition op args dbg ~label_after
+
 (* Deal with register constraints *)
 
-let insert_op_debug env sub_cfg op dbg rs rd :
+let insert_op_debug' env sub_cfg op dbg rs rd :
     Cfg_selectgen_target_intf.insert_op_debug_result =
   try
     let rsrc, rdst = pseudoregs_for_operation op rs rd in
@@ -443,3 +477,9 @@ let insert_op_debug env sub_cfg op dbg rs rd :
     Select_utils.insert_moves env sub_cfg rdst rd;
     Regs rd
   with Use_default_exn -> Use_default
+
+let insert_op_debug env sub_cfg op dbg rs rd :
+    Cfg_selectgen_target_intf.insert_op_debug_result =
+  if !Clflags.llvm_backend
+  then Use_default
+  else insert_op_debug' env sub_cfg op dbg rs rd

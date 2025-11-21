@@ -1,0 +1,4 @@
+(tests
+ (names recursive_module_init)
+ (libraries)
+ (modes js wasm))

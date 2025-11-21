@@ -18,10 +18,10 @@
 
 open! Int_replace_polymorphic_compare
 
-[@@@ocaml.warning "+a-4-9-40-41-42"]
+[@@@ocaml.warning "+a-4-40-41-42"]
 
 open Cmm
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 module Int = Numbers.Int
 module V = Backend_var
 module VP = Backend_var.With_provenance
@@ -53,7 +53,7 @@ type environment =
   { vars :
       (Reg.t array * Backend_var.Provenance.t option * Asttypes.mutable_flag)
       V.Map.t;
-    static_exceptions : static_handler Int.Map.t;
+    static_exceptions : static_handler Static_label.Map.t;
         (** Which registers must be populated when jumping to the given
         handler. *)
     trap_stack : Operation.trap_stack;
@@ -68,7 +68,10 @@ let env_add ?(mut = Asttypes.Immutable) var regs env =
 let env_add_static_exception id v env label =
   let r = ref Unreachable in
   let s : static_handler = { regs = v; traps_ref = r; label } in
-  { env with static_exceptions = Int.Map.add id s env.static_exceptions }, r
+  ( { env with
+      static_exceptions = Static_label.Map.add id s env.static_exceptions
+    },
+    r )
 
 let env_find id env =
   let regs, _provenance, _mut = V.Map.find id env.vars in
@@ -83,18 +86,20 @@ let env_find_mut id env =
   regs, provenance
 
 let env_find_regs_for_exception_extra_args id env =
-  match Int.Map.find id env.static_exceptions with
+  match Static_label.Map.find id env.static_exceptions with
   | { regs = _exn :: extra_args; _ } -> extra_args
   | { regs = []; _ } ->
-    Misc.fatal_errorf "Exception handler for continuation %d has no parameters"
-      id
+    Misc.fatal_errorf "Exception handler for continuation %a has no parameters"
+      Static_label.format id
   | exception Not_found ->
     Misc.fatal_errorf
-      "Could not find exception extra args registers for continuation %d" id
+      "Could not find exception extra args registers for continuation %a"
+      Static_label.format id
 
 let env_find_static_exception id env =
-  try Int.Map.find id env.static_exceptions
-  with Not_found -> Misc.fatal_errorf "Not found static exception id=%d" id
+  try Static_label.Map.find id env.static_exceptions
+  with Not_found ->
+    Misc.fatal_errorf "Not found static exception id=%a" Static_label.format id
 
 let env_set_trap_stack env trap_stack = { env with trap_stack }
 
@@ -110,7 +115,7 @@ let print_traps ppf traps =
   let rec print_traps ppf = function
     | Operation.Uncaught -> Format.fprintf ppf "T"
     | Operation.Specific_trap (lbl, ts) ->
-      Format.fprintf ppf "%d::%a" lbl print_traps ts
+      Format.fprintf ppf "%a::%a" Static_label.format lbl print_traps ts
   in
   Format.fprintf ppf "(%a)" print_traps traps
 
@@ -118,15 +123,16 @@ let set_traps nfail traps_ref base_traps exit_traps =
   let traps = combine_traps base_traps exit_traps in
   match !traps_ref with
   | Unreachable ->
-    (* Format.eprintf "Traps for %d set to %a@." nfail print_traps traps; *)
+    (* Format.eprintf "Traps for %a set to %a@." Static_label.format nfail
+       print_traps traps; *)
     traps_ref := Reachable traps
   | Reachable prev_traps ->
     if not (Operation.equal_trap_stack prev_traps traps)
     then
       Misc.fatal_errorf
-        "Mismatching trap stacks for continuation %d@.Previous traps: %a@.New \
+        "Mismatching trap stacks for continuation %a@.Previous traps: %a@.New \
          traps: %a"
-        nfail print_traps prev_traps print_traps traps
+        Static_label.format nfail print_traps prev_traps print_traps traps
     else ()
 
 let set_traps_for_raise env =
@@ -137,7 +143,7 @@ let set_traps_for_raise env =
     match env_find_static_exception lbl env with
     | s -> set_traps lbl s.traps_ref ts [Pop lbl]
     | exception Not_found ->
-      Misc.fatal_errorf "Trap %d not registered in env" lbl)
+      Misc.fatal_errorf "Trap %a not registered in env" Static_label.format lbl)
 
 let trap_stack_is_empty env =
   match env.trap_stack with Uncaught -> true | Specific_trap _ -> false
@@ -147,11 +153,11 @@ let pop_all_traps env =
     | Operation.Uncaught -> acc
     | Operation.Specific_trap (lbl, t) -> pop_all (Pop lbl :: acc) t
   in
-  pop_all [] env.trap_stack
+  pop_all [] env.trap_stack |> List.rev
 
 let env_create ~tailrec_label =
   { vars = V.Map.empty;
-    static_exceptions = Int.Map.empty;
+    static_exceptions = Static_label.Map.empty;
     trap_stack = Uncaught;
     tailrec_label
   }
@@ -165,25 +171,27 @@ let select_mutable_flag : Asttypes.mutable_flag -> Operation.mutable_flag =
 
 let oper_result_type = function
   | Capply (ty, _) -> ty
-  | Cextcall { ty; ty_args = _; alloc = _; func = _ } -> ty
-  | Cload { memory_chunk } -> (
+  | Cextcall { ty; ty_args = _; alloc = _; func = _; _ } -> ty
+  | Cload { memory_chunk; _ } -> (
     match memory_chunk with
     | Word_val -> typ_val
     | Single { reg = Float64 } | Double -> typ_float
     | Single { reg = Float32 } -> typ_float32
     | Onetwentyeight_aligned | Onetwentyeight_unaligned -> typ_vec128
+    | Twofiftysix_aligned | Twofiftysix_unaligned -> typ_vec256
+    | Fivetwelve_aligned | Fivetwelve_unaligned -> typ_vec512
     | _ -> typ_int)
   | Calloc _ -> typ_val
   | Cstore (_c, _) -> typ_void
   | Cdls_get -> typ_val
+  | Ctls_get -> typ_val
   | Cprefetch _ -> typ_void
   | Catomic
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
     typ_int
   | Catomic { op = Add | Sub | Land | Lor | Lxor; _ } -> typ_void
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
-  | Clsr | Casr | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpa _
-  | Ccmpf _ ->
+  | Clsr | Casr | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
     typ_int
   | Caddv -> typ_val
   | Cadda -> typ_addr
@@ -204,7 +212,9 @@ let oper_result_type = function
   | Cpackf32 -> typ_float
   | Ccsel ty -> ty
   | Creinterpret_cast Value_of_int -> typ_val
-  | Creinterpret_cast V128_of_v128 -> typ_vec128
+  | Creinterpret_cast (V128_of_vec _) -> typ_vec128
+  | Creinterpret_cast (V256_of_vec _) -> typ_vec256
+  | Creinterpret_cast (V512_of_vec _) -> typ_vec512
   | Creinterpret_cast (Float_of_int64 | Float_of_float32) -> typ_float
   | Creinterpret_cast (Float32_of_int32 | Float32_of_float) -> typ_float32
   | Creinterpret_cast (Int_of_value | Int64_of_float | Int32_of_float32) ->
@@ -215,13 +225,29 @@ let oper_result_type = function
   | Cstatic_cast (V128_of_scalar _) -> typ_vec128
   | Cstatic_cast (Scalar_of_v128 Float64x2) -> typ_float
   | Cstatic_cast (Scalar_of_v128 Float32x4) -> typ_float32
+  | Cstatic_cast (Scalar_of_v128 Float16x8) ->
+    Misc.fatal_error "float16x8: scalar type not supported"
   | Cstatic_cast (Scalar_of_v128 (Int8x16 | Int16x8 | Int32x4 | Int64x2)) ->
+    typ_int
+  | Cstatic_cast (V256_of_scalar _) -> typ_vec256
+  | Cstatic_cast (Scalar_of_v256 Float64x4) -> typ_float
+  | Cstatic_cast (Scalar_of_v256 Float32x8) -> typ_float32
+  | Cstatic_cast (Scalar_of_v256 Float16x16) ->
+    Misc.fatal_error "float16x16: scalar type not supported"
+  | Cstatic_cast (Scalar_of_v256 (Int8x32 | Int16x16 | Int32x8 | Int64x4)) ->
+    typ_int
+  | Cstatic_cast (V512_of_scalar _) -> typ_vec512
+  | Cstatic_cast (Scalar_of_v512 Float64x8) -> typ_float
+  | Cstatic_cast (Scalar_of_v512 Float32x16) -> typ_float32
+  | Cstatic_cast (Scalar_of_v512 Float16x32) ->
+    Misc.fatal_error "float16x32: scalar type not supported"
+  | Cstatic_cast (Scalar_of_v512 (Int8x64 | Int16x32 | Int32x16 | Int64x8)) ->
     typ_int
   | Craise _ -> typ_void
   | Cprobe _ -> typ_void
   | Cprobe_is_enabled _ -> typ_int
   | Copaque -> typ_val
-  | Cpoll -> typ_void
+  | Cpoll | Cpause -> typ_void
   | Cbeginregion ->
     (* This must not be typ_val; the begin-region operation returns a naked
        pointer into the local allocation stack. *)
@@ -248,6 +274,12 @@ let size_component : machtype_component -> int = function
   | Valx2 ->
     assert (Int.equal (Arch.size_addr * 2) Arch.size_vec128);
     Arch.size_vec128
+  | Vec256 ->
+    assert (Int.equal (Arch.size_addr * 4) Arch.size_vec256);
+    Arch.size_vec256
+  | Vec512 ->
+    assert (Int.equal (Arch.size_addr * 8) Arch.size_vec512);
+    Arch.size_vec512
 
 let size_machtype mty =
   let size = ref 0 in
@@ -266,6 +298,8 @@ let size_expr env exp =
          Note that packed float32# arrays are handled via a separate path. *)
       Arch.size_float
     | Cconst_vec128 _ -> Arch.size_vec128
+    | Cconst_vec256 _ -> Arch.size_vec256
+    | Cconst_vec512 _ -> Arch.size_vec512
     | Cvar id -> (
       try V.Map.find id localenv
       with Not_found -> (
@@ -283,23 +317,6 @@ let size_expr env exp =
     | _ -> Misc.fatal_error "Selection.size_expr"
   in
   size V.Map.empty exp
-
-(* Swap the two arguments of an integer comparison *)
-
-let swap_intcomp = function
-  | Operation.Isigned cmp -> Operation.Isigned (swap_integer_comparison cmp)
-  | Operation.Iunsigned cmp -> Operation.Iunsigned (swap_integer_comparison cmp)
-
-(* Naming of registers *)
-
-let name_regs id rv =
-  let id = VP.var id in
-  if Array.length rv = 1
-  then rv.(0).Reg.raw_name <- Reg.Raw_name.create_from_var id
-  else
-    for i = 0 to Array.length rv - 1 do
-      rv.(i).Reg.raw_name <- Reg.Raw_name.create_from_var id
-    done
 
 (* Name of function being compiled *)
 let current_function_name = ref ""
@@ -393,8 +410,6 @@ let select_effects (e : Cmm.effects) : Effect.t =
 let select_coeffects (e : Cmm.coeffects) : Coeffect.t =
   match e with No_coeffects -> None | Has_coeffects -> Arbitrary
 
-let debug = false
-
 let float_test_of_float_comparison :
     Cmm.float_width ->
     Cmm.float_comparison ->
@@ -419,20 +434,24 @@ let float_test_of_float_comparison :
 
 let int_test_of_integer_comparison :
     Cmm.integer_comparison ->
-    signed:bool ->
     immediate:int option ->
     label_false:Label.t ->
     label_true:Label.t ->
     Cfg.int_test =
- fun comparison ~signed:is_signed ~immediate:imm ~label_false ~label_true ->
-  let lt, eq, gt =
+ fun comparison ~immediate:imm ~label_false ~label_true ->
+  let lt, eq, gt, is_signed =
+    let module S = Scalar.Signedness in
     match comparison with
-    | Ceq -> label_false, label_true, label_false
-    | Cne -> label_true, label_false, label_true
-    | Clt -> label_true, label_false, label_false
-    | Cgt -> label_false, label_false, label_true
-    | Cle -> label_true, label_true, label_false
-    | Cge -> label_false, label_true, label_true
+    | Ceq -> label_false, label_true, label_false, S.Signed
+    | Cne -> label_true, label_false, label_true, S.Signed
+    | Clt -> label_true, label_false, label_false, S.Signed
+    | Cgt -> label_false, label_false, label_true, S.Signed
+    | Cle -> label_true, label_true, label_false, S.Signed
+    | Cge -> label_false, label_true, label_true, S.Signed
+    | Cult -> label_true, label_false, label_false, S.Unsigned
+    | Cugt -> label_false, label_false, label_true, S.Unsigned
+    | Cule -> label_true, label_true, label_false, S.Unsigned
+    | Cuge -> label_false, label_true, label_true, S.Unsigned
   in
   { lt; eq; gt; is_signed; imm }
 
@@ -443,12 +462,7 @@ let terminator_of_test :
     Cfg.terminator =
  fun test ~label_false ~label_true ->
   let int_test comparison immediate =
-    let signed, comparison =
-      match comparison with
-      | Operation.Isigned comparison -> true, comparison
-      | Operation.Iunsigned comparison -> false, comparison
-    in
-    int_test_of_integer_comparison comparison ~signed ~immediate ~label_false
+    int_test_of_integer_comparison comparison ~immediate ~label_false
       ~label_true
   in
   match test with
@@ -463,8 +477,6 @@ let terminator_of_test :
   | Ioddtest -> Parity_test { ifso = label_false; ifnot = label_true }
   | Ieventest -> Parity_test { ifso = label_true; ifnot = label_false }
 
-let invalid_stack_offset = -1
-
 module Stack_offset_and_exn = struct
   (* This module relies on the field `can_raise` of basic blocks but does not
      rely on this field of individual Cfg instructions. This may need to be
@@ -472,13 +484,15 @@ module Stack_offset_and_exn = struct
      pushtrap/poptrap operations. *)
   type handler_stack = Label.t list
 
+  let fun_name = ref ""
+
   let compute_stack_offset ~stack_offset ~traps =
-    stack_offset + (Proc.trap_size_in_bytes * List.length traps)
+    stack_offset + (Proc.trap_size_in_bytes () * List.length traps)
 
   let check_and_set_stack_offset :
       'a Cfg.instruction -> stack_offset:int -> traps:handler_stack -> unit =
    fun instr ~stack_offset ~traps ->
-    assert (instr.stack_offset = invalid_stack_offset);
+    assert (instr.stack_offset = Cfg.invalid_stack_offset);
     Cfg.set_stack_offset instr (compute_stack_offset ~stack_offset ~traps)
 
   let process_terminator :
@@ -512,23 +526,31 @@ module Stack_offset_and_exn = struct
     | Pushtrap { lbl_handler } ->
       update_block cfg lbl_handler ~stack_offset ~traps;
       stack_offset, lbl_handler :: traps
-    | Poptrap _ -> (
+    | Poptrap { lbl_handler } -> (
       match traps with
       | [] ->
         Misc.fatal_errorf
           "Cfgize.Stack_offset_and_exn.process_basic: trying to pop from an \
            empty stack (id=%a)"
           InstructionId.format instr.id
-      | _ :: traps -> stack_offset, traps)
+      | top_trap :: traps ->
+        (* CR-soon gyorsh: investigate why this check sometimes fails. *)
+        if not (Label.equal lbl_handler top_trap)
+        then
+          Misc.fatal_errorf
+            "Cfgize.Stack_offset_and_exn.process_basic: poptrap label %a does \
+             not match top of trap stack %a (stack_offset = %d) in CFG of %s\n"
+            Label.print lbl_handler Label.print top_trap stack_offset !fun_name;
+        stack_offset, traps)
     | Op (Stackoffset n) -> stack_offset + n, traps
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
-        | Const_symbol _ | Const_vec128 _ | Load _ | Store _ | Intop _
-        | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
-        | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
-        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Poll
-        | Alloc _ )
-    | Reloadretaddr | Prologue ->
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
+        | Csel _ | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _
+        | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
+        | Dls_get | Tls_get | Poll | Pause | Alloc _ )
+    | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->
       Misc.fatal_error
@@ -544,12 +566,10 @@ module Stack_offset_and_exn = struct
    fun cfg label ~stack_offset ~traps ->
     let block = Cfg.get_block_exn cfg label in
     let was_invalid =
-      if block.stack_offset = invalid_stack_offset
+      if block.stack_offset = Cfg.invalid_stack_offset
       then true
       else (
-        if debug
-        then
-          assert (block.stack_offset = compute_stack_offset ~stack_offset ~traps);
+        assert (block.stack_offset = compute_stack_offset ~stack_offset ~traps);
         false)
     in
     if was_invalid
@@ -576,16 +596,16 @@ module Stack_offset_and_exn = struct
         | handler_label :: _ -> block.exn <- Some handler_label))
 
   let update_cfg : Cfg.t -> unit =
-   fun cfg -> update_block cfg cfg.entry_label ~stack_offset:0 ~traps:[]
+   fun cfg ->
+    fun_name := cfg.fun_name;
+    update_block cfg cfg.entry_label ~stack_offset:0 ~traps:[]
 end
 
 let make_stack_offset stack_ofs = Cfg.Op (Stackoffset stack_ofs)
 
-let make_name_for_debugger ~ident ~which_parameter ~provenance ~is_assignment
-    ~regs =
+let make_name_for_debugger ~ident ~which_parameter ~provenance ~regs =
   Cfg.Op
-    (Operation.Name_for_debugger
-       { ident; which_parameter; provenance; is_assignment; regs })
+    (Operation.Name_for_debugger { ident; which_parameter; provenance; regs })
 
 let make_const_int x = Operation.Const_int x
 
@@ -595,20 +615,19 @@ let make_const_float x = Operation.Const_float x
 
 let make_const_vec128 x = Operation.Const_vec128 x
 
+let make_const_vec256 x = Operation.Const_vec256 x
+
+let make_const_vec512 x = Operation.Const_vec512 x
+
 let make_const_symbol x = Operation.Const_symbol x
 
 let make_opaque () = Operation.Opaque
-(* Return an array of fresh registers of the given type. Normally implemented as
-   Reg.createv, but some ports (e.g. Arm) can override this definition to store
-   float values in pairs of integer registers. *)
-
-let regs_for tys = Reg.createv tys
 
 let insert_debug (_env : environment) sub_cfg basic dbg arg res =
   Sub_cfg.add_instruction sub_cfg basic arg res dbg
 
 let insert_op_debug_returning_id (_env : environment) sub_cfg op dbg arg res =
-  let instr = Cfg.make_instr (Cfg.Op op) arg res dbg in
+  let instr = Sub_cfg.make_instr (Cfg.Op op) arg res dbg in
   Sub_cfg.add_instruction' sub_cfg instr;
   instr.id
 
@@ -628,7 +647,10 @@ let insert_op_debug' (_env : environment) sub_cfg op dbg rs rd =
   rd
 
 let insert_move env sub_cfg src dst =
-  if src.Reg.stamp <> dst.Reg.stamp
+  (* This should never be called on regs with incompatible [typ]s, but the
+     zero-alloc checker may unconditionally assume the result of
+     caml_flambda2_invalid is typ_int. *)
+  if not (Reg.same src dst)
   then insert env sub_cfg (Op Move) [| src |] [| dst |]
 
 let insert_moves env sub_cfg src dst =
@@ -658,12 +680,7 @@ let maybe_emit_naming_op env sub_cfg ~bound_name regs =
       let bound_name = Backend_var.With_provenance.var bound_name in
       let naming_op =
         Operation.Name_for_debugger
-          { ident = bound_name;
-            provenance;
-            which_parameter = None;
-            is_assignment = false;
-            regs
-          }
+          { ident = bound_name; provenance; which_parameter = None; regs }
       in
       insert_debug env sub_cfg (Cfg.Op naming_op) Debuginfo.none [||] [||]
 

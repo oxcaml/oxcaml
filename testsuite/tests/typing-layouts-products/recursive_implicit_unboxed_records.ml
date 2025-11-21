@@ -413,13 +413,10 @@ end
 [%%expect{|
 module type S = sig type u : any type t = { a : u; b : u; } end
 module F : functor (X : S) -> sig type u = X.t# = #{ a : X.u; b : X.u; } end
-Line 11, characters 2-28:
-11 |   type t = { a : u ; b : u }
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with M.u
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value
-         because it's a boxed record type.
+Line 12, characters 17-18:
+12 |   let rec u = #{ u ; u }
+                      ^
+Error: Unbound unboxed record field "u"
 |}]
 
 (* CR layouts v7.2: improve this error message *)

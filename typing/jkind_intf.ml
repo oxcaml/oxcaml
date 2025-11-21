@@ -24,12 +24,19 @@ module type Sort = sig
   type base =
     | Void  (** No run time representation at all *)
     | Value  (** Standard ocaml value representation *)
+    | Untagged_immediate
+        (** Untagged 31- or 63-bit immediates, but without the tag bit, so they must
+        never be visible to the GC *)
     | Float64  (** Unboxed 64-bit floats *)
     | Float32  (** Unboxed 32-bit floats *)
     | Word  (** Unboxed native-size integers *)
+    | Bits8  (** Unboxed 8-bit integers *)
+    | Bits16  (** Unboxed 16-bit integers *)
     | Bits32  (** Unboxed 32-bit integers *)
     | Bits64  (** Unboxed 64-bit integers *)
     | Vec128  (** Unboxed 128-bit simd vectors *)
+    | Vec256  (** Unboxed 256-bit simd vectors *)
+    | Vec512  (** Unboxed 512-bit simd vectors *)
 
   (** A sort variable that can be unified during type-checking. *)
   type var
@@ -43,6 +50,8 @@ module type Sort = sig
 
     val format : Format.formatter -> t -> unit
 
+    val all_void : t -> bool
+
     val value : t
 
     val void : t
@@ -53,11 +62,21 @@ module type Sort = sig
 
     val word : t
 
+    val untagged_immediate : t
+
+    val bits8 : t
+
+    val bits16 : t
+
     val bits32 : t
 
     val bits64 : t
 
     val vec128 : t
+
+    val vec256 : t
+
+    val vec512 : t
 
     module Debug_printers : sig
       val t : Format.formatter -> t -> unit
@@ -110,6 +129,18 @@ module type Sort = sig
     val for_predef_value : t (* Predefined value types, e.g. int and string *)
 
     val for_tuple : t
+
+    val for_idx : t
+
+    val for_loop_index : t
+
+    val for_constructor : t
+
+    val for_module_field : t
+
+    val for_boxed_variant : t
+
+    val for_exception : t
   end
 
   module Var : sig
@@ -145,7 +176,7 @@ module type Sort = sig
   val bits64 : t
 
   (** Create a new sort variable that can be unified. *)
-  val new_var : unit -> t
+  val new_var : level:int -> t
 
   val of_base : base -> t
 
@@ -213,17 +244,17 @@ module History = struct
     | Layout_poly_in_external
     | Unboxed_tuple_element
     | Peek_or_poke
+    | Mutable_var_assignment
+    | Old_style_unboxed_type
+    | Array_element
+    | Idx_element
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
-  (* CR layouts v3: after implementing separability, [Array_element]
-     should instead accept representable separable jkinds. *)
   type concrete_legacy_creation_reason =
     | Unannotated_type_parameter of Path.t
     | Wildcard
     | Unification_var
-    | Array_element
-    | Old_style_unboxed_type
 
   open Allowance
 
@@ -240,6 +271,7 @@ module History = struct
     | Univar : string -> (allowed * allowed) annotation_context
     | Type_variable : string -> (allowed * allowed) annotation_context
     | Type_wildcard : Location.t -> (allowed * allowed) annotation_context
+    | Type_of_kind : Location.t -> (allowed * allowed) annotation_context
     | With_error_message :
         string * 'd annotation_context
         -> 'd annotation_context
@@ -287,6 +319,7 @@ module History = struct
     | Tuple
     | Row_variable
     | Polymorphic_variant
+    | Polymorphic_variant_too_big
     | Arrow
     | Tfield
     | Tnil
@@ -294,6 +327,7 @@ module History = struct
     | Univar
     | Default_type_jkind
     | Existential_type_variable
+    | Idx_base
     | Array_comprehension_element
     | List_comprehension_iterator_element
     | Array_comprehension_iterator_element
@@ -302,6 +336,11 @@ module History = struct
     | Class_term_argument
     | Debug_printer_argument
     | Recmod_fun_arg
+    | Quotation_result
+    | Antiquotation_result
+    | Tquote
+    | Tsplice
+    | Array_type_kind
     | Unknown of string (* CR layouts: get rid of these *)
 
   type immediate_creation_reason =
@@ -327,6 +366,11 @@ module History = struct
     | Wildcard
     | Unification_var
     | Array_type_argument
+    | Type_argument of
+        { parent_path : Path.t;
+          position : int;
+          arity : int
+        }
 
   type product_creation_reason =
     | Unboxed_tuple
@@ -354,6 +398,8 @@ module History = struct
         }
     (* [position] is 1-indexed *)
     | Generalized of Ident.t option * Location.t
+    (* See commentary on [Jkind.for_abbreviation] *)
+    | Abbreviation
 
   type interact_reason =
     | Gadt_equation of Path.t

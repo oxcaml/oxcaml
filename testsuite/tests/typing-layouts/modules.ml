@@ -23,11 +23,7 @@ type t_any : any
 
 type t_void  : void;;
 [%%expect{|
-Line 1, characters 15-19:
-1 | type t_void  : void;;
-                   ^^^^
-Error: Layout void is more experimental than allowed by the enabled layouts extension.
-       You must enable -extension layouts_alpha to use this feature.
+type t_void : void
 |}];;
 
 (*********************************************************)
@@ -40,11 +36,7 @@ module type S1 = sig
   type s
 end;;
 [%%expect {|
-Line 2, characters 13-17:
-2 |   type ('a : void) t
-                 ^^^^
-Error: Layout void is more experimental than allowed by the enabled layouts extension.
-       You must enable -extension layouts_alpha to use this feature.
+module type S1 = sig type ('a : void) t type s end
 |}];;
 
 module type S1f = sig
@@ -80,12 +72,18 @@ Error: The type constraints are not consistent.
 module type S1f'' = S1f with type s = t_float64;;
 
 [%%expect{|
-Line 1, characters 29-47:
+Line 1, characters 20-47:
 1 | module type S1f'' = S1f with type s = t_float64;;
-                                 ^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t_float64" is float64
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this "with" constraint, the new definition of "s"
+       does not match its original definition in the constrained signature:
+       Type declarations do not match:
+         type s = t_float64
+       is not included in
+         type s
+       The layout of the first is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of type "t_float64" must be a sublayout of value
+       But the layout of the first must be a sublayout of value
          because of the definition of s at line 3, characters 2-8.
 |}]
 
@@ -195,11 +193,8 @@ end = struct
   type t : void
 end;;
 [%%expect {|
-Line 8, characters 11-15:
-8 |   type t : void
-               ^^^^
-Error: Layout void is more experimental than allowed by the enabled layouts extension.
-       You must enable -extension layouts_alpha to use this feature.
+module rec Foo3 : sig val create : Bar3.t -> unit end
+and Bar3 : sig type t : void end
 |}];;
 
 module rec Foo3f : sig
@@ -432,12 +427,18 @@ end
 module type S3_2' = S3_2 with type t := string;;
 [%%expect{|
 module type S3_2 = sig type t : immediate end
-Line 5, characters 30-46:
+Line 5, characters 20-46:
 5 | module type S3_2' = S3_2 with type t := string;;
-                                  ^^^^^^^^^^^^^^^^
-Error: The kind of type "string" is immutable_data
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this "with" constraint, the new definition of "t"
+       does not match its original definition in the constrained signature:
+       Type declarations do not match:
+         type t = string
+       is not included in
+         type t : immediate
+       The kind of the first is immutable_data
          because it is the primitive type string.
-       But the kind of type "string" must be a subkind of immediate
+       But the kind of the first must be a subkind of immediate
          because of the definition of t at line 2, characters 2-20.
 |}]
 
@@ -449,11 +450,7 @@ module type S6_1 = sig
   type t : void
 end
 [%%expect{|
-Line 2, characters 11-15:
-2 |   type t : void
-               ^^^^
-Error: Layout void is more experimental than allowed by the enabled layouts extension.
-       You must enable -extension layouts_alpha to use this feature.
+module type S6_1 = sig type t : void end
 |}]
 
 module type S6_1f = sig

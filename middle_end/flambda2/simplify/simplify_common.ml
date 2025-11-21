@@ -79,17 +79,17 @@ let update_exn_continuation_extra_args uacc ~exn_cont_use_id apply =
          (Apply.exn_continuation apply))
 
 (* generate the projection of the i-th field of a n-tuple *)
-let project_tuple ~dbg ~size ~field tuple =
+let project_tuple ~machine_width ~dbg ~size ~field tuple =
   let module BAK = P.Block_access_kind in
   let bak : BAK.t =
     Values
       { field_kind = Any_value;
         tag = Known Tag.Scannable.zero;
-        size = Known (Targetint_31_63.of_int size)
+        size = Known (Target_ocaml_int.of_int machine_width size)
       }
   in
   let mutability : Mutability.t = Immutable in
-  let field = Targetint_31_63.of_int field in
+  let field = Target_ocaml_int.of_int machine_width field in
   let prim =
     P.Unary (Block_load { kind = bak; mut = mutability; field }, tuple)
   in
@@ -121,7 +121,8 @@ let split_direct_over_application apply
     List.compare_length_with remaining_args
       (Flambda_arity.cardinal_unarized remaining_arity)
     = 0);
-  let func_var = Variable.create "full_apply" in
+  let func_var = Variable.create "full_apply" K.value in
+  let func_var_duid = Flambda_debug_uid.none in
   let result_mode = Code_metadata.result_mode callee's_code_metadata in
   let outer_apply_alloc_mode = apply_alloc_mode in
   let needs_region, inner_apply_alloc_mode =
@@ -138,8 +139,8 @@ let split_direct_over_application apply
     | Alloc_local -> (
       match apply_alloc_mode with
       | Heap ->
-        let region = Variable.create "over_app_region" in
-        let ghost_region = Variable.create "over_app_ghost_region" in
+        let region = Variable.create "over_app_region" K.region in
+        let ghost_region = Variable.create "over_app_ghost_region" K.region in
         ( Some (region, ghost_region, Continuation.create ()),
           Alloc_mode.For_applications.local ~region ~ghost_region )
       | Local _ -> None, apply_alloc_mode)
@@ -185,7 +186,11 @@ let split_direct_over_application apply
       let over_application_results =
         List.mapi
           (fun i kind ->
-            BP.create (Variable.create ("result" ^ string_of_int i)) kind)
+            let result_var =
+              Variable.create ("result" ^ string_of_int i) (KS.kind kind)
+            in
+            let result_var_duid = Flambda_debug_uid.none in
+            BP.create result_var kind result_var_duid)
           (Flambda_arity.unarized_components (Apply.return_arity apply))
       in
       let call_return_continuation, call_return_continuation_free_names =
@@ -205,14 +210,18 @@ let split_direct_over_application apply
       let handler_expr =
         Let.create
           (Bound_pattern.singleton
-             (Bound_var.create (Variable.create "unit") Name_mode.normal))
+             (Bound_var.create
+                (Variable.create "unit" K.value)
+                Flambda_debug_uid.none Name_mode.normal))
           (Named.create_prim
              (Unary (End_region { ghost = false }, Simple.var region))
              (Apply.dbg apply))
           ~body:
             (Let.create
                (Bound_pattern.singleton
-                  (Bound_var.create (Variable.create "unit") Name_mode.normal))
+                  (Bound_var.create
+                     (Variable.create "unit" K.value)
+                     Flambda_debug_uid.none Name_mode.normal))
                (Named.create_prim
                   (Unary (End_region { ghost = true }, Simple.var ghost_region))
                   (Apply.dbg apply))
@@ -241,13 +250,34 @@ let split_direct_over_application apply
         ~free_names_of_body:(Known perform_over_application_free_names)
   in
   let after_full_application = Continuation.create () in
+  let full_apply_result_arity =
+    Code_metadata.result_arity callee's_code_metadata
+  in
   let after_full_application_handler =
-    let func_param = BP.create func_var K.With_subkind.any_value in
-    Continuation_handler.create
-      (Bound_parameters.create [func_param])
-      ~handler:perform_over_application
-      ~free_names_of_handler:(Known perform_over_application_free_names)
-      ~is_exn_handler:false ~is_cold:false
+    if not (Flambda_arity.is_one_param_of_kind_value full_apply_result_arity)
+    then
+      let params =
+        Bound_parameters.create
+          (List.map
+             (fun kind ->
+               Bound_parameter.create
+                 (Variable.create "over_app_result" (KS.kind kind))
+                 kind Flambda_debug_uid.none)
+             (Flambda_arity.unarized_components full_apply_result_arity))
+      in
+      Continuation_handler.create params
+        ~handler:(Expr.create_invalid (Over_application_never_returns apply))
+        ~free_names_of_handler:(Known Name_occurrences.empty)
+        ~is_exn_handler:false ~is_cold:true
+    else
+      let func_param =
+        BP.create func_var K.With_subkind.any_value func_var_duid
+      in
+      Continuation_handler.create
+        (Bound_parameters.create [func_param])
+        ~handler:perform_over_application
+        ~free_names_of_handler:(Known perform_over_application_free_names)
+        ~is_exn_handler:false ~is_cold:false
   in
   let full_apply =
     Apply.create ~callee:(Apply.callee apply)
@@ -274,15 +304,18 @@ let split_direct_over_application apply
     let free_names_of_body =
       NO.union (Apply.free_names full_apply) perform_over_application_free_names
     in
+    let region_duid = Flambda_debug_uid.none in
+    let ghost_region_duid = Flambda_debug_uid.none in
     Let.create
-      (Bound_pattern.singleton (Bound_var.create region Name_mode.normal))
+      (Bound_pattern.singleton
+         (Bound_var.create region region_duid Name_mode.normal))
       (Named.create_prim
          (Variadic (Begin_region { ghost = false }, []))
          (Apply.dbg apply))
       ~body:
         (Let.create
            (Bound_pattern.singleton
-              (Bound_var.create ghost_region Name_mode.normal))
+              (Bound_var.create ghost_region ghost_region_duid Name_mode.normal))
            (Named.create_prim
               (Variadic (Begin_region { ghost = false }, []))
               (Apply.dbg apply))
@@ -361,7 +394,7 @@ let patch_unused_exn_bucket uacc apply_cont =
       else
         (* The raise argument must be present, if it is unused, we replace it by
            a dummy value to avoid keeping a useless value alive *)
-        let dummy_value = Simple.const_zero in
+        let dummy_value = Simple.const_zero (UE.machine_width (UA.uenv uacc)) in
         AC.update_args ~args:(dummy_value :: other_args) apply_cont
   else apply_cont
 
@@ -389,6 +422,8 @@ let specialise_array_kind dacc (array_kind : P.Array_kind.t) ~array_ty :
   | Naked_int64s -> for_naked_number Naked_int64
   | Naked_nativeints -> for_naked_number Naked_nativeint
   | Naked_vec128s -> for_naked_number Naked_vec128
+  | Naked_vec256s -> for_naked_number Naked_vec256
+  | Naked_vec512s -> for_naked_number Naked_vec512
   | Immediates -> (
     (* The only thing worth checking is for float arrays, as that would allow us
        to remove the branch *)

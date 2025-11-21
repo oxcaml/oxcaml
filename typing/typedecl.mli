@@ -35,7 +35,7 @@ val transl_type_extension:
     Typedtree.type_extension * Env.t * Shape.t list
 
 val transl_value_decl:
-    Env.t -> sig_modalities:Mode.Modality.Value.Const.t -> Location.t ->
+    Env.t -> modalities:Mode.Modality.t -> Location.t ->
     Parsetree.value_description -> Typedtree.value_description * Env.t
 
 (* If the [fixed_row_path] optional argument is provided,
@@ -60,10 +60,9 @@ val approx_type_decl:
 val check_recmod_typedecl:
     Env.t -> Location.t -> Ident.t list -> Path.t -> type_declaration -> unit
 
-(* Returns an updated decl that may include improved jkind estimates, but it's
-   sound to throw it away. *)
+(* Checks that constraints are respected in the [type_declaration] *)
 val check_coherence:
-    Env.t -> Location.t -> Path.t -> type_declaration -> type_declaration
+    Env.t -> Location.t -> Path.t -> type_declaration -> unit
 
 (* for fixed types *)
 val is_fixed_type : Parsetree.type_declaration -> bool
@@ -85,6 +84,9 @@ val update_record_representation:
     Types.label_declaration list ->
     'rep option ->
     ('rep, unrepresentable_record) Result.t
+
+val mixed_block_element :
+    Env.t -> type_expr -> _ jkind -> mixed_block_element option
 
 type native_repr_kind = Unboxed | Untagged
 
@@ -195,6 +197,10 @@ type error =
   | Unsafe_mode_crossing_on_invalid_type_kind
   | Illegal_baggage of jkind_l
   | No_unboxed_version of Path.t
+  | Atomic_field_must_be_mutable of string
+  | Constructor_submode_failed of Mode.Value.error
+  | Atomic_field_in_mixed_block
+  | Non_value_atomic_field
 
 exception Error of Location.t * error
 

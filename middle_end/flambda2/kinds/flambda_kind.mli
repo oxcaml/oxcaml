@@ -18,13 +18,20 @@
 
 module Naked_number_kind : sig
   type t =
+    (* CR mshinwell: I think we should consider renaming [Naked_immediate] to
+       [Naked_int] or (maybe better) [Naked_int31_63], to avoid confusion with
+       [Lambda.Const_naked_immediate]. *)
     | Naked_immediate
     | Naked_float32
     | Naked_float
+    | Naked_int8
+    | Naked_int16
     | Naked_int32
     | Naked_int64
     | Naked_nativeint
     | Naked_vec128
+    | Naked_vec256
+    | Naked_vec512
 
   val print : Format.formatter -> t -> unit
 
@@ -56,6 +63,10 @@ val naked_float32 : t
 
 val naked_float : t
 
+val naked_int8 : t
+
+val naked_int16 : t
+
 val naked_int32 : t
 
 val naked_int64 : t
@@ -63,6 +74,10 @@ val naked_int64 : t
 val naked_nativeint : t
 
 val naked_vec128 : t
+
+val naked_vec256 : t
+
+val naked_vec512 : t
 
 val region : t
 
@@ -72,22 +87,27 @@ val is_value : t -> bool
 
 val is_naked_float : t -> bool
 
-val to_lambda : t -> Lambda.layout
-
 include Container_types.S with type t := t
 
 type flat_suffix_element = private
   | Naked_float
   | Naked_float32
+  | Naked_int8
+  | Naked_int16
   | Naked_int32
   | Naked_int64
   | Naked_nativeint
+  | Naked_immediate
   | Naked_vec128
+  | Naked_vec256
+  | Naked_vec512
+
+module Mixed_block_lambda_shape = Mixed_block_shape
 
 module Mixed_block_shape : sig
   type t
 
-  val from_lambda : Lambda.mixed_block_shape -> t
+  val from_mixed_block_shape : _ Mixed_block_lambda_shape.t -> t
 
   val field_kinds : t -> kind array
 
@@ -142,6 +162,8 @@ module Standard_int : sig
   type t =
     | Tagged_immediate
     | Naked_immediate
+    | Naked_int8
+    | Naked_int16
     | Naked_int32
     | Naked_int64
     | Naked_nativeint
@@ -164,10 +186,10 @@ module Boxable_number : sig
     | Naked_int64
     | Naked_nativeint
     | Naked_vec128
+    | Naked_vec256
+    | Naked_vec512
 
   val unboxed_kind : t -> kind
-
-  val primitive_kind : t -> Primitive.boxed_integer
 
   val print_lowercase : Format.formatter -> t -> unit
 
@@ -197,9 +219,11 @@ module With_subkind : sig
       | Boxed_int64
       | Boxed_nativeint
       | Boxed_vec128
+      | Boxed_vec256
+      | Boxed_vec512
       | Tagged_immediate
       | Variant of
-          { consts : Targetint_31_63.Set.t;
+          { consts : Target_ocaml_int.Set.t;
             non_consts : (Block_shape.t * full_kind list) Tag.Scannable.Map.t
           }
       | Float_block of { num_fields : int }
@@ -212,6 +236,8 @@ module With_subkind : sig
       | Unboxed_int64_array
       | Unboxed_nativeint_array
       | Unboxed_vec128_array
+      | Unboxed_vec256_array
+      | Unboxed_vec512_array
       | Unboxed_product_array
 
     include Container_types.S with type t := t
@@ -242,6 +268,10 @@ module With_subkind : sig
 
   val naked_float : t
 
+  val naked_int8 : t
+
+  val naked_int16 : t
+
   val naked_int32 : t
 
   val naked_int64 : t
@@ -249,6 +279,10 @@ module With_subkind : sig
   val naked_nativeint : t
 
   val naked_vec128 : t
+
+  val naked_vec256 : t
+
+  val naked_vec512 : t
 
   val region : t
 
@@ -276,6 +310,10 @@ module With_subkind : sig
 
   val unboxed_vec128_array : t
 
+  val unboxed_vec256_array : t
+
+  val unboxed_vec512_array : t
+
   val unboxed_product_array : t
 
   val block : Tag.t -> t list -> t
@@ -289,10 +327,12 @@ module With_subkind : sig
   val boxed_of_boxable_number : Boxable_number.t -> t
 
   (* Nullability is taken from the Lambda value kind *)
-  val from_lambda_value_kind : Lambda.value_kind -> t
+  val from_lambda_value_kind :
+    Lambda.value_kind -> machine_width:Target_system.Machine_width.t -> t
 
   (* Nullability is taken from the Lambda value kind *)
-  val from_lambda_values_and_unboxed_numbers_only : Lambda.layout -> t
+  val from_lambda_values_and_unboxed_numbers_only :
+    Lambda.layout -> machine_width:Target_system.Machine_width.t -> t
 
   val compatible : t -> when_used_at:t -> bool
 
@@ -314,7 +354,8 @@ module Flat_suffix_element : sig
 
   val kind : t -> kind
 
-  val from_lambda : _ Lambda.mixed_block_element -> t
+  val from_singleton_mixed_block_element :
+    _ Mixed_block_lambda_shape.Singleton_mixed_block_element.t -> t
 
   val print : Format.formatter -> t -> unit
 
@@ -330,6 +371,8 @@ module Standard_int_or_float : sig
     | Naked_immediate
     | Naked_float32
     | Naked_float
+    | Naked_int8
+    | Naked_int16
     | Naked_int32
     | Naked_int64
     | Naked_nativeint

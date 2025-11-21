@@ -14,9 +14,12 @@ module Iarray : sig
   val empty : 'a t
 
   val make : int -> 'a -> 'a t
+  val init : int -> (int -> 'a) -> 'a t
   val append : 'a t -> 'a t -> 'a t
+  val concat : 'a t list -> 'a t
 
   val length : _ t -> int
+  val get : 'a t -> int -> 'a
   val (.:()) : 'a t -> int -> 'a
   val unsafe_get : 'a t -> int -> 'a
 
@@ -28,6 +31,8 @@ module Iarray : sig
   val for_all : ('a -> bool) -> 'a t -> bool
   val exists : ('a -> bool) -> 'a t -> bool
   val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b t -> 'a
+  val fold_left_map :
+    ('acc -> 'a -> 'acc * 'b) -> 'acc -> 'a iarray -> 'acc * 'b iarray
 
   val split : ('a * 'b) t -> 'a t * 'b t
 end

@@ -25,17 +25,13 @@ type t_any : any
 type t_void : void;;
 
 [%%expect{|
-Line 1, characters 14-18:
-1 | type t_void : void;;
-                  ^^^^
-Error: Layout void is more experimental than allowed by the enabled layouts extension.
-       You must enable -extension layouts_alpha to use this feature.
+type t_void : void
 |}]
 
-type t_any_non_null : any_non_null;;
+type t_any_mod_separable : any mod separable;;
 
 [%%expect{|
-type t_any_non_null : any_non_null
+type t_any_mod_separable : any mod separable
 |}]
 
 type t_value_or_null : value_or_null;;
@@ -330,8 +326,8 @@ type (_ : float64) t2_float64'
 type t3 = float# t2_float64
 type ('a : value mod global) t2_global
 type (_ : value mod global) t2_global'
-type ('a : word mod aliased many external_) t2_complex
-type (_ : word mod aliased many external_) t2_complex'
+type ('a : word mod many aliased external_) t2_complex
+type (_ : word mod many aliased external_) t2_complex'
 |}]
 
 module M1 : sig
@@ -398,8 +394,8 @@ end = struct
 end
 
 [%%expect {|
-module M1 : sig type ('a : word mod aliased many external_) t end
-module M2 : sig type (_ : word mod aliased many external_) t end
+module M1 : sig type ('a : word mod many aliased external_) t end
+module M2 : sig type (_ : word mod many aliased external_) t end
 |}]
 
 type t = string t2_imm
@@ -432,7 +428,7 @@ type u : word mod aliased many external_
 type t = u t2_complex
 ;;
 [%%expect {|
-type u : word mod aliased many external_
+type u : word mod many aliased external_
 type t = u t2_complex
 |}]
 
@@ -443,7 +439,7 @@ let f : 'a t2_complex -> 'a t2_complex = fun x -> x
 val f : ('a : immediate). 'a t2_imm -> 'a t2_imm = <fun>
 val f : ('a : value mod global). 'a t2_global -> 'a t2_global = <fun>
 val f :
-  ('a : word mod aliased many external_). 'a t2_complex -> 'a t2_complex =
+  ('a : word mod many aliased external_). 'a t2_complex -> 'a t2_complex =
   <fun>
 |}]
 
@@ -454,7 +450,7 @@ let f : ('a : word mod external_ many aliased) t2_complex -> ('a : word) t2_comp
 val f : ('a : immediate). 'a t2_imm -> 'a t2_imm = <fun>
 val f : ('a : value mod global). 'a t2_global -> 'a t2_global = <fun>
 val f :
-  ('a : word mod aliased many external_). 'a t2_complex -> 'a t2_complex =
+  ('a : word mod many aliased external_). 'a t2_complex -> 'a t2_complex =
   <fun>
 |}]
 
@@ -465,7 +461,7 @@ let f : ('a : word) t2_complex -> ('a : word) t2_complex = fun x -> x
 val f : ('a : immediate). 'a t2_imm -> 'a t2_imm = <fun>
 val f : ('a : value mod global). 'a t2_global -> 'a t2_global = <fun>
 val f :
-  ('a : word mod aliased many external_). 'a t2_complex -> 'a t2_complex =
+  ('a : word mod many aliased external_). 'a t2_complex -> 'a t2_complex =
   <fun>
 |}]
 
@@ -476,7 +472,7 @@ let f : ('a : word mod external_ many aliased). 'a t2_complex -> 'a t2_complex =
 val f : ('a : immediate). 'a t2_imm -> 'a t2_imm = <fun>
 val f : ('a : value mod global). 'a t2_global -> 'a t2_global = <fun>
 val f :
-  ('a : word mod aliased many external_). 'a t2_complex -> 'a t2_complex =
+  ('a : word mod many aliased external_). 'a t2_complex -> 'a t2_complex =
   <fun>
 |}]
 
@@ -508,7 +504,7 @@ let f :
 ;;
 [%%expect {|
 val f :
-  ('a : word mod aliased many external_). 'a t2_complex -> 'a t2_complex =
+  ('a : word mod many aliased external_). 'a t2_complex -> 'a t2_complex =
   <fun>
 |}]
 
@@ -518,7 +514,7 @@ type 'a t = 'a t2_complex
 [%%expect {|
 type ('a : immediate) t = 'a t2_imm
 type ('a : value mod global) t = 'a t2_global
-type ('a : word mod aliased many external_) t = 'a t2_complex
+type ('a : word mod many aliased external_) t = 'a t2_complex
 |}]
 
 type ('a : value) t = 'a t2_imm
@@ -527,7 +523,7 @@ type ('a : word) t = 'a t2_complex
 [%%expect {|
 type ('a : immediate) t = 'a t2_imm
 type ('a : value mod global) t = 'a t2_global
-type ('a : word mod aliased many external_) t = 'a t2_complex
+type ('a : word mod many aliased external_) t = 'a t2_complex
 |}]
 
 type ('a : immediate) t = 'a t2_imm
@@ -536,7 +532,7 @@ type ('a : word mod external_ many aliased) t = 'a t2_complex
 [%%expect {|
 type ('a : immediate) t = 'a t2_imm
 type ('a : value mod global) t = 'a t2_global
-type ('a : word mod aliased many external_) t = 'a t2_complex
+type ('a : word mod many aliased external_) t = 'a t2_complex
 |}]
 
 let f : (_ : value) t2_imm -> unit = fun _ -> ()
@@ -553,8 +549,8 @@ val f : ('a : immediate). 'a t2_imm -> unit = <fun>
 val g : ('a : immediate). 'a t2_imm -> unit = <fun>
 val f : ('a : value mod global). 'a t2_global -> unit = <fun>
 val g : ('a : value mod global). 'a t2_global -> unit = <fun>
-val f : ('a : word mod aliased many external_). 'a t2_complex -> unit = <fun>
-val g : ('a : word mod aliased many external_). 'a t2_complex -> unit = <fun>
+val f : ('a : word mod many aliased external_). 'a t2_complex -> unit = <fun>
+val g : ('a : word mod many aliased external_). 'a t2_complex -> unit = <fun>
 |}]
 
 let f : (_ : immediate) -> unit = fun _ -> ()
@@ -565,7 +561,7 @@ let g : (_ : value) -> unit = fun _ -> ()
 [%%expect {|
 val f : ('a : immediate). 'a -> unit = <fun>
 val f : ('a : value mod global). 'a -> unit = <fun>
-val f : ('a : word mod aliased many external_). 'a -> unit = <fun>
+val f : ('a : word mod many aliased external_). 'a -> unit = <fun>
 val g : 'a -> unit = <fun>
 |}]
 
@@ -583,8 +579,8 @@ val f : ('a : immediate) 'b. 'a -> 'b = <fun>
 val g : 'a ('b : immediate). 'a -> 'b = <fun>
 val f : ('a : value mod global) 'b. 'a -> 'b = <fun>
 val g : 'a ('b : value mod global). 'a -> 'b = <fun>
-val f : ('a : word mod aliased many external_) 'b. 'a -> 'b = <fun>
-val g : 'a ('b : word mod aliased many external_). 'a -> 'b = <fun>
+val f : ('a : word mod many aliased external_) 'b. 'a -> 'b = <fun>
+val g : 'a ('b : word mod many aliased external_). 'a -> 'b = <fun>
 |}]
 
 (********************************************)
@@ -648,8 +644,8 @@ let f { fieldc } =
   let x : _ as (_ : word mod external_ many aliased) = assert false in
   fieldc x;;
 [%%expect {|
-type rc = { fieldc : ('a : word mod aliased many external_). 'a -> 'a; }
-val f : ('a : word mod aliased many external_). rc -> 'a = <fun>
+type rc = { fieldc : ('a : word mod many aliased external_). 'a -> 'a; }
+val f : ('a : word mod many aliased external_). rc -> 'a = <fun>
 |}]
 
 let f { field } = field "hello"
@@ -687,7 +683,7 @@ Line 1, characters 26-33:
 1 | let f { fieldc } = fieldc "hello"
                               ^^^^^^^
 Error: This expression has type "string" but an expression was expected of type
-         "('a : word mod aliased many external_)"
+         "('a : word mod many aliased external_)"
        The layout of string is value
          because it is the primitive type string.
        But the layout of string must be a sublayout of word
@@ -801,9 +797,9 @@ type ('a : word mod external_ many aliased) t_complex
 type s = { f : ('a : word mod external_ many aliased). 'a -> 'a u }
 and 'a u = 'a t_complex
 [%%expect {|
-type ('a : word mod aliased many external_) t_complex
-type s = { f : ('a : word mod aliased many external_). 'a -> 'a u; }
-and ('a : word mod aliased many external_) u = 'a t_complex
+type ('a : word mod many aliased external_) t_complex
+type s = { f : ('a : word mod many aliased external_). 'a -> 'a u; }
+and ('a : word mod many aliased external_) u = 'a t_complex
 |}]
 
 (********************)
@@ -836,7 +832,7 @@ val f : ('a : value mod global). 'a -> 'a = <fun>
 let f = fun (type (a : word mod external_ many aliased)) (x : a) -> x
 ;;
 [%%expect {|
-val f : ('a : word mod aliased many external_). 'a -> 'a = <fun>
+val f : ('a : word mod many aliased external_). 'a -> 'a = <fun>
 |}]
 
 let f = fun (type (a : any)) (x : a) -> x
@@ -884,7 +880,7 @@ val f : ('a : value mod global). 'a -> 'a = <fun>
 let f : type (a : word mod external_ many aliased). a -> a = fun x -> x
 ;;
 [%%expect {|
-val f : ('a : word mod aliased many external_). 'a -> 'a = <fun>
+val f : ('a : word mod many aliased external_). 'a -> 'a = <fun>
 |}]
 
 let f : type (a : any). a -> a = fun x -> x
@@ -973,7 +969,7 @@ Line 2, characters 24-26:
 2 |   val f : ('a : value). 'a t2_complex -> 'a t2_complex
                             ^^
 Error: This type "('a : value)" should be an instance of type
-         "('b : word mod aliased many external_)"
+         "('b : word mod many aliased external_)"
        The layout of 'a is value
          because of the annotation on the universal variable 'a.
        But the layout of 'a must overlap with word
@@ -988,7 +984,7 @@ end
 module type S =
   sig
     val f :
-      ('a : word mod aliased many external_). 'a t2_complex -> 'a t2_complex
+      ('a : word mod many aliased external_). 'a t2_complex -> 'a t2_complex
   end
 |}]
 
@@ -1041,11 +1037,11 @@ end
 module type S =
   sig
     val f :
-      ('a : word mod aliased many external_). 'a t2_complex -> 'a t2_complex
+      ('a : word mod many aliased external_). 'a t2_complex -> 'a t2_complex
     val g :
-      ('a : word mod aliased many external_). 'a t2_complex -> 'a t2_complex
+      ('a : word mod many aliased external_). 'a t2_complex -> 'a t2_complex
     val h :
-      ('a : word mod aliased many external_). 'a t2_complex -> 'a t2_complex
+      ('a : word mod many aliased external_). 'a t2_complex -> 'a t2_complex
   end
 |}]
 
@@ -1063,7 +1059,7 @@ let f (x : ('a : word mod external_ many aliased). 'a -> 'a) =
   x native_int
 
 [%%expect {|
-val f : (('a : word mod aliased many external_). 'a -> 'a) -> nativeint# =
+val f : (('a : word mod many aliased external_). 'a -> 'a) -> nativeint# =
   <fun>
 |}]
 
@@ -1373,7 +1369,7 @@ let f (x : t) : _ as (_ : immediate) = x
 type t = private int
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since t is nominative *)
+(* CR layouts v2.8: This should fail since t is nominative. Internal ticket 5119. *)
 
 type t : immediate = private int
 let f (x : t) : _ as (_ : immediate) = x
@@ -1386,7 +1382,7 @@ type t : bits64 mod portable aliased
 type u = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod aliased portable
+type t : bits64 mod portable aliased
 type u = private t
 val f : t -> t = <fun>
 |}]
@@ -1395,17 +1391,17 @@ type t : bits64 mod portable aliased
 type u : bits64 = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod aliased portable
+type t : bits64 mod portable aliased
 type u = private t
 val f : t -> t = <fun>
 |}]
-(* CR layouts v2.8: This should fail since u is nominative *)
+(* CR layouts v2.8: This should fail since u is nominative. Internal ticket 5119. *)
 
 type t : bits64 mod portable aliased
 type u : bits64 mod portable aliased = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod aliased portable
+type t : bits64 mod portable aliased
 type u = private t
 val f : t -> t = <fun>
 |}]
@@ -1515,7 +1511,7 @@ val f : 'a -> 'a = <fun>
 val f : ('a : immediate). 'a -> 'a = <fun>
 val f : ('a : value mod global). 'a -> 'a = <fun>
 val f : ('a : immediate). 'a -> 'a = <fun>
-val f : ('a : word mod aliased many external_). 'a -> 'a = <fun>
+val f : ('a : word mod many aliased external_). 'a -> 'a = <fun>
 |}]
 
 let f = fun (type a : value) (x : a) -> x
@@ -1529,7 +1525,7 @@ val f : 'a -> 'a = <fun>
 val f : ('a : immediate). 'a -> 'a = <fun>
 val f : ('a : value mod global). 'a -> 'a = <fun>
 val f : ('a : immediate). 'a -> 'a = <fun>
-val f : ('a : word mod aliased many external_). 'a -> 'a = <fun>
+val f : ('a : word mod many aliased external_). 'a -> 'a = <fun>
 |}]
 
 let o = object
@@ -1553,7 +1549,7 @@ val o : < m : 'a. 'a -> 'a > = <obj>
 val o : < m : ('a : immediate). 'a -> 'a > = <obj>
 val o : < m : ('a : value mod global). 'a -> 'a > = <obj>
 val o : < m : ('a : immediate). 'a -> 'a > = <obj>
-val o : < m : ('a : word mod aliased many external_). 'a -> 'a > = <obj>
+val o : < m : ('a : word mod many aliased external_). 'a -> 'a > = <obj>
 |}]
 
 let f : type (a : value). a -> a = fun x -> x
@@ -1567,7 +1563,7 @@ val f : 'a -> 'a = <fun>
 val f : ('a : immediate). 'a -> 'a = <fun>
 val f : ('a : value mod global). 'a -> 'a = <fun>
 val f : ('a : immediate). 'a -> 'a = <fun>
-val f : ('a : word mod aliased many external_). 'a -> 'a = <fun>
+val f : ('a : word mod many aliased external_). 'a -> 'a = <fun>
 |}]
 
 let f x =
@@ -1595,7 +1591,7 @@ val f : 'a -> 'a = <fun>
 val f : ('a : immediate). 'a -> 'a = <fun>
 val f : ('a : value mod global). 'a -> 'a = <fun>
 val f : ('a : immediate). 'a -> 'a = <fun>
-val f : ('a : word mod aliased many external_). 'a -> 'a = <fun>
+val f : ('a : word mod many aliased external_). 'a -> 'a = <fun>
 |}]
 
 let f = fun x y (type (a : value)) (z : a) -> z
@@ -1609,7 +1605,7 @@ val f : 'b -> 'c -> 'a -> 'a = <fun>
 val f : 'b 'c ('a : immediate). 'b -> 'c -> 'a -> 'a = <fun>
 val f : 'b 'c ('a : value mod global). 'b -> 'c -> 'a -> 'a = <fun>
 val f : 'b 'c ('a : immediate). 'b -> 'c -> 'a -> 'a = <fun>
-val f : 'b 'c ('a : word mod aliased many external_). 'b -> 'c -> 'a -> 'a =
+val f : 'b 'c ('a : word mod many aliased external_). 'b -> 'c -> 'a -> 'a =
   <fun>
 |}]
 
@@ -1624,7 +1620,7 @@ val f : 'b -> 'c -> 'a -> 'a = <fun>
 val f : 'b 'c ('a : immediate). 'b -> 'c -> 'a -> 'a = <fun>
 val f : 'b 'c ('a : value mod global). 'b -> 'c -> 'a -> 'a = <fun>
 val f : 'b 'c ('a : immediate). 'b -> 'c -> 'a -> 'a = <fun>
-val f : 'b 'c ('a : word mod aliased many external_). 'b -> 'c -> 'a -> 'a =
+val f : 'b 'c ('a : word mod many aliased external_). 'b -> 'c -> 'a -> 'a =
   <fun>
 |}]
 (* CR layouts: canonicalizing the order of quantification here
@@ -1641,7 +1637,7 @@ external f : 'a -> 'a = "%identity"
 external f : ('a : immediate). 'a -> 'a = "%identity"
 external f : ('a : value mod global). 'a -> 'a = "%identity"
 external f : ('a : immediate). 'a -> 'a = "%identity"
-external f : ('a : word mod aliased many external_). 'a -> 'a = "%identity"
+external f : ('a : word mod many aliased external_). 'a -> 'a = "%identity"
 |}]
 
 

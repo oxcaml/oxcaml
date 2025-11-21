@@ -389,11 +389,7 @@ type t = {a: t_void; b: int}
 let f (x: t) = match x with | {a; b} -> a
 [%%expect {|
 type t = { a : t_void; b : int; }
-Line 2, characters 15-41:
-2 | let f (x: t) = match x with | {a; b} -> a
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Non-value layout void detected in [Typeopt.layout] as sort for type
-       t_void. Please report this error to the Jane Street compilers team.
+val f : t -> t_void = <fun>
 |}]
 
 (* Captured_in_object *)

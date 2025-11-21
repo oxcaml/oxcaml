@@ -17,6 +17,7 @@
 module K = Flambda_kind
 module MTC = More_type_creators
 module TE = Typing_env
+module ME = Meet_env
 module TEE = Typing_env_extension
 module TEL = Typing_env_level
 module TG = Type_grammar
@@ -46,7 +47,11 @@ let join_types ~env_at_fork envs_with_levels =
                     let kind = TEL.find_kind level var in
                     TE.add_definition base_env
                       (Bound_name.create_var
-                         (Bound_var.create var Name_mode.in_types))
+                         (Bound_var.create var Flambda_debug_uid.none
+                            (* Variables with [Name_mode.in_types] do not exist
+                               at runtime, so we do not equip them with a
+                               [Flambda_debug_uid.t]. See #3967. *)
+                            Name_mode.in_types))
                       kind)
                 vars base_env)
             (TEL.variables_by_binding_time level)
@@ -84,9 +89,10 @@ let join_types ~env_at_fork envs_with_levels =
         (* CR vlaviron: This is very likely quadratic (number of uses times
            number of variables in all uses). However it's hard to know how we
            could do better. *)
-        TE.add_env_extension_maybe_bottom base_env
-          (TEE.from_map joined_types)
-          ~meet_type:Meet_and_join.meet_type
+        ME.use_meet_env base_env ~f:(fun base_env ->
+            ME.add_env_extension_maybe_bottom base_env
+              (TEE.from_map joined_types)
+              ~meet_type:Meet_and_join.meet_type)
       in
       let join_types name joined_ty use_ty =
         let same_unit =
@@ -331,8 +337,9 @@ let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
       ~extra_lifted_consts_in_use_envs ~extra_allowed_names
   in
   let result_env =
-    TE.add_env_extension_from_level definition_typing_env level
-      ~meet_type:Meet_and_join.meet_type
+    ME.use_meet_env definition_typing_env ~f:(fun target_env ->
+        ME.add_env_extension_from_level target_env level
+          ~meet_type:Meet_and_join.meet_type)
   in
   TE.compute_joined_aliases result_env alias_candidates
     (List.map (fun (env_at_use, _, _, _) -> env_at_use) after_cuts)

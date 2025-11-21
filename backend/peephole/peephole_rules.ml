@@ -2,17 +2,17 @@
 [@@@ocaml.warning "+a-29-40-41-42-4"]
 
 open! Int_replace_polymorphic_compare
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 module U = Peephole_utils
 
-let delete_snd_if_redundant ~fst ~(fst_val : Cfg.basic Cfg.instruction)
+let delete_fst_if_redundant ~fst ~snd ~(fst_val : Cfg.basic Cfg.instruction)
     ~(snd_val : Cfg.basic Cfg.instruction) =
   let fst_dst = fst_val.res.(0) in
   let snd_dst = snd_val.res.(0) in
   if U.are_equal_regs fst_dst snd_dst
   then (
     DLL.delete_curr fst;
-    Some (U.prev_at_most U.go_back_const fst))
+    Some (U.prev_at_most U.go_back_const snd))
   else None
 
 (** Logical condition for simplifying the following case:
@@ -29,16 +29,20 @@ let remove_overwritten_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
     let fst_val = DLL.value fst in
     let snd_val = DLL.value snd in
     match fst_val.desc, snd_val.desc with
-    | ( Op (Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _),
-        Op (Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _) ) ->
-      (* Removing the second instruction is okay here since it doesn't change
-         the set of addresses we touch. *)
-      delete_snd_if_redundant ~fst ~fst_val ~snd_val
+    | ( Op
+          ( Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _
+          | Const_vec256 _ | Const_vec512 _ ),
+        Op
+          ( Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _
+          | Const_vec256 _ | Const_vec512 _ ) ) ->
+      (* Removing the first instruction is okay here since it doesn't change the
+         set of addresses we touch. *)
+      delete_fst_if_redundant ~fst ~snd ~fst_val ~snd_val
     | Op (Spill | Reload), Op (Move | Spill | Reload) ->
       (* We only consider the removal of spill and reload instructions because a
          move from/to an arbitrary memory location could fail because of memory
          protection. *)
-      delete_snd_if_redundant ~fst ~fst_val ~snd_val
+      delete_fst_if_redundant ~fst ~snd ~fst_val ~snd_val
     | _, _ -> None)
   | _ -> None
 
@@ -93,6 +97,11 @@ let are_compatible op1 op2 imm1 imm2 :
   match
     (op1 : Operation.integer_operation), (op2 : Operation.integer_operation)
   with
+  (* CR-someday xclerc: `U.bitwise_immediates` will return `None` if the
+     resulting immediate cannot be represented, but in some case a peephole rule
+     should nevertheless apply. For instance, on arm64 `(x xor 2) xor 2` will
+     fail, but there should arguably be a rule so that the expression is
+     simplified to `x`. *)
   | Iand, Iand -> U.bitwise_immediates op1 imm1 imm2 ( land )
   | Ior, Ior -> U.bitwise_immediates op1 imm1 imm2 ( lor )
   | Ixor, Ixor -> U.bitwise_immediates op1 imm1 imm2 ( lxor )

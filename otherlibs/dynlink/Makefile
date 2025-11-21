@@ -67,6 +67,7 @@ COMPILERLIBS_INTFS=\
   parsing/asttypes.mli \
   parsing/parsetree.mli \
   typing/solver_intf.mli \
+  typing/mode_hint.mli \
   typing/mode_intf.mli \
   typing/outcometree.mli \
   typing/value_rec_types.mli \
@@ -126,6 +127,7 @@ COMPILERLIBS_SOURCES=\
   typing/path.ml \
   typing/shape.ml \
   typing/jkind_types.ml \
+  typing/scalar.ml \
   typing/primitive.ml \
   typing/zero_alloc.ml \
   typing/types.ml \
@@ -141,10 +143,12 @@ COMPILERLIBS_SOURCES=\
   typing/persistent_env.ml \
   typing/env.ml \
   typing/shape_reduce.ml \
+  typing/type_shape.ml \
   typing/typedtree.ml \
   lambda/debuginfo.ml \
   lambda/lambda.ml \
   lambda/runtimedef.ml \
+  lambda/static_label.ml \
   middle_end/internal_variable_names.ml \
   middle_end/variable.ml \
   middle_end/flambda/base_types/closure_element.ml \

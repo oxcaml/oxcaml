@@ -349,5 +349,8 @@ end
 Line 2, characters 30-31:
 2 |   module rec M : sig end with N = N
                                   ^
-Error: Illegal recursive module reference
+Error: This module type is recursive. This use of the recursive module "N"
+       within the definition of the module "M"
+       makes the module type of "M" depend on the module type of "N".
+       Such recursive definitions of module types are not allowed.
 |}]

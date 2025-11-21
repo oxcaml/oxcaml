@@ -1,0 +1,5 @@
+File "domain_alert.ml", line 8, characters 8-25:
+8 | let _ = Domain.Safe.spawn (fun () -> ())
+            ^^^^^^^^^^^^^^^^^
+Alert do_not_spawn_domains: Stdlib.Domain.Safe.spawn
+User programs should never spawn domains. To execute a function on a domain, use [Multicore] from the threading library. This is because spawning more than [recommended_domain_count] domains (the CPU core count) will significantly degrade GC performance.

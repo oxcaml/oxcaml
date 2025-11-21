@@ -1,0 +1,2 @@
+Fatal error: SIMD is not supported in bytecode mode.
+Exit status: 134

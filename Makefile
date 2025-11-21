@@ -1,19 +1,21 @@
 SHELL = /usr/bin/env bash
-include Makefile.config
+ROOTDIR = .
+include Makefile.build_config
 export ARCH
 
 boot_ocamlc = main_native.exe
 boot_ocamlopt = boot_ocamlopt.exe
+boot_ocamlj = boot_ocamlj.exe
 boot_ocamlmklib = tools/ocamlmklib.exe
 boot_ocamldep = tools/ocamldep.exe
 boot_ocamlobjinfo = tools/objinfo.exe
 ocamldir = .
 toplevels_installed = top opttop
 
-$(ocamldir)/duneconf/jst-extra.inc:
+$(ocamldir)/duneconf/ox-extra.inc:
 	echo > $@
 
-include Makefile.common-jst
+include Makefile.common-ox
 
 .PHONY: ci
 ifeq ($(coverage),yes)
@@ -36,7 +38,7 @@ ci-coverage: boot-runtest coverage
 
 .PHONY: minimizer
 minimizer: runtime-stdlib
-	cp chamelon/dune.jst chamelon/dune
+	cp chamelon/dune.ox chamelon/dune
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_main) @chamelon/all
 
 .PHONY: hacking-externals
@@ -61,7 +63,7 @@ check_all_arches: _build/_bootinstall
 	  ARCH=$$arch RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) ocamloptcomp.cma; \
 	done
 
-# Compare the Flambda backend installation tree against the upstream one.
+# Compare the OxCaml installation tree against the upstream one.
 
 .PHONY: compare
 compare: _compare/config.status _install
@@ -91,26 +93,13 @@ promote:
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) promote $(ws_main)
 
 .PHONY: fmt
-fmt:
-	find . \( -name "*.ml" -or -name "*.mli" \) | xargs -P $$(nproc 2>/dev/null || echo 1) -n 20 ocamlformat -i
+fmt: $(dune_config_targets)
+	$(if $(filter 1,$(V)),,@)bash scripts/fmt.sh
+
 
 .PHONY: check-fmt
-check-fmt:
-	@if [ "$$(git status --porcelain)" != "" ]; then \
-	  echo; \
-	  echo "Tree must be clean before running 'make check-fmt'"; \
-	  exit 1; \
-	fi
-	$(MAKE) fmt
-	@if [ "$$(git diff)" != "" ]; then \
-	  echo; \
-	  echo "The following code was not formatted correctly:"; \
-	  echo "(the + side of the diff is how it should be formatted)"; \
-	  echo "(working copy now contains correctly-formatted code)"; \
-	  echo; \
-	  git diff --no-ext-diff; \
-	  exit 1; \
-	fi
+check-fmt: $(dune_config_targets)
+	$(if $(filter 1,$(V)),,@)bash tools/ci/actions/check-fmt.sh
 
 .PHONY: regen-flambda2-parser
 regen-flambda2-parser: $(dune_config_targets)

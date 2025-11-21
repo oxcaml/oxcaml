@@ -28,13 +28,44 @@ module Debug_info = struct
     }
 
   let compare t1 t2 =
-    let c = V.compare t1.holds_value_of t2.holds_value_of in
+    let { holds_value_of = holds_value_of1;
+          part_of_value = part_of_value1;
+          num_parts_of_value = num_parts_of_value1;
+          which_parameter = which_parameter1;
+          provenance = provenance1
+        } =
+      t1
+    in
+    let { holds_value_of = holds_value_of2;
+          part_of_value = part_of_value2;
+          num_parts_of_value = num_parts_of_value2;
+          which_parameter = which_parameter2;
+          provenance = provenance2
+        } =
+      t2
+    in
+    let c = V.compare holds_value_of1 holds_value_of2 in
     if c <> 0
     then c
     else
-      Stdlib.compare
-        (t1.part_of_value, t1.num_parts_of_value, t1.which_parameter)
-        (t2.part_of_value, t2.num_parts_of_value, t2.which_parameter)
+      let c = Int.compare part_of_value1 part_of_value2 in
+      if c <> 0
+      then c
+      else
+        let c = Int.compare num_parts_of_value1 num_parts_of_value2 in
+        if c <> 0
+        then c
+        else
+          let c =
+            Option.compare Int.compare which_parameter1 which_parameter2
+          in
+          if c <> 0
+          then c
+          else
+            Option.compare Backend_var.Provenance.compare provenance1
+              provenance2
+
+  let equal t1 t2 = compare t1 t2 = 0
 
   let holds_value_of t = t.holds_value_of
 
@@ -66,13 +97,10 @@ module T = struct
       debug_info : Debug_info.t option
     }
 
-  module Order = struct
-    type t = Reg.t
+  (* CR mshinwell: Why is this failing to compare [debug_info]? We should fix
+     this when we re-enable [Set], below.
 
-    let compare (t1 : t) (t2 : t) = t1.stamp - t2.stamp
-  end
-
-  let compare t1 t2 = Order.compare t1.reg t2.reg
+     let compare t1 t2 = Reg.compare t1.reg t2.reg *)
 end
 
 include T
@@ -108,7 +136,7 @@ let location t = t.reg.loc
 let holds_pointer t =
   match t.reg.typ with
   | Addr | Val | Valx2 -> true
-  | Int | Float | Float32 | Vec128 -> false
+  | Int | Float | Float32 | Vec128 | Vec256 | Vec512 -> false
 
 let holds_non_pointer t = not (holds_pointer t)
 
@@ -117,84 +145,134 @@ let assigned_to_stack t =
   | Stack (Local _ | Incoming _ | Outgoing _) -> true
   | Stack (Domainstate _) | Reg _ | Unknown -> false
 
-let regs_at_same_location (reg1 : Reg.t) (reg2 : Reg.t) ~register_class
-    ~stack_class =
-  (* We need to check the register classes too: two locations both saying "stack
-     offset N" might actually be different physical locations, for example if
-     one is of class "Int" and another "Float" on amd64. [register_class] will
-     be [Proc.register_class], but cannot be here, due to a circular
-     dependency. *)
-  Reg.equal_location reg1.loc reg2.loc
-  &&
-  match reg1.loc with
-  | Reg _ -> register_class reg1 = register_class reg2
-  | Stack _ -> Stack_class.equal (stack_class reg1) (stack_class reg2)
-  | Unknown -> Misc.fatal_errorf "regs_at_same_location got Unknown locations"
+let fatal_message =
+  "Found Unknown register location, but we should now be post-register \
+   allocation"
 
-let at_same_location t (reg : Reg.t) ~register_class ~stack_class =
-  regs_at_same_location t.reg reg ~register_class ~stack_class
+let regs_at_same_location (reg1 : Reg.t) (reg2 : Reg.t) =
+  Reg.same_loc_fatal_on_unknown ~fatal_message reg1 reg2
+
+let at_same_location t (reg : Reg.t) = regs_at_same_location t.reg reg
 
 let debug_info t = t.debug_info
 
 let clear_debug_info t = { t with debug_info = None }
 
+module Set = struct
+  (* This code is commented out until such time as we use it for
+     [Compute_ranges], instead of using [Reg_availability_set] for both the
+     dataflow analysis and [Compute_ranges]. *)
+
+  (* include Set.Make (T)
+
+     let of_array elts = of_list (Array.to_list elts)
+
+     let forget_debug_info t = fold (fun t acc -> Reg.Set.add (reg t) acc) t
+     Reg.Set.empty
+
+     let without_debug_info regs = Reg.Set.fold (fun reg acc -> add
+     (create_without_debug_info ~reg) acc) regs empty
+
+     let made_unavailable_by_clobber t ~regs_clobbered = Reg.Set.fold (fun reg
+     acc -> let made_unavailable = filter (fun reg' -> regs_at_same_location
+     reg'.reg reg) t in union made_unavailable acc) (Reg.set_of_array
+     regs_clobbered) (* ~init:*) empty
+
+     let mem_reg t (reg : Reg.t) = exists (fun t -> Reg.same t.reg reg) t
+
+     let mem_reg_by_loc t (reg : Reg.t) = exists (fun t ->
+     Reg.same_loc_fatal_on_unknown ~fatal_message t.reg reg) t
+
+     (* CR gyorsh/mshinwell: consider renaming filter_reg_by_loc to something
+     like remove_reg_by_loc to be consistent with the positive meaning of
+     filtering on sets. *) let filter_reg_by_loc t (reg : Reg.t) = filter (fun t
+     -> not (Reg.same_loc_fatal_on_unknown ~fatal_message t.reg reg)) t
+
+     (* CR-someday mshinwell: Well, it looks like we should have used a map.
+     mshinwell: Also see @chambart's suggestion on GPR#856. *) let find_reg_exn
+     t (reg : Reg.t) = match elements (filter (fun t -> Reg.same t.reg reg) t)
+     with | [] -> raise Not_found | [reg] -> reg | _ -> assert false
+
+     let find_reg_with_same_location_exn t (reg : Reg.t) = match elements
+     (filter (fun t -> Reg.same_loc_fatal_on_unknown ~fatal_message t.reg reg)
+     t) with | [] -> raise Not_found | reg :: _ -> reg *)
+
+  (**
+   let print ppf t = Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf
+   ppf ", ") print_el ppf (elements t) *)
+  let print_el ppf t =
+    let print_reg = Printreg.reg in
+    match t.debug_info with
+    | None -> Format.fprintf ppf "%a" print_reg t.reg
+    | Some debug_info ->
+      Format.fprintf ppf "%a(%a)" print_reg t.reg Debug_info.print debug_info
+end
+
 module Order_distinguishing_names_and_locations = struct
   type nonrec t = t
 
   let compare t1 t2 =
+    let fatal_message =
+      "Order_distinguishing_names_and_locations.compare: got Unknown register \
+       location, but we should now be post-register allocation"
+    in
     match t1.debug_info, t2.debug_info with
-    | None, None -> 0
+    | None, None ->
+      Reg.compare_loc_fatal_on_unknown ~fatal_message t1.reg t2.reg
     | None, Some _ -> -1
     | Some _, None -> 1
     | Some di1, Some di2 ->
-      let c = V.compare di1.holds_value_of di2.holds_value_of in
-      if c <> 0 then c else Stdlib.compare t1.reg.loc t2.reg.loc
+      let c = Debug_info.compare di1 di2 in
+      if c <> 0
+      then c
+      else Reg.compare_loc_fatal_on_unknown ~fatal_message t1.reg t2.reg
 end
 
-module Set_distinguishing_names_and_locations =
-  Set.Make (Order_distinguishing_names_and_locations)
-module Map_distinguishing_names_and_locations =
-  Map.Make (Order_distinguishing_names_and_locations)
-
-module Set = struct
-  include Set.Make (T)
-
-  let of_array elts = of_list (Array.to_list elts)
+module Set_distinguishing_names_and_locations = struct
+  include Stdlib.Set.Make (Order_distinguishing_names_and_locations)
 
   let forget_debug_info t =
     fold (fun t acc -> Reg.Set.add (reg t) acc) t Reg.Set.empty
+
+  (* let of_set (s : Set.t) : t = Set.fold add s empty
+
+     let to_set (t : t) : Set.t = fold Set.add t Set.empty *)
+
+  let mem_reg_by_loc t (r : Reg.t) =
+    exists (fun t -> Reg.same_loc_fatal_on_unknown ~fatal_message t.reg r) t
+
+  let filter_reg_by_loc t (r : Reg.t) =
+    filter
+      (fun t -> not (Reg.same_loc_fatal_on_unknown ~fatal_message t.reg r))
+      t
 
   let without_debug_info regs =
     Reg.Set.fold
       (fun reg acc -> add (create_without_debug_info ~reg) acc)
       regs empty
 
-  let made_unavailable_by_clobber t ~regs_clobbered ~register_class ~stack_class
-      =
+  let made_unavailable_by_clobber t ~regs_clobbered =
     Reg.Set.fold
       (fun reg acc ->
         let made_unavailable =
-          filter
-            (fun reg' ->
-              regs_at_same_location reg'.reg reg ~register_class ~stack_class)
-            t
+          filter (fun reg' -> regs_at_same_location reg'.reg reg) t
         in
         union made_unavailable acc)
       (Reg.set_of_array regs_clobbered)
-      (* ~init:*) empty
+      empty
 
-  let mem_reg t (reg : Reg.t) = exists (fun t -> t.reg.stamp = reg.stamp) t
+  let print ppf t =
+    Format.pp_print_list
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+      Set.print_el ppf (elements t)
 
-  let filter_reg t (reg : Reg.t) = filter (fun t -> t.reg.stamp <> reg.stamp) t
-
-  (* CR-someday mshinwell: Well, it looks like we should have used a map.
-     mshinwell: Also see @chambart's suggestion on GPR#856. *)
-  let find_reg_exn t (reg : Reg.t) =
-    match elements (filter (fun t -> t.reg.stamp = reg.stamp) t) with
-    | [] -> raise Not_found
-    | [reg] -> reg
-    | _ -> assert false
+  let find_reg_with_same_location_exn t (r : Reg.t) =
+    filter (fun t -> Reg.same_loc_fatal_on_unknown ~fatal_message t.reg r) t
+    |> choose
 end
+
+module Map_distinguishing_names_and_locations =
+  Map.Make (Order_distinguishing_names_and_locations)
 
 let print ~print_reg ppf t =
   match t.debug_info with

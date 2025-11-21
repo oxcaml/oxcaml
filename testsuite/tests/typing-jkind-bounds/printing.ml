@@ -51,6 +51,7 @@ Error: The kind of type "t" is immutable_data with 'a @@ portable
        The first mode-crosses less than the second along:
          linearity: mod many with 'a ≰ mod many
          contention: mod contended with 'a ≰ mod contended
+         forkable: mod forkable with 'a ≰ mod forkable
          yielding: mod unyielding with 'a ≰ mod unyielding
          statefulness: mod stateless with 'a ≰ mod stateless
          visibility: mod immutable with 'a ≰ mod immutable
@@ -104,6 +105,7 @@ Error: Signature mismatch:
 
        The first mode-crosses less than the second along:
          portability: mod portable with 'a ≰ mod portable
+         forkable: mod forkable with 'a ≰ mod forkable
          yielding: mod unyielding with 'a ≰ mod unyielding
          statefulness: mod stateless with 'a ≰ mod stateless
          visibility: mod immutable with 'a ≰ mod immutable
@@ -133,8 +135,8 @@ Error: Signature mismatch:
          type t : immutable_data with a @@ portable
        The kind of the first is immutable_data with a
          because of the definition of t at line 6, characters 4-45.
-       But the kind of the first must be a subkind of immutable_data
-         with a @@ portable
+       But the kind of the first must be a subkind of
+           immutable_data with a @@ portable
          because of the definition of t at line 3, characters 2-44.
 
        The first mode-crosses less than the second along:
@@ -179,7 +181,7 @@ Line 3, characters 11-12:
                ^
 Error: This type "a" = "int ref" should be an instance of type
          "('a : immutable_data)"
-       The kind of a is mutable_data with int @@ many unyielding.
+       The kind of a is mutable_data with int @@ forkable unyielding many.
        But the kind of a must be a subkind of immutable_data
          because of the definition of t at line 2, characters 0-28.
 
@@ -201,7 +203,7 @@ Line 3, characters 11-25:
                ^^^^^^^^^^^^^^
 Error: This type "(int -> int) u" should be an instance of type
          "('a : immutable_data)"
-       The kind of (int -> int) u is value mod portable immutable
+       The kind of (int -> int) u is value mod portable immutable non_float
          because of the definition of u at line 1, characters 0-33.
        But the kind of (int -> int) u must be a subkind of immutable_data
          because of the definition of t at line 2, characters 0-28.
@@ -213,8 +215,8 @@ Line 3, characters 11-25:
                ^^^^^^^^^^^^^^
 Error: This type "(int -> int) u" should be an instance of type
          "('a : immutable_data)"
-       The kind of (int -> int) u is immutable_data
-         with int -> int @@ portable
+       The kind of (int -> int) u is
+           immutable_data with int -> int @@ portable
          because of the definition of u at line 1, characters 0-33.
        But the kind of (int -> int) u must be a subkind of immutable_data
          because of the definition of t at line 2, characters 0-28.
@@ -222,6 +224,7 @@ Error: This type "(int -> int) u" should be an instance of type
        The first mode-crosses less than the second along:
          linearity: mod many with int -> int ≰ mod many
          contention: mod contended with int -> int ≰ mod contended
+         forkable: mod forkable with int -> int ≰ mod forkable
          yielding: mod unyielding with int -> int ≰ mod unyielding
          statefulness: mod stateless with int -> int ≰ mod stateless
          visibility: mod immutable with int -> int ≰ mod immutable
@@ -273,8 +276,8 @@ Error: Signature mismatch:
          type 'a t : value mod portable with 'a
        The kind of the first is value mod contended with 'a
          because of the definition of t at line 4, characters 2-41.
-       But the kind of the first must be a subkind of value mod portable
-         with 'a
+       But the kind of the first must be a subkind of
+           value mod portable with 'a
          because of the definition of t at line 2, characters 2-40.
 |}]
 
@@ -292,15 +295,15 @@ Error: Signature mismatch:
        Modules do not match:
          sig type 'a t : value mod contended with 'a end
        is not included in
-         sig type 'a t : value mod contended portable with 'a end
+         sig type 'a t : value mod portable contended with 'a end
        Type declarations do not match:
          type 'a t : value mod contended with 'a
        is not included in
-         type 'a t : value mod contended portable with 'a
+         type 'a t : value mod portable contended with 'a
        The kind of the first is value mod contended with 'a
          because of the definition of t at line 4, characters 2-41.
        But the kind of the first must be a subkind of
-         value mod contended portable with 'a
+           value mod portable contended with 'a
          because of the definition of t at line 2, characters 2-50.
 |}]
 
@@ -343,19 +346,20 @@ Error: Signature mismatch:
        Modules do not match:
          sig type 'a t : mutable_data with 'a end
        is not included in
-         sig type 'a t : mutable_data with 'a @@ many unyielding end
+         sig type 'a t : mutable_data with 'a @@ forkable unyielding many end
        Type declarations do not match:
          type 'a t : mutable_data with 'a
        is not included in
-         type 'a t : mutable_data with 'a @@ many unyielding
+         type 'a t : mutable_data with 'a @@ forkable unyielding many
        The kind of the first is mutable_data with 'a
          because of the definition of t at line 4, characters 2-34.
-       But the kind of the first must be a subkind of mutable_data
-         with 'a @@ many unyielding
+       But the kind of the first must be a subkind of
+           mutable_data with 'a @@ forkable unyielding many
          because of the definition of t at line 2, characters 2-40.
 
        The first mode-crosses less than the second along:
          linearity: mod many with 'a ≰ mod many
+         forkable: mod forkable with 'a ≰ mod forkable
          yielding: mod unyielding with 'a ≰ mod unyielding
 |}]
 
@@ -423,14 +427,15 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig type 'a t : mutable_data with 'a @@ many unyielding end
+         sig type 'a t : mutable_data with 'a @@ forkable unyielding many end
        is not included in
          sig type 'a t : immutable_data with 'a end
        Type declarations do not match:
-         type 'a t : mutable_data with 'a @@ many unyielding
+         type 'a t : mutable_data with 'a @@ forkable unyielding many
        is not included in
          type 'a t : immutable_data with 'a
-       The kind of the first is mutable_data with 'a @@ many unyielding
+       The kind of the first is
+           mutable_data with 'a @@ forkable unyielding many
          because of the definition of t at line 4, characters 2-40.
        But the kind of the first must be a subkind of immutable_data with 'a
          because of the definition of t at line 2, characters 2-56.

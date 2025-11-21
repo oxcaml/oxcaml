@@ -67,10 +67,13 @@ include Topcommon.MakeEvalPrinter(EvalBase)
 let may_trace = ref false (* Global lock on tracing *)
 
 let load_lambda ppf lam =
+  if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
-  let slam = Simplif.simplify_lambda lam in
+  let slam = Simplif.simplify_lambda_for_bytecode lam in
   if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda slam;
-  let instrs, can_free = Bytegen.compile_phrase slam in
+  let blam = Blambda_of_lambda.blambda_of_lambda ~compilation_unit:None slam in
+  if !Clflags.dump_blambda then fprintf ppf "%a@." Printblambda.blambda blam;
+  let instrs, can_free = Bytegen.compile_phrase blam in
   if !Clflags.dump_instr then
     fprintf ppf "%a@."
     Printinstr.instrlist instrs;
@@ -125,8 +128,8 @@ let execute_phrase print_outcome ppf phr =
       in
       if !Clflags.dump_typedtree then Printtyped.implementation ppf str;
       let sg' = Typemod.Signature_names.simplify newenv sn sg in
-      ignore (Includemod.signatures ~mark:Mark_positive oldenv
-        ~modes:(Legacy None) sg sg');
+      let modes = Includemod.modes_toplevel in
+      Includemod.check_implementation oldenv ~modes sg sg';
       Typecore.force_delayed_checks ();
       let shape = Shape_reduce.local_reduce Env.empty shape in
       if !Clflags.dump_shape then Shape.print ppf shape;

@@ -70,7 +70,7 @@ let build_intervals : State.t -> Cfg_with_infos.t -> unit =
     then
       Array.iter Proc.destroyed_at_raise ~f:(fun reg ->
           update_range reg ~begin_:on ~end_:on);
-    instr.ls_order <- on;
+    State.set_ls_order state ~instruction_id:instr.id ~ls_order:on;
     Array.iter instr.arg ~f:(fun reg -> update_range reg ~begin_:on ~end_:on);
     Array.iter instr.res ~f:(fun reg -> update_range reg ~begin_:off ~end_:off);
     let live = InstructionId.Tbl.find liveness instr.id in
@@ -92,14 +92,16 @@ let build_intervals : State.t -> Cfg_with_infos.t -> unit =
          present at the end of every "block". *)
       incr pos);
   Reg.Tbl.iter (fun reg (range : Range.t) -> add_range reg range) current_ranges;
-  if debug && Lazy.force verbose
+  (if debug && Lazy.force verbose
   then
+    let ls_order_mapping = State.ls_order_mapping state in
     Cfg.iter_blocks_dfs (Cfg_with_layout.cfg cfg_with_layout)
       ~f:(fun _label block ->
         indent ();
         log "(block %a)" Label.format block.start;
-        log_body_and_terminator block.body block.terminator liveness;
-        dedent ());
+        log_body_and_terminator_with_ls_order ls_order_mapping block.body
+          block.terminator liveness;
+        dedent ()));
   State.update_intervals state past_ranges;
   dedent ()
 
@@ -121,11 +123,13 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
   let reg = interval.reg in
   match reg.loc with
   | Unknown -> (
-    let reg_class = Proc.register_class reg in
+    let reg_class = Reg_class.of_machtype reg.typ in
     let intervals = State.active state ~reg_class in
-    let first_available = Proc.first_available_register.(reg_class) in
-    match Proc.num_available_registers.(reg_class) with
-    | 0 -> fatal "register class %d has no available registers" reg_class
+    let first_available = Reg_class.first_available_register reg_class in
+    match Reg_class.num_available_registers reg_class with
+    | 0 ->
+      fatal "register class %a has no available registers" Reg_class.print
+        reg_class
     | num_available_registers ->
       let available = Array.make num_available_registers true in
       let num_still_available = ref num_available_registers in
@@ -175,7 +179,7 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
 let allocate_blocked_register : State.t -> Interval.t -> spilling_reg =
  fun state interval ->
   let reg = interval.reg in
-  let reg_class = Proc.register_class reg in
+  let reg_class = Reg_class.of_machtype reg.typ in
   let intervals = State.active state ~reg_class in
   match DLL.hd_cell intervals.active_dll with
   | Some hd_cell ->
@@ -198,15 +202,20 @@ let allocate_blocked_register : State.t -> Interval.t -> spilling_reg =
   | None -> allocate_stack_slot reg
 
 let reg_reinit () =
-  List.iter (Reg.all_registers ()) ~f:(fun (reg : Reg.t) ->
+  List.iter (Reg.all_relocatable_regs ()) ~f:(fun (reg : Reg.t) ->
       match reg.loc with Reg _ -> reg.loc <- Unknown | Unknown | Stack _ -> ())
 
 (* CR xclerc for xclerc: could probably be lower; the compiler distribution
    seems to be fine with 3 *)
 let max_rounds = 50
 
+module For_testing = struct
+  let rounds = ref (-1)
+end
+
 let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
  fun ~round state cfg_with_infos ->
+  For_testing.rounds := round;
   if round > max_rounds
   then
     fatal "register allocation was not succesful after %d rounds (%s)"
@@ -265,8 +274,9 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
           (fun (intervals, active) ->
             Format.eprintf "Regalloc_ls.run (on_fatal):";
             Format.eprintf "\n\nactives:\n";
-            Array.iteri active ~f:(fun i a ->
-                Format.eprintf "class %d:\n %a\n" i ClassIntervals.print a);
+            Reg_class.Tbl.iter active ~f:(fun reg_class a ->
+                Format.eprintf "class %a:\n %a\n" Reg_class.print reg_class
+                  ClassIntervals.print a);
             Format.eprintf "\n\nintervals:\n";
             DLL.iter intervals ~f:(fun i ->
                 Format.eprintf "- %a\n" Interval.print i);
@@ -276,7 +286,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
       cfg_with_infos
   in
   let spilling_because_unused = Reg.Set.diff cfg_infos.res cfg_infos.arg in
-  let state = State.make ~stack_slots ~last_used:cfg_infos.max_instruction_id in
+  let state = State.make ~stack_slots in
   (match Reg.Set.elements spilling_because_unused with
   | [] -> ()
   | _ :: _ as spilled_nodes ->
@@ -292,10 +302,12 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
       then (
         let liveness = Cfg_with_infos.liveness cfg_with_infos in
         indent ();
+        let ls_order_mapping = State.ls_order_mapping state in
         Cfg.iter_blocks_dfs (Cfg_with_layout.cfg cfg_with_layout)
           ~f:(fun _label block ->
             log "(block %a)" Label.format block.start;
-            log_body_and_terminator block.body block.terminator liveness);
+            log_body_and_terminator_with_ls_order ls_order_mapping block.body
+              block.terminator liveness);
         dedent ()))
     cfg_with_infos;
   cfg_with_infos

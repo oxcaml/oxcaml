@@ -34,24 +34,24 @@ type error =
   | Not_compiled_as_parameter of Global_module.Name.t
   | Imported_module_has_unset_parameter of
       { imported : Global_module.Name.t;
-        parameter : Global_module.Name.t;
+        parameter : Global_module.Parameter_name.t;
       }
   | Imported_module_has_no_such_parameter of
       { imported : Compilation_unit.Name.t;
-        valid_parameters : Global_module.Name.t list;
-        parameter : Global_module.Name.t;
+        valid_parameters : Global_module.Parameter_name.t list;
+        parameter : Global_module.Parameter_name.t;
         value : Global_module.Name.t;
       }
   | Not_compiled_as_argument of
-      { param : Global_module.Name.t;
+      { param : Global_module.Parameter_name.t;
         value : Global_module.Name.t;
         filename : filepath;
       }
   | Argument_type_mismatch of
       { value : Global_module.Name.t;
         filename : filepath;
-        expected : Global_module.Name.t;
-        actual : Global_module.Name.t;
+        expected : Global_module.Parameter_name.t;
+        actual : Global_module.Parameter_name.t;
       }
   | Unbound_module_as_argument_value of
       { instance : Global_module.Name.t; value : Global_module.Name.t; }
@@ -116,10 +116,10 @@ val check : allow_hidden:bool -> 'a t -> 'a sig_reader
 (* Lets it be known that the given module is a parameter to this module and thus is
    expected to have been compiled as such. Raises an exception if the module has already
    been imported as a non-parameter. *)
-val register_parameter : 'a t -> Global_module.Name.t -> unit
+val register_parameter : 'a t -> Global_module.Parameter_name.t -> unit
 
-(* [is_parameter_import penv md] checks if [md] is a parameter. Raises a fatal
-   error if the module has not been imported. *)
+(* [is_parameter_import penv md] checks if [md] is a loaded parameter or has
+   been registered as a parameter. *)
 val is_parameter_import : 'a t -> Global_module.Name.t -> bool
 
 (* [looked_up penv md] checks if one has already tried
@@ -138,7 +138,7 @@ val register_import_as_opaque : 'a t -> Compilation_unit.Name.t -> unit
 (* [implemented_parameter penv md] returns the argument to [-as-argument-for]
    that [md] was compiled with. *)
 val implemented_parameter : 'a t
-  -> Global_module.Name.t -> Global_module.Name.t option
+  -> Global_module.Name.t -> Global_module.Parameter_name.t option
 
 val global_of_global_name : 'a t
   -> check:bool
@@ -172,6 +172,13 @@ val import_crcs : 'a t -> source:filepath ->
 (* Return the set of compilation units imported, with their CRC *)
 val imports : 'a t -> Import_info.Intf.t list
 
+(* Require that the specified compilation unit will be available at quotation
+   compile time. *)
+val require_global_for_quote : 'a t -> Compilation_unit.Name.t -> unit
+
+(* Return the set of compilation units referenced by quotes *)
+val quoted_globals : 'a t -> Compilation_unit.Name.t list
+
 (* Return the set of imports represented as runtime parameters. If this module is indeed
    parameterised (that is, [parameters] returns a non-empty list), it will be compiled as
    a functor rather than a [struct] as usual, and the parameters to this functor are what
@@ -196,7 +203,7 @@ val is_imported_parameter : 'a t -> Global_module.Name.t -> bool
    All of these will have been specified by [-parameter] but not all of them are
    necessarily imported - any that don't appear in the source are still considered
    parameters of the module but will not appear in [imports]. *)
-val parameters : 'a t -> Global_module.Name.t list
+val parameters : 'a t -> Global_module.Parameter_name.t list
 
 (* Return the CRC of the interface of the given compilation unit *)
 val crc_of_unit: 'a t -> Compilation_unit.Name.t -> Digest.t

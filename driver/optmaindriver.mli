@@ -25,6 +25,7 @@ val main
   -> flambda2:(
     ppf_dump:Format.formatter ->
     prefixname:string ->
+    machine_width:Target_system.Machine_width.t ->
     keep_symbol_tables:bool ->
     Lambda.program ->
     Cmm.phrase list)

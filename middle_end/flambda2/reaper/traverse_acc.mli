@@ -17,16 +17,25 @@ module Graph = Global_flow_graph
 
 type continuation_info =
   { is_exn_handler : bool;
-    params : Variable.t list
+    params : Variable.t list;
+    arity : Flambda_kind.With_subkind.t list
   }
 
 module Env : sig
   type cont_kind = Normal of Variable.t list
 
+  type should_preserve_direct_calls =
+    | Yes
+    | No
+    | Auto
+
   type t =
     { parent : Rev_expr.rev_expr_holed;
       conts : cont_kind Continuation.Map.t;
-      current_code_id : Code_id.t option
+      current_code_id : Code_id.t option;
+      should_preserve_direct_calls : should_preserve_direct_calls;
+      le_monde_exterieur : Name.t;
+      all_constants : Name.t
     }
 end
 
@@ -36,16 +45,16 @@ type code_dep =
     my_closure : Variable.t;
     return : Variable.t list; (* Dummy variable representing return value *)
     exn : Variable.t; (* Dummy variable representing exn return value *)
-    is_tupled : bool
+    is_tupled : bool;
+    known_arity_call_witness : Code_id_or_name.t;
+    unknown_arity_call_witnesses : Code_id_or_name.t list
   }
 
 type apply_dep =
   { function_containing_apply_expr : Code_id.t option;
     apply_code_id : Code_id.t;
-    apply_args : Simple.t list;
     apply_closure : Simple.t option;
-    params_of_apply_return_cont : Variable.t list option;
-    param_of_apply_exn_cont : Variable.t
+    apply_call_witness : Code_id_or_name.t
   }
 
 type t
@@ -60,11 +69,15 @@ val alias_kind : Name.t -> Simple.t -> t -> unit
 
 val kinds : t -> Flambda_kind.t Name.Map.t
 
+val simple_to_name : t -> denv:Env.t -> Simple.t -> Name.t
+
 val alias_dep : denv:Env.t -> Variable.t -> Simple.t -> t -> unit
 
 val root : Variable.t -> t -> unit
 
 val used : denv:Env.t -> Simple.t -> t -> unit
+
+val any_source : denv:Env.t -> Variable.t -> t -> unit
 
 val used_code_id : Code_id.t -> t -> unit
 
@@ -80,7 +93,43 @@ val get_continuation_info : t -> continuation_info Continuation.Map.t
 
 val add_apply : apply_dep -> t -> unit
 
-val add_set_of_closures_dep : Name.t -> Code_id.t -> t -> unit
+val create_known_arity_call_witness :
+  t ->
+  Code_id.t ->
+  params:Variable.t list ->
+  returns:Variable.t list ->
+  exn:Variable.t ->
+  Code_id_or_name.t
+
+val make_known_arity_apply_widget :
+  t ->
+  denv:Env.t ->
+  params:Simple.t list ->
+  returns:Variable.t list ->
+  exn:Variable.t ->
+  Code_id_or_name.t
+
+val create_unknown_arity_call_witnesses :
+  t ->
+  Code_id.t ->
+  is_tupled:bool ->
+  arity:[`Complex] Flambda_arity.t ->
+  params:Variable.t list ->
+  returns:Variable.t list ->
+  exn:Variable.t ->
+  Code_id_or_name.t list
+
+val make_unknown_arity_apply_widget :
+  t ->
+  denv:Env.t ->
+  arity:[`Complex] Flambda_arity.t ->
+  params:Simple.t list ->
+  returns:Variable.t list ->
+  exn:Variable.t ->
+  Code_id_or_name.t
+
+val add_set_of_closures_dep :
+  Name.t -> Code_id.t -> only_full_applications:bool -> t -> unit
 
 val add_code : Code_id.t -> code_dep -> t -> unit
 
@@ -90,4 +139,4 @@ val code_deps : t -> code_dep Code_id.Map.t
 
 val graph : t -> Graph.graph
 
-val deps : t -> Graph.graph
+val deps : t -> all_constants:Name.t -> Graph.graph

@@ -17,6 +17,7 @@
 (* Pseudo-random number generator *)
 
 open! Stdlib
+module DLS = Domain.Safe.DLS
 
 [@@@ocaml.flambda_o3]
 
@@ -341,8 +342,10 @@ let mk_default () =
            (-8591268803865043407L)
            6388613595849772044L
 
-module DLS = Domain.Safe.DLS
-
+(* CR-soon mslater: this is safe since the state is only updated by a C call
+   that cannot be preempted, we do not yield, and we do not borrow the state.
+   However, it will not be deterministic in the presence of threads, so it 
+   should be converted to TLS. *)
 let random_key =
   DLS.new_key
     ~split_from_parent:(fun s ->
@@ -350,14 +353,10 @@ let random_key =
       (fun () -> Obj.magic_uncontended s))
     mk_default
 
-let[@inline] apply0 f () = DLS.access (fun access -> f (DLS.get access random_key))
-
-let[@inline] apply1 (type (a : value mod portable contended)) (f : State.t -> a -> a) v =
-  DLS.access (fun access -> f (DLS.get access random_key) v)
-
-let[@inline] apply_in_range (type (a : value mod portable contended))
-      (f : State.t -> min:a -> max:a -> a) ~min ~max =
-  DLS.access (fun access -> f (DLS.get access random_key) ~min ~max)
+let[@inline] apply0 f () = f (Obj.magic_uncontended (DLS.get random_key))
+let[@inline] apply1 f v =  f (Obj.magic_uncontended (DLS.get random_key)) v
+let[@inline] apply_in_range f ~min ~max = 
+  f (Obj.magic_uncontended (DLS.get random_key)) ~min ~max
 
 let bits = apply0 State.bits
 let int = apply1 State.int
@@ -374,28 +373,15 @@ let bool = apply0 State.bool
 let bits32 = apply0 State.bits32
 let bits64 = apply0 State.bits64
 let nativebits = apply0 State.nativebits
-
-let full_init (seed : int array @ uncontended) =
-  DLS.access (fun access ->
-    State.reinit
-      (DLS.get access random_key)
-      (Obj.magic_uncontended seed))
-
+let full_init seed = apply1 State.reinit seed
 let init seed = full_init [| seed |]
-let self_init () = full_init (random_seed())
+let self_init () = full_init (random_seed ())
 
 (* Splitting *)
 
-let split () =
-  DLS.access (fun access -> State.split (DLS.get access random_key))
-  |> Obj.magic_uncontended
+let split = apply0 State.split
 
 (* Manipulating the current state. *)
 
-let get_state () =
-  DLS.access (fun access -> State.copy (DLS.get access random_key))
-  |> Obj.magic_uncontended
-
-let set_state s =
-  DLS.access (fun access ->
-    State.assign (DLS.get access random_key) (Obj.magic_uncontended s))
+let get_state = apply0 State.copy
+let set_state s = apply1 State.assign s

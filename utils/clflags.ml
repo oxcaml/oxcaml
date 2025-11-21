@@ -44,29 +44,68 @@ and dllibs = ref ([] : string list)     (* .so and -dllib -lxxx *)
 
 let cmi_file = ref None
 
-module Libloc = struct
-  type t = {
-    path: string;
-    libs: string list;
-    hidden_libs: string list
-  }
-end
-
 type profile_column = [ `Time | `Alloc | `Top_heap | `Abs_top_heap | `Counters ]
 type profile_granularity_level = File_level | Function_level | Block_level
 type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
+type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
+
+module Dwarf_config_defaults = struct
+  let shape_reduce_depth = Some 2
+  let shape_eval_depth = Some 2
+  let max_cms_files_per_unit = Some 20
+  let max_cms_files_per_variable = Some 5
+  let max_type_to_shape_depth = Some 10
+  let max_shape_reduce_steps_per_variable = Some 1000
+  let max_evaluation_steps_per_variable = Some 1_000_000
+  let shape_reduce_fuel = Some 10
+end
+type shape_format = Old_merlin | Debugging_shapes
+type gdwarf_fidelity =
+  | Fidelity_low | Fidelity_medium
+  | Fidelity_high | Fidelity_very_high | Fidelity_ultra_high
+  | Fidelity_unlimited
 
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
 and include_dirs = ref ([] : string list)  (* -I *)
-and libloc = ref ([] : Libloc.t list) (* -libloc *)
 and hidden_include_dirs = ref ([] : string list) (* -H *)
+and include_paths_files = ref ([] : string list) (* -I-paths *)
+and hidden_include_paths_files = ref ([] : string list) (* -H-paths *)
 and no_std_include = ref false          (* -nostdlib *)
 and no_cwd = ref false                  (* -nocwd *)
 and print_types = ref false             (* -i *)
 and make_archive = ref false            (* -a *)
 and debug = ref false                   (* -g *)
 and debug_full = ref false              (* For full DWARF support *)
+and dwarf_c_toolchain_flag = ref ""     (* DWARF compression flag for C *)
+and dwarf_fission = ref Fission_none    (* -gdwarf-fission=... *)
+and dwarf_pedantic = ref false          (* -gdwarf-pedantic *)
+and gdwarf_config_shape_reduce_depth =
+  ref Dwarf_config_defaults.shape_reduce_depth
+  (* -gdwarf-config-shape-reduce-depth *)
+and gdwarf_config_shape_eval_depth =
+  ref Dwarf_config_defaults.shape_eval_depth
+  (* -gdwarf-config-shape-eval-depth *)
+and gdwarf_config_max_cms_files_per_unit =
+  ref Dwarf_config_defaults.max_cms_files_per_unit
+  (* -gdwarf-config-max-cms-files-per-unit *)
+and gdwarf_config_max_cms_files_per_variable =
+  ref Dwarf_config_defaults.max_cms_files_per_variable
+  (* -gdwarf-config-max-cms-files-per-variable *)
+and gdwarf_config_max_type_to_shape_depth =
+  ref Dwarf_config_defaults.max_type_to_shape_depth
+  (* -gdwarf-config-max-type-to-shape-depth *)
+and gdwarf_config_max_shape_reduce_steps_per_variable =
+  ref Dwarf_config_defaults.max_shape_reduce_steps_per_variable
+  (* -gdwarf-config-max-shape-reduce-steps-per-variable *)
+and gdwarf_config_max_evaluation_steps_per_variable =
+  ref Dwarf_config_defaults.max_evaluation_steps_per_variable
+  (* -gdwarf-config-max-evaluation-steps-per-variable *)
+and gdwarf_config_shape_reduce_fuel =
+  ref Dwarf_config_defaults.shape_reduce_fuel
+  (* -gdwarf-config-shape-reduce-fuel *)
+and gdwarf_fidelity = ref (None : gdwarf_fidelity option)
+  (* -gdwarf-fidelity *)
 and unsafe = ref false                  (* -unsafe *)
 and use_linscan = ref false             (* -linscan *)
 and link_everything = ref false         (* -linkall *)
@@ -88,6 +127,8 @@ let directory = ref None                (* -directory *)
 let annotations = ref false             (* -annot *)
 let binary_annotations = ref false      (* -bin-annot *)
 let binary_annotations_cms = ref false  (* -bin-annot-cms *)
+let shape_format =                      (* -shape-format *)
+  ref (if Config.oxcaml_dwarf then Debugging_shapes else Old_merlin)
 let store_occurrences = ref false       (* -bin-annot-occurrences *)
 and use_threads = ref false             (* -thread *)
 and noassert = ref false                (* -noassert *)
@@ -127,8 +168,10 @@ let dump_source = ref false             (* -dsource *)
 let dump_parsetree = ref false          (* -dparsetree *)
 and dump_typedtree = ref false          (* -dtypedtree *)
 and dump_shape = ref false              (* -dshape *)
+and dump_slambda = ref false            (* -dslambda *)
 and dump_rawlambda = ref false          (* -drawlambda *)
 and dump_lambda = ref false             (* -dlambda *)
+and dump_blambda = ref false             (* -dblambda *)
 and dump_letreclambda = ref false       (* -dletreclambda *)
 and dump_rawclambda = ref false         (* -drawclambda *)
 and dump_clambda = ref false            (* -dclambda *)
@@ -136,6 +179,7 @@ and dump_rawflambda = ref false            (* -drawflambda *)
 and dump_flambda = ref false            (* -dflambda *)
 and dump_flambda_let = ref (None : int option) (* -dflambda-let=... *)
 and dump_flambda_verbose = ref false    (* -dflambda-verbose *)
+and dump_jsir = ref false               (* -djsir *)
 and dump_instr = ref false              (* -dinstr *)
 and keep_camlprimc_file = ref false     (* -dcamlprimc *)
 
@@ -148,6 +192,7 @@ let dump_cse = ref false                (* -dcse *)
 let dump_linear = ref false             (* -dlinear *)
 let keep_startup_file = ref false       (* -dstartup *)
 let debug_ocaml = ref false             (* -debug-ocaml *)
+let llvm_backend = ref false            (* -llvm-backend *)
 let default_timings_precision  = 3
 let timings_precision = ref default_timings_precision (* -dtimings-precision *)
 let profile_columns : profile_column list ref = ref [] (* -dprofile/-dtimings/-dcounters *)
@@ -167,6 +212,7 @@ let set_profile_granularity v =
   | None -> raise (Invalid_argument (Format.sprintf "profile granularity: %s" v))
 
 let native_code = ref false             (* set to true under ocamlopt *)
+let jsir = ref false                    (* set to true under ocamlj *)
 
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)
@@ -218,6 +264,83 @@ let rounds () =
   match !simplify_rounds with
   | None -> !default_simplify_rounds
   | Some r -> r
+
+let gdwarf_fidelity_of_string s =
+  match String.lowercase_ascii s with
+  | "low" -> Some Fidelity_low
+  | "medium" -> Some Fidelity_medium
+  | "high" -> Some Fidelity_high
+  | "very-high" -> Some Fidelity_very_high
+  | "ultra-high" -> Some Fidelity_ultra_high
+  | "unlimited" -> Some Fidelity_unlimited
+  | _ -> None
+
+let set_gdwarf_fidelity fidelity =
+  gdwarf_fidelity := Some fidelity;
+  match fidelity with
+  | Fidelity_low ->
+      gdwarf_config_shape_eval_depth := Some 1;
+      gdwarf_config_shape_reduce_depth := Some 2;
+      gdwarf_config_max_cms_files_per_unit := Some 0;
+      gdwarf_config_max_cms_files_per_variable := Some 0;
+      gdwarf_config_max_type_to_shape_depth := Some 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := Some 100;
+      gdwarf_config_max_evaluation_steps_per_variable := Some 1000;
+      gdwarf_config_shape_reduce_fuel := Some 10
+  | Fidelity_medium ->
+      (* The default. *)
+      gdwarf_config_shape_eval_depth :=
+        Dwarf_config_defaults.shape_eval_depth;
+      gdwarf_config_shape_reduce_depth :=
+        Dwarf_config_defaults.shape_reduce_depth;
+      gdwarf_config_max_cms_files_per_unit :=
+        Dwarf_config_defaults.max_cms_files_per_unit;
+      gdwarf_config_max_cms_files_per_variable :=
+        Dwarf_config_defaults.max_cms_files_per_variable;
+      gdwarf_config_max_type_to_shape_depth :=
+        Dwarf_config_defaults.max_type_to_shape_depth;
+      gdwarf_config_max_shape_reduce_steps_per_variable :=
+        Dwarf_config_defaults.max_shape_reduce_steps_per_variable;
+      gdwarf_config_max_evaluation_steps_per_variable :=
+        Dwarf_config_defaults.max_evaluation_steps_per_variable;
+      gdwarf_config_shape_reduce_fuel :=
+        Dwarf_config_defaults.shape_reduce_fuel
+  | Fidelity_high ->
+      gdwarf_config_shape_eval_depth := Some 3;
+      gdwarf_config_shape_reduce_depth := Some 3;
+      gdwarf_config_max_cms_files_per_unit := Some 50;
+      gdwarf_config_max_cms_files_per_variable := Some 10;
+      gdwarf_config_max_type_to_shape_depth := Some 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := Some (10_000);
+      gdwarf_config_max_evaluation_steps_per_variable := Some (1_000_000_000);
+      gdwarf_config_shape_reduce_fuel := Some 20
+  | Fidelity_very_high ->
+      gdwarf_config_shape_eval_depth := Some 4;
+      gdwarf_config_shape_reduce_depth := Some 3;
+      gdwarf_config_max_cms_files_per_unit := Some 100;
+      gdwarf_config_max_cms_files_per_variable := Some 10;
+      gdwarf_config_max_type_to_shape_depth := Some 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := None;
+      gdwarf_config_max_evaluation_steps_per_variable := None;
+      gdwarf_config_shape_reduce_fuel := None
+  | Fidelity_ultra_high ->
+      gdwarf_config_shape_eval_depth := Some 5;
+      gdwarf_config_shape_reduce_depth := Some 5;
+      gdwarf_config_max_cms_files_per_unit := Some 1000;
+      gdwarf_config_max_cms_files_per_variable := Some 50;
+      gdwarf_config_max_type_to_shape_depth := Some 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := None;
+      gdwarf_config_max_evaluation_steps_per_variable := None;
+      gdwarf_config_shape_reduce_fuel := None
+  | Fidelity_unlimited ->
+      gdwarf_config_shape_eval_depth := None;
+      gdwarf_config_shape_reduce_depth := None;
+      gdwarf_config_max_cms_files_per_unit := None;
+      gdwarf_config_max_cms_files_per_variable := None;
+      gdwarf_config_max_type_to_shape_depth := None;
+      gdwarf_config_max_shape_reduce_steps_per_variable := None;
+      gdwarf_config_max_evaluation_steps_per_variable := None;
+      gdwarf_config_shape_reduce_fuel := None
 
 let default_inline_threshold = if Config.flambda then 10. else 10. /. 8.
 let inline_toplevel_multiplier = 16
@@ -457,9 +580,13 @@ let error_style_reader = {
 
 let unboxed_types = ref false
 
-(* This is used by the -save-ir-after option. *)
+let dump_debug_uids = ref false         (* -ddebug-uids *)
+
+let dump_debug_uid_tables = ref false    (* -ddebug-uid-tables *)
+
+(* This is used by the -save-ir-after and -save-ir-before options. *)
 module Compiler_ir = struct
-  type t = Linear | Cfg
+  type t = Linear | Cfg | Llvmir
 
   let all = [
     Linear; Cfg
@@ -468,6 +595,7 @@ module Compiler_ir = struct
   let to_string = function
     | Linear -> "linear"
     | Cfg -> "cfg"
+    | Llvmir -> "ll"
 
   let extension t = ".cmir-" ^ (to_string t)
 
@@ -499,7 +627,7 @@ module Compiler_ir = struct
 end
 
 let is_flambda2 () =
-  Config.flambda2 && !native_code
+  Config.flambda2 && (!native_code || !jsir)
 
 module Opt_flag_handler = struct
   type t = {
@@ -547,6 +675,7 @@ module Compiler_pass = struct
   *)
   type t = Parsing | Typing | Lambda | Middle_end
          | Linearization | Emit | Simplify_cfg | Selection
+         | Register_allocation | Llvmize
 
   let to_string = function
     | Parsing -> "parsing"
@@ -557,6 +686,8 @@ module Compiler_pass = struct
     | Emit -> "emit"
     | Simplify_cfg -> "simplify_cfg"
     | Selection -> "selection"
+    | Register_allocation -> "register_allocation"
+    | Llvmize -> "llvmize"
 
   let of_string = function
     | "parsing" -> Some Parsing
@@ -567,6 +698,8 @@ module Compiler_pass = struct
     | "emit" -> Some Emit
     | "simplify_cfg" -> Some Simplify_cfg
     | "selection" -> Some Selection
+    | "register_allocation" -> Some Register_allocation
+    | "llvmize" -> Some Llvmize
     | _ -> None
 
   let rank = function
@@ -575,6 +708,8 @@ module Compiler_pass = struct
     | Lambda -> 2
     | Middle_end -> 3
     | Selection -> 20
+    | Llvmize -> 25
+    | Register_allocation -> 30
     | Simplify_cfg -> 49
     | Linearization -> 50
     | Emit -> 60
@@ -588,6 +723,8 @@ module Compiler_pass = struct
     Emit;
     Simplify_cfg;
     Selection;
+    Register_allocation;
+    Llvmize
   ]
   let is_compilation_pass _ = true
   let is_native_only = function
@@ -596,14 +733,23 @@ module Compiler_pass = struct
     | Emit -> true
     | Simplify_cfg -> true
     | Selection -> true
+    | Register_allocation -> true
     | Parsing | Typing | Lambda -> false
+    | Llvmize -> true
 
   let enabled is_native t = not (is_native_only t) || is_native
   let can_save_ir_after = function
     | Linearization -> true
     | Simplify_cfg -> true
     | Selection -> true
+    | Register_allocation -> false
     | Parsing | Typing | Lambda | Middle_end | Emit -> false
+    | Llvmize -> true
+
+    let can_save_ir_before = function
+    | Register_allocation -> true
+    | Linearization | Simplify_cfg | Selection
+    | Parsing | Typing | Lambda | Middle_end | Emit | Llvmize -> false
 
   let available_pass_names ~filter ~native =
     passes
@@ -619,12 +765,15 @@ module Compiler_pass = struct
     | Linearization -> prefix ^ Compiler_ir.(extension Linear)
     | Simplify_cfg -> prefix ^ Compiler_ir.(extension Cfg)
     | Selection -> prefix ^ Compiler_ir.(extension Cfg) ^ "-sel"
+    | Register_allocation ->  prefix ^ Compiler_ir.(extension Cfg) ^ "-regalloc"
+    | Llvmize -> prefix ^ Compiler_ir.(extension Llvmir)
     | Emit | Parsing | Typing | Lambda | Middle_end -> Misc.fatal_error "Not supported"
 
   let of_input_filename name =
     match Compiler_ir.extract_extension_with_pass name with
     | Some (Linear, _) -> Some Emit
     | Some (Cfg, _) -> None
+    | Some (Llvmir, _) -> Some Llvmize
     | None -> None
 end
 
@@ -638,19 +787,62 @@ let should_stop_after pass =
     | Some stop -> Compiler_pass.rank stop <= Compiler_pass.rank pass
 
 let save_ir_after = ref []
+let save_ir_before = ref []
 
 let should_save_ir_after pass =
   List.mem pass !save_ir_after
 
-let set_save_ir_after pass enabled =
-  let other_passes = List.filter ((<>) pass) !save_ir_after in
+let should_save_ir_before pass =
+  List.mem pass !save_ir_before
+
+let set_save_ir ref pass enabled =
+  let other_passes = List.filter ((<>) pass) !ref in
   let new_passes =
     if enabled then
       pass :: other_passes
     else
       other_passes
   in
-  save_ir_after := new_passes
+  ref := new_passes
+
+let set_save_ir_after pass enabled =
+  set_save_ir save_ir_after pass enabled
+
+let set_save_ir_before pass enabled =
+  set_save_ir save_ir_before pass enabled
+
+module Register_allocator = struct
+  type t =
+    | Cfg
+    | Irc
+    | Ls
+    | Gi
+
+  let all = [
+    Cfg;
+    Irc;
+    Ls;
+    Gi;
+  ]
+
+  let equal left right =
+    match left, right with
+    | Cfg, Cfg | Irc, Irc | Ls, Ls | Gi, Gi -> true
+    | (Cfg | Irc | Ls | Gi), _ -> false
+  
+  let to_string = function
+    | Cfg -> "cfg"
+    | Irc -> "irc"
+    | Ls -> "ls"
+    | Gi -> "gi"
+
+  let assoc_list = List.map (fun regalloc -> to_string regalloc, regalloc) all
+
+  let of_string s = List.assoc_opt (String.lowercase_ascii s) assoc_list
+  
+  let format ppf regalloc =
+    Format.fprintf ppf "%s" (to_string regalloc)
+end
 
 module String = Misc.Stdlib.String
 

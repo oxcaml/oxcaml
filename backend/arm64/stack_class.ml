@@ -1,4 +1,4 @@
-[@@@ocaml.warning "+a-30-40-41-42"]
+[@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
@@ -45,6 +45,8 @@ module T = struct
     | Val | Int | Addr -> Int64
     | Float | Float32 -> Float64
     | Vec128 | Valx2 -> Vector128
+    | Vec256 | Vec512 ->
+      Misc.fatal_error "Vec256 and Vec512 not supported on ARM64"
 end
 
 include T

@@ -23,7 +23,9 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-module DLL = Flambda_backend_utils.Doubly_linked_list
+[@@@ocaml.warning "+a-40-41-42"]
+
+module DLL = Oxcaml_utils.Doubly_linked_list
 module Int = Numbers.Int
 module V = Backend_var
 module VP = Backend_var.With_provenance
@@ -41,7 +43,7 @@ type static_handler =
 type environment =
   { vars :
       (Reg.t array * V.Provenance.t option * Asttypes.mutable_flag) V.Map.t;
-    static_exceptions : static_handler Int.Map.t;
+    static_exceptions : static_handler Static_label.Map.t;
     trap_stack : Operation.trap_stack;
     tailrec_label : Label.t
   }
@@ -56,7 +58,7 @@ val env_add :
   environment
 
 val env_add_static_exception :
-  Int.Map.key ->
+  Static_label.t ->
   Reg.t array list ->
   environment ->
   Label.t ->
@@ -70,7 +72,7 @@ val env_find_mut :
 val env_find_regs_for_exception_extra_args :
   Cmm.trywith_shared_label -> environment -> Reg.t array list
 
-val env_find_static_exception : Int.Map.key -> environment -> static_handler
+val env_find_static_exception : Static_label.t -> environment -> static_handler
 
 val env_set_trap_stack : environment -> Operation.trap_stack -> environment
 
@@ -98,10 +100,6 @@ val size_component : Cmx_format.machtype_component -> int
 val size_machtype : Cmx_format.machtype_component array -> int
 
 val size_expr : environment -> Cmm.expression -> int
-
-val swap_intcomp : Operation.integer_comparison -> Operation.integer_comparison
-
-val name_regs : VP.t -> Reg.t array -> unit
 
 val current_function_name : string ref
 
@@ -169,18 +167,15 @@ module Or_never_returns : sig
   end
 end
 
-val debug : bool
-
 val float_test_of_float_comparison :
   Cmm.float_width ->
-  Lambda.float_comparison ->
+  Scalar.Float_comparison.t ->
   label_false:Label.t ->
   label_true:Label.t ->
   Cfg.float_test
 
 val int_test_of_integer_comparison :
-  Lambda.integer_comparison ->
-  signed:bool ->
+  Scalar.Integer_comparison.t ->
   immediate:int option ->
   label_false:Label.t ->
   label_true:Label.t ->
@@ -189,32 +184,7 @@ val int_test_of_integer_comparison :
 val terminator_of_test :
   Operation.test -> label_false:Label.t -> label_true:Label.t -> Cfg.terminator
 
-val invalid_stack_offset : int
-
 module Stack_offset_and_exn : sig
-  type handler_stack = Label.t list
-
-  val compute_stack_offset : stack_offset:int -> traps:'a list -> int
-
-  val check_and_set_stack_offset :
-    'a Cfg.instruction -> stack_offset:int -> traps:handler_stack -> unit
-
-  val process_terminator :
-    stack_offset:int ->
-    traps:handler_stack ->
-    Cfg.terminator Cfg.instruction ->
-    int * handler_stack
-
-  val process_basic :
-    Cfg.t ->
-    stack_offset:int ->
-    traps:handler_stack ->
-    Cfg.basic Cfg.instruction ->
-    int * handler_stack
-
-  val update_block :
-    Cfg.t -> Label.t -> stack_offset:int -> traps:handler_stack -> unit
-
   val update_cfg : Cfg.t -> unit
 end
 
@@ -224,7 +194,6 @@ val make_name_for_debugger :
   ident:Ident.t ->
   which_parameter:int option ->
   provenance:Backend_var.Provenance.t option ->
-  is_assignment:bool ->
   regs:Reg.t array ->
   Cfg.basic
 
@@ -236,13 +205,13 @@ val make_const_float : int64 -> Operation.t
 
 val make_const_vec128 : Cmm.vec128_bits -> Operation.t
 
+val make_const_vec256 : Cmm.vec256_bits -> Operation.t
+
+val make_const_vec512 : Cmm.vec512_bits -> Operation.t
+
 val make_const_symbol : Cmm.symbol -> Operation.t
 
 val make_opaque : unit -> Operation.t
-
-val regs_for : Cmm.machtype -> Reg.t array
-
-val basic_op : Operation.t -> Cfg.basic_or_terminator
 
 val insert_debug :
   environment ->

@@ -2,7 +2,6 @@
  flambda2;
  include stdlib_upstream_compatible;
  {
-   flags = "-extension layouts_beta";
    expect;
  }
 *)
@@ -34,11 +33,8 @@ type t4_inner = #{ i : int; t4_inner2 : t4_inner2; co : char option }
 type t4 = #{ s : string; t4_inner : t4_inner }
 [%%expect{|
 type t4_inner2 = #{ b : bool; i : int; }
-Line 2, characters 0-69:
-2 | type t4_inner = #{ i : int; t4_inner2 : t4_inner2; co : char option }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "t4_inner2" has layout "value & value".
-       Records may not yet contain types of this layout.
+type t4_inner = #{ i : int; t4_inner2 : t4_inner2; co : char option; }
+type t4 = #{ s : string; t4_inner : t4_inner; }
 |}]
 
 (* But you can't put unboxed products into normal tuples (yet) *)
@@ -82,11 +78,7 @@ type t1 : float64 & value = #{ f : float#; b : bool }
 type t2 : value & (float64 & value) = #{ so : string option ; t1 : t1 }
 [%%expect{|
 type t1 = #{ f : float#; b : bool; }
-Line 2, characters 0-71:
-2 | type t2 : value & (float64 & value) = #{ so : string option ; t1 : t1 }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "t1" has layout "float64 & value".
-       Records may not yet contain types of this layout.
+type t2 = #{ so : string option; t1 : t1; }
 |}]
 
 type t2_wrong : value & float64 & value = #(string option * t1)
@@ -97,7 +89,7 @@ Line 1, characters 0-63:
 Error: The layout of type "#(string option * t1)" is value & (float64 & value)
          because it is an unboxed tuple.
        But the layout of type "#(string option * t1)" must be a sublayout of
-         value & float64 & value
+           value & float64 & value
          because of the definition of t2_wrong at line 1, characters 0-63.
 |}]
 
@@ -106,8 +98,11 @@ type t2_wrong : value & float64 & value = #{ so : string option; t1 : t1 }
 Line 1, characters 0-74:
 1 | type t2_wrong : value & float64 & value = #{ so : string option; t1 : t1 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "t1" has layout "float64 & value".
-       Records may not yet contain types of this layout.
+Error: The layout of type "t2_wrong" is value & (float64 & value)
+         because it is an unboxed record.
+       But the layout of type "t2_wrong" must be a sublayout of
+           value & float64 & value
+         because of the annotation on the declaration of the type t2_wrong.
 |}]
 
 type ('a : value & bits64) t3 = 'a
@@ -234,7 +229,7 @@ Error:
        The layout of t6_wrong_inner_record is any & any
          because it is an unboxed record.
        But the layout of t6_wrong_inner_record must be a sublayout of
-         value & bits64
+           value & bits64
          because of the annotation on 'a in the declaration of the type
                                       t6_wrong.
 |}]
@@ -340,11 +335,8 @@ type t1 = t1_left -> t1_right
 [%%expect{|
 type t1_left = #{ i : int; b : bool; }
 type t1_right_inner = #{ i64 : int64#; so : string option; }
-Line 3, characters 0-64:
-3 | type t1_right = #{ i : int; f : float#; inner : t1_right_inner }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "t1_right_inner" has layout "bits64 & value".
-       Records may not yet contain types of this layout.
+type t1_right = #{ i : int; f : float#; inner : t1_right_inner; }
+type t1 = t1_left -> t1_right
 |}]
 
 type make_record_result = #{ f : float#; s : string }
@@ -363,11 +355,9 @@ let f_pull_apart_an_unboxed_record (x : t) =
 type make_record_result = #{ f : float#; s : string; }
 val f_make_an_unboxed_record : string -> float# -> make_record_result = <fun>
 type inner = #{ f1 : float#; f2 : float#; }
-Line 5, characters 0-39:
-5 | type t = #{ s : string; inner : inner }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "inner" has layout "float64 & float64".
-       Records may not yet contain types of this layout.
+type t = #{ s : string; inner : inner; }
+val f_pull_apart_an_unboxed_record :
+  t -> Stdlib_upstream_compatible.Float_u.t = <fun>
 |}]
 
 
@@ -410,15 +400,46 @@ end
 [%%expect{|
 module type S =
   sig type a type b type c type d type e type f type g type h end
-Line 15, characters 2-62:
-15 |   type mix_input_inner = #{ c : c; inner2 : mix_input_inner2 }
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "mix_input_inner2" has layout "value & value".
-       Records may not yet contain types of this layout.
+module F :
+  functor (X : S) ->
+    sig
+      type a = X.a
+      type b = X.b
+      type c = X.c
+      type d = X.d
+      type e = X.e
+      type f = X.f
+      type g = X.g
+      type h = X.h
+      type mix_input_inner2 = #{ d : d; e : e; }
+      type mix_input_inner = #{ c : c; inner2 : mix_input_inner2; }
+      type mix_input = #{ a : a; b : b; inner : mix_input_inner; f : f; }
+      type mix_output_inner2 = #{ f : f; e : e; }
+      type mix_output_inner = #{ c : c; inner2 : mix_output_inner2; }
+      type mix_output = #{ b : b; inner : mix_output_inner; a : a; d : d; }
+      val f_mix_up_an_unboxed_record : mix_input -> mix_output
+      type take_few_input1 = #{ a : a; b : b; }
+      type take_few_input3 = #{ d : d; e : e; }
+      type take_few_input5 = #{ g : g; h : h; }
+      type take_few_output = #{
+        h : h;
+        g2 : g;
+        x4 : f;
+        e2 : e;
+        d : d;
+        x2 : c;
+        b : b;
+        a2 : a;
+      }
+      val f_take_a_few_unboxed_records :
+        take_few_input1 ->
+        c -> take_few_input3 -> f -> take_few_input5 -> take_few_output
+    end
 |}]
 
-(***************************************************)
-(* Test 4: Unboxed products don't go in structures *)
+(***************************************************************************)
+(* Test 4: Unboxed products can go blocks that are nominally typed, but not
+   structurally typed. *)
 
 type poly_var_type = [ `Foo of #(int * bool) ]
 [%%expect{|
@@ -439,7 +460,8 @@ Line 1, characters 25-31:
                              ^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is '_representable_layout_1 & '_representable_layout_2
+       The layout of #('a * 'b) is
+           '_representable_layout_1 & '_representable_layout_2
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of the field of a polymorphic variant.
@@ -464,7 +486,8 @@ Line 1, characters 24-31:
                             ^^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is '_representable_layout_3 & '_representable_layout_4
+       The layout of #('a * 'b) is
+           '_representable_layout_3 & '_representable_layout_4
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of a tuple element.
@@ -472,29 +495,17 @@ Error: This expression has type "#('a * 'b)"
 
 type record = { x : #(int * bool) }
 [%%expect{|
-Line 1, characters 0-35:
-1 | type record = { x : #(int * bool) }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "#(int * bool)" has layout "value & value".
-       Records may not yet contain types of this layout.
+type record = { x : #(int * bool); }
 |}]
 
 type inlined_record = A of { x : #(int * bool) }
 [%%expect{|
-Line 1, characters 22-48:
-1 | type inlined_record = A of { x : #(int * bool) }
-                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "#(int * bool)" has layout "value & value".
-       Inlined records may not yet contain types of this layout.
+type inlined_record = A of { x : #(int * bool); }
 |}]
 
 type variant = A of #(int * bool)
 [%%expect{|
-Line 1, characters 15-33:
-1 | type variant = A of #(int * bool)
-                   ^^^^^^^^^^^^^^^^^^
-Error: Type "#(int * bool)" has layout "value & value".
-       Variants may not yet contain types of this layout.
+type variant = A of #(int * bool)
 |}]
 
 module type S = sig
@@ -556,7 +567,8 @@ Line 3, characters 15-21:
                    ^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value)"
-       The layout of #('a * 'b) is '_representable_layout_5 & '_representable_layout_6
+       The layout of #('a * 'b) is
+           '_representable_layout_5 & '_representable_layout_6
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of an object field.
@@ -573,7 +585,8 @@ Line 3, characters 17-21:
                      ^^^^
 Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "#('b * 'c)"
-       The layout of #('a * 'b) is '_representable_layout_7 & '_representable_layout_8
+       The layout of #('a * 'b) is
+           '_representable_layout_7 & '_representable_layout_8
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of a variable captured in an object.
@@ -643,33 +656,21 @@ type record_inner = #{ i : int; b : bool }
 type record = { x : record_inner }
 [%%expect{|
 type record_inner = #{ i : int; b : bool; }
-Line 2, characters 0-34:
-2 | type record = { x : record_inner }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "record_inner" has layout "value & value".
-       Records may not yet contain types of this layout.
+type record = { x : record_inner; }
 |}]
 
 type inlined_inner = #{ i : int; b : bool }
 type inlined_record = A of { x : inlined_inner }
 [%%expect{|
 type inlined_inner = #{ i : int; b : bool; }
-Line 2, characters 22-48:
-2 | type inlined_record = A of { x : inlined_inner }
-                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "inlined_inner" has layout "value & value".
-       Inlined records may not yet contain types of this layout.
+type inlined_record = A of { x : inlined_inner; }
 |}]
 
 type variant_inner = #{ i : int; b : bool }
 type variant = A of variant_inner
 [%%expect{|
 type variant_inner = #{ i : int; b : bool; }
-Line 2, characters 15-33:
-2 | type variant = A of variant_inner
-                   ^^^^^^^^^^^^^^^^^^
-Error: Type "variant_inner" has layout "value & value".
-       Variants may not yet contain types of this layout.
+type variant = A of variant_inner
 |}]
 
 type sig_inner = #{ i : int; b : bool }
@@ -798,12 +799,12 @@ class class_with_urecord_manipulating_method :
 (*******************************************)
 (* Test 6: Nested expansion in kind checks *)
 
-(* This test shows that the [check_coherence] check in Typedecl can look deeply
-   into a product kind. That check is reached in this case because the
-   algorithm in typedecl assumes the annotation is correct initially, and then
-   it is checked in [check_coherence]. This relies on [type_jkind] doing
-   deep expansion, as [check_coherence] calls it and then [Jkind.sub], rather
-   than using [check_type_jkind]. *)
+(* This test shows that the [narrow_to_manifest_jkind] check in Typedecl can
+   look deeply into a product kind. That check is reached in this case because
+   the algorithm in typedecl assumes the annotation is correct initially, and
+   then it is checked in [narrow_to_manifest_jkind]. This relies on [type_jkind]
+   doing deep expansion, as [narrow_to_manifest_jkind] calls it and then
+   [Jkind.sub], rather than using [check_type_jkind]. *)
 module type S_coherence_deep = sig
   type t1 : any
   type t2 = #(int * t1)
@@ -949,7 +950,7 @@ let f_external_utuple_mode_crosses_local_1
   : local_ #(int * int) -> #(int * int) = fun x -> x
 [%%expect{|
 val f_external_utuple_mode_crosses_local_1 :
-  local_ #(int * int) -> #(int * int) = <fun>
+  #(int * int) @ local -> #(int * int) = <fun>
 |}]
 
 let f_internal_utuple_does_not_mode_cross_local_1
@@ -958,14 +959,14 @@ let f_internal_utuple_does_not_mode_cross_local_1
 Line 2, characters 57-58:
 2 |   : local_ #(int * string) -> #(int * string) = fun x -> x
                                                              ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let f_external_utuple_mode_crosses_local_2
   : local_ #(int * #(bool * int)) -> #(int * #(bool * int)) = fun x -> x
 [%%expect{|
 val f_external_utuple_mode_crosses_local_2 :
-  local_ #(int * #(bool * int)) -> #(int * #(bool * int)) = <fun>
+  #(int * #(bool * int)) @ local -> #(int * #(bool * int)) = <fun>
 |}]
 
 let f_internal_utuple_does_not_mode_cross_local_2
@@ -974,7 +975,7 @@ let f_internal_utuple_does_not_mode_cross_local_2
 Line 2, characters 77-78:
 2 |   : local_ #(int * #(bool * string)) -> #(int * #(bool * string)) = fun x -> x
                                                                                  ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 type t = #(int * int)
@@ -983,7 +984,7 @@ let f_external_utuple_mode_crosses_local_3
 [%%expect{|
 type t = #(int * int)
 val f_external_utuple_mode_crosses_local_3 :
-  local_ #(int * #(t * int)) -> #(int * #(t * int)) = <fun>
+  #(int * #(t * int)) @ local -> #(int * #(t * int)) = <fun>
 |}]
 
 type t = #(string * int)
@@ -994,7 +995,7 @@ type t = #(string * int)
 Line 3, characters 67-68:
 3 |   : local_ #(int * #(t * bool)) -> #(int * #(t * bool)) = fun x -> x
                                                                        ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (* Unboxed records version of the same test *)
@@ -1005,7 +1006,7 @@ let f_external_urecord_mode_crosses_local_1
 [%%expect{|
 type local_cross1 = #{ i1 : int; i2 : int; }
 val f_external_urecord_mode_crosses_local_1 :
-  local_ local_cross1 -> local_cross1 = <fun>
+  local_cross1 @ local -> local_cross1 = <fun>
 |}]
 
 type local_nocross1 = #{ i : int; s : string }
@@ -1016,7 +1017,7 @@ type local_nocross1 = #{ i : int; s : string; }
 Line 3, characters 55-56:
 3 |   : local_ local_nocross1 -> local_nocross1 = fun x -> x
                                                            ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 type local_cross2_inner = #{ b : bool; i : int }
@@ -1025,11 +1026,9 @@ let f_external_urecord_mode_crosses_local_2
   : local_ local_cross2 -> local_cross2 = fun x -> x
 [%%expect{|
 type local_cross2_inner = #{ b : bool; i : int; }
-Line 2, characters 0-60:
-2 | type local_cross2 = #{ i : int; inner : local_cross2_inner }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "local_cross2_inner" has layout "value & value".
-       Records may not yet contain types of this layout.
+type local_cross2 = #{ i : int; inner : local_cross2_inner; }
+val f_external_urecord_mode_crosses_local_2 :
+  local_cross2 @ local -> local_cross2 = <fun>
 |}]
 
 type local_nocross2_inner = #{ b : bool; s : string }
@@ -1038,11 +1037,11 @@ let f_internal_urecord_does_not_mode_cross_local_2
   : local_ local_nocross2 -> local_nocross2 = fun x -> x
 [%%expect{|
 type local_nocross2_inner = #{ b : bool; s : string; }
-Line 2, characters 0-64:
-2 | type local_nocross2 = #{ i : int; inner : local_nocross2_inner }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "local_nocross2_inner" has layout "value & value".
-       Records may not yet contain types of this layout.
+type local_nocross2 = #{ i : int; inner : local_nocross2_inner; }
+Line 4, characters 55-56:
+4 |   : local_ local_nocross2 -> local_nocross2 = fun x -> x
+                                                           ^
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 type t = #{ i1 : int; i2 : int }
@@ -1052,11 +1051,10 @@ let f_external_urecord_mode_crosses_local_3
   : local_ local_cross3 -> local_cross3 = fun x -> x
 [%%expect{|
 type t = #{ i1 : int; i2 : int; }
-Line 2, characters 0-45:
-2 | type local_cross3_inner = #{ t : t; i : int }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "t" has layout "value & value".
-       Records may not yet contain types of this layout.
+type local_cross3_inner = #{ t : t; i : int; }
+type local_cross3 = #{ i : int; inner : local_cross3_inner; }
+val f_external_urecord_mode_crosses_local_3 :
+  local_cross3 @ local -> local_cross3 = <fun>
 |}]
 
 type t = #{ s : string; i : int }
@@ -1066,11 +1064,12 @@ let f_internal_urecord_does_not_mode_cross_local_3
   : local_ local_nocross3 -> local_nocross3 = fun x -> x
 [%%expect{|
 type t = #{ s : string; i : int; }
-Line 2, characters 0-48:
-2 | type local_nocross3_inner = #{ t : t; b : bool }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "t" has layout "value & value".
-       Records may not yet contain types of this layout.
+type local_nocross3_inner = #{ t : t; b : bool; }
+type local_nocross3 = #{ i : int; inner : local_nocross3_inner; }
+Line 5, characters 55-56:
+5 |   : local_ local_nocross3 -> local_nocross3 = fun x -> x
+                                                           ^
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (****************************************************)
@@ -1081,7 +1080,7 @@ let f_external_kind_annot_mode_crosses_local_1
   : local_ t -> t = fun x -> x
 [%%expect{|
 type t : float64 mod global & float64 mod global
-val f_external_kind_annot_mode_crosses_local_1 : local_ t -> t = <fun>
+val f_external_kind_annot_mode_crosses_local_1 : t @ local -> t = <fun>
 |}]
 
 type t : float64 & value
@@ -1092,15 +1091,17 @@ type t : float64 & value
 Line 3, characters 29-30:
 3 |   : local_ t -> t = fun x -> x
                                  ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 type t : immediate & ((float64 mod global) & immediate)
 let f_external_kind_annot_mode_crosses_local_2
   : local_ t -> t = fun x -> x
 [%%expect{|
-type t : value mod global & (float64 mod global & value mod global)
-val f_external_kind_annot_mode_crosses_local_2 : local_ t -> t = <fun>
+type t
+  : value mod global non_float
+    & (float64 mod global & value mod global non_float)
+val f_external_kind_annot_mode_crosses_local_2 : t @ local -> t = <fun>
 |}]
 
 type t : immediate & (value & float64)
@@ -1111,32 +1112,52 @@ type t : value & (value & float64)
 Line 3, characters 29-30:
 3 |   : local_ t -> t = fun x -> x
                                  ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (*********************)
 (* Test 9: externals *)
 
+(* This test checks that we're correctly enforcing the limitations on products
+   in externals.  Those restrictions say:
+   - For C stubs
+     - No products in arguments
+     - Products in returns can only have two elements.
+   - For layout poly primitives
+     - No restrictions
+*)
+
 type t_product : value & value
+type t_product_3 : value & value & value
 
 external ext_tuple_arg : #(int * bool) -> int = "foo" "bar"
 [%%expect{|
 type t_product : value & value
-Line 3, characters 25-45:
-3 | external ext_tuple_arg : #(int * bool) -> int = "foo" "bar"
+type t_product_3 : value & value & value
+Line 4, characters 25-45:
+4 | external ext_tuple_arg : #(int * bool) -> int = "foo" "bar"
                              ^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
-external ext_tuple_arg_with_attr : (#(int * bool) [@unboxed]) -> int = "foo"
+external ext_tuple_arg_with_attr_u : (#(int * bool) [@unboxed]) -> int = "foo"
 [%%expect{|
-Line 1, characters 36-49:
-1 | external ext_tuple_arg_with_attr : (#(int * bool) [@unboxed]) -> int = "foo"
-                                        ^^^^^^^^^^^^^
+Line 1, characters 38-51:
+1 | external ext_tuple_arg_with_attr_u : (#(int * bool) [@unboxed]) -> int = "foo"
+                                          ^^^^^^^^^^^^^
 Error: Don't know how to unbox this type.
        Only "float", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
+|}]
+
+external ext_tuple_arg_with_attr_t : (#(int * bool) [@untagged]) -> int = "foo"
+[%%expect{|
+Line 1, characters 38-51:
+1 | external ext_tuple_arg_with_attr_t : (#(int * bool) [@untagged]) -> int = "foo"
+                                          ^^^^^^^^^^^^^
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}]
 
 external ext_product_arg : t_product -> int = "foo" "bar"
@@ -1148,52 +1169,110 @@ Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
-external ext_product_arg_with_attr : (t_product [@unboxed]) -> int = "foo"
+external ext_product_arg_3 : t_product_3 -> int = "foo" "bar"
 [%%expect{|
-Line 1, characters 38-47:
-1 | external ext_product_arg_with_attr : (t_product [@unboxed]) -> int = "foo"
-                                          ^^^^^^^^^
+Line 1, characters 29-47:
+1 | external ext_product_arg_3 : t_product_3 -> int = "foo" "bar"
+                                 ^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+|}]
+
+external ext_product_arg_with_attr_u : (t_product [@unboxed]) -> int = "foo"
+[%%expect{|
+Line 1, characters 40-49:
+1 | external ext_product_arg_with_attr_u : (t_product [@unboxed]) -> int = "foo"
+                                            ^^^^^^^^^
 Error: Don't know how to unbox this type.
        Only "float", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
+|}]
+
+external ext_product_arg_with_attr_t : (t_product [@untagged]) -> int = "foo"
+[%%expect{|
+Line 1, characters 40-49:
+1 | external ext_product_arg_with_attr_t : (t_product [@untagged]) -> int = "foo"
+                                            ^^^^^^^^^
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}]
 
 external ext_tuple_return : int -> #(int * bool) = "foo" "bar"
 [%%expect{|
-Line 1, characters 28-48:
-1 | external ext_tuple_return : int -> #(int * bool) = "foo" "bar"
-                                ^^^^^^^^^^^^^^^^^^^^
+external ext_tuple_return : int -> #(int * bool) = "foo" "bar"
+|}]
+
+external ext_triple_return : int -> #(int * bool * string) = "foo" "bar"
+[%%expect{|
+Line 1, characters 29-58:
+1 | external ext_triple_return : int -> #(int * bool * string) = "foo" "bar"
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
-external ext_tuple_return_with_attr : int -> (#(int * bool) [@unboxed]) = "foo"
+external ext_nested_tuple_return : int -> #(int * #(int * bool)) = "foo" "bar"
 [%%expect{|
-Line 1, characters 46-59:
-1 | external ext_tuple_return_with_attr : int -> (#(int * bool) [@unboxed]) = "foo"
-                                                  ^^^^^^^^^^^^^
+Line 1, characters 35-64:
+1 | external ext_nested_tuple_return : int -> #(int * #(int * bool)) = "foo" "bar"
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+|}]
+
+external ext_tuple_return_with_attr_u :
+  int -> (#(int * bool) [@unboxed]) = "foo"
+[%%expect{|
+Line 2, characters 10-23:
+2 |   int -> (#(int * bool) [@unboxed]) = "foo"
+              ^^^^^^^^^^^^^
 Error: Don't know how to unbox this type.
        Only "float", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
+
+external ext_tuple_return_with_attr_t :
+  int -> (#(int * bool) [@untagged]) = "foo"
+[%%expect{|
+Line 2, characters 10-23:
+2 |   int -> (#(int * bool) [@untagged]) = "foo"
+              ^^^^^^^^^^^^^
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
+|}]
+
 
 external ext_product_return : int -> t_product = "foo" "bar"
 [%%expect{|
-Line 1, characters 30-46:
-1 | external ext_product_return : int -> t_product = "foo" "bar"
-                                  ^^^^^^^^^^^^^^^^
+external ext_product_return : int -> t_product = "foo" "bar"
+|}]
+
+external ext_product_return_3 : int -> t_product_3 = "foo" "bar"
+[%%expect{|
+Line 1, characters 32-50:
+1 | external ext_product_return_3 : int -> t_product_3 = "foo" "bar"
+                                    ^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
-external ext_product_return_with_attr : int -> (t_product [@unboxed]) = "foo"
+external ext_product_return_with_attr_u : int -> (t_product [@unboxed]) = "foo"
 [%%expect{|
-Line 1, characters 48-57:
-1 | external ext_product_return_with_attr : int -> (t_product [@unboxed]) = "foo"
-                                                    ^^^^^^^^^
+Line 1, characters 50-59:
+1 | external ext_product_return_with_attr_u : int -> (t_product [@unboxed]) = "foo"
+                                                      ^^^^^^^^^
 Error: Don't know how to unbox this type.
        Only "float", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
+|}]
+
+external ext_product_return_with_attr_t : int -> (t_product [@untagged]) = "foo"
+[%%expect{|
+Line 1, characters 50-59:
+1 | external ext_product_return_with_attr_t : int -> (t_product [@untagged]) = "foo"
+                                                      ^^^^^^^^^
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}]
 
 external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity"
@@ -1206,93 +1285,108 @@ external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
 val sum : int = 3
 |}]
 
-(* Unboxed records version of the same test *)
+let sum =
+  let #(x,y,z) = id #(1,2,3) in
+  x + y + z
+[%%expect{|
+val sum : int = 6
+|}]
 
-type t_product : value & value
+(* Unboxed records version of the same test *)
 
 type ext_record_arg_record = #{ i : int; b : bool }
 external ext_record_arg : ext_record_arg_record -> int = "foo" "bar"
 [%%expect{|
-type t_product : value & value
 type ext_record_arg_record = #{ i : int; b : bool; }
-Line 4, characters 26-54:
-4 | external ext_record_arg : ext_record_arg_record -> int = "foo" "bar"
+Line 2, characters 26-54:
+2 | external ext_record_arg : ext_record_arg_record -> int = "foo" "bar"
                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
-type ext_record_arg_attr_record = #{ i : int; b : bool }
-external ext_record_arg_with_attr : (ext_record_arg_attr_record [@unboxed]) -> int = "foo"
+type ext_record_arg_record_3 = #{ i : int; b : bool; s : string }
+external ext_record_arg_3 : ext_record_arg_record_3 -> int = "foo" "bar"
 [%%expect{|
-type ext_record_arg_attr_record = #{ i : int; b : bool; }
-Line 2, characters 37-63:
-2 | external ext_record_arg_with_attr : (ext_record_arg_attr_record [@unboxed]) -> int = "foo"
-                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
-       the corresponding unboxed types can be marked unboxed.
-|}]
-
-external ext_product_arg : t_product -> int = "foo" "bar"
-[%%expect{|
-Line 1, characters 27-43:
-1 | external ext_product_arg : t_product -> int = "foo" "bar"
-                               ^^^^^^^^^^^^^^^^
+type ext_record_arg_record_3 = #{ i : int; b : bool; s : string; }
+Line 2, characters 28-58:
+2 | external ext_record_arg_3 : ext_record_arg_record_3 -> int = "foo" "bar"
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
-external ext_product_arg_with_attr : (t_product [@unboxed]) -> int = "foo"
+type ext_record_arg_attr_record = #{ i : int; b : bool }
+external ext_record_arg_with_attr_u :
+  (ext_record_arg_attr_record [@unboxed]) -> int = "foo"
 [%%expect{|
-Line 1, characters 38-47:
-1 | external ext_product_arg_with_attr : (t_product [@unboxed]) -> int = "foo"
-                                          ^^^^^^^^^
+type ext_record_arg_attr_record = #{ i : int; b : bool; }
+Line 3, characters 3-29:
+3 |   (ext_record_arg_attr_record [@unboxed]) -> int = "foo"
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Don't know how to unbox this type.
        Only "float", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
+|}]
+
+external ext_record_arg_with_attr_t :
+  (ext_record_arg_attr_record [@untagged]) -> int = "foo"
+[%%expect{|
+Line 2, characters 3-29:
+2 |   (ext_record_arg_attr_record [@untagged]) -> int = "foo"
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}]
 
 type t = #{ i : int; b : bool }
 external ext_record_return : int -> t = "foo" "bar"
 [%%expect{|
 type t = #{ i : int; b : bool; }
-Line 2, characters 29-37:
-2 | external ext_record_return : int -> t = "foo" "bar"
-                                 ^^^^^^^^
+external ext_record_return : int -> t = "foo" "bar"
+|}]
+
+type t_3 = #{ i : int; b : bool; s : string }
+external ext_record_return_3 : int -> t_3 = "foo" "bar"
+[%%expect{|
+type t_3 = #{ i : int; b : bool; s : string; }
+Line 2, characters 31-41:
+2 | external ext_record_return_3 : int -> t_3 = "foo" "bar"
+                                   ^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+|}]
+
+type ext_record_nested = #{ x : int; y : ext_record_arg_record }
+external ext_record_neested : int -> ext_record_nested = "foo" "bar"
+[%%expect{|
+type ext_record_nested = #{ x : int; y : ext_record_arg_record; }
+Line 2, characters 30-54:
+2 | external ext_record_neested : int -> ext_record_nested = "foo" "bar"
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
 type t = #{ i : int; b : bool }
-external ext_record_return_with_attr : int -> (t [@unboxed]) = "foo"
+external ext_record_return_with_attr_u : int -> (t [@unboxed]) = "foo"
 [%%expect{|
 type t = #{ i : int; b : bool; }
-Line 2, characters 47-48:
-2 | external ext_record_return_with_attr : int -> (t [@unboxed]) = "foo"
-                                                   ^
+Line 2, characters 49-50:
+2 | external ext_record_return_with_attr_u : int -> (t [@unboxed]) = "foo"
+                                                     ^
 Error: Don't know how to unbox this type.
        Only "float", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
-external ext_product_return : int -> t_product = "foo" "bar"
+external ext_record_return_with_attr_t : int -> (t [@untagged]) = "foo"
 [%%expect{|
-Line 1, characters 30-46:
-1 | external ext_product_return : int -> t_product = "foo" "bar"
-                                  ^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-|}]
-
-external ext_product_return_with_attr : int -> (t_product [@unboxed]) = "foo"
-[%%expect{|
-Line 1, characters 48-57:
-1 | external ext_product_return_with_attr : int -> (t_product [@unboxed]) = "foo"
-                                                    ^^^^^^^^^
-Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
-       the corresponding unboxed types can be marked unboxed.
+Line 1, characters 49-50:
+1 | external ext_record_return_with_attr_t : int -> (t [@untagged]) = "foo"
+                                                     ^
+Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+       other immediate types can be untagged.
 |}]
 
 external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity"
@@ -1307,6 +1401,40 @@ type id_record = #{ x : int; y : int; }
 val sum : int = 3
 |}]
 
+type id_record_3 = #{ x : int; y : int; z : int }
+let sum =
+  let #{ x; y; z } = id #{ x = 1; y = 2; z = 3 } in
+  x + y + z
+[%%expect{|
+type id_record_3 = #{ x : int; y : int; z : int; }
+val sum : int = 6
+|}]
+
+(* You can't smuggle an unrepresentable type into an external inside a
+   product. *)
+external foo1 : ('a : any). #( string * 'a * float# ) -> int = "foo" "bar"
+[%%expect{|
+Line 1, characters 28-53:
+1 | external foo1 : ('a : any). #( string * 'a * float# ) -> int = "foo" "bar"
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Types in an external must have a representable layout.
+       The layout of #(string * 'a * float#) is value & any & float64
+         because it is an unboxed tuple.
+       But the layout of #(string * 'a * float#) must be representable
+         because it's the type of an argument in an external declaration.
+|}]
+
+external foo2 : ('a : any). int -> #( string * 'a * float# ) = "foo" "bar"
+[%%expect{|
+Line 1, characters 35-60:
+1 | external foo2 : ('a : any). int -> #( string * 'a * float# ) = "foo" "bar"
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Types in an external must have a representable layout.
+       The layout of #(string * 'a * float#) is value & any & float64
+         because it is an unboxed tuple.
+       But the layout of #(string * 'a * float#) must be representable
+         because it's the type of the result of an external declaration.
+|}]
 
 (***********************************)
 (* Test 10: not allowed in let recs *)
@@ -1321,7 +1449,8 @@ Line 2, characters 37-44:
                                          ^^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is '_representable_layout_9 & '_representable_layout_10
+       The layout of #('a * 'b) is
+           '_representable_layout_9 & '_representable_layout_10
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of the recursive variable x.
@@ -1366,7 +1495,8 @@ Line 1, characters 21-29:
                          ^^^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is '_representable_layout_11 & '_representable_layout_12
+       The layout of #('a * 'b) is
+           '_representable_layout_11 & '_representable_layout_12
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of the recursive variable _x.
@@ -1471,7 +1601,8 @@ Line 1, characters 31-37:
                                    ^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value)"
-       The layout of #('a * 'b) is '_representable_layout_13 & '_representable_layout_14
+       The layout of #('a * 'b) is
+           '_representable_layout_13 & '_representable_layout_14
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value.
 |}]
@@ -1486,33 +1617,33 @@ Error: The primitive [caml_make_vect] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
-external[@layout_poly] make : ('a : any_non_null) . int -> 'a -> 'a array =
+external[@layout_poly] make : ('a : any mod separable) . int -> 'a -> 'a array =
   "caml_make_vect"
 
 let _ = make 3 #(1,2)
 [%%expect{|
 Lines 1-2, characters 0-18:
-1 | external[@layout_poly] make : ('a : any_non_null) . int -> 'a -> 'a array =
+1 | external[@layout_poly] make : ('a : any mod separable) . int -> 'a -> 'a array =
 2 |   "caml_make_vect"
 Error: Attribute "[@layout_poly]" can only be used on built-in primitives.
 |}]
 
 (* CR layouts v7.1: The two errors below should be improved when we move product
    arrays to beta. *)
-external[@layout_poly] array_get : ('a : any_non_null) . 'a array -> int -> 'a =
+external[@layout_poly] array_get : ('a : any mod separable) . 'a array -> int -> 'a =
   "%array_safe_get"
 let f x : #(int * int) = array_get x 3
 [%%expect{|
-external array_get : ('a : any_non_null). 'a array -> int -> 'a
+external array_get : ('a : any mod separable). 'a array -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
 val f : #(int * int) array -> #(int * int) = <fun>
 |}]
 
-external[@layout_poly] array_set : ('a : any_non_null) . 'a array -> int -> 'a -> unit =
+external[@layout_poly] array_set : ('a : any mod separable) . 'a array -> int -> 'a -> unit =
   "%array_safe_set"
 let f x = array_set x 3 #(1,2)
 [%%expect{|
-external array_set : ('a : any_non_null). 'a array -> int -> 'a -> unit
+external array_set : ('a : any mod separable). 'a array -> int -> 'a -> unit
   = "%array_safe_set" [@@layout_poly]
 val f : #(int * int) array -> unit = <fun>
 |}]
@@ -1533,11 +1664,8 @@ type ('a : bits64 & (value & float64)) t2 = 'a array
 type t3_record = #{ i : int; b : bool; }
 type t3 = t3_record array
 type t4_inner = #{ f : float#; bo : bool option; }
-Line 8, characters 0-50:
-8 | type t4_record = #{ s : string; inner : t4_inner }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "t4_inner" has layout "float64 & value".
-       Records may not yet contain types of this layout.
+type t4_record = #{ s : string; inner : t4_inner; }
+type t4 = t4_record array
 |}]
 
 type array_record = #{ i1 : int; i2 : int }
@@ -1589,7 +1717,8 @@ Line 2, characters 25-26:
                              ^
 Error: This expression has type "('a : value)"
        but an expression was expected of type "#('b * 'c)"
-       The layout of #('a * 'b) is '_representable_layout_15 & '_representable_layout_16
+       The layout of #('a * 'b) is
+           '_representable_layout_15 & '_representable_layout_16
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of a term-level argument to a class constructor.
@@ -1638,7 +1767,8 @@ Line 1, characters 13-19:
                  ^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value)"
-       The layout of #('a * 'b) is '_representable_layout_17 & '_representable_layout_18
+       The layout of #('a * 'b) is
+           '_representable_layout_17 & '_representable_layout_18
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because it's the type of a lazy expression.
@@ -1750,7 +1880,8 @@ Line 1, characters 28-34:
                                 ^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is '_representable_layout_19 & '_representable_layout_20
+       The layout of #('a * 'b) is
+           '_representable_layout_19 & '_representable_layout_20
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a sublayout of value
          because the type argument of option has layout value_or_null.
@@ -1807,7 +1938,8 @@ Line 1, characters 19-27:
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
        The kind of string t is
-         immediate with string u & immediate with string u
+           immediate mod dynamic with string u
+           & immediate mod dynamic with string u
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -1825,10 +1957,10 @@ Line 3, characters 9-30:
 Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
-         immutable_data & immutable_data & immutable_data
+           immutable_data & immutable_data & immutable_data
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
-         any mod external_
+           any mod external_
          because of the definition of t at line 1, characters 0-31.
 |}, Principal{|
 type ('a : any mod external_) t
@@ -1838,11 +1970,12 @@ Line 3, characters 9-30:
 Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
-         immediate with int with string & immediate with int with string
-         & immediate with int with string
+           immediate mod dynamic with int with string
+           & immediate mod dynamic with int with string
+           & immediate mod dynamic with int with string
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
-         any mod external_
+           any mod external_
          because of the definition of t at line 1, characters 0-31.
 |}]
 (* CR layouts v7.1: The appearance of [immediate] above is regrettable. *)
@@ -1876,7 +2009,8 @@ Line 1, characters 19-27:
                        ^^^^^^^^
 Error: This type "string t" should be an instance of type "('a : any mod global)"
        The kind of string t is
-         immediate with string u & immediate with string u
+           immediate mod dynamic with string u
+           & immediate mod dynamic with string u
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -1895,7 +2029,7 @@ Line 4, characters 9-17:
 Error: This type "s_record" should be an instance of type
          "('a : any mod external_)"
        The kind of s_record is
-         immutable_data & immutable_data & immutable_data
+           immutable_data & immutable_data & immutable_data
          because of the definition of s_record at line 3, characters 0-51.
        But the kind of s_record must be a subkind of any mod external_
          because of the definition of t at line 1, characters 0-31.
@@ -1905,33 +2039,346 @@ Error: This type "s_record" should be an instance of type
 (********************************************)
 (* Test 18: Subkinding with sorts and [any] *)
 
-(* CR layouts: Change to use [any] instead of [any_non_null] when doing so
+(* CR layouts: Change to use [any] instead of [any mod separable] when doing so
    won't cause trouble with the [alpha] check. *)
 
 (* test intersection *)
-let rec f : ('a : any_non_null & value). unit -> 'a -> 'a = fun () -> f ()
+let rec f : ('a : any mod separable & value). unit -> 'a -> 'a = fun () -> f ()
 
 let g (x : 'a) = f () x
 
 [%%expect{|
-val f : ('a : any_non_null & value). unit -> 'a -> 'a = <fun>
-val g : ('a : value & value). 'a -> 'a = <fun>
+val f :
+  ('a : any mod separable & value_or_null mod separable). unit -> 'a -> 'a =
+  <fun>
+val g :
+  ('a : value_or_null mod separable & value_or_null mod separable). 'a -> 'a =
+  <fun>
 |}]
 
 (* test subjkinding *)
-let rec f : ('a : any_non_null & value). unit -> 'a -> 'a = fun () -> f ()
+let rec f : ('a : any mod separable & value). unit -> 'a -> 'a = fun () -> f ()
 
 let g (type a) (x : a) = f () x
 
 [%%expect{|
-val f : ('a : any_non_null & value). unit -> 'a -> 'a = <fun>
+val f :
+  ('a : any mod separable & value_or_null mod separable). unit -> 'a -> 'a =
+  <fun>
 Line 3, characters 30-31:
 3 | let g (type a) (x : a) = f () x
                                   ^
 Error: This expression has type "a" but an expression was expected of type
-         "('a : '_representable_layout_21 & value)"
+         "('a : '_representable_layout_21 & value_or_null mod separable)"
        The layout of a is value
          because it is or unifies with an unannotated universal variable.
        But the layout of a must be representable
          because we must know concretely how to pass a function argument.
+|}]
+
+(****************************************************)
+(* Test 19: Complex nesting of records and variants *)
+
+type boxed_record = { x : int; y : string; z : float# }
+type unboxed_record = #{ x : int; y : int32#; z : string }
+type unboxed_tuple = #(int64# * int * string)
+
+type nested_record = { a : boxed_record#; b : unboxed_record; c : unboxed_tuple }
+type nested_variant =
+    A of boxed_record#
+  | B of unboxed_record * boxed_record#
+  | C of { a : boxed_record#; b : unboxed_record; c : unboxed_tuple }
+
+[%%expect{|
+type boxed_record = { x : int; y : string; z : float#; }
+type unboxed_record = #{ x : int; y : int32#; z : string; }
+type unboxed_tuple = #(int64# * int * string)
+type nested_record = {
+  a : boxed_record#;
+  b : unboxed_record;
+  c : unboxed_tuple;
+}
+type nested_variant =
+    A of boxed_record#
+  | B of unboxed_record * boxed_record#
+  | C of { a : boxed_record#; b : unboxed_record; c : unboxed_tuple; }
+|}]
+
+
+(* The unboxed version of the nested record has the kind we expect. *)
+type nested_record_unboxed
+  :   (value & value & float64)
+    & (value & bits32 & value)
+    & (bits64 & value & value)
+  = nested_record#
+[%%expect{|
+type nested_record_unboxed = nested_record#
+|}]
+
+(**************************************************************)
+(* Test 20: Complex nesting via abstract types and parameters *)
+
+type abstract_product : value & (float64 & value) & bits64 & value
+type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
+       nested_record =
+  { a : 'a;
+    b : abstract_product;
+    c : string;
+    d : 'b;
+    e : int64#;
+    f : abstract_product;
+    g : 'a;
+    h : int option }
+  constraint 'b = unboxed_record
+type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
+       nested_variant =
+    A of 'a
+  | B of abstract_product * 'a * string * 'b * int
+  | C of { a : abstract_product;
+           b : float#;
+           c : 'a;
+           d : string;
+           e : 'b;
+           f : string;
+           g : 'a }
+  constraint 'b = unboxed_record
+[%%expect{|
+type abstract_product : value & (float64 & value) & bits64 & value
+type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
+     nested_record = {
+  a : 'a;
+  b : abstract_product;
+  c : string;
+  d : 'b;
+  e : int64#;
+  f : abstract_product;
+  g : 'a;
+  h : int option;
+} constraint 'b = unboxed_record
+type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
+     nested_variant =
+    A of 'a
+  | B of abstract_product * 'a * string * 'b * int
+  | C of { a : abstract_product; b : float#; c : 'a; d : string; e : 'b;
+      f : string; g : 'a;
+    }
+  constraint 'b = unboxed_record
+|}]
+
+(* The unboxed version of the nested record has the kind we expect. *)
+type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
+       nested_record_unboxed
+  :   (float64 & (float64 & (value & bits64 & value)) & bits64)
+    & (value & (float64 & value) & bits64 & value)
+    & value
+    & (value & bits32 & value)
+    & bits64
+    & (value & (float64 & value) & bits64 & value)
+    & (float64 & (float64 & (value & bits64 & value)) & bits64)
+    & value
+  = ('a, 'b) nested_record#
+  constraint 'b = unboxed_record
+[%%expect{|
+type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
+     nested_record_unboxed =
+    ('a, 'b) nested_record#
+  constraint 'b = unboxed_record
+|}]
+
+(**********************************************************************)
+(* Test 21: Nested records mode cross or don't mode cross as expected *)
+
+type ('a : (value & value) mod portable, 'b) record : value mod portable =
+  { a : 'a;
+    b : string;
+    c : #(int64# * #(float# * bool option * 'b));
+    d : char }
+  constraint 'b = int * string
+[%%expect{|
+type ('a : value mod portable & value mod portable, 'b) record = {
+  a : 'a;
+  b : string;
+  c : #(int64# * #(float# * bool option * 'b));
+  d : char;
+} constraint 'b = int * string
+|}]
+
+type ('a : (value & value) mod portable, 'b) record : value mod portable =
+  { a : 'a;
+    b : string;
+    c : #(int64# * #(float# * (bool -> bool) * 'b ));
+    d : char }
+  constraint 'b = int * string
+[%%expect{|
+Lines 1-6, characters 0-30:
+1 | type ('a : (value & value) mod portable, 'b) record : value mod portable =
+2 |   { a : 'a;
+3 |     b : string;
+4 |     c : #(int64# * #(float# * (bool -> bool) * 'b ));
+5 |     d : char }
+6 |   constraint 'b = int * string
+Error: The kind of type "record" is value mod immutable non_float with 'a
+         because it's a boxed record type.
+       But the kind of type "record" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type record.
+|}]
+
+(*******************************************************************************)
+(* Test 22: You can't defeat the value prefix size limit with nested products. *)
+
+(* And note that blocks with products are always mixed blocks, so we don't
+   need to add any unboxed types to hit the limit. *)
+
+type eight_values :
+  value & value & value & value & value & value & value & value
+type thirty_two_values =
+  { a : eight_values; b : eight_values; c : eight_values; d : eight_values }
+type r_254 =
+  { a : thirty_two_values#;
+    b : thirty_two_values#;
+    c : thirty_two_values#;
+    d : thirty_two_values#;
+    e : thirty_two_values#;
+    f : thirty_two_values#;
+    g : thirty_two_values#;
+    h : #(eight_values * eight_values * eight_values);
+    f249 : string;
+    f250 : string;
+    f251 : string;
+    f252 : string;
+    f253 : string;
+    f254 : string;
+  }
+
+[%%expect{|
+type eight_values
+  : value & value & value & value & value & value & value & value
+type thirty_two_values = {
+  a : eight_values;
+  b : eight_values;
+  c : eight_values;
+  d : eight_values;
+}
+type r_254 = {
+  a : thirty_two_values#;
+  b : thirty_two_values#;
+  c : thirty_two_values#;
+  d : thirty_two_values#;
+  e : thirty_two_values#;
+  f : thirty_two_values#;
+  g : thirty_two_values#;
+  h : #(eight_values * eight_values * eight_values);
+  f249 : string;
+  f250 : string;
+  f251 : string;
+  f252 : string;
+  f253 : string;
+  f254 : string;
+}
+|}]
+
+type r_255 =
+  { a : thirty_two_values#;
+    b : thirty_two_values#;
+    c : thirty_two_values#;
+    d : thirty_two_values#;
+    e : thirty_two_values#;
+    f : thirty_two_values#;
+    g : thirty_two_values#;
+    h : #(eight_values * eight_values * eight_values);
+    f249 : string;
+    f250 : string;
+    f251 : string;
+    f252 : string;
+    f253 : string;
+    f254 : string;
+    f255 : string;
+  }
+
+[%%expect{|
+Lines 1-17, characters 0-3:
+ 1 | type r_255 =
+ 2 |   { a : thirty_two_values#;
+ 3 |     b : thirty_two_values#;
+ 4 |     c : thirty_two_values#;
+ 5 |     d : thirty_two_values#;
+...
+14 |     f253 : string;
+15 |     f254 : string;
+16 |     f255 : string;
+17 |   }
+Error: Mixed records may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+|}]
+
+(****************************************************************)
+(* Test 23: width mismatches against layout any with mod bounds *)
+
+(* This is a regression test for a bug that could cause the compiler to crash.
+
+   [t] doesn't typecheck because the annotation says it's a product of two
+   things, but it's a product of three. However, before we notice that, we
+   notice that the annotation we've given [t] isn't [non_null]. That forces us
+   to do some expansion, and the bit of code that expands assumes we've already
+   checked the width. We had missed the width guard in one of the cases. *)
+type ('a : any mod non_null) s
+
+type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
+[%%expect{|
+type ('a : any mod non_null) s
+Line 3, characters 0-66:
+3 | type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The kind of t is value_or_null & bits32
+         because of the annotation on the declaration of the type t.
+       But the kind of t must be a subkind of any mod non_null
+         because of the definition of s at line 1, characters 0-30.
+|}]
+
+(* modal axes have the same problem *)
+type ('a : any mod portable) s
+
+type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
+[%%expect{|
+type ('a : any mod portable) s
+Line 3, characters 0-66:
+3 | type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The kind of t is value_or_null & bits32
+         because of the annotation on the declaration of the type t.
+       But the kind of t must be a subkind of any mod portable
+         because of the definition of s at line 1, characters 0-30.
+|}]
+
+(* If the kind annotation does cross, you get a more sensible error. *)
+type ('a : any mod non_null) s
+
+type t : (value_or_null & bits32) mod non_null =
+  #{ a : int; b : t s; c : int32 }
+[%%expect{|
+type ('a : any mod non_null) s
+Lines 3-4, characters 0-34:
+3 | type t : (value_or_null & bits32) mod non_null =
+4 |   #{ a : int; b : t s; c : int32 }
+Error: The layout of type "t" is value & value & value
+         because it is an unboxed record.
+       But the layout of type "t" must be a sublayout of value & bits32
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* modal axes have the same problem *)
+type ('a : any mod portable) s
+
+type t : (value_or_null & bits32) mod portable =
+  #{ a : int; b : t s; c : int32 }
+[%%expect{|
+type ('a : any mod portable) s
+Lines 3-4, characters 0-34:
+3 | type t : (value_or_null & bits32) mod portable =
+4 |   #{ a : int; b : t s; c : int32 }
+Error: The layout of type "t" is value & value & value
+         because it is an unboxed record.
+       But the layout of type "t" must be a sublayout of value & bits32
+         because of the annotation on the declaration of the type t.
 |}]

@@ -17,8 +17,8 @@ open Clflags
 
 let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 
-module Options = Flambda_backend_args.Make_optcomp_options
-        (Flambda_backend_args.Default.Optmain)
+module Options = Oxcaml_args.Make_optcomp_options
+        (Oxcaml_args.Default.Optmain)
 
 let main unix argv ppf ~flambda2 =
   native_code := true;
@@ -51,26 +51,39 @@ let main unix argv ppf ~flambda2 =
   match
     Compenv.warnings_for_discarded_params := true;
     Compenv.set_extra_params
-      (Some Flambda_backend_args.Extra_params.read_param);
+      (Some Oxcaml_args.Extra_params.read_param);
     Compenv.readenv ppf Before_args;
     Clflags.add_arguments __LOC__ (Arch.command_line_options @ Options.list);
     Clflags.add_arguments __LOC__
       ["-depend", Arg.Unit Makedepend.main_from_option,
        "<options> Compute dependencies \
         (use 'ocamlopt -depend -help' for details)"];
-    Clflags.Opt_flag_handler.set Flambda_backend_flags.opt_flag_handler;
+    Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
     Compenv.parse_arguments (ref argv) Compenv.anonymous "ocamlopt";
     Compmisc.read_clflags_from_env ();
-    if !Flambda_backend_flags.gc_timings then Gc_timings.start_collection ();
+    (* Set platform-appropriate DWARF fission default when oxcaml-dwarf is
+       enabled *)
+    if Config.oxcaml_dwarf &&
+       !Clflags.dwarf_fission = Clflags.Fission_none &&
+       Target_system.is_macos () then
+      Clflags.dwarf_fission := Clflags.Fission_dsymutil;
+    (* Set up DWARF compression for C compiler invocations *)
+    if !Clflags.debug && !Clflags.native_code then
+      Clflags.dwarf_c_toolchain_flag :=
+        Dwarf_flags.get_dwarf_c_toolchain_flag ();
+    if !Oxcaml_flags.gc_timings then Gc_timings.start_collection ();
     if !Clflags.plugin then
       Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
+    let (module Compiler : Optcompile.S) =
+      Optcompile.native unix ~flambda2
+    in
     begin try
       Compenv.process_deferred_actions
         (ppf,
-         Optcompile.implementation unix ~flambda2,
-         Optcompile.interface,
-         ".cmx",
-         ".cmxa");
+         Compiler.implementation,
+         Compiler.interface,
+         Compiler.ext_flambda_obj,
+         Compiler.ext_flambda_lib);
     with Arg.Bad msg ->
       begin
         prerr_endline msg;
@@ -91,7 +104,8 @@ let main unix argv ppf ~flambda2 =
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
                          -output-obj, -instantiate";
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
-              | P.Simplify_cfg | P.Emit | P.Selection) as p) ->
+              | P.Simplify_cfg | P.Emit | P.Selection
+              | P.Register_allocation | P.Llvmize) as p) ->
         assert (P.is_compilation_pass p);
         Printf.ksprintf Compenv.fatal
           "Options -i and -stop-after (%s) \
@@ -102,7 +116,7 @@ let main unix argv ppf ~flambda2 =
     if !make_archive then begin
       Compmisc.init_path ();
       let target = Compenv.extract_output !output_name in
-      Asmlibrarian.create_archive
+      Compiler.create_archive
         (Compenv.get_objfiles ~with_ocamlparam:false) target;
       Warnings.check_fatal ();
     end
@@ -110,10 +124,8 @@ let main unix argv ppf ~flambda2 =
       Compmisc.init_path ();
       let target = Compenv.extract_output !output_name in
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
-        Asmpackager.package_files unix
-          ~ppf_dump (Compmisc.initial_env ())
-          (Compenv.get_objfiles ~with_ocamlparam:false) target
-          ~flambda2);
+        Compiler.package_files ~ppf_dump (Compmisc.initial_env ())
+          (Compenv.get_objfiles ~with_ocamlparam:false) target);
       Warnings.check_fatal ();
     end
     else if !instantiate then begin
@@ -126,18 +138,19 @@ let main unix argv ppf ~flambda2 =
         match Compenv.get_objfiles ~with_ocamlparam:false with
         | [] | [_] ->
           Printf.ksprintf Compenv.fatal
-            "Must specify at least two .cmx files with -instantiate"
+            "Must specify at least two %s files with -instantiate"
+            Compiler.ext_flambda_obj
         | src :: args ->
           src, args
       in
-      Asminstantiator.instantiate unix ~src ~args target ~flambda2;
+      Compiler.instantiate ~src ~args target;
       Warnings.check_fatal ();
     end
     else if !shared then begin
       Compmisc.init_path ();
       let target = Compenv.extract_output !output_name in
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
-        Asmlink.link_shared unix ~ppf_dump
+        Compiler.link_shared ~ppf_dump (Linkenv.create ())
           (Compenv.get_objfiles ~with_ocamlparam:false) target);
       Warnings.check_fatal ();
     end
@@ -160,7 +173,7 @@ let main unix argv ppf ~flambda2 =
       Compmisc.init_path ();
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->
           let objs = Compenv.get_objfiles ~with_ocamlparam:true in
-          Asmlink.link unix
+          Compiler.link
             ~ppf_dump objs target);
       Warnings.check_fatal ();
     end;
@@ -175,7 +188,7 @@ let main unix argv ppf ~flambda2 =
       ppf_file !Clflags.profile_columns ~timings_precision:!Clflags.timings_precision
     in
     let output_profile_standard ppf =
-      if !Flambda_backend_flags.gc_timings then begin
+      if !Oxcaml_flags.gc_timings then begin
         let minor = Gc_timings.gc_minor_ns () in
         let major = Gc_timings.gc_major_ns () in
         let stats = Gc.quick_stat () in
@@ -207,6 +220,6 @@ let main unix argv ppf ~flambda2 =
     in
     if !Clflags.dump_into_csv then
       Compmisc.with_ppf_file ~file_prefix:"profile" ~file_extension:".csv" output_profile_csv
-    else if !Flambda_backend_flags.gc_timings || !Clflags.profile_columns <> [] then
+    else if !Oxcaml_flags.gc_timings || !Clflags.profile_columns <> [] then
       Compmisc.with_ppf_dump ~stdout:() ~file_prefix:"profile" output_profile_standard;
     0

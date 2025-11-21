@@ -38,7 +38,7 @@ val join_depth : unit -> int
 
 val use_n_way_join : unit -> bool
 
-type join_algorithm = Flambda_backend_flags.join_algorithm =
+type join_algorithm = Oxcaml_flags.join_algorithm =
   | Binary
   | N_way
   | Checked
@@ -46,6 +46,14 @@ type join_algorithm = Flambda_backend_flags.join_algorithm =
 val join_algorithm : unit -> join_algorithm
 
 val enable_reaper : unit -> bool
+
+type reaper_preserve_direct_calls = Oxcaml_flags.reaper_preserve_direct_calls =
+  | Never
+  | Always
+  | Zero_alloc
+  | Auto
+
+val reaper_preserve_direct_calls : unit -> reaper_preserve_direct_calls
 
 val kind_checks : unit -> bool
 
@@ -74,7 +82,7 @@ val check_invariants : unit -> bool
 
 val check_light_invariants : unit -> bool
 
-type dump_target = Flambda_backend_flags.Flambda2.Dump.target =
+type dump_target = Oxcaml_flags.Flambda2.Dump.target =
   | Nowhere
   | Main_dump_stream
   | File of Misc.filepath
@@ -102,7 +110,7 @@ val freshen_when_printing : unit -> bool
 module Inlining : sig
   type round_or_default =
     | Round of int
-    | Default of Flambda_backend_flags.opt_level
+    | Default of Oxcaml_flags.opt_level
 
   val depth_scaling_factor : int
 
@@ -156,6 +164,8 @@ module Expert : sig
   val shorten_symbol_names : unit -> bool
 
   val cont_lifting_budget : unit -> int
+
+  val cont_spec_budget : unit -> int
 end
 
 val stack_allocation_enabled : unit -> bool

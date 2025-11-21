@@ -29,78 +29,16 @@
 static const mlsize_t mlsize_t_max = -1;
 
 #define Max_array_wosize                   (Max_wosize)
-#define Max_custom_array_wosize            (Max_wosize - 1)
-#define Max_unboxed_float_array_wosize     (Max_array_wosize / (sizeof(double) / sizeof(intnat)))
-#define Max_unboxed_int64_array_wosize     (Max_custom_array_wosize / (sizeof(int64_t) / sizeof(intnat)))
-#define Max_unboxed_int32_array_wosize     (Max_custom_array_wosize * (sizeof(intnat) / sizeof(int32_t)))
-#define Max_unboxed_nativeint_array_wosize (Max_custom_array_wosize)
-
-/* Unboxed arrays */
-
-CAMLprim int caml_unboxed_array_no_polymorphic_compare(value v1, value v2)
-{
-  caml_failwith("Polymorphic comparison is not permitted for unboxed arrays");
-}
-
-CAMLprim intnat caml_unboxed_array_no_polymorphic_hash(value v)
-{
-  caml_failwith("Polymorphic hash is not permitted for unboxed arrays");
-}
-
-CAMLprim void caml_unboxed_array_serialize(value v, uintnat* bsize_32, uintnat* bsize_64)
-{
-  caml_failwith("Marshalling is not yet implemented for unboxed arrays");
-}
-
-CAMLprim uintnat caml_unboxed_array_deserialize(void* dst)
-{
-  caml_failwith("Marshalling is not yet implemented for unboxed arrays");
-}
 
 // Note: if polymorphic comparison and/or hashing are implemented for
 // the int32 unboxed arrays, care needs to be taken with the last word
 // when the array is of odd length -- this is not currently initialized.
+#define Max_unboxed_float_array_wosize     (Max_array_wosize / (sizeof(double) / sizeof(intnat)))
+#define Max_unboxed_int64_array_wosize     (Max_array_wosize / (sizeof(int64_t) / sizeof(intnat)))
+#define Max_unboxed_int32_array_wosize     (Max_array_wosize * (sizeof(intnat) / sizeof(int32_t)))
+#define Max_unboxed_nativeint_array_wosize (Max_array_wosize)
 
-CAMLexport struct custom_operations caml_unboxed_int32_array_ops[2] = {
-  { "_unboxed_int32_even_array",
-    custom_finalize_default,
-    caml_unboxed_array_no_polymorphic_compare,
-    caml_unboxed_array_no_polymorphic_hash,
-    caml_unboxed_array_serialize,
-    caml_unboxed_array_deserialize,
-    custom_compare_ext_default,
-    custom_fixed_length_default },
-  { "_unboxed_int32_odd_array",
-    custom_finalize_default,
-    caml_unboxed_array_no_polymorphic_compare,
-    caml_unboxed_array_no_polymorphic_hash,
-    caml_unboxed_array_serialize,
-    caml_unboxed_array_deserialize,
-    custom_compare_ext_default,
-    custom_fixed_length_default },
-};
 
-CAMLexport struct custom_operations caml_unboxed_int64_array_ops = {
-  "_unboxed_int64_array",
-  custom_finalize_default,
-  caml_unboxed_array_no_polymorphic_compare,
-  caml_unboxed_array_no_polymorphic_hash,
-  caml_unboxed_array_serialize,
-  caml_unboxed_array_deserialize,
-  custom_compare_ext_default,
-  custom_fixed_length_default
-};
-
-CAMLexport struct custom_operations caml_unboxed_nativeint_array_ops = {
-  "_unboxed_nativeint_array",
-  custom_finalize_default,
-  caml_unboxed_array_no_polymorphic_compare,
-  caml_unboxed_array_no_polymorphic_hash,
-  caml_unboxed_array_serialize,
-  caml_unboxed_array_deserialize,
-  custom_compare_ext_default,
-  custom_fixed_length_default
-};
 
 /* returns number of elements (either fields or floats) */
 /* [ 'a array -> int ] */
@@ -610,7 +548,7 @@ CAMLprim value caml_makearray_dynamic_scannable_unboxed_product(
       /* CR mslater/mshinwell: Why is this better than adding them to the
          remembered set with caml_initialize?  See discussion in a
          conversation on:
-         https://github.com/ocaml-flambda/flambda-backend/pull/3317
+         https://github.com/oxcaml/oxcaml/pull/3317
       */
       CAML_EV_COUNTER (EV_C_FORCE_MINOR_MAKE_VECT, 1);
       caml_minor_collection ();
@@ -659,16 +597,24 @@ static value caml_make_unboxed_int32_vect0(value len, int local)
   if (num_elements > Max_unboxed_int32_array_wosize)
     caml_invalid_argument("Array.make");
 
-  /* [num_fields] does not include the custom operations field. */
-  mlsize_t num_fields = num_elements / 2 + num_elements % 2;
+  /* Empty arrays have tag 0 */
+  if (num_elements == 0) {
+    return Atom(0);
+  }
 
-  struct custom_operations* ops =
-    &caml_unboxed_int32_array_ops[num_elements % 2];
+  mlsize_t num_fields = num_elements / 2 + num_elements % 2;
+  
+  /* Use appropriate unboxed array tag based on even/odd length */
+  tag_t tag = (num_elements % 2 == 0) 
+    ? Unboxed_int32_array_even_tag : Unboxed_int32_array_odd_tag;
+  
+  /* Mixed block with no scannable fields */
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
 
   if (local)
-    return caml_alloc_custom_local(ops, num_fields * sizeof(value), 0, 0);
+    return caml_alloc_local_reserved(num_fields, tag, reserved);
   else
-    return caml_alloc_custom(ops, num_fields * sizeof(value), 0, 0);
+    return caml_alloc_with_reserved(num_fields, tag, reserved);
 }
 
 CAMLprim value caml_make_unboxed_int32_vect(value len)
@@ -692,12 +638,18 @@ static value caml_make_unboxed_int64_vect0(value len, int local)
   if (num_elements > Max_unboxed_int64_array_wosize)
     caml_invalid_argument("Array.make");
 
-  struct custom_operations* ops = &caml_unboxed_int64_array_ops;
+  /* Empty arrays have tag 0 */
+  if (num_elements == 0) {
+    return Atom(0);
+  }
+
+  /* Mixed block with no scannable fields */
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
 
   if (local)
-    return caml_alloc_custom_local(ops, num_elements * sizeof(value), 0, 0);
+    return caml_alloc_local_reserved(num_elements, Unboxed_int64_array_tag, reserved);
   else
-    return caml_alloc_custom(ops, num_elements * sizeof(value), 0, 0);
+    return caml_alloc_with_reserved(num_elements, Unboxed_int64_array_tag, reserved);
 }
 
 CAMLprim value caml_make_unboxed_int64_vect(value len)
@@ -723,12 +675,18 @@ static value caml_make_unboxed_nativeint_vect0(value len, int local)
   if (num_elements > Max_unboxed_nativeint_array_wosize)
     caml_invalid_argument("Array.make");
 
-  struct custom_operations* ops = &caml_unboxed_nativeint_array_ops;
+  /* Empty arrays have tag 0 */
+  if (num_elements == 0) {
+    return Atom(0);
+  }
+
+  /* Mixed block with no scannable fields */
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
 
   if (local)
-    return caml_alloc_custom_local(ops, num_elements * sizeof(value), 0, 0);
+    return caml_alloc_local_reserved(num_elements, Unboxed_nativeint_array_tag, reserved);
   else
-    return caml_alloc_custom(ops, num_elements * sizeof(value), 0, 0);
+    return caml_alloc_with_reserved(num_elements, Unboxed_nativeint_array_tag, reserved);
 }
 
 CAMLprim value caml_make_unboxed_nativeint_vect(value len)
@@ -816,9 +774,8 @@ CAMLprim value caml_floatarray_blit(value a1, value ofs1, value a2, value ofs2,
 CAMLprim value caml_unboxed_int32_vect_blit(value a1, value ofs1, value a2,
                                             value ofs2, value n)
 {
-  // Need to skip the custom_operations field
-  memmove((int32_t *)((uintnat *)a2 + 1) + Long_val(ofs2),
-          (int32_t *)((uintnat *)a1 + 1) + Long_val(ofs1),
+  memmove((int32_t *)a2 + Long_val(ofs2),
+          (int32_t *)a1 + Long_val(ofs1),
           Long_val(n) * sizeof(int32_t));
   return Val_unit;
 }
@@ -826,9 +783,8 @@ CAMLprim value caml_unboxed_int32_vect_blit(value a1, value ofs1, value a2,
 CAMLprim value caml_unboxed_int64_vect_blit(value a1, value ofs1, value a2, value ofs2,
                                             value n)
 {
-  // Need to skip the custom_operations field
-  memmove((int64_t *)((uintnat *)a2 + 1) + Long_val(ofs2),
-          (int64_t *)((uintnat *)a1 + 1) + Long_val(ofs1),
+  memmove((int64_t *)a2 + Long_val(ofs2),
+          (int64_t *)a1 + Long_val(ofs1),
           Long_val(n) * sizeof(int64_t));
   return Val_unit;
 }
@@ -836,9 +792,8 @@ CAMLprim value caml_unboxed_int64_vect_blit(value a1, value ofs1, value a2, valu
 CAMLprim value caml_unboxed_nativeint_vect_blit(value a1, value ofs1, value a2,
                                                 value ofs2, value n)
 {
-  // Need to skip the custom_operations field
-  memmove((uintnat *)((uintnat *)a2 + 1) + Long_val(ofs2),
-          (uintnat *)((uintnat *)a1 + 1) + Long_val(ofs1),
+  memmove((uintnat *)a2 + Long_val(ofs2),
+          (uintnat *)a1 + Long_val(ofs1),
           Long_val(n) * sizeof(uintnat));
   return Val_unit;
 }
@@ -888,6 +843,99 @@ CAMLprim value caml_array_blit(value a1, value ofs1, value a2, value ofs2,
      Give the minor GC a chance to run if it needs to. */
   caml_check_urgent_gc(Val_unit);
   return Val_unit;
+}
+
+/* In bytecode, an index is represented as a block containing a list of field
+   positions. See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md].
+*/
+CAMLprim value caml_unsafe_get_idx_bytecode(value base, value idx)
+{
+  CAMLparam2 (base, idx);
+  CAMLassert (Tag_val(idx) == 0);
+  value res;
+  mlsize_t depth = Wosize_val(idx);
+#ifdef FLAT_FLOAT_ARRAY
+  if (Tag_val(base) == Double_array_tag) {
+    CAMLassert (depth == 1);
+    intnat pos = Long_val(Field(idx, 0));
+    double d = Double_flat_field(base, pos);
+#define Setup_for_gc
+#define Restore_after_gc
+    Alloc_small(res, Double_wosize, Double_tag);
+#undef Setup_for_gc
+#undef Restore_after_gc
+    Store_double_val(res, d);
+    CAMLreturn (res);
+  }
+#endif
+  res = base;
+  for (mlsize_t i = 0; i < depth; i++) {
+    intnat pos = Long_val(Field(idx, i));
+    res = Field(res, pos);
+  }
+  CAMLreturn (res);
+}
+
+CAMLprim value caml_unsafe_set_idx_bytecode(value base, value idx, value v)
+{
+  CAMLparam3 (base, idx, v);
+  CAMLassert (Tag_val(idx) == 0);
+  mlsize_t depth = Wosize_val(idx);
+#ifdef FLAT_FLOAT_ARRAY
+  if (Tag_val(base) == Double_array_tag) {
+    CAMLassert (depth == 1);
+    intnat pos = Long_val(Field(idx, 0));
+    double d = Double_val (v);
+    Store_double_flat_field(base, pos, d);
+    CAMLreturn (Val_unit);
+  }
+#endif
+  value* dst = &base;
+  for (mlsize_t i = 0; i < depth; i++) {
+    intnat pos = Long_val(Field(idx, i));
+    dst = &Field(*dst, pos);
+  }
+  caml_modify(dst, v);
+  CAMLreturn (Val_unit);
+}
+
+/* Concatenates idx_prefix and idx_suffix */
+CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
+  mlsize_t prefix_depth = Wosize_val(idx_prefix);
+  mlsize_t suffix_depth = Wosize_val(idx_suffix);
+
+  mlsize_t wosize = prefix_depth + suffix_depth;
+  tag_t tag = 0;
+  value block;
+  mlsize_t i = 0;
+  if (wosize <= Max_young_wosize) {
+#define Setup_for_gc
+#define Restore_after_gc
+    Alloc_small(block, wosize, tag);
+#undef Setup_for_gc
+#undef Restore_after_gc
+    for (mlsize_t j = 0; j < prefix_depth; j++) {
+      value jth = Field(idx_prefix, j);
+      Field(block, i) = jth;
+      i++;
+    }
+    for (mlsize_t j = 0; j < suffix_depth; j++) {
+      value jth = Field(idx_suffix, j);
+      Field(block, i) = jth;
+      i++;
+    }
+  } else {
+    block = caml_alloc_shr(wosize, tag);
+    for (mlsize_t j = 0; j < prefix_depth; j++) {
+      caml_initialize(&Field(block, i), Field(idx_prefix, j));
+      i++;
+    }
+    for (mlsize_t j = 0; j < suffix_depth; j++) {
+      caml_initialize(&Field(block, i), Field(idx_suffix, j));
+      i++;
+    }
+  }
+  return block;
 }
 
 /* A generic function for extraction and concatenation of sub-arrays */

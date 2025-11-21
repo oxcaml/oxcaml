@@ -18,6 +18,7 @@
 
 #include "config.h"
 #include "misc.h"
+#include "camlatomic.h"
 #include "tsan.h"
 
 #ifdef __cplusplus
@@ -69,12 +70,17 @@ typedef opcode_t * code_t;
 
 #include "domain_state.h"
 
-/* The null pointer value. */
+/* Or_null constructors. */
+
 #define Val_null ((value) 0)
+#define Val_this(v) (v)
+#define This_val(v) (v)
+#define Is_null(v) ((v) == Val_null)
+#define Is_this(v) ((v) != Val_null)
 
 /* Longs vs blocks. */
 
-#ifdef __x86_64__
+#if defined(__x86_64__) && defined(HAS_BMI)
 // Specialize the implementation of Is_block and Is_long on x86-64.
 //
 // Is_block(x) returns 1 if the least significant bit of x is 0, and x != 0.
@@ -138,6 +144,15 @@ Caml_inline int Is_block(value x) {
 #define Unsigned_long_val(x) ((uintnat)(x) >> 1)
 #define Unsigned_int_val(x)  ((int) Unsigned_long_val(x))
 
+/* The widening conversion in Val_long will do sign extension, because
+   the signedness of the thing being casted determines the choice on
+   sign extension, not the signedness of the target type. */
+#define Val_int16(x) Val_long((int16_t)(x))
+#define Val_int8(x)  Val_long((int8_t)(x))
+
+#define Int16_val(x) ((int16_t) Long_val(x))
+#define Int8_val(x)  ((int8_t) Long_val(x))
+
 /* Encoded exceptional return values, when functions are suffixed with
    _exn. Encoded exceptions are invalid values and must not be seen
    by the garbage collector. */
@@ -161,7 +176,7 @@ For 64-bit architectures:
 bits  63    64-R 63-R  10 9     8 7   0
 
 where 0 <= R <= 31 is HEADER_RESERVED_BITS. R is always
-set to 8 for the flambda-backend compiler in order to support
+set to 8 for the OxCaml compiler in order to support
 mixed blocks. In the upstream compiler, R is set with the
 --enable-reserved-header-bits=R argument.
 
@@ -324,7 +339,7 @@ CAMLno_tsan_for_perf Caml_inline header_t Hd_val(value val)
    in a for-loop.
 */
 
-/* flambda-backend: We rename the size macros to [Allocated_...] so that we're
+/* oxcaml: We rename the size macros to [Allocated_...] so that we're
    forced to think about whether C code needs to updated for mixed blocks, which
    have separate notions of scannable size and total size of an object, even for
    scannable tags. We call an object's size (including possibly non-scannable
@@ -389,7 +404,9 @@ CAMLno_tsan_for_perf Caml_inline header_t Hd_val(value val)
 
 /* The lowest tag for blocks containing no value. */
 #define No_scan_tag 251
-
+#define Scannable_tag(t)   ((t) < No_scan_tag)
+#define Scannable_hd(hd)   Scannable_tag(Tag_hd(hd))
+#define Scannable_val(val) Scannable_tag(Tag_val(val))
 
 /* 1- If tag < No_scan_tag : a tuple of fields.  */
 
@@ -526,6 +543,19 @@ CAMLextern void caml_Store_double_val (value,double);
 /* Arrays of floating-point numbers. */
 #define Double_array_tag 254
 
+/* Unboxed array tags (for mixed blocks)
+   These must stay in sync with Cmm_helpers.Unboxed_array_tags */
+#define Unboxed_product_array_tag 0
+#define Unboxed_int64_array_tag 1
+#define Unboxed_int32_array_even_tag 2
+#define Unboxed_int32_array_odd_tag 3
+#define Unboxed_float32_array_even_tag 4
+#define Unboxed_float32_array_odd_tag 5
+#define Unboxed_vec128_array_tag 6
+#define Unboxed_vec256_array_tag 7
+#define Unboxed_vec512_array_tag 8
+#define Unboxed_nativeint_array_tag 9
+
 /* The [_flat_field] macros are for [floatarray] values and float-only records.
 */
 #define Double_flat_field(v,i) Double_val((value)((volatile double *)(v) + (i)))
@@ -642,7 +672,9 @@ CAMLextern value caml_set_oo_id(value obj);
    better by C formatters.)
  */
 #define Assert_mixed_block_layout_v1 _Static_assert(0, "")
-#define Assert_mixed_block_layout_v2 _Static_assert(1, "")
+#define Assert_mixed_block_layout_v2 _Static_assert(0, "")
+#define Assert_mixed_block_layout_v3 _Static_assert(0, "")
+#define Assert_mixed_block_layout_v4 _Static_assert(1, "")
 
 /* Header for out-of-heap blocks. */
 

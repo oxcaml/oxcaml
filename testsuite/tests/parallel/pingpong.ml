@@ -1,7 +1,8 @@
 (* TEST
- flags += "-alert -unsafe_parallelism -alert -unsafe_multidomain";
+ flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
  no-tsan; (* TSan detects the intentional data race *)
  runtime5;
+ multidomain;
  { bytecode; }
  { native; }
 *)

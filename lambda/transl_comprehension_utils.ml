@@ -11,28 +11,29 @@ module Let_binding = struct
     { let_kind : Let_kind.t;
       layout : layout;
       id : Ident.t;
+      debug_uid : debug_uid;
       init : lambda;
       var : lambda
     }
 
-  let make (let_kind : Let_kind.t) layout name init =
+  let make (let_kind : Let_kind.t) layout name debug_uid init =
     let id = Ident.create_local name in
     let var =
       match let_kind with Mutable -> Lmutvar id | Immutable _ -> Lvar id
     in
-    { let_kind; layout; id; init; var }
+    { let_kind; layout; id; debug_uid; init; var }
 
-  let let_one { let_kind; layout; id; init } body =
+  let let_one { let_kind; layout; id; debug_uid; init } body =
     match let_kind with
-    | Immutable let_kind -> Llet (let_kind, layout, id, init, body)
-    | Mutable -> Lmutlet (layout, id, init, body)
+    | Immutable let_kind -> Llet (let_kind, layout, id, debug_uid, init, body)
+    | Mutable -> Lmutlet (layout, id, debug_uid, init, body)
 
   let let_all = List.fold_right let_one
 end
 
 module Lambda_utils = struct
   module Constants = struct
-    let int n = Lconst (const_int n)
+    let int n = tagged_immediate n
 
     let float f = Lconst (Const_base (Const_float (Float.to_string f)))
 
@@ -41,6 +42,12 @@ module Lambda_utils = struct
 
     let unboxed_float32 f =
       Lconst (Const_base (Const_unboxed_float32 (Float.to_string f)))
+
+    let untagged_int i = Lconst (Const_base (Const_untagged_int i))
+
+    let untagged_int8 i = Lconst (Const_base (Const_untagged_int8 i))
+
+    let untagged_int16 i = Lconst (Const_base (Const_untagged_int16 i))
 
     let unboxed_int32 i = Lconst (Const_base (Const_unboxed_int32 i))
 
@@ -112,31 +119,33 @@ module Lambda_utils = struct
 
   let int_ops ~loc : (module Int_ops) =
     (module struct
-      let binop prim l r = Lprim (prim, [l; r], loc)
+      let binop prim l r = Lprim (Pscalar (Binary prim), [l; r], loc)
 
-      let ( + ) = binop Paddint
+      let size = int
 
-      let ( - ) = binop Psubint
+      let ( + ) = binop (Integral (size, Add))
 
-      let ( * ) = binop Pmulint
+      let ( - ) = binop (Integral (size, Sub))
 
-      let ( / ) = binop (Pdivint Unsafe)
+      let ( * ) = binop (Integral (size, Mul))
 
-      let ( = ) = binop (Pintcomp Ceq)
+      let ( / ) = binop (Integral (size, Div Unsafe))
 
-      let ( <> ) = binop (Pintcomp Cne)
+      let ( = ) = binop (Icmp (size, Ceq))
 
-      let ( < ) = binop (Pintcomp Clt)
+      let ( <> ) = binop (Icmp (size, Cne))
 
-      let ( > ) = binop (Pintcomp Cgt)
+      let ( < ) = binop (Icmp (size, Clt))
 
-      let ( <= ) = binop (Pintcomp Cle)
+      let ( > ) = binop (Icmp (size, Cgt))
 
-      let ( >= ) = binop (Pintcomp Cge)
+      let ( <= ) = binop (Icmp (size, Cle))
 
-      let ( && ) = binop Psequor
+      let ( >= ) = binop (Icmp (size, Cge))
 
-      let ( || ) = binop Psequor
+      let ( && ) l r = Lprim (Psequand, [l; r], loc)
+
+      let ( || ) l r = Lprim (Psequor, [l; r], loc)
 
       let i = Constants.int
 

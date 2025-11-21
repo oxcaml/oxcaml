@@ -39,6 +39,7 @@ let no_crc = ref false
 let shape = ref false
 let index = ref false
 let decls = ref false
+let uid_deps = ref false
 
 module Magic_number = Misc.Magic_number
 module String = Misc.Stdlib.String
@@ -81,17 +82,20 @@ let print_impl_import import =
   let crco = Import_info.crc import in
   print_cu_crc name crco
 
+let print_quoted_global global =
+  printf "\t%a\n" Compilation_unit.Name.output global
+
 let print_global_name_binding global =
   printf "\t%a\n" Global_module.With_precision.output global
 
 let print_line name =
   printf "\t%s\n" name
 
-let print_global_line glob =
-  printf "\t%a\n" Global_module.Name.output glob
-
 let print_global_as_name_line glob =
   printf "\t%a\n" Global_module.Name.output (Global_module.to_name glob)
+
+let print_parameter_name_line name =
+  printf "\t%a\n" Global_module.Parameter_name.output name
 
 let print_name_line cu =
   printf "\t%a\n" print_cu_without_prefix cu
@@ -114,7 +118,8 @@ let print_required_global id =
 
 let print_arg_descr arg_descr =
   let ({ arg_param; arg_block_idx = _ } : Lambda.arg_descr) = arg_descr in
-  printf "Parameter implemented: %a\n" Global_module.Name.output arg_param
+  printf "Parameter implemented: %a\n"
+    Global_module.Parameter_name.output arg_param
 
 let print_cmo_infos cu =
   printf "Unit name: %a\n" Compilation_unit.output cu.cu_name;
@@ -160,12 +165,12 @@ let print_cmi_infos name crcs kind params global_name_bindings =
     in
     printf "Is parameter: %s\n" (if is_param then "YES" else "no");
     print_string "Parameters:\n";
-    List.iter print_global_as_name_line params;
+    List.iter print_parameter_name_line params;
     begin
       match kind with
       | Normal { cmi_arg_for = Some arg_for; _ } ->
         printf "Argument for parameter:\n";
-        print_global_line arg_for
+        print_parameter_name_line arg_for
       | Normal _ | Parameter ->
         ()
     end;
@@ -213,9 +218,32 @@ let print_cmt_infos cmt =
       cmt.cmt_ident_occurrences;
     Format.print_flush ()
   end;
+  if !uid_deps then begin
+    printf "\nUid dependencies:\n";
+    let arr = Array.of_list cmt.cmt_declaration_dependencies in
+    let () =
+      Array.sort (fun (_tr, u1, u2) (_tr', u1', u2') ->
+                    match Shape.Uid.compare u1 u1' with
+                    | 0 -> Shape.Uid.compare u2 u2'
+                    | n -> n) arr
+    in
+    Format.printf "@[<v>";
+    Array.iter (fun (rk, u1, u2) ->
+      let rk = match rk with
+        | Definition_to_declaration -> "<-"
+        | Declaration_to_declaration -> "<->"
+      in
+      Format.printf "@[<h>%a %s %a@]@;"
+        Shape.Uid.print u1
+        rk
+        Shape.Uid.print u2) arr;
+    Format.printf "@]";
+  end;
   if !decls then begin
     printf "\nUid of decls:\n";
-    Shape.Uid.Tbl.iter (fun uid item ->
+    let decls = Array.of_list (Shape.Uid.Tbl.to_list cmt.cmt_uid_to_decl) in
+    Array.sort (fun (uid, _) (uid', _) -> Shape.Uid.compare uid uid') decls;
+    Array.iter (fun (uid, item) ->
       let loc = match (item : Typedtree.item_declaration) with
         | Value vd -> vd.val_name
         | Value_binding vb ->
@@ -245,18 +273,20 @@ let print_cmt_infos cmt =
       Format.printf "@[<hov 2>%a:@ %a@]@;"
         Shape.Uid.print uid
         pp_loc loc)
-      cmt.cmt_uid_to_decl;
-      Format.print_flush ()
+      decls;
+    Format.print_flush ()
   end
 
 let print_cms_infos cms =
   let open Cms_format in
   printf "Cms unit name: %a\n" Compilation_unit.output cms.cms_modname;
+  printf "Cms shape format: %s\n"
+    (Cms_format.shape_format_to_string cms.cms_shape_format);
   printf "Source file: %s\n"
     (match cms.cms_sourcefile with None -> "(none)" | Some f -> f)
 
 let print_general_infos print_name name crc defines arg_descr mbf
-    iter_cmi iter_cmx =
+    iter_cmi iter_cmx iter_qglobals =
   printf "Name: %a\n" print_name name;
   printf "CRC of implementation: %s\n" (string_of_crc crc);
   printf "Globals defined:\n";
@@ -266,6 +296,8 @@ let print_general_infos print_name name crc defines arg_descr mbf
   iter_cmi print_intf_import;
   printf "Implementations imported:\n";
   iter_cmx print_impl_import;
+  printf "Globals used in quotations:\n";
+  iter_qglobals print_quoted_global;
   Option.iter print_main_module_block_format mbf
 
 let print_global_table table =
@@ -314,7 +346,8 @@ let print_cmx_infos (uir, sections, crc) =
   print_general_infos Compilation_unit.output uir.uir_unit crc uir.uir_defines
     uir.uir_arg_descr (Some uir.uir_format)
     (fun f -> Array.iter f uir.uir_imports_cmi)
-    (fun f -> Array.iter f uir.uir_imports_cmx);
+    (fun f -> Array.iter f uir.uir_imports_cmx)
+    (fun f -> Array.iter f uir.uir_quoted_globals);
   begin
     match uir.uir_export_info with
     | None ->
@@ -351,7 +384,9 @@ let print_cmxa_infos (lib : Cmx_format.library_infos) =
           (fun f ->
             B.iter (fun i -> f lib.lib_imports_cmi.(i)) u.li_imports_cmi)
           (fun f ->
-            B.iter (fun i -> f lib.lib_imports_cmx.(i)) u.li_imports_cmx);
+            B.iter (fun i -> f lib.lib_imports_cmx.(i)) u.li_imports_cmx)
+          (fun f ->
+            B.iter(fun i -> f lib.lib_quoted_globals.(i)) u.li_quoted_globals);
         printf "Force link: %s\n" (if u.li_force_link then "YES" else "no"))
 
 let print_cmxs_infos header =
@@ -364,7 +399,8 @@ let print_cmxs_infos header =
          None
          None
          (fun f -> Array.iter f ui.dynu_imports_cmi)
-         (fun f -> Array.iter f ui.dynu_imports_cmx))
+         (fun f -> Array.iter f ui.dynu_imports_cmx)
+         (fun f -> Array.iter f ui.dynu_quoted_globals);)
     header.dynu_units
 
 let p_title title = printf "%s:\n" title
@@ -476,7 +512,7 @@ let dump_obj_by_kind filename ic obj_kind =
        seek_in ic (first_section_offset + uir.uir_sections_length);
        let crc = Digest.input ic in
        (* This consumes ic *)
-       let sections = Flambda_backend_utils.File_sections.create
+       let sections = Oxcaml_utils.File_sections.create
              uir.uir_section_toc filename ic ~first_section_offset in
        print_cmx_infos (uir, sections, crc)
     | Cmxa ->
@@ -569,6 +605,8 @@ let arg_list = [
     " Print a list of all usages of values, types, etc. in the module";
   "-decls", Arg.Set decls,
     " Print a list of all declarations in the module";
+  "-uid-deps", Arg.Set uid_deps,
+    " Print the declarations' uids dependencies of the module";
   "-null-crc", Arg.Set no_crc, " Print a null CRC for imported interfaces";
   "-args", Arg.Expand Arg.read_arg,
      "<file> Read additional newline separated command line arguments \n\

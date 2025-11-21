@@ -16,12 +16,17 @@ module Sort = struct
   type base =
     | Void
     | Value
+    | Untagged_immediate
     | Float64
     | Float32
     | Word
+    | Bits8
+    | Bits16
     | Bits32
     | Bits64
     | Vec128
+    | Vec256
+    | Vec512
 
   type t =
     | Var of var
@@ -30,6 +35,7 @@ module Sort = struct
 
   and var =
     { mutable contents : t option;
+      mutable level : int;
       uid : int (* For debugging / printing only *)
     }
 
@@ -37,25 +43,37 @@ module Sort = struct
     match b1, b2 with
     | Void, Void
     | Value, Value
+    | Untagged_immediate, Untagged_immediate
     | Float64, Float64
     | Float32, Float32
     | Word, Word
+    | Bits8, Bits8
+    | Bits16, Bits16
     | Bits32, Bits32
     | Bits64, Bits64
-    | Vec128, Vec128 ->
+    | Vec128, Vec128
+    | Vec256, Vec256
+    | Vec512, Vec512 ->
       true
-    | (Void | Value | Float64 | Float32 | Word | Bits32 | Bits64 | Vec128), _ ->
+    | ( ( Void | Value | Untagged_immediate | Float64 | Float32 | Word | Bits8
+        | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ),
+        _ ) ->
       false
 
   let to_string_base = function
     | Value -> "value"
     | Void -> "void"
+    | Untagged_immediate -> "untagged_immediate"
     | Float64 -> "float64"
     | Float32 -> "float32"
     | Word -> "word"
+    | Bits8 -> "bits8"
+    | Bits16 -> "bits16"
     | Bits32 -> "bits32"
     | Bits64 -> "bits64"
     | Vec128 -> "vec128"
+    | Vec256 -> "vec256"
+    | Vec512 -> "vec512"
 
   module Const = struct
     type t =
@@ -77,7 +95,17 @@ module Sort = struct
       in
       pp_element ~nested:false ppf c
 
+    let rec all_void = function
+      | Base Void -> true
+      | Base
+          ( Value | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
+          | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 ) ->
+        false
+      | Product ts -> List.for_all all_void ts
+
     let value = Base Value
+
+    let untagged_immediate = Base Untagged_immediate
 
     let void = Base Void
 
@@ -87,11 +115,19 @@ module Sort = struct
 
     let word = Base Word
 
+    let bits8 = Base Bits8
+
+    let bits16 = Base Bits16
+
     let bits32 = Base Bits32
 
     let bits64 = Base Bits64
 
     let vec128 = Base Vec128
+
+    let vec256 = Base Vec256
+
+    let vec512 = Base Vec512
 
     module Debug_printers = struct
       let t ppf c =
@@ -101,12 +137,17 @@ module Sort = struct
               (match b with
               | Void -> "Void"
               | Value -> "Value"
+              | Untagged_immediate -> "Untagged_immediate"
               | Float64 -> "Float64"
               | Float32 -> "Float32"
               | Word -> "Word"
+              | Bits8 -> "Bits8"
+              | Bits16 -> "Bits16"
               | Bits32 -> "Bits32"
               | Bits64 -> "Bits64"
-              | Vec128 -> "Vec128")
+              | Vec128 -> "Vec128"
+              | Vec256 -> "Vec256"
+              | Vec512 -> "Vec512")
           | Product cs ->
             let pp_sep ppf () = Format.fprintf ppf "@ , " in
             Format.fprintf ppf "Product [%a]"
@@ -153,6 +194,18 @@ module Sort = struct
     let for_array_comprehension_element = value
 
     let for_list_element = value
+
+    let for_idx = bits64
+
+    let for_loop_index = value
+
+    let for_constructor = value
+
+    let for_module_field = value
+
+    let for_boxed_variant = value
+
+    let for_exception = value
   end
 
   module Var = struct
@@ -187,12 +240,17 @@ module Sort = struct
         (match b with
         | Void -> "Void"
         | Value -> "Value"
+        | Untagged_immediate -> "Untagged_immediate"
         | Float64 -> "Float64"
         | Float32 -> "Float32"
         | Word -> "Word"
+        | Bits8 -> "Bits8"
+        | Bits16 -> "Bits16"
         | Bits32 -> "Bits32"
         | Bits64 -> "Bits64"
-        | Vec128 -> "Vec128")
+        | Vec128 -> "Vec128"
+        | Vec256 -> "Vec256"
+        | Vec512 -> "Vec512")
 
     let rec t ppf = function
       | Var v -> fprintf ppf "Var %a" var v
@@ -211,7 +269,11 @@ module Sort = struct
   end
 
   (* To record changes to sorts, for use with `Types.{snapshot, backtrack}` *)
-  type change = var * t option
+  type sort_change =
+    | Ccontents of t option
+    | Clevel of int
+
+  type change = var * sort_change
 
   let change_log : (change -> unit) ref = ref (fun _ -> ())
 
@@ -219,12 +281,32 @@ module Sort = struct
 
   let log_change change = !change_log change
 
-  let undo_change (v, t_op) = v.contents <- t_op
+  let undo_change (v, ch) =
+    match ch with
+    | Ccontents t_op -> v.contents <- t_op
+    | Clevel level -> v.level <- level
+
+  let rec t_iter ~f = function
+    | Var v -> f v
+    | Base _ -> ()
+    | Product ts -> List.iter (fun t -> t_iter ~f t) ts
+
+  let update_level u v =
+    let new_level = min v.level u.level in
+    if v.level <> new_level
+    then (
+      log_change (v, Clevel v.level);
+      v.level <- new_level);
+    if u.level <> new_level
+    then (
+      log_change (u, Clevel u.level);
+      u.level <- new_level)
 
   let set : var -> t option -> unit =
    fun v t_op ->
-    log_change (v, v.contents);
-    v.contents <- t_op
+    log_change (v, Ccontents v.contents);
+    v.contents <- t_op;
+    Option.iter (t_iter ~f:(fun u -> update_level u v)) t_op
 
   module Static = struct
     (* Statically allocated values of various consts and sorts to save
@@ -236,11 +318,17 @@ module Sort = struct
 
       let value = Base Value
 
+      let untagged_immediate = Base Untagged_immediate
+
       let float64 = Base Float64
 
       let float32 = Base Float32
 
       let word = Base Word
+
+      let bits8 = Base Bits8
+
+      let bits16 = Base Bits16
 
       let bits32 = Base Bits32
 
@@ -248,15 +336,24 @@ module Sort = struct
 
       let vec128 = Base Vec128
 
+      let vec256 = Base Vec256
+
+      let vec512 = Base Vec512
+
       let of_base = function
         | Void -> void
         | Value -> value
+        | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
         | Float32 -> float32
         | Word -> word
+        | Bits8 -> bits8
+        | Bits16 -> bits16
         | Bits32 -> bits32
         | Bits64 -> bits64
         | Vec128 -> vec128
+        | Vec256 -> vec256
+        | Vec512 -> vec512
 
       let rec of_const : Const.t -> t = function
         | Base b -> of_base b
@@ -268,11 +365,17 @@ module Sort = struct
 
       let void = Some T.void
 
+      let untagged_immediate = Some T.untagged_immediate
+
       let float64 = Some T.float64
 
       let float32 = Some T.float32
 
       let word = Some T.word
+
+      let bits8 = Some T.bits8
+
+      let bits16 = Some T.bits16
 
       let bits32 = Some T.bits32
 
@@ -280,15 +383,24 @@ module Sort = struct
 
       let vec128 = Some T.vec128
 
+      let vec256 = Some T.vec256
+
+      let vec512 = Some T.vec512
+
       let of_base = function
         | Void -> void
         | Value -> value
+        | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
         | Float32 -> float32
         | Word -> word
+        | Bits8 -> bits8
+        | Bits16 -> bits16
         | Bits32 -> bits32
         | Bits64 -> bits64
         | Vec128 -> vec128
+        | Vec256 -> vec256
+        | Vec512 -> vec512
 
       let rec of_const : Const.t -> t option = function
         | Base b -> of_base b
@@ -305,11 +417,17 @@ module Sort = struct
 
       let void = Base Void
 
+      let untagged_immediate = Base Untagged_immediate
+
       let float64 = Base Float64
 
       let float32 = Base Float32
 
       let word = Base Word
+
+      let bits8 = Base Bits8
+
+      let bits16 = Base Bits16
 
       let bits32 = Base Bits32
 
@@ -317,15 +435,24 @@ module Sort = struct
 
       let vec128 = Base Vec128
 
+      let vec256 = Base Vec256
+
+      let vec512 = Base Vec512
+
       let of_base : base -> Const.t = function
         | Value -> value
         | Void -> void
+        | Untagged_immediate -> untagged_immediate
         | Float64 -> float64
         | Float32 -> float32
         | Word -> word
+        | Bits8 -> bits8
+        | Bits16 -> bits16
         | Bits32 -> bits32
         | Bits64 -> bits64
         | Vec128 -> vec128
+        | Vec256 -> vec256
+        | Vec512 -> vec512
     end
   end
 
@@ -333,9 +460,9 @@ module Sort = struct
 
   let last_var_uid = ref 0
 
-  let new_var () =
+  let new_var ~level =
     incr last_var_uid;
-    Var { contents = None; uid = !last_var_uid }
+    Var { contents = None; uid = !last_var_uid; level }
 
   let rec get : t -> t = function
     | Base _ as t -> t
@@ -484,12 +611,14 @@ module Sort = struct
     (* CR layouts v5: this should probably default to void now *)
     match default_to_value_and_get t with
     | Base Void -> true
-    | Base (Value | Float64 | Float32 | Word | Bits32 | Bits64 | Vec128) ->
+    | Base
+        ( Value | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
+        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
       false
     | Product _ -> false
 
-  let decompose_into_product t n =
-    let ts = List.init n (fun _ -> new_var ()) in
+  let decompose_into_product ~level t n =
+    let ts = List.init n (fun _ -> new_var ~level) in
     if equate t (Product ts) then Some ts else None
 
   (*** pretty printing ***)

@@ -76,7 +76,17 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
     type t = O.t
 
-    external is_null : O.t -> bool = "%is_null"
+    (* Normally, [Obj.t] has layout [value], but we need to handle nullable
+       values at toplevel. flambda2 is allowed to optimise calls to [is_null]
+       on an argument with [value] layout to [false], so first convert
+       (opaquely!) to a type with [value_or_null] layout. *)
+    type obj_or_null : value_or_null
+
+    external obj_or_null : t -> obj_or_null = "%opaque"
+
+    external is_null : obj_or_null -> bool = "%is_null"
+
+    let[@inline] is_null obj = is_null (obj_or_null obj)
 
     (* Normally, [Obj.is_block] can't be called on [value_or_null]s.
        But here we need to handle nullable values at toplevel. *)
@@ -158,10 +168,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 (fun x -> Oval_char (O.obj x : char))) );
       ( Pident(Ident.create_local "print_int8"),
         Simple (Predef.type_int8,
-                (fun x -> Oval_int (O.obj x : int))) );
+                (fun x -> Oval_int8 (O.obj x : int))) );
       ( Pident(Ident.create_local "print_int16"),
         Simple (Predef.type_int16,
-                (fun x -> Oval_int (O.obj x : int))) );
+                (fun x -> Oval_int16 (O.obj x : int))) );
       ( Pident(Ident.create_local "print_int32"),
         Simple (Predef.type_int32,
                 (fun x -> Oval_int32 (O.obj x : int32))) );
@@ -267,7 +277,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     let print_sort : Jkind.Sort.Const.t -> _ = function
       | Base Value -> Print_as_value
       | Base Void -> Print_as "<void>"
-      | Base (Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word) -> Print_as "<abstr>"
+      | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 |
+              Vec128 | Vec256 | Vec512 | Word | Untagged_immediate) ->
+        Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
 
     let print_sort_option : Jkind.Sort.Const.t option -> _ = function
@@ -408,6 +420,11 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                  in
                  Oval_lazy v
                end
+
+          | Tconstr (path, [_], _)
+            when Path.same path Predef.path_code ->
+            Oval_code (O.obj obj : CamlinternalQuote.Code.t)
+
           | Tconstr(path, ty_list, _) -> begin
               try
                 let decl = Env.find_type path env in
@@ -591,7 +608,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 find (row_fields row)
           | Tobject (_, _) ->
               Oval_stuff "<obj>"
-          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ ->
+          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _
+          | Tquote _ | Tsplice _ | Tof_kind _ ->
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->
               tree_of_val (depth - 1) obj ty
@@ -634,16 +652,19 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                         | Value -> `Continue (O.field obj pos)
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
-                        | Float32 | Bits32 | Bits64 | Vec128 | Word ->
+                        | Float32 | Bits8 | Bits16 | Untagged_immediate
+                        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
+                        | Product _ ->
                             `Stop (Oval_stuff "<abstr>")
+                        | Void ->
+                            `Stop (Oval_stuff "<void>")
                       in
                       match fld with
                       | `Continue fld ->
                           nest tree_of_val (depth - 1) fld ty_arg
                       | `Stop result -> result
               in
-              let pos = if is_void then pos else pos + 1 in
-              (lid, v) :: tree_of_fields false pos remainder
+              (lid, v) :: tree_of_fields false (pos + 1) remainder
         in
         Oval_record (tree_of_fields (pos = 0) pos lbl_list)
 
@@ -657,11 +678,6 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               let name = Ident.name ld_id in
               (* PR#5722: print full module path only
                  for first record field *)
-              let is_void =
-                match ld_sort with
-                  | None -> false
-                  | Some ld_sort -> Jkind.Sort.Const.(equal void ld_sort)
-              in
               let lid =
                 if first then tree_of_label env path (Out_name.create name)
                 else Oide_ident (Out_name.create name)
@@ -675,8 +691,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     tree_of_val (depth - 1) obj ty_arg
                   | _ -> nest tree_of_val (depth - 1) (O.field obj pos) ty_arg
               in
-              let pos = if is_void then pos else pos + 1 in
-              (lid, v) :: tree_of_fields false pos remainder
+              (lid, v) :: tree_of_fields false (pos + 1) remainder
         in
         Oval_record_unboxed_product (tree_of_fields (pos = 0) pos lbl_list)
 
@@ -695,7 +710,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         let rec tree_list i = function
           | [] -> []
           | (_, Print_as msg) :: ty_list ->
-              Oval_stuff msg :: tree_list i ty_list
+              Oval_stuff msg :: tree_list (i + 1) ty_list
           | (ty, Print_as_value) :: ty_list ->
               let tree = nest tree_of_val (depth - 1) (O.field obj i) ty in
               tree :: tree_list (i + 1) ty_list
@@ -703,7 +718,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       tree_list start ty_list
 
       and tree_of_generic_array am depth obj ty_arg =
-        if O.tag obj = Obj.custom_tag then
+        let obj_block = Obj.Uniform_or_mixed.of_block (O.obj obj) in
+        if Obj.Uniform_or_mixed.is_mixed obj_block then
           Oval_stuff "<abstr array>"
         else
           let oval elts = Oval_array (elts, am) in

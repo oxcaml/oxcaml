@@ -68,14 +68,14 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : unit -> local_ int end
+         sig val f : unit -> int @ local end
        is not included in
          sig val f : unit -> int end
        Values do not match:
-         val f : unit -> local_ int
+         val f : unit -> int @ local
        is not included in
          val f : unit -> int
-       The type "unit -> local_ int" is not compatible with the type
+       The type "unit -> int @ local" is not compatible with the type
          "unit -> int"
 |}]
 
@@ -85,7 +85,7 @@ end = struct
     let f (_ @ global) = 42
 end
 [%%expect{|
-module M : sig val f : local_ int -> int end
+module M : sig val f : int @ local -> int end
 |}]
 
 (* Check all the mode crossing coercions *)
@@ -121,7 +121,7 @@ type cross_uncontended
 
 let cross_global (x : cross_global @ local) : _ @ global = x
 [%%expect{|
-val cross_global : local_ cross_global -> cross_global = <fun>
+val cross_global : cross_global @ local -> cross_global = <fun>
 |}]
 
 let cross_local (x : cross_local @ local) : _ @ global = x
@@ -129,7 +129,7 @@ let cross_local (x : cross_local @ local) : _ @ global = x
 Line 1, characters 57-58:
 1 | let cross_local (x : cross_local @ local) : _ @ global = x
                                                              ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let cross_many (x : cross_many @ once) : _ @ many = x
@@ -142,7 +142,7 @@ let cross_once (x : cross_once @ once) : _ @ many = x
 Line 1, characters 52-53:
 1 | let cross_once (x : cross_once @ once) : _ @ many = x
                                                         ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let cross_portable (x : cross_portable @ nonportable) : _ @ portable = x
@@ -155,7 +155,7 @@ let cross_nonportable (x : cross_nonportable @ nonportable) : _ @ portable = x
 Line 1, characters 77-78:
 1 | let cross_nonportable (x : cross_nonportable @ nonportable) : _ @ portable = x
                                                                                  ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let cross_unyielding (x : cross_unyielding @ yielding) : _ @ unyielding = x
@@ -169,7 +169,7 @@ let cross_yielding (x : cross_yielding @ yielding) : _ @ unyielding = x
 Line 1, characters 70-71:
 1 | let cross_yielding (x : cross_yielding @ yielding) : _ @ unyielding = x
                                                                           ^
-Error: This value is "yielding" but expected to be "unyielding".
+Error: This value is "yielding" but is expected to be "unyielding".
 |}]
 
 let cross_aliased (x : cross_aliased @ aliased) : _ @ unique = x
@@ -182,7 +182,7 @@ let cross_unique (x : cross_unique @ aliased) : _ @ unique = x
 Line 1, characters 61-62:
 1 | let cross_unique (x : cross_unique @ aliased) : _ @ unique = x
                                                                  ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let cross_contended1 (x : cross_contended @ shared) : _ @ uncontended = x
@@ -206,7 +206,7 @@ let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
 Line 1, characters 64-65:
 1 | let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
                                                                     ^
-Error: This value is "contended" but expected to be "shared".
+Error: This value is "contended" but is expected to be "shared" or "uncontended".
 |}]
 
 let cross_uncontended1 (x : cross_uncontended @ shared) : _ @ uncontended = x
@@ -214,7 +214,7 @@ let cross_uncontended1 (x : cross_uncontended @ shared) : _ @ uncontended = x
 Line 1, characters 76-77:
 1 | let cross_uncontended1 (x : cross_uncontended @ shared) : _ @ uncontended = x
                                                                                 ^
-Error: This value is "shared" but expected to be "uncontended".
+Error: This value is "shared" but is expected to be "uncontended".
 |}]
 
 let cross_uncontended2 (x : cross_uncontended @ contended) : _ @ shared = x
@@ -222,7 +222,7 @@ let cross_uncontended2 (x : cross_uncontended @ contended) : _ @ shared = x
 Line 1, characters 74-75:
 1 | let cross_uncontended2 (x : cross_uncontended @ contended) : _ @ shared = x
                                                                               ^
-Error: This value is "contended" but expected to be "shared".
+Error: This value is "contended" but is expected to be "shared" or "uncontended".
 |}]
 
 (* Check that all modalities cross modes *)
@@ -231,7 +231,7 @@ type t
 type s : value mod global = { v : t @@ global } [@@unboxed]
 [%%expect{|
 type t
-type s = { global_ v : t; } [@@unboxed]
+type s = { v : t @@ global; } [@@unboxed]
 |}]
 type s : value mod many = { v : t @@ many } [@@unboxed]
 [%%expect{|

@@ -46,7 +46,7 @@ val id : 'a -> 'a = <fun>
 Line 5, characters 21-22:
 5 |   let x = overwrite_ r with { x = "foo" } in
                          ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let overwrite_shared (r : record_update) =
@@ -80,7 +80,9 @@ let gc_soundness_bug (local_ unique_ r) (local_ x) =
 Line 2, characters 31-32:
 2 |   exclave_ overwrite_ r with { x }
                                    ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global"
+       because it is the field "x" of the record at Line 2, characters 29-34
+       which is expected to be "global".
 |}]
 
 let disallowed_by_locality (local_ unique_ r) (local_ x) =
@@ -89,7 +91,9 @@ let disallowed_by_locality (local_ unique_ r) (local_ x) =
 Line 2, characters 22-23:
 2 |   overwrite_ r with { x }
                           ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is the field "x" of the record at Line 2, characters 20-25
+       which is expected to be "global".
 |}]
 
 let gc_soundness_bug (unique_ r) (local_ x) =
@@ -98,7 +102,9 @@ let gc_soundness_bug (unique_ r) (local_ x) =
 Line 2, characters 31-32:
 2 |   exclave_ overwrite_ r with { x }
                                    ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global"
+       because it is the field "x" of the record at Line 2, characters 29-34
+       which is expected to be "global".
 |}]
 
 let disallowed_by_locality (unique_ r) (local_ x) =
@@ -107,7 +113,9 @@ let disallowed_by_locality (unique_ r) (local_ x) =
 Line 2, characters 22-23:
 2 |   overwrite_ r with { x }
                           ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is the field "x" of the record at Line 2, characters 20-25
+       which is expected to be "global".
 |}]
 
 let gc_soundness_no_bug (local_ unique_ r) x =
@@ -142,7 +150,9 @@ let disallowed_by_locality () x =
 Line 3, characters 13-14:
 3 |   overwrite_ r with { x }
                  ^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global".
 |}]
 
 let returning_regional () x =
@@ -176,7 +186,7 @@ let disallowed_by_regionality (local_ unique_ r) x =
 Line 3, characters 16-17:
 3 |   let ref = ref r in
                     ^
-Error: This value escapes its region.
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let gc_soundness_no_bug (unique_ r) x =
@@ -341,7 +351,9 @@ let update : moded_record @ unique once -> moded_record @ many =
 Line 4, characters 39-47:
 4 |     overwrite_ mr with { a = None; b = once_fun }
                                            ^^^^^^^^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many"
+       because it is the field "b" of the record at Line 4, characters 23-49
+       which is expected to be "many".
 |}]
 
 let update : moded_record @ unique once -> moded_record @ many =
@@ -351,7 +363,12 @@ let update : moded_record @ unique once -> moded_record @ many =
 Line 3, characters 39-40:
 3 |     overwrite_ mr with { a = None; b = _ }
                                            ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once"
+       because it is the field "b" of the record at Line 3, characters 15-17
+       which is "once".
+       However, the highlighted expression is expected to be "many"
+       because it is the field "b" of the record at Line 3, characters 23-42
+       which is expected to be "many".
 |}]
 
 (* Same as above, but omitting the [b = _]. *)
@@ -362,7 +379,12 @@ let update : moded_record @ unique once -> moded_record @ many =
 Line 3, characters 15-17:
 3 |     overwrite_ mr with { a = None }
                    ^^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once"
+       because it is the field "b" of the record at Line 3, characters 15-17
+       which is "once".
+       However, the highlighted expression is expected to be "many"
+       because it is the field "b" of the record at Line 3, characters 23-35
+       which is expected to be "many".
 |}]
 
 let update : moded_record @ unique nonportable -> moded_record @ portable =
@@ -386,7 +408,9 @@ let update : moded_record @ unique nonportable -> moded_record @ portable =
 Line 4, characters 39-54:
 4 |     overwrite_ mr with { a = None; b = nonportable_fun }
                                            ^^^^^^^^^^^^^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is the field "b" of the record at Line 4, characters 23-56
+       which is expected to be "portable".
 |}]
 
 let update : moded_record @ unique nonportable -> moded_record @ portable =
@@ -398,7 +422,11 @@ let update : moded_record @ unique nonportable -> moded_record @ portable =
 Line 5, characters 34-49:
 5 |     overwrite_ mr with { a = Some nonportable_fun; b = portable_fun }
                                       ^^^^^^^^^^^^^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable"
+       because it is contained (via constructor "Some") in the value at Line 5, characters 29-49
+       which is expected to be "portable"
+       because it is the field "a" of the record at Line 5, characters 23-69
+       which is expected to be "portable".
 |}]
 
 (* This works since the kept field has the portable modality: *)
@@ -816,7 +844,7 @@ let mutable_field_aliased r =
 Line 2, characters 10-13:
 2 |   unique_ r.m
               ^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let tag_of_mutable_field r =
@@ -828,7 +856,7 @@ let tag_of_mutable_field r =
 Line 4, characters 15-18:
 4 |     overwrite_ r.m with OptionA s
                    ^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let mutating_tag_seq r =
@@ -841,7 +869,7 @@ let mutating_tag_seq r =
 Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let mutating_tag_seq_same r =
@@ -854,7 +882,7 @@ let mutating_tag_seq_same r =
 Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let mutating_tag_seq_parent r =
@@ -867,7 +895,10 @@ let mutating_tag_seq_parent r =
 Line 5, characters 15-20:
 5 |     overwrite_ r.m.x with OptionA s
                    ^^^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "x" of the record at Line 5, characters 15-18
+       which is "aliased".
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let mutating_tag_par r =
@@ -879,7 +910,7 @@ let mutating_tag_par r =
 Line 4, characters 35-38:
 4 |     (r.m <- OptionB s), overwrite_ r.m with OptionA s
                                        ^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let mutating_tag_par_parent r =
@@ -891,7 +922,10 @@ let mutating_tag_par_parent r =
 Line 4, characters 43-48:
 4 |     (r.m <- { x = OptionB s }), overwrite_ r.m.x with OptionA s
                                                ^^^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "x" of the record at Line 4, characters 43-46
+       which is "aliased".
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let mutating_tag_choice r =
@@ -904,7 +938,7 @@ let mutating_tag_choice r =
 Line 5, characters 28-31:
 5 |             else overwrite_ r.m with OptionA s
                                 ^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let mutating_tag_choice_parent r =
@@ -917,7 +951,10 @@ let mutating_tag_choice_parent r =
 Line 5, characters 20-25:
 5 |     else overwrite_ r.m.x with OptionA s
                         ^^^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "x" of the record at Line 5, characters 20-23
+       which is "aliased".
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let mutating_tag_choice_seq r =
@@ -930,7 +967,7 @@ let mutating_tag_choice_seq r =
 Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let mutating_tag_choice_seq_parent r =
@@ -943,7 +980,10 @@ let mutating_tag_choice_seq_parent r =
 Line 5, characters 15-20:
 5 |     overwrite_ r.m.x with OptionA s
                    ^^^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased"
+       because it is the field "x" of the record at Line 5, characters 15-18
+       which is "aliased".
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 
@@ -961,7 +1001,7 @@ let mutating_tag_rematch r =
 Line 7, characters 17-20:
 7 |       overwrite_ r.m with OptionB s
                      ^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 (********************************)

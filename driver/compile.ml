@@ -19,11 +19,11 @@ open Compile_common
 let tool_name = "ocamlc"
 
 let with_info =
-  Compile_common.with_info ~native:false ~tool_name
+  Compile_common.with_info ~backend:Byte ~tool_name
 
 let interface ~source_file ~output_prefix =
   with_info ~source_file ~output_prefix ~dump_ext:"cmi"
-    ~compilation_unit:Inferred_from_output_prefix
+    ~compilation_unit:Inferred_from_output_prefix ~kind:Intf
   @@ fun info ->
   Compile_common.interface
     ~hook_parse_tree:(fun _ -> ())
@@ -39,16 +39,25 @@ let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
   | Some _, None -> Misc.fatal_error "No argument field"
   | None, Some _ -> Misc.fatal_error "Unexpected argument field"
 
-let raw_lambda_to_bytecode i raw_lambda ~as_arg_for =
-  raw_lambda
+let slambda_to_bytecode i slambda ~as_arg_for =
+  slambda
   |> Profile.(record ~accumulate:true generate)
-    (fun { Lambda.code = lambda; required_globals; main_module_block_format;
-           arg_block_idx } ->
+    (fun slambda ->
        Builtin_attributes.warn_unused ();
-       lambda
+       slambda
+       |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program
+       |> Slambdaeval.eval
+       |> fun { Lambda.code = lambda; required_globals;
+                main_module_block_format; arg_block_idx } ->
+          lambda
+       |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
+          (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
-       |> Simplif.simplify_lambda
+       |> Simplif.simplify_lambda_for_bytecode
        |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
+       |> Blambda_of_lambda.blambda_of_lambda
+            ~compilation_unit:(Some i.module_name)
+       |> print_if i.ppf_dump Clflags.dump_blambda Printblambda.blambda
        |> Bytegen.compile_implementation i.module_name
        |> print_if i.ppf_dump Clflags.dump_instr Printinstr.instrlist
        |> fun bytecode ->
@@ -65,8 +74,8 @@ let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
   in
   (structure, coercion, argument_coercion)
   |> Profile.(record transl)
-    (Translmod.transl_implementation i.module_name ~style:Set_global_to_block)
-  |> raw_lambda_to_bytecode i
+    (Translmod.transl_implementation i.module_name)
+  |> slambda_to_bytecode i
 
 let emit_bytecode i
       (bytecode, required_globals, main_module_block_format, arg_descr) =
@@ -102,16 +111,14 @@ let implementation_aux ~start_from ~source_file ~output_prefix
     ~keep_symbol_tables:_
     ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
   with_info ~source_file ~output_prefix ~dump_ext:"cmo" ~compilation_unit
+    ~kind:Impl
   @@ fun info ->
   match start_from with
   | Parsing ->
     let backend info typed =
       let as_arg_for =
         !Clflags.as_argument_for
-        |> Option.map (fun param ->
-          (* Currently, parameters don't have parameters, so we assume the argument
-             list is empty *)
-          Global_module.Name.create_no_args param)
+        |> Option.map Global_module.Parameter_name.of_string
       in
       let bytecode = to_bytecode info typed ~as_arg_for in
       emit_bytecode info bytecode
@@ -136,9 +143,9 @@ let implementation_aux ~start_from ~source_file ~output_prefix
     in
     let impl =
       Translmod.transl_instance info.module_name ~runtime_args
-        ~main_module_block_size ~arg_block_idx ~style:Set_global_to_block
+        ~main_module_block_size ~arg_block_idx
     in
-    let bytecode = raw_lambda_to_bytecode info impl ~as_arg_for in
+    let bytecode = slambda_to_bytecode info impl ~as_arg_for in
     emit_bytecode info bytecode
 
 let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =

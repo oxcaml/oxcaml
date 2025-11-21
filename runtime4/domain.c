@@ -18,6 +18,8 @@
 
 #include "caml/domain_state.h"
 #include "caml/memory.h"
+#include "caml/fail.h"
+#include "caml/signals.h"
 
 CAMLexport caml_domain_state* Caml_state;
 
@@ -67,6 +69,9 @@ void caml_init_domain (void)
   Caml_state->last_return_address = 1; /* not in OCaml code initially */
   Caml_state->gc_regs = NULL;
 
+  Caml_state->tls_state = Val_unit;
+  caml_register_generational_global_root(&Caml_state->tls_state);
+
   Caml_state->stat_minor_words = 0.0;
   Caml_state->stat_promoted_words = 0.0;
   Caml_state->stat_major_words = 0.0;
@@ -100,90 +105,14 @@ void caml_init_domain (void)
   #endif
 }
 
-/* OCaml 5 stdlib compatibility hooks */
-value (*caml_hook_mutex_new)(value unit) = NULL;
-value (*caml_hook_mutex_lock)(value wrapper) = NULL;
-value (*caml_hook_mutex_unlock)(value wrapper) = NULL;
-value (*caml_hook_mutex_try_lock)(value wrapper) = NULL;
-value (*caml_hook_condition_new)(value unit) = NULL;
-value (*caml_hook_condition_wait)(value wcond, value wmut) = NULL;
-value (*caml_hook_condition_signal)(value wrapper) = NULL;
-value (*caml_hook_condition_broadcast)(value wrapper) = NULL;
-
-#include "caml/fail.h"
-
-CAMLprim value caml_ml_mutex_new(value unit)
+CAMLprim value caml_ml_domain_cpu_relax(value unit)
 {
-  if (caml_hook_mutex_new == NULL)
-    caml_failwith("Must initialize systhreads library before using Mutex");
-
-  return (*caml_hook_mutex_new)(unit);
-}
-
-CAMLprim value caml_ml_mutex_lock(value wrapper)
-{
-  if (caml_hook_mutex_lock == NULL)
-    caml_failwith("Must initialize systhreads library before using Mutex");
-
-  return (*caml_hook_mutex_lock)(wrapper);
-}
-
-CAMLprim value caml_ml_mutex_unlock(value wrapper)
-{
-  if (caml_hook_mutex_unlock == NULL)
-    caml_failwith("Must initialize systhreads library before using Mutex");
-
-  return (*caml_hook_mutex_unlock)(wrapper);
-}
-
-CAMLprim value caml_ml_mutex_try_lock(value wrapper)
-{
-  if (caml_hook_mutex_try_lock == NULL)
-    caml_failwith("Must initialize systhreads library before using Mutex");
-
-  return (*caml_hook_mutex_try_lock)(wrapper);
-}
-
-CAMLprim value caml_ml_condition_new(value unit)
-{
-  if (caml_hook_condition_new == NULL)
-    caml_failwith("Must initialize systhreads library before using Condition");
-
-  return (*caml_hook_condition_new)(unit);
-}
-
-CAMLprim value caml_ml_condition_wait(value wcond, value wmut)
-{
-  if (caml_hook_condition_wait == NULL)
-    caml_failwith("Must initialize systhreads library before using Condition");
-
-  return (*caml_hook_condition_wait)(wcond, wmut);
-}
-
-CAMLprim value caml_ml_condition_signal(value wrapper)
-{
-  if (caml_hook_condition_signal == NULL)
-    caml_failwith("Must initialize systhreads library before using Condition");
-
-  return (*caml_hook_condition_signal)(wrapper);
-}
-
-CAMLprim value caml_ml_condition_broadcast(value wrapper)
-{
-  if (caml_hook_condition_broadcast == NULL)
-    caml_failwith("Must initialize systhreads library before using Condition");
-
-  return (*caml_hook_condition_broadcast)(wrapper);
+  return caml_process_pending_actions_with_root(unit);
 }
 
 /* Dummy implementations to enable [Stdlib.Domain] to link. */
 
 CAMLprim value caml_recommended_domain_count(void)
-{
-  caml_failwith("Domains not supported on runtime4");
-}
-
-CAMLprim value caml_ml_domain_cpu_relax(void)
 {
   caml_failwith("Domains not supported on runtime4");
 }
@@ -203,6 +132,11 @@ CAMLprim value caml_ml_domain_id(void)
   caml_failwith("Domains not supported on runtime4");
 }
 
+CAMLprim value caml_ml_domain_index(void)
+{
+  caml_failwith("Domains not supported on runtime4");
+}
+
 CAMLprim value caml_domain_dls_set(void)
 {
   caml_failwith("Domains not supported on runtime4");
@@ -211,4 +145,17 @@ CAMLprim value caml_domain_dls_set(void)
 CAMLprim value caml_domain_dls_get(void)
 {
   caml_failwith("Domains not supported on runtime4");
+}
+
+/* Thread-local state */
+
+CAMLprim value caml_domain_tls_set(value t)
+{
+  caml_modify_generational_global_root(&Caml_state->tls_state, t);
+  return Val_unit;
+}
+
+CAMLprim value caml_domain_tls_get(value unused)
+{
+  return Caml_state->tls_state;
 }

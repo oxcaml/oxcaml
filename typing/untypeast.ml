@@ -125,8 +125,11 @@ let rec extract_letop_patterns n pat =
 
 let constant = function
   | Const_char c -> Pconst_char c
+  | Const_untagged_char c -> Pconst_untagged_char c
   | Const_string (s,loc,d) -> Pconst_string (s,loc,d)
   | Const_int i -> Pconst_integer (Int.to_string i, None)
+  | Const_int8 i -> Pconst_integer (Int.to_string i, Some 's')
+  | Const_int16 i -> Pconst_integer (Int.to_string i, Some 'S')
   | Const_int32 i -> Pconst_integer (Int32.to_string i, Some 'l')
   | Const_int64 i -> Pconst_integer (Int64.to_string i, Some 'L')
   | Const_nativeint i -> Pconst_integer (Nativeint.to_string i, Some 'n')
@@ -134,6 +137,9 @@ let constant = function
   | Const_float32 f -> Pconst_float (f, Some 's')
   | Const_unboxed_float f -> Pconst_unboxed_float (f, None)
   | Const_unboxed_float32 f -> Pconst_unboxed_float (f, Some 's')
+  | Const_untagged_int i -> Pconst_unboxed_integer (Int.to_string i, 'm')
+  | Const_untagged_int8 i -> Pconst_unboxed_integer (Int.to_string i, 's')
+  | Const_untagged_int16 i -> Pconst_unboxed_integer (Int.to_string i, 'S')
   | Const_unboxed_int32 i -> Pconst_unboxed_integer (Int32.to_string i, 'l')
   | Const_unboxed_int64 i -> Pconst_unboxed_integer (Int64.to_string i, 'L')
   | Const_unboxed_nativeint i -> Pconst_unboxed_integer (Nativeint.to_string i, 'n')
@@ -254,7 +260,7 @@ let type_kind sub tk = match tk with
 
 let constructor_argument sub {ca_loc; ca_type; ca_modalities} =
   let loc = sub.location sub ca_loc in
-  let pca_modalities = Typemode.untransl_modalities Immutable [] ca_modalities in
+  let pca_modalities = Typemode.untransl_modalities Immutable ca_modalities in
   { pca_loc = loc; pca_type = sub.typ sub ca_type; pca_modalities }
 
 let constructor_arguments sub = function
@@ -274,20 +280,17 @@ let constructor_declaration sub cd =
 let mutable_ (mut : Types.mutability) : mutable_flag =
   match mut with
   | Immutable -> Immutable
-  | Mutable m ->
-      if Mode.Alloc.Comonadic.Const.eq m Mode.Alloc.Comonadic.Const.legacy then
-        Mutable
-      else
-        Misc.fatal_errorf "unexpected mutable(%a)"
-          Mode.Alloc.Comonadic.Const.print m
+  | Mutable { mode; atomic = _ } ->
+      let open Mode.Value.Comonadic in
+      equate_exn mode legacy;
+      Mutable
 
 let label_declaration sub ld =
   let loc = sub.location sub ld.ld_loc in
   let attrs = sub.attributes sub ld.ld_attributes in
   let mut = mutable_ ld.ld_mutable in
   let modalities =
-    Typemode.untransl_modalities ld.ld_mutable ld.ld_attributes
-      ld.ld_modalities
+    Typemode.untransl_modalities ld.ld_mutable ld.ld_modalities
   in
   Type.field ~loc ~attrs ~mut ~modalities
     (map_loc sub ld.ld_name)
@@ -328,7 +331,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
       { pat_extra=[Tpat_unpack, loc, _attrs]; pat_desc = Tpat_any; _ } ->
         Ppat_unpack { txt = None; loc  }
     | { pat_extra=[Tpat_unpack, _, _attrs];
-        pat_desc = Tpat_var (_,name, _, _); _ } ->
+        pat_desc = Tpat_var (_,name, _, _, _); _ } ->
         Ppat_unpack { name with txt = Some name.txt }
     | { pat_extra=[Tpat_type (_path, lid), _, _attrs]; _ } ->
         Ppat_type (map_loc sub lid)
@@ -339,7 +342,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
-    | Tpat_var (id, name,_,_) ->
+    | Tpat_var (id, name,_,_,_) ->
         begin
           match (Ident.name id).[0] with
             'A'..'Z' ->
@@ -352,11 +355,12 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
        The compiler transforms (x:t) into (_ as x : t).
        This avoids transforming a warning 27 into a 26.
      *)
-    | Tpat_alias ({pat_desc = Tpat_any; pat_loc}, _id, name, _uid, _mode, _ty)
+    | Tpat_alias
+      ({pat_desc = Tpat_any; pat_loc}, _id, name, _uid, _sort, _mode, _ty)
          when pat_loc = pat.pat_loc ->
        Ppat_var name
 
-    | Tpat_alias (pat, _id, name, _uid, _mode, _ty) ->
+    | Tpat_alias (pat, _id, name, _uid, _sort, _mode, _ty) ->
         Ppat_alias (sub.pat sub pat, name)
     | Tpat_constant cst -> Ppat_constant (constant cst)
     | Tpat_tuple list ->
@@ -451,6 +455,20 @@ let value_binding sub vb =
   in
   Vb.mk ~loc ~attrs ?value_constraint ~modes pat (sub.expr sub vb.vb_expr)
 
+let block_access sub : block_access -> Parsetree.block_access = function
+  | Baccess_field (lid, _) ->
+    Baccess_field (map_loc sub lid)
+  | Baccess_array
+      { mut; index_kind; index; base_ty = _; elt_ty = _; elt_sort = _ } ->
+    let index = sub.expr sub index in
+    Baccess_array (mut, index_kind, index)
+  | Baccess_block (mut, idx) ->
+    Baccess_block (mut, sub.expr sub idx)
+
+let unboxed_access sub : unboxed_access -> Parsetree.unboxed_access = function
+  | Uaccess_unboxed_field (lid, _) ->
+    Uaccess_unboxed_field (map_loc sub lid)
+
 let comprehension sub comp =
   let iterator = function
     | Texp_comp_range { ident = _; pattern; start ; stop ; direction } ->
@@ -497,8 +515,12 @@ let expression sub exp =
       Texp_ident (_path, lid, _, _, _) -> Pexp_ident (map_loc sub lid)
     | Texp_constant cst -> Pexp_constant (constant cst)
     | Texp_let (rec_flag, list, exp) ->
-        Pexp_let (rec_flag,
+        Pexp_let (Immutable, rec_flag,
           List.map (sub.value_binding sub) list,
+          sub.expr sub exp)
+    | Texp_letmutable (vb, exp) ->
+        Pexp_let (Mutable, Nonrecursive,
+          [sub.value_binding sub vb],
           sub.expr sub exp)
     | Texp_function { params; body } ->
         let body, constraint_ =
@@ -602,6 +624,13 @@ let expression sub exp =
         Pexp_record_unboxed_product
           (list,
            Option.map (fun (exp, _) -> sub.expr sub exp) extended_expression)
+    | Texp_atomic_loc (exp, _, lid, _label, _) ->
+        Pexp_extension ({ txt = "ocaml.atomic.loc"; loc },
+                        PStr [ Str.eval ~loc
+                                 (Exp.field ~loc
+                                    (sub.expr sub exp)
+                                    (map_loc sub lid))
+                             ])
     | Texp_field { record = exp; lid; _ } ->
         Pexp_field (sub.expr sub exp, map_loc sub lid)
     | Texp_unboxed_field (exp, _, lid, _label, _) ->
@@ -611,6 +640,8 @@ let expression sub exp =
           sub.expr sub exp2)
     | Texp_array (amut, _, list, _) ->
         Pexp_array (mutable_ amut, List.map (sub.expr sub) list)
+    | Texp_idx (ba, uas) ->
+        Pexp_idx (block_access sub ba, List.map (unboxed_access sub) uas)
     | Texp_list_comprehension comp ->
         Pexp_comprehension
           (Pcomp_list_comprehension (comprehension sub comp))
@@ -637,8 +668,15 @@ let expression sub exp =
     | Texp_new (_path, lid, _, _) -> Pexp_new (map_loc sub lid)
     | Texp_instvar (_, path, name) ->
       Pexp_ident ({loc = sub.location sub name.loc ; txt = lident_of_path path})
+    | Texp_mutvar id ->
+      Pexp_ident ({loc = sub.location sub id.loc;
+                   txt = lident_of_path (Pident id.txt)})
     | Texp_setinstvar (_, _path, lid, exp) ->
-        Pexp_setinstvar (map_loc sub lid, sub.expr sub exp)
+        Pexp_setvar (map_loc sub lid, sub.expr sub exp)
+    | Texp_setmutvar(lid, _sort, exp) ->
+        let lid = {loc = sub.location sub lid.loc;
+                   txt = Ident.name lid.txt} in
+        Pexp_setvar (lid, sub.expr sub exp)
     | Texp_override (_, list) ->
         Pexp_override (List.map (fun (_path, lid, exp) ->
               (map_loc sub lid, sub.expr sub exp)
@@ -722,6 +760,10 @@ let expression sub exp =
     | Texp_overwrite (exp1, exp2) ->
         Pexp_overwrite(sub.expr sub exp1, sub.expr sub exp2)
     | Texp_hole _ -> Pexp_hole
+    | Texp_quotation exp -> Pexp_quote (sub.expr sub exp)
+    | Texp_antiquotation exp -> Pexp_splice (sub.expr sub exp)
+    | Texp_eval (typ, _) ->
+        Pexp_extension ({ txt = "ocaml.eval"; loc}, PTyp (sub.typ sub typ))
   in
   List.fold_right (exp_extra sub) exp.exp_extra
     (Exp.mk ~loc ~attrs desc)
@@ -747,7 +789,7 @@ let module_type_declaration sub mtd =
 
 let signature sub {sig_items; sig_modalities; sig_sloc} =
   let psg_items = List.map (sub.signature_item sub) sig_items in
-  let psg_modalities = Typemode.untransl_modalities Immutable [] sig_modalities in
+  let psg_modalities = Typemode.untransl_modalities Immutable sig_modalities in
   let psg_loc = sub.location sub sig_sloc in
   {psg_items; psg_modalities; psg_loc}
 
@@ -778,7 +820,7 @@ let signature_item sub item =
     | Tsig_open od ->
         Psig_open (sub.open_description sub od)
     | Tsig_include (incl, moda) ->
-        let pmoda = Typemode.untransl_modalities Immutable [] moda in
+        let pmoda = Typemode.untransl_modalities Immutable moda in
         Psig_include (sub.include_description sub incl, pmoda)
     | Tsig_class list ->
         Psig_class (List.map (sub.class_description sub) list)
@@ -1010,6 +1052,9 @@ let core_type sub ct =
         Ptyp_poly (bound_vars, sub.typ sub ct)
     | Ttyp_package pack -> Ptyp_package (sub.package_type sub pack)
     | Ttyp_open (_path, mod_ident, t) -> Ptyp_open (mod_ident, sub.typ sub t)
+    | Ttyp_quote t -> Ptyp_quote (sub.typ sub t)
+    | Ttyp_splice t -> Ptyp_splice (sub.typ sub t)
+    | Ttyp_of_kind jkind -> Ptyp_of_kind jkind
     | Ttyp_call_pos ->
         Ptyp_extension call_pos_extension
   in
@@ -1017,7 +1062,7 @@ let core_type sub ct =
 
 let class_structure sub cs =
   let rec remove_self = function
-    | { pat_desc = Tpat_alias (p, id, _s, _uid, _mode, _ty) }
+    | { pat_desc = Tpat_alias (p, id, _s, _uid, _sort, _mode, _ty) }
       when string_is_prefix "selfpat-" (Ident.name id) ->
         remove_self p
     | p -> p
@@ -1047,7 +1092,7 @@ let object_field sub {of_loc; of_desc; of_attributes;} =
   Of.mk ~loc ~attrs desc
 
 and is_self_pat = function
-  | { pat_desc = Tpat_alias(_pat, id, _, _uid, _mode, _ty) } ->
+  | { pat_desc = Tpat_alias(_pat, id, _, _uid, _sort, _mode, _ty) } ->
       string_is_prefix "self-" (Ident.name id)
   | _ -> false
 

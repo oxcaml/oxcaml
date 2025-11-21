@@ -41,6 +41,7 @@ val strings_of_paths: namespace -> Path.t list -> string list
     (** Print a list of paths, using the same naming context to
         avoid name collisions *)
 
+val raw_row_desc : formatter -> row_desc -> unit
 val raw_type_expr: formatter -> type_expr -> unit
 val raw_field : formatter -> row_field -> unit
 val string_of_label: Types.arg_label -> string
@@ -108,7 +109,8 @@ val type_expr: formatter -> type_expr -> unit
 
 (** Prints a modality. If it is the identity modality, prints [id], which
     defaults to nothing. *)
-val modality : ?id:(formatter -> unit) -> formatter -> Mode.Modality.t -> unit
+val modality :
+  ?id:(formatter -> unit) -> 'a Mode.Modality.Axis.t -> formatter -> 'a -> unit
 
 (** [prepare_for_printing] resets the global printing environment, a la [reset],
     and prepares the types for printing by reserving names and marking loops.
@@ -174,7 +176,8 @@ val extension_only_constructor:
 *)
 
 val tree_of_module:
-    Ident.t -> ?ellipsis:bool -> module_type -> rec_status -> out_sig_item
+    Ident.t -> ?ellipsis:bool -> module_declaration -> rec_status
+    -> out_sig_item
 val modtype: formatter -> module_type -> unit
 val signature: formatter -> signature -> unit
 val tree_of_modtype: ?abbrev:bool -> module_type -> out_module_type

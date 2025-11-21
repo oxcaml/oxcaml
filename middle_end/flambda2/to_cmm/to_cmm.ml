@@ -60,8 +60,8 @@ let flush_cmm_helpers_state res =
 
 let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   (* If someone wants to add 32-bit support in the future there will be a
-     (merged) PR on ocaml-flambda/flambda-backend which can be used as a guide:
-     https://github.com/ocaml-flambda/flambda-backend/pull/685 *)
+     (merged) PR on oxcaml/oxcaml which can be used as a guide:
+     https://github.com/oxcaml/oxcaml/pull/685 *)
   if Target_system.is_32_bit ()
   then
     Misc.fatal_error
@@ -75,13 +75,15 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       ~return_continuation_arity:[] ~trans_prim:To_cmm_primitive.trans_prim
       ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
   in
+  let ret_var = Variable.create "*ret*" Flambda_kind.value in
+  let ret_var_duid = Flambda_debug_uid.none in
   let _env, return_cont_params =
     (* The environment is dropped because the handler for the dummy continuation
        (which just returns unit) doesn't use any of the parameters. *)
     C.continuation_bound_parameters env
       (Bound_parameters.create
-         [ Bound_parameter.create (Variable.create "*ret*")
-             Flambda_kind.With_subkind.any_value ])
+         [ Bound_parameter.create ret_var Flambda_kind.With_subkind.any_value
+             ret_var_duid ])
   in
   let return_cont, env =
     Env.add_jump_cont env
@@ -91,15 +93,20 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   (* See comment in [To_cmm_set_of_closures] about binding [my_region] *)
   let env, toplevel_region_var =
     Env.create_bound_parameter env
-      (Flambda_unit.toplevel_my_region flambda_unit)
+      (Flambda_unit.toplevel_my_region flambda_unit, Flambda_debug_uid.none)
   in
   let r =
     R.create ~reachable_names
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
   in
-  let body, body_free_vars, res =
+  let body, body_free_vars, body_symbol_inits, res =
     To_cmm_expr.expr env r (Flambda_unit.body flambda_unit)
   in
+  if not (To_cmm_env.Symbol_inits.is_empty body_symbol_inits)
+  then
+    Misc.fatal_errorf
+      "Did not find where to place the following symbol initializations: %a"
+      To_cmm_env.Symbol_inits.print body_symbol_inits;
   let free_vars =
     To_cmm_shared.remove_var_with_provenance body_free_vars toplevel_region_var
   in
@@ -111,7 +118,7 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   (* CR mshinwell: This should at least be given a source file location. *)
   let dbg = Debuginfo.none in
   let body =
-    let unit_value = C.targetint ~dbg Targetint_32_64.one in
+    let unit_value = C.targetint ~dbg (Targetint_32_64.one Sixty_four) in
     C.create_ccatch ~rec_flag:false ~body
       ~handlers:
         [ C.handler ~dbg return_cont
@@ -132,7 +139,8 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       then fun_codegen
       else Cmm.No_CSE :: fun_codegen
     in
-    C.cfunction (C.fundecl entry_sym [] body fun_codegen dbg Default_poll)
+    C.cfunction
+      (C.fundecl entry_sym [] body fun_codegen dbg Default_poll Cmm.typ_val)
   in
   let { R.data_items; gc_roots; functions } = R.to_cmm res in
   let _res, cmm_helpers_data = flush_cmm_helpers_state res in

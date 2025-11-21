@@ -246,6 +246,8 @@ let longident_loc f x = pp f "%a" longident x.txt
 let constant f = function
   | Pconst_char i ->
       pp f "%C"  i
+  | Pconst_untagged_char i ->
+      pp f "#%C"  i
   | Pconst_string (i, _, None) ->
       pp f "%S" i
   | Pconst_string (i, _, Some delim) ->
@@ -450,9 +452,9 @@ and type_with_label ctxt f (label, c, mode) =
       (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
 
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
-  | Default -> pp f "_"
-  | Abbreviation s -> pp f "%s" s
-  | Mod (t, modes) ->
+  | Pjk_default -> pp f "_"
+  | Pjk_abbreviation s -> pp f "%s" s
+  | Pjk_mod (t, modes) ->
     begin match modes with
     | [] -> Misc.fatal_error "malformed jkind annotation"
     | _ :: _ ->
@@ -462,15 +464,15 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
           (pp_print_list ~pp_sep:pp_print_space mode) modes
       ) f (t, modes)
     end
-  | With (t, ty, modalities) ->
+  | Pjk_with (t, ty, modalities) ->
     Misc.pp_parens_if nested (fun f (t, ty, modalities) ->
       pp f "%a with %a%a"
         (jkind_annotation ~nested:true ctxt) t
         (core_type ctxt) ty
         optional_space_atat_modalities modalities;
     ) f (t, ty, modalities)
-  | Kind_of ty -> pp f "kind_of_ %a" (core_type ctxt) ty
-  | Product ts ->
+  | Pjk_kind_of ty -> pp f "kind_of_ %a" (core_type ctxt) ty
+  | Pjk_product ts ->
     Misc.pp_parens_if nested (fun f ts ->
       pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep:"@ & ") ts
     ) f ts
@@ -524,6 +526,8 @@ and core_type ctxt f x =
                           (tyvar_loc_jkind tyvar) ~sep:"@;")
                           l)
           sl (core_type ctxt) ct
+    | Ptyp_of_kind jkind ->
+      pp f "@[(type@ :@ %a)@]" (jkind_annotation reset_ctxt) jkind
     | _ -> pp f "@[<2>%a@]" (core_type1 ctxt) x
 
 and core_type1 ctxt f x =
@@ -607,8 +611,12 @@ and core_type1 ctxt f x =
                (list aux  ~sep:"@ and@ ")  cstrs)
     | Ptyp_open(li, ct) ->
        pp f "@[<hov2>%a.(%a)@]" longident_loc li (core_type ctxt) ct
+    | Ptyp_quote t ->
+        pp f "@[<hov2><[%a]>@]" (core_type ctxt) t
+    | Ptyp_splice t ->
+        pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
     | Ptyp_extension e -> extension ctxt f e
-    | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _) ->
+    | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_of_kind _) ->
        paren true (core_type ctxt) f x
 
 and core_type2 ctxt f x =
@@ -993,12 +1001,13 @@ and expression ctxt f x =
         pp f "@[<0>@[<hv2>try@ %a@]@ @[<0>with%a@]@]"
              (* "try@;@[<2>%a@]@\nwith@\n%a"*)
           (expression reset_ctxt) e  (case_list ctxt) l
-    | Pexp_let (rf, l, e) ->
+    | Pexp_let (mf, rf, l, e) ->
         (* pp f "@[<2>let %a%a in@;<1 -2>%a@]"
            (*no indentation here, a new line*) *)
         (*   rec_flag rf *)
+        (*   mutable_flag mf *)
         pp f "@[<2>%a in@;<1 -2>%a@]"
-          (bindings reset_ctxt) (rf,l)
+          (bindings reset_ctxt) (mf,rf,l)
           (expression ctxt) e
     | Pexp_apply
       ({ pexp_desc = Pexp_extension({txt = "extension.exclave"}, PStr []) },
@@ -1078,7 +1087,7 @@ and expression ctxt f x =
           (list (expression (under_semi ctxt)) ~sep:";@;") lst
     | Pexp_new (li) ->
         pp f "@[<hov2>new@ %a@]" longident_loc li;
-    | Pexp_setinstvar (s, e) ->
+    | Pexp_setvar (s, e) ->
         pp f "@[<hov2>%a@ <-@ %a@]" ident_of_name s.txt (expression ctxt) e
     | Pexp_override l -> (* FIXME *)
         let string_x_expression f (s, e) =
@@ -1122,6 +1131,10 @@ and expression ctxt f x =
         pp f "@[<hov2>overwrite_@ %a@ with@ %a@]"
           (expression2 reset_ctxt) e1
           (expression2 reset_ctxt) e2
+    | Pexp_quote e ->
+        pp f "@[<hov2><[%a]>@]" (expression ctxt) e
+    | Pexp_splice e ->
+        pp f "@[$%a@]" (simple_expr ctxt) e
     | Pexp_hole -> pp f "_"
     | _ -> expression1 ctxt f x
 
@@ -1199,6 +1212,8 @@ and simple_expr ctxt f x =
           punct
           (list (simple_expr (under_semi ctxt)) ~sep:";") l
           punct
+    | Pexp_idx (ba, uas) ->
+      pp f "(%a%a)" (block_access ctxt) ba (list unboxed_access ~sep:"") uas
     | Pexp_comprehension comp -> comprehension_expr ctxt f comp
     | Pexp_while (e1, e2) ->
         let fmt : (_,_,_) format = "@[<2>while@;%a@;do@;%a@;done@]" in
@@ -1410,7 +1425,7 @@ and class_expr ctxt f x =
           (class_expr ctxt) e
     | Pcl_let (rf, l, ce) ->
         pp f "%a@ in@ %a"
-          (bindings ctxt) (rf,l)
+          (bindings ctxt) (Immutable,rf,l)
           (class_expr ctxt) ce
     | Pcl_apply (ce, l) ->
         pp f "((%a)@ %a)" (* Cf: #7200 *)
@@ -1816,8 +1831,8 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = mode
       end
 
 (* [in] is not printed *)
-and bindings ctxt f (rf,l) =
-  let binding kwd rf f x =
+and bindings ctxt f (mf,rf,l) =
+  let binding kwd mf rf f x =
     (* The other modes are printed inside [binding] *)
     let legacy, x =
       if print_modes_in_old_syntax x.pvb_modes then
@@ -1825,18 +1840,18 @@ and bindings ctxt f (rf,l) =
       else
         [], x
     in
-    pp f "@[<2>%s %a%a%a@]%a" kwd rec_flag rf
+    pp f "@[<2>%s %a%a%a%a@]%a" kwd mutable_flag mf rec_flag rf
       optional_legacy_modes legacy
       (binding ctxt) x
       (item_attributes ctxt) x.pvb_attributes
   in
   match l with
   | [] -> ()
-  | [x] -> binding "let" rf f x
+  | [x] -> binding "let" mf rf f x
   | x::xs ->
       pp f "@[<v>%a@,%a@]"
-        (binding "let" rf) x
-        (list ~sep:"@," (binding "and" Nonrecursive)) xs
+        (binding "let" mf rf) x
+        (list ~sep:"@," (binding "and" Immutable Nonrecursive)) xs
 
 and binding_op ctxt f x =
   match x.pbop_pat, x.pbop_exp with
@@ -1858,7 +1873,7 @@ and structure_item ctxt f x =
   | Pstr_type (rf, l)  -> type_def_list ctxt f (rf, true, l)
   | Pstr_value (rf, l) ->
       (* pp f "@[<hov2>let %a%a@]"  rec_flag rf bindings l *)
-      pp f "@[<2>%a@]" (bindings ctxt) (rf,l)
+      pp f "@[<2>%a@]" (bindings ctxt) (Immutable,rf,l)
   | Pstr_typext te -> type_extension ctxt f te
   | Pstr_exception ed -> exception_declaration ctxt f ed
   | Pstr_module x ->
@@ -2226,6 +2241,36 @@ and directive_argument f x =
   | Pdir_ident (li) -> pp f "@ %a" longident li
   | Pdir_bool (b) -> pp f "@ %s" (string_of_bool b)
 
+and block_access ctxt f = function
+  | Baccess_field li ->
+    pp f ".%a" longident_loc li
+  | Baccess_array (mut, index_kind, index) ->
+    let dotop =
+      match mut with
+      | Mutable -> "."
+      | Immutable -> ".:"
+    in
+    let suffix = match index_kind with
+      | Index_int -> ""
+      | Index_unboxed_int64 -> "L"
+      | Index_unboxed_int32 -> "l"
+      | Index_unboxed_int16 -> "S"
+      | Index_unboxed_int8 -> "s"
+      | Index_unboxed_nativeint -> "n"
+    in
+    pp f "%s%s(%a)" dotop suffix (expression ctxt) index
+  | Baccess_block (mut, index) ->
+    let s =
+      match mut with
+      | Mutable -> "idx_mut"
+      | Immutable -> "idx_imm"
+    in
+    pp f ".%s(%a)" s (expression ctxt) index
+
+and unboxed_access f = function
+  | Uaccess_unboxed_field li ->
+    pp f ".#%a" longident_loc li
+
 and comprehension_expr ctxt f cexp =
   let punct, comp = match cexp with
     | Pcomp_list_comprehension  comp ->
@@ -2296,7 +2341,8 @@ and function_constraint ctxt f x =
   match[@ocaml.warning "+9"] x with
   | { ret_type_constraint = Some (Pconstraint ty); ret_mode_annotations; _ } ->
 
-    pp f "@;:@;%a" (core_type_with_optional_modes ctxt) (ty, ret_mode_annotations)
+    pp f "@;:@;%a@;"
+      (core_type_with_optional_modes ctxt) (ty, ret_mode_annotations)
   | { ret_type_constraint = Some (Pcoerce (ty1, ty2)); _ } ->
     pp f "@;%a:>@;%a"
       (option ~first:":@;" (core_type ctxt)) ty1

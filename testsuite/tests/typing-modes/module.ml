@@ -1,11 +1,7 @@
 (* TEST
-    flags+="-extension mode";
+    flags+="-extension mode_alpha";
    expect;
 *)
-
-(* This file tests the legacy aspect of modules. The non-legacy aspects are
-   tested in [val_modalities.ml]. As we enrich modules with modes, this file
-   will shrink. *)
 
 let portable_use : 'a @ portable -> unit = fun _ -> ()
 
@@ -17,15 +13,18 @@ module M = struct
     type 'a t = int
     let x _ = ()
 end
+let (foo @ nonportable) () = ()
 module F (X : S) = struct
     type t = int
     let x = X.x
+    let _ = foo
 end
 [%%expect{|
 val portable_use : 'a @ portable -> unit = <fun>
 module type S = sig val x : 'a -> unit end
 module type SL = sig type 'a t end
-module M : sig type 'a t = int val x : 'a -> unit end
+module M : sig type 'a t = int val x : 'a -> unit end @@ stateless
+val foo : unit -> unit = <fun>
 module F : functor (X : S) -> sig type t = int val x : 'a -> unit end
 |}]
 
@@ -43,7 +42,12 @@ let u =
 Line 10, characters 17-20:
 10 |     portable_use foo
                       ^^^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable"
+       because it closes over the module "F" at Line 7, characters 23-24
+       which is "nonportable"
+       because it closes over the value "foo" at Line 15, characters 12-15
+       which is "nonportable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 let u =
@@ -57,25 +61,17 @@ let u =
 val u : unit = ()
 |}]
 
-(* first class modules are produced at legacy *)
-let x = ((module M : SL) : _ @ portable)
+(* Packing produces first class modules at the same mode as the module *)
+let () = portable_use (module M : S)
 [%%expect{|
-Line 1, characters 9-24:
-1 | let x = ((module M : SL) : _ @ portable)
-             ^^^^^^^^^^^^^^^
-Error: This value is "nonportable" but expected to be "portable".
 |}]
 
-(* first class modules are consumed at legacy *)
-let foo () =
-    let m @ local = (module M : SL) in
-    let module M = (val m) in
-    ()
+(* Unpacking produces module at the same mode as the first class module *)
+let foo (m : (module S)) =
+    let module M @ portable = (val m) in
+    portable_use M.x
 [%%expect{|
-Line 3, characters 24-25:
-3 |     let module M = (val m) in
-                            ^
-Error: This value escapes its region.
+val foo : (module S) @ portable -> unit = <fun>
 |}]
 
 let foo () =
@@ -160,12 +156,12 @@ module type S = sig
 end
 
 module M : S = struct
-    let foo = fun x -> x
+    let foo @ nonportable = fun x -> x
     let baz = fun x -> x
 end
 [%%expect{|
 module type S = sig val foo : 'a -> 'a val baz : 'a -> 'a @@ portable end
-module M : S
+module M : S @@ stateless nonportable
 |}]
 
 let (bar @ portable) () =
@@ -183,7 +179,9 @@ let (bar @ portable) () =
 Line 3, characters 4-9:
 3 |     N.foo ()
         ^^^^^
-Error: The value "N.foo" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "N.foo" is "nonportable" but is expected to be "portable"
+       because it is used inside the function at Lines 1-3, characters 21-12
+       which is expected to be "portable".
 |}]
 
 let (bar @ portable) () =
@@ -193,7 +191,9 @@ let (bar @ portable) () =
 Line 3, characters 4-9:
 3 |     M.foo ()
         ^^^^^
-Error: The value "M.foo" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "M.foo" is "nonportable" but is expected to be "portable"
+       because it is used inside the function at Lines 1-3, characters 21-12
+       which is expected to be "portable".
 |}]
 
 (* chained aliases. Creating alias of alias is fine. *)
@@ -216,7 +216,9 @@ let (bar @ portable) () =
 Line 4, characters 4-10:
 4 |     N'.foo ()
         ^^^^^^
-Error: The value "N'.foo" is nonportable, so cannot be used inside a function that is portable.
+Error: The value "N'.foo" is "nonportable" but is expected to be "portable"
+       because it is used inside the function at Lines 1-4, characters 21-13
+       which is expected to be "portable".
 |}]
 
 (* module aliases in structures still walk locks. *)
@@ -229,5 +231,304 @@ let (bar @ portable) () =
 Line 3, characters 19-20:
 3 |         module L = M
                        ^
-Error: "M" is a module, and modules are always nonportable, so cannot be used inside a function that is portable.
+Error: The module "M" is "nonportable" but is expected to be "portable"
+       because it is used inside the function at Lines 1-5, characters 21-14
+       which is expected to be "portable".
 |}]
+
+module F (X : S @ portable) = struct
+end
+[%%expect{|
+Line 1, characters 18-26:
+1 | module F (X : S @ portable) = struct
+                      ^^^^^^^^
+Error: Mode annotations on functor parameters are not supported yet.
+|}]
+
+module type S = functor () (M : S @ portable) (_ : S @ portable) -> S
+[%%expect{|
+Line 1, characters 36-44:
+1 | module type S = functor () (M : S @ portable) (_ : S @ portable) -> S
+                                        ^^^^^^^^
+Error: Mode annotations on functor parameters are not supported yet.
+|}]
+
+module type S = functor () (M : S) (_ : S) -> S @ portable
+[%%expect{|
+Line 1, characters 50-58:
+1 | module type S = functor () (M : S) (_ : S) -> S @ portable
+                                                      ^^^^^^^^
+Error: Mode annotations on functor return are not supported yet.
+|}]
+
+module F () = struct
+    let (foo @ once) () = ()
+end
+[%%expect{|
+Line 2, characters 9-12:
+2 |     let (foo @ once) () = ()
+             ^^^
+Error: This is "once", but expected to be "many" because it is inside a "many" structure.
+|}]
+
+module type Empty = sig end
+[%%expect{|
+module type Empty = sig end
+|}]
+
+let _ =
+    let module F (X : Empty) = struct end in
+    let module M @ local = struct end in
+    let module _ = F(M) in
+    ()
+[%%expect{|
+Line 4, characters 19-23:
+4 |     let module _ = F(M) in
+                       ^^^^
+Error: Modules do not match: sig end (* in a structure at local *)
+     is not included in Empty (* in a structure at global *)
+     Got "local" but expected "global".
+|}]
+
+let _ =
+    let module F (X : Empty) (Y : Empty) = struct end in
+    let module M = struct end in
+    let module N @ local = struct end in
+    let module _ = F(M)(N) in
+    ()
+[%%expect{|
+Line 5, characters 19-26:
+5 |     let module _ = F(M)(N) in
+                       ^^^^^^^
+Error: This application of the functor "F" is ill-typed.
+       These arguments:
+         M N
+       do not match these parameters:
+         functor (X : Empty) (Y : Empty) -> ...
+       1. Module M matches the expected module type Empty
+       2. Modules do not match:
+            N : sig end (* in a structure at local *)
+          is not included in
+            Empty (* in a structure at global *)
+          Got "local" but expected "global".
+|}]
+
+(* [include] should rebase modalities relative to the current structure *)
+module Test_incl = struct
+    module M = struct
+        let foo x = x
+    end
+    module type S = module type of M
+    (* [M] is portable, so inside [S] there is no [portable] modality on [foo] *)
+    module N = struct
+        let x  : int ref = ref 42
+        let f () = x := 24
+        (* [N] cannot be [portable] due to [f] *)
+
+        include M
+    end
+
+    let () = portable_use N.foo
+end
+[%%expect{|
+module Test_incl :
+  sig
+    module M : sig val foo : 'a -> 'a @@ stateless end
+    module type S = sig val foo : 'a -> 'a @@ stateless end
+    module N :
+      sig
+        val x : int ref @@ stateless
+        val f : unit -> unit
+        val foo : 'a -> 'a @@ stateless
+      end
+  end
+|}]
+
+let use_unique : 'a @ unique -> unit = fun _ -> ()
+
+(* Functors are [many], and can't close over unique values*)
+
+let foo (x @ unique) =
+  let module Foo (_ : sig end) = struct
+    let () = use_unique x
+  end in
+  let module _ = Foo(struct end) in
+  ()
+[%%expect{|
+val use_unique : 'a @ unique -> unit = <fun>
+Line 7, characters 24-25:
+7 |     let () = use_unique x
+                            ^
+Error: This value is aliased but used as unique.
+Hint: This value comes from outside the current module or class.
+|}]
+
+let foo (x @ unique) =
+  let module Foo () = struct
+    let () = use_unique x
+  end in
+  let module _ = Foo() in
+  ()
+[%%expect{|
+Line 3, characters 24-25:
+3 |     let () = use_unique x
+                            ^
+Error: This value is aliased but used as unique.
+Hint: This value comes from outside the current module or class.
+|}]
+
+let (foo @ nonportable) () = ()
+
+module (F @ portable) () = struct
+    let bar = foo
+end
+[%%expect{|
+val foo : unit -> unit = <fun>
+Line 4, characters 14-17:
+4 |     let bar = foo
+                  ^^^
+Error: The value "foo" is "nonportable" but is expected to be "portable"
+       because it is used inside the functor at Lines 3-5, characters 22-3
+       which is expected to be "portable".
+|}]
+
+module (F @ portable) (X : sig val x : int -> int end) = struct
+    let bar = X.x
+end
+[%%expect{|
+module F :
+  functor (X : sig val x : int -> int end) -> sig val bar : int -> int end @@
+  stateless
+|}]
+
+
+module type S = sig
+    module F (X : sig end) : sig end
+    module G (X : sig end) : sig
+        module type T = module type of (F (X))
+    end
+end
+[%%expect{|
+module type S =
+  sig
+    module F : functor (X : sig end) -> sig end
+    module G : functor (X : sig end) -> sig module type T = sig end end
+  end
+|}]
+
+module type S = sig
+    module F (X : sig end) : sig end
+    module rec M : sig
+        module N : sig
+        end
+        include module type of F(N)
+    end
+end
+[%%expect{|
+module type S =
+  sig
+    module F : functor (X : sig end) -> sig end
+    module rec M : sig module N : sig end end
+  end
+|}]
+
+module rec Foo : sig
+    val bar : unit -> unit
+end = struct
+include (Foo : module type of struct
+    include Foo
+end)
+let (bar @ stateful) () = ()
+end
+[%%expect{|
+module rec Foo : sig val bar : unit -> unit end
+|}]
+
+module type S = sig
+    module type S = sig end
+
+    module type Key = sig
+    module M0 : S
+    end
+
+    module L : sig
+    module M : Key
+
+    module N : sig
+        module Label : Key with M
+
+        include sig
+            module Key : S
+        end
+        with module Key = Label
+    end
+    end
+
+    include sig
+        module L' : S
+    end
+    with module L' = L
+
+end
+[%%expect{|
+module type S =
+  sig
+    module type S = sig end
+    module type Key = sig module M0 : S end
+    module L :
+      sig
+        module M : Key
+        module N :
+          sig
+            module Label : sig module M0 = M.M0 end
+            module Key : sig module M0 = M.M0 end
+          end
+      end
+    module L' :
+      sig
+        module M : sig module M0 : sig end end
+        module N :
+          sig
+            module Label : sig module M0 = M.M0 end
+            module Key : sig module M0 = M.M0 end
+          end
+      end
+  end
+|}]
+
+(* CR zqian: fix [make_aliases_absent]. *)
+(* CR lmaurer: Disabling this test until it is rewritten without a line number
+   in it. *)
+(*
+module type S = sig
+    module type S = sig end
+
+    module type Key = sig
+    module M0 : S
+    end
+
+    module L : sig
+    module M : Key
+
+    module N : sig
+        module Label : Key with M
+
+        include sig
+            module Key : S
+        end
+        with module Key = Label
+        @@ portable
+    end
+    end
+
+    include sig
+        module L' : S
+    end
+    with module L' = L
+    @@ portable
+end
+[%%expect{|
+Uncaught exception: File "typing/env.ml", line 2155, characters 13-19: Assertion failed
+
+|}]
+*)

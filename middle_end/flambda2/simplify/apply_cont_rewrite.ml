@@ -149,9 +149,10 @@ let extra_args_list rewrite id =
     | _ :: _ ->
       Misc.fatal_errorf
         "Apply_cont_rewrite.extra_args_list:@ Could not find extra args but \
-         extra params were not empty")
+         extra params were not empty for id %a"
+        Apply_cont_rewrite_id.print id)
 
-let make_rewrite rewrite ~ctx id args : _ Or_invalid.t =
+let make_rewrite rewrite ~machine_width ~ctx id args : _ Or_invalid.t =
   let invariant_args, args =
     partition_used args rewrite.original_params_usage
   in
@@ -175,9 +176,10 @@ let make_rewrite rewrite ~ctx id args : _ Or_invalid.t =
             | Already_in_scope simple ->
               simple, [], Simple.free_names simple, Name_occurrences.empty
             | New_let_binding (temp, prim) ->
+              let temp_duid = Flambda_debug_uid.none in
               let extra_let =
-                ( Bound_var.create temp Name_mode.normal,
-                  Code_size.prim prim,
+                ( Bound_var.create temp temp_duid Name_mode.normal,
+                  Code_size.prim ~machine_width prim,
                   Flambda.Named.create_prim prim Debuginfo.none )
               in
               ( Simple.var temp,
@@ -185,6 +187,7 @@ let make_rewrite rewrite ~ctx id args : _ Or_invalid.t =
                 Flambda_primitive.free_names prim,
                 Name_occurrences.singleton_variable temp Name_mode.normal )
             | New_let_binding_with_named_args (temp, gen_prim) ->
+              let temp_duid = Flambda_debug_uid.none in
               let prim =
                 match (ctx : rewrite_apply_cont_ctx) with
                 | Apply_expr function_return_values ->
@@ -195,8 +198,8 @@ let make_rewrite rewrite ~ctx id args : _ Or_invalid.t =
                      since they are already named."
               in
               let extra_let =
-                ( Bound_var.create temp Name_mode.normal,
-                  Code_size.prim prim,
+                ( Bound_var.create temp temp_duid Name_mode.normal,
+                  Code_size.prim ~machine_width prim,
                   Flambda.Named.create_prim prim Debuginfo.none )
               in
               ( Simple.var temp,

@@ -35,10 +35,11 @@ type t = private
 (** It is an error to pass [Set_of_closures] or [Static_consts] to this
     function. (Sets of closures are disallowed because computation of their free
     names might be expensive; use [reachable_with_known_free_names] instead.) *)
-val create : Named.t -> t
+val create : machine_width:Target_system.Machine_width.t -> Named.t -> t
 
 (** It is an error to pass [Static_consts] to this function. *)
 val create_with_known_free_names :
+  machine_width:Target_system.Machine_width.t ->
   find_code_characteristics:(Code_id.t -> Cost_metrics.code_characteristics) ->
   Named.t ->
   free_names:Name_occurrences.t ->
@@ -49,3 +50,7 @@ val print : Format.formatter -> t -> unit
 val cost_metrics : t -> Cost_metrics.t
 
 val update_cost_metrics : Cost_metrics.t -> t -> t
+
+type 'a or_rewritten =
+  | Simplified of 'a
+  | Rewritten of (body:Flambda.Expr.t -> Flambda.Expr.t)

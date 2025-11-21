@@ -405,8 +405,6 @@ external get_minor_free : unit -> int = "caml_get_minor_free"
 
     @since 4.03 *)
 
-(* CR runtime5: We need finalisers registered on the primary domain to only ever
-   run on the primary domain. *)
 val finalise : ('a -> unit) -> 'a -> unit @@ nonportable
 (** [finalise f v] registers [f] as a finalisation function for [v].
    [v] must be heap-allocated.  [f] will be called with [v] as
@@ -425,6 +423,12 @@ val finalise : ('a -> unit) -> 'a -> unit @@ nonportable
    as the values are allocated, that means each value is finalised
    before the values it depends upon.  Of course, this becomes
    false if additional dependencies are introduced by assignments.
+
+   Finalisers are run by the domain which registered them, unless that
+   domain has already terminated in which case they may be run by some
+   other domain. Note that termination of the initial domain ends the
+   OCaml process, so finalisers registered by the initial domain will
+   only by run by that domain.
 
    In the presence of multiple OCaml threads it should be assumed that
    any particular finaliser may be executed in any of the threads.
@@ -484,6 +488,10 @@ val finalise_last : (unit -> unit) -> 'a -> unit @@ nonportable
     before running the finalisation function. Moreover the finalisation
     functions attached with {!finalise} are always called before the
     finalisation functions attached with {!finalise_last}.
+
+    As for {!finalise}, the finaliser is run by the domain which registered it,
+    unless that domain has already terminated in which case it may be run by
+    some other domain.
 
     @since 4.04
 *)
@@ -709,6 +717,12 @@ module (Memprof @@ nonportable) :
        called on a profile which has not been stopped.
        *)
 
+    val participate : t -> unit
+    (** Cause the current domain to participate in the specified profile.
+        Raises an exception if the current domain is currently sampling for
+        any profile, or if the specified profile has been stopped or
+        discarded. *)
+
     (** Submodule containing non-backwards-compatible functions which enforce thread
         safety via modes. *)
     module Safe : sig
@@ -722,19 +736,6 @@ module (Memprof @@ nonportable) :
           The provided [tracker] must be [portable] as the contained callbacks are
           registered with the current domain, but may close over data contained in the
           current capsule which may later move to a different domain. *)
-
-      val start' :
-        Domain.Safe.DLS.Access.t ->
-        sampling_rate:float ->
-        ?callstack_size:int ->
-        ('minor, 'major) tracker ->
-        t
-      (** Like {!start}, but can be called from any domain.
-
-          An additional [Domain.Safe.DLS.Access.t] argument is taken, which acts as a
-          witness that the closures contained in the [tracker] do not close over any
-          data from the current capsule in an unsafe way. See {!Domain.Safe.DLS.Access}
-          for more details. *)
     end
 end
 

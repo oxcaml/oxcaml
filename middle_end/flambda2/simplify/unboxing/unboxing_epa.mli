@@ -29,6 +29,7 @@ val compute_extra_args_for_one_decision_and_use :
   pass:Unboxing_types.pass ->
   Apply_cont_rewrite_id.t ->
   typing_env_at_use:Flambda2_types.Typing_env.t ->
+  machine_width:Target_system.Machine_width.t ->
   unboxed_arg ->
   Unboxing_types.decision ->
   Unboxing_types.decision

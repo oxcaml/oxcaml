@@ -12,12 +12,12 @@
 
 
 (* makearray_dynamic *)
-external[@layout_poly] make_vect : ('a : any_non_null) . int -> 'a -> 'a iarray
+external[@layout_poly] make_vect : ('a : any mod separable) . int -> 'a -> 'a iarray
   = "%makearray_dynamic"
 
 let make_scannable (x : #(int * string)) = make_vect 42 x
 [%%expect{|
-external make_vect : ('a : any_non_null). int -> 'a -> 'a iarray
+external make_vect : ('a : any mod separable). int -> 'a -> 'a iarray
   = "%makearray_dynamic" [@@layout_poly]
 Line 4, characters 43-57:
 4 | let make_scannable (x : #(int * string)) = make_vect 42 x
@@ -39,18 +39,23 @@ let make_bad (x : #(string * float#)) = make_vect 42 x
 Line 1, characters 40-54:
 1 | let make_bad (x : #(string * float#)) = make_vect 42 x
                                             ^^^^^^^^^^^^^^
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * float#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (* array length *)
-external[@layout_poly] len : ('a : any_non_null) . 'a iarray -> int =
+external[@layout_poly] len : ('a : any mod separable) . 'a iarray -> int =
   "%array_length"
 
 let length_scannable (x : #(int * string) iarray) = len x
 [%%expect{|
-external len : ('a : any_non_null). 'a iarray -> int = "%array_length"
+external len : ('a : any mod separable). 'a iarray -> int = "%array_length"
   [@@layout_poly]
 Line 4, characters 52-57:
 4 | let length_scannable (x : #(int * string) iarray) = len x
@@ -71,18 +76,23 @@ let length_bad (x : #(string * float#) iarray) = len x
 Line 1, characters 49-54:
 1 | let length_bad (x : #(string * float#) iarray) = len x
                                                      ^^^^^
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * float#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (* safe get *)
-external[@layout_poly] get : ('a : any_non_null) . 'a iarray -> int -> 'a =
+external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int -> 'a =
   "%array_safe_get"
 
 let get_scannable (x : #(int * string) iarray) = get x 42
 [%%expect{|
-external get : ('a : any_non_null). 'a iarray -> int -> 'a
+external get : ('a : any mod separable). 'a iarray -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
 Line 4, characters 49-57:
 4 | let get_scannable (x : #(int * string) iarray) = get x 42
@@ -103,18 +113,23 @@ let get_bad (x : #(string * float#) iarray) = get x 42
 Line 1, characters 46-54:
 1 | let get_bad (x : #(string * float#) iarray) = get x 42
                                                   ^^^^^^^^
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * float#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (* unsafe get *)
-external[@layout_poly] get : ('a : any_non_null) . 'a iarray -> int -> 'a =
+external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int -> 'a =
   "%array_unsafe_get"
 
 let get_scannable (x : #(int * string) iarray) = get x 42
 [%%expect{|
-external get : ('a : any_non_null). 'a iarray -> int -> 'a
+external get : ('a : any mod separable). 'a iarray -> int -> 'a
   = "%array_unsafe_get" [@@layout_poly]
 Line 4, characters 49-57:
 4 | let get_scannable (x : #(int * string) iarray) = get x 42
@@ -135,18 +150,23 @@ let get_bad (x : #(string * float#) iarray) = get x 42
 Line 1, characters 46-54:
 1 | let get_bad (x : #(string * float#) iarray) = get x 42
                                                   ^^^^^^^^
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * float#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (* safe get indexed by int64# *)
-external[@layout_poly] get : ('a : any_non_null) . 'a iarray -> int64# -> 'a =
+external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int64# -> 'a =
   "%array_safe_get_indexed_by_int64#"
 
 let get_scannable (x : #(int * string) iarray) = get x #42L
 [%%expect{|
-external get : ('a : any_non_null). 'a iarray -> int64# -> 'a
+external get : ('a : any mod separable). 'a iarray -> int64# -> 'a
   = "%array_safe_get_indexed_by_int64#" [@@layout_poly]
 Line 4, characters 49-59:
 4 | let get_scannable (x : #(int * string) iarray) = get x #42L
@@ -167,18 +187,23 @@ let get_bad (x : #(string * float#) iarray) = get x #42L
 Line 1, characters 46-56:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42L
                                                   ^^^^^^^^^^
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * float#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (* unsafe get indexed by int64# *)
-external[@layout_poly] get : ('a : any_non_null) . 'a iarray -> int64# -> 'a =
+external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int64# -> 'a =
   "%array_unsafe_get_indexed_by_int64#"
 
 let get_scannable (x : #(int * string) iarray) = get x #42L
 [%%expect{|
-external get : ('a : any_non_null). 'a iarray -> int64# -> 'a
+external get : ('a : any mod separable). 'a iarray -> int64# -> 'a
   = "%array_unsafe_get_indexed_by_int64#" [@@layout_poly]
 Line 4, characters 49-59:
 4 | let get_scannable (x : #(int * string) iarray) = get x #42L
@@ -199,18 +224,23 @@ let get_bad (x : #(string * float#) iarray) = get x #42L
 Line 1, characters 46-56:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42L
                                                   ^^^^^^^^^^
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * float#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (* safe get indexed by int32# *)
-external[@layout_poly] get : ('a : any_non_null) . 'a iarray -> int32# -> 'a =
+external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int32# -> 'a =
   "%array_safe_get_indexed_by_int32#"
 
 let get_scannable (x : #(int * string) iarray) = get x #42l
 [%%expect{|
-external get : ('a : any_non_null). 'a iarray -> int32# -> 'a
+external get : ('a : any mod separable). 'a iarray -> int32# -> 'a
   = "%array_safe_get_indexed_by_int32#" [@@layout_poly]
 Line 4, characters 49-59:
 4 | let get_scannable (x : #(int * string) iarray) = get x #42l
@@ -231,18 +261,23 @@ let get_bad (x : #(string * float#) iarray) = get x #42l
 Line 1, characters 46-56:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42l
                                                   ^^^^^^^^^^
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * float#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (* unsafe get indexed by int32# *)
-external[@layout_poly] get : ('a : any_non_null) . 'a iarray -> int32# -> 'a =
+external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int32# -> 'a =
   "%array_unsafe_get_indexed_by_int32#"
 
 let get_scannable (x : #(int * string) iarray) = get x #42l
 [%%expect{|
-external get : ('a : any_non_null). 'a iarray -> int32# -> 'a
+external get : ('a : any mod separable). 'a iarray -> int32# -> 'a
   = "%array_unsafe_get_indexed_by_int32#" [@@layout_poly]
 Line 4, characters 49-59:
 4 | let get_scannable (x : #(int * string) iarray) = get x #42l
@@ -263,19 +298,24 @@ let get_bad (x : #(string * float#) iarray) = get x #42l
 Line 1, characters 46-56:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42l
                                                   ^^^^^^^^^^
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * float#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (* safe get indexed by nativeint# *)
 external[@layout_poly] get :
-  ('a : any_non_null) . 'a iarray -> nativeint# -> 'a =
+  ('a : any mod separable) . 'a iarray -> nativeint# -> 'a =
   "%array_safe_get_indexed_by_nativeint#"
 
 let get_scannable (x : #(int * string) iarray) = get x #42n
 [%%expect{|
-external get : ('a : any_non_null). 'a iarray -> nativeint# -> 'a
+external get : ('a : any mod separable). 'a iarray -> nativeint# -> 'a
   = "%array_safe_get_indexed_by_nativeint#" [@@layout_poly]
 Line 5, characters 49-59:
 5 | let get_scannable (x : #(int * string) iarray) = get x #42n
@@ -296,19 +336,24 @@ let get_bad (x : #(string * float#) iarray) = get x #42n
 Line 1, characters 46-56:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42n
                                                   ^^^^^^^^^^
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * float#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (* unsafe get indexed by nativeint# *)
 external[@layout_poly] get :
-  ('a : any_non_null) . 'a iarray -> nativeint# -> 'a =
+  ('a : any mod separable) . 'a iarray -> nativeint# -> 'a =
   "%array_unsafe_get_indexed_by_nativeint#"
 
 let get_scannable (x : #(int * string) iarray) = get x #42n
 [%%expect{|
-external get : ('a : any_non_null). 'a iarray -> nativeint# -> 'a
+external get : ('a : any mod separable). 'a iarray -> nativeint# -> 'a
   = "%array_unsafe_get_indexed_by_nativeint#" [@@layout_poly]
 Line 5, characters 49-59:
 5 | let get_scannable (x : #(int * string) iarray) = get x #42n
@@ -329,9 +374,14 @@ let get_bad (x : #(string * float#) iarray) = get x #42n
 Line 1, characters 46-56:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42n
                                                   ^^^^^^^^^^
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(string * float#), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (* expression literals *)
@@ -377,9 +427,14 @@ let f_illegal_literal (type a : value mod external_)
 Line 2, characters 47-63:
 2 |       (x : float#) (y : a) (z : bool option) = [: #(x, y, z) :]
                                                    ^^^^^^^^^^^^^^^^
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(float# * a * bool option), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 let f_illegal_empty_literal (type a : value mod external_)
@@ -388,9 +443,14 @@ let f_illegal_empty_literal (type a : value mod external_)
 Lines 1-2, characters 28-46:
 1 | ............................(type a : value mod external_)
 2 |   : #(float# * a * bool option) iarray = [: :]
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(float# * 'a * bool option), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 (* pattern literals *)
@@ -400,9 +460,9 @@ let f_scannable_literal arr : #(bool option * string * int) =
   | [: #(x, y, z) :] -> #(z, y, x)
   | _ -> assert false
 [%%expect{|
-Line 3, characters 4-9:
-3 |   | [: :] -> #(None, "hi", 42)
-        ^^^^^
+Line 2, characters 8-11:
+2 |   match arr with
+            ^^^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
@@ -412,9 +472,9 @@ let f_ignorable_literal arr : #(#(int64# * float#) * int32# * int) =
   | [: #(x, y, #(z, q)) :] -> #(#(q, z), y, x)
   | _ -> assert false
 [%%expect{|
-Line 3, characters 4-9:
-3 |   | [: :] -> #(#(#42L, #3.14), #10l, 43)
-        ^^^^^
+Line 2, characters 8-11:
+2 |   match arr with
+            ^^^
 Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
@@ -426,9 +486,14 @@ let f_illegal_literal : #(float# * bool option * int) iarray -> int =
 Line 3, characters 4-18:
 3 |   | [: #(a,b,c) :] -> 1
         ^^^^^^^^^^^^^^
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(float# * bool option * int), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]
 
 let f_illegal_empty_literal : #(float# * bool option * int) iarray -> int =
@@ -439,7 +504,12 @@ let f_illegal_empty_literal : #(float# * bool option * int) iarray -> int =
 Line 3, characters 4-9:
 3 |   | [: :] -> 0
         ^^^^^
-Error: Unboxed product array elements must be external or contain all gc
-       scannable types. The product type this function is applied at is
-       not external but contains an element of sort float64.
+Error: An unboxed product array element must be formed from all
+       external types (which are ignored by the gc) or all gc-scannable types.
+       But this array operation is peformed for an array whose
+       element type is #(float# * bool option * int), which is an unboxed product
+       that is not external and contains a type with the non-scannable
+       layout float64.
+       Hint: if the array contents should not be scanned, annotating
+       contained abstract types as [mod external] may resolve this error.
 |}]

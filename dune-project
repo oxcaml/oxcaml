@@ -1,4 +1,5 @@
-(lang dune 3.5)
+(lang dune 3.13)
+(formatting (enabled_for ocaml))
 (wrapped_executables false)
 (using experimental_building_ocaml_compiler_with_dune 0.1)
 (using menhir 2.1)
@@ -7,7 +8,7 @@
 (cram enable)
 
 (package
-  (name flambda_backend)
+  (name oxcaml)
 )
 
 (package
@@ -17,4 +18,3 @@
 (package
   (name ocaml_runtime_stdlib)
 )
-

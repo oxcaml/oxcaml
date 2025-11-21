@@ -23,7 +23,7 @@ type t : value mod contended portable
 (** {1 Thread creation and termination} *)
 
 module Portable : sig
-  val create : ('a -> 'b) @ portable -> 'a -> t
+  val create : ('a -> 'b) @ once portable -> 'a -> t
   (** [Thread.Portable.create funct arg] creates a new thread of control,
      in which the function application [funct arg]
      is executed concurrently with the other threads of the domain.
@@ -65,6 +65,15 @@ val id : t -> int
 (** Return the identifier of the given thread. A thread identifier
    is an integer that identifies uniquely the thread.
    It can be used to build data structures indexed by threads. *)
+
+val set_current_thread_name : string -> unit
+(** Set the thread's name. This should be called from within the thread
+    function. Setting thread name is available on most systems.
+
+    This does nothing if the functionality is not implemented but will
+    print a warning on the standard error if enabled.
+
+    @since 5.4 *)
 
 exception Exit
 (** Exception raised by user code to initiate termination of the
@@ -193,3 +202,30 @@ val set_uncaught_exception_handler : (exn -> unit) @ portable -> unit
 
     If the newly set uncaught exception handler raise an exception,
     {!default_uncaught_exception_handler} will be called. *)
+
+val use_domains : unit -> unit
+(** [Thread.use_domains ()] sets the internal locking system to the one
+    used by domains. This ensures that domains can be started from threads
+    other than the initial one. It prevents the use of a custom locking
+    scheme, such as the one used by pyocaml. *)
+
+(** Thread-local storage. Like {!Domain.DLS}, but stores a distinct value
+    for each thread. Domains can contain multiple threads, so [TLS] should be
+    preferred in nearly all cases. *)
+module TLS : sig @@ portable
+
+   type 'a key : value mod portable contended
+   (** Type of a TLS key *)
+
+   val new_key
+   : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
+   -> (unit -> 'a) @ portable
+   -> 'a key
+   (** Like {!DLS.new_key}, but represents a distinct value in every thread. *)
+
+   val get : ('a : value mod portable). 'a key -> 'a @ contended
+   (** Like {!DLS.get}, but reads the value for the current thread. *)
+
+   val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
+   (** Like {!DLS.set}, but sets the value for the current thread. *)
+end

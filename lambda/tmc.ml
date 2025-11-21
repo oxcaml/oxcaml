@@ -63,8 +63,13 @@ let offset_code (Offset t) = t
 
 let add_dst_params ({var; offset} : Ident.t destination) params =
   { name = var ; layout = Lambda.layout_block ;
+    debug_uid= Lambda.debug_uid_none;
+    (* The destination parameters are generated internally as part of the TMC
+       optimization. As such, they are not user visible, and we do not associate
+       them with a [debug_uid]. *)
     attributes = Lambda.default_param_attribute ; mode = alloc_heap } ::
   { name = offset ; layout = Lambda.layout_int ;
+    debug_uid= Lambda.debug_uid_none;
     attributes = Lambda.default_param_attribute ; mode = alloc_heap } ::
   params
 
@@ -138,7 +143,9 @@ end = struct
     let placeholder_pos = List.length constr.before in
     let placeholder_pos_lam = Lconst (Const_base (Const_int placeholder_pos)) in
     let block_var = Ident.create_local "block" in
-    Llet (Strict, Lambda.layout_block, block_var, k_with_placeholder,
+    let block_var_duid = Lambda.debug_uid_none in
+    Llet (Strict, Lambda.layout_block, block_var, block_var_duid,
+          k_with_placeholder,
           body {
             var = block_var;
             offset = Offset placeholder_pos_lam ;
@@ -162,14 +169,16 @@ end = struct
             else begin
               let v = Ident.create_local
                   (Printf.sprintf "block%d_arg%d" block_id (arg_offset + i)) in
-              (Some (v, lam), Lvar v)
+              let v_duid = Lambda.debug_uid_none in
+              (Some (v, v_duid, lam), Lvar v)
             end)
         |> List.split in
       let body = k args in
       List.fold_right (fun binding body ->
           match binding with
           | None -> body
-          | Some (v, lam) -> Llet(Strict, Lambda.layout_tmc_field, v, lam, body)
+          | Some (v, v_duid, lam) ->
+            Llet(Strict, Lambda.layout_tmc_field, v, v_duid, lam, body)
         ) bindings body in
     fun ~block_id constr body ->
     bind_list ~block_id ~arg_offset:0 constr.before @@ fun vbefore ->
@@ -557,8 +566,8 @@ and specialized = {
 }
 
 let llets lk vk bindings body =
-  List.fold_right (fun (var, def) body ->
-    Llet (lk, vk, var, def, body)
+  List.fold_right (fun (var, var_duid, def) body ->
+    Llet (lk, vk, var, var_duid, def, body)
   ) bindings body
 
 let find_candidate = function
@@ -611,13 +620,13 @@ let rec choice ctx t =
         let l1 = traverse ctx l1 in
         let+ (l2, l3) = choice_pair ctx ~tail (l2, l3) in
         Lifthenelse (l1, l2, l3, kind)
-    | Lmutlet (vk, var, def, body) ->
+    | Lmutlet (vk, var, var_duid, def, body) ->
         (* mutable bindings are not TMC-specialized *)
         let def = traverse ctx def in
         let+ body = choice ctx ~tail body in
-        Lmutlet (vk, var, def, body)
-    | Llet (lk, vk, var, def, body) ->
-        let ctx, bindings = traverse_let ctx var def in
+        Lmutlet (vk, var, var_duid, def, body)
+    | Llet (lk, vk, var, var_duid, def, body) ->
+        let ctx, bindings = traverse_let ctx var var_duid def in
         let+ body = choice ctx ~tail body in
         llets lk vk bindings body
     | Lletrec (bindings, body) ->
@@ -651,13 +660,13 @@ let rec choice ctx t =
     | Lstaticraise (id, ls) ->
         let ls = traverse_list ctx ls in
         Choice.lambda (Lstaticraise (id, ls))
-    | Ltrywith (l1, id, l2, kind) ->
+    | Ltrywith (l1, id, id_duid, l2, kind) ->
         (* in [try l1 with id -> l2], the term [l1] is
            not in tail-call position (after it returns
            we need to remove the exception handler) *)
         let+ l1 = choice ctx ~tail:false l1
         and+ l2 = choice ctx ~tail l2 in
-        Ltrywith (l1, id, l2, kind)
+        Ltrywith (l1, id, id_duid, l2, kind)
     | Lstaticcatch (l1, ids, l2, r, kind) ->
         (* In [static-catch l1 with ids -> l2],
            the term [l1] is in fact in tail-position *)
@@ -866,9 +875,13 @@ let rec choice ctx t =
         Lprim (Popaque layout, [l1], loc)
 
     (* in common cases we just return *)
+    | Pphys_equal _
+    | Pscalar _
+    (* Note for Pscalar: operations returning boxed values could be
+       considered constructions someday *)
     | Pbytes_to_string | Pbytes_of_string
     | Parray_to_iarray | Parray_of_iarray
-    | Pgetglobal _ | Psetglobal _ | Pgetpredef _
+    | Pgetglobal _ | Pgetpredef _
     | Pfield _ | Pfield_computed _
     | Psetfield _ | Psetfield_computed _
     | Pfloatfield _ | Psetfloatfield _
@@ -877,37 +890,27 @@ let rec choice ctx t =
     | Pccall _
     | Praise _
     | Pnot
-    | Pnegint | Paddint | Psubint | Pmulint | Pdivint _ | Pmodint _
-    | Pandint | Porint | Pxorint
-    | Plslint | Plsrint | Pasrint
-    | Pintcomp _ | Punboxed_int_comp _
-    | Poffsetint _ | Poffsetref _
-    | Pintoffloat _ | Pfloatofint (_, _)
-    | Pfloatoffloat32 _ | Pfloat32offloat _
-    | Pnegfloat (_, _) | Pabsfloat (_, _)
-    | Paddfloat (_, _) | Psubfloat (_, _)
-    | Pmulfloat (_, _) | Pdivfloat (_, _)
-    | Pfloatcomp (_, _) | Punboxed_float_comp (_, _)
+    | Poffsetref _
     | Pstringlength | Pstringrefu  | Pstringrefs
     | Pbyteslength | Pbytesrefu | Pbytessetu | Pbytesrefs | Pbytessets
     | Parraylength _ | Parrayrefu _ | Parraysetu _ | Parrayrefs _ | Parraysets _
     | Parrayblit _
     | Pisint _ | Pisnull | Pisout
     | Pignore
-    | Pcompare_ints | Pcompare_floats _ | Pcompare_bints _
     | Preinterpret_tagged_int63_as_unboxed_int64
     | Preinterpret_unboxed_int64_as_tagged_int63
+    | Punbox_unit
 
     (* we don't handle effect or DLS primitives *)
-    | Prunstack | Pperform | Presume | Preperform | Pdls_get
+    | Prunstack | Pperform | Presume | Preperform | Pdls_get | Ptls_get
 
     (* we don't handle atomic primitives *)
-    | Patomic_exchange _ | Patomic_compare_exchange _
-    | Patomic_compare_set _ | Patomic_fetch_add
-    | Patomic_add | Patomic_sub | Patomic_land
-    | Patomic_lor | Patomic_lxor | Patomic_load _ | Patomic_set _
-    | Punbox_float _ | Pbox_float (_, _)
-    | Punbox_int _ | Pbox_int _
+    | Patomic_exchange_field _ | Patomic_compare_exchange_field _
+    | Patomic_compare_set_field _ | Patomic_fetch_add_field
+    | Patomic_add_field | Patomic_sub_field | Patomic_land_field
+    | Patomic_lor_field | Patomic_lxor_field
+    | Patomic_load_field _ | Patomic_set_field _
+    | Pcpu_relax
     | Punbox_vector _ | Pbox_vector (_, _)
 
     (* it doesn't seem worth it to support lazy blocks for tmc *)
@@ -934,53 +937,44 @@ let rec choice ctx t =
     | Pobj_magic _
     | Pprobe_is_enabled _
 
-    (* operations returning boxed values could be considered
-       constructions someday *)
-    | Pbintofint _ | Pintofbint _
-    | Pcvtbint _
-    | Pnegbint _
-    | Paddbint _ | Psubbint _ | Pmulbint _ | Pdivbint _ | Pmodbint _
-    | Pandbint _ | Porbint _ | Pxorbint _ | Plslbint _ | Plsrbint _ | Pasrbint _
-    | Pbintcomp _
-
     (* more common cases... *)
     | Pbigarrayref _ | Pbigarrayset _
     | Pbigarraydim _
     | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
-    | Pstring_load_64 _ | Pstring_load_128 _
+    | Pstring_load_64 _ | Pstring_load_vec _
     | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
-    | Pbytes_load_64 _ | Pbytes_load_128 _
+    | Pbytes_load_64 _ | Pbytes_load_vec _
     | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
-    | Pbytes_set_64 _ | Pbytes_set_128 _
+    | Pbytes_set_64 _ | Pbytes_set_vec _
     | Pbigstring_load_16 _ | Pbigstring_load_32 _ | Pbigstring_load_f32 _
-    | Pbigstring_load_64 _ | Pbigstring_load_128 _
+    | Pbigstring_load_64 _ | Pbigstring_load_vec _
     | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
-    | Pbigstring_set_64 _ | Pbigstring_set_128 _
-    | Pfloatarray_load_128 _
-    | Pfloat_array_load_128 _
-    | Pint_array_load_128 _
-    | Punboxed_float_array_load_128 _
-    | Punboxed_float32_array_load_128 _
-    | Punboxed_int32_array_load_128 _
-    | Punboxed_int64_array_load_128 _
-    | Punboxed_nativeint_array_load_128 _
-    | Pfloatarray_set_128 _
-    | Pfloat_array_set_128 _
-    | Pint_array_set_128 _
-    | Punboxed_float_array_set_128 _
-    | Punboxed_float32_array_set_128 _
-    | Punboxed_int32_array_set_128 _
-    | Punboxed_int64_array_set_128 _
-    | Punboxed_nativeint_array_set_128 _
+    | Pbigstring_set_64 _ | Pbigstring_set_vec _
+    | Pfloatarray_load_vec _
+    | Pfloat_array_load_vec _
+    | Pint_array_load_vec _
+    | Punboxed_float_array_load_vec _
+    | Punboxed_float32_array_load_vec _
+    | Punboxed_int32_array_load_vec _
+    | Punboxed_int64_array_load_vec _
+    | Punboxed_nativeint_array_load_vec _
+    | Pfloatarray_set_vec _
+    | Pfloat_array_set_vec _
+    | Pint_array_set_vec _
+    | Punboxed_float_array_set_vec _
+    | Punboxed_float32_array_set_vec _
+    | Punboxed_int32_array_set_vec _
+    | Punboxed_int64_array_set_vec _
+    | Punboxed_nativeint_array_set_vec _
     | Pget_header _
     | Pctconst _
-    | Pbswap16
-    | Pbbswap _
     | Pint_as_pointer _
     | Psequand | Psequor
     | Ppoll
     | Ppeek _ | Ppoke _
-      ->
+    | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pidx_deepen _
+    | Pmake_idx_array _
+    | Pget_idx _ | Pset_idx _ | Pget_ptr _ | Pset_ptr _ ->
         let primargs = traverse_list ctx primargs in
         Choice.lambda (Lprim (prim, primargs, loc))
 
@@ -994,8 +988,8 @@ let rec choice ctx t =
   in choice ctx t
 
 and traverse ctx = function
-  | Llet (lk, vk, var, def, body) ->
-      let ctx, bindings = traverse_let ctx var def in
+  | Llet (lk, vk, var, var_duid, def, body) ->
+      let ctx, bindings = traverse_let ctx var var_duid def in
       let body = traverse ctx body in
       llets lk vk bindings body
   | Lletrec (bindings, body) ->
@@ -1007,10 +1001,10 @@ and traverse ctx = function
 and traverse_lfunction ctx lfun =
   map_lfunction (traverse ctx) lfun
 
-and traverse_let outer_ctx var def =
+and traverse_let outer_ctx var var_duid def =
   let inner_ctx = declare_binding outer_ctx (var, def) in
   let bindings =
-    traverse_let_binding outer_ctx inner_ctx var def
+    traverse_let_binding outer_ctx inner_ctx var var_duid def
   in
   inner_ctx, bindings
 
@@ -1025,22 +1019,25 @@ and traverse_letrec ctx bindings =
   in
   ctx, bindings
 
-and traverse_let_binding outer_ctx inner_ctx var def =
+and traverse_let_binding outer_ctx inner_ctx var var_duid def =
   match find_candidate def with
-  | None -> [ var, traverse outer_ctx def ]
+  | None -> [ var, var_duid, traverse outer_ctx def ]
   | Some lfun ->
-      let functions = make_dps_variant var inner_ctx outer_ctx lfun in
-      List.map (fun (var, lfun) -> var, Lfunction lfun) functions
+      let functions = make_dps_variant var var_duid inner_ctx outer_ctx lfun in
+      List.map
+        (fun (var, var_duid, lfun) -> var, var_duid, Lfunction lfun) functions
 
-and traverse_letrec_binding ctx { id; def } =
+and traverse_letrec_binding ctx { id; debug_uid; def } =
   if def.attr.tmc_candidate
   then
-    let functions = make_dps_variant id ctx ctx def in
-    List.map (fun (id, def) -> { id; def }) functions
+    let functions = make_dps_variant id debug_uid ctx ctx def in
+    List.map
+      (fun (id, id_duid, def) -> { id; debug_uid = id_duid; def })
+      functions
   else
-    [ { id; def = traverse_lfunction ctx def } ]
+    [ { id; debug_uid = debug_uid; def = traverse_lfunction ctx def } ]
 
-and make_dps_variant var inner_ctx outer_ctx (lfun : lfunction) =
+and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
   let special = Ident.Map.find var inner_ctx.specialized in
   let fun_choice = choice outer_ctx ~tail:true lfun.body in
   if fun_choice.Choice.tmc_calls = [] then
@@ -1081,7 +1078,9 @@ and make_dps_variant var inner_ctx outer_ctx (lfun : lfunction) =
       ~ret_mode:lfun.ret_mode
   in
   let dps_var = special.dps_id in
-  [var, direct; dps_var, dps]
+  let dps_var_duid = Lambda.debug_uid_none in
+  [var, var_duid, direct;
+   dps_var, dps_var_duid, dps]
 
 and traverse_list ctx terms =
   List.map (traverse ctx) terms

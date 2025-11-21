@@ -43,7 +43,9 @@ let rec is_arrow_type t =
   | Types.Tunboxed_tuple _
   | Types.Tconstr _
   | Types.Tvar _ | Types.Tunivar _ | Types.Tobject _ | Types.Tpoly _
-  | Types.Tfield _ | Types.Tnil | Types.Tvariant _ | Types.Tpackage _ -> false
+  | Types.Tquote _ | Types.Tsplice _
+  | Types.Tfield _ | Types.Tnil | Types.Tvariant _ | Types.Tpackage _
+  | Types.Tof_kind _ -> false
   | Types.Tsubst _ -> assert false
 
 
@@ -53,7 +55,9 @@ let rec need_parent t =
   | Types.Tlink t2 -> need_parent t2
   | Types.Tconstr _
   | Types.Tvar _ | Types.Tunivar _ | Types.Tobject _ | Types.Tpoly _
-  | Types.Tfield _ | Types.Tnil | Types.Tvariant _ | Types.Tpackage _ -> false
+  | Types.Tquote _ | Types.Tsplice _
+  | Types.Tfield _ | Types.Tnil | Types.Tvariant _ | Types.Tpackage _
+  | Types.Tof_kind _ -> false
   | Types.Tsubst _ -> assert false
 
 let print_type_scheme ppf t =

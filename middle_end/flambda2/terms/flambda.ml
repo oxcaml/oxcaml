@@ -121,7 +121,7 @@ and continuation_handler =
 and continuation_handlers_t0 =
   (Bound_parameters.t, continuation_handlers) Name_abstraction.t
 
-and continuation_handlers = continuation_handler Continuation.Map.t
+and continuation_handlers = continuation_handler Continuation.Lmap.t
 
 and function_params_and_body_base =
   { expr : expr;
@@ -284,12 +284,13 @@ and apply_renaming_continuation_handlers t renaming =
     t renaming ~apply_renaming_to_term:apply_renaming_continuations_handlers_t0
 
 and apply_renaming_continuations_handlers_t0 t renaming =
-  Continuation.Map.fold
-    (fun k handler result ->
-      let k = Renaming.apply_continuation renaming k in
-      let handler = apply_renaming_continuation_handler handler renaming in
-      Continuation.Map.add k handler result)
-    t Continuation.Map.empty
+  Continuation.Lmap.of_list
+  @@ List.map
+       (fun (k, handler) ->
+         let k = Renaming.apply_continuation renaming k in
+         let handler = apply_renaming_continuation_handler handler renaming in
+         k, handler)
+       (Continuation.Lmap.bindings t)
 
 and apply_renaming_function_params_and_body_base { expr; free_names } renaming =
   let expr = apply_renaming expr renaming in
@@ -350,7 +351,7 @@ and ids_for_export_continuation_handlers t =
     t ~ids_for_export_of_term:ids_for_export_continuation_handlers_t0
 
 and ids_for_export_continuation_handlers_t0 t =
-  Continuation.Map.fold
+  Continuation.Lmap.fold
     (fun k handler ids ->
       Ids_for_export.union ids
         (Ids_for_export.add_continuation
@@ -584,6 +585,7 @@ and print_function_params_and_body ppf t =
     let my_closure =
       Bound_parameter.create my_closure
         (K.With_subkind.create K.value Anything Non_nullable)
+        Flambda_debug_uid.none
     in
     fprintf ppf
       "@[<hov 1>(%t@<1>\u{03bb}%t@[<hov \
@@ -653,7 +655,7 @@ and print_let_cont_expr ppf t =
                 invariant_params,
                 handler,
                 Or_unknown.Unknown ))
-            (Continuation.Map.bindings handlers)
+            (Continuation.Lmap.bindings handlers)
         in
         new_let_conts @ let_conts, body
       in
@@ -974,10 +976,10 @@ module Continuation_handlers = struct
 
   let to_map t = t
 
-  let domain t = Continuation.Map.keys t
+  let domain t = Continuation.Lmap.keys t
 
   let contains_exn_handler t =
-    Continuation.Map.exists
+    Continuation.Lmap.exists
       (fun _cont handler -> Continuation_handler.is_exn_handler handler)
       t
 end
@@ -1199,7 +1201,7 @@ end
 
 module Recursive_let_cont_handlers = struct
   module T0 = struct
-    type t = continuation_handler Continuation.Map.t
+    type t = continuation_handler Continuation.Lmap.t
 
     let apply_renaming = apply_renaming_continuations_handlers_t0
 
@@ -1224,7 +1226,7 @@ module Recursive_let_cont_handlers = struct
   let create ~body ~invariant_params handlers =
     let bound = Continuation_handlers.domain handlers in
     let handlers0 = T1.create ~body (A0.create invariant_params handlers) in
-    let conts = Bound_continuations.create (Continuation.Set.elements bound) in
+    let conts = Bound_continuations.create bound in
     A1.create conts handlers0
 
   let pattern_match t ~f =
@@ -1389,12 +1391,14 @@ module Named = struct
     | Static_consts _ -> true
     | Rec_info _ -> true
 
-  let dummy_value (kind : K.t) : t =
+  let dummy_value ~machine_width (kind : K.t) : t =
     let simple =
       match kind with
-      | Value -> Simple.const_zero
+      | Value -> Simple.const_zero machine_width
       | Naked_number Naked_immediate ->
-        Simple.const (Reg_width_const.naked_immediate Targetint_31_63.zero)
+        Simple.const
+          (Reg_width_const.naked_immediate
+             (Target_ocaml_int.zero machine_width))
       | Naked_number Naked_float ->
         Simple.const
           (Reg_width_const.naked_float Numeric_types.Float_by_bit_pattern.zero)
@@ -1402,19 +1406,38 @@ module Named = struct
         Simple.const
           (Reg_width_const.naked_float32
              Numeric_types.Float32_by_bit_pattern.zero)
+      | Naked_number Naked_int8 ->
+        Simple.const (Reg_width_const.naked_int8 Numeric_types.Int8.zero)
+      | Naked_number Naked_int16 ->
+        Simple.const (Reg_width_const.naked_int16 Numeric_types.Int16.zero)
       | Naked_number Naked_int32 ->
         Simple.const (Reg_width_const.naked_int32 Int32.zero)
       | Naked_number Naked_int64 ->
         Simple.const (Reg_width_const.naked_int64 Int64.zero)
       | Naked_number Naked_nativeint ->
-        Simple.const (Reg_width_const.naked_nativeint Targetint_32_64.zero)
+        Simple.const
+          (Reg_width_const.naked_nativeint (Targetint_32_64.zero machine_width))
       | Naked_number Naked_vec128 ->
         Simple.const
           (Reg_width_const.naked_vec128 Vector_types.Vec128.Bit_pattern.zero)
+      | Naked_number Naked_vec256 ->
+        Simple.const
+          (Reg_width_const.naked_vec256 Vector_types.Vec256.Bit_pattern.zero)
+      | Naked_number Naked_vec512 ->
+        Simple.const
+          (Reg_width_const.naked_vec512 Vector_types.Vec512.Bit_pattern.zero)
       | Region -> Misc.fatal_error "[Region] kind not expected here"
       | Rec_info -> Misc.fatal_error "[Rec_info] kind not expected here"
     in
     Simple simple
+
+  let kind t =
+    match t with
+    | Simple s -> Simple.kind s
+    | Prim (p, _dbg) -> Flambda_primitive.result_kind' p
+    | Rec_info _ -> K.rec_info
+    | Set_of_closures _ | Static_consts _ ->
+      Misc.fatal_errorf "No valid kind for non-singleton named %a" print t
 
   let is_dynamically_allocated_set_of_closures t =
     match t with
@@ -1442,12 +1465,14 @@ module Named = struct
              | Deleted_code
              | Static_const
                  ( Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
-                 | Boxed_int64 _ | Boxed_vec128 _ | Boxed_nativeint _
-                 | Immutable_float_block _ | Immutable_float_array _
-                 | Immutable_float32_array _ | Mutable_string _
-                 | Immutable_string _ | Empty_array _ | Immutable_value_array _
-                 | Immutable_int32_array _ | Immutable_int64_array _
-                 | Immutable_nativeint_array _ | Immutable_vec128_array _ ) ->
+                 | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _
+                 | Boxed_vec512 _ | Boxed_nativeint _ | Immutable_float_block _
+                 | Immutable_float_array _ | Immutable_float32_array _
+                 | Mutable_string _ | Immutable_string _ | Empty_array _
+                 | Immutable_value_array _ | Immutable_int32_array _
+                 | Immutable_int64_array _ | Immutable_nativeint_array _
+                 | Immutable_vec128_array _ | Immutable_vec256_array _
+                 | Immutable_vec512_array _ ) ->
                acc)
            init
 end
@@ -1458,11 +1483,16 @@ module Invalid = struct
     | Apply_cont_of_unreachable_continuation of Continuation.t
     | Defining_expr_of_let of Bound_pattern.t * Named.t
     | Closure_type_was_invalid of Apply_expr.t
+    | Direct_application_parameter_kind_mismatch of
+        { params_arity : [`Complex] Flambda_arity.t;
+          args_arity : [`Complex] Flambda_arity.t;
+          apply : Apply_expr.t
+        }
     | Application_argument_kind_mismatch of
         [`Unarized] Flambda_arity.t * Apply_expr.t
     | Application_result_kind_mismatch of
         [`Unarized] Flambda_arity.t * Apply_expr.t
-    | Partial_application_mode_mismatch of Apply_expr.t
+    | Partial_application_mode_mismatch of Apply_expr.t * Code_metadata.t
     | Partial_application_mode_mismatch_in_lambda of Debuginfo.t
     | Calling_local_returning_closure_with_normal_apply of Apply_expr.t
     | Zero_switch_arms
@@ -1489,6 +1519,13 @@ module Invalid = struct
       Format.asprintf
         "@[<hov 1>(Closure_type_was_invalid@ @[<hov 1>(apply_expr@ %a)@])@]"
         Apply_expr.print apply_expr
+    | Direct_application_parameter_kind_mismatch
+        { params_arity; args_arity; apply } ->
+      Format.asprintf
+        "@[<hov 1>(Direct_application_parameter_kind_mismatch@ @[<hov \
+         1>(params_arity %a)@ (args_arity@ %a)@ (apply_expr@ %a)@])@]"
+        Flambda_arity.print params_arity Flambda_arity.print args_arity
+        Apply_expr.print apply
     | Application_argument_kind_mismatch (args_arity, apply_expr) ->
       Format.asprintf
         "@[<hov 1>(Application_argument_kind_mismatch@ @[<hov 1>(args_arity@ \
@@ -1499,11 +1536,11 @@ module Invalid = struct
         "@[<hov 1>(Application_result_kind_mismatch@ @[<hov 1>(result_arity@ \
          %a)@ (apply_expr@ %a)@])@]"
         Flambda_arity.print result_arity Apply_expr.print apply_expr
-    | Partial_application_mode_mismatch apply_expr ->
+    | Partial_application_mode_mismatch (apply_expr, code_metadata) ->
       Format.asprintf
         "@[<hov 1>(Partial_application_mode_mismatch@ @[<hov 1>(apply_expr@ \
-         %a)@])@]"
-        Apply_expr.print apply_expr
+         %a)@ (callee's_code_metadata@ (%a))@])@]"
+        Apply_expr.print apply_expr Code_metadata.print code_metadata
     | Partial_application_mode_mismatch_in_lambda dbg ->
       Format.asprintf
         "@[<hov 1>(Partial_application_mode_mismatch_in_lambda@ @[<hov 1>(dbg@ \

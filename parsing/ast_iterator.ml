@@ -155,6 +155,10 @@ module T = struct
     | Ptyp_open (mod_ident, t) ->
         iter_loc sub mod_ident;
         sub.typ sub t
+    | Ptyp_quote t -> sub.typ sub t
+    | Ptyp_splice t -> sub.typ sub t
+    | Ptyp_of_kind jkind ->
+        sub.jkind_annotation sub jkind
     | Ptyp_extension x -> sub.extension sub x
 
   let iter_type_declaration sub
@@ -454,13 +458,21 @@ module E = struct
 
   let iter_labeled_tuple sub el = List.iter (iter_snd (sub.expr sub)) el
 
+  let iter_block_access sub = function
+    | Baccess_field lid -> iter_loc sub lid
+    | Baccess_array (_, _, index) -> sub.expr sub index
+    | Baccess_block (_, idx) -> sub.expr sub idx
+
+  let iter_unboxed_access sub = function
+    | Uaccess_unboxed_field lid -> iter_loc sub lid
+
   let iter sub {pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} =
     sub.location sub loc;
     sub.attributes sub attrs;
     match desc with
     | Pexp_ident x -> iter_loc sub x
     | Pexp_constant _ -> ()
-    | Pexp_let (_r, vbs, e) ->
+    | Pexp_let (_m, _r, vbs, e) ->
         List.iter (sub.value_binding sub) vbs;
         sub.expr sub e
     | Pexp_function (params, constraint_, body) ->
@@ -489,6 +501,9 @@ module E = struct
         sub.expr sub e1; iter_loc sub lid;
         sub.expr sub e2
     | Pexp_array (_mut, el) -> List.iter (sub.expr sub) el
+    | Pexp_idx (ba, uas) ->
+        iter_block_access sub ba;
+        List.iter (iter_unboxed_access sub) uas
     | Pexp_ifthenelse (e1, e2, e3) ->
         sub.expr sub e1; sub.expr sub e2;
         iter_opt (sub.expr sub) e3
@@ -508,7 +523,7 @@ module E = struct
       sub.modes sub m
     | Pexp_send (e, _s) -> sub.expr sub e
     | Pexp_new lid -> iter_loc sub lid
-    | Pexp_setinstvar (s, e) ->
+    | Pexp_setvar (s, e) ->
         iter_loc sub s; sub.expr sub e
     | Pexp_override sel ->
         List.iter (iter_tuple (iter_loc sub) (sub.expr sub)) sel
@@ -539,6 +554,8 @@ module E = struct
     | Pexp_stack e -> sub.expr sub e
     | Pexp_comprehension e -> iter_comp_exp sub e
     | Pexp_overwrite (e1, e2) -> sub.expr sub e1; sub.expr sub e2
+    | Pexp_quote e -> sub.expr sub e
+    | Pexp_splice e -> sub.expr sub e
     | Pexp_hole -> ()
 
   let iter_binding_op sub {pbop_op; pbop_pat; pbop_exp; pbop_loc} =
@@ -841,17 +858,17 @@ let default_iterator =
       (fun this { pjkind_loc; pjkind_desc } ->
          this.location this pjkind_loc;
          match pjkind_desc with
-         | Default -> ()
-         | Abbreviation (_ : string) -> ()
-         | Mod (t, mode_list) ->
+         | Pjk_default -> ()
+         | Pjk_abbreviation (_ : string) -> ()
+         | Pjk_mod (t, mode_list) ->
              this.jkind_annotation this t;
              this.modes this mode_list
-         | With (t, ty, modalities) ->
+         | Pjk_with (t, ty, modalities) ->
              this.jkind_annotation this t;
              this.typ this ty;
              this.modalities this modalities
-         | Kind_of ty -> this.typ this ty
-         | Product ts -> List.iter (this.jkind_annotation this) ts);
+         | Pjk_kind_of ty -> this.typ this ty
+         | Pjk_product ts -> List.iter (this.jkind_annotation this) ts);
 
     directive_argument =
       (fun this a ->

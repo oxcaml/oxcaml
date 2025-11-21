@@ -121,8 +121,11 @@ let rec add_type bv ty =
       add_type bv t
   | Ptyp_package pt -> add_package_type bv pt
   | Ptyp_open (mod_ident, t) ->
-    let bv = open_module bv mod_ident.txt in
-    add_type bv t
+      let bv = open_module bv mod_ident.txt in
+      add_type bv t
+  | Ptyp_quote t -> add_type bv t
+  | Ptyp_splice t -> add_type bv t
+  | Ptyp_of_kind jkind -> add_jkind bv jkind
   | Ptyp_extension e -> handle_extension e
 
 and add_type_labeled_tuple bv tl =
@@ -136,15 +139,15 @@ and add_package_type bv (lid, l) =
    prefixes. *)
 and add_jkind bv (jkind : jkind_annotation) =
   match jkind.pjkind_desc with
-  | Default -> ()
-  | Abbreviation _ -> ()
-  | Mod (jkind, (_ : modes)) -> add_jkind bv jkind
-  | With (jkind, typ, (_ : modalities)) ->
+  | Pjk_default -> ()
+  | Pjk_abbreviation _ -> ()
+  | Pjk_mod (jkind, (_ : modes)) -> add_jkind bv jkind
+  | Pjk_with (jkind, typ, (_ : modalities)) ->
       add_jkind bv jkind;
       add_type bv typ;
-  | Kind_of typ ->
+  | Pjk_kind_of typ ->
       add_type bv typ
-  | Product jkinds ->
+  | Pjk_product jkinds ->
       List.iter (fun jkind -> add_jkind bv jkind) jkinds
 
 and add_vars_jkinds bv vars_jkinds =
@@ -239,7 +242,7 @@ let rec add_expr bv exp =
   match exp.pexp_desc with
     Pexp_ident l -> add bv l
   | Pexp_constant _ -> ()
-  | Pexp_let(rf, pel, e) ->
+  | Pexp_let(_mf, rf, pel, e) ->
       let bv = add_bindings rf bv pel in add_expr bv e
   | Pexp_function (params, constraint_, body) ->
       let bv = List.fold_left add_function_param bv params in
@@ -260,6 +263,9 @@ let rec add_expr bv exp =
   | Pexp_field(e, fld) | Pexp_unboxed_field(e, fld) -> add_expr bv e; add bv fld
   | Pexp_setfield(e1, fld, e2) -> add_expr bv e1; add bv fld; add_expr bv e2
   | Pexp_array (_, el) -> List.iter (add_expr bv) el
+  | Pexp_idx (ba, uas) ->
+    add_block_access bv ba;
+    List.iter (add_unboxed_access bv) uas
   | Pexp_ifthenelse(e1, e2, opte3) ->
       add_expr bv e1; add_expr bv e2; add_opt add_expr bv opte3
   | Pexp_sequence(e1, e2) -> add_expr bv e1; add_expr bv e2
@@ -275,7 +281,7 @@ let rec add_expr bv exp =
       Option.iter (add_type bv) ty2
   | Pexp_send(e, _m) -> add_expr bv e
   | Pexp_new li -> add bv li
-  | Pexp_setinstvar(_v, e) -> add_expr bv e
+  | Pexp_setvar(_v, e) -> add_expr bv e
   | Pexp_override sel -> List.iter (fun (_s, e) -> add_expr bv e) sel
   | Pexp_letmodule(id, m, e) ->
       let b = add_module_binding bv m in
@@ -317,6 +323,8 @@ let rec add_expr bv exp =
   | Pexp_extension e -> handle_extension e
   | Pexp_stack e -> add_expr bv e
   | Pexp_overwrite (e1, e2) -> add_expr bv e1; add_expr bv e2
+  | Pexp_quote e -> add_expr bv e
+  | Pexp_splice e -> add_expr bv e
   | Pexp_hole -> ()
   | Pexp_unreachable -> ()
   | Pexp_comprehension x -> add_comprehension_expr bv x
@@ -350,6 +358,16 @@ and add_comprehension_iterator bv = function
     add_expr bv expr
 
 and add_labeled_tuple_expr bv el = List.iter (add_expr bv) (List.map snd el)
+
+and add_block_access bv = function
+  | Baccess_field fld -> add bv fld
+  | Baccess_array (_, _, index) ->
+    add_expr bv index
+  | Baccess_block (_, idx) ->
+    add_expr bv idx
+
+and add_unboxed_access bv = function
+  | Uaccess_unboxed_field fld -> add bv fld
 
 and add_function_param bv param =
   match param.pparam_desc with

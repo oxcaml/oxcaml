@@ -21,14 +21,14 @@
   See {{!examples} the examples} below.
   See 'Memory model: The hard bits' chapter in the manual.
 
-    @since 4.12
-*)
+  @since 4.12 *)
 
 (** An atomic (mutable) reference to a value of type ['a]. *)
-type !'a t : mutable_data with 'a
+type (!'a : value_or_null) t : sync_data with 'a =
+  { mutable contents : 'a [@atomic] }
 
 (** Create an atomic reference. *)
-external make : 'a -> ('a t[@local_opt]) = "%makemutable"
+external make : ('a : value_or_null). 'a -> ('a t[@local_opt]) = "%makemutable"
 
 (** Create an atomic reference that is alone on a cache line. It occupies 4-16x
     the memory of one allocated with [make v].
@@ -43,77 +43,120 @@ external make : 'a -> ('a t[@local_opt]) = "%makemutable"
     enhance performance.
 
     CR ocaml 5 all-runtime5: does not support runtime4 *)
-
-external make_contended : 'a -> ('a t[@local_opt]) = "caml_atomic_make_contended"
+external make_contended
+  : ('a : value_or_null).
+  'a -> ('a t[@local_opt])
+  = "caml_atomic_make_contended"
 
 (** Get the current value of the atomic reference. *)
-val get : 'a t @ local -> 'a
+external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load"
 
 (** Set a new value for the atomic reference. *)
-external set : 'a t @ local -> 'a -> unit = "%atomic_set"
+external set : ('a : value_or_null). 'a t @ local -> 'a -> unit = "%atomic_set"
 
 (** Set a new value for the atomic reference, and return the current value. *)
-external exchange : 'a t @ local -> 'a -> 'a = "%atomic_exchange"
+external exchange
+  : ('a : value_or_null).
+  'a t @ local -> 'a -> 'a
+  = "%atomic_exchange"
 
-(** [compare_and_set r seen v] sets the new value of [r] to [v] only
-    if its current value is physically equal to [seen] -- the
-    comparison and the set occur atomically. Returns [true] if the
-    comparison succeeded (so the set happened) and [false]
-    otherwise. *)
-external compare_and_set : 'a t @ local -> 'a -> 'a -> bool = "%atomic_cas"
+(** [compare_and_set r seen v] sets the new value of [r] to [v] only if its
+    current value is physically equal to [seen] -- the comparison and the set
+    occur atomically. Returns [true] if the comparison succeeded (so the set
+    happened) and [false] otherwise. *)
+external compare_and_set
+  : ('a : value_or_null).
+  'a t @ local -> 'a -> 'a -> bool
+  = "%atomic_cas"
 
-(** [compare_exchange r seen v] sets the new value of [r] to [v] only
-    if its current value is physically equal to [seen] -- the comparison
-    and the set occur atomically. Returns the previous value. *)
-external compare_exchange : 'a t @ local -> 'a -> 'a -> 'a = "%atomic_compare_exchange"
+(** [compare_exchange r seen v] sets the new value of [r] to [v] only if its
+    current value is physically equal to [seen] -- the comparison and the set
+    occur atomically. Returns the previous value. *)
+external compare_exchange
+  : ('a : value_or_null).
+  'a t @ local -> 'a -> 'a -> 'a
+  = "%atomic_compare_exchange"
 
-(** [fetch_and_add r n] atomically increments the value of [r] by [n],
-    and returns the current value (before the increment). *)
-val fetch_and_add : int t @ contended local -> int -> int
+(** [fetch_and_add r n] atomically increments the value of [r] by [n], and
+    returns the current value (before the increment). *)
+external fetch_and_add : int t @ local -> int -> int = "%atomic_fetch_add"
 
 (** [add r i] atomically adds [i] onto [r]. *)
-val add : int t @ contended local -> int -> unit
+external add : int t @ local -> int -> unit =  "%atomic_add"
 
 (** [sub r i] atomically subtracts [i] onto [r]. *)
-val sub : int t @ contended local -> int -> unit
+external sub : int t @ local -> int -> unit =  "%atomic_sub"
 
 (** [logand r i] atomically bitwise-ands [i] onto [r]. *)
-val logand : int t @ contended local -> int -> unit
+external logand : int t @ local -> int -> unit =  "%atomic_land"
 
 (** [logor r i] atomically bitwise-ors [i] onto [r]. *)
-val logor : int t @ contended local -> int -> unit
+external logor : int t @ local -> int -> unit =  "%atomic_lor"
 
 (** [logxor r i] atomically bitwise-xors [i] onto [r]. *)
-val logxor : int t @ contended local -> int -> unit
+external logxor : int t @ local -> int -> unit =  "%atomic_lxor"
 
 (** [incr r] atomically increments the value of [r] by [1]. *)
-val incr : int t @ contended local -> unit
+val incr : int t @ local -> unit
 
 (** [decr r] atomically decrements the value of [r] by [1]. *)
-val decr : int t @ contended local -> unit
+val decr : int t @ local -> unit
 
-(** Submodule containing non-backwards-compatible functions which enforce thread safety
-    via modes. *)
-module Contended : sig
-  (** Like {!get}, but can be called on an atomic that came from another domain. *)
-  val get : ('a : value mod contended). 'a t @ contended local -> 'a
+(** Like {!get}, but can be called on an atomic from another domain. *)
+external get_contended
+  : ('a : value_or_null).
+  'a t @ contended local -> 'a @ contended
+  = "%atomic_load"
 
-  (** Like {!set}, but can be called on an atomic that came from another domain. *)
-  external set
-    : ('a : value mod portable). 'a t @ contended local -> 'a -> unit = "%atomic_set"
+(** Atomic "locations", such as record fields. *)
+module Loc : sig
+  (** This module exposes a dedicated type ['a Atomic.Loc.t] for
+      atomic locations (storing a value of type ['a]) inside objects
+      that may not be atomic references. It is used in particular for
+      atomic record fields: if a record [r] has an atomic field [f] of
+      type [foo], then [[%atomic.loc r.f]] has type [foo Atomic.Loc.t].
 
-  (** Like {!exchange}, but can be called on an atomic that came from another domain. *)
-  external exchange : ('a : value mod contended portable). 'a t @ contended local -> 'a -> 'a
-    = "%atomic_exchange"
+      The API below mirrors the API to access {{!t}atomic references},
+      see the documentation above for more information. *)
+  type ('a : value_or_null) t : sync_data with 'a = 'a atomic_loc
 
-  (** Like {!compare_and_set}, but can be called on an atomic that came from another domain. *)
-  external compare_and_set
-    : ('a : value mod portable). 'a t @ contended local -> 'a -> 'a -> bool = "%atomic_cas"
+  external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load_loc"
 
-  (** Like {!compare_exchange}, but can be called on an atomic that came from another domain. *)
-  external compare_exchange
-    : ('a : value mod contended portable). 'a t @ contended local -> 'a -> 'a -> 'a
-    = "%atomic_compare_exchange"
+  external get_contended : ('a : value_or_null).
+    'a t @ contended local -> 'a @ contended = "%atomic_load_loc"
+
+  external set : ('a : value_or_null).
+    'a t @ local -> 'a -> unit = "%atomic_set_loc"
+
+  external exchange : ('a : value_or_null).
+    'a t @ local -> 'a -> 'a = "%atomic_exchange_loc"
+
+  external compare_and_set : ('a : value_or_null).
+    'a t @ local -> 'a -> 'a -> bool = "%atomic_cas_loc"
+
+  external compare_exchange : ('a : value_or_null).
+    'a t @ local -> 'a -> 'a -> 'a = "%atomic_compare_exchange_loc"
+
+  external fetch_and_add
+    : int t @ local -> int -> int = "%atomic_fetch_add_loc"
+
+  external add
+    : int t @ local -> int -> unit = "%atomic_add_loc"
+
+  external sub
+    : int t @ local -> int -> unit = "%atomic_sub_loc"
+
+  external logand
+    : int t @ local -> int -> unit = "%atomic_land_loc"
+
+  external logor
+    : int t @ local -> int -> unit = "%atomic_lor_loc"
+
+  external logxor
+    : int t @ local -> int -> unit = "%atomic_lxor_loc"
+
+  val incr : int t @ local -> unit
+  val decr : int t @ local -> unit
 end
 
 (** {1:examples Examples}

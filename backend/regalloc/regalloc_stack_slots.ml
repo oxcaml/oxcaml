@@ -2,7 +2,7 @@
 
 open! Int_replace_polymorphic_compare
 open! Regalloc_utils
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 let debug = false
 
@@ -322,7 +322,7 @@ let optimize (t : t) (cfg_with_infos : Cfg_with_infos.t) : unit =
     if optimized
     then (
       let max_bucket_indices = Stack_class.Tbl.make (-1) in
-      List.iter (Reg.all_registers ()) ~f:(fun (reg : Reg.t) ->
+      List.iter (Reg.all_relocatable_regs ()) ~f:(fun (reg : Reg.t) ->
           apply_reg_stack_local reg ~f:(fun slot_index ->
               let stack_class = Stack_class.of_machtype reg.typ in
               match Buckets.find_bucket buckets ~stack_class ~slot_index with

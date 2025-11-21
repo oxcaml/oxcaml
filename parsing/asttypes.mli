@@ -68,3 +68,11 @@ type variance =
 type injectivity =
   | Injective
   | NoInjectivity
+
+type index_kind =
+  | Index_int
+  | Index_unboxed_int64
+  | Index_unboxed_int32
+  | Index_unboxed_int16
+  | Index_unboxed_int8
+  | Index_unboxed_nativeint

@@ -25,6 +25,7 @@ let of_simd_class (cl : Simd.operation_class) : Cfg_cse_target_intf.op_class =
   | Pure -> Op_pure
   | Load { is_mutable = true } -> Op_load Mutable
   | Load { is_mutable = false } -> Op_load Immutable
+  | Store -> Op_store true
 
 let class_of_operation (op : Operation.t)
     : Cfg_cse_target_intf.class_of_operation_result =
@@ -38,24 +39,28 @@ let class_of_operation (op : Operation.t)
     | Ibswap _ -> Use_default
     | Irdtsc | Irdpmc
     | Ilfence | Isfence | Imfence -> Class Op_other
+    | Ipackf32 -> Class Op_pure
     | Isimd op ->
       Class (of_simd_class (Simd.class_of_operation op))
     | Isimd_mem (op,_addr) ->
       Class (of_simd_class (Simd.Mem.class_of_operation op))
-    | Ipause
     | Icldemote _
     | Iprefetch _ -> Class Op_other
+    | Illvm_intrinsic intr ->
+      Misc.fatal_errorf "CSE.class_of_operation: Unexpected llvm_intrinsic %s: \
+                         not using LLVM backend"
+        intr
     end
   | Move | Spill | Reload
   | Floatop _
   | Csel _
   | Reinterpret_cast _ | Static_cast _
   | Const_int _ | Const_float32 _ | Const_float _
-  | Const_symbol _ | Const_vec128 _
+  | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
   | Stackoffset _ | Load _ | Store _ | Alloc _
   | Intop _ | Intop_imm _ | Intop_atomic _
-  | Name_for_debugger _ | Probe_is_enabled _ | Opaque
-  | Begin_region | End_region | Poll | Dls_get
+  | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
+  | Begin_region | End_region | Poll | Dls_get | Tls_get
     -> Use_default
 
 let is_cheap_operation _op

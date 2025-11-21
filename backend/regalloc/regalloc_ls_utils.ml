@@ -2,7 +2,7 @@
 
 open! Int_replace_polymorphic_compare
 open! Regalloc_utils
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 let log_function = lazy (make_log_function ~label:"ls")
 
@@ -27,10 +27,18 @@ let log : type a. ?no_eol:unit -> (a, Format.formatter, unit) format -> a =
  fun ?no_eol fmt -> (Lazy.force log_function).log ?no_eol fmt
 
 let instr_prefix (instr : Cfg.basic Cfg.instruction) =
-  Printf.sprintf "#%04d" instr.ls_order
+  Printf.sprintf "#%04d" (InstructionId.to_int_unsafe instr.id)
 
 let term_prefix (term : Cfg.terminator Cfg.instruction) =
-  Printf.sprintf "#%04d" term.ls_order
+  Printf.sprintf "#%04d" (InstructionId.to_int_unsafe term.id)
+
+let instr_prefix_with_ls_order (ls_order_mapping : InstructionId.t -> int)
+    (instr : Cfg.basic Cfg.instruction) =
+  Printf.sprintf "#%04d" (ls_order_mapping instr.id)
+
+let term_prefix_with_ls_order (ls_order_mapping : InstructionId.t -> int)
+    (term : Cfg.terminator Cfg.instruction) =
+  Printf.sprintf "#%04d" (ls_order_mapping term.id)
 
 let log_body_and_terminator :
     Cfg.basic_instruction_list ->
@@ -44,6 +52,26 @@ let log_body_and_terminator :
 let log_cfg_with_infos : Cfg_with_infos.t -> unit =
  fun cfg_with_infos ->
   make_log_cfg_with_infos (Lazy.force log_function) ~instr_prefix ~term_prefix
+    cfg_with_infos
+
+let log_body_and_terminator_with_ls_order :
+    (InstructionId.t -> int) ->
+    Cfg.basic_instruction_list ->
+    Cfg.terminator Cfg.instruction ->
+    liveness ->
+    unit =
+ fun ls_order_mapping body terminator liveness ->
+  make_log_body_and_terminator (Lazy.force log_function)
+    ~instr_prefix:(instr_prefix_with_ls_order ls_order_mapping)
+    ~term_prefix:(term_prefix_with_ls_order ls_order_mapping)
+    body terminator liveness
+
+let log_cfg_with_infos_with_ls_order :
+    (InstructionId.t -> int) -> Cfg_with_infos.t -> unit =
+ fun ls_order_mapping cfg_with_infos ->
+  make_log_cfg_with_infos (Lazy.force log_function)
+    ~instr_prefix:(instr_prefix_with_ls_order ls_order_mapping)
+    ~term_prefix:(term_prefix_with_ls_order ls_order_mapping)
     cfg_with_infos
 
 let iter_instructions_dfs :
@@ -170,7 +198,10 @@ module Interval = struct
     DLL.iter t.ranges ~f:(fun r -> Format.fprintf ppf " %a" Range.print r)
 
   let overlap : t -> t -> bool =
-   fun left right -> Range.overlap left.ranges right.ranges
+   fun left right ->
+    if left.end_ < right.begin_ || right.end_ < left.begin_
+    then false
+    else Range.overlap left.ranges right.ranges
 
   let is_live : t -> pos:int -> bool = fun t ~pos -> Range.is_live t.ranges ~pos
 
@@ -293,9 +324,9 @@ module ClassIntervals = struct
 end
 
 let log_interval ~kind (interval : Interval.t) =
-  let reg_class = Proc.register_class interval.reg in
-  log "%s %a (class %d) [%d..%d]" kind Printreg.reg interval.reg reg_class
-    interval.begin_ interval.end_;
+  let reg_class = Reg_class.of_machtype interval.reg.typ in
+  log "%s %a (class %a) [%d..%d]" kind Printreg.reg interval.reg Reg_class.print
+    reg_class interval.begin_ interval.end_;
   let ranges = Buffer.create 128 in
   let first = ref true in
   DLL.iter interval.ranges ~f:(fun { Range.begin_; end_ } ->

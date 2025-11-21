@@ -17,6 +17,8 @@
 
 (** cms and cmsi files format. *)
 
+module Uid = Shape.Uid
+
 type cms_infos = {
   cms_modname : Compilation_unit.t;
   cms_comments : (string * Location.t) list;
@@ -26,9 +28,13 @@ type cms_infos = {
   cms_initial_env : Env.t option;
   cms_uid_to_loc : string Location.loc Shape.Uid.Tbl.t;
   cms_uid_to_attributes : Parsetree.attributes Shape.Uid.Tbl.t;
+  cms_shape_format : Clflags.shape_format;
   cms_impl_shape : Shape.t option; (* None for mli *)
   cms_ident_occurrences :
-    (Longident.t Location.loc * Shape_reduce.result) array
+    (Longident.t Location.loc * Shape_reduce.result) array;
+  cms_declaration_dependencies :
+    (Cmt_format.dependency_kind * Uid.t * Uid.t) list;
+  cms_externals: Vicuna_value_shapes.extfun array;
 }
 
 type error =
@@ -49,6 +55,7 @@ val save_cms :
   Cmt_format.binary_annots ->
   Env.t -> (* initial env *)
   Shape.t option ->
+  (Cmt_format.dependency_kind * Uid.t * Uid.t) list ->
   unit
 
 val register_toplevel_attributes :
@@ -62,3 +69,5 @@ val register_toplevel_attributes :
 val read_magic_number : in_channel -> string
 
 val clear : unit -> unit
+
+val shape_format_to_string : Clflags.shape_format -> string

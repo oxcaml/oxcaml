@@ -3,7 +3,7 @@
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open! Regalloc_utils
 open! Regalloc_split_utils
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 module State = Regalloc_split_state
 module Substitution = Regalloc_substitution
 
@@ -87,7 +87,7 @@ let rec compute_substitution_tree :
         (fun old_reg bindings ->
           let slots = State.stack_slots state in
           let (_ : int) = Regalloc_stack_slots.get_or_create slots old_reg in
-          let new_reg = Reg.clone old_reg in
+          let new_reg = Reg.create_with_typ_and_name old_reg in
           Regalloc_stack_slots.use_same_slot_or_fatal slots new_reg
             ~existing:old_reg;
           if debug
@@ -134,6 +134,7 @@ let apply_substitutions : Cfg_with_infos.t -> Substitution.map -> unit =
 
 type 'a make_operation =
   State.t ->
+  instr_id:InstructionId.sequence ->
   stack_subst:Substitution.t ->
   old_reg:Reg.t ->
   new_reg:Reg.t ->
@@ -145,7 +146,7 @@ type 'a make_operation =
    information from `copy`, and populating `stack_subst` with a mapping from
    `old_reg` to its stack slot. *)
 let make_spill : type a. a make_operation =
- fun state ~stack_subst ~old_reg ~new_reg ~copy ->
+ fun state ~instr_id ~stack_subst ~old_reg ~new_reg ~copy ->
   let stack_reg =
     match Reg.Tbl.find_opt stack_subst old_reg with
     | Some stack_reg -> stack_reg
@@ -153,7 +154,7 @@ let make_spill : type a. a make_operation =
       let slots = State.stack_slots state in
       let slot : int = Regalloc_stack_slots.get_or_fatal slots old_reg in
       let stack : Reg.t =
-        make_temporary ~same_class_and_base_name_as:old_reg ~name_prefix:"stack"
+        Reg.create_with_typ_and_name ~prefix_if_var:"stack" old_reg
       in
       Regalloc_stack_slots.use_same_slot_or_fatal slots stack ~existing:old_reg;
       stack.Reg.loc <- Reg.(Stack (Local slot));
@@ -162,7 +163,7 @@ let make_spill : type a. a make_operation =
   in
   if debug then log "spill %a -> %a" Printreg.reg new_reg Printreg.reg stack_reg;
   Move.make_instr Move.Store
-    ~id:(State.get_and_incr_instruction_id state)
+    ~id:(InstructionId.get_and_incr instr_id)
     ~copy ~from:new_reg ~to_:stack_reg
 
 let dummy_instr_of_terminator : Cfg.terminator Cfg.instruction -> Instruction.t
@@ -177,11 +178,12 @@ let dummy_instr_of_terminator : Cfg.terminator Cfg.instruction -> Instruction.t
 
 let rec insert_spills_or_reloads_in_block :
     State.t ->
+    instr_id:InstructionId.sequence ->
     make_spill_or_reload:'a make_operation ->
     occur_check:(Instruction.t -> Reg.t -> bool) ->
-    insert:(Instruction.t DLL.cell -> Instruction.t -> unit) ->
+    insert:(Instruction.t DLL.cell -> Instruction.t -> Reg.t -> unit) ->
     copy_default:Instruction.t ->
-    add_default:(Instruction.t DLL.t -> Instruction.t -> unit) ->
+    add_default:(Instruction.t DLL.t -> Instruction.t -> Reg.t -> unit) ->
     move_cell:(Instruction.t DLL.cell -> Instruction.t DLL.cell option) ->
     block_subst:Substitution.t ->
     stack_subst:Substitution.t ->
@@ -189,8 +191,9 @@ let rec insert_spills_or_reloads_in_block :
     Instruction.t DLL.cell option ->
     Reg.Set.t ->
     unit =
- fun state ~make_spill_or_reload ~occur_check ~insert ~copy_default ~add_default
-     ~move_cell ~block_subst ~stack_subst block cell live_at_interesting_point ->
+ fun state ~instr_id ~make_spill_or_reload ~occur_check ~insert ~copy_default
+     ~add_default ~move_cell ~block_subst ~stack_subst block cell
+     live_at_interesting_point ->
   match Reg.Set.is_empty live_at_interesting_point with
   | true -> ()
   | false -> (
@@ -200,10 +203,10 @@ let rec insert_spills_or_reloads_in_block :
         (fun old_reg ->
           let new_reg = Substitution.apply_reg block_subst old_reg in
           let spill_or_reload =
-            make_spill_or_reload state ~stack_subst ~old_reg ~new_reg
+            make_spill_or_reload state ~instr_id ~stack_subst ~old_reg ~new_reg
               ~copy:copy_default
           in
-          add_default block.body spill_or_reload)
+          add_default block.body spill_or_reload new_reg)
         live_at_interesting_point
     | Some cell ->
       let live_at_interesting_point =
@@ -214,47 +217,53 @@ let rec insert_spills_or_reloads_in_block :
             if occur_check instr new_reg
             then (
               let spill_or_reload =
-                make_spill_or_reload state ~stack_subst ~old_reg ~new_reg
-                  ~copy:instr
+                make_spill_or_reload state ~instr_id ~stack_subst ~old_reg
+                  ~new_reg ~copy:instr
               in
-              insert cell spill_or_reload;
+              insert cell spill_or_reload new_reg;
               false)
             else true)
           live_at_interesting_point
       in
       let cell = move_cell cell in
-      insert_spills_or_reloads_in_block state ~make_spill_or_reload ~occur_check
-        ~insert ~copy_default ~add_default ~move_cell ~block_subst ~stack_subst
-        block cell live_at_interesting_point)
+      insert_spills_or_reloads_in_block state ~instr_id ~make_spill_or_reload
+        ~occur_check ~insert ~copy_default ~add_default ~move_cell ~block_subst
+        ~stack_subst block cell live_at_interesting_point)
 
 (* Inserts the spills in a block, as early as possible (i.e. immediately after
    the register is last set), to reduce live ranges. *)
 let insert_spills_in_block :
     State.t ->
+    instr_id:InstructionId.sequence ->
     block_subst:Substitution.t ->
     stack_subst:Substitution.t ->
     Cfg.basic_block ->
     Instruction.t DLL.cell option ->
     Reg.Set.t ->
     unit =
- fun state ~block_subst ~stack_subst block cell live_at_destruction_point ->
-  insert_spills_or_reloads_in_block state ~make_spill_or_reload:make_spill
+ fun state ~instr_id ~block_subst ~stack_subst block cell
+     live_at_destruction_point ->
+  insert_spills_or_reloads_in_block state ~instr_id
+    ~make_spill_or_reload:make_spill
     ~occur_check:(fun instr reg ->
       (* We have reached the insertion point not only if the register is
          explicitly set, but also if it is destroyed by the instruction. *)
       occurs_array instr.res reg
       || occurs_array (Proc.destroyed_at_basic instr.desc) reg)
-    ~insert:DLL.insert_after
+    ~insert:(fun cell instr reg ->
+      (* See comment before Insert_skipping_name_for_debugger *)
+      Insert_skipping_name_for_debugger.insert_after cell instr ~reg)
     ~copy_default:
       (match DLL.hd block.body with
       | None -> dummy_instr_of_terminator block.terminator
       | Some hd -> hd)
-    ~add_default:DLL.add_begin ~move_cell:DLL.prev ~block_subst ~stack_subst
-    block cell live_at_destruction_point
+    ~add_default:(fun list instr reg ->
+      (* See comment before Insert_skipping_name_for_debugger *)
+      Insert_skipping_name_for_debugger.add_begin list instr ~reg)
+    ~move_cell:DLL.prev ~block_subst ~stack_subst block cell
+    live_at_destruction_point
 
 (* Inserts spills in all blocks. *)
-(* CR mshinwell: Add special handling for [Iname_for_debugger] (see
-   [Spill.add_spills]). *)
 let insert_spills :
     State.t -> Cfg_with_infos.t -> Substitution.map -> Substitution.t =
  fun state cfg_with_infos substs ->
@@ -268,8 +277,9 @@ let insert_spills :
     (fun label (_, live_at_destruction_point) ->
       if debug then log "block %a" Label.format label;
       let block = Cfg_with_infos.get_block_exn cfg_with_infos label in
+      let instr_id = (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id in
       let block_subst = Substitution.for_label substs label in
-      insert_spills_in_block state ~block_subst ~stack_subst block
+      insert_spills_in_block state ~instr_id ~block_subst ~stack_subst block
         (DLL.last_cell block.body) live_at_destruction_point)
     destructions_at_end;
   if debug then dedent ();
@@ -280,16 +290,14 @@ let insert_spills :
    information from `copy`, and getting the stack slot from `stack_subst` if
    `old_reg` is mapped. *)
 let make_reload : type a. a make_operation =
- fun state ~stack_subst ~old_reg ~new_reg ~copy ->
+ fun state ~instr_id ~stack_subst ~old_reg ~new_reg ~copy ->
   let stack_reg : Reg.t =
     match Reg.Tbl.find_opt stack_subst old_reg with
     | Some stack_reg -> stack_reg
     | None ->
       let slots = State.stack_slots state in
       let slot = Regalloc_stack_slots.get_or_create slots old_reg in
-      let stack =
-        make_temporary ~same_class_and_base_name_as:old_reg ~name_prefix:"stack"
-      in
+      let stack = Reg.create_with_typ_and_name ~prefix_if_var:"stack" old_reg in
       Regalloc_stack_slots.use_same_slot_or_fatal slots stack ~existing:old_reg;
       Regalloc_stack_slots.use_same_slot_or_fatal slots stack ~existing:new_reg;
       stack.Reg.loc <- Reg.(Stack (Local slot));
@@ -298,26 +306,39 @@ let make_reload : type a. a make_operation =
   if debug
   then log "reload %a -> %a" Printreg.reg stack_reg Printreg.reg new_reg;
   Move.make_instr Move.Load
-    ~id:(State.get_and_incr_instruction_id state)
+    ~id:(InstructionId.get_and_incr instr_id)
     ~copy ~from:stack_reg ~to_:new_reg
 
 (* Inserts the relaods in a block, as late as possible (i.e. immediately before
    the register is first read), to reduce live ranges. *)
 let insert_reloads_in_block :
     State.t ->
+    instr_id:InstructionId.sequence ->
     block_subst:Substitution.t ->
     stack_subst:Substitution.t ->
     Cfg.basic_block ->
     Instruction.t DLL.cell option ->
     Reg.Set.t ->
     unit =
- fun state ~block_subst ~stack_subst block cell live_at_definition_point ->
-  insert_spills_or_reloads_in_block state ~make_spill_or_reload:make_reload
+ fun state ~instr_id ~block_subst ~stack_subst block cell
+     live_at_definition_point ->
+  insert_spills_or_reloads_in_block state ~instr_id
+    ~make_spill_or_reload:make_reload
     ~occur_check:(fun instr reg -> occurs_array instr.arg reg)
-    ~insert:DLL.insert_before
+    ~insert:(fun cell instr _reg ->
+      (* We don't need special handling here, because we wouldn't expect a new
+         Name_for_debugger operation anyway (that should have occurred when the
+         variable was first introduced, i.e. before the first spill); and
+         furthermore, we prefer the spilled registers (cf.
+         Reg_availability_set.canonicalise), so it's probably not necessary to
+         add a Name_for_debugger on the reloaded one. *)
+      DLL.insert_before cell instr)
     ~copy_default:(dummy_instr_of_terminator block.terminator)
-    ~add_default:DLL.add_end ~move_cell:DLL.next ~block_subst ~stack_subst block
-    cell live_at_definition_point
+    ~add_default:(fun list instr _reg ->
+      (* Same reasoning as for insert above *)
+      DLL.add_end list instr)
+    ~move_cell:DLL.next ~block_subst ~stack_subst block cell
+    live_at_definition_point
 
 (* Inserts reloads in all blocks. *)
 let insert_reloads :
@@ -331,21 +352,22 @@ let insert_reloads :
     (fun label live_at_definition_point ->
       if debug then log "block %a" Label.format label;
       let block = Cfg_with_infos.get_block_exn cfg_with_infos label in
+      let instr_id = (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id in
       let block_subst = Substitution.for_label substs label in
-      insert_reloads_in_block state ~block_subst ~stack_subst block
+      insert_reloads_in_block state ~instr_id ~block_subst ~stack_subst block
         (DLL.hd_cell block.body) live_at_definition_point)
     (State.definitions_at_beginning state);
   if debug then dedent ()
 
 let add_phi_moves_to_instr_list :
-    State.t ->
+    instr_id:InstructionId.sequence ->
     before:Cfg.basic_block ->
     phi:Cfg.basic_block ->
     Substitution.map ->
     Reg.Set.t ->
     Cfg.basic_instruction_list ->
     unit =
- fun state ~before ~phi substs to_unify instrs ->
+ fun ~instr_id ~before ~phi substs to_unify instrs ->
   let before_subst = Substitution.for_label substs before.start in
   let phi_subst = Substitution.for_label substs phi.start in
   Reg.Set.iter
@@ -362,7 +384,7 @@ let add_phi_moves_to_instr_list :
         if debug then log "phi %a -> %a" Printreg.reg from Printreg.reg to_;
         let phi_move =
           Move.make_instr Move.Plain
-            ~id:(State.get_and_incr_instruction_id state)
+            ~id:(InstructionId.get_and_incr instr_id)
             ~copy:before.terminator ~from ~to_
         in
         DLL.add_end instrs phi_move)
@@ -388,24 +410,29 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
           let predecessor_block =
             Cfg_with_infos.get_block_exn cfg_with_infos predecessor_label
           in
+          let instr_id =
+            (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id
+          in
           match predecessor_block.terminator.desc with
           | Return | Raise _ | Tailcall_func _ | Call_no_return _ | Never ->
             assert false
           | Tailcall_self _ -> ()
           | Always _ ->
-            add_phi_moves_to_instr_list state ~before:predecessor_block
+            add_phi_moves_to_instr_list ~instr_id ~before:predecessor_block
               ~phi:block substs to_unify predecessor_block.body
           | Switch _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
           | Call _ | Prim _ ->
             let instrs = DLL.make_empty () in
-            add_phi_moves_to_instr_list state ~before:predecessor_block
+            add_phi_moves_to_instr_list ~instr_id ~before:predecessor_block
               ~phi:block substs to_unify instrs;
+            (* CR-soon xclerc for xclerc: now that we preprocess critical nodes,
+               no insertion should occur here. *)
             let inserted_blocks =
               Cfg_with_layout.insert_block
                 (Cfg_with_infos.cfg_with_layout cfg_with_infos)
                 instrs ~after:predecessor_block ~before:(Some block)
                 ~next_instruction_id:(fun () ->
-                  State.get_and_incr_instruction_id state)
+                  InstructionId.get_and_incr instr_id)
             in
             block_inserted := true;
             if debug && Lazy.force invariants
@@ -432,8 +459,8 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
   !block_inserted
 
 let split_at_destruction_points :
-    Cfg_with_infos.t -> cfg_infos -> (Regalloc_stack_slots.t * bool) option =
- fun cfg_with_infos cfg_infos ->
+    Cfg_with_infos.t -> (Regalloc_stack_slots.t * bool) option =
+ fun cfg_with_infos ->
   if debug
   then (
     log "split_at_destruction_points";
@@ -441,8 +468,7 @@ let split_at_destruction_points :
     Regalloc_irc_utils.log_cfg_with_infos cfg_with_infos);
   let state =
     Profile.record ~accumulate:true "state"
-      (fun () ->
-        State.make cfg_with_infos ~last_used:cfg_infos.max_instruction_id)
+      (fun () -> State.make cfg_with_infos)
       ()
   in
   if debug
@@ -485,9 +511,8 @@ let split_at_destruction_points :
       dedent ());
     Some (State.stack_slots state, block_inserted)
 
-let split_live_ranges : Cfg_with_infos.t -> cfg_infos -> Regalloc_stack_slots.t
-    =
- fun cfg_with_infos cfg_infos ->
+let split_live_ranges : Cfg_with_infos.t -> Regalloc_stack_slots.t =
+ fun cfg_with_infos ->
   (* CR-soon xclerc for xclerc: support closure, flambda, and
      flambda2/classic *)
   (match Config.flambda, Config.flambda2 with
@@ -501,7 +526,7 @@ let split_live_ranges : Cfg_with_infos.t -> cfg_infos -> Regalloc_stack_slots.t
        "Regalloc_split: classic mode is currently not supported" *)
     ()
   | true, true -> assert false);
-  match split_at_destruction_points cfg_with_infos cfg_infos with
+  match split_at_destruction_points cfg_with_infos with
   | None -> Regalloc_stack_slots.make ()
   | Some (stack_slots, block_inserted) ->
     Cfg_with_infos.invalidate_liveness cfg_with_infos;

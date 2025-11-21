@@ -12,6 +12,8 @@
 ;*                                                                        *
 ;**************************************************************************
 
+(vendored_dirs external)
+
 ; set warning as error in release profile
 
 (env
@@ -20,10 +22,22 @@
    (:standard -g -principal -w +a-4-9-40-41-42-44-45-48-66-67-70)))
  (main
   (flags
-   (:standard -g -principal -warn-error +A -w +a-4-9-40-41-42-44-45-48-66-67-70)))
+   (:standard
+    -g
+    -principal
+    -warn-error
+    +A
+    -w
+    +a-4-9-40-41-42-44-45-48-66-67-70)))
  (dev
   (flags
-   (:standard -g -principal -w +a-4-9-40-41-42-44-45-48-66-67-70 -warn-error +A))))
+   (:standard
+    -g
+    -principal
+    -w
+    +a-4-9-40-41-42-44-45-48-66-67-70
+    -warn-error
+    +A))))
 
 (include dune.runtime_selection)
 
@@ -41,9 +55,13 @@
 
 (copy_files# asmcomp/*.ml{,i})
 
+(copy_files# optcomp/*.ml{,i})
+
 (copy_files# backend/*.ml{,i})
 
 (copy_files# "backend/%{env:ARCH=amd64}/*.ml{,i}")
+
+(copy_files# tools/simdgen/*.ml{,i})
 
 (copy_files# backend/cfg/*.ml{,i})
 
@@ -52,6 +70,8 @@
 (copy_files# backend/debug/dwarf/dwarf_ocaml/*.ml{,i})
 
 (copy_files# backend/internal_assembler/*.ml{,i})
+
+(copy_files# backend/llvm/*.ml{,i})
 
 (copy_files# backend/peephole/*.ml{,i})
 
@@ -98,8 +118,9 @@
    -safe-string
    -strict-formats
    -w
-   -67
+   -67-47
    ; remove -w -67 by adding the camlinternalMenhirLib hack like the Makefile
+   ; -47 needed because [@inline available] is not recognized by the system compiler
    ))
  (ocamlopt_flags
   (:include %{project_root}/ocamlopt_flags.sexp))
@@ -117,13 +138,16 @@
   value_rec_types
   asttypes
   cmo_format
+  cmj_format
   outcometree
   parsetree
   debug_event
   solver_intf
+  mode_hint
   mode_intf)
  (modules
   ;; UTILS
+  arrayset
   config
   build_path_prefix_map
   misc
@@ -134,6 +158,7 @@
   debug
   profile
   profile_counters_functions
+  priority_queue
   terminfo
   ccomp
   warnings
@@ -182,6 +207,7 @@
   ident
   path
   jkind
+  scalar
   primitive
   shape
   shape_reduce
@@ -194,10 +220,11 @@
   datarepr
   global_module
   cmi_format
+  vicuna_traverse_typed_tree
+  vicuna_value_shapes
   persistent_env
   env
   errortrace
-  mode
   jkind_types
   jkind_intf
   signature_with_global_bindings
@@ -209,6 +236,7 @@
   mtype
   envaux
   includecore
+  type_shape
   tast_iterator
   tast_mapper
   signature_group
@@ -230,6 +258,7 @@
   typecore
   solver_intf
   solver
+  mode_hint
   mode_intf
   mode
   uniqueness_analysis
@@ -246,13 +275,20 @@
   ;; lambda/
   debuginfo
   lambda
+  static_label
   matching
   mixed_block_shape
+  mixed_product_bytes
   printlambda
+  printslambda0
+  printslambda
   runtimedef
   runtimetags
   tmc
   simplif
+  slambda0
+  slambda
+  slambdaeval
   switch
   value_rec_compiler
   translmode
@@ -265,6 +301,7 @@
   translmod
   translobj
   translprim
+  translquote
   ;; bytecomp/
   debug_event
   meta
@@ -285,9 +322,35 @@
   value_rec_types
   asttypes
   cmo_format
+  cmj_format
   outcometree
   parsetree
-  debug_event))
+  debug_event
+  ; See note below about camlinternalQuote
+  (:include
+   %{project_root}/duneconf/camlinternalquote_if_missing_from_stdlib)))
+
+; Our system compiler doesn't have CamlInternalQuote in its stdlib, so
+; we need to compile it as an additional target, but only for the first
+; stage build.  See also duneconf/dune.
+
+(rule
+ (targets camlinternalQuote.ml)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy#
+   %{project_root}/stdlib/camlinternalQuote.ml
+   %{project_root}/camlinternalQuote.ml)))
+
+(rule
+ (targets camlinternalQuote.mli)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy#
+   %{project_root}/stdlib/camlinternalQuote.mli
+   %{project_root}/camlinternalQuote.mli)))
 
 (library
  (name ocamlbytecomp)
@@ -299,6 +362,9 @@
  (libraries ocamlcommon)
  (modules
   ;; bytecomp/
+  blambda
+  printblambda
+  blambda_of_lambda
   bytegen
   byteinstantiator
   bytelibrarian
@@ -328,12 +394,30 @@
  (libraries ocamlbytecomp ocamlcommon)
  (modules main_native))
 
+(library
+ (name ocamljcomp)
+ (wrapped false)
+ (flags
+  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
+ (ocamlopt_flags
+  (:include %{project_root}/ocamlopt_flags.sexp))
+ (libraries ocamlcommon flambda2)
+ (modules jsmaindriver jscompile jslibrarian))
+
+(executable
+ (name boot_ocamlj)
+ (modes native)
+ (flags
+  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
+ (libraries ocamljcomp ocamlcommon flambda2)
+ (modules boot_ocamlj))
+
 ; Disabled since there can be only one (data_only_dirs) declaration
 ;(data_only_dirs yacc)
 
 (include duneconf/dirs-to-ignore.inc)
 
-(include duneconf/jst-extra.inc)
+(include duneconf/ox-extra.inc)
 
 (rule
  (deps
@@ -349,6 +433,26 @@
      yacc
      (run make -s OCAMLYACC_INCLUDE_PATH=%{ocaml_where}))
     (copy yacc/ocamlyacc ocamlyacc)))))
+
+; Regular OCaml Rule (first phase of bootstrapping)
+
+(rule
+ (targets ocamlopt_flags.sexp)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (copy %{project_root}/ocamlopt_upstream_flags.sexp %{targets})))
+
+; OxCaml Rule
+
+(rule
+ (targets ocamlopt_flags.sexp)
+ (enabled_if
+  (or
+   (= %{context_name} "main")
+   (= %{context_name} "runtime_stdlib")))
+ (action
+  (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
 
 (install
  (files ocamlyacc)
@@ -369,6 +473,12 @@
  (files
   (main.bc as ocamlc.byte)
   (main_native.exe as ocamlc.opt))
+ (section bin)
+ (package ocaml))
+
+(install
+ (files
+  (boot_ocamlj.exe as ocamlj.opt))
  (section bin)
  (package ocaml))
 
@@ -394,8 +504,7 @@
  (files
   Makefile.build_config
   Makefile.config_if_required
-  Makefile.config
-  VERSION)
+  Makefile.config)
  (section lib)
  (package ocaml))
 
@@ -426,10 +535,10 @@
   compilenv
   ;; asmcomp/
   asmgen
-  asminstantiator
-  asmlibrarian
   asmlink
-  asmpackager
+  cm_bundle
+  linkenv
+  optlink
   ;; backend/
   afl_instrument
   arch
@@ -442,6 +551,7 @@
   cmm_helpers
   cmm_builtins
   cmm_invariants
+  cmm_peephole_engine
   cmm
   cmmgen_state
   CSE
@@ -463,11 +573,14 @@
   proc
   simd
   simd_selection
-  simd_reload
   simd_proc
+  amd64_simd_defs
+  amd64_simd_instrs
   stack_check
   sub_cfg
   reg
+  reg_class
+  reg_class_utils
   relocation_entry
   relocation_table
   section_table
@@ -490,6 +603,7 @@
   ;; backend/cfg
   cfg
   cfg_available_regs
+  cfg_edge
   cfg_intf
   cfg_to_linear
   cfg_with_layout
@@ -506,6 +620,7 @@
   cfg_stack_checks
   cfg_polling
   cfg_simplify
+  cfg_prologue
   extra_debug
   label
   linear_utils
@@ -513,6 +628,9 @@
   vectorize
   vectorize_utils
   vectorize_specific
+  ;; backend/llvm
+  llvm_ir
+  llvmize
   ;; backend/regalloc
   regalloc_gi
   regalloc_gi_state
@@ -557,9 +675,16 @@
   dwarf_reg_locations
   dwarf_state
   dwarf_variables_and_parameters
+  dwarf_type
+  ;; optcomp/
+  linkenv
+  optcompile
+  optlibrarian
+  optcomp_intf
+  optlink
+  optpackager
   ;; driver/
   opterrors
-  optcompile
   optmaindriver
   compiler_hooks
   ;; printer/
@@ -570,8 +695,8 @@
   )
  (libraries
   ocamlcommon
-  flambda_backend_common
-  flambda_backend_utils
+  oxcaml_common
+  oxcaml_utils
   flambda2_identifiers
   flambda2_cmx
   compiler_owee
@@ -580,12 +705,13 @@
   dwarf_high))
 
 (library
- (name flambda_backend_common)
+ (name oxcaml_common)
  (wrapped false)
  (modes byte native)
  ; same flags as for ocamlcommon library
  (flags
-  (-strict-sequence
+  (:standard
+   -strict-sequence
    -bin-annot
    -safe-string
    -strict-formats
@@ -598,46 +724,46 @@
  (instrumentation
   (backend bisect_ppx))
  (libraries ocamlcommon dwarf_flags asm_targets)
- (modules flambda_backend_args flambda_backend_flags))
+ (modules oxcaml_args oxcaml_flags))
 
 (executable
- (name flambda_backend_main)
+ (name oxcaml_main)
  (modes byte)
  (instrumentation
   (backend bisect_ppx))
  (libraries
-  flambda_backend_driver
   memtrace
   flambda2
   flambda2_ui
   flambda2_to_cmm
+  gc_timings
   ocamloptcomp
   ocamlcommon
   unix)
- (modules flambda_backend_main))
+ (modules oxcaml_main))
 
 (rule
- (targets flambda_backend_main_native.ml)
+ (targets oxcaml_main_native.ml)
  (action
-  (copy driver/flambda_backend_main.ml %{targets})))
+  (copy driver/oxcaml_main.ml %{targets})))
 
 (executable
- (name flambda_backend_main_native)
+ (name oxcaml_main_native)
  (modes native)
  (instrumentation
   (backend bisect_ppx))
  (ocamlopt_flags
   (:standard -runtime-variant nnp))
  (libraries
-  flambda_backend_driver
   memtrace
   flambda2
   flambda2_ui
   flambda2_to_cmm
+  gc_timings
   ocamloptcomp
   ocamlcommon
   unix)
- (modules flambda_backend_main_native))
+ (modules oxcaml_main_native))
 
 ; CR sdolan: Could be faster if it was closure-only?
 
@@ -651,7 +777,6 @@
  (ocamlc_flags unix.cma)
  (ocamlopt_flags unix.cmxa)
  (libraries
-  flambda_backend_driver
   flambda2
   flambda2_ui
   flambda2_to_cmm
@@ -672,8 +797,8 @@
    %{dep:backend/asm_targets/asm_targets.a}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.a}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.a}
-   %{dep:flambda_backend_common.a}
-   %{dep:utils/flambda_backend_utils.a}
+   %{dep:oxcaml_common.a}
+   %{dep:utils/oxcaml_utils.a}
    %{dep:middle_end/flambda2/import/flambda2_import.a}
    %{dep:middle_end/flambda2/ui/flambda2_ui.a}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.a}
@@ -711,8 +836,8 @@
    %{dep:backend/asm_targets/asm_targets.cma}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cma}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cma}
-   %{dep:flambda_backend_common.cma}
-   %{dep:utils/flambda_backend_utils.cma}
+   %{dep:oxcaml_common.cma}
+   %{dep:utils/oxcaml_utils.cma}
    %{dep:middle_end/flambda2/import/flambda2_import.cma}
    %{dep:middle_end/flambda2/ui/flambda2_ui.cma}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.cma}
@@ -750,8 +875,8 @@
    %{dep:backend/asm_targets/asm_targets.cmxa}
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cmxa}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cmxa}
-   %{dep:flambda_backend_common.cmxa}
-   %{dep:utils/flambda_backend_utils.cmxa}
+   %{dep:oxcaml_common.cmxa}
+   %{dep:utils/oxcaml_utils.cmxa}
    %{dep:middle_end/flambda2/import/flambda2_import.cmxa}
    %{dep:middle_end/flambda2/ui/flambda2_ui.cmxa}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.cmxa}
@@ -781,8 +906,8 @@
 
 (install
  (files
-  (flambda_backend_main.bc as ocamlopt.byte)
-  (flambda_backend_main_native.exe as ocamlopt.opt))
+  (oxcaml_main.bc as ocamlopt.byte)
+  (oxcaml_main_native.exe as ocamlopt.opt))
  (section bin)
  (package ocaml))
 
@@ -834,16 +959,14 @@
   (glob_files .ocamloptcomp.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files .ocamloptcomp.objs/native/*.cmx)
   (glob_files
-   backend/asm_targets/.asm_targets.objs/byte/asm_targets.{cmi,cmo,cmt})
-  (glob_files_rec
-   backend/asm_targets/.asm_targets.objs/native/asm_targets.cmx)
+   backend/asm_targets/.asm_targets.objs/byte/*.{cmi,cmo,cmt,cmti})
+  (glob_files_rec backend/asm_targets/.asm_targets.objs/native/*.cmx)
   (glob_files middle_end/flambda2/.flambda2objs/byte/flambda2.{cmi,cmt})
   (glob_files
    middle_end/flambda2/to_cmm/.flambda2_to_cmm.objs/byte/flambda2_to_cmm{,__To_cmm}.{cmi,cmt})
   (glob_files
-   .flambda_backend_common.objs/byte/flambda_backend_{args,flags}.{cmi,cmo,cmt,cmti})
-  (glob_files
-   .flambda_backend_common.objs/native/flambda_backend_{args,flags}.cmx)
+   .oxcaml_common.objs/byte/oxcaml_{args,flags}.{cmi,cmo,cmt,cmti})
+  (glob_files .oxcaml_common.objs/native/oxcaml_{args,flags}.cmx)
   backend/debug/dwarf/dwarf_flags/dwarf_flags.mli
   (glob_files
    backend/debug/dwarf/dwarf_flags/.dwarf_flags.objs/byte/dwarf_flags.{cmi,cmo,cmt,cmti})
@@ -879,6 +1002,7 @@
 ; guess is that targets in subdirectories aren't even discovered until
 ; ocamlcommon is built, unless something in the subdirectory is explicitly made
 ; a dependency.
+
 (alias
  (name install)
  (package ocaml)

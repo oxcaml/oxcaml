@@ -17,23 +17,23 @@
 type t =
   { condition_dbg : Debuginfo.t;
     scrutinee : Simple.t;
-    arms : Apply_cont_expr.t Targetint_31_63.Map.t
+    arms : Apply_cont_expr.t Target_ocaml_int.Map.t
   }
 
 let fprintf = Format.fprintf
 
 let print_arms ppf arms =
   let arms =
-    Targetint_31_63.Map.fold
+    Target_ocaml_int.Map.fold
       (fun discr action arms_inverse ->
         match Apply_cont_expr.Map.find action arms_inverse with
         | exception Not_found ->
           Apply_cont_expr.Map.add action
-            (Targetint_31_63.Set.singleton discr)
+            (Target_ocaml_int.Set.singleton discr)
             arms_inverse
         | discrs ->
           Apply_cont_expr.Map.add action
-            (Targetint_31_63.Set.add discr discrs)
+            (Target_ocaml_int.Set.add discr discrs)
             arms_inverse)
       arms Apply_cont_expr.Map.empty
   in
@@ -41,23 +41,23 @@ let print_arms ppf arms =
   let arms =
     List.sort
       (fun (action1, discrs1) (action2, discrs2) ->
-        let min1 = Targetint_31_63.Set.min_elt_opt discrs1 in
-        let min2 = Targetint_31_63.Set.min_elt_opt discrs2 in
+        let min1 = Target_ocaml_int.Set.min_elt_opt discrs1 in
+        let min2 = Target_ocaml_int.Set.min_elt_opt discrs2 in
         match min1, min2 with
         | None, None -> Apply_cont_expr.compare action1 action2
         | None, Some _ -> -1
         | Some _, None -> 1
-        | Some min1, Some min2 -> Targetint_31_63.compare min1 min2)
+        | Some min1, Some min2 -> Target_ocaml_int.compare min1 min2)
       (Apply_cont_expr.Map.bindings arms)
   in
   List.iter
     (fun (action, discrs) ->
       if !spc then fprintf ppf "@ " else spc := true;
-      let discrs = Targetint_31_63.Set.elements discrs in
+      let discrs = Target_ocaml_int.Set.elements discrs in
       fprintf ppf "@[<hov 2>@[<hov 0>| %a %t\u{21a6}%t@ @]%a@]"
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ | ")
-           Targetint_31_63.print)
+           Target_ocaml_int.print)
         discrs Flambda_colours.elide Flambda_colours.pop Apply_cont_expr.print
         action)
     arms
@@ -71,16 +71,17 @@ let print ppf { condition_dbg; scrutinee; arms } =
 
 let create ~condition_dbg ~scrutinee ~arms = { condition_dbg; scrutinee; arms }
 
-let if_then_else ~condition_dbg ~scrutinee ~if_true ~if_false =
+let if_then_else ~machine_width ~condition_dbg ~scrutinee ~if_true ~if_false =
   let arms =
-    Targetint_31_63.Map.of_list
-      [Targetint_31_63.bool_true, if_true; Targetint_31_63.bool_false, if_false]
+    Target_ocaml_int.Map.of_list
+      [ Target_ocaml_int.bool_true machine_width, if_true;
+        Target_ocaml_int.bool_false machine_width, if_false ]
   in
   create ~condition_dbg ~scrutinee ~arms
 
-let iter t ~f = Targetint_31_63.Map.iter f t.arms
+let iter t ~f = Target_ocaml_int.Map.iter f t.arms
 
-let num_arms t = Targetint_31_63.Map.cardinal t.arms
+let num_arms t = Target_ocaml_int.Map.cardinal t.arms
 
 let condition_dbg t = t.condition_dbg
 
@@ -90,7 +91,7 @@ let arms t = t.arms
 
 let free_names { condition_dbg = _; scrutinee; arms } =
   let free_names_of_scrutinee = Simple.free_names scrutinee in
-  Targetint_31_63.Map.fold
+  Target_ocaml_int.Map.fold
     (fun _discr action free_names ->
       Name_occurrences.union (Apply_cont_expr.free_names action) free_names)
     arms free_names_of_scrutinee
@@ -98,7 +99,7 @@ let free_names { condition_dbg = _; scrutinee; arms } =
 let apply_renaming ({ condition_dbg; scrutinee; arms } as t) renaming =
   let scrutinee' = Simple.apply_renaming scrutinee renaming in
   let arms' =
-    Targetint_31_63.Map.map_sharing
+    Target_ocaml_int.Map.map_sharing
       (fun action -> Apply_cont_expr.apply_renaming action renaming)
       arms
   in
@@ -108,7 +109,7 @@ let apply_renaming ({ condition_dbg; scrutinee; arms } as t) renaming =
 
 let ids_for_export { condition_dbg = _; scrutinee; arms } =
   let scrutinee_ids = Ids_for_export.from_simple scrutinee in
-  Targetint_31_63.Map.fold
+  Target_ocaml_int.Map.fold
     (fun _discr action ids ->
       Ids_for_export.union ids (Apply_cont_expr.ids_for_export action))
     arms scrutinee_ids

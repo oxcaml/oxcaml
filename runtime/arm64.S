@@ -209,6 +209,13 @@ G(name):
 #define Cstack_prev(reg)        [reg, #16]
 #define Cstack_async_exn_handler(reg) [reg, #24]
 
+/* struct dynamic_thread_s */
+/* If you change Dynamic_cache_entries, you must also update FLUSH_DYNAMIC_CACHE */
+#define Dynamic_cache            0 /* offset of cache in dynamic_thread_t */
+#define Dynamic_binding_size     (2*8) /* dyn, val */
+#define Dynamic_binding_var      0 /* offset of var within a single binding */
+#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in fiber.c */
+
 /* struct stack_handler */
 #define Handler_value(reg)      [reg]
 #define Handler_exception(reg)  [reg, #8]
@@ -279,19 +286,25 @@ G(name):
         stp     x23, x24, [TMP, 176]
         str     x25, [TMP, 192]
     /* Save caller-save floating-point registers
-       (callee-saves are preserved by C functions) */
-        stp     d0, d1, [TMP, 208]
-        stp     d2, d3, [TMP, 224]
-        stp     d4, d5, [TMP, 240]
-        stp     d6, d7, [TMP, 256]
-        stp     d16, d17, [TMP, 272]
-        stp     d18, d19, [TMP, 288]
-        stp     d20, d21, [TMP, 304]
-        stp     d22, d23, [TMP, 320]
-        stp     d24, d25, [TMP, 336]
-        stp     d26, d27, [TMP, 352]
-        stp     d28, d29, [TMP, 368]
-        stp     d30, d31, [TMP, 384]
+       (callee-saves are preserved by C functions,
+	but only the low 64-bits are preserved,
+	save the entire register here for simplicity).  */
+        stp     q0, q1, [TMP, 208]
+        stp     q2, q3, [TMP, 240]
+        stp     q4, q5, [TMP, 272]
+        stp     q6, q7, [TMP, 304]
+        stp     q8, q9, [TMP, 336]
+        stp     q10, q11, [TMP, 368]
+        stp     q12, q13, [TMP, 400]
+        stp     q14, q15, [TMP, 432]
+        stp     q16, q17, [TMP, 464]
+        stp     q18, q19, [TMP, 496]
+        stp     q20, q21, [TMP, 528]
+        stp     q22, q23, [TMP, 560]
+        stp     q24, q25, [TMP, 592]
+        stp     q26, q27, [TMP, 624]
+        stp     q28, q29, [TMP, 656]
+        stp     q30, q31, [TMP, 688]
         add     TMP, TMP, #16
         str     TMP, Caml_state(gc_regs)
 .endm
@@ -315,18 +328,22 @@ G(name):
         ldp     x21, x22, [TMP, 160]
         ldp     x23, x24, [TMP, 176]
         ldr     x25, [TMP, 192]
-        ldp     d0, d1, [TMP, 208]
-        ldp     d2, d3, [TMP, 224]
-        ldp     d4, d5, [TMP, 240]
-        ldp     d6, d7, [TMP, 256]
-        ldp     d16, d17, [TMP, 272]
-        ldp     d18, d19, [TMP, 288]
-        ldp     d20, d21, [TMP, 304]
-        ldp     d22, d23, [TMP, 320]
-        ldp     d24, d25, [TMP, 336]
-        ldp     d26, d27, [TMP, 352]
-        ldp     d28, d29, [TMP, 368]
-        ldp     d30, d31, [TMP, 384]
+        ldp     q0, q1, [TMP, 208]
+        ldp     q2, q3, [TMP, 240]
+        ldp     q4, q5, [TMP, 272]
+        ldp     q6, q7, [TMP, 304]
+        ldp     q8, q9, [TMP, 336]
+        ldp     q10, q11, [TMP, 368]
+        ldp     q12, q13, [TMP, 400]
+        ldp     q14, q15, [TMP, 432]
+        ldp     q16, q17, [TMP, 464]
+        ldp     q18, q19, [TMP, 496]
+        ldp     q20, q21, [TMP, 528]
+        ldp     q22, q23, [TMP, 560]
+        ldp     q24, q25, [TMP, 592]
+        ldp     q26, q27, [TMP, 624]
+        ldp     q28, q29, [TMP, 656]
+        ldp     q30, q31, [TMP, 688]
     /* Put gc_regs struct back in bucket linked list */
         ldr     TMP2, Caml_state(gc_regs_buckets)
         str     TMP2, [TMP, 0]  /* next ptr */
@@ -334,6 +351,20 @@ G(name):
     /* Reload new allocation pointer & exn handler */
         ldr     ALLOC_PTR, Caml_state(young_ptr)
         ldr     TRAP_PTR, Caml_state(exn_handler)
+.endm
+
+/* Flush the per-thread cache of dynamic binding values. */
+
+.macro FLUSH_DYNAMIC_CACHE
+        ldr     TMP, Caml_state(dynamic_bindings)
+        str     xzr, [TMP, (Dynamic_cache + 0*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 1*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 2*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 3*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 4*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 5*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 6*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, (Dynamic_cache + 7*Dynamic_binding_size + Dynamic_binding_var)]
 .endm
 
 #if defined(WITH_THREAD_SANITIZER) /* { */
@@ -392,18 +423,22 @@ G(name):
         stp     x12, x13, [TMP, 112]
         stp     x14, x15, [TMP, 128]
     /* Save caller-save floating-point registers */
-        stp     d0, d1, [TMP, 208]
-        stp     d2, d3, [TMP, 224]
-        stp     d4, d5, [TMP, 240]
-        stp     d6, d7, [TMP, 256]
-        stp     d16, d17, [TMP, 272]
-        stp     d18, d19, [TMP, 288]
-        stp     d20, d21, [TMP, 304]
-        stp     d22, d23, [TMP, 320]
-        stp     d24, d25, [TMP, 336]
-        stp     d26, d27, [TMP, 352]
-        stp     d28, d29, [TMP, 368]
-        stp     d30, d31, [TMP, 384]
+        stp     q0, q1, [TMP, 208]
+        stp     q2, q3, [TMP, 240]
+        stp     q4, q5, [TMP, 272]
+        stp     q6, q7, [TMP, 304]
+        stp     q8, q9, [TMP, 336]
+        stp     q10, q11, [TMP, 368]
+        stp     q12, q13, [TMP, 400]
+        stp     q14, q15, [TMP, 432]
+        stp     q16, q17, [TMP, 464]
+        stp     q18, q19, [TMP, 496]
+        stp     q20, q21, [TMP, 528]
+        stp     q22, q23, [TMP, 560]
+        stp     q24, q25, [TMP, 592]
+        stp     q26, q27, [TMP, 624]
+        stp     q28, q29, [TMP, 656]
+        stp     q30, q31, [TMP, 688]
         add     TMP, TMP, #16
         str     TMP, Caml_state(gc_regs)
 .endm
@@ -423,18 +458,22 @@ G(name):
         ldp     x10, x11, [TMP, 96]
         ldp     x12, x13, [TMP, 112]
         ldp     x14, x15, [TMP, 128]
-        ldp     d0, d1, [TMP, 208]
-        ldp     d2, d3, [TMP, 224]
-        ldp     d4, d5, [TMP, 240]
-        ldp     d6, d7, [TMP, 256]
-        ldp     d16, d17, [TMP, 272]
-        ldp     d18, d19, [TMP, 288]
-        ldp     d20, d21, [TMP, 304]
-        ldp     d22, d23, [TMP, 320]
-        ldp     d24, d25, [TMP, 336]
-        ldp     d26, d27, [TMP, 352]
-        ldp     d28, d29, [TMP, 368]
-        ldp     d30, d31, [TMP, 384]
+        ldp     q0, q1, [TMP, 208]
+        ldp     q2, q3, [TMP, 240]
+        ldp     q4, q5, [TMP, 272]
+        ldp     q6, q7, [TMP, 304]
+        ldp     q8, q9, [TMP, 336]
+        ldp     q10, q11, [TMP, 368]
+        ldp     q12, q13, [TMP, 400]
+        ldp     q14, q15, [TMP, 432]
+        ldp     q16, q17, [TMP, 464]
+        ldp     q18, q19, [TMP, 496]
+        ldp     q20, q21, [TMP, 528]
+        ldp     q22, q23, [TMP, 560]
+        ldp     q24, q25, [TMP, 592]
+        ldp     q26, q27, [TMP, 624]
+        ldp     q28, q29, [TMP, 656]
+        ldp     q30, q31, [TMP, 688]
     /* Put gc_regs struct back in bucket linked list */
         ldr     TMP2, Caml_state(gc_regs_buckets)
         str     TMP2, [TMP, 0]  /* next ptr */
@@ -485,10 +524,16 @@ FUNCTION(caml_call_realloc_stack)
     /* Free stack space and return to caller */
         ldp     x29, x30, [sp], 16
         ret
-1:      RESTORE_ALL_REGS
+1:  /* Restore the gc_regs bucket popped by SAVE_ALL_REGS */
+        ldr     TMP, Caml_state(gc_regs)
+        sub     TMP, TMP, #16
+        ldr     TMP2, Caml_state(gc_regs_buckets)
+        str     TMP2, [TMP, 0]  /* next ptr */
+        str     TMP, Caml_state(gc_regs_buckets)
     /* Raise the Stack_overflow exception */
         ldp     x29, x30, [sp], 16
         add     sp, sp, 16 /* pop argument */
+        SWITCH_OCAML_TO_C
         ADDRGLOBAL(x0, caml_exn_Stack_overflow)
         b       G(caml_raise_async)
         CFI_ENDPROC
@@ -620,15 +665,15 @@ FUNCTION(caml_c_call)
 #if defined(WITH_THREAD_SANITIZER)
     /* Save return value registers. Since the called function could be
        anything, it may have returned its result (if any) either in x0
-       or d0:d1. */
+       or q0:q1. */
         stp     x0, x1, [sp, -16]!
         CFI_ADJUST(16)
-        stp     d0, d1, [sp, -16]!
-        CFI_ADJUST(16)
+        stp     q0, q1, [sp, -32]!
+        CFI_ADJUST(32)
         TSAN_EXIT_FUNCTION
     /* Restore return value registers */
-        ldp     d0, d1, [sp], 16
-        CFI_ADJUST(-16)
+        ldp     q0, q1, [sp], 32
+        CFI_ADJUST(-32)
         ldp     x0, x1, [sp], 16
         CFI_ADJUST(-16)
 #endif
@@ -732,8 +777,8 @@ FUNCTION(caml_start_program)
 
 L(jump_to_caml):
     /* Set up stack frame and save callee-save registers */
-        stp     x29, x30, [sp, -160]!
-        CFI_ADJUST(160)
+        stp     x29, x30, [sp, -224]!
+        CFI_ADJUST(224)
         CFI_OFFSET(29, 0)
         CFI_OFFSET(30, 8)
         add     x29, sp, #0
@@ -742,10 +787,10 @@ L(jump_to_caml):
         stp     x23, x24, [sp, 48]
         stp     x25, x26, [sp, 64]
         stp     x27, x28, [sp, 80]
-        stp     d8, d9, [sp, 96]
-        stp     d10, d11, [sp, 112]
-        stp     d12, d13, [sp, 128]
-        stp     d14, d15, [sp, 144]
+        stp     q8, q9, [sp, 96]
+        stp     q10, q11, [sp, 128]
+        stp     q12, q13, [sp, 160]
+        stp     q14, q15, [sp, 192]
     /* Load domain state pointer from argument */
         mov     DOMAIN_STATE_PTR, TMP
     /* Reload allocation pointer */
@@ -841,12 +886,12 @@ L(return_result):
         ldp     x23, x24, [sp, 48]
         ldp     x25, x26, [sp, 64]
         ldp     x27, x28, [sp, 80]
-        ldp     d8, d9, [sp, 96]
-        ldp     d10, d11, [sp, 112]
-        ldp     d12, d13, [sp, 128]
-        ldp     d14, d15, [sp, 144]
-        ldp     x29, x30, [sp], 160
-        CFI_ADJUST(-160)
+        ldp     q8, q9, [sp, 96]
+        ldp     q10, q11, [sp, 128]
+        ldp     q12, q13, [sp, 160]
+        ldp     q14, q15, [sp, 192]
+        ldp     x29, x30, [sp], 224
+        CFI_ADJUST(-224)
     /* Return to C caller */
         ret
         CFI_ENDPROC
@@ -1013,7 +1058,7 @@ FUNCTION(caml_callback2_asm)
         mov     TMP2, x1
         ldp     x0, x1, [x2, 0] /* x0 = first arg, x1 = second arg */
         mov     x2, TMP2         /* x2 = closure environment */
-        ADDRGLOBAL(TMP2, caml_apply2)
+        ADDRGLOBAL(TMP2, caml_apply2L)
         b       L(jump_to_caml)
         CFI_ENDPROC
 END_FUNCTION(caml_callback2_asm)
@@ -1040,7 +1085,7 @@ FUNCTION(caml_callback3_asm)
         mov     x3, x1          /* x3 = closure environment */
         ldp     x0, x1, [x2, 0] /* x0 = first arg, x1 = second arg */
         ldr     x2, [x2, 16]    /* x2 = third arg */
-        ADDRGLOBAL(TMP2, caml_apply3)
+        ADDRGLOBAL(TMP2, caml_apply3L)
         b       L(jump_to_caml)
         CFI_ENDPROC
 END_FUNCTION(caml_callback3_asm)
@@ -1130,6 +1175,7 @@ L(do_perform):
         CFI_ADJUST(-16)
 #endif
         SWITCH_OCAML_STACKS x2, x10
+        FLUSH_DYNAMIC_CACHE
     /*  we have to null the Handler_parent after the switch because
         the Handler_parent is needed to unwind the stack for backtraces */
         str     xzr, Handler_parent(x9) /* Set parent of performer to NULL */
@@ -1221,6 +1267,7 @@ FUNCTION(caml_resume)
         ldr     x9, Caml_state(current_stack)
         str     x9, Handler_parent(x8)
         SWITCH_OCAML_STACKS x9, x0
+        FLUSH_DYNAMIC_CACHE
         mov     x0, x2
         br      x4
 1:      ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
@@ -1287,6 +1334,7 @@ FUNCTION(caml_runstack)
         mov     TRAP_PTR, x9
     /* Switch to the new stack */
         mov     sp, x9
+        FLUSH_DYNAMIC_CACHE
 #ifdef ASM_CFI_SUPPORTED
         CFI_REMEMBER_STATE
         .cfi_escape DW_CFA_def_cfa_expression, 3+3+2,       \
@@ -1328,6 +1376,7 @@ L(frame_runstack):
         CFI_RESTORE_STATE
         CFI_REMEMBER_STATE
         CFI_DEF_CFA_REGISTER(DW_REG_x21)
+        FLUSH_DYNAMIC_CACHE
         ldr     TMP, Caml_state(c_stack)
         mov     sp, TMP
         bl      G(caml_free_stack)

@@ -49,5 +49,5 @@ Line 4, characters 6-12:
           ^^^^^^
 Warning 33 [unused-open]: unused open A.
 
-module rec D : sig module M : sig module X : sig end end end
+module rec D : sig module M : sig module X : sig end @@ stateless end end
 |}]

@@ -6,7 +6,7 @@ expect;
 
 let ignore_local : 'a @ local -> unit = fun _ -> ()
 [%%expect{|
-val ignore_local : local_ 'a -> unit = <fun>
+val ignore_local : 'a @ local -> unit = <fun>
 |}]
 
 let f = ref (stack_ fun x -> x)
@@ -14,7 +14,9 @@ let f = ref (stack_ fun x -> x)
 Line 1, characters 12-31:
 1 | let f = ref (stack_ fun x -> x)
                 ^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let f = ref (stack_ (42, 42))
@@ -22,17 +24,21 @@ let f = ref (stack_ (42, 42))
 Line 1, characters 12-29:
 1 | let f = ref (stack_ (42, 42))
                 ^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let f () =
   let g = stack_ ((42, 42) : _ @ global ) in
   ()
 [%%expect{|
-Line 2, characters 17-41:
+Line 2, characters 18-26:
 2 |   let g = stack_ ((42, 42) : _ @ global ) in
-                     ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This allocation cannot be on the stack.
+                      ^^^^^^^^
+Error: The allocation is "local"
+       because it is "stack_"-allocated.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 let f () =
@@ -42,17 +48,21 @@ let f () =
 Line 2, characters 14-47:
 2 |   let g = ref (stack_ ((42, 42) : _ @ global )) in
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let f () =
   let g = stack_ (fun x y -> x : 'a -> 'a -> 'a) in
   ()
 [%%expect{|
-Line 2, characters 17-48:
+Line 2, characters 18-30:
 2 |   let g = stack_ (fun x y -> x : 'a -> 'a -> 'a) in
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This allocation cannot be on the stack.
+                      ^^^^^^^^^^^^
+Error: The allocation is "local"
+       because it is "stack_"-allocated.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 let f () =
@@ -62,7 +72,9 @@ let f () =
 Line 2, characters 14-54:
 2 |   let g = ref (stack_ (fun x y -> x : 'a -> 'a -> 'a)) in
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 
@@ -71,7 +83,9 @@ let f = ref (stack_ (2, 3))
 Line 1, characters 12-27:
 1 | let f = ref (stack_ (2, 3))
                 ^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let f = ignore_local (stack_ (2, 3))
@@ -95,7 +109,9 @@ let f = ref (stack_ (Bar 42))
 Line 1, characters 12-29:
 1 | let f = ref (stack_ (Bar 42))
                 ^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let f = ignore_local (stack_ (Bar 42))
@@ -116,7 +132,9 @@ let f = ref (stack_ (`Bar 42))
 Line 1, characters 12-30:
 1 | let f = ref (stack_ (`Bar 42))
                 ^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let f = ignore_local (stack_ (`Bar 42))
@@ -143,7 +161,9 @@ type r = { x : string; }
 Line 3, characters 12-34:
 3 | let f = ref (stack_ {x = "hello"})
                 ^^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let f = ignore_local (stack_ {x = "hello"})
@@ -169,7 +189,9 @@ type r = { x : float; y : float; }
 Line 2, characters 20-32:
 2 | let f (r : r) = ref (stack_ r.x)
                         ^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let f (r : r) = ignore_local (stack_ r.x) [@nontail]
@@ -182,7 +204,9 @@ let f = ref (stack_ [| 42; 56 |])
 Line 1, characters 12-33:
 1 | let f = ref (stack_ [| 42; 56 |])
                 ^^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let f = ignore_local (stack_ [| 42; 56 |])
@@ -196,13 +220,16 @@ let f () = stack_ (3, 5)
 Line 1, characters 11-24:
 1 | let f () = stack_ (3, 5)
                ^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let f () = exclave_ stack_ (3, 5)
 [%%expect{|
-val f : unit -> local_ int * int = <fun>
+val f : unit -> int * int @ local = <fun>
 |}]
 
 let f () =
@@ -212,9 +239,10 @@ let f () =
 Line 3, characters 4-5:
 3 |     g 42
         ^
-Error: This value escapes its region.
-  Hint: This function cannot be local,
-  because it is the function in a tail call.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+       because it is the function in a tail call.
 |}]
 
 let f () =
@@ -223,9 +251,10 @@ let f () =
 Line 2, characters 4-23:
 2 |     (stack_ fun x -> x) 42
         ^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: This function cannot be local,
-  because it is the function in a tail call.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+       because it is the function in a tail call.
 |}]
 
 let f () =
@@ -234,9 +263,43 @@ let f () =
 Line 2, characters 16-34:
 2 |     List.length (stack_ [1; 2; 3])
                     ^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: This argument cannot be local,
-  because it is an argument in a tail call.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
+|}]
+
+let f2 () =
+    let _ = List.length (stack_ [1; 2; 3]) in
+    42
+[%%expect{|
+Line 2, characters 24-42:
+2 |     let _ = List.length (stack_ [1; 2; 3]) in
+                            ^^^^^^^^^^^^^^^^^^
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
+|}]
+
+let f3 () =
+    let g _ = 42 in
+    g (stack_ [1; 2; 3])
+[%%expect{|
+Line 3, characters 6-24:
+3 |     g (stack_ [1; 2; 3])
+          ^^^^^^^^^^^^^^^^^^
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+       because it is an argument in a tail call.
+|}]
+
+let f4 (local_ x) =
+    List.length x
+[%%expect{|
+Line 2, characters 16-17:
+2 |     List.length x
+                    ^
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 (* Allocations that are not supported for stack *)
@@ -327,7 +390,7 @@ let mk () =
   let r = stack_ { x = [1;2;3]; y = [4;5;6] } in
   r.y
 [%%expect{|
-type t = { x : int list; global_ y : int list; }
+type t = { x : int list; y : int list @@ global; }
 val mk : unit -> int list = <fun>
 |}]
 
@@ -338,8 +401,13 @@ let mk () =
 Line 3, characters 2-5:
 3 |   r.x
       ^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       because it is the field "x" of the record at Line 3, characters 2-3
+       which is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Testing primitives *)
@@ -353,7 +421,7 @@ external c_func : 'a -> 'a = "foo"
 external fst : ('a * 'b [@local_opt]) -> ('a [@local_opt]) = "%field0_immut"
 external ref : 'a -> ('a ref [@local_opt]) = "%makemutable"
 external ref_heap : 'a -> 'a ref = "%makemutable"
-external ref_stack : 'a -> local_ 'a ref = "%makemutable"
+external ref_stack : 'a -> 'a ref @ local = "%makemutable"
 external id : 'a -> 'a = "%identity"
 external c_func : 'a -> 'a = "foo"
 |}]
@@ -388,7 +456,7 @@ Line 2, characters 17-30:
 2 |   let _ = stack_ (ref_heap 52) in
                      ^^^^^^^^^^^^^
 Error: This primitive always allocates on heap
-       (maybe it should be declared with "[@local_opt]" or "local_"?)
+       (maybe it should be declared with "[@local_opt]" or "@ local"?)
 |}]
 
 let foo () =

@@ -3,7 +3,7 @@
 open! Int_replace_polymorphic_compare
 open! Regalloc_utils
 open! Regalloc_split_utils
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 type destructions_at_end = (destruction_kind * Reg.Set.t) Label.Map.t
 
@@ -15,8 +15,7 @@ type t =
   { destructions_at_end : destructions_at_end;
     definitions_at_beginning : definitions_at_beginning;
     phi_at_beginning : phi_at_beginning;
-    stack_slots : Regalloc_stack_slots.t;
-    instruction_id : InstructionId.sequence
+    stack_slots : Regalloc_stack_slots.t
   }
 
 let log_renaming_info : t -> unit =
@@ -51,6 +50,157 @@ let log_renaming_info : t -> unit =
     state.phi_at_beginning;
   dedent ();
   dedent ()
+
+(* Optimizes `destructions_at_end` and `definitions_at_beginning`, by moving
+   destructions and definitions outside of loops when possible. *)
+module ExtractSpillsAndReloadsFromLoops : sig
+  val optimize :
+    Cfg_with_infos.t ->
+    destructions_at_end:destructions_at_end ->
+    definitions_at_beginning:definitions_at_beginning ->
+    destructions_at_end * definitions_at_beginning
+end = struct
+  type loop_sets =
+    { destroyed : Reg.Set.t;
+      occurring : Reg.Set.t
+    }
+
+  let compute_loop_sets cfg loop destructions_at_end =
+    Label.Set.fold
+      (fun label { destroyed; occurring } ->
+        let destroyed_here =
+          match Label.Map.find_opt label destructions_at_end with
+          | None -> Reg.Set.empty
+          | Some (_kind, regs) -> regs
+        in
+        let destroyed = Reg.Set.union destroyed destroyed_here in
+        let block = Cfg.get_block_exn cfg label in
+        let[@inline] update_occuring :
+            type a. Reg.Set.t -> a Cfg.instruction -> Reg.Set.t =
+         fun occurring instr ->
+          let occurring = Reg.add_set_array occurring instr.arg in
+          let occurring = Reg.add_set_array occurring instr.res in
+          occurring
+        in
+        let occurring =
+          DLL.fold_left block.body
+            ~init:(update_occuring occurring block.terminator)
+            ~f:update_occuring
+        in
+        { destroyed; occurring })
+      loop
+      { destroyed = Reg.Set.empty; occurring = Reg.Set.empty }
+
+  (* If a temporary is destroyed/reloaded inside a loop (typically because it is
+     live at a destruction point), but never used in the loop then the
+     destructions/definitions can be moved. *)
+  let optimize_loop cfg ~header (loop : Label.Set.t)
+      (destructions_at_end, definitions_at_beginning) =
+    if debug
+    then (
+      log "ExtractSpillsAndReloadsFromLoops.optimize_loop";
+      indent ());
+    let { destroyed; occurring } =
+      compute_loop_sets cfg loop destructions_at_end
+    in
+    let to_move = Reg.Set.diff destroyed occurring in
+    match Reg.Set.is_empty to_move with
+    | true ->
+      if debug
+      then (
+        log "no move available";
+        dedent ());
+      destructions_at_end, definitions_at_beginning
+    | false ->
+      if debug
+      then
+        Reg.Set.iter (fun reg -> log "%a can be moved" Printreg.reg reg) to_move;
+      let (destructions_at_end, definitions_at_beginning)
+            : destructions_at_end * definitions_at_beginning =
+        Label.Set.fold
+          (fun label (destructions_at_end, definitions_at_beginning) ->
+            let destructions_at_end =
+              Label.Map.update label
+                (function
+                  | None -> None
+                  | Some (kind, regs) -> Some (kind, Reg.Set.diff regs to_move))
+                destructions_at_end
+            in
+            let definitions_at_beginning =
+              Label.Map.update label
+                (function
+                  | None -> None | Some regs -> Some (Reg.Set.diff regs to_move))
+                definitions_at_beginning
+            in
+            destructions_at_end, definitions_at_beginning)
+          loop
+          (destructions_at_end, definitions_at_beginning)
+      in
+      (* Add destructions before the loop. *)
+      let all_loop_predecessors : Label.Set.t =
+        (Cfg.get_block_exn cfg header).predecessors
+      in
+      let destructions_at_end : destructions_at_end =
+        Label.Set.fold
+          (fun label acc ->
+            if debug then log "destructions now happen at %a" Label.print label;
+            Label.Map.update label
+              (function
+                | None -> Some (Destruction_on_all_paths, to_move)
+                | Some (_kind, regs) ->
+                  (* CR xclerc for xclerc: double-check the kind is correct. *)
+                  Some (Destruction_on_all_paths, Reg.Set.union regs to_move))
+              acc)
+          all_loop_predecessors destructions_at_end
+      in
+      (* Add definitions after the loop. *)
+      let all_loop_successors : Label.Set.t =
+        Label.Set.diff
+          (Label.Set.fold
+             (fun l acc ->
+               Label.Set.union acc
+                 (Cfg.successor_labels ~normal:true ~exn:true
+                    (Cfg.get_block_exn cfg l)))
+             loop Label.Set.empty)
+          loop
+      in
+      let definitions_at_beginning : definitions_at_beginning =
+        Label.Set.fold
+          (fun label acc ->
+            if debug then log "definitions now happen at %a" Label.print label;
+            Label.Map.update label
+              (function
+                | None -> Some to_move
+                | Some regs -> Some (Reg.Set.union regs to_move))
+              acc)
+          all_loop_successors definitions_at_beginning
+      in
+      if debug then dedent ();
+      destructions_at_end, definitions_at_beginning
+
+  let optimize cfg_with_infos ~destructions_at_end ~definitions_at_beginning =
+    if debug
+    then (
+      log "ExtractSpillsAndReloadsFromLoops.optimize";
+      indent ());
+    let cfg = Cfg_with_infos.cfg cfg_with_infos in
+    let loop_infos = Cfg_with_infos.loop_infos cfg_with_infos in
+    let res =
+      Label.Map.fold
+        (fun loop_header loops acc ->
+          let loops = Cfg_loop_infos.merge_loops loops in
+          let loops =
+            List.sort ~cmp:Cfg_loop_infos.compare_loop_by_cardinal loops
+          in
+          (* we use `fold_right` to start with the bigger loops *)
+          List.fold_right loops ~init:acc ~f:(fun loop acc ->
+              optimize_loop cfg ~header:loop_header loop acc))
+        loop_infos.header_map
+        (destructions_at_end, definitions_at_beginning)
+    in
+    if debug then dedent ();
+    res
+end
 
 (* Optimizes `destructions_at_end` and `definitions_at_beginning`, by moving
    definitions down and destructions up. Doing so create more opportunities for
@@ -318,13 +468,6 @@ module RemoveDominatedSpillsForConstants : sig
     destructions_at_end:destructions_at_end ->
     destructions_at_end
 end = struct
-  (* CR-someday xclerc for xclerc: move to Cfg_loop_infos? *)
-  let is_in_loop : Cfg_loop_infos.t -> Label.t -> bool =
-   fun loops label ->
-    Cfg_loop_infos.EdgeMap.exists
-      (fun _ (loop : Cfg_loop_infos.loop) -> Label.Set.mem label loop)
-      loops.loops
-
   type set =
     | At_most_once
     | Maybe_more_than_once
@@ -447,7 +590,7 @@ end = struct
     let num_sets =
       Cfg_with_infos.fold_blocks cfg_with_infos ~init:(Reg.Tbl.create 123)
         ~f:(fun label block acc ->
-          let in_loop : bool = is_in_loop loops label in
+          let in_loop : bool = Cfg_loop_infos.is_in_loop loops label in
           if debug then log "block %a in_loop? %B" Label.format label in_loop;
           incr_set acc block.terminator.res ~in_loop;
           DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
@@ -677,10 +820,17 @@ let[@inline] remove_empty_sets (map : 'a Label.Map.t) ~(f : 'a -> Reg.Set.t) :
     'a Label.Map.t =
   Label.Map.filter (fun _ data -> not (Reg.Set.is_empty (f data))) map
 
-let make cfg_with_infos ~last_used =
+let make cfg_with_infos =
   let destructions_at_end = compute_destructions cfg_with_infos in
   let definitions_at_beginning =
     compute_definitions cfg_with_infos ~destructions_at_end
+  in
+  let destructions_at_end, definitions_at_beginning =
+    if Lazy.force split_around_loops
+    then
+      ExtractSpillsAndReloadsFromLoops.optimize cfg_with_infos
+        ~destructions_at_end ~definitions_at_beginning
+    else destructions_at_end, definitions_at_beginning
   in
   let destructions_at_end, definitions_at_beginning =
     MoveSpillsAndReloads.optimize cfg_with_infos ~destructions_at_end
@@ -702,12 +852,10 @@ let make cfg_with_infos ~last_used =
     compute_phis cfg_with_infos ~destructions_at_end ~definitions_at_beginning
   in
   let stack_slots = Regalloc_stack_slots.make () in
-  let instruction_id = InstructionId.make_sequence ~last_used () in
   { destructions_at_end;
     definitions_at_beginning;
     phi_at_beginning;
-    stack_slots;
-    instruction_id
+    stack_slots
   }
 
 let destructions_at_end state = state.destructions_at_end
@@ -717,6 +865,3 @@ let definitions_at_beginning state = state.definitions_at_beginning
 let phi_at_beginning state = state.phi_at_beginning
 
 let stack_slots state = state.stack_slots
-
-let get_and_incr_instruction_id state =
-  InstructionId.get_next state.instruction_id

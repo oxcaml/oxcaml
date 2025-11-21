@@ -28,14 +28,20 @@
 open! Int_replace_polymorphic_compare
 module CL = Cfg_with_layout
 module L = Linear
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
     L.instruction =
   let arg, res, dbg, live, fdo, available_before, available_across =
     match like with
     | None ->
-      [||], [||], Debuginfo.none, Reg.Set.empty, Fdo_info.none, None, None
+      ( [||],
+        [||],
+        Debuginfo.none,
+        Reg.Set.empty,
+        Fdo_info.none,
+        Reg_availability_set.Unreachable,
+        Reg_availability_set.Unreachable )
     | Some like ->
       ( like.arg,
         like.res,
@@ -50,17 +56,6 @@ let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
 let basic_to_linear (i : _ Cfg.instruction) ~next =
   let desc = Cfg_to_linear_desc.from_basic i.desc in
   to_linear_instr ~like:i desc ~next
-
-let mk_int_test ~lt ~eq ~gt : Cmm.integer_comparison =
-  match eq, lt, gt with
-  | true, false, false -> Ceq
-  | false, true, false -> Clt
-  | false, false, true -> Cgt
-  | false, true, true -> Cne
-  | true, true, false -> Cle
-  | true, false, true -> Cge
-  | true, true, true -> assert false
-  | false, false, false -> assert false
 
 (* Certain "unordered" outcomes of float comparisons are not expressible as a
    single Cmm.float_comparison operator, or a disjunction of disjoint
@@ -101,7 +96,7 @@ let mk_float_cond ~lt ~eq ~gt ~uo =
   | true, false, false, true -> Must_be_last
 
 let cross_section cfg_with_layout src dst =
-  if !Flambda_backend_flags.basic_block_sections
+  if !Oxcaml_flags.basic_block_sections
      && not (Label.equal dst Linear_utils.labelled_insn_end.label)
   then
     let src_section = CL.get_section cfg_with_layout src in
@@ -117,7 +112,8 @@ let cross_section cfg_with_layout src dst =
 
 let linearize_terminator cfg_with_layout (func : string) start
     (terminator : Cfg.terminator Cfg.instruction)
-    ~(next : Linear_utils.labelled_insn) : L.instruction * Label.t option =
+    ~(next : Linear_utils.labelled_insn) ~has_epilogue :
+    L.instruction * Label.t option =
   (* CR-someday gyorsh: refactor, a lot of redundant code for different cases *)
   (* CR-someday gyorsh: for successor labels that are not fallthrough, order of
      branch instructions should depend on perf data and possibly the relative
@@ -162,7 +158,14 @@ let linearize_terminator cfg_with_layout (func : string) start
         ],
         Some destination )
     | Call_no_return
-        { func_symbol; alloc; ty_args; ty_res; stack_ofs; effects = _ } ->
+        { func_symbol;
+          alloc;
+          ty_args;
+          ty_res;
+          stack_ofs;
+          stack_align;
+          effects = _
+        } ->
       single
         (L.Lcall_op
            (Lextcall
@@ -171,7 +174,8 @@ let linearize_terminator cfg_with_layout (func : string) start
                 ty_args;
                 ty_res;
                 returns = false;
-                stack_ofs
+                stack_ofs;
+                stack_align
               }))
     | Call { op; label_after } ->
       let op : Linear.call_operation =
@@ -184,14 +188,22 @@ let linearize_terminator cfg_with_layout (func : string) start
       let op : Linear.call_operation =
         match op with
         | External
-            { func_symbol; alloc; ty_args; ty_res; stack_ofs; effects = _ } ->
+            { func_symbol;
+              alloc;
+              ty_args;
+              ty_res;
+              stack_ofs;
+              stack_align;
+              effects = _
+            } ->
           Lextcall
             { func = func_symbol;
               alloc;
               ty_args;
               ty_res;
               returns = true;
-              stack_ofs
+              stack_ofs;
+              stack_align
             }
         | Probe { name; handler_code_sym; enabled_at_init } ->
           Lprobe { name; handler_code_sym; enabled_at_init }
@@ -278,8 +290,8 @@ let linearize_terminator cfg_with_layout (func : string) start
            #8677 *)
         let can_emit_Lcondbranch3 =
           match is_signed, imm with
-          | false, Some 1 -> true
-          | false, Some _ | false, None | true, _ -> false
+          | Unsigned, Some 1 -> true
+          | Unsigned, Some _ | Unsigned, None | Signed, _ -> false
         in
         if Label.Set.cardinal cond_successor_labels = 2 && can_emit_Lcondbranch3
         then
@@ -295,29 +307,50 @@ let linearize_terminator cfg_with_layout (func : string) start
           let init = branch_or_fallthrough [] last in
           ( Label.Set.fold
               (fun lbl acc ->
-                let cond =
-                  mk_int_test ~lt:(Label.equal lt lbl) ~eq:(Label.equal eq lbl)
+                match
+                  Scalar.Integer_comparison.create is_signed
+                    ~lt:(Label.equal lt lbl) ~eq:(Label.equal eq lbl)
                     ~gt:(Label.equal gt lbl)
-                in
-                let comp =
-                  match is_signed with
-                  | true -> Operation.Isigned cond
-                  | false -> Operation.Iunsigned cond
-                in
-                let test =
-                  match imm with
-                  | None -> Operation.Iinttest comp
-                  | Some n -> Operation.Iinttest_imm (comp, n)
-                in
-                L.Lcondbranch (test, lbl) :: acc)
+                with
+                | Error result ->
+                  Misc.fatal_errorf
+                    "Cannot linearize terminator: meaningless specification of \
+                     comparison, always has result %b:@ %a"
+                    result Cfg.print_terminator terminator
+                | Ok comp ->
+                  let test =
+                    match imm with
+                    | None -> Operation.Iinttest comp
+                    | Some n -> Operation.Iinttest_imm (comp, n)
+                  in
+                  L.Lcondbranch (test, lbl) :: acc)
               cond_successor_labels init,
             None )
       | _ -> assert false)
   in
-  ( List.fold_left
-      (fun next desc -> to_linear_instr ~like:terminator desc ~next)
-      next.insn (List.rev desc_list),
-    tailrec_label )
+  let desc_list =
+    match has_epilogue with
+    | true ->
+      (* The corresponding [Lepilogue_open] was already added when converting
+         the body of the block, replacing a [Cfg.Epilogue] instruction. The
+         [Lepilogue_open] should be the last instruction in the block body,
+         immediately preceding the terminator. *)
+      desc_list @ [L.Lepilogue_close]
+    | false -> desc_list
+  in
+  let instr =
+    List.fold_left
+      (fun next desc ->
+        let instr = to_linear_instr desc ~next ~like:terminator in
+        match has_epilogue with
+        (* In order to match the debug info generated when the epilogue was not
+           a linear instruction, we need to explicitly remove debug info, as
+           they were already added to Lepilogue_open. *)
+        | true -> { instr with L.dbg = Debuginfo.none }
+        | false -> instr)
+      next.insn (List.rev desc_list)
+  in
+  instr, tailrec_label
 
 let need_starting_label (cfg_with_layout : CL.t) (block : Cfg.basic_block)
     ~(prev_block : Cfg.basic_block) =
@@ -358,7 +391,7 @@ let make_Llabel cfg_with_layout label =
   Linear.Llabel
     { label;
       section_name =
-        (if !Flambda_backend_flags.basic_block_sections
+        (if !Oxcaml_flags.basic_block_sections
         then CL.get_section cfg_with_layout label
         else None)
     }
@@ -377,9 +410,15 @@ let run cfg_with_layout =
       let block = Label.Tbl.find cfg.blocks label in
       assert (Label.equal label block.start);
       let body =
+        let has_epilogue =
+          DLL.exists block.body ~f:(fun instr ->
+              match[@ocaml.warning "-4"] instr.Cfg.desc with
+              | Cfg.Epilogue -> true
+              | _ -> false)
+        in
         let terminator, terminator_tailrec_label =
           linearize_terminator cfg_with_layout cfg.fun_name block.start
-            block.terminator ~next:!next
+            block.terminator ~next:!next ~has_epilogue
         in
         (match !tailrec_label, terminator_tailrec_label with
         | (Some _ | None), None -> ()
@@ -403,9 +442,15 @@ let run cfg_with_layout =
           let body =
             if need_starting_label cfg_with_layout block ~prev_block
             then
-              to_linear_instr
-                (make_Llabel cfg_with_layout block.start)
-                ~next:body
+              let instr =
+                to_linear_instr
+                  (make_Llabel cfg_with_layout block.start)
+                  ~next:body
+              in
+              { instr with
+                available_before = body.available_before;
+                available_across = body.available_across
+              }
             else body
           in
           adjust_stack_offset body block ~prev_block
@@ -420,7 +465,7 @@ let run cfg_with_layout =
     Proc.prologue_required ~fun_contains_calls ~fun_num_stack_slots
   in
   let fun_section_name =
-    if !Flambda_backend_flags.basic_block_sections
+    if !Oxcaml_flags.basic_block_sections
     then CL.get_section cfg_with_layout cfg.entry_label
     else None
   in
@@ -436,29 +481,3 @@ let run cfg_with_layout =
     fun_prologue_required;
     fun_section_name
   }
-
-let layout_of_block_list : Cfg.basic_block list -> Cfg_with_layout.layout =
- fun blocks ->
-  let res = DLL.make_empty () in
-  List.iter (fun block -> DLL.add_end res block.Cfg.start) blocks;
-  res
-
-(** debug print block as assembly *)
-let print_assembly (blocks : Cfg.basic_block list) =
-  (* create a fake cfg just for printing these blocks *)
-  let layout = layout_of_block_list blocks in
-  let fun_name = "_fun_start_" in
-  let cfg =
-    Cfg.create ~fun_name ~fun_args:[||] ~fun_codegen_options:[]
-      ~fun_dbg:Debuginfo.none ~fun_contains_calls:true
-      ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:Default_poll
-  in
-  List.iter
-    (fun (block : Cfg.basic_block) ->
-      Label.Tbl.add cfg.blocks block.start block)
-    blocks;
-  let cl = Cfg_with_layout.create cfg ~layout in
-  let fundecl = run cl in
-  X86_proc.reset_asm_code ();
-  Emit.fundecl fundecl;
-  X86_proc.generate_code (Some (X86_gas.generate_asm !Emitaux.output_channel))

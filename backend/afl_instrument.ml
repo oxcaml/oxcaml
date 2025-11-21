@@ -11,7 +11,7 @@
 (*   special exception on linking described in the file LICENSE.          *)
 (*                                                                        *)
 (**************************************************************************)
-
+[@@@ocaml.warning "+a-40-41-42"]
 (* Insert instrumentation for afl-fuzz *)
 
 open! Int_replace_polymorphic_compare
@@ -69,8 +69,8 @@ and instrument = function
        f_dbg, with_afl_logging f f_dbg, dbg)
   | Ccatch (Exn_handler, cases, body) ->
      let cases =
-       List.map (fun (nfail, ids, e, dbg, is_cold) ->
-           nfail, ids, with_afl_logging e dbg, dbg, is_cold)
+       List.map (fun Cmm.{label = nfail; params = ids; body = e; dbg; is_cold} ->
+           Cmm.{label = nfail; params = ids; body = with_afl_logging e dbg; dbg; is_cold})
          cases
      in
      Ccatch (Exn_handler, cases, instrument body)
@@ -92,8 +92,8 @@ and instrument = function
   | Csequence (e1, e2) -> Csequence (instrument e1, instrument e2)
   | Ccatch ((Normal | Recursive as flag), cases, body) ->
      let cases =
-       List.map (fun (nfail, ids, e, dbg, is_cold) ->
-           nfail, ids, instrument e, dbg, is_cold)
+       List.map (fun Cmm.{label = nfail; params = ids; body = e; dbg; is_cold} ->
+           Cmm.{label = nfail; params = ids; body = instrument e; dbg; is_cold})
          cases
      in
      Ccatch (flag, cases, instrument body)
@@ -101,7 +101,7 @@ and instrument = function
 
   (* these are base cases and have no logging *)
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_symbol _
+  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ as c -> c
 
 let instrument_function c dbg =

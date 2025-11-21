@@ -21,7 +21,8 @@ module IR = struct
 
   type exn_continuation =
     { exn_handler : Continuation.t;
-      extra_args : (simple * Flambda_kind.With_subkind.t) list
+      extra_args :
+        (simple * Flambda_debug_uid.t * Flambda_kind.With_subkind.t) list
     }
 
   type trap_action =
@@ -237,22 +238,27 @@ module Env = struct
       | Not_user_visible -> None
       | User_visible -> Some ()
     in
-    let var = Variable.create_with_same_name_as_ident ?user_visible id in
+    let var =
+      Variable.create_with_same_name_as_ident ?user_visible id
+        (Flambda_kind.With_subkind.kind kind)
+    in
     add_var t id var kind, var
 
   let add_vars_like t ids =
     let vars =
       List.map
-        (fun (id, (user_visible : IR.user_visible), kind) ->
+        (fun (id, _uid, (user_visible : IR.user_visible), kind) ->
           let user_visible =
             match user_visible with
             | Not_user_visible -> None
             | User_visible -> Some ()
           in
-          Variable.create_with_same_name_as_ident ?user_visible id, kind)
+          ( Variable.create_with_same_name_as_ident ?user_visible id
+              (Flambda_kind.With_subkind.kind kind),
+            kind ))
         ids
     in
-    add_vars t (List.map (fun (id, _, _) -> id) ids) vars, List.map fst vars
+    add_vars t (List.map (fun (id, _, _, _) -> id) ids) vars, List.map fst vars
 
   let find_var t id =
     try Ident.Map.find id t.variables
@@ -354,7 +360,8 @@ module Acc = struct
     }
 
   type t =
-    { declared_symbols : (Symbol.t * Static_const.t) list;
+    { machine_width : Target_system.Machine_width.t;
+      declared_symbols : (Symbol.t * Static_const.t) list;
       lifted_sets_of_closures :
         (Symbol.t Function_slot.Lmap.t * Flambda.Set_of_closures.t) list;
       shareable_constants : Symbol.t Static_const.Map.t;
@@ -379,6 +386,8 @@ module Acc = struct
     t, name
 
   let cost_metrics t = t.cost_metrics
+
+  let machine_width t = t.machine_width
 
   let increment_metrics metrics t =
     { t with cost_metrics = Cost_metrics.( + ) t.cost_metrics metrics }
@@ -427,7 +436,7 @@ module Acc = struct
               | Attribute_inline | Small_function _ -> approx
               | Not_yet_decided | Never_inline_attribute | Stub | Recursive
               | Function_body_too_large _ | Speculatively_inlinable _
-              | Functor _ ->
+              | Functor _ | Jsir_inlining_disabled ->
                 Value_approximation.Closure_approximation
                   { code_id;
                     function_slot;
@@ -439,8 +448,9 @@ module Acc = struct
         externals := Symbol.Map.add symbol approx !externals;
         approx
 
-  let create ~cmx_loader =
-    { declared_symbols = [];
+  let create ~cmx_loader ~machine_width =
+    { machine_width;
+      declared_symbols = [];
       lifted_sets_of_closures = [];
       shareable_constants = Static_const.Map.empty;
       symbol_approximations = Symbol.Map.empty;
@@ -500,14 +510,15 @@ module Acc = struct
             (tag, shape, fields, Alloc_mode.For_types.unknown ())
         else Value_unknown
       | Set_of_closures _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
-      | Boxed_int64 _ | Boxed_vec128 _ | Boxed_nativeint _
-      | Immutable_float_block _
+      | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
+      | Boxed_nativeint _ | Immutable_float_block _
       (* For immutable float blocks, we can statically allocate them in classic
          mode, but they are not currently provided with approximations. *)
       | Immutable_float_array _ | Immutable_float32_array _
       | Immutable_value_array _ | Empty_array _ | Immutable_int32_array _
       | Immutable_int64_array _ | Immutable_nativeint_array _
-      | Immutable_vec128_array _ | Mutable_string _ | Immutable_string _ ->
+      | Immutable_vec128_array _ | Immutable_vec256_array _
+      | Immutable_vec512_array _ | Mutable_string _ | Immutable_string _ ->
         Value_unknown
     in
     let symbol_approximations =
@@ -744,6 +755,7 @@ module Function_decls = struct
   module Function_decl = struct
     type param =
       { name : Ident.t;
+        debug_uid : Flambda_debug_uid.t;
         kind : Flambda_kind.With_subkind.t;
         attributes : Lambda.parameter_attribute;
         mode : Lambda.locality_mode
@@ -761,6 +773,7 @@ module Function_decls = struct
 
     type t =
       { let_rec_ident : Ident.t;
+        let_rec_uid : Flambda_debug_uid.t;
         function_slot : Function_slot.t;
         kind : Lambda.function_kind;
         params : param list;
@@ -782,9 +795,9 @@ module Function_decls = struct
         result_mode : Lambda.locality_mode
       }
 
-    let create ~let_rec_ident ~function_slot ~kind ~params ~params_arity
-        ~removed_params ~return ~calling_convention ~return_continuation
-        ~exn_continuation ~my_region ~my_ghost_region ~body
+    let create ~let_rec_ident ~let_rec_uid ~function_slot ~kind ~params
+        ~params_arity ~removed_params ~return ~calling_convention
+        ~return_continuation ~exn_continuation ~my_region ~my_ghost_region ~body
         ~(attr : Lambda.function_attribute) ~loc ~free_idents_of_body recursive
         ~closure_alloc_mode ~first_complex_local_param ~result_mode =
       let let_rec_ident =
@@ -805,6 +818,7 @@ module Function_decls = struct
           (Format.pp_print_option Ident.print)
           my_ghost_region);
       { let_rec_ident;
+        let_rec_uid;
         function_slot;
         kind;
         params;
@@ -827,6 +841,8 @@ module Function_decls = struct
       }
 
     let let_rec_ident t = t.let_rec_ident
+
+    let let_rec_debug_uid t = t.let_rec_uid
 
     let function_slot t = t.function_slot
 
@@ -857,6 +873,12 @@ module Function_decls = struct
     let specialise t = t.attr.specialise
 
     let poll_attribute t = t.attr.poll
+
+    let regalloc_attribute t = t.attr.regalloc
+
+    let regalloc_param_attribute t = t.attr.regalloc_param
+
+    let cold t = t.attr.cold
 
     let loop t = t.attr.loop
 
@@ -1060,7 +1082,9 @@ module Let_with_acc = struct
     else
       let cost_metrics_of_defining_expr =
         match (named : Named.t) with
-        | Prim (prim, _) -> Code_size.prim prim |> Cost_metrics.from_size
+        | Prim (prim, _) ->
+          Code_size.prim ~machine_width:(Acc.machine_width acc) prim
+          |> Cost_metrics.from_size
         | Simple simple -> Code_size.simple simple |> Cost_metrics.from_size
         | Static_consts _consts -> Cost_metrics.zero
         | Set_of_closures set_of_closures ->
@@ -1146,7 +1170,7 @@ module Let_cont_with_acc = struct
     in
     let expr = Let_cont.create_recursive ~invariant_params handlers ~body in
     let acc =
-      Continuation.Map.fold
+      Continuation.Lmap.fold
         (fun cont _ acc -> Acc.remove_continuation_from_free_names cont acc)
         handlers acc
     in
@@ -1166,9 +1190,9 @@ module Let_cont_with_acc = struct
           ( Name_occurrences.union free_names handler_free_names,
             Cost_metrics.( + ) costs cost_metrics_of_handler,
             acc,
-            Continuation.Map.add cont handler handlers ))
+            Continuation.Lmap.add cont handler handlers ))
         handlers
-        (Name_occurrences.empty, Cost_metrics.zero, acc, Continuation.Map.empty)
+        (Name_occurrences.empty, Cost_metrics.zero, acc, Continuation.Lmap.empty)
     in
     let body_free_names, acc, body = Acc.eval_branch_free_names acc ~f:body in
     let acc =

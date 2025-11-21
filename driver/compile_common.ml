@@ -15,35 +15,40 @@
 
 open Misc
 
+type opt_backend = Native | Js_of_ocaml
+
+type backend = Byte | Opt of opt_backend
+
+(* CR lmaurer: No longer need both [target] and [module_name] here (true in lots
+   of places) *)
 type info = {
   target: Unit_info.t;
   module_name : Compilation_unit.t;
   env : Env.t;
   ppf_dump : Format.formatter;
   tool_name : string;
-  native : bool;
+  backend : backend;
 }
 
 type compilation_unit_or_inferred =
   | Exactly of Compilation_unit.t
   | Inferred_from_output_prefix
 
-let with_info ~native ~tool_name ~source_file ~output_prefix
-      ~compilation_unit ~dump_ext k =
+let with_info ~backend ~tool_name ~source_file ~output_prefix
+      ~compilation_unit ~kind ~dump_ext k =
   Compmisc.init_path ();
   Compmisc.init_parameters ();
-  let target = Unit_info.make ~source_file output_prefix in
-  let compilation_unit =
+  let target =
     match compilation_unit with
-    | Exactly compilation_unit -> compilation_unit
+    | Exactly compilation_unit ->
+        Unit_info.make_with_known_compilation_unit ~source_file kind
+          output_prefix compilation_unit
     | Inferred_from_output_prefix ->
-        let module_name = Unit_info.modname target in
         let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
-        Compilation_unit.create for_pack_prefix
-          (module_name |> Compilation_unit.Name.of_string)
+        Unit_info.make ~source_file ~for_pack_prefix kind output_prefix
   in
-  Compilation_unit.set_current (Some compilation_unit);
-  Env.set_unit_name (Some compilation_unit);
+  let compilation_unit = Unit_info.modname target in
+  Env.set_unit_name (Some target);
   let env = Compmisc.initial_env() in
   let dump_file = String.concat "." [output_prefix; dump_ext] in
   Compmisc.with_ppf_dump ~file_prefix:dump_file (fun ppf_dump ->
@@ -53,15 +58,32 @@ let with_info ~native ~tool_name ~source_file ~output_prefix
     env;
     ppf_dump;
     tool_name;
-    native;
+    backend;
   })
+
+module Parse_result = struct
+  type 'a t = { ast : 'a; info : info }
+
+  let of_pparse_ast_result ~info ({ ast; source_file } : _ Pparse.ast_result) =
+    let new_target =
+      Unit_info.set_original_source_file_name info.target source_file
+    in
+    { ast; info = { info with target = new_target } }
+
+  let map_ast { ast; info } ~f = { ast = f ast; info }
+end
 
 (** Compile a .mli file *)
 
 let parse_intf i =
-  Pparse.parse_interface ~tool_name:i.tool_name (Unit_info.source_file i.target)
-  |> print_if i.ppf_dump Clflags.dump_parsetree Printast.interface
-  |> print_if i.ppf_dump Clflags.dump_source Pprintast.signature
+  Pparse.parse_interface
+    ~tool_name:i.tool_name
+    (Unit_info.original_source_file i.target)
+  |> Parse_result.of_pparse_ast_result ~info:i
+  |> Parse_result.map_ast
+       ~f:(print_if i.ppf_dump Clflags.dump_parsetree Printast.interface)
+  |> Parse_result.map_ast
+       ~f:(print_if i.ppf_dump Clflags.dump_source Pprintast.signature)
 
 let typecheck_intf info ast =
   Profile.(
@@ -74,7 +96,7 @@ let typecheck_intf info ast =
   let tsg =
     ast
     |> Typemod.type_interface
-         ~sourcefile:(Unit_info.source_file info.target)
+         ~sourcefile:(Unit_info.original_source_file info.target)
          info.module_name info.env
     |> print_if info.ppf_dump Clflags.dump_typedtree Printtyped.interface
   in
@@ -83,10 +105,11 @@ let typecheck_intf info ast =
   if !Clflags.print_types then
     Printtyp.wrap_printing_env ~error:false info.env (fun () ->
         Format.(fprintf std_formatter) "%a@."
-          (Printtyp.printed_signature (Unit_info.source_file info.target))
+          (Printtyp.printed_signature
+             (Unit_info.original_source_file info.target))
           sg);
-  ignore (Includemod.signatures info.env ~mark:Mark_both
-    ~modes:(Legacy None) sg sg);
+  ignore (Includemod.signatures info.env ~mark:true
+    ~modes:Includemod.modes_unit sg sg);
   Typecore.force_delayed_checks ();
   Builtin_attributes.warn_unused ();
   Warnings.check_fatal ();
@@ -99,9 +122,8 @@ let emit_signature info alerts tsg =
         Parameter
       else begin
         let cmi_arg_for =
-          match !Clflags.as_argument_for with
-          | Some arg_type -> Some (Global_module.Name.create_no_args arg_type)
-          | None -> None
+          !Clflags.as_argument_for
+          |> Option.map Global_module.Parameter_name.of_string
         in
         Normal { cmi_impl = info.module_name; cmi_arg_for }
       end
@@ -114,8 +136,8 @@ let emit_signature info alerts tsg =
 
 let interface ~hook_parse_tree ~hook_typed_tree info =
   Profile.(record_call (annotate_file_name (
-    Unit_info.source_file info.target))) @@ fun () ->
-  let ast = parse_intf info in
+    Unit_info.raw_source_file info.target))) @@ fun () ->
+  let { ast; info } : _ Parse_result.t = parse_intf info in
   hook_parse_tree ast;
   if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
     let alerts, tsg = typecheck_intf info ast in
@@ -129,10 +151,14 @@ let interface ~hook_parse_tree ~hook_typed_tree info =
 (** Frontend for a .ml file *)
 
 let parse_impl i =
-  let sourcefile = Unit_info.source_file i.target in
-  Pparse.parse_implementation ~tool_name:i.tool_name sourcefile
-  |> print_if i.ppf_dump Clflags.dump_parsetree Printast.implementation
-  |> print_if i.ppf_dump Clflags.dump_source Pprintast.structure
+  Pparse.parse_implementation
+    ~tool_name:i.tool_name
+    (Unit_info.original_source_file i.target)
+  |> Parse_result.of_pparse_ast_result ~info:i
+  |> Parse_result.map_ast
+       ~f:(print_if i.ppf_dump Clflags.dump_parsetree Printast.implementation)
+  |> Parse_result.map_ast
+       ~f:(print_if i.ppf_dump Clflags.dump_source Pprintast.structure)
 
 let typecheck_impl i parsetree =
   parsetree
@@ -151,17 +177,20 @@ let typecheck_impl i parsetree =
 
 let implementation ~hook_parse_tree ~hook_typed_tree info ~backend =
   Profile.(record_call (annotate_file_name (
-    Unit_info.source_file info.target))) @@ fun () ->
+    Unit_info.raw_source_file info.target))) @@ fun () ->
   let exceptionally () =
     let sufs =
-      if info.native then Unit_info.[ cmx; obj ]
-      else Unit_info.[ cmo ] in
+      match info.backend with
+      | Opt Native ->  Unit_info.[ cmx; obj ]
+      | Byte -> Unit_info.[ cmo ]
+      | Opt Js_of_ocaml -> Unit_info.[ cmjx; cmjo ]
+    in
     List.iter
       (fun suf -> remove_file (Unit_info.Artifact.filename @@ suf info.target))
       sufs;
   in
   Misc.try_finally ?always:None ~exceptionally (fun () ->
-    let parsed = parse_impl info in
+    let { ast = parsed; info } : _ Parse_result.t = parse_impl info in
     hook_parse_tree parsed;
     if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
       let typed = typecheck_impl info parsed in

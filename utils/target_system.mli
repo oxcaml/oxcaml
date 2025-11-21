@@ -11,6 +11,7 @@ val architecture : unit -> architecture
 
 val is_64_bit : unit -> bool
 
+(* CR mshinwell: what happens about these functions for JSIR? *)
 val is_32_bit : unit -> bool
 
 type derived_system =
@@ -42,12 +43,22 @@ type assembler =
 
 val assembler : unit -> assembler
 
-type machine_width =
-  | Thirty_two
-  | Sixty_four
+module Machine_width : sig
+  type t =
+    | Thirty_two  (* Traditional 32-bit OCaml with GC tag bit *)
+    | Thirty_two_no_gc_tag_bit  (* JavaScript mode with full 32-bit integers *)
+    | Sixty_four  (* Traditional 64-bit OCaml with GC tag bit *)
 
-(** The natural machine width of the target system. *)
-val machine_width : unit -> machine_width
+  val print : Format.formatter -> t -> unit
+
+  val equal : t -> t -> bool
+
+  val is_32_bit : t -> bool
+
+  val is_64_bit : t -> bool
+
+  val size_in_bytes : t -> int
+end
 
 type windows_system = private
   | Cygwin
@@ -74,3 +85,5 @@ val system: unit -> system
 val windows : unit -> bool
 
 val is_macos : unit -> bool
+
+val is_gas : unit -> bool

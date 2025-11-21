@@ -280,7 +280,7 @@ Lines 4-7, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           type t : value mod contended portable = { mutable x : int; }
+           type t : value mod portable contended = { mutable x : int; }
            [@@unsafe_allow_any_mode_crossing]
          end
        is not included in
@@ -289,7 +289,7 @@ Error: Signature mismatch:
            [@@unsafe_allow_any_mode_crossing]
          end
        Type declarations do not match:
-         type t : value mod contended portable = { mutable x : int; }
+         type t : value mod portable contended = { mutable x : int; }
        [@@unsafe_allow_any_mode_crossing]
        is not included in
          type t : value mod contended = { mutable x : int; }
@@ -301,7 +301,7 @@ Error: Signature mismatch:
 |}]
 
 module A : sig
-  type t : value mod external_ global portable many uncontended unique unyielding
+  type t : value mod external_ global portable many uncontended unyielding
 end = struct
   type t = int
 end
@@ -316,7 +316,7 @@ end
 module A : sig type t : value mod global many portable external_ end
 module B :
   sig
-    type t : value mod contended portable = { a : A.t; }
+    type t : value mod portable contended = { a : A.t; }
     [@@unsafe_allow_any_mode_crossing]
     val a : t -> A.t
   end
@@ -343,7 +343,7 @@ let bad (x : int ref t @ contended) = use_uncontended x
 Line 1, characters 54-55:
 1 | let bad (x : int ref t @ contended) = use_uncontended x
                                                           ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (* Reexporting after adding with-bounds *)
@@ -355,8 +355,7 @@ end
 module B :
   sig
     type 'a t_reexported
-      : immutable_data
-      with 'a =
+      : immutable_data with 'a =
       'a t =
         P : ('a, 'k) imm -> 'a t_reexported
     [@@unsafe_allow_any_mode_crossing]
@@ -373,7 +372,7 @@ let bad (x : int ref B.t_reexported @ contended) = use_uncontended x
 Line 1, characters 67-68:
 1 | let bad (x : int ref B.t_reexported @ contended) = use_uncontended x
                                                                        ^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 type 'a bad_reexport : immutable_data = 'a t = P : ('a, 'k) imm -> 'a bad_reexport
@@ -385,10 +384,10 @@ Lines 1-2, characters 0-34:
 Error: This variant or record definition does not match that of type "'a t"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod many portable unyielding stateless contended
-         immutable with 'a
-         but this has: mod many portable unyielding stateless contended
-         immutable
+         the original has: mod forkable unyielding many stateless portable
+         immutable contended with 'a
+         but this has: mod forkable unyielding many stateless portable
+         immutable contended
 |}]
 
 type ('a, 'b) arity_2 : immutable_data with 'b = { x : 'a }
@@ -406,10 +405,10 @@ Error: This variant or record definition does not match that of type
          "('a, 'b) arity_2"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod many portable unyielding stateless contended
-         immutable with 'b
-         but this has: mod many portable unyielding stateless contended
-         immutable with 'a
+         the original has: mod forkable unyielding many stateless portable
+         immutable contended with 'b
+         but this has: mod forkable unyielding many stateless portable
+         immutable contended with 'a
 |}]
 
 (* mcomp *)

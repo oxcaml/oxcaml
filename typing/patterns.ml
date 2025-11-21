@@ -87,19 +87,19 @@ end
 module General = struct
   type view = [
     | Half_simple.view
-    | `Var of Ident.t * string loc * Uid.t * Mode.Value.l
+    | `Var of Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.Value.l
     | `Alias of pattern * Ident.t * string loc
-                * Uid.t * Mode.Value.l * Types.type_expr
+                * Uid.t * Jkind.Sort.t * Mode.Value.l * Types.type_expr
   ]
   type pattern = view pattern_data
 
   let view_desc = function
     | Tpat_any ->
        `Any
-    | Tpat_var (id, str, uid, mode) ->
-       `Var (id, str, uid, mode)
-    | Tpat_alias (p, id, str, uid, mode, ty) ->
-       `Alias (p, id, str, uid, mode, ty)
+    | Tpat_var (id, str, uid, sort, mode) ->
+       `Var (id, str, uid, sort, mode)
+    | Tpat_alias (p, id, str, uid, sort, mode, ty) ->
+       `Alias (p, id, str, uid, sort, mode, ty)
     | Tpat_constant cst ->
        `Constant cst
     | Tpat_tuple ps ->
@@ -123,9 +123,9 @@ module General = struct
 
   let erase_desc = function
     | `Any -> Tpat_any
-    | `Var (id, str, uid, mode) -> Tpat_var (id, str, uid, mode)
-    | `Alias (p, id, str, uid, mode, ty) ->
-       Tpat_alias (p, id, str, uid, mode, ty)
+    | `Var (id, str, uid, sort, mode) -> Tpat_var (id, str, uid, sort, mode)
+    | `Alias (p, id, str, uid, sort, mode, ty) ->
+       Tpat_alias (p, id, str, uid, sort, mode, ty)
     | `Constant cst -> Tpat_constant cst
     | `Tuple ps -> Tpat_tuple ps
     | `Unboxed_tuple ps -> Tpat_unboxed_tuple ps
@@ -146,7 +146,7 @@ module General = struct
 
   let rec strip_vars (p : pattern) : Half_simple.pattern =
     match p.pat_desc with
-    | `Alias (p, _, _, _, _, _) -> strip_vars (view p)
+    | `Alias (p, _, _, _, _, _, _) -> strip_vars (view p)
     | `Var _ -> { p with pat_desc = `Any }
     | #Half_simple.view as view -> { p with pat_desc = view }
 end

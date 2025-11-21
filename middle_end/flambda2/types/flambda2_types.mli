@@ -71,9 +71,19 @@ module Typing_env_extension : sig
 
   val empty : t
 
+  val has_equation : Name.t -> t -> bool
+
   val one_equation : Name.t -> flambda_type -> t
 
   val add_or_replace_equation : t -> Name.t -> flambda_type -> t
+
+  val add_is_null_relation : t -> Name.t -> scrutinee:Simple.t -> t
+
+  val add_is_int_relation : t -> Name.t -> scrutinee:Simple.t -> t
+
+  val add_get_tag_relation : t -> Name.t -> scrutinee:Simple.t -> t
+
+  val disjoint_union : t -> t -> t
 
   module With_extra_variables : sig
     type t
@@ -122,7 +132,9 @@ module Typing_env : sig
     val create : Pre_serializable.t -> reachable_names:Name_occurrences.t -> t
 
     val create_from_closure_conversion_approx :
-      'a Value_approximation.t Symbol.Map.t -> t
+      machine_width:Target_system.Machine_width.t ->
+      'a Value_approximation.t Symbol.Map.t ->
+      t
 
     val predefined_exceptions : Symbol.Set.t -> t
 
@@ -145,9 +157,12 @@ module Typing_env : sig
   val print : Format.formatter -> t -> unit
 
   val create :
+    machine_width:Target_system.Machine_width.t ->
     resolver:(Compilation_unit.t -> Serializable.t option) ->
     get_imported_names:(unit -> Name.Set.t) ->
     t
+
+  val machine_width : t -> Target_system.Machine_width.t
 
   val closure_env : t -> t
 
@@ -176,6 +191,12 @@ module Typing_env : sig
 
   val add_equations_on_params :
     t -> params:Bound_parameters.t -> param_types:flambda_type list -> t
+
+  val add_is_null_relation : t -> Name.t -> scrutinee:Simple.t -> t
+
+  val add_is_int_relation : t -> Name.t -> scrutinee:Simple.t -> t
+
+  val add_get_tag_relation : t -> Name.t -> scrutinee:Simple.t -> t
 
   val mem : ?min_name_mode:Name_mode.t -> t -> Name.t -> bool
 
@@ -225,6 +246,8 @@ module Typing_env : sig
 
   val bump_current_level_scope : t -> t
 
+  val stable_compare_simples : t -> Simple.t -> Simple.t -> int
+
   module Alias_set : sig
     type t
 
@@ -249,6 +272,27 @@ val meet : Typing_env.t -> t -> t -> (t * Typing_env.t) Or_bottom.t
 
 val meet_shape : Typing_env.t -> t -> shape:t -> Typing_env.t Or_bottom.t
 
+module Join_analysis : sig
+  type 'a t
+
+  val print : Format.formatter -> 'a t -> unit
+
+  module Variable_refined_at_join : sig
+    type 'a t
+
+    val fold_values_at_uses :
+      ('a -> Reg_width_const.t Or_unknown.t -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  end
+
+  type 'a simple_refined_at_join =
+    | Not_refined_at_join
+    | Invariant_in_all_uses of Simple.t
+    | Variable_refined_at_these_uses of 'a Variable_refined_at_join.t
+
+  val simple_refined_at_join :
+    'a t -> Typing_env.t -> Simple.t -> 'a simple_refined_at_join
+end
+
 val cut_and_n_way_join :
   Typing_env.t ->
   (Typing_env.t * Apply_cont_rewrite_id.t * Continuation_use_kind.t) list ->
@@ -256,7 +300,7 @@ val cut_and_n_way_join :
   cut_after:Scope.t ->
   extra_lifted_consts_in_use_envs:Symbol.Set.t ->
   extra_allowed_names:Name_occurrences.t ->
-  Typing_env.t
+  Typing_env.t * Apply_cont_rewrite_id.t Join_analysis.t option
 
 module Function_type : sig
   type t
@@ -299,7 +343,10 @@ val bottom : Flambda_kind.t -> t
 val unknown : Flambda_kind.t -> t
 
 val unknown_with_subkind :
-  ?alloc_mode:Alloc_mode.For_types.t -> Flambda_kind.With_subkind.t -> t
+  ?alloc_mode:Alloc_mode.For_types.t ->
+  machine_width:Target_system.Machine_width.t ->
+  Flambda_kind.With_subkind.t ->
+  t
 
 (** Create an bottom type with the same kind as the given type. *)
 val bottom_like : t -> t
@@ -311,7 +358,9 @@ val any_value : t
 
 val any_tagged_immediate : t
 
-val any_tagged_bool : t
+val any_tagged_immediate_or_null : t
+
+val any_tagged_bool : machine_width:Target_system.Machine_width.t -> t
 
 val any_boxed_float32 : t
 
@@ -325,11 +374,15 @@ val any_boxed_nativeint : t
 
 val any_naked_immediate : t
 
-val any_naked_bool : t
+val any_naked_bool : machine_width:Target_system.Machine_width.t -> t
 
 val any_naked_float32 : t
 
 val any_naked_float : t
+
+val any_naked_int8 : t
+
+val any_naked_int16 : t
 
 val any_naked_int32 : t
 
@@ -343,7 +396,7 @@ val any_rec_info : t
 
 (** Building of types representing tagged / boxed values from specified
     constants. *)
-val this_tagged_immediate : Targetint_31_63.t -> t
+val this_tagged_immediate : Target_ocaml_int.t -> t
 
 val this_boxed_float32 :
   Numeric_types.Float32_by_bit_pattern.t -> Alloc_mode.For_types.t -> t
@@ -360,7 +413,13 @@ val this_boxed_nativeint : Targetint_32_64.t -> Alloc_mode.For_types.t -> t
 val this_boxed_vec128 :
   Vector_types.Vec128.Bit_pattern.t -> Alloc_mode.For_types.t -> t
 
-val these_tagged_immediates : Targetint_31_63.Set.t -> t
+val this_boxed_vec256 :
+  Vector_types.Vec256.Bit_pattern.t -> Alloc_mode.For_types.t -> t
+
+val this_boxed_vec512 :
+  Vector_types.Vec512.Bit_pattern.t -> Alloc_mode.For_types.t -> t
+
+val these_tagged_immediates : Target_ocaml_int.Set.t -> t
 
 val these_boxed_float32s :
   Numeric_types.Float32_by_bit_pattern.Set.t -> Alloc_mode.For_types.t -> t
@@ -379,11 +438,15 @@ val these_boxed_nativeints :
 
 (** Building of types representing untagged / unboxed values from specified
     constants. *)
-val this_naked_immediate : Targetint_31_63.t -> t
+val this_naked_immediate : Target_ocaml_int.t -> t
 
 val this_naked_float32 : Numeric_types.Float32_by_bit_pattern.t -> t
 
 val this_naked_float : Numeric_types.Float_by_bit_pattern.t -> t
+
+val this_naked_int8 : Numeric_types.Int8.t -> t
+
+val this_naked_int16 : Numeric_types.Int16.t -> t
 
 val this_naked_int32 : Numeric_types.Int32.t -> t
 
@@ -393,13 +456,21 @@ val this_naked_nativeint : Targetint_32_64.t -> t
 
 val this_naked_vec128 : Vector_types.Vec128.Bit_pattern.t -> t
 
+val this_naked_vec256 : Vector_types.Vec256.Bit_pattern.t -> t
+
+val this_naked_vec512 : Vector_types.Vec512.Bit_pattern.t -> t
+
 val this_rec_info : Rec_info_expr.t -> t
 
-val these_naked_immediates : Targetint_31_63.Set.t -> t
+val these_naked_immediates : Target_ocaml_int.Set.t -> t
 
 val these_naked_float32s : Numeric_types.Float32_by_bit_pattern.Set.t -> t
 
 val these_naked_floats : Numeric_types.Float_by_bit_pattern.Set.t -> t
+
+val these_naked_int8s : Numeric_types.Int8.Set.t -> t
+
+val these_naked_int16s : Numeric_types.Int16.Set.t -> t
 
 val these_naked_int32s : Numeric_types.Int32.Set.t -> t
 
@@ -412,6 +483,12 @@ val boxed_float32_alias_to :
 
 val boxed_float_alias_to : naked_float:Variable.t -> Alloc_mode.For_types.t -> t
 
+val tagged_int8_alias_to :
+  naked_int8:Variable.t -> machine_width:Target_system.Machine_width.t -> t
+
+val tagged_int16_alias_to :
+  naked_int16:Variable.t -> machine_width:Target_system.Machine_width.t -> t
+
 val boxed_int32_alias_to : naked_int32:Variable.t -> Alloc_mode.For_types.t -> t
 
 val boxed_int64_alias_to : naked_int64:Variable.t -> Alloc_mode.For_types.t -> t
@@ -421,6 +498,12 @@ val boxed_nativeint_alias_to :
 
 val boxed_vec128_alias_to :
   naked_vec128:Variable.t -> Alloc_mode.For_types.t -> t
+
+val boxed_vec256_alias_to :
+  naked_vec256:Variable.t -> Alloc_mode.For_types.t -> t
+
+val boxed_vec512_alias_to :
+  naked_vec512:Variable.t -> Alloc_mode.For_types.t -> t
 
 val box_float32 : t -> Alloc_mode.For_types.t -> t
 
@@ -434,20 +517,19 @@ val box_nativeint : t -> Alloc_mode.For_types.t -> t
 
 val box_vec128 : t -> Alloc_mode.For_types.t -> t
 
+val box_vec256 : t -> Alloc_mode.For_types.t -> t
+
+val box_vec512 : t -> Alloc_mode.For_types.t -> t
+
 val tagged_immediate_alias_to : naked_immediate:Variable.t -> t
 
 val tag_immediate : t -> t
-
-val is_int_for_scrutinee : scrutinee:Simple.t -> t
-
-val get_tag_for_block : block:Simple.t -> t
-
-val is_null : scrutinee:Simple.t -> t
 
 val any_block : t
 
 (** The type of an immutable block with a known tag, size and field types. *)
 val immutable_block :
+  machine_width:Target_system.Machine_width.t ->
   is_unique:bool ->
   Tag.t ->
   shape:Flambda_kind.Block_shape.t ->
@@ -459,8 +541,9 @@ val immutable_block :
     The type of the [n - 1]th field is taken to be an [Equals] to the given
     variable. *)
 val immutable_block_with_size_at_least :
+  machine_width:Target_system.Machine_width.t ->
   tag:Tag.t Or_unknown.t ->
-  n:Targetint_31_63.t ->
+  n:Target_ocaml_int.t ->
   shape:Flambda_kind.Block_shape.t ->
   field_n_minus_one:Variable.t ->
   t
@@ -468,19 +551,21 @@ val immutable_block_with_size_at_least :
 val mutable_block : Alloc_mode.For_types.t -> t
 
 val variant :
+  machine_width:Target_system.Machine_width.t ->
   const_ctors:t ->
   non_const_ctors:(Flambda_kind.Block_shape.t * t list) Tag.Scannable.Map.t ->
   Alloc_mode.For_types.t ->
   t
 
-val this_immutable_string : string -> t
+val this_immutable_string :
+  string -> machine_width:Target_system.Machine_width.t -> t
 
-val mutable_string : size:int -> t
+val mutable_string :
+  size:int -> machine_width:Target_system.Machine_width.t -> t
 
 val exactly_this_closure :
   Function_slot.t ->
-  all_function_slots_in_set:
-    Function_type.t Or_unknown_or_bottom.t Function_slot.Map.t ->
+  all_function_slots_in_set:Function_type.t Or_unknown.t Function_slot.Map.t ->
   all_closure_types_in_set:t Function_slot.Map.t ->
   all_value_slots_in_set:flambda_type Value_slot.Map.t ->
   Alloc_mode.For_types.t ->
@@ -495,12 +580,12 @@ val closure_with_at_least_this_value_slot :
   this_function_slot:Function_slot.t ->
   Value_slot.t ->
   value_slot_var:Variable.t ->
-  value_slot_kind:Flambda_kind.With_subkind.t ->
+  value_slot_kind:Flambda_kind.t ->
   flambda_type
 
 val closure_with_at_least_these_value_slots :
   this_function_slot:Function_slot.t ->
-  (Variable.t * Flambda_kind.With_subkind.t) Value_slot.Map.t ->
+  (Variable.t * Flambda_kind.t) Value_slot.Map.t ->
   flambda_type
 
 val array_of_length :
@@ -519,6 +604,7 @@ val immutable_array :
   element_kind:Flambda_kind.With_subkind.t Or_unknown_or_bottom.t ->
   fields:flambda_type list ->
   Alloc_mode.For_types.t ->
+  machine_width:Target_system.Machine_width.t ->
   flambda_type
 
 (** Construct a type equal to the type of the given name. (The name must be
@@ -529,7 +615,10 @@ val alias_type_of : Flambda_kind.t -> Simple.t -> t
 val kind : t -> Flambda_kind.t
 
 (** For each of the kinds in an arity, create an "unknown" type. *)
-val unknown_types_from_arity : [`Unarized] Flambda_arity.t -> t list
+val unknown_types_from_arity :
+  machine_width:Target_system.Machine_width.t ->
+  [`Unarized] Flambda_arity.t ->
+  t list
 
 (** Whether the given type says that a term of that type can never be
     constructed (in other words, it is [Invalid]). *)
@@ -554,22 +643,28 @@ type 'a proof_of_property = private
 
 (* CR mshinwell: Should remove "_equals_" from these names *)
 val prove_equals_tagged_immediates :
-  Typing_env.t -> t -> Targetint_31_63.Set.t proof_of_property
+  Typing_env.t -> t -> Target_ocaml_int.Set.t proof_of_property
 
 val meet_equals_tagged_immediates :
-  Typing_env.t -> t -> Targetint_31_63.Set.t meet_shortcut
+  Typing_env.t -> t -> Target_ocaml_int.Set.t meet_shortcut
 
 val meet_naked_immediates :
-  Typing_env.t -> t -> Targetint_31_63.Set.t meet_shortcut
+  Typing_env.t -> t -> Target_ocaml_int.Set.t meet_shortcut
 
 val meet_equals_single_tagged_immediate :
-  Typing_env.t -> t -> Targetint_31_63.t meet_shortcut
+  Typing_env.t -> t -> Target_ocaml_int.t meet_shortcut
 
 val meet_naked_float32s :
   Typing_env.t -> t -> Numeric_types.Float32_by_bit_pattern.Set.t meet_shortcut
 
 val meet_naked_floats :
   Typing_env.t -> t -> Numeric_types.Float_by_bit_pattern.Set.t meet_shortcut
+
+val meet_naked_int8s :
+  Typing_env.t -> t -> Numeric_types.Int8.Set.t meet_shortcut
+
+val meet_naked_int16s :
+  Typing_env.t -> t -> Numeric_types.Int16.Set.t meet_shortcut
 
 val meet_naked_int32s :
   Typing_env.t -> t -> Numeric_types.Int32.Set.t meet_shortcut
@@ -581,9 +676,9 @@ val meet_naked_nativeints :
   Typing_env.t -> t -> Targetint_32_64.Set.t meet_shortcut
 
 type variant_like_proof = private
-  { const_ctors : Targetint_31_63.Set.t Or_unknown.t;
+  { const_ctors : Target_ocaml_int.Set.t Or_unknown.t;
     non_const_ctors_with_sizes :
-      (Targetint_31_63.t * Flambda_kind.Block_shape.t) Tag.Scannable.Map.t
+      (Target_ocaml_int.t * Flambda_kind.Block_shape.t) Tag.Scannable.Map.t
   }
 
 val meet_variant_like : Typing_env.t -> t -> variant_like_proof meet_shortcut
@@ -606,6 +701,8 @@ type boxed_or_tagged_number = private
 val prove_is_a_boxed_or_tagged_number :
   Typing_env.t -> t -> boxed_or_tagged_number proof_of_property
 
+val prove_nothing : Typing_env.t -> t -> _ proof_of_property
+
 val prove_is_a_tagged_immediate : Typing_env.t -> t -> unit proof_of_property
 
 val prove_is_a_boxed_float32 : Typing_env.t -> t -> unit proof_of_property
@@ -620,21 +717,28 @@ val prove_is_a_boxed_nativeint : Typing_env.t -> t -> unit proof_of_property
 
 val prove_is_a_boxed_vec128 : Typing_env.t -> t -> unit proof_of_property
 
+val prove_is_a_boxed_vec256 : Typing_env.t -> t -> unit proof_of_property
+
+val prove_is_a_boxed_vec512 : Typing_env.t -> t -> unit proof_of_property
+
 val prove_is_or_is_not_a_boxed_float :
   Typing_env.t -> t -> bool proof_of_property
 
 val prove_unique_tag_and_size :
   Typing_env.t ->
   t ->
-  (Tag.t * Flambda_kind.Block_shape.t * Targetint_31_63.t) proof_of_property
+  (Tag.t * Flambda_kind.Block_shape.t * Target_ocaml_int.t) proof_of_property
 
 val prove_unique_fully_constructed_immutable_heap_block :
   Typing_env.t ->
   t ->
-  (Tag.t * Flambda_kind.Block_shape.t * Targetint_31_63.t * Simple.t list)
+  (Tag.t * Flambda_kind.Block_shape.t * Target_ocaml_int.t * Simple.t list)
   proof_of_property
 
 val prove_is_int : Typing_env.t -> t -> bool proof_of_property
+
+(* Either a tagged integer or a null poitner. *)
+val prove_is_not_a_pointer : Typing_env.t -> t -> bool proof_of_property
 
 (* Returns the result of [Is_flat_float_array] *)
 val meet_is_flat_float_array : Typing_env.t -> t -> bool meet_shortcut
@@ -717,12 +821,18 @@ val meet_boxed_nativeint_containing_simple :
 val meet_boxed_vec128_containing_simple :
   Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
 
+val meet_boxed_vec256_containing_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
+
+val meet_boxed_vec512_containing_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
+
 val meet_block_field_simple :
   Typing_env.t ->
   min_name_mode:Name_mode.t ->
   field_kind:Flambda_kind.t ->
   t ->
-  Targetint_31_63.t ->
+  Target_ocaml_int.t ->
   Simple.t meet_shortcut
 
 val meet_project_value_slot_simple :
@@ -759,6 +869,8 @@ type to_lift = private
   | Boxed_int64 of Numeric_types.Int64.t
   | Boxed_nativeint of Targetint_32_64.t
   | Boxed_vec128 of Vector_types.Vec128.Bit_pattern.t
+  | Boxed_vec256 of Vector_types.Vec256.Bit_pattern.t
+  | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.t
   | Immutable_float32_array of
       { fields : Numeric_types.Float32_by_bit_pattern.t list }
   | Immutable_float_array of
@@ -768,6 +880,10 @@ type to_lift = private
   | Immutable_nativeint_array of { fields : Targetint_32_64.t list }
   | Immutable_vec128_array of
       { fields : Vector_types.Vec128.Bit_pattern.t list }
+  | Immutable_vec256_array of
+      { fields : Vector_types.Vec256.Bit_pattern.t list }
+  | Immutable_vec512_array of
+      { fields : Vector_types.Vec512.Bit_pattern.t list }
   | Immutable_value_array of { fields : Simple.t list }
   | Empty_array of Empty_array_kind.t
 
@@ -791,7 +907,7 @@ val never_holds_locally_allocated_values :
 val remove_outermost_alias : Typing_env.t -> t -> t
 
 module Equal_types_for_debug : sig
-  val equal_type : Typing_env.t -> Type_grammar.t -> Type_grammar.t -> bool
+  val equal_type : Typing_env.t -> t -> t -> bool
 
   val equal_env_extension :
     Typing_env.t -> Typing_env_extension.t -> Typing_env_extension.t -> bool

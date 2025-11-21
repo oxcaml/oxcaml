@@ -16,13 +16,17 @@
 
 (** {2 Initialization} *)
 
+type opt_backend = Native | Js_of_ocaml
+
+type backend = Byte | Opt of opt_backend
+
 type info = {
   target : Unit_info.t;
   module_name : Compilation_unit.t;
   env : Env.t;
   ppf_dump : Format.formatter;
   tool_name : string;
-  native : bool;
+  backend : backend;
 }
 (** Information needed to compile a file. *)
 
@@ -31,11 +35,12 @@ type compilation_unit_or_inferred =
   | Inferred_from_output_prefix
 
 val with_info :
-  native:bool ->
+  backend:backend ->
   tool_name:string ->
   source_file:string ->
   output_prefix:string ->
   compilation_unit:compilation_unit_or_inferred ->
+  kind:Unit_info.intf_or_impl ->
   dump_ext:string ->
   (info -> 'a) -> 'a
 (** [with_info ~native ~tool_name ~source_file ~output_prefix ~dump_ext k]
@@ -49,9 +54,13 @@ val with_info :
    calling [with_info] several times.
 *)
 
+module Parse_result : sig
+  type 'a t = { ast : 'a; info : info }
+end
+
 (** {2 Interfaces} *)
 
-val parse_intf : info -> Parsetree.signature
+val parse_intf : info -> Parsetree.signature Parse_result.t
 (** [parse_intf info] parses an interface (usually an [.mli] file). *)
 
 val typecheck_intf :
@@ -73,7 +82,7 @@ val interface :
 
 (** {2 Implementations} *)
 
-val parse_impl : info -> Parsetree.structure
+val parse_impl : info -> Parsetree.structure Parse_result.t
 (** [parse_impl info] parses an implementation (usually an [.ml] file). *)
 
 val typecheck_impl : info -> Parsetree.structure -> Typedtree.implementation

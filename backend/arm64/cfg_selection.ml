@@ -38,6 +38,9 @@ let is_offset chunk n =
      | Word_int | Word_val | Double -> n land 7 = 0 && n lsr 3 < 0x1000
      | Onetwentyeight_aligned | Onetwentyeight_unaligned ->
        n land 15 = 0 && n lsr 4 < 0x1000
+     | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
+     | Fivetwelve_unaligned ->
+       Misc.fatal_error "arm64: got 256/512 bit vector"
 
 let is_logical_immediate_int n = Arch.is_logical_immediate (Nativeint.of_int n)
 
@@ -92,7 +95,7 @@ let effects_of (expr : Cmm.expression) :
     Effects_of_all_expressions args
   | _ -> Use_default
 
-let select_addressing chunk (expr : Cmm.expression) :
+let select_addressing' chunk (expr : Cmm.expression) :
     addressing_mode * Cmm.expression =
   match expr with
   | Cop ((Caddv | Cadda), [Cconst_symbol (s, _); Cconst_int (n, _)], _)
@@ -110,8 +113,13 @@ let select_addressing chunk (expr : Cmm.expression) :
     Ibased (s.sym_name, 0), Ctuple []
   | arg -> Iindexed 0, arg
 
-let select_operation ~generic_select_condition:_ (op : Cmm.operation)
-    (args : Cmm.expression list) _dbg ~label_after:_ :
+let select_addressing chunk exp : addressing_mode * Cmm.expression =
+  if !Clflags.llvm_backend (* Llvmize only expects [Iindexed] *)
+  then Iindexed 0, exp
+  else select_addressing' chunk exp
+
+let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
+    (args : Cmm.expression list) dbg ~label_after:_ :
     Cfg_selectgen_target_intf.select_operation_result =
   let[@inline] rewrite_multiply_add_or_sub shift_op mul_op ~arg1 ~args2 dbg :
       Cfg_selectgen_target_intf.select_operation_result =
@@ -199,7 +207,7 @@ let select_operation ~generic_select_condition:_ (op : Cmm.operation)
   | Cextcall { func = "sqrt" | "sqrtf" | "caml_neon_float64_sqrt"; _ } ->
     Rewritten (specific Isqrtf, args)
   | Cextcall { func; builtin = true; _ } -> (
-    match Simd_selection.select_operation_cfg func args with
+    match Simd_selection.select_operation_cfg func args dbg with
     | Some (op, args) -> Rewritten (Basic (Op op), args)
     | None -> Use_default)
   (* Recognize bswap instructions *)
@@ -208,6 +216,15 @@ let select_operation ~generic_select_condition:_ (op : Cmm.operation)
     Rewritten (specific (Ibswap { bitwidth }), args)
   (* Other operations are regular *)
   | _ -> Use_default
+
+let select_operation
+    ~(generic_select_condition :
+       Cmm.expression -> Operation.test * Cmm.expression) (op : Cmm.operation)
+    (args : Cmm.expression list) dbg ~label_after :
+    Cfg_selectgen_target_intf.select_operation_result =
+  if !Clflags.llvm_backend
+  then Use_default
+  else select_operation' ~generic_select_condition op args dbg ~label_after
 
 let select_store ~is_assign:_ _addr _exp :
     Cfg_selectgen_target_intf.select_store_result =
@@ -219,15 +236,57 @@ let is_store_out_of_range kind ~byte_offset :
 
 let insert_move_extcall_arg (ty_arg : Cmm.exttype) src dst :
     Cfg_selectgen_target_intf.insert_move_extcall_arg_result =
-  let ty_arg_is_int32 =
+  let ty_arg_is_small_int =
     match ty_arg with
-    | XInt32 -> true
+    | XInt32 | XInt16 | XInt8 -> true
     | XInt | XInt64 | XFloat32 | XFloat | XVec128 -> false
+    | XVec256 | XVec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
   in
-  if macosx && ty_arg_is_int32 && is_stack_slot dst
+  if macosx && ty_arg_is_small_int && is_stack_slot dst
   then Rewritten (Op (Specific Imove32), src, dst)
   else Use_default
 
-let insert_op_debug _env _sub_cfg _op _dbg _rs _rd :
+exception Use_default_exn
+
+let pseudoregs_for_operation op arg res =
+  match (op : Operation.t) with
+  | Specific (Isimd simd_op) ->
+    Simd_selection.pseudoregs_for_operation simd_op arg res
+  | Specific
+      ( Ifar_poll | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
+      | Imulsubf | Inegmulsubf | Isqrtf | Imove32 | Ifar_alloc _
+      | Ishiftarith (_, _)
+      | Ibswap _ | Isignext _ )
+  | Move | Spill | Reload | Opaque | Pause | Begin_region | End_region | Dls_get
+  | Tls_get | Poll | Const_int _ | Const_float32 _ | Const_float _
+  | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+  | Stackoffset _ | Load _
+  | Store (_, _, _)
+  | Intop _
+  | Intop_imm (_, _)
+  | Intop_atomic _
+  | Floatop (_, _)
+  | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+  | Name_for_debugger _ | Alloc _ ->
+    raise Use_default_exn
+  | Specific (Illvm_intrinsic intr) ->
+    Misc.fatal_errorf
+      "Cfg_selection.pseudoregs_for_operation: Unexpected llvm_intrinsic %s: \
+       not using LLVM backend"
+      intr
+
+let insert_op_debug' env sub_cfg op dbg rs rd :
     Cfg_selectgen_target_intf.insert_op_debug_result =
-  Use_default
+  try
+    let rsrc, rdst = pseudoregs_for_operation op rs rd in
+    Select_utils.insert_moves env sub_cfg rs rsrc;
+    Select_utils.insert_debug env sub_cfg (Op op) dbg rsrc rdst;
+    Select_utils.insert_moves env sub_cfg rdst rd;
+    Regs rd
+  with Use_default_exn -> Use_default
+
+let insert_op_debug env sub_cfg op dbg rs rd :
+    Cfg_selectgen_target_intf.insert_op_debug_result =
+  if !Clflags.llvm_backend
+  then Use_default
+  else insert_op_debug' env sub_cfg op dbg rs rd

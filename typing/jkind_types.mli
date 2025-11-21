@@ -48,12 +48,17 @@ module Sort : sig
   type base =
     | Void
     | Value
+    | Untagged_immediate
     | Float64
     | Float32
     | Word
+    | Bits8
+    | Bits16
     | Bits32
     | Bits64
     | Vec128
+    | Vec256
+    | Vec512
 
   val to_string_base : base -> string
 
@@ -86,7 +91,7 @@ module Sort : sig
 
   (** Decompose a sort into a list (of the given length) of fresh sort variables,
       equating the input sort with the product of the output sorts. *)
-  val decompose_into_product : t -> int -> t list option
+  val decompose_into_product : level:int -> t -> int -> t list option
 end
 
 module Layout : sig

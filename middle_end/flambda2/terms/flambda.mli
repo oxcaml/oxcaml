@@ -109,11 +109,16 @@ module Invalid : sig
     | Apply_cont_of_unreachable_continuation of Continuation.t
     | Defining_expr_of_let of Bound_pattern.t * named
     | Closure_type_was_invalid of Apply_expr.t
+    | Direct_application_parameter_kind_mismatch of
+        { params_arity : [`Complex] Flambda_arity.t;
+          args_arity : [`Complex] Flambda_arity.t;
+          apply : Apply_expr.t
+        }
     | Application_argument_kind_mismatch of
         [`Unarized] Flambda_arity.t * Apply_expr.t
     | Application_result_kind_mismatch of
         [`Unarized] Flambda_arity.t * Apply_expr.t
-    | Partial_application_mode_mismatch of Apply_expr.t
+    | Partial_application_mode_mismatch of Apply_expr.t * Code_metadata.t
     | Partial_application_mode_mismatch_in_lambda of Debuginfo.t
     | Calling_local_returning_closure_with_normal_apply of Apply_expr.t
     | Zero_switch_arms
@@ -180,7 +185,12 @@ module Named : sig
 
   (** Return a defining expression for a [Let] which is kind-correct, but not
       necessarily type-correct, at the given kind. *)
-  val dummy_value : Flambda_kind.t -> t
+  val dummy_value :
+    machine_width:Target_system.Machine_width.t -> Flambda_kind.t -> t
+
+  (** Return the kind of the expression. Must only be used on expressions
+      bound to a singleton pattern (everything except sets of closures and static consts). *)
+  val kind : t -> Flambda_kind.t
 
   (** Returns [true] iff the given expression is a set of closures that will be
       allocated on the OCaml heap during execution (i.e. not a
@@ -340,10 +350,10 @@ module Continuation_handlers : sig
   type t
 
   (** Obtain the mapping from continuation to handler. *)
-  val to_map : t -> Continuation_handler.t Continuation.Map.t
+  val to_map : t -> Continuation_handler.t Continuation.Lmap.t
 
   (** The domain of [to_map t]. *)
-  val domain : t -> Continuation.Set.t
+  val domain : t -> Continuation.t list
 
   (** Whether any of the continuations are exception handlers. *)
   val contains_exn_handler : t -> bool
@@ -402,7 +412,7 @@ module Let_cont_expr : sig
   (** Create a definition of a set of possibly-recursive continuations. *)
   val create_recursive :
     invariant_params:Bound_parameters.t ->
-    Continuation_handler.t Continuation.Map.t ->
+    Continuation_handler.t Continuation.Lmap.t ->
     body:expr ->
     expr
 end

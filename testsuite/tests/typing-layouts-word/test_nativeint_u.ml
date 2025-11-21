@@ -2,6 +2,10 @@
  include stdlib_upstream_compatible;
 *)
 
+(* External declarations for unsigned comparison primitives *)
+external unsigned_lt : nativeint# -> nativeint# -> bool = "%nativeint#_unsigned_lessthan"
+external unsigned_gt : nativeint# -> nativeint# -> bool = "%nativeint#_unsigned_greaterthan"
+
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 
@@ -323,4 +327,63 @@ let () =
   test_binary_of "equal"               Nativeint.equal               Nativeint_u.equal                bool_result;
   test_binary    "min"                 Nativeint.min                 Nativeint_u.min;
   test_binary    "max"                 Nativeint.max                 Nativeint_u.max;
+
+  (* Explicit unsigned comparison tests with hardcoded expected values *)
+  let module I = Nativeint_u in
+
+  (* Define constants using literals *)
+  let zero = #0n in
+  let one = #1n in
+  let minus_one = -#1n in
+  (* For 64-bit: max_int = 0x7FFFFFFFFFFFFFFF, min_int = 0x8000000000000000 *)
+  (* For 32-bit: max_int = 0x7FFFFFFF, min_int = 0x80000000 *)
+  let max_int =
+    if Sys.int_size = 63 then #0x7FFFFFFFFFFFFFFFn else #0x7FFFFFFFn
+  in
+  let min_int =
+    if Sys.int_size = 63 then -#0x8000000000000000n else -#0x80000000n
+  in
+
+  (* Test that -1 > 0 when compared as unsigned *)
+  assert (I.unsigned_compare minus_one zero = 1);
+  assert (I.unsigned_compare zero minus_one = -1);
+
+  (* Test that min_int > max_int when compared as unsigned *)
+  assert (I.unsigned_compare min_int max_int = 1);
+  assert (I.unsigned_compare max_int min_int = -1);
+
+  (* Test ordering: when viewed as unsigned:
+     0 < 1 < max_int < min_int < -1 *)
+  assert (I.unsigned_compare zero one = -1);
+  assert (I.unsigned_compare one max_int = -1);
+  assert (I.unsigned_compare max_int min_int = -1);
+  assert (I.unsigned_compare min_int minus_one = -1);
+
+  (* Test equality *)
+  assert (I.unsigned_compare zero zero = 0);
+  assert (I.unsigned_compare minus_one minus_one = 0);
+  assert (I.unsigned_compare min_int min_int = 0);
+
+  (* Test specific values *)
+  let neg_million = I.of_int (-1000000) in
+  let pos_million = I.of_int 1000000 in
+  assert (I.unsigned_compare neg_million pos_million = 1);
+  assert (I.unsigned_compare pos_million neg_million = -1);
+
+  (* Test the unsigned_lt primitive directly *)
+  assert (unsigned_lt zero minus_one = true);
+  assert (unsigned_lt minus_one zero = false);
+  assert (unsigned_lt max_int min_int = true);
+  assert (unsigned_lt min_int max_int = false);
+  assert (unsigned_lt pos_million neg_million = true);
+  assert (unsigned_lt neg_million pos_million = false);
+
+  (* Test unsigned greater than using primitive comparisons *)
+  assert (unsigned_gt minus_one zero = true);
+  assert (unsigned_gt zero minus_one = false);
+  assert (unsigned_gt min_int max_int = true);
+  assert (unsigned_gt max_int min_int = false);
+  assert (unsigned_gt neg_million pos_million = true);
+  assert (unsigned_gt pos_million neg_million = false);
+
   ()

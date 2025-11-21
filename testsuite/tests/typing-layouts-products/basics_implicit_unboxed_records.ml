@@ -102,18 +102,14 @@ val s : t# = #{s = "hi"}
 
 (* Accessing inner products *)
 
-(* CR layouts v5: this should work once we allow product record fields *)
 type t = { is: #(int * int) }
 
 let add t =
   let #(x, y) = t.#is in
   x + y
 [%%expect{|
-Line 1, characters 0-29:
-1 | type t = { is: #(int * int) }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "#(int * int)" has layout "value & value".
-       Records may not yet contain types of this layout.
+type t = { is : #(int * int); }
+val add : t# -> int = <fun>
 |}]
 
 (* An unboxed record is not an allocation, but a regular record is *)
@@ -128,7 +124,7 @@ let f_unboxed_record (local_ left) (local_ right) =
 [%%expect{|
 type ('a, 'b) ab = { left : 'a; right : 'b; }
 type ('a, 'b) ab_u = { left : 'a; right : 'b; }
-val f_unboxed_record : local_ 'a -> local_ 'b -> local_ 'a = <fun>
+val f_unboxed_record : 'a @ local -> 'b @ local -> 'a @ local = <fun>
 |}]
 
 let f_boxed_record (local_ left) (local_ right) =
@@ -139,8 +135,14 @@ let f_boxed_record (local_ left) (local_ right) =
 Line 4, characters 2-7:
 4 |   left'
       ^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       because it is the field "left" of the record at Line 3, characters 6-25
+       which is "local"
+       because it is allocated at Line 2, characters 10-25 containing data
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Mutable fields cannot be read from
@@ -209,7 +211,8 @@ Line 2, characters 0-36:
 Error:
        The layout of r_bad# is any & any
          because it is an unboxed record.
-       But the layout of r_bad# must be a sublayout of value & float64 & value
+       But the layout of r_bad# must be a sublayout of
+           value & float64 & value
          because of the definition of t1 at line 1, characters 0-38.
 |}]
 
@@ -340,6 +343,7 @@ Line 5, characters 18-20:
 5 |   type nonrec u = t#
                       ^^
 Error: The type "t" has no unboxed version.
+Hint: It is already an unboxed record.
 |}]
 
 (*************************************)

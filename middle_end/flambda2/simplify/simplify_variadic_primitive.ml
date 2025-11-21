@@ -40,7 +40,8 @@ let simplify_make_block ~original_prim ~(block_kind : P.Block_kind.t)
               let<+ _ty, typing_env =
                 T.meet typing_env
                   (T.alias_type_of (K.With_subkind.kind arg_kind) arg)
-                  (T.unknown_with_subkind arg_kind)
+                  (T.unknown_with_subkind arg_kind
+                     ~machine_width:(DE.machine_width (DA.denv dacc)))
               in
               typing_env)
             ~const:(fun _ : _ Or_bottom.t -> Ok typing_env)
@@ -60,8 +61,10 @@ let simplify_make_block ~original_prim ~(block_kind : P.Block_kind.t)
       match mutable_or_immutable with
       | Immutable ->
         T.immutable_block ~is_unique:false tag ~shape alloc_mode ~fields
+          ~machine_width:(DE.machine_width (DA.denv dacc))
       | Immutable_unique ->
         T.immutable_block ~is_unique:true tag ~shape alloc_mode ~fields
+          ~machine_width:(DE.machine_width (DA.denv dacc))
       | Mutable -> T.mutable_block alloc_mode
     in
     let dacc = DA.add_variable dacc result_var ty in
@@ -74,7 +77,8 @@ let simplify_make_block ~original_prim ~(block_kind : P.Block_kind.t)
         | Some prim ->
           DA.map_denv dacc ~f:(fun denv ->
               DE.add_cse denv prim
-                ~bound_to:(Simple.var (Bound_var.var result_var))))
+                ~bound_to:(Simple.var (Bound_var.var result_var))
+                ~name_mode:(Bound_var.name_mode result_var)))
     in
     SPR.create original_term ~try_reify:true dacc
 
@@ -83,7 +87,8 @@ let simplify_make_array (array_kind : P.Array_kind.t)
     ~args_with_tys ~result_var =
   let args, tys = List.split args_with_tys in
   let length =
-    match Targetint_31_63.of_int_option (List.length args) with
+    let machine_width = DE.machine_width (DA.denv dacc) in
+    match Target_ocaml_int.of_int_option machine_width (List.length args) with
     | Some ti -> T.this_tagged_immediate ti
     | None -> T.unknown K.value
   in
@@ -113,7 +118,10 @@ let simplify_make_array (array_kind : P.Array_kind.t)
     match element_kind with
     | None -> Or_bottom.Ok typing_env
     | Some element_kind ->
-      let initial_element_type = T.unknown_with_subkind element_kind in
+      let initial_element_type =
+        T.unknown_with_subkind element_kind
+          ~machine_width:(DE.machine_width (DA.denv dacc))
+      in
       List.fold_left
         (fun typing_env element_type ->
           let open Or_bottom.Let_syntax in
@@ -136,7 +144,9 @@ let simplify_make_array (array_kind : P.Array_kind.t)
       in
       match mutable_or_immutable with
       | Mutable -> T.mutable_array ~element_kind ~length alloc_mode
-      | Immutable -> T.immutable_array ~element_kind ~fields:tys alloc_mode
+      | Immutable ->
+        T.immutable_array ~element_kind ~fields:tys alloc_mode
+          ~machine_width:(DE.machine_width (DA.denv dacc))
       | Immutable_unique ->
         Misc.fatal_errorf "Immutable_unique is not expected for arrays:@ %a"
           Named.print original_term

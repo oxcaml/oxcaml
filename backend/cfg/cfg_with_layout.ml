@@ -29,7 +29,7 @@ open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
 let debug = false
 
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 type layout = Label.t DLL.t
 
@@ -117,6 +117,26 @@ let dump ppf t ~msg =
   let open Format in
   fprintf ppf "\ncfg for %s\n" msg;
   fprintf ppf "%s\n" t.cfg.fun_name;
+  let regalloc =
+    List.find_map
+      (function[@ocaml.warning "-4"]
+        | Cfg.Use_regalloc regalloc -> Some regalloc | _ -> None)
+      t.cfg.fun_codegen_options
+  in
+  (match regalloc with
+  | None -> ()
+  | Some regalloc ->
+    fprintf ppf "use_regalloc=%a\n" Clflags.Register_allocator.format regalloc);
+  let regalloc_params =
+    List.find_map
+      (function[@ocaml.warning "-4"]
+        | Cfg.Use_regalloc_param params -> Some params | _ -> None)
+      t.cfg.fun_codegen_options
+  in
+  (match regalloc_params with
+  | None -> ()
+  | Some regalloc_params ->
+    fprintf ppf "regalloc_params=%s\n" (String.concat ", " regalloc_params));
   fprintf ppf "layout.length=%d\n" (DLL.length t.layout);
   fprintf ppf "blocks.length=%d\n" (Label.Tbl.length t.cfg.blocks);
   let print_block label =
@@ -254,24 +274,18 @@ let print_dot ?(show_instr = true) ?(show_exn = true)
                   Label.format)
                (Label.Set.to_seq block.predecessors))))
         ppf;
-      let print_id_and_ls_order :
-          type a. a Cfg.instruction -> Format.formatter -> unit =
-       fun i ppf ->
-        if i.ls_order >= 0
-        then
-          Format.dprintf "id:%a ls:%d" InstructionId.format i.id i.ls_order ppf
-        else Format.dprintf "id:%a" InstructionId.format i.id ppf
+      let print_id : type a. a Cfg.instruction -> Format.formatter -> unit =
+       fun i ppf -> Format.dprintf "id:%a" InstructionId.format i.id ppf
       in
       DLL.iter
         ~f:(fun (i : _ Cfg.instruction) ->
           (print_row
-             (print_cell ~align:Right (print_id_and_ls_order i)
-             ++ annotate_instr (`Basic i)))
+             (print_cell ~align:Right (print_id i) ++ annotate_instr (`Basic i)))
             ppf)
         block.body;
       let ti = block.terminator in
       (print_row
-         (print_cell ~align:Right (print_id_and_ls_order ti)
+         (print_cell ~align:Right (print_id ti)
          ++ annotate_instr (`Terminator ti)))
         ppf;
       match annotate_block_end with
@@ -456,9 +470,9 @@ let insert_block :
       ( Debuginfo.none,
         Fdo_info.none,
         Reg.Set.empty,
-        predecessor_block.stack_offset,
-        None,
-        None )
+        predecessor_block.terminator.stack_offset,
+        Reg_availability_set.Unreachable,
+        Reg_availability_set.Unreachable )
     | Some
         { dbg; fdo; live; stack_offset; available_before; available_across; _ }
       ->
@@ -497,7 +511,6 @@ let insert_block :
               stack_offset;
               id = next_instruction_id ();
               irc_work_list = Unknown_list;
-              ls_order = -1;
               available_before;
               available_across
             };

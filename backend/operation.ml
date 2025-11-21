@@ -24,7 +24,7 @@
  *                                                                                *
  **********************************************************************************)
 
-[@@@ocaml.warning "+a-4-9-40-41-42"]
+[@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
@@ -36,26 +36,17 @@ let rec equal_trap_stack ts1 ts2 =
   match ts1, ts2 with
   | Uncaught, Uncaught -> true
   | Specific_trap (lbl1, ts1), Specific_trap (lbl2, ts2) ->
-    Int.equal lbl1 lbl2 && equal_trap_stack ts1 ts2
+    Static_label.equal lbl1 lbl2 && equal_trap_stack ts1 ts2
   | Uncaught, Specific_trap _ | Specific_trap _, Uncaught -> false
 
-type integer_comparison =
-  | Isigned of Cmm.integer_comparison
-  | Iunsigned of Cmm.integer_comparison
+type integer_comparison = Cmm.integer_comparison
 
-let string_of_integer_comparison = function
-  | Isigned c -> Printf.sprintf " %ss " (Printcmm.integer_comparison c)
-  | Iunsigned c -> Printf.sprintf " %su " (Printcmm.integer_comparison c)
+let string_of_integer_comparison c =
+  Printf.sprintf " %s " (Printcmm.integer_comparison c)
 
-let equal_integer_comparison left right =
-  match left, right with
-  | Isigned left, Isigned right -> Cmm.equal_integer_comparison left right
-  | Iunsigned left, Iunsigned right -> Cmm.equal_integer_comparison left right
-  | Isigned _, Iunsigned _ | Iunsigned _, Isigned _ -> false
+let equal_integer_comparison = Scalar.Integer_comparison.equal
 
-let invert_integer_comparison = function
-  | Isigned cmp -> Isigned (Cmm.negate_integer_comparison cmp)
-  | Iunsigned cmp -> Iunsigned (Cmm.negate_integer_comparison cmp)
+let invert_integer_comparison = Scalar.Integer_comparison.negate
 
 type integer_operation =
   | Iadd
@@ -280,6 +271,8 @@ type t =
   | Const_float of int64
   | Const_symbol of Cmm.symbol
   | Const_vec128 of Cmm.vec128_bits
+  | Const_vec256 of Cmm.vec256_bits
+  | Const_vec512 of Cmm.vec512_bits
   | Stackoffset of int
   | Load of
       { memory_chunk : Cmm.memory_chunk;
@@ -308,11 +301,12 @@ type t =
       { ident : Ident.t;
         which_parameter : int option;
         provenance : Backend_var.Provenance.t option;
-        is_assignment : bool;
         regs : Reg.t array
       }
   | Dls_get
+  | Tls_get
   | Poll
+  | Pause
   | Alloc of
       { bytes : int;
         dbginfo : Cmm.alloc_dbginfo;
@@ -328,6 +322,8 @@ let is_pure = function
   | Const_float _ -> true
   | Const_symbol _ -> true
   | Const_vec128 _ -> true
+  | Const_vec256 _ -> true
+  | Const_vec512 _ -> true
   | Stackoffset _ -> false
   | Load _ -> true
   | Store _ -> false
@@ -337,8 +333,9 @@ let is_pure = function
   | Floatop _ -> true
   | Csel _ -> true
   | Reinterpret_cast
-      ( V128_of_v128 | Float32_of_float | Float32_of_int32 | Float_of_float32
-      | Float_of_int64 | Int64_of_float | Int32_of_float32 ) ->
+      ( V128_of_vec _ | V256_of_vec _ | V512_of_vec _ | Float32_of_float
+      | Float32_of_int32 | Float_of_float32 | Float_of_int64 | Int64_of_float
+      | Int32_of_float32 ) ->
     true
   | Static_cast _ -> true
   (* Conservative to ensure valueofint/intofvalue are not eliminated before
@@ -351,7 +348,9 @@ let is_pure = function
   | Specific s -> Arch.operation_is_pure s
   | Name_for_debugger _ -> false
   | Dls_get -> true
+  | Tls_get -> true
   | Poll -> false
+  | Pause -> false
   | Alloc _ -> false
 
 (* The next 2 functions are copied almost as is from asmcomp/printmach.ml
@@ -362,9 +361,7 @@ let is_pure = function
    with regs, use the dreaded Format. *)
 
 let intcomp (comp : integer_comparison) =
-  match comp with
-  | Isigned c -> Printf.sprintf " %ss " (Printcmm.integer_comparison c)
-  | Iunsigned c -> Printf.sprintf " %su " (Printcmm.integer_comparison c)
+  Printf.sprintf " %s " (Printcmm.integer_comparison comp)
 
 let intop (op : integer_operation) =
   match op with
@@ -405,8 +402,15 @@ let dump ppf op =
     Format.fprintf ppf "const_float32 %Fs" (Int32.float_of_bits f)
   | Const_float f -> Format.fprintf ppf "const_float %F" (Int64.float_of_bits f)
   | Const_symbol s -> Format.fprintf ppf "const_symbol %s" s.sym_name
-  | Const_vec128 { high; low } ->
-    Format.fprintf ppf "const vec128 %016Lx:%016Lx" high low
+  | Const_vec128 { word0; word1 } ->
+    Format.fprintf ppf "const vec128 %016Lx:%016Lx" word0 word1
+  | Const_vec256 { word0; word1; word2; word3 } ->
+    Format.fprintf ppf "const vec256 %016Lx:%016Lx:%016Lx:%016Lx" word0 word1
+      word2 word3
+  | Const_vec512 { word0; word1; word2; word3; word4; word5; word6; word7 } ->
+    Format.fprintf ppf
+      "const vec512 %016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx"
+      word0 word1 word2 word3 word4 word5 word6 word7
   | Stackoffset n -> Format.fprintf ppf "stackoffset %d" n
   | Load _ -> Format.fprintf ppf "load"
   | Store _ -> Format.fprintf ppf "store"
@@ -420,14 +424,17 @@ let dump ppf op =
   | Reinterpret_cast cast ->
     Format.fprintf ppf "%s" (Printcmm.reinterpret_cast cast)
   | Static_cast cast -> Format.fprintf ppf "%s" (Printcmm.static_cast cast)
-  | Specific _ -> Format.fprintf ppf "specific"
+  | Specific specific ->
+    Format.fprintf ppf "specific %s" (Arch.specific_operation_name specific)
   | Probe_is_enabled { name } -> Format.fprintf ppf "probe_is_enabled %s" name
   | Opaque -> Format.fprintf ppf "opaque"
   | Begin_region -> Format.fprintf ppf "beginregion"
   | End_region -> Format.fprintf ppf "endregion"
   | Name_for_debugger _ -> Format.fprintf ppf "name_for_debugger"
   | Dls_get -> Format.fprintf ppf "dls_get"
+  | Tls_get -> Format.fprintf ppf "tls_get"
   | Poll -> Format.fprintf ppf "poll"
+  | Pause -> Format.fprintf ppf "pause"
   | Alloc { bytes; dbginfo = _; mode = Heap } ->
     Format.fprintf ppf "alloc %i" bytes
   | Alloc { bytes; dbginfo = _; mode = Local } ->

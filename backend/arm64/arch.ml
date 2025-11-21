@@ -25,6 +25,9 @@ let macosx = String.equal Config.system "macosx"
 
 let is_asan_enabled = ref false
 
+(* CR gyorsh: refactor to use [Arch.Extension] like amd64 *)
+let feat_cssc = ref false
+
 (* Machine-specific command-line options *)
 
 let command_line_options = [
@@ -32,6 +35,11 @@ let command_line_options = [
     Arg.Clear is_asan_enabled,
     " Disable AddressSanitizer. This is only meaningful if the compiler was \
      built with AddressSanitizer support enabled."
+  ;
+
+  "-fcssc",
+    Arg.Set feat_cssc,
+    " Enable the Common Short Sequence Compression (CSSC) instructions."
 ]
 
 (* Addressing modes *)
@@ -69,6 +77,7 @@ type specific_operation =
   | Imove32       (* 32-bit integer move *)
   | Isignext of int (* sign extension *)
   | Isimd of Simd.operation
+  | Illvm_intrinsic of string
 
 and arith_operation =
     Ishiftadd
@@ -83,6 +92,8 @@ let size_int = 8
 let size_float = 8
 
 let size_vec128 = 16
+let size_vec256 = 32
+let size_vec512 = 64
 
 let allow_unaligned_access = true
 
@@ -104,6 +115,19 @@ let offset_addressing addr delta =
 let num_args_addressing = function
   | Iindexed _ -> 1
   | Ibased _ -> 0
+
+let addressing_displacement_for_llvmize addr =
+  if not !Clflags.llvm_backend
+  then
+    Misc.fatal_error
+      "Arch.displacement_addressing_for_llvmize: should only be called with \
+        -llvm-backend"
+  else
+    match addr with
+    | Iindexed d -> d
+    | Ibased _ ->
+      Misc.fatal_error
+        "Arch.displacement_addressing_for_llvmize: unexpected addressing mode"
 
 (* Printing operations and addressing modes *)
 
@@ -187,6 +211,36 @@ let print_specific_operation printreg op ppf arg =
         n printreg arg.(0)
   | Isimd op ->
     Simd.print_operation printreg op ppf arg
+  | Illvm_intrinsic name ->
+      fprintf ppf "llvm_intrinsic %s" name
+
+let specific_operation_name : specific_operation -> string = fun op ->
+  match op with
+  | Ifar_poll -> "far poll"
+  | Ifar_alloc { bytes; dbginfo = _ } ->
+      Printf.sprintf "far alloc of %d bytes" bytes
+  | Ishiftarith (op, shift) ->
+      let op_name = function
+        | Ishiftadd -> "+"
+        | Ishiftsub -> "-" in
+      let shift_mark =
+        if shift >= 0
+        then sprintf "<< %i" shift
+        else sprintf ">> %i" (-shift) in
+      Printf.sprintf "%s %s" (op_name op) shift_mark
+  | Imuladd -> "muladd"
+  | Imulsub -> "mulsub"
+  | Inegmulf -> "negmulf"
+  | Imuladdf -> "muladdf"
+  | Inegmuladdf -> "negmuladdf"
+  | Imulsubf -> "mulsubf"
+  | Inegmulsubf -> "negmulsubf"
+  | Isqrtf -> "sqrtf"
+  | Ibswap _ -> "bswap"
+  | Imove32 -> "move32"
+  | Isignext _ -> "signext"
+  | Isimd _ -> "simd"
+  | Illvm_intrinsic _ -> "llvm_intrinsic"
 
 let equal_addressing_mode left right =
   match left, right with
@@ -225,9 +279,11 @@ let equal_specific_operation left right =
   | Imove32, Imove32 -> true
   | Isignext left, Isignext right -> Int.equal left right
   | Isimd left, Isimd right -> Simd.equal_operation left right
+  | Illvm_intrinsic left, Illvm_intrinsic right -> String.equal left right
   | (Ifar_alloc _  | Ifar_poll  | Ishiftarith _
     | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
-    | Inegmulsubf | Isqrtf | Ibswap _ | Imove32 | Isignext _ | Isimd _), _ -> false
+    | Inegmulsubf | Isqrtf | Ibswap _ | Imove32 | Isignext _ | Isimd _
+    | Illvm_intrinsic _), _ -> false
 
 let isomorphic_specific_operation op1 op2 =
   equal_specific_operation op1 op2
@@ -317,6 +373,10 @@ let operation_is_pure : specific_operation -> bool = function
   | Imove32 -> true
   | Isignext _ -> true
   | Isimd op -> Simd.operation_is_pure op
+  | Illvm_intrinsic intr ->
+      Misc.fatal_errorf "Arch.operation_is_pure: Unexpected llvm_intrinsic %s: \
+                                                  not using LLVM backend"
+      intr
 
 (* Specific operations that can raise *)
 
@@ -336,6 +396,9 @@ let operation_allocates = function
   | Isignext _
   | Ibswap _
   | Isimd _ -> false
+  | Illvm_intrinsic _intr ->
+      (* Used by the zero_alloc checker that runs before the Llvmize. *)
+      false
 
 (* See `amd64/arch.ml`. *)
 let equal_addressing_mode_without_displ (addressing_mode_1: addressing_mode)

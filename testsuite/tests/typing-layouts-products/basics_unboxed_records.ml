@@ -20,11 +20,8 @@ type ('a : value & value) t = #{ x : 'a ; y : string }
 let f : #(int * string) t -> #(string * int) t =
   fun (#{ x = #(i, s); y } as r) -> #{ r with x = #(s, i) }
 [%%expect{|
-Line 8, characters 0-54:
-8 | type ('a : value & value) t = #{ x : 'a ; y : string }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "'a" has layout "value & value".
-       Records may not yet contain types of this layout.
+type ('a : value & value) t = #{ x : 'a; y : string; }
+val f : #(int * string) t -> #(string * int) t = <fun>
 |}]
 
 (* Patterns, as-patterns, partial patterns *)
@@ -136,11 +133,8 @@ let add t =
   let #(x, y) = t.#is in
   x + y
 [%%expect{|
-Line 1, characters 0-30:
-1 | type t = #{ is: #(int * int) }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "#(int * int)" has layout "value & value".
-       Records may not yet contain types of this layout.
+type t = #{ is : #(int * int); }
+val add : t -> int = <fun>
 |}]
 
 (* An unboxed record is not an allocation, but a regular record is *)
@@ -155,7 +149,7 @@ let f_unboxed_record (local_ left) (local_ right) =
 [%%expect{|
 type ('a, 'b) ab = { left : 'a; right : 'b; }
 type ('a, 'b) ab_u = #{ left : 'a; right : 'b; }
-val f_unboxed_record : local_ 'a -> local_ 'b -> local_ 'a = <fun>
+val f_unboxed_record : 'a @ local -> 'b @ local -> 'a @ local = <fun>
 |}]
 
 let f_boxed_record (local_ left) (local_ right) =
@@ -166,8 +160,14 @@ let f_boxed_record (local_ left) (local_ right) =
 Line 4, characters 2-7:
 4 |   left'
       ^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       because it is the field "left" of the record at Line 3, characters 6-25
+       which is "local"
+       because it is allocated at Line 2, characters 10-25 containing data
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Mutable fields are not allowed *)
@@ -631,6 +631,7 @@ Line 1, characters 11-12:
                ^
 Error: Unbound unboxed record field "b"
 Hint: There is a boxed record field with this name.
+      Note that float- and [@@unboxed]- records don't get unboxed versions.
 |}]
 
 let _ = { u = #5.0 }
@@ -649,6 +650,7 @@ Line 1, characters 22-23:
                           ^
 Error: Unbound record field "u"
 Hint: There is an unboxed record field with this name.
+      To project an unboxed record field, use ".#u" instead of ".u".
 |}]
 
 let bad_get t = t.#b
@@ -658,6 +660,7 @@ Line 1, characters 19-20:
                        ^
 Error: Unbound unboxed record field "b"
 Hint: There is a boxed record field with this name.
+      Note that float- and [@@unboxed]- records don't get unboxed versions.
 |}]
 
 (*****************************************************************************)
@@ -775,11 +778,12 @@ Line 1, characters 0-61:
 1 | type q : any mod portable = #{ x : int -> int; y : int -> q }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "q" is
-         value mod aliased immutable & value mod aliased immutable
+           value mod aliased immutable non_float
+           & value mod aliased immutable non_float
          because it is an unboxed record.
        But the kind of type "q" must be a subkind of
-         any mod portable & any mod portable
+           any mod portable & any mod portable
          because of the annotation on the declaration of the type q.
 |}]
 (* CR layouts v2.8: That error message is incomprehensible without
-   with-bounds. *)
+   with-bounds. Internal ticket 5096. *)

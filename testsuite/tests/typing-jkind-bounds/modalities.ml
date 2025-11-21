@@ -37,7 +37,7 @@ let foo (t : int ref t @ contended) = use_uncontended t.contended
 Line 1, characters 54-65:
 1 | let foo (t : int ref t @ contended) = use_uncontended t.contended
                                                           ^^^^^^^^^^^
-Error: This value is "contended" but expected to be "uncontended".
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : int ref t @ contended) = cross_contended t
@@ -55,7 +55,7 @@ let foo (t : _ t @ nonportable) = use_portable t
 Line 1, characters 47-48:
 1 | let foo (t : _ t @ nonportable) = use_portable t
                                                    ^
-Error: This value is "nonportable" but expected to be "portable".
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 type 'a t : immutable_data with 'a @@ many = { x : 'a @@ many }
@@ -102,19 +102,19 @@ val use_global : ('a : value & value). 'a -> unit = <fun>
 val cross_global : ('a : value mod global & value mod global). 'a -> unit =
   <fun>
 val use_portable : ('a : value & value). 'a @ portable -> unit = <fun>
-type 'a t = #{ global_ x : 'a; global_ y : 'a; }
+type 'a t = #{ x : 'a @@ global; y : 'a @@ global; }
 |}]
 
 let foo (t : string t @ local) = use_global t
 
 [%%expect{|
-val foo : local_ string t -> unit = <fun>
+val foo : string t @ local -> unit = <fun>
 |}]
 
 let foo (t : string t @ local) = cross_global t
 
 [%%expect{|
-val foo : local_ string t -> unit = <fun>
+val foo : string t @ local -> unit = <fun>
 |}]
 
 let foo (t : string t @ nonportable) = use_portable t
@@ -129,21 +129,5 @@ let foo (t : (string -> string) t @ nonportable) = use_portable t
 Line 1, characters 64-65:
 1 | let foo (t : (string -> string) t @ nonportable) = use_portable t
                                                                     ^
-Error: This value is "nonportable" but expected to be "portable".
-|}, Principal{|
-Line 1, characters 64-65:
-1 | let foo (t : (string -> string) t @ nonportable) = use_portable t
-                                                                    ^
-Error: This expression has type "(string -> string) t"
-       but an expression was expected of type "('a : value & value)"
-       The kind of (string -> string) t is
-         immediate with string -> string @@ global & immediate
-         with string -> string @@ global
-         because of the definition of t at line 4, characters 0-51.
-       But the kind of (string -> string) t must be a subkind of
-         value & value
-         because of the definition of use_portable at line 3, characters 4-16.
-
-       The first mode-crosses less than the second along:
-         nullability: mod non_null with string -> string ≰ mod non_null
+Error: This value is "nonportable" but is expected to be "portable".
 |}]

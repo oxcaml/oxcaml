@@ -162,7 +162,7 @@ let code rec size(41)
   let rev_app = %project_value_slot spans.rev_app my_closure in
   let find_span = %project_function_slot (spans -> find_span) my_closure in
   let `region` = %begin_region in
-  let `ghost_region` = %begin_ghost_region in
+  let ghost_region = %begin_ghost_region in
   (let prim = %is_int l in
    let Pisint = %Tag_imm prim in
    (let untagged = %untag_imm Pisint in
@@ -170,7 +170,7 @@ let code rec size(41)
       | 0 -> k3
       | 1 -> k2 (0))
      where k3 =
-       (apply direct(find_span_6 &`region` &`ghost_region`)
+       (apply direct(find_span_6 &`region` &ghost_region)
           (find_span ~ depth my_depth -> next_depth
            : _ -> [ 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ])
             (break_here, l, 0)
@@ -202,7 +202,7 @@ let code rec size(41)
                       cont k2 (Pmakeblock)))))
     where k2 (region_return : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
       let `unit` = %end_region `region` in
-      let `unit` = %end_ghost_region `ghost_region` in
+      let `unit` = %end_ghost_region ghost_region in
       cont k (region_return)
 in
 let code size(25)
@@ -240,8 +240,8 @@ in
           cont error pop(regular error) ($camlLocal__Pmakeblock55))
    where k1 (`*match*` : imm tagged) =
      ((let `region` = %begin_region in
-       let `ghost_region` = %begin_ghost_region in
-       apply direct(return_local_0 &`region` &`ghost_region`)
+       let ghost_region = %begin_ghost_region in
+       apply direct(return_local_0 &`region` &ghost_region)
          (return_local : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
            (0)
            -> k4 * error
@@ -259,12 +259,12 @@ in
                 cont error pop(regular error) ($camlLocal__Pmakeblock69))
          where k2 (region_return : imm tagged) =
            let `unit` = %end_region `region` in
-           let `unit` = %end_ghost_region `ghost_region` in
+           let `unit` = %end_ghost_region ghost_region in
            cont k1 (region_return))
         where k1 (`*match*_1` : imm tagged) =
           ((let `region` = %begin_region in
-            let `ghost_region` = %begin_ghost_region in
-            apply direct(return_local_0 &`region` &`ghost_region`)
+            let ghost_region = %begin_ghost_region in
+            apply direct(return_local_0 &`region` &ghost_region)
               (return_local : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                 (0)
                 -> k3 * error
@@ -273,7 +273,7 @@ in
                     closure `anon-fn[local.ml:24,27--43]_3`
                       @`anon-fn[local.ml:24,27--43]`
                   in
-                  apply direct(map_local_1 &`region` &`ghost_region`)
+                  apply direct(map_local_1 &`region` &ghost_region)
                     (map_local
                      : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                       (`anon-fn[local.ml:24,27--43]`, ns)
@@ -294,12 +294,12 @@ in
                                       ($camlLocal__Pmakeblock92))))
               where k2 (region_return : imm tagged) =
                 let `unit` = %end_region `region` in
-                let `unit` = %end_ghost_region `ghost_region` in
+                let `unit` = %end_ghost_region ghost_region in
                 cont k1 (region_return))
              where k1 (`*match*_2` : imm tagged) =
                let rev_app = closure rev_app_4 @rev_app in
-               let spans = closure spans_5 @spans
-               and find_span = closure find_span_6 @find_span
+               let find_span = closure find_span_6 @find_span
+               and spans = closure spans_5 @spans
                with { rev_app = rev_app }
                in
                let is_even = closure is_even_7 @is_even in
@@ -464,7 +464,7 @@ apply direct(length_2_1)
            | 1 -> k2
        where k2 =
          let `region` = %begin_region in
-         let `ghost_region` = %begin_ghost_region in
+         let ghost_region = %begin_ghost_region in
          ((let code loopify(never) size(3) newer_version_of(`anon-fn[local.ml:24,27--43]_3`)
                  `anon-fn[local.ml:24,27--43]_3_1` (i : imm tagged)
                    my_closure my_region my_ghost_region my_depth
@@ -477,7 +477,7 @@ apply direct(length_2_1)
              closure `anon-fn[local.ml:24,27--43]_3_1`
                @`anon-fn[local.ml:24,27--43]`
            in
-           apply direct(map_local_1_1 &`region` &`ghost_region`)
+           apply direct(map_local_1_1 &`region` &ghost_region)
              ($camlLocal__map_local_9
               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                ($`camlLocal__anon-fn[local.ml:24,27--43]_11`,
@@ -495,7 +495,7 @@ apply direct(length_2_1)
                      | 1 -> k2)
             where k2 =
               let `unit` = %end_region `region` in
-              let `unit` = %end_ghost_region `ghost_region` in
+              let unit_1 = %end_ghost_region ghost_region in
               let code rec loopify(done) size(22) newer_version_of(rev_app_4)
                     rev_app_4_1
                       (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
@@ -520,7 +520,11 @@ apply direct(length_2_1)
                          cont self (Pfield_1, Pmakeblock))
               in
               let $camlLocal__rev_app_12 = closure rev_app_4_1 @rev_app in
-              let code rec loopify(never) size(36) newer_version_of(spans_5)
+              let $camlLocal__find_span_13 =
+                closure find_span_6_1 @find_span
+              and $camlLocal__spans_14 =
+                closure spans_5_1 @spans
+              and code rec loopify(never) size(36) newer_version_of(spans_5)
                     spans_5_1
                       (break_here,
                        l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
@@ -535,7 +539,7 @@ apply direct(length_2_1)
                    | 1 -> k2 (0)
                    where k3 =
                      (apply direct(find_span_6_1 &region_1 &ghost_region_1)
-                        ($camlLocal__find_span_14 ~ depth my_depth -> succ my_depth
+                        ($camlLocal__find_span_13 ~ depth my_depth -> succ my_depth
                          : _ ->
                            [ 0 of [ 0 | 0 of val * val ] *
                                [ 0 | 0 of val * val ] ]
@@ -548,7 +552,7 @@ apply direct(length_2_1)
                                        [ 0 | 0 of val * val ] ]) =
                           ((let Pfield = %block_load (1) `*match*` in
                             apply direct(spans_5_1)
-                              ($camlLocal__spans_13 ~ depth my_depth -> succ my_depth
+                              ($camlLocal__spans_14 ~ depth my_depth -> succ my_depth
                                : _ ->
                                  [ 0 | 0 of val * [ 0 | 0 of val * val ] ]
                                )
@@ -579,13 +583,9 @@ apply direct(length_2_1)
                   where k2
                           (region_return :
                              [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
-                    let unit_1 = %end_region region_1 in
-                    let unit_2 = %end_ghost_region ghost_region_1 in
+                    let unit_2 = %end_region region_1 in
+                    let unit_3 = %end_ghost_region ghost_region_1 in
                     cont k (region_return)
-              and $camlLocal__spans_13 =
-                closure spans_5_1 @spans
-              and $camlLocal__find_span_14 =
-                closure find_span_6_1 @find_span
               and code rec loopify(never) size(58) newer_version_of(find_span_6)
                     find_span_6_1
                       (break_here,
@@ -621,8 +621,10 @@ apply direct(length_2_1)
                               in
                               cont k (Pmakeblock)
                             where k2 =
-                              apply direct(find_span_6_1 &my_region &my_ghost_region)
-                                ($camlLocal__find_span_14 ~ depth my_depth -> succ my_depth
+                              apply
+                                     direct(find_span_6_1
+                                     &my_region &my_ghost_region)
+                                ($camlLocal__find_span_13 ~ depth my_depth -> succ my_depth
                                  : _ ->
                                    [ 0 of [ 0 | 0 of val * val ] *
                                        [ 0 | 0 of val * val ] ]
@@ -642,7 +644,7 @@ apply direct(length_2_1)
               in
               let $camlLocal__is_even_15 = closure is_even_7_1 @is_even in
               (apply direct(spans_5_1)
-                 ($camlLocal__spans_13
+                 ($camlLocal__spans_14
                   : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                    ($camlLocal__is_even_15, $camlLocal__const_block169)
                    -> k2 * error
@@ -666,8 +668,8 @@ apply direct(length_2_1)
                               $camlLocal__map_local_9,
                               $camlLocal__length_10,
                               $camlLocal__rev_app_12,
-                              $camlLocal__spans_13,
-                              $camlLocal__find_span_14,
+                              $camlLocal__spans_14,
+                              $camlLocal__find_span_13,
                               $camlLocal__is_even_15)
                    in
                    cont done ($camlLocal))))

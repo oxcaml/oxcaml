@@ -201,4 +201,5 @@ void caml_compute_gc_stats(struct gc_stats* buf)
   }
   buf->heap_stats.pool_max_words = pool_max;
   buf->heap_stats.large_max_words = large_max;
+  caml_get_global_heap_stats(&buf->global_stats);
 }

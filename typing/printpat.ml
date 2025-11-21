@@ -28,14 +28,23 @@ let is_cons = function
 let pretty_const c = match c with
 | Const_int i -> Printf.sprintf "%d" i
 | Const_char c -> Printf.sprintf "%C" c
+| Const_untagged_char c -> Printf.sprintf "#%C" c
 | Const_string (s, _, _) -> Printf.sprintf "%S" s
 | Const_float f -> Printf.sprintf "%s" f
 | Const_float32 f -> Printf.sprintf "%s" f
 | Const_unboxed_float f -> Printf.sprintf "%s" (Misc.format_as_unboxed_literal f)
 | Const_unboxed_float32 f -> Printf.sprintf "%ss" (Misc.format_as_unboxed_literal f)
+| Const_int8 i -> Printf.sprintf "%ds" i
+| Const_int16 i -> Printf.sprintf "%dS" i
 | Const_int32 i -> Printf.sprintf "%ldl" i
 | Const_int64 i -> Printf.sprintf "%LdL" i
 | Const_nativeint i -> Printf.sprintf "%ndn" i
+| Const_untagged_int i ->
+  Printf.sprintf "%sm" (Misc.format_as_unboxed_literal (Int.to_string i))
+| Const_untagged_int8 i ->
+  Printf.sprintf "%ss" (Misc.format_as_unboxed_literal (Int.to_string i))
+| Const_untagged_int16 i ->
+  Printf.sprintf "%sS" (Misc.format_as_unboxed_literal (Int.to_string i))
 | Const_unboxed_int32 i ->
   Printf.sprintf "%sl" (Misc.format_as_unboxed_literal (Int32.to_string i))
 | Const_unboxed_int64 i ->
@@ -80,7 +89,7 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
   in
   match v.pat_desc with
   | Tpat_any -> fprintf ppf "_"
-  | Tpat_var (x,_,_,_) -> fprintf ppf "%s" (Ident.name x)
+  | Tpat_var (x,_,_,_,_) -> fprintf ppf "%s" (Ident.name x)
   | Tpat_constant c -> fprintf ppf "%s" (pretty_const c)
   | Tpat_tuple vs ->
       fprintf ppf "@[(%a)@]" (pretty_list pretty_labeled_val ",") vs
@@ -116,7 +125,7 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
   | Tpat_lazy v ->
       fprintf ppf "@[<2>lazy@ %a@]" pretty_arg v
-  | Tpat_alias (v, x, _, _, _, _) ->
+  | Tpat_alias (v, x, _, _, _, _, _) ->
       fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.print x
   | Tpat_value v ->
       fprintf ppf "%a" pretty_val (v :> pattern)

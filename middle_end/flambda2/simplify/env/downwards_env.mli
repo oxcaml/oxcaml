@@ -32,6 +32,7 @@ val print : Format.formatter -> t -> unit
     unit. *)
 val create :
   round:int ->
+  machine_width:Target_system.Machine_width.t ->
   resolver:resolver ->
   get_imported_names:get_imported_names ->
   get_imported_code:get_imported_code ->
@@ -43,6 +44,8 @@ val create :
   t
 
 val all_code : t -> Code.t Code_id.Map.t
+
+val machine_width : t -> Target_system.Machine_width.t
 
 val resolver :
   t -> Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
@@ -63,8 +66,6 @@ val unit_toplevel_return_continuation : t -> Continuation.t
 
 val unit_toplevel_exn_continuation : t -> Continuation.t
 
-val enter_set_of_closures : t -> t
-
 val increment_continuation_scope : t -> t
 
 val bump_current_level_scope : t -> t
@@ -73,7 +74,11 @@ val get_continuation_scope : t -> Scope.t
 
 val typing_env : t -> Flambda2_types.Typing_env.t
 
+val define_continuations : t -> Continuation.t list -> t
+
 val define_variable : t -> Bound_var.t -> Flambda_kind.t -> t
+
+val define_extra_variable : t -> Bound_var.t -> Flambda_kind.t -> t
 
 val add_name : t -> Bound_name.t -> Flambda2_types.t -> t
 
@@ -99,9 +104,10 @@ val define_name_if_undefined : t -> Bound_name.t -> Flambda_kind.t -> t
 
 val add_equation_on_name : t -> Name.t -> Flambda2_types.t -> t
 
-val define_parameters : t -> params:Bound_parameters.t -> t
+val define_parameters : extra:bool -> t -> params:Bound_parameters.t -> t
 
 val add_parameters :
+  extra:bool ->
   ?name_mode:Name_mode.t ->
   t ->
   Bound_parameters.t ->
@@ -109,6 +115,7 @@ val add_parameters :
   t
 
 val add_parameters_with_unknown_types :
+  extra:bool ->
   ?alloc_modes:Alloc_mode.For_types.t list ->
   ?name_mode:Name_mode.t ->
   t ->
@@ -142,14 +149,16 @@ val add_inlined_debuginfo : t -> Debuginfo.t -> Debuginfo.t
 
 val round : t -> int
 
-val can_inline : t -> bool
-
 val set_inlining_state : t -> Inlining_state.t -> t
 
 val get_inlining_state : t -> Inlining_state.t
 
 val add_cse :
-  t -> Flambda_primitive.Eligible_for_cse.t -> bound_to:Simple.t -> t
+  t ->
+  Flambda_primitive.Eligible_for_cse.t ->
+  bound_to:Simple.t ->
+  name_mode:Name_mode.t ->
+  t
 
 val find_cse : t -> Flambda_primitive.Eligible_for_cse.t -> Simple.t option
 
@@ -161,9 +170,26 @@ val comparison_results : t -> Comparison_result.t Variable.Map.t
 
 val with_cse : t -> Common_subexpression_elimination.t -> t
 
-val set_do_not_rebuild_terms_and_disable_inlining : t -> t
+module Disable_inlining_reason : sig
+  type t =
+    | Stub
+    | Speculative_inlining
+end
 
-val disable_inlining : t -> t
+val set_do_not_rebuild_terms_and_disable_inlining :
+  t -> Disable_inlining_reason.t -> t
+
+val set_disable_inlining : t -> Disable_inlining_reason.t -> t
+
+module Disable_inlining : sig
+  type t =
+    | Disable_inlining of Disable_inlining_reason.t
+    | Do_not_disable_inlining
+end
+
+val disable_inlining : t -> Disable_inlining.t
+
+val enter_set_of_closures : t -> in_stub:bool -> t
 
 val set_rebuild_terms : t -> t
 
@@ -209,5 +235,21 @@ val variables_defined_in_current_continuation : t -> Lifted_cont_params.t
 val cost_of_lifting_continuations_out_of_current_one : t -> int
 
 val add_lifting_cost : int -> t -> t
+
+val must_inline : t -> bool
+
+val replay_history : t -> Replay_history.t
+
+val with_replay_history : (Replay_history.t * bool) option -> t -> t
+
+val with_join_analysis :
+  Apply_cont_rewrite_id.t Join_analysis.t option -> t -> t
+
+val join_analysis : t -> Apply_cont_rewrite_id.t Join_analysis.t option
+
+val map_specialization_cost :
+  f:(Specialization_cost.t -> Specialization_cost.t) -> t -> t
+
+val specialization_cost : t -> Specialization_cost.t
 
 val denv_for_lifted_continuation : denv_for_join:t -> denv:t -> t

@@ -8,6 +8,8 @@ val on_fatal : f:(unit -> unit) -> unit
 
 val fatal : ('a, Format.formatter, unit, 'b) format4 -> 'a
 
+val set_function_specific_params : string list -> unit
+
 val find_param_value : string -> string option
 
 val debug : bool
@@ -55,8 +57,7 @@ val first_instruction_id : Cfg.basic_block -> InstructionId.t
 
 type cfg_infos =
   { arg : Reg.Set.t;
-    res : Reg.Set.t;
-    max_instruction_id : InstructionId.t
+    res : Reg.Set.t
   }
 
 (* CR xclerc for xclerc: this function currently reset the worklist to
@@ -98,18 +99,23 @@ module Move : sig
   val to_string : t -> string
 end
 
+module DLL = Oxcaml_utils.Doubly_linked_list
+
+module Insert_skipping_name_for_debugger : sig
+  val insert_after :
+    Instruction.t DLL.cell -> Instruction.t -> reg:Reg.t -> unit
+
+  val add_begin :
+    Cfg.basic_instruction_list -> Instruction.t -> reg:Reg.t -> unit
+end
+
 val same_reg_class : Reg.t -> Reg.t -> bool
 
 val same_stack_class : Reg.t -> Reg.t -> bool
 
-val make_temporary :
-  same_class_and_base_name_as:Reg.t -> name_prefix:string -> Reg.t
-
 val simplify_cfg : Cfg_with_layout.t -> Cfg_with_layout.t
 
 val save_cfg : string -> Cfg_with_layout.t -> unit
-
-val remove_prologue_if_not_required : Cfg_with_layout.t -> unit
 
 val update_live_fields : Cfg_with_layout.t -> liveness -> unit
 

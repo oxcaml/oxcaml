@@ -44,44 +44,8 @@ let word_addressed = false
     d0 - d7               general purpose (caller-save)
     d8 - d15              general purpose (callee-save)
     d16 - d31             general purpose (caller-save)
+   Vector register map:   general purpose (caller-save)
 *)
-
-let int_reg_name =
-  [| "x0";  "x1";  "x2";  "x3";  "x4";  "x5";  "x6";  "x7";  (* 0 - 7 *)
-     "x8";  "x9";  "x10"; "x11"; "x12"; "x13"; "x14"; "x15"; (* 8 - 15 *)
-     "x19"; "x20"; "x21"; "x22"; "x23"; "x24"; "x25";        (* 16 - 22 *)
-     "x26"; "x27"; "x28";                                    (* 23 - 25 *)
-     "x16"; "x17" |]                                         (* 26 - 27 *)
-
-let float_reg_name =
-  [| "d0";  "d1";  "d2";  "d3";  "d4";  "d5";  "d6";  "d7";
-     "d8";  "d9";  "d10"; "d11"; "d12"; "d13"; "d14"; "d15";
-     "d16"; "d17"; "d18"; "d19"; "d20"; "d21"; "d22"; "d23";
-     "d24"; "d25"; "d26"; "d27"; "d28"; "d29"; "d30"; "d31" |]
-
-let float32_reg_name =
-  [| "s0";  "s1";  "s2";  "s3";  "s4";  "s5";  "s6";  "s7";
-     "s8";  "s9";  "s10"; "s11"; "s12"; "s13"; "s14"; "s15";
-     "s16"; "s17"; "s18"; "s19"; "s20"; "s21"; "s22"; "s23";
-     "s24"; "s25"; "s26"; "s27"; "s28"; "s29"; "s30"; "s31" |]
-
-let vec128_reg_name =
-  [| "q0";  "q1";  "q2";  "q3";  "q4";  "q5";  "q6";  "q7";
-     "q8";  "q9";  "q10"; "q11"; "q12"; "q13"; "q14"; "q15";
-     "q16"; "q17"; "q18"; "q19"; "q20"; "q21"; "q22"; "q23";
-     "q24"; "q25"; "q26"; "q27"; "q28"; "q29"; "q30"; "q31" |]
-
-let num_register_classes = 2
-
-let register_class_of_machtype_component typ =
-  match (typ : Cmm.machtype_component) with
-  | Val | Int | Addr  -> 0
-  | Float | Float32 -> 1
-  | Vec128 -> 1
-  | Valx2 -> 1
-
-let register_class r =
-  register_class_of_machtype_component r.typ
 
 let types_are_compatible left right =
   match left.typ, right.typ with
@@ -90,42 +54,27 @@ let types_are_compatible left right =
   | Float32, Float32 -> true
   | Vec128, Vec128 -> true
   | Valx2,Valx2 -> true
+  | (Vec256 | Vec512), _ | _, (Vec256 | Vec512) ->
+    Misc.fatal_error "arm64: got 256/512 bit vector"
   | (Int | Val | Addr | Float | Float32 | Vec128 | Valx2), _ -> false
-
-let num_available_registers =
-  [| 23; 32 |] (* first 23 int regs allocatable; all float regs allocatable *)
-
-let first_available_register =
-  [| 0; 100 |]
-
-let register_name ty r =
-  match (ty : Cmm.machtype_component) with
-  | Val | Int | Addr ->
-    int_reg_name.(r - first_available_register.(0))
-  | Float ->
-    float_reg_name.(r - first_available_register.(1))
-  | Float32 ->
-    float32_reg_name.(r - first_available_register.(1))
-  | Vec128 | Valx2 ->
-    vec128_reg_name.(r - first_available_register.(1))
-
 
 (* Representation of hard registers by pseudo-registers *)
 
-
-let hard_reg_gen typ n =
-  let reg_class = register_class_of_machtype_component typ in
-  let first = first_available_register.(reg_class) in
+let hard_reg_gen typ =
+  let reg_class = Reg_class.of_machtype typ in
+  let first = Reg_class.first_available_register reg_class in
+  let n = Reg_class.num_registers reg_class in
   let v = Array.make n Reg.dummy in
   for i = 0 to n - 1 do
-    v.(i) <- Reg.at_location typ (Reg(first + i))
+    v.(i) <- Reg.create_at_location typ (Reg(first + i))
   done;
-v
+  v
 
-let hard_int_reg = hard_reg_gen Int (Array.length int_reg_name)
-let hard_float_reg = hard_reg_gen Float (Array.length float_reg_name)
-let hard_float32_reg = hard_reg_gen Float32 (Array.length float32_reg_name)
-let hard_vec128_reg = hard_reg_gen Vec128 (Array.length vec128_reg_name)
+let hard_int_reg = hard_reg_gen Int
+let hard_float_reg = hard_reg_gen Float
+
+let hard_vec128_reg = Array.map (fun r -> {r with typ = Vec128}) hard_float_reg
+let hard_float32_reg = Array.map (fun r -> {r with typ = Float32}) hard_float_reg
 
 let all_phys_regs =
   Array.concat [hard_int_reg; hard_float_reg; hard_float32_reg; hard_vec128_reg; ]
@@ -136,18 +85,22 @@ let precolored_regs =
 
 let phys_reg ty n =
   match (ty : Cmm.machtype_component) with
-  | Int | Addr | Val -> hard_int_reg.(n)
+  | Int | Addr | Val ->
+    (* CR yusumez: We need physical registers to have the appropriate machtype
+       for the LLVM backend. However, this breaks an invariant the IRC register
+       allocator relies on. It is safe to guard it with this flag since the LLVM
+       backend doesn't get that far. *)
+    if !Clflags.llvm_backend
+    then { hard_int_reg.(n) with typ = ty }
+    else hard_int_reg.(n)
   | Float -> hard_float_reg.(n - 100)
   | Float32 -> hard_float32_reg.(n - 100)
   | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)
-
-let gc_regs_offset _ =
-    fatal_error "arm64: gc_reg_offset unreachable"
-
+  | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
 let reg_x8 = phys_reg Int 8
 
 let stack_slot slot ty =
-  Reg.at_location ty (Stack slot)
+  Reg.create_at_location ty (Stack slot)
 
 (* Calling conventions *)
 
@@ -202,6 +155,8 @@ let calling_conventions
         loc.(i) <- loc_float last_float make_stack float ofs
     | Vec128 ->
         loc.(i) <- loc_vec128 last_float make_stack float ofs
+    | Vec256 | Vec512 ->
+        Misc.fatal_error "arm64: got 256/512 bit vector"
     | Float32 ->
         loc.(i) <- loc_float32 last_float make_stack float ofs
     | Valx2 ->
@@ -265,17 +220,19 @@ let external_calling_conventions
     begin match (ty_arg : Cmm.exttype) with
     | XInt | XInt64 ->
         loc.(i) <- [| loc_int last_int make_stack int ofs |]
-    | XInt32 ->
+    | XInt32 | XInt16 | XInt8 ->
         loc.(i) <- [| loc_int32 last_int make_stack int ofs |]
     | XFloat ->
         loc.(i) <- [| loc_float last_float make_stack float ofs |]
     | XVec128 ->
         loc.(i) <- [| loc_vec128 last_float make_stack float ofs |]
+    | XVec256 | XVec512 ->
+        Misc.fatal_error "XVec256 and XVec512 not supported on ARM64"
     | XFloat32 ->
         loc.(i) <- [| loc_float32 last_float make_stack float ofs |]
     end)
     ty_args;
-  (loc, Misc.align !ofs 16)  (* keep stack 16-aligned *)
+  (loc, Misc.align !ofs 16, Cmm.Align_16) (* keep stack 16-aligned *)
 
 let loc_external_arguments ty_args =
   external_calling_conventions 0 7 100 107 outgoing ty_args
@@ -284,29 +241,6 @@ let loc_external_results res =
   let (loc, _) = calling_conventions 0 1 100 101 not_supported 0 res in loc
 
 let loc_exn_bucket = phys_reg Int 0
-
-(* See "DWARF for the ARM 64-bit architecture (AArch64)" available from
-   developer.arm.com. *)
-
-let int_dwarf_reg_numbers =
-  [| 0; 1; 2; 3; 4; 5; 6; 7;
-     8; 9; 10; 11; 12; 13; 14; 15;
-     19; 20; 21; 22; 23; 24;
-     25; 26; 27; 28; 16; 17;
-  |]
-
-let float_dwarf_reg_numbers =
-  [| 64; 65; 66; 67; 68; 69; 70; 71;
-     72; 73; 74; 75; 76; 77; 78; 79;
-     80; 81; 82; 83; 84; 85; 86; 87;
-     88; 89; 90; 91; 92; 93; 94; 95;
-  |]
-
-let dwarf_register_numbers ~reg_class =
-  match reg_class with
-  | 0 -> int_dwarf_reg_numbers
-  | 1 -> float_dwarf_reg_numbers
-  | _ -> Misc.fatal_errorf "Bad register class %d" reg_class
 
 let stack_ptr_dwarf_register_number = 31
 
@@ -324,16 +258,31 @@ let destroyed_at_c_noalloc_call =
       116;117;118;119;120;121;122;123;
       124;125;126;127;128;129;130;131|]
   in
+  let vec128_regs_destroyed_at_c_noalloc_call =
+    (* Registers v8-v15 must be preserved by a callee across
+       subroutine calls; the remaining registers (v0-v7, v16-v31) do
+       not need to be preserved (or should be preserved by the
+       caller). Additionally, only the bottom 64 bits of each value
+       stored in v8-v15 need to be preserved [8]; it is the
+       responsibility of the caller to preserve larger values.
+
+       https://github.com/ARM-software/abi-aa/blob/
+       3952cfbfd2404c442bb6bb6f59ff7b923ab0c148/
+       aapcs64/aapcs64.rst?plain=1#L837
+    *)
+    hard_vec128_reg
+  in
   Array.concat [
     Array.map (phys_reg Int) int_regs_destroyed_at_c_noalloc_call;
     Array.map (phys_reg Float) float_regs_destroyed_at_c_noalloc_call;
     Array.map (phys_reg Float32) float_regs_destroyed_at_c_noalloc_call;
-    Array.map (phys_reg Vec128) float_regs_destroyed_at_c_noalloc_call;
+    vec128_regs_destroyed_at_c_noalloc_call;
   ]
 
 (* CSE needs to know that all versions of neon are destroyed. *)
 let destroy_neon_reg n =
-  [| phys_reg Float (100 + n); phys_reg Float32 (100 + n); phys_reg Vec128 (100 + n); |]
+  [| phys_reg Float (100 + n); phys_reg Float32 (100 + n);
+     phys_reg Vec128 (100 + n); |]
 
 let destroy_neon_reg7 = destroy_neon_reg 7
 
@@ -377,20 +326,47 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     -> [||]
   | Op (Static_cast
           (V128_of_scalar _|Scalar_of_v128 _))
+  | Op (Intop Ipopcnt) ->
+      if !Arch.feat_cssc then
+        [||]
+      else
+        destroy_neon_reg7
+  | Op (Intop (Iadd  | Isub | Imul | Idiv|Imod|Iand|Ior|Ixor|Ilsl
+              |Ilsr|Iasr|Imulh _|Iclz _|Ictz _|Icomp _))
   | Op (Specific _
         | Move | Spill | Reload
         | Floatop _
         | Csel _
-        | Reinterpret_cast _ | Const_int _
+        | Const_int _
         | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _
         | Stackoffset _
-        | Intop _ | Intop_imm _ | Intop_atomic _
-        | Name_for_debugger _ | Probe_is_enabled _ | Opaque
-        | Begin_region | End_region | Dls_get)
-  | Poptrap _ | Prologue
+        | Intop_imm _ | Intop_atomic _
+        | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
+        | Begin_region | End_region | Dls_get | Tls_get)
+  | Poptrap _ | Prologue | Epilogue
+  | Op (Reinterpret_cast (Int_of_value | Value_of_int | Float_of_float32 |
+                          Float32_of_float | Float_of_int64 | Int64_of_float |
+                          Float32_of_int32 | Int32_of_float32 |
+                          V128_of_vec Vec128))
     -> [||]
-  | Stack_check _ -> assert false (* not supported *)
+  | Stack_check _ ->
+    (* This case is used by [Cfg_available_regs] *)
+    [||]
+  | Op (Const_vec256 _ | Const_vec512 _)
+  | Op (Load
+          {memory_chunk=(Twofiftysix_aligned|Twofiftysix_unaligned|
+                         Fivetwelve_aligned|Fivetwelve_unaligned);
+           _ })
+  | Op (Store
+          ((Twofiftysix_aligned|Twofiftysix_unaligned|
+            Fivetwelve_aligned|Fivetwelve_unaligned),
+            _, _))
+  | Op (Reinterpret_cast (V128_of_vec (Vec256 | Vec512) |
+                          V256_of_vec _ | V512_of_vec _))
+  | Op (Static_cast (V256_of_scalar _ | Scalar_of_v256 _ |
+                     V512_of_scalar _ | Scalar_of_v512 _))
+    -> Misc.fatal_error "arm64: got 256/512 bit vector"
 
 (* note: keep this function in sync with `is_destruction_point` below. *)
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
@@ -478,42 +454,67 @@ let slot_offset (loc : Reg.stack_location) ~stack_class ~stack_offset
 (* Calling the assembler *)
 
 let assemble_file infile outfile =
+  let dwarf_flag =
+    if !Clflags.native_code && !Clflags.debug then
+      Dwarf_flags.get_dwarf_as_toolchain_flag ()
+    else
+      ""
+  in
   Ccomp.command (Config.asm ^ " " ^
                  (String.concat " " (Misc.debug_prefix_map_flags ())) ^
+                 dwarf_flag ^
                  " -o " ^ Filename.quote outfile ^ " " ^ Filename.quote infile)
 
-
-let init () = ()
+let has_three_operand_float_ops () = false
 
 let operation_supported : Cmm.operation -> bool = function
-  | Cprefetch _ | Catomic _ -> false
+  | Cprefetch _ | Catomic _
+  | Creinterpret_cast (V128_of_vec (Vec256 | Vec512) |
+                       V256_of_vec _ | V512_of_vec _)
+  | Cstatic_cast (V256_of_scalar _ | Scalar_of_v256 _ |
+                  V512_of_scalar _ | Scalar_of_v512 _) ->
+    false
   | Cpopcnt
   | Cnegf Float32 | Cabsf Float32 | Caddf Float32
   | Csubf Float32 | Cmulf Float32 | Cdivf Float32
   | Cpackf32
-  | Creinterpret_cast (Float32_of_float | Float_of_float32 |
-                       Float32_of_int32 | Int32_of_float32 |
-                       V128_of_v128)
-  | Cstatic_cast (Float_of_float32 | Float32_of_float |
-                  Int_of_float Float32 | Float_of_int Float32 |
-                  V128_of_scalar _ | Scalar_of_v128 _)
   | Cclz _ | Cctz _ | Cbswap _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
-  | Ccmpi _ | Caddv | Cadda | Ccmpa _
+  | Ccmpi _ | Caddv | Cadda
   | Cnegf Float64 | Cabsf Float64 | Caddf Float64
   | Csubf Float64 | Cmulf Float64 | Cdivf Float64
-  | Creinterpret_cast (Int_of_value | Value_of_int |
-                       Int64_of_float | Float_of_int64)
-  | Cstatic_cast (Float_of_int Float64 | Int_of_float Float64)
   | Ccmpf _
   | Ccsel _
   | Craise _
-  | Cprobe _ | Cprobe_is_enabled _ | Copaque
+  | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpause
   | Cbeginregion | Cendregion | Ctuple_field _
   | Cdls_get
+  | Ctls_get
   | Cpoll
-    -> true
+  | Creinterpret_cast (Int_of_value | Value_of_int |
+                       Int64_of_float | Float_of_int64 |
+                       Float32_of_float | Float_of_float32 |
+                       Float32_of_int32 | Int32_of_float32 |
+                       V128_of_vec Vec128)
+  | Cstatic_cast (Float_of_float32 | Float32_of_float |
+                  Int_of_float Float32 | Float_of_int Float32 |
+                  Float_of_int Float64 | Int_of_float Float64 |
+                  V128_of_scalar _ | Scalar_of_v128 _) ->
+    true
 
-let trap_size_in_bytes = 16
+let expression_supported : Cmm.expression -> bool = function
+  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+  | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
+  | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
+  | Cexit _ -> true
+  | Cconst_vec256 _ | Cconst_vec512 _ -> false
+
+
+let trap_size_in_bytes () =
+  if !Clflags.llvm_backend
+  then
+    Misc.fatal_error
+      "Proc.trap_size_in_bytes: LLVM backend not supported for ARM"
+  else 16

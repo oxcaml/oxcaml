@@ -58,10 +58,7 @@ module type F2 = sig
   val four : 'a 'b 'd . 'a -> 'b -> 'c -> 'd -> 'a * 'b * 'c * 'd
 end
 [%%expect{|
-Line 2, characters 36-38:
-2 |   val four : 'a 'b 'd . 'a -> 'b -> 'c -> 'd -> 'a * 'b * 'c * 'd
-                                        ^^
-Error: The type variable "'c" is unbound in this type declaration.
+module type F2 = sig val four : 'a -> 'b -> 'c -> 'd -> 'a * 'b * 'c * 'd end
 |}]
 
 

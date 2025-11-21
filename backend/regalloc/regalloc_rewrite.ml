@@ -2,15 +2,13 @@
 
 open! Int_replace_polymorphic_compare
 open! Regalloc_utils
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 module Substitution = Regalloc_substitution
 
 module type State = sig
   type t
 
   val stack_slots : t -> Regalloc_stack_slots.t
-
-  val get_and_incr_instruction_id : t -> InstructionId.t
 end
 
 module type Utils = sig
@@ -87,11 +85,13 @@ let coalesce_temp_spills_and_reloads (block : Cfg.basic_block)
       match Reg.Tbl.find_opt var_to_block_temp var with
       | None -> Reg.Tbl.add var_to_block_temp var temp
       | Some block_temp -> replace temp block_temp)
-    | Reloadretaddr | Prologue | Pushtrap _ | Poptrap _ | Stack_check _
+    | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
+    | Stack_check _
     | Op
-        ( Move | Opaque | Begin_region | End_region | Dls_get | Poll
-        | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-        | Const_vec128 _ | Stackoffset _ | Load _
+        ( Move | Opaque | Begin_region | End_region | Dls_get | Tls_get | Poll
+        | Pause | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
+        | Load _
         | Store (_, _, _)
         | Intop _
         | Intop_imm (_, _)
@@ -148,9 +148,8 @@ let rewrite_gen :
   let spilled_map : Reg.t Reg.Tbl.t =
     List.fold_left spilled_nodes ~init:(Reg.Tbl.create 17)
       ~f:(fun spilled_map reg ->
-        let spilled = Reg.create reg.Reg.typ in
+        let spilled = Reg.create_with_typ_and_name reg in
         (* for printing *)
-        spilled.Reg.raw_name <- reg.Reg.raw_name;
         let slot =
           Regalloc_stack_slots.get_or_create (State.stack_slots state) reg
         in
@@ -164,9 +163,7 @@ let rewrite_gen :
   let new_inst_temporaries : Reg.t list ref = ref [] in
   let new_block_temporaries = ref [] in
   let make_new_temporary ~(move : Move.t) (reg : Reg.t) : Reg.t =
-    let res =
-      make_temporary ~same_class_and_base_name_as:reg ~name_prefix:"temp"
-    in
+    let res = Reg.create_with_typ_and_name ~prefix_if_var:"temp" reg in
     new_inst_temporaries := res :: !new_inst_temporaries;
     if debug
     then
@@ -214,16 +211,21 @@ let rewrite_gen :
           let from, to_ =
             match move_dir with Load -> spilled, temp | Store -> temp, spilled
           in
-          let new_instr =
-            Move.make_instr move
-              ~id:(State.get_and_incr_instruction_id state)
-              ~copy:instr ~from ~to_
+          let id =
+            InstructionId.get_and_incr
+              (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id
           in
+          let new_instr = Move.make_instr move ~id ~copy:instr ~from ~to_ in
           match direction with
           | Load_before_cell cell -> DLL.insert_before cell new_instr
-          | Store_after_cell cell -> DLL.insert_after cell new_instr
+          | Store_after_cell cell ->
+            (* See comment before Insert_skipping_name_for_debugger *)
+            Insert_skipping_name_for_debugger.insert_after cell new_instr
+              ~reg:from
           | Load_after_list list -> DLL.add_end list new_instr
-          | Store_before_list list -> DLL.add_begin list new_instr);
+          | Store_before_list list ->
+            (* See comment before Insert_skipping_name_for_debugger *)
+            Insert_skipping_name_for_debugger.add_begin list new_instr ~reg:from);
         temp)
       else reg
     in
@@ -296,12 +298,15 @@ let rewrite_gen :
           if not (DLL.is_empty new_instrs)
           then
             (* insert block *)
+            (* CR-soon xclerc for xclerc: now that we preprocess critical nodes,
+               no insertion should occur here. *)
             let (_ : Cfg.basic_block list) =
               Cfg_with_layout.insert_block
                 (Cfg_with_infos.cfg_with_layout cfg_with_infos)
                 new_instrs ~after:block ~before:None
                 ~next_instruction_id:(fun () ->
-                  State.get_and_incr_instruction_id state)
+                  InstructionId.get_and_incr
+                    (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id)
             in
             block_insertion := true);
       if !block_rewritten && should_coalesce_temp_spills_and_reloads
@@ -325,6 +330,58 @@ let rewrite_gen :
    above. *)
 let threshold_split_live_ranges = 1024
 
+(* A critical edge is an edge such that the source has several successors and
+   the destination has several predecessors. Such edges are problematic because
+   if an instruction needs to be inserted between the source and the
+   destination, a block will need to be inserted. *)
+let compute_critical_edges : Cfg.t -> Cfg_edge.Set.t =
+ fun cfg ->
+  Cfg.fold_blocks cfg ~init:Cfg_edge.Set.empty
+    ~f:(fun label block critical_edges ->
+      match block.exn with
+      | Some _ -> critical_edges
+      | None -> (
+        let successor_labels =
+          Cfg.successor_labels ~normal:true ~exn:false block
+        in
+        match Label.Set.cardinal successor_labels with
+        | 0 | 1 -> critical_edges
+        | _ ->
+          Label.Set.fold
+            (fun successor_label critical_edges ->
+              let successor_block = Cfg.get_block_exn cfg successor_label in
+              if (not (Cfg.can_raise_terminator block.terminator.desc))
+                 && (not (Label.equal label successor_label))
+                 && Label.Set.cardinal successor_block.predecessors > 1
+              then (
+                assert (not successor_block.is_trap_handler);
+                Cfg_edge.Set.add
+                  { Cfg_edge.src = label; dst = successor_label }
+                  critical_edges)
+              else critical_edges)
+            successor_labels critical_edges))
+
+(* A destruction edge is an edge following a destruction point. We are inserting
+   blocks on such edges to work around a bug in the split processing phase where
+   such an edge points to a block with another predecessor and that predecessor
+   has not spilled the temporaries destroyed at the destruction point. *)
+let compute_destruction_edges : Cfg.t -> Cfg_edge.Set.t =
+ fun cfg ->
+  Cfg.fold_blocks cfg ~init:Cfg_edge.Set.empty
+    ~f:(fun label block critical_edges ->
+      match Regalloc_split_utils.destruction_point_at_end block with
+      | None | Some Destruction_only_on_exceptional_path -> critical_edges
+      | Some Destruction_on_all_paths ->
+        let successor_labels : Label.Set.t =
+          Cfg.successor_labels ~normal:true ~exn:false block
+        in
+        Label.Set.fold
+          (fun successor_label critical_edges ->
+            Cfg_edge.Set.add
+              { Cfg_edge.src = label; dst = successor_label }
+              critical_edges)
+          successor_labels critical_edges)
+
 let prelude :
     (module Utils) ->
     on_fatal_callback:(unit -> unit) ->
@@ -333,13 +390,54 @@ let prelude :
  fun (module Utils) ~on_fatal_callback cfg_with_infos ->
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   on_fatal ~f:on_fatal_callback;
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  (* Extract function-specific regalloc params from codegen_options *)
+  let params =
+    List.concat_map cfg.fun_codegen_options ~f:(function
+      | Cfg.Use_regalloc_param params -> params
+      | Cfg.Reduce_code_size | Cfg.No_CSE | Cfg.Use_linscan_regalloc
+      | Cfg.Use_regalloc _ | Cfg.Cold | Cfg.Assume_zero_alloc _
+      | Cfg.Check_zero_alloc _ ->
+        [])
+  in
+  set_function_specific_params params;
   if debug
-  then Utils.log "run (%S)" (Cfg_with_layout.cfg cfg_with_layout).fun_name;
-  Reg.reinit ();
+  then (
+    Utils.log "run (%S)" cfg.fun_name;
+    match params with
+    | [] -> ()
+    | params ->
+      Utils.log "function_specific_params: %s" (String.concat ", " params));
+  Reg.reinit_relocatable_regs ();
   if debug && Lazy.force invariants
   then (
     Utils.log "precondition";
     Regalloc_invariants.precondition cfg_with_layout);
+  (* We identify critical edges, and pre-emptively insert block so that the
+     register allocator will not have to change the shape of the CFG. *)
+  let critical_edges =
+    Cfg_edge.Set.union
+      (compute_critical_edges cfg)
+      (compute_destruction_edges cfg)
+  in
+  if not (Cfg_edge.Set.is_empty critical_edges)
+  then (
+    let next_instruction_id () =
+      InstructionId.get_and_incr
+        (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id
+    in
+    Cfg_edge.Set.iter
+      (fun { Cfg_edge.src; dst } ->
+        let (_inserted_blocks : Cfg.basic_block list) =
+          Cfg_with_layout.insert_block cfg_with_layout (DLL.make_empty ())
+            ~after:(Cfg.get_block_exn cfg src)
+            ~before:(Some (Cfg.get_block_exn cfg dst))
+            ~next_instruction_id
+        in
+        ())
+      critical_edges;
+    Cfg_with_infos.invalidate_liveness cfg_with_infos;
+    Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos);
   let cfg_infos = collect_cfg_infos cfg_with_layout in
   let num_temporaries =
     (* note: this should probably be `Reg.Set.cardinal (Reg.Set.union
@@ -355,7 +453,7 @@ let prelude :
   then
     let stack_slots =
       Profile.record ~accumulate:true "split"
-        (fun () -> Regalloc_split.split_live_ranges cfg_with_infos cfg_infos)
+        (fun () -> Regalloc_split.split_live_ranges cfg_with_infos)
         ()
     in
     let cfg_infos = collect_cfg_infos cfg_with_layout in
@@ -389,7 +487,6 @@ let postlude :
         Utils.log "stack_slots[%a]=%d" Stack_class.print stack_class
           num_stack_slots);
     Utils.dedent ());
-  remove_prologue_if_not_required cfg_with_layout;
   update_live_fields cfg_with_layout (Cfg_with_infos.liveness cfg_with_infos);
   f ();
   if debug && Lazy.force invariants

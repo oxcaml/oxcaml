@@ -128,11 +128,11 @@ val continuations_including_in_trap_actions : t -> Continuation.Set.t
 
 val function_slots_in_normal_projections : t -> Function_slot.Set.t
 
-val all_function_slots : t -> Function_slot.Set.t
+val all_function_slots_at_normal_mode : t -> Function_slot.Set.t
 
 val value_slots_in_normal_projections : t -> Value_slot.Set.t
 
-val all_value_slots : t -> Value_slot.Set.t
+val all_value_slots_at_normal_mode : t -> Value_slot.Set.t
 
 val symbols : t -> Symbol.Set.t
 
@@ -147,6 +147,8 @@ val code_ids_and_newer_version_of_code_ids : t -> Code_id.Set.t
 val without_code_ids : t -> t
 
 val with_only_variables : t -> t
+
+val with_only_names : t -> t
 
 (** The value returned by this function only records occurrences in two fields:
 
@@ -168,6 +170,8 @@ val mem_symbol : t -> Symbol.t -> bool
 val mem_name : t -> Name.t -> bool
 
 val mem_code_id : t -> Code_id.t -> bool
+
+val mem_continuation : t -> Continuation.t -> bool
 
 val value_slot_is_used_or_imported : t -> Value_slot.t -> bool
 

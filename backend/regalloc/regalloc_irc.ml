@@ -11,9 +11,9 @@ let filter_unavailable : Reg.t array -> Reg.t array =
     match reg.loc with
     | Unknown -> true
     | Reg r ->
-      let reg_class = Proc.register_class reg in
-      r - Proc.first_available_register.(reg_class)
-      < Proc.num_available_registers.(reg_class)
+      let reg_class = Reg_class.of_machtype reg.typ in
+      r - Reg_class.first_available_register reg_class
+      < Reg_class.num_available_registers reg_class
     | Stack _ -> true
   in
   let num_available =
@@ -62,7 +62,7 @@ let build : State.t -> Cfg_with_infos.t -> unit =
       if is_move_instruction instr
          && (not (Reg.is_stack instr.arg.(0)))
          && (not (Reg.is_stack instr.res.(0)))
-         && same_reg_class instr.arg.(0) instr.res.(0)
+         && Proc.types_are_compatible instr.arg.(0) instr.res.(0)
       then (
         State.add_move_list state instr.arg.(0) instr;
         if not (Reg.same instr.arg.(0) instr.res.(0))
@@ -205,13 +205,7 @@ let coalesce : State.t -> unit =
     if debug then log "case #1/4";
     State.add_coalesced_moves state m;
     add_work_list state u)
-  else if State.is_precolored state v
-          || (* We must not alias v->u if u uses the same register as a neighbor
-                of v. Simply checking whether u and v are adjacent is not
-                sufficient because the interference graph treats machine
-                registers aliased at multiple types (e.g. xmm0 at float32,
-                float, and vec128) as disjoint. *)
-          State.interferes_with_adj state v u
+  else if State.is_precolored state v || State.mem_adj_set state v u
   then (
     if debug then log "case #2/4";
     State.add_constrained_moves state m;
@@ -329,13 +323,9 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
       then (
         log "%a" Printreg.reg n;
         indent ());
-      let reg_class = Proc.register_class n in
-      let reg_num_avail =
-        Array.unsafe_get Proc.num_available_registers reg_class
-      in
-      let reg_first_avail =
-        Array.unsafe_get Proc.first_available_register reg_class
-      in
+      let reg_class = Reg_class.of_machtype n.typ in
+      let reg_num_avail = Reg_class.num_available_registers reg_class in
+      let reg_first_avail = Reg_class.first_available_register reg_class in
       let ok_colors = Array.make reg_num_avail true in
       let counter = ref reg_num_avail in
       let rec mark_adjacent_colors_and_get_first_available (adj : Reg.t list) :
@@ -423,8 +413,13 @@ let rewrite :
    seems to be fine with 4 *)
 let max_rounds = 50
 
+module For_testing = struct
+  let rounds = ref (-1)
+end
+
 let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
  fun ~round state cfg_with_infos ->
+  For_testing.rounds := round;
   if round > max_rounds
   then
     fatal "register allocation was not succesful after %d rounds (%s)"
@@ -530,9 +525,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
   let all_temporaries = Reg.Set.union cfg_infos.arg cfg_infos.res in
   if debug then log "#temporaries=%d" (Reg.Set.cardinal all_temporaries);
   let state =
-    State.make
-      ~initial:(Reg.Set.elements all_temporaries)
-      ~stack_slots ~last_used:cfg_infos.max_instruction_id ()
+    State.make ~initial:(Reg.Set.elements all_temporaries) ~stack_slots ()
   in
   let spilling_because_unused = Reg.Set.diff cfg_infos.res cfg_infos.arg in
   (match Reg.Set.elements spilling_because_unused with

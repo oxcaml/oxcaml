@@ -35,7 +35,9 @@ module Serializable : sig
   val create : Pre_serializable.t -> reachable_names:Name_occurrences.t -> t
 
   val create_from_closure_conversion_approx :
-    'a Value_approximation.t Symbol.Map.t -> t
+    machine_width:Target_system.Machine_width.t ->
+    'a Value_approximation.t Symbol.Map.t ->
+    t
 
   val predefined_exceptions : Symbol.Set.t -> t
 
@@ -77,26 +79,19 @@ module Join_env : sig
   val already_joining : t -> Simple.t -> Simple.t -> bool
 end
 
-type 'a meet_return_value =
-  | Left_input
-  | Right_input
-  | Both_inputs
-  | New_result of 'a
-
-type meet_type =
-  t ->
-  Type_grammar.t ->
-  Type_grammar.t ->
-  (Type_grammar.t meet_return_value * t) Or_bottom.t
-
 val print : Format.formatter -> t -> unit
 
 val create :
+  machine_width:Target_system.Machine_width.t ->
   resolver:(Compilation_unit.t -> Serializable.t option) ->
   get_imported_names:(unit -> Name.Set.t) ->
   t
 
+val machine_width : t -> Target_system.Machine_width.t
+
 val is_bottom : t -> bool
+
+val make_bottom : t -> t
 
 val closure_env : t -> t
 
@@ -109,14 +104,24 @@ val current_scope : t -> Scope.t
 
 val increment_scope : t -> t
 
+val add_variable_definition :
+  t -> Variable.t -> Flambda_kind.t -> Name_mode.t -> t
+
 val add_definition : t -> Bound_name.t -> Flambda_kind.t -> t
 
-(** The caller is to ensure that the supplied type is the most precise available
-    for the given name. *)
-val add_equation : t -> Name.t -> Type_grammar.t -> meet_type:meet_type -> t
+val replace_equation : t -> Name.t -> Type_grammar.t -> t
 
-val add_equation_strict :
-  t -> Name.t -> Type_grammar.t -> meet_type:meet_type -> t Or_bottom.t
+type add_alias_result =
+  { canonical_element : Simple.t;
+    demoted_name : Name.t;
+    t : t
+  }
+
+val add_alias :
+  t ->
+  canonical_element1:Simple.t ->
+  canonical_element2:Simple.t ->
+  add_alias_result Or_unknown_or_bottom.t
 
 val add_definitions_of_params : t -> params:Bound_parameters.t -> t
 
@@ -127,13 +132,6 @@ val add_symbol_definitions : t -> Symbol.Set.t -> t
 val add_symbol_projection : t -> Variable.t -> Symbol_projection.t -> t
 
 val find_symbol_projection : t -> Variable.t -> Symbol_projection.t option
-
-val add_equations_on_params :
-  t ->
-  params:Bound_parameters.t ->
-  param_types:Type_grammar.t list ->
-  meet_type:meet_type ->
-  t
 
 (** If the kind of the name is known, it should be specified, otherwise it can
     be omitted. Such omission will cause an error if the name satisfies
@@ -153,26 +151,14 @@ val mem_simple : ?min_name_mode:Name_mode.t -> t -> Simple.t -> bool
 val alias_is_bound_strictly_earlier :
   t -> bound_name:Name.t -> alias:Simple.t -> bool
 
-(* CR vlaviron: If the underlying level in the extension defines several
-   variables, then there is no guarantee that the binding order in the result
-   will match the binding order used to create the level. If they don't match,
-   then adding equations in the wrong order can make equations disappear. *)
-val add_env_extension : t -> Typing_env_extension.t -> meet_type:meet_type -> t
-
-val add_env_extension_maybe_bottom :
-  t -> Typing_env_extension.t -> meet_type:meet_type -> t
-
-val add_env_extension_strict :
-  t -> Typing_env_extension.t -> meet_type:meet_type -> t Or_bottom.t
-
-val add_env_extension_with_extra_variables :
-  t -> Typing_env_extension.With_extra_variables.t -> meet_type:meet_type -> t
-
-val add_env_extension_from_level :
-  t -> Typing_env_level.t -> meet_type:meet_type -> t
+(** [stable_compare_simples t simple1 simple2] is a total extension of the
+    binding time order that does not depend on [Int_ids] hashing. *)
+val stable_compare_simples : t -> Simple.t -> Simple.t -> int
 
 val type_simple_in_term_exn :
   t -> ?min_name_mode:Name_mode.t -> Simple.t -> Type_grammar.t * Simple.t
+
+val get_canonical_simple_ignoring_name_mode : t -> Simple.t -> Simple.t
 
 (** [name_mode_of_existing_simple] can be provided to improve performance of
     this function. *)

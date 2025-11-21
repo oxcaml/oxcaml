@@ -57,7 +57,7 @@ let use_printers x =
          | None | exception _ -> conv tl
          | Some s -> Some s)
     | [] -> None in
-  conv (Atomic.Contended.get printers)
+  conv (Atomic.get printers)
 
 let destruct_ext_constructor x =
   if Obj.tag x <> 0 then
@@ -108,9 +108,17 @@ let catch fct arg =
 
 type raw_backtrace_slot : immutable_data
 type raw_backtrace_entry = private int
-type raw_backtrace = raw_backtrace_entry array
+type raw_backtrace = raw_backtrace_entry iarray
 
-let raw_backtrace_entries bt = bt
+external unsafe_iarray_to_array:
+  'a iarray -> 'a array @@ portable = "%array_of_iarray"
+
+external iarray_length:
+  'a iarray -> int @@ portable = "%array_length"
+
+let to_array bt = Array.copy (unsafe_iarray_to_array bt)
+
+let raw_backtrace_entries bt = to_array bt
 
 external get_raw_backtrace:
   unit -> raw_backtrace @@ portable = "caml_get_exception_raw_backtrace"
@@ -261,7 +269,7 @@ let backtrace_slots raw_backtrace =
       else None
 
 let backtrace_slots_of_raw_entry entry =
-  backtrace_slots [| entry |]
+  backtrace_slots [: entry :]
 
 module Slot = struct
   type t = backtrace_slot
@@ -272,7 +280,7 @@ module Slot = struct
   let name = backtrace_slot_defname
 end
 
-let raw_backtrace_length bt = Array.length bt
+let raw_backtrace_length bt = iarray_length bt
 
 external get_raw_backtrace_slot :
   raw_backtrace -> int -> raw_backtrace_slot @@ portable = "caml_raw_backtrace_slot"
@@ -289,9 +297,9 @@ external record_backtrace: bool -> unit @@ portable = "caml_record_backtrace"
 external backtrace_status: unit -> bool @@ portable = "caml_backtrace_status"
 
 let rec register_printer_safe fn =
-  let old_printers = Atomic.Contended.get printers in
+  let old_printers = Atomic.get printers in
   let new_printers = { Modes.Portable.portable = fn } :: old_printers in
-  let success = Atomic.Contended.compare_and_set printers old_printers new_printers in
+  let success = Atomic.compare_and_set printers old_printers new_printers in
   if not success then register_printer_safe fn
 
 let register_printer_unsafe fn = register_printer_safe (Obj.magic_portable fn)
@@ -345,12 +353,12 @@ let uncaught_exception_handler =
   Atomic.make { Modes.Portable.portable = default_uncaught_exception_handler }
 
 let set_uncaught_exception_handler_safe fn =
-  Atomic.Contended.set uncaught_exception_handler { Modes.Portable.portable = fn }
+  Atomic.set uncaught_exception_handler { Modes.Portable.portable = fn }
 
 let set_uncaught_exception_handler_unsafe fn =
   set_uncaught_exception_handler_safe (Obj.magic_portable fn)
 
-let empty_backtrace : raw_backtrace = [| |]
+let empty_backtrace : raw_backtrace = [: :]
 
 let try_get_raw_backtrace () =
   try
@@ -370,7 +378,7 @@ let handle_uncaught_exception' exn debugger_in_use =
     in
     (try Stdlib.do_at_exit () with _ -> ());
     try
-      (Atomic.Contended.get uncaught_exception_handler).portable exn raw_backtrace
+      (Atomic.get uncaught_exception_handler).portable exn raw_backtrace
     with exn' ->
       let raw_backtrace' = try_get_raw_backtrace () in
       eprintf "Fatal error: exception %s\n" (to_string exn);

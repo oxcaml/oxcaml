@@ -27,6 +27,8 @@ let c_compiler = boot_cannot_call "the C compiler"
 let c_output_obj = ""
 let c_has_debug_prefix_map = false
 let as_has_debug_prefix_map = false
+let as_compress_debug_sections_flag = ""
+let cc_compress_debug_sections_flag = ""
 let ocamlc_cflags = ""
 let ocamlc_cppflags = ""
 let ocamlopt_cflags = ""
@@ -84,3 +86,4 @@ let runtime5 = false
 let no_stack_checks = false
 (* This setting is only for bootstrap, does not affect dune-built compilers: *)
 let naked_pointers = false
+let parameterised_modules = true

@@ -35,10 +35,12 @@ val create_let_binding :
   Rebuilt_expr.t * Upwards_acc.t
 
 type binding_to_place =
-  { let_bound : Bound_pattern.t;
-    simplified_defining_expr : Simplified_named.t;
-    original_defining_expr : Named.t option
-  }
+  | Keep_binding of
+      { let_bound : Bound_pattern.t;
+        simplified_defining_expr : Simplified_named.t;
+        original_defining_expr : Named.t option
+      }
+  | Delete_binding of { original_defining_expr : Named.t option }
 
 (** Create [Let] binding(s) around a given body. (The type of this function
     prevents it from being used to create "let symbol" bindings; use the other
@@ -84,7 +86,7 @@ val create_switch :
   Upwards_acc.t ->
   condition_dbg:Debuginfo.t ->
   scrutinee:Simple.t ->
-  arms:Apply_cont.t Targetint_31_63.Map.t ->
+  arms:Apply_cont.t Target_ocaml_int.Map.t ->
   Rebuilt_expr.t * Upwards_acc.t
 
 type new_let_cont =
@@ -122,7 +124,8 @@ type rewrite_switch_arm_result = private
   | Apply_cont of Apply_cont.t
   | New_wrapper of new_let_cont
 
-val no_rewrite_apply_cont : Apply_cont.t -> rewrite_apply_cont_result
+val no_rewrite_apply_cont :
+  Upwards_env.t -> Apply_cont.t -> rewrite_apply_cont_result
 
 val rewrite_apply_cont :
   Upwards_acc.t ->

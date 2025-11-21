@@ -41,6 +41,12 @@ type upstream_compat_warning =
       [t : float64] is marked as unboxed. *)
   | Unboxed_attribute of string (* example: unboxed attribute
       on an external declaration with float# is missing. *)
+  | Immediate_void_variant
+      (* example: [type t = A of void] is immediate, but
+         not after erasure, which boxes void, so it can't be erased. *)
+  | Separability_check
+      (* example: [type packed = | Mk of 'a t [@@unboxed]]
+         where ['a t : value mod non_float]. *)
 
 type name_out_of_scope_warning =
   | Name of string
@@ -72,8 +78,8 @@ type t =
   | Useless_record_with of string           (* 23 *)
   | Bad_module_name of string               (* 24 *)
   | All_clauses_guarded                     (* 8, used to be 25 *)
-  | Unused_var of string                    (* 26 *)
-  | Unused_var_strict of string             (* 27 *)
+  | Unused_var of { name : string ; mutated : bool } (* 26 *)
+  | Unused_var_strict of { name : string ; mutated : bool } (* 27 *)
   | Wildcard_arg_to_constant_constr         (* 28 *)
   | Eol_in_string                           (* 29 *)
   | Duplicate_definitions of string * string * string * string (*30 *)
@@ -105,7 +111,9 @@ type t =
   | Inlining_impossible of string           (* 55 *)
   | Unreachable_case                        (* 56 *)
   | Ambiguous_var_in_pattern_guard of string list (* 57 *)
-  | No_cmx_file of string                   (* 58 *)
+  | No_cmx_file of
+      { missing_extension : string;
+        module_name : string }              (* 58 *)
   | Flambda_assignment_to_non_mutable_value (* 59 *)
   | Unused_module of string                 (* 60 *)
   | Unboxable_type_in_prim_decl of string   (* 61 *)
@@ -122,6 +130,7 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
+  | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
   | Unnecessarily_partial_tuple_pattern     (* 189 *)
@@ -131,6 +140,12 @@ type t =
   | Unboxing_impossible                     (* 210 *)
   | Mod_by_top of string                    (* 211 *)
   (* 212 taken *)
+  | Modal_axis_specified_twice of
+    { axis : string;
+      overriden_by : string;
+    } (* 213 *)
+  | Atomic_float_record_boxed               (* 214 *)
+  | Implied_attribute of { implying: string; implied : string} (* 215 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -212,6 +227,7 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
+  | Unmutated_mutable _ -> 186
   | Incompatible_with_upstream _ -> 187
   | Unerasable_position_argument -> 188
   | Unnecessarily_partial_tuple_pattern -> 189
@@ -220,6 +236,9 @@ let number = function
   | Unchecked_zero_alloc_attribute -> 199
   | Unboxing_impossible -> 210
   | Mod_by_top _ -> 211
+  | Modal_axis_specified_twice _ -> 213
+  | Atomic_float_record_boxed -> 214
+  | Implied_attribute _ -> 215
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -565,6 +584,12 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
+  { number = 186;
+    names = ["unmutated-mutable"];
+    description =
+    "Mutable variable was never mutated: mutable variable that\n\
+    \    doesn't start with an underscore (\"_\") character was never mutated.";
+    since = since 5 2 };
   { number = 187;
     names = ["incompatible-with-upstream"];
     description = "Extension usage is incompatible with upstream.";
@@ -600,6 +625,15 @@ let descriptions = [
     names = ["mod-by-top"];
     description = "Including the top-most element of an axis in a kind's modifiers is a no-op.";
     since = since 4 14 };
+  { number = 214;
+    names = ["atomic-float-record-boxed"];
+    description = "Record contains atomic float fields, preventing the flat\n\
+                   float record optimization.";
+    since = since 4 14 };
+  { number = 215;
+    names = ["implied-attribute"];
+    description = "An attribute is unused because it is implied by another.";
+    since = since 4 14 };
 ]
 
 let name_to_number =
@@ -611,7 +645,10 @@ let name_to_number =
 
 (* Must be the max number returned by the [number] function. *)
 
-let letter = function
+let parsed_ocamlparam = ref "<not-set>"
+
+(* CR-soon xclerc for xclerc: remove the `for_debug` parameter... *)
+let letter for_debug = function
   | 'a' ->
      let rec loop i = if i = 0 then [] else i :: loop (i - 1) in
      loop last_warning_number
@@ -640,7 +677,9 @@ let letter = function
   | 'x' -> [14; 15; 16; 17; 18; 19; 20; 21; 22; 23; 24; 30]
   | 'y' -> [26]
   | 'z' -> [27]
-  | _ -> assert false
+  | chr ->
+    let ocamlparam_from_env = match Sys.getenv_opt "OCAMLPARAM" with None -> "-" | Some  value -> value in
+    Misc.fatal_errorf "Warnings.letter %C (for_debug=%S, ocamlparam_from_env=%S ocamlparam_from_compenv=%S)" chr for_debug ocamlparam_from_env !parsed_ocamlparam
 
 type state =
   {
@@ -899,7 +938,7 @@ let parse_opt error active errflag s =
           | None -> if c = lc then Clear else Set
           | Some m -> m
         in
-        List.iter (action modifier) (letter lc)
+        List.iter (action modifier) (letter s lc)
     | Num(n1,n2,modifier) ->
         for n = n1 to Misc.Stdlib.Int.min n2 last_warning_number do action modifier n done
   in
@@ -1007,7 +1046,12 @@ let message = function
   | All_clauses_guarded ->
       "this pattern-matching is not exhaustive.\n\
        All clauses in this pattern-matching are guarded."
-  | Unused_var v | Unused_var_strict v -> "unused variable " ^ v ^ "."
+  | Unused_var { name = v; mutated = false }
+  | Unused_var_strict { name = v; mutated = false } ->
+    "unused variable " ^ v ^ "."
+  | Unused_var { name = v; mutated = true }
+  | Unused_var_strict { name = v; mutated = true } ->
+    "variable " ^ v ^ " was mutated but never used."
   | Wildcard_arg_to_constant_constr ->
      "wildcard pattern given as argument to a constant constructor"
   | Eol_in_string ->
@@ -1138,10 +1182,11 @@ let message = function
          Only the first match will be used to evaluate the guard expression.\n\
          %a"
         vars_explanation Misc.print_see_manual ref_manual
-  | No_cmx_file name ->
+  | No_cmx_file { missing_extension; module_name } ->
       Printf.sprintf
-        "no cmx file was found in path for module %s, \
-         and its interface was not compiled with -opaque" name
+        "no %s file was found in path for module %s, \
+         and its interface was not compiled with -opaque"
+        missing_extension module_name
   | Flambda_assignment_to_non_mutable_value ->
       "A potential assignment to a non-mutable value was detected \n\
         in this source file.  Such assignments may generate incorrect code \n\
@@ -1203,6 +1248,7 @@ let message = function
   | Generative_application_expects_unit ->
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
+  | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
   | Incompatible_with_upstream (Immediate_erasure id)  ->
       Printf.sprintf
       "Usage of layout immediate/immediate64 in %s \n\
@@ -1220,6 +1266,14 @@ let message = function
       "[@unboxed] attribute must be added to external declaration \n\
        argument type with layout %s for upstream compatibility."
       layout
+  | Incompatible_with_upstream Immediate_void_variant ->
+      "This variant is immediate \n\
+       because all its constructors have all-void arguments, but after \n\
+       erasure for upstream compatibility, void is no longer zero-width, \n\
+       so it won't be immediate."
+  | Incompatible_with_upstream Separability_check ->
+      "This type relies on OxCaml's extended separability checking \n\
+       and would not be accepted by upstream OCaml."
   | Unerasable_position_argument -> "this position argument cannot be erased."
   | Unnecessarily_partial_tuple_pattern ->
       "This tuple pattern\n\
@@ -1251,6 +1305,20 @@ let message = function
         "%s is the top-most modifier.\n\
          Modifying by a top element is a no-op."
         modifier
+  | Modal_axis_specified_twice {axis; overriden_by} ->
+    Printf.sprintf
+      "This %s is overriden by %s later."
+      axis overriden_by
+  | Atomic_float_record_boxed ->
+    Printf.sprintf
+      "This record contains atomic\n\
+       float fields, which prevents the float record optimization. The\n\
+       fields of this record will be boxed instead of being\n\
+       represented as a flat float array."
+  | Implied_attribute { implying; implied } ->
+    Printf.sprintf
+      "attribute [@%s] is unused because it is implied by [@%s]"
+      implied implying
 ;;
 
 let nerrors = ref 0
@@ -1343,7 +1411,7 @@ let help_warnings () =
   print_endline "  A all warnings";
   for i = Char.code 'b' to Char.code 'z' do
     let c = Char.chr i in
-    match letter c with
+    match letter "<help-warnings>" c with
     | [] -> ()
     | [n] ->
         Printf.printf "  %c Alias for warning %i.\n" (Char.uppercase_ascii c) n

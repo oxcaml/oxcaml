@@ -1,5 +1,6 @@
 (* TEST
  include stdlib_upstream_compatible;
+ include stdlib_stable;
  flags = "-extension layouts_beta";
  expect;
 *)
@@ -11,6 +12,8 @@ module Float_u = Stdlib_upstream_compatible.Float_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int_u = Stdlib_stable.Int_u
+module Char_u = Stdlib_stable.Char_u
 
 let test_float s f =
   Format.printf "%s: %f\n" s (Float_u.to_float f); Format.print_flush ()
@@ -20,16 +23,24 @@ let test_int64 s f =
   Format.printf "%s: %Ld\n" s (Int64_u.to_int64 f); Format.print_flush ()
 let test_nativeint s f =
   Format.printf "%s: %s\n" s (Nativeint_u.to_string f); Format.print_flush ()
+let test_int s f =
+  Format.printf "%s: %d\n" s (Int_u.to_int f); Format.print_flush ()
+let test_char s f =
+  Format.printf "%s: %C\n" s (Char_u.to_char f); Format.print_flush ()
 
 [%%expect{|
 module Float_u = Stdlib_upstream_compatible.Float_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int_u = Stdlib_stable.Int_u
+module Char_u = Stdlib_stable.Char_u
 val test_float : string -> Float_u.t -> unit = <fun>
 val test_int32 : string -> Int32_u.t -> unit = <fun>
 val test_int64 : string -> Int64_u.t -> unit = <fun>
 val test_nativeint : string -> Nativeint_u.t -> unit = <fun>
+val test_int : string -> int# -> unit = <fun>
+val test_char : string -> char# -> unit = <fun>
 |}]
 
 (*****************************************)
@@ -169,6 +180,47 @@ Line 1, characters 36-51:
 Error: Integer literal exceeds the range of representable integers of type "int32#"
 |}]
 
+let () = test_int "invalid_int" (#0x8000000000000000m)
+[%%expect{|
+Line 1, characters 32-54:
+1 | let () = test_int "invalid_int" (#0x8000000000000000m)
+                                    ^^^^^^^^^^^^^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int#"
+|}]
+
+let () = test_int "max_int + 1" (#4611686018427387904m)
+[%%expect{|
+max_int + 1: -4611686018427387904
+|}]
+
+let () = test_int "max_int + 2" (#4611686018427387905m)
+[%%expect{|
+Line 1, characters 32-55:
+1 | let () = test_int "max_int + 2" (#4611686018427387905m)
+                                    ^^^^^^^^^^^^^^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int#"
+|}]
+
+let () = test_char "untagged char" #'c'
+[%%expect{|
+untagged char: 'c'
+|}]
+
+let () = test_char "untagged octal char" #'\o000'
+[%%expect{|
+untagged octal char: '\000'
+|}]
+
+let () = test_char "untagged hex char" #'\xFF'
+[%%expect{|
+untagged hex char: '\255'
+|}]
+
+let () = test_char "untagged decimal char" #'\222'
+[%%expect{|
+untagged decimal char: '\222'
+|}]
+
 (*****************************************)
 (* Patterns *)
 
@@ -274,6 +326,33 @@ val f : float# -> float# = <fun>
 Exception: Match_failure ("", 2, 2).
 |}];;
 
+let f x =
+  match x with
+  | #0m -> -#4m
+  | #1m -> -#3m
+  | #2m -> -#2m
+  | #3m -> -#1m
+  | #4m -> #0m
+  | #5m -> #1m
+;;
+test_int "result" (f #10m);;
+(* This is here to test the [partial-match] warning *)
+[%%expect {|
+Lines 2-8, characters 2-14:
+2 | ..match x with
+3 |   | #0m -> -#4m
+4 |   | #1m -> -#3m
+5 |   | #2m -> -#2m
+6 |   | #3m -> -#1m
+7 |   | #4m -> #0m
+8 |   | #5m -> #1m
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+#6m
+
+val f : int# -> int# = <fun>
+Exception: Match_failure ("", 2, 2).
+|}];;
 
 (*****************************************)
 (* Lexing edge cases *)

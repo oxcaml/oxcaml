@@ -22,83 +22,19 @@
  (modules :standard \ topstart expunge))
 
 (rule
+  (target stdlib-modules)
+  (deps StdlibModules)
+  (action (with-stdout-to %{target}
+    (run make -f %{dep:Makefile.modules}))))
+
+(copy_files ../../stdlib/StdlibModules)
+
+(rule
  (targets bytetop)
- ; This should be generated from the stdlib modules files
- (action (run %{ocaml_where}/../../bin/ocamlrun 
+ (action (run %{ocaml_where}/../../bin/ocamlrun
               -I ../../middle_end/flambda2/numbers/floats
               %{exe:../expunge.bc} %{dep:../topstart.bc} %{targets}
-                    stdlib__Arg
-                    stdlib__Array
-                    stdlib__ArrayLabels
-                    stdlib__Bigarray
-                    stdlib__Bool
-                    stdlib__Buffer
-                    stdlib__Bytes
-                    stdlib__BytesLabels
-                    stdlib__Callback
-                    camlinternalFormat
-                    camlinternalFormatBasics
-                    camlinternalLazy
-                    camlinternalMod
-                    camlinternalComprehension
-                    camlinternalOO
-                    camlinternalAtomic
-                    stdlib__Char
-                    stdlib__Complex
-                    stdlib__Digest
-                    stdlib__Domain
-                    stdlib__Either
-                    stdlib__Effect
-                    stdlib__Ephemeron
-                    stdlib__Filename
-                    stdlib__Float
-                    stdlib__Float_u
-                    stdlib__Format
-                    stdlib__Fun
-                    stdlib__Gc
-                    stdlib__Genlex
-                    stdlib__Hashtbl
-                    stdlib__Iarray
-                    stdlib__IarrayLabels
-                    stdlib__In_channel
-                    stdlib__Int
-                    stdlib__Int32
-                    stdlib__Int32_u
-                    stdlib__Int64
-                    stdlib__Int64_u
-                    stdlib__Lazy
-                    stdlib__Lexing
-                    stdlib__List
-                    stdlib__ListLabels
-                    stdlib__Map
-                    stdlib__Marshal
-                    stdlib__MoreLabels
-                    stdlib__Nativeint
-                    stdlib__Nativeint_u
-                    stdlib__Obj
-                    stdlib__Oo
-                    stdlib__Option
-                    stdlib__Out_channel
-                    stdlib__Parsing
-                    stdlib__Pervasives
-                    stdlib__Printexc
-                    stdlib__Printf
-                    stdlib__Queue
-                    stdlib__Random
-                    stdlib__Result
-                    stdlib__Scanf
-                    stdlib__Seq
-                    stdlib__Set
-                    stdlib__Stack
-                    stdlib__StdLabels
-                    stdlib
-                    stdlib__Stream
-                    stdlib__String
-                    stdlib__StringLabels
-                    stdlib__Sys
-                    stdlib__Uchar
-                    stdlib__Unit
-                    stdlib__Weak
+                    %{read-lines:stdlib-modules}
                     ; the rest
                     outcometree topdirs topeval toploop topmain topcommon
  )))

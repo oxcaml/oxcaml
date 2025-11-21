@@ -3,7 +3,7 @@
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 module List = ListLabels
 module String = Misc.Stdlib.String
-module DLL = Flambda_backend_utils.Doubly_linked_list
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 let function_is_assumed_to_never_poll func =
   String.begins_with ~prefix:"caml_apply" func
@@ -11,7 +11,7 @@ let function_is_assumed_to_never_poll func =
 
 let is_disabled fun_name =
   (not Config.poll_insertion)
-  || !Flambda_backend_flags.disable_poll_insertion
+  || !Oxcaml_flags.disable_poll_insertion
   || function_is_assumed_to_never_poll fun_name
 
 (* These are used for the poll error annotation later on*)
@@ -188,8 +188,9 @@ module Polls_before_prtc_transfer = struct
     | Op (Alloc _) -> Ok Always_polls
     | Op
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-        | Const_vec128 _ | Stackoffset _ | Load _
+        | Tls_get | Pause | Const_int _ | Const_float32 _ | Const_float _
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _
         | Intop_imm (_, _)
@@ -197,7 +198,8 @@ module Polls_before_prtc_transfer = struct
         | Floatop (_, _)
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
         | Specific _ | Name_for_debugger _ )
-    | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ ->
+    | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+    | Stack_check _ ->
       Ok dom
 
   let terminator :
@@ -299,20 +301,15 @@ let exists_unsafe_path :
 let instr_cfg_with_layout :
     Cfg_with_layout.t ->
     safe_map:bool Label.Tbl.t ->
-    back_edges:Cfg_loop_infos.EdgeSet.t ->
+    back_edges:Cfg_edge.Set.t ->
     bool =
  fun cfg_with_layout ~safe_map ~back_edges ->
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  let instruction_id =
-    lazy
-      (let cfg = Cfg_with_layout.cfg cfg_with_layout in
-       InstructionId.make_sequence ~last_used:(Cfg.max_instr_id cfg) ())
-  in
   let next_instruction_id () =
-    InstructionId.get_next (Lazy.force instruction_id)
+    InstructionId.get_and_incr cfg.next_instruction_id
   in
-  Cfg_loop_infos.EdgeSet.fold
-    (fun { Cfg_loop_infos.Edge.src; dst } added_poll ->
+  Cfg_edge.Set.fold
+    (fun { Cfg_edge.src; dst } added_poll ->
       let needs_poll =
         (not (Label.Tbl.find safe_map src))
         && exists_unsafe_path cfg ~safe_map ~from:dst ~to_:src
@@ -356,14 +353,17 @@ let add_poll_or_alloc_basic :
   | Op op -> (
     match op with
     | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
-    | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _ | Store _
-    | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
-    | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
-    | Begin_region | End_region | Specific _ | Name_for_debugger _ | Dls_get ->
+    | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+    | Stackoffset _ | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _
+    | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+    | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
+    | Name_for_debugger _ | Dls_get | Tls_get | Pause ->
       points
     | Poll -> (Poll, instr.dbg) :: points
     | Alloc _ -> (Alloc, instr.dbg) :: points)
-  | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Stack_check _ -> points
+  | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
+    ->
+    points
 
 let add_calls_terminator :
     Cfg.terminator Cfg.instruction -> polling_points -> polling_points =
@@ -381,6 +381,7 @@ let add_calls_terminator :
         ty_res = _;
         ty_args = _;
         stack_ofs = _;
+        stack_align = _;
         effects = _
       }
   | Prim
@@ -391,6 +392,7 @@ let add_calls_terminator :
               ty_res = _;
               ty_args = _;
               stack_ofs = _;
+              stack_align = _;
               effects = _
             };
         label_after = _
@@ -402,6 +404,7 @@ let add_calls_terminator :
         ty_res = _;
         ty_args = _;
         stack_ofs = _;
+        stack_align = _;
         effects = _
       }
   | Prim
@@ -412,6 +415,7 @@ let add_calls_terminator :
               ty_res = _;
               ty_args = _;
               stack_ofs = _;
+              stack_align = _;
               effects = _
             };
         label_after = _

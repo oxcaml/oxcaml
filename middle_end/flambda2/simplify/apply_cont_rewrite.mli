@@ -50,6 +50,7 @@ type rewrite_apply_cont_ctx =
 
 val make_rewrite :
   t ->
+  machine_width:Target_system.Machine_width.t ->
   ctx:rewrite_apply_cont_ctx ->
   Apply_cont_rewrite_id.t ->
   Simple.t list ->

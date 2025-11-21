@@ -105,14 +105,21 @@ module Analysis : sig
   val analyze :
     ?speculative:bool ->
     ?print_name:string ->
+    machine_width:Target_system.Machine_width.t ->
     return_continuation:Continuation.t ->
     exn_continuation:Continuation.t ->
     code_age_relation:Code_age_relation.t ->
     used_value_slots:Name_occurrences.t Or_unknown.t ->
     code_ids_to_never_delete:Code_id.Set.t ->
+    specialization_map:Continuation.t Continuation_callsite_map.t ->
     Acc.t ->
     Flow_types.Flow_result.t
 
   (** [true] iff the mutable unboxing pass actually did unbox things *)
   val did_perform_mutable_unboxing : Flow_types.Flow_result.t -> bool
+
+  (* [true] iff an alias to something useful (e.g. a constant, a symbol with a
+     known type) has been added in a loop. *)
+  val added_useful_alias_in_loop :
+    Typing_env.t -> Acc.t -> Flow_types.Flow_result.t -> bool
 end

@@ -32,7 +32,7 @@ include module type of struct
 end
 
 type basic_instruction_list =
-  basic instruction Flambda_backend_utils.Doubly_linked_list.t
+  basic instruction Oxcaml_utils.Doubly_linked_list.t
 
 type basic_block =
   { mutable start : Label.t;
@@ -69,6 +69,12 @@ type basic_block =
 type codegen_option =
   | Reduce_code_size
   | No_CSE
+  | Use_linscan_regalloc
+    (* CR-soon xclerc for xclerc: remove the `Use_linscan_regalloc`, and use
+       `Use_regalloc_param` instead. *)
+  | Use_regalloc of Clflags.Register_allocator.t
+  | Use_regalloc_param of string list
+  | Cold
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;
@@ -82,6 +88,9 @@ type codegen_option =
       }
 
 val of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list
+
+(* CR-someday xclerc: we should probably make `t` abstract and make each and
+   every modifiction through accessors; that would help enforce invariants. *)
 
 (** Control Flow Graph of a function. *)
 type t =
@@ -100,7 +109,11 @@ type t =
         (** Precomputed during selection and poll insertion. *)
     fun_num_stack_slots : int Stack_class.Tbl.t;
         (** Precomputed at register allocation time *)
-    fun_poll : Lambda.poll_attribute (* Whether to insert polling points. *)
+    fun_poll : Lambda.poll_attribute; (* Whether to insert polling points. *)
+    next_instruction_id : InstructionId.sequence; (* Next instruction id. *)
+    fun_ret_type : Cmm.machtype
+        (** Function return type. As in [fun_args], this value is not used when starting
+            from Linear. *)
   }
 
 val create :
@@ -111,6 +124,8 @@ val create :
   fun_contains_calls:bool ->
   fun_num_stack_slots:int Stack_class.Tbl.t ->
   fun_poll:Lambda.poll_attribute ->
+  next_instruction_id:InstructionId.sequence ->
+  fun_ret_type:Cmm.machtype ->
   t
 
 val fun_name : t -> string
@@ -223,27 +238,28 @@ val make_instruction :
   stack_offset:int ->
   id:InstructionId.t ->
   ?irc_work_list:irc_work_list ->
-  ?ls_order:int ->
-  ?available_before:Reg_availability_set.t option ->
-  ?available_across:Reg_availability_set.t option ->
+  ?available_before:Reg_availability_set.t ->
+  ?available_across:Reg_availability_set.t ->
   unit ->
   'a instruction
 
-(* CR mshinwell: consolidate with [make_instruction] and tidy up ID interface *)
-val make_instr :
-  'a -> Reg.t array -> Reg.t array -> Debuginfo.t -> 'a instruction
-
-(** These IDs are also used by [make_instr] *)
-val next_instr_id : unit -> InstructionId.t
-
-val reset_instr_id : unit -> unit
+(** Make sure that the default parameter value of [irc_work_list] is
+    reasonable before using. *)
+val make_instruction_from_copy :
+  'a instruction ->
+  desc:'b ->
+  id:InstructionId.t ->
+  ?arg:Reg.t array ->
+  ?res:Reg.t array ->
+  ?irc_work_list:irc_work_list ->
+  unit ->
+  'b instruction
 
 val make_empty_block : ?label:Label.t -> terminator instruction -> basic_block
 
 (** "Contains calls" in the traditional sense as used in upstream [Selectgen]. *)
 val basic_block_contains_calls : basic_block -> bool
 
-(* [max_instr_id cfg] returns the maximum instruction identifier in [cfg]. *)
-val max_instr_id : t -> InstructionId.t
-
 val equal_irc_work_list : irc_work_list -> irc_work_list -> bool
+
+val invalid_stack_offset : int

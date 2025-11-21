@@ -3,12 +3,12 @@
 open! Int_replace_polymorphic_compare
 open! Regalloc_utils
 open! Regalloc_irc_utils
-module Doubly_linked_list = Flambda_backend_utils.Doubly_linked_list
+module Doubly_linked_list = Oxcaml_utils.Doubly_linked_list
 
-module RegWorkList = ArraySet.Make (struct
+module RegWorkList = Arrayset.Make (struct
   type t = Reg.t
 
-  let compare left right = Int.compare left.Reg.stamp right.Reg.stamp
+  let compare = Reg.compare
 
   let dummy = { Reg.dummy with stamp = -1 }
 end)
@@ -17,7 +17,7 @@ let reg_set_of_reg_work_list (rwl : RegWorkList.t) : Reg.Set.t =
   RegWorkList.fold rwl ~init:Reg.Set.empty ~f:(fun acc elem ->
       Reg.Set.add elem acc)
 
-module InstructionWorkList = ArraySet.Make (struct
+module InstructionWorkList = Arrayset.Make (struct
   type t = Instruction.t
 
   let compare = Instruction.compare
@@ -47,7 +47,6 @@ type t =
     adj_set : RegisterStamp.PairSet.t;
     move_list : Instruction.Set.t Reg.Tbl.t;
     stack_slots : Regalloc_stack_slots.t;
-    instruction_id : InstructionId.sequence;
     mutable inst_temporaries : Reg.Set.t;
     mutable block_temporaries : Reg.Set.t;
     reg_work_list : WorkList.t Reg.Tbl.t;
@@ -57,16 +56,14 @@ type t =
     reg_degree : int Reg.Tbl.t
   }
 
-let max_capacity = 1024
-
-let[@inline] make ~initial ~stack_slots ~last_used () =
-  let num_registers = List.length (Reg.all_registers ()) in
+let[@inline] make ~initial ~stack_slots () =
+  let num_registers = List.length (Reg.all_relocatable_regs ()) in
   let reg_work_list = Reg.Tbl.create num_registers in
   let reg_color = Reg.Tbl.create num_registers in
   let reg_alias = Reg.Tbl.create num_registers in
   let reg_interf = Reg.Tbl.create num_registers in
   let reg_degree = Reg.Tbl.create num_registers in
-  List.iter (Reg.all_registers ()) ~f:(fun reg ->
+  List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
       Reg.Tbl.replace reg_work_list reg WorkList.Unknown_list;
       Reg.Tbl.replace reg_color reg None;
       Reg.Tbl.replace reg_alias reg None;
@@ -87,7 +84,7 @@ let[@inline] make ~initial ~stack_slots ~last_used () =
       Reg.Tbl.replace reg_interf reg [];
       Reg.Tbl.replace reg_degree reg Degree.infinite)
     (all_precolored_regs ());
-  let original_capacity = Int.min max_capacity num_registers in
+  let original_capacity = num_registers in
   let simplify_work_list = RegWorkList.make ~original_capacity in
   let freeze_work_list = RegWorkList.make ~original_capacity in
   let spill_work_list = RegWorkList.make ~original_capacity in
@@ -95,9 +92,7 @@ let[@inline] make ~initial ~stack_slots ~last_used () =
   let coalesced_nodes = RegWorkList.make ~original_capacity in
   let colored_nodes = Doubly_linked_list.make_empty () in
   let select_stack = [] in
-  let original_capacity =
-    Int.min max_capacity (InstructionId.to_int_unsafe last_used)
-  in
+  let original_capacity = 128 in
   let coalesced_moves = InstructionWorkList.make ~original_capacity in
   let constrained_moves = InstructionWorkList.make ~original_capacity in
   let frozen_moves = InstructionWorkList.make ~original_capacity in
@@ -105,7 +100,6 @@ let[@inline] make ~initial ~stack_slots ~last_used () =
   let active_moves = InstructionWorkList.make ~original_capacity in
   let adj_set = RegisterStamp.PairSet.make ~num_registers in
   let move_list = Reg.Tbl.create 128 in
-  let instruction_id = InstructionId.make_sequence ~last_used () in
   let inst_temporaries = Reg.Set.empty in
   let block_temporaries = Reg.Set.empty in
   let initial = Doubly_linked_list.of_list initial in
@@ -125,7 +119,6 @@ let[@inline] make ~initial ~stack_slots ~last_used () =
     adj_set;
     move_list;
     stack_slots;
-    instruction_id;
     inst_temporaries;
     block_temporaries;
     reg_work_list;
@@ -161,7 +154,7 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
     InstructionWorkList.iter iwl ~f:(fun instr ->
         instr.irc_work_list <- Unknown_list)
   in
-  List.iter (Reg.all_registers ()) ~f:(fun reg ->
+  List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
       Reg.Tbl.replace state.reg_color reg None;
       Reg.Tbl.replace state.reg_alias reg None;
       Reg.Tbl.replace state.reg_interf reg [];
@@ -391,12 +384,6 @@ let[@inline] mem_adj_set state reg1 reg2 =
 
 let[@inline] adj_list state reg = Reg.Tbl.find state.reg_interf reg
 
-let[@inline] interferes_with_adj state reg1 reg2 =
-  mem_adj_set state reg1 reg2
-  || List.exists
-       (Reg.Tbl.find state.reg_interf reg1)
-       ~f:(Reg.same_phys_reg reg2)
-
 let[@inline] add_edge state u v =
   let is_interesting_reg reg =
     match reg.Reg.loc with
@@ -549,9 +536,6 @@ let[@inline] add_alias state v u =
 
 let[@inline] stack_slots state = state.stack_slots
 
-let[@inline] get_and_incr_instruction_id state =
-  InstructionId.get_next state.instruction_id
-
 let[@inline] add_inst_temporaries_list state regs =
   state.inst_temporaries
     <- Reg.Set.add_seq (List.to_seq regs) state.inst_temporaries
@@ -574,7 +558,7 @@ let[@inline] diff_all_introduced_temporaries state set =
 
 let update_register_locations state =
   if debug then log "update_register_locations";
-  List.iter (Reg.all_registers ()) ~f:(fun reg ->
+  List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
       match reg.Reg.loc with
       | Reg _ -> ()
       | Stack _ -> ()
@@ -631,7 +615,9 @@ let[@inline] invariant state =
   if debug && Lazy.force invariants
   then (
     (* interf (list) is morally a set *)
-    List.iter (Reg.all_registers ()) ~f:(check_inter_has_no_duplicates state);
+    List.iter
+      (Reg.all_relocatable_regs ())
+      ~f:(check_inter_has_no_duplicates state);
     Reg.Set.iter (check_inter_has_no_duplicates state) (all_precolored_regs ());
     (* register sets are disjoint *)
     check_disjoint ~is_disjoint:Reg.Set.disjoint

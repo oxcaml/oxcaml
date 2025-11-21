@@ -351,7 +351,7 @@ value caml_process_pending_actions_with_root_exn(value extra_root)
   return process_pending_actions_with_root_exn(extra_root);
 }
 
-value caml_process_pending_actions_with_root(value extra_root)
+CAMLprim value caml_process_pending_actions_with_root(value extra_root)
 {
   value res = process_pending_actions_with_root_exn(extra_root);
   caml_raise_async_if_exception(res, "");

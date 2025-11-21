@@ -44,7 +44,8 @@ let unchecked_zero_alloc_attributes = Attribute_table.create 1
 let mark_zero_alloc_attribute_checked txt loc =
   Attribute_table.remove unchecked_zero_alloc_attributes { txt; loc }
 let register_zero_alloc_attribute attr =
-    Attribute_table.replace unchecked_zero_alloc_attributes attr ()
+    Attribute_table.replace unchecked_zero_alloc_attributes attr
+     (Warnings.backup ())
 let warn_unchecked_zero_alloc_attribute () =
     (* When using -i, attributes will not have been translated, so we can't
      warn about missing ones. *)
@@ -52,9 +53,14 @@ let warn_unchecked_zero_alloc_attribute () =
   else
   let keys = List.of_seq (Attribute_table.to_seq_keys unchecked_zero_alloc_attributes) in
   let keys = List.sort attr_order keys in
+  (* Treatment of warnings is similar to [Typecore.force_delayed_checks]. *)
+  let w_old = Warnings.backup () in
   List.iter (fun sloc ->
+    let w = Attribute_table.find unchecked_zero_alloc_attributes sloc in
+    Warnings.restore w;
     Location.prerr_warning sloc.loc (Warnings.Unchecked_zero_alloc_attribute))
-    keys
+    keys;
+  Warnings.restore w_old
 
 let warn_unused () =
   let keys = List.of_seq (Attribute_table.to_seq_keys unused_attrs) in
@@ -69,6 +75,7 @@ let warn_unused () =
    misplaced attribute warnings. *)
 let builtin_attrs =
   [ "inline"
+  ; "atomic"
   ; "inlined"
   ; "specialise"
   ; "specialised"
@@ -113,10 +120,12 @@ let builtin_attrs =
   ; "only_generative_effects"
   ; "error_message"
   ; "layout_poly"
-  ; "no_mutable_implied_modalities"
   ; "or_null_reexport"
   ; "no_recursive_modalities"
   ; "jane.non_erasable.instances"
+  ; "cold"
+  ; "regalloc"
+  ; "regalloc_param"
   ]
 
 let builtin_attrs =
@@ -571,6 +580,11 @@ let flambda_o3_attribute attr =
     ~name:"flambda_o3"
     ~f:(fun () -> if Config.flambda || Config.flambda2 then Clflags.set_o3 ())
 
+let llvm_backend_attribute attr =
+  clflags_attribute_without_payload' attr
+    ~name:"llvm_backend"
+    ~f:(fun () -> Clflags.llvm_backend := true)
+
 let inline_attribute attr =
   when_attribute_is ["inline"; "ocaml.inline"] attr ~f:(fun () ->
     let err_msg =
@@ -648,10 +662,8 @@ let parse_standard_implementation_attributes attr =
   flambda_o3_attribute attr;
   flambda_oclassic_attribute attr;
   zero_alloc_attribute ~in_signature:false attr;
-  unsafe_allow_any_mode_crossing_attribute attr
-
-let has_no_mutable_implied_modalities attrs =
-  has_attribute "no_mutable_implied_modalities" attrs
+  unsafe_allow_any_mode_crossing_attribute attr;
+  llvm_backend_attribute attr
 
 let has_local_opt attrs =
   has_attribute "local_opt" attrs
@@ -1111,3 +1123,10 @@ let get_tracing_probe_payload (payload : Parsetree.payload) =
     | _ -> Error ()
   in
   Ok { name; name_loc; enabled_at_init; arg }
+
+let get_eval_payload payload =
+  match payload with
+  | PTyp typ -> Ok typ
+  | _ -> Error ()
+
+let has_atomic attrs = has_attribute "atomic" attrs

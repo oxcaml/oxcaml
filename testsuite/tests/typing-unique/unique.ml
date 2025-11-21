@@ -116,7 +116,7 @@ let f () =
 Line 3, characters 13-14:
 3 |   let g () = k @ [(fun x -> x)] in
                  ^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 (* variables inside loops will be made both aliased and many *)
@@ -141,7 +141,8 @@ let f () =
 Line 4, characters 4-5:
 4 |     k
         ^
-Error: The value "k" is once, so cannot be used inside a for loop
+Error: The value "k" is "once" but is expected to be "many"
+       because it is used in a loop (at Lines 3-5, characters 2-6).
 |}]
 
 (* The following is bad, because k is used uniquely *)
@@ -154,9 +155,9 @@ let f () =
 Line 4, characters 12-13:
 4 |     unique_ k
                 ^
-Error: This value is "aliased" but expected to be "unique".
-  Hint: This identifier cannot be used uniquely,
-  because it was defined outside of the for-loop.
+Error: This value is "aliased"
+       because it is used in a loop (at Lines 3-5, characters 2-6).
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let f =
@@ -170,9 +171,9 @@ let f =
 Line 5, characters 14-15:
 5 |     let _ = g a in ()
                   ^
-Error: This value is "aliased" but expected to be "unique".
-  Hint: This identifier cannot be used uniquely,
-  because it was defined outside of the for-loop.
+Error: This value is "aliased"
+       because it is used in a loop (at Lines 4-6, characters 2-6).
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let f =
@@ -197,7 +198,7 @@ let once_ foo = "foo"
 Line 1, characters 4-21:
 1 | let once_ foo = "foo"
         ^^^^^^^^^^^^^^^^^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 (* the following is fine - we relax many to once *)
@@ -219,7 +220,7 @@ let foo () = unique_ x
 Line 1, characters 21-22:
 1 | let foo () = unique_ x
                          ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 
@@ -284,7 +285,7 @@ let higher_order3 (f : 'a -> 'b) (unique_ x : 'a) = unique_ f x
 Line 1, characters 60-63:
 1 | let higher_order3 (f : 'a -> 'b) (unique_ x : 'a) = unique_ f x
                                                                 ^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let higher_order4 (f : unique_ 'a -> 'b) (x : 'a) = f (aliased_id x)
@@ -292,7 +293,7 @@ let higher_order4 (f : unique_ 'a -> 'b) (x : 'a) = f (aliased_id x)
 Line 1, characters 54-68:
 1 | let higher_order4 (f : unique_ 'a -> 'b) (x : 'a) = f (aliased_id x)
                                                           ^^^^^^^^^^^^^^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let higher_order5 (unique_ x) = let f (unique_ x) = unique_ x in higher_order f x
@@ -325,7 +326,7 @@ let inf3 : bool -> float -> unique_ float -> float = fun b y x ->
 Line 2, characters 59-60:
 2 |   let _ = aliased_id y in let unique_ z = if b then x else y in z
                                                                ^
-Error: This value is "aliased" but expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 let inf4 (b : bool) (y : float) (unique_ x : float) =
@@ -362,12 +363,12 @@ val unique_default_args : ?x:float @ unique -> unit -> float = <fun>
 
 let ul (unique_ local_ x) = x
 [%%expect{|
-val ul : 'a @ local unique -> local_ 'a = <fun>
+val ul : 'a @ local unique -> 'a @ local = <fun>
 |}]
 
 let ul_ret x = exclave_ unique_ x
 [%%expect{|
-val ul_ret : 'a @ unique -> local_ 'a = <fun>
+val ul_ret : 'a @ unique -> 'a @ local = <fun>
 |}]
 
 let rec foo =
@@ -417,7 +418,7 @@ let curry =
 Line 3, characters 2-15:
 3 |   foo ~a:3 ~c:4
       ^^^^^^^^^^^^^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let curry =
@@ -427,7 +428,7 @@ let curry =
 Line 3, characters 2-15:
 3 |   foo ~a:3 ~c:4
       ^^^^^^^^^^^^^
-Error: This value is "once" but expected to be "many".
+Error: This value is "once" but is expected to be "many".
 |}]
 
 let curry =
@@ -542,8 +543,8 @@ Error: This expression has type "int" but an expression was expected of type
 let return_local : local_ 'a -> local_ 'a = fun x -> x
 let return_global : local_ 'a -> int = fun x -> 0
 [%%expect{|
-val return_local : local_ 'a -> local_ 'a = <fun>
-val return_global : local_ 'a -> int = <fun>
+val return_local : 'a @ local -> 'a @ local = <fun>
+val return_global : 'a @ local -> int = <fun>
 |}]
 
 

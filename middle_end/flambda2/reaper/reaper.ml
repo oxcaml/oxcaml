@@ -23,27 +23,35 @@ let unit_with_body (unit : Flambda_unit.t) (body : Flambda.Expr.t) =
     ~module_symbol:(Flambda_unit.module_symbol unit)
     ~used_value_slots:(Flambda_unit.used_value_slots unit)
 
-let run ~cmx_loader ~all_code (unit : Flambda_unit.t) =
+let run ~machine_width ~cmx_loader ~all_code (unit : Flambda_unit.t) =
   let debug_print = Flambda_features.dump_reaper () in
+  let load_code = Flambda_cmx.get_imported_code cmx_loader in
+  let get_code_metadata code_id =
+    Code_or_metadata.code_metadata
+      (match Exported_code.find all_code code_id with
+      | Some code -> code
+      | None -> Exported_code.find_exn (load_code ()) code_id)
+  in
   let Traverse.
-        { holed; deps; kinds; fixed_arity_continuations; continuation_info } =
+        { holed;
+          deps;
+          kinds;
+          fixed_arity_continuations;
+          continuation_info;
+          code_deps
+        } =
     Traverse.run unit
   in
-  if debug_print
-  then Format.printf "USED %a@." Global_flow_graph.pp_used_graph deps;
   let solved_dep = Dep_solver.fixpoint deps in
-  if debug_print
-  then Format.printf "RESULT@ %a@." Dep_solver.pp_result solved_dep;
   let () =
     if debug_print
-    then Dot_printer.print_solved_dep solved_dep (Code_id.Map.empty, deps)
+    then (
+      Format.printf "RESULT@ %a@." Dep_solver.pp_result solved_dep;
+      Dot_printer.print_solved_dep solved_dep deps)
   in
   let Rebuild.{ body; free_names; all_code; slot_offsets } =
-    Rebuild.rebuild ~fixed_arity_continuations ~continuation_info kinds
-      solved_dep
-      (fun code_id ->
-        Code_or_metadata.code_metadata (Exported_code.find_exn all_code code_id))
-      holed
+    Rebuild.rebuild ~machine_width ~code_deps ~fixed_arity_continuations
+      ~continuation_info kinds solved_dep get_code_metadata holed
   in
   (* Is this what we really want? This keeps all the code that has not been
      deleted by this pass to be exported in the cmx. It looks like this does the

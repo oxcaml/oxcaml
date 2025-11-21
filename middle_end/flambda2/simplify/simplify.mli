@@ -30,6 +30,7 @@ type simplify_result = private
 
 val run :
   cmx_loader:Flambda_cmx.loader ->
+  machine_width:Target_system.Machine_width.t ->
   round:int ->
   code_slot_offsets:Slot_offsets.t Code_id.Map.t ->
   Flambda_unit.t ->

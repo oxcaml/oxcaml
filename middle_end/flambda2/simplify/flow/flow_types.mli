@@ -99,8 +99,7 @@ module Continuation_info : sig
       code_ids : Name_occurrences.t Code_id.Map.t;
       value_slots : Name_occurrences.t Name.Map.t Value_slot.Map.t;
       apply_cont_args :
-        Cont_arg.t Numeric_types.Int.Map.t Apply_cont_rewrite_id.Map.t
-        Continuation.Map.t
+        Cont_arg.t Numeric_types.Int.Map.t Continuation_callsite_map.t
     }
 
   val print : Format.formatter -> t -> unit
@@ -158,7 +157,9 @@ module Continuation_param_aliases : sig
 
   type t =
     { removed_aliased_params_and_extra_params : Variable.Set.t;
-      lets_to_introduce : Variable.t Variable.Map.t;
+      lets_to_introduce : Simple.t Variable.Lmap.t;
+      (* We are using a [Variable.Lmap.t] here in order to ensure a stable order
+         for the introduced [lets]. *)
       extra_args_for_aliases : Variable.Set.t;
       recursive_continuation_wrapper : recursive_continuation_wrapper
     }
@@ -184,7 +185,7 @@ end
 module Mutable_unboxing_result : sig
   type t =
     { did_unbox_a_mutable_block : bool;
-      additionnal_epa : Continuation_extra_params_and_args.t Continuation.Map.t;
+      additional_epa : Continuation_extra_params_and_args.t Continuation.Map.t;
       let_rewrites : Named_rewrite.t Named_rewrite_id.Map.t
     }
 

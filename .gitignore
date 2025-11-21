@@ -90,6 +90,7 @@ _profile/
 /_install
 /_runtest
 /_opam
+/.claude
 
 /oc_cflags.sexp
 /oc_cppflags.sexp
@@ -97,6 +98,7 @@ _profile/
 
 # Jane Street Merlin support
 /.local-merlin-binaries
+/.local-merlin-bin
 /.local-ocaml-lib
 
 # Debugger support
@@ -385,10 +387,8 @@ ocaml/primitives.new
 /tools/debug_printers
 /tools/lintapidiff.opt
 
-/toplevel/byte/topeval.mli
 /toplevel/byte/trace.mli
 /toplevel/byte/topmain.mli
-/toplevel/native/topeval.mli
 /toplevel/native/trace.mli
 /toplevel/native/topmain.mli
 
@@ -406,7 +406,7 @@ ocaml/primitives.new
 /yacc/version.h
 /yacc/.gdb_history
 
-/otherlibs/dynlink/natdynlinkops
+/natdynlinkops
 
 dune.runtime_selection
 /otherlibs/dune

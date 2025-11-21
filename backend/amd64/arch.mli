@@ -26,16 +26,25 @@ module Extension : sig
     | SSE4_1
     | SSE4_2
     | CLMUL
-    | LZCNT
-    | BMI (* IMPORTANT: LZCNT/TZCNT are interpreted as BSR/BSF on architectures prior
-             to Haswell, i.e. they do not cause an illegal instruction fault.
-             That means code using LZCNT/TZCNT will silently produce wrong results. *)
+    | BMI (* IMPORTANT: LZCNT/TZCNT are interpreted as BSR/BSF on architectures
+             prior to Haswell (i.e. without BMI), and do not cause an illegal
+             instruction fault. That means code using LZCNT/TZCNT will silently
+             produce wrong results. *)
     | BMI2
+    | AVX
+    | AVX2
+    | F16C
+    | FMA
+    | AVX512F
 
   val name : t -> string
 
   val enabled : t -> bool
   val available : unit -> t list
+
+  val enabled_vec256 : unit -> bool
+  val enabled_vec512 : unit -> bool
+  val enabled_instruction : Amd64_simd_instrs.instr -> bool
 end
 
 val trap_notes : bool ref
@@ -85,7 +94,7 @@ type specific_operation =
   | Ilfence                            (* load fence *)
   | Isfence                            (* store fence *)
   | Imfence                            (* memory fence *)
-  | Ipause                             (* hint for spin-wait loops *)
+  | Ipackf32                           (* UNPCKLPS on registers; see Cpackf32 *)
   | Isimd of Simd.operation            (* SIMD instruction set operations *)
   | Isimd_mem of Simd.Mem.operation * addressing_mode
                                        (* SIMD instruction set operations
@@ -96,6 +105,7 @@ type specific_operation =
         locality: prefetch_temporal_locality_hint;
         addr: addressing_mode;
       }
+  | Illvm_intrinsic of string
 
 and float_operation =
   | Ifloatadd
@@ -115,6 +125,10 @@ val size_float : int
 
 val size_vec128 : int
 
+val size_vec256 : int
+
+val size_vec512 : int
+
 val allow_unaligned_access : bool
 
 val division_crashes_on_overflow : bool
@@ -125,9 +139,13 @@ val offset_addressing : addressing_mode -> int -> addressing_mode
 
 val num_args_addressing : addressing_mode -> int
 
+val addressing_displacement_for_llvmize : addressing_mode -> int
+
 val print_addressing :
   (Format.formatter -> 'a -> unit) -> addressing_mode ->
   Format.formatter -> 'a array -> unit
+
+val specific_operation_name : specific_operation -> string
 
 val print_specific_operation :
   (Format.formatter -> 'a -> unit) -> specific_operation ->
@@ -140,7 +158,7 @@ val operation_is_pure : specific_operation -> bool
 val operation_allocates : specific_operation -> bool
 
 val float_cond_and_need_swap
-  :  Lambda.float_comparison -> X86_ast.float_condition * bool
+  :  Scalar.Float_comparison.t -> X86_ast.float_condition * bool
 
 val isomorphic_specific_operation : specific_operation -> specific_operation -> bool
 (* addressing mode functions *)

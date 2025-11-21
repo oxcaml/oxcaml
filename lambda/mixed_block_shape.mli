@@ -1,5 +1,5 @@
 (******************************************************************************
- *                             flambda-backend                                *
+ *                                  OxCaml                                    *
  *                        Xavier Clerc, Jane Street                           *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
@@ -33,31 +33,51 @@ open Iarray_shim
     type definition in the surface language to that representation. *)
 type 'a t
 
-val of_mixed_block_elements : 'a Lambda.mixed_block_element iarray -> 'a t
+type path
 
-(** Applies the permutation corresponding to the reordering to the passed array. *)
-val reorder_array : 'a t -> 'b array -> 'b array
+module Singleton_mixed_block_element : sig
+  type 'a t = private
+    | Value of Lambda.value_kind
+    | Float_boxed of 'a
+    | Float64
+    | Float32
+    | Bits8
+    | Bits16
+    | Bits32
+    | Bits64
+    | Vec128
+    | Vec256
+    | Vec512
+    | Word
+    | Untagged_immediate
 
-(** Get an element from the {i reordered} shape. *)
-val get_reordered : 'a t -> int -> 'a Lambda.mixed_block_element
+  val print :
+    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+end
 
-val value_prefix : 'a t -> 'a Lambda.mixed_block_element iarray
+val print : Format.formatter -> _ t -> unit
 
-val flat_suffix : 'a t -> 'a Lambda.mixed_block_element iarray
+val of_mixed_block_elements :
+  print_locality:(Format.formatter -> 'a -> unit) ->
+  'a Lambda.mixed_block_element iarray ->
+  'a t
+
+val value_prefix : 'a t -> 'a Singleton_mixed_block_element.t iarray
+
+val flat_suffix : 'a t -> 'a Singleton_mixed_block_element.t iarray
 
 val value_prefix_len : 'a t -> int
 
 val flat_suffix_len : 'a t -> int
 
-(** Access to the shape passed to [of_mixed_block_elements] to build the value. *)
-val original_shape : 'a t -> 'a Lambda.mixed_block_element iarray
+(** Access to the shape, as flattened and following the runtime restriction. *)
+val flattened_reordered_shape :
+  'a t -> 'a Singleton_mixed_block_element.t iarray
 
-(** Access to the shape, as reordered to follow the runtime restriction. *)
-val reordered_shape : 'a t -> 'a Lambda.mixed_block_element iarray
+val lookup_path_producing_new_indexes : 'a t -> int list -> int list
 
-(** (Same as [reordered_shape]). *)
-val reordered_shape_unit : 'a t -> unit Lambda.mixed_block_element iarray
+val new_indexes_to_old_indexes : 'a t -> int iarray
 
-val old_index_to_new_index : 'a t -> int -> int
+val new_block_length : 'a t -> int
 
-val new_index_to_old_index : 'a t -> int -> int
+val new_index_to_old_path : 'a t -> int -> int list

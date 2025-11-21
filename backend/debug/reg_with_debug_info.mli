@@ -20,6 +20,8 @@ module Debug_info : sig
 
   val compare : t -> t -> int
 
+  val equal : t -> t -> bool
+
   (** The identifier that the register holds (part of) the value of. *)
   val holds_value_of : t -> Backend_var.t
 
@@ -63,14 +65,8 @@ val debug_info : t -> Debug_info.t option
 
 (** [at_same_location t reg] holds iff the register [t] corresponds to the same
     (physical or pseudoregister) location as the register [reg], which is not
-    equipped with debugging information. [register_class] should be
-    [Proc.register_class]. *)
-val at_same_location :
-  t ->
-  Reg.t ->
-  register_class:(Reg.t -> int) ->
-  stack_class:(Reg.t -> Stack_class.t) ->
-  bool
+    equipped with debugging information. *)
+val at_same_location : t -> Reg.t -> bool
 
 val holds_pointer : t -> bool
 
@@ -82,38 +78,52 @@ val assigned_to_stack : t -> bool
 
 val clear_debug_info : t -> t
 
-module Set_distinguishing_names_and_locations : Set.S with type elt = t
+(* module Set : sig include Set.S with type elt = t
 
-module Map_distinguishing_names_and_locations : Map.S with type key = t
+   val print : Format.formatter -> t -> unit
 
-module Set : sig
-  include Set.S with type elt = t
+   val of_array : reg_with_debug_info array -> t
 
-  val of_array : reg_with_debug_info array -> t
+   val mem_reg : t -> Reg.t -> bool
 
-  val mem_reg : t -> Reg.t -> bool
+   val mem_reg_by_loc : t -> Reg.t -> bool
 
-  val find_reg_exn : t -> Reg.t -> reg_with_debug_info
+   val find_reg_exn : t -> Reg.t -> reg_with_debug_info
 
-  val filter_reg : t -> Reg.t -> t
+   val find_reg_with_same_location_exn : t -> Reg.t -> reg_with_debug_info
+
+   val filter_reg_by_loc : t -> Reg.t -> t
+
+   val forget_debug_info : t -> Reg.Set.t
+
+   val without_debug_info : Reg.Set.t -> t
+
+   (** [made_unavailable_by_clobber t ~regs_clobbered ~register_class] returns
+   the largest subset of [t] whose locations do not overlap with any registers
+   in [regs_clobbered]. (Think of [t] as a set of available registers.) *) val
+   made_unavailable_by_clobber : t -> regs_clobbered:Reg.t array -> t end *)
+
+module Set_distinguishing_names_and_locations : sig
+  include Stdlib.Set.S with type elt = t
 
   val forget_debug_info : t -> Reg.Set.t
 
+  (* val of_set : Set.t -> t val to_set : t -> Set.t *)
+
+  val mem_reg_by_loc : t -> Reg.t -> bool
+
+  val filter_reg_by_loc : t -> Reg.t -> t
+
   val without_debug_info : Reg.Set.t -> t
 
-  (** [made_unavailable_by_clobber t ~regs_clobbered ~register_class] returns
-      the largest subset of [t] whose locations do not overlap with any
-      registers in [regs_clobbered]. (Think of [t] as a set of available
-      registers.) [register_class] should always be [Proc.register_class]. *)
-  val made_unavailable_by_clobber :
-    t ->
-    regs_clobbered:Reg.t array ->
-    register_class:(Reg.t -> int) ->
-    stack_class:(Reg.t -> Stack_class.t) ->
-    t
+  val made_unavailable_by_clobber : t -> regs_clobbered:Reg.t array -> t
+
+  val print : Format.formatter -> t -> unit
+
+  val find_reg_with_same_location_exn : t -> Reg.t -> elt
 end
+
+module Map_distinguishing_names_and_locations : Map.S with type key = t
 
 val print :
   print_reg:(Format.formatter -> Reg.t -> unit) -> Format.formatter -> t -> unit
-
-val compare : t -> t -> int

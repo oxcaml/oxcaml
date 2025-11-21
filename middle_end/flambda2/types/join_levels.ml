@@ -48,17 +48,22 @@ let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
   let params = Bound_parameters.to_list params in
   check_join_inputs ~env_at_fork:definition_typing_env ts_and_use_ids ~params
     ~extra_lifted_consts_in_use_envs;
-  let ts = List.rev_map (fun (t, _, _) -> t) ts_and_use_ids in
-  Join_env.cut_and_n_way_join ~meet_type:Meet_and_n_way_join.meet_type
-    ~n_way_join_type:Meet_and_n_way_join.n_way_join definition_typing_env
-    ~cut_after ts
+  let ts = List.rev_map (fun (t, use_id, _) -> use_id, t) ts_and_use_ids in
+  let env, analysis =
+    Join_env.cut_and_n_way_join_with_analysis
+      ~meet_type:Meet_and_n_way_join.meet_type
+      ~n_way_join_type:Meet_and_n_way_join.n_way_join definition_typing_env
+      ~cut_after ts
+  in
+  env, Some analysis
 
 let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
     ~extra_lifted_consts_in_use_envs ~extra_allowed_names =
   match Flambda_features.join_algorithm () with
   | Binary ->
-    Join_levels_old.cut_and_n_way_join definition_typing_env ts_and_use_ids
-      ~params ~cut_after ~extra_lifted_consts_in_use_envs ~extra_allowed_names
+    ( Join_levels_old.cut_and_n_way_join definition_typing_env ts_and_use_ids
+        ~params ~cut_after ~extra_lifted_consts_in_use_envs ~extra_allowed_names,
+      None )
   | N_way ->
     cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
       ~extra_lifted_consts_in_use_envs
@@ -75,14 +80,17 @@ let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
         ~cut_after ~extra_lifted_consts_in_use_envs ~extra_allowed_names
     in
     let old_joined_level = TE.cut old_joined_env ~cut_after:scope in
-    let new_joined_env =
+    let new_joined_env, analysis =
       cut_and_n_way_join typing_env ts_and_use_ids ~params ~cut_after
         ~extra_lifted_consts_in_use_envs
     in
     let new_joined_level = TE.cut new_joined_env ~cut_after:scope in
-    (let distinct_names =
+    (let config =
+       Equal_types_for_debug.create_config ~ignore_alloc_mode:true ()
+     in
+     let distinct_names =
        Equal_types_for_debug.names_with_non_equal_types_level_ignoring_name_mode
-         ~meet_type:(Meet.meet_type ()) typing_env old_joined_level
+         ~config ~meet_type:(Meet.meet_type ()) typing_env old_joined_level
          new_joined_level
      in
      let distinct_names =
@@ -111,5 +119,7 @@ let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
        Format.eprintf "@[Names with distinct types:@ %a@]" Name.Set.print
          distinct_names;
        Format.eprintf "@]@\n%s@." (String.make 60 '=')));
-    TE.add_env_extension_from_level definition_typing_env new_joined_level
-      ~meet_type:(Meet.meet_type ())
+    ( Meet_env.use_meet_env definition_typing_env ~f:(fun target_env ->
+          Meet_env.add_env_extension_from_level target_env new_joined_level
+            ~meet_type:(Meet.meet_type ())),
+      analysis )

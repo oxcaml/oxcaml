@@ -27,6 +27,9 @@ let fatal_errorf fmt =
 
 let fatal_error msg = fatal_errorf "%s" msg
 
+let unboxed_small_int_arrays_are_not_implemented () =
+  fatal_error "unboxed int8/int16 and untagged int arrays are not implemented"
+
 (* Exceptions *)
 
 let try_finally ?(always=(fun () -> ())) ?(exceptionally=(fun () -> ())) work =
@@ -422,9 +425,39 @@ module Stdlib = struct
         let a = Array.make (1 + List.length tl) (f hd) in
         List.iteri (fun i x -> Array.unsafe_set a (i+1) (f x)) tl;
         a
+
+    let concat_arrays : 'a array array -> 'a array = fun arrays ->
+      (* CR-soon xclerc for xclerc: should we simply use the following?
+        `arrays |> Array.to_list |> Array.concat` *)
+      let total_len = ref 0 in
+      let init = ref None in
+      for i = 0 to pred (Array.length arrays) do
+        let array = Array.unsafe_get arrays i in
+        let len = Array.length array in
+        total_len := !total_len + len;
+        if len > 0 then init := Some (Array.unsafe_get array 0)
+      done;
+      match !total_len, !init with
+      | 0, None -> [||]
+      | 0, Some _ -> fatal_error "broken invariant"
+      | _, None -> fatal_error "broken invariant"
+      | _, Some init ->
+        let dst = Array.make !total_len init in
+        let dst_pos = ref 0 in
+        for i = 0 to pred (Array.length arrays) do
+          let array = Array.unsafe_get arrays i in
+          let len = Array.length array in
+          (* CR-soon xclerc for xclerc: use unsafe_blit? *)
+          ArrayLabels.blit ~src:array ~src_pos:0 ~dst ~dst_pos:!dst_pos ~len;
+          dst_pos := !dst_pos + len
+        done;
+        dst
   end
 
   module Iarray = struct
+    let update t i a =
+      Iarray.mapi (fun i' old -> if i = i' then a else old) t
+
     let equal eq_elt l1 l2 =
       (* Basically inlines [Array.for_all2] to avoid the [raise] *)
       let n = Iarray.length l1 in
@@ -439,6 +472,20 @@ module Stdlib = struct
       in
       loop 0
 
+    let compare compare arr1 arr2 =
+      let len1 = Iarray.length arr1 in
+      let len2 = Iarray.length arr2 in
+      if len1 <> len2 then
+        Int.compare len1 len2
+      else
+        let rec loop i =
+          if i >= len1 then 0
+          else
+            let cmp = compare arr1.:(i) arr2.:(i) in
+            if cmp <> 0 then cmp else loop (i + 1)
+        in
+        loop 0
+
     let all_somes a =
       try
         Some (Iarray.map (function None -> raise_notrace Exit | Some x -> x) a)
@@ -447,6 +494,9 @@ module Stdlib = struct
 
     let of_list_map f l =
       Array.of_list_map f l |> Iarray.unsafe_of_array
+
+    let concat_iarrays a =
+      a |> Iarray.to_list |> Iarray.concat
   end
 
   module String = struct
@@ -718,6 +768,12 @@ let remove_file filename =
   with Sys_error _msg ->
     ()
 
+let remove_dir dirname =
+  try
+    Sys.rmdir dirname
+  with Sys_error _msg ->
+    ()
+
 (* Expand a -I option: if it starts with +, make it relative to the standard
    library directory *)
 
@@ -801,6 +857,23 @@ let protect_writing_to_file ~filename ~f =
     ~exceptionally:(fun () -> remove_file filename)
     (fun () -> f outchan)
 
+let prng = lazy(Random.State.make_self_init ())
+
+let temp_file_name temp_dir prefix suffix =
+  let rnd = (Random.State.bits (Lazy.force prng)) land 0xFFFFFF in
+  Filename.concat temp_dir (Printf.sprintf "%s%06x%s" prefix rnd suffix)
+
+let mk_temp_dir ?(perms = 0o700) prefix suffix =
+  let temp_dir = Filename.get_temp_dir_name () in
+  let rec try_name counter =
+    let name = temp_file_name temp_dir prefix suffix in
+    try
+      Sys.mkdir name perms;
+      name
+    with Sys_error _ as e ->
+      if counter >= 20 then raise e else try_name (counter + 1)
+  in try_name 0
+
 (* Integer operations *)
 
 let rec log2 n =
@@ -846,6 +919,46 @@ module Int_literal_converter = struct
   let int32 s = cvt_int_aux s Int32.neg Int32.of_string
   let int64 s = cvt_int_aux s Int64.neg Int64.of_string
   let nativeint s = cvt_int_aux s Nativeint.neg Nativeint.of_string
+
+  (* Follows "parse_sign_and_base" in runtime/ints.c *)
+  let parse_signedness s =
+    let char_at i =
+      if String.length s > i
+      then Some s.[i]
+      else None
+    in
+    let p =
+      match char_at 0 with
+      | Some ('-' | '+') -> 1
+      | Some _ | None -> 0
+    in
+    match char_at p with
+    | Some '0' ->
+      begin match char_at (p+1) with
+      | Some ('x' | 'X' | 'o' | 'O' | 'b' | 'B' | 'u' | 'U') -> false
+      | Some _ | None -> true
+      end
+    | Some _ | None -> true
+
+  let cvt_small_int str ~bits =
+    let i = int_of_string str in
+    let max_int = (1 lsl (bits-1)) - 1 in
+    let min_int = -(1 lsl (bits-1)) in
+    let max_uint = (1 lsl bits) - 1 in
+    let lower_limit, upper_limit =
+      if parse_signedness str
+      then min_int, max_int + 1
+      else -max_uint, max_uint
+    in
+    if i < lower_limit || i > upper_limit
+    then failwith "small int overflow";
+    (* handle overflow *)
+    if i > max_int then i - (max_uint + 1)
+    else if i < min_int then i + (max_uint + 1)
+    else i
+
+  let int8 s = cvt_small_int s ~bits:8
+  let int16 s = cvt_small_int s ~bits:16
 end
 
 (* [find_first_mono p] assumes that there exists a natural number
@@ -1332,10 +1445,130 @@ let pp_parens_if condition printer ppf arg =
     (if condition then ")" else "")
 
 let pp_nested_list ~nested ~pp_element ~pp_sep ppf arg =
-  Format.fprintf ppf "@[%a@]"
+  Format.fprintf ppf "@[<hv>%a@]"
     (pp_parens_if nested
        (Format.pp_print_list ~pp_sep (pp_element ~nested:true)))
     arg
+
+
+(* Printing a table of strings with headers. *)
+type table =
+  { columns : column array;
+    num_rows : int
+  }
+
+and column =
+  { mutable header : string;
+    entries : cell array;
+    mutable char_width : int
+  }
+
+and cell = string list
+
+(* Initialize a table by storing the original column string in the cells. *)
+let make_table (columns : (string * string list) list) =
+  match columns with
+  | [] -> fatal_errorf "make_table: empty table"
+  | (_, col) :: _ ->
+    let num_rows = List.length col in
+    let columns =
+      List.map
+        (fun (header, col) ->
+          let char_width, entries =
+            List.fold_right
+              (fun cell (width, acc) ->
+                let char_width = max width (String.length cell) in
+                char_width, [cell] :: acc)
+              col
+              (String.length header, [])
+          in
+          let entries = Array.of_list entries in
+          if Array.length entries <> num_rows then
+            fatal_errorf "make_table: inconsistent column lengths";
+          { header; entries; char_width })
+        columns
+    in
+    { columns = Array.of_list columns; num_rows }
+
+(* Splits all cells based on new lines,
+   and expands the cells with white space to be all of the same length. *)
+let expand_table t =
+  let pad_string desired_length s =
+    s ^ String.make (desired_length - String.length s) ' '
+  in
+  let pad_row_cell desired_depth cell =
+    cell @ List.init (desired_depth - List.length cell) (fun _ -> "")
+  in
+  (* split based on new lines and adjust column width *)
+  for i = 0 to Array.length t.columns - 1 do
+    let column = t.columns.(i) in
+    column.char_width <- String.length column.header;
+    for j = 0 to Array.length column.entries - 1 do
+      let cell_strings = column.entries.(j) in
+      let cell_strings =
+        List.concat_map (String.split_on_char '\n') cell_strings
+      in
+      let cell_max_width =
+        List.fold_left (fun acc s -> max acc (String.length s)) 0 cell_strings
+      in
+      column.char_width <- max column.char_width cell_max_width;
+      column.entries.(j) <- cell_strings
+    done
+  done;
+  (* add empty strings for rows with different depths *)
+  for j = 0 to t.num_rows - 1 do
+    let max_depth = ref 1 in
+    for i = 0 to Array.length t.columns - 1 do
+      max_depth := max !max_depth (List.length t.columns.(i).entries.(j))
+    done;
+    for i = 0 to Array.length t.columns - 1 do
+      t.columns.(i).entries.(j)
+        <- pad_row_cell !max_depth t.columns.(i).entries.(j)
+    done
+  done;
+  (* expand all strings to be of the correct width *)
+  for i = 0 to Array.length t.columns - 1 do
+    let column = t.columns.(i) in
+    column.header <- pad_string column.char_width column.header;
+    for j = 0 to Array.length column.entries - 1 do
+      column.entries.(j)
+        <- List.map (pad_string column.char_width) column.entries.(j)
+    done
+  done
+
+let print_separator ppf table_width =
+  Format.fprintf ppf "|%s|\n" (String.make (table_width - 2) '-')
+
+(* prints a single row of [num_cols] columns *)
+let print_row ppf num_cols f =
+  for i = 0 to num_cols - 1 do
+    Format.fprintf ppf "| %s " (f i)
+  done;
+  Format.fprintf ppf "|\n"
+
+let pp_table ppf (columns : (string * string list) list) =
+  if List.length columns = 0 then fatal_errorf "pp_table: empty table";
+  let table = make_table columns in
+  expand_table table;
+  let table_width =
+    Array.fold_left (fun acc column -> acc + column.char_width) 0 table.columns
+    + 4 (* boundary characters *)
+    + ((Array.length table.columns - 1) * 3 (* inter column boundaries *))
+  in
+  print_separator ppf table_width;
+  print_row ppf (Array.length table.columns)
+    (fun i -> table.columns.(i).header);
+  print_separator ppf table_width;
+  for j = 0 to table.num_rows - 1 do
+    let first_column_cell = table.columns.(0).entries.(j) in
+    let depth = List.length first_column_cell in
+    for k = 0 to depth - 1 do
+      print_row ppf (Array.length table.columns) (fun i ->
+          List.nth table.columns.(i).entries.(j) k)
+    done;
+    print_separator ppf table_width
+  done
+
 
 (* showing configuration and configuration variables *)
 let show_config_and_exit () =
@@ -1794,6 +2027,83 @@ let remove_double_underscores s =
   loop 0;
   Buffer.contents buf
 
+module Json = struct
+
+  (* [escape_unicode] is based on [Bytes.unsafe_escape], which is used
+     for the format specifier [%S]. It is adjusted to output unicode escape
+     chacarcters \u00HH instead of the usual OCaml character literals \DDD.
+     Adds quotes around the input string. *)
+  let escape_unicode str =
+    let s = Bytes.of_string str in
+    let n = ref 2 in (* for the quotes *)
+    for i = 0 to Bytes.length s - 1 do
+      n := !n +
+        (match Bytes.unsafe_get s i with
+        | '\"' | '\\' | '\n' | '\t' | '\r' | '\b' -> 2
+        | ' ' .. '~' -> 1
+        | _ -> 6)
+    done;
+    begin
+      let s' = Bytes.create !n in
+      Bytes.unsafe_set s' 0 '\"';
+      n := 1;
+      for i = 0 to Bytes.length s - 1 do
+        begin match Bytes.unsafe_get s i with
+        | ('\"' | '\\') as c ->
+            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n c
+        | '\n' ->
+            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 'n'
+        | '\t' ->
+            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 't'
+        | '\r' ->
+            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 'r'
+        | '\b' ->
+            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 'b'
+        | (' ' .. '~') as c -> Bytes.unsafe_set s' !n c
+        | c ->
+            let a = Char.code c in
+            let hex_char n =
+              if n < 10 then Char.chr (48 + n)  (* '0'-'9' *)
+              else Char.chr (55 + n)            (* 'A'-'F' *)
+            in
+            Bytes.unsafe_set s' !n '\\';
+            incr n;
+            Bytes.unsafe_set s' !n 'u';
+            incr n;
+            Bytes.unsafe_set s' !n '0';
+            incr n;
+            Bytes.unsafe_set s' !n '0';
+            incr n;
+            Bytes.unsafe_set s' !n (hex_char (a / 16));
+            incr n;
+            Bytes.unsafe_set s' !n (hex_char (a mod 16));
+        end;
+        incr n
+      done;
+      Bytes.unsafe_set s' !n '\"';
+      String.of_bytes s'
+    end
+
+
+  let field name value = Printf.sprintf "%s: %s" (escape_unicode name) value
+
+  let string value = escape_unicode value
+
+  let int value = string_of_int value
+
+  let object_ fields =
+    let field_strings = String.concat ",\n" fields in
+    Printf.sprintf "{\n%s\n}" field_strings
+
+  let array items =
+    let item_strings = String.concat ",\n" items in
+    Printf.sprintf "[\n%s\n]" item_strings
+
+  let null = "null"
+
+  let option f = function None -> null | Some v -> f v
+end
+
 module Nonempty_list = struct
   type nonrec 'a t = ( :: ) of 'a * 'a list
 
@@ -1810,4 +2120,49 @@ module Nonempty_list = struct
 
   let (@) (x :: xs) (y :: ys) =
     x :: List.(xs @ (y :: ys))
+end
+
+module Maybe_bounded = struct
+  type t =
+    | Unbounded
+    | Bounded of { mutable bound: int }
+
+  let decr = function
+    | Unbounded -> ()
+    | Bounded r when r.bound > 0 -> r.bound <- r.bound - 1
+    | Bounded _ -> ()
+
+  let incr = function
+    | Unbounded -> ()
+    | Bounded r ->
+      if Int.equal r.bound Int.max_int
+      then
+        let msg = Format.asprintf "incr called with max_int (%d)" Int.max_int in
+        raise (Invalid_argument msg)
+      else
+        r.bound <- r.bound + 1
+
+  let is_depleted = function
+    | Unbounded -> false
+    | Bounded r -> r.bound <= 0
+
+  let is_in_bounds n t =
+    if n < 0 then false
+    else
+      match t with
+      | Unbounded -> true
+      | Bounded r -> n < r.bound
+
+  let is_out_of_bounds n t =
+    if n < 0 then true
+    else
+      match t with
+      | Unbounded -> false
+      | Bounded r -> n >= r.bound
+
+  let of_int n = if n < 0 then Bounded { bound = 0 } else Bounded { bound = n }
+
+  let of_option = function
+    | None -> Unbounded
+    | Some n -> of_int n
 end

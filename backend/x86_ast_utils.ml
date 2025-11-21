@@ -1,4 +1,4 @@
-[@@@ocaml.warning "+a-4-30-40-41-42"]
+[@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare[@@ocaml.warning "-66"]
 open X86_ast
@@ -13,10 +13,13 @@ let equal_data_type left right =
   | DWORD, DWORD
   | QWORD, QWORD
   | VEC128, VEC128
+  | VEC256, VEC256
+  | VEC512, VEC512
   | NEAR, NEAR
   | PROC, PROC ->
     true
-  | (NONE | REAL4 | REAL8 | BYTE | WORD | DWORD | QWORD | VEC128 | NEAR | PROC), _ ->
+  | (NONE | REAL4 | REAL8 | BYTE | WORD | DWORD | QWORD |
+     VEC128 | VEC256 | VEC512 | NEAR | PROC), _ ->
     false
 
 let equal_reg64 left right =
@@ -52,7 +55,10 @@ let equal_reg8h left right =
 
 let equal_regf left right =
   match left, right with
-  | XMM l, XMM r -> Int.equal l r
+  | XMM l, XMM r
+  | YMM l, YMM r
+  | ZMM l, ZMM r -> Int.equal l r
+  | (XMM _ | YMM _ | ZMM _), _ -> false
 
 let equal_arch left right =
   match left, right with
@@ -84,3 +90,14 @@ let equal_arg left right =
   | Mem64_RIP (l_dt, l_s, l_i), Mem64_RIP (r_dt, r_s, r_i) ->
     equal_data_type l_dt r_dt && String.equal l_s r_s && Int.equal l_i r_i
   | (Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Mem _ | Mem64_RIP _), _ -> false
+
+let is_mem = function
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ ->
+    false
+  | Mem _ | Mem64_RIP _ -> true
+
+let is_regf = function
+  | Regf _ -> true
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Mem _
+  | Mem64_RIP _ ->
+    false

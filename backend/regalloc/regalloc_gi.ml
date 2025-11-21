@@ -48,10 +48,10 @@ let update_register_locations : State.t -> unit =
             Hardware_register.print_location location;
         reg.Reg.loc <- Hardware_register.reg_location_of_location location)
   in
-  List.iter (Reg.all_registers ()) ~f:update_register;
+  List.iter (Reg.all_relocatable_regs ()) ~f:update_register;
   if debug then dedent ()
 
-module Prio_queue = Make_max_priority_queue (Int)
+module Prio_queue = Priority_queue.Make (Int)
 
 type prio_queue = (Reg.t * Interval.t) Prio_queue.t
 
@@ -114,11 +114,29 @@ let max_rounds = 32
 
 let max_temp_multiplier = 10
 
+module For_testing = struct
+  let rounds = ref (-1)
+end
+
+let compile_spill_costs state cfg_with_infos ~flat () =
+  let costs = SpillCosts.compute cfg_with_infos ~flat () in
+  State.iter_introduced_temporaries state ~f:(fun (reg : Reg.t) ->
+      SpillCosts.add_to_reg costs reg 10_000);
+  if debug
+  then (
+    log "spilling costs";
+    indent ();
+    SpillCosts.iter costs ~f:(fun (reg : Reg.t) (cost : int) ->
+        log "%a: %d" Printreg.reg reg cost);
+    dedent ());
+  costs
+
 (* CR xclerc for xclerc: the `round` parameter is temporary; this is an hybrid
    version of "greedy" using the `rewrite` function from IRC when it needs to
    spill. *)
 let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
  fun ~round ~flat state cfg_with_infos ->
+  For_testing.rounds := round;
   if round > max_rounds
   then
     fatal "register allocation was not succesful after %d rounds (%s)"
@@ -134,16 +152,7 @@ let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
     log "main, round #%d" round;
     log_cfg_with_infos cfg_with_infos);
   if debug then log "updating spilling costs";
-  let costs = SpillCosts.compute cfg_with_infos ~flat () in
-  State.iter_introduced_temporaries state ~f:(fun (reg : Reg.t) ->
-      SpillCosts.add_to_reg costs reg 10_000);
-  if debug
-  then (
-    log "spilling costs";
-    indent ();
-    SpillCosts.iter costs ~f:(fun (reg : Reg.t) (cost : int) ->
-        log "%a: %d" Printreg.reg reg cost);
-    dedent ());
+  let costs = lazy (compile_spill_costs state cfg_with_infos ~flat ()) in
   let hardware_registers, prio_queue =
     make_hardware_registers_and_prio_queue cfg_with_infos
   in
@@ -169,9 +178,7 @@ let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
         log "assigning %a to %a" Printreg.reg reg
           Hardware_register.print_location hardware_reg.location;
       State.add_assignment state reg ~to_:hardware_reg.location;
-      hardware_reg.assigned
-        <- { Hardware_register.pseudo_reg = reg; interval; evictable = true }
-           :: hardware_reg.assigned
+      Hardware_register.add_evictable hardware_reg reg interval
     | For_eviction { hardware_reg; evicted_regs } ->
       if debug
       then
@@ -194,19 +201,12 @@ let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
                evictable"
               Printreg.reg evict_reg;
           State.remove_assignment state evict_reg;
+          Hardware_register.remove_evictable hardware_reg evict_reg;
           Prio_queue.add prio_queue
             ~priority:(priority_heuristics evict_reg evict_interval)
             ~data:(evict_reg, evict_interval));
       State.add_assignment state reg ~to_:hardware_reg.location;
-      (* CR xclerc for xclerc: very inefficient. *)
-      hardware_reg.assigned
-        <- { Hardware_register.pseudo_reg = reg; interval; evictable = true }
-           :: List.filter hardware_reg.assigned
-                ~f:(fun { Hardware_register.pseudo_reg = r; _ } ->
-                  not
-                    (List.exists evicted_regs
-                       ~f:(fun { Hardware_register.pseudo_reg = r'; _ } ->
-                         Reg.same r r')))
+      Hardware_register.add_evictable hardware_reg reg interval
     | Split_or_spill ->
       (* CR xclerc for xclerc: we should actually try to split. *)
       if debug then log "spilling %a" Printreg.reg reg;
@@ -270,10 +270,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
   let all_temporaries = Reg.Set.union cfg_infos.arg cfg_infos.res in
   let initial_temporaries = Reg.Set.cardinal all_temporaries in
   if debug then log "#temporaries=%d" initial_temporaries;
-  let state =
-    State.make ~stack_slots ~initial_temporaries
-      ~last_used:cfg_infos.max_instruction_id
-  in
+  let state = State.make ~stack_slots ~initial_temporaries in
   let spilling_because_unused = Reg.Set.diff cfg_infos.res cfg_infos.arg in
   (match Reg.Set.elements spilling_because_unused with
   | [] -> ()

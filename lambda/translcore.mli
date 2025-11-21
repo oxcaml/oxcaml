@@ -54,6 +54,9 @@ type error =
   | Void_sort of Types.type_expr
   | Unboxed_vector_in_array_comprehension
   | Unboxed_product_in_array_comprehension
+  | Unboxed_product_in_let_mutable
+  | Block_index_gap_overflow_possible
+  | Element_would_be_reordered_in_record
 
 exception Error of Location.t * error
 
@@ -68,7 +71,3 @@ val transl_module :
 val transl_object :
       (scopes:scopes -> Ident.t -> string list ->
        class_expr -> lambda) ref
-
-(* Declarations to be wrapped around the entire body *)
-val clear_probe_handlers : unit -> unit
-val declare_probe_handlers : lambda -> lambda

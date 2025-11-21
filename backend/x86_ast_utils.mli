@@ -1,3 +1,5 @@
+[@@@ocaml.warning "+a-40-41-42"]
+
 val equal_data_type : X86_ast.data_type -> X86_ast.data_type -> bool
 
 val equal_reg64 : X86_ast.reg64 -> X86_ast.reg64 -> bool
@@ -11,3 +13,7 @@ val equal_arch : X86_ast.arch -> X86_ast.arch -> bool
 val equal_addr : X86_ast.addr -> X86_ast.addr -> bool
 
 val equal_arg : X86_ast.arg -> X86_ast.arg -> bool
+
+val is_mem : X86_ast.arg -> bool
+
+val is_regf : X86_ast.arg -> bool

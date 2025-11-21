@@ -4,7 +4,8 @@
 
 (* Test that "with" syntax isn't allowed in locations that expect a right-kind *)
 
-(* CR layouts v2.8: these errors should talk about kinds, not modes *)
+(* CR layouts v2.8: these errors should talk about kinds, not modes. Internal
+   ticket 5128 *)
 type ('a : immutable_data with int) t
 [%%expect {|
 Line 1, characters 31-34:

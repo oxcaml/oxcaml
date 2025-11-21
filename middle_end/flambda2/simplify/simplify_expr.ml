@@ -60,11 +60,15 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
           Flow.Analysis.analyze data_flow ~print_name ~code_age_relation
             ~used_value_slots
             ~code_ids_to_never_delete:(DA.code_ids_to_never_delete dacc)
+            ~specialization_map:(DA.specialization_map dacc)
             ~return_continuation ~exn_continuation
+            ~machine_width:(DE.machine_width (DA.denv dacc))
         in
         let uenv =
           UE.add_function_return_or_exn_continuation
-            (UE.create (DA.are_rebuilding_terms dacc))
+            (UE.create
+               (DA.are_rebuilding_terms dacc)
+               ~machine_width:(DE.machine_width (DA.denv dacc)))
             return_continuation return_arity
         in
         let uenv =
@@ -76,6 +80,8 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
         in
         let uacc =
           if Flow.Analysis.did_perform_mutable_unboxing flow_result
+             || Flow.Analysis.added_useful_alias_in_loop (DA.typing_env dacc)
+                  data_flow flow_result
           then UA.set_resimplify uacc
           else uacc
         in
@@ -114,8 +120,9 @@ let rec simplify_expr dacc expr ~down_to_up =
     Simplify_apply_cont_expr.simplify_apply_cont dacc apply_cont ~down_to_up
   | Switch switch ->
     Simplify_switch_expr.simplify_switch
-      ~simplify_let:Simplify_let_expr.simplify_let ~simplify_function_body dacc
-      switch ~down_to_up
+      ~simplify_let_with_bound_pattern:
+        Simplify_let_expr.simplify_let_with_bound_pattern
+      ~simplify_function_body dacc switch ~down_to_up
   | Invalid { message } ->
     (* CR mshinwell: Make sure that a program can be simplified to just
        [Invalid]. *)
@@ -138,7 +145,7 @@ and simplify_function_body dacc expr ~return_continuation ~return_arity
         (Apply_cont_expr.create cont ~args ~dbg:Debuginfo.none)
     in
     let handlers =
-      Continuation.Map.singleton cont
+      Continuation.Lmap.singleton cont
         (Continuation_handler.create params ~handler:expr
            ~free_names_of_handler:Unknown ~is_exn_handler:false ~is_cold:false)
     in

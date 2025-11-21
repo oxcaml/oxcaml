@@ -4,9 +4,9 @@ let test () =
      However, importing will map var to var_bad so if for some reason importing
      is done twice then one of the output simples will be printed as "bad"
      instead of "ok". *)
-  let var_ext = Variable.create "ext" in
-  let var_ok = Variable.create "ok" in
-  let var_bad = Variable.create "bad" in
+  let var_ext = Variable.create "ext" Flambda_kind.value in
+  let var_ok = Variable.create "ok" Flambda_kind.value in
+  let var_bad = Variable.create "bad" Flambda_kind.value in
   let variables =
     Variable.Map.add var_ok var_bad (Variable.Map.singleton var_ext var_ok)
   in

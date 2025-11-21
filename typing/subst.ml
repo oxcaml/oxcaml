@@ -33,14 +33,21 @@ type type_replacement =
 
 type additional_action =
   | Prepare_for_saving of
-      { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind }
-    (* The [Prepare_for_saving] function should be applied to all jkinds when
+      { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
+        prepare_mode : Mode.Alloc.lr -> Mode.Alloc.lr;
+        prepare_modality : Mode.Modality.t -> Mode.Modality.t
+      }
+    (* The [prepare_jkind] function should be applied to all jkinds when
        saving; this commons them up, truncates their histories, and runs
-       a check that all unconstrained variables have been defaulted to value. *)
+       a check that all unconstrained variables have been defaulted to value.
+
+       The [prepare_mode]/[prepare_modality] functions should be applied to all
+       modes/modalities when saving; this ensures the saved file doesn't contain
+       mode variables. *)
   | Duplicate_variables
   | No_action
 
-type t =
+type s =
   { types: type_replacement Path.Map.t;
     modules: Path.t Path.Map.t;
     modtypes: module_type Path.Map.t;
@@ -48,8 +55,15 @@ type t =
     additional_action: additional_action;
 
     loc: Location.t option;
-    mutable last_compose: (t * t) option  (* Memoized composition *)
+    mutable last_compose: (s * s) option  (* Memoized composition *)
   }
+
+type 'a subst = s
+type safe = [`Safe]
+type unsafe = [`Unsafe]
+type t = safe subst
+exception Module_type_path_substituted_away of Path.t * Types.module_type
+
 let identity =
   { types = Path.Map.empty;
     modules = Path.Map.empty;
@@ -84,26 +98,19 @@ let add_type_replacement types id replacement =
         (Path.unboxed_version id) (Type_function { params; body }) types
     | _ -> types
 
-let add_type_path id p s =
-  let types = add_type_replacement s.types id (Path p) in
-  { s with types; last_compose = None }
+let unsafe x = x
 
 let add_type id p s =
-  add_type_path (Pident id) p s
-
-let add_type_function id ~params ~body s =
-  let types =
-    add_type_replacement s.types id (Type_function { params; body })
-  in
+  let types = add_type_replacement s.types (Pident id) (Path p) in
   { s with types; last_compose = None }
 
-let add_module_path id p s =
-  { s with modules = Path.Map.add id p s.modules; last_compose = None }
-let add_module id p s = add_module_path (Pident id) p s
+let add_module id p s =
+  { s with modules = Path.Map.add (Pident id) p s.modules; last_compose = None }
 
-let add_modtype_path p ty s =
+let add_modtype_gen p ty s =
   { s with modtypes = Path.Map.add p ty s.modtypes; last_compose = None }
-let add_modtype id ty s = add_modtype_path (Pident id) ty s
+let add_modtype_path p p' s = add_modtype_gen p (Mty_ident p') s
+let add_modtype id p s = add_modtype_path (Pident id) p s
 
 type additional_action_config =
   | Duplicate_variables
@@ -130,7 +137,7 @@ end = struct
         const_jkind
         ~quality
         ~annotation:(Some { pjkind_loc = Location.none;
-                            pjkind_desc = Abbreviation builtin.name })
+                            pjkind_desc = Pjk_abbreviation builtin.name })
         ~why:Jkind.History.Imported)
 
   let best_builtins : (allowed * disallowed) builtins = make_builtins Best
@@ -185,7 +192,15 @@ let with_additional_action =
             end
           | None -> raise(Error (loc, Unconstrained_jkind_variable))
         in
-        Prepare_for_saving { prepare_jkind }
+        (* CR-someday zqian: preserve the hints *)
+        (* modes and modalities should have been zapped already *)
+        let prepare_mode mode =
+          Mode.Alloc.(mode |> to_const_exn |> of_const)
+        in
+        let prepare_modality modality =
+          Mode.Modality.(modality |> to_const_exn|> of_const)
+        in
+        Prepare_for_saving { prepare_jkind; prepare_mode; prepare_modality }
   in
   { s with additional_action; last_compose = None }
 
@@ -248,8 +263,9 @@ let rec module_path s path =
 let modtype_path s path =
       match Path.Map.find path s.modtypes with
       | Mty_ident p -> p
-      | Mty_alias _ | Mty_signature _ | Mty_functor _| Mty_strengthen _ ->
-         fatal_error "Subst.modtype_path"
+      | Mty_alias _ | Mty_signature _ | Mty_functor _
+      | Mty_strengthen _ as mty ->
+         raise (Module_type_path_substituted_away (path,mty))
       | exception Not_found ->
          match path with
          | Pdot(p, n) ->
@@ -397,7 +413,7 @@ let rec typexp copy_scope s ty =
         let ty' =
           match s.additional_action with
           | Duplicate_variables -> newpersty desc
-          | Prepare_for_saving { prepare_jkind } ->
+          | Prepare_for_saving { prepare_jkind; _ } ->
               newpersty (norm desc ~prepare_jkind)
           | No_action -> newty2 ~level:(get_level ty) desc
         in
@@ -474,7 +490,8 @@ let rec typexp copy_scope s ty =
               let more' =
                 match mored with
                   Tsubst (ty, None) -> ty
-                | Tconstr _ | Tnil -> typexp copy_scope s more
+                | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _ ->
+                    typexp copy_scope s more
                 | Tunivar _ | Tvar _ ->
                     if should_duplicate_vars then newpersty mored
                     else if dup && is_Tvar more then newgenty mored
@@ -500,6 +517,17 @@ let rec typexp copy_scope s ty =
           end
       | Tfield(_label, kind, _t1, t2) when field_kind_repr kind = Fabsent ->
           Tlink (typexp copy_scope s t2)
+      | Tarrow ((label, marg, mret), arg, ret, comm) ->
+          let marg, mret =
+            match s.additional_action with
+            | Prepare_for_saving { prepare_mode; _ } ->
+              prepare_mode marg, prepare_mode mret
+            | _ -> marg, mret
+          in
+          let arg = typexp copy_scope s arg in
+          let ret = typexp copy_scope s ret in
+          let comm = copy_commu comm in
+          Tarrow ((label, marg, mret), arg, ret, comm)
       | _ -> copy_type_desc (typexp copy_scope s) desc
     in
     Transient_expr.set_stub_desc ty' desc;
@@ -600,7 +628,7 @@ let rec type_declaration' copy_scope s decl =
       begin
         let jkind =
           match s.additional_action with
-          | Prepare_for_saving { prepare_jkind } ->
+          | Prepare_for_saving { prepare_jkind; _ } ->
             prepare_jkind decl.type_loc decl.type_jkind
           | Duplicate_variables | No_action -> decl.type_jkind
         in
@@ -811,7 +839,7 @@ let rename_bound_idents scoping s sg =
     | Sig_modtype(id, mtd, vis) :: rest ->
         let id' = rename id in
         rename_bound_idents
-          (add_modtype id (Types.Mty_ident(Pident id')) s)
+          (add_modtype id (Pident id') s)
           (Sig_modtype(id', mtd, vis) :: sg)
           rest
     | Sig_class(id, cd, rs, vis) :: rest ->
@@ -861,8 +889,14 @@ let force_type_expr ty = Wrap.force (fun _ s ty ->
   For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)) ty
 
 let rec subst_lazy_value_description s descr =
+  let val_modalities =
+    match s.additional_action with
+    | Prepare_for_saving { prepare_modality; _ } ->
+        prepare_modality descr.val_modalities
+    | _ -> descr.val_modalities
+  in
   { val_type = Wrap.substitute ~compose Keep s descr.val_type;
-    val_modalities = descr.val_modalities;
+    val_modalities;
     val_kind = descr.val_kind;
     val_loc = loc s descr.val_loc;
     val_zero_alloc =
@@ -882,7 +916,14 @@ let rec subst_lazy_value_description s descr =
 
 and subst_lazy_module_decl scoping s md =
   let md_type = subst_lazy_modtype scoping s md.md_type in
+  let md_modalities =
+    match s.additional_action with
+    | Prepare_for_saving { prepare_modality; _ } ->
+        prepare_modality md.md_modalities
+    | _ -> md.md_modalities
+  in
   { md_type;
+    md_modalities;
     md_attributes = attrs s md.md_attributes;
     md_loc = loc s md.md_loc;
     md_uid = md.md_uid }
@@ -1061,6 +1102,35 @@ let modtype_declaration sc s decl =
 
 let module_declaration scoping s decl =
   Lazy.(decl |> of_module_decl |> module_decl scoping s |> force_module_decl)
+
+module Unsafe = struct
+
+  type t = unsafe subst
+  type error = Fcm_type_substituted_away of Path.t * Types.module_type
+
+  let add_modtype_path = add_modtype_gen
+  let add_modtype id mty s = add_modtype_path (Pident id) mty s
+  let add_type_path id p s =
+    { s with types = Path.Map.add id (Path p) s.types; last_compose = None }
+  let add_type_function id ~params ~body s =
+    let types =
+      add_type_replacement s.types id (Type_function { params; body })
+    in
+    { s with types; last_compose = None }
+  let add_module_path id p s =
+    { s with modules = Path.Map.add id p s.modules; last_compose = None }
+
+  let wrap f : _ result = match f () with
+    | x -> Ok x
+    | exception Module_type_path_substituted_away (p,mty) ->
+        Error (Fcm_type_substituted_away (p,mty))
+
+  let signature_item sc s comp = wrap (fun () -> signature_item sc s comp)
+  let signature sc s comp = wrap (fun () -> signature sc s comp )
+  let compose s1 s2 = wrap (fun () -> compose s1 s2)
+  let type_declaration s t = wrap (fun () -> type_declaration s t)
+
+end
 
 let value_description s descr =
   Lazy.(descr |> of_value_description |> value_description s |> force_value_description)

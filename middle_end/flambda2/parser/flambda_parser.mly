@@ -234,6 +234,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token PRIM_UNTAG_IMM [@symbol "%untag_imm"]
 
 %token STATIC_CONST_BLOCK [@symbol "Block"]
+%token STATIC_CONST_VALUE_ARRAY [@symbol "Value_array"]
 %token STATIC_CONST_FLOAT_ARRAY [@symbol "Float_array"]
 %token STATIC_CONST_FLOAT_BLOCK [@symbol "Float_block"]
 %token STATIC_CONST_EMPTY_ARRAY [@symbol "Empty_array"]
@@ -278,6 +279,8 @@ let make_boxed_const_int (i, m) : static_data =
 %type <Fexpr.symbol_binding> symbol_binding
 %type <Fexpr.unary_int_arith_op> unary_int_arith_op
 %type <Fexpr.unop> unop
+%type <Fexpr.is_recursive> recursive
+%type <Fexpr.is_cont_recursive> cont_recursive
 %%
 
 (* CR-someday lmaurer: Modularize and generally clean up *)
@@ -386,7 +389,6 @@ recursive:
 
 unary_int_arith_op:
   | KWD_BSWAP { Swap_byte_endianness }
-  | TILDEMINUS { Neg }
 
 unop:
   | PRIM_ARRAY_LENGTH; kind = array_kind_for_length { Array_length kind }
@@ -432,7 +434,10 @@ unop:
     mut = mutability;
     kind = block_access_kind;
     LPAREN; field = tag; RPAREN;
-    { Block_load { kind; mut; field = Targetint_31_63.of_int field } }
+    { (* CR mshinwell: Should get machine_width from fexpr context when
+         available *)
+      let mw = Target_system.Machine_width.Sixty_four in
+      Block_load { kind; mut; field = Target_ocaml_int.of_int mw field } }
 
 infix_binop:
   | o = binary_int_arith_op { Int_arith o }
@@ -470,6 +475,10 @@ string_accessor_width:
       | 64, None -> Sixty_four
       | 128, Some 'a' -> One_twenty_eight {aligned = true}
       | 128, Some 'u' -> One_twenty_eight {aligned = false}
+      | 256, Some 'a' -> Two_fifty_six {aligned = true}
+      | 256, Some 'u' -> Two_fifty_six {aligned = false}
+      | 512, Some 'a' -> Five_twelve {aligned = true}
+      | 512, Some 'u' -> Five_twelve {aligned = false}
       | _, _ -> Misc.fatal_error "invalid string accessor width" }
 
 array_kind:
@@ -578,8 +587,12 @@ binop_app:
     block = simple; DOT;
     LPAREN; field = tag; RPAREN;
     init = init_or_assign;
-    v = simple
-    { Binary (Block_set { kind; init; field = Targetint_31_63.of_int field }, block, v) }
+    v = simple;
+    { (* CR mshinwell: pass machine width through properly *)
+      let mw = Target_system.Machine_width.Sixty_four in
+      let field = Target_ocaml_int.of_int mw field in
+      Binary (Block_set { kind; init; field }, block, v) }
+           (* TODO: Should get machine_width from fexpr context *)
   | op = prefix_binop; LPAREN; arg1 = simple; COMMA; arg2 = simple; RPAREN
     { Binary (op, arg1, arg2) }
   | arg1 = simple; op = infix_binop; arg2 = simple
@@ -598,6 +611,8 @@ binop_app:
       | Naked_int64s -> Naked_int64s
       | Naked_nativeints -> Naked_nativeints
       | Naked_vec128s -> Naked_vec128s
+      | Naked_vec256s -> Naked_vec256s
+      | Naked_vec512s -> Naked_vec512s
       | Unboxed_product _ ->
         Misc.fatal_error "Unboxed product array ops not supported"
     in
@@ -633,6 +648,8 @@ ternop_app:
         | Naked_int64s -> Naked_int64s
         | Naked_nativeints -> Naked_nativeints
         | Naked_vec128s -> Naked_vec128s
+        | Naked_vec256s -> Naked_vec256s
+        | Naked_vec512s -> Naked_vec512s
         | Unboxed_product _ ->
           Misc.fatal_error "Unboxed product array ops not supported"
       in
@@ -771,7 +788,7 @@ inner_expr:
 ;
 
 where_expr:
-  | body = inner_expr; KWD_WHERE; recursive = recursive;
+  | body = inner_expr; KWD_WHERE; recursive = cont_recursive;
     bindings = separated_list(KWD_ANDWHERE, continuation_binding)
     { Let_cont { recursive; body; bindings } }
 ;
@@ -940,6 +957,12 @@ raise_kind:
   | KWD_RERAISE { Reraise }
   | KWD_NOTRACE { No_trace }
 
+cont_recursive:
+  | { Nonrecursive }
+  | KWD_REC params = kinded_args
+    { (Recursive params : Fexpr.is_cont_recursive) }
+;
+
 continuation_sort:
   | { None }
   | KWD_EXN { Some Exn }
@@ -977,6 +1000,10 @@ static_data:
     fs = separated_list(SEMICOLON, float_or_variable);
     RBRACKPIPE
     { Immutable_float_array fs }
+  | STATIC_CONST_VALUE_ARRAY; LBRACKPIPE;
+    fs = separated_list(SEMICOLON, field_of_block);
+    RBRACKPIPE
+    { Immutable_value_array fs }
   | STATIC_CONST_EMPTY_ARRAY kind=empty_array_kind { Empty_array kind }
   | KWD_MUTABLE; s = STRING { Mutable_string { initial_value = s } }
   | s = STRING { Immutable_string s }

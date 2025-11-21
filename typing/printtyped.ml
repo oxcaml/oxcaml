@@ -69,6 +69,8 @@ let fmt_constant f x =
   match x with
   | Const_int (i) -> fprintf f "Const_int %d" i
   | Const_char (c) -> fprintf f "Const_char %02x" (Char.code c)
+  | Const_untagged_char (c) ->
+      fprintf f "Const_untagged_char %02x" (Char.code c)
   | Const_string (s, strloc, None) ->
       fprintf f "Const_string(%S,%a,None)" s fmt_location strloc
   | Const_string (s, strloc, Some delim) ->
@@ -77,9 +79,14 @@ let fmt_constant f x =
   | Const_float32 (s) -> fprintf f "Const_float32 %s" s;
   | Const_unboxed_float (s) -> fprintf f "Const_unboxed_float %s" s
   | Const_unboxed_float32 (s) -> fprintf f "Const_unboxed_float32 %s" s
+  | Const_int8 (i) -> fprintf f "Const_int8 %d" i
+  | Const_int16 (i) -> fprintf f "Const_int16 %d" i
   | Const_int32 (i) -> fprintf f "Const_int32 %ld" i
   | Const_int64 (i) -> fprintf f "Const_int64 %Ld" i
   | Const_nativeint (i) -> fprintf f "Const_nativeint %nd" i
+  | Const_untagged_int (i) -> fprintf f "Const_untagged_int %d" i
+  | Const_untagged_int8 (i) -> fprintf f "Const_untagged_int8 %d" i
+  | Const_untagged_int16 (i) -> fprintf f "Const_untagged_int16 %d" i
   | Const_unboxed_int32 (i) -> fprintf f "Const_unboxed_int32 %ld" i
   | Const_unboxed_int64 (i) -> fprintf f "Const_unboxed_int64 %Ld" i
   | Const_unboxed_nativeint (i) -> fprintf f "Const_unboxed_nativeint %nd" i
@@ -92,8 +99,10 @@ let fmt_mutable_flag f x =
 let fmt_mutable_mode_flag f (x : Types.mutability) =
   match x with
   | Immutable -> fprintf f "Immutable"
-  | Mutable m ->
-    fprintf f "Mutable(%a)" Mode.Alloc.Comonadic.Const.print m
+  | Mutable { mode; atomic = Nonatomic } ->
+    fprintf f "Mutable(%a)" (Mode.Value.Comonadic.print ()) mode
+  | Mutable { mode; atomic = Atomic } ->
+    fprintf f "Atomic(%a)" (Mode.Value.Comonadic.print ()) mode
 
 let fmt_virtual_flag f x =
   match x with
@@ -129,6 +138,14 @@ let fmt_partiality f x =
   match x with
   | Total -> ()
   | Partial -> fprintf f " (Partial)"
+
+let fmt_index_kind f = function
+  | Index_int -> fprintf f "Index_int"
+  | Index_unboxed_int64 -> fprintf f "Index_unboxed_int64"
+  | Index_unboxed_int32 -> fprintf f "Index_unboxed_int32"
+  | Index_unboxed_int16 -> fprintf f "Index_unboxed_int16"
+  | Index_unboxed_int8 -> fprintf f "Index_unboxed_int8"
+  | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
 
 let line i f s (*...*) =
   fprintf f "%s" (String.make (2*i) ' ');
@@ -316,6 +333,14 @@ let rec core_type i ppf x =
   | Ttyp_open (path, _mod_ident, t) ->
       line i ppf "Ttyp_open %a\n" fmt_path path;
       core_type i ppf t
+  | Ttyp_quote t ->
+      line i ppf "Ttyp_quote\n";
+      core_type i ppf t
+  | Ttyp_splice t ->
+      line i ppf "Ttyp_splice\n";
+      core_type i ppf t
+  | Ttyp_of_kind jkind ->
+      line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";
 
 and labeled_core_type i ppf (l, t) =
@@ -338,11 +363,13 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   end;
   match x.pat_desc with
   | Tpat_any -> line i ppf "Tpat_any\n";
-  | Tpat_var (s,_,_,m) ->
+  | Tpat_var (s,_,_,sort,m) ->
       line i ppf "Tpat_var \"%a\"\n" fmt_ident s;
+      line i ppf "sort %a\n" Jkind.Sort.format sort;
       value_mode i ppf m
-  | Tpat_alias (p, s,_,_,m,_) ->
+  | Tpat_alias (p, s,_,_,sort,m,_) ->
       line i ppf "Tpat_alias \"%a\"\n" fmt_ident s;
+      line i ppf "sort %a\n" Jkind.Sort.format sort;
       value_mode i ppf m;
       pattern i ppf p;
   | Tpat_constant (c) -> line i ppf "Tpat_constant %a\n" fmt_constant c;
@@ -426,7 +453,8 @@ and function_body i ppf (body : function_body) =
       expression (i+1) ppf e
   | Tfunction_cases
       { fc_cases; fc_loc; fc_exp_extra; fc_attributes; fc_arg_mode;
-        fc_arg_sort; fc_param = _; fc_partial; fc_env = _; fc_ret_type = _ }
+        fc_arg_sort; fc_param = _; fc_param_debug_uid = _;
+        fc_partial; fc_env = _; fc_ret_type = _ }
     ->
       line i ppf "Tfunction_cases%a %a\n"
         fmt_partiality fc_partial
@@ -466,7 +494,7 @@ and expression_extra i ppf x attrs =
 and alloc_mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
   = fun i ppf m -> line i ppf "alloc_mode %a\n" (Mode.Alloc.print ()) m
 
-and alloc_mode i ppf (m : alloc_mode) = alloc_mode_raw i ppf m.mode
+and alloc_mode i ppf (m : alloc_mode) = alloc_mode_raw i ppf m
 
 and alloc_mode_option i ppf m = Option.iter (alloc_mode i ppf) m
 
@@ -497,11 +525,16 @@ and expression i ppf x =
   match x.exp_desc with
   | Texp_ident (li,_,_,_,_) -> line i ppf "Texp_ident %a\n" fmt_path li;
   | Texp_instvar (_, li,_) -> line i ppf "Texp_instvar %a\n" fmt_path li;
+  | Texp_mutvar id -> line i ppf "Texp_mutvar %a\n" fmt_ident id.txt;
   | Texp_constant (c) -> line i ppf "Texp_constant %a\n" fmt_constant c;
   | Texp_let (rf, l, e) ->
       line i ppf "Texp_let %a\n" fmt_rec_flag rf;
       list i (value_binding rf) ppf l;
       expression i ppf e;
+  | Texp_letmutable (vb, e) ->
+      line i ppf "Texp_letmutable\n";
+      value_binding Nonrecursive i ppf vb;
+      expression i ppf e
   | Texp_function { params; body; alloc_mode = am } ->
       line i ppf "Texp_function\n";
       alloc_mode i ppf am;
@@ -585,6 +618,16 @@ and expression i ppf x =
       line i ppf "%a\n" Jkind.Sort.format sort;
       alloc_mode i ppf amode;
       list i expression ppf l;
+  | Texp_idx (ba, uas) ->
+      line i ppf "Texp_idx\n";
+      block_access i ppf ba;
+      List.iter (unboxed_access i ppf) uas;
+  | Texp_atomic_loc (e, sort, li, _, amode) ->
+      line i ppf "Texp_atomic_loc\n";
+      expression i ppf e;
+      line i ppf "%a\n" Jkind.Sort.format sort;
+      longident i ppf li;
+      alloc_mode i ppf amode
   | Texp_list_comprehension comp ->
       line i ppf "Texp_list_comprehension\n";
       comprehension i ppf comp
@@ -624,6 +667,9 @@ and expression i ppf x =
   | Texp_new (li, _, _, _) -> line i ppf "Texp_new %a\n" fmt_path li;
   | Texp_setinstvar (_, s, _, e) ->
       line i ppf "Texp_setinstvar %a\n" fmt_path s;
+      expression i ppf e;
+  | Texp_setmutvar (lid, _, e) ->
+      line i ppf "Texp_setmutvar %a\n" fmt_ident lid.txt;
       expression i ppf e;
   | Texp_override (_, l) ->
       line i ppf "Texp_override\n";
@@ -680,6 +726,15 @@ and expression i ppf x =
     expression i ppf e2
   | Texp_hole _ ->
     line i ppf "Texp_hole"
+  | Texp_quotation e ->
+    line i ppf "Texp_quotation";
+      expression i ppf e
+  | Texp_antiquotation e ->
+    line i ppf "Texp_antiquotation";
+    expression i ppf e
+  | Texp_eval (typ, _) ->
+    line i ppf "Texp_eval";
+    core_type i ppf typ;
 
 and value_description i ppf x =
   line i ppf "value_description %a %a\n" fmt_ident x.val_id fmt_location
@@ -1175,6 +1230,24 @@ and longident_x_pattern : 'a. _ -> _ -> _ * 'a * _ * _ -> _ =
   fun i ppf (li, _, _, p) ->
   line i ppf "%a\n" fmt_longident li;
   pattern (i+1) ppf p;
+
+and block_access i ppf = function
+  | Baccess_field (li, _) ->
+      line i ppf "Baccess_field %a\n" fmt_longident li
+  | Baccess_array
+        { mut; index_kind; index; base_ty = _; elt_ty = _; elt_sort } ->
+      line i ppf "Baccess_array %a %a %a\n"
+        fmt_mutable_flag mut fmt_index_kind index_kind
+        Jkind.Sort.format elt_sort;
+      expression i ppf index
+  | Baccess_block (mut, index) ->
+      line i ppf "Baccess_block %a\n"
+        fmt_mutable_flag mut;
+      expression i ppf index
+
+and unboxed_access i ppf = function
+  | Uaccess_unboxed_field (li, _) ->
+      line i ppf "Uaccess_unboxed_field %a\n" fmt_longident li
 
 and comprehension i ppf {comp_body; comp_clauses} =
   line i ppf "comprehension\n";

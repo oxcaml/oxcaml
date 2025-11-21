@@ -93,7 +93,7 @@ Ptop_def
                 Pexp_ident "payload" (//toplevel//[2,1+22]..[2,1+29])
           ]
         ptyext_constructor =
-          extension_constructor (//toplevel//[2,1+0]..[2,1+13])
+          extension_constructor (//toplevel//[2,1+0]..[2,1+30])
             pext_name = "Exn"
             pext_kind =
               Pext_decl
@@ -1341,7 +1341,7 @@ Ptop_def
     structure_item (//toplevel//[2,1+0]..[5,76+12])
       Pstr_eval
       expression (//toplevel//[2,1+0]..[5,76+12])
-        Pexp_let Nonrec
+        Pexp_let Immutable Nonrec
         [
           <def>
             pattern (//toplevel//[2,1+4]..[2,1+5])
@@ -1445,7 +1445,7 @@ Ptop_def
             None
             Pfunction_body
               expression (//toplevel//[4,76+2]..[5,98+12])
-                Pexp_let Nonrec
+                Pexp_let Immutable Nonrec
                 [
                   <def>
                     pattern (//toplevel//[4,76+6]..[4,76+7])

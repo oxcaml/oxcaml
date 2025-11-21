@@ -181,43 +181,22 @@ CAMLexport void caml_modify_generational_global_root(value *r, value newval)
 
 #ifdef NATIVE_CODE
 
-/* Linked-list of natdynlink'd globals */
-
-typedef struct link {
-  void *data;
-  struct link *next;
-} link;
-
-static link *cons(void *data, link *tl) {
-  link *lnk = caml_stat_alloc(sizeof(link));
-  lnk->data = data;
-  lnk->next = tl;
-  return lnk;
-}
-
-#define iter_list(list,lnk) \
-  for (lnk = list; lnk != NULL; lnk = lnk->next)
-
-
 /* protected by roots_mutex */
-static link * caml_dyn_globals = NULL;
+static struct skiplist caml_dyn_globals = SKIPLIST_STATIC_INITIALIZER;
 
 static void caml_register_dyn_global(void *v) {
-  link *link = caml_dyn_globals;
-  while (link) {
-    if (link->data == v) {
-      const value *exn = caml_named_value("Register_dyn_global_duplicate");
-      if (exn == NULL) {
-        fprintf(stderr,
-          "[ocaml] attempt to add duplicate in caml_dyn_globals: %p\n", v);
-        abort();
-      }
-      caml_plat_unlock(&roots_mutex);
-      caml_raise(*exn);
+  if (caml_skiplist_find_ptr(&caml_dyn_globals, (uintnat) v) != NULL) {
+    const value *exn = caml_named_value("Register_dyn_global_duplicate");
+    if (exn == NULL) {
+      fprintf(stderr,
+        "[ocaml] attempt to add duplicate in caml_dyn_globals: %p\n", v);
+      abort();
     }
-    link = link->next;
+    caml_plat_unlock(&roots_mutex);
+    caml_raise(*exn);
   }
-  caml_dyn_globals = cons((void*) v,caml_dyn_globals);
+
+  caml_skiplist_insert(&caml_dyn_globals, (uintnat) v, 0);
 }
 
 void caml_register_dyn_globals(void **globals, int nglobals) {
@@ -238,7 +217,7 @@ static void compute_index_for_global_root_scan(value* glob_block, int* start,
 
   CAMLassert (Is_block(*glob_block));
 
-  if (Tag_val(*glob_block) < No_scan_tag) {
+  if (Scannable_val(*glob_block)) {
     /* Note: if a [Closure_tag] block is registered as a global root
        (possibly containing one or more [Infix_tag] blocks), then only one
        out of the combined set of the [Closure_tag] and [Infix_tag] blocks
@@ -269,15 +248,9 @@ static void compute_index_for_global_root_scan(value* glob_block, int* start,
 static void scan_native_globals(scanning_action f, void* fdata)
 {
   int i, j;
-  link* dyn_globals;
   value* glob;
   value glob_block;
   int start, stop;
-  link* lnk;
-
-  caml_plat_lock_blocking(&roots_mutex);
-  dyn_globals = caml_dyn_globals;
-  caml_plat_unlock(&roots_mutex);
 
   /* The global roots */
   for (i = 0; caml_globals[i] != 0; i++) {
@@ -291,15 +264,17 @@ static void scan_native_globals(scanning_action f, void* fdata)
   }
 
   /* Dynamic (natdynlink) global roots */
-  iter_list(dyn_globals, lnk) {
-    for(glob = (value *) lnk->data; *glob != 0; glob++) {
+  caml_plat_lock_blocking(&roots_mutex);
+  FOREACH_SKIPLIST_ELEMENT(e, &caml_dyn_globals, {
+    for(glob = (value *) (e->key); *glob != 0; glob++) {
       glob_block = *glob;
       compute_index_for_global_root_scan(&glob_block, &start, &stop);
       for (j = start; j < stop; j++) {
         f(fdata, Field(glob_block, j), &Field(glob_block, j));
       }
     }
-  }
+  })
+  caml_plat_unlock(&roots_mutex);
 }
 
 #endif

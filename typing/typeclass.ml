@@ -490,7 +490,7 @@ let enter_ancestor_met ~loc name ~sign ~meths ~cl_num ~ty ~attrs met_env =
   let check s = Warnings.Unused_ancestor s in
   let kind = Val_anc (sign, meths, cl_num) in
   let desc =
-    { val_type = ty; val_modalities = Modality.Value.id; val_kind = kind;
+    { val_type = ty; val_modalities = Modality.id; val_kind = kind;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
       Types.val_loc = loc;
@@ -501,12 +501,12 @@ let enter_ancestor_met ~loc name ~sign ~meths ~cl_num ~ty ~attrs met_env =
 let add_self_met loc id sign self_var_kind vars cl_num
       as_var ty attrs met_env =
   let check =
-    if as_var then (fun s -> Warnings.Unused_var s)
-    else (fun s -> Warnings.Unused_var_strict s)
+    if as_var then (fun s -> Warnings.Unused_var { name = s; mutated = false })
+    else (fun s -> Warnings.Unused_var_strict { name = s; mutated = false })
   in
   let kind = Val_self (sign, self_var_kind, vars, cl_num) in
   let desc =
-    { val_type = ty; val_modalities = Modality.Value.id; val_kind = kind;
+    { val_type = ty; val_modalities = Modality.id; val_kind = kind;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
       Types.val_loc = loc;
@@ -522,7 +522,7 @@ let add_instance_var_met loc label id sign cl_num attrs met_env =
   in
   let kind = Val_ivar (mut, cl_num) in
   let desc =
-    { val_type = ty; val_modalities = Modality.Value.id; val_kind = kind;
+    { val_type = ty; val_modalities = Modality.id; val_kind = kind;
       val_attributes = attrs;
       Types.val_loc = loc;
       val_zero_alloc = Zero_alloc.default;
@@ -831,7 +831,7 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
                    Ctype.unify val_env (Ctype.newmono ty') ty;
                    Typecore.type_approx val_env sbody ty'
                | Tpoly (ty1, tl) ->
-                   let _, ty1' = Ctype.instance_poly ~fixed:false tl ty1 in
+                   let ty1' = Ctype.instance_poly tl ty1 in
                    Typecore.type_approx val_env sbody ty1'
                | _ -> assert false
              with Ctype.Unify err ->
@@ -1026,15 +1026,21 @@ and class_structure cl_num virt self_scope final val_env met_env loc
      - cannot refer to local or once variables in the
      environment
      - access to unique variables will be relaxed to shared *)
-  (* CR zqian: We should add [Env.add_sync_lock] which restricts
-  syncness/contention to legacy, but that lock would be a no-op. However, we
-  should be future-proof for potential axes who legacy is set otherwise. The
-  best is to call [Env.add_legacy_lock] (which can be defined by
-  [Env.add_closure_lock]) that covers all axes. *)
-  let val_env = Env.add_escape_lock Class (Env.add_unboxed_lock val_env) in
-  let val_env = Env.add_share_lock Class val_env in
-  let met_env = Env.add_escape_lock Class (Env.add_unboxed_lock met_env) in
-  let met_env = Env.add_share_lock Class met_env in
+  let pp : Mode.Hint.pinpoint =
+    match final with
+    | Not_final -> (loc, Class)
+    | Final -> (loc, Object)
+  in
+  let val_env =
+    val_env
+    |> Env.add_unboxed_lock
+    |> Env.add_const_closure_lock pp Mode.Value.Comonadic.Const.legacy
+  in
+  let met_env =
+    met_env
+    |> Env.add_unboxed_lock
+    |> Env.add_const_closure_lock pp Mode.Value.Comonadic.Const.legacy
+  in
   let par_env = met_env in
 
   (* Location of self. Used for locations of self arguments *)
@@ -1272,8 +1278,11 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
         Typecore.check_partial val_env pat.pat_type pat.pat_loc
           [{c_lhs = pat; c_guard = None; c_rhs = dummy}]
       in
-      let val_env' = Env.add_escape_lock Class val_env' in
-      let val_env' = Env.add_share_lock Class val_env' in
+      let val_env' =
+        val_env'
+        |> Env.add_const_closure_lock (scl.pcl_loc, Class)
+            Value.Comonadic.Const.legacy
+      in
       let cl =
         Ctype.with_raised_nongen_level
           (fun () -> class_expr cl_num val_env' met_env virt self_scope scl') in
@@ -1434,7 +1443,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
          }
   | Pcl_let (rec_flag, sdefs, scl') ->
       let (defs, val_env) =
-        Typecore.type_let In_class_def val_env rec_flag sdefs in
+        Typecore.type_let In_class_def val_env Immutable rec_flag sdefs in
       let (vals, met_env) =
         List.fold_right
           (fun (id, modes_and_sorts, _) (vals, met_env) ->
@@ -1468,7 +1477,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
              in
              let desc =
                {val_type = expr.exp_type;
-                val_modalities = Modality.Value.id;
+                val_modalities = Modality.id;
                 val_kind = Val_ivar (Immutable, cl_num);
                 val_attributes = [];
                 val_zero_alloc = Zero_alloc.default;
@@ -2109,30 +2118,45 @@ let () =
 (*******************************)
 
 (* Check that there is no references through recursive modules (GPR#6491) *)
-let rec check_recmod_class_type env cty =
+let rec check_recmod_class_type env name cty =
   match cty.pcty_desc with
   | Pcty_constr(lid, _) ->
-      ignore (Env.lookup_cltype ~use:false ~loc:lid.loc lid.txt env)
+      begin try
+        ignore (Env.lookup_cltype ~use:false ~loc:lid.loc lid.txt env)
+      with
+      | Env.Error
+          (Lookup_error
+             (location, env,
+              Illegal_reference_to_recursive_module { container; unbound; })) ->
+          Env.lookup_error
+            location env
+            (Illegal_reference_to_recursive_class_type
+               { container;
+                 unbound;
+                 unbound_class_type = lid.txt;
+                 container_class_type = name.txt;
+               })
+      end
   | Pcty_extension _ -> ()
   | Pcty_arrow(_, _, cty) ->
-      check_recmod_class_type env cty
+      check_recmod_class_type env name cty
   | Pcty_open(od, cty) ->
       let _, env = !type_open_descr env od in
-      check_recmod_class_type env cty
+      check_recmod_class_type env name cty
   | Pcty_signature csig ->
-      check_recmod_class_sig env csig
+      check_recmod_class_sig env name csig
 
-and check_recmod_class_sig env csig =
+and check_recmod_class_sig env name csig =
   List.iter
     (fun ctf ->
        match ctf.pctf_desc with
-       | Pctf_inherit cty -> check_recmod_class_type env cty
+       | Pctf_inherit cty -> check_recmod_class_type env name cty
        | Pctf_val _ | Pctf_method _
        | Pctf_constraint _ | Pctf_attribute _ | Pctf_extension _ -> ())
     csig.pcsig_fields
 
 let check_recmod_decl env sdecl =
-  check_recmod_class_type env sdecl.pci_expr
+  check_recmod_class_type env sdecl.pci_name sdecl.pci_expr
 
 (* Approximate the class declaration as class ['params] id = object end *)
 let approx_class sdecl =
@@ -2369,7 +2393,10 @@ let report_error env ppf =
   | Non_value_binding (nm, err) ->
     fprintf ppf
       "@[Variables bound in a class must have layout value.@ %a@]"
-      (Jkind.Violation.report_with_name ~name:nm) err
+      (Jkind.Violation.report_with_name
+         ~name:nm
+         ~level:(Ctype.get_current_level ()))
+      err
   | Non_value_let_binding (nm, sort) ->
     fprintf ppf
       "@[The types of variables bound by a 'let' in a class function@ \

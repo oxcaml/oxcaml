@@ -22,11 +22,7 @@ type t_any : any
 
 type t_void : void;;
 [%%expect{|
-Line 1, characters 14-18:
-1 | type t_void : void;;
-                  ^^^^
-Error: Layout void is more experimental than allowed by the enabled layouts extension.
-       You must enable -extension layouts_alpha to use this feature.
+type t_void : void
 |}];;
 
 (********************************************************)
@@ -234,7 +230,8 @@ Line 8, characters 32-36:
                                     ^^^^
 Error: This expression has type "float" but an expression was expected of type
          "('a : immediate)"
-       The kind of float is immutable_data
+       The kind of float is
+           value mod forkable unyielding many stateless immutable
          because it is the primitive type float.
        But the kind of float must be a subkind of immediate
          because of the definition of s6 at line 2, characters 0-35.

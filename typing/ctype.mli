@@ -224,9 +224,15 @@ val instance_class:
         type_expr list -> class_type -> type_expr list * class_type
 
 val instance_poly:
-        ?keep_names:bool -> fixed:bool ->
-        type_expr list -> type_expr -> type_expr list * type_expr
+        ?keep_names:bool ->
+        type_expr list -> type_expr -> type_expr
         (* Take an instance of a type scheme containing free univars *)
+val instance_poly_fixed:
+        ?keep_names:bool ->
+        type_expr list -> type_expr -> type_expr list * type_expr
+        (* Take an instance of a type scheme containing free univars for
+           checking that an expression matches this scheme. *)
+
 val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * bool
 val instance_label:
         fixed:bool ->
@@ -251,8 +257,9 @@ val prim_mode :
         -> (Mode.allowed * 'r) Mode.Locality.t
 val instance_prim:
         Primitive.description -> type_expr ->
-        type_expr * Mode.Locality.lr option
-        * Mode.Yielding.lr option * Jkind.Sort.t option
+        type_expr *
+        Mode.Locality.lr option * (Mode.Forkable.lr * Mode.Yielding.lr) option *
+        Jkind.Sort.t option
 
 (** Given (a @ m1 -> b -> c) @ m0, where [m0] and [m1] are modes expressed by
     user-syntax, [curry_mode m0 m1] gives the mode we implicitly interpret b->c
@@ -560,6 +567,8 @@ val free_variables: ?env:Env.t -> type_expr -> type_expr list
            returns both normal variables and row variables*)
 val free_non_row_variables_of_list: type_expr list -> type_expr list
         (* gets only non-row variables *)
+val free_variable_set_of_list: Env.t -> type_expr list -> Btype.TypeSet.t
+        (* post-condition: all elements in the set are Tvars *)
 
 val exists_free_variable : (type_expr -> jkind_lr -> bool) -> type_expr -> bool
         (* Check if there exists a free variable that satisfies the
@@ -601,7 +610,7 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
 type unwrapped_type_expr =
   { ty : type_expr
   ; is_open : bool  (* are there any unbound variables in this type? *)
-  ; modality : Mode.Modality.Value.Const.t }
+  ; modality : Mode.Modality.Const.t }
 
 val get_unboxed_type_representation :
   Env.t ->
@@ -623,10 +632,6 @@ val contained_without_boxing : Env.t -> type_expr -> type_expr list
        (or "without indirection" or "flatly"); in the case of [@@unboxed]
        existentials, these types might have free variables*)
 
-(* Given the row from a variant type, determine if it is immediate.  Currently
-   just checks that all constructors have no arguments, doesn't consider
-   void. *)
-val tvariant_not_immediate : row_desc -> bool
 
 (* Cheap upper bound on jkind.  Will not expand unboxed types - call
    [type_jkind] if that's needed. *)
@@ -645,6 +650,12 @@ val type_jkind_purely : Env.t -> type_expr -> jkind_l
    functions exported by [Jkind]. *)
 val type_jkind_purely_if_principal : Env.t -> type_expr -> jkind_l option
 
+(* Helper functions for creating jkind contexts *)
+val mk_jkind_context :
+  Env.t -> (type_expr -> jkind_l option) -> Jkind.jkind_context
+val mk_jkind_context_check_principal : Env.t -> Jkind.jkind_context
+val mk_jkind_context_always_principal : Env.t -> Jkind.jkind_context
+
 (* Find a type's sort (if fixed is false: constraining it to be an
    arbitrary sort variable, if needed) *)
 val type_sort :
@@ -658,12 +669,6 @@ val type_jkind_and_sort :
   why:Jkind.History.concrete_creation_reason ->
   fixed:bool ->
   Env.t -> type_expr -> (Types.jkind_lr * Jkind.sort, Jkind.Violation.t) result
-
-(* As [type_sort ~fixed:false], but constrain the jkind to be non-null.
-   Used for checking array elements. *)
-val type_legacy_sort :
-  why:Jkind.History.concrete_legacy_creation_reason ->
-  Env.t -> type_expr -> (Jkind.sort, Jkind.Violation.t) result
 
 (* Jkind checking. [constrain_type_jkind] will update the jkind of type
    variables to make the check true, if possible.  [check_decl_jkind] and
@@ -693,11 +698,21 @@ val constrain_type_jkind :
 val check_type_externality :
   Env.t -> type_expr -> Jkind_axis.Externality.t -> bool
 
+(* Check whether a type is gc ignorable based on its externality and the target
+   platform. *)
+val is_always_gc_ignorable : Env.t -> type_expr -> bool
+
 (* Check whether a type's nullability is less than some target.
    Uses get_nullability which is potentially cheaper than calling type_jkind
    if all with-bounds are irrelevant. *)
 val check_type_nullability :
   Env.t -> type_expr -> Jkind_axis.Nullability.t -> bool
+
+(* Check whether a type's separability is less than some target.
+   Potentially cheaper than just calling [type_jkind], because this can stop
+   expansion once it succeeds. *)
+val check_type_separability :
+  Env.t -> type_expr -> Jkind_axis.Separability.t -> bool
 
 (* This function should get called after a type is generalized.
 
@@ -761,7 +776,7 @@ val crossing_of_jkind : Env.t -> 'd Types.jkind -> Mode.Crossing.t
     trivial crossing. *)
 val crossing_of_ty :
   Env.t ->
-  ?modalities:Mode.Modality.Value.Const.t ->
+  ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
   Mode.Crossing.t
 
@@ -769,7 +784,7 @@ val crossing_of_ty :
     types don't cross. *)
 val cross_right :
   Env.t ->
-  ?modalities:Mode.Modality.Value.Const.t ->
+  ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
   Mode.Value.r ->
   Mode.Value.r
@@ -778,7 +793,7 @@ val cross_right :
     types don't cross. *)
 val cross_left :
   Env.t ->
-  ?modalities:Mode.Modality.Value.Const.t ->
+  ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
   Mode.Value.l ->
   Mode.Value.l
@@ -786,7 +801,7 @@ val cross_left :
 (** Similar to [cross_right] but for [Mode.Alloc]  *)
 val cross_right_alloc :
   Env.t ->
-  ?modalities:Mode.Modality.Value.Const.t ->
+  ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
   Mode.Alloc.r ->
   Mode.Alloc.r
@@ -794,7 +809,39 @@ val cross_right_alloc :
 (** Similar to [cross_left] but for [Mode.Alloc]  *)
 val cross_left_alloc :
   Env.t ->
-  ?modalities:Mode.Modality.Value.Const.t ->
+  ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
   Mode.Alloc.l ->
   Mode.Alloc.l
+
+(** Zap a modality to floor if the [modes] extension is enabled at a level more
+    immature than the given one. Zap to id otherwise. *)
+val zap_modalities_to_floor_if_modes_enabled_at :
+  Language_extension.maturity ->
+  Mode.Modality.t ->
+  Mode.Modality.Const.t
+
+(** The mode crossing of the memory block of a structure. *)
+val mode_crossing_structure_memaddr : Mode.Crossing.t
+
+(** The mode crossing of a functor. *)
+val mode_crossing_functor : Mode.Crossing.t
+
+(** The mode crossing of any module. *)
+val mode_crossing_module : Mode.Crossing.t
+
+(** Zap a modality to floor if maturity allows, zap to id otherwise. *)
+val zap_modalities_to_floor_if_at_least :
+  Language_extension.maturity ->
+  Mode.Modality.t ->
+  Mode.Modality.Const.t
+
+val check_constructor_crossing_creation :
+  Env.t -> Longident.t loc
+  -> tag -> res:type_expr -> args:constructor_argument list
+  -> Env.locks -> (Mode.Value.r, Mode.Value.error) result
+
+val check_constructor_crossing_destruction :
+  Env.t -> Longident.t loc
+  -> tag -> res:type_expr -> args:constructor_argument list
+  -> Env.locks -> (Mode.Value.l, Mode.Value.error) result

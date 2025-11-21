@@ -24,6 +24,8 @@ open Typedtree
 open Outcometree
 open Ast_helper
 
+module SL = Slambda
+
 module Genprintval = Genprintval_native
 
 type res = Ok of Obj.t | Err of string
@@ -119,8 +121,12 @@ let close_phrase lam =
              [Lprim (Pgetglobal glb, [], Loc_unknown)],
              Loc_unknown)
     in
-    Llet(Strict, Lambda.layout_module_field, id, glob, l)
+    Llet(Strict, Lambda.layout_module_field, id, Lambda.debug_uid_none, glob, l)
   ) (free_variables lam) lam
+
+let close_slambda_phrase slam =
+  match slam with
+  | SL.Quote lam -> SL.Quote (close_phrase lam)
 
 let toplevel_value id =
   let glob, pos = toplevel_value id in
@@ -255,8 +261,11 @@ let default_load ppf (program : Lambda.program) =
     else Filename.temp_file ("caml" ^ !phrase_name) ext_dll
   in
   let filename = Filename.chop_extension dll in
+  (* TODO: Determine machine_width properly from target configuration *)
+  let machine_width = Target_system.Machine_width.Sixty_four in
   let pipeline : Asmgen.pipeline =
-    Direct_to_cmm (Flambda2.lambda_to_cmm ~keep_symbol_tables:true)
+    Direct_to_cmm
+      (Flambda2.lambda_to_cmm ~machine_width ~keep_symbol_tables:true)
   in
   Asmgen.compile_implementation
     (module Unix : Compiler_owee.Unix_intf.S)
@@ -281,9 +290,18 @@ let default_load ppf (program : Lambda.program) =
      files) *)
   res
 
-let load_lambda ppf ~compilation_unit ~required_globals lam size =
+let load_slambda ppf ~compilation_unit ~required_globals program size =
+  if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
+  if !Clflags.dump_slambda then fprintf ppf "%a@." Printslambda.program program;
+  let program = Slambdaeval.eval program in
+  let lam = program.code in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
-  let slam = Simplif.simplify_lambda lam in
+  let slam =
+    Simplif.simplify_lambda lam
+      ~restrict_to_upstream_dwarf:
+        !Dwarf_flags.restrict_to_upstream_dwarf
+      ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
+  in
   if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda slam;
   let program =
     { Lambda.
@@ -346,12 +364,15 @@ let name_expression ~loc ~attrs sort exp =
       val_loc = loc;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
-      val_modalities = Mode.Modality.Value.id;
+      val_modalities = Mode.Modality.id;
       val_uid = Uid.internal_not_actually_unique; }
   in
   let sg = [Sig_value(id, vd, Exported)] in
   let pat =
-    { pat_desc = Tpat_var(id, mknoloc name, vd.val_uid, Mode.Value.disallow_right Mode.Value.legacy);
+    { pat_desc =
+        Tpat_var(id, mknoloc name, vd.val_uid,
+          Jkind.Sort.(of_const Const.for_module_field),
+          Mode.Value.disallow_right Mode.Value.legacy);
       pat_loc = loc;
       pat_extra = [];
       pat_type = exp.exp_type;
@@ -393,16 +414,19 @@ let execute_phrase print_outcome ppf phr =
         Compilation_unit.create Compilation_unit.Prefix.empty
           (!phrase_name |> Compilation_unit.Name.of_string)
       in
-      Compilenv.reset compilation_unit;
+      let unit_info =
+        Unit_info.make_dummy ~input_name:!phrase_name compilation_unit
+      in
+      Compilenv.reset unit_info;
       Typecore.reset_delayed_checks ();
       let (str, sg, names, _shape, newenv) =
         Typemod.type_toplevel_phrase oldenv oldsig sstr
       in
       if !Clflags.dump_typedtree then Printtyped.implementation ppf str;
       let sg' = Typemod.Signature_names.simplify newenv names sg in
+      let modes = Includemod.modes_toplevel in
       let coercion =
-        Includemod.signatures oldenv ~mark:Mark_positive
-          ~modes:(Legacy None) sg sg'
+        Includemod.signatures oldenv ~mark:true ~modes sg sg'
       in
       Typecore.force_delayed_checks ();
       let str, sg', rewritten =
@@ -421,12 +445,11 @@ let execute_phrase print_outcome ppf phr =
             str, sg', true
         | _ -> str, sg', false
       in
-      let compilation_unit, res, required_globals, size =
+      let compilation_unit, program, required_globals, size =
         let { Lambda.compilation_unit; main_module_block_format;
-              required_globals; code = res } =
+              required_globals; code = res } as program =
           Translmod.transl_implementation compilation_unit
             (str, coercion, None)
-            ~style:Plain_block
         in
         remember compilation_unit sg';
         let size =
@@ -435,14 +458,15 @@ let execute_phrase print_outcome ppf phr =
           | Mb_instantiating_functor _ ->
             Misc.fatal_error "Unexpected parameterised module in toplevel"
         in
-        compilation_unit, close_phrase res, required_globals, size
+        let program = { program with code = close_slambda_phrase res } in
+        compilation_unit, program, required_globals, size
       in
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;
         toplevel_sig := List.rev_append sg' oldsig;
         let res =
-          load_lambda ppf ~required_globals ~compilation_unit res size
+          load_slambda ppf ~required_globals ~compilation_unit program size
         in
         let out_phr =
           match res with

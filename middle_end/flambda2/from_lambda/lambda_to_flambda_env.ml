@@ -70,16 +70,21 @@ end
 
 type t =
   { current_unit : Compilation_unit.t;
+    machine_width : Target_system.Machine_width.t;
     current_values_of_mutables_in_scope :
-      (Ident.t * Flambda_kind.With_subkind.t) Ident.Map.t;
+      ((Ident.t * Flambda_debug_uid.t * Flambda_kind.With_subkind.full_kind)
+       list
+      * [`Complex] Flambda_arity.Component_for_creation.t)
+      Ident.Map.t;
     mutables_needed_by_continuations : Ident.Set.t Continuation.Map.t;
     unboxed_product_components_in_scope :
-      ([`Complex] Flambda_arity.Component_for_creation.t * Ident.t list)
+      ([`Complex] Flambda_arity.Component_for_creation.t
+      * (Ident.t * Flambda_debug_uid.t) list)
       Ident.Map.t;
     try_stack : Continuation.t list;
     try_stack_at_handler : Continuation.t list Continuation.Map.t;
-    static_exn_continuation : Continuation.t Numeric_types.Int.Map.t;
-    recursive_static_catches : Numeric_types.Int.Set.t;
+    static_exn_continuation : Continuation.t Static_label.Map.t;
+    recursive_static_catches : Static_label.Set.t;
     my_region : Region_stack_element.t option;
     region_stack : Region_stack_element.t list;
     region_stack_in_cont_scope : Region_stack_element.t list Continuation.Map.t;
@@ -88,7 +93,8 @@ type t =
     ident_stamp_upon_starting : int
   }
 
-let create ~current_unit ~return_continuation ~exn_continuation ~my_region =
+let create ~current_unit ~machine_width ~return_continuation ~exn_continuation
+    ~my_region =
   let mutables_needed_by_continuations =
     Continuation.Map.of_list
       [return_continuation, Ident.Set.empty; exn_continuation, Ident.Set.empty]
@@ -96,13 +102,14 @@ let create ~current_unit ~return_continuation ~exn_continuation ~my_region =
   let id = Ident.create_local "unused" in
   let ident_stamp_upon_starting = Ident.stamp id in
   { current_unit;
+    machine_width;
     current_values_of_mutables_in_scope = Ident.Map.empty;
     mutables_needed_by_continuations;
     unboxed_product_components_in_scope = Ident.Map.empty;
     try_stack = [];
     try_stack_at_handler = Continuation.Map.empty;
-    static_exn_continuation = Numeric_types.Int.Map.empty;
-    recursive_static_catches = Numeric_types.Int.Set.empty;
+    static_exn_continuation = Static_label.Map.empty;
+    recursive_static_catches = Static_label.Set.empty;
     my_region;
     region_stack = [];
     region_stack_in_cont_scope =
@@ -113,31 +120,50 @@ let create ~current_unit ~return_continuation ~exn_continuation ~my_region =
 
 let current_unit t = t.current_unit
 
+let machine_width t = t.machine_width
+
 let ident_stamp_upon_starting t = t.ident_stamp_upon_starting
 
 let is_mutable t id = Ident.Map.mem id t.current_values_of_mutables_in_scope
 
-let register_mutable_variable t id kind =
+let register_mutable_variable t id ~before_unarization =
   if Ident.Map.mem id t.current_values_of_mutables_in_scope
   then Misc.fatal_errorf "Redefinition of mutable variable %a" Ident.print id;
-  let new_id = Ident.rename id in
+  let fields =
+    Flambda_arity.fresh_idents_unarized ~id
+      (Flambda_arity.create [before_unarization])
+    |> Flambda_debug_uid.add_proj_debugging_uids_to_fields
+         ~duid:Lambda.debug_uid_none
+    (* CR sspies: We should propagate the debugging uid here for mutable
+       variables. *)
+  in
   let current_values_of_mutables_in_scope =
-    Ident.Map.add id (new_id, kind) t.current_values_of_mutables_in_scope
+    Ident.Map.add id
+      (fields, before_unarization)
+      t.current_values_of_mutables_in_scope
   in
   let t = { t with current_values_of_mutables_in_scope } in
-  t, new_id
+  t, fields
 
 let update_mutable_variable t id =
   match Ident.Map.find id t.current_values_of_mutables_in_scope with
   | exception Not_found ->
     Misc.fatal_errorf "Mutable variable %a not in environment" Ident.print id
-  | _old_id, kind ->
-    let new_id = Ident.rename id in
-    let current_values_of_mutables_in_scope =
-      Ident.Map.add id (new_id, kind) t.current_values_of_mutables_in_scope
+  | _old_ids_and_kinds, before_unarization ->
+    let fields =
+      Flambda_arity.fresh_idents_unarized ~id
+        (Flambda_arity.create [before_unarization])
+      |> Flambda_debug_uid.add_proj_debugging_uids_to_fields
+           ~duid:Lambda.debug_uid_none
+      (* CR sspies: We should derive/copy the debugging uids here from
+         before_unarization/old_ids_and_kinds. *)
     in
-    let t = { t with current_values_of_mutables_in_scope } in
-    t, new_id
+    let current_values_of_mutables_in_scope =
+      Ident.Map.add id
+        (fields, before_unarization)
+        t.current_values_of_mutables_in_scope
+    in
+    { t with current_values_of_mutables_in_scope }
 
 let mutables_in_scope t = Ident.Map.keys t.current_values_of_mutables_in_scope
 
@@ -152,12 +178,13 @@ let register_unboxed_product t ~unboxed_product ~before_unarization ~fields =
 let register_unboxed_product_with_kinds t ~unboxed_product ~before_unarization
     ~fields =
   register_unboxed_product t ~unboxed_product ~before_unarization
-    ~fields:(List.map fst fields)
+    ~fields:(List.map (fun (id, duid, _) -> id, duid) fields)
 
 type add_continuation_result =
   { body_env : t;
     handler_env : t;
-    extra_params : (Ident.t * Flambda_kind.With_subkind.t) list
+    extra_params :
+      (Ident.t * Flambda_debug_uid.t * Flambda_kind.With_subkind.t) list
   }
 
 let add_continuation t cont ~push_to_try_stack ~pop_region
@@ -189,7 +216,16 @@ let add_continuation t cont ~push_to_try_stack ~pop_region
   in
   let current_values_of_mutables_in_scope =
     Ident.Map.mapi
-      (fun mut_var (_outer_value, kind) -> Ident.rename mut_var, kind)
+      (fun mut_var (_outer_values_with_kinds, before_unarization) ->
+        let fields =
+          Flambda_arity.fresh_idents_unarized ~id:mut_var
+            (Flambda_arity.create [before_unarization])
+          |> Flambda_debug_uid.add_proj_debugging_uids_to_fields
+               ~duid:Lambda.debug_uid_none
+          (* CR sspies: We should derive/copy the debugging uids here from
+             before_unarization/old_ids_and_kinds. *)
+        in
+        fields, before_unarization)
       t.current_values_of_mutables_in_scope
   in
   let handler_env =
@@ -209,6 +245,7 @@ let add_continuation t cont ~push_to_try_stack ~pop_region
   in
   let extra_params =
     Ident.Map.data handler_env.current_values_of_mutables_in_scope
+    |> List.map fst |> List.concat
   in
   { body_env; handler_env; extra_params }
 
@@ -218,36 +255,37 @@ let add_static_exn_continuation t static_exn ~pop_region cont =
       try_stack_at_handler =
         Continuation.Map.add cont t.try_stack t.try_stack_at_handler;
       static_exn_continuation =
-        Numeric_types.Int.Map.add static_exn cont t.static_exn_continuation
+        Static_label.Map.add static_exn cont t.static_exn_continuation
     }
   in
   let recursive : Asttypes.rec_flag =
-    if Numeric_types.Int.Set.mem static_exn t.recursive_static_catches
+    if Static_label.Set.mem static_exn t.recursive_static_catches
     then Recursive
     else Nonrecursive
   in
   add_continuation t cont ~push_to_try_stack:false ~pop_region recursive
 
 let get_static_exn_continuation t static_exn =
-  match Numeric_types.Int.Map.find static_exn t.static_exn_continuation with
+  match Static_label.Map.find static_exn t.static_exn_continuation with
   | exception Not_found ->
-    Misc.fatal_errorf "Unbound static exception %d" static_exn
+    Misc.fatal_errorf "Unbound static exception %a" Static_label.format
+      static_exn
   | continuation -> continuation
 
 let mark_as_recursive_static_catch t static_exn =
-  if Numeric_types.Int.Set.mem static_exn t.recursive_static_catches
+  if Static_label.Set.mem static_exn t.recursive_static_catches
   then
     Misc.fatal_errorf
-      "Static catch with continuation %d already marked as recursive -- is it \
+      "Static catch with continuation %a already marked as recursive -- is it \
        being redefined?"
-      static_exn;
+      Static_label.format static_exn;
   { t with
     recursive_static_catches =
-      Numeric_types.Int.Set.add static_exn t.recursive_static_catches
+      Static_label.Set.add static_exn t.recursive_static_catches
   }
 
 let is_static_exn_recursive t static_exn =
-  Numeric_types.Int.Set.mem static_exn t.recursive_static_catches
+  Static_label.Set.mem static_exn t.recursive_static_catches
 
 let get_try_stack t = t.try_stack
 
@@ -264,22 +302,26 @@ let extra_args_for_continuation_with_kinds t cont =
     Misc.fatal_errorf "Unbound continuation %a" Continuation.print cont
   | mutables ->
     let mutables = Ident.Set.elements mutables in
-    List.map
+    List.concat_map
       (fun mut ->
         match Ident.Map.find mut t.current_values_of_mutables_in_scope with
         | exception Not_found ->
           Misc.fatal_errorf "No current value for %a" Ident.print mut
-        | current_value, kind -> current_value, kind)
+        | current_values_with_kinds, _before_unarization ->
+          current_values_with_kinds)
       mutables
 
 let extra_args_for_continuation t cont =
-  List.map fst (extra_args_for_continuation_with_kinds t cont)
+  List.map
+    (fun (arg, _, _) -> arg)
+    (extra_args_for_continuation_with_kinds t cont)
 
-let get_mutable_variable_with_kind t id =
+let get_mutable_variable_with_kinds t id =
   match Ident.Map.find id t.current_values_of_mutables_in_scope with
   | exception Not_found ->
     Misc.fatal_errorf "Mutable variable %a not bound in env" Ident.print id
-  | id, kind -> id, kind
+  | ids_with_kinds_and_arity_before_unarization ->
+    ids_with_kinds_and_arity_before_unarization
 
 let get_unboxed_product_fields t id =
   match Ident.Map.find id t.unboxed_product_components_in_scope with

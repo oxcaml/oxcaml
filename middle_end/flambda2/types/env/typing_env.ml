@@ -104,7 +104,8 @@ end = struct
 end
 
 type t =
-  { resolver : Compilation_unit.t -> serializable option;
+  { machine_width : Target_system.Machine_width.t;
+    resolver : Compilation_unit.t -> serializable option;
     binding_time_resolver : Name.t -> Binding_time.With_name_mode.t;
     get_imported_names : unit -> Name.Set.t;
     defined_symbols : Symbol.Set.t;
@@ -144,7 +145,7 @@ let [@ocamlformat "disable"] print ppf
       ({ resolver = _; binding_time_resolver = _;get_imported_names = _;
          prev_levels; current_level; next_binding_time = _;
          defined_symbols; code_age_relation; min_binding_time;
-         is_bottom;
+         is_bottom; machine_width = _
        } as t) =
   if is_empty t then
     Format.pp_print_string ppf "Empty"
@@ -244,14 +245,6 @@ end = struct
         Simple.pattern_match simple2 ~const ~name:(fun name2 ~coercion:_ ->
             now_meeting_or_joining_names t name1 name2))
 end
-
-type 'a meet_return_value =
-  | Left_input
-  | Right_input
-  | Both_inputs
-  | New_result of 'a
-
-type meet_type = t -> TG.t -> TG.t -> (TG.t meet_return_value * t) Or_bottom.t
 
 module Join_env : sig
   type t
@@ -355,8 +348,9 @@ let code_age_relation_resolver t comp_unit =
 
 let current_scope t = One_level.scope t.current_level
 
-let create ~resolver ~get_imported_names =
-  { resolver;
+let create ~machine_width ~resolver ~get_imported_names =
+  { machine_width;
+    resolver;
     binding_time_resolver = binding_time_resolver resolver;
     get_imported_names;
     prev_levels = [];
@@ -370,6 +364,8 @@ let create ~resolver ~get_imported_names =
     min_binding_time = Binding_time.earliest_var;
     is_bottom = false
   }
+
+let machine_width t = t.machine_width
 
 let increment_scope t =
   let current_scope = current_scope t in
@@ -597,6 +593,68 @@ let alias_is_bound_strictly_earlier t ~bound_name ~alias =
   in
   Binding_time.strictly_earlier time_of_alias ~than:time_of_name
 
+let stable_compare_variables t var1 var2 =
+  let name1 = Name.var var1 and name2 = Name.var var2 in
+  let binding_time1 =
+    binding_time_and_mode t name1 |> Binding_time.With_name_mode.binding_time
+  and binding_time2 =
+    binding_time_and_mode t name2 |> Binding_time.With_name_mode.binding_time
+  in
+  let c = Binding_time.compare binding_time1 binding_time2 in
+  if c <> 0
+  then c
+  else
+    let compunit1 = Variable.compilation_unit var1 in
+    let compunit2 = Variable.compilation_unit var2 in
+    let c = Compilation_unit.compare compunit1 compunit2 in
+    if c <> 0
+    then c
+    else
+      let stamp1 = Variable.name_stamp var1 in
+      let stamp2 = Variable.name_stamp var2 in
+      Int.compare stamp1 stamp2
+
+let stable_compare_symbols symbol1 symbol2 =
+  let compunit1 = Symbol.compilation_unit symbol1 in
+  let compunit2 = Symbol.compilation_unit symbol2 in
+  let c = Compilation_unit.compare compunit1 compunit2 in
+  if c <> 0
+  then c
+  else
+    let linkage_name1 = Symbol.linkage_name symbol1 in
+    let linkage_name2 = Symbol.linkage_name symbol2 in
+    Linkage_name.compare linkage_name1 linkage_name2
+
+let stable_compare_names t name1 name2 =
+  Name.pattern_match name1
+    ~symbol:(fun symbol1 ->
+      Name.pattern_match name2
+        ~symbol:(fun symbol2 -> stable_compare_symbols symbol1 symbol2)
+        ~var:(fun _ -> -1))
+    ~var:(fun var1 ->
+      Name.pattern_match name2
+        ~symbol:(fun _ -> 1)
+        ~var:(fun var2 -> stable_compare_variables t var1 var2))
+
+let stable_compare_simples t simple1 simple2 =
+  Simple.pattern_match simple1
+    ~const:(fun const1 ->
+      Simple.pattern_match simple2
+        ~const:(fun const2 ->
+          let descr1 = Reg_width_const.descr const1 in
+          let descr2 = Reg_width_const.descr const2 in
+          Reg_width_const.Descr.compare descr1 descr2)
+        ~name:(fun _ ~coercion:_ -> -1))
+    ~name:(fun name1 ~coercion:_ ->
+      Simple.pattern_match simple2
+        ~const:(fun _ -> 1)
+        ~name:(fun name2 ~coercion:_ -> stable_compare_names t name1 name2))
+
+let stable_compare_simples t simple1 simple2 =
+  if Simple.equal simple1 simple2
+  then 0
+  else stable_compare_simples t simple1 simple2
+
 let with_current_level t ~current_level = { t with current_level }
 
 let with_current_level_and_next_binding_time t ~current_level next_binding_time
@@ -713,7 +771,7 @@ let invariant_for_new_equation (t : t) name ty =
         (Name.Set.union (name_domain t) (t.get_imported_names ()))
         Name_mode.in_types
     in
-    let free_names = Name_occurrences.without_code_ids (TG.free_names ty) in
+    let free_names = Name_occurrences.with_only_names (TG.free_names ty) in
     if not (Name_occurrences.subset_domain free_names defined_names)
     then
       let unbound_names =
@@ -722,25 +780,7 @@ let invariant_for_new_equation (t : t) name ty =
       Misc.fatal_errorf "New equation@ %a@ =@ %a@ has unbound names@ (%a):@ %a"
         Name.print name TG.print ty Name_occurrences.print unbound_names print t)
 
-let pattern_match_equation ~name ~const simple ty =
-  (* We have [(coerce <bare_lhs> <coercion>) : <ty>]. Thus [<bare_lhs> : (coerce
-     <ty> <coercion>^-1)]. *)
-  let bare_lhs = Simple.without_coercion simple in
-  let coercion_from_bare_lhs_to_ty = Simple.coercion simple in
-  let coercion_from_ty_to_bare_lhs =
-    Coercion.inverse coercion_from_bare_lhs_to_ty
-  in
-  let ty = TG.apply_coercion ty coercion_from_ty_to_bare_lhs in
-  let name eqn_name ~coercion =
-    (* true by definition *)
-    assert (Coercion.is_id coercion);
-    name eqn_name ty
-  in
-  Simple.pattern_match bare_lhs ~name ~const:(fun c -> const c ty)
-
-exception Bottom_equation
-
-let rec replace_equation (t : t) name ty =
+let replace_equation (t : t) name ty =
   (if Flambda_features.Debug.concrete_types_only_on_canonicals ()
   then
     let is_concrete =
@@ -792,229 +832,29 @@ let rec replace_equation (t : t) name ty =
   in
   with_current_level t ~current_level
 
-and replace_equation_or_add_alias_to_const t name ty =
-  match TG.recover_const_alias ty with
-  | None -> replace_equation t name ty
-  | Some const -> (
-    match
-      Aliases.add ~binding_time_resolver:t.binding_time_resolver
-        ~binding_times_and_modes:(names_to_types t) (aliases t)
-        ~canonical_element1:(Simple.name name)
-        ~canonical_element2:(Simple.const const)
-    with
-    | Ok { canonical_element = _; alias_of_demoted_element; t = aliases } ->
-      if not (Simple.equal alias_of_demoted_element (Simple.name name))
-      then Misc.fatal_error "Unexpected demotion of constant.";
-      let t = with_aliases t ~aliases in
-      let kind = MTC.kind_for_const const in
-      let ty = TG.alias_type_of kind (Simple.const const) in
-      replace_equation t name ty
-    | Bottom ->
-      Misc.fatal_error "Unexpected bottom while adding alias to constant.")
+let aliases_add t ~canonical_element1 ~canonical_element2 =
+  (* This may raise [Binding_time_resolver_failure]. *)
+  Aliases.add ~binding_time_resolver:t.binding_time_resolver (aliases t)
+    ~binding_times_and_modes:(names_to_types t) ~canonical_element1
+    ~canonical_element2
 
-and add_non_alias_equation ~raise_on_bottom t lhs_simple rhs_ty
-    ~(meet_type : meet_type) =
-  (* We are about to add a non-alias type on a canonical *simple*. This type
-     might have been provided by the caller of [add_equation], or it might come
-     from an existing equation. In either case, we need to call [meet] with the
-     existing type in order to ensure that we record the most precise type
-     available.
+type add_alias_result =
+  { canonical_element : Simple.t;
+    demoted_name : Name.t;
+    t : t
+  }
 
-     For example, suppose [p] is defined earlier than [x], with [p] of type
-     [ty1] and [x] of type [ty2]. If the caller says that the type of [p] is now
-     to be "= x", then we will instead add a type "= p" on [x] and demote [x] to
-     [p], due to the definition ordering. We then need to record the information
-     that [p] now has type [ty1 meet ty2], otherwise the type [ty2] would be
-     lost.
-
-     If instead we say that the type of [p] is to be "= c", where [c] is a
-     constant, we will add the type "= c" to [p] and demote [p] to [c]. We have
-     no type to record for [c], however we still need to check that [c] is
-     compatible with the previous type of [p].
-
-     Note also that [p] and [x] may have different name modes! *)
-  let[@inline always] name eqn_name ty =
-    let existing_ty = find t eqn_name (Some (TG.kind ty)) in
-    match meet_type t ty existing_ty with
-    | Bottom ->
-      if raise_on_bottom
-      then raise Bottom_equation
-      else replace_equation t eqn_name (MTC.bottom (TG.kind ty))
-    | Ok (meet_ty, env) -> (
-      match meet_ty with
-      | Left_input -> replace_equation_or_add_alias_to_const env eqn_name ty
-      | Right_input | Both_inputs -> env
-      | New_result ty' ->
-        replace_equation_or_add_alias_to_const env eqn_name ty')
-  in
-  let[@inline always] const const ty =
-    (* If we are applying an alias-to-constant type to a name, the constant
-       becomes canonical and we need to apply the type to the constant instead.
-       This merely reduces to checking that the type is compatible (e.g. if we
-       are adding [x : (= 0)] in a context where [x : { 1, 2 }] holds). *)
-    let existing_ty = MTC.type_for_const const in
-    match meet_type t ty existing_ty with
-    | Bottom -> if raise_on_bottom then raise Bottom_equation else t
-    | Ok (_, env) -> env
-  in
-  pattern_match_equation lhs_simple rhs_ty ~name ~const
-
-and orient_and_add_equation ~raise_on_bottom t name ty ~meet_type =
-  (if Flambda_features.check_light_invariants ()
-  then
-    let existing_ty = find t name None in
-    if not (K.equal (TG.kind existing_ty) (TG.kind ty))
-    then
-      Misc.fatal_errorf
-        "Cannot add equation %a = %a@ given existing binding %a = %a@ whose \
-         type is of a different kind:@ %a"
-        Name.print name TG.print ty Name.print name TG.print existing_ty print t);
-  (if Flambda_features.check_light_invariants ()
-  then
-    match TG.get_alias_exn ty with
-    | exception Not_found -> ()
-    | simple ->
-      Simple.pattern_match simple
-        ~name:(fun name' ~coercion:_ ->
-          if Name.equal name name'
-          then
-            Misc.fatal_errorf
-              "Directly recursive equation@ %a = %a@ disallowed:@ %a" Name.print
-              name TG.print ty print t)
-        ~const:(fun _ -> ()));
-  let inputs =
-    let aliases = aliases t in
-    let find_canonical name =
-      Aliases.get_canonical_ignoring_name_mode aliases name
-    in
-    match TG.get_alias_exn ty with
-    | exception Not_found ->
-      (* Equations giving concrete types may only be added to the canonical
-         element as known by the relevant alias tracker (the actual canonical,
-         ignoring any name modes). *)
-      Some (find_canonical name, t, ty)
-    | alias_rhs -> (
-      (* Forget where [name] and [alias_rhs] came from---our job is now to
-         record that they're equal. In general, they have canonical expressions
-         [c_l] and [c_r], respectively, so what we ultimately need to record is
-         that [c_l] = [c_r]. Clearly, only one of them can remain canonical, so
-         we pick whichever was bound earlier. If [c_r] was bound earlier, then
-         we demote [c_l] and give [name] the type "= c_r" (which will always be
-         valid since [c_r] was bound earlier). Otherwise, we demote [c_r] and
-         give [alias_of] the type "= c_l". *)
-      (* The canonical elements [c_r] and [c_l] might not be present in the
-         current aliases structure, so we force a lookup of canonical elements
-         first using the relevant structure *)
-      let alias_lhs = find_canonical name in
-      let alias_rhs =
-        Simple.pattern_match alias_rhs
-          ~const:(fun _ -> alias_rhs)
-          ~name:(fun name ~coercion ->
-            Simple.apply_coercion_exn (find_canonical name) coercion)
-      in
-      if Simple.equal alias_lhs alias_rhs
-      then None
-      else
-        let kind = TG.kind ty in
-        match
-          (* This may raise [Binding_time_resolver_failure]. *)
-          Aliases.add ~binding_time_resolver:t.binding_time_resolver aliases
-            ~binding_times_and_modes:(names_to_types t)
-            ~canonical_element1:alias_lhs ~canonical_element2:alias_rhs
-        with
-        | Ok { canonical_element; alias_of_demoted_element; t = aliases } ->
-          let t = with_aliases t ~aliases in
-          (* If we are demoting [x] to [p], we need to add the type "= p" to
-             [x]. However, we also need to add the current type of [x] to [p],
-             otherwise that information would be lost. *)
-          let existing_ty =
-            Simple.pattern_match alias_of_demoted_element
-              ~const:MTC.type_for_const ~name:(fun name ~coercion ->
-                TG.apply_coercion (find t name (Some kind)) coercion)
-          in
-          let ty = TG.alias_type_of kind canonical_element in
-          let t =
-            pattern_match_equation alias_of_demoted_element ty
-              ~name:(fun name ty -> replace_equation t name ty)
-              ~const:(fun _ _ ->
-                Misc.fatal_error "Unexpected demotion of constant.")
-          in
-          Some (canonical_element, t, existing_ty)
-        | Bottom -> if raise_on_bottom then raise Bottom_equation else None)
-  in
-  match inputs with
-  | None -> t
-  | Some (simple, t, ty) ->
-    add_non_alias_equation ~raise_on_bottom t simple ty ~meet_type
-
-and[@inline always] add_equation ~raise_on_bottom t name ty ~meet_type =
-  match orient_and_add_equation ~raise_on_bottom t name ty ~meet_type with
+let add_alias t ~canonical_element1 ~canonical_element2 :
+    _ Or_unknown_or_bottom.t =
+  match aliases_add t ~canonical_element1 ~canonical_element2 with
+  | Bottom -> Bottom
   | exception Binding_time_resolver_failure ->
     (* Addition of aliases between names that are both in external compilation
        units failed, e.g. due to a missing .cmx file. Simply drop the
        equation. *)
-    t
-  | t -> t
-
-and add_env_extension ~raise_on_bottom t
-    (env_extension : Typing_env_extension.t) ~meet_type =
-  Typing_env_extension.fold
-    ~equation:(fun name ty t ->
-      add_equation ~raise_on_bottom t name ty ~meet_type)
-    env_extension t
-
-and add_env_extension_with_extra_variables t
-    (env_extension : Typing_env_extension.With_extra_variables.t) ~meet_type =
-  Typing_env_extension.With_extra_variables.fold
-    ~variable:(fun var kind t ->
-      add_variable_definition t var kind Name_mode.in_types)
-    ~equation:(fun name ty t ->
-      try add_equation ~raise_on_bottom:true t name ty ~meet_type
-      with Bottom_equation -> make_bottom t)
-    env_extension t
-
-let add_env_extension_from_level t level ~meet_type : t =
-  let t =
-    TEL.fold_on_defined_vars
-      (fun var kind t -> add_variable_definition t var kind Name_mode.in_types)
-      level t
-  in
-  let t =
-    Name.Map.fold
-      (fun name ty t ->
-        try add_equation ~raise_on_bottom:true t name ty ~meet_type
-        with Bottom_equation -> make_bottom t)
-      (TEL.equations level) t
-  in
-  Variable.Map.fold
-    (fun var proj t -> add_symbol_projection t var proj)
-    (TEL.symbol_projections level)
-    t
-
-let add_equation_strict t name ty ~meet_type : _ Or_bottom.t =
-  if t.is_bottom
-  then Bottom
-  else
-    try Ok (add_equation ~raise_on_bottom:true t name ty ~meet_type)
-    with Bottom_equation -> Bottom
-
-let add_env_extension_strict t env_extension ~meet_type : _ Or_bottom.t =
-  if t.is_bottom
-  then Bottom
-  else
-    try Ok (add_env_extension ~raise_on_bottom:true t env_extension ~meet_type)
-    with Bottom_equation -> Bottom
-
-let add_env_extension_maybe_bottom t env_extension ~meet_type =
-  add_env_extension ~raise_on_bottom:false t env_extension ~meet_type
-
-let add_equation t name ty ~meet_type =
-  try add_equation ~raise_on_bottom:true t name ty ~meet_type
-  with Bottom_equation -> make_bottom t
-
-let add_env_extension t env_extension ~meet_type =
-  try add_env_extension ~raise_on_bottom:true t env_extension ~meet_type
-  with Bottom_equation -> make_bottom t
+    Unknown
+  | Ok { canonical_element; demoted_name; t = aliases } ->
+    Ok { canonical_element; demoted_name; t = with_aliases t ~aliases }
 
 let add_definitions_of_params t ~params =
   List.fold_left
@@ -1026,25 +866,6 @@ let add_definitions_of_params t ~params =
         (Flambda_kind.With_subkind.kind (Bound_parameter.kind param)))
     t
     (Bound_parameters.to_list params)
-
-let check_params_and_types ~params ~param_types =
-  if Flambda_features.check_invariants ()
-     && List.compare_lengths (Bound_parameters.to_list params) param_types <> 0
-  then
-    Misc.fatal_errorf
-      "Mismatch between number of [params] and [param_types]:@ (%a)@ and@ %a"
-      Bound_parameters.print params
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space TG.print)
-      param_types
-
-let add_equations_on_params t ~params ~param_types ~meet_type =
-  check_params_and_types ~params ~param_types;
-  List.fold_left2
-    (fun t param param_type ->
-      add_equation t (Bound_parameter.name param) param_type ~meet_type)
-    t
-    (Bound_parameters.to_list params)
-    param_types
 
 let add_to_code_age_relation t ~new_code_id ~old_code_id =
   let code_age_relation =
@@ -1130,6 +951,15 @@ let type_simple_in_term_exn t ?min_name_mode simple =
   | exception Binding_time_resolver_failure ->
     TG.alias_type_of kind simple, simple
   | alias -> TG.alias_type_of kind alias, alias
+
+let get_canonical_simple_ignoring_name_mode t simple =
+  Simple.pattern_match simple
+    ~const:(fun _ -> simple)
+    ~name:(fun name ~coercion ->
+      let canonical_of_name =
+        Aliases.get_canonical_ignoring_name_mode (aliases t) name
+      in
+      Simple.apply_coercion_exn canonical_of_name coercion)
 
 let get_canonical_simple_exn t ?min_name_mode ?name_mode_of_existing_simple
     simple =
@@ -1222,12 +1052,10 @@ let rec free_names_transitive_of_type_of_name t name ~result =
 
 and free_names_transitive0 t typ ~result =
   let free_names = TG.free_names typ in
-  let to_traverse = Name_occurrences.diff free_names ~without:result in
-  if Name_occurrences.is_empty to_traverse
-  then result
-  else
-    Name_occurrences.fold_names to_traverse ~init:result ~f:(fun result name ->
-        free_names_transitive_of_type_of_name t name ~result)
+  Name_occurrences.fold_names free_names ~init:result ~f:(fun result name ->
+      if Name_occurrences.mem_name result name
+      then result
+      else free_names_transitive_of_type_of_name t name ~result)
 
 let free_names_transitive t typ =
   free_names_transitive0 t typ ~result:Name_occurrences.empty
@@ -1260,7 +1088,9 @@ module Serializable : sig
   val create : Pre_serializable.t -> reachable_names:Name_occurrences.t -> t
 
   val create_from_closure_conversion_approx :
-    'a Value_approximation.t Symbol.Map.t -> t
+    machine_width:Target_system.Machine_width.t ->
+    'a Value_approximation.t Symbol.Map.t ->
+    t
 
   val predefined_exceptions : Symbol.Set.t -> t
 
@@ -1308,7 +1138,7 @@ end = struct
       just_after_level = Cached_level.empty
     }
 
-  let create_from_closure_conversion_approx
+  let create_from_closure_conversion_approx ~machine_width
       (symbols : _ Value_approximation.t Symbol.Map.t) : t =
     (* By using Cached_level.add_or_replace_binding below, we ensure that all
        symbols have an equation (that may be Unknown). *)
@@ -1322,8 +1152,8 @@ end = struct
         TG.alias_type_of Flambda_kind.value (Simple.symbol symbol)
       | Block_approximation (tag, shape, fields, alloc_mode) ->
         let fields = List.map type_from_approx (Array.to_list fields) in
-        MTC.immutable_block ~is_unique:false (Tag.Scannable.to_tag tag)
-          ~shape:(Scannable shape) ~fields alloc_mode
+        MTC.immutable_block ~machine_width ~is_unique:false
+          (Tag.Scannable.to_tag tag) ~shape:(Scannable shape) ~fields alloc_mode
       | Closure_approximation { code_id; function_slot; code = _; symbol } ->
         MTC.static_closure_with_this_code ~this_function_slot:function_slot
           ~closure_symbol:symbol ~code_id
@@ -1403,14 +1233,14 @@ end = struct
             ~const:(fun const -> VA.Value_const const)
             ~var:(fun _ ~coercion:_ -> VA.Value_unknown)
             ~symbol:(fun symbol ~coercion:_ -> VA.Value_symbol symbol)
-        | Ok (No_alias { is_null = Maybe_null; _ })
+        | Ok (No_alias { is_null = Maybe_null _; _ })
         | Ok (No_alias { non_null = Unknown | Bottom; _ }) ->
           VA.Value_unknown
         | Ok (No_alias { is_null = Not_null; non_null = Ok head }) -> (
           match head with
           | Mutable_block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
-          | Boxed_int64 _ | Boxed_vec128 _ | Boxed_nativeint _ | String _
-          | Array _ ->
+          | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
+          | Boxed_nativeint _ | String _ | Array _ ->
             Value_unknown
           | Closures { by_function_slot; alloc_mode = _ } -> (
             let approx_of_closures_entry ~exact function_slot closures_entry :
@@ -1437,46 +1267,54 @@ end = struct
               { immediates = _;
                 blocks = Unknown;
                 extensions = _;
-                is_unique = _
+                is_unique = _;
+                is_int = _;
+                get_tag = _
               }
           | Variant
               { immediates = Unknown;
                 blocks = _;
                 extensions = _;
-                is_unique = _
+                is_unique = _;
+                is_int = _;
+                get_tag = _
               } ->
             Value_unknown
           | Variant
               { immediates = Known imms;
                 blocks = Known blocks;
                 extensions = _;
-                is_unique = _
+                is_unique = _;
+                is_int = _;
+                get_tag = _
               } ->
             if TG.is_obviously_bottom imms
             then
               match TG.Row_like_for_blocks.get_singleton blocks with
               | None -> Value_unknown
-              | Some (tag, Scannable shape, _size, fields, alloc_mode) ->
+              | Some (tag, Scannable Value_only, _size, fields, alloc_mode) ->
                 let tag =
                   match Tag.Scannable.of_tag tag with
                   | Some tag -> tag
                   | None ->
                     Misc.fatal_errorf
                       "For symbol %a, the tag %a is non-scannable yet the \
-                       block shape appears to be scannable:@ %a"
+                       block shape appears to be scannable"
                       Symbol.print symbol Tag.print tag
-                      K.Scannable_block_shape.print shape
                 in
                 let fields =
                   List.map type_to_approx
                     (TG.Product.Int_indexed.components fields)
                 in
                 Block_approximation
-                  (tag, shape, Array.of_list fields, alloc_mode)
-              | Some (_, Float_record, _, _, _) -> Value_unknown
+                  (tag, Value_only, Array.of_list fields, alloc_mode)
+              | Some (_, (Float_record | Scannable (Mixed_record _)), _, _, _)
+                ->
+                Value_unknown
             else Value_unknown))
-      | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int32 _
-      | Naked_int64 _ | Naked_vec128 _ | Naked_nativeint _ | Rec_info _
+      | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
+      | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
+      | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _
       | Region _ ->
         assert false
     in

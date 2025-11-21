@@ -1,6 +1,7 @@
 (* TEST
    flags = "-extension-universe alpha";
    include stdlib_upstream_compatible;
+   include stdlib_stable;
    expect;
 *)
 
@@ -107,7 +108,7 @@ type t = ..
 type t += K : ('a : float64). 'a ignore -> t
 |}]
 
-(* CR layouts v2.8: re-enable this *)
+(* CR layouts v2.8: re-enable this. Internal ticket 5118. *)
 (*
 module M : sig
   kind_abbrev_ k = immediate
@@ -123,7 +124,7 @@ Uncaught exception: Misc.Fatal_error
 *)
 
 type t1 : any
-type t2 : any_non_null
+type t2 : any mod separable
 type t3 : value_or_null
 type t4 : value
 type t5 : void
@@ -137,7 +138,7 @@ type t12 : bits64
 
 [%%expect{|
 type t1 : any
-type t2 : any_non_null
+type t2 : any mod separable
 type t3 : value_or_null
 type t4
 type t5 : void
@@ -182,7 +183,8 @@ let x () = #( M.Null, M.This "hi" )
 
 [%%expect{|
 module M :
-  sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end
+  sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end @@
+  stateless
 val x : unit -> #('a M.t * string M.t) = <fun>
 |}]
 
@@ -223,6 +225,13 @@ type packed2 = T2 : 'a * 'b -> packed2
 val f2 : packed2 -> unit = <fun>
 val f3 : packed2 -> unit = <fun>
 val f4 : packed2 -> unit = <fun>
+|}]
+
+(* This needs to be printed with a space after "float#" because of how
+   identifiers ending in "#" are parsed. *)
+let f () = fun () : float# -> #0.
+[%%expect{|
+val f : unit -> unit -> float# = <fun>
 |}]
 
 (******************)
@@ -305,18 +314,6 @@ val nums : (int * int * int) array =
     (5, 4, 5); (5, 4, 3); (5, 1, 2); (5, 1, 2); (6, 3, 3); (6, 0, 2);
     (7, 5, 6); (7, 5, 2); (7, 2, 3); (7, 2, 3); (8, 4, 2); (8, 1, 3);
     (9, 3, 4); (9, 3, 2); (9, 0, 1); (9, 0, 3); (10, 5, 3); (10, 2, 2)|]
-|}]
-
-(* local_ is allowed in the parser in this one place, but the type-checker
-   rejects *)
-let broken_local =
-  [ 5 for local_ n in [ 1; 2 ] ];;
-
-[%%expect{|
-Line 2, characters 10-30:
-2 |   [ 5 for local_ n in [ 1; 2 ] ];;
-              ^^^^^^^^^^^^^^^^^^^^
-Error: This value escapes its region.
 |}]
 
 (* User-written attributes *)
@@ -449,7 +446,7 @@ type record =
 
 [%%expect{|
 type record = {
-  global_ field0 : int;
+  field0 : int @@ global;
   field1 : int @@ global portable contended;
   field2 : int @@ global portable contended;
   normal_field : int;
@@ -472,16 +469,16 @@ type t =
 
 [%%expect{|
 type 'a parameterized_record = {
-  global_ field0 : 'a;
+  field0 : 'a @@ global;
   field1 : 'a @@ global portable contended;
   field2 : 'a @@ global portable contended;
   normal_field : 'a;
 }
 type t =
-    Foo of global_ int * int
+    Foo of int @@ global * int
   | Foo1 of int @@ global portable contended * int
-  | Foo2 of global_ int * int @@ global portable contended
-  | Foo3 of global_ int * int @@ portable contended
+  | Foo2 of int @@ global * int @@ global portable contended
+  | Foo3 of int @@ global * int @@ portable contended
   | Foo4 of (int * int) @@ global portable contended
 |}]
 
@@ -537,26 +534,26 @@ let f ~(x1 @ many)
 [%%expect{|
 val f :
   x1:'b ->
-  x2:local_ string ->
-  x3:local_ (string -> string) ->
-  x4:local_ ('a. 'a -> 'a) ->
-  x9:local_ ('a. 'a) ->
-  x5:local_ 'c ->
-  x6:local_ bool ->
-  x7:local_ bool ->
-  x8:local_ unit ->
+  x2:string @ local ->
+  x3:(string -> string) @ local ->
+  x4:('a. 'a -> 'a) @ local ->
+  x9:('a. 'a) @ local ->
+  x5:'c @ local ->
+  x6:bool @ local ->
+  x7:bool @ local ->
+  x8:unit @ local ->
   string ->
-  local_ 'd ->
+  'd @ local ->
   'b * string * (string -> string) * ('e -> 'e) * 'c * string * string *
-  int array * string * (int -> local_ (int -> int)) *
-  (int -> local_ (int -> int)) @ local contended = <fun>
+  int array * string * (int -> (int -> int) @ local) *
+  (int -> (int -> int) @ local) @ local contended = <fun>
 |}]
 
 let f1 (_ @ local) = ()
 let f2 () = let x @ local = [1; 2; 3] in f1 x [@nontail]
 
 [%%expect{|
-val f1 : local_ 'a -> unit = <fun>
+val f1 : 'a @ local -> unit = <fun>
 val f2 : unit -> unit = <fun>
 |}]
 
@@ -587,7 +584,7 @@ module type S =
 external x4 : string -> string @@ portable many = "%identity"
 
 [%%expect{|
-external x4 : string -> string @@ many portable = "%identity"
+external x4 : string -> string @@ portable = "%identity"
 |}]
 
 type t =
@@ -601,20 +598,23 @@ type t = { x : string @@ global
 type t1 = { mutable x : float
           ; mutable f : float -> float }
 
-type t2 = { mutable x : float [@no_mutable_implied_modalities]
-          ; mutable f : float -> float [@no_mutable_implied_modalities] }
+type t2 = { mutable x : float @@ local once
+          ; mutable f : float -> float @@ local once }
 
 [%%expect{|
 type t =
-    K1 of global_ string * (float -> float) @@ many * string
-  | K2 : global_ string * (float -> float) @@ many * string -> t
+    K1 of string @@ global * (float -> float) @@ many * string
+  | K2 : string @@ global * (float -> float) @@ many * string -> t
 type t = {
-  global_ x : string;
+  x : string @@ global;
   mutable y : float -> float;
   z : string @@ global many;
 }
 type t1 = { mutable x : float; mutable f : float -> float; }
-type t2 = { mutable x : float; mutable f : float -> float; }
+type t2 = {
+  mutable x : float @@ local once;
+  mutable f : float -> float @@ local once;
+}
 |}]
 
 let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
@@ -623,13 +623,13 @@ let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
 Line 1, characters 48-49:
 1 | let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
                                                     ^
-Error: This value escapes its region.
+Error: This value is "local" but is expected to be "global".
 |}]
 
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
 
 [%%expect{|
-val f2 : local_ float -> (float -> float) @ once -> t2 @ local once = <fun>
+val f2 : float @ local -> (float -> float) @ once -> t2 @ local once = <fun>
 |}]
 
 
@@ -641,7 +641,7 @@ module type S = sig
 end
 
 module type S' = sig
-  include [@no_recursive_modalities] S @@ portable
+  include S @@ portable
 end
 
 [%%expect{|
@@ -650,7 +650,7 @@ module type S =
 module type S' =
   sig
     val bar : 'a -> 'a @@ portable
-    module M : sig val foo : 'a -> 'a end
+    module M : sig val foo : 'a -> 'a @@ portable end
   end
 |}]
 
@@ -660,7 +660,7 @@ module type S = sig end
 module M = struct end
 [%%expect{|
 module type S = sig end
-module M : sig end
+module M : sig end @@ stateless
 |}]
 
 module F (X : S @ portable) = struct
@@ -669,7 +669,7 @@ end
 Line 1, characters 18-26:
 1 | module F (X : S @ portable) = struct
                       ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module F (_ : S @ portable) = struct
@@ -678,15 +678,12 @@ end
 Line 1, characters 18-26:
 1 | module F (_ : S @ portable) = struct
                       ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module M' = (M : S @ portable)
 [%%expect{|
-Line 1, characters 21-29:
-1 | module M' = (M : S @ portable)
-                         ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M' : S @@ stateless
 |}]
 
 module F (M : S @ portable) : S @ portable = struct
@@ -695,7 +692,7 @@ end
 Line 1, characters 18-26:
 1 | module F (M : S @ portable) : S @ portable = struct
                       ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module F (M : S @ portable) @ portable = struct
@@ -704,43 +701,31 @@ end
 Line 1, characters 18-26:
 1 | module F (M : S @ portable) @ portable = struct
                       ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 
 
-(* CR zqian: the similar syntax for expressions are not allowed because @ might
+(* the similar syntax for expressions are not allowed because @ might
   be an binary operator *)
 module M' = (M @ portable)
 [%%expect{|
-Line 1, characters 17-25:
-1 | module M' = (M @ portable)
-                     ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M' = M @@ stateless
 |}]
 
 module M' = (M : S @ portable)
 [%%expect{|
-Line 1, characters 21-29:
-1 | module M' = (M : S @ portable)
-                         ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M' : S @@ stateless
 |}]
 
 module M @ portable = struct end
 [%%expect{|
-Line 1, characters 11-19:
-1 | module M @ portable = struct end
-               ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M : sig end @@ stateless
 |}]
 
 module M : S @ portable = struct end
 [%%expect{|
-Line 1, characters 15-23:
-1 | module M : S @ portable = struct end
-                   ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module M : S @@ stateless
 |}]
 
 module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
@@ -748,7 +733,7 @@ module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portabl
 Line 1, characters 37-45:
 1 | module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
                                          ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 
@@ -757,41 +742,33 @@ module type S' = () -> S @ portable -> S @ portable -> S @ portable
 Line 1, characters 27-35:
 1 | module type S' = () -> S @ portable -> S @ portable -> S @ portable
                                ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module (F @ portable) () = struct end
 [%%expect{|
-Line 1, characters 12-20:
-1 | module (F @ portable) () = struct end
-                ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module F : functor () -> sig end @@ stateless
 |}]
 
 module (G @ portable) () = F
 
 [%%expect{|
-Line 1, characters 12-20:
+Line 1, characters 27-28:
 1 | module (G @ portable) () = F
-                ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+                               ^
+Error: This is "contended", but expected to be "uncontended" because it is a functor body.
 |}]
 
 module (G' @ portable) = F
 [%%expect{|
-Line 1, characters 13-21:
-1 | module (G' @ portable) = F
-                 ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+module G' = F @@ stateless
 |}]
 
 module rec (F @ portable) () = struct end
 and (G @ portable) () = struct end
 [%%expect{|
-Line 1, characters 16-24:
-1 | module rec (F @ portable) () = struct end
-                    ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+File "_none_", line 1:
+Error: Recursive modules require an explicit module type.
 |}]
 
 module type T = sig
@@ -821,10 +798,7 @@ let foo () =
   let module (F @ portable) () = struct end in
   ()
 [%%expect{|
-Line 2, characters 18-26:
-2 |   let module (F @ portable) () = struct end in
-                      ^^^^^^^^
-Error: Mode annotations on modules are not supported yet.
+val foo : unit -> unit = <fun>
 |}]
 
 (**********)
@@ -836,8 +810,10 @@ let f x = stack_ (ref x)
 Line 1, characters 10-24:
 1 | let f x = stack_ (ref x)
               ^^^^^^^^^^^^^^
-Error: This value escapes its region.
-  Hint: Cannot return a local value without an "exclave_" annotation.
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 type t = { a : int }
@@ -855,7 +831,7 @@ let double1 y = apply ~f:(stack_ fun x -> x + y) y [@nontail]
 let double2 y = apply ~f:(stack_ function x -> x + y) y [@nontail]
 
 [%%expect{|
-val apply : f:local_ ('a -> 'b) -> 'a -> 'b = <fun>
+val apply : f:('a -> 'b) @ local -> 'a -> 'b = <fun>
 val double1 : int -> int = <fun>
 val double2 : int -> int = <fun>
 |}]
@@ -865,7 +841,14 @@ let make_tuple x y z = stack_ (x, y), z
 Line 1, characters 23-36:
 1 | let make_tuple x y z = stack_ (x, y), z
                            ^^^^^^^^^^^^^
-Error: This value escapes its region.
+Error: This value is "local"
+       because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global"
+       because it is an element of the tuple at Line 1, characters 23-39
+       which is expected to be "global" because it is an allocation
+       which is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 type u = A of unit | C of int | B of int * int | D
@@ -924,9 +907,9 @@ module type S = sig
 end;;
 
 [%%expect{|
-module F_struct : sig end -> sig end
+module F_struct : sig end -> sig end @@ stateless
 module type F_sig = sig end -> sig end
-module T : sig end
+module T : sig end @@ stateless
 module type S = sig end
 |}]
 
@@ -942,7 +925,7 @@ let f x =
   | _ -> assert false;;
 
 [%%expect{|
-val f : 'a iarray -> 'a iarray = <fun>
+val f : ('a : value_or_null mod separable). 'a iarray -> 'a iarray = <fun>
 |}]
 
 (******************)
@@ -965,17 +948,17 @@ exception Odd
 val x : x:int * y:int = (~x:1, ~y:2)
 val x : x:int * y:int = (~x:1, ~y:2)
 - : x:int * int * z:int * punned:int = (~x:5, 2, ~z:4, ~punned:5)
-val x : x:int * y:int = (~x:1, ~y:2)
-val x : x:int * y:int = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
 |}]
 
 let (~x:x0, ~s, ~(y:int), ..) : (x:int * s:string * y:int * string) =
    (~x: 1, ~s: "a", ~y: 2, "ignore me")
 
 [%%expect{|
-val x0 : int = 1
-val s : string = "a"
-val y : int = 2
+val x0 : int @@ stateless = 1
+val s : string @@ stateless = "a"
+val y : int @@ stateless = 2
 |}]
 
 module M : sig
@@ -995,8 +978,8 @@ module M :
   sig
     val f : (x:int * string) -> x:int * string
     val mk : unit -> x:bool * y:string
-  end
-module X_int_int : sig type t = x:int * int end
+  end @@ stateless
+module X_int_int : sig type t = x:int * int end @@ stateless
 |}]
 
 let foo xy k_good k_bad =
@@ -1011,9 +994,9 @@ let f ((~(x:int),y) : (x:int * int)) : int = x + y
 
 [%%expect{|
 val foo : 'a -> (unit -> 'b) -> (unit -> 'b) -> 'b = <fun>
-val x : int = 1
+val x : int @@ stateless = 1
 val y : int = 2
-val x : int = 1
+val x : int @@ stateless = 1
 val y : int = 2
 val f : (foo:int * bar:int) -> int = <fun>
 val f : (x:int * int) -> int = <fun>
@@ -1043,31 +1026,51 @@ val matches : int * int = (1, 2)
 (* Unboxed literals *)
 
 module Float_u = Stdlib_upstream_compatible.Float_u
+module Int8_u = Stdlib_stable.Int8_u
+module Int16_u = Stdlib_stable.Int16_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int_u = Stdlib_stable.Int_u
+module Char_u = Stdlib_stable.Char_u
 
 [%%expect{|
 module Float_u = Stdlib_upstream_compatible.Float_u
+module Int8_u = Stdlib_stable.Int8_u
+module Int16_u = Stdlib_stable.Int16_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int_u = Stdlib_stable.Int_u
+module Char_u = Stdlib_stable.Char_u
 |}]
 
 let test_float s f =
   Format.printf "%s: %f\n" s (Float_u.to_float f); Format.print_flush ()
+let test_int8 s f =
+  Format.printf "%s: %d\n" s (Int8_u.to_int f); Format.print_flush ()
+let test_int16 s f =
+  Format.printf "%s: %d\n" s (Int16_u.to_int f); Format.print_flush ()
 let test_int32 s f =
   Format.printf "%s: %ld\n" s (Int32_u.to_int32 f); Format.print_flush ()
 let test_int64 s f =
   Format.printf "%s: %Ld\n" s (Int64_u.to_int64 f); Format.print_flush ()
+let test_int s f =
+  Format.printf "%s: %d\n" s (Int_u.to_int f); Format.print_flush ()
 let test_nativeint s f =
   Format.printf "%s: %s\n" s (Nativeint_u.to_string f); Format.print_flush ()
+let test_char s f =
+  Format.printf "%s: %C\n" s (Char_u.to_char f); Format.print_flush ()
 
 [%%expect{|
 val test_float : string -> Float_u.t -> unit = <fun>
+val test_int8 : string -> int8# -> unit = <fun>
+val test_int16 : string -> int16# -> unit = <fun>
 val test_int32 : string -> Int32_u.t -> unit = <fun>
 val test_int64 : string -> Int64_u.t -> unit = <fun>
+val test_int : string -> int# -> unit = <fun>
 val test_nativeint : string -> Nativeint_u.t -> unit = <fun>
+val test_char : string -> char# -> unit = <fun>
 |}]
 
 (* Expressions *)
@@ -1086,13 +1089,22 @@ let x = test_float "one_twenty_seven_point_two_five_in_floating_hex" (#0x7f.4)
 let x = test_float "five_point_three_seven_five_in_floating_hexponent" (#0xa.cp-1)
 
 let x = test_nativeint "zero" (#0n)
+let x = test_int "zero" (#0m)
+let x = test_int8 "positive_one" (+#1s)
+let x = test_int8 "positive_one" (+ #1s)
+let x = test_int16 "positive_one" (+#1S)
+let x = test_int16 "positive_one" (+ #1S)
 let x = test_int32 "positive_one" (+#1l)
 let x = test_int32 "positive_one" (+ #1l)
 let x = test_int64 "negative_one" (-#1L)
 let x = test_int64 "negative_one" (- #1L)
 let x = test_nativeint "two_fifty_five_in_hex" (#0xFFn)
+let x = test_int "ten_in_binary" (#0b1010m)
+let x = test_int8 "one_hundred_in_octal" (#0o144s)
+let x = test_int16 "two_hundred_in_hex" (#0xC8S)
 let x = test_int32 "twenty_five_in_octal" (#0o31l)
 let x = test_int64 "forty_two_in_binary" (#0b101010L)
+let x = test_char "untagged char" (#'c')
 
 [%%expect{|
 e: 2.718282
@@ -1121,6 +1133,16 @@ five_point_three_seven_five_in_floating_hexponent: 5.375000
 val x : unit = ()
 zero: 0
 val x : unit = ()
+zero: 0
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
 positive_one: 1
 val x : unit = ()
 positive_one: 1
@@ -1131,9 +1153,17 @@ negative_one: -1
 val x : unit = ()
 two_fifty_five_in_hex: 255
 val x : unit = ()
+ten_in_binary: 10
+val x : unit = ()
+one_hundred_in_octal: 100
+val x : unit = ()
+two_hundred_in_hex: 200
+val x : unit = ()
 twenty_five_in_octal: 25
 val x : unit = ()
 forty_two_in_binary: 42
+val x : unit = ()
+untagged char: 'c'
 val x : unit = ()
 |}]
 
@@ -1219,6 +1249,17 @@ result: 7
 - : unit = ()
 |}]
 
+(* Ranges of `char#` are allowed. *)
+let x =
+  match #'c' with
+  | #'a'..#'z' -> 10
+  | _ -> 20
+;;
+
+[%%expect{|
+val x : int = 10
+|}]
+
 (*******************)
 (* Unboxed records *)
 
@@ -1236,6 +1277,67 @@ val payload : string = "payload"
 val inc : 'a with_idx -> 'a with_idx = <fun>
 |}]
 
+(*****************)
+(* Block indices *)
+
+type 'a r = { foo : 'a }
+let idx_r () = (.foo)
+let idx_r_r () = (.foo.#foo)
+let idx_array x = (.(x))
+let idx_array_L x = (.L(x))
+let idx_array_l x = (.l(x))
+let idx_array_S x = (.S(x))
+let idx_array_s x = (.s(x))
+let idx_array_n x = (.n(x))
+let idx_iarray x = (.:(x))
+let idx_iarray_L x = (.:L(x))
+let idx_iarray_l x = (.:l(x))
+let idx_iarray_S x = (.:S(x))
+let idx_iarray_s x = (.:s(x))
+let idx_iarray_n x = (.:n(x))
+let idx_imm x = (.idx_imm(x))
+let idx_mut x = (.idx_mut(x))
+[%%expect{|
+type 'a r = { foo : 'a; }
+val idx_r : unit -> ('a r, 'a) idx_imm = <fun>
+val idx_r_r : unit -> ('a r# r, 'a) idx_imm = <fun>
+val idx_array :
+  ('a : value_or_null mod non_float). int -> ('a array, 'a) idx_mut = <fun>
+val idx_array_L :
+  ('a : value_or_null mod non_float). int64# -> ('a array, 'a) idx_mut =
+  <fun>
+val idx_array_l :
+  ('a : value_or_null mod non_float). int32# -> ('a array, 'a) idx_mut =
+  <fun>
+val idx_array_S :
+  ('a : value_or_null mod non_float). int16# -> ('a array, 'a) idx_mut =
+  <fun>
+val idx_array_s :
+  ('a : value_or_null mod non_float). int8# -> ('a array, 'a) idx_mut = <fun>
+val idx_array_n :
+  ('a : value_or_null mod non_float). nativeint# -> ('a array, 'a) idx_mut =
+  <fun>
+val idx_iarray :
+  ('a : value_or_null mod non_float). int -> ('a iarray, 'a) idx_imm = <fun>
+val idx_iarray_L :
+  ('a : value_or_null mod non_float). int64# -> ('a iarray, 'a) idx_imm =
+  <fun>
+val idx_iarray_l :
+  ('a : value_or_null mod non_float). int32# -> ('a iarray, 'a) idx_imm =
+  <fun>
+val idx_iarray_S :
+  ('a : value_or_null mod non_float). int16# -> ('a iarray, 'a) idx_imm =
+  <fun>
+val idx_iarray_s :
+  ('a : value_or_null mod non_float). int8# -> ('a iarray, 'a) idx_imm =
+  <fun>
+val idx_iarray_n :
+  ('a : value_or_null mod non_float). nativeint# -> ('a iarray, 'a) idx_imm =
+  <fun>
+val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
+val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
+|}]
+
 (***************)
 (* Modal kinds *)
 
@@ -1250,6 +1352,22 @@ type 'a list : immutable_data with 'a
 type ('a, 'b) either : immutable_data with 'a with 'b
 type 'a contended : immutable_data with 'a @@ contended
 type 'a contended_with_int : immutable_data with 'a @@ contended
+|}]
+
+type 'a abstract
+type existential_abstract : immutable_data with (type : value mod portable) abstract =
+  | Mk : ('a : value mod portable) abstract -> existential_abstract
+(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
+[%%expect{|
+type 'a abstract
+Lines 2-3, characters 0-67:
+2 | type existential_abstract : immutable_data with (type : value mod portable) abstract =
+3 |   | Mk : ('a : value mod portable) abstract -> existential_abstract
+Error: The kind of type "existential_abstract" is value mod non_float
+         because it's a boxed variant type.
+       But the kind of type "existential_abstract" must be a subkind of
+           immutable_data with (type : value mod portable) abstract
+         because of the annotation on the declaration of the type existential_abstract.
 |}]
 
 (* not yet supported *)
@@ -1270,7 +1388,7 @@ end = struct
 end
 
 (* CR layouts v2.8: Expect this output to change once modal kinds are
-   supported. *)
+   supported. Internal ticket 5118. *)
 
 [%%expect{|
 Line 9, characters 16-27:
@@ -1310,7 +1428,7 @@ module type S2 = S with M
 
 [%%expect{|
 module type S = sig type t1 type t2 type t3 end
-module M : sig type t1 = int type t2 = K of string type t3 end
+module M : sig type t1 = int type t2 = K of string type t3 end @@ stateless
 module type S2 = sig type t1 = M.t1 type t2 = M.t2 type t3 = M.t3 end
 |}]
 
@@ -1319,15 +1437,31 @@ module type S2 = sig type t1 = M.t1 type t2 = M.t2 type t3 = M.t3 end
 
 type t1 = float32
 type t2 = float32#
+type t3 = int8
+type t4 = int8#
+type t5 = int16
+type t6 = int16#
 
 let x = 3.14s
 let x () = #3.14s
+let y = 42s
+let y () = #42s
+let z = 42S
+let z () = #42S
 
 [%%expect{|
 type t1 = float32
 type t2 = float32#
+type t3 = int8
+type t4 = int8#
+type t5 = int16
+type t6 = int16#
 val x : float32 = 3.1400001s
 val x : unit -> float32# = <fun>
+val y : int8 = 42s
+val y : unit -> int8# = <fun>
+val z : int16 = 42S
+val z : unit -> int16# = <fun>
 |}]
 
 (********)
@@ -1400,13 +1534,14 @@ module _ = Base(Name1)(Value1)(Name2)(Value2(Name2_1)(Value2_1)) [@jane.non_eras
 
 
 [%%expect{|
-module Base : sig end -> sig end -> sig end -> sig end -> sig end
-module Name1 : sig end
-module Name2 : sig end
-module Value1 : sig end
-module Value2 : sig end -> sig end -> sig end
-module Name2_1 : sig end
-module Name2_1 : sig end
+module Base : sig end -> sig end -> sig end -> sig end -> sig end @@
+  stateless
+module Name1 : sig end @@ stateless
+module Name2 : sig end @@ stateless
+module Value1 : sig end @@ stateless
+module Value2 : sig end -> sig end -> sig end @@ stateless
+module Name2_1 : sig end @@ stateless
+module Name2_1 : sig end @@ stateless
 Line 9, characters 11-95:
 9 | module _ = Base(Name1)(Value1)(Name2)(Value2(Name2_1)(Value2_1)) [@jane.non_erasable.instances]
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1469,3 +1604,22 @@ let f g here = g ~(here : [%call_pos])
 [%%expect{|
 val f : (here:[%call_pos] -> 'a) -> lexing_position -> 'a = <fun>
 |}]
+
+(***************)
+(* let mutable *)
+
+let triangle_10 = let mutable x = 0 in
+  for i = 1 to 10 do
+    x <- x + i
+  done;
+  (x : int)
+;;
+
+[%%expect{|
+val triangle_10 : int = 55
+|}]
+
+(*********************)
+(* quotations syntax *)
+
+(* Test will only be added once quotations work end-to-end. *)

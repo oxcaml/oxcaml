@@ -37,31 +37,39 @@ type error =
   | Void_sort of type_expr
   | Unboxed_vector_in_array_comprehension
   | Unboxed_product_in_array_comprehension
+  | Unboxed_product_in_let_mutable
+  | Block_index_gap_overflow_possible
+  | Element_would_be_reordered_in_record
 
 exception Error of Location.t * error
 
 let use_dup_for_constant_mutable_arrays_bigger_than = 4
 
-(* CR layouts v7: In the places where this is used, we will want to allow
-   float#, but not void yet (e.g., the left of a semicolon and loop bodies).  we
-   still default to value before checking for void, to allow for sort variables
-   arising in situations like
-
-     let foo () = raise Foo; ()
-
-   When this sanity check is removed, consider whether we are still defaulting
-   appropriately.
-*)
-let sort_must_not_be_void loc ty sort =
-  if Jkind.Sort.Const.(equal void sort) then raise (Error (loc, Void_sort ty))
-
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
 
-let check_record_field_sort loc : Jkind.Sort.Const.t -> _ = function
-  | Base (Value | Float64 | Float32 | Bits32 | Bits64 | Vec128 | Word) -> ()
-  | Base Void -> raise (Error (loc, Illegal_void_record_field))
-  | Product _ as c -> raise (Error (loc, Illegal_product_record_field c))
+let field_offset_for_label lbl repres =
+  match repres with
+  | Record_boxed _
+  | Record_inlined (_, Constructor_uniform_value, Variant_boxed _)
+  | Record_inlined (_, Constructor_uniform_value, Variant_with_null) ->
+      lbl.lbl_pos
+  | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
+      lbl.lbl_pos + 1
+  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
+    (* CR layouts 5.1: For unboxed records, no offset calculation needed in
+       regular field access *)
+      lbl.lbl_pos
+  | Record_float ->
+      lbl.lbl_pos
+  | Record_ufloat ->
+      lbl.lbl_pos
+  | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
+      fatal_error "Mixed inlined records not supported for extensible variants"
+  | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
+  | Record_inlined (_, Constructor_mixed _, Variant_with_null)
+  | Record_mixed _ ->
+      lbl.lbl_pos
 
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
 let transl_module =
@@ -72,16 +80,6 @@ let transl_module =
 let transl_object =
   ref (fun ~scopes:_ _id _s _cl -> assert false :
        scopes:scopes -> Ident.t -> string list -> class_expr -> lambda)
-
-(* Probe handlers are generated from %probe as closed functions
-   during transl_exp and immediately lifted to top level. *)
-let probe_handlers = ref []
-let clear_probe_handlers () = probe_handlers := []
-let declare_probe_handlers lam =
-  List.fold_left (fun acc (funcid, func) ->
-      Llet(Strict, Lambda.layout_function, funcid, func, acc))
-    lam
-    !probe_handlers
 
 (* Compile an exception/extension definition *)
 
@@ -107,7 +105,7 @@ let transl_extension_constructor ~scopes env path ext =
          to pattern typing, as patterns can close over them. *)
       Lprim (Pmakeblock (Obj.object_tag, Immutable_unique, None, alloc_heap),
         [Lconst (Const_base (Const_string (name, ext.ext_loc, None)));
-         Lprim (prim_fresh_oo_id, [Lconst (const_int 0)], loc)],
+         Lprim (prim_fresh_oo_id, [lambda_unit], loc)],
         loc)
   | Text_rebind(path, _lid) ->
       transl_extension_path loc env path
@@ -298,8 +296,8 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
 
 let rec iter_exn_names f pat =
   match pat.pat_desc with
-  | Tpat_var (id, _, _, _) -> f id
-  | Tpat_alias (p, id, _, _, _, _) ->
+  | Tpat_var (id, _, _, _, _) -> f id
+  | Tpat_alias (p, id, _, _, _, _, _) ->
       f id;
       iter_exn_names f p
   | _ -> ()
@@ -393,6 +391,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let return_layout = layout_exp sort body in
       transl_let ~scopes ~return_layout rec_flag pat_expr_list
         (event_before ~scopes body (transl_exp ~scopes sort body))
+  | Texp_letmutable(pat_expr, body) ->
+      let return_layout = layout_exp sort body in
+      transl_letmutable ~scopes ~return_layout pat_expr
+        (event_before ~scopes body (transl_exp ~scopes sort body))
   | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
                     zero_alloc } ->
       let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
@@ -476,9 +478,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       transl_match ~scopes ~arg_sort ~return_sort:sort e arg pat_expr_list
         partial
   | Texp_try(body, pat_expr_list) ->
-      let id = Typecore.name_cases "exn" pat_expr_list in
+      let id, id_duid = Typecore.name_cases "exn" pat_expr_list in
       let return_layout = layout_exp sort e in
-      Ltrywith(transl_exp ~scopes sort body, id,
+      Ltrywith(transl_exp ~scopes sort body, id, id_duid,
                Matching.for_trywith ~scopes ~return_layout e.exp_loc (Lvar id)
                  (transl_cases_try ~scopes sort pat_expr_list),
                return_layout)
@@ -521,11 +523,15 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | Null, Variant_with_null -> Lconst Const_null
       | Null, (Variant_boxed _ | Variant_unboxed | Variant_extensible) ->
         assert false
-      | Ordinary {runtime_tag}, _ when cstr.cstr_constant ->
-          assert (args_with_sorts = []);
-          (* CR layouts v5: This could have void args, but for now we've ruled
-             that out by checking that the sort list is empty *)
-          Lconst(const_int runtime_tag)
+      | Ordinary {runtime_tag},
+        (Variant_boxed _ | Variant_extensible) when cstr.cstr_constant ->
+          assert (
+            List.for_all
+              (fun (_, s) -> Jkind.Sort.Const.all_void s) args_with_sorts);
+          List.fold_left
+            (fun (acc : lambda) (e : lambda) -> Lsequence (e, acc))
+            ((tagged_immediate runtime_tag) : lambda)
+            ll
       | Ordinary _, (Variant_unboxed | Variant_with_null) ->
           (match ll with [v] -> v | _ -> assert false)
       | Ordinary {runtime_tag}, Variant_boxed _ ->
@@ -535,12 +541,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             | constants -> (
               match shape with
               | Constructor_mixed shape ->
+                  (* CR layouts v5: once all-void records are allowed, handle
+                     constructors with all-void inline records, which are stored
+                     as immediates *)
                   if !Clflags.native_code then
-                    let shape =
-                      Lambda.transl_mixed_product_shape
-                        ~get_value_kind:(fun _i -> Lambda.generic_value)
-                        shape
-                    in
+                    let shape = Lambda.transl_mixed_product_shape shape in
                     Some (Const_mixed_block(runtime_tag, shape, constants))
                   else
                     (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -564,11 +569,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                     in
                     Pmakeblock(runtime_tag, Immutable, Some shape, alloc_mode)
                 | Constructor_mixed shape ->
-                    let shape =
-                      Lambda.transl_mixed_product_shape
-                        ~get_value_kind:(fun _i -> Lambda.generic_value)
-                        shape
-                    in
+                    (* CR layouts v5: once all-void records are allowed, handle
+                       constructors with all-void inline records, which are
+                       stored as immediates *)
+                    let shape = Lambda.transl_mixed_product_shape shape in
                     Pmakemixedblock(runtime_tag, Immutable, shape, alloc_mode)
               in
               Lprim (makeblock, ll, of_location ~scopes e.exp_loc)
@@ -579,8 +583,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           if cstr.cstr_constant
           then (
             assert (args_with_sorts = []);
-            (* CR layouts v5: This could have void args, but for now we've ruled
-               that out by checking that the sort list is empty *)
+            (* CR layouts v5: once non-values (namely voids) are allowed in
+               extensible variants, args_with_sorts could be non-empty in this
+               case, and we should assert that all sorts are void rather than
+               that the list is empty *)
             lam)
           else
             let alloc_mode = transl_alloc_mode (Option.get alloc_mode) in
@@ -597,11 +603,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   Pmakeblock(0, Immutable, Some (Lambda.generic_value :: shape),
                             alloc_mode)
               | Some (Constructor_mixed shape) ->
-                  let shape =
-                    Lambda.transl_mixed_product_shape
-                      ~get_value_kind:(fun _i -> Lambda.generic_value)
-                      shape
-                  in
+                  (* CR layouts v5: once all-void records are allowed, handle
+                     constructors with all-void inline records, which are stored
+                     as immediates *)
+                  let shape = Lambda.transl_mixed_product_shape shape in
                   let shape =
                     (* This corresponds to the poly variant hash.  This will
                        always stay in the same place because the reordering
@@ -623,7 +628,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_variant(l, arg) ->
       let tag = Btype.hash_variant l in
       begin match arg with
-        None -> Lconst(const_int tag)
+        None -> (tagged_immediate tag)
       | Some (arg, alloc_mode) ->
           let lam = transl_exp ~scopes Jkind.Sort.Const.for_poly_variant arg in
           try
@@ -632,7 +637,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           with Not_constant ->
             Lprim(Pmakeblock(0, Immutable, None,
                              transl_alloc_mode alloc_mode),
-                  [Lconst(const_int tag); lam],
+                  [tagged_immediate tag; lam],
                   of_location ~scopes e.exp_loc)
       end
   | Texp_record {fields; representation; extended_expression; alloc_mode} ->
@@ -643,24 +648,48 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         {fields; representation; extended_expression } ->
       transl_record_unboxed_product ~scopes e.exp_loc e.exp_env
         fields representation extended_expression
+  | Texp_atomic_loc (arg, arg_sort, _id, lbl, alloc_mode) ->
+      let shape =
+        Some
+          [ Typeopt.value_kind arg.exp_env arg.exp_loc arg.exp_type;
+            { raw_kind = Pintval; nullable = Non_nullable }
+          ]
+      in
+      let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
+      let repres =
+        match lbl.lbl_repres with
+        | Some repres -> repres
+        | None -> failwith "TODO after merge"
+      in
+      let (arg, lbl) = transl_atomic_loc ~scopes arg arg_sort lbl repres in
+      let loc = of_location ~scopes e.exp_loc in
+      Lprim (Pmakeblock (0, Immutable, shape, transl_alloc_mode alloc_mode),
+             [arg; lbl], loc)
   | Texp_field { record = arg; record_sort = arg_sort; record_repres;
-                 field_sort; lid = id; label = lbl; boxing = float;
+                 field_sort; lid = _; label = lbl; boxing = float;
                  unique_barrier = ubr } ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
-      let field_sort = Jkind.Sort.default_for_transl_and_get field_sort in
+      let _field_sort = Jkind.Sort.default_for_transl_and_get field_sort in
       let targ = transl_exp ~scopes arg_sort arg in
       let sem =
         if Types.is_mutable lbl.lbl_mut then Reads_vary else Reads_agree
       in
       let sem = add_barrier_to_read (transl_unique_barrier ubr) sem in
-      check_record_field_sort id.loc field_sort;
-      begin match record_repres with
+      let prim_and_args =
+        match record_repres with
           Record_boxed _
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
-          let ptr_or_imm, _ = maybe_pointer e in
-          Lprim (Pfield (lbl.lbl_pos, ptr_or_imm, sem), [targ],
-                 of_location ~scopes e.exp_loc)
-        | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> targ
+          let immediate_or_pointer, _ = maybe_pointer e in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Some
+              (Patomic_load_field { immediate_or_pointer },
+               [targ;
+                Lconst (Const_base (Const_int (
+                  field_offset_for_label lbl record_repres)))])
+          else
+            Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
+        | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
         | Record_float ->
           let alloc_mode =
             match float with
@@ -668,25 +697,33 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             | Non_boxing _ -> assert false
           in
           let mode = transl_alloc_mode alloc_mode in
-          Lprim (Pfloatfield (lbl.lbl_pos, sem, mode), [targ],
-                 of_location ~scopes e.exp_loc)
+          Some (Pfloatfield (lbl.lbl_pos, sem, mode), [targ])
         | Record_ufloat ->
-          Lprim (Pufloatfield (lbl.lbl_pos, sem), [targ],
-                 of_location ~scopes e.exp_loc)
+          Some (Pufloatfield (lbl.lbl_pos, sem), [targ])
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
-          let ptr_or_imm, _ = maybe_pointer e in
-          Lprim (Pfield (lbl.lbl_pos + 1, ptr_or_imm, sem), [targ],
-                 of_location ~scopes e.exp_loc)
-        | Record_inlined (_, (Constructor_mixed _), Variant_extensible) ->
+          let immediate_or_pointer, _ = maybe_pointer e in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Some
+              (Patomic_load_field { immediate_or_pointer },
+               [targ;
+                Lconst (Const_base (Const_int (
+                  field_offset_for_label lbl record_repres)))])
+          else
+            Some (Pfield (lbl.lbl_pos + 1, immediate_or_pointer, sem), [targ])
+        | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
             fatal_error
               "Mixed inlined records not supported for extensible variants"
-        | Record_inlined (_, (Constructor_mixed shape), Variant_boxed _)
+        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+          (* CR layouts v5: once all-void records are allowed, handle
+             constructors with all-void inline records, which are stored as
+             immediates *)
         | Record_mixed shape ->
           let shape =
             Lambda.transl_mixed_product_shape_for_read
               ~get_value_kind:(fun i ->
-                if i <> lbl.lbl_num then Lambda.generic_value
+                if i <> lbl.lbl_pos then Lambda.generic_value
                 else
                   let pointerness, nullable = maybe_pointer e in
                   let raw_kind = match pointerness with
@@ -695,7 +732,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   in
                   Lambda.{ raw_kind; nullable })
               ~get_mode:(fun i ->
-                if i <> lbl.lbl_num then Lambda.alloc_heap
+                if i <> lbl.lbl_pos then Lambda.alloc_heap
                 else
                   match float with
                     | Boxing (mode, _) -> transl_alloc_mode mode
@@ -705,9 +742,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                           \ present for float field read")
               shape
           in
-          Lprim (Pmixedfield (lbl.lbl_pos, shape, sem), [targ],
-                  of_location ~scopes e.exp_loc)
+          Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
         | Record_inlined (_, _, Variant_with_null) -> assert false
+      in
+      begin match prim_and_args with
+      | None -> targ
+      | Some (prim, args) -> Lprim (prim, args, of_location ~scopes e.exp_loc)
       end
   | Texp_unboxed_field(arg, arg_sort, _id, lbl, _) ->
     begin match lbl.lbl_repres with
@@ -720,57 +760,18 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         (* erase singleton unboxed records before lambda *)
         targ
       else
-        Lprim (Punboxed_product_field (lbl.lbl_num, layouts), [targ],
+        Lprim (Punboxed_product_field (lbl.lbl_pos, layouts), [targ],
                of_location ~scopes e.exp_loc)
     | None -> fatal_error "Unexpected indeterminate representation of unboxed record"
     end
   | Texp_setfield{ record = arg; record_repres; field_sort; modality = arg_mode;
-                   lid = id; label = lbl; newval } ->
+                   lid = _id; label = lbl; newval } ->
       (* CR layouts v2.5: When we allow `any` in record fields and check
          representability on construction, [sort_of_jkind] will be unsafe here.
          Probably we should add a sort to `Texp_setfield` in the typed tree,
          then. *)
-      check_record_field_sort id.loc
-        (Jkind.Sort.default_for_transl_and_get field_sort);
       let mode =
         Assignment (transl_modify_mode arg_mode)
-      in
-      let access =
-        match record_repres with
-          Record_boxed _
-        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
-          let ptr_or_imm, _ = maybe_pointer newval in
-          Psetfield(lbl.lbl_pos, ptr_or_imm, mode)
-        | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
-          assert false
-        | Record_float -> Psetfloatfield (lbl.lbl_pos, mode)
-        | Record_ufloat -> Psetufloatfield (lbl.lbl_pos, mode)
-        | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
-          let ptr_or_imm, _ = maybe_pointer newval in
-          Psetfield (lbl.lbl_pos + 1, ptr_or_imm, mode)
-        | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
-            (* CR layouts v5.9: support this *)
-            fatal_error
-              "Mixed inlined records not supported for extensible variants"
-        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
-        | Record_mixed shape ->
-          let shape =
-            Lambda.transl_mixed_product_shape
-              ~get_value_kind:(fun i ->
-                if i <> lbl.lbl_num then Lambda.generic_value
-                else
-                  let pointerness, nullable =
-                    maybe_pointer newval
-                  in
-                  let raw_kind = match pointerness with
-                    | Pointer -> Pgenval
-                    | Immediate -> Pintval
-                  in
-                  Lambda.{ raw_kind; nullable })
-              shape
-            in
-            Psetmixedfield(lbl.lbl_pos, shape, mode)
-        | Record_inlined (_, _, Variant_with_null) -> assert false
       in
       let sort_arg =
         (* We know the record is boxed because [@@unboxed] records don't have
@@ -781,9 +782,57 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let sort_newval =
         Jkind.Sort.default_for_transl_and_get field_sort
       in
-      Lprim(access, [transl_exp ~scopes sort_arg arg;
-                     transl_exp ~scopes sort_newval newval],
-            of_location ~scopes e.exp_loc)
+      let arg_lambda = transl_exp ~scopes sort_arg arg in
+      let field_lambda = Lconst (Const_base (Const_int lbl.lbl_pos)) in
+      let newval_lambda = transl_exp ~scopes sort_newval newval in
+      let prim, args =
+        match record_repres with
+          Record_boxed _
+        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
+          let immediate_or_pointer, _ = maybe_pointer newval in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Patomic_set_field { immediate_or_pointer },
+            [arg_lambda; field_lambda; newval_lambda]
+          else
+            Psetfield(lbl.lbl_pos, immediate_or_pointer, mode),
+            [arg_lambda; newval_lambda]
+        | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
+          assert false
+        | Record_float ->
+          Psetfloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
+        | Record_ufloat ->
+          Psetufloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
+        | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
+          let immediate_or_pointer, _ = maybe_pointer newval in
+          if Types.is_atomic lbl.lbl_mut
+          then
+            Patomic_set_field { immediate_or_pointer },
+            [arg_lambda; field_lambda; newval_lambda]
+          else
+            Psetfield (lbl.lbl_pos + 1, immediate_or_pointer, mode),
+            [arg_lambda; newval_lambda]
+        | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
+            (* CR layouts v5.9: support this *)
+            fatal_error
+              "Mixed inlined records not supported for extensible variants"
+        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+          (* CR layouts v5: once all-void records are allowed, handle
+             constructors with all-void inline records, which are stored as
+             immediates *)
+        | Record_mixed shape ->
+          let field_shape =
+            Typeopt.transl_mixed_block_element newval.exp_env newval.exp_loc
+              newval.exp_type shape.:(lbl.lbl_pos)
+          in
+          let shape = Lambda.transl_mixed_product_shape shape in
+          (* Update the shape with details for the modified field. *)
+          let shape = Misc.Stdlib.Iarray.update shape lbl.lbl_pos field_shape in
+          Psetmixedfield([lbl.lbl_pos], shape, mode),
+          [arg_lambda; newval_lambda]
+        | Record_inlined (_, _, Variant_with_null) -> assert false
+      in
+      Lprim(prim, args, of_location ~scopes e.exp_loc)
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
       let mode = transl_alloc_mode alloc_mode in
       let element_sort = Jkind.Sort.default_for_transl_and_get element_sort in
@@ -843,7 +892,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   Lconst(Const_float_array(List.map extract_float cl))
                 | Pgenarray ->
                   raise Not_constant    (* can this really happen? *)
-                | Punboxedfloatarray _ | Punboxedintarray _
+                | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
                 | Punboxedvectorarray _
                 | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
                   Misc.fatal_error "Use flambda2 for unboxed arrays"
@@ -853,6 +902,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       with Not_constant ->
         makearray lambda_arr_mut
       end
+  | Texp_idx (ba, uas) ->
+    transl_idx ~scopes e.exp_loc e.exp_env ba uas
   | Texp_list_comprehension comp ->
       let loc = of_location ~scopes e.exp_loc in
       Transl_list_comprehension.comprehension
@@ -866,7 +917,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let array_kind = Typeopt.array_kind e elt_sort in
       begin match array_kind with
       | Pgenarray | Paddrarray | Pintarray | Pfloatarray
-      | Punboxedfloatarray _ | Punboxedintarray _ -> ()
+      | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ -> ()
       | Punboxedvectorarray _ ->
         raise (Error(e.exp_loc, Unboxed_vector_in_array_comprehension))
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
@@ -886,12 +937,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                   Lambda.layout_unit)
   | Texp_sequence(expr1, sort', expr2) ->
       let sort' = Jkind.Sort.default_for_transl_and_get sort' in
-      sort_must_not_be_void expr1.exp_loc expr1.exp_type sort';
       Lsequence(transl_exp ~scopes sort' expr1,
                 event_before ~scopes expr2 (transl_exp ~scopes sort expr2))
   | Texp_while {wh_body; wh_body_sort; wh_cond} ->
       let wh_body_sort = Jkind.Sort.default_for_transl_and_get wh_body_sort in
-      sort_must_not_be_void wh_body.exp_loc wh_body.exp_type wh_body_sort;
       let cond = transl_exp ~scopes Jkind.Sort.Const.for_predef_value wh_cond in
       let body = transl_exp ~scopes wh_body_sort wh_body in
       Lwhile {
@@ -899,12 +948,13 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         wh_body = event_before ~scopes wh_body
                     (maybe_region_layout layout_unit body);
       }
-  | Texp_for {for_id; for_from; for_to; for_dir; for_body; for_body_sort} ->
+  | Texp_for {for_id; for_debug_uid; for_from; for_to; for_dir; for_body;
+              for_body_sort} ->
       let for_body_sort = Jkind.Sort.default_for_transl_and_get for_body_sort in
-      sort_must_not_be_void for_body.exp_loc for_body.exp_type for_body_sort;
       let body = transl_exp ~scopes for_body_sort for_body in
       Lfor {
         for_id;
+        for_debug_uid;
         for_loc = of_location ~scopes e.exp_loc;
         for_from = transl_exp ~scopes Jkind.Sort.Const.for_predef_value for_from;
         for_to = transl_exp ~scopes Jkind.Sort.Const.for_predef_value for_to;
@@ -963,16 +1013,21 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let self = transl_value_path loc e.exp_env path_self in
       let var = transl_value_path loc e.exp_env path in
       Lprim(Pfield_computed Reads_vary, [self; var], loc)
+  | Texp_mutvar id -> Lmutvar id.txt
   | Texp_setinstvar(path_self, path, _, expr) ->
       let loc = of_location ~scopes e.exp_loc in
       let self = transl_value_path loc e.exp_env path_self in
       let var = transl_value_path loc e.exp_env path in
       transl_setinstvar ~scopes loc self var expr
+  | Texp_setmutvar(id, expr_sort, expr) ->
+      Lassign(id.txt, transl_exp ~scopes
+        (Jkind.Sort.default_for_transl_and_get expr_sort) expr)
   | Texp_override(path_self, modifs) ->
       let loc = of_location ~scopes e.exp_loc in
       let self = transl_value_path loc e.exp_env path_self in
       let cpy = Ident.create_local "copy" in
-      Llet(Strict, Lambda.layout_object, cpy,
+      let cpy_duid = Lambda.debug_uid_none in
+      Llet(Strict, Lambda.layout_object, cpy, cpy_duid,
            Lapply{
              ap_loc=Loc_unknown;
              ap_func=Translobj.oo_prim "copy";
@@ -1000,13 +1055,15 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         let mod_scopes = enter_module_definition ~scopes id in
         !transl_module ~scopes:mod_scopes Tcoerce_none None modl
       in
-      Llet(Strict, Lambda.layout_module, id, defining_expr,
-           transl_exp ~scopes sort body)
+      (* CR sspies: Add a debug uid to [Texp_letmodule] for the binder. *)
+      Llet(Strict, Lambda.layout_module, id, Lambda.debug_uid_none,
+          defining_expr, transl_exp ~scopes sort body)
   | Texp_letmodule(_, _, Mp_absent, _, body) ->
       transl_exp ~scopes sort body
   | Texp_letexception(cd, body) ->
       Llet(Strict, Lambda.layout_block,
-           cd.ext_id, transl_extension_constructor ~scopes e.exp_env None cd,
+           cd.ext_id,  Lambda.debug_uid_none,
+           transl_extension_constructor ~scopes e.exp_env None cd,
            transl_exp ~scopes sort body)
   | Texp_pack modl ->
       !transl_module ~scopes Tcoerce_none None modl
@@ -1056,6 +1113,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
          let scopes = enter_lazy ~scopes in
          let fn = lfunction ~kind:(Curried {nlocal=0})
                             ~params:[{ name = Ident.create_local "param";
+                                       debug_uid = Lambda.debug_uid_none;
                                        layout = Lambda.layout_unit;
                                        attributes = Lambda.default_param_attribute;
                                        mode = alloc_heap}]
@@ -1085,11 +1143,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           cl_env = e.exp_env;
           cl_attributes = [];
          }
-  | Texp_letop{let_; ands; param; param_sort; body; body_sort; partial} ->
+  | Texp_letop{let_; ands; param; param_debug_uid; param_sort; body; body_sort;
+               partial} ->
       let body_sort = Jkind.Sort.default_for_transl_and_get body_sort in
       event_after ~scopes e
         (transl_letop ~scopes e.exp_loc e.exp_env let_ ands
-           param param_sort body body_sort partial)
+           param param_debug_uid param_sort body body_sort partial)
   | Texp_unreachable ->
       raise (Error (e.exp_loc, Unreachable_reached))
   | Texp_open (od, e) ->
@@ -1102,19 +1161,21 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | [] when pure = Alias -> transl_exp ~scopes sort e
       | _ ->
           let oid = Ident.create_local "open" in
+          let oid_duid = Lambda.debug_uid_none in
           let body, _ =
             (* CR layouts v5: Currently we only allow values at the top of a
                module.  When that changes, some adjustments may be needed
                here. *)
             List.fold_left (fun (body, pos) id ->
               Llet(Alias, Lambda.layout_module_field, id,
+                   Lambda.debug_uid_none,
                    Lprim(mod_field pos, [Lvar oid],
                          of_location ~scopes od.open_loc), body),
               pos + 1
             ) (transl_exp ~scopes sort e, 0)
               (bound_value_identifiers od.open_bound_items)
           in
-          Llet(pure, Lambda.layout_module, oid,
+          Llet(pure, Lambda.layout_module, oid, oid_duid,
                !transl_module ~scopes Tcoerce_none None od.open_expr, body)
       end
   | Texp_probe {name; handler=exp; enabled_at_init} ->
@@ -1172,6 +1233,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       ) arg_idents;
       let make_param name = {
         name;
+        debug_uid = Lambda.debug_uid_none;
+        (* For probes, we currently do not track [debug_uid] values. *)
         layout = layout_probe_arg;
         attributes = Lambda.default_param_attribute;
         mode = alloc_local }
@@ -1192,6 +1255,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           local = Never_local;
           zero_alloc = Default_zero_alloc;
           loop = Never_loop;
+          regalloc = Default_regalloc;
+          regalloc_param = Default_regalloc_params;
+          cold = false;
           is_a_functor = false;
           is_opaque = false;
           stub = false;
@@ -1201,6 +1267,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           may_fuse_arity = false;
         } in
       let funcid = Ident.create_local ("probe_handler_" ^ name) in
+      let funcid_duid = Lambda.debug_uid_none in
       let return_layout = layout_unit (* Probe bodies have type unit. *) in
       let handler =
         let assume_zero_alloc = get_assume_zero_alloc ~scopes in
@@ -1234,18 +1301,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           ap_probe = Some {name; enabled_at_init};
         }
       in
-      begin match Config.flambda || Config.flambda2 with
-      | true ->
-          Llet(Strict, Lambda.layout_function, funcid, handler, Lapply app)
-      | false ->
-        (* Needs to be lifted to top level manually here,
-           because functions that contain other function declarations
-           are not inlined by Closure. For example, adding a probe into
-           the body of function foo will prevent foo from being inlined
-           into another function. *)
-        probe_handlers := (funcid, handler)::!probe_handlers;
-        Lapply app
-      end
+      Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler,
+            Lapply app)
     end else begin
       lambda_unit
     end
@@ -1273,6 +1330,20 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
   | Texp_hole _ ->
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
+  | Texp_quotation exp ->
+      Translquote.transl_quote (transl_exp ~scopes sort) exp e.exp_loc
+  (* TODO: update scopes *)
+  | Texp_antiquotation exp ->
+      fatal_errorf
+        "@[Cannot unquote expression outside of a quotation context:@ \
+         %a@]"
+        Pprintast.expression (Untypeast.untype_expression exp)
+  | Texp_eval (_, _sort) ->
+    let loc = of_location ~scopes e.exp_loc in
+    Lprim (Pfield (0, Pointer, Reads_agree), [
+      Lprim
+        (Pgetglobal (Compilation_unit.of_string "Camlinternaleval"), [], loc);
+    ], loc)
 
 and pure_module m =
   match m.mod_desc with
@@ -1433,6 +1504,7 @@ and transl_apply ~scopes
             l
         in
         let id_arg = Ident.create_local "param" in
+        let id_arg_duid = Lambda.debug_uid_none in
         (* Process remaining arguments and build closure *)
         let body =
           let loc = map_scopes enter_partial_or_eta_wrapper loc in
@@ -1454,6 +1526,7 @@ and transl_apply ~scopes
           let layout_arg = layout_of_sort (to_location loc) sort_arg in
           let params = [{
               name = id_arg;
+              debug_uid = id_arg_duid;
               layout = layout_arg;
               attributes = Lambda.default_param_attribute;
               mode = arg_mode
@@ -1465,7 +1538,8 @@ and transl_apply ~scopes
         (* Wrap "protected" definitions, starting from the left,
            so that evaluation is right-to-left. *)
         List.fold_right
-          (fun (id, layout, lam) body -> Llet(Strict, layout, id, lam, body))
+          (fun (id, layout, lam) body ->
+          Llet(Strict, layout, id, Lambda.debug_uid_none, lam, body))
           !defs body
     | Arg (arg, _) :: l ->
       build_apply lam (arg :: args) loc pos ap_mode result_layout l
@@ -1566,6 +1640,7 @@ and transl_tupled_function
         let tparams =
           List.map (fun kind -> {
                 name = Ident.create_local "param";
+                debug_uid = Lambda.debug_uid_none;
                 layout = kind;
                 attributes = Lambda.default_param_attribute;
                 mode = alloc_heap
@@ -1577,11 +1652,67 @@ and transl_tupled_function
             (transl_tupled_cases ~scopes return_sort pats_expr_list) partial
         in
         let region = region || not (may_allocate_in_region body) in
+        add_type_shapes_of_cases cases;
         Some
           ((Tupled, tparams, return_layout, region, return_mode), body)
     with Matching.Cannot_flatten -> None
       end
   | _ -> None
+
+(* For the functions [add_type_shape_of_cases], [add_type_shapes_of_params], and
+   [add_type_shapes_of_patterns] to be correct, we must ensure that at the type
+   tree level, a [debug_uid] is never associated with more than one type
+   expression, because the type expressions determine the debug information we
+   emit for the bound variable associated with the debug uid.
+
+   For example, for:
+
+      let f (x: int list) = x
+
+   the functions below will associate the UID of [x] with [int list] as the type
+   expression.
+*)
+
+and add_type_shapes_of_pattern ~env pattern =
+  if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
+    let var_list = Typedtree.pat_bound_idents_full pattern in
+    List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
+      let type_name = Format.asprintf "%a" Printtyp.type_expr type_expr in
+      Type_shape.add_to_type_shapes var_uid type_expr var_sort ~name:type_name
+        (Env.shape_for_constr env))
+    var_list
+
+(** [add_type_shapes_of_cases] iterates through a given list of cases and
+    associates for each case, the debugging UID of the variable with the type
+    expression of the variable and its sort. *)
+and add_type_shapes_of_cases cases =
+  let add_case (case : Typedtree.value Typedtree.case) =
+    add_type_shapes_of_pattern ~env:case.c_lhs.pat_env case.c_lhs
+  in
+  List.iter add_case cases
+
+(** [add_type_shapes_of_params] iterates through the variables in a function
+    parameter and, for each variable, associates the debugging UID of the
+    variable with the type expression of the variable. *)
+and add_type_shapes_of_params params =
+    let add_param (param : Typedtree.function_param) =
+      let pattern = match param.fp_kind with
+                    | Tparam_pat p -> p
+                    | Tparam_optional_default (p, _, _) -> p
+      in
+      add_type_shapes_of_pattern ~env:pattern.pat_env pattern
+    in
+    List.iter add_param params
+
+(** [add_type_shapes_of_patterns] iterates through the variables in a value
+    binding and, for each variable, associates the debugging UID of the variable
+    with the type expression of the variable. *)
+and add_type_shapes_of_patterns patterns =
+  let add_case (value_binding : Typedtree.value_binding) =
+    add_type_shapes_of_pattern ~env:value_binding.vb_expr.exp_env
+      value_binding.vb_pat
+  in
+  List.iter add_case patterns
 
 and transl_curried_function ~scopes loc repr params body
     ~return_sort ~return_layout ~return_mode ~region ~mode
@@ -1595,12 +1726,14 @@ and transl_curried_function ~scopes loc repr params body
        | Tfunction_body _ -> param_curries
        | Tfunction_cases fc -> param_curries @ [ Final_arg, fc.fc_arg_mode ])
   in
+  add_type_shapes_of_params params;
   let cases_param, body =
     match body with
     | Tfunction_body body ->
         None, event_before ~scopes body (transl_exp ~scopes return_sort body)
     | Tfunction_cases
-        { fc_cases; fc_partial; fc_param; fc_loc; fc_arg_sort; fc_arg_mode }
+        { fc_cases; fc_partial; fc_param; fc_param_debug_uid;
+          fc_loc; fc_arg_sort; fc_arg_mode }
       ->
         let fc_arg_sort = Jkind.Sort.default_for_transl_and_get fc_arg_sort in
         let arg_layout =
@@ -1614,6 +1747,7 @@ and transl_curried_function ~scopes loc repr params body
               layout_of_sort fc_loc fc_arg_sort
         in
         let arg_mode = transl_alloc_mode_l fc_arg_mode in
+        add_type_shapes_of_cases fc_cases;
         let attributes =
           match fc_cases with
           | [ { c_lhs }] -> Translattribute.transl_param_attributes c_lhs
@@ -1621,6 +1755,7 @@ and transl_curried_function ~scopes loc repr params body
         in
         let param =
           { name = fc_param;
+            debug_uid = fc_param_debug_uid;
             layout = arg_layout;
             attributes;
             mode = arg_mode;
@@ -1636,7 +1771,8 @@ and transl_curried_function ~scopes loc repr params body
   let body, params =
     List.fold_right
       (fun fp (body, params) ->
-        let { fp_param; fp_kind; fp_mode; fp_sort; fp_partial; fp_loc } = fp in
+        let { fp_param; fp_param_debug_uid; fp_kind; fp_mode; fp_sort;
+              fp_partial; fp_loc } = fp in
         let arg_env, arg_type, attributes =
           match fp_kind with
           | Tparam_pat pat ->
@@ -1649,6 +1785,7 @@ and transl_curried_function ~scopes loc repr params body
         let arg_mode = transl_alloc_mode_l fp_mode in
         let param =
           { name = fp_param;
+            debug_uid = fp_param_debug_uid;
             layout = arg_layout;
             attributes;
             mode = arg_mode;
@@ -1854,6 +1991,7 @@ and transl_bound_exp ~scopes ~in_structure pat sort expr loc attrs =
 *)
 and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
                rec_flag pat_expr_list =
+  add_type_shapes_of_patterns pat_expr_list;
   match rec_flag with
     Nonrecursive ->
       let rec transl = function
@@ -1871,19 +2009,19 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
           let mk_body = transl rem in
           fun body ->
             Matching.for_let ~scopes ~arg_sort:sort ~return_layout pat.pat_loc
-              lam pat (mk_body body)
+              lam Immutable pat (mk_body body)
       in
       transl pat_expr_list
   | Recursive ->
       let idlist =
         List.map
           (fun {vb_pat=pat} -> match pat.pat_desc with
-              Tpat_var (id,_,_,_) -> id
+              Tpat_var (id,_,uid,_,_) -> id, uid
             | _ -> assert false)
         pat_expr_list in
       let transl_case
             {vb_expr=expr; vb_sort; vb_attributes; vb_rec_kind = rkind;
-             vb_loc; vb_pat} id =
+             vb_loc; vb_pat} (id, id_duid) =
         let vb_sort = Jkind.Sort.default_for_transl_and_get vb_sort in
         let def =
           transl_bound_exp ~scopes ~in_structure vb_pat vb_sort expr vb_loc vb_attributes
@@ -1891,9 +2029,18 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
         let def =
           if add_regions then maybe_region_exp vb_sort expr def else def
         in
-        ( id, rkind, def ) in
+        ( id, id_duid, rkind, def ) in
       let lam_bds = List.map2 transl_case pat_expr_list idlist in
       fun body -> Value_rec_compiler.compile_letrec lam_bds body
+
+and transl_letmutable ~scopes ~return_layout
+      {vb_pat=pat; vb_expr=expr; vb_attributes=attr; vb_loc; vb_sort} body =
+  let arg_sort = Jkind_types.Sort.default_to_value_and_get vb_sort in
+  let lam =
+    transl_bound_exp ~scopes ~in_structure:false pat arg_sort expr vb_loc attr
+  in
+  Matching.for_let ~scopes ~return_layout ~arg_sort pat.pat_loc lam Mutable
+    pat body
 
 and transl_setinstvar ~scopes loc self var expr =
   let ptr_or_imm, _ = maybe_pointer expr in
@@ -1915,10 +2062,10 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     (* Take a shallow copy of the init record, then mutate the fields
        of the copy *)
     let copy_id = Ident.create_local "newrecord" in
+    let copy_id_duid = Lambda.debug_uid_none in
     let update_field cont (lbl, lbl_sort, definition) =
       let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
       (* CR layouts v5: allow more unboxed types here. *)
-      check_record_field_sort lbl.lbl_loc lbl_sort;
       match definition with
       | Kept _ -> cont
       | Overridden (_lid, expr) ->
@@ -1943,26 +2090,21 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                 fatal_error
                   "Mixed inlined records not supported for extensible variants"
             | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+                (* CR layouts v5: once all-void records are allowed, handle
+                  constructors with all-void inline records, which are stored as
+                  immediates *)
             | Record_mixed shape ->
+                let field_shape =
+                  Typeopt.transl_mixed_block_element expr.exp_env expr.exp_loc
+                    expr.exp_type shape.:(lbl.lbl_pos)
+                in
+                let shape = Lambda.transl_mixed_product_shape shape in
+                (* Update the shape with details for the modified field. *)
                 let shape =
-                  Lambda.transl_mixed_product_shape
-                    ~get_value_kind:(fun i ->
-                      if i <> lbl.lbl_num then Lambda.generic_value
-                      else
-                        let pointerness, nullable =
-                          maybe_pointer expr
-                        in
-                        let raw_kind = match pointerness with
-                          | Pointer -> Pgenval
-                          | Immediate -> Pintval
-                        in
-                        Lambda.{ raw_kind; nullable })
-                    shape
-                  in
-
-
+                  Misc.Stdlib.Iarray.update shape lbl.lbl_pos field_shape
+                in
                 Psetmixedfield
-                  (lbl.lbl_pos, shape, Assignment modify_heap)
+                  ([lbl.lbl_pos], shape, Assignment modify_heap)
             | Record_inlined (_, _, Variant_with_null) -> assert false
           in
           Lsequence(Lprim(upd, [Lvar copy_id;
@@ -1974,7 +2116,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
       Jkind.Sort.default_for_transl_and_get init_expr_sort
     in
     assert (is_heap_mode (Option.get mode)); (* Pduprecord must be Alloc_heap and not unboxed *)
-    Llet(Strict, Lambda.layout_block, copy_id,
+    Llet(Strict, Lambda.layout_block, copy_id, copy_id_duid,
          Lprim(Pduprecord (repres, size),
                [transl_exp ~scopes init_expr_sort init_expr],
                of_location ~scopes loc),
@@ -1984,6 +2126,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
        taken from init_expr if any *)
     (* CR layouts v5: allow non-value fields beyond just float# *)
     let init_id = Ident.create_local "init" in
+    let init_id_duid = Lambda.debug_uid_none in
     let lv =
       Iarray.mapi
         (fun i (lbl, lbl_sort, definition) ->
@@ -2020,11 +2163,14 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                     Pfloatfield (i, sem, alloc_heap)
                  | Record_ufloat -> Pufloatfield (i, sem)
                  | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+                   (* CR layouts v5: once all-void records are allowed, handle
+                      constructors with all-void inline records, which are
+                      stored as immediates *)
                  | Record_mixed shape ->
                    let shape =
                      Lambda.transl_mixed_product_shape_for_read
                        ~get_value_kind:(fun i ->
-                         if i <> lbl.lbl_num then Lambda.generic_value
+                         if i <> lbl.lbl_pos then Lambda.generic_value
                          else
                            let pointerness, nullable =
                              maybe_pointer_type env typ
@@ -2040,7 +2186,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                          Lambda.alloc_heap)
                       shape
                    in
-                   Pmixedfield (i, shape, sem)
+                   Pmixedfield ([i], shape, sem)
                  | Record_inlined (_, _, Variant_with_null) -> assert false
                in
                Lprim(access, [Lvar init_id],
@@ -2071,11 +2217,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             Lconst(Const_float_block(List.map extract_float cl))
         | Record_mixed shape ->
             if !Clflags.native_code then
-              let shape =
-                Lambda.transl_mixed_product_shape
-                  ~get_value_kind:(fun _i -> Lambda.generic_value)
-                  shape
-              in
+              let shape = Lambda.transl_mixed_product_shape shape in
               Lconst(Const_mixed_block(0, shape, cl))
             else
               (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -2126,19 +2268,14 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_inlined (Ordinary _, _, Variant_extensible) ->
             assert false
         | Record_mixed shape ->
-            let shape =
-              Lambda.transl_mixed_product_shape
-                ~get_value_kind:(fun _i -> Lambda.generic_value)
-                shape
-            in
+            let shape = Lambda.transl_mixed_product_shape shape in
             Lprim (Pmakemixedblock (0, mut, shape, Option.get mode), ll, loc)
         | Record_inlined (Ordinary { runtime_tag },
                           Constructor_mixed shape, Variant_boxed _) ->
-            let shape =
-              Lambda.transl_mixed_product_shape
-                ~get_value_kind:(fun _i -> Lambda.generic_value)
-                shape
-            in
+            (* CR layouts v5: once all-void records are allowed, handle
+              constructors with all-void inline records, which are stored as
+              immediates *)
+            let shape = Lambda.transl_mixed_product_shape shape in
             Lprim (Pmakemixedblock (runtime_tag, mut, shape, Option.get mode),
                    ll, loc)
         | Record_inlined (_, _, Variant_with_null) -> assert false
@@ -2150,14 +2287,33 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         let init_expr_sort =
           Jkind.Sort.default_for_transl_and_get init_expr_sort
         in
-        Llet(Strict, Lambda.layout_block, init_id,
+        Llet(Strict, Lambda.layout_block, init_id, init_id_duid,
              transl_exp ~scopes init_expr_sort init_expr, lam)
     end
+
+and transl_atomic_loc ~scopes arg arg_sort lbl repres =
+  let arg = transl_exp ~scopes arg_sort arg in
+  begin match repres with
+  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
+  | Record_float | Record_ufloat
+    ->
+      (* Atomic fields not allowed here *)
+      Misc.fatal_error "Bad lbl_repres for label of atomic_loc"
+  | Record_boxed _
+  | Record_inlined (_, _, ( Variant_boxed _
+                          | Variant_extensible
+                          | Variant_with_null))
+    -> ()
+  end;
+  let field_offset = field_offset_for_label lbl repres in
+  let lbl = Lconst (Const_base (Const_int field_offset)) in
+  (arg, lbl)
 
 and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
   match repres with
   | Record_unboxed_product _ ->
     let init_id = Ident.create_local "init" in
+    let init_id_duid = Lambda.debug_uid_none in
     let shape =
       Iarray.map
         (fun (lbl, lbl_sort, definition) ->
@@ -2193,7 +2349,114 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
       in
       let layout = layout_exp init_expr_sort init_expr in
       let exp = transl_exp ~scopes init_expr_sort init_expr in
-      Llet(Strict, layout, init_id, exp, lam)
+      Llet(Strict, layout, init_id, init_id_duid, exp, lam)
+
+(* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
+and transl_idx ~scopes loc env ba uas =
+  let ua_to_pos (Uaccess_unboxed_field (_, lbl)) =
+    (* erase singleton unboxed products before lambda *)
+    if Iarray.length (Lazy.force lbl.lbl_all) == 1
+    then None
+    else Some lbl.lbl_pos
+  in
+  let uas_path = List.filter_map ua_to_pos uas in
+  begin match ba with
+  | Baccess_block (_, idx) ->
+    let idx = transl_exp ~scopes Jkind.Sort.Const.for_idx idx in
+    begin match uas with
+    | [] -> idx
+    | Uaccess_unboxed_field (_, lbl) :: _ ->
+      (* Preserve the invariant that products have at least two elements *)
+      let base_sort =
+        if Int.equal (Iarray.length (Lazy.force lbl.lbl_all)) 1 then
+          lbl.lbl_sort
+        else
+          Iarray.map (fun lbl -> lbl.lbl_sort) (Lazy.force lbl.lbl_all)
+          |> Misc.Stdlib.Iarray.all_somes
+          |> Option.map
+               (fun sorts -> Jkind.Sort.Const.Product (Iarray.to_list sorts))
+      in
+      let base_sort =
+        match base_sort with
+        | Some base_sort -> base_sort
+        | None -> failwith "TODO after merge"
+      in
+      (* CR layouts v8: this might unnecessarily compute the value kind, which
+         shouldn't be needed for deepening *)
+      let base_layout = layout env lbl.lbl_loc base_sort lbl.lbl_res in
+      let mbe = mixed_block_element_of_layout base_layout in
+      (* [uas_path] is a path into [mbe] *)
+      Lprim (Pidx_deepen (mbe, uas_path), [idx], (of_location ~scopes loc))
+    end
+  | Baccess_field (_id, lbl) ->
+    let repres =
+      match lbl.lbl_repres with
+      | Some repres -> repres
+      | None -> failwith "TODO after merge"
+    in
+    begin match repres with
+    | Record_boxed _
+    | Record_float | Record_ufloat ->
+      (* Assert that all unboxed fields are of singleton records *)
+      List.iter
+        (fun (Uaccess_unboxed_field (_, l)) ->
+            if Iarray.length (Lazy.force l.lbl_all) <> 1 then
+              Misc.fatal_error "Texp_idx: non-singleton unboxed record field \
+                in non-mixed boxed record")
+        uas;
+      Lprim (Pmake_idx_field lbl.lbl_pos, [], (of_location ~scopes loc))
+    | Record_inlined _ | Record_unboxed ->
+      Misc.fatal_error "Texp_idx: unexpected unboxed/inlined record"
+    | Record_mixed shape ->
+      let shape = Lambda.transl_mixed_product_shape shape in
+      (* Check to make sure the gap never overflows.
+         See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
+      let cts =
+        Mixed_product_bytes.Wrt_path.count_shape shape lbl.lbl_pos uas_path
+      in
+      if Option.is_none
+           (Mixed_product_bytes.Wrt_path.offset_and_gap cts)
+      then
+        raise (Error (loc, Block_index_gap_overflow_possible));
+      Lprim (Pmake_idx_mixed_field (shape, lbl.lbl_pos, uas_path), [],
+             (of_location ~scopes loc))
+    end
+  | Baccess_array { mut = _; index_kind; index; base_ty; elt_ty; elt_sort } ->
+    let index_sort, index_kind = match index_kind with
+      | Index_int ->
+        Jkind.Sort.Const.value, Ptagged_int_index
+      | Index_unboxed_int64 ->
+        Jkind.Sort.Const.bits64,
+        Punboxed_or_untagged_integer_index Unboxed_int64
+      | Index_unboxed_int32 ->
+        Jkind.Sort.Const.bits32,
+        Punboxed_or_untagged_integer_index Unboxed_int32
+      | Index_unboxed_int16 ->
+        Jkind.Sort.Const.bits16,
+        Punboxed_or_untagged_integer_index Untagged_int16
+      | Index_unboxed_int8 ->
+        Jkind.Sort.Const.bits8,
+        Punboxed_or_untagged_integer_index Untagged_int8
+      | Index_unboxed_nativeint ->
+        Jkind.Sort.Const.word,
+        Punboxed_or_untagged_integer_index Unboxed_nativeint
+    in
+    let index = transl_exp ~scopes index_sort index in
+    let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
+    let array_kind =
+      array_type_kind ~elt_ty:(Some elt_ty) ~elt_sort:(Some elt_sort) env loc
+        base_ty
+    in
+    let elt_layout = layout env loc elt_sort elt_ty in
+    let mbe = mixed_block_element_of_layout elt_layout in
+    (* CR layouts v8: remove this restriction once we stable sort (within) array
+       elements to place values before non-values, which will likely be done to
+       support striped arrays *)
+    if will_be_reordered mbe then
+      raise (Error (loc, Element_would_be_reordered_in_record));
+    Lprim (Pmake_idx_array (array_kind, index_kind, mbe, uas_path), [index],
+           (of_location ~scopes loc))
+  end
 
 and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
   let return_layout = layout_exp return_sort e in
@@ -2221,11 +2484,11 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
         in
         (* Simplif doesn't like it if binders are not uniq, so we make sure to
            use different names in the value and the exception branches. *)
-        let ids_full = Typedtree.pat_bound_idents_full arg_sort pv in
+        let ids_full = Typedtree.pat_bound_idents_full pv in
         let ids = List.map (fun (id, _, _, _, _) -> id) ids_full in
         let ids_kinds =
-          List.map (fun (id, {Location.loc; _}, ty, _, s) ->
-            id, Typeopt.layout pv.pat_env loc s ty)
+          List.map (fun (id, {Location.loc; _}, ty, duid, s) ->
+            id, duid, Typeopt.layout pv.pat_env loc s ty)
             ids_full
         in
         let vids = List.map Ident.rename ids in
@@ -2265,10 +2528,10 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
      value actions run outside the try..with exception handler.
   *)
   let static_catch scrutinees val_ids handler =
-    let id = Typecore.name_pattern "exn" (List.map fst exn_cases) in
+    let id, id_duid = Typecore.name_pattern "exn" (List.map fst exn_cases) in
     let static_exception_id = next_raise_count () in
     Lstaticcatch
-      (Ltrywith (Lstaticraise (static_exception_id, scrutinees), id,
+      (Ltrywith (Lstaticraise (static_exception_id, scrutinees), id, id_duid,
                  Matching.for_trywith ~scopes ~return_layout e.exp_loc (Lvar id)
                    exn_cases,
                  return_layout),
@@ -2299,8 +2562,8 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
           List.map
             (fun (arg,s) ->
                let layout = layout_exp s arg in
-               let id = Typecore.name_pattern "val" [] in
-               (id, layout), (Lvar id, s, layout))
+               let id, id_duid = Typecore.name_pattern "val" [] in
+               (id, id_duid, layout), (Lvar id, s, layout))
             argl
           |> List.split
         in
@@ -2314,9 +2577,13 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
       Matching.for_function ~scopes ~arg_sort ~arg_layout ~return_layout
         e.exp_loc None (transl_exp ~scopes arg_sort arg) val_cases partial
     | arg, _ :: _ ->
-        let val_id = Typecore.name_pattern "val" (List.map fst val_cases) in
+        let val_id, val_id_duid =
+          Typecore.name_pattern "val" (List.map fst val_cases)
+        in
         let arg_layout = layout_exp arg_sort arg in
-        static_catch [transl_exp ~scopes arg_sort arg] [val_id, arg_layout]
+        static_catch
+          [transl_exp ~scopes arg_sort arg]
+          [val_id, val_id_duid, arg_layout]
           (Matching.for_function ~scopes ~arg_sort ~arg_layout ~return_layout
              e.exp_loc None (Lvar val_id) val_cases partial)
   in
@@ -2326,13 +2593,15 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
        handler, Same_region, return_layout)
   ) classic static_handlers
 
-and transl_letop ~scopes loc env let_ ands param param_sort case case_sort
-      partial =
+and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
+      case_sort partial =
   let rec loop prev_layout prev_lam = function
     | [] -> prev_lam
     | and_ :: rest ->
         let left_id = Ident.create_local "left" in
+        let left_id_duid = Lambda.debug_uid_none in
         let right_id = Ident.create_local "right" in
+        let right_id_duid = Lambda.debug_uid_none in
         let op =
           transl_ident (of_location ~scopes and_.bop_op_name.loc) env
             and_.bop_op_type and_.bop_op_path and_.bop_op_val Id_value
@@ -2350,7 +2619,7 @@ and transl_letop ~scopes loc env let_ ands param param_sort case case_sort
             and_.bop_op_type
         in
         let lam =
-          bind_with_layout Strict (right_id, right_layout) exp
+          bind_with_layout Strict (right_id, right_id_duid, right_layout) exp
             (Lapply{
                ap_loc = of_location ~scopes and_.bop_loc;
                ap_func = op;
@@ -2364,7 +2633,8 @@ and transl_letop ~scopes loc env let_ ands param param_sort case case_sort
                ap_probe=None;
              })
         in
-        bind_with_layout Strict (left_id, prev_layout) prev_lam (loop result_layout lam rest)
+        bind_with_layout Strict (left_id, left_id_duid, prev_layout) prev_lam
+            (loop result_layout lam rest)
   in
   let op =
     transl_ident (of_location ~scopes let_.bop_op_name.loc) env
@@ -2391,7 +2661,8 @@ and transl_letop ~scopes loc env let_ ands param param_sort case case_sort
              ~return_sort:case_sort ~mode:alloc_heap ~return_mode
              loc repr []
              (Tfunction_cases
-                { fc_cases = [case]; fc_param = param; fc_partial = partial;
+                { fc_cases = [case]; fc_param = param;
+                  fc_param_debug_uid = param_debug_uid; fc_partial = partial;
                   fc_loc = ghost_loc; fc_exp_extra = None; fc_attributes = [];
                   fc_arg_mode = Mode.Alloc.disallow_right Mode.Alloc.legacy;
                   fc_arg_sort = param_sort; fc_env = env;
@@ -2481,7 +2752,20 @@ let report_error ppf = function
       fprintf ppf
         "Array comprehensions are not yet supported for arrays of unboxed \
          products."
-
+  | Unboxed_product_in_let_mutable ->
+      fprintf ppf
+        "Mutable lets are not yet supported with unboxed products."
+  | Block_index_gap_overflow_possible ->
+      (* This error message describes a more conservative rule than we actually
+         enforce, see [Lambda.Mixed_product_bytes_wrt_path] *)
+      fprintf ppf
+        "This block index cannot be created because it refers to values@ \
+         and non-values that are separated by 2^16 or more bytes in their@ \
+         block, or could be deepened to such an index."
+  | Element_would_be_reordered_in_record ->
+      fprintf ppf
+        "Block indices into arrays whose element layout contains a@ \
+         non-value before a value are not yet supported."
 let () =
   Location.register_error_of_exn
     (function

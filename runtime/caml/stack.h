@@ -63,8 +63,7 @@
 #ifdef TARGET_amd64
 /* Size of the gc_regs structure, in words.
    See amd64.S and amd64/proc.ml for the indices */
-/* The "*2" is for SIMD */
-#define Wosize_gc_regs (13 /* int regs */ + (16 * 2) /* float regs */)
+#define Wosize_gc_regs (13 /* int regs */ + (32 * 8) /* simd regs */)
 #define Saved_return_address(sp) *((intnat *)((sp) - 8))
 #ifdef WITH_FRAME_POINTERS
 #define First_frame(sp) ((sp) + 16)
@@ -78,8 +77,8 @@
 #ifdef TARGET_arm64
 /* Size of the gc_regs structure, in words.
    See arm64.S and arm64/proc.ml for the indices */
-/* CR-someday mshinwell: update for SIMD */
-#define Wosize_gc_regs (2 + 24 /* int regs */ + 24 /* float regs */)
+/* The "*2" is for SIMD */
+#define Wosize_gc_regs (2 + 24 /* int regs */ + 32*2 /* float regs */)
 #define Saved_return_address(sp) *((intnat *)((sp) - 8))
 #define First_frame(sp) ((sp) + 16)
 #define Saved_gc_regs(sp) (*(value **)((sp) + 24))
