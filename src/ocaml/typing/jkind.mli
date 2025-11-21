@@ -899,3 +899,11 @@ module Debug_printers : sig
     val t : Format.formatter -> 'd Const.t -> unit
   end
 end
+
+(* For Merlin *)
+
+module Error : sig
+  type t
+  
+  exception User_error of Location.t * t
+end

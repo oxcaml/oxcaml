@@ -39,6 +39,7 @@ type type_info =
   | Type of Env.t * Types.type_expr
   | Type_decl of Env.t * Ident.t * Types.type_declaration
   | Type_constr of Env.t * Types.constructor_description
+  | Jkind of Env.t * Types.jkind_lr
   | String of string
 
 type typed_enclosings =
