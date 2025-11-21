@@ -347,11 +347,7 @@ module Instruction_name = struct
     (* base *)
     | NOP
     | ADD
-    | ADC
-    | ADDS
     | SUB
-    | SUBS
-    | SBC
     | MUL
     | DIV
     | AND
@@ -490,11 +486,7 @@ module Instruction_name = struct
     match t with
     | NOP -> "nop"
     | ADD -> "add"
-    | ADC -> "adc"
-    | ADDS -> "adds"
     | SUB -> "sub"
-    | SUBS -> "subs"
-    | SBC -> "sbc"
     | MUL -> "mul"
     | DIV -> "div"
     | AND -> "and"

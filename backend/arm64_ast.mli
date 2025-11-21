@@ -177,11 +177,7 @@ module Instruction_name : sig
     (* base *)
     | NOP
     | ADD
-    | ADC
-    | ADDS
     | SUB
-    | SUBS
-    | SBC
     | MUL
     | DIV
     | AND
