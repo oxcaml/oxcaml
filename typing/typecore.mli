@@ -126,9 +126,11 @@ type module_patterns_restriction =
 val type_binding:
         Env.t -> mutable_flag -> rec_flag ->
           ?force_toplevel:bool ->
+          staticity:Mode.Staticity.r ->
           Parsetree.value_binding list ->
           Typedtree.value_binding list * Env.t
 val type_let:
+        staticity:Mode.Staticity.r ->
         existential_restriction -> Env.t -> mutable_flag -> rec_flag ->
           Parsetree.value_binding list ->
           Typedtree.value_binding list * Env.t

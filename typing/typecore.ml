@@ -534,6 +534,12 @@ let as_single_mode {mode; tuple_modes; _} =
       Value.meet (mode :: l)
   | None -> mode
 
+(** Takes the [pinpoint] of an expression and its expected mode, return the
+[staticity] that controls the expression. *)
+let controls_staticity pp expected_mode =
+  let {monadic; _} = expected_mode |> as_single_mode in
+  monadic |> Value.Monadic.apply_hint (Controls pp) |> Value.Monadic.proj Staticity
+
 let mode_morph f expected_mode =
   let mode = as_single_mode expected_mode in
   let mode = f mode |> Mode.Value.disallow_left in
@@ -701,27 +707,52 @@ type expected_pat_mode =
   { mode : Value.l;
     (** The mode of the current pattern. *)
 
+    branching : bool;
+    (** Does this pattern controls some branching? It's safe (conservative) to
+     set this to [true]. *)
+
+    staticity : Staticity.r;
+    (** The expected staticity of the expression controlled by the pattern
+    match, with [Mode.Hint.Controls] already applied. *)
+
     tuple_modes : Value.l list option;
     (** If the current pattern is [Ppat_tuple], the sub-patterns will have these
         modes. It is sound to ignore this field and get weaker modes. *)
     }
 
-let simple_pat_mode mode =
-  { mode = Value.disallow_right mode; tuple_modes = None }
+let simple_pat_mode ~staticity ?(branching=false) mode =
+  let mode = Value.disallow_right mode in
+  let staticity = Staticity.disallow_left staticity in
+  { mode; tuple_modes = None; branching; staticity }
 
-let tuple_pat_mode mode tuple_modes =
+let tuple_pat_mode ~staticity ?(branching=false) mode tuple_modes =
   let mode = Value.disallow_right mode in
   let tuple_modes = Some (Value.List.disallow_right tuple_modes) in
-  { mode; tuple_modes }
+  let staticity = Staticity.disallow_left staticity in
+  { mode; tuple_modes; staticity; branching }
 
-let global_pat_mode {mode; _}=
+let global_pat_mode ~staticity ?(branching=false) {mode; _}=
   let mode =
     mode
     |> Value.meet_with Areality Regionality.Const.Global
     |> Value.meet_with Forkable Forkable.Const.Forkable
     |> Value.meet_with Yielding Yielding.Const.Unyielding
   in
-  simple_pat_mode mode
+  simple_pat_mode ~staticity ~branching mode
+
+let pattern_is_partial ~loc ({mode; staticity; branching; _}) =
+  if branching then
+    (* If there is a branching controlled by the current pattern, and the
+       current pattern is partial, then the staticity of the branching outcome
+       will depend on the staticity of the value being matched by the pattern.
+       *)
+    Staticity.submode_err (loc, Pattern)
+      (mode |> Value.proj_monadic Staticity)
+      staticity
+  else
+    (* Otherwise, the cases list is non-exhaustive and might raise exception,
+    which is not tracked by staticity *)
+    ()
 
 let allocations : Alloc.r list ref = Local_store.s_ref []
 
@@ -1723,7 +1754,8 @@ let solve_Ppat_tuple ~refine ~alloc_mode loc env args expected_ty =
         ( label,
           p,
           newgenvar (Jkind.Builtin.value_or_null ~why:Tuple_element),
-          simple_pat_mode mode ))
+          simple_pat_mode ~staticity:alloc_mode.staticity
+            ~branching:alloc_mode.branching mode ))
       args arg_modes
   in
   let ty = newgenty (Ttuple (List.map (fun (lbl, _, t, _) -> lbl, t) ann)) in
@@ -1757,7 +1789,7 @@ let solve_Ppat_unboxed_tuple ~refine ~alloc_mode loc env args expected_ty =
         ( label,
           p,
           newgenvar jkind,
-          simple_pat_mode mode,
+          simple_pat_mode ~staticity:alloc_mode.staticity mode,
           sort
         ))
       args arg_modes
@@ -2800,6 +2832,8 @@ and type_pat_aux
   let type_pat tps category ?(alloc_mode=alloc_mode) ?(penv=penv) =
     type_pat tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv
   in
+  let simple_pat_mode x = simple_pat_mode ~staticity:alloc_mode.staticity ~branching:alloc_mode.branching x in
+  let global_pat_mode x = global_pat_mode ~staticity:alloc_mode.staticity ~branching:alloc_mode.branching x in
   let loc = sp.ppat_loc in
   let solve_expected (x : pattern) : pattern =
     unify_pat ~sdesc_for_hint:sp.ppat_desc !!penv x (instance expected_ty);
@@ -3086,6 +3120,7 @@ and type_pat_aux
             pat_env = !!penv;
             pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_constant cst ->
+      pattern_is_partial ~loc alloc_mode;
       let cst = constant_or_raise !!penv loc cst in
       rvp @@ solve_expected {
         pat_desc = Tpat_constant cst;
@@ -3095,6 +3130,7 @@ and type_pat_aux
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_interval (l, r) ->
+      pattern_is_partial ~loc alloc_mode;
       let expand_interval lo hi ~make =
         let open Ast_helper.Pat in
         let gloc = Location.ghostify loc in
@@ -3146,6 +3182,8 @@ and type_pat_aux
           (Constructor.disambiguate Env.Pattern lid !!penv expected_type)
           candidates
       in
+      if constr.cstr_consts + constr.cstr_nonconsts > 1 then
+        pattern_is_partial ~loc alloc_mode;
       begin match no_existentials, constr.cstr_existentials with
       | None, _ | _, [] -> ()
       | Some r, (_ :: _) ->
@@ -3249,6 +3287,7 @@ and type_pat_aux
             pat_env = !!penv;
             pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_variant(tag, sarg) ->
+      pattern_is_partial ~loc alloc_mode;
       assert (tag <> Parmatch.some_private_tag);
       let constant = (sarg = None) in
       let arg_type, row, pat_type =
@@ -3275,6 +3314,7 @@ and type_pat_aux
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_record_pat Unboxed_product lid_sp_list closed
   | Ppat_array (mut, spl) ->
+      pattern_is_partial ~loc alloc_mode;
       let mut =
         match mut with
         | Mutable  -> Mutable {
@@ -3297,7 +3337,8 @@ and type_pat_aux
       let env1, p1, env2, p2 =
         with_local_level begin fun () ->
           let type_pat_rec tps penv sp =
-            type_pat tps category sp expected_ty sort ~penv
+            let alloc_mode = {alloc_mode with branching = true} in
+            type_pat ~alloc_mode tps category sp expected_ty sort ~penv
           in
           let penv1 =
             Pattern_env.copy ~equations_scope:(get_current_level ()) penv in
@@ -3391,6 +3432,11 @@ and type_pat_aux
       { p with pat_extra = (Tpat_open (path,lid,new_env),
                                 loc, sp.ppat_attributes) :: p.pat_extra }
   | Ppat_exception p ->
+      (* Since [ppat_exception] must be mixed with regular patterns, the outcome
+         of the case list must be [dynamic]. *)
+      Staticity.submode_err (loc, Pattern)
+        (Staticity.of_const ~hint:(Always_dynamic Ppat_exception) Dynamic)
+        alloc_mode.staticity;
       let alloc_mode = simple_pat_mode Value.legacy in
       let p_exn =
         type_pat tps Value ~alloc_mode p Predef.type_exn
@@ -3456,7 +3502,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
     with_local_level_if_principal begin fun () ->
       let tps = create_type_pat_state Modules_rejected in
       let nv = newvar (Jkind.Builtin.value ~why:Class_term_argument) in
-      let alloc_mode = simple_pat_mode Value.legacy in
+      let alloc_mode = simple_pat_mode ~staticity:Staticity.legacy Value.legacy in
       let equations_scope = get_current_level () in
       let new_penv = Pattern_env.make val_env
           ~equations_scope ~allow_recursive_equations:false in
@@ -3521,7 +3567,7 @@ let type_self_pattern env spat =
   let spat = Pat.mk(Ppat_alias (spat, mknoloc "selfpat-*")) in
   let tps = create_type_pat_state Modules_rejected in
   let nv = newvar (Jkind.Builtin.value ~why:Object) in
-  let alloc_mode = simple_pat_mode Value.legacy in
+  let alloc_mode = simple_pat_mode ~staticity:Staticity.legacy Value.legacy in
   let equations_scope = get_current_level () in
   let new_penv = Pattern_env.make env
       ~equations_scope ~allow_recursive_equations:false in
@@ -3735,7 +3781,7 @@ let rec check_counter_example_pat
     check_counter_example_pat ~info ~penv type_pat_state in
   let loc = tp.pat_loc in
   let refine = true in
-  let alloc_mode = simple_pat_mode Value.min in
+  let alloc_mode = simple_pat_mode ~staticity:Staticity.max Value.min in
   let solve_expected (x : pattern) : pattern =
     unify_pat_types_refine ~refine x.pat_loc penv x.pat_type
       (instance expected_ty);
@@ -5532,7 +5578,8 @@ let split_function_ty
     end
   in
   let arg_value_mode = alloc_to_value_l2r arg_mode in
-  let expected_pat_mode = simple_pat_mode arg_value_mode in
+  let staticity = expected_inner_mode |> controls_staticity (loc, Function_return) in
+  let expected_pat_mode = simple_pat_mode ~staticity arg_value_mode in
   let type_sort ~why ty =
     match Ctype.type_sort ~why ~fixed:false env ty with
     | Ok sort -> sort
@@ -5669,24 +5716,25 @@ let vb_pat_constraint
   in
   vb.pvb_attributes, spat
 
-let pat_modes ~force_toplevel rec_mode_var (attrs, spat) =
+let pat_modes ~force_toplevel ~staticity rec_mode_var (attrs, spat) =
+  let branching = false in
   let pat_mode, exp_mode =
     if force_toplevel
-    then simple_pat_mode Value.legacy, mode_legacy
+    then simple_pat_mode ~staticity ~branching Value.legacy, mode_legacy
     else match rec_mode_var with
     | None -> begin
         match pat_tuple_arity spat with
         | Not_local_tuple | Maybe_local_tuple ->
             let mode = Value.newvar () in
-            simple_pat_mode mode, mode_default mode
+            simple_pat_mode ~staticity ~branching mode, mode_default mode
         | Local_tuple locs ->
             let modes = List.map (fun loc -> Value.newvar (), loc) locs in
             let modes_pat = List.map fst modes in
             let mode = Value.newvar () in
-            tuple_pat_mode mode modes_pat, mode_tuple mode modes
+            tuple_pat_mode ~staticity ~branching mode modes_pat, mode_tuple mode modes
       end
     | Some mode ->
-        simple_pat_mode mode, mode_default mode
+        simple_pat_mode ~staticity ~branching mode, mode_default mode
   in
   attrs, pat_mode, exp_mode, spat
 
@@ -6143,6 +6191,7 @@ and type_expect_
          pexp_desc = Pexp_match (sval, [Ast_helper.Exp.case spat sbody])}
         ty_expected_explained
   | Pexp_let(mutable_flag, rec_flag, spat_sexp_list, sbody) ->
+      let staticity = controls_staticity (loc, Expression) expected_mode in
       let restriction = match rec_flag with
         | Recursive -> Some In_rec
         | Nonrecursive -> None
@@ -6171,7 +6220,7 @@ and type_expect_
             else Modules_rejected
           in
           let (pat_exp_list, new_env) =
-            type_let existential_context env mutable_flag rec_flag
+            type_let ~staticity existential_context env mutable_flag rec_flag
               spat_sexp_list allow_modules
           in
           let body =
@@ -6279,6 +6328,9 @@ and type_expect_
   | Pexp_apply(sfunct, sargs) ->
       (* See Note [Type-checking applications] *)
       assert (sargs <> []);
+      Staticity.submode_err (loc, Expression)
+        (Dynamic |> Staticity.of_const ~hint:(Always_dynamic Pexp_apply))
+        (expected_mode |> as_single_mode |> Value.proj_monadic Staticity);
       let pm = position_and_mode env expected_mode sexp in
       let funct_mode =
         match pm.apply_position with
@@ -6370,16 +6422,18 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_match(sarg, caselist) ->
+      let staticity = controls_staticity (loc, Expression) expected_mode in
+      let branching = false in
       let arg_pat_mode, arg_expected_mode =
         match cases_tuple_arity caselist with
         | Not_local_tuple | Maybe_local_tuple ->
           let mode = Value.newvar () in
-          simple_pat_mode mode, mode_default mode
+          simple_pat_mode ~staticity ~branching mode, mode_default mode
         | Local_tuple locs ->
           let modes = List.map (fun loc -> Value.newvar (), loc) locs in
           let modes_pat = List.map fst modes in
           let mode = Value.newvar () in
-          tuple_pat_mode mode modes_pat, mode_tuple mode modes
+          tuple_pat_mode ~staticity ~branching mode modes_pat, mode_tuple mode modes
       in
       let arg, sort =
         with_local_level begin fun () ->
@@ -6406,11 +6460,17 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_try(sbody, caselist) ->
+      let staticity =
+        expected_mode |> as_single_mode |> Value.proj_monadic Staticity
+      in
+      Staticity.(submode_err (loc, Expression)
+        (of_const ~hint:(Always_dynamic Pexp_try) Dynamic)
+        staticity);
       let body =
         type_expect env (mode_trywith expected_mode)
           sbody ty_expected_explained
       in
-      let arg_mode = simple_pat_mode Value.legacy in
+      let arg_mode = simple_pat_mode ~staticity ~branching:false Value.legacy in
       let cases, _ =
         type_cases Value env arg_mode expected_mode
           Predef.type_exn Jkind.Sort.(of_const Const.for_exception)
@@ -6752,8 +6812,13 @@ and type_expect_
       exp_attributes = sexp.pexp_attributes;
       exp_env = env }
   | Pexp_ifthenelse(scond, sifso, sifnot) ->
+      let mode_cond =
+        controls_staticity (loc, Expression) expected_mode
+        |> Value.max_with_monadic Staticity
+        |> mode_default
+      in
       let cond =
-        type_expect env mode_max scond
+        type_expect env mode_cond scond
           (mk_expected ~explanation:If_conditional Predef.type_bool)
       in
       begin match sifnot with
@@ -7304,7 +7369,7 @@ and type_expect_
       let scase = Ast_helper.Exp.case spat_params sbody in
       let cases, partial =
         type_cases Value body_env
-          (simple_pat_mode Value.legacy) (mode_return Value.legacy)
+          (simple_pat_mode ~staticity:Staticity.legacy ~branching:false Value.legacy) (mode_return Value.legacy)
           ty_params param_sort (mk_expected ty_func_result)
           ~check_if_total:true loc [scase]
       in
@@ -9592,9 +9657,10 @@ and map_half_typed_cases
       let pattern_force = ref [] in
       (*  Format.printf "@[%i %i@ %a@]@." lev (get_current_level())
           Printtyp.raw_type_expr ty_arg; *)
+      let n = List.length caselist in
       let half_typed_cases =
-        List.map
-        (fun ({ Parmatch.pattern; _ } as untyped_case, case_data) ->
+        List.mapi
+        (fun i ({ Parmatch.pattern; _ } as untyped_case, case_data) ->
           let htc =
             with_local_level_if_principal begin fun () ->
               let ty_arg =
@@ -9602,8 +9668,14 @@ and map_half_typed_cases
                 with_local_level ~post:generalize_structure
                   (fun () -> instance ?partial:take_partial_instance ty_arg)
               in
+              let alloc_mode =
+                if i < n - 1 then
+                  {pat_mode with branching = true}
+                else
+                  pat_mode
+              in
               let (pat, ext_env, force, pvs, mvs) =
-                type_pattern category ~lev ~alloc_mode:pat_mode env pattern
+                type_pattern category ~lev ~alloc_mode env pattern
                   ty_arg sort_arg allow_modules
               in
               pattern_force := force @ !pattern_force;
@@ -9945,7 +10017,7 @@ and type_function_cases_expect
 
 (* Typing of let bindings *)
 
-and type_let ?check ?check_strict ?(force_toplevel = false)
+and type_let ?check ?check_strict ?(force_toplevel = false) ~staticity
     existential_context env mutable_flag rec_flag spat_sexp_list allow_modules =
   let rec sexp_is_fun sexp =
     match sexp.pexp_desc with
@@ -9973,7 +10045,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
     | Nonrecursive -> None
   in
   let spatl = List.map vb_pat_constraint spat_sexp_list in
-  let spatl = List.map (pat_modes ~force_toplevel rec_mode_var) spatl in
+  let spatl = List.map (pat_modes ~force_toplevel ~staticity rec_mode_var) spatl in
   let attrs_list = List.map (fun (attrs, _, _, _) -> attrs) spatl in
   let is_recursive = (rec_flag = Recursive) in
 
@@ -10837,7 +10909,7 @@ and type_comprehension_iterator
           tps
           Value
           ~no_existentials:In_self_pattern
-          ~alloc_mode:(simple_pat_mode Value.legacy)
+          ~alloc_mode:(simple_pat_mode ~staticity:Staticity.legacy Value.legacy)
           ~mutable_flag:Immutable
           penv
           pattern
@@ -10944,21 +11016,22 @@ let maybe_check_uniqueness_value_bindings vbl =
 
 (* Typing of toplevel bindings *)
 
-let type_binding env mutable_flag rec_flag ?force_toplevel spat_sexp_list =
+let type_binding env mutable_flag rec_flag ?force_toplevel ~staticity spat_sexp_list =
   let (pat_exp_list, new_env) =
     type_let
       ~check:(fun s _ -> Warnings.Unused_value_declaration s)
       ~check_strict:(fun s _ -> Warnings.Unused_value_declaration s)
       ?force_toplevel
+      ~staticity
       At_toplevel
       env mutable_flag rec_flag spat_sexp_list Modules_rejected
   in
   maybe_check_uniqueness_value_bindings pat_exp_list;
   (pat_exp_list, new_env)
 
-let type_let existential_ctx env mutable_flag rec_flag spat_sexp_list =
+let type_let ~staticity existential_ctx env mutable_flag rec_flag spat_sexp_list =
   let (pat_exp_list, new_env) =
-    type_let existential_ctx env mutable_flag rec_flag spat_sexp_list
+    type_let ~staticity existential_ctx env mutable_flag rec_flag spat_sexp_list
       Modules_rejected
   in
   maybe_check_uniqueness_value_bindings pat_exp_list;

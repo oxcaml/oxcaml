@@ -710,6 +710,10 @@ module type S = sig
     val min_with_comonadic :
       'a Comonadic.Axis.t -> ('a, 'l * 'r) mode -> ('l * disallowed) t
 
+    (** [max_with_monadic ax elt] returns [max] but with moandic axis [ax] set to [elt] *)
+    val max_with_monadic :
+      'a Monadic.Axis.t -> ('a, 'r * 'l) mode -> (disallowed * 'r) t
+
     val meet_with : 'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 
     val join_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t

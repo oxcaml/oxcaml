@@ -28,6 +28,8 @@ type pinpoint_desc =
   | Object  (** An object declaration *)
   | Loop  (** a loop *)
   | Letop  (** let op *)
+  | Pattern  (** a pattern*)
+  | Function_return  (** the return of a function *)
 
 (** A pinpoint is a location in the source code, accompanied by additional description *)
 type pinpoint = Location.t * pinpoint_desc
@@ -35,6 +37,11 @@ type pinpoint = Location.t * pinpoint_desc
 type mutable_part =
   | Record_field of string
   | Array_elements
+
+type always_dynamic =
+  | Pexp_apply
+  | Ppat_exception
+  | Pexp_try
 
 (** Hint for a constant bound. See [Mode.Report.print_const] for what each non-trivial constructor means. *)
 type 'd const =
@@ -50,6 +57,7 @@ type 'd const =
   | Function_return : (disallowed * 'r) pos const
   | Stack_expression : ('l * disallowed) pos const
   | Module_allocated_on_heap : (disallowed * 'r) pos const
+  | Always_dynamic : always_dynamic -> ('l * disallowed) neg const
   | Is_used_in : pinpoint -> (disallowed * 'r) const
       (** A variant of [Is_closed_by] where the closure mode is constant.
         INVARIANT: The [pinpoint] cannot be [Unknown]. *)
@@ -122,5 +130,7 @@ type 'd morph =
   | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph
   | Is_contained_by : ('l * 'r, 'd) polarity * is_contained_by -> 'd morph
   | Contains_r : (disallowed * 'r, 'd) polarity * contains -> 'd morph
+  | Controls : pinpoint -> (disallowed * 'r) neg morph
+  | Is_controlled_by : pinpoint -> ('l * disallowed) neg morph
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]

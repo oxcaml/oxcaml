@@ -3414,8 +3414,13 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
           end;
         Tstr_eval (expr, sort, attrs), [], shape_map, env
     | Pstr_value (rec_flag, sdefs) ->
+        let staticity =
+          md_mode |> Value.proj_monadic Staticity |> Staticity.disallow_left
+        in
         let (defs, newenv) =
-          Typecore.type_binding env Immutable rec_flag ~force_toplevel sdefs in
+          Typecore.type_binding ~staticity env Immutable rec_flag
+            ~force_toplevel sdefs
+        in
         let defs = match rec_flag with
           | Recursive -> Typecore.annotate_recursive_bindings env defs
           | Nonrecursive -> defs

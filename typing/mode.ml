@@ -61,6 +61,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Is_contained_by (Monadic, { containing; container }) ->
         ( (container, Expression),
           Contains_r (Monadic, { containing; contained = pp }) )
+      | Is_controlled_by pp' -> pp', Controls pp
 
     let right_adjoint :
         type r.
@@ -89,6 +90,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Is_contained_by (Monadic, { containing; container }) ->
         ( (container, Expression),
           Contains_l (Monadic, { containing; contained = pp }) )
+      | Controls pp' -> pp', Is_controlled_by pp
 
     include Magic_allow_disallow (struct
       type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
@@ -109,6 +111,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
          | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
          | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
+         | Controls x -> Controls x
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
         fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -125,6 +128,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
          | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
          | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
+         | Is_controlled_by x -> Is_controlled_by x
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
         fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -148,6 +152,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
          | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
          | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
+         | Controls x -> Controls x
+         | Is_controlled_by x -> Is_controlled_by x
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
         fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -171,6 +177,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
          | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
          | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
+         | Controls x -> Controls x
+         | Is_controlled_by x -> Is_controlled_by x
     end)
   end
 
@@ -207,6 +215,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Function_return -> Function_return
          | Module_allocated_on_heap -> Module_allocated_on_heap
          | Is_used_in pp -> Is_used_in pp
+         | Always_dynamic x -> Always_dynamic x
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
         fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -224,6 +233,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Stack_expression -> Stack_expression
          | Module_allocated_on_heap -> Module_allocated_on_heap
          | Is_used_in pp -> Is_used_in pp
+         | Always_dynamic x -> Always_dynamic x
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
         fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -241,6 +251,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Stack_expression -> Stack_expression
          | Module_allocated_on_heap -> Module_allocated_on_heap
          | Is_used_in pp -> Is_used_in pp
+         | Always_dynamic x -> Always_dynamic x
     end)
   end
 end
@@ -2070,6 +2081,14 @@ module Report = struct
     | Object -> Some (print_article_noun Vowel "object")
     | Loop -> Some (print_article_noun Consonant "loop")
     | Letop -> Some (print_article_noun Consonant "letop")
+    | Pattern -> Some (print_article_noun Consonant "pattern")
+    | Function_return ->
+      Some (
+        fun ~definite ~capitalize ->
+          dprintf "%t of %t"
+          (print_article_noun ~definite:true ~capitalize Consonant "return")
+          (print_article_noun ~definite ~capitalize:false Consonant "function"))
+
 
   let print_pinpoint : pinpoint -> _ =
    fun (loc, desc) ->
@@ -2138,6 +2157,14 @@ module Report = struct
       let print_pp = print_pinpoint pp |> Option.get in
       fprintf ppf "it is used in %t"
         (print_pp ~definite:false ~capitalize:false)
+    | Always_dynamic x ->
+        let s =
+          match x with
+          | Pexp_apply -> "function applications"
+          | Pexp_try -> "try clauses"
+          | Ppat_exception -> "exception patterns"
+        in
+        fprintf ppf "%s are always dynamic" s
 
   let print_allocation_l : allocation -> formatter -> unit =
    fun { txt; loc } ->
@@ -2249,6 +2276,17 @@ module Report = struct
     | Contains_r (_, contains) -> print_contains contains
     | Is_contained_by (_, is_contained_by) ->
       Some (print_is_contained_by is_contained_by)
+    | Controls pp ->
+      print_pinpoint pp
+      |> Option.map (fun print_pp ->
+             ( dprintf "controls %t" (print_pp ~definite:true ~capitalize:false),
+               pp ))
+    | Is_controlled_by pp ->
+      print_pinpoint pp
+      |> Option.map (fun print_pp ->
+             ( dprintf "is controlled by %t"
+                 (print_pp ~definite:true ~capitalize:false),
+               pp ))
 
   let print_mode :
       type a. [`Actual | `Expected] -> a C.obj -> formatter -> a -> unit =
@@ -2299,8 +2337,8 @@ module Report = struct
   let is_rigid : type l r. (l * r) morph -> bool = function
     | Unknown -> true
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
-    | Contains_l _ | Contains_r _ | Is_contained_by _
-    | Adj_captured_by_partial_application ->
+    | Contains_l _ | Contains_r _ | Is_contained_by _ | Controls _
+    | Is_controlled_by _ | Adj_captured_by_partial_application ->
       true
     | Allocation_r _ | Allocation_l _ | Skip | Crossing | Unknown_non_rigid ->
       false
@@ -3214,6 +3252,9 @@ module Monadic = struct
   let min_with ax m =
     Solver.apply Obj.obj (Max_with ax) (Solver.disallow_left m)
 
+  let max_with ax m =
+    Solver.apply ~hint:Skip Obj.obj (Min_with ax) (Solver.disallow_right m)
+
   let zap_to_legacy m : Const.t =
     let uniqueness = proj Uniqueness m |> Uniqueness.zap_to_legacy in
     let visibility = proj Visibility m |> Visibility.zap_to_legacy in
@@ -3762,6 +3803,13 @@ module Value_with (Areality : Areality) = struct
   let min_with_comonadic ax m =
     let comonadic = Comonadic.min_with ax m in
     let monadic = Monadic.min |> Monadic.disallow_right |> Monadic.allow_left in
+    { comonadic; monadic }
+
+  let max_with_monadic ax m =
+    let monadic = Monadic.max_with ax m in
+    let comonadic =
+      Comonadic.max |> Comonadic.disallow_left |> Comonadic.allow_right
+    in
     { comonadic; monadic }
 
   let join_with ax c { monadic; comonadic } =
