@@ -1658,23 +1658,26 @@ let to_res_with_width loc instr i =
 let emit_simd_sanitize ~address ~instr ~loc ~kind =
   if Config.with_address_sanitizer && !Arch.is_asan_enabled
   then
-    let chunk : Cmm.memory_chunk =
-      (* Conservatively assumes unaligned memory. This means ASAN checks are
-         slower than if we were sure the input address is aligned. *)
+    let chunk : Cmm.memory_chunk option =
       match Simd.loc_memory_width loc with
-      | M8 -> Byte_unsigned
-      | M16 -> Sixteen_unsigned
-      | M32 | M32X | M32Y -> Thirtytwo_unsigned
-      | M64 | M64X | M64Y -> Word_int
-      | M128 -> Onetwentyeight_unaligned
-      | M256 -> Twofiftysix_unaligned
+      | M8 -> Some Byte_unsigned
+      | M16 -> Some Sixteen_unsigned
+      | M32 -> Some Thirtytwo_unsigned
+      | M64 -> Some Word_int
+      (* Conservatively assumes unaligned memory; generates slower checks. *)
+      | M128 -> Some Onetwentyeight_unaligned
+      | M256 -> Some Twofiftysix_unaligned
+      (* We do not sanitize gather/scatter instructions. *)
+      | M32X | M32Y | M64X | M64Y -> None
     in
-    (* CR mslater: sanitize gather *)
-    (* May duplicate dependencies, including anything in [address]. *)
-    let arg = Array.init (Array.length instr.arg) (fun i -> arg instr i) in
-    let res = Array.init (Array.length instr.res) (fun i -> res instr i) in
-    let dependencies = Array.append arg res in
-    Address_sanitizer.emit_sanitize ~dependencies ~instr ~address chunk kind
+    match chunk with
+    | None -> ()
+    | Some chunk ->
+      (* May duplicate dependencies, including anything in [address]. *)
+      let arg = Array.init (Array.length instr.arg) (fun i -> arg instr i) in
+      let res = Array.init (Array.length instr.res) (fun i -> res instr i) in
+      let dependencies = Array.append arg res in
+      Address_sanitizer.emit_sanitize ~dependencies ~instr ~address chunk kind
   else ()
 
 let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
