@@ -56,7 +56,7 @@ module Separability : sig
 
   val to_string : t -> string
 
-  (* CR layouts-scannable: as more axes are ported, consider adding [is_max]
+  (* CR layouts-scannable: As more axes are ported, consider adding [is_max]
      to the [Axis_ops] signature (which helps with printing) *)
   val is_max : t -> bool
 end

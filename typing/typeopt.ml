@@ -409,7 +409,7 @@ let value_kind_of_value_jkind env jkind =
     Jkind.get_externality_upper_bound ~context jkind
   in
   match layout with
-  (* CR layouts-scannable: use scannable axes to improve codegen *)
+  (* CR layouts-scannable: Use scannable axes to improve codegen *)
   | Base (Scannable, _) ->
     value_kind_of_value_with_externality externality_upper_bound
   | Any _

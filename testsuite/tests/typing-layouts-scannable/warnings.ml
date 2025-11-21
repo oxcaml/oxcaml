@@ -52,8 +52,6 @@ Warning 183 [redundant-kind-modifier]: This kind modifier is already implied by 
 type t
 |}]
 
-(* CR layouts-scannable: This should give a warning for a redundant annotation.
-   This logic will come in a _following_ PR! *)
 type t : immediate non_pointer
 [%%expect{|
 Line 1, characters 19-30:
