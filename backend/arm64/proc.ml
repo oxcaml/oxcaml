@@ -469,6 +469,9 @@ let assemble_file infile outfile =
 let has_three_operand_float_ops () = false
 
 let operation_supported : Cmm.operation -> bool = function
+  | Caddi128 | Csubi128 | Cmuli64 _ ->
+    (* CR mslater: restore after the arm DSL is merged *)
+    false
   | Cprefetch _ | Catomic _
   | Creinterpret_cast (V128_of_vec (Vec256 | Vec512) |
                        V256_of_vec _ | V512_of_vec _)
@@ -494,9 +497,6 @@ let operation_supported : Cmm.operation -> bool = function
   | Cdls_get
   | Ctls_get
   | Cpoll
-  | Caddi128
-  | Csubi128
-  | Cmuli64 _
   | Creinterpret_cast (Int_of_value | Value_of_int |
                        Int64_of_float | Float_of_int64 |
                        Float32_of_float | Float_of_float32 |

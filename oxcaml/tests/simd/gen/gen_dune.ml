@@ -152,7 +152,8 @@ let () =
   in
   List.iter make_ops_u ops;
   let tests =
-    [ "int128", enabled_if_main;
+    [ (* CR mslater: restore after the arm DSL is merged *)
+      "int128", enabled_if_main_amd64_not_macos;
       "basic", enabled_if_main;
       "basic_u", enabled_if_main;
       "basic256", enabled_if_main_amd64_not_macos;

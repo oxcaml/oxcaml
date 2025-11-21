@@ -1991,58 +1991,9 @@ let emit_instr i =
          DSL.emit_reg i.arg.(0);
          DSL.emit_reg i.arg.(1)
       |]
-  | Lop (Int128op Iadd128) ->
-    (* Avoids clobbering arguments *)
-    DSL.ins I.ADDS
-      [| DSL.emit_reg reg_tmp1;
-         DSL.emit_reg i.arg.(0);
-         DSL.emit_reg i.arg.(2)
-      |];
-    DSL.ins I.ADC
-      [| DSL.emit_reg i.res.(1);
-         DSL.emit_reg i.arg.(1);
-         DSL.emit_reg i.arg.(3)
-      |];
-    DSL.ins I.MOV [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_tmp1 |]
-  | Lop (Int128op Isub128) ->
-    (* Avoids clobbering arguments *)
-    DSL.ins I.SUBS
-      [| DSL.emit_reg reg_tmp1;
-         DSL.emit_reg i.arg.(0);
-         DSL.emit_reg i.arg.(2)
-      |];
-    DSL.ins I.SBC
-      [| DSL.emit_reg i.res.(1);
-         DSL.emit_reg i.arg.(1);
-         DSL.emit_reg i.arg.(3)
-      |];
-    DSL.ins I.MOV [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_tmp1 |]
-  | Lop (Int128op (Imul64 { signed = true })) ->
-    (* Avoids clobbering arguments *)
-    DSL.ins I.MUL
-      [| DSL.emit_reg reg_tmp1;
-         DSL.emit_reg i.arg.(0);
-         DSL.emit_reg i.arg.(1)
-      |];
-    DSL.ins I.SMULH
-      [| DSL.emit_reg i.res.(1);
-         DSL.emit_reg i.arg.(0);
-         DSL.emit_reg i.arg.(1)
-      |];
-    DSL.ins I.MOV [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_tmp1 |]
-  | Lop (Int128op (Imul64 { signed = false })) ->
-    (* Avoids clobbering arguments *)
-    DSL.ins I.MUL
-      [| DSL.emit_reg reg_tmp1;
-         DSL.emit_reg i.arg.(0);
-         DSL.emit_reg i.arg.(1)
-      |];
-    DSL.ins I.UMULH
-      [| DSL.emit_reg i.res.(1);
-         DSL.emit_reg i.arg.(0);
-         DSL.emit_reg i.arg.(1)
-      |];
-    DSL.ins I.MOV [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_tmp1 |]
+  | Lop (Int128op _) ->
+    (* CR mslater: restore after the arm DSL is merged *)
+    Misc.fatal_error "arm64: got int128 op"
   | Lop (Intop Ipopcnt) ->
     if !Arch.feat_cssc
     then DSL.ins I.CNT [| DSL.emit_reg i.res.(0); DSL.emit_reg i.arg.(0) |]
