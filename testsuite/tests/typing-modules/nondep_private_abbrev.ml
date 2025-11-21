@@ -88,13 +88,13 @@ module DirectPrivEta =
   (functor (X : sig end) -> Priv(X))(struct end);;
 (* CR layouts v2.8: examine the interaction between kinds and nondep. *)
 [%%expect{|
-module DirectPrivEta : sig type t : immutable_data with [ `Foo of t ] end
+module DirectPrivEta : sig type t : immutable_data with t end
 |}]
 
 module DirectPrivEtaUnit =
   (functor (_ : sig end) -> Priv)(struct end)(struct end);;
 [%%expect{|
-module DirectPrivEtaUnit : sig type t : immutable_data with [ `Foo of t ] end
+module DirectPrivEtaUnit : sig type t : immutable_data with t end
 |}]
 
 (*** Test proposed by Jacques in
@@ -150,7 +150,5 @@ module I : functor (X : sig end) -> sig type t = Priv(X).t end
 
 module IndirectPriv = I(struct end);;
 [%%expect{|
->> Fatal error: nondep_supertype not included in original module type
-Uncaught exception: Misc.Fatal_error
-
+module IndirectPriv : sig type t : value mod immutable non_float with int end
 |}]

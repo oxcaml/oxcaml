@@ -71,10 +71,7 @@ val cross_contention : int w @ contended -> unit = <fun>
 
 let don't_cross_portability (x : int w @ nonportable) = use_portable x
 [%%expect{|
-Line 1, characters 69-70:
-1 | let don't_cross_portability (x : int w @ nonportable) = use_portable x
-                                                                         ^
-Error: This value is "nonportable" but is expected to be "portable".
+val don't_cross_portability : int w -> unit = <fun>
 |}]
 
 (* Quality *)
@@ -275,15 +272,7 @@ type trec2 = [ `A | `B of 'a list ] as 'a
 type trec_fails : immutable_data = [ `C | `D of 'a * unit -> 'a ] as 'a
 
 [%%expect{|
-Line 1, characters 0-71:
-1 | type trec_fails : immutable_data = [ `C | `D of 'a * unit -> 'a ] as 'a
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" is
-           immutable_data
-         because it's a polymorphic variant type.
-       But the kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" must be a subkind of
-         immutable_data
-         because of the definition of trec_fails at line 1, characters 0-71.
+type trec_fails = [ `C | `D of 'a * unit -> 'a ] as 'a
 |}]
 
 type trec_succeeds : value mod immutable = [ `C | `D of 'a * unit -> 'a ] as 'a
@@ -295,19 +284,9 @@ type trec_rec_fails : immutable_data =
   [ `X of 'b | `Y of [ `Z of ('a -> 'b) | `W of 'a | `Loop of 'b ] as 'b ] as 'a
 
 [%%expect{|
-Lines 1-2, characters 0-80:
-1 | type trec_rec_fails : immutable_data =
-2 |   [ `X of 'b | `Y of [ `Z of ('a -> 'b) | `W of 'a | `Loop of 'b ] as 'b ] as 'a
-Error: The kind of type "[ `X of
-                            [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ] as 'b
-                        | `Y of 'b ] as 'a" is immutable_data
-         because it's a polymorphic variant type.
-       But the kind of type "[ `X of
-                                [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ]
-                                as 'b
-                            | `Y of 'b ] as 'a" must be a subkind of
-           immutable_data
-         because of the definition of trec_rec_fails at lines 1-2, characters 0-80.
+type trec_rec_fails =
+    [ `X of [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ] as 'b | `Y of 'b ]
+    as 'a
 |}]
 
 type trec_rec_succeeds : value mod immutable =
@@ -324,7 +303,14 @@ type 'a t1 = [< `A of string | `B of int ] as 'a
 type 'a t2 : immediate with 'a t1 = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
 [%%expect{|
 type 'a t1 = 'a constraint 'a = [< `A of string | `B of int ]
-type 'a t2 = C of string constraint 'a = [< `A of string | `B of int ]
+Line 2, characters 0-47:
+2 | type 'a t2 : immediate with 'a t1 = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t2" is immutable_data
+         because it's a boxed variant type.
+       But the kind of type "t2" must be a subkind of
+           immediate with [< `A of string | `B of int ] t1
+         because of the annotation on the declaration of the type t2.
 |}]
 type t3 : immediate with [ `A of string] t1 = C of string  (* should be accepted *)
 (* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
@@ -336,7 +322,14 @@ type 'a t1 = [> `A of string | `B of int ] as 'a
 type 'a t2 : immediate with 'a t1 = C of string  (* should be rejected *)
 [%%expect{|
 type 'a t1 = 'a constraint 'a = [> `A of string | `B of int ]
-type 'a t2 = C of string constraint 'a = [> `A of string | `B of int ]
+Line 2, characters 0-47:
+2 | type 'a t2 : immediate with 'a t1 = C of string  (* should be rejected *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t2" is immutable_data
+         because it's a boxed variant type.
+       But the kind of type "t2" must be a subkind of
+           immediate with [> `A of string | `B of int ] t1
+         because of the annotation on the declaration of the type t2.
 |}]
 type t3 : immediate with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
 (* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
@@ -354,7 +347,13 @@ type t2 : immediate with M1.t = C of string  (* should be rejected, at least unt
 [%%expect{|
 module type S = sig type t = private [< `A of string | `B of int ] end
 module M1 : S
-type t2 = C of string
+Line 7, characters 0-43:
+7 | type t2 : immediate with M1.t = C of string  (* should be rejected, at least until we sort out closed-but-not-static bestness *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t2" is immutable_data
+         because it's a boxed variant type.
+       But the kind of type "t2" must be a subkind of immediate with M1.t
+         because of the annotation on the declaration of the type t2.
 |}]
 
 module M2 : S with type t = [ `A of string ] = struct
@@ -376,7 +375,13 @@ let sneaky (x : (M1.t, [ `A of string ]) eq) = match x with
   end in ()
 [%%expect{|
 type (_, _) eq = Refl : ('a, 'a) eq
-val sneaky : (M1.t, [ `A of string ]) eq -> unit = <fun>
+Line 6, characters 4-47:
+6 |     type t4 : immediate with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t4" is immutable_data
+         because it's a boxed variant type.
+       But the kind of type "t4" must be a subkind of immediate with M1.t
+         because of the annotation on the declaration of the type t4.
 |}]
 
 module type S = sig
@@ -389,7 +394,13 @@ type t2 : immediate with M1.t = C of string  (* should be rejected *)
 [%%expect{|
 module type S = sig type t = private [> `A of string | `B of int ] end
 module M1 : S
-type t2 = C of string
+Line 7, characters 0-43:
+7 | type t2 : immediate with M1.t = C of string  (* should be rejected *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t2" is immutable_data
+         because it's a boxed variant type.
+       But the kind of type "t2" must be a subkind of immediate with M1.t
+         because of the annotation on the declaration of the type t2.
 |}]
 
 module M2 : S with type t = [ `A of string | `B of int ] = struct
@@ -407,5 +418,11 @@ let sneaky (x : (M1.t, [ `A of string | `B of int ]) eq) = match x with
     type t4 : immediate with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
   end in ()
 [%%expect{|
-val sneaky : (M1.t, [ `A of string | `B of int ]) eq -> unit = <fun>
+Line 3, characters 4-47:
+3 |     type t4 : immediate with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t4" is immutable_data
+         because it's a boxed variant type.
+       But the kind of type "t4" must be a subkind of immediate with M1.t
+         because of the annotation on the declaration of the type t4.
 |}]

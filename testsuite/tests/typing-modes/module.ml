@@ -283,7 +283,7 @@ Line 4, characters 19-23:
                        ^^^^
 Error: Modules do not match: sig end (* in a structure at local *)
      is not included in Empty (* in a structure at global *)
-     This escapes its region.
+     Got "local" but expected "global".
 |}]
 
 let _ =
@@ -306,7 +306,7 @@ Error: This application of the functor "F" is ill-typed.
             N : sig end (* in a structure at local *)
           is not included in
             Empty (* in a structure at global *)
-          This escapes its region.
+          Got "local" but expected "global".
 |}]
 
 (* [include] should rebase modalities relative to the current structure *)
@@ -520,6 +520,6 @@ module type S = sig
     @@ portable
 end
 [%%expect{|
-Uncaught exception: File "typing/env.ml", line 2131, characters 13-19: Assertion failed
+Uncaught exception: File "typing/env.ml", line 2159, characters 13-19: Assertion failed
 
 |}]

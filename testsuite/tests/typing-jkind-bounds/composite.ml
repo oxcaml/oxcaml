@@ -164,6 +164,11 @@ let foo (t : _ t @ contended) = use_uncontended t
 (* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
+|}, Principal{|
+Line 1, characters 48-49:
+1 | let foo (t : _ t @ contended) = use_uncontended t
+                                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
@@ -373,6 +378,11 @@ let foo (t : _ t @ contended) = use_uncontended t
 (* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
+|}, Principal{|
+Line 1, characters 48-49:
+1 | let foo (t : _ t @ contended) = use_uncontended t
+                                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -514,9 +524,23 @@ type t = int list list list list
 (***********************************************************************)
 type t : immutable_data = int list list list list list list list list list list list list list list list list list list list list list list list list
 [%%expect {|
-type t =
-    int list list list list list list list list list list list list list list
-    list list list list list list list list list list
+Line 1, characters 0-149:
+1 | type t : immutable_data = int list list list list list list list list list list list list list list list list list list list list list list list list
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "int list list list list list list list list list list
+                        list list list list list list list list list list
+                        list list list list" is
+           immutable_data
+             with int list list list list list list list list list list list list list list
+                  list list list
+         because it's a boxed variant type.
+       But the kind of type "int list list list list list list list list list
+                            list list list list list list list list list list
+                            list list list list list" must be a subkind of
+           immutable_data
+         because of the definition of t at line 1, characters 0-149.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
 |}]
 
 type t = int list list list list list list list list list list list list list list list list list list list list list list list list
@@ -528,7 +552,10 @@ type t =
 
 let foo (t : t @ contended) = use_uncontended t
 [%%expect {|
-val foo : t @ contended -> unit = <fun>
+Line 1, characters 46-47:
+1 | let foo (t : t @ contended) = use_uncontended t
+                                                  ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -571,13 +598,24 @@ Error: This value is "contended" but is expected to be "uncontended".
 type 'a t : immutable_data = Flat | Nested of 'a t t
 (* CR layouts v2.8: This should work once we get proper subsumption. Internal ticket 4770 *)
 [%%expect {|
-type 'a t = Flat | Nested of 'a t t
+Line 1, characters 0-52:
+1 | type 'a t : immutable_data = Flat | Nested of 'a t t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with 'a t t t t t t t t t t t
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
 (* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
-val foo : 'a t @ contended -> unit = <fun>
+Line 1, characters 48-49:
+1 | let foo (t : _ t @ contended) = use_uncontended t
+                                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -607,19 +645,34 @@ type ('a : immutable_data) t : immutable_data = Flat | Nested of 'a t t
 (* CR layouts v2.8: If we can't get this accepted, investigate the terrible
    /2 stuff in the error message. That scares me a bit. *)
 [%%expect {|
-type ('a : immutable_data) t = Flat | Nested of 'a t t
+Line 1, characters 0-71:
+1 | type ('a : immutable_data) t : immutable_data = Flat | Nested of 'a t t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is
+           immutable_data with 'a t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
 (* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
-val foo : int t @ contended -> unit = <fun>
+Line 1, characters 50-51:
+1 | let foo (t : int t @ contended) = use_uncontended t
+                                                      ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
 (* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
-val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
+Line 1, characters 48-49:
+1 | let foo (t : _ t @ contended) = use_uncontended t
+                                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -682,12 +735,18 @@ type 'a t = None | Some of ('a * 'a) t u
 let foo (t : int t @ contended) = use_uncontended t
 (* CR layouts v2.8: this should work when we get tuples working. Internal ticket 4770 *)
 [%%expect {|
-val foo : int t @ contended -> unit = <fun>
+Line 1, characters 50-51:
+1 | let foo (t : int t @ contended) = use_uncontended t
+                                                      ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
 [%%expect {|
-val foo : 'a t @ contended -> unit = <fun>
+Line 1, characters 48-49:
+1 | let foo (t : _ t @ contended) = use_uncontended t
+                                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -708,14 +767,20 @@ type 'a t = None | Some of ('a * 'a) t
 
 let foo (t : _ t @ contended) = use_uncontended t
 [%%expect {|
-val foo : 'a t @ contended -> unit = <fun>
+Line 1, characters 48-49:
+1 | let foo (t : _ t @ contended) = use_uncontended t
+                                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
 (* CR layouts v2.8: this should work, but the recursive expansion
    of with-bounds presumably runs out of fuel and gives up. Internal ticket 4770 *)
 [%%expect {|
-val foo : int t @ contended -> unit = <fun>
+Line 1, characters 50-51:
+1 | let foo (t : int t @ contended) = use_uncontended t
+                                                      ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -737,7 +802,10 @@ type 'a t = Leaf of 'a | Some of ('a * 'a) t
 let foo (t : int t @ contended) = use_uncontended t
 (* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
-val foo : int t @ contended -> unit = <fun>
+Line 1, characters 50-51:
+1 | let foo (t : int t @ contended) = use_uncontended t
+                                                      ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t

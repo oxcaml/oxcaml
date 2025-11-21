@@ -155,18 +155,45 @@ Error: Signature mismatch:
            val y : int ref @@ stateless
            val z : 'a -> 'a
            val x : 'a -> 'a
-         end (* at nonportable *)
+         end (* at stateful *)
        is not included in
          sig
            val y : int ref @@ stateless
            val z : 'a -> 'a
            val x : 'a -> 'a @@ stateless
-         end (* at nonportable *)
+         end (* at stateful *)
        Values do not match:
-         val x : 'a -> 'a (* in a structure at nonportable *)
+         val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
-         val x : 'a -> 'a @@ stateless (* in a structure at nonportable *)
-       The first is "nonportable" but the second is "portable".
+         val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
+       The left-hand side is "stateful"
+       because it contains a usage (of the value "y" at Line 11, characters 29-30)
+       which is expected to be "read_write".
+       However, the right-hand side is "stateless".
+|}, Principal{|
+Lines 8-12, characters 33-5:
+ 8 | .................................struct
+ 9 |     let y = ref 42
+10 |     let z = fun x -> ignore !y; x
+11 |     let x = fun x -> ignore !y; x
+12 |   end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end (* at stateful *)
+       is not included in
+         sig
+           val y : int ref
+           val z : 'a -> 'a
+           val x : 'a -> 'a @@ stateless
+         end (* at stateful *)
+       Values do not match:
+         val x : 'a -> 'a (* in a structure at stateful *)
+       is not included in
+         val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
+       The left-hand side is "stateful"
+       because it contains a usage (of the value "y" at Line 11, characters 29-30)
+       which is expected to be "read_write".
+       However, the right-hand side is "stateless".
 |}]
 
 module Module_type_of_monadic = struct
@@ -218,6 +245,20 @@ module Module_type_nested :
         module N : sig val y : string ref @@ stateless end
       end @@ stateless contended
   end
+|}, Principal{|
+module Module_type_nested :
+  sig
+    module M :
+      sig
+        val x : 'a -> 'a @@ stateless
+        module N : sig val y : string ref end
+      end
+    module M' :
+      sig
+        val x : 'a -> 'a @@ stateless
+        module N : sig val y : string ref end
+      end @@ contended
+  end
 |}]
 
 (* When defaulting, prioritize modes in arrow types over modalities. *)
@@ -262,6 +303,9 @@ end
 [%%expect{|
 module Inclusion_fail :
   sig module M : sig val x : string ref end @@ contended end @@ stateless
+|}, Principal{|
+module Inclusion_fail :
+  sig module M : sig val x : string ref end @@ contended end
 |}]
 
 module Inclusion_fail = struct
@@ -285,7 +329,24 @@ Error: Signature mismatch:
          val x : string ref @@ stateless contended (* in a structure at uncontended *)
        is not included in
          val x : string ref (* in a structure at uncontended *)
-       The first is "contended" but the second is "uncontended".
+       The left-hand side is "contended"
+       but the right-hand side is "uncontended".
+|}, Principal{|
+Lines 4-6, characters 22-5:
+4 | ......................struct
+5 |       let x @ contended = ref "hello"
+6 |   end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val x : string ref @@ contended end (* at uncontended *)
+       is not included in
+         sig val x : string ref end (* at uncontended *)
+       Values do not match:
+         val x : string ref @@ contended (* in a structure at uncontended *)
+       is not included in
+         val x : string ref (* in a structure at uncontended *)
+       The left-hand side is "contended"
+       but the right-hand side is "uncontended".
 |}]
 
 module Inclusion_weakens_monadic = struct
@@ -343,6 +404,8 @@ end
 [%%expect{|
 module Inclusion_match : sig module M : sig val x : int ref end end @@
   stateless
+|}, Principal{|
+module Inclusion_match : sig module M : sig val x : int ref end end
 |}]
 
 (* [foo] closes over [M.x] instead of [M]. This is better ergonomics. *)
@@ -432,7 +495,8 @@ Error: Signature mismatch:
          external length : string -> int = "%string_length" (* in a structure at nonportable *)
        is not included in
          external length : string -> int @@ portable = "%string_length" (* in a structure at nonportable *)
-       The first is "nonportable" but the second is "portable".
+       The left-hand side is "nonportable"
+       but the right-hand side is "portable".
 |}]
 
 module M : sig
@@ -560,7 +624,8 @@ Error: Signature mismatch:
          val f : int -> int (* in a structure at nonportable *)
        is not included in
          val f : int -> int @@ portable (* in a structure at nonportable *)
-       The first is "nonportable" but the second is "portable".
+       The left-hand side is "nonportable"
+       but the right-hand side is "portable".
 |}]
 
 
@@ -650,7 +715,8 @@ Error: Signature mismatch:
          val t : [> `Foo ] @@ stateless nonportable (* in a structure at nonportable *)
        is not included in
          val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@ portable (* in a structure at nonportable *)
-       The first is "nonportable" but the second is "portable".
+       The left-hand side is "nonportable"
+       but the right-hand side is "portable".
 |}]
 
 (* module constraint inclusion check looks at the modes of modules *)
@@ -1409,7 +1475,8 @@ Error: Signature mismatch:
          val f : 'a -> 'a (* in a structure at nonportable *)
        is not included in
          val f : 'a -> 'a @@ portable (* in a structure at nonportable *)
-       The first is "nonportable" but the second is "portable".
+       The left-hand side is "nonportable"
+       but the right-hand side is "portable".
 |}]
 
 module rec M0 : sig
@@ -1436,7 +1503,8 @@ Error: Signature mismatch:
          val f : 'a -> 'a (* in a structure at nonportable *)
        is not included in
          val f : 'a -> 'a (* in a structure at portable *)
-       The first is "nonportable" but the second is "portable".
+       The left-hand side is "nonportable"
+       but the right-hand side is "portable".
 |}]
 
 (* nested signature *)
@@ -1473,5 +1541,6 @@ Error: Signature mismatch:
        is not included in
          sig class foo : object  end end (* at portable *)
        Class declarations foo do not match:
-       First is "nonportable" but second is "portable".
+       First is "nonportable"
+       but second is "portable".
 |}]

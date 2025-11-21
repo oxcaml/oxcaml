@@ -989,7 +989,7 @@ type ('a : immediate) t : value mod global = { mutable x : 'a }
 Line 1, characters 0-63:
 1 | type ('a : immediate) t : value mod global = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod global
          because of the annotation on the declaration of the type t.
@@ -1003,7 +1003,7 @@ type ('a : immediate) t : value mod aliased = { mutable x : 'a }
 Line 1, characters 0-64:
 1 | type ('a : immediate) t : value mod aliased = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod aliased
          because of the annotation on the declaration of the type t.
@@ -1017,7 +1017,7 @@ type ('a : immediate) t : value mod contended = { mutable x : 'a }
 Line 1, characters 0-66:
 1 | type ('a : immediate) t : value mod contended = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod contended
          because of the annotation on the declaration of the type t.
@@ -1031,7 +1031,7 @@ type ('a : immediate) t : value mod external_ = { mutable x : 'a }
 Line 1, characters 0-66:
 1 | type ('a : immediate) t : value mod external_ = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod external_
          because of the annotation on the declaration of the type t.
@@ -1045,7 +1045,7 @@ type ('a : immediate) t : value mod external64 = { mutable x : 'a }
 Line 1, characters 0-67:
 1 | type ('a : immediate) t : value mod external64 = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod external64
          because of the annotation on the declaration of the type t.
@@ -1167,7 +1167,7 @@ Error: The kind of type "t" is value
          because it instantiates an unannotated type parameter of t,
          chosen to have kind value.
        But the kind of type "t" must be a subkind of
-           immutable_data mod global aliased yielding
+           immutable_data mod global aliased yielding unforkable
          because of the annotation on the declaration of the type t.
 |}]
 (* CR layouts v2.8: this could be accepted, if we infer ('a : value mod
@@ -1253,7 +1253,7 @@ type 'a t : value mod global = { x : 'a @@ global }
 Line 1, characters 0-51:
 1 | type 'a t : value mod global = { x : 'a @@ global }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a @@ unyielding
+Error: The kind of type "t" is immutable_data with 'a @@ forkable unyielding
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod global
          because of the annotation on the declaration of the type t.
