@@ -260,7 +260,16 @@ let function_sections = ref false      (* -function-sections *)
 let probes = ref Config.probes         (* -probes *)
 
 let supports_optimized_probes =
-  Config.probes && (String.equal Config.architecture "amd64")
+  Config.probes
+  && match Target_system.architecture () with
+    | X86_64 -> true
+    | IA32
+    | ARM
+    | AArch64
+    | POWER
+    | Z
+    | Riscv -> false
+
 let emit_optimized_probes =
   ref supports_optimized_probes (* -probes-optimized *)
 

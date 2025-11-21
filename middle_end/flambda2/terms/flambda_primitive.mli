@@ -336,7 +336,10 @@ type nullary_primitive =
       { name : string;
         enabled_at_init : bool option
       }
-      (** Returns a boolean saying whether the given tracing probe is enabled. *)
+      (** Returns a boolean saying whether the given tracing probe is enabled.
+          Semaphore initialization code may be emitted as a consequence of
+          seeing this instruction, but the emitter checks that all occurrences
+          of [enabled_at_init] are consistent for a given probe [name]. *)
   | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
       (** Used in classic mode to denote the start of an inlined function body.
           This is then used in to_cmm to correctly add inlined debuginfo. *)

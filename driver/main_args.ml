@@ -334,8 +334,8 @@ let mk_probes_optimized f =
       raise
         (Arg.Bad
           "OCaml has been configured without support for \
-           tracing probes or optimized probes are not supported on the target: \
-           -probes-optimized not available.")
+           tracing probes; or optimized probes are not supported on the \
+           target: -probes-optimized not available.")
     in
     "-probes-optimized", Arg.Unit err, " (option not available)"
 ;;
