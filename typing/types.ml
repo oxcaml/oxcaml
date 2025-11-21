@@ -251,6 +251,8 @@ module Jkind_mod_bounds = struct
 
   let contention_const t = extract_monadic contention t
 
+  let forkable_const t = extract_comonadic forkable t
+
   let yielding_const t = extract_comonadic yielding t
 
   let statefulness_const t = extract_comonadic statefulness t

@@ -3285,10 +3285,22 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
             with
             | Tcoerce_none -> ()
             | _ ->
+                if !Types.ikind_debug then
+                  Format.eprintf
+                    "[nondep-supertype] unexpected coercion@;original=%a@;\
+                     nondep=%a@."
+                    Printtyp.modtype mty_res
+                    Printtyp.modtype nondep_mty;
                 fatal_error
                   "unexpected coercion from original module type to \
                    nondep_supertype one"
             | exception Includemod.Error _ ->
+                if !Types.ikind_debug then
+                  Format.eprintf
+                    "[nondep-supertype] inclusion failure@;original=%a@;\
+                     nondep=%a@."
+                    Printtyp.modtype mty_res
+                    Printtyp.modtype nondep_mty;
                 fatal_error
                   "nondep_supertype not included in original module type"
             end;

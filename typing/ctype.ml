@@ -2476,17 +2476,7 @@ let rec estimate_type_jkind ~expand_component env ty =
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
-     if !Clflags.ikinds
-        && tvariant_not_immediate row
-        && Btype.static_row row
-     then
-       (* Under -ikinds: approximate closed rows as immutable_data with a
-          single with-bound to the whole variant. *)
-       Jkind.Builtin.immutable_data ~why:Polymorphic_variant
-       |> Jkind.add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:ty
-       |> Jkind.mark_best
-     else
-       Jkind.for_boxed_row row
+     Jkind.for_boxed_row row
   | Tunivar { jkind } -> Jkind.disallow_right jkind
   | Tpoly (ty, _) ->
     let context = mk_jkind_context_check_principal_ref env in

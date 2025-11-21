@@ -70,12 +70,15 @@ module Make (V : ORDERED) = struct
     let make_var () = make Unsolved
 
     let make_rigid ~name () =
-      match VMap.find_opt name !rigid_tbl with
-      | Some v -> v
-      | None ->
-        let v = make (Rigid name) in
-        rigid_tbl := VMap.add name v !rigid_tbl;
-        v
+      if V.compare name name <> 0
+      then make (Rigid name)
+      else
+        match VMap.find_opt name !rigid_tbl with
+        | Some v -> v
+        | None ->
+          let v = make (Rigid name) in
+          rigid_tbl := VMap.add name v !rigid_tbl;
+          v
 
     let _id v = v.id
   end

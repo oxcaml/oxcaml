@@ -31,6 +31,7 @@ module Levels : sig
   val level_of_uniqueness_monadic : Mode.Uniqueness.Const.t -> int
   val level_of_portability : Mode.Portability.Const.t -> int
   val level_of_contention_monadic : Mode.Contention.Const.t -> int
+  val level_of_forkable : Mode.Forkable.Const.t -> int
   val level_of_yielding : Mode.Yielding.Const.t -> int
   val level_of_statefulness : Mode.Statefulness.Const.t -> int
   val level_of_visibility_monadic : Mode.Visibility.Const.t -> int
@@ -43,6 +44,7 @@ module Levels : sig
   val uniqueness_of_level_monadic : int -> Mode.Uniqueness.Const.t
   val portability_of_level : int -> Mode.Portability.Const.t
   val contention_of_level_monadic : int -> Mode.Contention.Const.t
+  val forkable_of_level : int -> Mode.Forkable.Const.t
   val yielding_of_level : int -> Mode.Yielding.Const.t
   val statefulness_of_level : int -> Mode.Statefulness.Const.t
   val visibility_of_level_monadic : int -> Mode.Visibility.Const.t

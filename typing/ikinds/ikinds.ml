@@ -1,11 +1,12 @@
 (* This forces ikinds globally on. *)
-Clflags.ikinds := true
+Clflags.ikinds := true;
 
-(* Types.ikind_debug := true *)
+Types.ikind_debug := false
 let enable_crossing = true
 let enable_sub_jkind_l = true
 let enable_sub_or_intersect = false
 let enable_sub_or_error = false
+let reset_constructor_ikind_on_substitution = true
 
 module Ldd = Ikind.Ldd
 
@@ -103,7 +104,7 @@ module JK = struct
             ConstrTbl.add ctx.constr_to_coeffs c (base_node, coeff_nodes);
             let instantiate (name : Ldd.Name.t) : kind =
               match name with
-              | Ldd.Name.Param _ -> Ldd.var (Ldd.rigid name)
+              | Ldd.Name.Param _  | Ldd.Name.Unknown _ -> Ldd.var (Ldd.rigid name)
               | Ldd.Name.Atom { constr = constr'; arg_index } ->
                   if Path.compare constr' c = 0
                   then Ldd.var (Ldd.rigid name)
@@ -248,9 +249,9 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
  fun (ctx : JK.ctx) ->
   ignore context;
   incr kind_of_depth;
-  if !kind_of_depth > 50 then failwith "kind_of_depth too deep" else ();
+  if !kind_of_depth > 500 then failwith "kind_of_depth too deep" else ();
   incr kind_of_counter;
-  if !kind_of_counter > 10000000 then failwith "kind_of_counter too big" else ();
+  if !kind_of_counter > 100000000 then failwith "kind_of_counter too big" else ();
   let res =
     match Types.get_desc ty with
     | Types.Tvar { name = _name; jkind } | Types.Tunivar { name = _name; jkind }
@@ -288,8 +289,8 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
       Ldd.const Axis_lattice.arrow
     | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind_of"
     | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind_of"
-    | Types.Tpoly _ ->
-      Ldd.const Axis_lattice.value
+    | Types.Tpoly (ty, _) ->
+      JK.kind ctx ty
     | Types.Tof_kind jkind ->
       ckind_of_jkind jkind ctx
     | Types.Tobject _ ->
@@ -300,6 +301,9 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
     | Types.Tnil ->
       failwith "Tnil shouldn't appear in kind_of"
       (* Ldd.const Axis_lattice.value *)
+    | Types.Tquote _ | Types.Tsplice _ ->
+      (* Treat quoted/spliced types conservatively as boxed values. *)
+      Ldd.const Axis_lattice.value
     | Types.Tvariant row ->
       if Btype.tvariant_not_immediate row
       then
@@ -316,8 +320,12 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
               Ldd.join acc k)
             base row
         else
-          (* Open row: conservative non-float value (boxed). *)
-          Ldd.const Axis_lattice.nonfloat_value
+          (* Open row: conservative non-float value (boxed) intersected with an
+             unknown rigid so the solver treats it as an unknown element. *)
+          let unknown =
+            Ldd.var (Ldd.rigid (Ldd.Name.fresh_unknown ()))
+          in
+          Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown
       else
         (* All-constant (immediate) polymorphic variant. *)
         Ldd.const Axis_lattice.immediate
@@ -348,28 +356,51 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
   (* We may need to be careful here to look up the right thing: what happens on GADT-installed equations? *)
   match context.lookup_type p with
   | None ->
+    Format.eprintf "ERROR: unknown constructor";
     (* Fallback for unknown constructors: treat them as abstract non-recursive values. *)
     let kind : JK.ckind = fun _ctx -> Ldd.const Axis_lattice.value in
     JK.Ty { args = []; kind; abstract = true }
   | Some decl ->
     (* Here we can switch to using the cached ikind or not. *)
     let fallback () =
+      (* When we have no stored ikind, we go to this fallback and compute. *)
       match decl.type_manifest with
+      | Some body_ty ->
+        (* Concrete: compute kind of body. *)
+        let args = decl.type_params in
+        let kind : JK.ckind =
+         fun ctx ->
+          JK.kind ctx body_ty
+        in
+        JK.Ty { args; kind; abstract = false }
       | None ->
         begin
-        (* No manifest: may still be concrete (record/variant/...). Build
-           ckind. *)
-        match decl.type_kind with
-        | Types.Type_abstract _ ->
+        (* No manifest: may still be "concrete" (record/variant/...). 
+           Build ckind. *)
+        let allow_any_crossing =
+          match decl.type_kind with
+          | Types.Type_record (_, _, umc_opt)
+          | Types.Type_record_unboxed_product (_, _, umc_opt)
+          | Types.Type_variant (_, _, umc_opt) ->
+            Option.is_some umc_opt
+          | Types.Type_abstract _ | Types.Type_open -> false
+        in
+        let use_decl_jkind () = 
           let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
-          JK.Ty { args = decl.type_params; kind; abstract = true }
+          JK.Ty { args = decl.type_params; kind; abstract = true } in
+        match decl.type_kind with
+        | _ when allow_any_crossing -> use_decl_jkind ()
+        | Types.Type_abstract _ -> use_decl_jkind ()
         | Types.Type_record (lbls, rep, _umc_opt) ->
           (* Build from components: base (non-float value) + per-label
              contributions. *)
           let base_lat =
             if has_mutable_label lbls
             then Axis_lattice.mutable_data
-            else Axis_lattice.immutable_data
+            else
+              match rep with
+              | Types.Record_unboxed -> Axis_lattice.immediate
+              | _ -> Axis_lattice.immutable_data
           in
           let relevant_for_shallow = relevance_of_rep (`Record rep) in
           let kind : JK.ckind =
@@ -393,7 +424,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           let base_lat =
             if has_mutable_label lbls
             then Axis_lattice.mutable_data
-            else Axis_lattice.nonfloat_value
+            else Axis_lattice.immediate
           in
           let kind : JK.ckind =
            fun (ctx : JK.ctx) ->
@@ -481,22 +512,20 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           in
           JK.Ty { args = decl.type_params; kind; abstract = false }
         | Types.Type_open ->
+          (* Need to use the stored jkind here in case it is `exn`, which is special *)
+          let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
+          JK.Ty { args = decl.type_params; kind; abstract = false }
+          (* 
+          (* This is the code we'd use otherwise *)
           let kind : JK.ckind =
            fun _ctx ->
-            Ldd.const Axis_lattice.value
+            Ldd.const Axis_lattice.nonfloat_value
           in
-          JK.Ty { args = decl.type_params; kind; abstract = false }
+          JK.Ty { args = decl.type_params; kind; abstract = false } 
+          *)
         end
-      | Some body_ty ->
-        (* Concrete: compute kind of body. *)
-        let args = decl.type_params in
-        let kind : JK.ckind =
-         fun ctx ->
-          JK.kind ctx body_ty
-        in
-        JK.Ty { args; kind; abstract = false }
     in
-    match decl.type_ikind with
+    let ikind = match decl.type_ikind with
     | Types.Constructor_ikind constructor when !Clflags.ikinds ->
       let base, coeffs =
         constructor_ikind_polynomial constructor
@@ -504,10 +533,25 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
       JK.Poly (base, coeffs)
     | Types.No_constructor_ikind reason ->
       (* Print the reason *)
-      ignore reason;
       (*= Format.eprintf "[ikind-miss] %s@." reason; *)
+      ignore reason;
       fallback ()
-    | Types.Constructor_ikind _ -> fallback ()
+    | Types.Constructor_ikind _ -> fallback () in 
+    if !Types.ikind_debug
+    then begin
+      let ikind_msg =
+        match ikind with
+        | JK.Ty _ -> "Ty"
+        | JK.Poly (base, coeffs) ->
+            let coeffs =
+              coeffs |> List.map Ikind.Ldd.pp |> String.concat "; "
+            in
+            Format.asprintf "Poly(base=%s; coeffs=[%s])"
+              (Ikind.Ldd.pp base) coeffs
+      in
+      Format.eprintf "[ikind] %a: %s@." Path.print p ikind_msg
+    end;
+    ikind
 
 (* Package the above into a full evaluation context. *)
 let make_ctx ~(context : Jkind.jkind_context) : JK.ctx =
@@ -577,6 +621,20 @@ let sub_jkind_l ?allow_any_crossing ?origin
       match ik_leq with
       | None -> Ok ()
       | Some violating_axes ->
+        let () =
+          if !Types.ikind_debug
+          then
+            let axes =
+              violating_axes
+              |> List.map Axis_lattice.axis_number_to_axis_packed
+              |> List.map
+                   (fun (Jkind_axis.Axis.Pack ax) -> Jkind_axis.Axis.name ax)
+              |> String.concat ", "
+            in
+            Format.eprintf
+              "[ikind-subjkind] failure on axes: %s@;sub=%a@;super=%a@."
+              axes Jkind.format sub Jkind.format super
+        in
         (* Do not try to adjust allowances; Violation.Not_a_subjkind
            accepts an r-jkind. *)
         let axis_reasons =
@@ -659,22 +717,52 @@ let sub_or_error ?origin:_origin
 
 (** Substitute constructor ikinds according to [lookup] without requiring Env. *)
 
-let rec max_arity_in_type (acc : int Path.Map.t) (ty : Types.type_expr) =
+let rec max_arity_in_jkind (acc : int Path.Map.t) (jkind : _ Types.jkind) =
+  Jkind.With_bounds.to_seq jkind.jkind.with_bounds
+  |> Seq.fold_left (fun acc (ty, _) -> max_arity_in_type acc ty) acc
+
+and max_arity_in_type (acc : int Path.Map.t) (ty : Types.type_expr) =
   let open Types in
   match get_desc ty with
+  | Tvar { jkind; _ } | Tunivar { jkind; _ } ->
+      max_arity_in_jkind acc jkind
   | Tconstr (p, args, _) ->
       let n = List.length args in
       let prev = match Path.Map.find_opt p acc with None -> 0 | Some m -> m in
       let acc = if n > prev then Path.Map.add p n acc else acc in
       List.fold_left max_arity_in_type acc args
-  | Ttuple elts -> List.fold_left (fun a (_, t) -> max_arity_in_type a t) acc elts
-  | Tunboxed_tuple elts -> List.fold_left (fun a (_, t) -> max_arity_in_type a t) acc elts
-  | Tarrow (_, t1, t2, _) -> max_arity_in_type (max_arity_in_type acc t1) t2
-  | Tpoly (t, ts) -> List.fold_left max_arity_in_type (max_arity_in_type acc t) ts
-  | Tobject (t, _) -> max_arity_in_type acc t
-  | Tfield (_, _, t1, t2) -> max_arity_in_type (max_arity_in_type acc t1) t2
-  | Tvar _ | Tunivar _ | Tlink _ | Tsubst _ | Tnil | Tvariant _ | Tpackage _
-  | Tof_kind _ -> acc
+  | Ttuple elts ->
+      List.fold_left
+        (fun a (_, t) -> max_arity_in_type a t) acc elts
+  | Tunboxed_tuple elts ->
+      List.fold_left
+        (fun a (_, t) -> max_arity_in_type a t) acc elts
+  | Tarrow (_, t1, t2, _) ->
+      max_arity_in_type (max_arity_in_type acc t1) t2
+  | Tpoly (t, ts) ->
+      List.fold_left max_arity_in_type (max_arity_in_type acc t) ts
+  | Tobject (t, name) ->
+      let acc = max_arity_in_type acc t in
+      (match !name with
+       | None -> acc
+       | Some (_, tl) -> List.fold_left max_arity_in_type acc tl)
+  | Tfield (_, _, t1, t2) ->
+      max_arity_in_type (max_arity_in_type acc t1) t2
+  | Tvariant row ->
+      let acc = Btype.fold_row max_arity_in_type acc row in
+      max_arity_in_type acc (row_more row)
+  | Tpackage (_, fields) ->
+      List.fold_left
+        (fun acc (_n, t) -> max_arity_in_type acc t) acc fields
+  | Tquote t | Tsplice t -> max_arity_in_type acc t
+  | Tlink t -> max_arity_in_type acc t
+  | Tsubst (t, row_opt) ->
+      let acc = max_arity_in_type acc t in
+      (match row_opt with
+       | None -> acc
+       | Some row -> max_arity_in_type acc row)
+  | Tof_kind jkind -> max_arity_in_jkind acc jkind
+  | Tnil -> acc
 
 let identity_lookup_from_arity_map (arity : int Path.Map.t) (p : Path.t)
     : JK.constr_decl =
@@ -688,7 +776,8 @@ let identity_lookup_from_arity_map (arity : int Path.Map.t) (p : Path.t)
 
 let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
     ~(body : Types.type_expr) : JK.poly * JK.poly list =
-  (* Approximate type-function substitution by evaluating in an identity environment. *)
+  (* Approximate type-function substitution by evaluating in an identity
+     environment. *)
   let arity = max_arity_in_type Path.Map.empty body in
   let lookup p = identity_lookup_from_arity_map arity p in
   let dummy_context =
@@ -710,44 +799,61 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
   Ldd.decompose_linear ~universe:rigid_vars poly
 
 let substitute_decl_ikind_with_lookup
-    ~(lookup : Path.t -> [ `Path of Path.t
-                         | `Type_fun of Types.type_expr list * Types.type_expr ] option)
+    ~(lookup :
+        Path.t ->
+        [ `Path of Path.t
+        | `Type_fun of Types.type_expr list * Types.type_expr ] option)
     (entry : Types.type_ikind) : Types.type_ikind =
   match entry with
   | Types.No_constructor_ikind _ -> entry
+  | Types.Constructor_ikind _ when reset_constructor_ikind_on_substitution ->
+      Types.ikind_reset "ikind substitution reset"
   | Types.Constructor_ikind packed ->
       let payload = packed in
-      let memo : (Path.t, (JK.poly * JK.poly list)) Hashtbl.t = Hashtbl.create 17 in
-      let map_name (name : Ldd.Name.t) : Ldd.node =
+      let memo :
+        (Path.t, (JK.poly * JK.poly list)) Hashtbl.t =
+        Hashtbl.create 17
+      in
+      let rec map_poly (expanding : Path.Set.t) (poly : Ldd.node) : Ldd.node =
+        Ldd.map_rigid (map_name expanding) poly
+      and map_name (expanding : Path.Set.t) (name : Ldd.Name.t) : Ldd.node =
         match name with
         | Ldd.Name.Param _ -> Ldd.var (Ldd.rigid name)
-        | Ldd.Name.Atom { constr = p; arg_index } ->
-            (match lookup p with
-             | None -> Ldd.var (Ldd.rigid name)
-             | Some (`Path q) ->
-                 Ldd.var (Ldd.rigid (Ldd.Name.atomic q arg_index))
-             | Some (`Type_fun _ as tf) ->
-                 let base, coeffs =
-                   match tf with
-                   | `Type_fun (params, body) ->
-                       (* Memoized by [p] to avoid recomputation *)
-                       (match Hashtbl.find_opt memo p with
-                        | Some v -> v
-                        | None ->
-                            let v =
-                              poly_of_type_function_in_identity_env
-                                ~params ~body
-                            in
-                            Hashtbl.add memo p v; v)
-                 in
-                 if arg_index = 0 then base
-                 else
-                   match List.nth_opt coeffs (arg_index - 1) with
-                   | Some k -> k
-                   | None ->
-                       (* Fallback: if coefficient missing, keep original atom *)
-                       Ldd.var (Ldd.rigid name))
+        | Ldd.Name.Unknown _ -> Ldd.var (Ldd.rigid name)
+        | Ldd.Name.Atom { constr = p; arg_index } -> (
+            match lookup p with
+            | None -> Ldd.var (Ldd.rigid name)
+            | Some (`Path q) ->
+                Ldd.var (Ldd.rigid (Ldd.Name.atomic q arg_index))
+            | Some (`Type_fun _ as tf) ->
+                if Path.Set.mem p expanding
+                then Ldd.var (Ldd.rigid name)
+                else
+                  let base_raw, coeffs_raw =
+                    match tf with
+                    | `Type_fun (params, body) ->
+                        (* Memoized by [p] to avoid recomputation *)
+                        (match Hashtbl.find_opt memo p with
+                         | Some v -> v
+                         | None ->
+                             let v =
+                               poly_of_type_function_in_identity_env
+                                 ~params ~body
+                             in
+                             Hashtbl.add memo p v; v)
+                  in
+                  let expanding = Path.Set.add p expanding in
+                  let base = map_poly expanding base_raw in
+                  let coeffs = List.map (map_poly expanding) coeffs_raw in
+                  if arg_index = 0
+                  then base
+                  else
+                    match List.nth_opt coeffs (arg_index - 1) with
+                    | Some k -> k
+                    | None ->
+                        (* Fallback: if coefficient missing, keep original atom *)
+                        Ldd.var (Ldd.rigid name))
       in
-      let base' = Ldd.map_rigid map_name payload.base in
-      let coeffs' = Array.map (Ldd.map_rigid map_name) payload.coeffs in
+      let base' = map_poly Path.Set.empty payload.base in
+      let coeffs' = Array.map (map_poly Path.Set.empty) payload.coeffs in
       Types.Constructor_ikind { base = base'; coeffs = coeffs' }

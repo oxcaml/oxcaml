@@ -1,5 +1,5 @@
 (* TEST
-    flags = "-extension layouts_alpha -ikinds";
+    flags = "-extension layouts_alpha";
     expect;
 *)
 
@@ -474,7 +474,7 @@ type should_fail : immutable_data = [`A of int -> int]
 Line 1, characters 0-54:
 1 | type should_fail : immutable_data = [`A of int -> int]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[ `A of int -> int ]" is immutable_data
+Error: The kind of type "[ `A of int -> int ]" is value mod immutable non_float
          because it's a polymorphic variant type.
        But the kind of type "[ `A of int -> int ]" must be a subkind of
            immutable_data
@@ -487,7 +487,7 @@ Line 1, characters 0-76:
 1 | type should_also_fail : immutable_data = [`A of int -> int | `B of 'a] as 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[ `A of int -> int | `B of 'a ] as 'a" is
-           immutable_data
+           value mod immutable non_float
          because it's a polymorphic variant type.
        But the kind of type "[ `A of int -> int | `B of 'a ] as 'a" must be a subkind of
          immutable_data
@@ -502,7 +502,7 @@ type r
 Line 3, characters 0-62:
 3 | type should_fail_too : immutable_data with r = [`A of int ref]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[ `A of int ref ]" is immutable_data
+Error: The kind of type "[ `A of int ref ]" is mutable_data
          because it's a polymorphic variant type.
        But the kind of type "[ `A of int ref ]" must be a subkind of
            immutable_data with r
@@ -526,7 +526,7 @@ type and_even_this_should_fail : immutable_data = [`A of [`B of int ref]]
 Line 1, characters 0-73:
 1 | type and_even_this_should_fail : immutable_data = [`A of [`B of int ref]]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[ `A of [ `B of int ref ] ]" is immutable_data
+Error: The kind of type "[ `A of [ `B of int ref ] ]" is mutable_data
          because it's a polymorphic variant type.
        But the kind of type "[ `A of [ `B of int ref ] ]" must be a subkind of
            immutable_data

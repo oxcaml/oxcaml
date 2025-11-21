@@ -127,6 +127,7 @@ module Jkind_mod_bounds : sig
   val uniqueness_const : t -> Mode.Uniqueness.Const.t
   val portability_const : t -> Mode.Portability.Const.t
   val contention_const : t -> Mode.Contention.Const.t
+  val forkable_const : t -> Mode.Forkable.Const.t
   val yielding_const : t -> Mode.Yielding.Const.t
   val statefulness_const : t -> Mode.Statefulness.Const.t
   val visibility_const : t -> Mode.Visibility.Const.t

@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension small_numbers -ikinds";
+ flags = "-extension small_numbers";
  expect;
 *)
 
@@ -989,7 +989,7 @@ type ('a : immediate) t : value mod global = { mutable x : 'a }
 Line 1, characters 0-63:
 1 | type ('a : immediate) t : value mod global = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod global
          because of the annotation on the declaration of the type t.
@@ -1003,7 +1003,7 @@ type ('a : immediate) t : value mod aliased = { mutable x : 'a }
 Line 1, characters 0-64:
 1 | type ('a : immediate) t : value mod aliased = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod aliased
          because of the annotation on the declaration of the type t.
@@ -1017,7 +1017,7 @@ type ('a : immediate) t : value mod contended = { mutable x : 'a }
 Line 1, characters 0-66:
 1 | type ('a : immediate) t : value mod contended = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod contended
          because of the annotation on the declaration of the type t.
@@ -1031,7 +1031,7 @@ type ('a : immediate) t : value mod external_ = { mutable x : 'a }
 Line 1, characters 0-66:
 1 | type ('a : immediate) t : value mod external_ = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod external_
          because of the annotation on the declaration of the type t.
@@ -1045,7 +1045,7 @@ type ('a : immediate) t : value mod external64 = { mutable x : 'a }
 Line 1, characters 0-67:
 1 | type ('a : immediate) t : value mod external64 = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ unyielding many
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod external64
          because of the annotation on the declaration of the type t.
@@ -1167,7 +1167,7 @@ Error: The kind of type "t" is value
          because it instantiates an unannotated type parameter of t,
          chosen to have kind value.
        But the kind of type "t" must be a subkind of
-           immutable_data mod global aliased yielding
+           immutable_data mod global aliased yielding unforkable
          because of the annotation on the declaration of the type t.
 |}]
 (* CR layouts v2.8: this could be accepted, if we infer ('a : value mod
@@ -1253,7 +1253,7 @@ type 'a t : value mod global = { x : 'a @@ global }
 Line 1, characters 0-51:
 1 | type 'a t : value mod global = { x : 'a @@ global }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a @@ unyielding
+Error: The kind of type "t" is immutable_data with 'a @@ forkable unyielding
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod global
          because of the annotation on the declaration of the type t.
@@ -1496,13 +1496,7 @@ type 'a t = 'a
 type 'a t : value mod global = 'a
 (* CR jujacobs: this used to be accepted: bounds should propagate to type argument *)
 [%%expect {|
-Line 1, characters 0-33:
-1 | type 'a t : value mod global = 'a
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a" is value
-         because of the definition of t at line 1, characters 0-33.
-       But the kind of type "'a" must be a subkind of value mod global
-         because of the definition of t at line 1, characters 0-33.
+type ('a : value mod global) t = 'a
 |}]
 
 type ('a : immutable_data) t
@@ -1551,7 +1545,7 @@ Line 1, characters 0-21:
     ^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "'a" is value
          because of the definition of t at line 1, characters 0-21.
-       But the layout of type "'a" must be a sublayout of word
+       But the layout of type "'a" must overlap with word
          because of the definition of t at line 1, characters 0-21.
 |}]
 (* CR layouts v2.8: this should be accepted; 'a should be inferred to have kind
@@ -1570,13 +1564,7 @@ type 'a t = private 'a
 type 'a t : value mod global = private 'a
 (* CR jujacobs: this used to be accepted: bounds should propagate to type argument *)
 [%%expect {|
-Line 1, characters 0-41:
-1 | type 'a t : value mod global = private 'a
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a" is value
-         because of the definition of t at line 1, characters 0-41.
-       But the kind of type "'a" must be a subkind of value mod global
-         because of the definition of t at line 1, characters 0-41.
+type ('a : value mod global) t = private 'a
 |}]
 
 type 'a t : word = private 'a
@@ -1586,7 +1574,7 @@ Line 1, characters 0-29:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "'a" is value
          because of the definition of t at line 1, characters 0-29.
-       But the layout of type "'a" must be a sublayout of word
+       But the layout of type "'a" must overlap with word
          because of the definition of t at line 1, characters 0-29.
 |}]
 (* CR layouts v2.8: this should be accepted; 'a should be inferred to have kind
@@ -1887,4 +1875,102 @@ Error: The kind of type "int -> int" is value mod aliased immutable non_float
          because it's a function type.
        But the kind of type "int -> int" must be a subkind of immutable_data
          because of the definition of t at line 1, characters 0-36.
+|}]
+
+type t : value mod contended
+external f : unit -> t @ contended = "%identity"
+let _ : unit -> t = f
+[%%expect {|
+type t : value mod contended
+external f : unit -> t @ contended = "%identity"
+Line 3, characters 20-21:
+3 | let _ : unit -> t = f
+                        ^
+Error: This expression has type "unit -> t @ contended"
+       but an expression was expected of type "unit -> t"
+|}]
+
+type t : value mod contended portable = { bar : exn * bool option * int option * t }
+type q : value mod contended portable = { foo : t }
+[%%expect{|
+type t = { bar : exn * bool option * int option * t; }
+type q = { foo : t; }
+|}]
+
+type ('a : any) t : value mod contended = 
+  { foo : ('b : any). 'b -> int }
+[%%expect{|
+type ('a : any) t = { foo : ('b : any). 'b -> int; }
+|}]
+
+type 'witness wrap : value mod portable with 'witness = { dummy : int }
+[@@unsafe_allow_any_mode_crossing]
+
+module type Derived1 = sig
+  type 'cmp_a comparator_witness : value mod portable with 'cmp_a
+
+  val comparator : 'cmp_a wrap -> 'cmp_a comparator_witness wrap
+end
+
+module T1 : Derived1 = struct
+  type 'cmp_a comparator_witness : value mod portable with 'cmp_a
+
+  let comparator a = { dummy = a.dummy }
+end
+
+module type S_portable = sig
+  type comparator_witness : value mod portable
+
+  val comparator : comparator_witness wrap
+end
+
+module type S = sig
+  type comparator_witness
+
+  val comparator : comparator_witness wrap
+end
+
+module Make_nonportable (A : S) = struct
+  type comparator_witness = A.comparator_witness T1.comparator_witness
+
+  let comparator = T1.comparator A.comparator
+end
+
+module type Result = sig
+  type comparator_witness : value mod portable
+
+  val comparator : comparator_witness wrap @@ portable
+end
+
+module Test (A : S_portable) : Result = struct
+  include Make_nonportable (A)
+end
+[%%expect{|
+type 'witness wrap : value mod portable with 'witness = { dummy : int; }
+[@@unsafe_allow_any_mode_crossing]
+module type Derived1 =
+  sig
+    type 'cmp_a comparator_witness : value mod portable with 'cmp_a
+    val comparator : 'cmp_a wrap -> 'cmp_a comparator_witness wrap
+  end
+module T1 : Derived1
+module type S_portable =
+  sig
+    type comparator_witness : value mod portable
+    val comparator : comparator_witness wrap
+  end
+module type S =
+  sig type comparator_witness val comparator : comparator_witness wrap end
+module Make_nonportable :
+  functor (A : S) ->
+    sig
+      type comparator_witness = A.comparator_witness T1.comparator_witness
+      val comparator : A.comparator_witness T1.comparator_witness wrap
+    end
+module type Result =
+  sig
+    type comparator_witness : value mod portable
+    val comparator : comparator_witness wrap @@ portable
+  end
+module Test : functor (A : S_portable) -> Result
 |}]

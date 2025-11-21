@@ -1,10 +1,9 @@
 (* TEST
  include stdlib_upstream_compatible;
- flags += " -ikinds";
  {
    expect;
  }{
-   flags = " -extension layouts_beta -ikinds";
+   flags = " -extension layouts_beta";
    expect;
  }
 *)

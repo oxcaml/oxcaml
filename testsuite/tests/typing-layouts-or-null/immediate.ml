@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension-universe alpha -ikinds";
+ flags = "-extension-universe alpha";
  expect;
 *)
 
@@ -77,22 +77,12 @@ type should_work = t_immediate_or_null accept_value_or_null
 
 type int_or_null : immediate_or_null = int or_null
 [%%expect{|
-Line 1, characters 0-50:
-1 | type int_or_null : immediate_or_null = int or_null
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "int or_null" is value_or_null mod everything
-         because it is the primitive type or_null.
-       But the kind of type "int or_null" must be a subkind of
-           immediate_or_null
-         because of the definition of int_or_null at line 1, characters 0-50.
+type int_or_null = int or_null
 |}]
 
 type should_work = int_or_null accept_immediate_or_null
 [%%expect{|
-Line 1, characters 19-30:
-1 | type should_work = int_or_null accept_immediate_or_null
-                       ^^^^^^^^^^^
-Error: Unbound type constructor "int_or_null"
+type should_work = int_or_null accept_immediate_or_null
 |}]
 
 type should_work = int or_null accept_immediate_or_null

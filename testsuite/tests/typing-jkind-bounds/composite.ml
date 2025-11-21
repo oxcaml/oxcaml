@@ -1,5 +1,4 @@
 (* TEST
-    flags += " -ikinds";
     expect;
 *)
 
@@ -514,9 +513,23 @@ type t = int list list list list
 (***********************************************************************)
 type t : immutable_data = int list list list list list list list list list list list list list list list list list list list list list list list list
 [%%expect {|
-type t =
-    int list list list list list list list list list list list list list list
-    list list list list list list list list list list
+Line 1, characters 0-149:
+1 | type t : immutable_data = int list list list list list list list list list list list list list list list list list list list list list list list list
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "int list list list list list list list list list list
+                        list list list list list list list list list list
+                        list list list list" is
+           immutable_data
+             with int list list list list list list list list list list list list list list
+                  list list list list list list
+         because it's a boxed variant type.
+       But the kind of type "int list list list list list list list list list
+                            list list list list list list list list list list
+                            list list list list list" must be a subkind of
+           immutable_data
+         because of the definition of t at line 1, characters 0-149.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
 |}]
 
 type t = int list list list list list list list list list list list list list list list list list list list list list list list list
@@ -718,6 +731,13 @@ let foo (t : int t @ contended) = use_uncontended t
 val foo : int t @ contended -> unit = <fun>
 |}]
 
+(* Even this is safe because 'a cannot appear in 'a t *)
+let foo (t : (int ref) t @ contended) = use_uncontended t
+[%%expect {|
+val foo : int ref t @ contended -> unit = <fun>
+|}]
+
+
 let foo (t : int t @ aliased) = use_unique t
 [%%expect {|
 Line 1, characters 43-44:
@@ -738,6 +758,14 @@ let foo (t : int t @ contended) = use_uncontended t
 (* CR layouts v2.8: fix this. Internal ticket 4770 *)
 [%%expect {|
 val foo : int t @ contended -> unit = <fun>
+|}]
+
+let foo (t : (int ref) t @ contended) = use_uncontended t
+[%%expect {|
+Line 1, characters 56-57:
+1 | let foo (t : (int ref) t @ contended) = use_uncontended t
+                                                            ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
