@@ -3926,15 +3926,19 @@ let is_void_defaulting = function
   | { jkind = { layout = Sort s; _ }; _ } -> Sort.is_void_defaulting s
   | _ -> false
 
-let is_obviously_max = function
+let is_max (t : (_ * allowed) jkind) =
+  match t with
   (* This doesn't do any mutation because mutating a sort variable can't make it
      any, and modal upper bounds are constant. *)
-  | { jkind = { layout = Any; mod_bounds; with_bounds = _ }; _ } ->
+  | { jkind = { layout = Any; mod_bounds; with_bounds = No_with_bounds }; _ } ->
     Mod_bounds.is_max mod_bounds
-  | _ -> false
+  | { jkind = { layout = _; mod_bounds = _; with_bounds = No_with_bounds }; _ }
+    ->
+    false
 
-let mod_bounds_are_obviously_max
-    { jkind = { layout = _; mod_bounds; with_bounds = _ }; _ } =
+let mod_bounds_are_max
+    ({ jkind = { layout = _; mod_bounds; with_bounds = No_with_bounds }; _ } :
+      (_ * allowed) jkind) =
   Mod_bounds.is_max mod_bounds
 
 let has_layout_any jkind =
