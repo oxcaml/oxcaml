@@ -1992,6 +1992,7 @@ let emit_instr i =
          DSL.emit_reg i.arg.(1)
       |]
   | Lop (Int128op Iadd128) ->
+    (* Avoids clobbering arguments *)
     DSL.ins I.ADDS
       [| DSL.emit_reg reg_tmp1;
          DSL.emit_reg i.arg.(0);
@@ -2004,6 +2005,7 @@ let emit_instr i =
       |];
     DSL.ins I.MOV [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_tmp1 |]
   | Lop (Int128op Isub128) ->
+    (* Avoids clobbering arguments *)
     DSL.ins I.SUBS
       [| DSL.emit_reg reg_tmp1;
          DSL.emit_reg i.arg.(0);
@@ -2016,6 +2018,7 @@ let emit_instr i =
       |];
     DSL.ins I.MOV [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_tmp1 |]
   | Lop (Int128op (Imul64 { signed = true })) ->
+    (* Avoids clobbering arguments *)
     DSL.ins I.MUL
       [| DSL.emit_reg reg_tmp1;
          DSL.emit_reg i.arg.(0);
@@ -2028,6 +2031,7 @@ let emit_instr i =
       |];
     DSL.ins I.MOV [| DSL.emit_reg i.res.(0); DSL.emit_reg reg_tmp1 |]
   | Lop (Int128op (Imul64 { signed = false })) ->
+    (* Avoids clobbering arguments *)
     DSL.ins I.MUL
       [| DSL.emit_reg reg_tmp1;
          DSL.emit_reg i.arg.(0);
