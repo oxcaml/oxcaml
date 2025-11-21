@@ -104,7 +104,7 @@ let extract_scale args name =
   let i, args = extract_constant args name ~max:8 in
   match i with
   | 1 | 2 | 4 | 8 -> i, args
-  | _ -> bad_immediate "Did not get 1,2,4,8 as scale for %s" name
+  | _ -> bad_immediate "Did not get 1, 2, 4, or 8 as scale for %s" name
 
 let int_of_float_rounding : X86_ast.rounding -> int = function
   | RoundNearest -> 0x8

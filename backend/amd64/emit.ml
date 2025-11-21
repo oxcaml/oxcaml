@@ -1336,18 +1336,15 @@ end = struct
   let[@inline always] uses_register register (arg : X86_ast.arg) =
     match arg with
     | Reg8L register' | Reg16 register' | Reg32 register' | Reg64 register' ->
-      equal_reg_idx register (Scalar register')
-    | Regf register' -> equal_reg_idx register (Vector register')
-    | Mem { idx = register'; base = None; scale; _ } ->
-      scale <> 0 && equal_reg_idx register register'
-    | Mem { idx = register'; base = Some register''; _ } ->
-      equal_reg_idx register register'
-      || equal_reg_idx register (Scalar register'')
-    | Imm _ | Sym _ | Reg8H _ | Mem64_RIP (_, _, _) -> false
-
-  let[@inline always] need_to_save_register ~address ~dependencies register =
-    uses_register register address
-    || Array.exists (uses_register register) dependencies
+      equal_reg64 register register'
+    | Mem { idx = Scalar register'; base = None; scale; _ } ->
+      scale <> 0 && equal_reg64 register register'
+    | Mem { idx = Scalar register'; base = Some register''; _ } ->
+      equal_reg64 register register' || equal_reg64 register register''
+    | Mem { idx = Vector _; _ }
+    | Regf _ | Imm _ | Sym _ | Reg8H _
+    | Mem64_RIP (_, _, _) ->
+      false
 
   (* The C code snippets in the comments throughout this function refer to the
      implementation given in
@@ -1356,11 +1353,13 @@ end = struct
      function. *)
   let emit_shadow_check ?(dependencies = [||]) ?(offset = 0) ~address ~report
       (memory_chunk : Cmm.memory_chunk) =
+    let[@inline always] need_to_save_register register =
+      uses_register register address
+      || Array.exists (uses_register register) dependencies
+    in
     let memory_chunk_size = Memory_chunk_size.of_memory_chunk memory_chunk in
     (* -------- Begin prologue -------- *)
-    let need_to_save_rdi =
-      need_to_save_register ~address ~dependencies (Scalar RDI)
-    in
+    let need_to_save_rdi = need_to_save_register RDI in
     if need_to_save_rdi then push rdi;
     (* For the remainder of this function [rdi] will hold [address]. It's vital
        that we do this now before we change the contents of any other registers,
@@ -1370,13 +1369,10 @@ end = struct
        is just that you have to do this before you modify the contents of any
        registers (other than [rsp]). *)
     mov_address ~offset address rdi;
-    let need_to_save_r11 =
-      need_to_save_register ~address ~dependencies (Scalar R11)
-    in
+    let need_to_save_r11 = need_to_save_register R11 in
     if need_to_save_r11 then push r11;
     let need_to_save_r10 =
-      Memory_chunk_size.is_small memory_chunk_size
-      && need_to_save_register ~address ~dependencies (Scalar R10)
+      Memory_chunk_size.is_small memory_chunk_size && need_to_save_register R10
     in
     if need_to_save_r10 then push r10;
     (* -------- End prologue -------- *)
