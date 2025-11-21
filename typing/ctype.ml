@@ -2321,7 +2321,7 @@ let unbox_once env ty =
               | Tvar { name = _; jkind } -> ty, newgenty (Tof_kind jkind)
               | _ ->
                 Misc.fatal_error
-                  "Ctype.unbox_once: existensial is not a variable")
+                  "Ctype.unbox_once: existential is not a variable")
             existentials
         in
         Stepped { ty = apply ty2 ~extra_substs; modality }
