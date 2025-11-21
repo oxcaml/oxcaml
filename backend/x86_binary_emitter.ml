@@ -760,6 +760,7 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
       (match enc 2, enc 1, enc 0 with
       | RM_rm, Vex_v, RM_r -> src2, rd_of_reg src1, rd_of_reg dst
       | RM_r, Vex_v, RM_rm -> dst, rd_of_reg src1, rd_of_reg src2
+      | Vex_v, RM_rm, RM_r -> src1, rd_of_reg src2, rd_of_reg dst
       | _ -> failwith instr.mnemonic)
     | _ -> failwith instr.mnemonic
   in

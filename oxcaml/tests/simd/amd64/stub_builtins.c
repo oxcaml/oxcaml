@@ -37,6 +37,14 @@ BUILTIN(caml_avx_vec128_store_mask64);
 BUILTIN(caml_avx_vec256_store_mask64);
 BUILTIN(caml_avx_vec128_store_mask32);
 BUILTIN(caml_avx_vec256_store_mask32);
+BUILTIN(caml_avx2_vec128_gather32_index32);
+BUILTIN(caml_avx2_vec256_gather32_index32);
+BUILTIN(caml_avx2_vec128_gather32_index64);
+BUILTIN(caml_avx2_vec256_gather32_index64);
+BUILTIN(caml_avx2_vec128_gather64_index32);
+BUILTIN(caml_avx2_vec256_gather64_index32);
+BUILTIN(caml_avx2_vec128_gather64_index64);
+BUILTIN(caml_avx2_vec256_gather64_index64);
 
 BUILTIN(caml_sse2_float64_add);
 BUILTIN(caml_sse2_float64_sub);
