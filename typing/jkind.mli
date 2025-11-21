@@ -759,6 +759,10 @@ val set_raw_type_expr : (Format.formatter -> Types.type_expr -> unit) -> unit
 
 val format : Format.formatter -> 'd Types.jkind -> unit
 
+(** Similar to [format], but the kind is expanded as much as possible rather
+    than written in terms of a kind abbreviation. This is used by Merlin. *)
+val format_expanded : Format.formatter -> 'd Types.jkind -> unit
+
 (** Format the history of this jkind: what interactions it has had and why
     it is the jkind that it is. Might be a no-op: see [display_histories]
     in the implementation of the [Jkind] module.

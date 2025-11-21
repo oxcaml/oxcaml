@@ -1871,15 +1871,15 @@ module Const = struct
   end
 
   module To_out_jkind_const : sig
-    (** Convert a [t] into a [Outcometree.out_jkind_const].
-        The jkind is written in terms of the built-in jkind that requires the
-        least amount of modes after the mod. For example, [value mod global many
-        unique portable uncontended external_ non_null] could be written in
-        terms of [value] (as it appears above), or in terms of [immediate]
-        (which would just be [immediate]). Since the latter requires less modes
-        to be printed, it is chosen.
+    (** Convert a [t] into a [Outcometree.out_jkind_const]. If [expanded] is
+        [false], the jkind is written in terms of the built-in jkind that
+        requires the least amount of modes after the mod. For example,
+        [value mod global many unique portable uncontended external_ non_null]
+        could be written in terms of [value] (as it appears above), or in terms
+        of [immediate] (which would just be [immediate]). Since the latter
+        requires less modes to be printed, it is chosen.
     *)
-    val convert : 'd t -> Outcometree.out_jkind_const
+    val convert : expanded:bool -> 'd t -> Outcometree.out_jkind_const
   end = struct
     type printable_jkind =
       { base : string;
@@ -2000,15 +2000,18 @@ module Const = struct
       | [out] -> Some out
       | [] -> None
 
-    let convert jkind =
+    let convert ~expanded jkind =
       (* For each primitive jkind, we try to print the jkind in terms of it
          (this is possible if the primitive is a subjkind of it). We then choose
          the "simplest". The "simplest" is taken to mean the one with the least
          number of modes that need to follow the [mod]. *)
       let simplest =
-        Builtin.all
-        |> List.filter_map (fun base -> convert_with_base ~base jkind)
-        |> select_simplest
+        match expanded with
+        | false ->
+          Builtin.all
+          |> List.filter_map (fun base -> convert_with_base ~base jkind)
+          |> select_simplest
+        | true -> None
       in
       let printable_jkind =
         match simplest with
@@ -2070,10 +2073,11 @@ module Const = struct
         base with_tys
   end
 
-  let to_out_jkind_const jkind = To_out_jkind_const.convert jkind
+  let to_out_jkind_const jkind =
+    To_out_jkind_const.convert ~expanded:false jkind
 
-  let format ppf jkind =
-    To_out_jkind_const.convert jkind |> !Oprint.out_jkind_const ppf
+  let format ~expanded ppf jkind =
+    To_out_jkind_const.convert ~expanded jkind |> !Oprint.out_jkind_const ppf
 
   (*******************************)
   (* converting user annotations *)
@@ -2199,7 +2203,7 @@ module Desc = struct
   (* CR layouts v2.8: This will probably need to be overhauled with
      [with]-types. See also [Printtyp.out_jkind_of_desc], which uses the same
      algorithm. Internal ticket 5096. *)
-  let format ppf t =
+  let format_maybe_expanded ~expanded ppf t =
     let open Format in
     let rec format_desc ~nested ppf (desc : _ t) =
       match desc.layout with
@@ -2212,10 +2216,12 @@ module Desc = struct
           (List.map (fun layout -> { desc with layout }) lays)
       | _ -> (
         match get_const desc with
-        | Some c -> Const.format ppf c
+        | Some c -> Const.format ~expanded ppf c
         | None -> assert false (* handled above *))
     in
     format_desc ppf ~nested:false t
+
+  let format ppf t = format_maybe_expanded ~expanded:false ppf t
 end
 
 module Jkind_desc = struct
@@ -3040,7 +3046,12 @@ let decompose_product ({ jkind; _ } as jk) =
    doing so, because it teaches the user that e.g. [value mod local] is better
    off spelled [value]. Possibly remove [jkind.annotation], but only after
    we have a proper printing story. Internal ticket 5096. *)
-let format ppf jkind = Desc.format ppf (Jkind_desc.get jkind.jkind)
+let format_maybe_expanded ~expanded ppf jkind =
+  Desc.format_maybe_expanded ~expanded ppf (Jkind_desc.get jkind.jkind)
+
+let format ppf jkind = format_maybe_expanded ~expanded:false ppf jkind
+
+let format_expanded ppf jkind = format_maybe_expanded ~expanded:true ppf jkind
 
 let printtyp_path = ref (fun _ _ -> assert false)
 
