@@ -297,6 +297,24 @@ let f () =
 val f : unit -> unit = <fun>
 |}]
 
+(* or_null interaction: *)
+
+let f (type a : immediate) (x : a) =
+  let g (type b : immediate_or_null) (y : b) = () in
+  g (This x : a or_null)
+[%%expect{|
+val f : ('a : immediate). 'a -> unit = <fun>
+|}]
+
+let f (x : 'a or_null) =
+  let g (type b : immediate) (y : b) = () in
+  match x with
+  | This y -> g y
+  | Null -> ()
+[%%expect{|
+val f : ('a : immediate). 'a or_null -> unit = <fun>
+|}]
+
 (* modules and module inclusion *)
 
 module M (X : sig type t : any non_pointer end) : sig type t : any end = X
