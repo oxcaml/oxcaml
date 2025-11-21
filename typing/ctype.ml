@@ -2545,7 +2545,7 @@ let constrain_type_jkind ~fixed env ty jkind =
      more than necessary.  *)
   let rec loop ~fuel ~expanded ty ~is_open ty's_jkind jkind =
     (* Just succeed if we're comparing against [any] *)
-    if Jkind.is_obviously_max jkind then Ok () else
+    if Jkind.is_max jkind then Ok () else
     if fuel < 0 then
       Error (
         Jkind.Violation.of_ ~context (
@@ -2713,7 +2713,7 @@ let constrain_type_jkind ~fixed env ty jkind =
        substitutions into the with-bounds while in [estimate_type_jkind]. These
        substitutions can be expensive if there are many with-bounds, and this
        case gets hit a lot (the v1 safety check always hits this case). *)
-    let ignore_mod_bounds = Jkind.mod_bounds_are_obviously_max jkind in
+    let ignore_mod_bounds = Jkind.mod_bounds_are_max jkind in
     let ty's_jkind = estimate_type_jkind ~ignore_mod_bounds env ty in
     loop ~fuel ~expanded ty ~is_open ty's_jkind jkind
   in

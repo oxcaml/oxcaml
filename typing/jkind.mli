@@ -852,17 +852,13 @@ val map_type_expr :
   (allowed * 'r) Types.jkind ->
   (allowed * 'r) Types.jkind
 
-(** Checks to see whether a jkind is {iobviously} the maximum jkind. Never does any
-    mutation, preferring a quick check over a thorough one, and doesn't expand any
-    with-bounds. Might return [false] even when the input is actually the maximum
-    jkind. *)
-val is_obviously_max : ('l * allowed) Types.jkind -> bool
+(** Checks to see whether a right-jkind is the maximum jkind. Never does any
+    mutation. *)
+val is_max : ('l * allowed) Types.jkind -> bool
 
-(** Checks to see whether a jkind's mod-bounds are {iobviously} the maximum
-    mod-bounds. Never does any mutation, preferring a quick check over a
-    thorough one, and doesn't expand any with-bounds. Might return [false] even
-    when the input actually has max mod-bounds. *)
-val mod_bounds_are_obviously_max : ('l * allowed) Types.jkind -> bool
+(** Checks to see whether a right-jkind's mod-bounds are the maximum
+    mod-bounds. Never does any mutation. *)
+val mod_bounds_are_max : ('l * allowed) Types.jkind -> bool
 
 (** Checks to see whether a jkind has layout any. Never does any mutation. *)
 val has_layout_any : ('l * allowed) Types.jkind -> bool
