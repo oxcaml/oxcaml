@@ -3933,6 +3933,10 @@ let is_obviously_max = function
     Mod_bounds.is_max mod_bounds
   | _ -> false
 
+let mod_bounds_are_obviously_max
+    { jkind = { layout = _; mod_bounds; with_bounds = _ }; _ } =
+  Mod_bounds.is_max mod_bounds
+
 let has_layout_any jkind =
   match jkind.jkind.layout with Any -> true | _ -> false
 
