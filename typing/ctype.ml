@@ -1713,7 +1713,7 @@ let instance_poly_for_jkind univars sch =
       - a record field
       - a method of a class/object
       In all these cases, it is true that we can never learn more about the
-      type, so it's sound to give it "best".
+      type of the univars it binds, so it's sound to give them "best".
 
       But it's also plausible that in the future we will decide to assign
       mod-bounds to the jkind of a [Tunivar] (internal ticket 5746). Since we do
@@ -1730,7 +1730,7 @@ let instance_poly_for_jkind univars sch =
          univar. However, the utility of this is not clear, as most univars
          occur within arrow types (or an abstract type that is really an arrow),
          whose jkind is (at the moment) independent of the types in the
-         arrow. *)
+         arrow. Internal ticket 5746. *)
       newgenty (Tof_kind jkind)
     | _ -> Misc.fatal_error "Ctype.instance_poly_for_jkind: expected Tunivar"
   in
@@ -2425,10 +2425,6 @@ let mk_is_abstract env p =
 
 let mk_jkind_context env jkind_of_type =
   { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
-
-(* This uses the forward ref - only needed inside estimate_type_jkind *)
-let _mk_jkind_context_check_principal_ref env =
-  mk_jkind_context env (!type_jkind_purely_if_principal' env)
 
 (* We parameterize [estimate_type_jkind] by a function
    [expand_component] because some callers want expansion of types and others

@@ -55,7 +55,7 @@ Error: This expression has type "'a t" but an expression was expected of type
 |}]
 
 type 'a t : immutable_data = { f : 'b. 'b t }
-(* CR layouts v2.8: This should be accepted. *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 5746. *)
 [%%expect {|
 Line 1, characters 0-45:
 1 | type 'a t : immutable_data = { f : 'b. 'b t }
@@ -122,7 +122,7 @@ Error: This expression has type "t" but an expression was expected of type
 
 type 'a u
 type t : immutable_data with (type : value) u = { foo : 'a. 'a u }
-(* CR layouts v2.8: This should be accepted. *)
+(* CR layouts v2.8: This should be accepted. Internal ticket 5770. *)
 [%%expect{|
 type 'a u
 Line 2, characters 0-66:
