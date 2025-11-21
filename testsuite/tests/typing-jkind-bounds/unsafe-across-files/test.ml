@@ -1,6 +1,5 @@
 (* TEST
    readonly_files = "unsafe_across_files.mli unsafe_across_files.ml";
-   flags += " -ikinds";
    setup-ocamlc.byte-build-env;
    module = "unsafe_across_files.mli";
    ocamlc.byte;

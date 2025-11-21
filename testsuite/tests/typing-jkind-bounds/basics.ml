@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension small_numbers -ikinds";
+ flags = "-extension small_numbers";
  expect;
 *)
 
@@ -1496,13 +1496,7 @@ type 'a t = 'a
 type 'a t : value mod global = 'a
 (* CR jujacobs: this used to be accepted: bounds should propagate to type argument *)
 [%%expect {|
-Line 1, characters 0-33:
-1 | type 'a t : value mod global = 'a
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a" is value
-         because of the definition of t at line 1, characters 0-33.
-       But the kind of type "'a" must be a subkind of value mod global
-         because of the definition of t at line 1, characters 0-33.
+type ('a : value mod global) t = 'a
 |}]
 
 type ('a : immutable_data) t
@@ -1551,7 +1545,7 @@ Line 1, characters 0-21:
     ^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "'a" is value
          because of the definition of t at line 1, characters 0-21.
-       But the layout of type "'a" must be a sublayout of word
+       But the layout of type "'a" must overlap with word
          because of the definition of t at line 1, characters 0-21.
 |}]
 (* CR layouts v2.8: this should be accepted; 'a should be inferred to have kind
@@ -1570,13 +1564,7 @@ type 'a t = private 'a
 type 'a t : value mod global = private 'a
 (* CR jujacobs: this used to be accepted: bounds should propagate to type argument *)
 [%%expect {|
-Line 1, characters 0-41:
-1 | type 'a t : value mod global = private 'a
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a" is value
-         because of the definition of t at line 1, characters 0-41.
-       But the kind of type "'a" must be a subkind of value mod global
-         because of the definition of t at line 1, characters 0-41.
+type ('a : value mod global) t = private 'a
 |}]
 
 type 'a t : word = private 'a
@@ -1586,7 +1574,7 @@ Line 1, characters 0-29:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "'a" is value
          because of the definition of t at line 1, characters 0-29.
-       But the layout of type "'a" must be a sublayout of word
+       But the layout of type "'a" must overlap with word
          because of the definition of t at line 1, characters 0-29.
 |}]
 (* CR layouts v2.8: this should be accepted; 'a should be inferred to have kind

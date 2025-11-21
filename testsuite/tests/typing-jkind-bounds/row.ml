@@ -1,5 +1,4 @@
 (* TEST
-    flags += "-ikinds";
     expect;
 *)
 
@@ -71,7 +70,10 @@ val cross_contention : int w @ contended -> unit = <fun>
 
 let don't_cross_portability (x : int w @ nonportable) = use_portable x
 [%%expect{|
-val don't_cross_portability : int w -> unit = <fun>
+Line 1, characters 69-70:
+1 | let don't_cross_portability (x : int w @ nonportable) = use_portable x
+                                                                         ^
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (* Quality *)
@@ -82,7 +84,10 @@ module type S = sig
 end
 [%%expect{|
 module type S =
-  sig type 'a polyvar = [ `A of 'a ] type 'a abstract : immutable_data end
+  sig
+    type 'a polyvar = [ `A of 'a ]
+    type 'a abstract : immutable_data with 'a
+  end
 |}]
 
 (* Since the jkind of [ `A of 'a ] has best quality, we can substitute with another type *)
@@ -91,19 +96,8 @@ module type S2 = S with type 'a abstract = 'a simple
 (* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 type 'a simple : immutable_data with 'a
-Line 2, characters 17-52:
-2 | module type S2 = S with type 'a abstract = 'a simple
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: In this "with" constraint, the new definition of "abstract"
-       does not match its original definition in the constrained signature:
-       Type declarations do not match:
-         type 'a abstract = 'a simple
-       is not included in
-         type 'a abstract : immutable_data
-       The kind of the first is immutable_data with 'a
-         because of the definition of simple at line 1, characters 0-39.
-       But the kind of the first must be a subkind of immutable_data
-         because of the definition of abstract at line 3, characters 2-51.
+module type S2 =
+  sig type 'a polyvar = [ `A of 'a ] type 'a abstract = 'a simple end
 |}]
 
 (* Contrast: jkinds of abstract types always have non-best quality. *)
@@ -272,7 +266,15 @@ type trec2 = [ `A | `B of 'a list ] as 'a
 type trec_fails : immutable_data = [ `C | `D of 'a * unit -> 'a ] as 'a
 
 [%%expect{|
-type trec_fails = [ `C | `D of 'a * unit -> 'a ] as 'a
+Line 1, characters 0-71:
+1 | type trec_fails : immutable_data = [ `C | `D of 'a * unit -> 'a ] as 'a
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" is
+           value mod immutable non_float
+         because it's a polymorphic variant type.
+       But the kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" must be a subkind of
+         immutable_data
+         because of the definition of trec_fails at line 1, characters 0-71.
 |}]
 
 type trec_succeeds : value mod immutable = [ `C | `D of 'a * unit -> 'a ] as 'a
@@ -284,9 +286,19 @@ type trec_rec_fails : immutable_data =
   [ `X of 'b | `Y of [ `Z of ('a -> 'b) | `W of 'a | `Loop of 'b ] as 'b ] as 'a
 
 [%%expect{|
-type trec_rec_fails =
-    [ `X of [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ] as 'b | `Y of 'b ]
-    as 'a
+Lines 1-2, characters 0-80:
+1 | type trec_rec_fails : immutable_data =
+2 |   [ `X of 'b | `Y of [ `Z of ('a -> 'b) | `W of 'a | `Loop of 'b ] as 'b ] as 'a
+Error: The kind of type "[ `X of
+                            [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ] as 'b
+                        | `Y of 'b ] as 'a" is value mod immutable non_float
+         because it's a polymorphic variant type.
+       But the kind of type "[ `X of
+                                [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ]
+                                as 'b
+                            | `Y of 'b ] as 'a" must be a subkind of
+           immutable_data
+         because of the definition of trec_rec_fails at lines 1-2, characters 0-80.
 |}]
 
 type trec_rec_succeeds : value mod immutable =

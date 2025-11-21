@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension-universe alpha -ikinds";
+ flags = "-extension-universe alpha";
  expect;
 *)
 

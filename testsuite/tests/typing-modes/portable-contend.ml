@@ -1,6 +1,5 @@
 (* TEST
    include stdlib_stable;
-   flags = "-ikinds";
    expect;
 *)
 

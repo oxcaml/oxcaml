@@ -1,5 +1,5 @@
 (* TEST
-    flags = "-extension layouts_alpha -ikinds";
+    flags = "-extension layouts_alpha";
     expect;
 *)
 
@@ -536,12 +536,27 @@ Error: The kind of type "int -> int" is value mod aliased immutable non_float
 
 type should_fail : immutable_data = [`A of int -> int]
 [%%expect{|
-type should_fail = [ `A of int -> int ]
+Line 1, characters 0-54:
+1 | type should_fail : immutable_data = [`A of int -> int]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `A of int -> int ]" is value mod immutable non_float
+         because it's a polymorphic variant type.
+       But the kind of type "[ `A of int -> int ]" must be a subkind of
+           immutable_data
+         because of the definition of should_fail at line 1, characters 0-54.
 |}]
 
 type should_also_fail : immutable_data = [`A of int -> int | `B of 'a] as 'a
 [%%expect{|
-type should_also_fail = [ `A of int -> int | `B of 'a ] as 'a
+Line 1, characters 0-76:
+1 | type should_also_fail : immutable_data = [`A of int -> int | `B of 'a] as 'a
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `A of int -> int | `B of 'a ] as 'a" is
+           value mod immutable non_float
+         because it's a polymorphic variant type.
+       But the kind of type "[ `A of int -> int | `B of 'a ] as 'a" must be a subkind of
+         immutable_data
+         because of the definition of should_also_fail at line 1, characters 0-76.
 |}]
 
 type r
@@ -549,7 +564,14 @@ type r
 type should_fail_too : immutable_data with r = [`A of int ref]
 [%%expect{|
 type r
-type should_fail_too = [ `A of int ref ]
+Line 3, characters 0-62:
+3 | type should_fail_too : immutable_data with r = [`A of int ref]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `A of int ref ]" is mutable_data
+         because it's a polymorphic variant type.
+       But the kind of type "[ `A of int ref ]" must be a subkind of
+           immutable_data with r
+         because of the definition of should_fail_too at line 3, characters 0-62.
 |}]
 
 type should_likewise_fail : immutable_data = (int ref * (int -> int))
@@ -566,7 +588,14 @@ Error: The kind of type "int ref * (int -> int)" is value mod non_float
 
 type and_even_this_should_fail : immutable_data = [`A of [`B of int ref]]
 [%%expect{|
-type and_even_this_should_fail = [ `A of [ `B of int ref ] ]
+Line 1, characters 0-73:
+1 | type and_even_this_should_fail : immutable_data = [`A of [`B of int ref]]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "[ `A of [ `B of int ref ] ]" is mutable_data
+         because it's a polymorphic variant type.
+       But the kind of type "[ `A of [ `B of int ref ] ]" must be a subkind of
+           immutable_data
+         because of the definition of and_even_this_should_fail at line 1, characters 0-73.
 |}]
 
 type this_should_succeed : immutable_data = ((int * int) * (int * int))
@@ -639,14 +668,35 @@ type 'number t : immutable_data with 'number =
   | `Array of 'number t list
   ]
 [%%expect{|
-type 'number t =
-    [ `Array of 'number t list
-    | `False
-    | `Null
-    | `Number of 'number
-    | `Object of (string * 'number t) list
-    | `String of string
-    | `True ]
+Lines 1-9, characters 0-3:
+1 | type 'number t : immutable_data with 'number =
+2 |   [ `Null
+3 |   | `False
+4 |   | `True
+5 |   | `String of string
+6 |   | `Number of 'number
+7 |   | `Object of (string * 'number t) list
+8 |   | `Array of 'number t list
+9 |   ]
+Error: The kind of type "[ `Array of 'number t list
+                        | `False
+                        | `Null
+                        | `Number of 'number
+                        | `Object of (string * 'number t) list
+                        | `String of string
+                        | `True ]" is immutable_data with 'number
+         because it's a polymorphic variant type.
+       But the kind of type "[ `Array of 'number t list
+                            | `False
+                            | `Null
+                            | `Number of 'number
+                            | `Object of (string * 'number t) list
+                            | `String of string
+                            | `True ]" must be a subkind of
+           immutable_data with 'number
+         because of the definition of t at lines 1-9, characters 0-3.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
 |}]
 
 (* simplified version of the above that still runs out of fuel (minimized by mdelvecchio) *)
@@ -655,6 +705,19 @@ type 'number t : immutable_data with 'number =
   | `Array of 'number t list
   ]
 [%%expect{|
-type 'number t =
-    [ `Array of 'number t list | `Object of (string * 'number t) list ]
+Lines 1-4, characters 0-3:
+1 | type 'number t : immutable_data with 'number =
+2 |   [ `Object of (string * 'number t) list
+3 |   | `Array of 'number t list
+4 |   ]
+Error: The kind of type "[ `Array of 'number t/2 list
+                        | `Object of (string * 'number t/2) list ]" is
+           immutable_data
+         because it's a polymorphic variant type.
+       But the kind of type "[ `Array of 'number t/2 list
+                            | `Object of (string * 'number t/2) list ]" must be a subkind of
+         immutable_data with 'number
+         because of the definition of t at lines 1-4, characters 0-3.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
 |}]
