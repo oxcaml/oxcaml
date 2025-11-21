@@ -100,6 +100,12 @@ let extract_constant args name ~max =
     :: _ ->
     bad_immediate "Did not get integer immediate for %s" name
 
+let extract_scale args name =
+  let i, args = extract_constant args name ~max:8 in
+  match i with
+  | 1 | 2 | 4 | 8 -> i, args
+  | _ -> bad_immediate "Did not get 1,2,4,8 as scale for %s" name
+
 let int_of_float_rounding : X86_ast.rounding -> int = function
   | RoundNearest -> 0x8
   | RoundDown -> 0x9
@@ -798,6 +804,30 @@ let select_operation_avx2 ~dbg:_ op args =
   then None
   else
     match op with
+    | "caml_avx2_vec128_gather32_index32" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherdd_X_M32X_X args
+    | "caml_avx2_vec256_gather32_index32" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherdd_Y_M32Y_Y args
+    | "caml_avx2_vec128_gather64_index32" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherdq_X_M32X_X args
+    | "caml_avx2_vec256_gather64_index32" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherdq_Y_M32X_Y args
+    | "caml_avx2_vec128_gather32_index64" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherqd_X_M64X_X args
+    | "caml_avx2_vec256_gather32_index64" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherqd_X_M64Y_X args
+    | "caml_avx2_vec128_gather64_index64" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherqq_X_M64X_X args
+    | "caml_avx2_vec256_gather64_index64" ->
+      let i, args = extract_scale args op in
+      simd_load ~mode:(Iindexed2scaled (i, 0)) vpgatherqq_Y_M64Y_Y args
     | "caml_avx2_int8x32_abs" -> instr vpabsb_Y_Ym256 args
     | "caml_avx2_int16x16_abs" -> instr vpabsw_Y_Ym256 args
     | "caml_avx2_int32x8_abs" -> instr vpabsd_Y_Ym256 args

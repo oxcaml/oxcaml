@@ -416,8 +416,8 @@ let print_specific_operation printreg op ppf arg =
   | Isimd simd ->
       Simd.print_operation printreg simd ppf arg
   | Isimd_mem (simd, addr) ->
-      Simd.Mem.print_operation printreg 
-        (print_addressing printreg addr) (num_args_addressing addr) 
+      Simd.Mem.print_operation printreg
+        (print_addressing printreg addr) (num_args_addressing addr)
         simd ppf arg
   | Icldemote _ ->
       fprintf ppf "cldemote %a" printreg arg.(0)

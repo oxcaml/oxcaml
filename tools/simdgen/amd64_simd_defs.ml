@@ -52,6 +52,10 @@ type temp =
   | MM
   | XMM
   | YMM
+  | VM32X (* R64 base + i32x4 offset *)
+  | VM32Y (* R64 base + i32x8 offset *)
+  | VM64X (* R64 base + i64x2 offset *)
+  | VM64Y (* R64 base + i64x4 offset *)
 
 (* Possible argument location *)
 type loc =
@@ -157,10 +161,14 @@ let equal_temp temp0 temp1 =
   | M256, M256
   | MM, MM
   | XMM, XMM
-  | YMM, YMM ->
+  | YMM, YMM
+  | VM32X, VM32X
+  | VM32Y, VM32Y
+  | VM64X, VM64X
+  | VM64Y, VM64Y ->
     true
   | ( ( R8 | R16 | R32 | R64 | M8 | M16 | M32 | M64 | M128 | M256 | MM | XMM
-      | YMM ),
+      | YMM | VM32X | VM32Y | VM64X | VM64Y ),
       _ ) ->
     false
 
@@ -172,7 +180,7 @@ let equal_loc loc0 loc1 =
 
 let temp_is_reg = function
   | R8 | R16 | R32 | R64 | MM | XMM | YMM -> true
-  | M8 | M16 | M32 | M64 | M128 | M256 -> false
+  | M8 | M16 | M32 | M64 | M128 | M256 | VM32X | VM32Y | VM64X | VM64Y -> false
 
 let loc_allows_reg = function
   | Pin _ -> true
@@ -204,31 +212,46 @@ let ext_to_string : ext -> string = function
 let exts_to_string exts =
   Array.map ext_to_string exts |> Array.to_list |> String.concat ", "
 
-type bit_width =
-  | Eight
-  | Sixteen
-  | Thirtytwo
-  | Sixtyfour
-  | Onetwentyeight
-  | Twofiftysix
+module Width = struct
+  type reg =
+    | R8
+    | R16
+    | R32
+    | R64
+    | R128
+    | R256
+
+  type mem =
+    | M8
+    | M16
+    | M32
+    | M64
+    | M128
+    | M256
+    | M32X
+    | M64X
+    | M32Y
+    | M64Y
+end
 
 let loc_register_width = function
   | Pin _ -> None
   | Temp temps ->
     let width = ref None in
-    let set w =
+    let set (w : Width.reg) =
       assert (Option.is_none !width);
       width := Some w
     in
     Array.iter
       (function
-        | R8 -> set Eight
-        | R16 -> set Sixteen
-        | R32 -> set Thirtytwo
-        | R64 | MM -> set Sixtyfour
-        | XMM -> set Onetwentyeight
-        | YMM -> set Twofiftysix
-        | M8 | M16 | M32 | M64 | M128 | M256 -> ())
+        | R8 -> set Width.R8
+        | R16 -> set Width.R16
+        | R32 -> set Width.R32
+        | R64 | MM -> set Width.R64
+        | XMM -> set Width.R128
+        | YMM -> set Width.R256
+        | M8 | M16 | M32 | M64 | M128 | M256 | VM32X | VM32Y | VM64X | VM64Y ->
+          ())
       temps;
     !width
 
@@ -236,18 +259,22 @@ let loc_memory_width = function
   | Pin _ -> assert false
   | Temp temps ->
     let width = ref None in
-    let set w =
+    let set (w : Width.mem) =
       assert (Option.is_none !width);
       width := Some w
     in
     Array.iter
       (function
-        | M8 -> set Eight
-        | M16 -> set Sixteen
-        | M32 -> set Thirtytwo
-        | M64 -> set Sixtyfour
-        | M128 -> set Onetwentyeight
-        | M256 -> set Twofiftysix
+        | M8 -> set Width.M8
+        | M16 -> set Width.M16
+        | M32 -> set Width.M32
+        | M64 -> set Width.M64
+        | M128 -> set Width.M128
+        | M256 -> set Width.M256
+        | VM32X -> set Width.M32X
+        | VM32Y -> set Width.M32Y
+        | VM64X -> set Width.M64X
+        | VM64Y -> set Width.M64Y
         | R8 | R16 | R32 | R64 | MM | XMM | YMM -> ())
       temps;
     Option.get !width

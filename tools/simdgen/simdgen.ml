@@ -139,8 +139,10 @@ let rec parse_args mnemonic acc encs args imm res =
         Some (Temp [| XMM; M64 |])
       | "xmm0/m128" | "xmm1/m128" | "xmm2/m128" | "xmm3/m128" ->
         Some (Temp [| XMM; M128 |])
-      (* Load/store operations are not handled *)
-      | "mem" | "vm32x" | "vm64x" | "vm32y" | "vm64y" -> raise Unsupported
+      | "vm32x" -> Some (Temp [| VM32X |])
+      | "vm64x" -> Some (Temp [| VM64X |])
+      | "vm32y" -> Some (Temp [| VM32Y |])
+      | "vm64y" -> Some (Temp [| VM64Y |])
       | "ymm" | "ymm0" | "ymm1" | "ymm2" | "ymm3" | "ymm4" ->
         Some (Temp [| YMM |])
       | "ymm0/m256" | "ymm1/m256" | "ymm2/m256" | "ymm3/m256" ->
@@ -151,7 +153,7 @@ let rec parse_args mnemonic acc encs args imm res =
     let enc =
       match String.trim enc with
       | "ModRM:reg" -> RM_r
-      | "ModRM:r/m" -> RM_rm
+      | "ModRM:r/m" | "BaseReg" -> RM_rm
       | "VEX.vvvv" -> Vex_v
       | "NA" | "<XMM0>" | "<RAX>" | "<RDI>" | "<RCX>" | "<RDX>" | "implicit" ->
         Implicit
@@ -288,7 +290,7 @@ let mangle_loc (loc : loc) =
     | R64 | M64 -> Some 64
     | M128 -> Some 128
     | M256 -> Some 256
-    | MM | XMM | YMM -> None
+    | MM | XMM | YMM | VM32X | VM32Y | VM64X | VM64Y -> None
   in
   let short : temp -> string = function
     | R8 | R16 | R32 | R64 -> "r"
@@ -296,6 +298,10 @@ let mangle_loc (loc : loc) =
     | MM -> "M"
     | XMM -> "X"
     | YMM -> "Y"
+    | VM32X -> "M32X"
+    | VM32Y -> "M32Y"
+    | VM64X -> "M64X"
+    | VM64Y -> "M64Y"
   in
   match loc with
   | Pin RAX -> "rax"
@@ -357,6 +363,10 @@ let print_one bind instr =
     | MM -> "MM"
     | XMM -> "XMM"
     | YMM -> "YMM"
+    | VM32X -> "VM32X"
+    | VM32Y -> "VM32Y"
+    | VM64X -> "VM64X"
+    | VM64Y -> "VM64Y"
   in
   let print_loc : loc -> string = function
     | Pin RAX -> "Pin RAX"

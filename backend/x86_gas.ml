@@ -34,8 +34,12 @@ let opt_displ b displ =
   else bprintf b "%d" displ
 
 let arg_mem b { arch; typ = _; idx; scale; base; sym; displ } =
-  let string_of_register =
+  let string_of_gpr =
     match arch with X86 -> string_of_reg32 | X64 -> string_of_reg64
+  in
+  let string_of_reg_idx = function
+    | Scalar reg -> string_of_gpr reg
+    | Vector reg -> string_of_regf reg
   in
   (match sym with
   | None ->
@@ -46,11 +50,9 @@ let arg_mem b { arch; typ = _; idx; scale; base; sym; displ } =
   if scale <> 0
   then (
     Buffer.add_char b '(';
-    (match base with
-    | None -> ()
-    | Some base -> print_reg b string_of_register base);
+    (match base with None -> () | Some base -> print_reg b string_of_gpr base);
     if base != None || scale <> 1 then Buffer.add_char b ',';
-    print_reg b string_of_register idx;
+    print_reg b string_of_reg_idx idx;
     if scale <> 1 then bprintf b ",%s" (Int.to_string scale);
     Buffer.add_char b ')')
 
