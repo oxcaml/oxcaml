@@ -610,6 +610,8 @@ module Sort = struct
          [Sort]s aren't frequently printed, and if these error messages aren't
          descriptive enough then printing [Layout]s should be considered. *)
       | Base Scannable -> Format.fprintf ppf "value"
+      (* CR zeisbach: match on other cases here? i think the question is whether
+         we expect any other scannable sorts, which seems unlikely! *)
       | Base b -> Format.fprintf ppf "%s" (to_string_base b)
       | Var v -> Format.fprintf ppf "%s" (Var.name v)
       | Product ts ->

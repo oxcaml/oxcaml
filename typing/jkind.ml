@@ -523,21 +523,27 @@ module Layout = struct
         (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
           ppf
           ("any" :: Scannable_axes.to_string_list sa)
-      | Sort (Sort.Base Scannable, sa) ->
-        (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
-          ppf
-          ("value"
-           (* CR zeisbach: should there be a helper to do this? should there
-              not be a helper to compare against max? *)
-          :: Scannable_axes.to_string_list_diff ~base:Scannable_axes.value_axes
-               sa)
-      | Sort ((Sort.Var _ as s), sa) ->
-        let sort_var_str = Format.asprintf "%a" Sort.format s in
-        (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
-          ppf
-          (sort_var_str :: Scannable_axes.to_string_list sa)
-      (* definitely never scannable *)
-      | Sort (s, _) -> fprintf ppf "%a" Sort.format s
+      | Sort (s, sa) -> (
+        match Sort.get s with
+        (* CR zeisbach: ways to cut down on duplication? between here and also
+           maybe the const layout [to_string] above...? *)
+        | Sort.Base Scannable when Scannable_axes.(equal sa immediate_axes) ->
+          fprintf ppf "immediate"
+        | Sort.Base Scannable ->
+          (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
+            ppf
+            ("value"
+             (* CR zeisbach: should there be a helper to do this? should there
+                not be a helper to compare against max? *)
+            :: Scannable_axes.to_string_list_diff
+                 ~base:Scannable_axes.value_axes sa)
+        | Sort.Var _ ->
+          let sort_var_str = Format.asprintf "%a" Sort.format s in
+          (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
+            ppf
+            (sort_var_str :: Scannable_axes.to_string_list sa)
+        (* definitely never scannable *)
+        | _ -> fprintf ppf "%a" Sort.format s)
       | Product ts ->
         let pp_sep ppf () = Format.fprintf ppf "@ & " in
         Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
