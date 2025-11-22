@@ -33,7 +33,7 @@ open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
 module S = struct
   type func_call_operation =
-    | Indirect
+    | Indirect of Cmm.symbol list option
     | Direct of Cmm.symbol
 
   type external_call_operation =

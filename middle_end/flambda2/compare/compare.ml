@@ -556,6 +556,12 @@ let code_ids env code_id1 code_id2 : Code_id.t Comparison.t =
   then Equivalent
   else Different { approximant = code_id1 }
 
+let code_ids_set env code_ids1 code_ids2 : Code_id.Set.t Comparison.t =
+  let code_ids1 = Code_id.Set.map (subst_code_id env) code_ids1 in
+  if Code_id.Set.equal code_ids1 code_ids2
+  then Equivalent
+  else Different { approximant = code_ids1 }
+
 let function_slots env function_slot1 function_slot2 :
     Function_slot.t Comparison.t =
   match Env.find_function_slot env function_slot1 with
@@ -967,10 +973,23 @@ let call_kinds env (call_kind1 : Call_kind.t) (call_kind2 : Call_kind.t) :
         if code_ids env code_id1 code_id2 |> Comparison.is_equivalent
         then Equivalent
         else Different { approximant = call_kind1 })
-  | ( Function { function_call = Indirect_known_arity; alloc_mode = alloc_mode1 },
+  | ( Function
+        { function_call = Indirect_known_arity code_ids1;
+          alloc_mode = alloc_mode1
+        },
       Function
-        { function_call = Indirect_known_arity; alloc_mode = alloc_mode2 } ) ->
-    compare_alloc_modes_then alloc_mode1 alloc_mode2 ~f:(fun () -> Equivalent)
+        { function_call = Indirect_known_arity code_ids2;
+          alloc_mode = alloc_mode2
+        } ) ->
+    compare_alloc_modes_then alloc_mode1 alloc_mode2 ~f:(fun () ->
+        match code_ids1, code_ids2 with
+        | Unknown, Unknown -> Equivalent
+        | Known code_ids1, Known code_ids2 ->
+          if code_ids_set env code_ids1 code_ids2 |> Comparison.is_equivalent
+          then Equivalent
+          else Different { approximant = call_kind1 }
+        | Unknown, Known _ | Known _, Unknown ->
+          Different { approximant = call_kind1 })
   | ( Function
         { function_call = Indirect_unknown_arity; alloc_mode = alloc_mode1 },
       Function

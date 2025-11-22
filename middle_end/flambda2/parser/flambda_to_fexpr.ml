@@ -1123,7 +1123,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       let alloc = alloc_mode_for_applications env alloc_mode in
       Function (Direct { code_id; function_slot; alloc })
     | Function
-        { function_call = Indirect_unknown_arity | Indirect_known_arity;
+        { function_call = Indirect_unknown_arity | Indirect_known_arity _;
           alloc_mode
         } ->
       let alloc = alloc_mode_for_applications env alloc_mode in
@@ -1136,7 +1136,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   let return_arity = Apply_expr.return_arity app in
   let arities : Fexpr.function_arities option =
     match Apply_expr.call_kind app with
-    | Function { function_call = Indirect_known_arity; alloc_mode = _ } ->
+    | Function { function_call = Indirect_known_arity _; alloc_mode = _ } ->
       let params_arity = Some (complex_arity param_arity) in
       let ret_arity = arity return_arity in
       Some { params_arity; ret_arity }

@@ -521,7 +521,7 @@ let apply apply =
   (* CR mshinwell: Check / fix these numbers *)
   | Function { function_call = Indirect_unknown_arity; alloc_mode = _ } ->
     indirect_call_size
-  | Function { function_call = Indirect_known_arity; alloc_mode = _ } ->
+  | Function { function_call = Indirect_known_arity _; alloc_mode = _ } ->
     indirect_call_size
   | C_call { needs_caml_c_call = true; _ } -> needs_caml_c_call_extcall_size
   | C_call { needs_caml_c_call = false; _ } ->
