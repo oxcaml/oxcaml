@@ -1,5 +1,5 @@
 (* This forces ikinds globally on. *)
-Clflags.ikinds := true
+Clflags.ikinds := true;;
 
 (* Types.ikind_debug := true *)
 let enable_crossing = true
@@ -580,6 +580,20 @@ let sub_jkind_l ?allow_any_crossing ?origin
       match ik_leq with
       | None -> Ok ()
       | Some violating_axes ->
+        let () =
+          if !Types.ikind_debug
+          then
+            let axes =
+              violating_axes
+              |> List.map Axis_lattice.axis_number_to_axis_packed
+              |> List.map
+                   (fun (Jkind_axis.Axis.Pack ax) -> Jkind_axis.Axis.name ax)
+              |> String.concat ", "
+            in
+            Format.eprintf
+              "[ikind-subjkind] failure on axes: %s@;sub=%a@;super=%a@."
+              axes Jkind.format sub Jkind.format super
+        in
         (* Do not try to adjust allowances; Violation.Not_a_subjkind
            accepts an r-jkind. *)
         let axis_reasons =

@@ -411,7 +411,7 @@ let nonfloat_value : t =
     ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.max
     ~contention:Mode.Contention.Const.Uncontended
-    ~forkable:Mode.Forkable.Const.max
+    ~forkable:Mode.Forkable.Const.min
     ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
@@ -426,7 +426,7 @@ let immutable_data : t =
     ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.min
     ~contention:Mode.Contention.Const.Contended
-    ~forkable:Mode.Forkable.Const.max
+    ~forkable:Mode.Forkable.Const.min
     ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable
@@ -441,7 +441,7 @@ let mutable_data : t =
     ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.min
     ~contention:Mode.Contention.Const.Uncontended
-    ~forkable:Mode.Forkable.Const.max
+    ~forkable:Mode.Forkable.Const.min
     ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
@@ -456,7 +456,7 @@ let value : t =
     ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.max
     ~contention:Mode.Contention.Const.Uncontended
-    ~forkable:Mode.Forkable.Const.max
+    ~forkable:Mode.Forkable.Const.min
     ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
@@ -486,7 +486,7 @@ let immediate : t =
     ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability:Mode.Portability.Const.min
     ~contention:Mode.Contention.Const.Contended
-    ~forkable:Mode.Forkable.Const.max
+    ~forkable:Mode.Forkable.Const.min
     ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable
