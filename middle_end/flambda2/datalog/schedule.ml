@@ -545,6 +545,3 @@ let run ?stats schedule db =
   (run_incremental ?stats schedule ~previous:Table.Map.empty ~diff:db
      ~current:db)
     .current
-
-let run_stratified ?stats schedules db =
-  List.fold_left (fun db schedule -> run ?stats schedule db) db schedules

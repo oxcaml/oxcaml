@@ -488,10 +488,6 @@ module Datalog : sig
           the facts that were inferred by [schedule].
       *)
     val run : ?stats:stats -> t -> database -> database
-
-    (** [run_stratified schedule db] runs the schedules in [schedules] on the
-        database [db] once each, in order. *)
-    val run_stratified : ?stats:stats -> t list -> database -> database
   end
 
   type bindings
