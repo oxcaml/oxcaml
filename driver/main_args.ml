@@ -186,9 +186,9 @@ let mk_I_manifest f =
   \    'manifest' means that the compiler should read the specified\n\
   \    manifest file recursively, <visible_path> is the path as interpreted\n\
   \    by the compiler, <actual_path> is where this file is in the\n\
-  \    filesystem (relative to [$DUNE_MANIFEST_LOAD_PATH_ROOT]). The\n\
-  \    manifest file passed to the [-I-manifest] flag should itself be\n\
-  \    relative to [$DUNE_MANIFEST_LOAD_PATH_ROOT]."
+  \    filesystem (relative to [$MANIFEST_FILES_ROOT]). The manifest file\n\
+  \    passed to the [-I-manifest] flag should itself be relative to\n\
+  \    [$MANIFEST_FILES_ROOT]."
 
 let mk_H_manifest f =
   "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given\n\
