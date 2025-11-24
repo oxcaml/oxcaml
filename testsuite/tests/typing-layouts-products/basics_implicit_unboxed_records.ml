@@ -215,7 +215,8 @@ Error:
          because of the definition of t1 at line 1, characters 0-38.
 |}]
 
-(* CR zeisbach: this accidentally broke *)
+(* CR zeisbach: this accidentally broke. maybe this is an example of the
+   same mutual recursion badness that was present already? Poke around! *)
 type 'a t = #{ a : 'a ; a' : 'a } constraint 'a = r#
 and r = { i : int ; f : float# }
 [%%expect{|
