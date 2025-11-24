@@ -826,11 +826,12 @@ module Layout_and_axes = struct
       context:_ ->
       mode:r2 normalize_mode ->
       skip_axes:_ ->
+      previously_ran_out_of_fuel:bool ->
       ?map_type_info:
         (type_expr -> With_bounds_type_info.t -> With_bounds_type_info.t) ->
       (layout, l * r1) layout_and_axes ->
       (layout, l * r2) layout_and_axes * Fuel_status.t =
-   fun ~context ~mode ~skip_axes ?map_type_info t ->
+   fun ~context ~mode ~skip_axes ~previously_ran_out_of_fuel ?map_type_info t ->
     (* handle a few common cases first, before doing anything else *)
     (* DEBUGGING
        Format.printf "@[normalize: %a@;  relevant_axes: %a@]@;"
@@ -918,7 +919,8 @@ module Layout_and_axes = struct
                 skippable_axes : Axis_set.t
               }  (** continue, with a new [t] *)
 
-        let initial_fuel_per_ty = 10
+        let initial_fuel_per_ty =
+          match previously_ran_out_of_fuel with false -> 10 | true -> 1
 
         let starting =
           { tuple_fuel = initial_fuel_per_ty;
@@ -2275,7 +2277,7 @@ module Jkind_desc = struct
   let equate_or_equal ~allow_mutation t1 t2 =
     Layout_and_axes.equal (Layout.equate_or_equal ~allow_mutation) t1 t2
 
-  let sub (type l r) ~type_equal:_ ~context (sub : (allowed * r) jkind_desc)
+  let sub (type l r) ~type_equal:_ ~context ~sub_previously_ran_out_of_fuel (sub : (allowed * r) jkind_desc)
       ({ layout = lay2; mod_bounds = bounds2; with_bounds = No_with_bounds } :
         (l * allowed) jkind_desc) =
     let axes_max_on_right =
@@ -2286,8 +2288,9 @@ module Jkind_desc = struct
     let ( ({ layout = lay1; mod_bounds = bounds1; with_bounds = No_with_bounds } :
             (_ * allowed) jkind_desc),
           _ ) =
-      Layout_and_axes.normalize ~skip_axes:axes_max_on_right ~mode:Ignore_best
-        ~context sub
+      Layout_and_axes.normalize ~skip_axes:axes_max_on_right
+        ~previously_ran_out_of_fuel:sub_previously_ran_out_of_fuel
+        ~mode:Ignore_best ~context sub
     in
     let layout = Layout.sub lay1 lay2 in
     let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
@@ -2510,12 +2513,12 @@ let of_new_non_float_sort_var ~why =
 let of_new_legacy_sort ~why = fst (of_new_legacy_sort_var ~why)
 
 let of_const (type l r) ~annotation ~why ~(quality : (l * r) jkind_quality)
-    (c : (l * r) Const.t) =
+    ~ran_out_of_fuel_during_normalize (c : (l * r) Const.t) =
   { jkind = Layout_and_axes.map Layout.of_const c;
     annotation;
     history = Creation why;
     has_warned = false;
-    ran_out_of_fuel_during_normalize = false;
+    ran_out_of_fuel_during_normalize;
     quality
   }
 
@@ -2525,13 +2528,13 @@ let of_builtin ~why Const.Builtin.{ jkind; name } =
        ~why
          (* The [Best] is OK here because this function is used only in
             Predef. *)
-       ~quality:Best
+       ~quality:Best ~ran_out_of_fuel_during_normalize:false
 
 let of_annotated_const ~context ~annotation ~const ~const_loc =
   let context = Context_with_transl.get_context context in
   of_const ~annotation
     ~why:(Annotated (context, const_loc))
-    const ~quality:Not_best
+    const ~quality:Not_best ~ran_out_of_fuel_during_normalize:false
 
 let of_annotation_lr ~context (annot : Parsetree.jkind_annotation) =
   let const = Const.of_user_written_annotation ~context annot in
@@ -2856,7 +2859,9 @@ let[@inline] normalize ~mode ~context t =
     match mode with Require_best -> Require_best | Ignore_best -> Ignore_best
   in
   let jkind, fuel_result =
-    Layout_and_axes.normalize ~context ~skip_axes:Axis_set.empty ~mode t.jkind
+    Layout_and_axes.normalize ~context ~skip_axes:Axis_set.empty
+      ~previously_ran_out_of_fuel:t.ran_out_of_fuel_during_normalize ~mode
+      t.jkind
   in
   { t with
     jkind;
@@ -2899,7 +2904,9 @@ let get_mode_crossing (type l r) ~context (jk : (l * r) jkind) =
           (_ * allowed) jkind_desc),
         _ ) =
     Layout_and_axes.normalize ~mode:Ignore_best
-      ~skip_axes:Axis_set.all_nonmodal_axes ~context jk.jkind
+      ~skip_axes:Axis_set.all_nonmodal_axes
+      ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize ~context
+      jk.jkind
   in
   Mod_bounds.crossing mod_bounds
 
@@ -2916,7 +2923,9 @@ let get_externality_upper_bound ~context jk =
           (_ * allowed) jkind_desc),
         _ ) =
     Layout_and_axes.normalize ~mode:Ignore_best
-      ~skip_axes:all_except_externality ~context jk.jkind
+      ~skip_axes:all_except_externality
+      ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize ~context
+      jk.jkind
   in
   Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
 
@@ -2948,7 +2957,8 @@ let get_nullability ~context jk =
             (_ * allowed) jkind_desc),
           _ ) =
       Layout_and_axes.normalize ~mode:Ignore_best ~context
-        ~skip_axes:all_except_nullability jk.jkind
+        ~skip_axes:all_except_nullability
+        ~previously_ran_out_of_fuel:jk.ran_out_of_fuel_during_normalize jk.jkind
     in
     Mod_bounds.get mod_bounds ~axis:(Nonmodal Nullability)
 
@@ -3745,8 +3755,11 @@ let combine_histories ~type_equal ~context reason (Pack_jkind k1)
       then history_a
       else history_b
     in
-    let choose_subjkind_history k_a history_a k_b history_b =
-      match Jkind_desc.sub ~type_equal ~context k_a k_b with
+    let choose_subjkind_history k_a history_a roofdn_a k_b history_b =
+      match
+        Jkind_desc.sub ~type_equal
+          ~sub_previously_ran_out_of_fuel:roofdn_a ~context k_a k_b
+      with
       | Less -> history_a
       | Not_le _ ->
         (* CR layouts: this will be wrong if we ever have a non-trivial meet in
@@ -3756,11 +3769,13 @@ let combine_histories ~type_equal ~context reason (Pack_jkind k1)
     in
     match Layout_and_axes.(try_allow_l k1.jkind, try_allow_r k2.jkind) with
     | Some k1_l, Some k2_r ->
-      choose_subjkind_history k1_l k1.history k2_r k2.history
+      choose_subjkind_history k1_l k1.history
+        k1.ran_out_of_fuel_during_normalize k2_r k2.history
     | _ -> (
       match Layout_and_axes.(try_allow_r k1.jkind, try_allow_l k2.jkind) with
       | Some k1_r, Some k2_l ->
-        choose_subjkind_history k2_l k2.history k1_r k1.history
+        choose_subjkind_history k2_l k2.history
+          k2.ran_out_of_fuel_during_normalize k1_r k1.history
       | _ -> choose_higher_scored_history k1.history k2.history)
   else
     Interact
@@ -3810,7 +3825,10 @@ let map_type_expr f t =
 let check_sub ~context sub super = Jkind_desc.sub ~context sub.jkind super.jkind
 
 let sub_with_reason ~type_equal ~context sub super =
-  Sub_result.require_le (check_sub ~type_equal ~context sub super)
+  Sub_result.require_le
+    (check_sub ~type_equal
+       ~sub_previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize
+       ~context sub super)
 
 let sub ~type_equal ~context sub super =
   Result.is_ok (sub_with_reason ~type_equal ~context sub super)
@@ -3898,8 +3916,9 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) sub super =
       (* [Jkind_desc.map_normalize] handles the stepping, jkind lookups, and
          joining.  [map_type_info] handles looking for [ty] on the right and
          removing irrelevant axes. *)
-      Layout_and_axes.normalize sub.jkind ~skip_axes:axes_max_on_right ~context
-        ~mode:Ignore_best
+      Layout_and_axes.normalize sub.jkind ~skip_axes:axes_max_on_right
+        ~previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize
+        ~context ~mode:Ignore_best
         ~map_type_info:(fun ty { relevant_axes = left_relevant_axes } ->
           let right_relevant_axes =
             (* Look for [ty] on the right. There may be multiple occurrences of

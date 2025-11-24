@@ -113,6 +113,7 @@ type additional_action_config =
 module Builtins_memo : sig
   val find :
     quality:('l * 'r) jkind_quality ->
+    ran_out_of_fuel_during_normalize:bool ->
     ('l * 'r) Jkind.Const.t ->
     ('l * 'r) jkind option
 end = struct
@@ -120,7 +121,12 @@ end = struct
 
   type 'd builtins = ('d Jkind.Const.t * 'd jkind) list
 
-  let make_builtins (type l r) (quality : (l * r) jkind_quality) : (l * r) builtins =
+  let make_builtins
+        (type l r)
+        (quality : (l * r) jkind_quality)
+        ~ran_out_of_fuel_during_normalize
+    : (l * r) builtins
+    =
     Jkind.Const.Builtin.all
     |> List.map (fun (builtin : Jkind.Const.Builtin.t) ->
       let const_jkind : (l * r) Jkind.Const.t =
@@ -129,16 +135,39 @@ end = struct
       Jkind.of_const
         const_jkind
         ~quality
+        ~ran_out_of_fuel_during_normalize
         ~annotation:(Some { pjkind_loc = Location.none;
                             pjkind_desc = Pjk_abbreviation builtin.name })
         ~why:Jkind.History.Imported)
 
-  let best_builtins : (allowed * disallowed) builtins = make_builtins Best
-  let not_best_builtins : (allowed * allowed) builtins = make_builtins Not_best
+  let best_builtins =
+    let sufficient_fuel =
+      make_builtins Best ~ran_out_of_fuel_during_normalize:false
+    in
+    let ran_out_of_fuel =
+      make_builtins Best ~ran_out_of_fuel_during_normalize:true
+    in
+    fun ~ran_out_of_fuel_during_normalize : (allowed * disallowed) builtins ->
+      match ran_out_of_fuel_during_normalize with
+      | false -> sufficient_fuel
+      | true -> ran_out_of_fuel
+
+  let not_best_builtins =
+    let sufficient_fuel =
+      make_builtins Not_best ~ran_out_of_fuel_during_normalize:false
+    in
+    let ran_out_of_fuel =
+      make_builtins Not_best ~ran_out_of_fuel_during_normalize:true
+    in
+    fun ~ran_out_of_fuel_during_normalize : (allowed * allowed) builtins ->
+      match ran_out_of_fuel_during_normalize with
+      | false -> sufficient_fuel
+      | true -> ran_out_of_fuel
 
   let find
         (type l r)
         ~(quality : (l * r) jkind_quality)
+        ~ran_out_of_fuel_during_normalize
         (const : (l * r) Jkind.Const.t)
     : (l * r) jkind option
     =
@@ -148,14 +177,14 @@ end = struct
          Jkind.Const.no_with_bounds_and_equal
            (const |> Jkind.Const.disallow_right)
            (builtin |> Jkind.Const.allow_left))
-       best_builtins
+       (best_builtins ~ran_out_of_fuel_during_normalize)
        |> Option.map (fun (_, jkind) -> jkind |> Jkind.allow_left)
      | Not_best ->
        List.find_opt (fun (builtin, _) ->
          Jkind.Const.no_with_bounds_and_equal
            const
            (builtin |> Jkind.Const.allow_left |> Jkind.Const.allow_right))
-         not_best_builtins
+         (not_best_builtins ~ran_out_of_fuel_during_normalize)
        |> Option.map (fun (_, jkind) -> jkind |> Jkind.allow_left |> Jkind.allow_right)
     )
 end
@@ -179,9 +208,23 @@ let with_additional_action =
         let prepare_jkind (type l r) loc (jkind : (l * r) jkind) =
           match Jkind.get_const jkind with
           | Some const ->
-            begin match Builtins_memo.find ~quality:jkind.quality const with
+            let memoized =
+              Builtins_memo.find
+                ~quality:jkind.quality
+                ~ran_out_of_fuel_during_normalize:
+                  jkind.ran_out_of_fuel_during_normalize
+                const
+            in
+            begin match memoized with
             | Some jkind -> jkind
-            | None -> Jkind.of_const ~quality:jkind.quality const ~annotation:None ~why:Imported
+            | None ->
+              Jkind.of_const
+                ~quality:jkind.quality
+                ~ran_out_of_fuel_during_normalize:
+                  jkind.ran_out_of_fuel_during_normalize
+                const
+                ~annotation:None
+                ~why:Imported
             end
           | None -> raise(Error (loc, Unconstrained_jkind_variable))
         in
