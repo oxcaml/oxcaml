@@ -3633,21 +3633,32 @@ module Violation = struct
      indeed just about the payload.) *)
 
   let of_ ~context ?missing_cmi violation =
-    (* Normalize for better printing *)
+    (* Normalize the jkinds for better printing. *)
     let violation =
+      (* A jkind that is the result of previously running out of fuel may not
+         run out of fuel here (maybe it was [Ignore_best] normalization before,
+         but [Require_best] normalization here). But for error reporting, we
+         should still mention that we ran out of fuel in this case. *)
+      let best_normalize_while_preserving_fuel_status original =
+        let normalized =
+          normalize ~mode:Require_best ~context (disallow_right original)
+        in
+        { normalized with
+          jkind =
+            { normalized.jkind with
+              ran_out_of_fuel_during_normalize =
+                original.jkind.ran_out_of_fuel_during_normalize
+                || normalized.jkind.ran_out_of_fuel_during_normalize
+            }
+        }
+      in
       match violation with
       | Not_a_subjkind (jkind1, jkind2, reasons) ->
-        let jkind1 =
-          normalize ~mode:Require_best ~context (disallow_right jkind1)
-        in
-        let jkind2 =
-          normalize ~mode:Require_best ~context (disallow_right jkind2)
-        in
+        let jkind1 = best_normalize_while_preserving_fuel_status jkind1 in
+        let jkind2 = best_normalize_while_preserving_fuel_status jkind2 in
         Not_a_subjkind (jkind1, jkind2, reasons)
       | No_intersection (jkind1, jkind2) ->
-        let jkind1 =
-          normalize ~mode:Require_best ~context (disallow_right jkind1)
-        in
+        let jkind1 = best_normalize_while_preserving_fuel_status jkind1 in
         (* jkind2 can't have with-bounds, by its type *)
         No_intersection (jkind1, jkind2)
     in
