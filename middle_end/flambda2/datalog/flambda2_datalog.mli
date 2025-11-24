@@ -436,6 +436,64 @@ module Datalog : sig
       unit
   end
 
+  (** The type of compiled rules.
+
+      Rule specifications must be compiled to low-level rules using
+      {!compile_rule} before being applied to a database using {!Schedule.rules}.
+
+      {b Note}: Although compiled rules are mutable data structures, this
+      mutability is only exploited while the compiled rule is executing (e.g.
+      during {!Schedule.run}). It is thus safe to reuse a [rule] across
+      multiple schedules or within the same schedule.
+  *)
+  type rule
+
+  module Schedule : sig
+    (** Enable provenance tracking in rules.
+
+      This makes the computation of rules slower and should only be enabled for
+      debugging.
+
+      {b Warning}: This flag is used during the compilation of rules. Enabling it
+      will {b not} allow provenance tracking for rules that already exist. *)
+    val enable_provenance_for_debug : unit -> unit
+
+    type t
+
+    (** [saturate rules] is a schedule that repeatedly applies the rules in
+          [rules] until reaching a fixpoint.
+
+          {b Note}: [saturate rules] is equivalent to [fixpoint (rules rules)], but
+          is (slightly) more efficient. It is not necessary to wrap a [saturate]
+          schedule in a [fixpoint].
+      *)
+    val saturate : rule list -> t
+
+    (** [fixpoint schedules] repeatedly runs the schedules in [schedules] until
+          reaching a fixpoint.
+
+          Facts added by previous schedules in the list are visible.
+      *)
+    val fixpoint : t list -> t
+
+    type stats
+
+    val create_stats : database -> stats
+
+    val print_stats : Format.formatter -> stats -> unit
+
+    (** [run schedule db] runs the schedule [schedule] on the database [db].
+
+          It returns a new database that contains all the facts in [db], plus all
+          the facts that were inferred by [schedule].
+      *)
+    val run : ?stats:stats -> t -> database -> database
+
+    (** [run_stratified schedule db] runs the schedules in [schedules] on the
+        database [db] once each, in order. *)
+    val run_stratified : ?stats:stats -> t list -> database -> database
+  end
+
   type bindings
 
   val print_bindings : Format.formatter -> bindings -> unit
@@ -457,16 +515,13 @@ module Datalog : sig
       Repeated compilation of a program building mutable values (such as
       cursors) create new values each time they are compiled.
     *)
-  val compile :
-    'v String.hlist ->
-    ('v Term.hlist -> (nil, 'a) program) ->
-    (nil, 'a) Cursor.with_parameters
+  val compile : 'v String.hlist -> ('v Term.hlist -> (nil, 'a) program) -> 'a
 
   val compile_with_parameters :
     'p String.hlist ->
     'v String.hlist ->
-    ('p Term.hlist -> 'v Term.hlist -> (nil, 'a) program) ->
-    ('p, 'a) Cursor.with_parameters
+    ('p Term.hlist -> 'v Term.hlist -> ('p, 'a) program) ->
+    'a
 
   (** [foreach vars prog] binds the variables [vars] in [prog].
 
@@ -479,87 +534,13 @@ module Datalog : sig
   val where : hypothesis list -> ('p, 'a) program -> ('p, 'a) program
 
   (** [yield args] is a query program that outputs the tuple [args]. *)
-  val yield : 'v Term.hlist -> (nil, 'v) program
+  val yield : 'v Term.hlist -> ('p, ('p, 'v) Cursor.with_parameters) program
 
   type deduction =
     [ `Atom of atom
     | `And of deduction list ]
 
   val and_ : 'a list -> [> `And of 'a list]
-
-  (* Monadic binding API *)
-
-  type ('a, 'b, 'c, 'd) binder =
-    ('a Term.hlist -> ('b, 'c) program) -> ('d, 'c) program
-
-  val ( let@ ) :
-    ('a, 'b, 'c, 'd) binder ->
-    ('a Term.hlist -> ('b, 'c) program) ->
-    ('d, 'c) program
-
-  val variables : 'v String.hlist -> ('v, 'p, 'c, 'p) binder
-
-  val parameters : 'p String.hlist -> ('p, nil, 'c, 'p) binder
-
-  val query : ('a, 'b) program -> ('a, 'b) Cursor.with_parameters
-
-  (** The type of compiled rules.
-
-        Rule specifications must be compiled to low-level rules using
-        {!compile_rule} before being applied to a database using {!Schedule.rules}.
-
-        {b Note}: Although compiled rules are mutable data structures, this
-        mutability is only exploited while the compiled rule is executing (e.g.
-        during {!Schedule.run}). It is thus safe to reuse a [rule] across
-        multiple schedules or within the same schedule.
-    *)
-  type rule
-
-  module Schedule : sig
-    (** Enable provenance tracking in rules.
-
-        This makes the computation of rules slower and should only be enabled for
-        debugging.
-
-        {b Warning}: This flag is used during the compilation of rules. Enabling it
-        will {b not} allow provenance tracking for rules that already exist. *)
-    val enable_provenance_for_debug : unit -> unit
-
-    type t
-
-    (** [saturate rules] is a schedule that repeatedly applies the rules in
-            [rules] until reaching a fixpoint.
-
-            {b Note}: [saturate rules] is equivalent to [fixpoint (rules rules)], but
-            is (slightly) more efficient. It is not necessary to wrap a [saturate]
-            schedule in a [fixpoint].
-        *)
-    val saturate : (nil, rule) program list -> t
-
-    (** [fixpoint schedules] repeatedly runs the schedules in [schedules] until
-            reaching a fixpoint.
-
-            Facts added by previous schedules in the list are visible.
-        *)
-    val fixpoint : t list -> t
-
-    type stats
-
-    val create_stats : database -> stats
-
-    val print_stats : Format.formatter -> stats -> unit
-
-    (** [run schedule db] runs the schedule [schedule] on the database [db].
-
-            It returns a new database that contains all the facts in [db], plus all
-            the facts that were inferred by [schedule].
-        *)
-    val run : ?stats:stats -> t -> database -> database
-
-    (** [run_stratified schedule db] runs the schedules in [schedules] on the
-        database [db] once each, in order. *)
-    val run_stratified : ?stats:stats -> t list -> database -> database
-  end
 
   (** [deduce rel args] adds the fact [rel args] to the database. *)
   val deduce : deduction -> (nil, rule) program

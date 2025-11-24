@@ -221,11 +221,12 @@ module Datalog = struct
       f predicates
 
   module Cursor = struct
-    type ('p, 'v) with_parameters = ('p, 'v) Datalog.cursor
+    type ('p, 'v) with_parameters = ('p, 'v) Cursor.With_parameters.t
+    (* ('p, (action, 'v Constant.hlist, nil) Cursor0.instruction) cursor *)
 
     type 'v t = (nil, 'v) with_parameters
 
-    let print = Datalog.print_cursor
+    let print = Cursor.With_parameters.print
 
     let create variables f =
       compile variables @@ fun variables ->
@@ -235,18 +236,16 @@ module Datalog = struct
       compile_with_parameters parameters variables (fun parameters variables ->
           where (f parameters variables) (yield variables))
 
-    let iter_with_parameters cursor parameters database ~f =
-      ignore (Datalog.naive_iter cursor parameters database ~f)
-
-    let iter cursor database ~f = iter_with_parameters cursor [] database ~f
-
     let fold_with_parameters cursor parameters database ~init ~f =
-      let acc = ref init in
-      iter_with_parameters cursor parameters database ~f:(fun args ->
-          acc := f args !acc);
-      !acc
+      Cursor.With_parameters.naive_fold cursor parameters database f init
 
     let fold cursor database ~init ~f =
-      fold_with_parameters cursor [] database ~init ~f
+      Cursor.With_parameters.naive_fold cursor [] database f init
+
+    let iter_with_parameters cursor parameters database ~f =
+      Cursor.With_parameters.naive_iter cursor parameters database f
+
+    let iter cursor database ~f =
+      Cursor.With_parameters.naive_iter cursor [] database f
   end
 end

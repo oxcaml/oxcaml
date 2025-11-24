@@ -170,18 +170,12 @@ let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
 module Syntax = struct
   include Datalog
 
-  let ( let$ ) xs f =
-    let@ xs = variables xs in
-    f xs
+  let query q = q
 
-  let ( let^ ) ps f =
-    let@ ps = parameters ps in
-    f ps
+  let ( let$ ) xs f = compile xs f
 
   let ( let^$ ) (ps, xs) f =
-    let@ ps = parameters ps in
-    let@ xs = variables xs in
-    f (ps, xs)
+    compile_with_parameters ps xs (fun ps xs -> f (ps, xs))
 
   let rec flatten_hypotheses l =
     match l with
@@ -686,37 +680,35 @@ module Fixit : sig
 
   val fix :
     ('a, 'b) Table.hlist ->
-    (('a, 'b) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
+    (('a, 'b) Table.hlist -> Datalog.rule list) ->
     (('a, 'b) Table.hlist -> ('x, 'y, 'd) stmt) ->
     ('x, 'y, 'd) stmt
 
   val seq :
     ('a, 'b) Table.hlist ->
-    (('a, 'b) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
+    (('a, 'b) Table.hlist -> Datalog.rule list) ->
     (('a, 'b) Table.hlist -> ('x, 'y, 'd) stmt) ->
     ('x, 'y, 'd) stmt
 
   val fix1 :
     ('t, 'k, unit) Datalog.table ->
-    (('t, 'k, unit) Datalog.table ->
-    (Datalog.nil, Datalog.rule) Datalog.program list) ->
+    (('t, 'k, unit) Datalog.table -> Datalog.rule list) ->
     (('t, 'k, unit) Datalog.table -> ('x, 'y, 'd) stmt) ->
     ('x, 'y, 'd) stmt
 
   val fix' :
     ('a, 'b) Table.hlist ->
-    (('a, 'b) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
+    (('a, 'b) Table.hlist -> Datalog.rule list) ->
     ('a Datalog.Constant.hlist, 'c, 'c) stmt
 
   val seq' :
     ('a, 'b) Table.hlist ->
-    (('a, 'b) Table.hlist -> (Datalog.nil, Datalog.rule) Datalog.program list) ->
+    (('a, 'b) Table.hlist -> Datalog.rule list) ->
     ('a Datalog.Constant.hlist, 'c, 'c) stmt
 
   val fix1' :
     ('t, 'k, unit) Datalog.table ->
-    (('t, 'k, unit) Datalog.table ->
-    (Datalog.nil, Datalog.rule) Datalog.program list) ->
+    (('t, 'k, unit) Datalog.table -> Datalog.rule list) ->
     ('t, 'c, 'c) stmt
 
   val ( let@ ) : ('a -> 'b) -> 'a -> 'b
@@ -1857,8 +1849,9 @@ let get_single_field_source =
   in
   let q_source =
     query
-      (let^ [block; field] = ["block"; "field"] in
-       let$ [field_source; source] = ["field_source"; "source"] in
+      (let^$ [block; field], [field_source; source] =
+         ["block"; "field"], ["field_source"; "source"]
+       in
        [field_sources block field field_source; sources field_source source]
        =>? [source])
   in
