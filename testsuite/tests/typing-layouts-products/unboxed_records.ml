@@ -2,9 +2,6 @@
  reference = "${test_source_directory}/unboxed_records.reference";
  include stdlib_upstream_compatible;
  flambda2;
- (* CR lmaurer: Remove skip after rebasing *)
- reason = "temporarily disabled";
- skip;
  {
    ocamlc_byte_exit_status = "2";
    setup-ocamlc.byte-build-env;

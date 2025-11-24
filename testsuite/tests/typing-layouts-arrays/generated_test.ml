@@ -3,9 +3,6 @@
  include stdlib_upstream_compatible;
  modules = "stubs.c";
  flags = "-extension simd_beta";
- (* CR lmaurer: Re-enable after rebase *)
- reason = "temporarily disabled";
- skip;
  flambda2;
  stack-allocation;
  native;

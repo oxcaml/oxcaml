@@ -2,9 +2,6 @@
  modules = "block_checks.ml";
  flambda2;
  stack-allocation;
- (* CR lmaurer: Re-enable after rebase *)
- reason = "temporarily disabled";
- skip;
  {
    bytecode;
  } {

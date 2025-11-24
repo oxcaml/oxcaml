@@ -605,9 +605,6 @@ let main ~bytecode =
   ) else (
     line {| modules = "stubs.c";|};
     line {| flags = "-extension simd_beta";|};
-    line {| (* CR lmaurer: Re-enable after rebase *)|};
-    line {| reason = "temporarily disabled";|};
-    line {| skip;|};
     line {| flambda2;|};
     line {| stack-allocation;|};
     line {| native;|};
