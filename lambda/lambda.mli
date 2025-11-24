@@ -571,6 +571,8 @@ and raise_kind =
   | Raise_reraise
   | Raise_notrace
 
+val equal_raise_kind : raise_kind -> raise_kind -> bool
+
 val equal_value_kind : value_kind -> value_kind -> bool
 
 val equal_layout : layout -> layout -> bool

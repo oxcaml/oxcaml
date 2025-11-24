@@ -56,6 +56,8 @@ tracked by the GC:
 
 type machtype = machtype_component array
 
+val equal_machtype : machtype -> machtype -> bool
+
 val typ_void : machtype
 
 val typ_val : machtype
@@ -170,14 +172,20 @@ type atomic_op =
   | Compare_set
   | Compare_exchange
 
+val equal_atomic_op : atomic_op -> atomic_op -> bool
+
 type atomic_bitwidth =
   | Thirtytwo
   | Sixtyfour
   | Word
 
+val equal_atomic_bitwidth : atomic_bitwidth -> atomic_bitwidth -> bool
+
 type effects =
   | No_effects
   | Arbitrary_effects
+
+val equal_effects : effects -> effects -> bool
 
 type coeffects =
   | No_coeffects
@@ -358,6 +366,8 @@ type alloc_block_kind =
   | Alloc_block_kind_vec256_u_array
   | Alloc_block_kind_vec512_u_array
 
+val equal_alloc_block_kind : alloc_block_kind -> alloc_block_kind -> bool
+
 (** Due to Comballoc, a single Ialloc instruction may combine several
     unrelated allocations. Their Debuginfo.t (which may differ) are stored
     as a list of alloc_dbginfo. This list is in order of increasing memory
@@ -477,6 +487,8 @@ type symbol =
   { sym_name : string;
     sym_global : is_global
   }
+
+val equal_symbol : symbol -> symbol -> bool
 
 (* SIMD vectors are untyped in the backend. This record holds the bitwise
    representation of a 128-bit value. [word0] is the least significant word. *)

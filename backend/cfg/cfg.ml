@@ -797,3 +797,107 @@ let remove_blocks t labels_to_remove =
     Misc.fatal_errorf "Cfg.remove_blocks: not found blocks %a" Label.Set.print
       labels_not_found;
   remove_trap_instructions t !removed_trap_handlers
+
+let equal_basic left right =
+  match left, right with
+  | Op left_op, Op right_op -> Operation.equal left_op right_op
+  | Reloadretaddr, Reloadretaddr -> true
+  | Pushtrap { lbl_handler = left_lbl }, Pushtrap { lbl_handler = right_lbl }
+  | Poptrap { lbl_handler = left_lbl }, Poptrap { lbl_handler = right_lbl } ->
+    Label.equal left_lbl right_lbl
+  | Prologue, Prologue | Epilogue, Epilogue -> true
+  | ( Stack_check { max_frame_size_bytes = left_size },
+      Stack_check { max_frame_size_bytes = right_size } ) ->
+    Int.equal left_size right_size
+  | ( ( Op _ | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+      | Stack_check _ ),
+      _ ) ->
+    false
+
+let equal_bool_test (left : bool_test) (right : bool_test) =
+  Label.equal left.ifso right.ifso && Label.equal left.ifnot right.ifnot
+
+let equal_int_test (left : int_test) (right : int_test) =
+  Label.equal left.lt right.lt
+  && Label.equal left.eq right.eq
+  && Label.equal left.gt right.gt
+  && Scalar.Signedness.equal left.is_signed right.is_signed
+  && Option.equal Int.equal left.imm right.imm
+
+let equal_float_test (left : float_test) (right : float_test) =
+  Cmm.equal_float_width left.width right.width
+  && Label.equal left.lt right.lt
+  && Label.equal left.eq right.eq
+  && Label.equal left.gt right.gt
+  && Label.equal left.uo right.uo
+
+let equal_func_call_operation left right =
+  match left, right with
+  | Indirect, Indirect -> true
+  | Direct left_sym, Direct right_sym -> Cmm.equal_symbol left_sym right_sym
+  | (Indirect | Direct _), _ -> false
+
+let equal_external_call_operation left right =
+  String.equal left.func_symbol right.func_symbol
+  && Bool.equal left.alloc right.alloc
+  && Cmm.equal_effects left.effects right.effects
+  && Cmm.equal_machtype left.ty_res right.ty_res
+  && List.equal Cmm.equal_exttype left.ty_args right.ty_args
+  && Int.equal left.stack_ofs right.stack_ofs
+  && Cmm.equal_stack_align left.stack_align right.stack_align
+
+let equal_prim_call_operation left right =
+  match left, right with
+  | External left_op, External right_op ->
+    equal_external_call_operation left_op right_op
+  | ( Probe
+        { name = left_name;
+          handler_code_sym = left_handler;
+          enabled_at_init = left_enabled
+        },
+      Probe
+        { name = right_name;
+          handler_code_sym = right_handler;
+          enabled_at_init = right_enabled
+        } ) ->
+    String.equal left_name right_name
+    && String.equal left_handler right_handler
+    && Bool.equal left_enabled right_enabled
+  | (External _ | Probe _), _ -> false
+
+let equal_with_label_after equal_op left right =
+  equal_op left.op right.op && Label.equal left.label_after right.label_after
+
+let equal_terminator left right =
+  match left, right with
+  | Never, Never -> true
+  | Always left_lbl, Always right_lbl -> Label.equal left_lbl right_lbl
+  | Parity_test left_test, Parity_test right_test
+  | Truth_test left_test, Truth_test right_test ->
+    equal_bool_test left_test right_test
+  | Float_test left_test, Float_test right_test ->
+    equal_float_test left_test right_test
+  | Int_test left_test, Int_test right_test ->
+    equal_int_test left_test right_test
+  | Switch left_labels, Switch right_labels ->
+    Int.equal (Array.length left_labels) (Array.length right_labels)
+    && Array.for_all2 Label.equal left_labels right_labels
+  | Return, Return -> true
+  | Raise left_kind, Raise right_kind ->
+    Lambda.equal_raise_kind left_kind right_kind
+  | ( Tailcall_self { destination = left_dest },
+      Tailcall_self { destination = right_dest } ) ->
+    Label.equal left_dest right_dest
+  | Tailcall_func left_op, Tailcall_func right_op ->
+    equal_func_call_operation left_op right_op
+  | Call_no_return left_op, Call_no_return right_op ->
+    equal_external_call_operation left_op right_op
+  | Call left_call, Call right_call ->
+    equal_with_label_after equal_func_call_operation left_call right_call
+  | Prim left_prim, Prim right_prim ->
+    equal_with_label_after equal_prim_call_operation left_prim right_prim
+  | ( ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+      | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+      | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ),
+      _ ) ->
+    false
