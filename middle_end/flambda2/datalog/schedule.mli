@@ -43,5 +43,3 @@ val saturate : rule list -> t
 val fixpoint : t list -> t
 
 val run : ?stats:stats -> t -> Table.Map.t -> Table.Map.t
-
-val run_stratified : ?stats:stats -> t list -> Table.Map.t -> Table.Map.t
