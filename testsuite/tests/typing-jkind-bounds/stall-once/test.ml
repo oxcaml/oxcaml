@@ -26,8 +26,8 @@ type 'a t = {
     portable;
 }
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>
-Line 6, characters 52-53:
-6 | let f (t : int list list list t) = require_portable t
+Line 8, characters 52-53:
+8 | let f (t : int list list list t) = require_portable t
                                                         ^
 Error: This expression has type "int list list list t"
        but an expression was expected of type "('a : value mod portable)"

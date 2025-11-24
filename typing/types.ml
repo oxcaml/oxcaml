@@ -345,8 +345,7 @@ and 'd with_bounds =
 and ('layout, 'd) layout_and_axes =
   { layout : 'layout;
     mod_bounds : Jkind_mod_bounds.t;
-    with_bounds : 'd with_bounds;
-    ran_out_of_fuel_during_normalize : bool;
+    with_bounds : 'd with_bounds
   }
   constraint 'd = 'l * 'r
 
@@ -364,6 +363,7 @@ and 'd jkind =
     annotation : Parsetree.jkind_annotation option;
     history : jkind_history;
     has_warned : bool;
+    ran_out_of_fuel_during_normalize : bool;
     quality : 'd jkind_quality;
   }
   constraint 'd = 'l * 'r

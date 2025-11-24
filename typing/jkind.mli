@@ -496,6 +496,7 @@ val of_const :
   annotation:Parsetree.jkind_annotation option ->
   why:History.creation_reason ->
   quality:'d Types.jkind_quality ->
+  ran_out_of_fuel_during_normalize:bool ->
   'd Const.t ->
   'd Types.jkind
 
