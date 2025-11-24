@@ -3235,8 +3235,10 @@ let get_nullability jk =
   match get_root_scannable_axes jk with
   | Some { nullability; _ } -> nullability
   (* CR zeisbach: this might be the entirely wrong default! But this might
-     not matter either? THINK AND ASK! *)
-  (* TRY THIS IN THE OTHER DIRECTION! *)
+     not matter either? THINK AND ASK!
+     UPDATE: after trying this both ways, it doesn't make a difference
+     at least on the tests. Nor does [assert false]. It's worth experimenting
+     a little more with this though; maybe this can be deleted! *)
   | None -> Nullability.Non_null
 
 let set_root_nullability jk nullability =
