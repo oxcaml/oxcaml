@@ -48,7 +48,7 @@ type binder =
       }
       -> binder
 
-let _print_binder ppf (Binder { table_id; _ }) = Table.Id.print ppf table_id
+let print_binder ppf (Binder { table_id; _ }) = Table.Id.print ppf table_id
 
 type rule_id = Rule_id of int [@@unboxed]
 
@@ -104,8 +104,6 @@ type provenance =
   | Input
   | Rule of rule_id * Datalog.bindings
 
-let _ = ignore (Rule (fresh_rule_id (), Obj.magic 0))
-
 let add_if_not_exists sources tid args provenance =
   let fact = Fact_id (tid, args) in
   match FactMap.find_opt fact sources with
@@ -124,20 +122,20 @@ let add_if_not_exists sources tid args provenance =
       - An unique identifier for logging/tracing purposes.
 
     The cursor embeds callbacks to update the [binder]s. *)
-type actual_rule =
+type rule =
   | Rule :
-      { cursor : (nil, 'a) Datalog.cursor;
+      { cursor : 'a Cursor.t;
+        binders : binder list;
+        provenance_table_ref : provenance FactMap.t ref;
         rule_id : rule_id
       }
-      -> actual_rule
-
-type rule = (nil, unit) Datalog.cursor
+      -> rule
 
 type deduction =
   [ `Atom of Datalog.atom
   | `And of deduction list ]
 
-let _find_or_create_ref (type t k v) binders (table_id : (t, k, v) Table.Id.t) :
+let find_or_create_ref (type t k v) binders (table_id : (t, k, v) Table.Id.t) :
     t incremental ref =
   let uid = Table.Id.uid table_id in
   match Hashtbl.find_opt binders uid with
@@ -157,67 +155,59 @@ let deduce (atoms : deduction) =
     | `Atom atom -> f atom acc
     | `And atoms -> List.fold_left (fun acc atoms -> fold f atoms acc) acc atoms
   in
-  let deductions =
+  let rule_id = fresh_rule_id () in
+  let binders : (int, binder) Hashtbl.t = Hashtbl.create 17 in
+  let provenance_table_ref = ref FactMap.empty in
+  let callbacks =
     fold
-      (fun (Datalog.Atom (tid, args)) deductions ->
-        Datalog.deduction tid args :: deductions)
+      (fun (Datalog.Atom (tid, args)) callbacks ->
+        let is_trie = Table.Id.is_trie tid in
+        let table_ref = find_or_create_ref binders tid in
+        let[@inline] callback_fn ~accept keys =
+          let incremental_table = !table_ref in
+          match Trie.find_opt is_trie keys incremental_table.current with
+          | Some _ -> ()
+          | None ->
+            (accept [@inlined hint]) ();
+            table_ref
+              := incremental
+                   ~current:
+                     (Trie.add_or_replace is_trie keys ()
+                        incremental_table.current)
+                   ~difference:
+                     (Trie.add_or_replace is_trie keys ()
+                        incremental_table.difference)
+        in
+        let name = Table.Id.name tid ^ ".insert" in
+        let callback =
+          if !use_provenance
+          then
+            Datalog.create_callback_with_bindings ~name
+              (fun bindings keys ->
+                callback_fn
+                  ~accept:(fun [@inline] () ->
+                    provenance_table_ref
+                      := add_if_not_exists !provenance_table_ref tid keys
+                           (Rule (rule_id, bindings) : provenance))
+                  keys)
+              args
+          else
+            Datalog.create_callback ~name
+              (fun keys -> callback_fn ~accept:(fun [@inline] () -> ()) keys)
+              args
+        in
+        callback :: callbacks)
       atoms []
   in
-  Datalog.accumulate deductions
-(*
- * let binders : (int, binder) Hashtbl.t = Hashtbl.create 17 in
- * let provenance_table_ref = ref FactMap.empty in
- * let callbacks =
- *   fold
- *     (fun (Datalog.Atom (tid, args)) callbacks ->
- *       let is_trie = Table.Id.is_trie tid in
- *       let table_ref = find_or_create_ref binders tid in
- *       let[@inline] callback_fn ~accept keys =
- *         let incremental_table = !table_ref in
- *         match Trie.find_opt is_trie keys incremental_table.current with
- *         | Some _ -> ()
- *         | None ->
- *           (accept [@inlined hint]) ();
- *           table_ref
- *             := incremental
- *                  ~current:
- *                    (Trie.add_or_replace is_trie keys ()
- *                       incremental_table.current)
- *                  ~difference:
- *                    (Trie.add_or_replace is_trie keys ()
- *                       incremental_table.difference)
- *       in
- *       let name = Table.Id.name tid ^ ".insert" in
- *       let callback =
- *         if !use_provenance
- *         then
- *           Datalog.create_callback_with_bindings ~name
- *             (fun bindings keys ->
- *               callback_fn
- *                 ~accept:(fun [@inline] () ->
- *                   provenance_table_ref
- *                     := add_if_not_exists !provenance_table_ref tid keys
- *                          (Rule (rule_id, bindings) : provenance))
- *                 keys)
- *             args
- *         else
- *           Datalog.create_callback ~name
- *             (fun keys -> callback_fn ~accept:(fun [@inline] () -> ()) keys)
- *             args
- *       in
- *       callback :: callbacks)
- *     atoms []
- * in
- * let binders =
- *   Hashtbl.fold (fun _ binder binders -> binder :: binders) binders []
- * in
- * Datalog.map_program (Datalog.execute callbacks) (fun cursor ->
- *     let cursor = Cursor.With_parameters.without_parameters cursor in
- *     Rule { cursor; binders; provenance_table_ref; rule_id })
- *)
+  let binders =
+    Hashtbl.fold (fun _ binder binders -> binder :: binders) binders []
+  in
+  Datalog.map_program (Datalog.execute callbacks) (fun cursor ->
+      let cursor = Cursor.With_parameters.without_parameters cursor in
+      Rule { cursor; binders; provenance_table_ref; rule_id })
 
 type stats =
-  { timings : (rule_id, actual_rule * float) Hashtbl.t;
+  { timings : (rule_id, rule * float) Hashtbl.t;
     mutable provenance : provenance FactMap.t
   }
 
@@ -233,13 +223,10 @@ let provenance_from_db db =
           (vars (Table.Id.columns tid))
           (fun args -> Datalog.where_atom tid args (Datalog.yield args))
       in
-      let provenance = ref provenance in
-      let db' =
-        Datalog.naive_iter cursor [] db ~f:(fun args ->
-            provenance := add_if_not_exists !provenance tid args Input)
-      in
-      assert (Table.Map.is_empty db');
-      !provenance)
+      let cursor = Cursor.With_parameters.without_parameters cursor in
+      Cursor.naive_fold cursor db
+        (fun args provenance -> add_if_not_exists provenance tid args Input)
+        provenance)
 
 let create_stats db =
   let provenance =
@@ -290,12 +277,16 @@ let print_string_with_unique_prefix len ppf s =
     (String.sub s 0 len) Flambda_colours.pop
     (String.sub s len (String.length s - len))
 
-let print_rule char_trie ppf (Rule { cursor; rule_id; _ }) =
+let print_rule char_trie ppf (Rule { cursor; binders; rule_id; _ }) =
   let rule_id = rule_id_to_string rule_id in
   let len = unique_prefix_len char_trie rule_id ~pos:0 in
-  Format.fprintf ppf "%a:@ %a@]"
+  Format.fprintf ppf "%a:@ @[@[%a@]@ :- %a@]"
     (print_string_with_unique_prefix len)
-    rule_id Datalog.print_cursor cursor
+    rule_id
+    (Format.pp_print_list
+       ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+       print_binder)
+    binders Cursor.print cursor
 
 let print_fact ppf (tid, args) =
   Format.fprintf ppf "@[%a(@;<1 2>@[<hv>%a@]@,)@]" Table.Id.print tid
@@ -422,73 +413,47 @@ let print_stats ppf stats =
     database [incremental_db].
 *)
 let run_rule_incremental ?stats ~previous ~diff ~current incremental_db
-    (Rule { cursor; _ } as rule) =
-  (*
-   * (match stats with
-   * | None -> ()
-   * | Some stats -> provenance_table_ref := stats.provenance); *)
-  (*
-   * List.iter
-   *   (fun (Binder { table_id; previous; current }) ->
-   *     let incremental_table =
-   *       incremental_get (Table.Map.get table_id) incremental_db
-   *     in
-   *     previous := incremental_table.current;
-   *     current := incremental_table)
-   *   binders; *)
+    (Rule { binders; cursor; provenance_table_ref; _ } as rule) =
+  (match stats with
+  | None -> ()
+  | Some stats -> provenance_table_ref := stats.provenance);
+  List.iter
+    (fun (Binder { table_id; previous; current }) ->
+      let incremental_table =
+        incremental_get (Table.Map.get table_id) incremental_db
+      in
+      previous := incremental_table.current;
+      current := incremental_table)
+    binders;
   let time0 = Sys.time () in
-  let diff' =
-    Datalog.seminaive_iter cursor [] ~previous ~diff ~current ~f:(fun _ -> ())
-  in
+  Cursor.seminaive_run cursor ~previous ~diff ~current;
   let time1 = Sys.time () in
   let seminaive_time = time1 -. time0 in
   Option.iter (fun stats -> add_timing ~stats rule seminaive_time) stats;
+  (match stats with
+  | None -> ()
+  | Some stats -> stats.provenance <- !provenance_table_ref);
+  provenance_table_ref := FactMap.empty;
   let incremental_db =
-    Table.Map.fold diff' ~init:incremental_db
-      ~f:(fun (Binding (id, id_diff)) incremental_db ->
-        let is_trie = Table.Id.is_trie id in
-        let incremental_table =
-          incremental_get (Table.Map.get id) incremental_db
-        in
-        let id_diff =
-          Trie.diff is_trie (fun _ _ -> None) id_diff incremental_table.current
-        in
-        let id_current =
-          Trie.union is_trie
-            (fun _ _ -> assert false)
-            incremental_table.current id_diff
-        in
-        let id_diff =
-          Trie.union is_trie
-            (fun _ _ -> assert false)
-            incremental_table.difference id_diff
-        in
-        (* if id_current == incremental_table.current && Trie.is_empty is_trie
-           incremental_table.difference then incremental_db else *)
-        incremental_set (Table.Map.set id)
-          { current = id_current; difference = id_diff }
-          incremental_db)
+    List.fold_left
+      (fun incremental_db (Binder { table_id; previous; current }) ->
+        let previous = !previous and { current; difference } = !current in
+        if previous == current
+        then incremental_db
+        else
+          incremental_set (Table.Map.set table_id) { current; difference }
+            incremental_db)
+      incremental_db binders
   in
-  (* (match stats with
-   * | None -> ()
-   * | Some stats -> stats.provenance <- !provenance_table_ref);
-   * provenance_table_ref := FactMap.empty; *)
   incremental_db
 
 type t =
-  | Saturate of actual_rule list
+  | Saturate of rule list
   | Fixpoint of t list
 
 let fixpoint schedule = Fixpoint schedule
 
-let saturate rules =
-  Saturate
-    (List.map
-       (fun cursor ->
-         let cursor = Datalog.compile [] (fun [] -> cursor) in
-         let rule_id = fresh_rule_id () in
-         Rule { cursor; rule_id })
-       rules)
+let saturate rules = Saturate rules
 
 let run_rules_incremental ?stats rules ~previous ~diff ~current incremental_db =
   List.fold_left

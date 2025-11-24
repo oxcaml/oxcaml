@@ -110,18 +110,6 @@ let rec union :
         if is_empty w' s then None else Some s)
       t1 t2
 
-let rec diff :
-    type t k v. (t, k, v) is_trie -> (v -> v -> v option) -> t -> t -> t =
- fun w f t1 t2 ->
-  match w with
-  | Map_is_trie -> Int.Map.diff (fun _ left right -> f left right) t1 t2
-  | Nested_trie w' ->
-    Int.Map.diff
-      (fun _ left right ->
-        let s = diff w' f left right in
-        if is_empty w' s then None else Some s)
-      t1 t2
-
 let rec iter :
     type t k v.
     (t, k, v) is_trie -> (k Constant.hlist -> v -> unit) -> t -> unit =
