@@ -20,6 +20,8 @@ let reaperdbg_flags =
 
 let debug = reaperdbg_env <> None
 
+let nounbox = true
+
 (* This needs to be set before creating any datalog rules. *)
 let () =
   if debug && List.mem "prov" reaperdbg_flags
@@ -1705,13 +1707,17 @@ let fixpoint (graph : Global_flow_graph.graph) =
     Format.eprintf "@.TO_CHG: %a@."
       (Code_id_or_name.Map.print pp_changed_representation)
       !changed_representation;
-  { db;
-    unboxed_fields = !unboxed;
-    changed_representation =
-      !changed_representation
-      (* unboxed_fields = Code_id_or_name.Map.empty; changed_representation =
-         Code_id_or_name.Map.empty *)
-  }
+  if not nounbox
+  then
+    { db;
+      unboxed_fields = !unboxed;
+      changed_representation = !changed_representation
+    }
+  else
+    { db;
+      unboxed_fields = Code_id_or_name.Map.empty;
+      changed_representation = Code_id_or_name.Map.empty
+    }
 
 let print_color { db; unboxed_fields; changed_representation } v =
   let red =

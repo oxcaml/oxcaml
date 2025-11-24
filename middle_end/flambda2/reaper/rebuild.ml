@@ -119,7 +119,7 @@ let is_name_used (env : env) name =
   Name.pattern_match name ~symbol:(is_symbol_used env) ~var:(is_var_used env)
 
 (* XXX so which is it? *)
-let poison_value = 0 (* 123456789 *)
+let poison_value = 42 (* 123456789 *)
 
 let poison ~machine_width kind =
   Simple.const_int_of_kind ~machine_width kind poison_value
