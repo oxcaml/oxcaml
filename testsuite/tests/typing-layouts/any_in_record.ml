@@ -32,7 +32,19 @@ let fst (t : int64# t) = t.fst
 val fst : int64# t -> int64# = <fun>
 |}]
 
+let fst (t : int64# t) =
+  match t with { fst; _ } -> fst
+[%%expect{|
+val fst : int64# t -> int64# = <fun>
+|}]
+
 let fst (type a : bits64) (t : a t) = t.fst
+[%%expect{|
+val fst : ('a : bits64). 'a t -> 'a = <fun>
+|}]
+
+let fst (type a : bits64) (t : a t) =
+  match t with { fst; _ } -> fst
 [%%expect{|
 val fst : ('a : bits64). 'a t -> 'a = <fun>
 |}]

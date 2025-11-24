@@ -2622,7 +2622,11 @@ let representation_for_label (type rep) env label (form : rep record_form) ~loc
   | Some rep -> rep
   | None ->
       let labels =
-        Lazy.force label.lbl_all
+        Ctype.instance_labels_update ~fixed:false (Lazy.force label.lbl_all)
+      in
+      unify_exp_types loc env containing_type labels.:(0).lbl_res;
+      let labels =
+        labels
         |> Iarray.map Types.label_declaration_of_label_description
         |> Iarray.to_list
       in
