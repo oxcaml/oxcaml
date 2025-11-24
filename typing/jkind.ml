@@ -2703,11 +2703,6 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
     }
     ~annotation:None ~why:Abbreviation
 
-<<<<<<< HEAD
-let for_boxed_variant ~loc cstrs =
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-let for_boxed_variant cstrs =
-=======
 (* Note [With-bounds for GADTs]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2821,196 +2816,130 @@ let for_boxed_variant cstrs =
      needs a [fixed_explanation]. The [fixed_explanation] is [Existential], used
      only for this purpose.
 *)
-let for_boxed_variant ~decl_params ~type_apply ~free_vars cstrs =
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
+let for_boxed_variant ~loc ~decl_params ~type_apply ~free_vars cstrs =
   let open Types in
-  let has_gadt_constructor =
-    List.exists
-      (fun cstr -> match cstr.cd_res with None -> false | Some _ -> true)
-      cstrs
-  in
-  if has_gadt_constructor
-  then
-    let no_args =
+  let base =
+    let all_args_void =
       List.for_all
         (fun cstr ->
           match cstr.cd_args with
-          | Cstr_tuple [] | Cstr_record [] -> true
-          | Cstr_tuple _ | Cstr_record _ -> false)
+          | Cstr_tuple args ->
+            List.for_all (fun arg -> Sort.Const.(all_void arg.ca_sort)) args
+          | Cstr_record lbls -> all_void_labels lbls)
         cstrs
     in
-<<<<<<< HEAD
-    if no_args
-    then Builtin.immediate ~why:Enumeration
-    else for_non_float ~why:Boxed_variant
-  else
-    let base =
-      let all_args_void =
-        List.for_all
+    if all_args_void
+    then (
+      let has_args =
+        List.exists
           (fun cstr ->
             match cstr.cd_args with
-            | Cstr_tuple args ->
-              List.for_all (fun arg -> Sort.Const.(all_void arg.ca_sort)) args
-            | Cstr_record lbls -> all_void_labels lbls)
+            | Cstr_tuple (_ :: _) | Cstr_record (_ :: _) -> true
+            | Cstr_tuple [] | Cstr_record [] -> false)
           cstrs
       in
-      if all_args_void
-      then (
-        let has_args =
-          List.exists
-            (fun cstr ->
-              match cstr.cd_args with
-              | Cstr_tuple (_ :: _) | Cstr_record (_ :: _) -> true
-              | Cstr_tuple [] | Cstr_record [] -> false)
-            cstrs
-        in
-        if has_args && Language_extension.erasable_extensions_only ()
-        then
-          Location.prerr_warning loc
-            (Warnings.Incompatible_with_upstream Warnings.Immediate_void_variant);
-        Builtin.immediate ~why:Enumeration)
-      else
-        List.concat_map
-          (fun cstr ->
-            match cstr.cd_args with
-            | Cstr_tuple _ -> [Immutable]
-            | Cstr_record lbls ->
-              List.map
-                (fun (ld : Types.label_declaration) -> ld.ld_mutable)
-                lbls)
-          cstrs
-        |> List.fold_left combine_mutability Immutable
-        |> jkind_of_mutability ~why:Boxed_variant
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-    let has_gadt_constructor =
-      List.exists
-        (fun cstr -> match cstr.cd_res with None -> false | Some _ -> true)
+      if has_args && Language_extension.erasable_extensions_only ()
+      then
+        Location.prerr_warning loc
+          (Warnings.Incompatible_with_upstream Warnings.Immediate_void_variant);
+      Builtin.immediate ~why:Enumeration)
+    else
+      List.concat_map
+        (fun cstr ->
+          match cstr.cd_args with
+          | Cstr_tuple _ -> [Immutable]
+          | Cstr_record lbls ->
+            List.map (fun (ld : Types.label_declaration) -> ld.ld_mutable) lbls)
         cstrs
-=======
-    let base =
-      (if is_mutable then Builtin.mutable_data else Builtin.immutable_data)
-        ~why:Boxed_variant
-      |> mark_best
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-    in
-<<<<<<< HEAD
-    let base = mark_best base in
-    let add_cstr_args cstr jkind =
+      |> List.fold_left combine_mutability Immutable
+      |> jkind_of_mutability ~why:Boxed_variant
+  in
+  let base = mark_best base in
+  let add_with_bounds_for_cstr jkind_so_far cstr =
+    let cstr_arg_tys, cstr_arg_modalities =
       match cstr.cd_args with
       | Cstr_tuple args ->
-        List.fold_right
-          (fun arg ->
-            add_with_bounds ~modality:arg.ca_modalities ~type_expr:arg.ca_type)
-          args jkind
-      | Cstr_record lbls -> add_labels_as_with_bounds lbls jkind
+        List.fold_left
+          (fun (tys, ms) arg -> arg.ca_type :: tys, arg.ca_modalities :: ms)
+          ([], []) args
+      | Cstr_record lbls ->
+        List.fold_left
+          (fun (tys, ms) lbl -> lbl.ld_type :: tys, lbl.ld_modalities :: ms)
+          ([], []) lbls
     in
-    List.fold_right add_cstr_args cstrs base
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-    if has_gadt_constructor
-    then for_non_float ~why:Boxed_variant
-    else
-      let base =
-        (if is_mutable then Builtin.mutable_data else Builtin.immutable_data)
-          ~why:Boxed_variant
-        |> mark_best
-      in
-      let add_cstr_args cstr jkind =
-        match cstr.cd_args with
-        | Cstr_tuple args ->
-          List.fold_right
-            (fun arg ->
-              add_with_bounds ~modality:arg.ca_modalities ~type_expr:arg.ca_type)
-            args jkind
-        | Cstr_record lbls -> add_labels_as_with_bounds lbls jkind
-      in
-      List.fold_right add_cstr_args cstrs base
-=======
-    let add_with_bounds_for_cstr jkind_so_far cstr =
-      let cstr_arg_tys, cstr_arg_modalities =
-        match cstr.cd_args with
-        | Cstr_tuple args ->
-          List.fold_left
-            (fun (tys, ms) arg -> arg.ca_type :: tys, arg.ca_modalities :: ms)
-            ([], []) args
-        | Cstr_record lbls ->
-          List.fold_left
-            (fun (tys, ms) lbl -> lbl.ld_type :: tys, lbl.ld_modalities :: ms)
-            ([], []) lbls
-      in
-      let cstr_arg_tys =
-        match cstr.cd_res with
-        | None -> cstr_arg_tys
-        | Some res ->
-          (* See Note [With-bounds for GADTs] for an overview *)
-          let apply_subst domain range tys =
-            if Misc.Stdlib.List.is_empty domain
-            then tys
-            else List.map (fun ty -> type_apply domain ty range) tys
-          in
-          (* STEP B1 from Note [With-bounds for GADTs]: *)
-          let res_args =
-            match Types.get_desc res with
-            | Tconstr (_, args, _) -> args
-            | _ -> Misc.fatal_error "cd_res must be Tconstr"
-          in
-          let domain, range, seen =
-            List.fold_left2
-              (fun ((domain, range, seen) as acc) arg param ->
-                if Btype.TypeSet.mem arg seen
-                then
-                  (* We've already seen this type parameter, so don't add it
-                     again.  See wrinkle BW1 from Note [With-bounds for GADTs]
-                  *)
-                  acc
-                else
-                  match Types.get_desc arg with
-                  | Tvar _ ->
-                    (* Only add types which are direct variables. Note that
-                       types which aren't variables might themselves /contain/
-                       variables; if those variables don't show up on another
-                       parameter, they're treated as orphaned. See example K2
-                       from Note [With-bounds for GADTs] *)
-                    arg :: domain, param :: range, Btype.TypeSet.add arg seen
-                  | _ -> acc)
-              ([], [], Btype.TypeSet.empty)
-              res_args decl_params
-          in
-          (* STEP B2 from Note [With-bounds for GADTs]: *)
-          let free_var_set = free_vars cstr_arg_tys in
-          let orphaned_type_var_set = Btype.TypeSet.diff free_var_set seen in
-          let orphaned_type_var_list =
-            Btype.TypeSet.elements orphaned_type_var_set
-          in
-          (* STEP B3 from Note [With-bounds for GADTs]: *)
-          let mk_type_of_kind ty =
-            match Types.get_desc ty with
-            (* use [newgenty] not [newty] here because we've already
-               generalized the decl and want to keep things at
-               generic_level *)
-            | Tvar { jkind; name = _ } -> Btype.newgenty (Tof_kind jkind)
-            | _ ->
-              Misc.fatal_error
-                "post-condition of [free_variable_set_of_list] violated"
-          in
-          let type_of_kind_list =
-            List.map mk_type_of_kind orphaned_type_var_list
-          in
-          (* STEP B4 from Note [With-bounds for GADTs]: *)
-          let cstr_arg_tys =
-            apply_subst
-              (orphaned_type_var_list @ domain)
-              (type_of_kind_list @ range)
-              cstr_arg_tys
-          in
-          cstr_arg_tys
-      in
-      List.fold_left2
-        (fun jkind type_expr modality ->
-          add_with_bounds ~modality ~type_expr jkind)
-        jkind_so_far cstr_arg_tys cstr_arg_modalities
+    let cstr_arg_tys =
+      match cstr.cd_res with
+      | None -> cstr_arg_tys
+      | Some res ->
+        (* See Note [With-bounds for GADTs] for an overview *)
+        let apply_subst domain range tys =
+          if Misc.Stdlib.List.is_empty domain
+          then tys
+          else List.map (fun ty -> type_apply domain ty range) tys
+        in
+        (* STEP B1 from Note [With-bounds for GADTs]: *)
+        let res_args =
+          match Types.get_desc res with
+          | Tconstr (_, args, _) -> args
+          | _ -> Misc.fatal_error "cd_res must be Tconstr"
+        in
+        let domain, range, seen =
+          List.fold_left2
+            (fun ((domain, range, seen) as acc) arg param ->
+              if Btype.TypeSet.mem arg seen
+              then
+                (* We've already seen this type parameter, so don't add it
+                   again.  See wrinkle BW1 from Note [With-bounds for GADTs]
+                *)
+                acc
+              else
+                match Types.get_desc arg with
+                | Tvar _ ->
+                  (* Only add types which are direct variables. Note that
+                     types which aren't variables might themselves /contain/
+                     variables; if those variables don't show up on another
+                     parameter, they're treated as orphaned. See example K2
+                     from Note [With-bounds for GADTs] *)
+                  arg :: domain, param :: range, Btype.TypeSet.add arg seen
+                | _ -> acc)
+            ([], [], Btype.TypeSet.empty)
+            res_args decl_params
+        in
+        (* STEP B2 from Note [With-bounds for GADTs]: *)
+        let free_var_set = free_vars cstr_arg_tys in
+        let orphaned_type_var_set = Btype.TypeSet.diff free_var_set seen in
+        let orphaned_type_var_list =
+          Btype.TypeSet.elements orphaned_type_var_set
+        in
+        (* STEP B3 from Note [With-bounds for GADTs]: *)
+        let mk_type_of_kind ty =
+          match Types.get_desc ty with
+          (* use [newgenty] not [newty] here because we've already
+             generalized the decl and want to keep things at
+             generic_level *)
+          | Tvar { jkind; name = _ } -> Btype.newgenty (Tof_kind jkind)
+          | _ ->
+            Misc.fatal_error
+              "post-condition of [free_variable_set_of_list] violated"
+        in
+        let type_of_kind_list =
+          List.map mk_type_of_kind orphaned_type_var_list
+        in
+        (* STEP B4 from Note [With-bounds for GADTs]: *)
+        let cstr_arg_tys =
+          apply_subst
+            (orphaned_type_var_list @ domain)
+            (type_of_kind_list @ range)
+            cstr_arg_tys
+        in
+        cstr_arg_tys
     in
-    List.fold_left add_with_bounds_for_cstr base cstrs
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
+    List.fold_left2
+      (fun jkind type_expr modality ->
+        add_with_bounds ~modality ~type_expr jkind)
+      jkind_so_far cstr_arg_tys cstr_arg_modalities
+  in
+  List.fold_left add_with_bounds_for_cstr base cstrs
 
 let for_boxed_tuple elts =
   List.fold_right

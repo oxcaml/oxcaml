@@ -1357,12 +1357,6 @@ type 'a contended_with_int : immutable_data with 'a @@ contended
 type 'a abstract
 type existential_abstract : immutable_data with (type : value mod portable) abstract =
   | Mk : ('a : value mod portable) abstract -> existential_abstract
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
 type 'a abstract
 type existential_abstract =

@@ -61,26 +61,8 @@ type t = Foo : ('a : immutable_data). 'a -> t
 |}]
 
 let foo (t : t @ contended) = use_uncontended t
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect {|
-<<<<<<< HEAD
-Line 1, characters 46-47:
-1 | let foo (t : t @ contended) = use_uncontended t
-                                                  ^
-Error: This value is "contended" but is expected to be "uncontended".
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-Line 1, characters 46-47:
-1 | let foo (t : t @ contended) = use_uncontended t
-                                                  ^
-Error: This value is "contended" but expected to be "uncontended".
-=======
 val foo : t @ contended -> unit = <fun>
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 |}]
 
 let foo (t : t @ local) = use_global t [@nontail]
@@ -99,26 +81,8 @@ type 'a t = Foo : 'a -> 'a t
 |}]
 
 let foo (t : int t @ once) = use_many t
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect {|
-<<<<<<< HEAD
-Line 1, characters 38-39:
-1 | let foo (t : int t @ once) = use_many t
-                                          ^
-Error: This value is "once" but is expected to be "many".
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-Line 1, characters 38-39:
-1 | let foo (t : int t @ once) = use_many t
-                                          ^
-Error: This value is "once" but expected to be "many".
-=======
 val foo : int t @ once -> unit = <fun>
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -212,12 +176,6 @@ type ('a, 'b) t = { inner : 'a; }
 type 'a u : immutable_data with 'a =
 | P1 : ('a1, 'b) t -> 'a1 u
 | P2 : ('a2, 'b) t -> 'a2 u
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
 type 'a u = P1 : ('a1, 'b) t -> 'a1 u | P2 : ('a2, 'b) t -> 'a2 u
 |}]
@@ -272,12 +230,6 @@ Error: The kind of type "t" is value mod non_float
 
 type 'a t : immutable_data =
   | A : ('b : immutable_data). 'b -> 'b option t
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
 type 'a t = A : ('b : immutable_data). 'b -> 'b option t
 |}]
@@ -297,12 +249,6 @@ Error: The kind of type "t" is immutable_data
 type 'a cell : mutable_data with 'a =
   | Nil : 'a cell
   | Cons of { value : 'a; mutable next: 'a cell }
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
 type 'a cell =
     Nil : 'a cell
@@ -312,12 +258,6 @@ type 'a cell =
 type 'a cell : mutable_data with 'a =
   | Nil
   | Cons : { value : 'b; mutable next: 'b cell } -> 'b cell
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
 type 'a cell =
     Nil
@@ -327,31 +267,19 @@ type 'a cell =
 type 'a cell : sync_data with 'a =
   | Nil : 'a cell
   | Cons of { value : 'a; mutable next: 'a cell [@atomic] }
-(* CR layouts v2.8: This should be accepted *)
 [%%expect{|
-Lines 1-3, characters 0-59:
-1 | type 'a cell : sync_data with 'a =
-2 |   | Nil : 'a cell
-3 |   | Cons of { value : 'a; mutable next: 'a cell [@atomic] }
-Error: The kind of type "cell" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "cell" must be a subkind of sync_data with 'a
-         because of the annotation on the declaration of the type cell.
+type 'a cell =
+    Nil : 'a cell
+  | Cons of { value : 'a; mutable next : 'a cell [@atomic]; }
 |}]
 
 type 'a cell : sync_data with 'a =
   | Nil
   | Cons : { value : 'b; mutable next: 'b cell [@atomic] } -> 'b cell
-(* CR layouts v2.8: This should be accepted *)
 [%%expect{|
-Lines 1-3, characters 0-69:
-1 | type 'a cell : sync_data with 'a =
-2 |   | Nil
-3 |   | Cons : { value : 'b; mutable next: 'b cell [@atomic] } -> 'b cell
-Error: The kind of type "cell" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "cell" must be a subkind of sync_data with 'a
-         because of the annotation on the declaration of the type cell.
+type 'a cell =
+    Nil
+  | Cons : { value : 'b; mutable next : 'b cell [@atomic]; } -> 'b cell
 |}]
 
 (* Existentials that are the type arguments to abstract types should end up as [type :
@@ -377,12 +305,6 @@ Error: The kind of type "existential_abstract" is
 
 type existential_abstract : immutable_data with (type : value mod portable) abstract =
   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
 type existential_abstract =
     P : ('a : value mod portable). 'a abstract -> existential_abstract
@@ -390,12 +312,6 @@ type existential_abstract =
 
 type existential_abstract : value mod portable =
   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
 type existential_abstract =
     P : ('a : value mod portable). 'a abstract -> existential_abstract
@@ -409,12 +325,6 @@ module M : sig
 end = struct
   type t = P : ('a : value mod portable). 'a abstract -> t
 end
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
 val foo : existential_abstract -> unit = <fun>
 module M :
@@ -457,12 +367,6 @@ type existential_abstract : value mod portable with (type : value mod portable) 
   | P : ('a : value mod portable). 'a abstract t2 -> existential_abstract
 and 'a t2 = P : { contents : 'a; other : ('b : value mod portable) option } -> 'a t2
 and 'a abstract : value mod portable
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
 type existential_abstract =
     P : ('a : value mod portable). 'a abstract t2 -> existential_abstract
@@ -498,12 +402,6 @@ module F2(M : S with type 'a b = int) = struct
   let foo1 (x : M.t @ nonportable) = use_portable x
   let foo2 (x : M.t @ contended) = use_uncontended x
 end
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
 module F2 :
   functor
@@ -523,12 +421,6 @@ module F3(M : S with type 'a b = 'a) = struct
   type t : value mod portable = M.t
   let foo (x : t @ nonportable) = use_portable x
 end
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
 module F3 :
   functor
@@ -562,26 +454,8 @@ type _ box = Box : 'a -> 'a box
 |}]
 
 let foo (x : int box @ contended) = use_uncontended x
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
-<<<<<<< HEAD
-Line 1, characters 52-53:
-1 | let foo (x : int box @ contended) = use_uncontended x
-                                                        ^
-Error: This value is "contended" but is expected to be "uncontended".
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-Line 1, characters 52-53:
-1 | let foo (x : int box @ contended) = use_uncontended x
-                                                        ^
-Error: This value is "contended" but expected to be "uncontended".
-=======
 val foo : int box @ contended -> unit = <fun>
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 |}]
 
 let should_reject (x : int ref box @ contended) = use_uncontended x
@@ -599,26 +473,8 @@ type (_, _) box2 = Box2 : 'a -> ('a, 'a) box2
 |}]
 
 let foo (x : (int, int) box2 @ contended) = use_uncontended x
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
-<<<<<<< HEAD
-Line 1, characters 60-61:
-1 | let foo (x : (int, int) box2 @ contended) = use_uncontended x
-                                                                ^
-Error: This value is "contended" but is expected to be "uncontended".
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-Line 1, characters 60-61:
-1 | let foo (x : (int, int) box2 @ contended) = use_uncontended x
-                                                                ^
-Error: This value is "contended" but expected to be "uncontended".
-=======
 val foo : (int, int) box2 @ contended -> unit = <fun>
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 |}]
 
 let should_reject (x : (int ref, int ref) box2 @ contended) = use_uncontended x
@@ -657,26 +513,8 @@ Error: The kind of type "box" is immutable_data with _
 (* Only the first type parameter matters *)
 
 let crosses (x : (int, int ref) box2 @ contended) = use_uncontended x
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
-<<<<<<< HEAD
-Line 1, characters 68-69:
-1 | let crosses (x : (int, int ref) box2 @ contended) = use_uncontended x
-                                                                        ^
-Error: This value is "contended" but is expected to be "uncontended".
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-Line 1, characters 68-69:
-1 | let crosses (x : (int, int ref) box2 @ contended) = use_uncontended x
-                                                                        ^
-Error: This value is "contended" but expected to be "uncontended".
-=======
 val crosses : (int, int ref) box2 @ contended -> unit = <fun>
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 |}]
 
 let doesn't_cross (x : (int ref, int) box2 @ contended) = use_uncontended x
@@ -694,12 +532,6 @@ Error: This value is "contended" but is expected to be "uncontended".
 type 'a t constraint 'a = 'b option
 type 'c t2 : immutable_data with (type : value) option t =
   | K : 'd t -> 'd t2
-<<<<<<< HEAD
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
-||||||| f9dd3bb72f (Remove with-bounds for GADTs (#4242))
-(* CR layouts v2.8: This should be accepted *)
-=======
->>>>>>> parent of f9dd3bb72f (Remove with-bounds for GADTs (#4242))
 [%%expect{|
 type 'a t constraint 'a = 'b option
 type 'c t2 = K : 'a option t -> 'a option t2
