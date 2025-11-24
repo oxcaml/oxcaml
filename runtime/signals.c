@@ -50,7 +50,8 @@
 
 CAMLexport atomic_uintnat caml_pending_signals[NSIG_WORDS];
 
-static caml_plat_mutex signal_install_mutex = CAML_PLAT_MUTEX_INITIALIZER;
+/* Protects the caml_signal_handlers array */
+static caml_plat_mutex signal_handlers_mutex = CAML_PLAT_MUTEX_INITIALIZER;
 
 /* Only used in signals_nat.c, but defined here to avoid link errors
    on bytecode builds */
@@ -302,6 +303,7 @@ value caml_raise_async_if_exception(value res, const char* where)
 
 value caml_execute_signal_exn(int signal_number)
 {
+  value res = Val_unit;
 #ifdef POSIX_SIGNALS
   sigset_t nsigs, sigs;
   /* Block the signal before executing the handler, and record in sigs
@@ -310,9 +312,13 @@ value caml_execute_signal_exn(int signal_number)
   sigaddset(&nsigs, signal_number);
   pthread_sigmask(SIG_BLOCK, &nsigs, &sigs);
 #endif
+  caml_plat_lock_blocking(&signal_handlers_mutex);
   value handler = Field(caml_signal_handlers, signal_number);
-  value signum = Val_int(caml_rev_convert_signal_number(signal_number));
-  value res = caml_callback_exn(handler, signum);
+  caml_plat_unlock(&signal_handlers_mutex);
+  if (handler != Val_unit) {
+    value signum = Val_int(caml_rev_convert_signal_number(signal_number));
+    res = caml_callback_exn(handler, signum);
+  }
 #ifdef POSIX_SIGNALS
   /* Restore the original signal mask */
   pthread_sigmask(SIG_SETMASK, &sigs, NULL);
@@ -828,12 +834,13 @@ CAMLprim value caml_install_signal_handler(value signal_number, value action)
       new_dis = Disposition_box(Field(action, 0));
     }
   }
-  caml_plat_lock_non_blocking(&signal_install_mutex);
+
+  caml_plat_lock_non_blocking(&signal_handlers_mutex);
   /* Note: no safepoint for calling signals in this critical section */
   disposition old_dis = set_disposition(sig, new_dis);
   handler old_handler = disposition_handler(old_dis);
   if (old_handler == SIG_ERR) {
-    caml_plat_unlock(&signal_install_mutex);
+    caml_plat_unlock(&signal_handlers_mutex);
     caml_sys_error(NO_ARG);
   }
 
@@ -845,7 +852,7 @@ CAMLprim value caml_install_signal_handler(value signal_number, value action)
   } else {
     caml_modify(&Field(caml_signal_handlers, sig), Field(action, 0));
   }
-  caml_plat_unlock(&signal_install_mutex);
+  caml_plat_unlock(&signal_handlers_mutex);
 
   if (old_handler == SIG_DFL) {
     res = Val_int(0); /* Signal_default */
