@@ -295,9 +295,9 @@ let initial_env ~loc ~initially_opened_module
         (open_module env m, units)
   in
   let env = List.fold_left add_units env units in
-  (* Add [basenames] skipping [initially_opened_module] check.
-     [initially_opened_module] is usually [Stdlib], which cannot come from
-     [basenames]. *)
+  (* Adding [basenames] after [initially_opened_module] check, since the
+     [initially_opened_module] cannot come from [basenames] (hence no need to
+     search for it in there). *)
   let units_from_filenames =
     Env.persistent_structures_of_basenames basenames in
   let env = add_units env units_from_filenames in

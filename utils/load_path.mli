@@ -118,4 +118,5 @@ module For_testing : sig
   exception Parse_error of string
 
   val split_and_unescape : buffer:Buffer.t -> string -> string list
+  val set_manifest_files_root : string option -> unit
 end

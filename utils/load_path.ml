@@ -16,12 +16,16 @@ open Local_store
 
 exception Parse_error of string
 
+(** Splits input line into tokens, with spaces acting as separators.
+    Leading/trailing whitespace is removed to avoid empty tokens. Backslashing
+    works inside tokens, namely '\n', '\r', ' ' and '\' itself should be
+    escaped with '\'. *)
 let split_and_unescape ~buffer line =
   let len = String.length line in
   let[@inline] end_current_token current_token tokens =
     let token = Buffer.contents current_token in
     Buffer.clear current_token;
-    if token = "" then tokens else token :: tokens
+    if String.equal token "" then tokens else token :: tokens
   in
   let rec loop i current_token tokens =
     if i >= len
@@ -57,12 +61,21 @@ let split_and_unescape ~buffer line =
 
 module Dune_manifests_reader : sig
   module Path : sig
-    type load_root_relative
-    type cwd_relative
-    type 'a t
+    module For_testing : sig
+      val root_override : string option ref
+    end
 
-    val of_string : string -> load_root_relative t
-    val to_string : cwd_relative t -> string
+    module Load_root_relative : sig
+      type t
+
+      val of_string : string -> t
+    end
+
+    module Cwd_relative : sig
+      type t
+
+      val to_string : t -> string
+    end
   end
 
   type t
@@ -71,75 +84,95 @@ module Dune_manifests_reader : sig
 
   val iter_manifest
     :  t
-    -> f:(filename:string -> location:Path.cwd_relative Path.t -> unit)
-    -> manifest_path:Path.load_root_relative Path.t
+    -> f:(filename:string -> location:Path.Cwd_relative.t -> unit)
+    -> manifest_path:Path.Load_root_relative.t
     -> unit
 end = struct
   module Path : sig
-    type load_root_relative
-    type cwd_relative
-    type 'a t
+    module For_testing : sig
+      val root_override : string option ref
+    end
 
-    val of_string : string -> load_root_relative t
-    val to_string : cwd_relative t -> string
-    val make_cwd_relative : load_root_relative t -> cwd_relative t
-
-    module Hash_set : sig
-      type path = load_root_relative t
+    module Cwd_relative : sig
       type t
 
-      val create : unit -> t
-      val mem : t -> path -> bool
-      val add : t -> path -> unit
+      val to_string : t -> string
+    end
+
+    module Load_root_relative : sig
+      type t
+
+      val of_string : string -> t
+      val to_cwd_relative : t -> Cwd_relative.t
+
+      module Hash_set : sig
+        type elem := t
+        type t
+
+        val create : unit -> t
+        val mem : t -> elem -> bool
+        val add : t -> elem -> unit
+      end
     end
   end = struct
-    type load_root_relative = [ `Load_root_relative ]
-    type cwd_relative = [ `Cwd_relative ]
+    module For_testing = struct
+      let root_override = ref None
+    end
 
-    type _ t =
-      | Cwd_relative : string -> cwd_relative t
-      | Load_root_relative : string -> load_root_relative t
+    let root =
+      let from_env_var = lazy (
+        let var_name = "MANIFEST_FILES_ROOT" in
+        match Sys.getenv_opt var_name with
+        | None -> failwith (var_name ^ " not set")
+        | Some path -> path)
+      in
+      fun () ->
+        match !For_testing.root_override with
+        | None -> Lazy.force from_env_var
+        | Some root -> root
 
-    let of_string path = Load_root_relative path
-    let to_string (Cwd_relative path) = path
-    let root = lazy (
-      let var_name = "DUNE_MANIFEST_LOAD_PATH_ROOT" in
-      match Sys.getenv_opt var_name with
-      | None -> failwith (var_name ^ " not set")
-      | Some path -> path)
+    module Cwd_relative = struct
+      type t = string
 
-    let make_cwd_relative (Load_root_relative path) =
-      let root = Lazy.force root in
-      Cwd_relative (Filename.concat root path)
-    ;;
+      let to_string path = path
+    end
 
-    module Hash_set = struct
-      type path = load_root_relative t
-      type t = unit Misc.Stdlib.String.Tbl.t
+    module Load_root_relative = struct
+      type t = string
 
-      let create () = Misc.Stdlib.String.Tbl.create 42
-      let mem t (Load_root_relative path) =
-        Misc.Stdlib.String.Tbl.mem t path
-      let add t (Load_root_relative path) =
-        Misc.Stdlib.String.Tbl.add t path ()
+      let of_string path = path
+
+      let to_cwd_relative path =
+        Filename.concat (root ()) path
+      ;;
+
+      module Hash_set = struct
+        type t = unit Misc.Stdlib.String.Tbl.t
+
+        let create () = Misc.Stdlib.String.Tbl.create 42
+        let mem t path =
+          Misc.Stdlib.String.Tbl.mem t path
+        let add t path =
+          Misc.Stdlib.String.Tbl.add t path ()
+      end
     end
   end
 
-  type t = { visited : Path.Hash_set.t }
+  type t = { visited : Path.Load_root_relative.Hash_set.t }
 
-  let create () = { visited = Path.Hash_set.create () }
+  let create () = { visited = Path.Load_root_relative.Hash_set.create () }
 
   let visit { visited } ~f path =
-    if Path.Hash_set.mem visited path
+    if Path.Load_root_relative.Hash_set.mem visited path
     then ()
     else (
-      Path.Hash_set.add visited path;
-      f (Path.make_cwd_relative path))
+      Path.Load_root_relative.Hash_set.add visited path;
+      f (Path.Load_root_relative.to_cwd_relative path))
   ;;
 
   let iter_lines ~f path =
     In_channel.with_open_text
-      (Path.to_string path)
+      (Path.Cwd_relative.to_string path)
       (fun ic ->
         let rec loop () =
           try
@@ -156,20 +189,20 @@ end = struct
     type t =
       | File of
           { filename : string
-          ; location : Path.load_root_relative Path.t
+          ; location : Path.Load_root_relative.t
           }
-      | Manifest of Path.load_root_relative Path.t
+      | Manifest of Path.Load_root_relative.t
   end
 
   let parse_line ~buffer line =
     match split_and_unescape ~buffer line with
     | [ "file"; filename; location ] ->
-      let location = Path.of_string location in
+      let location = Path.Load_root_relative.of_string location in
       Some (Entry.File { filename; location })
     | [ "manifest"; _; location ] ->
       (* [filename] is included in "manifest" entry only for human
          readability, so we discard them here. *)
-      let location = Path.of_string location in
+      let location = Path.Load_root_relative.of_string location in
       Some (Entry.Manifest location)
     | [] -> None
     | _ -> raise (Parse_error ("Cannot parse manifest file line: " ^ line))
@@ -191,6 +224,9 @@ module For_testing = struct
   exception Parse_error = Parse_error
 
   let split_and_unescape = split_and_unescape
+
+  let set_manifest_files_root path =
+    Dune_manifests_reader.Path.For_testing.root_override := path
 end
 
 module Dir : sig
@@ -303,7 +339,7 @@ end = struct
   let prepend_add_single ~hidden base fn =
     if hidden then begin
       STbl.replace !hidden_files base fn;
-      STbl.replace!hidden_files_uncap (Misc.normalized_unit_filename base) fn
+      STbl.replace !hidden_files_uncap (Misc.normalized_unit_filename base) fn
     end else begin
       STbl.replace !visible_files base fn;
       STbl.replace !visible_files_uncap (String.uncapitalize_ascii base) fn
@@ -378,7 +414,6 @@ type paths =
 let get_paths () =
   { visible = List.rev_map Dir.path !visible_dirs;
     hidden = List.rev_map Dir.path !hidden_dirs }
-;;
 
 let get_visible_path_list () = List.rev_map Dir.path !visible_dirs
 let get_hidden_path_list () = List.rev_map Dir.path !hidden_dirs
@@ -386,7 +421,8 @@ let get_hidden_path_list () = List.rev_map Dir.path !hidden_dirs
 let init_manifests () =
   let manifests_reader = Dune_manifests_reader.create () in
   let load_manifest ~hidden ~basenames manifest_path =
-    let manifest_path = Dune_manifests_reader.Path.of_string manifest_path in
+    let manifest_path =
+      Dune_manifests_reader.Path.Load_root_relative.of_string manifest_path in
     Dune_manifests_reader.iter_manifest
       manifests_reader
       ~manifest_path
@@ -396,7 +432,7 @@ let init_manifests () =
           Path_cache.prepend_add_single
             ~hidden
             basename
-            (Dune_manifests_reader.Path.to_string location))
+            (Dune_manifests_reader.Path.Cwd_relative.to_string location))
   in
   List.iter
     (load_manifest ~hidden:false ~basenames:visible_basenames)
