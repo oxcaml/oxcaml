@@ -2450,27 +2450,13 @@ and join_function_type (env : Join_env.t)
   match func_type1, func_type2 with
   | Unknown, _ | _, Unknown -> Unknown
   | ( Known { code_id = code_id1; rec_info = rec_info1 },
-      Known { code_id = code_id2; rec_info = rec_info2 } ) -> (
-    let target_typing_env = Join_env.target_join_env env in
-    (* As a note, sometimes it might be preferable not to do the code age
-       relation join, and take the hit of an indirect call in exchange for
-       calling specialised versions of the code. Maybe an annotation would be
-       needed. Dolan thinks there isn't a single good answer here and we should
-       maybe just not do the join. (The code age relation meet would remain
-       though as it's useful elsewhere.) *)
-    match
-      Code_age_relation.join
-        ~target_t:(TE.code_age_relation target_typing_env)
-        ~resolver:(TE.code_age_relation_resolver target_typing_env)
-        (TE.code_age_relation (Join_env.left_join_env env))
-        (TE.code_age_relation (Join_env.right_join_env env))
-        code_id1 code_id2
-    with
-    | Unknown -> Unknown
-    | Known code_id -> (
+      Known { code_id = code_id2; rec_info = rec_info2 } ) ->
+    if Code_id.equal code_id1 code_id2
+    then
       match join env rec_info1 rec_info2 with
-      | Known rec_info -> Known (TG.Function_type.create code_id ~rec_info)
-      | Unknown -> Unknown))
+      | Known rec_info -> Known (TG.Function_type.create code_id1 ~rec_info)
+      | Unknown -> Unknown
+    else Unknown
 
 and join_env_extension env (ext1 : TEE.t) (ext2 : TEE.t) : TEE.t =
   let equations =
