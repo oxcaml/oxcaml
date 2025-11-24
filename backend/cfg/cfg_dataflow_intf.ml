@@ -128,5 +128,4 @@ module S = struct
          and type input = d control
          and type output = d
   end
-
 end

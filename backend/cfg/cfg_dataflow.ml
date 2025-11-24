@@ -435,9 +435,11 @@ struct
       let bot = { normal = D.bot; exceptional = D.bot }
 
       let less_equal t1 t2 =
-        D.less_equal t1.normal t2.normal && D.less_equal t1.exceptional t2.exceptional
+        D.less_equal t1.normal t2.normal
+        && D.less_equal t1.exceptional t2.exceptional
 
-      let join { normal = n1; exceptional = e1 } { normal = n2; exceptional = e2 } =
+      let join { normal = n1; exceptional = e1 }
+          { normal = n2; exceptional = e2 } =
         { normal = D.join n1 n2; exceptional = D.join e1 e2 }
     end
 
@@ -456,7 +458,10 @@ struct
         Transfer_domain.t =
      fun ~old_value ~transfer_result ~predecessor ~current:_ ->
       if predecessor.is_trap_handler
-      then { old_value with exceptional = D.join old_value.exceptional transfer_result }
+      then
+        { old_value with
+          exceptional = D.join old_value.exceptional transfer_result
+        }
       else { old_value with normal = D.join old_value.normal transfer_result }
 
     type context = T.context
@@ -503,7 +508,8 @@ struct
 
     let init_block _cfg b (init : instr_domain control) =
       { normal = init.normal;
-        exceptional = (if Cfg.can_raise_interproc b then init.exceptional else D.bot)
+        exceptional =
+          (if Cfg.can_raise_interproc b then init.exceptional else D.bot)
       }
   end
 
