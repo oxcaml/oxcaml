@@ -460,8 +460,8 @@ module Operand = struct
     let print : type w. Format.formatter -> w t -> unit =
      fun ppf t ->
       match t with
-      | Six n -> Format.fprintf ppf "#0x%x" n
-      | Twelve n -> Format.fprintf ppf "#0x%x" n
+      | Six n -> Format.fprintf ppf "#%d" n
+      | Twelve n -> Format.fprintf ppf "#%d" n
   end
 
   module Bitmask = struct
