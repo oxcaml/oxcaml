@@ -739,85 +739,126 @@ static void handle_signal(int signal_number)
   errno = saved_errno;
 }
 
-static int caml_set_signal_action(int signo, int action)
-{
-  void (*act)(int signo), (*oldact)(int signo);
-#ifdef POSIX_SIGNALS
-  struct sigaction sigact, oldsigact;
-#endif
+/* Type of a handler function */
+typedef void (*handler)(int signo), (*oldact)(int signo);
 
-  switch (action) {
-  case 0:  act = SIG_DFL; break;
-  case 1:  act = SIG_IGN; break;
-  default: act = handle_signal; break;
+/* Either with or without POSIX_SIGNALS, define:
+ *
+ * - the type `disposition` (how a signal is handled, including
+ * handler function and whatever flags or masks are settable),
+ * - trivial functions
+ *     `make_disposition(handler)`,
+ *     `disposition_handler(disposition)`, and
+ *     `set_disposition(disposition)`. */
+
+#ifdef POSIX_SIGNALS
+  typedef struct sigaction disposition;
+
+  Caml_inline disposition make_disposition(handler h)
+  {
+    struct sigaction dis;
+    dis.sa_handler = h;
+    dis.sa_flags = SA_ONSTACK;
+    sigemptyset(&dis.sa_mask);
+    return dis;
   }
 
-#ifdef POSIX_SIGNALS
-  sigact.sa_handler = act;
-  sigemptyset(&sigact.sa_mask);
-  sigact.sa_flags = SA_ONSTACK;
-  if (sigaction(signo, &sigact, &oldsigact) == -1) return -1;
-  oldact = oldsigact.sa_handler;
+  Caml_inline handler disposition_handler(disposition dis)
+  {
+    return dis.sa_handler;
+  }
+
+  Caml_inline disposition set_disposition(int signo, disposition new_dis)
+  {
+    disposition old_dis;
+    int res = sigaction(signo, &new_dis, &old_dis);
+    if (res == -1) {
+      old_dis.sa_handler = SIG_ERR;
+    }
+    return old_dis;
+  }
 #else
-  oldact = signal(signo, act);
-  if (oldact == SIG_ERR) return -1;
+  typedef handler disposition;
+
+  Caml_inline disposition make_disposition(handler h)
+  {
+    return h;
+  }
+
+  Caml_inline handler disposition_handler(disposition dis)
+  {
+    return dis;
+  }
+
+  Caml_inline disposition set_disposition(int signo, disposition new_dis)
+  {
+    return signal(signo, new_dis);
+  }
 #endif
-  if (oldact == handle_signal)
-    return 2;
-  else if (oldact == SIG_IGN)
-    return 1;
-  else
-    return 0;
-}
+
+/* If we find a signal already has a third-party handler, we record it
+ * in an Abstract_tag block, for which we need to know the size. */
+
+#define DISPOSITION_BOX_WORDS ((sizeof(disposition) + sizeof(value) - 1)/sizeof(value))
+#define Disposition_box(box) (*(disposition*)Op_val(box)) /* lvalue */
 
 CAMLprim value caml_install_signal_handler(value signal_number, value action)
 {
   CAMLparam2 (signal_number, action);
-  CAMLlocal1 (res);
-  int sig, act, oldact;
+  CAMLlocal4 (res, box, old_closure, new_closure);
+  disposition new_dis;
 
-  sig = caml_convert_signal_number(Int_val(signal_number));
+  int sig = caml_convert_signal_number(Int_val(signal_number));
   if (sig <= 0 || sig >= NSIG)
     caml_invalid_argument("Sys.signal: unavailable signal");
-  switch(action) {
-  case Val_int(0):              /* Signal_default */
-    act = 0;
-    break;
-  case Val_int(1):              /* Signal_ignore */
-    act = 1;
-    break;
-  default:                      /* Signal_handle */
-    act = 2;
-    break;
+
+  /* Calculate new disposition */
+  if (action == Val_int(0)) {   /* Signal_default */
+    new_dis = make_disposition(SIG_DFL);
+  } else if (action == Val_int(1)) { /* Signal_ignore */
+    new_dis = make_disposition(SIG_IGN);
+  } else {
+    CAMLassert(Is_block(action));
+    tag_t tag = Tag_val(action);
+    CAMLassert(tag == 0 || tag == 1);
+    if (tag == 0) { /* Signal_handle */
+      new_closure = Field(action, 0);
+      new_dis = make_disposition(handle_signal);
+    } else { /* Signal_external */
+      new_dis = Disposition_box(Field(action, 0));
+    }
   }
   caml_plat_lock_non_blocking(&signal_install_mutex);
   /* Note: no safepoint for calling signals in this critical section */
-  oldact = caml_set_signal_action(sig, act);
-  switch (oldact) {
-  case 0:                       /* was Signal_default */
-    res = Val_int(0);
-    break;
-  case 1:                       /* was Signal_ignore */
-    res = Val_int(1);
-    break;
-  case 2:                       /* was Signal_handle */
-    res = caml_alloc_small (1, 0);
-    Field(res, 0) = Field(caml_signal_handlers, sig);
-    break;
-  default:                      /* error in caml_set_signal_action */
-    goto err;
+  disposition old_dis = set_disposition(sig, new_dis);
+  handler old_handler = disposition_handler(old_dis);
+  if (old_handler == SIG_ERR) {
+    caml_plat_unlock(&signal_install_mutex);
+    caml_sys_error(NO_ARG);
   }
-  if (Is_block(action)) {
-    if (caml_signal_handlers == 0) {
-      caml_signal_handlers = caml_alloc(NSIG, 0);
-      caml_register_global_root(&caml_signal_handlers);
-    }
+
+  old_closure = Field(caml_signal_handlers, sig);
+  /* Update caml_signal_handlers and unlock before any allocation */
+  if (new_closure == Val_unit) {
+    /* Clear any previously-existing handler */
+    caml_modify(&Field(caml_signal_handlers, sig), Val_unit);
+  } else {
     caml_modify(&Field(caml_signal_handlers, sig), Field(action, 0));
   }
   caml_plat_unlock(&signal_install_mutex);
+
+  if (old_handler == SIG_DFL) {
+    res = Val_int(0); /* Signal_default */
+  } else if (old_handler == SIG_IGN) {
+    res = Val_int(1); /* Signal_ignore */
+  } else if (old_handler == handle_signal) {
+      CAMLassert(old_closure != Val_unit);
+      res = caml_alloc_1 (0, old_closure);  /* Signal_handle */
+  } else {
+    box = caml_alloc_small(DISPOSITION_BOX_WORDS, Abstract_tag);
+    Disposition_box(box) = old_dis;
+    res = caml_alloc_1(1, box); /* Signal_external */
+  }
   (void) caml_raise_async_if_exception(caml_process_pending_signals_exn(), "");
   CAMLreturn (res);
- err:
-  caml_plat_unlock(&signal_install_mutex);
-  caml_sys_error(NO_ARG);
 }

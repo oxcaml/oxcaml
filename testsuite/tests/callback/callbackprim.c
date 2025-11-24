@@ -14,9 +14,13 @@
 /**************************************************************************/
 
 #include <signal.h>
+
+#define CAML_INTERNALS
+
 #include "caml/mlvalues.h"
 #include "caml/memory.h"
 #include "caml/callback.h"
+#include "caml/signals.h"
 
 value mycallback1(value fun, value arg)
 {
@@ -72,4 +76,32 @@ value raise_sigusr1(value unused)
 {
   raise(SIGUSR1);
   return Val_unit;
+}
+
+static volatile sig_atomic_t other_handler_count = 0;
+
+static void myotherhandler(int sig)
+{
+  ++ other_handler_count;
+}
+
+value myotherhandlercount(value unit)
+{
+  return Val_int(other_handler_count);
+}
+
+value mysetotherhandler(value signal)
+{
+  int res;
+  int sig = caml_convert_signal_number(Int_val(signal));
+#ifdef POSIX_SIGNALS
+  struct sigaction sa;
+    sa.sa_handler = myotherhandler;
+    sa.sa_flags = SA_ONSTACK;
+    sigemptyset(&sa.sa_mask);
+    res = sigaction(SIGUSR1, &sa, NULL);
+#else
+    res = signal(sig, myotherhandler);
+#endif
+    return Val_int(res);
 }
