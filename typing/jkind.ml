@@ -80,51 +80,71 @@ module Sub_result = struct
 end
 
 module Scannable_axes = struct
-  type t = Jkind_types.Scannable_axes.t = { separability : Separability.t }
+  type t = Jkind_types.Scannable_axes.t =
+    { nullability : Jkind_axis.Nullability.t;
+      separability : Jkind_axis.Separability.t
+    }
 
   (* adding in the stubs explicitly so that they can be expanded later *)
 
-  let max = { separability = Separability.max }
+  let max = { nullability = Nullability.max; separability = Separability.max }
 
-  let min = { separability = Separability.min }
+  let min = { nullability = Nullability.min; separability = Separability.min }
 
   (* CR zeisbach: this is going to go away when we rebase,
      hence the introduction of [value_axes] *)
-  let legacy = { separability = Separability.legacy }
+  let legacy =
+    { nullability = Nullability.legacy; separability = Separability.legacy }
 
-  let value_axes = { separability = Separable }
+  let value_axes = { nullability = Non_null; separability = Separable }
 
-  let immediate_axes = { separability = Non_pointer }
+  let immediate_axes = { nullability = Non_null; separability = Non_pointer }
 
-  let equal { separability = s1 } { separability = s2 } =
-    Separability.equal s1 s2
+  let equal { nullability = n1; separability = s1 }
+      { nullability = n2; separability = s2 } =
+    Nullability.equal n1 n2 && Separability.equal s1 s2
 
-  let less_or_equal { separability = s1 } { separability = s2 } =
-    Separability.less_or_equal s1 s2
+  let less_or_equal { nullability = n1; separability = s1 }
+      { nullability = n2; separability = s2 } =
+    Misc.Le_result.combine
+      (Nullability.less_or_equal n1 n2)
+      (Separability.less_or_equal s1 s2)
 
   let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
 
-  let meet { separability = s1 } { separability = s2 } =
-    { separability = Separability.meet s1 s2 }
+  let meet { nullability = n1; separability = s1 }
+      { nullability = n2; separability = s2 } =
+    { nullability = Nullability.meet n1 n2;
+      separability = Separability.meet s1 s2
+    }
 
-  let join { separability = s1 } { separability = s2 } =
-    { separability = Separability.join s1 s2 }
+  let join { nullability = n1; separability = s1 }
+      { nullability = n2; separability = s2 } =
+    { nullability = Nullability.join n1 n2;
+      separability = Separability.join s1 s2
+    }
 
   let is_max sa = equal sa max
 
-  let print ppf { separability } = Separability.print ppf separability
+  (* CR zeisbach: this won't compile without having a stub for print, because
+     it has to have Axis_ops. I should probably refactor that anyways, then
+     this isn't a problem. I'd rather do that then print out something *)
+  let print ppf { separability } = failwith "FIXME"
+  (*= Separability.print ppf separability *)
 
-  let to_string_list_diff ~base:{ separability = s_against } { separability } =
+  let to_string_list_diff
+      ~base:{ nullability = n_against; separability = s_against }
+      { nullability; separability } =
+    let with_nullability =
+      if Nullability.equal n_against nullability
+      then []
+      else [Nullability.to_string nullability]
+    in
     if Separability.equal s_against separability
-    then []
-    else [Separability.to_string separability]
+    then with_nullability
+    else Separability.to_string separability :: with_nullability
 
   let to_string_list = to_string_list_diff ~base:max
-
-  let set_separability sa separability =
-    (* CR layouts-scannable: Once there are more axes, use [sa]! *)
-    ignore sa;
-    { separability }
 
   (* CR layouts-scannable: When more axes get added, I think this should get
      printed like [{ nullability: ...; ... }]. Could also have Caps versions
@@ -172,17 +192,43 @@ module Layout = struct
       | (Base _ | Any _ | Product _), _ -> false
 
     module Static = struct
-      let scannable_non_pointer =
-        Base (Sort.Scannable, { separability = Non_pointer })
+      let scannable_non_null_non_pointer =
+        Base
+          ( Sort.Scannable,
+            { nullability = Non_null; separability = Non_pointer } )
 
-      let scannable_non_float =
-        Base (Sort.Scannable, { separability = Non_float })
+      let scannable_non_null_non_float =
+        Base
+          (Sort.Scannable, { nullability = Non_null; separability = Non_float })
 
-      let scannable_separable =
-        Base (Sort.Scannable, { separability = Separable })
+      let scannable_non_null_separable =
+        Base
+          (Sort.Scannable, { nullability = Non_null; separability = Separable })
 
-      let scannable_maybe_separable =
-        Base (Sort.Scannable, { separability = Maybe_separable })
+      let scannable_non_null_maybe_separable =
+        Base
+          ( Sort.Scannable,
+            { nullability = Non_null; separability = Maybe_separable } )
+
+      let scannable_maybe_null_non_pointer =
+        Base
+          ( Sort.Scannable,
+            { nullability = Maybe_null; separability = Non_pointer } )
+
+      let scannable_maybe_null_non_float =
+        Base
+          ( Sort.Scannable,
+            { nullability = Maybe_null; separability = Non_float } )
+
+      let scannable_maybe_null_separable =
+        Base
+          ( Sort.Scannable,
+            { nullability = Maybe_null; separability = Separable } )
+
+      let scannable_maybe_null_maybe_separable =
+        Base
+          ( Sort.Scannable,
+            { nullability = Maybe_null; separability = Maybe_separable } )
 
       let void = Base (Sort.Void, Scannable_axes.max)
 
@@ -210,14 +256,40 @@ module Layout = struct
 
       let of_base (b : Sort.base) (sa : Scannable_axes.t) =
         match b, sa with
-        | Scannable, { separability = Separability.Non_pointer } ->
-          scannable_non_pointer
-        | Scannable, { separability = Separability.Non_float } ->
-          scannable_non_float
-        | Scannable, { separability = Separability.Separable } ->
-          scannable_separable
-        | Scannable, { separability = Separability.Maybe_separable } ->
-          scannable_maybe_separable
+        | Scannable, sa -> (
+          match sa with
+          | { nullability = Nullability.Non_null;
+              separability = Separability.Non_pointer
+            } ->
+            scannable_non_null_non_pointer
+          | { nullability = Nullability.Non_null;
+              separability = Separability.Non_float
+            } ->
+            scannable_non_null_non_float
+          | { nullability = Nullability.Non_null;
+              separability = Separability.Separable
+            } ->
+            scannable_non_null_separable
+          | { nullability = Nullability.Non_null;
+              separability = Separability.Maybe_separable
+            } ->
+            scannable_non_null_maybe_separable
+          | { nullability = Nullability.Maybe_null;
+              separability = Separability.Non_pointer
+            } ->
+            scannable_maybe_null_non_pointer
+          | { nullability = Nullability.Maybe_null;
+              separability = Separability.Non_float
+            } ->
+            scannable_maybe_null_non_float
+          | { nullability = Nullability.Maybe_null;
+              separability = Separability.Separable
+            } ->
+            scannable_maybe_null_separable
+          | { nullability = Nullability.Maybe_null;
+              separability = Separability.Maybe_separable
+            } ->
+            scannable_maybe_null_maybe_separable)
         | Void, _ -> void
         | Untagged_immediate, _ -> untagged_immediate
         | Float64, _ -> float64
@@ -279,9 +351,8 @@ module Layout = struct
 
     let set_root_separability t separability =
       match t with
-      | Any sa -> Any (Scannable_axes.set_separability sa separability)
-      | Base (b, sa) ->
-        Static.of_base b (Scannable_axes.set_separability sa separability)
+      | Any sa -> Any { sa with separability }
+      | Base (b, sa) -> Static.of_base b { sa with separability }
       | Product _ -> t
 
     (* Returns [None] if the root has no meaningful scannable axes. *)
@@ -420,13 +491,14 @@ module Layout = struct
     | Sort (b, sa) -> if Sort.is_possibly_scannable b then Some sa else None
     | Product _ -> None
 
-  (* CR layouts-scannable: Once nullability becomes a scannable axis, reconsider
-     whether this function is needed. *)
-  (* If [t] has no meaningful scannable axes, returns [t] unchanged *)
-  let set_root_scannable_axes t sa =
+  let set_root_separability t separability =
     match t with
-    | Any _ -> Any sa
-    | Sort (b, _) -> if Sort.is_possibly_scannable b then Sort (b, sa) else t
+    (* CR zeisbach: this indicates that maybe we don't need the SA helper *)
+    | Any sa -> Any { sa with separability }
+    | Sort (b, sa) ->
+      if Sort.is_possibly_scannable b
+      then Sort (b, { sa with separability })
+      else t
     | Product _ -> t
 
   let is_possibly_scannable t = t |> get_root_scannable_axes |> Option.is_some
@@ -1581,7 +1653,9 @@ module Const = struct
     let value_or_null =
       { jkind =
           mk_jkind
-            (Base (Scannable, { separability = Maybe_separable }))
+            (Base
+               ( Scannable,
+                 { nullability = Maybe_null; separability = Maybe_separable } ))
             ~crossing:Crossing.max ~externality:Externality.max
             ~nullability:Maybe_null;
         name = "value_or_null"
@@ -1590,7 +1664,9 @@ module Const = struct
     let value_or_null_mod_everything =
       { jkind =
           mk_jkind
-            (Base (Scannable, { separability = Maybe_separable }))
+            (Base
+               ( Scannable,
+                 { nullability = Maybe_null; separability = Maybe_separable } ))
             ~crossing:cross_all_except_staticity ~externality:Externality.min
             ~nullability:Maybe_null;
         name = "value_or_null mod everything"
@@ -1607,7 +1683,9 @@ module Const = struct
 
     let immutable_data =
       { jkind =
-          { layout = Base (Scannable, { separability = Non_float });
+          { layout =
+              Base
+                (Scannable, { nullability = Non_null; separability = Non_float });
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
@@ -1624,7 +1702,9 @@ module Const = struct
 
     let exn =
       { jkind =
-          { layout = Base (Scannable, { separability = Non_float });
+          { layout =
+              Base
+                (Scannable, { nullability = Non_null; separability = Non_float });
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:false
@@ -1641,7 +1721,9 @@ module Const = struct
 
     let sync_data =
       { jkind =
-          { layout = Base (Scannable, { separability = Non_float });
+          { layout =
+              Base
+                (Scannable, { nullability = Non_null; separability = Non_float });
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
@@ -1658,7 +1740,9 @@ module Const = struct
 
     let mutable_data =
       { jkind =
-          { layout = Base (Scannable, { separability = Non_float });
+          { layout =
+              Base
+                (Scannable, { nullability = Non_null; separability = Non_float });
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
@@ -1703,7 +1787,9 @@ module Const = struct
     let immediate_or_null =
       { jkind =
           mk_jkind
-            (Base (Scannable, { separability = Non_pointer }))
+            (Base
+               ( Scannable,
+                 { nullability = Maybe_null; separability = Non_pointer } ))
             ~crossing:cross_all_except_staticity ~externality:Externality.min
             ~nullability:Maybe_null;
         name = "immediate_or_null"
@@ -2294,7 +2380,7 @@ module Const = struct
     | Some (new_sep, loc) ->
       (match Layout.Const.get_root_scannable_axes t.layout with
       | None -> ()
-      | Some { separability } ->
+      | Some { nullability = _; separability } ->
         if new_sep = separability
         then
           Location.prerr_warning loc (Warnings.Redundant_kind_modifier abbrev));
@@ -2399,6 +2485,8 @@ module Const = struct
         match separability with
         | None -> base.layout
         | Some separability ->
+          (* CR zeisbach: is there a way to get rid of this const helper?
+             a call above could be replaced with set_root_sa but this can't *)
           Layout.Const.set_root_separability base.layout
             (Location.get_txt separability)
       in
@@ -2760,7 +2848,8 @@ let of_new_legacy_sort_var ~why =
 
 let of_new_non_float_sort_var ~why =
   let jkind, sort =
-    Jkind_desc.of_new_sort_var Maybe_null { separability = Non_float }
+    Jkind_desc.of_new_sort_var Maybe_null
+      { nullability = Maybe_null; separability = Non_float }
   in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
@@ -2889,7 +2978,9 @@ let for_non_float ~(why : History.value_creation_reason) =
       ~nullability:Nullability.Non_null
   in
   fresh_jkind
-    { layout = Sort (Base Scannable, { separability = Non_float });
+    { layout =
+        Sort
+          (Base Scannable, { nullability = Non_null; separability = Non_float });
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -2904,7 +2995,10 @@ let for_or_null_argument ident =
       ~nullability:Nullability.Non_null
   in
   fresh_jkind
-    { layout = Sort (Base Scannable, { separability = Maybe_separable });
+    { layout =
+        Sort
+          ( Base Scannable,
+            { nullability = Non_null; separability = Maybe_separable } );
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -3010,7 +3104,9 @@ let for_open_boxed_row =
       ~nullability:Nullability.Non_null
   in
   fresh_jkind
-    { layout = Sort (Base Scannable, { separability = Non_float });
+    { layout =
+        Sort
+          (Base Scannable, { nullability = Non_null; separability = Non_float });
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -3052,7 +3148,9 @@ let for_boxed_row row =
 
 let for_arrow =
   fresh_jkind
-    { layout = Sort (Base Scannable, { separability = Non_float });
+    { layout =
+        Sort
+          (Base Scannable, { nullability = Non_null; separability = Non_float });
       mod_bounds = Mod_bounds.for_arrow;
       with_bounds = No_with_bounds
     }
@@ -3066,7 +3164,9 @@ let for_object =
   let comonadic = Crossing.Comonadic.legacy in
   let monadic = Crossing.Monadic.max in
   fresh_jkind
-    { layout = Sort (Base Scannable, { separability = Non_float });
+    { layout =
+        Sort
+          (Base Scannable, { nullability = Non_null; separability = Non_float });
       mod_bounds =
         Mod_bounds.create { comonadic; monadic } ~externality:Externality.max
           ~nullability:Non_null;
@@ -3085,7 +3185,9 @@ let for_float ident =
       ~nullability:Nullability.Non_null
   in
   fresh_jkind
-    { layout = Sort (Base Scannable, { separability = Separable });
+    { layout =
+        Sort
+          (Base Scannable, { nullability = Non_null; separability = Separable });
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -3098,7 +3200,7 @@ let for_array_argument =
       ~nullability:Nullability.Maybe_null
   in
   fresh_jkind
-    { layout = Any { separability = Separable };
+    { layout = Any { nullability = Maybe_null; separability = Separable };
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -3106,7 +3208,8 @@ let for_array_argument =
 
 let for_array_element_sort () =
   let jkind_desc, sort =
-    Jkind_desc.of_new_sort_var Maybe_null { separability = Separable }
+    Jkind_desc.of_new_sort_var Maybe_null
+      { nullability = Maybe_null; separability = Separable }
   in
   let jkind = { for_array_argument.jkind with layout = jkind_desc.layout } in
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
@@ -3232,7 +3335,8 @@ let set_root_separability jk separability =
   { jk with
     jkind =
       { jk.jkind with
-        layout = Layout.set_root_scannable_axes jk.jkind.layout { separability }
+        (* CR zeisbach: try to improve upon this interface. *)
+        layout = Layout.set_root_separability jk.jkind.layout separability
       }
   }
 

@@ -40,6 +40,11 @@ module Nullability : sig
     | Maybe_null
 
   include Axis_ops with type t := t
+
+  (* CR zeisbach: edit that interface to include this stuff.
+     and then figure out what to do with externality.
+     and probably fix the scannable axes interface too when I do that... *)
+  val to_string : t -> string
 end
 
 module Separability : sig

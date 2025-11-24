@@ -115,9 +115,9 @@ module Nullability = struct
     | Maybe_null, (Maybe_null | Non_null) | Non_null, Maybe_null -> Maybe_null
     | Non_null, Non_null -> Non_null
 
-  let print ppf = function
-    | Non_null -> Format.fprintf ppf "non_null"
-    | Maybe_null -> Format.fprintf ppf "maybe_null"
+  let to_string = function Non_null -> "non_null" | Maybe_null -> "maybe_null"
+
+  let print ppf t = Format.fprintf ppf "%s" (to_string t)
 end
 
 module Separability = struct

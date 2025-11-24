@@ -86,7 +86,7 @@ end
 module Scannable_axes : sig
   type t = Jkind_types.Scannable_axes.t
 
-  (* CR layouts-scannable: It might be unnecessary to have this module exposed,
+  (* CR zeisbach: It might be unnecessary to have this module exposed,
      since most of it goes unused (even internally to this file). *)
   include Jkind_axis.Axis_ops with type t := t
 
