@@ -68,9 +68,7 @@ end
 
 module Axis : sig
   module Nonmodal : sig
-    type 'a t =
-      | Externality : Externality.t t
-      | Nullability : Nullability.t t
+    type 'a t = Externality : Externality.t t
   end
 
   (** Represents an axis of a jkind *)

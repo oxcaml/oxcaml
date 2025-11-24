@@ -33,6 +33,8 @@ val untransl_modalities :
 (** Interpret a mod-bounds. *)
 val transl_mod_bounds :
   Parsetree.modes ->
-  Types.Jkind_mod_bounds.t * Jkind_axis.Separability.t Location.loc option
+  Types.Jkind_mod_bounds.t
+  * (Jkind_axis.Nullability.t Location.loc option
+    * Jkind_axis.Separability.t Location.loc option)
 
 val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
