@@ -99,7 +99,7 @@ Line 1, characters 14-25:
                   ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type
          "('a : value maybe_separable)"
-       The kind of int or_null is immediate_or_null maybe_separable
+       The kind of int or_null is value_or_null mod everything
          because it is the primitive type or_null.
        But the kind of int or_null must be a subkind of value maybe_separable
          because the type argument of or_null has kind value.
@@ -109,7 +109,7 @@ Line 1, characters 14-25:
                   ^^^^^^^^^^^
 Error: This type "int or_null" should be an instance of type
          "('a : value maybe_separable)"
-       The kind of int or_null is immediate_or_null maybe_separable with int
+       The kind of int or_null is value_or_null mod everything with int
          because it is the primitive type or_null.
        But the kind of int or_null must be a subkind of value maybe_separable
          because the type argument of or_null has kind value.

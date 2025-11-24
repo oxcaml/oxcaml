@@ -257,7 +257,7 @@ type t : value_or_null mod everything
 type bad : value = t
 
 [%%expect{|
-type t : immediate_or_null maybe_separable
+type t : value_or_null mod everything
 Line 2, characters 0-20:
 2 | type bad : value = t
     ^^^^^^^^^^^^^^^^^^^^

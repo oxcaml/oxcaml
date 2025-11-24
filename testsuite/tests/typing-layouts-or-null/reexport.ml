@@ -156,7 +156,7 @@ Line 4, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value maybe_separable)"
-       The kind of 'a Or_null.t is immediate_or_null maybe_separable with 'a
+       The kind of 'a Or_null.t is value_or_null mod everything with 'a
          because it is the primitive type or_null.
        But the kind of 'a Or_null.t must be a subkind of
            value maybe_separable

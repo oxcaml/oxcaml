@@ -1820,11 +1820,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig type 'a t : immediate_or_null maybe_separable end
+         sig type 'a t : value_or_null mod everything end
        is not included in
          sig type 'a t : immediate_or_null separable end
        Type declarations do not match:
-         type 'a t : immediate_or_null maybe_separable
+         type 'a t : value_or_null mod everything
        is not included in
          type 'a t : immediate_or_null separable
        The layout of the first is value maybe_separable

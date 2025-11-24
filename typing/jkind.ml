@@ -2201,7 +2201,8 @@ module Const = struct
     let rec select_simplest = function
       | a :: b :: tl ->
         let simpler =
-          if List.length a.modal_bounds < List.length b.modal_bounds
+          if List.length a.modal_bounds + List.length a.scannable_axes
+             < List.length b.modal_bounds + List.length b.scannable_axes
           then a
           else b
         in
