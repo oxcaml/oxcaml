@@ -770,11 +770,13 @@ module Layout_and_axes = struct
   let equal eq_layout
       { layout = lay1;
         mod_bounds = mod_bounds1;
-        with_bounds = (No_with_bounds : (allowed * allowed) with_bounds)
+        with_bounds = (No_with_bounds : (allowed * allowed) with_bounds);
+        ran_out_of_fuel_during_normalize = _
       }
       { layout = lay2;
         mod_bounds = mod_bounds2;
-        with_bounds = (No_with_bounds : (allowed * allowed) with_bounds)
+        with_bounds = (No_with_bounds : (allowed * allowed) with_bounds);
+        ran_out_of_fuel_during_normalize = _
       } =
     eq_layout lay1 lay2 && Mod_bounds.equal mod_bounds1 mod_bounds2
 
@@ -782,22 +784,36 @@ module Layout_and_axes = struct
       type l r.
       ('layout, l * r) layout_and_axes ->
       ('layout, Allowance.allowed * r) layout_and_axes option =
-   fun { layout; mod_bounds; with_bounds } ->
+   fun { layout; mod_bounds; with_bounds; ran_out_of_fuel_during_normalize } ->
     match With_bounds.try_allow_l with_bounds with
     | None -> None
     | Some with_bounds ->
-      Some { layout; mod_bounds = Obj.magic mod_bounds; with_bounds }
+      Some
+        { layout;
+          mod_bounds = Obj.magic mod_bounds;
+          with_bounds;
+          ran_out_of_fuel_during_normalize
+        }
 
-  let try_allow_r { layout; mod_bounds; with_bounds } =
+  let try_allow_r
+      { layout; mod_bounds; with_bounds; ran_out_of_fuel_during_normalize } =
     match With_bounds.try_allow_r with_bounds with
     | Some with_bounds ->
-      Some { layout; mod_bounds = Obj.magic mod_bounds; with_bounds }
+      Some
+        { layout;
+          mod_bounds = Obj.magic mod_bounds;
+          with_bounds;
+          ran_out_of_fuel_during_normalize
+        }
     | None -> None
 
-  let debug_print format_layout ppf { layout; mod_bounds; with_bounds } =
-    Format.fprintf ppf "{ layout = %a;@ mod_bounds = %a;@ with_bounds = %a }"
+  let debug_print format_layout ppf
+      { layout; mod_bounds; with_bounds; ran_out_of_fuel_during_normalize } =
+    Format.fprintf ppf
+      "{ layout = %a;@ mod_bounds = %a;@ with_bounds = %a; \
+       ran_out_of_fuel_during_normalize = %b }"
       format_layout layout Mod_bounds.debug_print mod_bounds
-      With_bounds.debug_print with_bounds
+      With_bounds.debug_print with_bounds ran_out_of_fuel_during_normalize
 
   type 'r normalize_mode =
     | Require_best : disallowed normalize_mode
@@ -920,7 +936,15 @@ module Layout_and_axes = struct
                 skippable_axes : Axis_set.t
               }  (** continue, with a new [t] *)
 
-        let initial_fuel_per_ty = 10
+        let initial_fuel_per_ty =
+          (* If we ran out of fuel while normalizing this jkind in the past,
+             we'll probably run out again. So we just use a small amount of fuel
+             in such a case. (We don't just immediately give up incase a
+             substitution unlocked some progress that allows us to quickly
+             terminate.) *)
+          match t.ran_out_of_fuel_during_normalize with
+          | false -> 10
+          | true -> 1
 
         let starting =
           { tuple_fuel = initial_fuel_per_ty;
@@ -1240,10 +1264,15 @@ module Layout_and_axes = struct
           (Axis_set.complement skip_axes)
           (With_bounds.to_list t.with_bounds)
       in
+      let ran_out_of_fuel_during_normalize =
+        match ctl.fuel_status with
+        | Ran_out_of_fuel -> true
+        | Sufficient_fuel -> false
+      in
       let normalized_t : (layout, l * r2) layout_and_axes =
         match mode, ctl.fuel_status with
         | Require_best, Sufficient_fuel | Ignore_best, _ ->
-          { t with mod_bounds; with_bounds }
+          { t with mod_bounds; with_bounds; ran_out_of_fuel_during_normalize }
         | Require_best, Ran_out_of_fuel ->
           (* Note [Ran out of fuel when requiring best]
              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1280,7 +1309,7 @@ module Layout_and_axes = struct
              mod- and with-bounds, because down here we detect the case and
              simply return [t].
           *)
-          t |> disallow_right
+          { t with ran_out_of_fuel_during_normalize } |> disallow_right
       in
       normalized_t, ctl.fuel_status
 end
@@ -1361,7 +1390,6 @@ let fresh_jkind jkind ~annotation ~why =
     annotation;
     history = Creation why;
     has_warned = false;
-    ran_out_of_fuel_during_normalize = false;
     quality = Not_best
   }
   |> allow_left |> allow_right
@@ -1372,7 +1400,6 @@ let fresh_jkind_poly jkind ~annotation ~why =
     annotation;
     history = Creation why;
     has_warned = false;
-    ran_out_of_fuel_during_normalize = false;
     quality = Not_best
   }
 
@@ -1419,7 +1446,8 @@ module Const = struct
     Types.
       { layout = Layout.Const.max;
         mod_bounds = Mod_bounds.max;
-        with_bounds = No_with_bounds
+        with_bounds = No_with_bounds;
+        ran_out_of_fuel_during_normalize = false
       }
 
   let no_with_bounds_and_equal t1 t2 =
@@ -1453,7 +1481,11 @@ module Const = struct
       let mod_bounds =
         Mod_bounds.create crossing ~nullability ~separability ~externality
       in
-      { layout; mod_bounds; with_bounds = No_with_bounds }
+      { layout;
+        mod_bounds;
+        with_bounds = No_with_bounds;
+        ran_out_of_fuel_during_normalize = false
+      }
 
     let any =
       { jkind =
@@ -1507,7 +1539,8 @@ module Const = struct
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
                  ~separability:Separability.Non_float);
-            with_bounds = No_with_bounds
+            with_bounds = No_with_bounds;
+            ran_out_of_fuel_during_normalize = false
           };
         name = "immutable_data"
       }
@@ -1525,7 +1558,8 @@ module Const = struct
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
                  ~separability:Separability.Non_float);
-            with_bounds = No_with_bounds
+            with_bounds = No_with_bounds;
+            ran_out_of_fuel_during_normalize = false
           };
         name = "exn"
       }
@@ -1543,7 +1577,8 @@ module Const = struct
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
                  ~separability:Separability.Non_float);
-            with_bounds = No_with_bounds
+            with_bounds = No_with_bounds;
+            ran_out_of_fuel_during_normalize = false
           };
         name = "sync_data"
       }
@@ -1561,7 +1596,8 @@ module Const = struct
                Mod_bounds.create crossing ~externality:Externality.max
                  ~nullability:Nullability.Non_null
                  ~separability:Separability.Non_float);
-            with_bounds = No_with_bounds
+            with_bounds = No_with_bounds;
+            ran_out_of_fuel_during_normalize = false
           };
         name = "mutable_data"
       }
@@ -2081,7 +2117,8 @@ module Const = struct
                         Mod_bounds.set_separability Separability.Separable
                           (Mod_bounds.set_nullability Nullability.Non_null
                              Mod_bounds.max);
-                      with_bounds = No_with_bounds
+                      with_bounds = No_with_bounds;
+                      ran_out_of_fuel_during_normalize = false
                     };
                   name = Layout.Const.to_string jkind.layout
                 }
@@ -2097,7 +2134,8 @@ module Const = struct
                   { jkind =
                       { layout = jkind.layout;
                         mod_bounds = Mod_bounds.max;
-                        with_bounds = No_with_bounds
+                        with_bounds = No_with_bounds;
+                        ran_out_of_fuel_during_normalize = false
                       };
                     name = Layout.Const.to_string jkind.layout
                   }
@@ -2134,18 +2172,26 @@ module Const = struct
   (* converting user annotations *)
 
   let jkind_of_product_annotations (type l r) (jkinds : (l * r) t list) =
-    let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
-        ({ layout; mod_bounds; with_bounds } : (l * r) t) =
+    let folder (type l r)
+        ( layouts_acc,
+          mod_bounds_acc,
+          with_bounds_acc,
+          ran_out_of_fuel_during_normalize_acc )
+        ({ layout; mod_bounds; with_bounds; ran_out_of_fuel_during_normalize } :
+          (l * r) t) =
       ( layout :: layouts_acc,
         Mod_bounds.join mod_bounds mod_bounds_acc,
-        With_bounds.join with_bounds with_bounds_acc )
+        With_bounds.join with_bounds with_bounds_acc,
+        ran_out_of_fuel_during_normalize || ran_out_of_fuel_during_normalize_acc
+      )
     in
-    let layouts, mod_bounds, with_bounds =
-      List.fold_left folder ([], Mod_bounds.min, No_with_bounds) jkinds
+    let layouts, mod_bounds, with_bounds, ran_out_of_fuel_during_normalize =
+      List.fold_left folder ([], Mod_bounds.min, No_with_bounds, false) jkinds
     in
     { layout = Layout.Const.Product (List.rev layouts);
       mod_bounds;
-      with_bounds
+      with_bounds;
+      ran_out_of_fuel_during_normalize
     }
 
   let rec of_user_written_annotation_unchecked_level :
@@ -2186,7 +2232,11 @@ module Const = struct
       let mod_bounds =
         Mod_bounds.meet base.mod_bounds (Typemode.transl_mod_bounds modifiers)
       in
-      { layout = base.layout; mod_bounds; with_bounds = No_with_bounds }
+      { layout = base.layout;
+        mod_bounds;
+        with_bounds = No_with_bounds;
+        ran_out_of_fuel_during_normalize = false
+      }
     | Pjk_product ts ->
       let jkinds =
         List.map (of_user_written_annotation_unchecked_level context) ts
@@ -2205,7 +2255,8 @@ module Const = struct
           mod_bounds = base.mod_bounds;
           with_bounds =
             With_bounds.add_modality ~modality ~relevant_for_shallow:`Irrelevant
-              ~type_expr:type_ base.with_bounds
+              ~type_expr:type_ base.with_bounds;
+          ran_out_of_fuel_during_normalize = false
         })
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjkind_loc Unimplemented_syntax
@@ -2308,14 +2359,22 @@ module Jkind_desc = struct
 
   let sub (type l r) ~type_equal:_ ~context ~level
       (sub : (allowed * r) jkind_desc)
-      ({ layout = lay2; mod_bounds = bounds2; with_bounds = No_with_bounds } :
+      ({ layout = lay2;
+         mod_bounds = bounds2;
+         with_bounds = No_with_bounds;
+         ran_out_of_fuel_during_normalize = _
+       } :
         (l * allowed) jkind_desc) =
     let axes_max_on_right =
       (* Optimization: if the upper_bound is max on the right, then that axis is
          irrelevant - the left will always satisfy the right along that axis. *)
       Mod_bounds.get_max_axes bounds2
     in
-    let ( ({ layout = lay1; mod_bounds = bounds1; with_bounds = No_with_bounds } :
+    let ( ({ layout = lay1;
+             mod_bounds = bounds1;
+             with_bounds = No_with_bounds;
+             ran_out_of_fuel_during_normalize = _
+           } :
             (_ * allowed) jkind_desc),
           _ ) =
       Layout_and_axes.normalize ~skip_axes:axes_max_on_right ~mode:Ignore_best
@@ -2326,15 +2385,26 @@ module Jkind_desc = struct
     Sub_result.combine layout bounds
 
   let intersection ~level
-      { layout = lay1; mod_bounds = mod_bounds1; with_bounds = with_bounds1 }
-      { layout = lay2; mod_bounds = mod_bounds2; with_bounds = with_bounds2 } =
+      { layout = lay1;
+        mod_bounds = mod_bounds1;
+        with_bounds = with_bounds1;
+        ran_out_of_fuel_during_normalize = ran_out_of_fuel_during_normalize1
+      }
+      { layout = lay2;
+        mod_bounds = mod_bounds2;
+        with_bounds = with_bounds2;
+        ran_out_of_fuel_during_normalize = ran_out_of_fuel_during_normalize2
+      } =
     match Layout.intersection ~level lay1 lay2 with
     | None -> None
     | Some layout ->
       Some
         { layout;
           mod_bounds = Mod_bounds.meet mod_bounds1 mod_bounds2;
-          with_bounds = With_bounds.meet with_bounds1 with_bounds2
+          with_bounds = With_bounds.meet with_bounds1 with_bounds2;
+          ran_out_of_fuel_during_normalize =
+            ran_out_of_fuel_during_normalize1
+            || ran_out_of_fuel_during_normalize2
         }
 
   let map_type_expr f t = Layout_and_axes.map_type_expr f t
@@ -2346,7 +2416,8 @@ module Jkind_desc = struct
           Mod_bounds.max
           |> Mod_bounds.set_nullability nullability_upper_bound
           |> Mod_bounds.set_separability separability_upper_bound;
-        with_bounds = No_with_bounds
+        with_bounds = No_with_bounds;
+        ran_out_of_fuel_during_normalize = false
       },
       sort )
 
@@ -2385,7 +2456,11 @@ module Jkind_desc = struct
             bounds)
         tys_modalities No_with_bounds
     in
-    { layout; mod_bounds; with_bounds }
+    { layout;
+      mod_bounds;
+      with_bounds;
+      ran_out_of_fuel_during_normalize = false
+    }
 
   let get t = Layout_and_axes.map Layout.get t
 
@@ -2420,7 +2495,6 @@ module Builtin = struct
       (* this should never get printed: it's a dummy *)
       history = Creation (Any_creation Dummy_jkind);
       has_warned = false;
-      ran_out_of_fuel_during_normalize = false;
       quality = Not_best
     }
 
@@ -2439,7 +2513,6 @@ module Builtin = struct
       annotation = mk_annot "value";
       history = Creation (Value_or_null_creation V1_safety_check);
       has_warned = false;
-      ran_out_of_fuel_during_normalize = false;
       quality = Not_best
     }
 
@@ -2496,7 +2569,11 @@ module Builtin = struct
         (List.init arity (fun _ -> fst (Layout.of_new_sort_var ~level)))
     in
     let desc : _ jkind_desc =
-      { layout; mod_bounds = Mod_bounds.max; with_bounds = No_with_bounds }
+      { layout;
+        mod_bounds = Mod_bounds.max;
+        with_bounds = No_with_bounds;
+        ran_out_of_fuel_during_normalize = false
+      }
     in
     fresh_jkind_poly desc ~annotation:None ~why:(Product_creation why)
   (* We do not [mark_best] here because the resulting jkind is used (only) in
@@ -2549,7 +2626,6 @@ let of_const (type l r) ~annotation ~why ~(quality : (l * r) jkind_quality)
     annotation;
     history = Creation why;
     has_warned = false;
-    ran_out_of_fuel_during_normalize = false;
     quality
   }
 
@@ -2671,7 +2747,11 @@ let for_non_float ~(why : History.value_creation_reason) =
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
-    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    { layout = Sort (Base Value);
+      mod_bounds;
+      with_bounds = No_with_bounds;
+      ran_out_of_fuel_during_normalize = false
+    }
     ~annotation:None ~why:(Value_creation why)
 
 let for_or_null_argument ident =
@@ -2684,7 +2764,11 @@ let for_or_null_argument ident =
       ~separability:Separability.Maybe_separable
   in
   fresh_jkind
-    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    { layout = Sort (Base Value);
+      mod_bounds;
+      with_bounds = No_with_bounds;
+      ran_out_of_fuel_during_normalize = false
+    }
     ~annotation:None ~why:(Value_creation why)
 
 let for_abbreviation ~type_jkind_purely ~modality ty =
@@ -2699,7 +2783,8 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
   fresh_jkind_poly
     { layout = jkind.jkind.layout;
       mod_bounds = Mod_bounds.min;
-      with_bounds = With_bounds with_bounds_types
+      with_bounds = With_bounds with_bounds_types;
+      ran_out_of_fuel_during_normalize = false
     }
     ~annotation:None ~why:Abbreviation
 
@@ -2787,7 +2872,11 @@ let for_open_boxed_row =
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
-    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    { layout = Sort (Base Value);
+      mod_bounds;
+      with_bounds = No_with_bounds;
+      ran_out_of_fuel_during_normalize = false
+    }
     ~annotation:None ~why:(Value_creation Polymorphic_variant)
 
 let limit_for_mode_crossing_rows = 100
@@ -2828,7 +2917,8 @@ let for_arrow =
   fresh_jkind
     { layout = Sort (Base Value);
       mod_bounds = Mod_bounds.for_arrow;
-      with_bounds = No_with_bounds
+      with_bounds = No_with_bounds;
+      ran_out_of_fuel_during_normalize = false
     }
     ~annotation:None ~why:(Value_creation Arrow)
   |> mark_best
@@ -2854,7 +2944,8 @@ let for_object =
       mod_bounds =
         Mod_bounds.create { comonadic; monadic } ~externality:Externality.max
           ~nullability:Non_null ~separability:Separability.Non_float;
-      with_bounds = No_with_bounds
+      with_bounds = No_with_bounds;
+      ran_out_of_fuel_during_normalize = false
     }
     ~annotation:None ~why:(Value_creation Object)
 
@@ -2869,7 +2960,11 @@ let for_float ident =
       ~nullability:Nullability.Non_null ~separability:Separability.Separable
   in
   fresh_jkind
-    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+    { layout = Sort (Base Value);
+      mod_bounds;
+      with_bounds = No_with_bounds;
+      ran_out_of_fuel_during_normalize = false
+    }
     ~annotation:None ~why:(Primitive ident)
   |> mark_best
 
@@ -2879,7 +2974,11 @@ let for_array_argument =
       ~nullability:Nullability.Maybe_null ~separability:Separability.Separable
   in
   fresh_jkind
-    { layout = Any; mod_bounds; with_bounds = No_with_bounds }
+    { layout = Any;
+      mod_bounds;
+      with_bounds = No_with_bounds;
+      ran_out_of_fuel_during_normalize = false
+    }
     ~annotation:None ~why:(Any_creation Array_type_argument)
 
 let for_array_element_sort ~level =
@@ -2909,11 +3008,7 @@ let[@inline] normalize ~mode ~context t =
     quality =
       (match t.quality, fuel_result with
       | Not_best, _ | _, Ran_out_of_fuel -> Not_best
-      | Best, Sufficient_fuel -> Best);
-    ran_out_of_fuel_during_normalize =
-      (match fuel_result with
-      | Ran_out_of_fuel -> true
-      | _ -> t.ran_out_of_fuel_during_normalize)
+      | Best, Sufficient_fuel -> Best)
   }
 
 let get_layout_defaulting_to_value { jkind = { layout; _ }; _ } =
@@ -2941,7 +3036,11 @@ let get_layout jk : Layout.Const.t option = Layout.get_const jk.jkind.layout
 let extract_layout jk = jk.jkind.layout
 
 let get_mode_crossing (type l r) ~context (jk : (l * r) jkind) =
-  let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :
+  let ( ({ layout = _;
+           mod_bounds;
+           with_bounds = No_with_bounds;
+           ran_out_of_fuel_during_normalize = _
+         } :
           (_ * allowed) jkind_desc),
         _ ) =
     Layout_and_axes.normalize ~mode:Ignore_best
@@ -2958,7 +3057,11 @@ let all_except_externality =
   Axis_set.singleton (Nonmodal Externality) |> Axis_set.complement
 
 let get_externality_upper_bound ~context jk =
-  let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :
+  let ( ({ layout = _;
+           mod_bounds;
+           with_bounds = No_with_bounds;
+           ran_out_of_fuel_during_normalize = _
+         } :
           (_ * allowed) jkind_desc),
         _ ) =
     Layout_and_axes.normalize ~mode:Ignore_best
@@ -2990,7 +3093,11 @@ let get_nullability ~context jk =
   if all_with_bounds_are_irrelevant
   then Mod_bounds.nullability jk.jkind.mod_bounds
   else
-    let ( ({ layout = _; mod_bounds; with_bounds = No_with_bounds } :
+    let ( ({ layout = _;
+             mod_bounds;
+             with_bounds = No_with_bounds;
+             ran_out_of_fuel_during_normalize = _
+           } :
             (_ * allowed) jkind_desc),
           _ ) =
       Layout_and_axes.normalize ~mode:Ignore_best ~context
@@ -3638,9 +3745,11 @@ module Violation = struct
     let first_ran_out, second_ran_out =
       match violation with
       | Not_a_subjkind (k1, k2, _) ->
-        k1.ran_out_of_fuel_during_normalize, k2.ran_out_of_fuel_during_normalize
+        ( k1.jkind.ran_out_of_fuel_during_normalize,
+          k2.jkind.ran_out_of_fuel_during_normalize )
       | No_intersection (k1, k2) ->
-        k1.ran_out_of_fuel_during_normalize, k2.ran_out_of_fuel_during_normalize
+        ( k1.jkind.ran_out_of_fuel_during_normalize,
+          k2.jkind.ran_out_of_fuel_during_normalize )
     in
     if first_ran_out then report_fuel_for_type "first";
     if second_ran_out then report_fuel_for_type "second"
@@ -3756,20 +3865,9 @@ end
 (* relations *)
 
 let equate_or_equal ~allow_mutation
-    { jkind = jkind1;
-      annotation = _;
-      history = _;
-      has_warned = _;
-      ran_out_of_fuel_during_normalize = _;
-      quality = _
-    }
-    { jkind = jkind2;
-      annotation = _;
-      history = _;
-      has_warned = _;
-      ran_out_of_fuel_during_normalize = _;
-      quality = _
-    } =
+    { jkind = jkind1; annotation = _; history = _; has_warned = _; quality = _ }
+    { jkind = jkind2; annotation = _; history = _; has_warned = _; quality = _ }
+    =
   Jkind_desc.equate_or_equal ~allow_mutation jkind1 jkind2
 
 (* CR layouts: Switch this back to ~allow_mutation:false. Internal ticket 5099. *)
@@ -3839,9 +3937,6 @@ let intersection_or_error ~type_equal ~context ~reason ~level t1 t2 =
           combine_histories ~type_equal ~context ~level reason (Pack_jkind t1)
             (Pack_jkind t2);
         has_warned = t1.has_warned || t2.has_warned;
-        ran_out_of_fuel_during_normalize =
-          t1.ran_out_of_fuel_during_normalize
-          || t2.ran_out_of_fuel_during_normalize;
         quality =
           Not_best (* As required by the fact that this is a [jkind_r] *)
       }
@@ -3932,7 +4027,8 @@ let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) sub
     let right_bounds_seq = right_bounds |> With_bounds_types.to_seq in
     let ( ({ layout = _;
              mod_bounds = sub_upper_bounds;
-             with_bounds = No_with_bounds
+             with_bounds = No_with_bounds;
+             ran_out_of_fuel_during_normalize = _
            } :
             (_ * allowed) jkind_desc),
           _ ) =
@@ -3991,14 +4087,34 @@ let is_max (t : (_ * allowed) jkind) =
   match t with
   (* This doesn't do any mutation because mutating a sort variable can't make it
      any, and modal upper bounds are constant. *)
-  | { jkind = { layout = Any; mod_bounds; with_bounds = No_with_bounds }; _ } ->
+  | { jkind =
+        { layout = Any;
+          mod_bounds;
+          with_bounds = No_with_bounds;
+          ran_out_of_fuel_during_normalize = _
+        };
+      _
+    } ->
     Mod_bounds.is_max mod_bounds
-  | { jkind = { layout = _; mod_bounds = _; with_bounds = No_with_bounds }; _ }
-    ->
+  | { jkind =
+        { layout = _;
+          mod_bounds = _;
+          with_bounds = No_with_bounds;
+          ran_out_of_fuel_during_normalize = _
+        };
+      _
+    } ->
     false
 
 let mod_bounds_are_max
-    ({ jkind = { layout = _; mod_bounds; with_bounds = No_with_bounds }; _ } :
+    ({ jkind =
+         { layout = _;
+           mod_bounds;
+           with_bounds = No_with_bounds;
+           ran_out_of_fuel_during_normalize = _
+         };
+       _
+     } :
       (_ * allowed) jkind) =
   Mod_bounds.is_max mod_bounds
 
@@ -4232,31 +4348,30 @@ module Debug_printers = struct
     | Creation c -> fprintf ppf "Creation (%a)" creation_reason c
 
   let t (type l r) ppf
-      ({ jkind;
-         annotation = a;
-         history = h;
-         has_warned = _;
-         ran_out_of_fuel_during_normalize = roofdn;
-         quality = q
-       } :
+      ({ jkind; annotation = a; history = h; has_warned = _; quality = q } :
         (l * r) jkind) : unit =
     fprintf ppf
       "@[<v 2>{ jkind = %a@,\
        ; annotation = %a@,\
        ; history = %a@,\
-       ; ran_out_of_fuel_during_normalize = %a@,\
        ; quality = %s@,\
       \ }@]" Jkind_desc.Debug_printers.t jkind
       (pp_print_option Pprintast.jkind_annotation)
-      a history h pp_print_bool roofdn
+      a history h
       (match q with Best -> "Best" | Not_best -> "Not_best")
 
   module Const = struct
-    let t ppf ({ layout; mod_bounds; with_bounds } : _ Const.t) =
+    let t ppf
+        ({ layout; mod_bounds; with_bounds; ran_out_of_fuel_during_normalize } :
+          _ Const.t) =
       fprintf ppf
-        "@[<v 2>{ layout = %a@,; mod_bounds = %a@,; with_bounds = %a@, }@]"
-        Layout.Const.Debug_printers.t layout Mod_bounds.debug_print mod_bounds
-        With_bounds.debug_print with_bounds
+        "@[<v 2>{ layout = %a@,\
+         ; mod_bounds = %a@,\
+         ; with_bounds = %a@,\
+         ; ran_out_of_fuel_during_normalize = %b@,\
+        \ }@]" Layout.Const.Debug_printers.t layout Mod_bounds.debug_print
+        mod_bounds With_bounds.debug_print with_bounds
+        ran_out_of_fuel_during_normalize
   end
 end
 
