@@ -580,7 +580,7 @@ Error: This type signature for "x" is not a value type.
        The layout of type t_any is any
          because of the definition of t_any at line 5, characters 0-18.
        But the layout of type t_any must be a sublayout of
-           value maybe_separable
+           value maybe_separable maybe_null
          because it's the type of something stored in a module structure.
 |}]
 

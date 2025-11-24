@@ -814,7 +814,10 @@ module With_bounds = struct
          print constant modalities for those axes!
       *)
       let implicit_relevant_axes = Mod_bounds.get_max_axes mod_bounds in
-      Axis_set.union explicit_relevant_axes implicit_relevant_axes
+      let relevant_axes =
+        Axis_set.union explicit_relevant_axes implicit_relevant_axes
+      in
+      Axis_set.complement relevant_axes
   end
 
   let to_best_eff_map = function
@@ -2242,7 +2245,8 @@ module Const = struct
     let rec select_simplest = function
       | a :: b :: tl ->
         let simpler =
-          if List.length a.modal_bounds < List.length b.modal_bounds
+          if List.length a.modal_bounds + List.length a.scannable_axes
+             < List.length b.modal_bounds + List.length b.scannable_axes
           then a
           else b
         in
@@ -3225,10 +3229,14 @@ let set_externality_upper_bound jk externality_upper_bound =
 
 (* CR zeisbach: this might be entirely wrong! *)
 let get_nullability jk =
+  (* do we have to always normalize in here? maybe some places were relying
+     on this doing normalization and now it doesn't?? Not sure why else huge
+     with blobs are getting printed out... *)
   match get_root_scannable_axes jk with
   | Some { nullability; _ } -> nullability
   (* CR zeisbach: this might be the entirely wrong default! But this might
      not matter either? THINK AND ASK! *)
+  (* TRY THIS IN THE OTHER DIRECTION! *)
   | None -> Nullability.Non_null
 
 let set_root_nullability jk nullability =
@@ -3881,6 +3889,11 @@ module Violation = struct
     if first_ran_out then report_fuel_for_type "first";
     if second_ran_out then report_fuel_for_type "second"
 
+  (* CR zeisbach: now that we have multiple axes here, it might be the time to
+     implement the change where the first error gets reported. right now,
+     irrelevant axes get reported. But at least it's too much info, instead
+     of not enough. Also having to know that [any] and [value] have different
+     defaults is a bit of friction: could always have [any] report them all? *)
   let report_general preamble pp_former former ppf t =
     let mismatch_type =
       match t.violation with

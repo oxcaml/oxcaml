@@ -74,7 +74,7 @@ Line 4, characters 35-41:
 4 |   type 'a s = 'a -> int constraint 'a = t
                                        ^^^^^^
 Error: The type constraints are not consistent.
-       Type "('a : '_representable_layout_1 separable)"
+       Type "('a : '_representable_layout_1 separable non_null)"
        is not compatible with type "t"
        The layout of t is any
          because of the definition of t at line 2, characters 2-14.
@@ -92,7 +92,7 @@ Line 4, characters 35-41:
 4 |   type 'a s = int -> 'a constraint 'a = t
                                        ^^^^^^
 Error: The type constraints are not consistent.
-       Type "('a : '_representable_layout_2 separable)"
+       Type "('a : '_representable_layout_2 separable non_null)"
        is not compatible with type "t"
        The layout of t is any
          because of the definition of t at line 2, characters 2-14.
@@ -1714,7 +1714,7 @@ Error: This type signature for "foo33" is not a value type.
        The layout of type t_any is any
          because of the definition of t_any at line 1, characters 0-18.
        But the layout of type t_any must be a sublayout of
-           value maybe_separable
+           value maybe_separable maybe_null
          because it's the type of something stored in a module structure.
 |}]
 

@@ -422,6 +422,13 @@ Error: Record element types must have a representable layout.
 |}]
 
 (* CR layouts v7.2: improve this error message *)
+
+(* CR zeisbach: the error message got way worse, specifically the history:
+BEFORE: the message had
+-       But the layout of r must be a sublayout of value & float64
+-         because of the definition of t at line 1, characters 0-29.
+*)
+
 type ('a : value & float64) t
 type bad = r# t
 and r = { x:int; y:bool }
@@ -430,9 +437,9 @@ type ('a : value & float64) t
 Line 3, characters 0-25:
 3 | and r = { x:int; y:bool }
     ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of r# is value maybe_separable & float64
+Error: The layout of type "r#" is immediate & immediate
          because it is an unboxed record.
-       But the layout of r# must be a sublayout of value & float64
-         because of the definition of t at line 1, characters 0-29.
+       But the layout of type "r#" must be a sublayout of
+           value maybe_separable maybe_null & float64
+         because it is an unboxed record.
 |}]
