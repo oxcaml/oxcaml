@@ -418,8 +418,6 @@ module Layout = struct
     | Sort (b, _) -> Sort.is_scannable_or_var b
     | Product _ -> false
 
-  let _is_scannable_or_any t = t |> get_root_scannable_axes |> Option.is_some
-
   (* CR layouts-scannable: Once nullability becomes a scannable axis, reconsider
      whether this function is needed. *)
   (* If [t] has no meaningful scannable axes, returns [t] unchanged *)
