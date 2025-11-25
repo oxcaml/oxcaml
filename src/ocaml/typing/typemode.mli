@@ -48,8 +48,16 @@ module Modality_axis_pair : sig
   val of_string : string -> t
 end
 
+<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
 module Modifier_axis_pair : sig
   type t = P : 'a Jkind_axis.Axis.t * 'a -> t
 
   val of_string : string -> t
 end
+||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
+val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
+=======
+val untransl_mod_bounds : Types.Jkind_mod_bounds.t -> Parsetree.modes
+
+val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
+>>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7

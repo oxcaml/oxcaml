@@ -144,18 +144,21 @@ let classify ~classify_product env ty sort : _ classification =
            || Path.same p Predef.path_int16x8
            || Path.same p Predef.path_int32x4
            || Path.same p Predef.path_int64x2
+           || Path.same p Predef.path_float16x8
            || Path.same p Predef.path_float32x4
            || Path.same p Predef.path_float64x2
            || Path.same p Predef.path_int8x32
            || Path.same p Predef.path_int16x16
            || Path.same p Predef.path_int32x8
            || Path.same p Predef.path_int64x4
+           || Path.same p Predef.path_float16x16
            || Path.same p Predef.path_float32x8
            || Path.same p Predef.path_float64x4
            || Path.same p Predef.path_int8x64
            || Path.same p Predef.path_int16x32
            || Path.same p Predef.path_int32x16
            || Path.same p Predef.path_int64x8
+           || Path.same p Predef.path_float16x32
            || Path.same p Predef.path_float32x16
            || Path.same p Predef.path_float64x8
            then Addr
@@ -351,16 +354,15 @@ let value_kind_of_value_jkind env jkind =
      the principality check, as we're just trying to compute optimizations. *)
   let context = Ctype.mk_jkind_context_always_principal env in
   let externality_upper_bound =
-    Jkind.get_externality_upper_bound ~context jkind in
-  match layout, externality_upper_bound with
-  | Base Value, External -> Pintval
-  | Base Value, External64 ->
-    if !Clflags.native_code && Sys.word_size = 64 then Pintval else Pgenval
-  | Base Value, Internal -> Pgenval
-  | Any, _
-  | Product _, _
+    Jkind.get_externality_upper_bound ~context jkind
+  in
+  match layout with
+  | Base Value ->
+    value_kind_of_value_with_externality externality_upper_bound
+  | Any
+  | Product _
   | Base (Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 |
-          Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) , _ ->
+          Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
     Misc.fatal_error "expected a layout of value"
 
 (* [value_kind] has a pre-condition that it is only called on values.  With the
@@ -531,6 +533,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec128)
   | Tconstr(p, _, _) when Path.same p Predef.path_int64x2 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec128)
+  | Tconstr(p, _, _) when Path.same p Predef.path_float16x8 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec128)
   | Tconstr(p, _, _) when Path.same p Predef.path_float32x4 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec128)
   | Tconstr(p, _, _) when Path.same p Predef.path_float64x2 ->
@@ -543,6 +547,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
   | Tconstr(p, _, _) when Path.same p Predef.path_int64x4 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
+  | Tconstr(p, _, _) when Path.same p Predef.path_float16x16 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
   | Tconstr(p, _, _) when Path.same p Predef.path_float32x8->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
   | Tconstr(p, _, _) when Path.same p Predef.path_float64x4 ->
@@ -554,6 +560,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
   | Tconstr(p, _, _) when Path.same p Predef.path_int32x16 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
   | Tconstr(p, _, _) when Path.same p Predef.path_int64x8 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
+  | Tconstr(p, _, _) when Path.same p Predef.path_float16x32->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
   | Tconstr(p, _, _) when Path.same p Predef.path_float32x16->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
@@ -970,11 +978,9 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       && Language_extension.(is_at_least Small_numbers Stable) then
       Lambda.Punboxed_or_untagged_integer Untagged_int
     else error const
-  | Base Bits8 when Language_extension.(is_at_least Layouts Stable) &&
-                    Language_extension.(is_at_least Small_numbers Stable) ->
+  | Base Bits8 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_or_untagged_integer Untagged_int8
-  | Base Bits16 when Language_extension.(is_at_least Layouts Stable) &&
-                     Language_extension.(is_at_least Small_numbers Stable) ->
+  | Base Bits16 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_or_untagged_integer Untagged_int16
   | Base Bits32 when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_or_untagged_integer Unboxed_int32
@@ -1147,4 +1153,61 @@ let rec layout_union l1 l2 =
      Punboxed_vector _ | Punboxed_product _),
     _ ->
       Ptop
+<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
 *)
+||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
+      | Some err ->
+        fprintf ppf "@ %a"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) err
+      end
+  | Sort_without_extension (sort, maturity, ty) ->
+      fprintf ppf "Non-value layout %a detected" Jkind.Sort.format sort;
+=======
+      | Some err ->
+        fprintf ppf "@ %a"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~level:(Ctype.get_current_level ())) err
+      end
+  | Sort_without_extension (sort, maturity, ty) ->
+      fprintf ppf "Non-value layout %a detected" Jkind.Sort.format sort;
+>>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
+<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
+||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
+  | Not_a_sort (ty, err) ->
+      fprintf ppf "A representable layout is required here.@ %a"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) err
+  | Unsupported_product_in_lazy const ->
+      fprintf ppf
+        "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \
+=======
+  | Not_a_sort (ty, err) ->
+      fprintf ppf "A representable layout is required here.@ %a"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~level:(Ctype.get_current_level ()) ) err
+  | Unsupported_product_in_lazy const ->
+      fprintf ppf
+        "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \
+>>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
+<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
+||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
+          Printtyp.type_expr array_type
+          Printtyp.type_expr ty
+          (Jkind.Violation.report_with_offender
+            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) err
+      | None ->
+        fprintf ppf
+          "This array operation expects an array type, but %a does not appear@ \
+=======
+          Printtyp.type_expr array_type
+          Printtyp.type_expr ty
+          (Jkind.Violation.report_with_offender
+             ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+             ~level:(Ctype.get_current_level ())) err
+      | None ->
+        fprintf ppf
+          "This array operation expects an array type, but %a does not appear@ \
+>>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
