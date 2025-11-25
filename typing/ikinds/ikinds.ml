@@ -1,9 +1,9 @@
 (* This forces ikinds globally on. *)
-Clflags.ikinds := true;;
+Clflags.ikinds := false
 
 (* Types.ikind_debug := true *)
-let enable_crossing = true
-let enable_sub_jkind_l = true
+let enable_crossing = false
+let enable_sub_jkind_l = false
 let enable_sub_or_intersect = false
 let enable_sub_or_error = false
 
