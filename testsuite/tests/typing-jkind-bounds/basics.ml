@@ -115,7 +115,7 @@ Line 2, characters 0-18:
     ^^^^^^^^^^^^^^^^^^
 Error: The layout of type "a" is any
          because of the definition of a at line 1, characters 0-12.
-       But the layout of type "a" must be a sublayout of value
+       But the layout of type "a" must be a sublayout of a value layout
          because of the definition of b at line 2, characters 0-18.
 |}]
 

@@ -413,7 +413,12 @@ module Layout = struct
     | Sort (b, sa) -> if Sort.is_scannable_or_var b then Some sa else None
     | Product _ -> None
 
-  let is_scannable_or_any t = t |> get_root_scannable_axes |> Option.is_some
+  let is_scannable_or_var : _ t -> bool = function
+    | Any _ -> false
+    | Sort (b, _) -> Sort.is_scannable_or_var b
+    | Product _ -> false
+
+  let _is_scannable_or_any t = t |> get_root_scannable_axes |> Option.is_some
 
   (* CR layouts-scannable: Once nullability becomes a scannable axis, reconsider
      whether this function is needed. *)
@@ -3888,10 +3893,10 @@ module Violation = struct
         else
           (* If the type on the left is known to be not scannable, there
              is no need to report the scannable axes on the right. *)
-          Layout { can_omit_right_sa = not (Layout.is_scannable_or_any l1) }
+          Layout { can_omit_right_sa = not (Layout.is_scannable_or_var l1) }
       | No_intersection (k1, _k2) ->
         Layout
-          { can_omit_right_sa = not (Layout.is_scannable_or_any k1.jkind.layout)
+          { can_omit_right_sa = not (Layout.is_scannable_or_var k1.jkind.layout)
           }
     in
     let layout_or_kind =

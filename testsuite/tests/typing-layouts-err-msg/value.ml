@@ -47,7 +47,7 @@ Line 1, characters 9-14:
 Error: Tuple element types must have layout value.
        The layout of "t_any" is any
          because of the definition of t_any at line 1, characters 0-18.
-       But the layout of "t_any" must be a sublayout of value maybe_separable
+       But the layout of "t_any" must be a sublayout of a value layout
          because it's the type of a tuple element.
 |}];;
 

@@ -205,7 +205,7 @@ Line 3, characters 19-24:
 Error: This type "t_any" should be an instance of type "('a : value_or_null)"
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
-       But the layout of t_any must be a sublayout of value maybe_separable
+       But the layout of t_any must be a sublayout of a value layout
          because the type argument of list has layout value_or_null.
 |}]
 
@@ -232,7 +232,7 @@ Error: This type "t_any_mod_separable" should be an instance of type
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 1, characters 0-44.
        But the layout of t_any_mod_separable must be a sublayout of
-           value maybe_separable
+           a value layout
          because the type argument of list has layout value_or_null.
 |}]
 
@@ -272,7 +272,7 @@ Line 3, characters 19-24:
 Error: This type "t_any" should be an instance of type "('a : value_or_null)"
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
-       But the layout of t_any must be a sublayout of value maybe_separable
+       But the layout of t_any must be a sublayout of a value layout
          because the type argument of option has layout value_or_null.
 |}]
 
@@ -299,7 +299,7 @@ Error: This type "t_any_mod_separable" should be an instance of type
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 1, characters 0-44.
        But the layout of t_any_mod_separable must be a sublayout of
-           value maybe_separable
+           a value layout
          because the type argument of option has layout value_or_null.
 |}]
 

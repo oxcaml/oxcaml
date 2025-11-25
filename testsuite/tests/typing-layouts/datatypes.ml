@@ -453,7 +453,7 @@ Line 10, characters 10-20:
 Error: This type "t_any M.t2" should be an instance of type "'a M.t2"
        The layout of t_any is any
          because of the definition of t_any at line 3, characters 0-16.
-       But the layout of t_any must be a sublayout of value
+       But the layout of t_any must be a sublayout of a value layout
          because of the definition of t1 at line 2, characters 2-42.
 |}]
 
@@ -477,7 +477,7 @@ Line 10, characters 10-20:
 Error: This type "t_any M.t2" should be an instance of type "'a M.t2"
        The layout of t_any is any
          because of the definition of t_any at line 3, characters 0-16.
-       But the layout of t_any must be a sublayout of value
+       But the layout of t_any must be a sublayout of a value layout
          because of the definition of t1 at line 3, characters 2-41.
 |}]
 
@@ -501,7 +501,7 @@ Line 10, characters 10-20:
 Error: This type "t_any M.t2" should be an instance of type "'a M.t2"
        The layout of t_any is any
          because of the definition of t_any at line 3, characters 0-16.
-       But the layout of t_any must be a sublayout of value
+       But the layout of t_any must be a sublayout of a value layout
          because of the definition of t1 at line 3, characters 2-42.
 |}]
 

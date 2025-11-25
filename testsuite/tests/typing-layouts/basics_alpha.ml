@@ -1713,8 +1713,7 @@ Line 1, characters 17-22:
 Error: This type signature for "foo33" is not a value type.
        The layout of type t_any is any
          because of the definition of t_any at line 1, characters 0-18.
-       But the layout of type t_any must be a sublayout of
-           value maybe_separable
+       But the layout of type t_any must be a sublayout of a value layout
          because it's the type of something stored in a module structure.
 |}]
 

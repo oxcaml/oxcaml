@@ -57,7 +57,7 @@ Error: This type signature for "x" is not a value type.
        The layout of type t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of type t_any_mod_separable must be a sublayout of
-           value maybe_separable
+           a value layout
          because it's the type of something stored in a module structure.
 |}]
 
@@ -330,7 +330,8 @@ Error: This type "t_any_mod_separable" should be an instance of type
          "('a : value)"
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
-       But the layout of t_any_mod_separable must be a sublayout of value
+       But the layout of t_any_mod_separable must be a sublayout of
+           a value layout
          because of the definition of id_value at line 4, characters 0-31.
 |}]
 
@@ -348,7 +349,7 @@ Error: Signature mismatch:
        Type declarations do not match: type t = X.t is not included in type t
        The layout of the first is any separable
          because of the definition of t at line 1, characters 18-44.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a sublayout of a value layout
          because of the definition of t at line 1, characters 56-70.
 |}]
 
@@ -365,7 +366,7 @@ Error: This type "t_any_mod_separable" should be an instance of type
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of t_any_mod_separable must be a sublayout of
-           value maybe_separable
+           a value layout
          because of the definition of id_value_or_null at line 3, characters 0-47.
 |}]
 
@@ -386,8 +387,7 @@ Error: Signature mismatch:
          type t : value_or_null
        The layout of the first is any separable
          because of the definition of t at line 1, characters 18-44.
-       But the layout of the first must be a sublayout of
-           value maybe_separable
+       But the layout of the first must be a sublayout of a value layout
          because of the definition of t at line 1, characters 56-78.
 |}]
 
@@ -465,7 +465,8 @@ Error: This type "t_any_mod_separable" should be an instance of type
          "('a : value)"
        The layout of t_any_mod_separable is any separable
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
-       But the layout of t_any_mod_separable must be a sublayout of value
+       But the layout of t_any_mod_separable must be a sublayout of
+           a value layout
          because of the definition of t1 at line 3, characters 0-71.
 |}]
 

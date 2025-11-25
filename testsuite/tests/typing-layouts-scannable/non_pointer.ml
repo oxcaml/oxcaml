@@ -115,7 +115,7 @@ Error: This type "t_nonptr" should be an instance of type
          "('a : value non_pointer)"
        The layout of t_nonptr is any non_pointer
          because of the definition of t_nonptr at line 2, characters 0-31.
-       But the layout of t_nonptr must be a sublayout of immediate
+       But the layout of t_nonptr must be a sublayout of a value layout
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
 |}]
 
