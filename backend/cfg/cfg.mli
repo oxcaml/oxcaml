@@ -242,8 +242,8 @@ val make_instruction :
   ?live:Reg.Set.t ->
   stack_offset:int ->
   id:InstructionId.t ->
-  ?available_before:Reg_availability_set.t option ->
-  ?available_across:Reg_availability_set.t option ->
+  ?available_before:Reg_availability_set.t ->
+  ?available_across:Reg_availability_set.t ->
   unit ->
   'a instruction
 

@@ -549,7 +549,8 @@ let set_live (instr : _ instruction) live = instr.live <- live
 
 let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     ?(fdo = Fdo_info.none) ?(live = Reg.Set.empty) ~stack_offset ~id
-    ?(available_before = None) ?(available_across = None) () =
+    ?(available_before = Reg_availability_set.Unreachable)
+    ?(available_across = Reg_availability_set.Unreachable) () =
   { desc;
     arg;
     res;
