@@ -229,8 +229,6 @@ val set_stack_offset : 'a instruction -> int -> unit
 
 val set_live : 'a instruction -> Reg.Set.t -> unit
 
-val string_of_irc_work_list : irc_work_list -> string
-
 val dump_basic : Format.formatter -> basic -> unit
 
 val dump_terminator : ?sep:string -> Format.formatter -> terminator -> unit
@@ -244,21 +242,17 @@ val make_instruction :
   ?live:Reg.Set.t ->
   stack_offset:int ->
   id:InstructionId.t ->
-  ?irc_work_list:irc_work_list ->
-  ?available_before:Reg_availability_set.t ->
-  ?available_across:Reg_availability_set.t ->
+  ?available_before:Reg_availability_set.t option ->
+  ?available_across:Reg_availability_set.t option ->
   unit ->
   'a instruction
 
-(** Make sure that the default parameter value of [irc_work_list] is
-    reasonable before using. *)
 val make_instruction_from_copy :
   'a instruction ->
   desc:'b ->
   id:InstructionId.t ->
   ?arg:Reg.t array ->
   ?res:Reg.t array ->
-  ?irc_work_list:irc_work_list ->
   unit ->
   'b instruction
 
@@ -266,7 +260,5 @@ val make_empty_block : ?label:Label.t -> terminator instruction -> basic_block
 
 (** "Contains calls" in the traditional sense as used in upstream [Selectgen]. *)
 val basic_block_contains_calls : basic_block -> bool
-
-val equal_irc_work_list : irc_work_list -> irc_work_list -> bool
 
 val invalid_stack_offset : int
