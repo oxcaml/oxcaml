@@ -156,10 +156,6 @@ let[@inline] add_initial_list state regs =
       Doubly_linked_list.add_begin state.initial reg)
 
 let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
-  let unknown_reg_work_list (rwl : RegWorkListSet.t) : unit =
-    RegWorkListSet.iter rwl ~f:(fun reg ->
-        Reg.Tbl.replace state.reg_work_list reg RegWorkList.Unknown_list)
-  in
   List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
       Reg.Tbl.replace state.reg_color reg None;
       Reg.Tbl.replace state.reg_alias reg None;
@@ -186,13 +182,9 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
       Doubly_linked_list.add_end state.initial reg);
   Doubly_linked_list.iter state.initial ~f:(fun reg ->
       Reg.Tbl.replace state.reg_work_list reg RegWorkList.Initial);
-  unknown_reg_work_list state.simplify_work_list;
   RegWorkListSet.clear state.simplify_work_list;
-  unknown_reg_work_list state.freeze_work_list;
   RegWorkListSet.clear state.freeze_work_list;
-  unknown_reg_work_list state.spill_work_list;
   RegWorkListSet.clear state.spill_work_list;
-  unknown_reg_work_list state.spilled_nodes;
   RegWorkListSet.clear state.spilled_nodes;
   RegWorkListSet.clear state.coalesced_nodes;
   assert (Misc.Stdlib.List.is_empty state.select_stack);
