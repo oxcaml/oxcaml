@@ -3847,7 +3847,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
         let mode =
           modes
           |> Typemode.transl_mode_annots
-          |> Mode.Alloc.Const.(Option.value ~default:legacy)
+          |> Mode.Alloc.Const.(
+              Option.value ~default:{legacy with staticity = Static})
           |> Mode.Alloc.of_const
           |> Mode.alloc_as_value
         in
