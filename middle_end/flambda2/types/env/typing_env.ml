@@ -1292,31 +1292,30 @@ end = struct
             then
               match TG.Row_like_for_blocks.get_singleton blocks with
               | None -> Value_unknown
-              | Some (tag, Scannable Value_only, _size, fields, alloc_mode) ->
+              | Some (tag, Scannable shape, _size, fields, alloc_mode) ->
                 let tag =
                   match Tag.Scannable.of_tag tag with
                   | Some tag -> tag
                   | None ->
                     Misc.fatal_errorf
                       "For symbol %a, the tag %a is non-scannable yet the \
-                       block shape appears to be scannable"
+                       block shape appears to be scannable:@ %a"
                       Symbol.print symbol Tag.print tag
+                      K.Scannable_block_shape.print shape
                 in
                 let fields =
                   List.map type_to_approx
                     (TG.Product.Int_indexed.components fields)
                 in
                 Block_approximation
-                  (tag, Value_only, Array.of_list fields, alloc_mode)
-              | Some (_, (Float_record | Scannable (Mixed_record _)), _, _, _)
-                ->
-                Value_unknown
+                  (tag, shape, Array.of_list fields, alloc_mode)
+              | Some (_, Float_record, _, _, _) -> Value_unknown
             else Value_unknown))
       | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
       | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _
       | Region _ ->
-        assert false
+        Value_unknown
     in
     let symbol_ty, _binding_time_and_mode =
       Name.Map.find (Name.symbol symbol)
