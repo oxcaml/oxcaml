@@ -3910,6 +3910,10 @@ module Violation = struct
       | Layout _ -> fprintf ppf "%t%a" indent Layout.format jkind.jkind.layout
     in
     (* On the right / for expected kinds, we may omit the scannable axes. *)
+    (* CR layouts-scannable: When there is a layout violation and both are
+       value (scannable) layouts, a more useful error should be reported.
+       Specifically, the first mismatched axis should be reported as a reason,
+       like "because it is not non_pointer" for a value vs immediate error. *)
     let format_layout_or_kind ppf jkind =
       match mismatch_type with
       | Layout { can_omit_right_sa = true }

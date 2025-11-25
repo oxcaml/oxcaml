@@ -3,10 +3,6 @@
  expect;
 *)
 
-(* CR zeisbach for rtjoa: We decided to keep the tests in this file, but do you
-   think renaming it to something involving "non_pointer" is appropriate?
-   (Very low priority). *)
-
 (* type declarations *)
 
 type t : value non_pointer
