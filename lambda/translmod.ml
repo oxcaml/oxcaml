@@ -43,6 +43,7 @@ type unsafe_info =
 type error =
   Circular_dependency of (Ident.t * unsafe_info) list
 | Conflicting_inline_attributes
+| Non_value_jkind of type_expr * Jkind.Sort.Const.t
 | Instantiating_packed of Compilation_unit.t
 
 exception Error of Location.t * error
@@ -100,26 +101,19 @@ let rec apply_coercion loc strict restr arg =
   match restr with
     Tcoerce_none ->
       arg
-  | Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list } ->
+  | Tcoerce_structure(pos_cc_list, id_pos_list) ->
       name_lambda strict arg Lambda.layout_module (fun id ->
-        let input_repr = transl_module_representation input_repr in
-        let output_repr = transl_module_representation output_repr in
         let get_field pos =
           if pos < 0 then lambda_unit
           else
-            Lprim(mod_field pos input_repr, [Lvar id], loc)
-        in
-        let get_layout pos =
-          if pos < 0 then layout_value_field
-          else layout_of_module_field input_repr pos
+            Lprim(mod_field pos,[Lvar id], loc)
         in
         let lam =
-          Lprim(block_of_module_representation
-                  ~loc:(to_location loc) output_repr,
+          Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
                 List.map (apply_coercion_field loc get_field) pos_cc_list,
                 loc)
         in
-        wrap_id_pos_list loc id_pos_list get_field get_layout lam)
+        wrap_id_pos_list loc id_pos_list get_field lam)
   | Tcoerce_functor(cc_arg, cc_res) ->
       let param = Ident.create_local "funarg" in
       let param_duid = Lambda.debug_uid_none in
@@ -184,7 +178,7 @@ and apply_coercion_result loc strict funct params args cc_res =
                       ap_probe=None;
                     })))
 
-and wrap_id_pos_list loc id_pos_list get_field get_layout lam =
+and wrap_id_pos_list loc id_pos_list get_field lam =
   let fv = free_variables lam in
   (*Format.eprintf "%a@." Printlambda.lambda lam;
   Ident.Set.iter (fun id -> Format.eprintf "%a " Ident.print id) fv;
@@ -195,9 +189,8 @@ and wrap_id_pos_list loc id_pos_list get_field get_layout lam =
         let id'' = Ident.create_local (Ident.name id') in
         let id''_duid = Lambda.debug_uid_none in
         let rhs = apply_coercion loc Alias c (get_field pos) in
-        let rhs_layout = get_layout pos in
         let fv_rhs = free_variables rhs in
-        (Llet(Alias, rhs_layout, id'', id''_duid, rhs, lam),
+        (Llet(Alias, Lambda.layout_module_field, id'', id''_duid, rhs, lam),
          Ident.Set.union fv fv_rhs,
          Ident.Map.add id' id'' s)
       else (lam, fv, s))
@@ -214,11 +207,7 @@ let rec compose_coercions c1 c2 =
   match (c1, c2) with
     (Tcoerce_none, c2) -> c2
   | (c1, Tcoerce_none) -> c1
-  | ( Tcoerce_structure { input_repr = _; output_repr = or1;
-                          pos_cc_list = pc1; id_pos_list = ids1 },
-      Tcoerce_structure { input_repr = ir2; output_repr = _;
-                          pos_cc_list = pc2; id_pos_list = ids2 }
-    ) ->
+  | (Tcoerce_structure (pc1, ids1), Tcoerce_structure (pc2, ids2)) ->
       let v2 = Array.of_list pc2 in
       let ids1 =
         List.map (fun (id,pos1,c1) ->
@@ -228,8 +217,8 @@ let rec compose_coercions c1 c2 =
               (id, pos2, compose_coercions c1 c2))
           ids1
       in
-      let pos_cc_list =
-        List.map
+      Tcoerce_structure
+        (List.map
            (fun pc ->
               match pc with
               | _, (Tcoerce_primitive _ | Tcoerce_alias _) ->
@@ -239,14 +228,8 @@ let rec compose_coercions c1 c2 =
               | (p1, c1) ->
                 let (p2, c2) = v2.(p1) in
                 (p2, compose_coercions c1 c2))
-          pc1
-      in
-      Tcoerce_structure
-        { input_repr = ir2
-        ; output_repr = or1
-        ; pos_cc_list
-        ; id_pos_list = ids1 @ ids2
-        }
+          pc1,
+         ids1 @ ids2)
   | (Tcoerce_functor(arg1, res1), Tcoerce_functor(arg2, res2)) ->
       Tcoerce_functor(compose_coercions arg2 arg1,
                       compose_coercions res1 res2)
@@ -306,8 +289,7 @@ let init_shape id modl =
   and init_shape_struct env sg =
     match sg with
       [] -> []
-    | Sig_value(subid, {val_kind=Val_reg _; val_type=ty; val_loc=loc},_)
-      :: rem ->
+    | Sig_value(subid, {val_kind=Val_reg; val_type=ty; val_loc=loc},_) :: rem ->
         let init_v =
           match get_desc (Ctype.expand_head env ty) with
             Tarrow(_,ty_arg,_,_) -> begin
@@ -616,8 +598,7 @@ and transl_module ~scopes cc rootpath mexp =
       apply_coercion loc Strict cc
         (transl_module_path loc mexp.mod_env path)
   | Tmod_structure str ->
-      let lam, _repr = transl_struct ~scopes loc [] cc rootpath str in
-      lam
+      fst (transl_struct ~scopes loc [] cc rootpath str)
   | Tmod_functor _ ->
       oo_wrap mexp.mod_env true (fun () ->
         compile_functor ~scopes mexp cc rootpath loc) ()
@@ -650,27 +631,21 @@ and transl_apply ~scopes ~loc ~cc mod_env funct translated_arg =
        ap_specialised=Default_specialise;
        ap_probe=None;})
 
-and transl_struct ~scopes loc fields cc rootpath
-      {str_final_env; str_items; _} =
+and transl_struct ~scopes loc fields cc rootpath {str_final_env; str_items; _} =
   transl_structure ~scopes loc fields cc rootpath str_final_env str_items
 
 (* The function  transl_structure is called by  the bytecode compiler.
    Some effort is made to compile in top to bottom order, in order to display
    warning by increasing locations. *)
-and transl_structure ~scopes loc
-  (fields : (Ident.t * Jkind.Sort.t) list) cc rootpath final_env =
-  function
+and transl_structure ~scopes loc fields cc rootpath final_env = function
     [] ->
-      let body, repr =
+      let body, size =
         match cc with
           Tcoerce_none ->
-            let ids, sorts = List.split (List.rev fields) in
-            let repr = transl_module_representation (Array.of_list sorts) in
-            Lprim(block_of_module_representation ~loc:(to_location loc) repr,
-                  List.map (fun id -> Lvar id) ids, loc),
-              repr
-        | Tcoerce_structure
-          { input_repr = _; output_repr; pos_cc_list; id_pos_list; } ->
+            Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
+                  List.map (fun id -> Lvar id) (List.rev fields), loc),
+              List.length fields
+        | Tcoerce_structure(pos_cc_list, id_pos_list) ->
                 (* Do not ignore id_pos_list ! *)
             (*Format.eprintf "%a@.@[" Includemod.print_coercion cc;
             List.iter (fun l -> Format.eprintf "%a@ " Ident.print l)
@@ -679,23 +654,11 @@ and transl_structure ~scopes loc
             let v = Array.of_list (List.rev fields) in
             let get_field pos =
               if pos < 0 then lambda_unit
-              else let id, _ = v.(pos) in Lvar id
+              else Lvar v.(pos)
             in
-            let get_layout pos =
-              if pos < 0 then layout_value_field
-              else let _, shape = v.(pos) in
-                shape |> Jkind.Sort.default_for_transl_and_get
-                      |> Typeopt.layout_of_sort (to_location loc)
-            in
-            let ids =
-              List.fold_right
-                (fun (id, _) s -> Ident.Set.add id s)
-                fields Ident.Set.empty
-            in
-            let output_repr = transl_module_representation output_repr in
+            let ids = List.fold_right Ident.Set.add fields Ident.Set.empty in
             let lam =
-              Lprim(block_of_module_representation
-                      ~loc:(to_location loc) output_repr,
+              Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
                   List.map
                     (fun (pos, cc) ->
                       match cc with
@@ -712,8 +675,8 @@ and transl_structure ~scopes loc
               List.filter (fun (id,_,_) -> not (Ident.Set.mem id ids))
                 id_pos_list
             in
-            ( wrap_id_pos_list loc id_pos_list get_field get_layout lam,
-              output_repr )
+            wrap_id_pos_list loc id_pos_list get_field lam,
+              List.length pos_cc_list
         | _ ->
             fatal_error "Translmod.transl_structure"
       in
@@ -728,69 +691,56 @@ and transl_structure ~scopes loc
                  lev_env = final_env})
        else
          body),
-      repr
+      size
   | item :: rem ->
       match item.str_desc with
       | Tstr_eval (expr, sort, _) ->
-          let body, repr =
+          let body, size =
             transl_structure ~scopes loc fields cc rootpath final_env rem
           in
           let sort = Jkind.Sort.default_for_transl_and_get sort in
-          Lsequence(transl_exp ~scopes sort expr, body), repr
+          Lsequence(transl_exp ~scopes sort expr, body), size
       | Tstr_value(rec_flag, pat_expr_list) ->
           (* Translate bindings first *)
           let mk_lam_let =
-            transl_let ~scopes ~return_layout:Lambda.layout_module
+            transl_let ~scopes ~return_layout:Lambda.layout_module_field
               ~in_structure:true rec_flag pat_expr_list
           in
           let ext_fields =
-            List.rev_append
-              (let_bound_idents_with_sorts pat_expr_list)
-              fields
-          in
+            List.rev_append (let_bound_idents pat_expr_list) fields in
           (* Then, translate remainder of struct *)
-          let body, repr =
+          let body, size =
             transl_structure ~scopes loc ext_fields cc rootpath final_env rem
           in
-          mk_lam_let body, repr
+          mk_lam_let body, size
       | Tstr_primitive descr ->
           record_primitive descr.val_val;
           transl_structure ~scopes loc fields cc rootpath final_env rem
       | Tstr_type _ ->
           transl_structure ~scopes loc fields cc rootpath final_env rem
       | Tstr_typext(tyext) ->
-          let newfields =
-            List.map
-              (fun ext ->
-                ext.ext_id, Jkind.Sort.(of_const Const.for_type_extension))
-              tyext.tyext_constructors
-          in
-          let body, repr =
-            transl_structure ~scopes loc (List.rev_append newfields fields)
+          let ids = List.map (fun ext -> ext.ext_id) tyext.tyext_constructors in
+          let body, size =
+            transl_structure ~scopes loc (List.rev_append ids fields)
               cc rootpath final_env rem
           in
-          transl_type_extension ~scopes item.str_env rootpath tyext body, repr
+          transl_type_extension ~scopes item.str_env rootpath tyext body, size
       | Tstr_exception ext ->
           let id = ext.tyexn_constructor.ext_id in
           let id_duid = Lambda.debug_uid_none in
           (* CR sspies: Can we find a better [debug_uid] here? *)
           let path = field_path rootpath id in
-          let body, repr =
-            transl_structure ~scopes loc
-              ((id, Jkind.Sort.(of_const Const.for_exception)) :: fields)
-              cc rootpath final_env rem
+          let body, size =
+            transl_structure ~scopes loc (id::fields) cc rootpath final_env rem
           in
           Llet(Strict, Lambda.layout_block, id, id_duid,
                transl_extension_constructor ~scopes
                                             item.str_env
                                             path
                                             ext.tyexn_constructor, body),
-          repr
+          size
       | Tstr_module ({mb_presence=Mp_present} as mb) ->
           let id = mb.mb_id in
-          let field =
-            Option.map (fun id -> id, Jkind.Sort.(of_const Const.for_module)) id
-          in
           let id_duid = mb.mb_uid in
           (* Translate module first *)
           let subscopes = match id with
@@ -805,31 +755,28 @@ and transl_structure ~scopes loc
                                                  mb.mb_attributes
           in
           (* Translate remainder second *)
-          let body, repr =
-            transl_structure ~scopes loc (cons_opt field fields)
+          let body, size =
+            transl_structure ~scopes loc (cons_opt id fields)
               cc rootpath final_env rem
           in
           begin match id with
           | None ->
               Lsequence (Lprim(Pignore, [module_body],
                                of_location ~scopes mb.mb_name.loc), body),
-              repr
+              size
           | Some id ->
               Llet(pure_module mb.mb_expr, Lambda.layout_module, id,
-              id_duid, module_body, body), repr
+              id_duid, module_body, body), size
           end
       | Tstr_module ({mb_presence=Mp_absent}) ->
           transl_structure ~scopes loc fields cc rootpath final_env rem
       | Tstr_recmodule bindings ->
-          let newfields =
-            List.filter_map
-              (fun mb -> Option.map
-                (fun id -> id, Jkind.Sort.(of_const Const.for_module)) mb.mb_id)
-              bindings
+          let ext_fields =
+            List.rev_append (List.filter_map (fun mb -> mb.mb_id) bindings)
+              fields
           in
-          let body, repr =
-            transl_structure ~scopes loc (List.rev_append newfields fields)
-              cc rootpath final_env rem
+          let body, size =
+            transl_structure ~scopes loc ext_fields cc rootpath final_env rem
           in
           let lam =
             compile_recmodule ~scopes (fun id modl ->
@@ -841,62 +788,48 @@ and transl_structure ~scopes loc
                     Tcoerce_none (field_path rootpath id) modl
             ) bindings body
           in
-          lam, repr
+          lam, size
       | Tstr_class cl_list ->
           let (ids, class_bindings) = transl_class_bindings ~scopes cl_list in
-          let newfields =
-            List.map (fun id -> id, Jkind.Sort.(of_const Const.for_class)) ids
-          in
-          let body, repr =
-            transl_structure ~scopes loc (List.rev_append newfields fields)
+          let body, size =
+            transl_structure ~scopes loc (List.rev_append ids fields)
               cc rootpath final_env rem
           in
-          Value_rec_compiler.compile_letrec class_bindings body, repr
+          Value_rec_compiler.compile_letrec class_bindings body, size
       | Tstr_include incl ->
-          let ids_with_sorts =
-            bound_value_identifiers_and_sorts incl.incl_type
-          in
+          let ids = bound_value_identifiers incl.incl_type in
           let modl = incl.incl_mod in
           let mid = Ident.create_local "include" in
           let mid_duid = Lambda.debug_uid_none in
-          let incl_repr = transl_module_representation incl.incl_repr in
           let rec rebind_idents pos newfields = function
               [] ->
                 transl_structure ~scopes loc newfields cc rootpath final_env rem
-            | (id, sort) :: ids_with_sorts ->
-                let const_sort = Jkind.Sort.default_for_transl_and_get sort in
-                let lambda_layout =
-                  Typeopt.layout_of_sort (to_location loc) const_sort
-                in
-                let body, repr =
-                  rebind_idents (pos + 1) ((id, sort) :: newfields)
-                    ids_with_sorts
+            | id :: ids ->
+                let body, size =
+                  rebind_idents (pos + 1) (id :: newfields) ids
                 in
                 let id_duid = Lambda.debug_uid_none in
                 (* CR sspies: Can we find a better [debug_uid] here? *)
-                Llet(Alias, lambda_layout, id, id_duid,
-                     Lprim(mod_field pos incl_repr,
-                           [Lvar mid],
+                Llet(Alias, Lambda.layout_module_field, id, id_duid,
+                     Lprim(mod_field pos, [Lvar mid],
                            of_location ~scopes incl.incl_loc), body),
-                repr
+                size
           in
-          let body, repr =
-            rebind_idents 0 fields ids_with_sorts
-          in
+          let body, size = rebind_idents 0 fields ids in
           let loc = of_location ~scopes incl.incl_loc in
           let let_kind, modl =
             match incl.incl_kind with
             | Tincl_structure ->
                 pure_module modl, transl_module ~scopes Tcoerce_none None modl
-            | Tincl_functor { input_coercion; input_repr } ->
-                Strict, transl_include_functor ~generative:false modl
-                          input_coercion scopes loc ~input_repr
-            | Tincl_gen_functor { input_coercion; input_repr } ->
-                Strict, transl_include_functor ~generative:true modl
-                          input_coercion scopes loc ~input_repr
+            | Tincl_functor ccs ->
+                Strict, transl_include_functor ~generative:false modl ccs
+                          scopes loc
+            | Tincl_gen_functor ccs ->
+                Strict, transl_include_functor ~generative:true modl ccs
+                          scopes loc
           in
           Llet(let_kind, Lambda.layout_module, mid, mid_duid, modl, body),
-          repr
+          size
 
       | Tstr_open od ->
           let pure = pure_module od.open_expr in
@@ -908,37 +841,27 @@ and transl_structure ~scopes loc
           | [] when pure = Alias ->
               transl_structure ~scopes loc fields cc rootpath final_env rem
           | _ ->
-              let ids_with_sorts =
-                bound_value_identifiers_and_sorts od.open_bound_items
-              in
+              let ids = bound_value_identifiers od.open_bound_items in
               let mid = Ident.create_local "open" in
               let mid_duid = Lambda.debug_uid_none in
-              let open_repr = transl_module_representation od.open_items_repr in
               let rec rebind_idents pos newfields = function
                   [] -> transl_structure
                           ~scopes loc newfields cc rootpath final_env rem
-                | (id, sort) :: ids_with_sorts ->
-                  let const_sort = Jkind.Sort.default_for_transl_and_get sort in
-                  let lambda_layout =
-                    Typeopt.layout_of_sort (to_location loc) const_sort
-                  in
-                  let body, repr =
-                    rebind_idents (pos + 1) ((id, sort) :: newfields)
-                      ids_with_sorts
+                | id :: ids ->
+                  let body, size =
+                    rebind_idents (pos + 1) (id :: newfields) ids
                   in
                   let id_duid = Lambda.debug_uid_none in
                   (* CR sspies: Can we find a better [debug_uid] here? *)
-                  Llet(Alias, lambda_layout, id, id_duid,
-                      Lprim(mod_field pos open_repr, [Lvar mid],
+                  Llet(Alias, Lambda.layout_module_field, id, id_duid,
+                      Lprim(mod_field pos, [Lvar mid],
                             of_location ~scopes od.open_loc), body),
-                  repr
+                  size
               in
-              let body, repr =
-                rebind_idents 0 fields ids_with_sorts
-              in
+              let body, size = rebind_idents 0 fields ids in
               Llet(pure, Lambda.layout_module, mid, mid_duid,
                    transl_module ~scopes Tcoerce_none None od.open_expr, body),
-              repr
+              size
           end
       | Tstr_modtype _
       | Tstr_class_type _
@@ -946,15 +869,14 @@ and transl_structure ~scopes loc
           transl_structure ~scopes loc fields cc rootpath final_env rem
 
 (* construct functor application in "include functor" case *)
-and transl_include_functor ~generative ~input_repr modl params scopes loc =
-  let input_repr = transl_module_representation input_repr in
+and transl_include_functor ~generative modl params scopes loc =
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module modl
   in
   let modl = transl_module ~scopes Tcoerce_none None modl in
   let params = if generative then [params;[]] else [params] in
   let params = List.map (fun coercion ->
-    Lprim(block_of_module_representation ~loc:(to_location loc) input_repr,
+    Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
           List.map (fun (name, cc) ->
             apply_coercion loc Strict cc (Lvar name))
             coercion,
@@ -1011,17 +933,7 @@ let required_globals ~flambda body =
   Translprim.clear_used_primitives ();
   required
 
-let add_arg_block_to_module_representation = function
-    (* NB: this assumes [arg_block] has layout value *)
-  | Module_value_only { field_count } ->
-    Module_value_only { field_count = field_count + 1 }
-  | Module_mixed (shape, shape_for_read) ->
-    Module_mixed
-      ( Array.append shape [| mixed_block_element_for_module |],
-        Array.append shape_for_read
-          [| mixed_block_element_with_locality_mode_for_module |] )
-
-let add_arg_block_to_module_block ~loc primary_block_lam primary_repr restr =
+let add_arg_block_to_module_block primary_block_lam size restr =
   let primary_block_id = Ident.create_local "*primary-block*" in
   let primary_block_id_duid = Lambda.debug_uid_none in
   let arg_block_id = Ident.create_local "*arg-block*" in
@@ -1029,21 +941,18 @@ let add_arg_block_to_module_block ~loc primary_block_lam primary_repr restr =
   let arg_block_lam =
     apply_coercion Loc_unknown Strict restr (Lvar primary_block_id)
   in
-  let get_field i =
-    Lprim (mod_field i primary_repr, [Lvar primary_block_id], Loc_unknown)
-  in
-  let size = module_representation_field_count primary_repr in
+  let get_field i = Lprim (mod_field i, [Lvar primary_block_id], Loc_unknown) in
   let all_fields = List.init size get_field @ [Lvar arg_block_id] in
   let arg_block_field = size in
-  let new_repr = add_arg_block_to_module_representation primary_repr in
+  let new_size = size + 1 in
   Llet(Strict, layout_module, primary_block_id,
        primary_block_id_duid, primary_block_lam,
        Llet(Strict, layout_module, arg_block_id,
             arg_block_id_duid, arg_block_lam,
-            Lprim(block_of_module_representation ~loc new_repr,
+            Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
                   all_fields,
                   Loc_unknown))),
-  new_repr,
+  new_size,
   Some arg_block_field
 
 let add_runtime_parameters lam params =
@@ -1053,7 +962,7 @@ let add_runtime_parameters lam params =
         { name;
           debug_uid = Lambda.debug_uid_none;
           (* CR sspies: Can we find a better [debug_uid] here? *)
-          layout = layout_module;
+          layout = Pvalue Lambda.generic_value;
           attributes = Lambda.default_param_attribute;
           mode = Lambda.alloc_heap })
       params
@@ -1066,22 +975,21 @@ let add_runtime_parameters lam params =
   lfunction
     ~params
     ~kind:(Curried { nlocal = 0 })
-    ~return:layout_module
+    ~return:(Pvalue Lambda.generic_value)
     ~attr:{ default_function_attribute with is_a_functor = true; inline }
     ~loc:Loc_unknown
     ~body:lam
     ~mode:alloc_heap
     ~ret_mode:alloc_heap
 
-let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
+let transl_implementation_module ~scopes module_id (str, cc, cc2) =
   let path = global_path module_id in
-  let lam, repr =
-    transl_struct ~scopes (of_location ~scopes loc) [] cc path str
+  let lam, size =
+    transl_struct ~scopes Loc_unknown [] cc path str
   in
   match cc2 with
-  | None -> lam, repr, None
-  | Some cc2 ->
-    add_arg_block_to_module_block ~loc lam repr cc2
+  | None -> lam, size, None
+  | Some cc2 -> add_arg_block_to_module_block lam size cc2
 
 let wrap_toplevel_functor_in_struct code =
   Lprim(Pmakeblock(0, Immutable, None, Lambda.alloc_heap),
@@ -1094,23 +1002,23 @@ let wrap_toplevel_functor_in_struct code =
 let has_parameters () =
   Env.parameters () <> []
 
-let transl_implementation compilation_unit impl ~loc =
+let transl_implementation compilation_unit impl =
   reset_labels ();
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
-  let body, (repr, arg_block_idx) =
+  let body, (size, arg_block_idx) =
     Translobj.transl_label_init (fun () ->
-      let body, repr, arg_block_idx =
-        transl_implementation_module ~loc ~scopes compilation_unit
+      let body, size, arg_block_idx =
+        transl_implementation_module ~scopes compilation_unit
           impl
       in
-      body, (repr, arg_block_idx))
+      body, (size, arg_block_idx))
   in
   let body, main_module_block_format =
     match has_parameters () with
     | false ->
-        body, Mb_struct { mb_repr = repr }
+        body, Mb_struct { mb_size = size }
     | true ->
         let mb_runtime_params, runtime_param_idents =
           match Env.runtime_parameter_bindings () with
@@ -1136,7 +1044,7 @@ let transl_implementation compilation_unit impl ~loc =
         let body = wrap_toplevel_functor_in_struct body in
         let format =
           Mb_instantiating_functor { mb_runtime_params;
-                                     mb_returned_repr = repr }
+                                     mb_returned_size = size }
         in
         body, format
   in
@@ -1164,14 +1072,9 @@ let toplevel_name id =
   with Not_found -> Ident.name id
 
 let toploop_getvalue id =
-  if !Clflags.native_code then
-    (* [toploop_getvalue] and [toploop_setvalue] are only used by bytecode, so
-       we can hardcode the module representations passed to [mod_field] as
-       [Module_value_only]. *)
-    fatal_error "Translmod.toploop_getvalue: expected bytecode";
   Lapply{
     ap_loc=Loc_unknown;
-    ap_func=Lprim(Pfield (toploop_getvalue_pos, Pointer, Reads_agree),
+    ap_func=Lprim(mod_field toploop_getvalue_pos,
                   [Lprim(Pgetglobal toploop_unit, [], Loc_unknown)],
                   Loc_unknown);
     ap_args=[Lconst(Const_base(
@@ -1186,12 +1089,9 @@ let toploop_getvalue id =
   }
 
 let toploop_setvalue id lam =
-  if !Clflags.native_code then
-    (* See comment under [toploop_getvalue] *)
-    fatal_error "Translmod.toploop_setvalue: expected bytecode";
   Lapply{
     ap_loc=Loc_unknown;
-    ap_func=Lprim(Pfield (toploop_setvalue_pos, Pointer, Reads_agree),
+    ap_func=Lprim(mod_field toploop_setvalue_pos,
                   [Lprim(Pgetglobal toploop_unit, [], Loc_unknown)],
                   Loc_unknown);
     ap_args=
@@ -1285,23 +1185,19 @@ let transl_toplevel_item ~scopes item =
         match incl.incl_kind with
         | Tincl_structure ->
             transl_module ~scopes Tcoerce_none None modl
-        | Tincl_functor { input_coercion; input_repr } ->
-            transl_include_functor ~generative:false modl input_coercion scopes
-              loc ~input_repr
-        | Tincl_gen_functor { input_coercion; input_repr } ->
-            transl_include_functor ~generative:true modl input_coercion scopes
-              loc ~input_repr
+        | Tincl_functor ccs ->
+            transl_include_functor ~generative:false modl ccs scopes loc
+        | Tincl_gen_functor ccs ->
+            transl_include_functor ~generative:true modl ccs scopes loc
       in
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in
-      let incl_repr = transl_module_representation incl.incl_repr in
       let rec set_idents pos = function
         [] ->
           lambda_unit
       | id :: ids ->
           Lsequence(toploop_setvalue id
-                      (Lprim(mod_field pos incl_repr,
-                        [Lvar mid], Loc_unknown)),
+                      (Lprim(mod_field pos, [Lvar mid], Loc_unknown)),
                     set_idents (pos + 1) ids) in
       Llet(Strict, Lambda.layout_module, mid, mid_duid, modl, set_idents 0 ids)
   | Tstr_primitive descr ->
@@ -1319,14 +1215,12 @@ let transl_toplevel_item ~scopes item =
           let ids = bound_value_identifiers od.open_bound_items in
           let mid = Ident.create_local "open" in
           let mid_duid = Lambda.debug_uid_none in
-          let open_repr = transl_module_representation od.open_items_repr in
           let rec set_idents pos = function
               [] ->
                 lambda_unit
             | id :: ids ->
                 Lsequence(toploop_setvalue id
-                            (Lprim(mod_field pos open_repr,
-                              [Lvar mid], Loc_unknown)),
+                            (Lprim(mod_field pos, [Lvar mid], Loc_unknown)),
                           set_idents (pos + 1) ids)
           in
           Llet(pure, Lambda.layout_module, mid, mid_duid,
@@ -1361,26 +1255,18 @@ let get_component = function
     None -> Lconst const_unit
   | Some id -> Lprim(Pgetglobal id, [], Loc_unknown)
 
-let () =
-  match Jkind.Sort.Const.for_module with
-  | Base Value -> ()
-  | _ -> Misc.fatal_error "Lambda.transl_package: expected modules to be values"
-    (* If this assumption is broken, [transl_package] should return a
-       module representation instead of a size *)
-
 let transl_package component_names coercion =
-  let field_count =
+  let size =
     match coercion with
     | Tcoerce_none -> List.length component_names
-    | Tcoerce_structure { pos_cc_list; _ } -> List.length pos_cc_list
+    | Tcoerce_structure (l, _) -> List.length l
     | Tcoerce_functor _
     | Tcoerce_primitive _
     | Tcoerce_alias _ -> assert false
   in
-  field_count,
+  size,
   apply_coercion Loc_unknown Strict coercion
-    (Lprim(block_of_module_representation ~loc:Location.none
-             (Module_value_only { field_count }),
+    (Lprim(Pmakeblock(0, Immutable, None, alloc_heap),
            List.map get_component component_names,
            Loc_unknown))
 
@@ -1389,7 +1275,6 @@ type runtime_arg =
   | Argument_block of {
       ra_unit : Compilation_unit.t;
       ra_field_idx : int;
-      ra_main_repr : module_representation;
     }
   | Main_module_block of Compilation_unit.t
   | Unit
@@ -1401,8 +1286,8 @@ let unit_of_runtime_arg arg =
 
 let transl_runtime_arg arg =
   match arg with
-  | Argument_block { ra_unit; ra_field_idx; ra_main_repr } ->
-      Lprim (mod_field ra_field_idx ra_main_repr,
+  | Argument_block { ra_unit; ra_field_idx; } ->
+      Lprim (mod_field ra_field_idx,
              [Lprim (Pgetglobal ra_unit, [], Loc_unknown)],
              Loc_unknown)
   | Main_module_block cu ->
@@ -1411,7 +1296,7 @@ let transl_runtime_arg arg =
       lambda_unit
 
 let transl_instance_impl
-      compilation_unit ~runtime_args ~main_module_block_repr
+      compilation_unit ~runtime_args ~main_module_block_size
       ~arg_block_idx
     : SL.program =
   let base_compilation_unit, _args =
@@ -1420,7 +1305,7 @@ let transl_instance_impl
   let instantiating_functor_lam =
     (* Any parameterised module has a block with exactly one field, namely the
        instantiating functor (see [Lambda.main_module_block_format]) *)
-    Lprim (mod_field 0 (Module_value_only { field_count = 1 }),
+    Lprim (mod_field 0,
            [Lprim (Pgetglobal base_compilation_unit, [], Loc_unknown)],
            Loc_unknown)
   in
@@ -1429,7 +1314,7 @@ let transl_instance_impl
     Lapply {
       ap_func = instantiating_functor_lam;
       ap_args = runtime_args_lam;
-      ap_result_layout = layout_module;
+      ap_result_layout = Pvalue Lambda.generic_value;
       ap_loc = Loc_unknown;
       ap_inlined = Always_inlined; (* Definitely inline!! *)
       ap_tailcall = Default_tailcall;
@@ -1445,7 +1330,7 @@ let transl_instance_impl
     |> Compilation_unit.Set.of_list
   in
   let main_module_block_format =
-    Mb_struct { mb_repr = main_module_block_repr }
+    Mb_struct { mb_size = main_module_block_size }
   in
   {
     compilation_unit;
@@ -1455,13 +1340,13 @@ let transl_instance_impl
     arg_block_idx;
   }
 
-let transl_instance instance_unit ~runtime_args ~main_module_block_repr
+let transl_instance instance_unit ~runtime_args ~main_module_block_size
       ~arg_block_idx =
   assert (Compilation_unit.is_instance instance_unit);
   if (runtime_args = []) then
     Misc.fatal_error "Trying to instantiate but passing no arguments";
   transl_instance_impl instance_unit ~runtime_args
-    ~main_module_block_repr ~arg_block_idx
+    ~main_module_block_size ~arg_block_idx
 
 (* Error report *)
 
@@ -1508,6 +1393,12 @@ let report_error loc = function
   | Conflicting_inline_attributes ->
       Location.errorf "@[Conflicting %a attributes@]"
         Style.inline_code "inline"
+  | Non_value_jkind (ty, sort) ->
+      Location.errorf
+        "Non-value sort %a detected in [translmod] in type %a:@ \
+         Please report this error to the Jane Street compilers team."
+        Jkind.Sort.Const.format sort
+        Printtyp.type_expr ty
   | Instantiating_packed comp_unit ->
       Location.errorf ~loc
         "Cannot instantiate using the packed module %a@ \

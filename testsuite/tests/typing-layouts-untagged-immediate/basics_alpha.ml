@@ -55,29 +55,45 @@ val f2_2 :
 val f2_3 : int# -> int# = <fun>
 |}];;
 
-(**************************************)
-(* Test 3: Module-level bindings yet. *)
+(*****************************************)
+(* Test 3: No module-level bindings yet. *)
 
 let x3_1 : t_untagged_immediate = assert false;;
 [%%expect{|
-Exception: Assert_failure ("", 1, 34).
+Line 1, characters 4-8:
+1 | let x3_1 : t_untagged_immediate = assert false;;
+        ^^^^
+Error: Types of top-level module bindings must have layout "value", but
+       the type of "x3_1" has layout "untagged_immediate".
 |}];;
 
 let x3_2 : 'a t_untagged_immediate_id = assert false;;
 [%%expect{|
-Exception: Assert_failure ("", 1, 40).
+Line 1, characters 4-8:
+1 | let x3_2 : 'a t_untagged_immediate_id = assert false;;
+        ^^^^
+Error: Types of top-level module bindings must have layout "value", but
+       the type of "x3_2" has layout "untagged_immediate".
 |}];;
 
 let x3_3 : int# = assert false;;
 [%%expect{|
-Exception: Assert_failure ("", 1, 18).
+Line 1, characters 4-8:
+1 | let x3_3 : int# = assert false;;
+        ^^^^
+Error: Types of top-level module bindings must have layout "value", but
+       the type of "x3_3" has layout "untagged_immediate".
 |}];;
 
 module M3_4 = struct
   let x : t_untagged_immediate = assert false
 end
 [%%expect{|
-Exception: Assert_failure ("", 2, 33).
+Line 2, characters 6-7:
+2 |   let x : t_untagged_immediate = assert false
+          ^
+Error: Types of top-level module bindings must have layout "value", but
+       the type of "x" has layout "untagged_immediate".
 |}];;
 
 module M3_5 = struct
@@ -86,7 +102,11 @@ module M3_5 = struct
   let y = f (assert false)
 end
 [%%expect{|
-Exception: Assert_failure ("", 4, 12).
+Line 4, characters 6-7:
+4 |   let y = f (assert false)
+          ^
+Error: Types of top-level module bindings must have layout "value", but
+       the type of "y" has layout "untagged_immediate".
 |}];;
 
 (*************************************)
@@ -235,28 +255,46 @@ type t5_6 = A of t_untagged_immediate [@@unboxed];;
 type t5_6 = A of t_untagged_immediate [@@unboxed]
 |}];;
 
-(**************************************************)
-(* Test 6: Can be put at top level of signatures. *)
+(****************************************************)
+(* Test 6: Can't be put at top level of signatures. *)
 module type S6_1 = sig val x : t_untagged_immediate end
 
 let f6 (m : (module S6_1)) = let module M6 = (val m) in M6.x;;
 [%%expect{|
-module type S6_1 = sig val x : t_untagged_immediate end
-val f6 : (module S6_1) -> t_untagged_immediate = <fun>
+Line 1, characters 31-51:
+1 | module type S6_1 = sig val x : t_untagged_immediate end
+                                   ^^^^^^^^^^^^^^^^^^^^
+Error: This type signature for "x" is not a value type.
+       The layout of type t_untagged_immediate is untagged_immediate
+         because of the definition of t_untagged_immediate at line 1, characters 0-46.
+       But the layout of type t_untagged_immediate must be a sublayout of
+           value
+         because it's the type of something stored in a module structure.
 |}];;
 
 module type S6_2 = sig val x : 'a t_untagged_immediate_id end
 [%%expect{|
-module type S6_2 =
-  sig
-    val x :
-      ('a : untagged_immediate mod non_float). 'a t_untagged_immediate_id
-  end
+Line 1, characters 31-57:
+1 | module type S6_2 = sig val x : 'a t_untagged_immediate_id end
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type signature for "x" is not a value type.
+       The layout of type 'a t_untagged_immediate_id is untagged_immediate
+         because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
+       But the layout of type 'a t_untagged_immediate_id must be a sublayout of
+         value
+         because it's the type of something stored in a module structure.
 |}];;
 
 module type S6_3 = sig val x : int# end
 [%%expect{|
-module type S6_3 = sig val x : int# end
+Line 1, characters 31-35:
+1 | module type S6_3 = sig val x : int# end
+                                   ^^^^
+Error: This type signature for "x" is not a value type.
+       The layout of type int# is untagged_immediate
+         because it is the unboxed version of the primitive type int.
+       But the layout of type int# must be a sublayout of value
+         because it's the type of something stored in a module structure.
 |}];;
 
 

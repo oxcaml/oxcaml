@@ -69,18 +69,28 @@ let combine_ts #{ f = _f1; i = i1 } #{ f = f2; i = _i2 } =
 val combine_ts : t -> t -> t = <fun>
 |}]
 
-(* Top-level products *)
+(* We still cannot have top-level products *)
 
-let unboxed_product = #{ f = #3.14; i = 0 }
+let disallowed = #{ f = #3.14; i = 0 }
 [%%expect{|
-val unboxed_product : t = #{f = <abstr>; i = 0}
+Line 1, characters 4-14:
+1 | let disallowed = #{ f = #3.14; i = 0 }
+        ^^^^^^^^^^
+Error: Types of top-level module bindings must have layout "value", but
+       the type of "disallowed" has layout "float64 & value".
 |}]
 
 ;;
 #{ f = #3.14; i = 0};;
 [%%expect{|
-- : t = #{f = <abstr>; i = 0}
+Line 1, characters 0-20:
+1 | #{ f = #3.14; i = 0};;
+    ^^^^^^^^^^^^^^^^^^^^
+Error: Types of unnamed expressions must have layout value when using
+       the toplevel, but this expression has layout "float64 & value".
 |}]
+
+(* However, we can have a top-level unboxed record if its kind is value *)
 
 type m_record = #{ i1 : int }
 module M = struct

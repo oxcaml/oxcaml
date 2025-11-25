@@ -3812,61 +3812,11 @@ let bind_static_consts_and_code acc body =
         defining_expr ~body)
     (acc, body) components
 
-(* Returns a tuple [block_shape, field_count, block_access, kind_of_field].
-   [block_access] and [kind_of_field] are function that take an index [pos] and
-   return the block_access/kind of the [pos]th field of the module. "Fields" are
-   physical, so unboxed products count as more than one field when indexing and
-   determining [field_count]. *)
-let final_module_block_representation acc
-    ~(module_repr : Lambda.module_representation) =
-  match module_repr with
-  | Module_value_only { field_count } ->
-    let block_access _pos : P.Block_access_kind.t =
-      Values
-        { tag = Known Tag.Scannable.zero;
-          size =
-            Known (Target_ocaml_int.of_int (Acc.machine_width acc) field_count);
-          field_kind = Any_value
-        }
-    in
-    ( K.Scannable_block_shape.Value_only,
-      field_count,
-      block_access,
-      fun _ -> K.value )
-  | Module_mixed (shape, _) ->
-    let shape =
-      K.Mixed_block_lambda_shape.of_mixed_block_elements shape
-        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-    in
-    let flattened_reordered_shape =
-      K.Mixed_block_lambda_shape.flattened_reordered_shape shape
-    in
-    let field_count = Array.length flattened_reordered_shape in
-    let kind_shape = K.Mixed_block_shape.from_mixed_block_shape shape in
-    let field_kinds = K.Mixed_block_shape.field_kinds kind_shape in
-    let block_shape = K.Scannable_block_shape.Mixed_record kind_shape in
-    let block_access pos : P.Block_access_kind.t =
-      let field_kind =
-        Lambda_to_flambda_primitives_helpers.mixed_block_access_field_kind
-          flattened_reordered_shape.(pos)
-      in
-      Mixed
-        { tag = Known Tag.Scannable.zero;
-          size = Unknown;
-          field_kind;
-          shape = kind_shape
-        }
-    in
-    block_shape, field_count, block_access, fun pos -> field_kinds.(pos)
-
 let wrap_final_module_block acc env ~program ~prog_return_cont
-    ~(module_repr : Lambda.module_representation) ~return_cont ~module_symbol =
+    ~module_block_size_in_words ~return_cont ~module_symbol =
   let module_block_var = Variable.create "module_block" K.value in
   let module_block_var_duid = Flambda_debug_uid.none in
   let module_block_tag = Tag.Scannable.zero in
-  let block_shape, field_count, block_access, kind_of_field =
-    final_module_block_representation acc ~module_repr
-  in
   let load_fields_body acc =
     let env =
       match Acc.continuation_known_arguments ~cont:prog_return_cont acc with
@@ -3880,10 +3830,12 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       | _ -> simple_var
     in
     let field_vars =
-      List.init field_count (fun pos ->
+      List.init module_block_size_in_words (fun pos ->
           let pos_str = string_of_int pos in
           ( pos,
-            Variable.create ("field_" ^ pos_str) (kind_of_field pos),
+            Variable.create ("field_" ^ pos_str) K.value
+            (* CR mixed-modules: Find the right kind from the module block
+               shape *),
             Flambda_debug_uid.none ))
     in
     let acc, body =
@@ -3894,7 +3846,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
               Simple.With_debuginfo.create (Simple.var var) Debuginfo.none)
             field_vars
         in
-        Static_const.block module_block_tag Immutable block_shape field_vars
+        Static_const.block module_block_tag Immutable Value_only field_vars
       in
       let acc, apply_cont =
         (* Module initialisers return unit, but since that is taken care of
@@ -3917,18 +3869,29 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
         (Bound_pattern.static bound_static)
         named ~body:return
     in
+    let block_access : P.Block_access_kind.t =
+      Values
+        { tag = Known Tag.Scannable.zero;
+          size =
+            Known
+              (Target_ocaml_int.of_int (Acc.machine_width acc)
+                 module_block_size_in_words);
+          field_kind = Any_value
+        }
+    in
     List.fold_left
       (fun (acc, body) (pos, var, var_duid) ->
         let var = VB.create var var_duid Name_mode.normal in
         let pat = Bound_pattern.singleton var in
-        let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
+        let pos = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
         let block = module_block_simple in
-        match simplify_block_load acc env ~block ~field with
+        match simplify_block_load acc env ~block ~field:pos with
         | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
           let named =
             Named.create_prim
               (Unary
-                 ( Block_load { kind = block_access pos; mut = Immutable; field },
+                 ( Block_load
+                     { kind = block_access; mut = Immutable; field = pos },
                    block ))
               Debuginfo.none
           in
@@ -3956,9 +3919,9 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
     ~is_exn_handler:false ~is_cold:false
 
 let close_program (type mode) ~(mode : mode Flambda_features.mode)
-    ~machine_width ~big_endian ~cmx_loader ~compilation_unit ~module_repr
-    ~program ~prog_return_cont ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region : mode close_program_result =
+    ~machine_width ~big_endian ~cmx_loader ~compilation_unit
+    ~module_block_size_in_words ~program ~prog_return_cont ~exn_continuation
+    ~toplevel_my_region ~toplevel_my_ghost_region : mode close_program_result =
   let env = Env.create ~big_endian in
   let module_symbol =
     Symbol.create_wrapped
@@ -3975,8 +3938,8 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
   in
   let acc = Acc.create ~cmx_loader ~machine_width in
   let acc, body =
-    wrap_final_module_block acc env ~program ~prog_return_cont ~module_repr
-      ~return_cont ~module_symbol
+    wrap_final_module_block acc env ~program ~prog_return_cont
+      ~module_block_size_in_words ~return_cont ~module_symbol
   in
   let module_block_approximation =
     match Acc.continuation_known_arguments ~cont:prog_return_cont acc with

@@ -98,45 +98,12 @@ module type EVAL_BASE = sig
   val eval_ident: Ident.t -> Obj.t
 end
 
-(* Like [Obj.field], but handles field reordering in mixed modules.
-   Returns [None] if the selected field is not a value, [Some field]
-   otherwise. *)
-let mod_field obj (module_repr : Lambda.module_representation) pos =
-  if not !Clflags.native_code then
-    Some (Obj.field obj pos)
-  else
-  match module_repr with
-  | Module_value_only _ -> Some (Obj.field obj pos)
-  | Module_mixed (shape, _) ->
-    let shape =
-      Mixed_block_shape.of_mixed_block_elements shape
-        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-    in
-    let new_pos =
-      match Mixed_block_shape.lookup_path_producing_new_indexes shape [pos] with
-      | [new_pos] -> Some new_pos
-      | _ -> None (* [pos] points to an unboxed product or void *)
-    in
-    Option.bind new_pos
-      (fun new_pos ->
-        if new_pos < Mixed_block_shape.value_prefix_len shape
-        then Some (Obj.field obj new_pos)
-        else None (* [pos] points to an unboxed singleton *))
-
 module MakeEvalPrinter (E: EVAL_BASE) = struct
 
   let rec eval_address = function
     | Env.Aunit cu -> E.eval_compilation_unit cu
     | Env.Alocal id -> E.eval_ident id
-    | Env.Adot(p, module_repr, pos) ->
-      let module_repr = Lambda.transl_module_representation module_repr in
-      begin match mod_field (eval_address p) module_repr pos with
-      | Some field -> field
-      | None ->
-        Location.raise_errorf
-          ~loc:Location.none
-          "Topcommon.eval_address: Can't return a non-value"
-      end
+    | Env.Adot(p, pos) -> Obj.field (eval_address p) pos
 
   let eval_path find env path =
     match find path env with

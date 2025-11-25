@@ -576,11 +576,11 @@ end
 Line 1, characters 28-33:
 1 | module type S = sig val x : t_any end
                                 ^^^^^
-Error: The type of a module-level value must have a representable layout.
+Error: This type signature for "x" is not a value type.
        The layout of type t_any is any
          because of the definition of t_any at line 5, characters 0-18.
-       But the layout of type t_any must be representable
-         because it's the type of something in a signature.
+       But the layout of type t_any must be a sublayout of value
+         because it's the type of something stored in a module structure.
 |}]
 
 (****************************************************************)

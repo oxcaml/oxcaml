@@ -15,7 +15,6 @@
 
 type t_float64 : float64
 type ('a : float64) t_float64_id = 'a
-external of_f64 : float# -> t_float64 = "%opaque"
 
 (*********************************)
 (* Test 1: The identity function *)
@@ -26,7 +25,6 @@ let f1_3 (x : float#) = x;;
 [%%expect{|
 type t_float64 : float64
 type ('a : float64) t_float64_id = 'a
-external of_f64 : float# -> t_float64 = "%opaque"
 val f1_1 : t_float64 -> t_float64 = <fun>
 val f1_2 : ('a : float64). 'a t_float64_id -> 'a t_float64_id = <fun>
 val f1_3 : float# -> float# = <fun>
@@ -51,40 +49,58 @@ val f2_2 : ('a : float64). 'a t_float64_id -> 'a t_float64_id = <fun>
 val f2_3 : float# -> float# = <fun>
 |}];;
 
-(**********************************)
-(* Test 3: Module-level bindings. *)
+(*****************************************)
+(* Test 3: No module-level bindings yet. *)
 
-let x3_1 : t_float64 = of_f64 #42.0;;
+let x3_1 : t_float64 = assert false;;
 [%%expect{|
-val x3_1 : t_float64 = <abstr>
+Line 1, characters 4-8:
+1 | let x3_1 : t_float64 = assert false;;
+        ^^^^
+Error: Types of top-level module bindings must have layout "value", but
+       the type of "x3_1" has layout "float64".
 |}];;
 
-let x3_2_1 : 'a t_float64_id = #42.0;;
-let x3_2_2 : 'a t_float64_id = of_f64 #42.0;;
+let x3_2 : 'a t_float64_id = assert false;;
 [%%expect{|
-val x3_2_1 : float# t_float64_id = <abstr>
-val x3_2_2 : t_float64 t_float64_id = <abstr>
+Line 1, characters 4-8:
+1 | let x3_2 : 'a t_float64_id = assert false;;
+        ^^^^
+Error: Types of top-level module bindings must have layout "value", but
+       the type of "x3_2" has layout "float64".
 |}];;
 
-let x3_3 : float# = #42.0;;
+let x3_3 : float# = assert false;;
 [%%expect{|
-val x3_3 : float# = <abstr>
+Line 1, characters 4-8:
+1 | let x3_3 : float# = assert false;;
+        ^^^^
+Error: Types of top-level module bindings must have layout "value", but
+       the type of "x3_3" has layout "float64".
 |}];;
 
 module M3_4 = struct
-  let x : t_float64 = of_f64 #42.0
+  let x : t_float64 = assert false
 end
 [%%expect{|
-module M3_4 : sig val x : t_float64 end
+Line 2, characters 6-7:
+2 |   let x : t_float64 = assert false
+          ^
+Error: Types of top-level module bindings must have layout "value", but
+       the type of "x" has layout "float64".
 |}];;
 
 module M3_5 = struct
   let f (x : float#) = x
 
-  let y = f #42.0
+  let y = f (assert false)
 end
 [%%expect{|
-module M3_5 : sig val f : float# -> float# val y : float# end
+Line 4, characters 6-7:
+4 |   let y = f (assert false)
+          ^
+Error: Types of top-level module bindings must have layout "value", but
+       the type of "y" has layout "float64".
 |}];;
 
 (*************************************)
@@ -269,24 +285,44 @@ type ufref = { mutable contents : float# };;
 type ufref = { mutable contents : float#; }
 |}];;
 
-(**************************************************)
-(* Test 6: Can be put at top level of signatures. *)
+(****************************************************)
+(* Test 6: Can't be put at top level of signatures. *)
 module type S6_1 = sig val x : t_float64 end
 
 let f6 (m : (module S6_1)) = let module M6 = (val m) in M6.x;;
 [%%expect{|
-module type S6_1 = sig val x : t_float64 end
-val f6 : (module S6_1) -> t_float64 = <fun>
+Line 1, characters 31-40:
+1 | module type S6_1 = sig val x : t_float64 end
+                                   ^^^^^^^^^
+Error: This type signature for "x" is not a value type.
+       The layout of type t_float64 is float64
+         because of the definition of t_float64 at line 1, characters 0-24.
+       But the layout of type t_float64 must be a sublayout of value
+         because it's the type of something stored in a module structure.
 |}];;
 
 module type S6_2 = sig val x : 'a t_float64_id end
 [%%expect{|
-module type S6_2 = sig val x : ('a : float64). 'a t_float64_id end
+Line 1, characters 31-46:
+1 | module type S6_2 = sig val x : 'a t_float64_id end
+                                   ^^^^^^^^^^^^^^^
+Error: This type signature for "x" is not a value type.
+       The layout of type 'a t_float64_id is float64
+         because of the definition of t_float64_id at line 2, characters 0-37.
+       But the layout of type 'a t_float64_id must be a sublayout of value
+         because it's the type of something stored in a module structure.
 |}];;
 
 module type S6_3 = sig val x : float# end
 [%%expect{|
-module type S6_3 = sig val x : float# end
+Line 1, characters 31-37:
+1 | module type S6_3 = sig val x : float# end
+                                   ^^^^^^
+Error: This type signature for "x" is not a value type.
+       The layout of type float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of type float# must be a sublayout of value
+         because it's the type of something stored in a module structure.
 |}];;
 
 

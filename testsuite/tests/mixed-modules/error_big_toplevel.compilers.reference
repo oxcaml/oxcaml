@@ -1,2 +1,0 @@
-File "error_big_toplevel.ml", line 1:
-Error: Mixed modules may contain at most 254 value fields prior to the flat suffix, but this one contains 257.

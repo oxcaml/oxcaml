@@ -88,7 +88,7 @@ let prim_makearray =
 
 (* Also use it for required globals *)
 let transl_label_init_general f =
-  let expr, repr = f () in
+  let expr, size = f () in
   let expr =
     Hashtbl.fold
       (fun c id expr ->
@@ -110,7 +110,7 @@ let transl_label_init_general f =
   in
   Env.reset_required_globals ();*)
   reset_labels ();
-  expr, repr
+  expr, size
 
 let transl_label_init_flambda f =
   assert(Config.flambda || Config.flambda2);
@@ -120,7 +120,7 @@ let transl_label_init_flambda f =
   (* Calling f (usually Translmod.transl_struct) requires the
      method_cache variable to be initialised to be able to generate
      method accesses. *)
-  let expr, repr = f () in
+  let expr, size = f () in
   let expr =
     if !method_count = 0 then expr
     else
@@ -131,7 +131,30 @@ let transl_label_init_flambda f =
                Loc_unknown),
         expr)
   in
-  transl_label_init_general (fun () -> expr, repr)
+  transl_label_init_general (fun () -> expr, size)
+
+let transl_store_label_init glob size f arg =
+  assert(not (Config.flambda || Config.flambda2));
+  assert(!Clflags.native_code);
+  method_cache := Lprim(mod_field ~read_semantics:Reads_vary size,
+                        (* XXX KC: conservative *)
+                        [Lprim(Pgetglobal glob, [], Loc_unknown)],
+                        Loc_unknown);
+  let expr = f arg in
+  let (size, expr) =
+    if !method_count = 0 then (size, expr) else
+    (size+1,
+     Lsequence(
+     Lprim(mod_setfield size,
+           [Lprim(Pgetglobal glob, [], Loc_unknown);
+            Lprim (Pccall prim_makearray,
+                   [int !method_count; int 0],
+                   Loc_unknown)],
+           Loc_unknown),
+     expr))
+  in
+  let lam, size = transl_label_init_general (fun () -> (expr, size)) in
+  size, lam
 
 let transl_label_init f =
   if !Clflags.native_code || Clflags.is_flambda2 () then

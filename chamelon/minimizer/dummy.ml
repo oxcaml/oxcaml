@@ -97,8 +97,8 @@ let dummy_core_typet : Parsetree.core_type =
   }
 
 let dummy_value_description =
-  mk_value_description ~val_type:dummy_type_expr
-    ~val_kind:(Val_reg Jkind.Sort.value) ~val_attributes:[]
+  mk_value_description ~val_type:dummy_type_expr ~val_kind:Val_reg
+    ~val_attributes:[]
 
 let exp_desc_to_exp ed =
   {

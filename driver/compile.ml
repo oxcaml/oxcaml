@@ -32,10 +32,9 @@ let interface ~source_file ~output_prefix =
 
 (** Bytecode compilation backend for .ml files. *)
 
-let make_arg_descr ~param ~arg_block_idx ~main_repr : Lambda.arg_descr option =
+let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
   match param, arg_block_idx with
-  | Some arg_param, Some arg_block_idx ->
-    Some { arg_param; arg_block_idx; main_repr }
+  | Some arg_param, Some arg_block_idx -> Some { arg_param; arg_block_idx }
   | None, None -> None
   | Some _, None -> Misc.fatal_error "No argument field"
   | None, Some _ -> Misc.fatal_error "Unexpected argument field"
@@ -62,11 +61,7 @@ let slambda_to_bytecode i slambda ~as_arg_for =
        |> Bytegen.compile_implementation i.module_name
        |> print_if i.ppf_dump Clflags.dump_instr Printinstr.instrlist
        |> fun bytecode ->
-          let arg_descr =
-            make_arg_descr ~param:as_arg_for ~arg_block_idx
-              ~main_repr:(
-                Lambda.main_module_representation main_module_block_format)
-          in
+          let arg_descr = make_arg_descr ~param:as_arg_for ~arg_block_idx in
           bytecode, required_globals, main_module_block_format, arg_descr
     )
 
@@ -77,10 +72,9 @@ let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
         Some ai_coercion_from_primary
     | None -> None
   in
-  let loc = Location.in_file (Unit_info.original_source_file i.target) in
   (structure, coercion, argument_coercion)
   |> Profile.(record transl)
-    (Translmod.transl_implementation ~loc i.module_name)
+    (Translmod.transl_implementation i.module_name)
   |> slambda_to_bytecode i
 
 let emit_bytecode i
@@ -103,7 +97,7 @@ type starting_point =
   | Parsing
   | Instantiation of {
       runtime_args : Translmod.runtime_arg list;
-      main_module_block_repr : Lambda.module_representation;
+      main_module_block_size : int;
       arg_descr : Lambda.arg_descr option;
     }
 
@@ -133,7 +127,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       ~hook_parse_tree:(fun _ -> ())
       ~hook_typed_tree:(fun _ -> ())
       info ~backend
-  | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
+  | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
     begin
       match !Clflags.as_argument_for with
       | Some _ ->
@@ -149,7 +143,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
     in
     let impl =
       Translmod.transl_instance info.module_name ~runtime_args
-        ~main_module_block_repr ~arg_block_idx
+        ~main_module_block_size ~arg_block_idx
     in
     let bytecode = slambda_to_bytecode info impl ~as_arg_for in
     emit_bytecode info bytecode
@@ -160,9 +154,9 @@ let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
     ~compilation_unit:Inferred_from_output_prefix
 
 let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
-    ~main_module_block_repr ~arg_descr ~keep_symbol_tables =
+    ~main_module_block_size ~arg_descr ~keep_symbol_tables =
   let start_from =
-    Instantiation { runtime_args; main_module_block_repr; arg_descr }
+    Instantiation { runtime_args; main_module_block_size; arg_descr }
   in
   implementation_aux ~start_from ~source_file ~output_prefix ~keep_symbol_tables
     ~compilation_unit:(Exactly compilation_unit)

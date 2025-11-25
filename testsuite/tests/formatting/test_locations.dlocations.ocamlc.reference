@@ -193,4 +193,4 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                (after Test_locations.fib test_locations.ml(19):595-606
                  (apply fib (%int_sub n 2)))))
            (before Test_locations.fib test_locations.ml(18):570-571 1)))))
-  (pseudo Test_locations test_locations.ml(0)<ghost>:-1--1 (makeblock 0 fib)))
+  (pseudo <unknown location> (makeblock 0 fib)))

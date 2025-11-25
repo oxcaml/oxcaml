@@ -22,6 +22,6 @@ val lambda_to_flambda :
   big_endian:bool ->
   cmx_loader:Flambda_cmx.loader ->
   compilation_unit:Compilation_unit.t ->
-  module_repr:Lambda.module_representation ->
+  module_block_size_in_words:int ->
   Lambda.lambda ->
   'mode Closure_conversion.close_program_result

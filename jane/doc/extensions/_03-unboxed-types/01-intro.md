@@ -156,6 +156,7 @@ Each numeric type has its own library for working with it: `float_u`,
   functions, and have limited support in records (details below).
 
 * Unboxed numbers may *not* appear...
+   * ... top-level in a module (e.g. you cannot have `val pi : float#`)
    * ... in a tuple (e.g. you cannot have `int32# * int32#`)
    * ... as a field of a constructor (e.g. you cannot have `| K of int64#` or `| K of {
      x : nativeint# }`)
@@ -449,6 +450,7 @@ Unboxed numbers can't be put in these structures:
   * Constructors with inline record fields
   * Exceptions
   * Extensible variant constructors
+  * Top-level fields of modules
   * Tuples
 
 There aren't fundamental issues with the structures that lack support. They will
@@ -496,8 +498,7 @@ on the runtime representation of values. It is stable in the sense that it never
 changes the relative order of two values, or of two non-values.  Immediates
 count as values for this purpose (they are always moved to the prefix).
 
-There is a special case for records (but not modules) that consist solely of
-`float` and
+There is a special case for records that consist solely of `float` and
 `float#` fields. The "flat float record optimization" applies to any such
 record&mdash;all of the fields are stored flat, even the `float` ones that will
 require boxing upon projection. The fields are also not reordered. This special

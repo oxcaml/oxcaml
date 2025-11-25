@@ -64,24 +64,6 @@ let rec t = { bx = #{ bx2 = t } }
 val t : bx = {bx = <cycle>}
 |}]
 
-(* The cycle-finding algorithm in genprintval does not store non-values in its
-   [ObjTbl.t]. As a result, a cyclic unboxed record may be printed twice
-   ([unboxed_cycle] in this example), but any cycle will contain at least one
-   boxed value and will eventually be detected by genprintval. *)
-type unboxed = #{ b : boxed option; name : string }
-and boxed = { mutable a : unboxed }
-
-let unboxed_cycle =
-  let t = { a = #{ b = None; name = "t" } } in
-  t.a <- #{ b = Some t; name = "t" };
-  t.a
-[%%expect{|
-type unboxed = #{ b : boxed option; name : string; }
-and boxed = { mutable a : unboxed; }
-val unboxed_cycle : unboxed =
-  #{b = Some {a = #{b = <cycle>; name = "t"}}; name = "t"}
-|}]
-
 (* The below is adapted from [testsuite/tests/letrec-check/unboxed.ml]. *)
 
 type t = #{x: int64}

@@ -43,7 +43,7 @@ val instantiate
       output_prefix:string ->
       compilation_unit:CU.t ->
       runtime_args:Translmod.runtime_arg list ->
-      main_module_block_repr:Lambda.module_representation ->
+      main_module_block_size:int ->
       arg_descr:Lambda.arg_descr option -> unit)
   -> unit
 

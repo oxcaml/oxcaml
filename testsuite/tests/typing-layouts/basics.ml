@@ -452,10 +452,16 @@ module F2 (X : sig val x : t_float64 end) = struct
   let f () = X.x
 end;;
 [%%expect{|
-module F2 :
-  functor (X : sig val x : t_float64 end) ->
-    sig val f : unit -> t_float64 end
+Line 1, characters 27-36:
+1 | module F2 (X : sig val x : t_float64 end) = struct
+                               ^^^^^^^^^
+Error: This type signature for "x" is not a value type.
+       The layout of type t_float64 is float64
+         because of the definition of t_float64 at line 4, characters 0-24.
+       But the layout of type t_float64 must be a sublayout of value
+         because it's the type of something stored in a module structure.
 |}];;
+(* CR layouts v5: the test above should be made to work *)
 
 module F2 (X : sig val f : t_float64 -> unit end) = struct
   let g z = X.f z
@@ -1796,7 +1802,7 @@ Error: This expression has type "t_float64"
          because it's the type of the field of a polymorphic variant.
 |}]
 
-(****************************************************)
+(******************************************************)
 (* Test 33: Externals must have representable types *)
 
 external foo33 : t_any = "foo33";;
@@ -1805,11 +1811,11 @@ external foo33 : t_any = "foo33";;
 Line 1, characters 17-22:
 1 | external foo33 : t_any = "foo33";;
                      ^^^^^
-Error: The type of a module-level value must have a representable layout.
+Error: This type signature for "foo33" is not a value type.
        The layout of type t_any is any
          because of the definition of t_any at line 5, characters 0-18.
-       But the layout of type t_any must be representable
-         because it's the type of something stored in a module.
+       But the layout of type t_any must be a sublayout of value
+         because it's the type of something stored in a module structure.
 |}]
 
 external foo44 : ('a : any). 'a -> unit = "foo44";;

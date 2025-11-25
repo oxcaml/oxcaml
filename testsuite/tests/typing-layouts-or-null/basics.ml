@@ -53,11 +53,12 @@ end
 Line 2, characters 10-29:
 2 |   val x : t_any_mod_separable
               ^^^^^^^^^^^^^^^^^^^
-Error: The type of a module-level value must have a representable layout.
+Error: This type signature for "x" is not a value type.
        The layout of type t_any_mod_separable is any
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
-       But the layout of type t_any_mod_separable must be representable
-         because it's the type of something in a signature.
+       But the layout of type t_any_mod_separable must be a sublayout of
+           value
+         because it's the type of something stored in a module structure.
 |}]
 
 module type S2 = sig

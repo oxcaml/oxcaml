@@ -215,7 +215,7 @@ let eval code =
     Typemod.type_implementation unit_info compilation_unit env ast
   in
   let slambda_program =
-    Translmod.transl_implementation compilation_unit ~loc:(Location.curr lexbuf)
+    Translmod.transl_implementation compilation_unit
       ( typed_impl.structure,
         typed_impl.coercion,
         Option.map

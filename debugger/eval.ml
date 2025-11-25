@@ -78,8 +78,7 @@ let rec address path event = function
             not_found ()
         end
     end
-  | Env.Adot(root, _field_sorts, pos) ->
-      (* We can ignore [_field_sorts] since the debugger runs only bytecode *)
+  | Env.Adot(root, pos) ->
       let v = address path event root in
       if not (Debugcom.Remote_value.is_block v) then
         raise(Error(Not_initialized_yet path));

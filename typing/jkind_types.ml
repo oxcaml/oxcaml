@@ -201,13 +201,11 @@ module Sort = struct
 
     let for_constructor = value
 
+    let for_module_field = value
+
     let for_boxed_variant = value
 
     let for_exception = value
-
-    let for_type_extension = value
-
-    let for_class = value
   end
 
   module Var = struct

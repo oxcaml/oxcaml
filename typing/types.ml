@@ -398,7 +398,7 @@ module Vars = Misc.Stdlib.String.Map
 (* Value descriptions *)
 
 type value_kind =
-    Val_reg of Jkind_types.Sort.t       (* Regular value *)
+    Val_reg                             (* Regular value *)
   | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
@@ -583,8 +583,6 @@ and mixed_block_element =
   | Void
 
 and mixed_product_shape = mixed_block_element array
-
-and module_representation = Jkind_types.Sort.t array
 
 and record_representation =
   | Record_unboxed
@@ -780,39 +778,12 @@ module type Wrapped = sig
     mtd_loc: Location.t;
     mtd_uid: Uid.t;
   }
-
-  val sort_of_signature_item :
-    signature_item -> Jkind_types.Sort.t option
 end
 
 module Make_wrapped(Wrap : Wrap) = struct
   (* Avoid repeating everything in Wrapped *)
   module rec M : Wrapped with type 'a wrapped = 'a Wrap.t = M
   include M
-
-  let sort_of_signature_item = function
-    | Sig_value(_, decl, _) ->
-      begin match decl.val_kind with
-      | Val_reg sort -> Some sort
-      | Val_ivar _ ->
-        Some Jkind_types.Sort.(of_const Const.for_instance_var)
-      | Val_self _ | Val_anc _ ->
-        Some Jkind_types.Sort.(of_const Const.for_object)
-      | Val_prim _ -> None (* Primitives are not stored in modules *)
-      | Val_mut _ ->
-        Misc.fatal_error "Mutable variable found at the structure level"
-      end
-    | Sig_typext _ ->
-      Some Jkind_types.Sort.(of_const Const.for_type_extension)
-    | Sig_module(_, pres, _, _, _) ->
-      begin match pres with
-      | Mp_present ->
-        Some Jkind_types.Sort.(of_const Const.for_module)
-      | Mp_absent -> None
-      end
-    | Sig_class _ ->
-        Some Jkind_types.Sort.(of_const Const.for_class)
-    | Sig_type _ | Sig_modtype _ | Sig_class_type _ -> None
 end
 
 module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
@@ -1078,24 +1049,6 @@ let record_form_to_string (type rep) (record_form : rep record_form) =
   | Legacy -> "record"
   | Unboxed_product -> "unboxed record"
 
-let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
-  match sort with
-  | Base Value -> Value
-  | Base Bits8 -> Bits8
-  | Base Bits16 -> Bits16
-  | Base Bits32 -> Bits32
-  | Base Bits64 -> Bits64
-  | Base Float32 -> Float32
-  | Base Float64 -> Float64
-  | Base Untagged_immediate -> Untagged_immediate
-  | Base Vec128 -> Vec128
-  | Base Vec256 -> Vec256
-  | Base Vec512 -> Vec512
-  | Base Word -> Word
-  | Product sorts ->
-    Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
-  | Base Void -> Void
-
 let find_unboxed_type decl =
   match decl.type_kind with
     Type_record ([{ld_type = arg; ld_modalities = ms; _}], Record_unboxed, _)
@@ -1126,7 +1079,7 @@ let item_visibility = function
 
 let rec bound_value_identifiers = function
     [] -> []
-  | Sig_value(id, {val_kind = Val_reg _}, _) :: rem ->
+  | Sig_value(id, {val_kind = Val_reg}, _) :: rem ->
       id :: bound_value_identifiers rem
   | Sig_typext(id, _, _, _) :: rem -> id :: bound_value_identifiers rem
   | Sig_module(id, Mp_present, _, _, _) :: rem ->
@@ -1143,14 +1096,6 @@ let signature_item_id = function
   | Sig_class (id, _, _, _)
   | Sig_class_type (id, _, _, _)
     -> id
-
-let signature_item_representation sg =
-  match sort_of_signature_item sg with
-  | None -> None
-  | Some sort -> Some (signature_item_id sg, sort)
-
-let bound_value_identifiers_and_sorts sigs =
-  List.filter_map signature_item_representation sigs
 
 let rec mixed_block_element_to_string = function
   | Value -> "Value"

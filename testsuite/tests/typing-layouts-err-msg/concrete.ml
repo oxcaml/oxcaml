@@ -177,16 +177,3 @@ Error: This expression has type "t_any" but an expression was expected of type
        But the layout of t_any must be representable
          because it's the type of a statement.
 |}]
-
-(* Signature item *)
-module type S = sig type t : any val x : t end
-[%%expect{|
-Line 1, characters 41-42:
-1 | module type S = sig type t : any val x : t end
-                                             ^
-Error: The type of a module-level value must have a representable layout.
-       The layout of type t is any
-         because of the definition of t at line 1, characters 20-32.
-       But the layout of type t must be representable
-         because it's the type of something in a signature.
-|}]

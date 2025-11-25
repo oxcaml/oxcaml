@@ -58,7 +58,7 @@ let current_unit =
     ui_imports_cmi = [];
     ui_imports_cmx = [];
     ui_quoted_globals = [];
-    ui_format = ();
+    ui_format = Mb_struct { mb_size = -1 };
     ui_generic_fns = { curry_fun = []; apply_fun = []; send_fun = [] };
     ui_force_link = false;
     ui_zero_alloc_info = Zero_alloc_info.create ();
@@ -77,7 +77,7 @@ let reset unit_info =
   current_unit.ui_imports_cmi <- [];
   current_unit.ui_imports_cmx <- [];
   current_unit.ui_quoted_globals <- [];
-  current_unit.ui_format <- ();
+  current_unit.ui_format <- Mb_struct { mb_size = -1 };
   current_unit.ui_generic_fns <-
     { curry_fun = []; apply_fun = []; send_fun = [] };
   current_unit.ui_force_link <- !Clflags.link_everything;
@@ -154,7 +154,7 @@ let equal_up_to_pack_prefix cu1 cu2 =
   CU.Name.equal (CU.name cu1) (CU.name cu2)
   && List.equal equal_args (CU.instance_arguments cu1) (CU.instance_arguments cu2)
 
-let get_unit_export_info comp_unit =
+let get_unit_info comp_unit =
   (* If this fails, it likely means that someone didn't call
      [CU.which_cmx_file]. *)
   assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.ui_unit);
@@ -163,12 +163,11 @@ let get_unit_export_info comp_unit =
      that. *)
   if equal_up_to_pack_prefix comp_unit current_unit.ui_unit
   then
-    current_unit.ui_export_info
+    Some current_unit
   else begin
     let name = CU.to_global_name_without_prefix comp_unit in
     try
-      let ui = Infos_table.find global_infos_table name in
-      Option.bind ui (fun ui -> ui.ui_export_info)
+      Infos_table.find global_infos_table name
     with Not_found ->
       let (infos, crc) =
         if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
@@ -200,14 +199,24 @@ let get_unit_export_info comp_unit =
       let import = Import_info.create_normal comp_unit ~crc in
       current_unit.ui_imports_cmx <- import :: current_unit.ui_imports_cmx;
       Infos_table.add global_infos_table name infos;
-      Option.bind infos (fun ui -> ui.ui_export_info)
+      infos
   end
 
 let which_cmx_file comp_unit =
   CU.which_cmx_file comp_unit ~accessed_by:(CU.get_current_exn ())
 
-let get_global_export_info comp_unit =
-  get_unit_export_info (which_cmx_file comp_unit)
+let get_unit_export_info comp_unit =
+  match get_unit_info comp_unit with
+  | None -> None
+  | Some ui -> ui.ui_export_info
+
+let get_global_info comp_unit =
+  get_unit_info (which_cmx_file comp_unit)
+
+let get_global_export_info id =
+  match get_global_info id with
+  | None -> None
+  | Some ui -> ui.ui_export_info
 
 let cache_unit_info ui =
   cache_zero_alloc_info ui.ui_zero_alloc_info;
@@ -307,8 +316,8 @@ let save_unit_info filename ~main_module_block_format ~arg_descr =
      they just get computed once. (Arguably we should remove [set_export_info]
      by the same reasoning.) *)
   current_unit.ui_arg_descr <- arg_descr;
-  write_unit_info
-    { current_unit with ui_format = main_module_block_format } filename
+  current_unit.ui_format <- main_module_block_format;
+  write_unit_info current_unit filename
 
 let new_const_symbol () =
   Symbol.for_new_const_in_current_unit ()
@@ -316,9 +325,7 @@ let new_const_symbol () =
   |> Linkage_name.to_string
 
 let require_global global_ident =
-  ignore
-    (get_global_export_info global_ident
-     : Flambda2_cmx.Flambda_cmx_format.t option)
+  ignore (get_global_info global_ident : Cmx_format.unit_infos option)
 
 (* Error report *)
 

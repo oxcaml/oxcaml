@@ -936,38 +936,22 @@ type runtime_param =
   | Rp_unit                               (* The unit value (only used when
                                              there are no other parameters) *)
 
-type module_representation =
-  | Module_value_only of { field_count : int }
-  (* All module fields are boxed. *)
-  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
-  (* The module contains both values and unboxed elements. We have two shapes:
-     one for allocating (used by [block_of_module_representation]) and one for
-     reading (used by [mod_field]). This will be cleaned up after we add
-     [Pmixedfieldzeroalloc] (name subject to change) *)
-
-(* Logical field count: Each unboxed product counts as 1 field *)
-val module_representation_field_count : module_representation -> int
-
-val layout_of_module_field : module_representation -> int -> layout
-
 (* The structure of the main module block. A module with no parameters will be
    compiled to an [Mb_struct] and a module with at least one parameter will be
    compiled to an [Mb_instantiating_functor]. *)
 type main_module_block_format =
-  | Mb_struct of { mb_repr : module_representation }
-                                         (* A block with
-                                            representation [mb_repr] *)
+  | Mb_struct of { mb_size : int }        (* A block with [mb_size] fields *)
   | Mb_instantiating_functor of
       { mb_runtime_params : runtime_param list;
-        mb_returned_repr : module_representation;
+        mb_returned_size : int;
       }
-                                         (* A block with exactly one field: a
-                                            function taking [mb_runtime_params]
-                                            and returning a block with
-                                            representation [mb_returned_repr] *)
+                                          (* A block with exactly one field: a
+                                             function taking [mb_runtime_params]
+                                             and returning a block with
+                                             [mb_returned_size] fields *)
 
-val main_module_representation :
-  main_module_block_format -> module_representation
+(* The number of words in the main module block. *)
+val main_module_block_size : main_module_block_format -> int
 
 type 'lam program0 =
   { compilation_unit : Compilation_unit.t;
@@ -1008,7 +992,7 @@ type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
                                         (* The parameter implemented (the [P] in
                                            [-as-argument-for P]) *)
-    arg_block_idx: int;                 (* The index within the main module
+    arg_block_idx: int; }               (* The index within the main module
                                            block of the _argument block_. If
                                            this compilation unit is used as an
                                            argument when instantiating,
@@ -1019,10 +1003,6 @@ type arg_descr =
                                            that of the parameter, which is in
                                            general a supertype of this
                                            compilation unit's signature. *)
-    main_repr: module_representation;   (* The representation of the main
-                                           module, which is required to index
-                                           into it *)
-  }
 
 (* Sharing key *)
 val make_key: lambda -> lambda option
@@ -1047,6 +1027,7 @@ val layout_object : layout
 val layout_class : layout
 val layout_module : layout
 val layout_functor : layout
+val layout_module_field : layout
 val layout_string : layout
 val layout_boxed_float : boxed_float -> layout
 val layout_unboxed_float : unboxed_float -> layout
@@ -1063,7 +1044,6 @@ val layout_tmc_field : layout
 (* A layout that is Pgenval because it is an optional argument *)
 val layout_optional_arg : layout
 val layout_value_field : layout
-val layout_predef_value : layout
 val layout_lazy : layout
 val layout_lazy_contents : layout
 (* A layout that is Pgenval because we are missing layout polymorphism *)
@@ -1077,10 +1057,6 @@ val layout_unboxed_product : layout list -> layout
 
 val layout_top : layout
 val layout_bottom : layout
-
-val mixed_block_element_for_module : unit mixed_block_element
-val mixed_block_element_with_locality_mode_for_module :
-  locality_mode mixed_block_element
 
 
 (** [dummy_constant] produces a placeholder value with a recognizable
@@ -1145,15 +1121,9 @@ val transl_address : scoped_location -> Persistent_env.address -> lambda
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 
 val transl_mixed_product_shape_for_read :
-  get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
+  get_value_kind:(int -> value_kind) -> get_mode:(int -> locality_mode)
   -> Types.mixed_product_shape
-  -> 'a mixed_block_element array
-
-val transl_module_representation :
-  Types.module_representation -> module_representation
-
-val block_of_module_representation :
-  loc:Warnings.loc -> module_representation -> primitive
+  -> mixed_block_shape_with_locality_mode
 
 val make_sequence: ('a -> lambda) -> 'a list -> lambda
 
@@ -1259,9 +1229,8 @@ val reset: unit -> unit
     Module accesses are always immutable, except in translobj where the
     method cache is stored in a mutable module field.
 *)
-val mod_field:
-  ?read_semantics: field_read_semantics -> int ->
-  module_representation -> primitive
+val mod_field: ?read_semantics: field_read_semantics -> int -> primitive
+val mod_setfield: int -> primitive
 
 val structured_constant_layout : structured_constant -> layout
 
