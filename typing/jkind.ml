@@ -3915,7 +3915,7 @@ module Violation = struct
        Specifically, the first mismatched axis should be reported as a reason,
        like "because it is not non_pointer" for a value vs immediate error. *)
     let format_layout_or_kind ppf jkind =
-      match mismatch_type, jkind.jkind.layout with
+      match mismatch_type, Layout.get jkind.jkind.layout with
       | Layout { can_omit_right_sa = true }, Sort (Base Scannable, _) ->
         fprintf ppf "%ta value layout" indent
       | _ -> format_full_layout_or_kind ppf jkind
