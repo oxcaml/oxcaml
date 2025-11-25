@@ -408,17 +408,12 @@ module Layout = struct
     | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
     | (Any _ | Sort _ | Product _), _ -> false
 
-  (* only meets at the root, meaning products are left unchanged. *)
-  let meet_root_scannable_axes t sa =
-    match t with
-    | Any sa' -> Any (Scannable_axes.meet sa sa')
-    | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
-    | Product _ -> t
-
   let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
     | Any sa -> Some sa
     | Sort (b, sa) -> if Sort.is_scannable_or_var b then Some sa else None
     | Product _ -> None
+
+  let is_scannable_or_any t = t |> get_root_scannable_axes |> Option.is_some
 
   (* CR layouts-scannable: Once nullability becomes a scannable axis, reconsider
      whether this function is needed. *)
@@ -429,7 +424,12 @@ module Layout = struct
     | Sort (b, _) -> if Sort.is_scannable_or_var b then Sort (b, sa) else t
     | Product _ -> t
 
-  let is_scannable_or_any t = t |> get_root_scannable_axes |> Option.is_some
+  (* only meets at the root, meaning products are left unchanged. *)
+  let meet_root_scannable_axes t sa =
+    match t with
+    | Any sa' -> Any (Scannable_axes.meet sa sa')
+    | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
+    | Product _ -> t
 
   let sub t1 t2 =
     let rec sub t1 t2 : Misc.Le_result.t =
