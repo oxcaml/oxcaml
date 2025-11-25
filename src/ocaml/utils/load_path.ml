@@ -12,6 +12,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* Merlin-specific: change some module paths to match the compiler *)
+module Misc = struct
+  include Misc
+  module Stdlib = Misc_stdlib
+  include Misc_stdlib
+end
+
 open Local_store
 
 exception Parse_error of string
@@ -60,6 +67,8 @@ let split_and_unescape ~buffer line =
 ;;
 
 module Dune_manifests_reader : sig
+  (* Internal ticket 5767 *)
+  [@@@warning "-32"]
   module Path : sig
     module For_testing : sig
       val root_override : string option ref
@@ -284,64 +293,15 @@ end = struct
 
   let check ~hidden t =
     hidden = t.hidden && Directory_content_cache.check t.path
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
 
   let create ~hidden path =
     let files = Array.to_list (Directory_content_cache.read path)
-      |> List.map (fun basename -> { basename; path = Filename.concat path basename }) in
-    { path; files; hidden }
-end
-
-type visibility = Visible | Hidden
-||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
-
-  let create ~hidden path =
-    let files = Array.to_list (readdir_compat path)
-      |> List.map (fun basename -> { basename; path = Filename.concat path basename }) in
-    { path; files; hidden }
-
-  let read_path_list_file' path =
-    let ic = open_in path in
-    Misc.try_finally
-      (fun () ->
-        let rec loop acc =
-          try
-            let line = input_line ic in
-            let (basename, path) = Misc.Stdlib.String.split_first_exn ~split_on:' ' line in
-            loop ({ basename; path } :: acc)
-          with End_of_file -> acc
-        in
-        loop [])
-      ~always:(fun () -> close_in ic)
-
-  let read_path_list_file path =
-    let files = read_path_list_file' path in
-    List.map (fun { basename; path } ->
-      let path = if Filename.is_relative path then
-        (* Paths are relative to parent directory of path list file *)
-        Filename.concat (Filename.dirname path) path
-      else
-        path
-      in
-      { basename; path }) files
-
-  let create_from_path_list_file ~hidden ~path_list_file =
-    let files = read_path_list_file path_list_file in
-    { path = path_list_file; files; hidden }
-end
-
-type visibility = Visible | Hidden
-=======
-
-  let create ~hidden path =
-    let files = Array.to_list (readdir_compat path)
       |> List.map (
         fun basename -> { basename; path = Filename.concat path basename }) in
     { path; files; hidden }
 end
 
 type visibility = Visible | Hidden
->>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
 
 (** Stores cached paths to files *)
 module Path_cache : sig
@@ -464,6 +424,13 @@ let get_paths () =
 let get_visible_path_list () = List.rev_map Dir.path !visible_dirs
 let get_hidden_path_list () = List.rev_map Dir.path !hidden_dirs
 
+(* CR-someday: init_manifests is not currently relevant because Merlin can safely ignore
+   the -I-manifest and -H-manifest flags due to current build rules. But at some point,
+   this will change, and manifest files will need to be handled properly. This will also
+   likely involve updating .merlin files to be able to accept directives equivalent to
+   -I-manifest and -H-manifest. Internal ticket 5767 *)
+let () = ignore Path_cache.prepend_add_single;;
+(*
 let init_manifests () =
   let manifests_reader = Dune_manifests_reader.create () in
   let load_manifest ~hidden ~basenames manifest_path =
@@ -486,6 +453,7 @@ let init_manifests () =
   List.iter
     (load_manifest ~hidden:true ~basenames:hidden_basenames)
     !Clflags.hidden_include_manifests
+*)
 
 let init ~auto_include ~visible ~hidden =
   assert (not Config.merlin || Local_store.is_bound ());
@@ -527,45 +495,15 @@ let init ~auto_include ~visible ~hidden =
   match update with
   | None -> ()
   | Some (new_visible, new_hidden) ->
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
     reset ();
     visible_dirs := new_visible;
     hidden_dirs := new_hidden;
     List.iter Path_cache.prepend_add new_hidden;
     List.iter Path_cache.prepend_add new_visible;
+    (*= init_manifests (); *)
     auto_include_callback := auto_include
 
 let remove_dir dir =
-||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
-  reset ();
-  visible_dirs := List.rev_map (Dir.create ~hidden:false) visible;
-  hidden_dirs := List.rev_map (Dir.create ~hidden:true) hidden;
-  List.iter (fun path_list_file ->
-    visible_dirs :=
-      Dir.create_from_path_list_file ~hidden:false ~path_list_file ::
-        !visible_dirs;
-  ) !Clflags.include_paths_files;
-  List.iter (fun path_list_file ->
-    hidden_dirs :=
-      Dir.create_from_path_list_file ~hidden:true ~path_list_file ::
-        !hidden_dirs;
-  ) !Clflags.hidden_include_paths_files;
-  List.iter Path_cache.prepend_add !hidden_dirs;
-  List.iter Path_cache.prepend_add !visible_dirs;
-  auto_include_callback := auto_include
-
-let remove_dir dir =
-=======
-  reset ();
-  visible_dirs := List.rev_map (Dir.create ~hidden:false) visible;
-  hidden_dirs := List.rev_map (Dir.create ~hidden:true) hidden;
-  List.iter Path_cache.prepend_add !hidden_dirs;
-  List.iter Path_cache.prepend_add !visible_dirs;
-  init_manifests ();
-  auto_include_callback := auto_include
-
-let remove_dir dir =
->>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
   assert (not Config.merlin || Local_store.is_bound ());
   let visible = List.filter (fun d -> Dir.path d <> dir) !visible_dirs in
   let hidden = List.filter (fun d -> Dir.path d <> dir) !hidden_dirs in
