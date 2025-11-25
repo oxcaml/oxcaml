@@ -315,6 +315,27 @@ let f (x : 'a or_null) =
 val f : ('a : immediate). 'a or_null -> unit = <fun>
 |}]
 
+let outer (type a : value non_float) (nf : a or_null) =
+  let f (x : 'a or_null) =
+    let g (type b : value non_pointer) (y : b) = () in
+    match x with
+    | This y -> g y
+    | Null -> ()
+  in
+  f nf
+[%%expect{|
+Line 8, characters 4-6:
+8 |   f nf
+        ^^
+Error: This expression has type "a or_null"
+       but an expression was expected of type "'a or_null"
+       The layout of a is value non_float
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be a sublayout of immediate
+         because of the definition of g at line 3, characters 10-51.
+|}]
+
+
 (* modules and module inclusion *)
 
 module M (X : sig type t : any non_pointer end) : sig type t : any end = X

@@ -89,8 +89,7 @@ module Sort : sig
       result is a [Var v], then [!v] is [None]. *)
   val get : t -> t
 
-  (** Determines if the sort is [Value] or an unfilled sort variable *)
-  val is_possibly_scannable : t -> bool
+  val is_scannable_or_var : t -> bool
 
   (** Decompose a sort into a list (of the given length) of fresh sort variables,
       equating the input sort with the product of the output sorts. *)

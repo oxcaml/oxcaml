@@ -475,7 +475,7 @@ module Sort = struct
   (* CR layouts v12: Default to void instead. *)
   let default_for_transl_and_get s = default_to_scannable_and_get s
 
-  let is_possibly_scannable s =
+  let is_scannable_or_var s =
     match get s with Base Scannable | Var _ -> true | _ -> false
 
   (***********************)

@@ -233,7 +233,7 @@ module Layout = struct
     end
 
     (* if so, scannable axis annotations should not trigger a warning *)
-    let is_possibly_scannable = function
+    let is_scannable_or_any = function
       | Any _ | Base (Scannable, _) -> true
       | Base
           ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
@@ -288,7 +288,7 @@ module Layout = struct
     let get_root_scannable_axes t =
       match t with
       | Any sa -> Some sa
-      | Base (_, sa) -> if is_possibly_scannable t then Some sa else None
+      | Base (_, sa) -> if is_scannable_or_any t then Some sa else None
       | Product _ -> None
 
     let to_string t =
@@ -387,7 +387,7 @@ module Layout = struct
     | Sort (s1, sa1), Sort (s2, sa2) ->
       sort_equal_result ~allow_mutation (Sort.equate_tracking_mutation s1 s2)
       &&
-      if Sort.is_possibly_scannable s1
+      if Sort.is_scannable_or_var s1
          (* CR layouts-scannable: if [s1] and [s2] are both unfilled sort
             variables, and [sa1 <> sa2], then they should _not_ be equal,
             even though they would be in the case that the sort variables
@@ -417,7 +417,7 @@ module Layout = struct
 
   let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
     | Any sa -> Some sa
-    | Sort (b, sa) -> if Sort.is_possibly_scannable b then Some sa else None
+    | Sort (b, sa) -> if Sort.is_scannable_or_var b then Some sa else None
     | Product _ -> None
 
   (* CR layouts-scannable: Once nullability becomes a scannable axis, reconsider
@@ -426,13 +426,10 @@ module Layout = struct
   let set_root_scannable_axes t sa =
     match t with
     | Any _ -> Any sa
-    | Sort (b, _) -> if Sort.is_possibly_scannable b then Sort (b, sa) else t
+    | Sort (b, _) -> if Sort.is_scannable_or_var b then Sort (b, sa) else t
     | Product _ -> t
 
-  let is_possibly_scannable t = t |> get_root_scannable_axes |> Option.is_some
-
-  let is_definitely_scannable t =
-    match get t with Sort (Base Scannable, _) -> true | _ -> false
+  let is_scannable_or_any t = t |> get_root_scannable_axes |> Option.is_some
 
   let sub t1 t2 =
     let rec sub t1 t2 : Misc.Le_result.t =
@@ -445,7 +442,7 @@ module Layout = struct
            filled in with anything other than [scannable]. Unifying [sort] with
            [scannable] could potentially yield better error messages. Another
            option could be to add to the [Layout_disagreement] type. *)
-        if Sort.is_possibly_scannable sort && not (Scannable_axes.le sa1 sa2)
+        if Sort.is_scannable_or_var sort && not (Scannable_axes.le sa1 sa2)
         then Not_le
         else Less
       | Product _, Any _ -> Less
@@ -453,7 +450,7 @@ module Layout = struct
       | Sort (s1, sa1), Sort (s2, sa2) ->
         if Sort.equate s1 s2
         then
-          if Sort.is_possibly_scannable s1
+          if Sort.is_scannable_or_var s1
           then Scannable_axes.less_or_equal sa1 sa2
           else Equal
         else Not_le
@@ -750,8 +747,9 @@ module With_bounds = struct
       let relevant_axes =
         Axis_set.union explicit_relevant_axes implicit_relevant_axes
       in
+      let irrelevant_axes = Axis_set.complement relevant_axes in
       (* nullability is always implicitly irrelevant since it isn't deep *)
-      Axis_set.remove (Axis_set.complement relevant_axes) (Nonmodal Nullability)
+      Axis_set.remove irrelevant_axes (Nonmodal Nullability)
   end
 
   let to_best_eff_map = function
@@ -2167,7 +2165,7 @@ module Const = struct
         Layout.Const.equal_up_to_scannable_axes base.jkind.layout actual.layout
       in
       let scannable_axes =
-        if Layout.Const.is_possibly_scannable actual.layout
+        if Layout.Const.is_scannable_or_any actual.layout
         then get_scannable_axes_diff ~base:base.jkind.layout actual.layout
         else []
       in
@@ -2232,12 +2230,13 @@ module Const = struct
             convert_with_base
               ~base:
                 { jkind =
-                    (* CR layouts-scannable: Before overwriting semantics, this
-                       function used [Separable] as a mod bound. This is no
-                       longer needed (as scannable axes currently override),
-                       but if that behavior is changed then this must as well.
-                       The second call to [convert_with_base] should be replaced
-                       by one once nullability is a scannable axis. *)
+                    (* Previously, adding a non-modal axis annotation (like
+                       [mod separable]) would take the _meet_ with a built-in
+                       abbreviation's point on that axis. These annotations (now
+                       called scannable axes, not non-modal) now _override_ the
+                       built-in abbreviation's point on the axis. Thus, we can
+                       avoid setting to max and decreasing. If the overriding
+                       behavior changes, this function should too. *)
                     { layout = jkind.layout;
                       mod_bounds =
                         Mod_bounds.set_nullability Nullability.Non_null
@@ -2252,6 +2251,8 @@ module Const = struct
           | Some out_jkind -> out_jkind
           | None ->
             (* If we fail, try again with nullable/maybe-separable jkinds. *)
+            (* CR layouts-scannable: Once nullability is a scannable axis, this
+               can be eliminated. *)
             let out_jkind_verbose =
               convert_with_base
                 ~base:
@@ -2381,7 +2382,7 @@ module Const = struct
       in
       let separability = transl_scannable_axes sa_annot in
       if sa_annot <> []
-         && not (Layout.Const.is_possibly_scannable jkind_without_sa.layout)
+         && not (Layout.Const.is_scannable_or_any jkind_without_sa.layout)
       then
         Location.prerr_warning jkind.pjkind_loc
           (Warnings.Ignored_kind_modifier
@@ -3887,11 +3888,10 @@ module Violation = struct
         else
           (* If the type on the left is known to be not scannable, there
              is no need to report the scannable axes on the right. *)
-          Layout { can_omit_right_sa = not (Layout.is_possibly_scannable l1) }
+          Layout { can_omit_right_sa = not (Layout.is_scannable_or_any l1) }
       | No_intersection (k1, _k2) ->
         Layout
-          { can_omit_right_sa =
-              not (Layout.is_possibly_scannable k1.jkind.layout)
+          { can_omit_right_sa = not (Layout.is_scannable_or_any k1.jkind.layout)
           }
     in
     let layout_or_kind =
@@ -3915,9 +3915,8 @@ module Violation = struct
        Specifically, the first mismatched axis should be reported as a reason,
        like "because it is not non_pointer" for a value vs immediate error. *)
     let format_layout_or_kind ppf jkind =
-      match mismatch_type with
-      | Layout { can_omit_right_sa = true }
-        when Layout.is_definitely_scannable jkind.jkind.layout ->
+      match mismatch_type, jkind.jkind.layout with
+      | Layout { can_omit_right_sa = true }, Sort (Base Scannable, _) ->
         fprintf ppf "%ta value layout" indent
       | _ -> format_full_layout_or_kind ppf jkind
     in

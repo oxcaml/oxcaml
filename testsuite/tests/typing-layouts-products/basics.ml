@@ -1106,6 +1106,9 @@ Line 3, characters 29-30:
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
+(* CR layouts-scannable: The printing of this kind could be improved, (e.g.
+   printing [immediate] instead of [value non_pointer] to better match the
+   annotation) but doing so may require care. *)
 type t : immediate & ((float64 mod global) & immediate)
 let f_external_kind_annot_mode_crosses_local_2
   : local_ t -> t = fun x -> x
