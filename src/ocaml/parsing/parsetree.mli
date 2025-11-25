@@ -201,6 +201,9 @@ and core_type_desc =
 
            - As the {{!value_description.pval_type}[pval_type]} field of a
            {!value_description}.
+
+           - As the {!core_type} of a
+           {{!function_param_desc.Pparam_val}[Pparam_val]}.
          *)
   | Ptyp_package of package_type  (** [(module S)]. *)
   | Ptyp_open of Longident.t loc * core_type (** [M.(T)] *)

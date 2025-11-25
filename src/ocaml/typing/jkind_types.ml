@@ -42,6 +42,7 @@ module Sort = struct
 
   and var =
     { mutable contents : t option;
+      mutable level : int;
       uid : int (* For debugging / printing only *)
     }
 
@@ -207,11 +208,13 @@ module Sort = struct
 
     let for_constructor = value
 
-    let for_module_field = value
-
     let for_boxed_variant = value
 
     let for_exception = value
+
+    let for_type_extension = value
+
+    let for_class = value
   end
 
   module Var = struct
@@ -275,7 +278,11 @@ module Sort = struct
   end
 
   (* To record changes to sorts, for use with `Types.{snapshot, backtrack}` *)
-  type change = var * t option
+  type sort_change =
+    | Ccontents of t option
+    | Clevel of int
+
+  type change = var * sort_change
 
   let change_log : (change -> unit) ref = ref (fun _ -> ())
 
@@ -283,12 +290,32 @@ module Sort = struct
 
   let log_change change = !change_log change
 
-  let undo_change (v, t_op) = v.contents <- t_op
+  let undo_change (v, ch) =
+    match ch with
+    | Ccontents t_op -> v.contents <- t_op
+    | Clevel level -> v.level <- level
+
+  let rec t_iter ~f = function
+    | Var v -> f v
+    | Base _ -> ()
+    | Product ts -> List.iter (fun t -> t_iter ~f t) ts
+
+  let update_level u v =
+    let new_level = min v.level u.level in
+    if v.level <> new_level
+    then (
+      log_change (v, Clevel v.level);
+      v.level <- new_level);
+    if u.level <> new_level
+    then (
+      log_change (u, Clevel u.level);
+      u.level <- new_level)
 
   let set : var -> t option -> unit =
    fun v t_op ->
-    log_change (v, v.contents);
-    v.contents <- t_op
+    log_change (v, Ccontents v.contents);
+    v.contents <- t_op;
+    Option.iter (t_iter ~f:(fun u -> update_level u v)) t_op
 
   module Static = struct
     (* Statically allocated values of various consts and sorts to save
@@ -442,9 +469,9 @@ module Sort = struct
 
   let last_var_uid = ref 0
 
-  let new_var () =
+  let new_var ~level =
     incr last_var_uid;
-    Var { contents = None; uid = !last_var_uid }
+    Var { contents = None; uid = !last_var_uid; level }
 
   let rec get : t -> t = function
     | Base _ as t -> t
@@ -599,8 +626,8 @@ module Sort = struct
       false
     | Product _ -> false
 
-  let decompose_into_product t n =
-    let ts = List.init n (fun _ -> new_var ()) in
+  let decompose_into_product ~level t n =
+    let ts = List.init n (fun _ -> new_var ~level) in
     if equate t (Product ts) then Some ts else None
 
   (*** pretty printing ***)
