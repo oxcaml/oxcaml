@@ -1135,6 +1135,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           C.join obj acc (zap_to_floor_morphvar obj mv ~commit:None))
         mvs a
 
+  let to_const_exn obj m =
+    let floor = get_floor obj m in
+    let ceil = get_ceil obj m in
+    if C.le obj ceil floor
+    then ceil
+    else
+      Misc.fatal_errorf "mode is not tight: floor = %a, ceil = %a" (C.print obj)
+        floor (C.print obj) ceil
+
   let print :
       type a l r.
       ?verbose:bool -> a C.obj -> Format.formatter -> (a, l * r) mode -> unit =

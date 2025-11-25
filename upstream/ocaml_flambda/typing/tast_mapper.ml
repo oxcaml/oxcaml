@@ -133,12 +133,18 @@ let module_substitution sub x =
 
 let include_kind sub = function
   | Tincl_structure -> Tincl_structure
-  | Tincl_functor ccs ->
-      Tincl_functor
-        (List.map (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) ccs)
-  | Tincl_gen_functor ccs ->
-      Tincl_gen_functor
-        (List.map (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) ccs)
+  | Tincl_functor { input_coercion; input_repr } ->
+      let input_coercion =
+        List.map
+          (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) input_coercion
+      in
+      Tincl_functor { input_coercion; input_repr }
+  | Tincl_gen_functor { input_coercion; input_repr } ->
+      let input_coercion =
+        List.map
+          (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) input_coercion
+      in
+      Tincl_gen_functor { input_coercion; input_repr }
 
 let str_include_infos sub x =
   let incl_loc = sub.location sub x.incl_loc in
@@ -789,12 +795,15 @@ let module_coercion sub = function
       Tcoerce_functor (sub.module_coercion sub c1, sub.module_coercion sub c2)
   | Tcoerce_alias (env, p, c1) ->
       Tcoerce_alias (sub.env sub env, p, sub.module_coercion sub c1)
-  | Tcoerce_structure (l1, l2) ->
-      let l1' = List.map (fun (i,c) -> i, sub.module_coercion sub c) l1 in
-      let l2' =
-        List.map (fun (id,i,c) -> id, i, sub.module_coercion sub c) l2
+  | Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list } ->
+      let pos_cc_list =
+        List.map
+          (fun (i,c) -> i, sub.module_coercion sub c) pos_cc_list
       in
-      Tcoerce_structure (l1', l2')
+      let id_pos_list =
+        List.map (fun (id,i,c) -> id, i, sub.module_coercion sub c) id_pos_list
+      in
+      Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
   | Tcoerce_primitive pc ->
       Tcoerce_primitive {pc with pc_loc = sub.location sub pc.pc_loc;
                                  pc_env = sub.env sub pc.pc_env}

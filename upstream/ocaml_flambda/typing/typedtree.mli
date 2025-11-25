@@ -862,8 +862,14 @@ and value_binding =
 
 and module_coercion =
     Tcoerce_none
-  | Tcoerce_structure of (int * module_coercion) list *
-                         (Ident.t * int * module_coercion) list
+  | Tcoerce_structure of
+      { input_repr : Types.module_representation
+      ; output_repr : Types.module_representation
+      ; pos_cc_list : (int * module_coercion) list
+      ; id_pos_list : (Ident.t * int * module_coercion) list
+      (* [pos] (the [int]s in [pos_cc_list] and [id_pos_list]) is an index into
+         the list of fields in the input module *)
+      }
   | Tcoerce_functor of module_coercion * module_coercion
   | Tcoerce_primitive of primitive_coercion
   (** External declaration coerced to a regular value.
@@ -974,6 +980,7 @@ and 'a open_infos =
     {
      open_expr: 'a;
      open_bound_items: Types.signature;
+     open_items_repr: Types.module_representation;
      open_override: override_flag;
      open_env: Env.t;
      open_loc: Location.t;
@@ -986,15 +993,26 @@ and open_declaration = module_expr open_infos
 
 and include_kind =
   | Tincl_structure
-  | Tincl_functor of (Ident.t * module_coercion) list
+  | Tincl_functor of
+      { input_coercion : (Ident.t * module_coercion) list
+      ; input_repr : Types.module_representation
+      }
       (* S1 -> S2 *)
-  | Tincl_gen_functor of (Ident.t * module_coercion) list
+      (* Since [Types.module_representation = Jkind.sort array], this could've
+         been [of { inputs : (Ident.t * module_coercion * Jkind.sort) list }],
+         but the way [input_coercion] and [input_repr] are used makes keeping
+         them separate more natural. *)
+  | Tincl_gen_functor of
+      { input_coercion : (Ident.t * module_coercion) list
+      ; input_repr : Types.module_representation
+      }
       (* S1 -> () -> S2 *)
 
 and 'a include_infos =
     {
      incl_mod: 'a;
      incl_type: Types.signature;
+     incl_repr: Types.module_representation;
      incl_loc: Location.t;
      incl_kind: include_kind;
      incl_attributes: attribute list;
@@ -1304,8 +1322,11 @@ val exists_general_pattern: pattern_predicate -> 'k general_pattern -> bool
 val exists_pattern: (pattern -> bool) -> pattern -> bool
 
 val let_bound_idents: value_binding list -> Ident.t list
+val let_bound_idents_with_sorts:
+    value_binding list -> (Ident.t * Jkind.Sort.t) list
 val let_bound_idents_full:
-    value_binding list -> (Ident.t * string loc * Types.type_expr * Uid.t) list
+    value_binding list ->
+    (Ident.t * string loc * Types.type_expr * Jkind.Sort.t * Uid.t) list
 
 (* [let_bound_idents_with_modes_sorts_and_checks] finds all the idents in the
    let bindings and computes their modes, sorts, and whether they have any check
