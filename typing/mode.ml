@@ -207,6 +207,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Function_return -> Function_return
          | Module_allocated_on_heap -> Module_allocated_on_heap
          | Is_used_in pp -> Is_used_in pp
+         | Always_dynamic x -> Always_dynamic x
+         | Branching -> Branching
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
         fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -224,6 +226,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Stack_expression -> Stack_expression
          | Module_allocated_on_heap -> Module_allocated_on_heap
          | Is_used_in pp -> Is_used_in pp
+         | Always_dynamic x -> Always_dynamic x
+         | Branching -> Branching
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
         fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -241,6 +245,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
          | Stack_expression -> Stack_expression
          | Module_allocated_on_heap -> Module_allocated_on_heap
          | Is_used_in pp -> Is_used_in pp
+         | Always_dynamic x -> Always_dynamic x
+         | Branching -> Branching
     end)
   end
 end
@@ -2070,6 +2076,12 @@ module Report = struct
     | Object -> Some (print_article_noun Vowel "object")
     | Loop -> Some (print_article_noun Consonant "loop")
     | Letop -> Some (print_article_noun Consonant "letop")
+    | Cases_result ->
+      Some
+        (fun ~definite ~capitalize ->
+          dprintf "%t of %t"
+            (print_article_noun ~definite:true ~capitalize Consonant "result")
+            (print_article_noun ~definite ~capitalize:false Consonant "cases"))
 
   let print_pinpoint : pinpoint -> _ =
    fun (loc, desc) ->
@@ -2138,6 +2150,10 @@ module Report = struct
       let print_pp = print_pinpoint pp |> Option.get in
       fprintf ppf "it is used in %t"
         (print_pp ~definite:false ~capitalize:false)
+    | Always_dynamic x ->
+      let s = match x with Application -> "function applications" in
+      fprintf ppf "%s are always dynamic" s
+    | Branching -> fprintf ppf "it is branched"
 
   let print_allocation_l : allocation -> formatter -> unit =
    fun { txt; loc } ->
@@ -3762,6 +3778,13 @@ module Value_with (Areality : Areality) = struct
   let min_with_comonadic ax m =
     let comonadic = Comonadic.min_with ax m in
     let monadic = Monadic.min |> Monadic.disallow_right |> Monadic.allow_left in
+    { comonadic; monadic }
+
+  let min_with_monadic ax m =
+    let monadic = Monadic.min_with ax m in
+    let comonadic =
+      Comonadic.min |> Comonadic.disallow_right |> Comonadic.allow_left
+    in
     { comonadic; monadic }
 
   let join_with ax c { monadic; comonadic } =
