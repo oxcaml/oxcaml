@@ -284,12 +284,15 @@ end = struct
 
   let check ~hidden t =
     hidden = t.hidden && Directory_content_cache.check t.path
+<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
 
   let create ~hidden path =
     let files = Array.to_list (Directory_content_cache.read path)
       |> List.map (fun basename -> { basename; path = Filename.concat path basename }) in
     { path; files; hidden }
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
+end
+
+type visibility = Visible | Hidden
 ||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
 
   let create ~hidden path =
@@ -339,9 +342,6 @@ end
 
 type visibility = Visible | Hidden
 >>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
-end
-
-type visibility = Visible | Hidden
 
 (** Stores cached paths to files *)
 module Path_cache : sig
@@ -488,43 +488,12 @@ let init_manifests () =
     !Clflags.hidden_include_manifests
 
 let init ~auto_include ~visible ~hidden =
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
   assert (not Config.merlin || Local_store.is_bound ());
   let rec loop_changed ~hidden acc = function
     | [] -> Some acc
     | new_path :: new_rest ->
       loop_changed ~hidden (Dir.create new_path ~hidden :: acc) new_rest
   in
-||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
-  reset ();
-  visible_dirs := List.rev_map (Dir.create ~hidden:false) visible;
-  hidden_dirs := List.rev_map (Dir.create ~hidden:true) hidden;
-  List.iter (fun path_list_file ->
-    visible_dirs :=
-      Dir.create_from_path_list_file ~hidden:false ~path_list_file ::
-        !visible_dirs;
-  ) !Clflags.include_paths_files;
-  List.iter (fun path_list_file ->
-    hidden_dirs :=
-      Dir.create_from_path_list_file ~hidden:true ~path_list_file ::
-        !hidden_dirs;
-  ) !Clflags.hidden_include_paths_files;
-  List.iter Path_cache.prepend_add !hidden_dirs;
-  List.iter Path_cache.prepend_add !visible_dirs;
-  auto_include_callback := auto_include
-
-let remove_dir dir =
-=======
-  reset ();
-  visible_dirs := List.rev_map (Dir.create ~hidden:false) visible;
-  hidden_dirs := List.rev_map (Dir.create ~hidden:true) hidden;
-  List.iter Path_cache.prepend_add !hidden_dirs;
-  List.iter Path_cache.prepend_add !visible_dirs;
-  init_manifests ();
-  auto_include_callback := auto_include
-
-let remove_dir dir =
->>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
   let rec loop_unchanged ~hidden acc new_paths old_dirs =
     match new_paths, old_dirs with
     | [], [] -> None
@@ -558,6 +527,7 @@ let remove_dir dir =
   match update with
   | None -> ()
   | Some (new_visible, new_hidden) ->
+<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
     reset ();
     visible_dirs := new_visible;
     hidden_dirs := new_hidden;
@@ -566,6 +536,36 @@ let remove_dir dir =
     auto_include_callback := auto_include
 
 let remove_dir dir =
+||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
+  reset ();
+  visible_dirs := List.rev_map (Dir.create ~hidden:false) visible;
+  hidden_dirs := List.rev_map (Dir.create ~hidden:true) hidden;
+  List.iter (fun path_list_file ->
+    visible_dirs :=
+      Dir.create_from_path_list_file ~hidden:false ~path_list_file ::
+        !visible_dirs;
+  ) !Clflags.include_paths_files;
+  List.iter (fun path_list_file ->
+    hidden_dirs :=
+      Dir.create_from_path_list_file ~hidden:true ~path_list_file ::
+        !hidden_dirs;
+  ) !Clflags.hidden_include_paths_files;
+  List.iter Path_cache.prepend_add !hidden_dirs;
+  List.iter Path_cache.prepend_add !visible_dirs;
+  auto_include_callback := auto_include
+
+let remove_dir dir =
+=======
+  reset ();
+  visible_dirs := List.rev_map (Dir.create ~hidden:false) visible;
+  hidden_dirs := List.rev_map (Dir.create ~hidden:true) hidden;
+  List.iter Path_cache.prepend_add !hidden_dirs;
+  List.iter Path_cache.prepend_add !visible_dirs;
+  init_manifests ();
+  auto_include_callback := auto_include
+
+let remove_dir dir =
+>>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
   assert (not Config.merlin || Local_store.is_bound ());
   let visible = List.filter (fun d -> Dir.path d <> dir) !visible_dirs in
   let hidden = List.filter (fun d -> Dir.path d <> dir) !hidden_dirs in

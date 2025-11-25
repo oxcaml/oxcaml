@@ -2667,16 +2667,8 @@ let constrain_type_jkind ~fixed env ty jkind =
              let num_components = List.length tys in
              let recur ty's_jkinds jkinds =
                let results =
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
-                 Misc_stdlib.List.map3
-                   (fun { ty; is_open = _; modality } ty's_jkind jkind ->
-||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
-                 Misc.Stdlib.List.map3
-                   (fun { ty; is_open = _; modality } ty's_jkind jkind ->
-=======
                  Misc.Stdlib.List.map3
                    (fun { ty; modality } ty's_jkind jkind ->
->>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
                       let jkind =
                         Jkind.apply_modality_r modality jkind
                       in

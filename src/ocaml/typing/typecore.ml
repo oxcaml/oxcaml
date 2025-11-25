@@ -809,20 +809,8 @@ let submode ~loc ~env ?(reason = Other) mode expected_mode =
   match res with
   | Ok () -> ()
   | Error failure_reason ->
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
-      let err =
-        Submode_failed(failure_reason, reason, shared_context)
-      in
-      raise (error(loc, env, err))
-||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
-      let error =
-        Submode_failed(failure_reason, reason, shared_context)
-      in
-      raise (Error(loc, env, error))
-=======
       let error = Submode_failed(failure_reason, reason) in
-      raise (Error(loc, env, error))
->>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
+      raise (error(loc, env, error))
 
 let escape ~loc ~env ~reason m =
   submode ~loc ~env ~reason m mode_legacy
@@ -3253,13 +3241,6 @@ and type_pat_aux
         type_pat tps category p expected_ty
           Jkind.Sort.(of_const Const.for_predef_value)
         (* TODO: record 'extra' to remember about interval *)
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
-  | Ppat_interval _ ->
-      raise (error (loc, !!penv, Invalid_interval))
-||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
-  | Ppat_interval _ ->
-      raise (Error (loc, !!penv, Invalid_interval))
-=======
       in
       begin match
         constant_or_raise !!penv loc l, constant_or_raise !!penv loc r
@@ -3271,9 +3252,8 @@ and type_pat_aux
         expand_interval (Char.code c1) (Char.code c2)
           ~make:(fun i -> Pconst_untagged_char (Char.chr i))
       | _ ->
-        raise (Error (loc, !!penv, Invalid_interval))
+        raise (error (loc, !!penv, Invalid_interval))
       end
->>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
   | Ppat_tuple (spl, closed) ->
       type_tuple_pat spl closed
   | Ppat_unboxed_tuple (spl, oc) ->

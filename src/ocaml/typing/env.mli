@@ -724,17 +724,9 @@ type address_head =
 
 val address_head : address -> address_head
 
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
-val sharedness_hint : Format.formatter -> shared_context -> unit
+val print_stage : Format.formatter -> stage -> unit
 
 val unbound_class : Path.t
-||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
-val sharedness_hint : Format.formatter -> shared_context -> unit
-
-val print_stage : Format.formatter -> stage -> unit
-=======
-val print_stage : Format.formatter -> stage -> unit
->>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
 
 (** merlin: manage internal state *)
 
@@ -757,8 +749,6 @@ type 'acc fold_all_labels_f = {
   fold_all_labels_f : 'rcd. 'rcd record_form -> 'rcd gen_label_description -> 'acc -> 'acc
 }
 val fold_all_labels: 'a fold_all_labels_f -> Longident.t option -> t -> 'a -> 'a
-
-val print_stage : Format.formatter -> stage -> unit
 
 val print_with_quote_promote :
   Format.formatter -> (string * stage * stage) -> unit

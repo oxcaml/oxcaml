@@ -3629,16 +3629,10 @@ let walk_locks ~errors ~env ~loc ~item ~lid mode ty locks =
           unboxed_type ~errors ~env ~loc ~lid ty;
           vmode
       | Quotation_lock | Splice_lock -> vmode
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
       with exn ->
         !msupport_raise_error exn;
         vmode
-    ) vmode locks
-||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
-    ) vmode locks
-=======
     ) mode locks
->>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
   and [locks] which is the locks between the declaration and the usage (either

@@ -1283,17 +1283,9 @@ The precedences must be listed from low to high.
 %nonassoc BACKQUOTE BANG BEGIN CHAR HASH_CHAR FALSE FLOAT HASH_FLOAT
           INT HASH_INT OBJECT
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
-          NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR UNDERSCORE
-          LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN
-          DOTLESS DOTTILDE GREATERDOT
-||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
-          NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
-          LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN
-=======
           NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
           LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN UNDERSCORE
->>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
+          DOTLESS DOTTILDE GREATERDOT
 
 /* Entry points */
 
@@ -2995,18 +2987,6 @@ fun_:
     { mk_indexop_expr user_indexing_operators ~loc:$sloc $1 }
   | fun_expr attribute
       { Exp.attr $1 $2 }
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
-  (* Merlin-only: this is commented out because we already accept UNDERSCORE in this
-     position via the simple_expr -> simple_expr_ rules (in order to support typed holes) *)
-  (*
-  | UNDERSCORE
-    { mkexp ~loc:$sloc Pexp_hole }
-  *)
-||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
-  | UNDERSCORE
-    { mkexp ~loc:$sloc Pexp_hole }
-=======
->>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
   | mode=mode_legacy exp=seq_expr
      { mkexp_constraint ~loc:$sloc ~exp ~cty:None ~modes:[mode] }
   | EXCLAVE seq_expr
@@ -3331,8 +3311,6 @@ block_access:
       { mkinfix $1 $2 $3 }
   | extension
       { Pexp_extension $1 }
-  | UNDERSCORE
-      { Pexp_hole }
   | od=open_dot_declaration DOT mkrhs(LPAREN RPAREN {Lident "()"})
       { Pexp_open(od, mkexp ~loc:($loc($3)) (Pexp_construct($3, None))) }
   (*
@@ -3404,13 +3382,9 @@ block_access:
   /* BEGIN AVOID */
   | LESSLBRACKET seq_expr error
       { unclosed "<[" $loc($1) "]>" $loc($3) }
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
   /* END AVOID */
-||||||| oxcaml/oxcaml:05b98d54a75966bf39540157c8bd1f7281a39e57
-=======
   | UNDERSCORE
       { Pexp_hole }
->>>>>>> oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
 ;
 labeled_simple_expr:
     simple_expr %prec below_HASH
