@@ -163,7 +163,7 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
         then Misc.fatal_error "No_free_register should have been raised earlier"
         else if available.(idx)
         then (
-          reg.loc <- Reg (first_available + idx);
+          Reg.set_loc reg (Reg (first_available + idx));
           Interval.DLL.insert_sorted intervals.active_dll interval;
           if debug
           then (
@@ -194,7 +194,7 @@ let allocate_blocked_register : State.t -> Interval.t -> spilling_reg =
             || DLL.exists ~f:chk intervals.inactive_dll)
     then (
       (match hd.reg.loc with Reg _ -> () | Stack _ | Unknown -> assert false);
-      interval.reg.loc <- hd.reg.loc;
+      Reg.set_loc interval.reg hd.reg.loc;
       DLL.delete_curr hd_cell;
       Interval.DLL.insert_sorted intervals.active_dll interval;
       allocate_stack_slot hd.reg)
@@ -203,7 +203,9 @@ let allocate_blocked_register : State.t -> Interval.t -> spilling_reg =
 
 let reg_reinit () =
   List.iter (Reg.all_relocatable_regs ()) ~f:(fun (reg : Reg.t) ->
-      match reg.loc with Reg _ -> reg.loc <- Unknown | Unknown | Stack _ -> ())
+      match reg.loc with
+      | Reg _ -> Reg.set_loc reg Unknown
+      | Unknown | Stack _ -> ())
 
 (* CR xclerc for xclerc: could probably be lower; the compiler distribution
    seems to be fine with 3 *)

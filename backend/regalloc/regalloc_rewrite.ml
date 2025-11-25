@@ -153,7 +153,7 @@ let rewrite_gen :
         let slot =
           Regalloc_stack_slots.get_or_create (State.stack_slots state) reg
         in
-        spilled.Reg.loc <- Reg.(Stack (Local slot));
+        Reg.set_loc spilled Reg.(Stack (Local slot));
         if debug
         then Utils.log "spilling %a to %a" Printreg.reg reg Printreg.reg spilled;
         Reg.Tbl.replace spilled_map reg spilled;
