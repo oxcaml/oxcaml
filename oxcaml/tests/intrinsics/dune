@@ -137,4 +137,4 @@
  (action
   (with-stdout-to
    flags.sexp
-   (echo "()"))))
+   (echo "(-march=armv8-a+crc)"))))
