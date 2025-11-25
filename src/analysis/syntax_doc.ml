@@ -225,9 +225,12 @@ let get_mode_doc mode =
       Some "The mutable parts of values with this mode can be fully accessed"
     | Comonadic Portability, Nonportable ->
       Some
-        "Values with this mode cannot be sent to other threads, in order to \
-         avoid data races."
-    | Comonadic Portability, Shareable -> Some "todo"
+        "Values with this mode cannot be sent to or shared with other threads, \
+         in order to avoid data races."
+    | Comonadic Portability, Shareable ->
+      Some
+        "Values with this mode can be shared with (but not sent to) other \
+         threads without causing data races"
     | Comonadic Portability, Portable ->
       Some
         "Values with this mode can be sent to other threads without causing \
