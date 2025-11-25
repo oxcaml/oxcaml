@@ -1288,4 +1288,3 @@ val on_backtrack: (unit -> unit) -> unit
    Used to estimate the "cost" of unification. *)
 val linked_variables: unit -> int
 
-val unpack_functor : module_type -> functor_parameter * module_type

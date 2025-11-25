@@ -4625,7 +4625,7 @@ let find_all_simple_list proj1 proj2 f lid env acc =
           acc
       end
 
-let fold_modules f lid env acc =
+let fold_modules_lazy f lid env acc =
   match lid with
   | None ->
       IdTbl.fold_name wrap_module
@@ -4633,10 +4633,7 @@ let fold_modules f lid env acc =
            match entry with
            | Mod_unbound _ -> acc
            | Mod_local (mda, _) ->
-               let md =
-                 Subst.Lazy.force_module_decl mda.mda_declaration
-               in
-               f name p md acc
+               f name p mda.mda_declaration acc
            | Mod_persistent ->
                (* CR lmaurer: Setting instance args to [] here isn't right. We
                   really should have [IdTbl.fold_name] provide the whole ident
@@ -4647,10 +4644,7 @@ let fold_modules f lid env acc =
                match Persistent_env.find_in_cache !persistent_env modname with
                | None -> acc
                | Some mda ->
-                   let md =
-                     Subst.Lazy.force_module_decl mda.mda_declaration
-                   in
-                   f name p md acc)
+                   f name p mda.mda_declaration acc)
         env.modules
         acc
   | Some l ->
@@ -4662,15 +4656,19 @@ let fold_modules f lid env acc =
       | Structure_comps c ->
           NameMap.fold
             (fun s mda acc ->
-               let md =
-                 Subst.Lazy.force_module_decl mda.mda_declaration
-               in
-               f s (Pdot (p, s)) md acc)
+               f s (Pdot (p, s)) mda.mda_declaration acc)
             c.comp_modules
             acc
       | Functor_comps _ ->
           acc
       end
+
+let fold_modules f lid env acc =
+  fold_modules_lazy
+    (fun name path md acc ->
+      let md = Subst.Lazy.force_module_decl md in
+      f name path md acc)
+    lid env acc
 
 let fold_values f =
   find_all wrap_value (fun env -> env.values) (fun sc -> sc.comp_values)
@@ -4693,8 +4691,8 @@ and fold_types f =
   find_all wrap_identity
     (fun env -> env.types) (fun sc -> sc.comp_types)
     (fun k p tda acc -> f k p tda.tda_declaration acc)
-and fold_modtypes f =
-  let f l path data acc = f l path (Subst.Lazy.force_modtype_decl data) acc in
+and fold_modtypes_lazy f =
+  let f l path data acc = f l path data acc in
   find_all wrap_identity
     (fun env -> env.modtypes) (fun sc -> sc.comp_modtypes)
     (fun k p mta acc -> f k p mta.mtda_declaration acc)
@@ -4705,6 +4703,9 @@ and fold_cltypes f =
   find_all wrap_identity
     (fun env -> env.cltypes) (fun sc -> sc.comp_cltypes)
     (fun k p cltda acc -> f k p cltda.cltda_declaration acc)
+
+let fold_modtypes f =
+  fold_modtypes_lazy (fun k p mdty acc -> f k p (Subst.Lazy.force_modtype_decl mdty) acc)
 
 let filter_non_loaded_persistent f env =
   let to_remove =

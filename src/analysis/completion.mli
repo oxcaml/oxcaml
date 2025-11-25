@@ -32,8 +32,8 @@ open Query_protocol
 
 type raw_info =
   [ `Constructor of Types.constructor_description
-  | `Modtype of Types.module_type
-  | `Modtype_declaration of Ident.t * Types.modtype_declaration
+  | `Modtype of Subst.Lazy.module_type
+  | `Modtype_declaration of Ident.t * Subst.Lazy.modtype_declaration
   | `None
   | `String of string
   | `Type_declaration of Ident.t * Types.type_declaration

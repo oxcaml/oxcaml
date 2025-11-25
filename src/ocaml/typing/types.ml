@@ -1914,7 +1914,3 @@ let is_valid (changes, _old) =
 
 let on_backtrack f =
   log_change (Cfun f)
-
-let unpack_functor = function
-  | Mty_functor (fp, mty) -> fp, mty
-  | _ -> invalid_arg "Types.unpack_functor (merlin)"

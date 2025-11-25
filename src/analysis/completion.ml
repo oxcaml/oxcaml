@@ -37,8 +37,8 @@ let { Logger.log } = Logger.for_section "Completion"
 
 type raw_info =
   [ `Constructor of Types.constructor_description
-  | `Modtype of Types.module_type
-  | `Modtype_declaration of Ident.t * Types.modtype_declaration
+  | `Modtype of Subst.Lazy.module_type
+  | `Modtype_declaration of Ident.t * Subst.Lazy.modtype_declaration
   | `None
   | `String of string
   | `Type_declaration of Ident.t * Types.type_declaration
@@ -47,8 +47,11 @@ type raw_info =
 
 let raw_info_printer : raw_info -> _ = function
   | `Constructor c -> `Print (Out_type (Browse_misc.print_constructor c))
-  | `Modtype mt -> `Print (Out_module_type (Printtyp.tree_of_modtype mt))
+  | `Modtype mt ->
+    let mt = Subst.Lazy.force_modtype mt in
+    `Print (Out_module_type (Printtyp.tree_of_modtype mt))
   | `Modtype_declaration (id, mtd) ->
+    let mtd = Subst.Lazy.force_modtype_decl mtd in
     `Print (Out_sig_item (Printtyp.tree_of_modtype_declaration id mtd))
   | `None -> `String ""
   | `String s -> `String s
@@ -315,8 +318,8 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
   let val_attributes v = v.Subst.Lazy.val_attributes in
   let type_attributes t = t.Types.type_attributes in
   let lbl_attributes l = l.Types.lbl_attributes in
-  let mtd_attributes t = t.Types.mtd_attributes in
-  let md_attributes t = t.Types.md_attributes in
+  let mtd_attributes t = t.Subst.Lazy.mtd_attributes in
+  let md_attributes t = t.Subst.Lazy.md_attributes in
   let make_candidate ~attrs ~exact name ?loc ?path ty =
     make_candidate ~get_doc ~prefix_path ~attrs ~exact name ?loc ?path ty
   in
@@ -459,10 +462,10 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
               :: candidates)
           prefix_path env []
       | `Modules ->
-        Env.fold_modules
+        Env.fold_modules_lazy
           (fun name path v candidates ->
             let attrs = md_attributes v in
-            let v = v.Types.md_type in
+            let v = v.Subst.Lazy.md_type in
             if not @@ validate `Uident `Mod name then candidates
             else
               make_weighted_candidate ~exact:(name = prefix) name ~path (`Mod v)
@@ -470,7 +473,7 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
               :: candidates)
           prefix_path env []
       | `Modules_type ->
-        Env.fold_modtypes
+        Env.fold_modtypes_lazy
           (fun name path v candidates ->
             if not @@ validate `Uident `Mod name then candidates
             else
@@ -683,7 +686,7 @@ let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
   with Not_found -> []
 
 (* Propose completion from a particular node *)
-let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix =
+let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix : _ -> raw_info raw_entry list =
   function
   | [] -> []
   | (env, node) :: branch -> (

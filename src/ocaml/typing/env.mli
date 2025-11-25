@@ -752,3 +752,10 @@ val fold_all_labels: 'a fold_all_labels_f -> Longident.t option -> t -> 'a -> 'a
 
 val print_with_quote_promote :
   Format.formatter -> (string * stage * stage) -> unit
+
+val fold_modules_lazy:
+  (string -> Path.t -> Subst.Lazy.module_declaration -> 'a -> 'a) ->
+  Longident.t option -> t -> 'a -> 'a
+val fold_modtypes_lazy:
+  (string -> Path.t -> Subst.Lazy.modtype_declaration -> 'a -> 'a) ->
+  Longident.t option -> t -> 'a -> 'a

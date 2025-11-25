@@ -1393,16 +1393,6 @@ let mode_without_locks_exn = function
 
 (* Merlin specific *)
 
-let unpack_functor_me me =
-  match me.mod_desc with
-  | Tmod_functor (fp, mty) -> fp, mty
-  | _ -> invalid_arg "Typedtree.unpack_functor_me (merlin)"
-
-let unpack_functor_mty mty =
-  match mty.mty_desc with
-  | Tmty_functor (fp, mty) -> fp, mty
-  | _ -> invalid_arg "Typedtree.unpack_functor_mty (merlin)"
-
 let rec fold_antiquote_exp f  acc exp =
   match exp.exp_desc with
   | Texp_ident _ | Texp_constant _ -> acc

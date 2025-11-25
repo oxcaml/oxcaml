@@ -59,8 +59,8 @@ let parse_longident lid =
   with Parser_raw.Error -> None
 
 let lookup_module name env =
-  let path, md = Env.find_module_by_name name env in
-  (path, md.Types.md_type, md.Types.md_attributes)
+  let path, md = Env.find_module_by_name_lazy name env in
+  (path, md.md_type, md.md_attributes)
 
 let verbosity = ref Verbosity.default
 
@@ -155,22 +155,22 @@ module Printtyp = struct
     let_ref verbosity v (fun () -> wrap_printing_env env f)
 end
 
-let si_modtype_opt = function
-  | Types.Sig_modtype (_, m, _) -> m.mtd_type
-  | Types.Sig_module (_, _, m, _, _) -> Some m.md_type
+let si_modtype_opt : Subst.Lazy.signature_item -> _ = function
+  | Sig_modtype (_, m, _) -> m.mtd_type
+  | Sig_module (_, _, m, _, _) -> Some m.md_type
   | _ -> None
 
 (* Check if module is smaller (= has less definition, counting nested ones)
  * than a particular threshold. Return (Some n) if module has size n, or None
  * otherwise (module is bigger than threshold).
  * Used to skip printing big modules in completion. *)
-let rec mod_smallerthan n m =
+let rec mod_smallerthan n (m : Subst.Lazy.module_type) =
   if n < 0 then None
   else
-    let open Types in
     match m with
     | Mty_ident _ -> Some 1
     | Mty_signature s -> begin
+      let s = Subst.Lazy.force_signature_once s in
       match List.length_lessthan n s with
       | None -> None
       | Some _ ->
@@ -190,17 +190,15 @@ let rec mod_smallerthan n m =
                 | Some n', _ -> Some (succ n')
             end
     end
-    | Mty_functor _ ->
-      let m1, m2 = unpack_functor m in
-      begin
-        match (mod_smallerthan n m2, m1) with
-        | None, _ -> None
-        | result, Unit -> result
-        | Some n1, Named (_, mt) -> (
-          match mod_smallerthan (n - n1) mt with
-          | None -> None
-          | Some n2 -> Some (n1 + n2))
-      end
+    | Mty_functor (m1, m2) -> begin
+      match (mod_smallerthan n m2, m1) with
+      | None, _ -> None
+      | result, Unit -> result
+      | Some n1, Named (_, mt) -> (
+        match mod_smallerthan (n - n1) mt with
+        | None -> None
+        | Some n2 -> Some (n1 + n2))
+    end
     | _ -> Some 1
 
 let print_short_modtype verbosity env ppf md =
@@ -209,7 +207,9 @@ let print_short_modtype verbosity env ppf md =
   match mod_smallerthan 1000 md with
   | None when verbosity = 0 ->
     Format.pp_print_string ppf "(* large signature, repeat to confirm *)"
-  | _ -> Printtyp.modtype env ppf md
+  | _ ->
+    let md = Subst.Lazy.force_modtype md in
+    Printtyp.modtype env ppf md
 
 let print_type_with_decl ~verbosity env ppf typ =
   match verbosity with
@@ -260,13 +260,13 @@ let print_type ppf verbosity env lid =
     end
 
 let print_modtype ppf verbosity env lid =
-  let _p, mtd = Env.find_modtype_by_name lid.Asttypes.txt env in
+  let _p, mtd = Env.find_modtype_by_name_lazy lid.Asttypes.txt env in
   match mtd.mtd_type with
   | Some mt -> print_short_modtype verbosity env ppf mt
   | None -> Format.pp_print_string ppf "(* abstract module *)"
 
 let print_modpath ppf verbosity env lid =
-  let _path, md = Env.find_module_by_name lid.Asttypes.txt env in
+  let _path, md = Env.find_module_by_name_lazy lid.Asttypes.txt env in
   print_short_modtype verbosity env ppf md.md_type
 
 let print_cstr_desc ppf cstr_desc =
