@@ -331,8 +331,8 @@ let deep_copy () =
     try TypeHash.find table ty
     with Not_found ->
       let ty' =
-        let {Types. level; id; desc; scope} = Transient_expr.repr ty in
-        create_expr ~level ~id ~scope desc
+        let {Types. level; id; desc; scope = _ } as ty = Transient_expr.repr ty in
+        create_expr ~level ~id ~scope:(Transient_expr.get_scope ty) desc
       in
       TypeHash.add table ty ty';
       let desc =
@@ -809,8 +809,8 @@ let submode ~loc ~env ?(reason = Other) mode expected_mode =
   match res with
   | Ok () -> ()
   | Error failure_reason ->
-      let error = Submode_failed(failure_reason, reason) in
-      raise (error(loc, env, error))
+      let err = Submode_failed(failure_reason, reason) in
+      raise (error(loc, env, err))
 
 let escape ~loc ~env ~reason m =
   submode ~loc ~env ~reason m mode_legacy
@@ -5853,7 +5853,7 @@ let create_merlin_type_error_node loc env ty_expected ~attributes =
             Location.mkloc (Longident.Lident "*type-error*") loc,
             { Types.
               val_type = ty_expected;
-              val_kind = Val_reg;
+              val_kind = Val_reg (Jkind.Sort.new_var ~level:(Ctype.get_current_level ()));
               val_loc = loc;
               val_attributes = [];
               val_uid = Uid.internal_not_actually_unique;
@@ -8277,7 +8277,9 @@ and type_function
       Msupport.erroneous_type_register ty_expected;
       raise_error exn;
       set_levels saved;
-      let fun_ty = newvar (Jkind.of_new_sort ~why:Merlin) in
+      let fun_ty =
+        newvar (Jkind.of_new_sort ~why:Merlin ~level:(Ctype.get_current_level ()))
+      in
       let fun_body =
         Tfunction_body
           (create_merlin_type_error_node loc env ty_expected
@@ -8285,7 +8287,7 @@ and type_function
       in
       let ret_info =
         { ret_mode = Alloc.newvar ();
-          ret_sort = Jkind.Sort.new_var ();
+          ret_sort = Jkind.Sort.new_var ~level:(Ctype.get_current_level ());
         }
       in
       { function_ = fun_ty, [], fun_body;
@@ -8350,7 +8352,9 @@ and type_function_
                 let ret_mode, ret_sort =
                   match ret_info with
                   | Some { ret_mode; ret_sort } -> ret_mode, ret_sort
-                  | None -> Alloc.newvar (), Jkind.Sort.new_var ()
+                  | None ->
+                    (Alloc.newvar (),
+                     Jkind.Sort.new_var ~level:(Ctype.get_current_level ()))
                 in
                 let alloc_mode = Alloc.disallow_left @@
                   match fun_alloc_mode with
@@ -8750,7 +8754,7 @@ and type_label_access
   with exn ->
     raise_error exn;
     let arg_kind, _ =
-      Jkind.of_new_sort_var ~why:Record_projection
+      Jkind.of_new_sort_var ~why:Record_projection ~level:(Ctype.get_current_level ())
     in
     let make_fake_label (type rep) (record_form : rep record_form) : rep gen_label_description =
       {

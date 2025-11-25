@@ -16,7 +16,11 @@
 open Allowance
 open Solver_intf
 
-module Misc = Misc_stdlib
+module Misc = struct
+  include Misc
+  module Stdlib = Misc_stdlib
+  include Misc_stdlib
+end
 
 module Magic_equal (X : Equal) :
   Equal with type ('a, 'b, 'c) t = ('a, 'b, 'c) X.t = struct

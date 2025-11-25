@@ -517,7 +517,10 @@ module Gen = struct
               let arg, name = make_arg env label tyleft in
               let value_description =
                 { val_type = tyleft;
-                  val_kind = Val_reg;
+                  val_kind =
+                    (* CR-someday: this sort should be based on the jkind of [tyleft]. But
+                       this isn't important since this value is just used for printing. *)
+                    Val_reg (Base Value);
                   val_loc = Location.none;
                   val_attributes = [];
                   val_zero_alloc = Zero_alloc.default;
