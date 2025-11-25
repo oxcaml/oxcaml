@@ -16,9 +16,6 @@ type 'a t =
     b : int list list list list list list list list list list list list list @@ portable
   }
 let require_portable (_ : (_ : value mod portable)) = ()
-(* Accepting this line requires at least 2 fuel, which is less than normal but
-   more than we use if we ran out previously. *)
-let f (t : int list list list t) = require_portable t
 [%%expect {|
 type 'a t = {
   a : 'a;
@@ -26,8 +23,13 @@ type 'a t = {
     portable;
 }
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>
-Line 8, characters 52-53:
-8 | let f (t : int list list list t) = require_portable t
+|}]
+(* Accepting this line requires at least 2 fuel, which is less than normal but
+   more than we use if we ran out previously. *)
+let f (t : int list list list t) = require_portable t
+[%%expect {|
+Line 1, characters 52-53:
+1 | let f (t : int list list list t) = require_portable t
                                                         ^
 Error: This expression has type "int list list list t"
        but an expression was expected of type "('a : value mod portable)"
@@ -57,12 +59,14 @@ Error: This expression has type "int list list list t"
 
 type 'a t = 'a Foo.t
 let require_portable (_ : (_ : value mod portable)) = ()
-let f (t : int list list list Foo.t) = require_portable t
 [%%expect {|
 type 'a t = 'a Foo.t
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>
-Line 3, characters 56-57:
-3 | let f (t : int list list list Foo.t) = require_portable t
+|}]
+let f (t : int list list list Foo.t) = require_portable t
+[%%expect {|
+Line 1, characters 56-57:
+1 | let f (t : int list list list Foo.t) = require_portable t
                                                             ^
 Error: This expression has type "int list list list Foo.t"
        but an expression was expected of type "('a : value mod portable)"

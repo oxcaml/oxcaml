@@ -922,6 +922,12 @@ module Layout_and_axes = struct
               }  (** continue, with a new [t] *)
 
         let initial_fuel_per_ty =
+          (* Optimization: If we ran out of fuel while normalizing this jkind
+             before, chances are we will again. So we reduce fuel to reduce work
+             in this case. (We still use a little bit of fuel because a
+             substitution may have enabled us to now terminate significantly
+             faster.) In practice, this doesn't seem to make us reject any
+             programs we care about. *)
           match previously_ran_out_of_fuel with false -> 10 | true -> 1
 
         let starting =
