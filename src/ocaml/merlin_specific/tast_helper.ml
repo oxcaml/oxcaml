@@ -21,7 +21,9 @@ module Pat = struct
       | None -> str.Asttypes.loc
       | Some loc -> loc
     in
-    let sort = Jkind.Sort.new_var () in
+    (* The level we use here isn't important - the constructed type is just used for
+       printing and is never unified. *)
+    let sort = Jkind.Sort.new_var ~level:(Ctype.get_current_level ()) in
     let mode = Mode.Value.newvar () in
     let pat_desc =
       Tpat_var (Ident.create_local str.Asttypes.txt, str, uid, sort, mode)

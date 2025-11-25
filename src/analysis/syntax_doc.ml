@@ -227,6 +227,7 @@ let get_mode_doc mode =
       Some
         "Values with this mode cannot be sent to other threads, in order to \
          avoid data races."
+    | Comonadic Portability, Shareable -> Some "todo"
     | Comonadic Portability, Portable ->
       Some
         "Values with this mode can be sent to other threads without causing \
@@ -263,6 +264,8 @@ let get_mode_doc mode =
       Some "Functions with this mode may be executed concurrently."
     | Comonadic Forkable, Unforkable ->
       Some "Functions with this mode cannot be executed concurrently."
+    | Monadic Staticity, Static -> Some "todo"
+    | Monadic Staticity, Dynamic -> Some "todo"
   in
   let doc_url =
     let subpage =
@@ -276,6 +279,7 @@ let get_mode_doc mode =
       | Monadic Visibility -> "modes/intro/"
       | Comonadic Statefulness -> "modes/intro/"
       | Comonadic Forkable -> "modes/intro/"
+      | Monadic Staticity -> "modes/intro/"
     in
     syntax_doc_url Oxcaml subpage
   in
