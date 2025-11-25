@@ -3329,12 +3329,18 @@ let fixpoint (graph : Global_flow_graph.graph) =
            Format.fprintf ff "[from %a]%a" Code_id_or_name.print alloc_point
              pp_changed_representation repr))
       !changed_representation;
-  let no_unbox = Sys.getenv_opt "NOUNBOX" <> None in
-  { db;
-    unboxed_fields = (if no_unbox then Code_id_or_name.Map.empty else unboxed);
-    changed_representation =
-      (if no_unbox then Code_id_or_name.Map.empty else !changed_representation)
-  }
+  if Flambda_features.reaper_unbox ()
+     && Flambda_features.reaper_change_calling_conventions ()
+  then
+    { db;
+      unboxed_fields = unboxed;
+      changed_representation = !changed_representation
+    }
+  else
+    { db;
+      unboxed_fields = Code_id_or_name.Map.empty;
+      changed_representation = Code_id_or_name.Map.empty
+    }
 
 let print_color { db; unboxed_fields; changed_representation } v =
   let red =
@@ -3377,7 +3383,8 @@ let cannot_change_calling_convention_query =
   [cannot_change_calling_convention x]
 
 let cannot_change_calling_convention uses v =
-  (not (Compilation_unit.is_current (Code_id.get_compilation_unit v)))
+  (not (Flambda_features.reaper_change_calling_conventions ()))
+  || (not (Compilation_unit.is_current (Code_id.get_compilation_unit v)))
   || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
 
 let unknown_code_id_actually_directly_called_query =

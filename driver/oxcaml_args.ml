@@ -537,6 +537,49 @@ let mk_reaper_preserve_direct_calls f =
       \       \"zero-alloc\": preserve direct calls only in zero-alloc checked \
        functions." )
 
+let mk_reaper_local_fields f =
+  ( "-reaper-local-fields",
+    Arg.Unit f,
+    Printf.sprintf " Enable local field handing in the reaper%s (Flambda2 only)"
+      (format_default Flambda2.Default.reaper_local_fields) )
+
+let mk_no_reaper_local_fields f =
+  ( "-no-reaper-local-fields",
+    Arg.Unit f,
+    Printf.sprintf
+      " Disable local field handing in the reaper%s (Flambda2 only)"
+      (format_not_default Flambda2.Default.reaper_local_fields) )
+
+let mk_reaper_unbox f =
+  ( "-reaper-unbox",
+    Arg.Unit f,
+    Printf.sprintf
+      " Enable unboxing in the reaper%s (Flambda2 only, requires \
+       -reaper-change-calling-conventions)"
+      (format_default Flambda2.Default.reaper_unbox) )
+
+let mk_no_reaper_unbox f =
+  ( "-no-reaper-unbox",
+    Arg.Unit f,
+    Printf.sprintf " Disable unboxing in the reaper%s (Flambda2 only)"
+      (format_not_default Flambda2.Default.reaper_unbox) )
+
+let mk_reaper_change_calling_conventions f =
+  ( "-reaper-change-calling-conventions",
+    Arg.Unit f,
+    Printf.sprintf
+      " Allow the reaper to change the calling conventions of functions%s \
+       (Flambda2 only)"
+      (format_default Flambda2.Default.reaper_change_calling_conventions) )
+
+let mk_no_reaper_change_calling_conventions f =
+  ( "-no-reaper-change-calling-conventions",
+    Arg.Unit f,
+    Printf.sprintf
+      " Prevent the reaper from changing the calling conventions of \
+       functions%s (Flambda2 only)"
+      (format_not_default Flambda2.Default.reaper_change_calling_conventions) )
+
 let mk_flambda2_expert_fallback_inlining_heuristic f =
   ( "-flambda2-expert-fallback-inlining-heuristic",
     Arg.Unit f,
@@ -1080,6 +1123,12 @@ module type Oxcaml_options = sig
   val flambda2_reaper : unit -> unit
   val no_flambda2_reaper : unit -> unit
   val reaper_preserve_direct_calls : string -> unit
+  val reaper_local_fields : unit -> unit
+  val no_reaper_local_fields : unit -> unit
+  val reaper_unbox : unit -> unit
+  val no_reaper_unbox : unit -> unit
+  val reaper_change_calling_conventions : unit -> unit
+  val no_reaper_change_calling_conventions : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
@@ -1226,6 +1275,13 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_reaper F.flambda2_reaper;
       mk_no_flambda2_reaper F.no_flambda2_reaper;
       mk_reaper_preserve_direct_calls F.reaper_preserve_direct_calls;
+      mk_reaper_local_fields F.reaper_local_fields;
+      mk_no_reaper_local_fields F.no_reaper_local_fields;
+      mk_reaper_unbox F.reaper_unbox;
+      mk_no_reaper_unbox F.no_reaper_unbox;
+      mk_reaper_change_calling_conventions F.reaper_change_calling_conventions;
+      mk_no_reaper_change_calling_conventions
+        F.no_reaper_change_calling_conventions;
       mk_flambda2_expert_fallback_inlining_heuristic
         F.flambda2_expert_fallback_inlining_heuristic;
       mk_no_flambda2_expert_fallback_inlining_heuristic
@@ -1491,6 +1547,17 @@ module Oxcaml_options_impl = struct
         Flambda2.reaper_preserve_direct_calls :=
           Oxcaml_flags.Set Oxcaml_flags.Auto
     | _ -> () (* This should not occur as we use Arg.Symbol *)
+
+  let reaper_local_fields = set Flambda2.reaper_local_fields
+  let no_reaper_local_fields = clear Flambda2.reaper_local_fields
+  let reaper_unbox = set Flambda2.reaper_unbox
+  let no_reaper_unbox = clear Flambda2.reaper_unbox
+
+  let reaper_change_calling_conventions =
+    set Flambda2.reaper_change_calling_conventions
+
+  let no_reaper_change_calling_conventions =
+    clear Flambda2.reaper_change_calling_conventions
 
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic
@@ -2049,6 +2116,10 @@ module Extra_params = struct
               "Syntax: reaper-preserve-direct-calls: \
                always|never|zero-alloc|auto");
         true
+    | "reaper-local-fields" -> set Flambda2.reaper_local_fields
+    | "reaper-unbox" -> set Flambda2.reaper_unbox
+    | "reaper-change-calling-conventions" ->
+        set Flambda2.reaper_change_calling_conventions
     | _ -> false
 end
 
