@@ -119,8 +119,8 @@
     val exists : ('a -> bool) -> 'a list -> bool @@ portable
     val for_all2 : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool @@ portable
     val exists2 : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool @@ portable
-    val mem : 'a -> 'a list -> bool @@ portable
-    val memq : 'a -> 'a list -> bool @@ portable
+    val mem : 'a @ local -> 'a list @ local -> bool @@ portable
+    val memq : 'a @ local -> 'a list @ local -> bool @@ portable
     val find : ('a -> bool) -> 'a list -> 'a @@ portable
     val find_opt : ('a -> bool) -> 'a list -> 'a option @@ portable
     val find_index : ('a -> bool) -> 'a list -> int option @@ portable
