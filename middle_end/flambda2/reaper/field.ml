@@ -166,6 +166,8 @@ let must_be_function_slot t =
     Misc.fatal_errorf "[must_be_function_slot] got %a instead" print_view view
 
 let is_local f =
+  Flambda_features.reaper_local_fields ()
+  &&
   match view f with
   | Value_slot vs ->
     Compilation_unit.is_current (Value_slot.get_compilation_unit vs)

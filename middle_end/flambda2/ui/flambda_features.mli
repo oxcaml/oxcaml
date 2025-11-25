@@ -55,6 +55,12 @@ type reaper_preserve_direct_calls = Oxcaml_flags.reaper_preserve_direct_calls =
 
 val reaper_preserve_direct_calls : unit -> reaper_preserve_direct_calls
 
+val reaper_local_fields : unit -> bool
+
+val reaper_unbox : unit -> bool
+
+val reaper_change_calling_conventions : unit -> bool
+
 val kind_checks : unit -> bool
 
 val flat_float_array : unit -> bool
