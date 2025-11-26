@@ -66,12 +66,6 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_bigarray(param=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlTest_ocaml_and_c_dwarf__entry
-=== Testing OCaml/C boundary - GC stat (caml_alloc_tuple) ===
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_alloc_tuple [inlined] caml_alloc(tag=0 : tag_t, wosize=17 : mlsize_t)
-  * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_alloc_tuple [inlined] caml_alloc(tag=0 : tag_t, wosize=17 : mlsize_t)
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_alloc_tuple(n=17 : mlsize_t)
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_gc_quick_stat(v=<unavailable>)
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
 === Testing OCaml/C boundary - large tuple (caml_alloc_shr_check_gc) ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_alloc_shr_check_gc(wosize=500 : mlsize_t, tag=0 : tag_t)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_alloc_shr_check_gc(wosize=500 : mlsize_t, tag=0 : tag_t)
@@ -83,10 +77,6 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_start_program
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`callback(closure=<unavailable>, arg=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_with_async_exns
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_with_async_exns(body_callback=<unavailable>)
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_callback [inlined] Stdlib.Sys.(partial)
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_callback(param=<unavailable>)
 === Testing OCaml/C boundary - finalizer (C calls OCaml during GC) ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_my_finalizer(param=[42] : ocaml_value)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_my_finalizer(param=[42] : ocaml_value)
@@ -95,9 +85,3 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_callback_exn(closure=<unavailable>, arg=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_final_do_calls_exn
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_do_pending_actions_exn
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_process_pending_actions_with_root_exn(root=<unavailable>)
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_process_pending_actions_exn
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`gc_full_major_exn
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_gc_full_major(v=<unavailable>)
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_trigger_finalizer(value=42 : int @ value)

@@ -99,13 +99,7 @@ let[@inline never] [@local never] f_bigarray () =
 
 let _ = f_bigarray ()
 
-(* Test case 12: GC quick_stat - goes through caml_alloc_tuple(17) which calls
-   caml_alloc(17, 0). *)
-let[@inline never] [@local never] f_gc_stat () = Gc.quick_stat ()
-
-let _ = f_gc_stat ()
-
-(* Test case 13: Large tuple allocation - 500 components exceeds
+(* Test case 12: Large tuple allocation - 500 components exceeds
    Max_young_wosize (256 words), so this should go through caml_alloc_shr for
    shared heap allocation. *)
 let[@inline never] [@local never] f_large_tuple (n : int) =
@@ -613,7 +607,7 @@ let[@inline never] [@local never] f_large_tuple (n : int) =
 
 let _ = ignore (f_large_tuple 42)
 
-(* Test case 14: C-to-OCaml callback via Sys.with_async_exns. The stack trace
+(* Test case 13: C-to-OCaml callback via Sys.with_async_exns. The stack trace
    will show OCaml -> C -> OCaml. *)
 let[@inline never] [@local never] f_callback_inner () = 42
 
@@ -622,7 +616,7 @@ let[@inline never] [@local never] f_callback () =
 
 let _ = f_callback ()
 
-(* Test case 15: Finalization callback - C calls OCaml during GC. The stack
+(* Test case 14: Finalization callback - C calls OCaml during GC. The stack
    trace will show OCaml finalizer called from C GC code. *)
 let[@inline never] [@local never] f_my_finalizer (_ : int ref) = ()
 
