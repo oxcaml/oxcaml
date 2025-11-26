@@ -21,4 +21,5 @@ val make_decision :
   cost_metrics:Cost_metrics.t ->
   is_a_functor:bool ->
   recursive:Recursive.t ->
+  free_names_of_code:Name_occurrences.t ->
   Function_decl_inlining_decision_type.t
