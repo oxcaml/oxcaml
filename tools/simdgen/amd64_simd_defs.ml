@@ -22,7 +22,10 @@ type ext =
   | SSSE3
   | SSE4_1
   | SSE4_2
+  | POPCNT
+  | LZCNT
   | PCLMULQDQ
+  | BMI
   | BMI2
   | AVX
   | AVX2
@@ -74,7 +77,7 @@ type arg =
 type res =
   | Res_none (* No result *)
   | First_arg (* Result is returned in the first argument operand. *)
-  | Res of arg (* Separate operand for result. *)
+  | Res of arg array (* Separate operand(s) for result. *)
 
 type legacy_prefix =
   | Prx_none
@@ -194,7 +197,10 @@ let ext_to_string : ext -> string = function
   | SSSE3 -> "SSSE3"
   | SSE4_1 -> "SSE4_1"
   | SSE4_2 -> "SSE4_2"
+  | POPCNT -> "POPCNT"
+  | LZCNT -> "LZCNT"
   | PCLMULQDQ -> "PCLMULQDQ"
+  | BMI -> "BMI"
   | BMI2 -> "BMI2"
   | AVX -> "AVX"
   | AVX2 -> "AVX2"

@@ -770,11 +770,11 @@ module Sse_other_builtins = struct
     type t = int64
 
     external bit_deposit : t -> t -> t
-      = "caml_vec128_unreachable" "caml_bmi2_int64_deposit_bits"
+      = "caml_vec128_unreachable" "caml_bmi2_pdep_int64"
       [@@noalloc] [@@unboxed] [@@builtin]
 
     external bit_extract : t -> t -> t
-      = "caml_vec128_unreachable" "caml_bmi2_int64_extract_bits"
+      = "caml_vec128_unreachable" "caml_bmi2_pext_int64"
       [@@noalloc] [@@unboxed] [@@builtin]
   end
 

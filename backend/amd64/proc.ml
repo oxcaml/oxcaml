@@ -521,14 +521,18 @@ let destroyed_by_simd_instr (instr : Simd.instr) =
   | _ ->
     match instr.res with
     | Res_none | First_arg -> [||]
-    | Res { loc; _ } ->
-      match Simd.loc_is_pinned loc with
-      | Some RAX -> [|rax|]
-      | Some RDI -> [|rdi|]
-      | Some RCX -> [|rcx|]
-      | Some RDX -> [|rdx|]
-      | Some XMM0 -> destroy_xmm 0
-      | None -> [||]
+    | Res rr ->
+      Array.fold_left (fun acc ({loc; _} : Simd.arg) ->
+        match Simd.loc_is_pinned loc with
+        | Some RAX -> rax :: acc
+        | Some RDI -> rdi :: acc
+        | Some RCX -> rcx :: acc
+        | Some RDX -> rdx :: acc
+        | Some XMM0 ->
+          let xmm0 = Array.to_list (destroy_xmm 0) in
+          xmm0 @ acc
+        | None -> acc) [] rr
+      |> Array.of_list
 
 let destroyed_by_simd_op (op : Simd.operation) =
   match op.instr with

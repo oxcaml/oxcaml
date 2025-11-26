@@ -715,9 +715,18 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
   in
   let enc i =
     match instr.res with
-    | Res_none | First_arg | Res { enc = Implicit; _ } -> instr.args.(i).enc
-    | Res { enc; _ } when i = 0 -> enc
-    | Res _ -> instr.args.(i - 1).enc
+    | Res_none | First_arg -> instr.args.(i).enc
+    | Res rr ->
+      let rr = Array.fold_left
+        (fun acc ({enc; _} : Simd.arg) ->
+          match enc with
+          | Implicit -> acc
+          | _ -> enc :: acc) [] rr
+       |> Array.of_list
+      in
+      let n = Array.length rr in
+      if i < n then rr.(i)
+      else instr.args.(i - n).enc
   in
   let rm_only () =
     match args with
@@ -1228,45 +1237,6 @@ let emit_pop b dst =
   | (Mem _ | Mem64_RIP _) as rm -> emit_mod_rm_reg b no_rex [ 0x8F ] rm 0
   | _ -> assert false
 
-let emit_popcnt b ~dst ~src =
-  match (dst, src) with
-  | (Reg16 reg, ((Reg16 _ | Mem _ | Mem64_RIP _) as rm))
-  | (Reg32 reg, ((Reg32 _ | Mem _ | Mem64_RIP _) as rm)) ->
-    (* POPCNT r16, r/m16 and POPCNT r32, r/m32 *)
-    buf_int8 b 0xF3;
-    emit_mod_rm_reg b no_rex [ 0x0F; 0xB8 ] rm (rd_of_reg64 reg);
-  | (Reg64 reg, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm)) ->
-    (* POPCNT r64, r/m64 *)
-    buf_int8 b 0xF3;
-    emit_mod_rm_reg b rexw [ 0x0F; 0xB8 ] rm (rd_of_reg64 reg);
-  | _ -> assert false
-
-let emit_tzcnt b ~dst ~src =
-  match (dst, src) with
-  | (Reg16 reg, ((Reg16 _ | Mem _ | Mem64_RIP _) as rm))
-  | (Reg32 reg, ((Reg32 _ | Mem _ | Mem64_RIP _) as rm)) ->
-    (* TZCNT r16, r/m16 and TZCNT r32, r/m32 *)
-    buf_int8 b 0xF3;
-    emit_mod_rm_reg b no_rex [ 0x0F; 0xBC ] rm (rd_of_reg64 reg);
-  | (Reg64 reg, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm)) ->
-    (* TZCNT r64, r/m64 *)
-    buf_int8 b 0xF3;
-    emit_mod_rm_reg b rexw [ 0x0F; 0xBC ] rm (rd_of_reg64 reg);
-  | _ -> assert false
-
-let emit_lzcnt b ~dst ~src =
-  match (dst, src) with
-  | (Reg16 reg, ((Reg16 _ | Mem _ | Mem64_RIP _) as rm))
-  | (Reg32 reg, ((Reg32 _ | Mem _ | Mem64_RIP _) as rm)) ->
-    (* LZCNT r16, r/m16 and LZCNT r32, r/m32 *)
-    buf_int8 b 0xF3;
-    emit_mod_rm_reg b no_rex [ 0x0F; 0xBD ] rm (rd_of_reg64 reg);
-  | (Reg64 reg, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm)) ->
-    (* LZCNT r64, r/m64 *)
-    buf_int8 b 0xF3;
-    emit_mod_rm_reg b rexw [ 0x0F; 0xBD ] rm (rd_of_reg64 reg);
-  | _ -> assert false
-
 let rd_of_prefetch_hint = function
   | Nta -> 0
   | T0 -> 1
@@ -1400,7 +1370,6 @@ let assemble_instr b loc = function
   | PAUSE -> emit_pause b
   | PUSH dst -> emit_push b dst
   | POP dst -> emit_pop b dst
-  | POPCNT (src, dst) -> emit_popcnt b ~dst ~src
   | PREFETCH (is_write, hint, rm) -> emit_prefetch b ~is_write ~hint rm
   | RDTSC -> emit_rdtsc b
   | RDPMC -> emit_rdpmc b
@@ -1417,8 +1386,6 @@ let assemble_instr b loc = function
   | TEST (src, dst) -> emit_test b dst src
   | XCHG (src, dst) -> emit_XCHG b dst src
   | XOR (src, dst) -> emit_XOR b dst src
-  | TZCNT (src, dst) -> emit_tzcnt b ~dst ~src
-  | LZCNT (src, dst) -> emit_lzcnt b ~dst ~src
   | SIMD (instr, args) -> emit_simd b instr args
 
 

@@ -176,7 +176,6 @@ let print_instr b = function
   | OR (arg1, arg2) -> i2 b "or" arg1 arg2
   | PAUSE -> i0 b "pause"
   | POP arg -> i1 b "pop" arg
-  | POPCNT (arg1, arg2) -> i2 b "popcnt" arg1 arg2
   | PREFETCH (is_write, hint, arg1) -> (
     match is_write, hint with
     | true, T0 -> i1 b "prefetchw" arg1
@@ -199,8 +198,6 @@ let print_instr b = function
   | TEST (arg1, arg2) -> i2 b "test" arg1 arg2
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2 b "xor" arg1 arg2
-  | LZCNT (arg1, arg2) -> i2 b "lzcnt" arg1 arg2
-  | TZCNT (arg1, arg2) -> i2 b "tzcnt" arg1 arg2
   | SIMD (instr, args) -> (
     match instr.id, args with
     (* The assembler won't accept these mnemonics directly. *)

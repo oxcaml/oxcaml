@@ -2976,6 +2976,18 @@ int main(void) {
 }
 ]])], AC_DEFINE([HAS_POPCNT]) has_popcnt=yes, [])
 
+AC_SUBST([has_lzcnt])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("lzcnt")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_LZCNT]) has_lzcnt=yes, [])
+
 AC_SUBST([has_pclmul])
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
 int main(void) {

@@ -1617,9 +1617,11 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
     | First_arg ->
       assert (Reg.same_loc instr.arg.(0) instr.res.(0));
       1
-    | Res { loc; _ } ->
-      assert_loc loc instr.res.(0);
-      1
+    | Res rr ->
+      Array.iteri
+        (fun i ({ loc; _ } : Simd.arg) -> assert_loc loc instr.res.(i))
+        rr;
+      Array.length rr
   in
   assert (res_used = Array.length instr.res)
 
@@ -1689,11 +1691,16 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   in
   let args =
     match simd.res with
-    | Res_none | First_arg | Res { enc = Implicit | Immediate; _ } -> args
-    | Res { loc; enc = RM_r | RM_rm | Vex_v } -> (
-      match Simd.loc_is_pinned loc with
-      | Some _ -> args
-      | None -> to_res_with_width loc instr 0 :: args)
+    | Res_none | First_arg -> args
+    | Res rr ->
+      Array.fold_left
+        (fun (idx, acc) ({ loc; enc } : Simd.arg) ->
+          match enc with
+          | Implicit | Immediate -> idx + 1, acc
+          | RM_r | RM_rm | Vex_v ->
+            idx + 1, to_res_with_width loc instr idx :: acc)
+        (0, args) rr
+      |> snd
   in
   let args =
     match imm with
@@ -2191,8 +2198,8 @@ let emit_instr ~first ~fallthrough i =
        to do this earlier, based on previous experience with similar things, but
        maybe the change should be left for later. mshinwell: The current
        situation is fine for now. *)
-    if Arch.Extension.enabled BMI
-    then I.lzcnt (arg i 0) (res i 0)
+    if Arch.Extension.enabled LZCNT
+    then I.simd lzcnt_r64_r64m64 [| arg i 0; res i 0 |]
     else if arg_is_non_zero
     then (
       (* No need to handle that bsr is undefined on 0 input. *)
@@ -2212,7 +2219,7 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Intop (Ictz { arg_is_non_zero })) ->
     (* CR-someday gyorsh: can we do it at selection? *)
     if Arch.Extension.enabled BMI
-    then I.tzcnt (arg i 0) (res i 0)
+    then I.simd tzcnt_r64_r64m64 [| arg i 0; res i 0 |]
     else if arg_is_non_zero
     then
       (* No need to handle that bsf is undefined on 0 input. *)
@@ -2223,9 +2230,7 @@ let emit_instr ~first ~fallthrough i =
       I.jne (emit_asm_label_arg lbl_nz);
       I.mov (int 64) (res i 0);
       D.define_label lbl_nz
-  | Lop (Intop Ipopcnt) ->
-    assert (Arch.Extension.enabled POPCNT);
-    I.popcnt (arg i 0) (res i 0)
+  | Lop (Intop Ipopcnt) -> I.simd popcnt_r64_r64m64 [| arg i 0; res i 0 |]
   | Lop (Csel tst) ->
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in

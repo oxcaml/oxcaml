@@ -122,15 +122,67 @@ let select_operation_clmul ~dbg:_ op args =
       sse_or_avx pclmulqdq vpclmulqdq ~i args
     | _ -> None
 
+let select_operation_popcnt ~dbg:_ op args =
+  if not (Arch.Extension.enabled POPCNT)
+  then None
+  else
+    match op with
+    | "caml_popcnt_int16" -> instr popcnt_r16_r16m16 args
+    | "caml_popcnt_int32" -> instr popcnt_r32_r32m32 args
+    | "caml_popcnt_int64" -> instr popcnt_r64_r64m64 args
+    | _ -> None
+
+let select_operation_lzcnt ~dbg:_ op args =
+  if not (Arch.Extension.enabled LZCNT)
+  then None
+  else
+    match op with
+    | "caml_lzcnt_int16" -> instr lzcnt_r16_r16m16 args
+    | "caml_lzcnt_int32" -> instr lzcnt_r32_r32m32 args
+    | "caml_lzcnt_int64" -> instr lzcnt_r64_r64m64 args
+    | _ -> None
+
+let select_operation_bmi ~dbg:_ op args =
+  if not (Arch.Extension.enabled BMI)
+  then None
+  else
+    match op with
+    | "caml_bmi_andn_int32" -> instr andn_r32_r32_r32m32 args
+    | "caml_bmi_andn_int64" -> instr andn_r64_r64_r64m64 args
+    | "caml_bmi_bextr_int32" -> instr bextr_r32_r32m32_r32 args
+    | "caml_bmi_bextr_int64" -> instr bextr_r64_r64m64_r64 args
+    | "caml_bmi_blsi_int32" -> instr blsi_r32_r32m32 args
+    | "caml_bmi_blsi_int64" -> instr blsi_r64_r64m64 args
+    | "caml_bmi_blsmsk_int32" -> instr blsmsk_r32_r32m32 args
+    | "caml_bmi_blsmsk_int64" -> instr blsmsk_r64_r64m64 args
+    | "caml_bmi_blsr_int32" -> instr blsr_r32_r32m32 args
+    | "caml_bmi_blsr_int64" -> instr blsr_r64_r64m64 args
+    | "caml_bmi_tzcnt_int16" -> instr tzcnt_r16_r16m16 args
+    | "caml_bmi_tzcnt_int32" -> instr tzcnt_r32_r32m32 args
+    | "caml_bmi_tzcnt_int64" -> instr tzcnt_r64_r64m64 args
+    | _ -> None
+
 let select_operation_bmi2 ~dbg:_ op args =
   if not (Arch.Extension.enabled BMI2)
   then None
   else
     match op with
-    | "caml_bmi2_int64_extract_bits" ->
-      sse_or_avx pext_r64_r64_r64m64 pext_r64_r64_r64m64 args
-    | "caml_bmi2_int64_deposit_bits" ->
-      sse_or_avx pdep_r64_r64_r64m64 pdep_r64_r64_r64m64 args
+    | "caml_bmi2_bzhi_int32" -> instr bzhi_r32_r32m32_r32 args
+    | "caml_bmi2_bzhi_int64" -> instr bzhi_r64_r64m64_r64 args
+    | "caml_bmi2_mulx_int32" -> instr mulx_r32_r32_r32m32_rdx args
+    | "caml_bmi2_mulx_int64" -> instr mulx_r64_r64_r64m64_rdx args
+    | "caml_bmi2_pext_int32" -> instr pext_r32_r32_r32m32 args
+    | "caml_bmi2_pext_int64" -> instr pext_r64_r64_r64m64 args
+    | "caml_bmi2_pdep_int32" -> instr pdep_r32_r32_r32m32 args
+    | "caml_bmi2_pdep_int64" -> instr pdep_r64_r64_r64m64 args
+    | "caml_bmi2_rorx_int32" -> instr rorx_r32_r32m32 args
+    | "caml_bmi2_rorx_int64" -> instr rorx_r64_r64m64 args
+    | "caml_bmi2_sarx_int32" -> instr sarx_r32_r32m32_r32 args
+    | "caml_bmi2_sarx_int64" -> instr sarx_r64_r64m64_r64 args
+    | "caml_bmi2_shrx_int32" -> instr shrx_r32_r32m32_r32 args
+    | "caml_bmi2_shrx_int64" -> instr shrx_r64_r64m64_r64 args
+    | "caml_bmi2_shlx_int32" -> instr shlx_r32_r32m32_r32 args
+    | "caml_bmi2_shlx_int64" -> instr shlx_r64_r64m64_r64 args
     | _ -> None
 
 let select_operation_sse ~dbg op args =
@@ -1023,6 +1075,9 @@ let select_operation_cfg ~dbg op args =
   in
   None
   |> or_else select_operation_clmul
+  |> or_else select_operation_popcnt
+  |> or_else select_operation_lzcnt
+  |> or_else select_operation_bmi
   |> or_else select_operation_bmi2
   |> or_else select_operation_sse
   |> or_else select_operation_sse2
@@ -1060,14 +1115,15 @@ let maybe_pin arr i loc =
 
 let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
   Array.iteri
-    (fun i (simd_arg : Simd.arg) -> maybe_pin arg_regs i simd_arg.loc)
+    (fun i ({ loc; _ } : Simd.arg) -> maybe_pin arg_regs i loc)
     simd.args;
   (match simd.res with
   | Res_none -> ()
   | First_arg ->
     assert (not (Reg.is_preassigned arg_regs.(0)));
     arg_regs.(0) <- res_regs.(0)
-  | Res { loc; _ } -> maybe_pin res_regs 0 loc);
+  | Res rr ->
+    Array.iteri (fun i ({ loc; _ } : Simd.arg) -> maybe_pin res_regs i loc) rr);
   arg_regs, res_regs
 
 let pseudoregs_for_operation (simd : Simd.operation) arg res =
