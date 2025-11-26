@@ -1164,6 +1164,63 @@ module X86_peephole = struct
       | _, _ -> None)
     | _ -> None
 
+  (* Find a redundant CMP instruction with the same operands. Returns Some cell
+     if found, None otherwise. *)
+  let find_redundant_cmp src dst start_cell =
+    let rec loop cell_opt =
+      match cell_opt with
+      | None -> None
+      | Some cell -> (
+        match DLL.value cell with
+        | Ins instr -> (
+          if is_control_flow instr
+          then None
+          else
+            match[@warning "-4"] instr with
+            | CMP (src2, dst2) when equal_args src src2 && equal_args dst dst2
+              ->
+              (* Found a redundant CMP! *)
+              Some cell
+            | _ ->
+              (* Check if this instruction invalidates the optimization *)
+              if writes_flags instr
+              then None
+              else if writes_to_arg src instr || writes_to_arg dst instr
+              then None
+              else loop (DLL.next cell))
+        | Directive _ ->
+          if is_hard_barrier (DLL.value cell)
+          then None
+          else loop (DLL.next cell))
+    in
+    loop (DLL.next start_cell)
+
+  (* Rewrite rule: remove redundant CMP with identical operands. Pattern: cmp A,
+     B; ...; cmp A, B (where ... doesn't write flags or modify A or B) Rewrite:
+     cmp A, B; ...
+
+     This is safe when: - Both operands are registers (to avoid memory aliasing
+     issues) - Neither operand is modified between the two CMPs - Flags are not
+     written between the two CMPs (but can be read) - No control flow or hard
+     barriers between the CMPs *)
+  let remove_redundant_cmp cell =
+    match[@warning "-4"] DLL.value cell with
+    | Ins (CMP (src, dst)) -> (
+      (* Only optimize register-register comparisons to avoid aliasing issues *)
+      match src, dst with
+      | ( (Reg64 _ | Reg32 _ | Reg16 _ | Reg8L _),
+          (Reg64 _ | Reg32 _ | Reg16 _ | Reg8L _) ) -> (
+        (* Search for a redundant CMP *)
+        match find_redundant_cmp src dst cell with
+        | Some redundant_cell ->
+          (* Delete the redundant CMP *)
+          DLL.delete_curr redundant_cell;
+          (* Return the first CMP cell to allow iterative removal *)
+          Some (Some cell)
+        | None -> None)
+      | _, _ -> None)
+    | _ -> None
+
   (* Apply all rewrite rules in sequence. Returns Some continuation_cell if a
      rule matched, None otherwise. *)
   let apply_rules cell =
@@ -1188,9 +1245,12 @@ module X86_peephole = struct
                 match rewrite_mov_add_reg_to_lea cell with
                 | Some cont -> Some cont
                 | None -> (
-                  match combine_add_rsp cell with
+                  match remove_redundant_cmp cell with
                   | Some cont -> Some cont
-                  | None -> None)))))))
+                  | None -> (
+                    match combine_add_rsp cell with
+                    | Some cont -> Some cont
+                    | None -> None))))))))
 
   (* Main optimization loop for a single asm_program. Iterates through the
      instruction list, applying rewrite rules and respecting hard barriers. *)
