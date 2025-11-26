@@ -109,14 +109,17 @@ let read_clflags_from_env () =
   set_from_env Clflags.error_style Clflags.error_style_reader;
   ()
 
+let directory_exists dir =
+  Sys.file_exists dir && Sys.is_directory dir
+
 let rec make_directory dir =
-  if Sys.file_exists dir then () else
+  if directory_exists dir then () else
     begin
       make_directory (Filename.dirname dir);
       (try
         Sys.mkdir dir 0o777
       with (Sys_error _) as se ->
-        if not (Sys.file_exists dir) then raise se)
+        if not (directory_exists dir) then raise se)
     end
 
 let with_ppf_file ~file_prefix ~file_extension f =
