@@ -1425,10 +1425,10 @@ module Ast = struct
 
   and print_const fmt = function
     | Int n -> pp fmt "%d" n
-    | Char c -> pp fmt "\'%c\'" c
+    | Char c -> pp fmt "%C" c
     | String (s, id_opt) -> (
       match id_opt with
-      | None -> pp fmt "\"%s\"" s
+      | None -> pp fmt "%S" s
       | Some id -> pp fmt "{%s|@[%s@]|%s}" id s id)
     | Float s -> pp fmt "%s" s
     | Float32 s -> pp fmt "%ss" s
@@ -1588,7 +1588,7 @@ module Ast = struct
     | TypeAny -> pp fmt "_"
     | TypeVar v -> Var.Type_var.print env fmt v
     | TypeArrow (arg_label, ty1, ty2) ->
-      pp fmt "%a%a@ ->@ %a" print_arg_lab arg_label
+      pp fmt "%a%a@ ->@ %a" print_arrow_arg_lab arg_label
         (print_core_type_with_arrow env)
         ty1 (print_core_type env) ty2
     | TypeTuple ((tl, ty) :: ts) ->
@@ -1672,11 +1672,16 @@ module Ast = struct
     | Labelled s -> pp fmt "~%s:" s
     | Optional s -> pp fmt "?%s:" s
 
+  and print_arrow_arg_lab fmt = function
+    | Nolabel -> pp fmt ""
+    | Labelled s -> pp fmt "%s:" s
+    | Optional s -> pp fmt "?%s:" s
+
   and print_param env fmt = function
     | Pparam_val (arg_lab, None, pat) ->
       pp fmt "@ %a%a" print_arg_lab arg_lab (print_pat env) pat
     | Pparam_val (arg_lab, Some exp, pat) ->
-      pp fmt "@ %a%a=(@[%a@])" print_arg_lab arg_lab (print_pat env) pat
+      pp fmt "@ %a(%a=@[%a@])" print_arg_lab arg_lab (print_pat env) pat
         (print_exp env) exp
     | Pparam_newtype ty -> pp fmt "@ (type@ %a)" (Var.Type_constr.print env) ty
 
