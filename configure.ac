@@ -2978,13 +2978,12 @@ int main(void) {
 
 AC_SUBST([has_lzcnt])
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <cpuid.h>
 int main(void) {
-  __builtin_cpu_init ();
-  if (__builtin_cpu_supports("lzcnt")) {
-    return 0;
-  } else {
-    return 1;
-  }
+    // Clang doesn't accept "lzcnt" in __builtin_cpu_supports
+    unsigned int eax, ebx, ecx, edx;
+    if (!__get_cpuid(0x80000001, &eax, &ebx, &ecx, &edx)) return 1;
+    return (ecx & bit_LZCNT) == 0;
 }
 ]])], AC_DEFINE([HAS_LZCNT]) has_lzcnt=yes, [])
 
