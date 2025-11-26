@@ -74,7 +74,7 @@ install::
 	$(INSTALL_DATA) META "$(INSTALL_STDLIB_META_DIR)"
 ifeq "$(INSTALL_SOURCE_ARTIFACTS)" "true"
 	$(INSTALL_DATA) \
-	  *.cmt *.cmti *.mli *.ml *.ml.in \
+	  *.cmt *.cms *.cmti *.mli *.ml *.ml.in \
 	  "$(INSTALL_LIBDIR)"
 endif
 	$(INSTALL_DATA) target_$(HEADER_NAME) "$(INSTALL_LIBDIR)/$(HEADER_NAME)"

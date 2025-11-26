@@ -121,9 +121,9 @@ Error: Modalities are not allowed on fields given to "[%atomic.loc]" (here, "con
 (* Test for forbidding non-legacy monadic modalities in [%atomic.loc] *)
 
 (* This is allowed... *)
-type 'a aliased_atomic = { mutable contents : 'a @@ unique [@atomic] }
+type 'a aliased_atomic = { mutable contents : 'a @@ contended [@atomic] }
 [%%expect{|
-type 'a aliased_atomic = { mutable contents : 'a @@ unique [@atomic]; }
+type 'a aliased_atomic = { mutable contents : 'a @@ contended [@atomic]; }
 |}]
 
 (* ...but you can't make an [%atomic.loc] to the field *)

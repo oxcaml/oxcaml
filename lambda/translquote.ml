@@ -52,7 +52,7 @@ let combinator modname field =
        | None -> Lident field
        | Some lid -> Ldot (lid, field)
      in
-     match Env.find_value_by_name lid env with
+     match Env.find_value_by_name_lazy lid env with
      | p, _ -> transl_value_path Loc_unknown env p
      | exception Not_found ->
        fatal_error
@@ -723,6 +723,8 @@ module Identifier : sig
 
     val out_of_memory : t'
 
+    val out_of_fibers : t'
+
     val invalid_argument : t'
 
     val failure : t'
@@ -918,6 +920,8 @@ end = struct
     let match_failure = use "Identifier.Constructor" "match_failure"
 
     let out_of_memory = use "Identifier.Constructor" "out_of_memory"
+
+    let out_of_fibers = use "Identifier.Constructor" "out_of_fibers"
 
     let invalid_argument = use "Identifier.Constructor" "invalid_argument"
 
@@ -2210,6 +2214,7 @@ let quote_constructor env loc constr =
          | "Some" -> Identifier.Constructor.some
          | "Match_failure" -> Identifier.Constructor.match_failure
          | "Out_of_memory" -> Identifier.Constructor.out_of_memory
+         | "Out_of_fibers" -> Identifier.Constructor.out_of_fibers
          | "Invalid_argument" -> Identifier.Constructor.invalid_argument
          | "Failure" -> Identifier.Constructor.failure
          | "Not_found" -> Identifier.Constructor.not_found

@@ -30,8 +30,6 @@ module Externality = struct
 
   let min = External
 
-  let legacy = Internal
-
   let equal e1 e2 =
     match e1, e2 with
     | External, External -> true
@@ -88,8 +86,6 @@ module Nullability = struct
 
   let min = Non_null
 
-  let legacy = Non_null
-
   let equal n1 n2 =
     match n1, n2 with
     | Non_null, Non_null -> true
@@ -129,8 +125,6 @@ module Separability = struct
   let max = Maybe_separable
 
   let min = Non_float
-
-  let legacy = Separable
 
   let equal s1 s2 =
     match s1, s2 with

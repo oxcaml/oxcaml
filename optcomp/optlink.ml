@@ -230,7 +230,6 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let link ~ppf_dump objfiles output_name =
     let shared = false in
     Profile.(record_call (annotate_file_name output_name)) (fun () ->
-        let linkenv = Linkenv.create () in
         let stdlib = "stdlib" ^ Backend.ext_flambda_lib in
         let stdexit = "std_exit" ^ Backend.ext_flambda_obj in
         let objfiles =
@@ -241,53 +240,126 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         in
         let genfns = Generic_fns.Tbl.make () in
         (* CR mshinwell/xclerc: This tuple should be a record *)
-        let full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
+        let[@inline] scan_user_supplied_files linkenv ~genfns ~objfiles =
           (* This covers all files that the user has requested be linked *)
           List.fold_right
             (scan_file linkenv ~shared:false genfns)
             objfiles
             ([], [], [], Generic_fns.Partition.Set.empty)
         in
+        let linkenv = Linkenv.create () in
+        let full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
+          scan_user_supplied_files linkenv ~genfns ~objfiles
+        in
         let uses_eval =
           (* This query must come after scan_file has been called on objfiles,
              otherwise is_required will always return false. *)
+          (* CR mshinwell: maybe instead we could have a flag on cmx/cmxa files
+             to indicate whether they need metaprogramming? Then we wouldn't
+             have to do scan_file first, which in turn would avoid the need to
+             snapshot the Linkenv. It also wouldn't capture things like mdx
+             which should not receive this special treatment. *)
           Linkenv.is_required linkenv
             (Compilation_unit.of_string "Camlinternaleval")
         in
-        let quoted_globals = Linkenv.get_quoted_globals linkenv in
         if uses_eval && not Backend.supports_metaprogramming
         then
           raise
             (Linkenv.Error
                (Metaprogramming_not_supported_by_backend output_name));
+        let eval_support_files = Backend.support_files_for_eval () in
+        if uses_eval && not !Clflags.nopervasives
+        then Backend.set_load_path_for_eval ();
+        let full_paths_of_eval_support_files_already_provided_by_user =
+          if not uses_eval
+          then []
+          else
+            (* Avoid double linking errors in the case where the user has
+               already passed one of the support files on the command line. The
+               equality used here is the full path as resolved by [Load_path]
+               (see also [scan_file], above). *)
+            List.filter_map
+              (fun support_file ->
+                (* CR mshinwell: it's unclear that [Load_path] does anything
+                   along the lines of [realpath], so this equality might not be
+                   as good as we would like *)
+                match Load_path.find support_file with
+                | full_path ->
+                  if List.mem full_path full_paths then Some full_path else None
+                | exception Not_found ->
+                  (* An error will be reported by [scan_file], called below, in
+                     this case. (This is likely to be a compiler bug or a
+                     corrupted installation.) *)
+                  None)
+              eval_support_files
+        in
+        (* Unfortunately because of the need to determine [for_eval] in order to
+           decide whether we need to filter the list of input files, we have to
+           rerun the first [scan_file] pass here if we need to remove any
+           user-specified libraries. *)
+        (* CR mshinwell: another possibility might be to always move the eval
+           support files to the start of the command line whether or not they're
+           used, but this seems like the sort of thing that might cost someone a
+           lot of time one day *)
+        let ( linkenv,
+              _full_paths,
+              ml_objfiles,
+              units_tolink,
+              cached_genfns_imports,
+              genfns ) =
+          match full_paths_of_eval_support_files_already_provided_by_user with
+          | [] ->
+            ( linkenv,
+              full_paths,
+              ml_objfiles,
+              units_tolink,
+              cached_genfns_imports,
+              genfns )
+          | _ :: _ when !Clflags.nopervasives ->
+            (* In this case we won't link any eval support files
+               automatically *)
+            ( linkenv,
+              full_paths,
+              ml_objfiles,
+              units_tolink,
+              cached_genfns_imports,
+              genfns )
+          | _ :: _ ->
+            assert uses_eval;
+            let linkenv = Linkenv.create () in
+            let genfns = Generic_fns.Tbl.make () in
+            let objfiles =
+              (* Remove user-provided occurrences of support libraries *)
+              List.filter
+                (fun file ->
+                  match Load_path.find file with
+                  | full_path ->
+                    not
+                      (List.mem full_path
+                         full_paths_of_eval_support_files_already_provided_by_user)
+                  | exception Not_found ->
+                    (* Some kind of race has occurred, just ignore it. *)
+                    true)
+                objfiles
+            in
+            let _full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
+              scan_user_supplied_files linkenv ~genfns ~objfiles
+            in
+            ( linkenv,
+              _full_paths,
+              ml_objfiles,
+              units_tolink,
+              cached_genfns_imports,
+              genfns )
+        in
+        let quoted_globals = Linkenv.get_quoted_globals linkenv in
         let stdlib_and_support_files_for_eval =
           if !Clflags.nopervasives
           then []
           else
-            let for_eval =
-              if not uses_eval
-              then []
-              else
-                let deps = Backend.support_files_for_eval () in
-                (* Avoid double linking errors in the case where the user has
-                   already passed one of the support files on the command line.
-                   The equality used here is the full path as resolved by
-                   [Load_path] (see also [scan_file], above). *)
-                List.filter
-                  (fun dep ->
-                    (* CR mshinwell: it's unclear that [Load_path] does anything
-                       along the lines of [realpath], so this equality might not
-                       be as good as we would like *)
-                    match Load_path.find dep with
-                    | full_path -> not (List.mem full_path full_paths)
-                    | exception Not_found ->
-                      (* An error will be reported by [scan_file], called below,
-                         in this case. (This is likely to be a compiler bug or a
-                         corrupted installation.) *)
-                      true)
-                  deps
-            in
-            stdlib :: for_eval
+            (* We can safely add all of the support files now without risking
+               double linking. *)
+            stdlib :: (if uses_eval then eval_support_files else [])
         in
         let _full_paths, ml_objfiles, units_tolink, cached_genfns_imports =
           (* This is just for any stdlib and eval support files which are

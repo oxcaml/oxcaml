@@ -715,7 +715,7 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
   in
   let enc i =
     match instr.res with
-    | First_arg | Res { enc = Implicit; _ } -> instr.args.(i).enc
+    | Res_none | First_arg | Res { enc = Implicit; _ } -> instr.args.(i).enc
     | Res { enc; _ } when i = 0 -> enc
     | Res _ -> instr.args.(i - 1).enc
   in
@@ -902,11 +902,15 @@ let emit_simple_encoding base reg =
 
 let emit_ADD = emit_simple_encoding 0x00 0
 
+let emit_ADC = emit_simple_encoding 0x10 2
+
 let emit_OR = emit_simple_encoding 0x08 1
 
 let emit_AND = emit_simple_encoding 0x20 4
 
 let emit_SUB = emit_simple_encoding 0x28 5
+
+let emit_SBB = emit_simple_encoding 0x18 3
 
 let emit_XOR = emit_simple_encoding 0x30 6
 
@@ -1358,6 +1362,7 @@ let emit_XCHG b src dst =
 
 let assemble_instr b loc = function
   | ADD (src, dst) -> emit_ADD b dst src
+  | ADC (src, dst) -> emit_ADC b dst src
   | AND (src, dst) -> emit_AND b dst src
   | BSF (src, dst) -> emit_bsf b ~dst ~src
   | BSR (src, dst) -> emit_bsr b ~dst ~src
@@ -1407,6 +1412,7 @@ let assemble_instr b loc = function
   | SAR (src, dst) -> emit_SAR b dst src
   | SHR (src, dst) -> emit_SHR b dst src
   | SUB (src, dst) -> emit_SUB b dst src
+  | SBB (src, dst) -> emit_SBB b dst src
   | SET (condition, dst) -> emit_set b condition dst
   | TEST (src, dst) -> emit_test b dst src
   | XCHG (src, dst) -> emit_XCHG b dst src
