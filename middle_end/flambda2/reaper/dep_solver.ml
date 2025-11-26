@@ -85,7 +85,55 @@
    Finally, we have, for [s] the source of an accessor the relations
    [field_usages s f t], which mean $f ⋅ Lₜ ⊆ Lₛ$. For performance, we also have
    an additionnal relation [field_usages_top s f], which means $f ⋅ ε ∈ Lₛ$,
-   that is, the field [f] of [s] has unknown usages. *)
+   that is, the field [f] of [s] has unknown usages.
+
+   # Encoding of function calls
+
+   Closures have a special field, [Code_of_closure], which represents what
+   happens when the closure is called. Schematically, if we have a function
+   named [f], with a code_id [p], which has a parameter [x] and returns a result
+   [r], and that this function flows to a point where there is an application
+   where it is named [g], it takes as argument [y] and names the result [s], the
+   graph will look like the following: *)
+(*
+ *    ╔═══╗                    ╔═══╗
+ *    ║ f ║───────────────────>║ g ║
+ *    ╚═══╝                    ╚═══╝
+ *      ^                        │
+ *      │                        │
+ *    [wit]                    [wit]
+ *      │                        │
+ *      │                        v
+ *    ╔═══╗                    ╔═══╗
+ *    ║   ║                    ║   ║
+ *    ╚═══╝                    ╚═══╝
+ *     ^^^                      ││║
+ *     ││║          ╔═══╗       ││║          ╔═══╗
+ *     ││╚[param0]══║ a ║       ││╚[param0]═>║ b ║
+ *     ││           ╚═══╝       ││           ╚═══╝
+ *     ││           ╔═══╗       ││           ╔═══╗
+ *     │└[return0]──║ r ║       │└[return0]─>║ s ║
+ *     │            ╚═══╝       │            ╚═══╝
+ *     │            ╔═══╗       │            ╔═══╗
+ *     └─[code_id]──║ p ║       └─[code_id]─>║ T ║
+ *                  ╚═══╝                    ╚═══╝
+ *  ╰──────────╮╭──────────╯ ╰─────────╮╭───────────╯
+ *      (co)constructors         (co)accessors
+ *)
+(* On the left side of the graph, the construction of the [Code_of_closure]
+   field of the closure (named [wit] in the graph, for compactness) is done. On
+   the right side, the access to that field representing the application is
+   done. When the function is applied, we need to do three things:
+
+   - Mark the code_id [p] as used. This is easy, since it corresponds exactly to
+   what happens with standard block constructors and accessors.
+
+   - Add an alias $r → s$. Again, this is easy and corresponds precisely to what
+   happens with constructors and accessors.
+
+   - Add an alias $b → a$. This is the direction opposite to what would happen
+   with constructors and accessors. Thus, for parameters, we use coconstructors
+   and coaccessors that put this alias in the opposite direction. *)
 
 (* Disable [not-principal] warning in this file. We often write code that looks
    like [let@ [x; y] = a in b] where the list constructor is an [hlist], and [a]
