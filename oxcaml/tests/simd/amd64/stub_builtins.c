@@ -243,10 +243,8 @@ BUILTIN(caml_sse42_vec128_cmpistrs);
 BUILTIN(caml_sse42_vec128_cmpistrz);
 
 BUILTIN(caml_clmul_int64x2);
-BUILTIN(caml_popcnt_int16);
 BUILTIN(caml_popcnt_int32);
 BUILTIN(caml_popcnt_int64);
-BUILTIN(caml_lzcnt_int16);
 BUILTIN(caml_lzcnt_int32);
 BUILTIN(caml_lzcnt_int64);
 BUILTIN(caml_bmi_andn_int32);
@@ -259,7 +257,6 @@ BUILTIN(caml_bmi_blsmsk_int32);
 BUILTIN(caml_bmi_blsmsk_int64);
 BUILTIN(caml_bmi_blsr_int32);
 BUILTIN(caml_bmi_blsr_int64);
-BUILTIN(caml_bmi_tzcnt_int16);
 BUILTIN(caml_bmi_tzcnt_int32);
 BUILTIN(caml_bmi_tzcnt_int64);
 BUILTIN(caml_bmi2_bzhi_int32);

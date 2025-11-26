@@ -4,6 +4,7 @@ backend/vectorizer/test_float_unboxed.ml
 backend/vectorizer/test_int32_unboxed.ml
 backend/vectorizer/test_float32_unboxed.ml
 simd/int128.ml
+simd/int_ops.ml
 simd/*_u.ml
 simd/let_mutable.ml
 simd/unbox_types.ml

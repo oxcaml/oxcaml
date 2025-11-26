@@ -127,7 +127,6 @@ let select_operation_popcnt ~dbg:_ op args =
   then None
   else
     match op with
-    | "caml_popcnt_int16" -> instr popcnt_r16_r16m16 args
     | "caml_popcnt_int32" -> instr popcnt_r32_r32m32 args
     | "caml_popcnt_int64" -> instr popcnt_r64_r64m64 args
     | _ -> None
@@ -137,7 +136,6 @@ let select_operation_lzcnt ~dbg:_ op args =
   then None
   else
     match op with
-    | "caml_lzcnt_int16" -> instr lzcnt_r16_r16m16 args
     | "caml_lzcnt_int32" -> instr lzcnt_r32_r32m32 args
     | "caml_lzcnt_int64" -> instr lzcnt_r64_r64m64 args
     | _ -> None
@@ -157,7 +155,6 @@ let select_operation_bmi ~dbg:_ op args =
     | "caml_bmi_blsmsk_int64" -> instr blsmsk_r64_r64m64 args
     | "caml_bmi_blsr_int32" -> instr blsr_r32_r32m32 args
     | "caml_bmi_blsr_int64" -> instr blsr_r64_r64m64 args
-    | "caml_bmi_tzcnt_int16" -> instr tzcnt_r16_r16m16 args
     | "caml_bmi_tzcnt_int32" -> instr tzcnt_r32_r32m32 args
     | "caml_bmi_tzcnt_int64" -> instr tzcnt_r64_r64m64 args
     | _ -> None
@@ -175,8 +172,12 @@ let select_operation_bmi2 ~dbg:_ op args =
     | "caml_bmi2_pext_int64" -> instr pext_r64_r64_r64m64 args
     | "caml_bmi2_pdep_int32" -> instr pdep_r32_r32_r32m32 args
     | "caml_bmi2_pdep_int64" -> instr pdep_r64_r64_r64m64 args
-    | "caml_bmi2_rorx_int32" -> instr rorx_r32_r32m32 args
-    | "caml_bmi2_rorx_int64" -> instr rorx_r64_r64m64 args
+    | "caml_bmi2_rorx_int32" ->
+      let i, args = extract_constant args ~max:31 op in
+      instr rorx_r32_r32m32 ~i args
+    | "caml_bmi2_rorx_int64" ->
+      let i, args = extract_constant args ~max:63 op in
+      instr rorx_r64_r64m64 ~i args
     | "caml_bmi2_sarx_int32" -> instr sarx_r32_r32m32_r32 args
     | "caml_bmi2_sarx_int64" -> instr sarx_r64_r64m64_r64 args
     | "caml_bmi2_shrx_int32" -> instr shrx_r32_r32m32_r32 args

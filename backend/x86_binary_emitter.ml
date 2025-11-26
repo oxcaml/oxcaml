@@ -717,11 +717,11 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
     match instr.res with
     | Res_none | First_arg -> instr.args.(i).enc
     | Res rr ->
-      let rr = Array.fold_left
-        (fun acc ({enc; _} : Simd.arg) ->
+      let rr = Array.fold_right
+        (fun ({enc; _} : Simd.arg) acc ->
           match enc with
           | Implicit -> acc
-          | _ -> enc :: acc) [] rr
+          | _ -> enc :: acc) rr []
        |> Array.of_list
       in
       let n = Array.length rr in
@@ -765,6 +765,7 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
       (match enc 2, enc 1, enc 0 with
       | RM_rm, Vex_v, RM_r -> src2, rd_of_reg src1, rd_of_reg dst
       | RM_r, Vex_v, RM_rm -> dst, rd_of_reg src1, rd_of_reg src2
+      | Vex_v, RM_rm, RM_r -> src1, rd_of_reg src2, rd_of_reg dst
       | _ -> failwith instr.mnemonic)
     | _ -> failwith instr.mnemonic
   in
