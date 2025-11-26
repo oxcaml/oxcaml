@@ -115,7 +115,7 @@ Lines 1-3, characters 0-61:
 Error: The kind of type "t" is value mod non_float
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of
-           value mod contended portable
+           value mod portable contended
          because of the annotation on the declaration of the type t.
 |}]
 

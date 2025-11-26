@@ -2088,7 +2088,7 @@ let get_mod_field modname field =
          (Lazy.force Env.initial)
      in
      let _, _, env = Env.open_pers_signature modname env in
-     match Env.find_value_by_name (Longident.Lident field) env with
+     match Env.find_value_by_name_lazy (Longident.Lident field) env with
      | exception Not_found ->
          fatal_errorf "Primitive %s.%s not found." modname field
      | path, _ ->

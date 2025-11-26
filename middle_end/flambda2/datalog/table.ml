@@ -56,7 +56,7 @@ let concat is_trie ~earlier:t1 ~later:t2 =
   Trie.union is_trie (fun _ v -> Some v) t1 t2
 
 module Id = struct
-  type ('t, 'k, 'v) t =
+  type (!'t, !'k, !'v) t =
     { id : ('t * 'k) Type.Id.t;
       name : string;
       is_trie : ('t, 'k, 'v) Trie.is_trie;
