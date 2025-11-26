@@ -6,3 +6,4 @@
 
 BUILTIN(caml_rdtsc_unboxed)
 BUILTIN(caml_arm64_read_cntvct_el0_unboxed)
+BUILTIN(caml_pause_hint)
