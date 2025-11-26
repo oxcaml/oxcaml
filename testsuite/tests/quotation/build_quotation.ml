@@ -641,42 +641,48 @@ end;;
 module Mod : sig type t = int val mk : 'a -> 'a end
 |}];;
 
+<[fun (module M : Hashtbl.S) x -> M.clear (M.create x)]>;;
+[%%expect {|
+- : <[(module Hashtbl.S) -> int -> unit]> expr =
+<[fun (module M : Stdlib.Hashtbl.S) x -> M.clear (M.create x)]>
+|}];;
+
 <[ fun (module _ : S) x -> 42 ]>;;
 [%%expect {|
-Line 644, characters 19-20:
-644 | <[ fun (module _ : S) x -> 42 ]>;;
+Line 650, characters 19-20:
+650 | <[ fun (module _ : S) x -> 42 ]>;;
                          ^
-Error: Identifier "S" is used at Line 644, characters 19-20,
+Error: Identifier "S" is used at Line 650, characters 19-20,
        inside a quotation (<[ ... ]>);
        it is introduced at Lines 1-7, characters 0-3, outside any quotations.
 |}];;
 
 <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
 [%%expect {|
-Line 654, characters 18-52:
-654 | <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
+Line 660, characters 18-52:
+660 | <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Module definition using "struct..end"
        is not supported inside quoted expressions,
-       as seen at Line 654, characters 18-52.
+       as seen at Line 660, characters 18-52.
 |}];;
 
 <[ Mod.mk 42 ]>;;
 [%%expect {|
-Line 664, characters 3-9:
-664 | <[ Mod.mk 42 ]>;;
+Line 670, characters 3-9:
+670 | <[ Mod.mk 42 ]>;;
          ^^^^^^
-Error: Identifier "Mod" is used at Line 664, characters 3-9,
+Error: Identifier "Mod" is used at Line 670, characters 3-9,
        inside a quotation (<[ ... ]>);
        it is introduced at File "_none_", line 1, outside any quotations.
 |}];;
 
 let x = 42 in <[ x ]>;;
 [%%expect {|
-Line 674, characters 17-18:
-674 | let x = 42 in <[ x ]>;;
+Line 680, characters 17-18:
+680 | let x = 42 in <[ x ]>;;
                        ^
-Error: Identifier "x" is used at Line 674, characters 17-18,
+Error: Identifier "x" is used at Line 680, characters 17-18,
        inside a quotation (<[ ... ]>);
        it is introduced at Line 1, characters 4-5, outside any quotations.
 |}];;
@@ -688,21 +694,21 @@ let x = <[ 123 ]> in <[ $x ]>;;
 
 <[ let o = object method f = 1 end in o#f ]>;;
 [%%expect {|
-Line 689, characters 11-34:
-689 | <[ let o = object method f = 1 end in o#f ]>;;
+Line 695, characters 11-34:
+695 | <[ let o = object method f = 1 end in o#f ]>;;
                  ^^^^^^^^^^^^^^^^^^^^^^^
 Error: Object definition using "object..end"
        is not supported inside quoted expressions,
-       as seen at Line 689, characters 11-34.
+       as seen at Line 695, characters 11-34.
 |}];;
 
 <[ let open List in map ]>;;
 [%%expect {|
-Line 699, characters 3-23:
-699 | <[ let open List in map ]>;;
+Line 705, characters 3-23:
+705 | <[ let open List in map ]>;;
          ^^^^^^^^^^^^^^^^^^^^
 Error: Opening modules is not supported inside quoted expressions,
-       as seen at Line 699, characters 3-23.
+       as seen at Line 705, characters 3-23.
 |}];;
 
 <[ fun x -> $ (<[ x ]>) ]>;;
