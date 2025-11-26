@@ -284,16 +284,19 @@ we're correctly tracking parameters separately per file, even in server mode.
     {
       "start": {
         "line": 2,
-        "col": 18
+        "col": 60
       },
       "end": {
         "line": 2,
-        "col": 19
+        "col": 61
       },
-      "type": "warning",
+      "type": "typer",
       "sub": [],
       "valid": true,
-      "message": "Warning 49: no valid cmi file was found in path for module P. P is a parameter"
+      "message": "The file $TESTCASE_ROOT/p.cmi
+  contains the interface of a parameter. P
+  is not declared as a parameter for the current unit.
+  Hint: Compile the current unit with -parameter P."
     },
     {
       "start": {
@@ -447,18 +450,18 @@ rather than [p.mli].)
 
   $ multi_query_impl use_reexported_int.ml 3:37 $instance_warnings
   "unit -> Reexport_int.As_alias.t"
-  "No documentation available"
+  "Make a thing."
   {
-    "file": "$TESTCASE_ROOT/p_int.mli",
+    "file": "$TESTCASE_ROOT/p.mli",
     "pos": {
-      "line": 3,
+      "line": 7,
       "col": 4
     }
   }
   {
-    "file": "$TESTCASE_ROOT/p_int.mli",
+    "file": "$TESTCASE_ROOT/p.mli",
     "pos": {
-      "line": 3,
+      "line": 7,
       "col": 4
     }
   }
@@ -545,3 +548,15 @@ Check that [basic.ml] no longer compiles:
   ]
 
   $ $MERLIN server stop-server
+
+This test observes that aliasing module parameters is disallowed. When it is allowed
+again, this test should be deleted, and reexport.mli/reexport.ml should change [As_alias]
+back to actually being a module alias.
+  $ cat > canary.mli <<EOF
+  > module M = P
+  > EOF
+  $ $OCAMLC -bin-annot-cms -c canary.mli -parameter P && \
+  > echo "Delete this test and follow instructions in reexport.mli"
+  File "canary.mli", line 1:
+  Error: In module M: Module P cannot be aliased
+  [2]

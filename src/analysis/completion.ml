@@ -686,8 +686,8 @@ let complete_prefix ?get_doc ?target_type ?(kinds = []) ~keywords ~prefix
   with Not_found -> []
 
 (* Propose completion from a particular node *)
-let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix : _ -> raw_info raw_entry list =
-  function
+let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix :
+    _ -> raw_info raw_entry list = function
   | [] -> []
   | (env, node) :: branch -> (
     match node with
