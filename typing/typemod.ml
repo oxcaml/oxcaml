@@ -2033,15 +2033,10 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
     let loc = item.psig_loc in
     match item.psig_desc with
     | Psig_value sdesc ->
-        let modalities =
-          match sdesc.pval_modalities with
-          | [] -> sig_modalities
-          | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
-        in
-        let modalities = Mode.Modality.of_const modalities in
-        let (tdesc, newenv) =
-          Typedecl.transl_value_decl
-            env ~modalities ~why:Signature_item item.psig_loc sdesc
+        let (tdesc, _, newenv) =
+          Typedecl.transl_value_decl env loc sdesc
+            ~modal:(Sig_value (Value.(disallow_right legacy), sig_modalities))
+            ~why:Signature_item
         in
         Signature_names.check_value names tdesc.val_loc tdesc.val_id;
         mksig (Tsig_value tdesc) env loc,
@@ -3472,22 +3467,14 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         shape_map,
         newenv
     | Pstr_primitive sdesc ->
-        (* primitive in structure still carries modalities, which doesn't make
-        sense. We convert them to modes. *)
-        (* CR zqian: remove this hack *)
-        let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
-        let modes = List.map modality_to_mode sdesc.pval_modalities in
-        let mode =
-          modes
-          |> Typemode.transl_alloc_mode
-          |> Alloc.of_const
-          |> alloc_as_value
+        let (desc, mode, newenv) =
+          Typedecl.transl_value_decl env ~modal:Str_primitive
+            ~why:Structure_item loc sdesc
         in
-        let modalities = infer_modalities ~loc ~env ~md_mode ~mode in
-        let (desc, newenv) =
-          Typedecl.transl_value_decl
-            env ~modalities ~why:Structure_item loc sdesc
-        in
+        let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
+        (* the original val_modalities must be id *)
+        let val_val = {desc.val_val with val_modalities} in
+        let desc = {desc with val_val} in
         Signature_names.check_value names desc.val_loc desc.val_id;
         Tstr_primitive desc,
         [Sig_value(desc.val_id, desc.val_val, Exported)],
