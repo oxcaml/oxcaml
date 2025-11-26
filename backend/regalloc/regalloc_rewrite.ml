@@ -386,7 +386,7 @@ let prelude :
     (module Utils) ->
     on_fatal_callback:(unit -> unit) ->
     Cfg_with_infos.t ->
-    cfg_infos * Regalloc_stack_slots.t =
+    cfg_infos * Regalloc_stack_slots.t * Regalloc_affinity.t =
  fun (module Utils) ~on_fatal_callback cfg_with_infos ->
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   on_fatal ~f:on_fatal_callback;
@@ -446,19 +446,21 @@ let prelude :
     Reg.Set.cardinal cfg_infos.arg
   in
   if debug then Utils.log "#temporaries(before):%d" num_temporaries;
-  if num_temporaries >= threshold_split_live_ranges
-     || Flambda2_ui.Flambda_features.classic_mode ()
-  then cfg_infos, Regalloc_stack_slots.make ()
-  else if Lazy.force Regalloc_split_utils.split_live_ranges
-  then
-    let stack_slots =
-      Profile.record ~accumulate:true "split"
-        (fun () -> Regalloc_split.split_live_ranges cfg_with_infos)
-        ()
-    in
-    let cfg_infos = collect_cfg_infos cfg_with_layout in
-    cfg_infos, stack_slots
-  else cfg_infos, Regalloc_stack_slots.make ()
+  let cfg_infos, stack_slots =
+    if num_temporaries >= threshold_split_live_ranges
+       || Flambda2_ui.Flambda_features.classic_mode ()
+    then cfg_infos, Regalloc_stack_slots.make ()
+    else if Lazy.force Regalloc_split_utils.split_live_ranges
+    then
+      let stack_slots =
+        Profile.record ~accumulate:true "split"
+          (fun () -> Regalloc_split.split_live_ranges cfg_with_infos)
+          ()
+      in
+      collect_cfg_infos cfg_with_layout, stack_slots
+    else cfg_infos, Regalloc_stack_slots.make ()
+  in
+  cfg_infos, stack_slots, Regalloc_affinity.compute cfg_with_infos
 
 let postlude :
     type s.
