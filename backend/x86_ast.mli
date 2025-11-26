@@ -117,6 +117,7 @@ type arg =
 
 type instruction =
   | ADD of arg * arg
+  | ADC of arg * arg
   | AND of arg * arg
   | BSF of arg * arg
   | BSR of arg * arg
@@ -167,6 +168,7 @@ type instruction =
   | SET of condition * arg
   | SHR of arg * arg
   | SUB of arg * arg
+  | SBB of arg * arg
   | TEST of arg * arg
   | XCHG of arg * arg
   | XOR of arg * arg

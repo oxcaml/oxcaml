@@ -240,7 +240,7 @@ let foo (type a : value mod contended portable)
   use_portable t
 
 [%%expect{|
-val foo : ('a : value mod contended portable). 'a option @ contended -> unit =
+val foo : ('a : value mod portable contended). 'a option @ contended -> unit =
   <fun>
 |}]
 
@@ -250,7 +250,7 @@ let foo (t : ('a : value mod contended portable) option @ contended nonportable)
   use_portable t
 
 [%%expect{|
-val foo : ('a : value mod contended portable). 'a option @ contended -> unit =
+val foo : ('a : value mod portable contended). 'a option @ contended -> unit =
   <fun>
 |}, Principal{|
 Line 2, characters 18-19:
@@ -510,7 +510,7 @@ let foo (type a : value mod contended portable)
   use_portable t
 
 [%%expect{|
-val foo : ('a : value mod contended portable). 'a list @ contended -> unit =
+val foo : ('a : value mod portable contended). 'a list @ contended -> unit =
   <fun>
 |}]
 
@@ -1186,7 +1186,6 @@ Error: This value is "nonportable" but is expected to be "portable".
 
 (*********************************************)
 (* Reduction of error seen in the tree *)
-(* This requires the [is_open] technology in Ctype. *)
 
 type 'k t1 = T of Obj.t [@@unboxed]
 

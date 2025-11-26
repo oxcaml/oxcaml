@@ -69,6 +69,11 @@ CAMLextern_libthreads int caml_c_thread_unregister(void);
 */
 
 enum caml_thread_type { Thread_type_caml, Thread_type_c_registered };
+
+/* locking scheme version 0 has no send_interrupt field. */
+
+#define CAML_LOCKING_SCHEME_VERSION 1 /* Adds send_interrupt field */
+
 struct caml_locking_scheme {
   void* context;
   void (*lock)(void*);
@@ -95,6 +100,8 @@ struct caml_locking_scheme {
   /* If non-NULL, called without the lock held when the runtime urgently
      needs to take the lock to service an interrupt, such as for GC */
   void (*send_interrupt)(void*);
+
+  /* TODO: add magic number including version number, to improve checking */
 };
 
 /* Switch to a new runtime locking scheme.

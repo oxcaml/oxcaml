@@ -129,6 +129,8 @@ let register_name typ r : X86_ast.arg =
 
 let phys_rax = phys_reg Int 0
 
+let phys_rdi = phys_reg Int 2
+
 let phys_rdx = phys_reg Int 4
 
 let phys_rcx = phys_reg Int 5
@@ -1019,9 +1021,9 @@ let movpd ~unaligned src dst =
   | false, true, true -> I.simd movupd_X_Xm128 [| src; dst |]
   | false, false, false -> I.simd movapd_Xm128_X [| src; dst |]
   | false, false, true -> I.simd movupd_Xm128_X [| src; dst |]
-  | true, false, false -> I.simd vmovupd_Xm128_X [| src; dst |]
+  | true, false, false -> I.simd vmovapd_Xm128_X [| src; dst |]
   | true, false, true -> I.simd vmovupd_Xm128_X [| src; dst |]
-  | true, true, false -> I.simd vmovupd_X_Xm128 [| src; dst |]
+  | true, true, false -> I.simd vmovapd_X_Xm128 [| src; dst |]
   | true, true, true -> I.simd vmovupd_X_Xm128 [| src; dst |]
 
 let move (src : Reg.t) (dst : Reg.t) =
@@ -1090,59 +1092,9 @@ let tailrec_entry_point = ref None
 
 (* Emit tracing probes *)
 
-type probe =
-  { stack_offset : int;
-    num_stack_slots : int Stack_class.Tbl.t;
-    probe_name : string;
-    probe_enabled_at_init : bool;
-    probe_handler_code_sym : string;
-    (* Record frame info held in the corresponding mutable variables. *)
-    probe_label : label;
-    (* Probe site, recorded in .note.stapsdt section for enabling and disabling
-       the probes *)
-    probe_insn : Linear.instruction
-        (* Iprobe instruction, recorded at probe site and used for emitting the
-           notes and the wrapper code at the end of the compilation unit. *)
-  }
-
 let probe_handler_wrapper_name probe_label =
   let w = Printf.sprintf "probe_wrapper_%s" (Label.to_string probe_label) in
   Cmm_helpers.make_symbol w |> S.create
-
-let probes = ref []
-
-let probe_semaphores = ref String.Map.empty
-
-let stapsdt_base_emitted = ref false
-
-let reset_probes () =
-  probes := [];
-  probe_semaphores := String.Map.empty
-
-let find_or_add_semaphore name enabled_at_init dbg =
-  match String.Map.find_opt name !probe_semaphores with
-  | Some (label, symbol, e) ->
-    (match e, enabled_at_init with
-    | None, None -> ()
-    | None, Some _ ->
-      let d = label, symbol, enabled_at_init in
-      probe_semaphores
-        := String.Map.remove name !probe_semaphores |> String.Map.add name d
-    | Some _, None ->
-      (* [find_or_add_semaphore] is called with None for Iprobe_is_enabled
-         during code emission only. [find_or_add_semaphore] us called with Some
-         to emit probe notes only after all code is emitted. *)
-      assert false
-    | Some b, Some b' ->
-      if not (Bool.equal b b')
-      then raise (Emitaux.Error (Inconsistent_probe_init (name, dbg))));
-    label
-  | None ->
-    let sym = "caml_probes_semaphore_" ^ name in
-    let symbol = S.Predef.caml_probes_semaphore ~name in
-    let d = sym, symbol, enabled_at_init in
-    probe_semaphores := String.Map.add name d !probe_semaphores;
-    sym
 
 let emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label =
   assert !frame_required;
@@ -1602,18 +1554,15 @@ let emit_static_cast (cast : Cmm.static_cast) i =
     if distinct then movss (argX i 0) (res i 0)
   | V128_of_scalar Float32x4 | V256_of_scalar Float32x8 ->
     if distinct then movss (arg i 0) (resX i 0)
+  | Scalar_of_v128 Float16x8
+  | V128_of_scalar Float16x8
+  | Scalar_of_v256 Float16x16
+  | V256_of_scalar Float16x16 ->
+    Misc.fatal_error "float16 scalar type not supported"
   | Scalar_of_v128 Int16x8 | Scalar_of_v256 Int16x16 ->
-    (* CR-someday mslater: int16# shouldn't require sign extension *)
-    (* [movw] and [movzx] cannot operate on vector registers. We must sign
-       extend as the result is an untagged int8. *)
-    movd (argX i 0) (res32 i 0);
-    I.movsx (res16 i 0) (res i 0)
+    movd (argX i 0) (res32 i 0)
   | Scalar_of_v128 Int8x16 | Scalar_of_v256 Int8x32 ->
-    (* CR-someday mslater: int8# shouldn't require sign extension *)
-    (* [movb] and [movzx] cannot operate on vector registers. We must sign
-       extend as the result is an untagged int16. *)
-    movd (argX i 0) (res32 i 0);
-    I.movsx (res8 i 0) (res i 0)
+    movd (argX i 0) (res32 i 0)
   | V128_of_scalar Int16x8
   | V128_of_scalar Int8x16
   | V256_of_scalar Int16x16
@@ -1632,51 +1581,115 @@ let assert_loc (loc : Simd.loc) arg =
   | false -> assert (Simd.loc_allows_mem loc));
   match Simd.loc_is_pinned loc with
   | Some RAX -> assert (Reg.same_loc arg phys_rax)
+  | Some RDI -> assert (Reg.same_loc arg phys_rdi)
   | Some RCX -> assert (Reg.same_loc arg phys_rcx)
   | Some RDX -> assert (Reg.same_loc arg phys_rdx)
   | Some XMM0 -> assert (Reg.same_loc arg (phys_xmm0v ()))
   | None -> ()
 
-let check_simd_instr (simd : Simd.instr) imm instr =
+let check_simd_instr ?mode (simd : Simd.instr) imm instr =
   (match simd.imm with
   | Imm_none | Imm_reg -> assert (Option.is_none imm)
   | Imm_spec -> assert (Option.is_some imm));
-  Array.iteri
-    (fun j (arg : Simd.arg) -> assert_loc arg.loc instr.arg.(j))
-    simd.args;
-  match simd.res with
-  | First_arg -> assert (Reg.same_loc instr.arg.(0) instr.res.(0))
-  | Res { loc; _ } -> assert_loc loc instr.res.(0)
+  let addr_used_or_not_provided = ref (Option.is_none mode) in
+  let use_addr () =
+    assert (not !addr_used_or_not_provided);
+    addr_used_or_not_provided := true
+  in
+  let args_used =
+    Array.fold_left
+      (fun idx (arg : Simd.arg) ->
+        if not (Simd.loc_allows_reg arg.loc) then assert (Option.is_some mode);
+        match Simd.loc_allows_mem arg.loc, mode with
+        | true, Some (mode, _) ->
+          use_addr ();
+          idx + num_args_addressing mode
+        | _ ->
+          assert_loc arg.loc instr.arg.(idx);
+          idx + 1)
+      0 simd.args
+  in
+  assert !addr_used_or_not_provided;
+  assert (args_used = Array.length instr.arg);
+  let res_used =
+    match simd.res with
+    | Res_none -> 0
+    | First_arg ->
+      assert (Reg.same_loc instr.arg.(0) instr.res.(0));
+      1
+    | Res { loc; _ } ->
+      assert_loc loc instr.res.(0);
+      1
+  in
+  assert (res_used = Array.length instr.res)
 
 let to_arg_with_width loc instr i =
-  match Simd.loc_requires_width loc with
+  match Simd.loc_register_width loc with
   | Some Eight -> arg8 instr i
   | Some Sixteen -> arg16 instr i
   | Some Thirtytwo -> arg32 instr i
-  | Some Sixtyfour | None -> arg instr i
+  | Some (Sixtyfour | Onetwentyeight | Twofiftysix) | None -> arg instr i
 
 let to_res_with_width loc instr i =
-  match Simd.loc_requires_width loc with
+  match Simd.loc_register_width loc with
   | Some Eight -> res8 instr i
   | Some Sixteen -> res16 instr i
   | Some Thirtytwo -> res32 instr i
-  | Some Sixtyfour | None -> res instr i
+  | Some (Sixtyfour | Onetwentyeight | Twofiftysix) | None -> res instr i
 
-let emit_simd_instr (simd : Simd.instr) imm instr =
-  check_simd_instr simd imm instr;
-  let total_args = Array.length instr.arg in
-  if total_args <> Array.length simd.args
-  then Misc.fatal_errorf "wrong number of arguments for %s" simd.mnemonic;
+let to_addr_width loc : X86_ast.data_type =
+  match Simd.loc_memory_width loc with
+  | Simd.Eight -> BYTE
+  | Sixteen -> WORD
+  | Thirtytwo -> DWORD
+  | Sixtyfour -> QWORD
+  | Onetwentyeight -> VEC128
+  | Twofiftysix -> VEC256
+
+(* Conservatively assumes unaligned memory. This means ASAN checks are slower
+   than they could be if we were sure the input address is aligned. *)
+let to_memory_chunk loc : Cmm.memory_chunk =
+  match Simd.loc_memory_width loc with
+  | Simd.Eight -> Byte_unsigned
+  | Sixteen -> Sixteen_unsigned
+  | Thirtytwo -> Thirtytwo_unsigned
+  | Sixtyfour -> Word_int
+  | Onetwentyeight -> Onetwentyeight_unaligned
+  | Twofiftysix -> Twofiftysix_unaligned
+
+let emit_simd_sanitize ~address ~instr ~chunk ~kind =
+  if Config.with_address_sanitizer && !Arch.is_asan_enabled
+  then
+    (* May duplicate dependencies, including anything in [address]. *)
+    let arg = Array.init (Array.length instr.arg) (fun i -> arg instr i) in
+    let res = Array.init (Array.length instr.res) (fun i -> res instr i) in
+    let dependencies = Array.append arg res in
+    Address_sanitizer.emit_sanitize ~dependencies ~instr ~address chunk kind
+  else ()
+
+let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
+  check_simd_instr ?mode simd imm instr;
   let args =
-    List.init total_args (fun i ->
-        if Simd.arg_is_implicit simd.args.(i)
-        then None
-        else Some (to_arg_with_width simd.args.(i).loc instr i))
-    |> List.filter_map (fun arg -> arg)
+    Array.fold_left
+      (fun (idx, args) (arg : Simd.arg) ->
+        if Simd.arg_is_implicit arg
+        then idx + 1, args
+        else
+          match Simd.loc_allows_mem arg.loc, mode with
+          | true, Some (mode, kind) ->
+            let n = num_args_addressing mode in
+            let width = to_addr_width arg.loc in
+            let chunk = to_memory_chunk arg.loc in
+            let address = addressing mode width instr idx in
+            emit_simd_sanitize ~address ~instr ~chunk ~kind;
+            idx + n, address :: args
+          | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args)
+      (0, []) simd.args
+    |> fun (_, args) -> List.rev args
   in
   let args =
     match simd.res with
-    | First_arg | Res { enc = Implicit | Immediate; _ } -> args
+    | Res_none | First_arg | Res { enc = Implicit | Immediate; _ } -> args
     | Res { loc; enc = RM_r | RM_rm | Vex_v } -> (
       match Simd.loc_is_pinned loc with
       | Some _ -> args
@@ -1689,18 +1702,36 @@ let emit_simd_instr (simd : Simd.instr) imm instr =
   in
   I.simd simd (Array.of_list args)
 
-let emit_simd (op : Simd.operation) instr =
+(* Only used for instructions that have an implicit memory operand. Explicit
+   load/store operations are sanitized automatically by [emit_simd_instr]. *)
+let emit_implicit_simd_sanitize (op : Simd.operation) instr =
+  if Config.with_address_sanitizer && !Arch.is_asan_enabled
+     && Simd.is_memory_operation op
+  then
+    let simd = Simd.Pseudo_instr.instr op.instr in
+    match[@warning "-4"] simd.id with
+    | Maskmovdqu | Vmaskmovdqu ->
+      let address = addressing identity_addressing VEC128 instr 2 in
+      emit_simd_sanitize ~address ~instr ~chunk:Onetwentyeight_unaligned
+        ~kind:Store_modify
+    | _ ->
+      (* Must handle all impure cases in [Simd.class_of_operation] *)
+      Misc.fatal_errorf
+        "Don't know how to sanitize implicit memory operand of %s" simd.mnemonic
+
+let emit_simd ?mode (op : Simd.operation) instr =
   let open Simd_instrs in
+  emit_implicit_simd_sanitize op instr;
   let imm = op.imm in
   match op.instr with
-  | Instruction simd -> emit_simd_instr simd imm instr
+  | Instruction simd -> emit_simd_instr ?mode simd imm instr
   | Sequence seq -> (
     match seq.id with
     | Sqrtss | Sqrtsd | Roundss | Roundsd ->
       (* Avoids partial register stall *)
       if not (equal_arg (arg instr 0) (res instr 0))
       then sse_or_avx_dst xorpd vxorpd_X_X_Xm128 (res instr 0) (res instr 0);
-      emit_simd_instr seq.instr imm instr
+      emit_simd_instr ?mode seq.instr imm instr
     | Pcompare_string p | Vpcompare_string p ->
       let cond : X86_ast.condition =
         match p with
@@ -1715,35 +1746,26 @@ let emit_simd (op : Simd.operation) instr =
         | Pcmpistrs -> S
         | Pcmpistrz -> E
       in
-      emit_simd_instr seq.instr imm instr;
+      emit_simd_instr ?mode seq.instr imm instr;
       I.set cond (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
     | Ptestz | Vptestz_X | Vptestz_Y ->
-      emit_simd_instr seq.instr imm instr;
+      emit_simd_instr ?mode seq.instr imm instr;
       I.set E (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
     | Ptestc | Vptestc_X | Vptestc_Y ->
-      emit_simd_instr seq.instr imm instr;
+      emit_simd_instr ?mode seq.instr imm instr;
       I.set B (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0)
     | Ptestnzc | Vptestnzc_X | Vptestnzc_Y ->
-      emit_simd_instr seq.instr imm instr;
+      emit_simd_instr ?mode seq.instr imm instr;
       I.set A (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0))
 
-let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i addr =
-  let open Simd_instrs in
-  assert (Reg.is_reg i.arg.(0));
-  assert (not (Reg.is_reg i.arg.(1)));
+let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i mode =
   match simd with
-  | Add_f64 -> sse_or_avx3 addpd vaddpd_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Sub_f64 -> sse_or_avx3 subpd vsubpd_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Mul_f64 -> sse_or_avx3 mulpd vmulpd_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Div_f64 -> sse_or_avx3 divpd vdivpd_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Add_f32 -> sse_or_avx3 addps vaddps_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Sub_f32 -> sse_or_avx3 subps vsubps_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Mul_f32 -> sse_or_avx3 mulps vmulps_X_X_Xm128 (arg i 0) addr (res i 0)
-  | Div_f32 -> sse_or_avx3 divps vdivps_X_X_Xm128 (arg i 0) addr (res i 0)
+  | Load op -> emit_simd ~mode:(mode, Load) op i
+  | Store op -> emit_simd ~mode:(mode, Store_modify) op i
 
 let prologue_stack_offset () =
   assert !frame_required;
@@ -2079,6 +2101,14 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Intop (Idiv | Imod)) ->
     I.cqo ();
     I.idiv (arg i 1)
+  | Lop (Int128op Iadd128) ->
+    I.add (arg i 2) (res i 0);
+    I.adc (arg i 3) (res i 1)
+  | Lop (Int128op Isub128) ->
+    I.sub (arg i 2) (res i 0);
+    I.sbb (arg i 3) (res i 1)
+  | Lop (Int128op (Imul64 { signed = true })) -> I.imul (arg i 1) None
+  | Lop (Int128op (Imul64 { signed = false })) -> I.mul (arg i 1)
   | Lop (Intop ((Ilsl | Ilsr | Iasr) as op)) ->
     (* We have i.arg.(0) = i.res.(0) and i.arg.(1) = %rcx *)
     instr_for_intop op cl (res i 0)
@@ -2243,11 +2273,7 @@ let emit_instr ~first ~fallthrough i =
     else I.simd unpcklps [| arg i 1; res i 0 |]
   | Lop (Specific (Isimd op)) -> emit_simd op i
   | Lop (Specific (Isimd_mem (op, addressing_mode))) ->
-    let address = addressing addressing_mode VEC128 i 1 in
-    Address_sanitizer.emit_sanitize
-      ~dependencies:[| res i 0 |]
-      ~instr:i ~address Onetwentyeight_unaligned Store_modify;
-    emit_simd_instr_with_memory_arg op i address
+    emit_simd_instr_with_memory_arg op i addressing_mode
   | Lop (Specific (Illvm_intrinsic intr)) ->
     Misc.fatal_errorf
       "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
@@ -2288,17 +2314,10 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Name_for_debugger _) -> ()
   | Lcall_op (Lprobe { enabled_at_init; name; handler_code_sym }) ->
     let probe_label = Cmm.new_label () in
-    let probe =
-      { probe_label;
-        probe_insn = i;
-        probe_name = name;
-        probe_enabled_at_init = enabled_at_init;
-        probe_handler_code_sym = handler_code_sym;
-        stack_offset = !stack_offset;
-        num_stack_slots = Stack_class.Tbl.copy num_stack_slots
-      }
-    in
-    probes := probe :: !probes;
+    Probe_emission.add_probe ~probe_label ~probe_insn:i ~probe_name:name
+      ~probe_enabled_at_init:enabled_at_init
+      ~probe_handler_code_sym:handler_code_sym ~stack_offset:!stack_offset
+      ~num_stack_slots:(Stack_class.Tbl.copy num_stack_slots);
     D.define_label (label_to_asm_label ~section:Text probe_label);
     I.nop ();
     (* for uprobes and usdt probes as well *)
@@ -2307,8 +2326,10 @@ let emit_instr ~first ~fallthrough i =
        the correct place and managing the spilling/reloading of live registers.
        See [emit_probe_handler_wrapper] below. *)
     emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label
-  | Lop (Probe_is_enabled { name }) ->
-    let semaphore_sym = find_or_add_semaphore name None i.dbg in
+  | Lop (Probe_is_enabled { name; enabled_at_init }) ->
+    let semaphore_sym =
+      Probe_emission.find_or_add_semaphore name enabled_at_init i.dbg
+    in
     (* Load unsigned 2-byte integer value of the semaphore. According to the
        documentation [1], semaphores are of type unsigned short. [1]
        https://sourceware.org/systemtap/wiki/UserSpaceProbeImplementation *)
@@ -2586,8 +2607,7 @@ let reset_all () =
   reset_debug_info ();
   (* PR#5603 *)
   reset_imp_table ();
-  reset_probes ();
-  stapsdt_base_emitted := false;
+  Probe_emission.reset ();
   reset_traps ();
   float_constants := [];
   all_functions := []
@@ -2766,7 +2786,7 @@ let stack_locations ~offset regs =
   in
   locs |> Array.of_list
 
-let emit_probe_handler_wrapper p =
+let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   let wrap_label = probe_handler_wrapper_name p.probe_label in
   let probe_name = p.probe_name in
   let handler_code_sym = p.probe_handler_code_sym in
@@ -2869,144 +2889,6 @@ let emit_probe_handler_wrapper p =
   D.cfi_endproc ();
   emit_function_type_and_size wrap_label
 
-let emit_stapsdt_base_section () =
-  if not !stapsdt_base_emitted
-  then (
-    stapsdt_base_emitted := true;
-    D.switch_to_section Stapsdt_base;
-    (* Note that the Stapsdt symbols do not follow the usual symbol encoding
-       convention. Hence, in this rare case, we create the symbol as a raw
-       symbol for which no subsequent encoding will be done.*)
-    let stapsdt_sym = S.Predef.stapsdt_base in
-    D.weak stapsdt_sym;
-    D.hidden stapsdt_sym;
-    D.define_symbol_label ~section:Stapsdt_base stapsdt_sym;
-    D.space ~bytes:1;
-    D.size_const stapsdt_sym
-      1L (* 1 byte; alternative would be . - _.stapsdt.base *))
-
-let emit_elf_note ~section ~owner ~typ ~emit_desc =
-  D.align ~fill_x86_bin_emitter:Zero ~bytes:4;
-  let a = L.create section in
-  let b = L.create section in
-  let c = L.create section in
-  let d = L.create section in
-  D.between_labels_32_bit ~upper:b ~lower:a ();
-  D.between_labels_32_bit ~upper:d ~lower:c ();
-  D.int32 typ;
-  D.define_label a;
-  D.string (owner ^ "\000");
-  D.define_label b;
-  D.align ~fill_x86_bin_emitter:Zero ~bytes:4;
-  D.define_label c;
-  emit_desc ();
-  D.define_label d;
-  D.align ~fill_x86_bin_emitter:Zero ~bytes:4
-
-let emit_probe_note_desc ~probe_name ~probe_label ~semaphore_label ~probe_args =
-  (match probe_label with
-  | Some probe_label ->
-    let lbl = label_to_asm_label ~section:Stapsdt_note probe_label in
-    D.label lbl
-  | None -> D.int64 0L);
-  (match Target_system.is_macos () with
-  | false -> D.symbol S.Predef.stapsdt_base
-  | true -> D.int64 0L);
-  D.symbol semaphore_label;
-  D.string "ocaml_2\000";
-  D.string (probe_name ^ "\000");
-  D.string (probe_args ^ "\000")
-
-let emit_probe_notes0 () =
-  D.switch_to_section Stapsdt_note;
-  let stap_arg arg =
-    let arg_name =
-      match arg.loc with
-      | Stack s ->
-        Printf.sprintf "%d(%%rsp)"
-          (slot_offset s (Stack_class.of_machtype arg.Reg.typ))
-      | Reg reg -> Reg_class.register_name arg.Reg.typ reg
-      | Unknown ->
-        Misc.fatal_errorf "Cannot create probe: illegal argument: %a"
-          Printreg.reg arg
-    in
-    Printf.sprintf "%d@%s" (Select_utils.size_component arg.Reg.typ) arg_name
-  in
-  let describe_one_probe p =
-    let probe_name = p.probe_name in
-    let enabled_at_init = p.probe_enabled_at_init in
-    let args =
-      Array.fold_right (fun arg acc -> stap_arg arg :: acc) p.probe_insn.arg []
-      |> String.concat " "
-    in
-    let semsym =
-      find_or_add_semaphore probe_name (Some enabled_at_init) p.probe_insn.dbg
-    in
-    let semaphore_label = S.create semsym in
-    let emit_desc () =
-      emit_probe_note_desc ~probe_label:(Some p.probe_label) ~semaphore_label
-        ~probe_name ~probe_args:args
-    in
-    emit_elf_note ~section:Stapsdt_note ~owner:"stapsdt" ~typ:3l ~emit_desc
-  in
-  List.iter describe_one_probe !probes;
-  ()
-
-let emit_dummy_probe_notes () =
-  (* A semaphore may be used via [%probe_is_enabled] without a corresponding
-     probe site in the same compilation unit or even the entire program due to
-     inlining or optimizations or user defined special cases. Emit dummy probe
-     notes to correctly toggle such semaphores. A dummy note has no associated
-     probe site or probe handler. *)
-  let describe_dummy_probe ~probe_name sym =
-    let semaphore_label = S.create sym in
-    let emit_desc () =
-      emit_probe_note_desc ~probe_name ~probe_label:None ~semaphore_label
-        ~probe_args:""
-    in
-    emit_elf_note ~section:Stapsdt_note ~owner:"stapsdt" ~typ:3l ~emit_desc
-  in
-  let semaphores_without_probes =
-    List.fold_left
-      (fun acc probe -> String.Map.remove probe.probe_name acc)
-      !probe_semaphores !probes
-  in
-  if not (String.Map.is_empty semaphores_without_probes)
-  then (
-    D.switch_to_section Stapsdt_note;
-    String.Map.iter
-      (fun probe_name (sym, _, _) -> describe_dummy_probe ~probe_name sym)
-      semaphores_without_probes)
-
-let emit_probe_semaphores () =
-  (match Target_system.is_macos () with
-  | false ->
-    emit_stapsdt_base_section ();
-    D.switch_to_section Probes
-  | true -> D.switch_to_section Probes);
-  D.align ~fill_x86_bin_emitter:Zero ~bytes:2;
-  String.Map.iter
-    (fun _ (label, label_sym, enabled_at_init) ->
-      (* Unresolved weak symbols have a zero value regardless of the following
-         initialization. *)
-      let enabled_at_init = Option.value enabled_at_init ~default:false in
-      D.weak label_sym;
-      D.hidden label_sym;
-      D.define_symbol_label ~section:Probes label_sym;
-      D.int16 (Numbers.Int16.of_int_exn 0);
-      (* for systemtap probes *)
-      D.int16 (Numbers.Int16.of_int_exn (Bool.to_int enabled_at_init));
-      (* for ocaml probes *)
-      add_def_symbol label)
-    !probe_semaphores
-
-let emit_probe_notes () =
-  (match !probes with [] -> () | _ -> emit_probe_notes0 ());
-  if not (String.Map.is_empty !probe_semaphores)
-  then (
-    emit_dummy_probe_notes ();
-    emit_probe_semaphores ())
-
 let emit_trap_notes () =
   (* Don't emit trap notes on windows and macos systems *)
   let is_system_supported =
@@ -3032,9 +2914,10 @@ let emit_trap_notes () =
      && not (L.Set.is_empty traps.enter_traps)
   then (
     D.switch_to_section Note_ocaml_eh;
-    emit_elf_note ~section:Note_ocaml_eh ~owner:"OCaml" ~typ:1l ~emit_desc;
-    (* Reuse stapsdt base section for calcluating addresses after pre-link *)
-    emit_stapsdt_base_section ();
+    Emitaux.emit_elf_note ~section:Note_ocaml_eh ~owner:"OCaml" ~typ:1l
+      ~emit_desc;
+    (* Reuse stapsdt base section for calculating addresses after prelinking *)
+    Emitaux.emit_stapsdt_base_section ();
     (* Switch back to Data section *)
     D.data ())
 
@@ -3060,7 +2943,7 @@ let end_assembly () =
     D.align ~fill_x86_bin_emitter:Zero ~bytes:64;
     List.iter (fun (cst, lbl) -> emit_vec512_constant cst lbl) !vec512_constants);
   (* Emit probe handler wrappers *)
-  List.iter emit_probe_handler_wrapper !probes;
+  List.iter emit_probe_handler_wrapper (Probe_emission.get_probes ());
   emit_named_text_section (Cmm_helpers.make_symbol "jump_tables");
   emit_jump_tables ();
   let code_end = Cmm_helpers.make_symbol "code_end" in
@@ -3121,7 +3004,7 @@ let end_assembly () =
   let frametable_sym = S.create (Cmm_helpers.make_symbol "frametable") in
   D.size frametable_sym;
   D.data ();
-  emit_probe_notes ();
+  Probe_emission.emit_probe_notes ~slot_offset ~add_def_symbol;
   emit_trap_notes ();
   D.mark_stack_non_executable ();
   (* Note that [mark_stack_non_executable] switches the section on Linux. *)

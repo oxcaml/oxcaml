@@ -136,3 +136,12 @@ val add_stack_checks_if_needed :
   stack_threshold_size:int ->
   trap_size:int ->
   Linear.fundecl
+
+val emit_stapsdt_base_section : unit -> unit
+
+val emit_elf_note :
+  section:Asm_targets.Asm_section.t ->
+  owner:string ->
+  typ:int32 ->
+  emit_desc:(unit -> unit) ->
+  unit

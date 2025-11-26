@@ -106,7 +106,7 @@ let rec protect ppf restart loop =
   | x ->
       cleanup x kill_program
 
-let execute_file_if_any () =
+let execute_file_if_any ~quiet () =
   let buffer = Buffer.create 128 in
   begin
     try
@@ -130,13 +130,18 @@ let execute_file_if_any () =
   let len = Buffer.length buffer in
   if len > 0 then
     let commands = Buffer.sub buffer 0 (pred len) in
-    line_loop Format.std_formatter (Lexing.from_string commands);
+    let ppf =
+      match quiet with
+      | true -> Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
+      | false -> Format.std_formatter
+    in
+    line_loop ppf (Lexing.from_string commands);
     stop_user_input ()
 
-let toplevel_loop () =
+let toplevel_loop ~quiet () =
   interactif := false;
   current_prompt := "";
-  execute_file_if_any ();
+  execute_file_if_any ~quiet ();
   interactif := true;
   current_prompt := debugger_prompt;
   protect Format.std_formatter loop loop
@@ -189,6 +194,8 @@ let speclist = [
       " Do not print times";
    "-no-breakpoint-message", Arg.Clear Parameters.breakpoint,
       " Do not print message at breakpoint setup and removal";
+   "-quiet", Arg.Set Parameters.quiet,
+      " Suppress printing while executing an initalization file";
    ]
 
 let function_placeholder () =
@@ -227,7 +234,8 @@ let main () =
     Load_path.init ~auto_include:Compmisc.auto_include
       ~visible:!default_load_path ~hidden:[];
     Clflags.recursive_types := true;    (* Allow recursive types. *)
-    toplevel_loop ();                   (* Toplevel. *)
+    let quiet = !Parameters.quiet in
+    toplevel_loop ~quiet ();            (* Toplevel. *)
     kill_program ();
     exit 0
   with
