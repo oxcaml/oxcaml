@@ -501,6 +501,10 @@ module Directive : sig
   val emit_int_le : Buffer.t -> width_bytes:int -> int64 -> unit
 end
 
+(** Helper function to construct CFI directive values for use in optimization
+    passes that need to create new directives. *)
+val make_cfi_adjust_cfa_offset_directive : int -> Directive.t
+
 (** To be called by the emitter at the very start of code generation.
     [big_endian] should always be [Arch.big_endian]. Calling the functions in
     this module will cause directives to be passed to the given [emit] function
