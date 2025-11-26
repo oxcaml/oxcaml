@@ -267,8 +267,9 @@ let get_mode_doc mode =
       Some "Functions with this mode may be executed concurrently."
     | Comonadic Forkable, Unforkable ->
       Some "Functions with this mode cannot be executed concurrently."
-    | Monadic Staticity, Static -> Some "todo"
-    | Monadic Staticity, Dynamic -> Some "todo"
+    | Monadic Staticity, Static -> Some "The value is known at compile-time."
+    | Monadic Staticity, Dynamic ->
+      Some "The value is not known at compile-time."
   in
   let doc_url =
     let subpage =
