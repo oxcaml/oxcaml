@@ -26,10 +26,6 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-module Code : sig
-  type t
-end
-
 val transl_quote :
   scopes:Debuginfo.Scoped_location.scopes ->
   loc:Location.t ->

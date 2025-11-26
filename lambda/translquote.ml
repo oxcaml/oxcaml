@@ -305,12 +305,6 @@ let vars_env =
     env_poly = Hashtbl.create 64
   }
 
-let _refresh_env () =
-  Hashtbl.clear vars_env.env_vals;
-  Hashtbl.clear vars_env.env_tys;
-  Hashtbl.clear vars_env.env_mod;
-  Hashtbl.clear vars_env.env_poly
-
 let with_value ident val_ =
   Hashtbl.add vars_env.env_vals ident (Var.Value.mk val_)
 
