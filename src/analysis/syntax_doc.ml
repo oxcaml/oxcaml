@@ -225,8 +225,12 @@ let get_mode_doc mode =
       Some "The mutable parts of values with this mode can be fully accessed"
     | Comonadic Portability, Nonportable ->
       Some
-        "Values with this mode cannot be sent to other threads, in order to \
-         avoid data races."
+        "Values with this mode cannot be sent to or shared with other threads, \
+         in order to avoid data races."
+    | Comonadic Portability, Shareable ->
+      Some
+        "Values with this mode can be shared with (but not sent to) other \
+         threads without causing data races"
     | Comonadic Portability, Portable ->
       Some
         "Values with this mode can be sent to other threads without causing \
@@ -263,6 +267,9 @@ let get_mode_doc mode =
       Some "Functions with this mode may be executed concurrently."
     | Comonadic Forkable, Unforkable ->
       Some "Functions with this mode cannot be executed concurrently."
+    | Monadic Staticity, Static -> Some "The value is known at compile-time."
+    | Monadic Staticity, Dynamic ->
+      Some "The value is not known at compile-time."
   in
   let doc_url =
     let subpage =
@@ -276,6 +283,7 @@ let get_mode_doc mode =
       | Monadic Visibility -> "modes/intro/"
       | Comonadic Statefulness -> "modes/intro/"
       | Comonadic Forkable -> "modes/intro/"
+      | Monadic Staticity -> "modes/intro/"
     in
     syntax_doc_url Oxcaml subpage
   in

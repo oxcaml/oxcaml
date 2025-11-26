@@ -16,7 +16,11 @@
 open Allowance
 open Solver_intf
 
-module Misc = Misc_stdlib
+module Misc = struct
+  include Misc
+  module Stdlib = Misc_stdlib
+  include Misc_stdlib
+end
 
 module Magic_equal (X : Equal) :
   Equal with type ('a, 'b, 'c) t = ('a, 'b, 'c) X.t = struct
@@ -1136,6 +1140,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (fun _ mv acc ->
           C.join obj acc (zap_to_floor_morphvar obj mv ~commit:None))
         mvs a
+
+  let to_const_exn obj m =
+    let floor = get_floor obj m in
+    let ceil = get_ceil obj m in
+    if C.le obj ceil floor
+    then ceil
+    else
+      Misc.fatal_errorf "mode is not tight: floor = %a, ceil = %a" (C.print obj)
+        floor (C.print obj) ceil
 
   let print :
       type a l r.

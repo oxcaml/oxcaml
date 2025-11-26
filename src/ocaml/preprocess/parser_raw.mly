@@ -1283,8 +1283,8 @@ The precedences must be listed from low to high.
 %nonassoc BACKQUOTE BANG BEGIN CHAR HASH_CHAR FALSE FLOAT HASH_FLOAT
           INT HASH_INT OBJECT
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
-          NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR UNDERSCORE
-          LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN
+          NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
+          LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN UNDERSCORE
           DOTLESS DOTTILDE GREATERDOT
 
 /* Entry points */
@@ -2987,12 +2987,6 @@ fun_:
     { mk_indexop_expr user_indexing_operators ~loc:$sloc $1 }
   | fun_expr attribute
       { Exp.attr $1 $2 }
-  (* Merlin-only: this is commented out because we already accept UNDERSCORE in this
-     position via the simple_expr -> simple_expr_ rules (in order to support typed holes) *)
-  (*
-  | UNDERSCORE
-    { mkexp ~loc:$sloc Pexp_hole }
-  *)
   | mode=mode_legacy exp=seq_expr
      { mkexp_constraint ~loc:$sloc ~exp ~cty:None ~modes:[mode] }
   | EXCLAVE seq_expr
@@ -3163,20 +3157,6 @@ comprehension_iterator:
 comprehension_clause_binding:
   | attributes pattern comprehension_iterator
       { { pcomp_cb_pattern = $2 ; pcomp_cb_iterator = $3 ; pcomp_cb_attributes = $1 } }
-  (* We can't write [[e for local_ x = 1 to 10]], because the [local_] has to
-     move to the RHS and there's nowhere for it to move to; besides, you never
-     want that [int] to be [local_].  But we can parse [[e for local_ x in xs]].
-     We have to have that as a separate rule here because it moves the [local_]
-     over to the RHS of the binding, so we need everything to be visible. *)
-  | attributes mode_legacy pattern IN expr
-      { let expr =
-          mkexp_constraint ~loc:$sloc ~exp:$5 ~cty:None ~modes:[$2]
-        in
-        { pcomp_cb_pattern    = $3
-        ; pcomp_cb_iterator   = Pcomp_in expr
-        ; pcomp_cb_attributes = $1
-        }
-      }
 ;
 
 comprehension_clause:
@@ -3331,8 +3311,6 @@ block_access:
       { mkinfix $1 $2 $3 }
   | extension
       { Pexp_extension $1 }
-  | UNDERSCORE
-      { Pexp_hole }
   | od=open_dot_declaration DOT mkrhs(LPAREN RPAREN {Lident "()"})
       { Pexp_open(od, mkexp ~loc:($loc($3)) (Pexp_construct($3, None))) }
   (*
@@ -3405,6 +3383,8 @@ block_access:
   | LESSLBRACKET seq_expr error
       { unclosed "<[" $loc($1) "]>" $loc($3) }
   /* END AVOID */
+  | UNDERSCORE
+      { Pexp_hole }
 ;
 labeled_simple_expr:
     simple_expr %prec below_HASH
@@ -3414,12 +3394,16 @@ labeled_simple_expr:
   | TILDE label = LIDENT
       { let loc = $loc(label) in
         (Labelled label, mkexpvar ~loc label) }
+  | TILDE UNDERSCORE
+      { (Labelled "_", mkexp ~loc:$sloc Pexp_hole) }
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN
       { (Labelled label, mkexp_type_constraint_with_modes ~loc:($startpos($2), $endpos) ~modes:[]
                            (mkexpvar ~loc:$loc(label) label) c) }
   | QUESTION label = LIDENT
       { let loc = $loc(label) in
         (Optional label, mkexpvar ~loc label) }
+  | QUESTION UNDERSCORE
+      { (Optional "_", mkexp ~loc:$sloc Pexp_hole) }
   | OPTLABEL simple_expr %prec below_HASH
       { (Optional $1, $2) }
 ;
@@ -3974,7 +3958,7 @@ simple_pattern_not_ident:
   mkpat(
     UNDERSCORE
       { Ppat_any }
-  | signed_value_constant DOTDOT signed_value_constant
+  | signed_constant DOTDOT signed_constant
       { Ppat_interval ($1, $3) }
   | mkrhs(constr_longident)
       { Ppat_construct($1, None) }
@@ -4397,7 +4381,7 @@ str_exception_declaration:
   attrs = post_item_attributes
   { let loc = make_loc $sloc in
     let docs = symbol_docs $sloc in
-    Te.mk_exception ~attrs
+    Te.mk_exception ~attrs ~loc
       (Te.rebind id lid ~attrs:(attrs1 @ attrs2) ~loc ~docs)
     , ext }
 ;
@@ -4410,9 +4394,9 @@ sig_exception_declaration:
   attrs2 = attributes
   attrs = post_item_attributes
     { let vars, args, res = vars_args_res in
-      let loc = make_loc ($startpos, $endpos(attrs2)) in
+      let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
-      Te.mk_exception ~attrs
+      Te.mk_exception ~attrs ~loc
         (Te.decl id ~vars ~args ?res ~attrs:(attrs1 @ attrs2) ~loc ~docs)
       , ext }
 ;

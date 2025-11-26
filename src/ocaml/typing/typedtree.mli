@@ -1364,9 +1364,6 @@ val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
 
 (* Merlin specific *)
 
-val unpack_functor_me : module_expr -> functor_parameter * module_expr
-val unpack_functor_mty : module_type -> functor_parameter * module_type
-
 (** Fold over the antiquotations in an expression. This function defines the
     evaluation order of antiquotations. *)
 val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a

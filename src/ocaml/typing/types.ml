@@ -78,6 +78,7 @@ module Jkind_mod_bounds = struct
   let yielding = Crossing.Axis.Comonadic Yielding
   let statefulness = Crossing.Axis.Comonadic Statefulness
   let visibility = Crossing.Axis.Monadic Visibility
+  let staticity = Crossing.Axis.Monadic Staticity
   let[@inline] externality t = t.externality
   let[@inline] nullability t = t.nullability
   let[@inline] separability t = t.separability
@@ -117,6 +118,7 @@ module Jkind_mod_bounds = struct
     let yielding = modal yielding in
     let statefulness = modal statefulness in
     let visibility = modal visibility in
+    let staticity = modal staticity in
     let externality =
       if mem max_axes (Nonmodal Externality)
       then Externality.max
@@ -133,7 +135,7 @@ module Jkind_mod_bounds = struct
       else t.separability
     in
     let monadic =
-      Crossing.Monadic.create ~uniqueness ~contention ~visibility
+      Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
     in
     let comonadic =
       Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
@@ -165,6 +167,7 @@ module Jkind_mod_bounds = struct
     let yielding = modal yielding in
     let statefulness = modal statefulness in
     let visibility = modal visibility in
+    let staticity = modal staticity in
     let externality =
       if mem min_axes (Nonmodal Externality)
       then Externality.min
@@ -181,7 +184,7 @@ module Jkind_mod_bounds = struct
       else t.separability
     in
     let monadic =
-      Crossing.Monadic.create ~uniqueness ~contention ~visibility
+      Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
     in
     let comonadic =
       Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
@@ -211,6 +214,7 @@ module Jkind_mod_bounds = struct
     modal yielding &&
     modal statefulness &&
     modal visibility &&
+    modal staticity &&
     (not (mem axes (Nonmodal Externality)) ||
      Externality.(le max (externality t))) &&
     (not (mem axes (Nonmodal Nullability)) ||
@@ -246,8 +250,12 @@ end
 type transient_expr =
   { mutable desc: type_desc;
     mutable level: int;
-    mutable scope: int;
+    mutable scope: scope_field;
     id: int }
+
+and scope_field = int
+  (* bit field: 27 bits for scope (Ident.highest_scope = 100_000_000)
+     and at least 4 marks *)
 
 and type_expr = transient_expr
 
@@ -377,6 +385,8 @@ module TransientTypeOps = struct
   let hash t = t.id
   let equal t1 t2 = t1 == t2
 end
+
+module TransientTypeHash = Hashtbl.Make(TransientTypeOps)
 
 (* *)
 
@@ -1250,12 +1260,48 @@ let repr t =
  | _ -> t
 
 
+(* scope_field and marks *)
+
+let scope_mask = (1 lsl 27) - 1
+let marks_mask = (-1) lxor scope_mask
+let () = assert (Ident.highest_scope land marks_mask = 0)
+
+type type_mark =
+  | Mark of {mark: int; mutable marked: type_expr list}
+  | Hash of {visited: unit TransientTypeHash.t}
+let type_marks =
+  (* All the bits in marks_mask *)
+  List.init (Sys.int_size - 27) (fun x -> 1 lsl (x + 27))
+let available_marks = Local_store.s_ref type_marks
+let with_type_mark f =
+  match !available_marks with
+  | mark :: rem as old ->
+      available_marks := rem;
+      let mk = Mark {mark; marked = []} in
+      Misc.try_finally (fun () -> f mk) ~always: begin fun () ->
+        available_marks := old;
+        match mk with
+        | Mark {marked} ->
+            (* unmark marked type nodes *)
+            List.iter
+              (fun ty -> ty.scope <- ty.scope land ((-1) lxor mark))
+              marked
+        | Hash _ -> ()
+      end
+  | [] ->
+      (* When marks are exhausted, fall back to using a hash table *)
+      f (Hash {visited = TransientTypeHash.create 1})
+
 (* getters for type_expr *)
 
 let get_desc t = (repr t).desc
 let get_level t = (repr t).level
-let get_scope t = (repr t).scope
+let get_scope t = (repr t).scope land scope_mask
 let get_id t = (repr t).id
+let not_marked_node mark t =
+  match mark with
+  | Mark {mark} -> (repr t).scope land mark = 0
+  | Hash {visited} -> not (TransientTypeHash.mem visited (repr t))
 
 (* transient type_expr *)
 
@@ -1268,16 +1314,32 @@ module Transient_expr = struct
     | _ -> assert false);
     ty.desc <- d
   let set_level ty lv = ty.level <- lv
-  let set_scope ty sc = ty.scope <- sc
   let set_var_jkind ty jkind' =
     match ty.desc with
     | Tvar { name; _ } ->
       set_desc ty (Tvar { name; jkind = jkind' })
     | _ -> Misc.fatal_error "set_var_jkind called on non-var"
+  let get_scope ty = ty.scope land scope_mask
+  let get_marks ty = ty.scope lsr 27
+  let set_scope ty sc =
+    if (sc land marks_mask <> 0) then
+      invalid_arg "Types.Transient_expr.set_scope";
+    ty.scope <- (ty.scope land marks_mask) lor sc
+  let try_mark_node mark ty =
+    match mark with
+    | Mark ({mark} as mk) ->
+        (ty.scope land mark = 0) && (* mark type node when not marked *)
+        (ty.scope <- ty.scope lor mark; mk.marked <- ty :: mk.marked; true)
+    | Hash {visited} ->
+        not (TransientTypeHash.mem visited ty) &&
+        (TransientTypeHash.add visited ty (); true)
   let coerce ty = ty
   let repr = repr
   let type_expr ty = ty
 end
+
+(* setting marks *)
+let try_mark_node mark t = Transient_expr.try_mark_node mark (repr t)
 
 (* Comparison for [type_expr]; cannot be used for functors *)
 
@@ -1672,11 +1734,13 @@ let set_level ty level =
     if ty.id <= !last_snapshot then log_change (Clevel (ty, ty.level));
     Transient_expr.set_level ty level
   end
+
 (* TODO: introduce a guard and rename it to set_higher_scope? *)
 let set_scope ty scope =
   let ty = repr ty in
-  if scope <> ty.scope then begin
-    if ty.id <= !last_snapshot then log_change (Cscope (ty, ty.scope));
+  let prev_scope = ty.scope land scope_mask in
+  if scope <> prev_scope then begin
+    if ty.id <= !last_snapshot then log_change (Cscope (ty, prev_scope));
     Transient_expr.set_scope ty scope
   end
 let set_var_jkind ty jkind =
@@ -1795,7 +1859,3 @@ let is_valid (changes, _old) =
 
 let on_backtrack f =
   log_change (Cfun f)
-
-let unpack_functor = function
-  | Mty_functor (fp, mty) -> fp, mty
-  | _ -> invalid_arg "Types.unpack_functor (merlin)"

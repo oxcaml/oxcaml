@@ -115,7 +115,7 @@ let directories ~global_modules env =
   List.fold_left
     ~f:(fun l name ->
       let lident = Longident.Lident name in
-      match Env.find_module_by_name lident env with
+      match Env.find_module_by_name_lazy lident env with
       | exception _ -> l
       | _ -> Trie (name, lident, lazy (explore lident env)) :: l)
     ~init:[] global_modules
@@ -138,7 +138,7 @@ let execute_query query env dirs =
   in
   let rec recurse acc (Trie (_, dir, children)) =
     match
-      ignore (Env.find_module_by_name dir env);
+      ignore (Env.find_module_by_name_lazy dir env);
       Lazy.force children
     with
     | children ->

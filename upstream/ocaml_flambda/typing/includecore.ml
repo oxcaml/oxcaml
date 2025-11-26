@@ -94,8 +94,7 @@ let check_modes env ?(crossing = Crossing.max) ~item ?typ = function
         | None -> m0
         | Some (locks, lid, loc) ->
             let m0 = Crossing.apply_left crossing m0 in
-            let m0 = Env.walk_locks ~env ~loc lid ~item typ (m0, locks) in
-            m0.mode
+            Env.walk_locks ~env ~loc lid ~item typ (m0, locks)
       in
       let m1 = Crossing.apply_right crossing m1 in
       Mode.Value.submode m0 m1
@@ -678,7 +677,8 @@ let report_type_mismatch first second decl env ppf err =
   | Parameter_jkind (ty, v) ->
       pr "The problem is in the kinds of a parameter:@,";
       Jkind.Violation.report_with_offender
-        ~offender:(fun pp -> Printtyp.type_expr pp ty) ppf v
+        ~offender:(fun pp -> Printtyp.type_expr pp ty)
+        ~level:(Ctype.get_current_level ()) ppf v
   | Private_variant (_ty1, _ty2, mismatch) ->
       report_private_variant_mismatch first second decl env ppf mismatch
   | Private_object (_ty1, _ty2, mismatch) ->
@@ -706,7 +706,8 @@ let report_type_mismatch first second decl env ppf err =
          "has a constructor represented as a null pointer";
       pr "@ Hint: add [%@%@or_null_reexport]."
   | Jkind v ->
-      Jkind.Violation.report_with_name ~name:first ppf v
+      Jkind.Violation.report_with_name ~name:first
+        ~level:(Ctype.get_current_level ()) ppf v
   | Unsafe_mode_crossing mismatch ->
     pr "They have different unsafe mode crossing behavior:@,@[<v 2>%a@]"
       (fun ppf (first, second, mismatch) ->

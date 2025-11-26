@@ -176,7 +176,7 @@ module type Sort = sig
   val bits64 : t
 
   (** Create a new sort variable that can be unified. *)
-  val new_var : unit -> t
+  val new_var : level:int -> t
 
   val of_base : base -> t
 

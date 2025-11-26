@@ -116,7 +116,7 @@ let compute_values query env lident acc =
 
 let values_from_module query env lident acc =
   let rec aux acc lident =
-    match Env.find_module_by_name lident env with
+    match Env.find_module_by_name_lazy lident env with
     | exception _ -> acc
     | _ ->
       let acc = compute_values query env (Some lident) acc in
