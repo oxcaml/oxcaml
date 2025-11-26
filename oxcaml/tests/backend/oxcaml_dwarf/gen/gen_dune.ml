@@ -83,4 +83,5 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
   print_dwarf_test "test_closures_dwarf";
   print_dwarf_test "test_large_data_dwarf";
   print_dwarf_test "test_tailrec_dwarf";
+  print_dwarf_test "test_ocaml_and_c_dwarf";
   ()

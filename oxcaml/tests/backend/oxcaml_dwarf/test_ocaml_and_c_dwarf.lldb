@@ -1,0 +1,66 @@
+(lldb) settings set stop-line-count-before 0
+(lldb) settings set stop-line-count-after 0
+(lldb) settings set stop-disassembly-display never
+(lldb) b Test_ocaml_and_c_dwarf.f_start
+(lldb) run
+(lldb) script print("=== Testing OCaml/C boundary - string allocation ===")
+(lldb) br set -o true -n caml_alloc_string
+(lldb) c
+(lldb) bt 5
+(lldb) script print("=== Testing OCaml/C boundary - array allocation ===")
+(lldb) br set -o true -n caml_make_vect
+(lldb) c
+(lldb) bt 4
+(lldb) script print("=== Testing OCaml/C boundary - bytes blit ===")
+(lldb) br set -o true -n caml_blit_bytes
+(lldb) c
+(lldb) bt 4
+(lldb) script print("=== Testing OCaml/C boundary - GC minor ===")
+(lldb) br set -o true -n caml_gc_minor
+(lldb) c
+(lldb) bt 3
+(lldb) script print("=== Testing OCaml/C boundary - polymorphic hash ===")
+(lldb) br set -o true -n caml_hash_exn
+(lldb) c
+(lldb) bt 5
+(lldb) script print("=== Testing OCaml/C boundary - polymorphic compare ===")
+(lldb) br set -o true -n caml_compare
+(lldb) c
+(lldb) bt 4
+(lldb) script print("=== Testing OCaml/C boundary - marshal output ===")
+(lldb) br set -o true -n caml_output_value_to_buffer
+(lldb) c
+(lldb) bt 4
+(lldb) script print("=== Testing OCaml/C boundary - unmarshal input ===")
+(lldb) br set -o true -n caml_input_value_from_bytes
+(lldb) c
+(lldb) bt 4
+(lldb) script print("=== Testing OCaml/C boundary - MD5 hash ===")
+(lldb) br set -o true -n caml_md5_string
+(lldb) c
+(lldb) bt 4
+(lldb) script print("=== Testing OCaml/C boundary - getenv ===")
+(lldb) br set -o true -n caml_sys_getenv
+(lldb) c
+(lldb) bt 4
+(lldb) script print("=== Testing OCaml/C boundary - bigarray create ===")
+(lldb) br set -o true -n caml_ba_create
+(lldb) c
+(lldb) bt 4
+(lldb) script print("=== Testing OCaml/C boundary - GC stat (caml_alloc_tuple) ===")
+(lldb) br set -o true -n caml_alloc_tuple
+(lldb) c
+(lldb) bt 4
+(lldb) script print("=== Testing OCaml/C boundary - large tuple (caml_alloc_shr_check_gc) ===")
+(lldb) br set -o true -n caml_alloc_shr_check_gc
+(lldb) c
+(lldb) bt 3
+(lldb) script print("=== Testing OCaml/C boundary - callback (C calls OCaml) ===")
+(lldb) br set -o true -n Test_ocaml_and_c_dwarf.f_callback_inner
+(lldb) c
+(lldb) bt 8
+(lldb) script print("=== Testing OCaml/C boundary - finalizer (C calls OCaml during GC) ===")
+(lldb) br set -o true -n Test_ocaml_and_c_dwarf.f_my_finalizer
+(lldb) c
+(lldb) bt 12
+(lldb) quit
