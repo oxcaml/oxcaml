@@ -776,7 +776,7 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
 type address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * Types.module_representation * int
+  | Adot of address * int
 
 type 'a sig_reader =
   Subst.Lazy.signature

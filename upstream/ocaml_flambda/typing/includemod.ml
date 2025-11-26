@@ -418,10 +418,10 @@ let rec print_coercion ppf c =
   let pr fmt = Format.fprintf ppf fmt in
   match c with
     Tcoerce_none -> pr "id"
-  | Tcoerce_structure { pos_cc_list; id_pos_list; _ } ->
+  | Tcoerce_structure (fl, nl) ->
       pr "@[<2>struct@ %a@ %a@]"
-        (print_list print_coercion2) pos_cc_list
-        (print_list print_coercion3) id_pos_list
+        (print_list print_coercion2) fl
+        (print_list print_coercion3) nl
   | Tcoerce_functor (inp, out) ->
       pr "@[<2>functor@ (%a)@ (%a)@]"
         print_coercion inp
@@ -453,15 +453,15 @@ let equal_modtype_paths env p1 subst p2 =
        (Env.normalize_modtype_path env
           (Subst.modtype_path subst p2))
 
-let simplify_structure_coercion input_repr output_repr pos_cc_list id_pos_list =
+let simplify_structure_coercion cc id_pos_list =
   let rec is_identity_coercion pos = function
   | [] ->
       true
   | (n, c) :: rem ->
       n = pos && c = Tcoerce_none && is_identity_coercion (pos + 1) rem in
-  if is_identity_coercion 0 pos_cc_list
+  if is_identity_coercion 0 cc
   then Tcoerce_none
-  else Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
+  else Tcoerce_structure (cc, id_pos_list)
 
 
 (* Build a table of the components of sig1, along with their positions.
@@ -907,22 +907,10 @@ and signatures ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           then mod_shape
           else Shape.str ?uid:mod_shape.Shape.uid d.shape_map
         in
-        let input_repr =
-          List.filter_map Subst.Lazy.sort_of_signature_item sig1
-          |> Array.of_list
-        in
-        let output_repr =
-          List.filter_map Subst.Lazy.sort_of_signature_item sig2
-          |> Array.of_list
-        in
-        let coercion =
-          if runtime_len1 = runtime_len2 then (* see PR#5098 *)
-            simplify_structure_coercion input_repr output_repr cc id_pos_list
-          else
-            Tcoerce_structure
-              { input_repr; output_repr; pos_cc_list = cc; id_pos_list }
-        in
-        Ok (coercion, shape)
+        if runtime_len1 = runtime_len2 then (* see PR#5098 *)
+          Ok (simplify_structure_coercion cc id_pos_list, shape)
+        else
+          Ok (Tcoerce_structure (cc, id_pos_list), shape)
     | missings, incompatibles, _runtime_coercions, _leftovers ->
         Error {
           Error.env=new_env;

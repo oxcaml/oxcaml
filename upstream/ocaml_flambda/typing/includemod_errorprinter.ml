@@ -98,10 +98,10 @@ module Illegal_permutation = struct
   (** We extract a lone transposition from a full tree of permutations. *)
   let rec transposition_under path (coerc:Typedtree.module_coercion) =
     match coerc with
-    | Tcoerce_structure { pos_cc_list; _ } ->
+    | Tcoerce_structure(c,_) ->
         either
-          (not_fixpoint path 0) pos_cc_list
-          (first_non_id path 0) pos_cc_list
+          (not_fixpoint path 0) c
+          (first_non_id path 0) c
     | Tcoerce_functor(arg,res) ->
         either
           (transposition_under (InArg::path)) arg
