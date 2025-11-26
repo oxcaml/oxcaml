@@ -1309,16 +1309,13 @@ end = struct
                 in
                 Block_approximation
                   (tag, shape, Array.of_list fields, alloc_mode)
-              | Some (_, Float_record, _, _, _)
-                ->
-                value_unknown
+              | Some (_, Float_record, _, _, _) -> value_unknown
             else value_unknown))
       | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
       | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ ->
-          Unknown (TG.kind ty)
-      | Rec_info _ | Region _ ->
-        assert false
+        Unknown (TG.kind ty)
+      | Rec_info _ | Region _ -> assert false
     in
     let symbol_ty, _binding_time_and_mode =
       Name.Map.find (Name.symbol symbol)

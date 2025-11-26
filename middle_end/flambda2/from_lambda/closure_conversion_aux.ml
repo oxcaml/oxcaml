@@ -414,13 +414,13 @@ module Acc = struct
                approximation (%a) for symbol %a"
               Symbol.print sym Symbol.print symbol
           | Unknown kind ->
-              if not (Flambda_kind.equal kind Flambda_kind.value) then
-                Misc.fatal_errorf
-                  "Closure_conversion: approximation loader returned an \
-                   approximation of kind %a for symbol %a"
-                  Flambda_kind.print kind Symbol.print symbol
-          | Value_const _ | Closure_approximation _
-          | Block_approximation _ ->
+            if not (Flambda_kind.equal kind Flambda_kind.value)
+            then
+              Misc.fatal_errorf
+                "Closure_conversion: approximation loader returned an \
+                 approximation of kind %a for symbol %a"
+                Flambda_kind.print kind Symbol.print symbol
+          | Value_const _ | Closure_approximation _ | Block_approximation _ ->
             ());
         let rec filter_inlinable approx =
           match (approx : Env.value_approximation) with

@@ -1756,9 +1756,8 @@ let close_exact_or_unknown_apply acc env
           in
           acc, Call_kind.direct_function_call code_id mode, can_erase_callee
       | None -> acc, Call_kind.indirect_function_call_unknown_arity mode, false
-      | Some
-          ( Unknown _ | Value_symbol _ | Value_const _
-          | Block_approximation _ ) ->
+      | Some (Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _)
+        ->
         assert false (* See [close_apply] *))
     | Method { kind; obj } ->
       let acc, obj = find_simple acc env obj in
