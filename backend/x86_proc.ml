@@ -424,7 +424,267 @@ let reset_asm_code () =
   asm_code_current_section := DLL.make_empty ();
   Section_name.Tbl.clear asm_code_by_section
 
+(* Peephole optimization for x86 instruction lists.
+
+   TODO: This code should eventually be moved to a separate module in
+   backend/x86_peephole/ to better organize the peephole optimization
+   infrastructure and rules. *)
+
+module X86_peephole = struct
+  (* Equality functions for x86_ast types, avoiding polymorphic equality *)
+
+  let equal_reg64 left right =
+    match left, right with
+    | RAX, RAX
+    | RBX, RBX
+    | RCX, RCX
+    | RDX, RDX
+    | RSP, RSP
+    | RBP, RBP
+    | RSI, RSI
+    | RDI, RDI
+    | R8, R8
+    | R9, R9
+    | R10, R10
+    | R11, R11
+    | R12, R12
+    | R13, R13
+    | R14, R14
+    | R15, R15 ->
+      true
+    | ( ( RAX | RBX | RCX | RDX | RSP | RBP | RSI | RDI | R8 | R9 | R10 | R11
+        | R12 | R13 | R14 | R15 ),
+        _ ) ->
+      false
+
+  let equal_reg8h left right =
+    match left, right with
+    | AH, AH | BH, BH | CH, CH | DH, DH -> true
+    | (AH | BH | CH | DH), _ -> false
+
+  let equal_regf left right =
+    match left, right with
+    | XMM n1, XMM n2 | YMM n1, YMM n2 | ZMM n1, ZMM n2 -> n1 = n2
+    | (XMM _ | YMM _ | ZMM _), _ -> false
+
+  let equal_arch left right =
+    match left, right with
+    | X64, X64 | X86, X86 -> true
+    | (X64 | X86), _ -> false
+
+  let equal_data_type left right =
+    match left, right with
+    | NONE, NONE
+    | REAL4, REAL4
+    | REAL8, REAL8
+    | BYTE, BYTE
+    | WORD, WORD
+    | DWORD, DWORD
+    | QWORD, QWORD
+    | VEC128, VEC128
+    | VEC256, VEC256
+    | VEC512, VEC512
+    | NEAR, NEAR
+    | PROC, PROC ->
+      true
+    | ( ( NONE | REAL4 | REAL8 | BYTE | WORD | DWORD | QWORD | VEC128 | VEC256
+        | VEC512 | NEAR | PROC ),
+        _ ) ->
+      false
+
+  let equal_addr left right =
+    equal_arch left.arch right.arch
+    && equal_data_type left.typ right.typ
+    && equal_reg64 left.idx right.idx
+    && left.scale = right.scale
+    && Option.equal equal_reg64 left.base right.base
+    && Option.equal String.equal left.sym right.sym
+    && left.displ = right.displ
+
+  (* Hard barriers are instruction boundaries that stop peephole optimization.
+     These include: - Labels (control flow targets) - Section changes -
+     Alignment directives *)
+  let is_hard_barrier = function
+    | Directive d -> (
+      match d with
+      | Asm_targets.Asm_directives.Directive.New_label _ -> true
+      | Asm_targets.Asm_directives.Directive.Section _ -> true
+      | Asm_targets.Asm_directives.Directive.Align _ -> true
+      | Asm_targets.Asm_directives.Directive.Bytes _
+      | Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset _
+      | Asm_targets.Asm_directives.Directive.Cfi_def_cfa_offset _
+      | Asm_targets.Asm_directives.Directive.Cfi_endproc
+      | Asm_targets.Asm_directives.Directive.Cfi_offset _
+      | Asm_targets.Asm_directives.Directive.Cfi_startproc
+      | Asm_targets.Asm_directives.Directive.Cfi_remember_state
+      | Asm_targets.Asm_directives.Directive.Cfi_restore_state
+      | Asm_targets.Asm_directives.Directive.Cfi_def_cfa_register _
+      | Asm_targets.Asm_directives.Directive.Comment _
+      | Asm_targets.Asm_directives.Directive.Const _
+      | Asm_targets.Asm_directives.Directive.Direct_assignment _
+      | Asm_targets.Asm_directives.Directive.File _
+      | Asm_targets.Asm_directives.Directive.Global _
+      | Asm_targets.Asm_directives.Directive.Indirect_symbol _
+      | Asm_targets.Asm_directives.Directive.Loc _
+      | Asm_targets.Asm_directives.Directive.New_line
+      | Asm_targets.Asm_directives.Directive.Private_extern _
+      | Asm_targets.Asm_directives.Directive.Size _
+      | Asm_targets.Asm_directives.Directive.Sleb128 _
+      | Asm_targets.Asm_directives.Directive.Space _
+      | Asm_targets.Asm_directives.Directive.Type _
+      | Asm_targets.Asm_directives.Directive.Uleb128 _
+      | Asm_targets.Asm_directives.Directive.Protected _
+      | Asm_targets.Asm_directives.Directive.Hidden _
+      | Asm_targets.Asm_directives.Directive.Weak _
+      | Asm_targets.Asm_directives.Directive.External _
+      | Asm_targets.Asm_directives.Directive.Reloc _ ->
+        false)
+    | Ins _ -> false
+
+  (* Utility: get at most n cells starting from the given cell. Returns a list
+     of cells (may be shorter than n if we reach the end). *)
+  let get_cells cell n =
+    let rec loop acc remaining current_opt =
+      if remaining <= 0
+      then List.rev acc
+      else
+        match current_opt with
+        | None -> List.rev acc
+        | Some current ->
+          loop (current :: acc) (remaining - 1) (DLL.next current)
+    in
+    loop [] n (Some cell)
+
+  (* Compare two args for equality *)
+  let equal_args arg1 arg2 =
+    match[@warning "-4"] arg1, arg2 with
+    | Imm i1, Imm i2 -> Int64.equal i1 i2
+    | Sym s1, Sym s2 -> String.equal s1 s2
+    | Reg8L r1, Reg8L r2 -> equal_reg64 r1 r2
+    | Reg8H r1, Reg8H r2 -> equal_reg8h r1 r2
+    | Reg16 r1, Reg16 r2 -> equal_reg64 r1 r2
+    | Reg32 r1, Reg32 r2 -> equal_reg64 r1 r2
+    | Reg64 r1, Reg64 r2 -> equal_reg64 r1 r2
+    | Regf rf1, Regf rf2 -> equal_regf rf1 rf2
+    | Mem addr1, Mem addr2 -> equal_addr addr1 addr2
+    | Mem64_RIP (t1, s1, i1), Mem64_RIP (t2, s2, i2) ->
+      equal_data_type t1 t2 && String.equal s1 s2 && i1 = i2
+    | _, _ -> false
+
+  (* Check if an arg is a safe-to-optimize self-move *)
+  let is_safe_self_move_arg = function[@warning "-4"]
+    | Reg8L _ | Reg8H _ | Reg16 _ | Reg64 _ -> true
+    | _ -> false
+
+  (* Rewrite rule: remove MOV x, x (moving a value to itself) Note: We can only
+     safely remove self-moves for registers that don't have zero-extension side
+     effects. On x86-64: - 32-bit moves (Reg32) zero the upper 32 bits - SIMD
+     moves (Regf) may zero upper bits depending on instruction encoding So we
+     only optimize 8/16/64-bit integer register self-moves. *)
+  let remove_mov_x_x cell =
+    match[@warning "-4"] DLL.value cell with
+    | Ins (MOV (src, dst)) when equal_args src dst && is_safe_self_move_arg src
+      ->
+      (* Get next cell before deleting *)
+      let next = DLL.next cell in
+      (* Delete the redundant instruction *)
+      DLL.delete_curr cell;
+      (* Continue from the next cell *) Some next
+    | _ -> None
+
+  (* Rewrite rule: remove useless MOV x, y; MOV y, x pattern *)
+  let remove_useless_mov cell =
+    match get_cells cell 2 with
+    | [cell1; cell2] -> (
+      match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
+      | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2))
+        when equal_args src1 dst2 && equal_args dst1 src2 ->
+        (* Get the cell after cell2 before deleting *)
+        let after_cell2 = DLL.next cell2 in
+        (* Delete the second MOV (the first one is still useful) *)
+        DLL.delete_curr cell2;
+        (* Continue from the cell after the deleted one *)
+        Some after_cell2
+      | _, _ -> None)
+    | _ -> None
+
+  (* Rewrite rule: combine adjacent ADD to RSP with CFI directives. Pattern:
+     addq $n1, %rsp; .cfi_adjust_cfa_offset d1; addq $n2, %rsp;
+     .cfi_adjust_cfa_offset d2 Rewrite: addq $(n1+n2), %rsp;
+     .cfi_adjust_cfa_offset (d1+d2)
+
+     This only applies when d1 = -n1 and d2 = -n2 (i.e., the CFI offsets
+     correctly track the stack adjustment). *)
+  let combine_add_rsp cell =
+    match get_cells cell 4 with
+    | [cell1; cell2; cell3; cell4] -> (
+      match[@warning "-4"]
+        DLL.value cell1, DLL.value cell2, DLL.value cell3, DLL.value cell4
+      with
+      | ( Ins (ADD (Imm n1, Reg64 RSP)),
+          Directive
+            (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d1),
+          Ins (ADD (Imm n2, Reg64 RSP)),
+          Directive
+            (Asm_targets.Asm_directives.Directive.Cfi_adjust_cfa_offset d2) )
+        when Int64.equal (Int64.of_int d1) (Int64.neg n1)
+             && Int64.equal (Int64.of_int d2) (Int64.neg n2) ->
+        (* Combine the instructions *)
+        let combined_imm = Int64.add n1 n2 in
+        let combined_offset = d1 + d2 in
+        (* Update cells with combined values *)
+        DLL.set_value cell1 (Ins (ADD (Imm combined_imm, Reg64 RSP)));
+        DLL.set_value cell2
+          (Directive
+             (Asm_targets.Asm_directives.make_cfi_adjust_cfa_offset_directive
+                combined_offset));
+        (* Delete the redundant cells *)
+        DLL.delete_curr cell3;
+        DLL.delete_curr cell4;
+        (* Return cell1 to allow iterative combination of multiple ADDs *)
+        Some (Some cell1)
+      | _, _, _, _ -> None)
+    | _ -> None
+
+  (* Apply all rewrite rules in sequence. Returns Some continuation_cell if a
+     rule matched, None otherwise. *)
+  let apply_rules cell =
+    match remove_mov_x_x cell with
+    | Some cont -> Some cont
+    | None -> (
+      match remove_useless_mov cell with
+      | Some cont -> Some cont
+      | None -> (
+        match combine_add_rsp cell with Some cont -> Some cont | None -> None))
+
+  (* Main optimization loop for a single asm_program. Iterates through the
+     instruction list, applying rewrite rules and respecting hard barriers. *)
+  let peephole_optimize_asm_program asm_program =
+    let rec optimize_from cell_opt =
+      match cell_opt with
+      | None -> ()
+      | Some cell -> (
+        if is_hard_barrier (DLL.value cell)
+        then
+          (* Skip hard barriers and continue after them *)
+          optimize_from (DLL.next cell)
+        else
+          match apply_rules cell with
+          | Some continuation_cell ->
+            (* A rule was applied, continue from the continuation point *)
+            optimize_from continuation_cell
+          | None ->
+            (* No rule matched, move to the next instruction *)
+            optimize_from (DLL.next cell))
+    in
+    optimize_from (DLL.hd_cell asm_program)
+end
+
 let generate_code asm =
+  (* Apply peephole optimizations to asm_code. TODO: Extend this to optimize all
+     sections in asm_code_by_section, not just asm_code. *)
+  if !Oxcaml_flags.x86_peephole_optimize
+  then X86_peephole.peephole_optimize_asm_program asm_code;
   (match asm with
   | Some f -> Profile.record ~accumulate:true "write_asm" f asm_code
   | None -> ());
