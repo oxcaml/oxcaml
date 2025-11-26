@@ -231,6 +231,8 @@ type 'a t = #{ x : 'a portable; y : 'a portable; }
 type 'a t : value & value mod portable =
   #{ x : 'a contended; y : 'a @@ portable }
 
+(* CR layouts: The formatting on this error message should be fixed. *)
+
 [%%expect{|
 Lines 1-2, characters 0-43:
 1 | type 'a t : value & value mod portable =
