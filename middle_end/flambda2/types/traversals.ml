@@ -827,8 +827,13 @@ struct
   and rewrite_head_of_kind_value env acc metadata head :
       TG.head_of_kind_value Or_unknown.t * _ =
     let ({ non_null; is_null } : TG.head_of_kind_value) = head in
+    let is_null : TG.is_null =
+      match is_null with
+      | Not_null -> Not_null
+      | Maybe_null { is_null = _ } -> Maybe_null { is_null = None }
+    in
     match non_null with
-    | Unknown | Bottom -> Known head, acc
+    | Unknown | Bottom -> Known { non_null; is_null }, acc
     | Ok non_null ->
       let non_null, acc =
         rewrite_head_of_kind_value_non_null env acc metadata non_null
