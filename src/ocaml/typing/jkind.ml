@@ -3228,18 +3228,8 @@ module Format_history = struct
       fprintf ppf
         "it's the element type (the second type parameter) for a@ block index \
          (idx or mut_idx)"
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
-    | Structure_item ->
-      fprintf ppf "it's the type of something stored in a module"
-    | Signature_item -> fprintf ppf "it's the type of something in a signature"
     | Merlin ->
       fprintf ppf "merlin needed to create a fake AST node"
-||||||| oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
-    | Structure_item ->
-      fprintf ppf "it's the type of something stored in a module"
-    | Signature_item -> fprintf ppf "it's the type of something in a signature"
-=======
->>>>>>> oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -4076,15 +4066,7 @@ module Debug_printers = struct
     | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
-    | Structure_item -> fprintf ppf "Structure_item"
-    | Signature_item -> fprintf ppf "Signature_item"
     | Merlin -> fprintf ppf "Merlin"
-||||||| oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
-    | Structure_item -> fprintf ppf "Structure_item"
-    | Signature_item -> fprintf ppf "Signature_item"
-=======
->>>>>>> oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function

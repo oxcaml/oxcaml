@@ -48,7 +48,7 @@ let location_of_declaration ~uid =
   let of_value_binding vb =
     let bound_idents = Typedtree.let_bound_idents_full [ vb ] in
     ListLabels.find_map
-      ~f:(fun (_, loc, _, _, uid') -> if uid = uid' then Some loc else None)
+      ~f:(fun (_, loc, _, uid') -> if uid = uid' then Some loc else None)
       bound_idents
   in
   function
