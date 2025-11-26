@@ -718,7 +718,7 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
     | Res_none | First_arg -> instr.args.(i).enc
     | Res rr ->
       let rr = Array.fold_right
-        (fun ({enc; _} : Simd.arg) acc ->
+        (fun ({enc; _} : Amd64_simd_defs.arg) acc ->
           match enc with
           | Implicit -> acc
           | _ -> enc :: acc) rr []
