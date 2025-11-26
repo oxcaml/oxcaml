@@ -94,7 +94,7 @@ Line 1, characters 14-35:
                   ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "(unit -> unit) option" should be an instance of type
          "('a : value mod portable)"
-       The kind of (unit -> unit) option is value mod immutable non_float
+       The kind of (unit -> unit) option is value non_float mod immutable
          because it's a boxed variant type.
        But the kind of (unit -> unit) option must be a subkind of
            value mod portable
@@ -315,7 +315,7 @@ Line 1, characters 14-33:
                   ^^^^^^^^^^^^^^^^^^^
 Error: This type "(unit -> unit) list" should be an instance of type
          "('a : value mod portable)"
-       The kind of (unit -> unit) list is value mod immutable non_float
+       The kind of (unit -> unit) list is value non_float mod immutable
          because it's a boxed variant type.
        But the kind of (unit -> unit) list must be a subkind of
            value mod portable
@@ -526,7 +526,7 @@ Line 1, characters 14-35:
                   ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "(unit -> unit) iarray" should be an instance of type
          "('a : value mod portable)"
-       The kind of (unit -> unit) iarray is value mod immutable non_float
+       The kind of (unit -> unit) iarray is value non_float mod immutable
          because it is the primitive value type iarray.
        But the kind of (unit -> unit) iarray must be a subkind of
            value mod portable

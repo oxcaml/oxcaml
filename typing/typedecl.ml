@@ -987,7 +987,7 @@ let transl_declaration env sdecl (id, uid) =
                      match Types.(cstr.cd_args) with
                      | Cstr_tuple args ->
                        Array.make (List.length args) Jkind.Sort.Const.void
-                     | Cstr_record _ -> [| Jkind.Sort.Const.value |]
+                     | Cstr_record _ -> [| Jkind.Sort.Const.scannable |]
                    in
                    Constructor_uniform_value, sorts)
                 (Array.of_list cstrs)
@@ -1164,7 +1164,7 @@ let record_gets_unboxed_version = function
       Array.exists
         (fun (kind : mixed_block_element) ->
           match kind with
-          | Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+          | Scannable | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
           | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Void -> false
           | Float_boxed -> true
           | Product shape -> shape_has_float_boxed shape)
@@ -1601,7 +1601,7 @@ let update_label_sorts env loc lbls named =
       let jkind = Ctype.type_jkind env ld_type in
       (* Next line guaranteed to be safe because of [check_representable] *)
       let sort = Jkind.sort_of_jkind jkind in
-      let ld_sort = Jkind.Sort.default_to_value_and_get sort in
+      let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
       update idx ld_sort;
       {lbl with ld_sort}, jkind
     ) lbls
@@ -1628,7 +1628,7 @@ let update_constructor_arguments_sorts env loc cd_args sorts =
           let jkind = Ctype.type_jkind env ca_type in
           (* Next line guaranteed to be safe because of [check_representable] *)
           let sort = Jkind.sort_of_jkind jkind in
-          let ca_sort = Jkind.Sort.default_to_value_and_get sort in
+          let ca_sort = Jkind.Sort.default_to_scannable_and_get sort in
           update idx ca_sort;
           {arg with ca_sort}, jkind)
         args
@@ -1642,7 +1642,7 @@ let update_constructor_arguments_sorts env loc cd_args sorts =
     let lbls, all_void, jkinds =
       update_label_sorts env loc lbls None
     in
-    update 0 Jkind.Sort.Const.value;
+    update 0 Jkind.Sort.Const.scannable;
     Types.Cstr_record lbls, all_void, jkinds
 
 let assert_mixed_product_support =
@@ -1704,7 +1704,7 @@ module Element_repr = struct
   let to_shape_element t : mixed_block_element =
     let rec of_t : t -> mixed_block_element = function
     | Unboxed_element unboxed -> of_unboxed_element unboxed
-    | Float_element | Value_element -> Value
+    | Float_element | Value_element -> Scannable
     | Void -> Void
     and of_unboxed_element : unboxed_element -> mixed_block_element = function
       | Float64 -> Float64
@@ -1726,7 +1726,7 @@ module Element_repr = struct
     if is_float env ty
     then Float_element
     else
-      let layout = Jkind.get_layout_defaulting_to_value jkind in
+      let layout = Jkind.get_layout_defaulting_to_scannable jkind in
       let sort =
         match Jkind.Layout.Const.get_sort layout with
         | None ->
@@ -1734,7 +1734,7 @@ module Element_repr = struct
         | Some s -> s
       in
       let rec sort_to_t : Jkind_types.Sort.Const.t -> t = function
-      | Base Value -> Value_element
+      | Base Scannable -> Value_element
       | Base Float64 -> Unboxed_element Float64
       | Base Float32 -> Unboxed_element Float32
       | Base Word -> Unboxed_element Word
@@ -1875,7 +1875,7 @@ let rec update_decl_jkind env dpath decl =
       (* This next line is guaranteed to be OK because of a call to
          [check_representable] *)
       let sort = Jkind.sort_of_jkind jkind in
-      let ld_sort = Jkind.Sort.default_to_value_and_get sort in
+      let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
       [{lbl with ld_sort}], Record_unboxed, jkind
     | _, Record_boxed sorts ->
       let lbls, _all_void, jkinds =
@@ -2045,7 +2045,7 @@ let rec update_decl_jkind env dpath decl =
         | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
             let jkind = Ctype.type_jkind env ty in
             let sort = Jkind.sort_of_jkind jkind in
-            let ca_sort = Jkind.Sort.default_to_value_and_get sort in
+            let ca_sort = Jkind.Sort.default_to_scannable_and_get sort in
             [{ cstr with Types.cd_args =
                            Cstr_tuple [{ arg with ca_sort }] }],
             Variant_unboxed, jkind
@@ -2053,7 +2053,7 @@ let rec update_decl_jkind env dpath decl =
         | Cstr_record [{ld_type} as lbl] -> begin
             let jkind = Ctype.type_jkind env ld_type in
             let sort = Jkind.sort_of_jkind jkind in
-            let ld_sort = Jkind.Sort.default_to_value_and_get sort in
+            let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
             [{ cstr with Types.cd_args =
                            Cstr_record [{ lbl with ld_sort }] }],
             Variant_unboxed, jkind
@@ -2136,7 +2136,7 @@ let rec update_decl_jkind env dpath decl =
               (* This next line is guaranteed to be OK because of a call to
                  [check_representable] *)
               let sort = Jkind.sort_of_jkind jkind in
-              let ld_sort = Jkind.Sort.default_to_value_and_get sort in
+              let ld_sort = Jkind.Sort.default_to_scannable_and_get sort in
               {lbl with ld_sort}, Jkind.extract_layout jkind
             ) lbls
             |> List.split
@@ -3469,7 +3469,7 @@ let native_repr_of_type env kind ty sort_or_poly =
     let is_value =
       match sort_or_poly with
       | Poly -> false
-      | Sort (Base Value) -> true
+      | Sort (Base Scannable) -> true
       | Sort (Base _ | Product _) -> false
     in
     if is_immediate && is_non_nullable && is_value
@@ -3555,7 +3555,7 @@ let error_if_has_deep_native_repr_attributes core_type =
    In such cases, we raise an expection. *)
 let type_sort_external ~is_layout_poly ~why env loc typ =
   match Ctype.type_sort ~why ~fixed:true env typ with
-  | Ok s -> Jkind.Sort.default_to_value_and_get s
+  | Ok s -> Jkind.Sort.default_to_scannable_and_get s
   | Error err ->
     let kloc =
       if is_layout_poly then External_with_layout_poly else External
@@ -3588,7 +3588,7 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
         sort_or_poly with
   | Native_repr_attr_absent, Poly ->
     Repr_poly
-  | Native_repr_attr_absent, Sort (Base (Value | Void) as base) ->
+  | Native_repr_attr_absent, Sort (Base (Scannable | Void) as base) ->
     Same_as_ocaml_repr base
   | Native_repr_attr_absent, (Sort (Base sort as c)) ->
     (if Language_extension.erasable_extensions_only ()
@@ -3615,7 +3615,7 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
          (Warnings.Incompatible_with_upstream
             (Warnings.Non_value_sort sort)));
     Same_as_ocaml_repr c
-  | Native_repr_attr_present kind, (Poly | Sort (Base Value))
+  | Native_repr_attr_present kind, (Poly | Sort (Base Scannable))
   | Native_repr_attr_present (Untagged as kind), Sort _ ->
     begin match native_repr_of_type env kind ty sort_or_poly with
     | None ->

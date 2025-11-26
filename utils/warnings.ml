@@ -593,16 +593,16 @@ let descriptions = [
     since = since 5 1 };
   { number = 183;
     names = ["redundant-kind-modifier"];
-    (* CR layouts-scannable: as more axes are added, this description (and
+    (* CR layouts-scannable: As more axes are added, this description (and
        the following description) should be updated in tandem. *)
-    description = "A pointerness axis annotation appears on a kind that \
+    description = "A separability axis annotation appears on a kind that \
                    already implies the annotation.";
     since = since 5 2 };
   { number = 184;
     names = ["ignored-kind-modifier"];
-    (* CR layouts-scannable: as more axes are added, this description (and
+    (* CR layouts-scannable: As more axes are added, this description (and
        the following description) should be updated in tandem. *)
-    description = "A pointerness axis annotation appears on a non-value, \
+    description = "A separability axis annotation appears on a non-value, \
                    non-any layout.";
     since = since 5 2 };
   { number = 185;

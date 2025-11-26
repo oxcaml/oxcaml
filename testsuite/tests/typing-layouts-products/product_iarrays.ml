@@ -17,7 +17,7 @@ external[@layout_poly] make_vect : ('a : any mod separable) . int -> 'a -> 'a ia
 
 let make_scannable (x : #(int * string)) = make_vect 42 x
 [%%expect{|
-external make_vect : ('a : any mod separable). int -> 'a -> 'a iarray
+external make_vect : ('a : any separable). int -> 'a -> 'a iarray
   = "%makearray_dynamic" [@@layout_poly]
 Line 4, characters 43-57:
 4 | let make_scannable (x : #(int * string)) = make_vect 42 x
@@ -55,7 +55,7 @@ external[@layout_poly] len : ('a : any mod separable) . 'a iarray -> int =
 
 let length_scannable (x : #(int * string) iarray) = len x
 [%%expect{|
-external len : ('a : any mod separable). 'a iarray -> int = "%array_length"
+external len : ('a : any separable). 'a iarray -> int = "%array_length"
   [@@layout_poly]
 Line 4, characters 52-57:
 4 | let length_scannable (x : #(int * string) iarray) = len x
@@ -92,7 +92,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int -> 'a =
 
 let get_scannable (x : #(int * string) iarray) = get x 42
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int -> 'a
+external get : ('a : any separable). 'a iarray -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
 Line 4, characters 49-57:
 4 | let get_scannable (x : #(int * string) iarray) = get x 42
@@ -129,7 +129,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int -> 'a =
 
 let get_scannable (x : #(int * string) iarray) = get x 42
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int -> 'a
+external get : ('a : any separable). 'a iarray -> int -> 'a
   = "%array_unsafe_get" [@@layout_poly]
 Line 4, characters 49-57:
 4 | let get_scannable (x : #(int * string) iarray) = get x 42
@@ -166,7 +166,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int64# -> '
 
 let get_scannable (x : #(int * string) iarray) = get x #42L
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int64# -> 'a
+external get : ('a : any separable). 'a iarray -> int64# -> 'a
   = "%array_safe_get_indexed_by_int64#" [@@layout_poly]
 Line 4, characters 49-59:
 4 | let get_scannable (x : #(int * string) iarray) = get x #42L
@@ -203,7 +203,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int64# -> '
 
 let get_scannable (x : #(int * string) iarray) = get x #42L
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int64# -> 'a
+external get : ('a : any separable). 'a iarray -> int64# -> 'a
   = "%array_unsafe_get_indexed_by_int64#" [@@layout_poly]
 Line 4, characters 49-59:
 4 | let get_scannable (x : #(int * string) iarray) = get x #42L
@@ -240,7 +240,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int32# -> '
 
 let get_scannable (x : #(int * string) iarray) = get x #42l
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int32# -> 'a
+external get : ('a : any separable). 'a iarray -> int32# -> 'a
   = "%array_safe_get_indexed_by_int32#" [@@layout_poly]
 Line 4, characters 49-59:
 4 | let get_scannable (x : #(int * string) iarray) = get x #42l
@@ -277,7 +277,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int32# -> '
 
 let get_scannable (x : #(int * string) iarray) = get x #42l
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int32# -> 'a
+external get : ('a : any separable). 'a iarray -> int32# -> 'a
   = "%array_unsafe_get_indexed_by_int32#" [@@layout_poly]
 Line 4, characters 49-59:
 4 | let get_scannable (x : #(int * string) iarray) = get x #42l
@@ -315,7 +315,7 @@ external[@layout_poly] get :
 
 let get_scannable (x : #(int * string) iarray) = get x #42n
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> nativeint# -> 'a
+external get : ('a : any separable). 'a iarray -> nativeint# -> 'a
   = "%array_safe_get_indexed_by_nativeint#" [@@layout_poly]
 Line 5, characters 49-59:
 5 | let get_scannable (x : #(int * string) iarray) = get x #42n
@@ -353,7 +353,7 @@ external[@layout_poly] get :
 
 let get_scannable (x : #(int * string) iarray) = get x #42n
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> nativeint# -> 'a
+external get : ('a : any separable). 'a iarray -> nativeint# -> 'a
   = "%array_unsafe_get_indexed_by_nativeint#" [@@layout_poly]
 Line 5, characters 49-59:
 5 | let get_scannable (x : #(int * string) iarray) = get x #42n
