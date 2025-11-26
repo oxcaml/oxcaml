@@ -38,7 +38,7 @@ type transl_value_decl_modal =
   | Str_primitive
   (** A primitive in structure, in which case the modalities are treated as
     modes. *)
-  (* CR zqian: avoid this hack *)
+  (* CR zqian: avoid the above hack *)
   | Sig_value of Mode.Value.l * Mode.Modality.Const.t
   (** A value description in a signature, in which case we require the mode of
       the structure that the modalities are based on, as well as the default
