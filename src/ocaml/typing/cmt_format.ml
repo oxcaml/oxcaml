@@ -107,7 +107,13 @@ let iter_on_declaration f decl =
   | Value vd -> f vd.val_val.val_uid decl;
   | Value_binding vb ->
       let bound_idents = let_bound_idents_full [vb] in
+<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-24
       List.iter ~f:(fun (_, _, _, _, uid) -> f uid decl) bound_idents
+||||||| oxcaml/oxcaml:8abf835dda41a9b2949b886a0a26950d87ddc9a7
+      List.iter (fun (_, _, _, _, uid) -> f uid decl) bound_idents
+=======
+      List.iter (fun (_, _, _, uid) -> f uid decl) bound_idents
+>>>>>>> oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
   | Type td ->
       if not (Btype.is_row_name (Ident.name td.typ_id)) then
         f td.typ_type.type_uid (Type td)
