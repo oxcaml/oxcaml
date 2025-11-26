@@ -1078,6 +1078,8 @@ module Identifier = struct
 
     let out_of_memory = CBuiltin "Out_of_memory" |> mk
 
+    let out_of_fibers = CBuiltin "Out_of_fibers" |> mk
+
     let invalid_argument = CBuiltin "Invalid_argument" |> mk
 
     let failure = CBuiltin "Failure" |> mk

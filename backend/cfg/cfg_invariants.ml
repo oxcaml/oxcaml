@@ -242,8 +242,8 @@ let check_stack_offset t label (block : Cfg.basic_block) =
         | Op
             ( Move | Spill | Reload | Const_int _ | Const_float _
             | Const_float32 _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-            | Const_vec512 _ | Load _ | Store _ | Intop _ | Intop_imm _
-            | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
+            | Const_vec512 _ | Load _ | Store _ | Intop _ | Int128op _
+            | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
             | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
             | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
             | Poll | Pause | Alloc _ )
@@ -309,6 +309,15 @@ let check_block t label (block : Cfg.basic_block) =
   check_stack_offset t label block;
   ()
 
+let check_reducibility t cfg_with_layout =
+  match t.cfg.allowed_to_be_irreducible with
+  | true -> ()
+  | false -> (
+    let cfg_with_infos = Cfg_with_infos.make cfg_with_layout in
+    match Cfg_reducibility.is_cfg_with_infos_reducible cfg_with_infos with
+    | true -> ()
+    | false -> report t "CFG is not reducible")
+
 let run ppf cfg_with_layout =
   let cfg = CL.cfg cfg_with_layout in
   let layout = CL.layout cfg_with_layout in
@@ -323,4 +332,5 @@ let run ppf cfg_with_layout =
   check_layout t layout;
   Cfg.iter_blocks ~f:(check_block t) cfg;
   check_tailrec_position t;
+  check_reducibility t cfg_with_layout;
   t.result

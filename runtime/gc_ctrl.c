@@ -447,6 +447,7 @@ static struct gc_tweak gc_tweaks[] = {
   { "gc_overhead_adjustment", &caml_gc_overhead_adjustment, 0 },
   { "nohugepage_stacks", &caml_nohugepage_stacks, 0 },
   { "enable_segv_handler", &caml_enable_segv_handler, 0 },
+  { "cache_stacks_per_class", &caml_cache_stacks_per_class, 0 },
 };
 
 enum {N_GC_TWEAKS = sizeof(gc_tweaks)/sizeof(gc_tweaks[0])};

@@ -957,7 +957,7 @@ let f_external_utuple_mode_crosses_local_1
   : local_ #(int * int) -> #(int * int) = fun x -> x
 [%%expect{|
 val f_external_utuple_mode_crosses_local_1 :
-  local_ #(int * int) -> #(int * int) = <fun>
+  #(int * int) @ local -> #(int * int) = <fun>
 |}]
 
 let f_internal_utuple_does_not_mode_cross_local_1
@@ -973,7 +973,7 @@ let f_external_utuple_mode_crosses_local_2
   : local_ #(int * #(bool * int)) -> #(int * #(bool * int)) = fun x -> x
 [%%expect{|
 val f_external_utuple_mode_crosses_local_2 :
-  local_ #(int * #(bool * int)) -> #(int * #(bool * int)) = <fun>
+  #(int * #(bool * int)) @ local -> #(int * #(bool * int)) = <fun>
 |}]
 
 let f_internal_utuple_does_not_mode_cross_local_2
@@ -991,7 +991,7 @@ let f_external_utuple_mode_crosses_local_3
 [%%expect{|
 type t = #(int * int)
 val f_external_utuple_mode_crosses_local_3 :
-  local_ #(int * #(t * int)) -> #(int * #(t * int)) = <fun>
+  #(int * #(t * int)) @ local -> #(int * #(t * int)) = <fun>
 |}]
 
 type t = #(string * int)
@@ -1013,7 +1013,7 @@ let f_external_urecord_mode_crosses_local_1
 [%%expect{|
 type local_cross1 = #{ i1 : int; i2 : int; }
 val f_external_urecord_mode_crosses_local_1 :
-  local_ local_cross1 -> local_cross1 = <fun>
+  local_cross1 @ local -> local_cross1 = <fun>
 |}]
 
 type local_nocross1 = #{ i : int; s : string }
@@ -1035,7 +1035,7 @@ let f_external_urecord_mode_crosses_local_2
 type local_cross2_inner = #{ b : bool; i : int; }
 type local_cross2 = #{ i : int; inner : local_cross2_inner; }
 val f_external_urecord_mode_crosses_local_2 :
-  local_ local_cross2 -> local_cross2 = <fun>
+  local_cross2 @ local -> local_cross2 = <fun>
 |}]
 
 type local_nocross2_inner = #{ b : bool; s : string }
@@ -1061,7 +1061,7 @@ type t = #{ i1 : int; i2 : int; }
 type local_cross3_inner = #{ t : t; i : int; }
 type local_cross3 = #{ i : int; inner : local_cross3_inner; }
 val f_external_urecord_mode_crosses_local_3 :
-  local_ local_cross3 -> local_cross3 = <fun>
+  local_cross3 @ local -> local_cross3 = <fun>
 |}]
 
 type t = #{ s : string; i : int }
@@ -1087,7 +1087,7 @@ let f_external_kind_annot_mode_crosses_local_1
   : local_ t -> t = fun x -> x
 [%%expect{|
 type t : float64 mod global & float64 mod global
-val f_external_kind_annot_mode_crosses_local_1 : local_ t -> t = <fun>
+val f_external_kind_annot_mode_crosses_local_1 : t @ local -> t = <fun>
 |}]
 
 type t : float64 & value
@@ -1108,7 +1108,7 @@ let f_external_kind_annot_mode_crosses_local_2
 type t
   : value mod global non_float
     & (float64 mod global & value mod global non_float)
-val f_external_kind_annot_mode_crosses_local_2 : local_ t -> t = <fun>
+val f_external_kind_annot_mode_crosses_local_2 : t @ local -> t = <fun>
 |}]
 
 type t : immediate & (value & float64)

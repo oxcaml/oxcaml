@@ -30,7 +30,7 @@ let simplify_nullary_primitive dacc original_prim (prim : P.nullary_primitive)
     let ty = T.unknown result_kind in
     let dacc = DA.add_variable dacc result_var ty in
     Simplify_primitive_result.create named ~try_reify:false dacc
-  | Probe_is_enabled { name = _ } ->
+  | Probe_is_enabled { name = _; enabled_at_init = _ } ->
     let named = Named.create_prim original_prim dbg in
     let ty =
       T.any_naked_bool ~machine_width:(DE.machine_width (DA.denv dacc))

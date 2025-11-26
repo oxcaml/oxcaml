@@ -30,6 +30,8 @@ type compile_time_constant =
   | Ostype_cygwin
   | Backend_type
   | Runtime5
+  | Arch_amd64
+  | Arch_arm64
 
 type immediate_or_pointer =
   | Immediate
@@ -330,7 +332,7 @@ type primitive =
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
-  | Pprobe_is_enabled of { name: string }
+  | Pprobe_is_enabled of { name: string; enabled_at_init: bool option }
   (* Primitives for [Obj] *)
   | Pobj_dup
   | Pobj_magic of layout
@@ -967,12 +969,14 @@ let main_module_block_size format =
   | Mb_struct { mb_size } -> mb_size
   | Mb_instantiating_functor _ -> 1
 
-type program =
+type 'lam program0 =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
     arg_block_idx : int option;
     required_globals : Compilation_unit.Set.t;
-    code : lambda }
+    code : 'lam }
+
+type program = lambda program0
 
 type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
@@ -1452,7 +1456,7 @@ let transl_prim mod_name name =
   let pers = Ident.create_persistent mod_name in
   let env = Env.add_persistent_structure pers Env.empty in
   let lid = Longident.Ldot (Longident.Lident mod_name, name) in
-  match Env.find_value_by_name lid env with
+  match Env.find_value_by_name_lazy lid env with
   | path, _ -> transl_value_path Loc_unknown env path
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
@@ -2561,6 +2565,7 @@ let primitive_result_layout (p : primitive) =
   | Pctconst (
     Big_endian | Word_size | Int_size | Max_wosize
     | Ostype_unix | Ostype_cygwin | Ostype_win32 | Backend_type | Runtime5
+    | Arch_amd64 | Arch_arm64
   ) ->
     (* Compile-time constants only ever return ints for now,
        enumerate them all to be sure to modify this if it becomes wrong. *)

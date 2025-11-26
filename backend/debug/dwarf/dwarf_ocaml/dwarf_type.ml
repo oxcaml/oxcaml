@@ -1202,18 +1202,21 @@ let vec_split_to_properties (vec_split : S.Predef.simd_vec_split) =
   | Int16x8 -> { encoding = signed; count = 8; size = 2 }
   | Int32x4 -> { encoding = signed; count = 4; size = 4 }
   | Int64x2 -> { encoding = signed; count = 2; size = 8 }
+  | Float16x8 -> { encoding = float; count = 8; size = 2 }
   | Float32x4 -> { encoding = float; count = 4; size = 4 }
   | Float64x2 -> { encoding = float; count = 2; size = 8 }
   | Int8x32 -> { encoding = signed; count = 32; size = 1 }
   | Int16x16 -> { encoding = signed; count = 16; size = 2 }
   | Int32x8 -> { encoding = signed; count = 8; size = 4 }
   | Int64x4 -> { encoding = signed; count = 4; size = 8 }
+  | Float16x16 -> { encoding = float; count = 16; size = 2 }
   | Float32x8 -> { encoding = float; count = 8; size = 4 }
   | Float64x4 -> { encoding = float; count = 4; size = 8 }
   | Int8x64 -> { encoding = signed; count = 64; size = 1 }
   | Int16x32 -> { encoding = signed; count = 32; size = 2 }
   | Int32x16 -> { encoding = signed; count = 16; size = 4 }
   | Int64x8 -> { encoding = signed; count = 8; size = 8 }
+  | Float16x32 -> { encoding = float; count = 32; size = 2 }
   | Float32x16 -> { encoding = float; count = 16; size = 4 }
   | Float64x8 -> { encoding = float; count = 8; size = 8 }
 

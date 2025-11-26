@@ -97,11 +97,14 @@ type t =
     fun_num_stack_slots : int Stack_class.Tbl.t;
     fun_poll : Lambda.poll_attribute;
     next_instruction_id : InstructionId.sequence;
-    fun_ret_type : Cmm.machtype
+    fun_ret_type : Cmm.machtype;
+    mutable allowed_to_be_irreducible : bool;
+    mutable register_locations_are_set : bool
   }
 
 let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
-    ~fun_num_stack_slots ~fun_poll ~next_instruction_id ~fun_ret_type =
+    ~fun_num_stack_slots ~fun_poll ~next_instruction_id ~fun_ret_type
+    ~allowed_to_be_irreducible =
   { fun_name;
     fun_args;
     fun_codegen_options;
@@ -114,7 +117,9 @@ let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
     fun_num_stack_slots;
     fun_poll;
     next_instruction_id;
-    fun_ret_type
+    fun_ret_type;
+    allowed_to_be_irreducible;
+    register_locations_are_set = false
   }
 
 let mem_block t label = Label.Tbl.mem t.blocks label
@@ -517,10 +522,10 @@ let is_noop_move instr =
   | Op
       ( Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
       | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-      | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
-      | Opaque | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-      | Specific _ | Name_for_debugger _ | Begin_region | End_region | Dls_get
-      | Tls_get | Poll | Alloc _ | Pause )
+      | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
+      | Floatop _ | Opaque | Reinterpret_cast _ | Static_cast _
+      | Probe_is_enabled _ | Specific _ | Name_for_debugger _ | Begin_region
+      | End_region | Dls_get | Tls_get | Poll | Alloc _ | Pause )
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
     ->
     false
@@ -542,17 +547,8 @@ let set_stack_offset_for_block (block : basic_block) stack_offset =
 
 let set_live (instr : _ instruction) live = instr.live <- live
 
-let string_of_irc_work_list = function
-  | Unknown_list -> "unknown_list"
-  | Coalesced -> "coalesced"
-  | Constrained -> "constrained"
-  | Frozen -> "frozen"
-  | Work_list -> "work_list"
-  | Active -> "active"
-
 let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     ?(fdo = Fdo_info.none) ?(live = Reg.Set.empty) ~stack_offset ~id
-    ?(irc_work_list = Unknown_list)
     ?(available_before = Reg_availability_set.Unreachable)
     ?(available_across = Reg_availability_set.Unreachable) () =
   { desc;
@@ -563,13 +559,12 @@ let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     live;
     stack_offset;
     id;
-    irc_work_list;
     available_before;
     available_across
   }
 
 let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
-    ?(res = [||]) ?(irc_work_list = Unknown_list) () =
+    ?(res = [||]) () =
   { desc;
     arg;
     res;
@@ -578,7 +573,6 @@ let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
     live = copy.live;
     stack_offset = copy.stack_offset;
     id;
-    irc_work_list;
     available_before = copy.available_before;
     available_across = copy.available_across
   }
@@ -610,7 +604,7 @@ let is_poll (instr : basic instruction) =
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Stackoffset _ | Load _
       | Store (_, _, _)
-      | Intop _
+      | Intop _ | Int128op _
       | Intop_imm (_, _)
       | Intop_atomic _
       | Floatop (_, _)
@@ -628,7 +622,7 @@ let is_alloc (instr : basic instruction) =
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Stackoffset _ | Load _
       | Store (_, _, _)
-      | Intop _
+      | Intop _ | Int128op _
       | Intop_imm (_, _)
       | Intop_atomic _
       | Floatop (_, _)
@@ -646,7 +640,7 @@ let is_end_region (b : basic) =
       | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
       | Stackoffset _ | Load _
       | Store (_, _, _)
-      | Intop _
+      | Intop _ | Int128op _
       | Intop_imm (_, _)
       | Intop_atomic _
       | Floatop (_, _)
@@ -677,18 +671,6 @@ let basic_block_contains_calls block =
      | Prim { op = External _; _ } -> true
      | Prim { op = Probe _; _ } -> true)
   || DLL.exists block.body ~f:is_alloc_or_poll
-
-let equal_irc_work_list left right =
-  match left, right with
-  | Unknown_list, Unknown_list
-  | Coalesced, Coalesced
-  | Constrained, Constrained
-  | Frozen, Frozen
-  | Work_list, Work_list
-  | Active, Active ->
-    true
-  | (Unknown_list | Coalesced | Constrained | Frozen | Work_list | Active), _ ->
-    false
 
 let remove_trap_instructions t removed_trap_handlers =
   (* Remove Lpushtrap and Lpoptrap instructions that refer to dead labels and
@@ -726,10 +708,10 @@ let remove_trap_instructions t removed_trap_handlers =
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
-        | Csel _ | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _
-        | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
-        | Dls_get | Tls_get | Poll | Alloc _ | Pause )
+        | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
+        | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
+        | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
+        | Name_for_debugger _ | Dls_get | Tls_get | Poll | Alloc _ | Pause )
     | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset
   and update_body r ~stack_offset =

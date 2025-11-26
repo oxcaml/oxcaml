@@ -38,7 +38,7 @@ end
 module Hidden_string : sig type t val hide : string -> t end
 module Hidden_int : sig type t : immediate val hide : int -> t end
 module Hidden_float_u :
-  sig type t : float64 mod global aliased many val hide : float# -> t end
+  sig type t : float64 mod global many val hide : float# -> t end
 module Hidden_function :
   sig type (-'a, +'b) t val hide : ('a -> 'b) -> ('a, 'b) t end
 |}]
@@ -75,13 +75,15 @@ let string_escape : local_ _ -> string * string = fun x -> x, x
 Line 1, characters 59-60:
 1 | let string_escape : local_ _ -> string * string = fun x -> x, x
                                                                ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an element of the tuple at Line 1, characters 59-63
+       which is expected to be "global".
 |}]
 
 let int_escape : local_ _ -> int * int = fun x -> x, x
 
 [%%expect{|
-val int_escape : local_ int -> int * int = <fun>
+val int_escape : int @ local -> int * int = <fun>
 |}]
 
 let string_list_escape : local_ _ -> string list * string list = fun x -> x, x
@@ -90,7 +92,9 @@ let string_list_escape : local_ _ -> string list * string list = fun x -> x, x
 Line 1, characters 74-75:
 1 | let string_list_escape : local_ _ -> string list * string list = fun x -> x, x
                                                                               ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an element of the tuple at Line 1, characters 74-78
+       which is expected to be "global".
 |}]
 
 let int_list_escape : local_ _ -> int list * int list = fun x -> x, x
@@ -99,7 +103,9 @@ let int_list_escape : local_ _ -> int list * int list = fun x -> x, x
 Line 1, characters 65-66:
 1 | let int_list_escape : local_ _ -> int list * int list = fun x -> x, x
                                                                      ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an element of the tuple at Line 1, characters 65-69
+       which is expected to be "global".
 |}]
 
 let hidden_string_escape : local_ _ -> Hidden_string.t * Hidden_string.t =
@@ -109,14 +115,16 @@ let hidden_string_escape : local_ _ -> Hidden_string.t * Hidden_string.t =
 Line 2, characters 11-12:
 2 |   fun x -> x, x
                ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an element of the tuple at Line 2, characters 11-15
+       which is expected to be "global".
 |}]
 
 let hidden_int_escape : local_ _ -> Hidden_int.t * Hidden_int.t =
   fun x -> x, x
 
 [%%expect{|
-val hidden_int_escape : local_ Hidden_int.t -> Hidden_int.t * Hidden_int.t =
+val hidden_int_escape : Hidden_int.t @ local -> Hidden_int.t * Hidden_int.t =
   <fun>
 |}]
 
@@ -126,7 +134,9 @@ let float_escape : local_ _ -> float * float = fun x -> x, x
 Line 1, characters 56-57:
 1 | let float_escape : local_ _ -> float * float = fun x -> x, x
                                                             ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an element of the tuple at Line 1, characters 56-60
+       which is expected to be "global".
 |}]
 
 (* CR layouts v2.8: The following should pass, even in principal mode. Internal ticket 5111 *)
@@ -134,7 +144,7 @@ let float_u_escape : local_ _ -> (float#, float#) Float_u.pair =
   fun x -> Float_u.mk_pair x x [@nontail]
 
 [%%expect{|
-val float_u_escape : local_ float# -> (float#, float#) Float_u.pair = <fun>
+val float_u_escape : float# @ local -> (float#, float#) Float_u.pair = <fun>
 |}, Principal{|
 Line 2, characters 27-28:
 2 |   fun x -> Float_u.mk_pair x x [@nontail]
@@ -148,7 +158,7 @@ let hidden_float_u_escape :
 
 [%%expect{|
 val hidden_float_u_escape :
-  local_ Hidden_float_u.t ->
+  Hidden_float_u.t @ local ->
   (Hidden_float_u.t, Hidden_float_u.t) Float_u.pair = <fun>
 |}, Principal{|
 Line 3, characters 27-28:
@@ -164,7 +174,9 @@ let float_u_record_escape : local_ _ -> float_u_record * float_u_record =
 Line 2, characters 11-12:
 2 |   fun x -> x, x
                ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an element of the tuple at Line 2, characters 11-15
+       which is expected to be "global".
 |}]
 
 let float_u_record_list_escape :
@@ -175,7 +187,9 @@ let float_u_record_list_escape :
 Line 3, characters 11-12:
 3 |   fun x -> x, x
                ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an element of the tuple at Line 3, characters 11-15
+       which is expected to be "global".
 |}]
 
 let function_escape : local_ _ -> (int -> int) * (int -> int) = fun x -> x, x
@@ -184,7 +198,9 @@ let function_escape : local_ _ -> (int -> int) * (int -> int) = fun x -> x, x
 Line 1, characters 73-74:
 1 | let function_escape : local_ _ -> (int -> int) * (int -> int) = fun x -> x, x
                                                                              ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an element of the tuple at Line 1, characters 73-77
+       which is expected to be "global".
 |}]
 
 let function_list_escape : local_ _ -> (int -> int) list * (int -> int) list =
@@ -194,7 +210,9 @@ let function_list_escape : local_ _ -> (int -> int) list * (int -> int) list =
 Line 2, characters 11-12:
 2 |   fun x -> x, x
                ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global"
+       because it is an element of the tuple at Line 2, characters 11-15
+       which is expected to be "global".
 |}]
 
 type t_value

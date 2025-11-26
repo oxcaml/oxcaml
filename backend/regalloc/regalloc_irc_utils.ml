@@ -34,7 +34,7 @@ let log_cfg_with_infos : Cfg_with_infos.t -> unit =
   make_log_cfg_with_infos (Lazy.force log_function) ~instr_prefix ~term_prefix
     cfg_with_infos
 
-module WorkList = struct
+module RegWorkList = struct
   type t =
     | Unknown_list
     | Precolored
@@ -75,6 +75,37 @@ module WorkList = struct
     | Coalesced -> "coalesced"
     | Colored -> "colored"
     | Select_stack -> "select_stack"
+end
+
+module InstrWorkList = struct
+  type t =
+    | Unknown_list
+    | Coalesced
+    | Constrained
+    | Frozen
+    | Work_list
+    | Active
+
+  let rank = function
+    | Unknown_list -> 0
+    | Coalesced -> 1
+    | Constrained -> 2
+    | Frozen -> 3
+    | Work_list -> 4
+    | Active -> 5
+
+  let equal
+      ((Unknown_list | Coalesced | Constrained | Frozen | Work_list | Active) as
+      left) right =
+    rank left = rank right
+
+  let to_string = function
+    | Unknown_list -> "unknown_list"
+    | Coalesced -> "coalesced"
+    | Constrained -> "constrained"
+    | Frozen -> "frozen"
+    | Work_list -> "work_list"
+    | Active -> "active"
 end
 
 module Color = struct
@@ -159,6 +190,7 @@ let is_move_basic : Cfg.basic -> bool =
     | Load _ -> false
     | Store _ -> false
     | Intop _ -> false
+    | Int128op _ -> false
     | Intop_imm _ -> false
     | Intop_atomic _ -> false
     | Floatop _ -> false
