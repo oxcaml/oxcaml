@@ -1146,7 +1146,7 @@ end = struct
     let code_age_relation = Code_age_relation.empty in
     let rec type_from_approx approx =
       match (approx : _ Value_approximation.t) with
-      | Value_unknown -> MTC.unknown Flambda_kind.value
+      | Unknown kind -> MTC.unknown kind
       | Value_const cst -> MTC.type_for_const cst
       | Value_symbol symbol ->
         TG.alias_type_of Flambda_kind.value (Simple.symbol symbol)
@@ -1226,22 +1226,23 @@ end = struct
       let module VA = Value_approximation in
       match ty with
       | Value descr -> (
+        let value_unknown = VA.Unknown K.value in
         match Type_descr.descr descr with
-        | Unknown | Bottom -> Value_unknown
+        | Unknown | Bottom -> value_unknown
         | Ok (Equals simple) ->
           Simple.pattern_match' simple
             ~const:(fun const -> VA.Value_const const)
-            ~var:(fun _ ~coercion:_ -> VA.Value_unknown)
+            ~var:(fun var ~coercion:_ -> VA.Unknown (Variable.kind var))
             ~symbol:(fun symbol ~coercion:_ -> VA.Value_symbol symbol)
         | Ok (No_alias { is_null = Maybe_null _; _ })
         | Ok (No_alias { non_null = Unknown | Bottom; _ }) ->
-          VA.Value_unknown
+          value_unknown
         | Ok (No_alias { is_null = Not_null; non_null = Ok head }) -> (
           match head with
           | Mutable_block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
           | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
           | Boxed_nativeint _ | String _ | Array _ ->
-            Value_unknown
+            value_unknown
           | Closures { by_function_slot; alloc_mode = _ } -> (
             let approx_of_closures_entry ~exact function_slot closures_entry :
                 _ Value_approximation.t =
@@ -1249,7 +1250,7 @@ end = struct
                 TG.Closures_entry.find_function_type closures_entry ~exact
                   function_slot
               with
-              | Bottom | Unknown -> Value_unknown
+              | Bottom | Unknown -> value_unknown
               | Ok function_type ->
                 let code_id = TG.Function_type.code_id function_type in
                 let code_or_meta = find_code code_id in
@@ -1257,7 +1258,7 @@ end = struct
                   { code_id; function_slot; code = code_or_meta; symbol = None }
             in
             match TG.Row_like_for_closures.get_single_tag by_function_slot with
-            | No_singleton -> Value_unknown
+            | No_singleton -> value_unknown
             | Exact_closure (function_slot, closures_entry) ->
               approx_of_closures_entry ~exact:true function_slot closures_entry
             | Incomplete_closure (function_slot, closures_entry) ->
@@ -1279,7 +1280,7 @@ end = struct
                 is_int = _;
                 get_tag = _
               } ->
-            Value_unknown
+            value_unknown
           | Variant
               { immediates = Known imms;
                 blocks = Known blocks;
@@ -1291,8 +1292,8 @@ end = struct
             if TG.is_obviously_bottom imms
             then
               match TG.Row_like_for_blocks.get_singleton blocks with
-              | None -> Value_unknown
-              | Some (tag, Scannable Value_only, _size, fields, alloc_mode) ->
+              | None -> value_unknown
+              | Some (tag, Scannable shape, _size, fields, alloc_mode) ->
                 let tag =
                   match Tag.Scannable.of_tag tag with
                   | Some tag -> tag
@@ -1307,15 +1308,16 @@ end = struct
                     (TG.Product.Int_indexed.components fields)
                 in
                 Block_approximation
-                  (tag, Value_only, Array.of_list fields, alloc_mode)
-              | Some (_, (Float_record | Scannable (Mixed_record _)), _, _, _)
+                  (tag, shape, Array.of_list fields, alloc_mode)
+              | Some (_, Float_record, _, _, _)
                 ->
-                Value_unknown
-            else Value_unknown))
+                value_unknown
+            else value_unknown))
       | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-      | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Rec_info _
-      | Region _ ->
+      | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ ->
+          Unknown (TG.kind ty)
+      | Rec_info _ | Region _ ->
         assert false
     in
     let symbol_ty, _binding_time_and_mode =
