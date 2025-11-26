@@ -447,6 +447,7 @@ let ocaml_ignored_flags =
     "-dlinear";
     "-dparsetree";
     "-dshape";
+    "-dslambda";
     "-drawclambda";
     "-drawflambda";
     "-drawlambda";
@@ -622,6 +623,10 @@ let ocaml_ignored_flags =
     "-fno-avx2";
     "-favx";
     "-fno-avx";
+    "-ffma";
+    "-fno-fma";
+    "-ff16c";
+    "-fno-f16c";
     "-dllvmir";
     "-keep-llvmir";
     "-llvm-backend";
@@ -632,9 +637,17 @@ let ocaml_ignored_flags =
     "-no-cfg-prologue-validate";
     "-cfg-prologue-shrink-wrap";
     "-no-cfg-prologue-shrink-wrap";
+    "-cfg-value-propagation";
+    "-no-cfg-value-propagation";
+    "-cfg-value-propagation-float";
+    "-no-cfg-value-propagation-float";
     "-gdwarf-pedantic";
     "-ddwarf-metrics";
-    "-afl-instrument"
+    "-afl-instrument";
+    "-probes";
+    "-no-probes";
+    "-probes-optimized";
+    "-no-probes-optimized"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -671,8 +684,8 @@ let ocaml_ignored_parametrized_flags =
     "-use-runtime";
     "-error-style";
     "-dump-dir";
-    "-I-paths";
-    "-H-paths";
+    "-I-manifest";
+    "-H-manifest";
     (* flambda-backend specific *)
     "-extension";
     "-extension-universe";
