@@ -1232,7 +1232,7 @@ end = struct
         | Ok (Equals simple) ->
           Simple.pattern_match' simple
             ~const:(fun const -> VA.Value_const const)
-            ~var:(fun var ~coercion:_ -> VA.Unknown (Variable.kind var))
+            ~var:(fun _ ~coercion:_ -> value_unknown)
             ~symbol:(fun symbol ~coercion:_ -> VA.Value_symbol symbol)
         | Ok (No_alias { is_null = Maybe_null _; _ })
         | Ok (No_alias { non_null = Unknown | Bottom; _ }) ->
