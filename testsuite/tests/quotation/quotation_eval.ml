@@ -1,4 +1,5 @@
 (* TEST
+  flags = "-extension runtime_metaprogramming";
   arch_amd64;
   native;
 *)

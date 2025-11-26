@@ -954,7 +954,10 @@ type result_kind =
 type nullary_primitive =
   | Invalid of K.t
   | Optimised_out of K.t
-  | Probe_is_enabled of { name : string }
+  | Probe_is_enabled of
+      { name : string;
+        enabled_at_init : bool option
+      }
   | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
   | Dls_get
   | Tls_get
@@ -970,8 +973,12 @@ let compare_nullary_primitive p1 p2 =
   match p1, p2 with
   | Invalid k1, Invalid k2 -> K.compare k1 k2
   | Optimised_out k1, Optimised_out k2 -> K.compare k1 k2
-  | Probe_is_enabled { name = name1 }, Probe_is_enabled { name = name2 } ->
-    String.compare name1 name2
+  | ( Probe_is_enabled { name = name1; enabled_at_init = enabled_at_init1 },
+      Probe_is_enabled { name = name2; enabled_at_init = enabled_at_init2 } ) ->
+    let c = String.compare name1 name2 in
+    if c <> 0
+    then c
+    else Option.compare Bool.compare enabled_at_init1 enabled_at_init2
   | Enter_inlined_apply { dbg = dbg1 }, Enter_inlined_apply { dbg = dbg2 } ->
     Inlined_debuginfo.compare dbg1 dbg2
   | Dls_get, Dls_get -> 0
@@ -1020,8 +1027,11 @@ let print_nullary_primitive ppf p =
   | Optimised_out _ ->
     Format.fprintf ppf "%tOptimised_out%t" Flambda_colours.elide
       Flambda_colours.pop
-  | Probe_is_enabled { name } ->
-    Format.fprintf ppf "@[<hov 1>(Probe_is_enabled@ %s)@]" name
+  | Probe_is_enabled { name; enabled_at_init } ->
+    Format.fprintf ppf "@[<hov 1>(Probe_is_enabled@ %s%s)@]" name
+      (match enabled_at_init with
+      | None | Some false -> ""
+      | Some true -> " enabled_at_init")
   | Enter_inlined_apply { dbg } ->
     Format.fprintf ppf "@[<hov 1>(Enter_inlined_apply@ %a)@]"
       Inlined_debuginfo.print dbg

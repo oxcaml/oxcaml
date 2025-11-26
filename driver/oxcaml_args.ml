@@ -173,6 +173,24 @@ let mk_cfg_prologue_shrink_wrap_threshold f =
     Arg.Int f,
     "<n>  Only CFGs with fewer than n blocks will be shrink-wrapped" )
 
+let mk_cfg_value_propagation f =
+  ("-cfg-value-propagation", Arg.Unit f, " Propagate value to simplify CFG")
+
+let mk_no_cfg_value_propagation f =
+  ( "-no-cfg-value-propagation",
+    Arg.Unit f,
+    " Do not propagate value to simplify CFG" )
+
+let mk_cfg_value_propagation_float f =
+  ( "-cfg-value-propagation-float",
+    Arg.Unit f,
+    " Propagate float value to simplify CFG" )
+
+let mk_no_cfg_value_propagation_float f =
+  ( "-no-cfg-value-propagation-float",
+    Arg.Unit f,
+    " Do not propagate float value to simplify CFG" )
+
 let mk_reorder_blocks_random f =
   ( "-reorder-blocks-random",
     Arg.Int f,
@@ -1017,6 +1035,10 @@ module type Oxcaml_options = sig
   val cfg_prologue_shrink_wrap : unit -> unit
   val no_cfg_prologue_shrink_wrap : unit -> unit
   val cfg_prologue_shrink_wrap_threshold : int -> unit
+  val cfg_value_propagation : unit -> unit
+  val no_cfg_value_propagation : unit -> unit
+  val cfg_value_propagation_float : unit -> unit
+  val no_cfg_value_propagation_float : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
@@ -1155,6 +1177,10 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_prologue_shrink_wrap F.cfg_prologue_shrink_wrap;
       mk_no_cfg_prologue_shrink_wrap F.no_cfg_prologue_shrink_wrap;
       mk_cfg_prologue_shrink_wrap_threshold F.cfg_prologue_shrink_wrap_threshold;
+      mk_cfg_value_propagation F.cfg_value_propagation;
+      mk_no_cfg_value_propagation F.no_cfg_value_propagation;
+      mk_cfg_value_propagation_float F.cfg_value_propagation_float;
+      mk_no_cfg_value_propagation_float F.no_cfg_value_propagation_float;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
@@ -1327,6 +1353,14 @@ module Oxcaml_options_impl = struct
   let no_cfg_prologue_validate = clear' Oxcaml_flags.cfg_prologue_validate
   let cfg_prologue_shrink_wrap = set' Oxcaml_flags.cfg_prologue_shrink_wrap
   let no_cfg_prologue_shrink_wrap = clear' Oxcaml_flags.cfg_prologue_shrink_wrap
+  let cfg_value_propagation = set' Oxcaml_flags.cfg_value_propagation
+  let no_cfg_value_propagation = clear' Oxcaml_flags.cfg_value_propagation
+
+  let cfg_value_propagation_float =
+    set' Oxcaml_flags.cfg_value_propagation_float
+
+  let no_cfg_value_propagation_float =
+    clear' Oxcaml_flags.cfg_value_propagation_float
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
@@ -1792,6 +1826,9 @@ module Extra_params = struct
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
     | "cfg-prologue-validate" -> set' Oxcaml_flags.cfg_prologue_validate
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
+    | "cfg-value-propagation" -> set' Oxcaml_flags.cfg_value_propagation
+    | "cfg-value-propagation-float" ->
+        set' Oxcaml_flags.cfg_value_propagation_float
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
     | "dranges" -> set' Oxcaml_flags.dranges

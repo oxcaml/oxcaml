@@ -162,18 +162,21 @@ let classify ~classify_product env ty sort : _ classification =
            || Path.same p Predef.path_int16x8
            || Path.same p Predef.path_int32x4
            || Path.same p Predef.path_int64x2
+           || Path.same p Predef.path_float16x8
            || Path.same p Predef.path_float32x4
            || Path.same p Predef.path_float64x2
            || Path.same p Predef.path_int8x32
            || Path.same p Predef.path_int16x16
            || Path.same p Predef.path_int32x8
            || Path.same p Predef.path_int64x4
+           || Path.same p Predef.path_float16x16
            || Path.same p Predef.path_float32x8
            || Path.same p Predef.path_float64x4
            || Path.same p Predef.path_int8x64
            || Path.same p Predef.path_int16x32
            || Path.same p Predef.path_int32x16
            || Path.same p Predef.path_int64x8
+           || Path.same p Predef.path_float16x32
            || Path.same p Predef.path_float32x16
            || Path.same p Predef.path_float64x8
            then Addr
@@ -585,6 +588,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec128)
   | Tconstr(p, _, _) when Path.same p Predef.path_int64x2 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec128)
+  | Tconstr(p, _, _) when Path.same p Predef.path_float16x8 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec128)
   | Tconstr(p, _, _) when Path.same p Predef.path_float32x4 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec128)
   | Tconstr(p, _, _) when Path.same p Predef.path_float64x2 ->
@@ -597,6 +602,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
   | Tconstr(p, _, _) when Path.same p Predef.path_int64x4 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
+  | Tconstr(p, _, _) when Path.same p Predef.path_float16x16 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
   | Tconstr(p, _, _) when Path.same p Predef.path_float32x8->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec256)
   | Tconstr(p, _, _) when Path.same p Predef.path_float64x4 ->
@@ -608,6 +615,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
   | Tconstr(p, _, _) when Path.same p Predef.path_int32x16 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
   | Tconstr(p, _, _) when Path.same p Predef.path_int64x8 ->
+    num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
+  | Tconstr(p, _, _) when Path.same p Predef.path_float16x32->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
   | Tconstr(p, _, _) when Path.same p Predef.path_float32x16->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
@@ -1211,7 +1220,8 @@ let report_error ppf = function
       | Some err ->
         fprintf ppf "@ %a"
         (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) err
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~level:(Ctype.get_current_level ())) err
       end
   | Sort_without_extension (sort, maturity, ty) ->
       fprintf ppf "Non-value layout %a detected" Jkind.Sort.format sort;
@@ -1268,7 +1278,8 @@ let report_error ppf = function
   | Not_a_sort (ty, err) ->
       fprintf ppf "A representable layout is required here.@ %a"
         (Jkind.Violation.report_with_offender
-           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) err
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           ~level:(Ctype.get_current_level ()) ) err
   | Unsupported_product_in_lazy const ->
       fprintf ppf
         "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \
@@ -1306,7 +1317,8 @@ let report_error ppf = function
           Printtyp.type_expr array_type
           Printtyp.type_expr ty
           (Jkind.Violation.report_with_offender
-            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)) err
+             ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+             ~level:(Ctype.get_current_level ())) err
       | None ->
         fprintf ppf
           "This array operation expects an array type, but %a does not appear@ \

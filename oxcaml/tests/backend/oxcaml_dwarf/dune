@@ -3,7 +3,7 @@
  (archive_name simd_stubs)
  (language c)
  (names simd_stubs)
- (flags (:standard -msse4.2 -mavx2)))
+ (flags (:standard -msse4.2 -mavx2 -mf16c)))
 
 (include dune.inc)
 

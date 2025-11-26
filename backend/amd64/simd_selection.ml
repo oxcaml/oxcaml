@@ -48,6 +48,24 @@ let seq_or_avx_zeroed ~dbg seq instr ?i args =
       (Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args)
   else cfg_operation (Simd.sequence seq i) args
 
+let simd_load ~mode instr args =
+  Some
+    ( Operation.Specific (Isimd_mem (Load (Simd.instruction instr None), mode)),
+      args )
+
+let simd_store ~mode instr args =
+  Some
+    ( Operation.Specific (Isimd_mem (Store (Simd.instruction instr None), mode)),
+      args )
+
+let simd_load_sse_or_avx ~mode sse vex args =
+  let instr = if Arch.Extension.enabled AVX then vex else sse in
+  simd_load ~mode instr args
+
+let simd_store_sse_or_avx ~mode sse vex args =
+  let instr = if Arch.Extension.enabled AVX then vex else sse in
+  simd_store ~mode instr args
+
 let bad_immediate fmt =
   Format.kasprintf (fun msg -> raise (Error (Bad_immediate msg))) fmt
 
@@ -115,27 +133,23 @@ let select_operation_bmi2 ~dbg:_ op args =
       sse_or_avx pdep_r64_r64_r64m64 pdep_r64_r64_r64m64 args
     | _ -> None
 
-let simd_load memory_chunk args =
-  Some
-    ( Operation.Load
-        { memory_chunk;
-          addressing_mode = Iindexed 0;
-          mutability = Mutable;
-          is_atomic = false
-        },
-      args )
-
-let simd_store memory_chunk args =
-  Some (Operation.Store (memory_chunk, Iindexed 0, true), args)
-
 let select_operation_sse ~dbg op args =
   match op with
-  | "caml_sse_load_aligned" -> simd_load Onetwentyeight_aligned args
-  | "caml_sse_load_unaligned" -> simd_load Onetwentyeight_unaligned args
-  | "caml_sse_store_aligned" ->
-    simd_store Onetwentyeight_aligned (List.rev args)
-  | "caml_sse_store_unaligned" ->
-    simd_store Onetwentyeight_unaligned (List.rev args)
+  | "caml_sse_vec128_load_aligned" ->
+    simd_load_sse_or_avx ~mode:Arch.identity_addressing movapd_X_Xm128
+      vmovapd_X_Xm128 args
+  | "caml_sse_vec128_load_unaligned" ->
+    simd_load_sse_or_avx ~mode:Arch.identity_addressing movupd_X_Xm128
+      vmovupd_X_Xm128 args
+  | "caml_sse_vec128_store_aligned" ->
+    simd_store_sse_or_avx ~mode:Arch.identity_addressing movapd_m128_X
+      vmovapd_m128_X args
+  | "caml_sse_vec128_store_unaligned" ->
+    simd_store_sse_or_avx ~mode:Arch.identity_addressing movupd_m128_X
+      vmovupd_m128_X args
+  | "caml_sse_vec128_store_aligned_uncached" ->
+    simd_store_sse_or_avx ~mode:Arch.identity_addressing movntps vmovntps_m128_X
+      args
   | "caml_sse_float32_sqrt" | "sqrtf" ->
     seq_or_avx_zeroed ~dbg Seq.sqrtss vsqrtss args
   | "caml_simd_float32_max" | "caml_sse_float32_max" ->
@@ -175,6 +189,37 @@ let select_operation_sse ~dbg op args =
 
 let select_operation_sse2 ~dbg op args =
   match op with
+  | "caml_sse2_vec128_load_low64" ->
+    simd_load_sse_or_avx ~mode:Arch.identity_addressing movq_X_r64m64
+      vmovq_X_r64m64 args
+  | "caml_sse2_vec128_load_low32" ->
+    simd_load_sse_or_avx ~mode:Arch.identity_addressing movd_X_r32m32
+      vmovd_X_r32m32 args
+  | "caml_sse2_int32_store_uncached" ->
+    simd_store ~mode:Arch.identity_addressing movnti_m32_r32 args
+  | "caml_sse2_int64_store_uncached" ->
+    simd_store ~mode:Arch.identity_addressing movnti_m64_r64 args
+  | "caml_sse2_vec128_load_low64_copy_high64" ->
+    simd_load_sse_or_avx ~mode:Arch.identity_addressing movlpd_X_m64
+      vmovlpd_X_X_m64 args
+  | "caml_sse2_vec128_load_high64_copy_low64" ->
+    simd_load_sse_or_avx ~mode:Arch.identity_addressing movhpd_X_m64
+      vmovhpd_X_X_m64 args
+  | "caml_sse2_vec128_load_zero_low32" ->
+    simd_load_sse_or_avx ~mode:Arch.identity_addressing movss_X_m32 vmovss_X_m32
+      args
+  | "caml_sse2_vec128_load_zero_low64" ->
+    simd_load_sse_or_avx ~mode:Arch.identity_addressing movsd_X_m64 vmovsd_X_m64
+      args
+  | "caml_sse2_vec128_store_low32" ->
+    simd_store_sse_or_avx ~mode:Arch.identity_addressing movss_m32_X
+      vmovss_m32_X args
+  | "caml_sse2_vec128_store_low64" ->
+    simd_store_sse_or_avx ~mode:Arch.identity_addressing movsd_m64_X
+      vmovsd_m64_X args
+  | "caml_sse2_vec128_store_mask8" ->
+    (* Does not have a mode; base address is always in rdi. *)
+    sse_or_avx maskmovdqu vmaskmovdqu args
   | "caml_sse2_float64_sqrt" | "sqrt" ->
     seq_or_avx_zeroed ~dbg Seq.sqrtsd vsqrtsd args
   | "caml_simd_float64_max" | "caml_sse2_float64_max" ->
@@ -340,6 +385,8 @@ let select_operation_sse3 ~dbg:_ op args =
   then None
   else
     match op with
+    | "caml_sse3_vec128_load_broadcast64" ->
+      simd_load_sse_or_avx ~mode:(Iindexed 0) movddup vmovddup_X_Xm64 args
     | "caml_sse3_float32x4_addsub" ->
       sse_or_avx addsubps vaddsubps_X_X_Xm128 args
     | "caml_sse3_float64x2_addsub" ->
@@ -397,6 +444,8 @@ let select_operation_sse41 ~dbg op args =
   then None
   else
     match op with
+    | "caml_sse41_vec128_load_aligned_uncached" ->
+      simd_load_sse_or_avx ~mode:(Iindexed 0) movntdqa vmovntdqa_X_m128 args
     | "caml_sse41_vec128_blend_16" ->
       let i, args = extract_constant args ~max:255 op in
       sse_or_avx pblendw vpblendw_X_X_Xm128 ~i args
@@ -599,11 +648,42 @@ let select_operation_avx ~dbg:_ op args =
   then None
   else
     match op with
-    | "caml_avx_load_aligned" -> simd_load Twofiftysix_aligned args
-    | "caml_avx_load_unaligned" -> simd_load Twofiftysix_unaligned args
-    | "caml_avx_store_aligned" -> simd_store Twofiftysix_aligned (List.rev args)
-    | "caml_avx_store_unaligned" ->
-      simd_store Twofiftysix_unaligned (List.rev args)
+    | "caml_avx_vec256_load_aligned" ->
+      simd_load ~mode:Arch.identity_addressing vmovapd_Y_Ym256 args
+    | "caml_avx_vec256_load_unaligned" ->
+      simd_load ~mode:Arch.identity_addressing vmovupd_Y_Ym256 args
+    | "caml_avx_vec256_store_aligned" ->
+      simd_store ~mode:Arch.identity_addressing vmovapd_m256_Y args
+    | "caml_avx_vec256_store_unaligned" ->
+      simd_store ~mode:Arch.identity_addressing vmovupd_m256_Y args
+    | "caml_avx_vec256_load_aligned_uncached" ->
+      simd_load ~mode:Arch.identity_addressing vmovntdqa_Y_m256 args
+    | "caml_avx_vec256_store_aligned_uncached" ->
+      simd_store ~mode:Arch.identity_addressing vmovntps_m256_Y args
+    | "caml_avx_vec256_load_broadcast128" ->
+      simd_load ~mode:Arch.identity_addressing vbroadcastf128 args
+    | "caml_avx_vec256_load_broadcast64" ->
+      simd_load ~mode:Arch.identity_addressing vbroadcastsd_Y_m64 args
+    | "caml_avx_vec256_load_broadcast32" ->
+      simd_load ~mode:Arch.identity_addressing vbroadcastss_Y_m32 args
+    | "caml_avx_vec128_load_broadcast32" ->
+      simd_load ~mode:Arch.identity_addressing vbroadcastss_X_m32 args
+    | "caml_avx_vec128_load_mask64" ->
+      simd_load ~mode:Arch.identity_addressing vmaskmovpd_X_X_m128 args
+    | "caml_avx_vec256_load_mask64" ->
+      simd_load ~mode:Arch.identity_addressing vmaskmovpd_Y_Y_m256 args
+    | "caml_avx_vec128_load_mask32" ->
+      simd_load ~mode:Arch.identity_addressing vmaskmovps_X_X_m128 args
+    | "caml_avx_vec256_load_mask32" ->
+      simd_load ~mode:Arch.identity_addressing vmaskmovps_Y_Y_m256 args
+    | "caml_avx_vec128_store_mask64" ->
+      simd_store ~mode:Arch.identity_addressing vmaskmovpd_m128_X_X args
+    | "caml_avx_vec256_store_mask64" ->
+      simd_store ~mode:Arch.identity_addressing vmaskmovpd_m256_Y_Y args
+    | "caml_avx_vec128_store_mask32" ->
+      simd_store ~mode:Arch.identity_addressing vmaskmovps_m128_X_X args
+    | "caml_avx_vec256_store_mask32" ->
+      simd_store ~mode:Arch.identity_addressing vmaskmovps_m256_Y_Y args
     | "caml_avx_float64x4_add" -> instr vaddpd_Y_Y_Ym256 args
     | "caml_avx_float32x8_add" -> instr vaddps_Y_Y_Ym256 args
     | "caml_avx_float32x8_addsub" -> instr vaddsubps_Y_Y_Ym256 args
@@ -618,7 +698,6 @@ let select_operation_avx ~dbg:_ op args =
       instr vblendps_Y_Y_Ym256 ~i args
     | "caml_avx_vec256_blendv_64" -> instr vblendvpd_Y_Y_Ym256_Y args
     | "caml_avx_vec256_blendv_32" -> instr vblendvps_Y_Y_Ym256_Y args
-    | "caml_avx_vec256_broadcast_128" -> instr vbroadcastf128 args
     | "caml_avx_vec256_broadcast_64" -> instr vbroadcastsd_Y_X args
     | "caml_avx_vec256_broadcast_32" -> instr vbroadcastss_Y_X args
     | "caml_avx_vec128_broadcast_32" -> instr vbroadcastss_X_X args
@@ -884,6 +963,60 @@ let select_operation_avx2 ~dbg:_ op args =
     | "caml_avx2_vec128x2_interleave_low_16" -> instr vpunpcklwd_Y_Y_Ym256 args
     | _ -> None
 
+let select_operation_f16c ~dbg:_ op args =
+  if not (Arch.Extension.enabled F16C)
+  then None
+  else
+    match op with
+    | "caml_f16c_cvt_float16x8_float32x4" -> instr vcvtph2ps_X_Xm64 args
+    | "caml_f16c_cvt_float16x8_float32x8" -> instr vcvtph2ps_Y_Xm128 args
+    | "caml_f16c_cvt_float32x4_float16x8" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vcvtps2ph_Xm64_X ~i args
+    | "caml_f16c_cvt_float32x8_float16x8" ->
+      let i, args = extract_constant args ~max:7 op in
+      instr vcvtps2ph_Xm128_Y ~i args
+    | _ -> None
+
+let select_operation_fma ~dbg:_ op args =
+  if not (Arch.Extension.enabled FMA)
+  then None
+  else
+    match op with
+    | "caml_fma_float64x2_mul_add" -> instr vfmadd213pd_X_X_Xm128 args
+    | "caml_fma_float64x4_mul_add" -> instr vfmadd213pd_Y_Y_Ym256 args
+    | "caml_fma_float32x4_mul_add" -> instr vfmadd213ps_X_X_Xm128 args
+    | "caml_fma_float32x8_mul_add" -> instr vfmadd213ps_Y_Y_Ym256 args
+    | "caml_fma_float64_mul_add" -> instr vfmadd213sd args
+    | "caml_fma_float32_mul_add" -> instr vfmadd213ss args
+    | "caml_fma_float64x2_mul_addsub" -> instr vfmaddsub213pd_X_X_Xm128 args
+    | "caml_fma_float64x4_mul_addsub" -> instr vfmaddsub213pd_Y_Y_Ym256 args
+    | "caml_fma_float32x4_mul_addsub" -> instr vfmaddsub213ps_X_X_Xm128 args
+    | "caml_fma_float32x8_mul_addsub" -> instr vfmaddsub213ps_Y_Y_Ym256 args
+    | "caml_fma_float64x2_mul_sub" -> instr vfmsub213pd_X_X_Xm128 args
+    | "caml_fma_float64x4_mul_sub" -> instr vfmsub213pd_Y_Y_Ym256 args
+    | "caml_fma_float32x4_mul_sub" -> instr vfmsub213ps_X_X_Xm128 args
+    | "caml_fma_float32x8_mul_sub" -> instr vfmsub213ps_Y_Y_Ym256 args
+    | "caml_fma_float64_mul_sub" -> instr vfmsub213sd args
+    | "caml_fma_float32_mul_sub" -> instr vfmsub213ss args
+    | "caml_fma_float64x2_mul_subadd" -> instr vfmsubadd213pd_X_X_Xm128 args
+    | "caml_fma_float64x4_mul_subadd" -> instr vfmsubadd213pd_Y_Y_Ym256 args
+    | "caml_fma_float32x4_mul_subadd" -> instr vfmsubadd213ps_X_X_Xm128 args
+    | "caml_fma_float32x8_mul_subadd" -> instr vfmsubadd213ps_Y_Y_Ym256 args
+    | "caml_fma_float64x2_neg_mul_add" -> instr vfnmadd213pd_X_X_Xm128 args
+    | "caml_fma_float64x4_neg_mul_add" -> instr vfnmadd213pd_Y_Y_Ym256 args
+    | "caml_fma_float32x4_neg_mul_add" -> instr vfnmadd213ps_X_X_Xm128 args
+    | "caml_fma_float32x8_neg_mul_add" -> instr vfnmadd213ps_Y_Y_Ym256 args
+    | "caml_fma_float64_neg_mul_add" -> instr vfnmadd213sd args
+    | "caml_fma_float32_neg_mul_add" -> instr vfnmadd213ss args
+    | "caml_fma_float64x2_neg_mul_sub" -> instr vfnmsub213pd_X_X_Xm128 args
+    | "caml_fma_float64x4_neg_mul_sub" -> instr vfnmsub213pd_Y_Y_Ym256 args
+    | "caml_fma_float32x4_neg_mul_sub" -> instr vfnmsub213ps_X_X_Xm128 args
+    | "caml_fma_float32x8_neg_mul_sub" -> instr vfnmsub213ps_Y_Y_Ym256 args
+    | "caml_fma_float64_neg_mul_sub" -> instr vfnmsub213sd args
+    | "caml_fma_float32_neg_mul_sub" -> instr vfnmsub213ss args
+    | _ -> None
+
 let select_operation_cfg ~dbg op args =
   let or_else try_ opt =
     match opt with Some x -> Some x | None -> try_ ~dbg op args
@@ -899,16 +1032,12 @@ let select_operation_cfg ~dbg op args =
   |> or_else select_operation_sse42
   |> or_else select_operation_avx
   |> or_else select_operation_avx2
-
-let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
-  match op with
-  | Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32 | Mul_f32
-  | Div_f32 ->
-    if Proc.has_three_operand_float_ops ()
-    then None
-    else Some ([| res.(0); arg.(1) |], res)
+  |> or_else select_operation_f16c
+  |> or_else select_operation_fma
 
 let rax = Proc.phys_reg Int 0
+
+let rdi = Proc.phys_reg Int 2
 
 let rcx = Proc.phys_reg Int 5
 
@@ -917,7 +1046,12 @@ let rdx = Proc.phys_reg Int 4
 let xmm0v = Proc.phys_reg Vec128 100
 
 let to_phys_reg (pinned_reg : Simd.reg) =
-  match pinned_reg with RAX -> rax | RCX -> rcx | RDX -> rdx | XMM0 -> xmm0v
+  match pinned_reg with
+  | RAX -> rax
+  | RDI -> rdi
+  | RCX -> rcx
+  | RDX -> rdx
+  | XMM0 -> xmm0v
 
 let maybe_pin arr i loc =
   match Simd.loc_is_pinned loc with
@@ -929,6 +1063,7 @@ let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
     (fun i (simd_arg : Simd.arg) -> maybe_pin arg_regs i simd_arg.loc)
     simd.args;
   (match simd.res with
+  | Res_none -> ()
   | First_arg ->
     assert (not (Reg.is_preassigned arg_regs.(0)));
     arg_regs.(0) <- res_regs.(0)
@@ -951,6 +1086,9 @@ let pseudoregs_for_operation (simd : Simd.operation) arg res =
       instr
   in
   pseudoregs_for_instr sse_or_avx arg_regs res_regs
+
+let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
+  match op with Load op | Store op -> pseudoregs_for_operation op arg res
 
 (* Error report *)
 
@@ -1157,8 +1295,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Specific _ | Alloc _
       | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Intop_atomic _ | Floatop _ | Csel _
-      | Probe_is_enabled _ | Opaque | Begin_region | End_region | Pause
+      | Const_vec512 _ | Stackoffset _ | Int128op _ | Intop_atomic _ | Floatop _
+      | Csel _ | Probe_is_enabled _ | Opaque | Begin_region | End_region | Pause
       | Name_for_debugger _ | Dls_get | Tls_get | Poll ->
         assert false
     in
@@ -1212,9 +1350,10 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | Move | Load _ | Store _ | Intop _ | Specific _ | Alloc _
       | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
       | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
-      | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
-      | End_region | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause ->
+      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
+      | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
+      | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
+      | Poll | Pause ->
         assert false
     in
     let consts = List.map extract_intop_imm_int cfg_ops in
@@ -1253,9 +1392,10 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Alloc _
         | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
         | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-        | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
-        | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
-        | End_region | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause ->
+        | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
+        | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
+        | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
+        | Poll | Pause ->
           assert false
       in
       let get_scale op =
@@ -1382,13 +1522,13 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
               | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
               | Isimd _ | Isimd_mem _ | Ilea _ | Ibswap _ | Isextend32
               | Izextend32 | Illvm_intrinsic _ )
-          | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Alloc _
-          | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
-          | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-          | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _
-          | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Begin_region
-          | End_region | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause
-            ->
+          | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Int128op _
+          | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
+          | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+          | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
+          | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque
+          | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
+          | Poll | Pause ->
             assert false
         in
         let consts = List.map extract_store_int_imm cfg_ops in
@@ -1436,41 +1576,30 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         then args.(0) <- Vectorize_utils.Vectorized_instruction.Argument 0;
         args
       in
+      let sse, avx =
+        match float_width, float_op with
+        | Float64, Ifloatadd -> addpd, vaddpd_X_X_Xm128
+        | Float64, Ifloatsub -> subpd, vsubpd_X_X_Xm128
+        | Float64, Ifloatmul -> mulpd, vmulpd_X_X_Xm128
+        | Float64, Ifloatdiv -> divpd, vdivpd_X_X_Xm128
+        | Float32, Ifloatadd -> addps, vaddps_X_X_Xm128
+        | Float32, Ifloatsub -> subps, vsubps_X_X_Xm128
+        | Float32, Ifloatmul -> mulps, vmulps_X_X_Xm128
+        | Float32, Ifloatdiv -> divps, vdivps_X_X_Xm128
+      in
       if is_aligned_to_vector_width ()
       then
-        let sse_op : Simd.Mem.operation =
-          match float_width, float_op with
-          | Float64, Ifloatadd -> Add_f64
-          | Float64, Ifloatsub -> Sub_f64
-          | Float64, Ifloatmul -> Mul_f64
-          | Float64, Ifloatdiv -> Div_f64
-          | Float32, Ifloatadd -> Add_f32
-          | Float32, Ifloatsub -> Sub_f32
-          | Float32, Ifloatmul -> Mul_f32
-          | Float32, Ifloatdiv -> Div_f32
-        in
         let arguments = append_result results address_args in
-        Some
-          [ { operation =
-                Operation.Specific (Isimd_mem (sse_op, addressing_mode));
-              arguments;
-              results
-            } ]
+        simd_load_sse_or_avx ~mode:addressing_mode sse avx arguments
+        |> Option.map (fun (operation, arguments) ->
+               [ { Vectorize_utils.Vectorized_instruction.operation;
+                   arguments;
+                   results
+                 } ])
       else
         (* Emit a load followed by an arithmetic operation, effectively
            reverting the decision from Arch.selection. It will probably not be
            beneficial with 128-bit accesses. *)
-        let sse, avx =
-          match float_width, float_op with
-          | Float64, Ifloatadd -> addpd, vaddpd_X_X_Xm128
-          | Float64, Ifloatsub -> subpd, vsubpd_X_X_Xm128
-          | Float64, Ifloatmul -> mulpd, vmulpd_X_X_Xm128
-          | Float64, Ifloatdiv -> divpd, vdivpd_X_X_Xm128
-          | Float32, Ifloatadd -> addps, vaddps_X_X_Xm128
-          | Float32, Ifloatsub -> subps, vsubps_X_X_Xm128
-          | Float32, Ifloatmul -> mulps, vmulps_X_X_Xm128
-          | Float32, Ifloatdiv -> divps, vdivps_X_X_Xm128
-        in
         let new_reg =
           [| Vectorize_utils.Vectorized_instruction.New_Vec128 0 |]
         in
@@ -1502,7 +1631,8 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         intr)
   | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
   | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-  | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop_atomic _ | Floatop _
-  | Csel _ | Probe_is_enabled _ | Opaque | Pause | Begin_region | End_region
-  | Name_for_debugger _ | Dls_get | Tls_get | Poll ->
+  | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Int128op _
+  | Intop_atomic _ | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Pause
+  | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get | Poll
+    ->
     None

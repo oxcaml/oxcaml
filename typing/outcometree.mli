@@ -64,13 +64,7 @@ type out_value =
   | Oval_lazy of out_value
   | Oval_code of CamlinternalQuote.Code.t
 
-type out_modality_legacy = Ogf_global
-
-type out_modality_new = string
-
-type out_modality =
-  | Ogf_legacy of out_modality_legacy
-  | Ogf_new of out_modality_new
+type out_modality = string
 
 type out_atomicity =
   | Atomic
@@ -89,14 +83,7 @@ type arg_label =
   | Optional of string
   | Position of string
 
-type out_mode_legacy =
-  | Omd_local
-
-type out_mode_new = string
-
-type out_mode =
-  | Omd_legacy of out_mode_legacy
-  | Omd_new of out_mode_new
+type out_mode = string
 
 type out_arg_mode = out_mode list
 
@@ -115,7 +102,7 @@ type out_jkind_const =
   | Ojkind_const_abbreviation of string
   (** The base of [Ojkind_const_mod] is optional to enable printing individual axes *)
   | Ojkind_const_mod of out_jkind_const option * string list
-  | Ojkind_const_with of out_jkind_const * out_type * out_modality_new list
+  | Ojkind_const_with of out_jkind_const * out_type * out_modality list
   | Ojkind_const_kind_of of out_type
   | Ojkind_const_product of out_jkind_const list
 
@@ -203,7 +190,7 @@ and out_sig_item =
         out_rec_status
   | Osig_typext of out_extension_constructor * out_ext_status
   | Osig_modtype of string * out_module_type
-  | Osig_module of string * out_module_type * out_modality_new list
+  | Osig_module of string * out_module_type * out_modality list
       * out_rec_status
   | Osig_type of out_type_decl * out_rec_status
   | Osig_value of out_val_decl
@@ -237,7 +224,7 @@ and out_type_extension =
 and out_val_decl =
   { oval_name: string;
     oval_type: out_type;
-    oval_modalities : out_modality_new list;
+    oval_modalities : out_modality list;
     (* Modalities on value descriptions are always new, even for [global_] *)
     oval_prims: string list;
     oval_attributes: out_attribute list }

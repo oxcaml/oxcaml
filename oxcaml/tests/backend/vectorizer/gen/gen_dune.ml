@@ -38,6 +38,9 @@ let compile ~enabled_if ~extra_flags name =
     | "cmx_dump" -> cmx_dump name
     | _ -> assert false
   in
+  (* We override the OCAMLPARAM environment variable below, because
+   * the vectorizer tests uses the "dump-to-file" feature of the
+   * compiler which is also used by the CI job for metrics collection. *)
   rule ~subst
     {|
 (rule
@@ -45,7 +48,11 @@ let compile ~enabled_if ~extra_flags name =
  ${enabled_if}
  (targets ${runner} ${cmx_dump})
  (deps ${deps})
- (action (run %{bin:ocamlopt.opt} %{deps} ${flags} ${extra_flags} -o ${runner})))
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} ${flags} ${extra_flags} -o ${runner}))))
 |}
 
 let run ~enabled_if name =

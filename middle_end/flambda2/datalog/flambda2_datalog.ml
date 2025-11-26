@@ -70,10 +70,12 @@ module Datalog = struct
 
   include Datalog
 
-  type ('t, 'k, 'v) table = ('t, 'k, 'v) Table.Id.t
+  type (!'t, !'k, !'v) table = ('t, 'k, 'v) Table.Id.t
 
   let create_table ?(provenance = true) ~name ~default_value columns =
     Table.Id.create ~provenance ~name ~columns ~default_value
+
+  let columns table = Table.Id.columns table
 
   type ('t, 'k) relation = ('t, 'k, unit) table
 

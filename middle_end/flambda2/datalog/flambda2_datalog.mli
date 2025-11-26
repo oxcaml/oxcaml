@@ -70,7 +70,7 @@ module Datalog : sig
     end) : S with type t = int
   end
 
-  type ('t, 'k, 'v) table
+  type (!'t, !'k, !'v) table
 
   (** The [provenance] argument is [true] by default. If set to [false],
       provenance tracking will be disabled for this table. This is useful for
@@ -82,6 +82,8 @@ module Datalog : sig
     default_value:'v ->
     ('t, 'k, 'v) Column.hlist ->
     ('t, 'k, 'v) table
+
+  val columns : ('t, 'k, 'v) table -> ('t, 'k, 'v) Column.hlist
 
   type ('t, 'k) relation = ('t, 'k, unit) table
 
