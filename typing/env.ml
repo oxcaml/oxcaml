@@ -768,10 +768,7 @@ and cltype_data =
   { cltda_declaration : class_type_declaration;
     cltda_shape : Shape.t }
 
-let clda_mode = Mode.Value.(
-  Const.legacy
-  |> of_const ~hint_monadic:Class_legacy_monadic
-      ~hint_comonadic:Class_legacy_comonadic)
+let clda_mode = Types.class_mode |> Mode.Value.disallow_right
 
 let fcomp_res_mode = Types.functor_res_mode |> Mode.Alloc.disallow_right
 
@@ -1138,7 +1135,9 @@ let components_of_module ~alerts ~uid env ps path addr mty mode shape =
     }
   }
 
-let mode_unit = Mode.Value.legacy
+let mode_unit =
+  let hint : _ Mode.Hint.const = Legacy Compilation_unit in
+  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
 
 let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
   let id = Ident.create_global name in

@@ -753,10 +753,14 @@ module F : functor () -> sig end @@ stateless
 module (G @ portable) () = F
 
 [%%expect{|
-Line 1, characters 27-28:
+Line 1, characters 22-28:
 1 | module (G @ portable) () = F
-                               ^
-Error: This is "contended", but expected to be "uncontended" because it is a functor body.
+                          ^^^^^^
+Error: The module is "nonportable"
+       because it contains a usage (of the module "F" at Line 1, characters 27-28)
+       which is expected to be "uncontended"
+       because it is a functor return and thus always at the legacy modes.
+       However, the module highlighted is expected to be "portable".
 |}]
 
 module (G' @ portable) = F

@@ -14,13 +14,17 @@ type ident =
         point to [M]. This field would store [M.x]. *)
   }
 
+type structure_item = lock_item * Ident.t
+
 (** Description of pinpoints to accompany the location. The constructors are not
 mutually exclusive - some might be more precise than others *)
 type pinpoint_desc =
   | Unknown
   | Ident of ident  (** An identifier *)
   | Function  (** A function definition *)
+  | Module  (** A module definition *)
   | Functor  (** A functor definition *)
+  | Structure  (** A structure definition *)
   | Lazy  (** A lazy expression *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
@@ -28,6 +32,8 @@ type pinpoint_desc =
   | Object  (** An object declaration *)
   | Loop  (** a loop *)
   | Letop  (** let op *)
+  | Structure_item of structure_item
+      (** an item in the structure pointed by the location *)
 
 (** A pinpoint is a location in the source code, accompanied by additional description *)
 type pinpoint = Location.t * pinpoint_desc
@@ -36,12 +42,16 @@ type mutable_part =
   | Record_field of string
   | Array_elements
 
+type legacy =
+  | Compilation_unit
+  | Toplevel
+  | Functor_return
+  | Class
+
 (** Hint for a constant bound. See [Mode.Report.print_const] for what each non-trivial constructor means. *)
 type 'd const =
   | Unknown : ('l * 'r) const  (** The constant bound is not explained. *)
   | Lazy_allocated_on_heap : (disallowed * 'r) pos const
-  | Class_legacy_monadic : ('l * disallowed) neg const
-  | Class_legacy_comonadic : ('l * disallowed) pos const
   | Tailcall_function : (disallowed * 'r) pos const
   | Tailcall_argument : (disallowed * 'r) pos const
   | Mutable_read : mutable_part -> (disallowed * 'r) neg const
@@ -53,6 +63,7 @@ type 'd const =
   | Is_used_in : pinpoint -> (disallowed * 'r) const
       (** A variant of [Is_closed_by] where the closure mode is constant.
         INVARIANT: The [pinpoint] cannot be [Unknown]. *)
+  | Legacy : legacy -> ('l * 'r) const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 
@@ -72,7 +83,7 @@ type containing =
   | Record of string
   | Array
   | Constructor of string
-(* CR-soon zqian: add the relation between structure and items *)
+  | Structure of structure_item
 
 type contains =
   { containing : containing;
