@@ -394,7 +394,7 @@ let operation_is_pure : specific_operation -> bool = function
   | Ibswap _ -> true
   | Imove32 -> true
   | Isignext _ -> true
-  | Iread_system_reg CNTVCT_EL0 -> true
+  | Iread_system_reg CNTVCT_EL0 -> false
   | Isimd op -> Simd.operation_is_pure op
   | Icrc32 -> true
   | Illvm_intrinsic intr ->
