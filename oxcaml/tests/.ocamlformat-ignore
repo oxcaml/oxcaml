@@ -14,6 +14,7 @@ simd/consts256_u.ml
 simd/arrays.ml
 simd/arrays256.ml
 simd/amd64/load_store.ml
+simd/mixed_modules.ml
 simd/disabled/disabled256.ml
 small_numbers/float32_u_lib.ml
 backend/zero_alloc_checker/fail27.ml

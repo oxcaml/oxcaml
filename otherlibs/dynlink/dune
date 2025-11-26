@@ -135,6 +135,8 @@
   lazy_backtrack
   type_shape
   zero_alloc_utils
+  diffing
+  diffing_with_keys
   subst
   signature_with_global_bindings
   predef
@@ -143,6 +145,17 @@
   cmi_format
   persistent_env
   env
+  errortrace
+  ctype
+  signature_group
+  printtyp
+  includecore
+  typedecl_properties
+  typedecl_separability
+  typedecl_variance
+  typetexp
+  typedecl
+  mtype
   debuginfo
   static_label
   lambda
@@ -242,6 +255,10 @@
 
 (copy_files ../../utils/zero_alloc_utils.ml)
 
+(copy_files ../../utils/diffing.ml)
+
+(copy_files ../../utils/diffing_with_keys.ml)
+
 (copy_files ../../parsing/location.ml)
 
 (copy_files ../../parsing/language_extension.ml)
@@ -309,6 +326,28 @@
 (copy_files ../../typing/types.ml)
 
 (copy_files ../../typing/btype.ml)
+
+(copy_files ../../typing/errortrace.ml)
+
+(copy_files ../../typing/ctype.ml)
+
+(copy_files ../../typing/printtyp.ml)
+
+(copy_files ../../typing/signature_group.ml)
+
+(copy_files ../../typing/includecore.ml)
+
+(copy_files ../../typing/typedecl_properties.ml)
+
+(copy_files ../../typing/typedecl_separability.ml)
+
+(copy_files ../../typing/typedecl_variance.ml)
+
+(copy_files ../../typing/typetexp.ml)
+
+(copy_files ../../typing/typedecl.ml)
+
+(copy_files ../../typing/mtype.ml)
 
 (copy_files ../../typing/type_shape.ml)
 
@@ -404,6 +443,10 @@
 
 (copy_files ../../utils/zero_alloc_utils.mli)
 
+(copy_files ../../utils/diffing.mli)
+
+(copy_files ../../utils/diffing_with_keys.mli)
+
 (copy_files ../../parsing/location.mli)
 
 (copy_files ../../parsing/language_extension.mli)
@@ -469,6 +512,28 @@
 (copy_files ../../typing/types.mli)
 
 (copy_files ../../typing/btype.mli)
+
+(copy_files ../../typing/errortrace.mli)
+
+(copy_files ../../typing/ctype.mli)
+
+(copy_files ../../typing/signature_group.mli)
+
+(copy_files ../../typing/printtyp.mli)
+
+(copy_files ../../typing/includecore.mli)
+
+(copy_files ../../typing/typedecl_properties.mli)
+
+(copy_files ../../typing/typedecl_separability.mli)
+
+(copy_files ../../typing/typedecl_variance.mli)
+
+(copy_files ../../typing/typetexp.mli)
+
+(copy_files ../../typing/typedecl.mli)
+
+(copy_files ../../typing/mtype.mli)
 
 (copy_files ../../typing/type_shape.mli)
 
@@ -616,6 +681,8 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Syntaxerr.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lazy_backtrack.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Zero_alloc_utils.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Diffing.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Diffing_with_keys.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ast_helper.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ast_iterator.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Builtin_attributes.cmo
@@ -653,6 +720,18 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Predef.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Errortrace.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ctype.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Signature_group.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Printtyp.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Includecore.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedtree.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedecl_properties.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedecl_separability.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedecl_variance.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typetexp.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedecl.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Mtype.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Static_label.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lambda.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Dll.cmo
@@ -714,6 +793,8 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Path.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lazy_backtrack.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Zero_alloc_utils.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Diffing.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Diffing_with_keys.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Printast.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Syntaxerr.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ast_helper.cmx
@@ -753,6 +834,18 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Predef.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Errortrace.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ctype.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Signature_group.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Printtyp.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Includecore.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedtree.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedecl_properties.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedecl_separability.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedecl_variance.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typetexp.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedecl.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Mtype.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Static_label.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lambda.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Dll.cmx

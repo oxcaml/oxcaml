@@ -26,6 +26,10 @@ let wrap create s =
   builtin_idents := (s, id) :: !builtin_idents;
   id
 
+(* Note: [ident_create] creates identifiers with [Ident.Predef], and later
+   portions of the compiler assume that expressions with these identifiers must
+   have types with layout value (see, e.g., the compilation of [Pgetpredef]
+   in `lambda.ml`). *)
 let ident_create = wrap Ident.create_predef
 
 let ident_int = ident_create "int"

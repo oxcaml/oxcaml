@@ -87,3 +87,7 @@ val bind_recs :
   Debuginfo.t ->
   (Acc.t -> Flambda.Named.t list -> Expr_with_acc.t) ->
   Expr_with_acc.t
+
+val mixed_block_access_field_kind :
+  'a Mixed_block_shape.Singleton_mixed_block_element.t ->
+  Flambda_primitive.Mixed_block_access_field_kind.t
