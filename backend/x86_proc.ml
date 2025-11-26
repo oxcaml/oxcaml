@@ -581,6 +581,259 @@ module X86_peephole = struct
     | Reg8L _ | Reg8H _ | Reg16 _ | Reg64 _ -> true
     | _ -> false
 
+  (* Extract the underlying reg64 from any integer register variant. Returns
+     None for non-register arguments or float registers. *)
+  let underlying_reg64 = function[@warning "-4"]
+    | Reg64 r | Reg32 r | Reg16 r | Reg8L r -> Some r
+    | Reg8H h -> (
+      match[@warning "-4"] h with
+      | AH -> Some RAX
+      | BH -> Some RBX
+      | CH -> Some RCX
+      | DH -> Some RDX)
+    | Regf _ | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> None
+
+  (* Check if two register arguments refer to the same underlying physical
+     register (considering aliasing). Examples: - Reg64 RAX and Reg8L RAX:
+     aliased (both refer to RAX) - Reg32 RBX and Reg16 RBX: aliased (both refer
+     to RBX) - Reg64 RAX and Reg64 RBX: not aliased (different registers) -
+     Reg8H AH and Reg64 RAX: aliased (AH is part of RAX) *)
+  let registers_alias arg1 arg2 =
+    match underlying_reg64 arg1, underlying_reg64 arg2 with
+    | Some r1, Some r2 -> equal_reg64 r1 r2
+    | _ -> false
+
+  (* Check if a register appears in an argument, including inside memory
+     operands. Handles sub-register aliasing: reading %al counts as reading
+     %rax. Examples: - mov %rax, ...: reads %rax - mov %al, ...: reads %rax (via
+     sub-register) - mov (%rax), ...: reads %rax (for address) *)
+  let reg_appears_in_arg target arg =
+    (* First check direct register usage (including aliasing) *)
+    if registers_alias target arg
+    then true
+    else
+      (* Then check if target appears in memory operand address *)
+      match[@warning "-4"] arg with
+      | Mem addr -> (
+        match(* Check if target register appears as base or index in memory
+                operand *)
+             [@warning "-4"]
+          target
+        with
+        | Reg64 r | Reg32 r | Reg16 r | Reg8L r ->
+          (match addr.base with
+          | Some base when equal_reg64 r base -> true
+          | _ -> false)
+          || (addr.scale <> 0 && equal_reg64 r addr.idx)
+        | _ -> false)
+      | _ -> false
+
+  (* Check if a register is directly written by an argument. Returns true only
+     if the argument IS a register that equals the target, not if the register
+     merely appears in a memory address. Handles sub-register aliasing: writing
+     to %al counts as writing to %rax. Examples: - mov %rax, %rbx: %rbx is
+     written - mov %rax, (%rbx): %rbx is NOT written (it's read for the address)
+     - mov c, %al: %rax is written (via sub-register) *)
+  let reg_is_written_by_arg target arg =
+    match[@warning "-4"] arg with
+    | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ ->
+      registers_alias target arg
+    | Regf _ -> equal_args target arg
+    | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
+
+  (* Check if a register appears in a memory operand's address calculation.
+     Returns true only for memory operands where the register is used as
+     base/index, not for register operands. Handles aliasing: checking if %ebx
+     is in address of (%rbx) returns true. Examples: - mov %rax, (%rbx): %rbx is
+     in address - mov %rax, %rbx: %rbx is NOT in address *)
+  let reg_in_memory_address target arg =
+    match[@warning "-4"] arg with
+    | Mem addr -> (
+      match underlying_reg64 target with
+      | Some target_r64 ->
+        (match addr.base with
+        | Some base when equal_reg64 target_r64 base -> true
+        | _ -> false)
+        || (addr.scale <> 0 && equal_reg64 target_r64 addr.idx)
+      | None -> false)
+    | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Imm _ | Sym _
+    | Mem64_RIP _ ->
+      false
+
+  (* Check if an instruction is a control flow instruction (jump, call, return).
+     These act as basic block boundaries for peephole optimization. *)
+  let is_control_flow = function[@warning "-4"]
+    | J _ | JMP _ | CALL _ | RET -> true
+    | _ -> false
+
+  (* Check if an instruction writes to a given argument. Conservative: only
+     handles common cases explicitly. *)
+  let writes_to_arg target = function[@warning "-4"]
+    | MOV (_, dst)
+    | MOVSX (_, dst)
+    | MOVSXD (_, dst)
+    | MOVZX (_, dst)
+    | LEA (_, dst)
+    | ADD (_, dst)
+    | SUB (_, dst)
+    | AND (_, dst)
+    | OR (_, dst)
+    | XOR (_, dst)
+    | SAL (_, dst)
+    | SAR (_, dst)
+    | SHR (_, dst)
+    | BSF (_, dst)
+    | BSR (_, dst)
+    | POPCNT (_, dst)
+    | TZCNT (_, dst)
+    | LZCNT (_, dst)
+    | CMOV (_, _, dst) ->
+      reg_is_written_by_arg target dst
+    | INC dst | DEC dst | NEG dst | BSWAP dst | SET (_, dst) ->
+      reg_is_written_by_arg target dst
+    | POP dst -> reg_is_written_by_arg target dst
+    | IMUL (_, Some dst) -> reg_is_written_by_arg target dst
+    | LOCK_XADD (_, dst) -> reg_is_written_by_arg target dst
+    | XCHG (op1, op2) ->
+      reg_is_written_by_arg target op1 || reg_is_written_by_arg target op2
+    | MUL _ | IMUL (_, None) ->
+      (* MUL/IMUL(single-op) implicitly write to RAX and RDX *)
+      equal_args target (Reg64 RAX) || equal_args target (Reg64 RDX)
+    | IDIV _ ->
+      (* IDIV implicitly writes RAX (quotient) and RDX (remainder) *)
+      equal_args target (Reg64 RAX) || equal_args target (Reg64 RDX)
+    | CDQ ->
+      (* CDQ sign-extends EAX into EDX *)
+      equal_args target (Reg32 RAX)
+    | CQO ->
+      (* CQO sign-extends RAX into RDX *)
+      equal_args target (Reg64 RDX)
+    | LOCK_CMPXCHG (_, dst) ->
+      (* CMPXCHG writes to RAX (always) and conditionally to dst *)
+      reg_is_written_by_arg target dst || equal_args target (Reg64 RAX)
+    | _ ->
+      (* Conservative: assume unknown instructions might write to the target. *)
+      false
+
+  (* Check if an instruction reads from a given argument. Conservative: returns
+     true if unsure. *)
+  let reads_from_arg target = function[@warning "-4"]
+    | MOV (src, dst) | MOVSX (src, dst) | MOVSXD (src, dst) | MOVZX (src, dst)
+      ->
+      (* src is read (including address registers if memory operand). dst is not
+         read as a value, but address registers are read if dst is a memory
+         operand. *)
+      reg_appears_in_arg target src || reg_in_memory_address target dst
+    | PUSH src -> reg_appears_in_arg target src
+    | ADD (src, dst)
+    | SUB (src, dst)
+    | AND (src, dst)
+    | OR (src, dst)
+    | XOR (src, dst)
+    | CMP (src, dst)
+    | TEST (src, dst) ->
+      (* Read-modify-write or comparison: both src and dst are read *)
+      reg_appears_in_arg target src || reg_appears_in_arg target dst
+    | LEA (src, _)
+    | BSF (src, _)
+    | BSR (src, _)
+    | POPCNT (src, _)
+    | TZCNT (src, _)
+    | LZCNT (src, _) ->
+      (* These instructions don't read dst value, only write to it. dst must be
+         a register for these instructions. *)
+      reg_appears_in_arg target src
+    | SAL (src, dst) | SAR (src, dst) | SHR (src, dst) ->
+      (* Shift instructions are read-modify-write: both src (shift amount) and
+         dst (value to shift, or address if memory operand) are read *)
+      reg_appears_in_arg target src || reg_appears_in_arg target dst
+    | CMOV (_, src, dst) ->
+      (* CMOV reads both operands: src is copied to dst if condition is met, but
+         dst retains its value otherwise *)
+      reg_appears_in_arg target src || reg_appears_in_arg target dst
+    | INC dst | DEC dst | NEG dst | BSWAP dst ->
+      (* Read-modify-write: reads dst (value or address if memory operand) *)
+      reg_appears_in_arg target dst
+    | IMUL (op1, Some op2) ->
+      reg_appears_in_arg target op1 || reg_appears_in_arg target op2
+    | MUL op ->
+      (* MUL implicitly reads RAX in addition to explicit operand *)
+      reg_appears_in_arg target op || equal_args target (Reg64 RAX)
+    | IMUL (op, None) ->
+      (* Single-operand IMUL implicitly reads RAX in addition to explicit op *)
+      reg_appears_in_arg target op || equal_args target (Reg64 RAX)
+    | IDIV op ->
+      (* IDIV implicitly reads RDX:RAX in addition to explicit operand *)
+      reg_appears_in_arg target op
+      || equal_args target (Reg64 RAX)
+      || equal_args target (Reg64 RDX)
+    | CDQ ->
+      (* CDQ reads EAX to sign-extend into EDX *)
+      equal_args target (Reg32 RAX)
+    | CQO ->
+      (* CQO reads RAX to sign-extend into RDX *)
+      equal_args target (Reg64 RAX)
+    | CALL arg | JMP arg | J (_, arg) -> reg_appears_in_arg target arg
+    | XCHG (op1, op2) ->
+      reg_appears_in_arg target op1 || reg_appears_in_arg target op2
+    | LOCK_CMPXCHG (op1, op2) ->
+      (* CMPXCHG implicitly reads RAX (for comparison) in addition to
+         operands *)
+      reg_appears_in_arg target op1
+      || reg_appears_in_arg target op2
+      || equal_args target (Reg64 RAX)
+    | LOCK_XADD (op1, op2)
+    | LOCK_ADD (op1, op2)
+    | LOCK_SUB (op1, op2)
+    | LOCK_AND (op1, op2)
+    | LOCK_OR (op1, op2)
+    | LOCK_XOR (op1, op2) ->
+      reg_appears_in_arg target op1 || reg_appears_in_arg target op2
+    | SET (_, dst) ->
+      (* SET writes to dst based on condition flags, doesn't read dst value.
+         Only reads address registers if dst is a memory operand. *)
+      reg_in_memory_address target dst
+    | POP dst ->
+      (* POP writes to dst from stack, doesn't read dst value. Only reads
+         address registers if dst is a memory operand. *)
+      reg_in_memory_address target dst
+    | CLDEMOTE arg -> reg_appears_in_arg target arg
+    | PREFETCH (_, _, arg) -> reg_appears_in_arg target arg
+    | _ ->
+      (* Conservative: assume unknown instructions might read from the
+         target. *)
+      true
+
+  (* Find the next occurrence of a register within the same basic block.
+     Returns: - `WriteFound if the next occurrence is a write (without a read) -
+     `ReadFound if a read occurs before any write - `NotFound if we reach the
+     end of block or the list *)
+  type next_occurrence =
+    | WriteFound
+    | ReadFound
+    | NotFound
+
+  let find_next_occurrence_of_register target start_cell =
+    let rec loop cell_opt =
+      match cell_opt with
+      | None -> NotFound
+      | Some cell -> (
+        match DLL.value cell with
+        | Ins instr ->
+          if is_control_flow instr
+          then NotFound
+          else if reads_from_arg target instr
+          then ReadFound
+          else if writes_to_arg target instr
+          then WriteFound
+          else loop (DLL.next cell)
+        | Directive _ ->
+          if is_hard_barrier (DLL.value cell)
+          then NotFound
+          else loop (DLL.next cell))
+    in
+    loop (DLL.next start_cell)
+
   (* Rewrite rule: remove MOV x, x (moving a value to itself) Note: We can only
      safely remove self-moves for registers that don't have zero-extension side
      effects. On x86-64: - 32-bit moves (Reg32) zero the upper 32 bits - SIMD
@@ -680,6 +933,45 @@ module X86_peephole = struct
       | _, _, _ -> None)
     | _ -> None
 
+  (* Check if a register is safe for dead register optimization. We restrict to
+     Reg64 to avoid aliasing issues: our liveness analysis doesn't track that
+     writes to %eax (Reg32) also affect %rax (Reg64). *)
+  let is_safe_for_dead_register_opt = function[@warning "-4"]
+    | Reg64 _ -> true
+    | _ -> false
+
+  (* Rewrite rule: optimize MOV to register that is overwritten before use.
+     Pattern: mov A, x; mov x, y where the next occurrence of x is a write.
+     Rewrite: mov A, y
+
+     This is safe when both x and y are registers and x is not read before the
+     next write to x within the same basic block. The transformation preserves
+     semantics: y gets the value of A, and x is overwritten before being read.
+
+     We restrict x to Reg64 to avoid register aliasing issues. *)
+  let remove_mov_to_dead_register cell =
+    match get_cells cell 2 with
+    | [cell1; cell2] -> (
+      match[@warning "-4"] DLL.value cell1, DLL.value cell2 with
+      | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2))
+        when equal_args dst1 src2 && is_register dst1 && is_register dst2
+             && is_safe_for_dead_register_opt dst1 -> (
+        (* Pattern: mov A, x; mov x, y where x and y are registers *)
+        (* Check if the next occurrence of x is a write *)
+        match find_next_occurrence_of_register dst1 cell2 with
+        | WriteFound ->
+          (* x is written before being read, so we can optimize *)
+          (* Rewrite to: mov A, y *)
+          DLL.set_value cell1 (Ins (MOV (src1, dst2)));
+          DLL.delete_curr cell2;
+          (* Return cell1 to allow iterative combination *)
+          Some (Some cell1)
+        | ReadFound | NotFound ->
+          (* x is read before write, or we can't determine - don't optimize *)
+          None)
+      | _, _ -> None)
+    | _ -> None
+
   (* Apply all rewrite rules in sequence. Returns Some continuation_cell if a
      rule matched, None otherwise. *)
   let apply_rules cell =
@@ -692,9 +984,12 @@ module X86_peephole = struct
         match remove_mov_chain cell with
         | Some cont -> Some cont
         | None -> (
-          match combine_add_rsp cell with
+          match remove_mov_to_dead_register cell with
           | Some cont -> Some cont
-          | None -> None)))
+          | None -> (
+            match combine_add_rsp cell with
+            | Some cont -> Some cont
+            | None -> None))))
 
   (* Main optimization loop for a single asm_program. Iterates through the
      instruction list, applying rewrite rules and respecting hard barriers. *)
