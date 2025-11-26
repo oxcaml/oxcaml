@@ -3831,8 +3831,40 @@ let check_for_hidden_arrow env loc ty =
       check()
   | Assert_default -> ()
 
+type transl_value_decl_modal =
+  | Str_primitive
+  (** A primitive in structure, in which case the modalities are treated as
+    modes. *)
+  (* CR zqian: avoid this hack *)
+  | Sig_value of Mode.Value.l * Mode.Modality.Const.t
+  (** A value description in a signature, in which case we require the mode of
+      the structure that the modalities are based on, as well as the default
+      modalities of the signature. *)
+
 (* Translate a value declaration *)
-let transl_value_decl env loc ~modalities valdecl =
+let transl_value_decl env loc ~modal valdecl =
+  let mode, val_modalities =
+    match modal with
+    | Str_primitive ->
+        let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
+        let modes = List.map modality_to_mode valdecl.pval_modalities in
+        let mode =
+          modes
+          |> Typemode.transl_mode_annots
+          |> Mode.Alloc.Const.(Option.value ~default:legacy)
+          |> Mode.Alloc.of_const
+          |> Mode.alloc_as_value
+        in
+        mode, Mode.Modality.id
+    | Sig_value (md_mode, sig_modalities) ->
+        let modalities =
+          match valdecl.pval_modalities with
+          | [] -> sig_modalities
+          | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
+        in
+        let modalities = Mode.Modality.of_const modalities in
+        md_mode, modalities
+  in
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
   (* CR layouts v5: relax this to check for representability. *)
   begin match Ctype.constrain_type_jkind env cty.ctyp_type
@@ -3891,7 +3923,7 @@ let transl_value_decl env loc ~modalities valdecl =
           raise (Error(valdecl.pval_loc, Zero_alloc_attr_unsupported zero_alloc))
       in
       { val_type = ty; val_kind = Val_reg; Types.val_loc = loc;
-        val_attributes = valdecl.pval_attributes; val_modalities = modalities;
+        val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = zero_alloc;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
       }
@@ -3931,13 +3963,13 @@ let transl_value_decl env loc ~modalities valdecl =
       then raise(Error(valdecl.pval_type.ptyp_loc, Missing_native_external));
       check_unboxable env loc ty;
       { val_type = ty; val_kind = Val_prim prim; Types.val_loc = loc;
-        val_attributes = valdecl.pval_attributes; val_modalities = modalities;
+        val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = Zero_alloc.default;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
       }
   in
   let (id, newenv) =
-    Env.enter_value ~mode:Mode.Value.legacy valdecl.pval_name.txt v env
+    Env.enter_value ~mode valdecl.pval_name.txt v env
       ~check:(fun s -> Warnings.Unused_value_declaration s)
   in
   Ctype.check_and_update_generalized_ty_jkind ~name:id ~loc newenv ty;
@@ -3951,11 +3983,11 @@ let transl_value_decl env loc ~modalities valdecl =
      val_attributes = valdecl.pval_attributes;
     }
   in
-  desc, newenv
+  desc, mode, newenv
 
-let transl_value_decl env ~modalities loc valdecl =
+let transl_value_decl env ~modal loc valdecl =
   Builtin_attributes.warning_scope valdecl.pval_attributes
-    (fun () -> transl_value_decl env ~modalities loc valdecl)
+    (fun () -> transl_value_decl env ~modal loc valdecl)
 
 (* Translate a "with" constraint -- much simplified version of
    transl_type_decl. For a constraint [Sig with t = sdecl],
