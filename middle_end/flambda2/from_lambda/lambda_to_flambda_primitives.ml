@@ -2660,6 +2660,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         [ Simple
             (Simple.const_bool machine_width
                (String.equal Sys.os_type "Cygwin")) ]
+      (* CR-someday gyorsh: replace string comparisons with dedicated types for
+         [arch] and [os_type]. *)
+      | Arch_amd64 ->
+        [ Simple
+            (Simple.const_bool machine_width
+               (String.equal Config.architecture "amd64")) ]
+      | Arch_arm64 ->
+        [ Simple
+            (Simple.const_bool machine_width
+               (String.equal Config.architecture "arm64")) ]
       | Backend_type ->
         [Simple (Simple.const_zero machine_width)]
         (* constructor 0 is the same as Native here *)
@@ -2878,8 +2888,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
         ~vec_kind:(vec_kind size) Naked_int32s array ~index_kind index new_value
     ]
-  | Pprobe_is_enabled { name }, [] ->
-    [tag_int (Nullary (Probe_is_enabled { name }))]
+  | Pprobe_is_enabled { name; enabled_at_init }, [] ->
+    [tag_int (Nullary (Probe_is_enabled { name; enabled_at_init }))]
   | Pobj_dup, [[v]] -> [Unary (Obj_dup, v)]
   | Pget_header m, [[obj]] -> [get_header obj m ~current_region]
   | Patomic_load_field { immediate_or_pointer }, [[atomic]; [field]] ->

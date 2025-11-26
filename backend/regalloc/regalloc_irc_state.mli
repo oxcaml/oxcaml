@@ -17,9 +17,7 @@ val reset :
   new_block_temporaries:Reg.t list ->
   unit
 
-val work_list : t -> Reg.t -> WorkList.t
-
-val work_list_opt : t -> Reg.t -> WorkList.t option
+val reg_work_list : t -> Reg.t -> RegWorkList.t
 
 val color : t -> Reg.t -> Color.t option
 
@@ -146,6 +144,11 @@ val mem_inst_temporaries : t -> Reg.t -> bool
 val mem_all_introduced_temporaries : t -> Reg.t -> bool
 
 val diff_all_introduced_temporaries : t -> Reg.Set.t -> Reg.Set.t
+
+val set_instr_work_list :
+  t -> instruction_id:InstructionId.t -> work_list:InstrWorkList.t -> unit
+
+val get_instr_work_list : t -> instruction_id:InstructionId.t -> InstrWorkList.t
 
 val update_register_locations : t -> unit
 

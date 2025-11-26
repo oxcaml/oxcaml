@@ -17,6 +17,7 @@
 
 open Misc
 open Compile_common
+module SL = Slambda
 
 module type S = sig
   include Optcomp_intf.File_extensions
@@ -85,14 +86,18 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     | Some _, None -> Misc.fatal_error "No argument field"
     | None, Some _ -> Misc.fatal_error "Unexpected argument field"
 
-  let compile_from_raw_lambda i raw_lambda ~keep_symbol_tables ~as_arg_for =
-    raw_lambda
-    |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
-           Type_shape.print_debug_uid_tables ppf)
-    |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
-    |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
-    |> Profile.(record generate) (fun (program : Lambda.program) ->
+  let compile_from_slambda i slambda ~keep_symbol_tables ~as_arg_for =
+    slambda
+    |> Profile.(record generate) (fun (program : SL.program) ->
            Builtin_attributes.warn_unused ();
+           program
+           |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program
+           |> Slambdaeval.eval
+           |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
+                  Type_shape.print_debug_uid_tables ppf)
+           |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
+           |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
+           |> fun program ->
            let code =
              Simplif.simplify_lambda program.Lambda.code
                ~restrict_to_upstream_dwarf:
@@ -124,7 +129,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let compile_from_typed i typed ~keep_symbol_tables ~as_arg_for =
     typed
     |> Profile.(record transl) (Translmod.transl_implementation i.module_name)
-    |> compile_from_raw_lambda i ~keep_symbol_tables ~as_arg_for
+    |> compile_from_slambda i ~keep_symbol_tables ~as_arg_for
 
   type starting_point =
     | Parsing
@@ -195,7 +200,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           ~main_module_block_size ~arg_block_idx
       in
       if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-      compile_from_raw_lambda info impl ~as_arg_for ~keep_symbol_tables
+      compile_from_slambda info impl ~as_arg_for ~keep_symbol_tables
 
   let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables
       =
@@ -298,10 +303,12 @@ let native unix
         "camlinternaleval" ]
 
     let support_files_for_eval () =
+      List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval
+
+    let set_load_path_for_eval () =
       List.iter
         (fun lib ->
           Load_path.add_dir ~hidden:false
             (Misc.expand_directory Config.standard_library ("+" ^ lib)))
-        extra_load_paths_for_eval;
-      List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval
+        extra_load_paths_for_eval
   end) : S)

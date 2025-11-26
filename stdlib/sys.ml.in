@@ -235,3 +235,24 @@ external signal
   = "caml_install_signal_handler"
 
 let set_signal sig_num sig_beh = ignore(signal sig_num sig_beh)
+
+(* Expose the value of [Config.architecture] *)
+(* CR-someday gyorsh: utils/target_system.ml already has [architecture].
+   Consider moving to [config.ml] or here. *)
+type arch =
+  | Amd64
+  | Arm64
+
+external amd64 : unit -> bool @@ portable = "%arch_amd64"
+external arm64 : unit -> bool @@ portable = "%arch_arm64"
+
+let amd64 = amd64 ()
+let arm64 = arm64 ()
+
+let arch =
+  match amd64, arm64 with
+  | true, true -> failwith "Cannot determine architecture: both amd64 and arm64 detected"
+  | false, false -> failwith "Cannot determine architecture: must be amd64 or arm64"
+  | true, false -> Amd64
+  | false, true -> Arm64
+;;

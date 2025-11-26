@@ -213,6 +213,12 @@ module type Solver_mono = sig
   val of_const :
     'a obj -> ?hint:('l * 'r) hint_const -> 'a -> ('a, 'l * 'r) mode
 
+  (* CR-soon zqian: [to_const_exn] should return hints as well. *)
+
+  (** Given a mode whose lower and upper bounds are equal, returns that bound. Raises
+  exception if the condition does not hold. *)
+  val to_const_exn : 'a obj -> ('a, allowed * allowed) mode -> 'a
+
   (** The minimum mode in the lattice *)
   val min : 'a obj -> ('a, 'l * 'r) mode
 

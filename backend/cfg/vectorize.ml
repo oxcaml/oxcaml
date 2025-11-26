@@ -283,6 +283,8 @@ end = struct
       && Bool.equal is_assignment1 is_assignment2
     | Intop intop1, Intop intop2 ->
       Operation.equal_integer_operation intop1 intop2
+    | Int128op intop1, Int128op intop2 ->
+      Operation.equal_int128_operation intop1 intop2
     | Intop_imm (intop1, _), Intop_imm (intop2, _) ->
       Operation.equal_integer_operation intop1 intop2
     | Floatop (width1, floatop1), Floatop (width2, floatop2) ->
@@ -304,6 +306,7 @@ end = struct
     | Load _, _
     | Store _, _
     | Intop _, _
+    | Int128op _, _
     | Intop_imm _, _
     | Intop_atomic _, _
     | Floatop _, _
@@ -807,7 +810,7 @@ end = struct
                   | Const_symbol _ | Const_vec128 _ | Const_vec256 _
                   | Const_vec512 _ | Stackoffset _ | Load _
                   | Store (_, _, _)
-                  | Intop _ | Intop_atomic _
+                  | Intop _ | Int128op _ | Intop_atomic _
                   | Floatop (_, _)
                   | Csel _ | Reinterpret_cast _ | Static_cast _
                   | Probe_is_enabled _ | Specific _ | Name_for_debugger _
@@ -1058,7 +1061,7 @@ end = struct
           | Move | Reinterpret_cast _ | Static_cast _ | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop _
-          | Intop_imm _ | Floatop _ | Csel _ | Alloc _ ->
+          | Int128op _ | Intop_imm _ | Floatop _ | Csel _ | Alloc _ ->
             None)
 
       let create (instruction : Instruction.t) reaching_definitions : t option =
@@ -2304,9 +2307,10 @@ end = struct
         | Alloc _ | Load _ | Move | Reinterpret_cast _ | Static_cast _ | Spill
         | Reload | Const_int _ | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Stackoffset _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
-        | Csel _ | Probe_is_enabled _ | Opaque | Pause | Begin_region
-        | End_region | Name_for_debugger _ | Dls_get | Tls_get | Poll ->
+        | Stackoffset _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
+        | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Pause
+        | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
+        | Poll ->
           None)
 
     let from_block (block : Block.t) deps : t list =

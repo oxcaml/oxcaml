@@ -620,11 +620,6 @@ module Source_env : sig
 
   val create : TE.t -> t
 
-  val code_age_relation : t -> Code_age_relation.t
-
-  val code_age_relation_resolver :
-    t -> Compilation_unit.t -> Code_age_relation.t option
-
   val machine_width : t -> Target_system.Machine_width.t
 
   val exists_in_source_env : t -> Variable.t -> Variable_in_source_env.t option
@@ -654,11 +649,6 @@ end = struct
   type t = { source_env : TE.t } [@@unboxed]
 
   let create source_env = { source_env }
-
-  let code_age_relation { source_env } = TE.code_age_relation source_env
-
-  let code_age_relation_resolver { source_env } =
-    TE.code_age_relation_resolver source_env
 
   let machine_width { source_env; _ } = TE.machine_width source_env
 
@@ -1319,13 +1309,6 @@ type t =
 type n_way_join_type = t -> TG.t join_arg list -> TG.t Or_unknown.t * t
 
 let joined_env t index = Joined_envs.get_nth_joined_env t.joined_envs index
-
-let code_age_relation t =
-  Source_env.code_age_relation (Bindings_in_target_env.source_env t.bindings)
-
-let code_age_relation_resolver t =
-  Source_env.code_age_relation_resolver
-    (Bindings_in_target_env.source_env t.bindings)
 
 let machine_width t =
   Source_env.machine_width (Bindings_in_target_env.source_env t.bindings)
