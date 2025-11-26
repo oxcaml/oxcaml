@@ -4,7 +4,6 @@ backend/vectorizer/test_float_unboxed.ml
 backend/vectorizer/test_int32_unboxed.ml
 backend/vectorizer/test_float32_unboxed.ml
 simd/int128.ml
-simd/int_ops.ml
 simd/*_u.ml
 simd/let_mutable.ml
 simd/unbox_types.ml
@@ -14,6 +13,7 @@ simd/consts_u.ml
 simd/consts256_u.ml
 simd/arrays.ml
 simd/arrays256.ml
+simd/amd64/int_ops.ml
 simd/amd64/load_store.ml
 simd/disabled/disabled256.ml
 small_numbers/float32_u_lib.ml
