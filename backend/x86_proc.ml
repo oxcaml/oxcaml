@@ -972,6 +972,45 @@ module X86_peephole = struct
       | _, _ -> None)
     | _ -> None
 
+  (* Rewrite rule: optimize MOV sequence to XCHG. Pattern: mov %a, %b; mov %c,
+     %a; mov %b, %c Rewrite: xchg %a, %c
+
+     This is safe when: - All operands are Reg64 registers (to avoid aliasing
+     issues) - %a, %b, %c are all distinct registers - %b is dead after the
+     sequence (not read before next write)
+
+     The transformation changes %b's final value, so %b must not be read. *)
+  let rewrite_mov_sequence_to_xchg cell =
+    match get_cells cell 3 with
+    | [cell1; cell2; cell3] -> (
+      match[@warning "-4"]
+        DLL.value cell1, DLL.value cell2, DLL.value cell3
+      with
+      | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2)), Ins (MOV (src3, dst3))
+        -> (
+        (* Pattern: mov %a, %b; mov %c, %a; mov %b, %c src1=%a, dst1=%b,
+           src2=%c, dst2=%a, src3=%b, dst3=%c *)
+        match src1, dst1, src2, dst2, src3, dst3 with
+        | Reg64 a, Reg64 b, Reg64 c, Reg64 a', Reg64 b', Reg64 c'
+          when equal_reg64 a a' && equal_reg64 b b' && equal_reg64 c c'
+               && (not (equal_reg64 a b))
+               && (not (equal_reg64 a c))
+               && not (equal_reg64 b c) -> (
+          (* Check if %b is dead after the sequence *)
+          match find_next_occurrence_of_register dst1 cell3 with
+          | WriteFound ->
+            (* %b is dead, safe to optimize *)
+            (* Rewrite to: xchg %a, %c *)
+            DLL.set_value cell1 (Ins (XCHG (src1, src2)));
+            DLL.delete_curr cell2;
+            DLL.delete_curr cell3;
+            (* Return the cell we modified *)
+            Some (Some cell1)
+          | NotFound | ReadFound -> None)
+        | _, _, _, _, _, _ -> None)
+      | _, _, _ -> None)
+    | _ -> None
+
   (* Apply all rewrite rules in sequence. Returns Some continuation_cell if a
      rule matched, None otherwise. *)
   let apply_rules cell =
@@ -987,9 +1026,12 @@ module X86_peephole = struct
           match remove_mov_to_dead_register cell with
           | Some cont -> Some cont
           | None -> (
-            match combine_add_rsp cell with
+            match rewrite_mov_sequence_to_xchg cell with
             | Some cont -> Some cont
-            | None -> None))))
+            | None -> (
+              match combine_add_rsp cell with
+              | Some cont -> Some cont
+              | None -> None)))))
 
   (* Main optimization loop for a single asm_program. Iterates through the
      instruction list, applying rewrite rules and respecting hard barriers. *)
