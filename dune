@@ -77,8 +77,6 @@
 
 (copy_files# backend/x86_peephole/*.ml{,i})
 
-(copy_files# backend/x86_peephole/*.ml{,i})
-
 (copy_files# backend/regalloc/*.ml{,i})
 
 (copy_files# file_formats/*.ml{,i})
