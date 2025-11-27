@@ -673,7 +673,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                ~name
         in
         let code_id =
-          Code_id.create ~name (Compilation_unit.get_current_exn ())
+          Code_id.create ~name ~debug:dbg (Compilation_unit.get_current_exn ())
         in
         (* We could create better result types by combining the types for the
            first arguments with the result types from the called function.

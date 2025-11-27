@@ -227,7 +227,9 @@ let compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures =
             if Code_or_metadata.code_present code
                && not (Code_metadata.stub (Code_or_metadata.code_metadata code))
             then
-              let new_code_id = Code_id.rename old_code_id in
+              let new_code_id =
+                Code_id.rename ~preserve_debug_info:() old_code_id
+              in
               Code_id.Map.add old_code_id new_code_id old_to_new_code_ids
             else old_to_new_code_ids)
         (Function_declarations.funs function_decls)
