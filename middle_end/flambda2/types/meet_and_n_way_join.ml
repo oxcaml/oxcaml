@@ -3056,33 +3056,14 @@ and n_way_join_function_type (env : Join_env.t)
       then Misc.fatal_error "Join of zero function types";
       Unknown, env
     | (id1, { code_id = code_id1; rec_info = rec_info1 }) :: func_types -> (
-      let target_code_age_relation = Join_env.code_age_relation env in
-      let target_code_age_relation_resolver =
-        Join_env.code_age_relation_resolver env
-      in
-      let code_id, _, rec_infos =
+      let code_id, rec_infos =
         List.fold_left
-          (fun (code_id1, code_age_relation1, rec_infos)
+          (fun (code_id1, rec_infos)
                (id2, { TG.code_id = code_id2; rec_info = rec_info2 }) ->
-            (* As a note, sometimes it might be preferable not to do the code
-               age relation join, and take the hit of an indirect call in
-               exchange for calling specialised versions of the code. Maybe an
-               annotation would be needed. Dolan thinks there isn't a single
-               good answer here and we should maybe just not do the join. (The
-               code age relation meet would remain though as it's useful
-               elsewhere.) *)
-            match
-              Code_age_relation.join ~target_t:target_code_age_relation
-                ~resolver:target_code_age_relation_resolver code_age_relation1
-                (TE.code_age_relation (Join_env.joined_env env id2))
-                code_id1 code_id2
-            with
-            | Unknown -> raise Unknown_result
-            | Known code_id ->
-              code_id, target_code_age_relation, (id2, rec_info2) :: rec_infos)
-          ( code_id1,
-            TE.code_age_relation (Join_env.joined_env env id1),
-            [id1, rec_info1] )
+            if Code_id.equal code_id1 code_id2
+            then code_id1, (id2, rec_info2) :: rec_infos
+            else raise Unknown_result)
+          (code_id1, [id1, rec_info1])
           func_types
       in
       match n_way_join env rec_infos with

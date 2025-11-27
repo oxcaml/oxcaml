@@ -56,6 +56,16 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
       fprintf ppf "%a%s%a" reg arg.(0)
         (Operation.string_of_integer_operation op)
         reg arg.(1))
+  | Int128op (Imul64 _ as op) ->
+    assert (Array.length arg = 2);
+    fprintf ppf "%a%s%a" reg arg.(0)
+      (Operation.string_of_int128_operation op)
+      reg arg.(1)
+  | Int128op ((Iadd128 | Isub128) as op) ->
+    assert (Array.length arg = 4);
+    fprintf ppf "(%a,%a)%s(%a,%a)" reg arg.(0) reg arg.(1)
+      (Operation.string_of_int128_operation op)
+      reg arg.(2) reg arg.(3)
   | Intop_imm (op, n) ->
     fprintf ppf "%a%s%i" reg arg.(0)
       (Operation.string_of_integer_operation op)
@@ -116,4 +126,8 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
   | Tls_get -> fprintf ppf "tls_get"
   | Poll -> fprintf ppf "poll call"
   | Pause -> fprintf ppf "pause"
-  | Probe_is_enabled { name } -> fprintf ppf "probe_is_enabled \"%s\"" name
+  | Probe_is_enabled { name; enabled_at_init } ->
+    fprintf ppf "probe_is_enabled \"%s\"%s" name
+      (match enabled_at_init with
+      | None | Some false -> ""
+      | Some true -> " enabled_at_init")

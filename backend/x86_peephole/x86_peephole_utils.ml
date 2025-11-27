@@ -220,7 +220,7 @@ let is_control_flow = function
   | BSF _ | BSR _ | BSWAP _ | POPCNT _ | TZCNT _ | LZCNT _ | XCHG _
   | LOCK_CMPXCHG _ | LOCK_XADD _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _
   | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | HLT | LEAVE
-  | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _ ->
+  | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _ | ADC _ | SBB _ ->
     false
 
 let writes_to_arg target = function
@@ -242,7 +242,9 @@ let writes_to_arg target = function
   | POPCNT (_, dst)
   | TZCNT (_, dst)
   | LZCNT (_, dst)
-  | CMOV (_, _, dst) ->
+  | CMOV (_, _, dst)
+  | ADC (_, dst)
+  | SBB (_, dst) ->
     reg_is_written_by_arg target dst
   | INC dst | DEC dst | NEG dst | BSWAP dst | SET (_, dst) ->
     reg_is_written_by_arg target dst
@@ -274,7 +276,9 @@ let reads_from_arg target = function
   | OR (src, dst)
   | XOR (src, dst)
   | CMP (src, dst)
-  | TEST (src, dst) ->
+  | TEST (src, dst)
+  | ADC (src, dst)
+  | SBB (src, dst) ->
     reg_appears_in_arg target src || reg_appears_in_arg target dst
   | LEA (src, _)
   | BSF (src, _)
@@ -345,7 +349,7 @@ let find_next_occurrence_of_register target start_cell =
   loop (DLL.next start_cell)
 
 let reads_flags = function
-  | J _ | CMOV _ | SET _ -> true
+  | J _ | CMOV _ | SET _ | ADC _ | SBB _ -> true
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | ADD _
   | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _ | SAR _
   | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | BSF _ | BSR _
@@ -359,7 +363,7 @@ let writes_flags = function
   | ADD _ | SUB _ | AND _ | OR _ | XOR _ | CMP _ | TEST _ | INC _ | DEC _
   | NEG _ | MUL _ | IMUL _ | IDIV _ | BSF _ | BSR _ | SAL _ | SAR _ | SHR _
   | POPCNT _ | TZCNT _ | LZCNT _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _
-  | LOCK_OR _ | LOCK_XOR _ | LOCK_XADD _ | LOCK_CMPXCHG _ ->
+  | LOCK_OR _ | LOCK_XOR _ | LOCK_XADD _ | LOCK_CMPXCHG _ | ADC _ | SBB _ ->
     true
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ | CQO
   | SET _ | CMOV _ | BSWAP _ | J _ | JMP _ | CALL _ | RET | XCHG _ | CLDEMOTE _

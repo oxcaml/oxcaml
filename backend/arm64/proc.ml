@@ -333,6 +333,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         destroy_neon_reg7
   | Op (Intop (Iadd  | Isub | Imul | Idiv|Imod|Iand|Ior|Ixor|Ilsl
               |Ilsr|Iasr|Imulh _|Iclz _|Ictz _|Icomp _))
+  | Op (Int128op (Iadd128 | Isub128 | Imul64 _))
   | Op (Specific _
         | Move | Spill | Reload
         | Floatop _
@@ -468,6 +469,9 @@ let assemble_file infile outfile =
 let has_three_operand_float_ops () = false
 
 let operation_supported : Cmm.operation -> bool = function
+  | Caddi128 | Csubi128 | Cmuli64 _ ->
+    (* CR mslater: restore after the arm DSL is merged *)
+    false
   | Cprefetch _ | Catomic _
   | Creinterpret_cast (V128_of_vec (Vec256 | Vec512) |
                        V256_of_vec _ | V512_of_vec _)

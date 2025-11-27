@@ -228,6 +228,8 @@ module Identifier : sig
 
     val out_of_memory : t
 
+    val out_of_fibers : t
+
     val invalid_argument : t
 
     val failure : t

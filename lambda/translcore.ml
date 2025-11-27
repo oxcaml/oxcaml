@@ -80,16 +80,6 @@ let transl_object =
   ref (fun ~scopes:_ _id _s _cl -> assert false :
        scopes:scopes -> Ident.t -> string list -> class_expr -> lambda)
 
-(* Probe handlers are generated from %probe as closed functions
-   during transl_exp and immediately lifted to top level. *)
-let probe_handlers = ref []
-let clear_probe_handlers () = probe_handlers := []
-let declare_probe_handlers lam =
-  List.fold_left (fun acc (funcid, func_duid, func) ->
-      Llet(Strict, Lambda.layout_function, funcid, func_duid, func, acc))
-    lam
-    !probe_handlers
-
 (* Compile an exception/extension definition *)
 
 let prim_fresh_oo_id =
@@ -1277,38 +1267,45 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (* CR zqian: the handler function doesn't have a region. However, the
              [region] field is currently broken. *)
       in
-      let app =
+      let ap_loc = of_location e.exp_loc ~scopes in
+      let app ~ap_probe =
         { ap_func = Lvar funcid;
           ap_args;
           ap_result_layout = return_layout;
           ap_region_close = Rc_normal;
           ap_mode = alloc_local;
-          ap_loc = of_location e.exp_loc ~scopes;
+          ap_loc;
           ap_tailcall = Default_tailcall;
           ap_inlined = Never_inlined;
           ap_specialised = Always_specialise;
-          ap_probe = Some {name; enabled_at_init};
+          ap_probe;
         }
       in
-      begin match Config.flambda || Config.flambda2 with
-      | true ->
-          Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler,
-               Lapply app)
-      | false ->
-        (* Needs to be lifted to top level manually here,
-           because functions that contain other function declarations
-           are not inlined by Closure. For example, adding a probe into
-           the body of function foo will prevent foo from being inlined
-           into another function. *)
-        probe_handlers := (funcid, funcid_duid, handler)::!probe_handlers;
-        Lapply app
-      end
+      let lam =
+        if !Clflags.emit_optimized_probes then
+          let ap_probe = Some {name; enabled_at_init} in
+          Lapply (app ~ap_probe)
+        else
+          (* Slower implementation of probes where there isn't clever
+             architecture-specific codegen. Read the semaphore each time. *)
+          (Lifthenelse
+             ( Lprim
+                 (Pprobe_is_enabled
+                    { name; enabled_at_init = Some enabled_at_init },
+                      [], ap_loc),
+               (* probe handler has type [unit] *)
+               Lapply (app ~ap_probe:None),
+               lambda_unit,
+               layout_unit ))
+      in
+      Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler, lam)
     end else begin
       lambda_unit
     end
   | Texp_probe_is_enabled {name} ->
     if !Clflags.native_code && !Clflags.probes then
-      Lprim(Pprobe_is_enabled {name}, [], of_location ~scopes e.exp_loc)
+      Lprim(Pprobe_is_enabled {name; enabled_at_init = None},
+            [], of_location ~scopes e.exp_loc)
     else
       lambda_unit
   | Texp_exclave e ->

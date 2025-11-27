@@ -111,9 +111,15 @@ type t =
         (** Precomputed at register allocation time *)
     fun_poll : Lambda.poll_attribute; (* Whether to insert polling points. *)
     next_instruction_id : InstructionId.sequence; (* Next instruction id. *)
-    fun_ret_type : Cmm.machtype
+    fun_ret_type : Cmm.machtype;
         (** Function return type. As in [fun_args], this value is not used when starting
             from Linear. *)
+    mutable allowed_to_be_irreducible : bool;
+        (* Whether rewrites are allowed to make the CFG irreducible (if the CFG
+           is irreducible, the information about loops cannot be trusted). *)
+    mutable register_locations_are_set : bool
+        (* Whether register allocation has set the locations of the `Reg.t`
+           values. *)
   }
 
 val create :
@@ -126,6 +132,7 @@ val create :
   fun_poll:Lambda.poll_attribute ->
   next_instruction_id:InstructionId.sequence ->
   fun_ret_type:Cmm.machtype ->
+  allowed_to_be_irreducible:bool ->
   t
 
 val fun_name : t -> string
@@ -222,8 +229,6 @@ val set_stack_offset : 'a instruction -> int -> unit
 
 val set_live : 'a instruction -> Reg.Set.t -> unit
 
-val string_of_irc_work_list : irc_work_list -> string
-
 val dump_basic : Format.formatter -> basic -> unit
 
 val dump_terminator : ?sep:string -> Format.formatter -> terminator -> unit
@@ -237,21 +242,17 @@ val make_instruction :
   ?live:Reg.Set.t ->
   stack_offset:int ->
   id:InstructionId.t ->
-  ?irc_work_list:irc_work_list ->
   ?available_before:Reg_availability_set.t ->
   ?available_across:Reg_availability_set.t ->
   unit ->
   'a instruction
 
-(** Make sure that the default parameter value of [irc_work_list] is
-    reasonable before using. *)
 val make_instruction_from_copy :
   'a instruction ->
   desc:'b ->
   id:InstructionId.t ->
   ?arg:Reg.t array ->
   ?res:Reg.t array ->
-  ?irc_work_list:irc_work_list ->
   unit ->
   'b instruction
 
@@ -259,7 +260,5 @@ val make_empty_block : ?label:Label.t -> terminator instruction -> basic_block
 
 (** "Contains calls" in the traditional sense as used in upstream [Selectgen]. *)
 val basic_block_contains_calls : basic_block -> bool
-
-val equal_irc_work_list : irc_work_list -> irc_work_list -> bool
 
 val invalid_stack_offset : int

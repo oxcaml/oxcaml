@@ -40,6 +40,7 @@ typedef value caml_generated_constant[1];
 
 extern caml_generated_constant
   caml_exn_Out_of_memory,
+  caml_exn_Out_of_fibers,
   caml_exn_Sys_error,
   caml_exn_Failure,
   caml_exn_Invalid_argument,
@@ -174,6 +175,12 @@ void caml_raise_out_of_memory(void)
 {
   /* Note that this is not an async exn. */
   caml_raise_constant((value) caml_exn_Out_of_memory);
+}
+
+void caml_raise_out_of_fibers(void)
+{
+  /* Note that this is not an async exn. */
+  caml_raise_constant((value) caml_exn_Out_of_fibers);
 }
 
 /* Used by the stack overflow handler -> deactivate ASAN (see

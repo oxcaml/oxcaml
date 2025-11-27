@@ -146,11 +146,15 @@ let () =
       "sse_other_ops";
       "avx_test_ops";
       "sse41_test_ops";
-      "sse42_string_ops" ]
+      "sse42_string_ops";
+      "f16c_ops";
+      "fma_ops" ]
   in
   List.iter make_ops_u ops;
   let tests =
-    [ "basic", enabled_if_main;
+    [ (* CR mslater: restore after the arm DSL is merged *)
+      "int128", enabled_if_main_amd64_not_macos;
+      "basic", enabled_if_main;
       "basic_u", enabled_if_main;
       "basic256", enabled_if_main_amd64_not_macos;
       "basic256_u", enabled_if_main_amd64_not_macos;
@@ -181,6 +185,10 @@ let () =
       "avx_test_ops_u", enabled_if_main_amd64_not_macos;
       "sse42_string_ops", enabled_if_main_amd64_not_macos;
       "sse42_string_ops_u", enabled_if_main_amd64_not_macos;
+      "f16c_ops", enabled_if_main_amd64_not_macos;
+      "f16c_ops_u", enabled_if_main_amd64_not_macos;
+      "fma_ops", enabled_if_main_amd64_not_macos;
+      "fma_ops_u", enabled_if_main_amd64_not_macos;
       "arrays", enabled_if_main;
       "arrays_u", enabled_if_main;
       "scalar_ops", enabled_if_main;

@@ -73,5 +73,6 @@ val all_columns : Clflags.profile_column list
     avoid typos. *)
 
 val generate : string
+val static_eval : string
 val transl : string
 val typing : string

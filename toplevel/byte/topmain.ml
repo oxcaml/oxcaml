@@ -69,7 +69,7 @@ let dir_trace ppf lid =
       Format.fprintf ppf "Unbound value %a.@." Printtyp.longident lid
 
 let dir_untrace ppf lid =
-  match Env.find_value_by_name lid !Topcommon.toplevel_env with
+  match Env.find_value_by_name_lazy lid !Topcommon.toplevel_env with
   | (path, _desc) ->
       let rec remove = function
       | [] ->

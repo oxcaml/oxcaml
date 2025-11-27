@@ -25,6 +25,7 @@ let of_simd_class (cl : Simd.operation_class) : Cfg_cse_target_intf.op_class =
   | Pure -> Op_pure
   | Load { is_mutable = true } -> Op_load Mutable
   | Load { is_mutable = false } -> Op_load Immutable
+  | Store -> Op_store true
 
 let class_of_operation (op : Operation.t)
     : Cfg_cse_target_intf.class_of_operation_result =
@@ -57,7 +58,7 @@ let class_of_operation (op : Operation.t)
   | Const_int _ | Const_float32 _ | Const_float _
   | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
   | Stackoffset _ | Load _ | Store _ | Alloc _
-  | Intop _ | Intop_imm _ | Intop_atomic _
+  | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
   | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
   | Begin_region | End_region | Poll | Dls_get | Tls_get
     -> Use_default
