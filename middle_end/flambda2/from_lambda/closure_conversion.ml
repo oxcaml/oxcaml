@@ -2807,7 +2807,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let main_code_id =
     match calling_convention with
     | Normal_calling_convention -> code_id
-    | Unboxed_calling_convention _ -> Code_id.rename code_id
+    | Unboxed_calling_convention _ ->
+      Code_id.rename ~preserve_debug_info:() code_id
   in
   let contains_no_escaping_local_allocs =
     match Function_decl.result_mode decl with
@@ -2938,10 +2939,11 @@ let close_functions acc external_env ~current_region function_declarations =
     List.fold_left
       (fun map decl ->
         let function_slot = Function_decl.function_slot decl in
+        let function_dbg = Debuginfo.from_location (Function_decl.loc decl) in
         let code_id =
           Code_id.create
             ~name:(Function_slot.to_string function_slot)
-            compilation_unit
+            ~debug:function_dbg compilation_unit
         in
         Function_slot.Map.add function_slot code_id map)
       Function_slot.Map.empty func_decl_list
