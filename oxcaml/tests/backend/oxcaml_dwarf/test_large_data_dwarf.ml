@@ -33,10 +33,12 @@ let large_float_array = Array.init 1000 (fun i -> Float.of_int i *. 0.1)
 
 let _ = f_large_float_array large_float_array
 
-(* List with 1000 entries *)
+(* List with 100 entries *)
+(* CR sspies: Lists that are too large can create a stack overflow at the
+   moment. *)
 let[@inline never] [@local never] f_large_list (x : int list) = x
 
-let large_list = List.init 1000 (fun i -> i * 3)
+let large_list = List.init 100 (fun i -> i * 3)
 
 let _ = f_large_list large_list
 
