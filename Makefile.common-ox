@@ -370,6 +370,7 @@ install_for_test: install
 	ln -s ../_install/bin/ocamlmklib.byte _runtest/tools/ocamlmklib
 	ln -s ../_install/bin/ocamlobjinfo.byte _runtest/tools/ocamlobjinfo
 	ln -s ../_install/bin/dumpobj.byte _runtest/tools/dumpobj
+	ln -s ../_install/bin/ocamlfilt _runtest/tools/ocamlfilt
         # ocamldoc
 	# rm _runtest/ocamldoc
 	# mkdir _runtest/ocamldoc
