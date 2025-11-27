@@ -1696,7 +1696,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
       Array.fold_left
         (fun (idx, acc) ({ loc; enc } : Simd.arg) ->
           match enc with
-          | Implicit | Immediate -> idx + 1, acc
+          | Implicit | Immediate -> idx, acc
           | RM_r | RM_rm | Vex_v ->
             idx + 1, to_res_with_width loc instr idx :: acc)
         (0, args) rr
