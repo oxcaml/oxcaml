@@ -36,7 +36,7 @@ let for_fundecl ~get_file_id state (fundecl : L.fundecl) ~fun_end_label
     | [] | _ :: _ -> fun_name
   in
   let linkage_name =
-    match Config.name_mangling_version with
+    match Config.name_mangling_scheme with
     | Flat -> Some (linkage_name_from_debug ())
   in
   let start_sym = Asm_symbol.create_global fun_name in

@@ -340,7 +340,7 @@ AC_SUBST([no_partial_inlining_cflags])
 AC_SUBST([frame_pointers])
 AC_SUBST([address_sanitizer])
 AC_SUBST([cpp_mangling])
-AC_SUBST([name_mangling_version])
+AC_SUBST([name_mangling_scheme])
 AC_SUBST([flambda])
 AC_SUBST([flambda2])
 AC_SUBST([flambda_invariants])
@@ -587,13 +587,13 @@ AC_ARG_ENABLE([cpp-mangling],
     [use cpp mangling for exported symbols])])
 
 AC_ARG_ENABLE([name-mangling],
-  [AS_HELP_STRING([--enable-name-mangling=VERSION],
-    [specify name mangling version (flat, default: flat)])],
+  [AS_HELP_STRING([--enable-name-mangling=SCHEME],
+    [specify name mangling scheme [default=flat]])],
   [AS_CASE([$enable_name_mangling],
-    [flat], [name_mangling_version=flat],
-    [yes], [name_mangling_version=flat],
-    [*], [AC_MSG_ERROR([Invalid name mangling version: must be 'flat'])])],
-  [name_mangling_version=flat])
+    [flat], [name_mangling_scheme=flat],
+    [*], [AC_MSG_ERROR(m4_normalize([Invalid or missing name mangling scheme:
+      must be 'flat']))])],
+  [name_mangling_scheme=flat])
 
 AC_ARG_ENABLE([naked-pointers], [],
   [AS_IF([test "x$enableval" != 'xno'],
@@ -2774,9 +2774,9 @@ AS_IF([test x"$enable_cpp_mangling" = "xyes"],
     AC_DEFINE([WITH_CPP_MANGLING])],
   [cpp_mangling=false])
 
-## Name mangling version
+## Name mangling scheme
 
-AS_CASE([$name_mangling_version],
+AS_CASE([$name_mangling_scheme],
   [flat], [AC_DEFINE([NAME_MANGLING_FLAT])])
 
 ## Check for mmap support for huge pages and contiguous heap

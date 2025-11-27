@@ -47,7 +47,7 @@ let print_compact_location ppf (loc : Location.t) =
 
 let name_for_function (func : Lambda.lfunction) =
   let mangling_scheme_locates_anonymous_functions =
-    match Config.name_mangling_version with Flat -> false
+    match Config.name_mangling_scheme with Flat -> false
   in
   match func.loc with
   | Loc_unknown -> "fn"
