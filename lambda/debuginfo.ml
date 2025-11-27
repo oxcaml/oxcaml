@@ -78,10 +78,17 @@ module Scoped_location = struct
     | Empty -> s
     | Cons {str; _} -> str ^ sep ^ s
 
-  let enter_anonymous_function ~scopes ~assume_zero_alloc =
+  let enter_anonymous_function ~scopes ~assume_zero_alloc ~loc =
+    ignore loc; (* CR sspies: [loc] will be used in subsequent PRs. *)
     let str = str_fun scopes in
     Cons {item = Sc_anonymous_function; str; str_fun = str; name = ""; prev = scopes;
           assume_zero_alloc }
+
+  let enter_anonymous_module ~scopes ~loc =
+    ignore loc;
+    let str = str scopes in
+    Cons {item = Sc_module_definition; str; str_fun = str ^ ".(fun)"; name = "";
+          prev = scopes; assume_zero_alloc = ZA.Assume_info.none; }
 
   let enter_value_definition ~scopes ~assume_zero_alloc id =
     cons scopes Sc_value_definition (dot scopes (Ident.name id)) (Ident.name id)
