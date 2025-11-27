@@ -223,6 +223,9 @@ let is_control_flow = function
   | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _ | ADC _ | SBB _ ->
     false
 
+(* CR xclerc: in `writes_to_arg` and `reads_from_arg`, when there are
+   occurrences of `Reg64 RAX` or `Reg64 RDX`, consider checking for
+   subregisters. *)
 let writes_to_arg target = function
   | MOV (_, dst)
   | MOVSX (_, dst)
@@ -262,8 +265,10 @@ let writes_to_arg target = function
     reg_is_written_by_arg target dst || equal_args target (Reg64 RAX)
   | PUSH _ | CMP _ | TEST _ | J _ | JMP _ | CALL _ | RET | LOCK_ADD _
   | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _
-  | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE
+  | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE ->
+    false
   | SIMD _ ->
+    (* CR xclerc: is this correct? *)
     false
 
 let reads_from_arg target = function
