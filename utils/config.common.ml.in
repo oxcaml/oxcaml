@@ -69,6 +69,12 @@ let default_executable_name =
     "Unix" -> "a.out"
   | "Win32" | "Cygwin" -> "camlprog.exe"
   | _ -> "camlprog"
+
+type name_mangling_version =
+  | Flat
+
+exception Invalid_name_mangling_version of string
+
 type configuration_value =
   | String of string
   | Int of int
@@ -105,6 +111,7 @@ let configuration_variables () =
   p_bool "with_frame_pointers" with_frame_pointers;
   p_bool "with_address_sanitizer" with_address_sanitizer;
   p_bool "with_cpp_mangling" with_cpp_mangling;
+  p "name_mangling_version" name_mangling_version_string;
   p "ext_exe" ext_exe;
   p "ext_obj" ext_obj;
   p "ext_asm" ext_asm;
@@ -183,3 +190,8 @@ let config_var x =
       Some s
 
 let merlin = false
+
+let name_mangling_version =
+  match name_mangling_version_string with
+  | "flat" -> Flat
+  | s -> raise (Invalid_name_mangling_version s)
