@@ -42,6 +42,8 @@ module type Oxcaml_options = sig
   val dvectorize : unit -> unit
   val cfg_peephole_optimize : unit -> unit
   val no_cfg_peephole_optimize : unit -> unit
+  val x86_peephole_optimize : unit -> unit
+  val no_x86_peephole_optimize : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit

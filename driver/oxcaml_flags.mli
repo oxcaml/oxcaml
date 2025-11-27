@@ -31,6 +31,8 @@ val vectorize_max_block_size : int ref
 
 val cfg_peephole_optimize: bool ref
 
+val x86_peephole_optimize : bool ref
+
 val cfg_stack_checks : bool ref
 val cfg_stack_checks_threshold : int ref
 
