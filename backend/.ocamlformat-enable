@@ -31,6 +31,8 @@ cfg/**/*.ml
 cfg/**/*.mli
 cfg/vectorize.ml
 cfg/vectorize.mli
+cfg_peephole/**/*.ml
+cfg_peephole/**/*.mli
 vectorize_utils.ml
 vectorize_utils.mli
 cfg_selectgen.ml
@@ -61,8 +63,6 @@ llvm/**/*.ml
 llvm/**/*.mli
 polling_utils.ml
 polling_utils.mli
-peephole/**/*.ml
-peephole/**/*.mli
 printcmm.ml
 printcmm.mli
 printlinear.ml
