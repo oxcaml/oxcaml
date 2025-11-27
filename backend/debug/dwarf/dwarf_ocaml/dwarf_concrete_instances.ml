@@ -38,6 +38,15 @@ let for_fundecl ~get_file_id state (fundecl : L.fundecl) ~fun_end_label
   let linkage_name =
     match Config.name_mangling_version with
     | LegacyOCaml -> Some (linkage_name_from_debug ())
+    | RunLengthEncoding -> None
+    (* When the runlength encoding is used, there is no need for additional
+       linkage names on non-inlined functions, because the module path can be
+       reconstructed from the assembly symbol name. *)
+    (* CR sspies: This removes the linkage name for some symbols that still use
+       the old mangling scheme (see the comment in [make_symbol] in
+       cmm_helpers.ml). I observed this for the linkage name of the module entry
+       point, but for that one the linkage name is currently just the symbol
+       name (e.g., "camlTest__entry"). *)
   in
   let start_sym = Asm_symbol.create fun_name in
   let location_attributes =

@@ -211,6 +211,8 @@ val with_cpp_mangling : bool
 
 type name_mangling_version =
   | LegacyOCaml
+  | RunLengthEncoding
+
 exception Invalid_name_mangling_version of string
 
 val name_mangling_version : name_mangling_version
