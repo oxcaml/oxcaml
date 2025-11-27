@@ -5,11 +5,7 @@ module DLL = Oxcaml_utils.Doubly_linked_list
 
 (** Optimize all code sections with peephole optimizations.
     This includes the main code section and all additional sections,
-    with profiling and counter tracking.
-
-    @param main_code The main code section to optimize
-    @param asm_code_by_section Hash table of additional code sections
-    @param delayed_sections Hash table of delayed code sections *)
+    with profiling and counter tracking. *)
 val optimize_all_sections :
   asm_line DLL.t ->
   asm_line DLL.t X86_section.Section_name.Tbl.t ->

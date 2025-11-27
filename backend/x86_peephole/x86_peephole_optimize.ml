@@ -30,13 +30,14 @@ let peephole_optimize_asm_program stats asm_program =
 let optimize_all_sections main_code asm_code_by_section delayed_sections =
   let stats = R.create_peephole_stats () in
   let counter_f () = R.peephole_stats_to_counters stats in
+  let optimize_table section_table =
+    X86_section.Section_name.Tbl.iter
+      (fun _name section -> peephole_optimize_asm_program stats section)
+      section_table
+  in
   Profile.record_with_counters ~accumulate:true ~counter_f "x86_peephole"
     (fun () ->
       peephole_optimize_asm_program stats main_code;
-      X86_section.Section_name.Tbl.iter
-        (fun _name section -> peephole_optimize_asm_program stats section)
-        asm_code_by_section;
-      X86_section.Section_name.Tbl.iter
-        (fun _name section -> peephole_optimize_asm_program stats section)
-        delayed_sections)
+      optimize_table asm_code_by_section;
+      optimize_table delayed_sections)
     ()
