@@ -47,12 +47,17 @@ let peephole_stats_to_counters stats =
        stats.remove_redundant_cmp
   |> Profile.Counters.set "x86_peephole.combine_add_rsp" stats.combine_add_rsp
 
+(* CR xclerc: check where the rules should set the "restart" cell to be sure we
+   always apply all rules. *)
+
 (* Rewrite rule: remove MOV x, x (moving a value to itself) Note: We can only
    safely remove self-moves for registers that don't have zero-extension side
    effects. On x86-64: - 32-bit moves (Reg32) zero the upper 32 bits - SIMD
    moves (Regf) may zero upper bits depending on instruction encoding So we only
    optimize 8/16/64-bit integer register self-moves. *)
 let remove_mov_x_x stats cell =
+  (* CR xclerc: we expect previous passes to never emit `mov x, x`, so perhaps
+     this rule is superfluous. *)
   match DLL.value cell with
   | Ins (MOV (src, dst))
     when U.equal_args src dst && U.is_safe_self_move_arg src ->
@@ -259,6 +264,7 @@ let apply_lea_optimization cell1 cell2 dst idx_reg base_reg_opt displ =
    Key difference: ADD/SUB/INC/DEC set flags (CF, OF, SF, ZF, AF, PF), LEA
    doesn't. *)
 let rewrite_mov_add_to_lea stats cell =
+  (* CR xclerc: check this rewrite is always beneficial. *)
   match U.get_cells cell 2 with
   | [cell1; cell2] -> (
     match DLL.value cell1, DLL.value cell2 with
@@ -336,6 +342,7 @@ let rewrite_mov_add_to_lea stats cell =
 
    Key difference: ADD sets flags (CF, OF, SF, ZF, AF, PF), LEA doesn't. *)
 let rewrite_mov_add_reg_to_lea stats cell =
+  (* CR xclerc: check this rewrite is always beneficial. *)
   match U.get_cells cell 2 with
   | [cell1; cell2] -> (
     match DLL.value cell1, DLL.value cell2 with

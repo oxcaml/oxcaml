@@ -3,7 +3,7 @@
 open X86_ast
 module DLL = Oxcaml_utils.Doubly_linked_list
 
-(** Type for the result of searching for the next occurrence of a register *)
+(** Type for the result of searching for the next occurrence of a register or flags *)
 type next_occurrence =
   | WriteFound
   | ReadFound
