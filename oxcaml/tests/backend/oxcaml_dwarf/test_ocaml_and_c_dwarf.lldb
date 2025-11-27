@@ -54,7 +54,7 @@
 (lldb) script print("=== Testing OCaml/C boundary - callback (C calls OCaml) ===")
 (lldb) br set -o true -n Test_ocaml_and_c_dwarf.f_callback_inner
 (lldb) c
-(lldb) bt 4
+(lldb) bt 6
 (lldb) script print("=== Testing OCaml/C boundary - finalizer (C calls OCaml during GC) ===")
 (lldb) br set -o true -n Test_ocaml_and_c_dwarf.f_my_finalizer
 (lldb) c
