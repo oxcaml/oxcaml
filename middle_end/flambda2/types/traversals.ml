@@ -575,6 +575,11 @@ module Make (X : sig
 
   val rewrite : t -> TE.t -> TG.t -> t rewrite
 
+  (* CR vlaviron: Not all recursive calls to rewrite_arbitrary_type change the
+     metadata. We should enhance the signature with metadata transformers for
+     all types of accesses (i.e. array lenghts, boxed number contents, ...) to
+     better reflect the actual traversal. *)
+
   val block_slot : ?tag:Tag.t -> t -> TI.t -> TE.t -> TG.t -> t
 
   val array_slot : t -> TI.t -> TE.t -> TG.t -> t
@@ -1253,7 +1258,9 @@ struct
     in
     Var.Map.map fst sbs, teev
 
-  let rewrite env symbol_abstraction live_vars =
+  let rewrite env symbol_abstraction =
+    (* CR vlaviron for bclement: This should share more code with
+       [rewrite_env_extension_with_extra_variables] above. *)
     let base_env =
       TE.create ~resolver:(TE.resolver env)
         ~get_imported_names:(TE.get_imported_names env)
@@ -1280,25 +1287,6 @@ struct
           base_env, { aliases_of_names; names_to_process })
         (TE.defined_symbols env) (base_env, empty)
     in
-    let base_env, acc =
-      Variable.Map.fold
-        (fun var (abs, kind) (base_env, acc) ->
-          let aliases_of_names =
-            Name.Map.add (Name.var var)
-              (X.Map.singleton abs (Name.var var, kind))
-              acc.aliases_of_names
-          in
-          let names_to_process =
-            (Name.var var, abs, kind, Name.var var) :: acc.names_to_process
-          in
-          let bound_name =
-            Bound_name.create_var
-              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
-          in
-          let base_env = TE.add_definition base_env bound_name kind in
-          base_env, { aliases_of_names; names_to_process })
-        live_vars (base_env, acc)
-    in
     let new_types, aliases_of_names = rewrite_in_depth env acc Name.Map.empty in
     let base_env =
       Name.Map.fold
@@ -1308,15 +1296,12 @@ struct
               Name.pattern_match name_after_rewrite
                 ~symbol:(fun _ -> base_env)
                 ~var:(fun var_after_rewrite ->
-                  if Variable.Map.mem var_after_rewrite live_vars
-                  then base_env
-                  else
-                    let bound_name =
-                      Bound_name.create_var
-                        (Bound_var.create var_after_rewrite
-                           Flambda_debug_uid.none Name_mode.in_types)
-                    in
-                    TE.add_definition base_env bound_name kind))
+                  let bound_name =
+                    Bound_name.create_var
+                      (Bound_var.create var_after_rewrite Flambda_debug_uid.none
+                         Name_mode.in_types)
+                  in
+                  TE.add_definition base_env bound_name kind))
             aliases_of_name base_env)
         aliases_of_names base_env
     in

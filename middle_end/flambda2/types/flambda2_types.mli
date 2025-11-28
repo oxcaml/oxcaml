@@ -1057,16 +1057,7 @@ module Rewriter : sig
     val function_slot :
       set_of_closures -> Function_slot.t -> typing_env -> flambda_type -> t
   end) : sig
-    (** Rewrite the provided typing env.
-
-        The provided name map contains all the names that must be preserved,
-        along with their abstraction. It must only contain symbols and variables
-        with [Name_mode.normal] that exist in the provided typing env. *)
-    val rewrite :
-      typing_env ->
-      (Symbol.t -> X.t) ->
-      (X.t * Flambda_kind.t) Variable.Map.t ->
-      typing_env
+    val rewrite : typing_env -> (Symbol.t -> X.t) -> typing_env
 
     val rewrite_env_extension_with_extra_variables :
       Typing_env.t ->
