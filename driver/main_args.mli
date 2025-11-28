@@ -19,6 +19,8 @@
 module type Common_options = sig
   val _absname : unit -> unit
   val _no_absname : unit -> unit
+  val _no_linenums : unit -> unit
+  val _no_colnums : unit -> unit
   val _alert : string -> unit
   val _I : string -> unit
   val _H : string -> unit

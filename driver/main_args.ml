@@ -34,6 +34,14 @@ let mk_no_absname f =
     "-no-absname", Arg.Unit f,
     " Do not try to show absolute filenames in error messages (default)"
 
+let mk_no_linenums f =
+    "-no-linenums", Arg.Unit f,
+    " Do not print line numbers in error messages"
+
+let mk_no_colnums f =
+    "-no-colnums", Arg.Unit f,
+    " Do not print character numbers in error messages"
+
 let mk_annot f =
   "-annot", Arg.Unit f, " (deprecated) Save information in <filename>.annot"
 
@@ -1058,6 +1066,8 @@ let mk__ f =
 module type Common_options = sig
   val _absname : unit -> unit
   val _no_absname : unit -> unit
+  val _no_linenums : unit -> unit
+  val _no_colnums : unit -> unit
   val _alert : string -> unit
   val _I : string -> unit
   val _H : string -> unit
@@ -1377,6 +1387,8 @@ struct
     mk_alert F._alert;
     mk_absname F._absname;
     mk_no_absname F._no_absname;
+    mk_no_linenums F._no_linenums;
+    mk_no_colnums F._no_colnums;
     mk_annot F._annot;
     mk_as_argument_for F._as_argument_for;
     mk_as_parameter F._as_parameter;
@@ -1524,6 +1536,8 @@ struct
   let list = [
     mk_absname F._absname;
     mk_no_absname F._no_absname;
+    mk_no_linenums F._no_linenums;
+    mk_no_colnums F._no_colnums;
     mk_alert F._alert;
     mk_I F._I;
     mk_H F._H;
@@ -1612,6 +1626,8 @@ struct
     mk_alert F._alert;
     mk_absname F._absname;
     mk_no_absname F._no_absname;
+    mk_no_linenums F._no_linenums;
+    mk_no_colnums F._no_colnums;
     mk_afl_instrument F._afl_instrument;
     mk_afl_inst_ratio F._afl_inst_ratio;
     mk_annot F._annot;
@@ -1815,6 +1831,8 @@ module Make_opttop_options (F : Opttop_options) = struct
   let list = [
     mk_absname F._absname;
     mk_no_absname F._no_absname;
+    mk_no_linenums F._no_linenums;
+    mk_no_colnums F._no_colnums;
     mk_alert F._alert;
     mk_compact F._compact;
     mk_I F._I;
@@ -1933,6 +1951,8 @@ struct
     mk_alert F._alert;
     mk_absname F._absname;
     mk_no_absname F._no_absname;
+    mk_no_linenums F._no_linenums;
+    mk_no_colnums F._no_colnums;
     mk_annot F._annot;
     mk_as_argument_for F._as_argument_for;
     mk_as_parameter F._as_parameter;
@@ -2088,6 +2108,8 @@ struct
   let list = [
     mk_absname F._absname;
     mk_no_absname F._no_absname;
+    mk_no_linenums F._no_linenums;
+    mk_no_colnums F._no_colnums;
     mk_alert F._alert;
     mk_I F._I;
     mk_H F._H;
@@ -2202,6 +2224,8 @@ module Default = struct
     let _app_funct = set applicative_functors
     let _labels = clear classic
     let _no_absname = clear Clflags.absname
+    let _no_linenums = set Clflags.no_linenums
+    let _no_colnums = set Clflags.no_colnums
     let _no_alias_deps = set transparent_modules
     let _no_app_funct = clear applicative_functors
     let _directory d = Clflags.directory := Some d
