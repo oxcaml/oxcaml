@@ -145,6 +145,7 @@ and out_type =
   | Otyp_quote of out_type
   | Otyp_splice of out_type
   | Otyp_poly of out_vars_jkinds * out_type
+  | Otyp_repr of string list * out_type
   | Otyp_module of out_ident * (string * out_type) list
   | Otyp_attribute of out_type * out_attribute
   | Otyp_jkind_annot of out_type * out_jkind
