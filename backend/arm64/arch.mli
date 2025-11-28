@@ -42,6 +42,9 @@ type cmm_label = Label.t
 
 type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 
+type system_reg =
+  |  CNTVCT_EL0
+
 type specific_operation =
   | Ifar_poll
   | Ifar_alloc of { bytes : int; dbginfo : Cmm.alloc_dbginfo }
@@ -59,6 +62,8 @@ type specific_operation =
   | Isignext of int (* sign extension *)
   | Isimd of Simd.operation
   | Illvm_intrinsic of string
+  | Iread_system_reg of system_reg  (* MRS *)
+  | Icrc32
 
 and arith_operation =
     Ishiftadd
