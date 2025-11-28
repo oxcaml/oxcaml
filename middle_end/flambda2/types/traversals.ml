@@ -601,8 +601,8 @@ struct
 
   let empty = { aliases_of_names = Name.Map.empty; names_to_process = [] }
 
-  let get_canonical_with ({ aliases_of_names; names_to_process } as u) _env
-      canonical kind metadata =
+  let get_canonical_with ({ aliases_of_names; names_to_process } as u) canonical
+      kind metadata =
     match Name.Map.find_opt canonical aliases_of_names with
     | None ->
       let aliases_of_names =
@@ -805,7 +805,7 @@ struct
             then canonical, acc
             else
               let canonical_name, acc =
-                get_canonical_with acc env name (TG.kind ty) abs
+                get_canonical_with acc name (TG.kind ty) abs
               in
               let simple = Simple.name canonical_name in
               Simple.with_coercion simple coercion, acc)
