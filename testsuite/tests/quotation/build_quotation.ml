@@ -775,5 +775,5 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 <[ fun x -> function None -> 0 | Some x -> x ]>
 [%%expect {|
 - : <[$('a) -> int option -> int]> expr =
-<[function | None -> 0 | Some (x) -> x]>
+<[fun x -> function | None -> 0 | Some (x__1) -> x__1]>
 |}];;

@@ -1768,12 +1768,16 @@ module Ast = struct
         | _ -> print_apply env fmt exp args)
       | _ -> print_apply env fmt exp args)
     | Fun { params; constraint_; body } -> (
-      match body with
-      | Pfunction_body exp ->
+      (match params with
+      | _::_ ->
         pp fmt "@[<2>fun";
         List.iter (print_param env fmt) params;
+        pp fmt "@ ->@ "
+      | [] -> ());
+      match body with
+      | Pfunction_body exp ->
         Option.iter (print_type_constraint env fmt) constraint_;
-        pp fmt "@ ->@ %a@]" (print_exp env) exp
+        pp fmt "%a@]" (print_exp env) exp
       | Pfunction_cases cases ->
         pp fmt "function@[";
         List.iter (print_case env fmt) cases;
