@@ -633,6 +633,7 @@
   llvm_ir
   llvmize
   ;; backend/regalloc
+  regalloc_affinity
   regalloc_gi
   regalloc_gi_state
   regalloc_gi_utils

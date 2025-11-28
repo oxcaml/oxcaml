@@ -148,5 +148,10 @@ module Hardware_registers : sig
   val of_reg : t -> Reg.t -> Hardware_register.t option
 
   val find_available :
-    t -> SpillCosts.t Lazy.t -> Reg.t -> Interval.t -> available
+    t ->
+    Regalloc_affinity.t ->
+    SpillCosts.t Lazy.t ->
+    Reg.t ->
+    Interval.t ->
+    available
 end

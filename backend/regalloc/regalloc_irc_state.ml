@@ -47,6 +47,7 @@ type t =
     adj_set : RegisterStamp.PairSet.t;
     move_list : Instruction.Set.t Reg.Tbl.t;
     stack_slots : Regalloc_stack_slots.t;
+    affinity : Regalloc_affinity.t;
     mutable inst_temporaries : Reg.Set.t;
     mutable block_temporaries : Reg.Set.t;
     reg_work_list : RegWorkList.t Reg.Tbl.t;
@@ -57,7 +58,7 @@ type t =
     instr_work_list : InstrWorkList.t InstructionId.Tbl.t
   }
 
-let[@inline] make ~initial ~stack_slots () =
+let[@inline] make ~initial ~stack_slots ~affinity () =
   let num_registers = List.length (Reg.all_relocatable_regs ()) in
   let reg_work_list = Reg.Tbl.create num_registers in
   let reg_color = Reg.Tbl.create num_registers in
@@ -121,6 +122,7 @@ let[@inline] make ~initial ~stack_slots () =
     adj_set;
     move_list;
     stack_slots;
+    affinity;
     inst_temporaries;
     block_temporaries;
     reg_work_list;
@@ -530,6 +532,8 @@ let[@inline] add_alias state v u =
   Reg.Tbl.replace state.reg_alias v (Some u)
 
 let[@inline] stack_slots state = state.stack_slots
+
+let[@inline] affinity state = state.affinity
 
 let[@inline] add_inst_temporaries_list state regs =
   state.inst_temporaries
