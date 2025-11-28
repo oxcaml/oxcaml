@@ -50,13 +50,13 @@
 
    - for each node $x$ with unknown usages, $ε ∈ Lₓ$,
 
-   - for each alias $s → t$, $Lₜ ⊆ Lₛ$ (the source has at least as many uses as
-   the target)
+   - for each alias [let t = s], $Lₜ ⊆ Lₛ$ (the source has at least as many uses
+   as the target)
 
-   - for each accessor $s → t$ with field $f$, $f ⋅ Lₜ ⊆ Lₛ$ (each access to the
-   target corresponds to an access to the source after taking the field $f$)
+   - for each accessor [let t = s.f], $f ⋅ Lₜ ⊆ Lₛ$ (each access to the target
+   corresponds to an access to the source after taking the field $f$)
 
-   - for each constructor $s → t$ with field $f$, $f⁻¹ ⋅ Lₜ ⊆ Lₛ$ (each access
+   - for each constructor [let t = { f = s; ... }], $f⁻¹ ⋅ Lₜ ⊆ Lₛ$ (each access
    to the target that starts with $f$ corresponds to an access to the sources
    after removing the initial $f$), where $f⁻¹ ⋅ Lₜ$ is the Brzozowski
    derivative of $Lₜ$ with respect to $f$, i.e. { u / f ⋅ u ∈ Lₜ }.
@@ -128,12 +128,61 @@
    - Mark the code_id [p] as used. This is easy, since it corresponds exactly to
    what happens with standard block constructors and accessors.
 
-   - Add an alias $r → s$. Again, this is easy and corresponds precisely to what
-   happens with constructors and accessors.
+   - Add an alias [let s = r]. Again, this is easy and corresponds precisely to
+   what happens with constructors and accessors.
 
-   - Add an alias $b → a$. This is the direction opposite to what would happen
-   with constructors and accessors. Thus, for parameters, we use coconstructors
-   and coaccessors that put this alias in the opposite direction. *)
+   - Add an alias [let a = b]. This is the direction opposite to what would
+   happen with constructors and accessors. Thus, for parameters, we use
+   coconstructors and coaccessors that put this alias in the opposite direction.
+
+   # Local fields
+
+   Fields that are value slots or function slots originating from the current
+   compilation unit are said to be *local*. Local fields are special, because we
+   know all the places they are used: any constructor or accessor to a local
+   field in a different compilation unit comes necessarily from inlining such a
+   use from the current compilation unit, or type-based changed from the types
+   exported by the current compilation unit. As such, we can perform a much more
+   precise analysis on them.
+
+   Thus, let us assume we have a block $a$, with a local field $f$ containing a
+   value $u$, and a block $b$, from which we read a value $v$ from the field
+   $f$. We must add an alias [let v = u] if there is a way $a$ could possibly
+   flow to $b$.
+
+   Let us consider three cases:
+
+   - $a$ has known usages. Then, $b$ is in the usages of $a$, making the usual
+   mechanism of handling usages for fields of constructors add the alias [let v
+   = u].
+
+   - $b$ has known sources. Then, $a$ is in the sources of $b$, making the usual
+   mechanism of handling sources for the result of accessors add the alias [let
+   v = u].
+
+   - Both $a$ has unknown usages and $b$ has unknown sources. Then, neither of
+   the above will apply, and we need to do something. Fortunately, when this
+   happens, we cannot do any better than assuming $a$ will flow to $b$, so it is
+   enough to mark all local fields stored in blocks that have unknown usages,
+   and all local fields read from block that have unknown sources, and add
+   aliases between both.
+
+   Still, there is a subtlety in the other cases we must take care not to
+   overlook. The usual mechanism of handling usages for fields of constructors
+   (and likewise for the sources of the result of accessors) only add an alias
+   if the result has known usages (resp. sources) as an optimisation. However,
+   this optimisation is incorrect in the case of local fields! Remember the
+   above example, and assume that $a$ has unknown usages, $b$ has known sources
+   (including $a$), and that $u$ has unknown sources. If we used the
+   optimisation we use for other fields, then we would mark that the field $f$
+   of $a$ has unknown sources, therefore $v$ has unknown sources, without adding
+   an alias [let v = u]. While this is correct for the sources of $v$, this
+   misses the usages of $u$! Indeed, $u$ is correctly marked as being in a local
+   field $f$ of a block with unknown usages, but no block with unknown sources
+   reads from a local field $f$, missing $v$ as uses of $u$. Fortunately,
+   disabling this optimisation for local fields is enough to restore
+   correctness: in that case, we simply add an alias [let v = u], which
+   correctly accounts for the usages of $u$. *)
 
 (* Disable [not-principal] warning in this file. We often write code that looks
    like [let@ [x; y] = a in b] where the list constructor is an [hlist], and [a]
