@@ -4448,10 +4448,7 @@ let fold_modules f lid env acc =
            match entry with
            | Mod_unbound _ -> acc
            | Mod_local (mda, _) ->
-               let md =
-                 Subst.Lazy.force_module_decl mda.mda_declaration
-               in
-               f name p md acc
+               f name p mda.mda_declaration acc
            | Mod_persistent ->
                (* CR lmaurer: Setting instance args to [] here isn't right. We
                   really should have [IdTbl.fold_name] provide the whole ident
@@ -4462,10 +4459,7 @@ let fold_modules f lid env acc =
                match Persistent_env.find_in_cache !persistent_env modname with
                | None -> acc
                | Some mda ->
-                   let md =
-                     Subst.Lazy.force_module_decl mda.mda_declaration
-                   in
-                   f name p md acc)
+                   f name p mda.mda_declaration acc)
         env.modules
         acc
   | Some l ->
@@ -4477,10 +4471,7 @@ let fold_modules f lid env acc =
       | Structure_comps c ->
           NameMap.fold
             (fun s mda acc ->
-               let md =
-                 Subst.Lazy.force_module_decl mda.mda_declaration
-               in
-               f s (Pdot (p, s)) md acc)
+               f s (Pdot (p, s)) mda.mda_declaration acc)
             c.comp_modules
             acc
       | Functor_comps _ ->
@@ -4509,7 +4500,6 @@ and fold_types f =
     (fun env -> env.types) (fun sc -> sc.comp_types)
     (fun k p tda acc -> f k p tda.tda_declaration acc)
 and fold_modtypes f =
-  let f l path data acc = f l path (Subst.Lazy.force_modtype_decl data) acc in
   find_all wrap_identity
     (fun env -> env.modtypes) (fun sc -> sc.comp_modtypes)
     (fun k p mta acc -> f k p mta.mtda_declaration acc)
