@@ -97,6 +97,8 @@ val closure_env : t -> t
 
 val resolver : t -> Compilation_unit.t -> Serializable.t option
 
+val get_imported_names : t -> unit -> Name.Set.t
+
 val code_age_relation_resolver :
   t -> Compilation_unit.t -> Code_age_relation.t option
 
@@ -197,3 +199,5 @@ val free_names_transitive : t -> Type_grammar.t -> Name_occurrences.t
 val bump_current_level_scope : t -> t
 
 val compute_joined_aliases : t -> Name.Set.t -> t list -> t
+
+val defined_symbols : t -> Symbol.Set.t
