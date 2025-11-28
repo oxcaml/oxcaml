@@ -1014,8 +1014,7 @@ struct
             X.set_of_closures metadata function_slot env maps_to
           in
           let maps_to, acc =
-            rewrite_closures_entry ~this_function_slot:function_slot env acc
-              set_of_closures_metadata maps_to
+            rewrite_closures_entry env acc set_of_closures_metadata maps_to
           in
           let row_like_case =
             TG.Row_like_case.create ~maps_to
@@ -1032,7 +1031,7 @@ struct
     in
     TG.Row_like_for_closures.create_raw ~known_closures ~other_closures, acc
 
-  and rewrite_closures_entry ~this_function_slot:_ env acc metadata
+  and rewrite_closures_entry env acc metadata
       ({ function_types; closure_types; value_slot_types } : TG.closures_entry)
       =
     let function_types, acc =
