@@ -766,3 +766,14 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 [%%expect {|
 - : 'a expr = <[Stdlib.raise Out_of_fibers]>
 |}];;
+
+<[ let rec id : 'a. 'a -> 'a = fun x -> x in id ]>
+[%%expect {|
+- : <[$('a) -> $('a)]> expr = <[let rec id = (fun x -> x) in id]>
+|}];;
+
+<[ fun x -> function None -> 0 | Some x -> x ]>
+[%%expect {|
+- : <[$('a) -> int option -> int]> expr =
+<[function | None -> 0 | Some (x) -> x]>
+|}];;
