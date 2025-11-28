@@ -613,10 +613,10 @@ struct
       let names_to_process =
         (canonical, metadata, kind, canonical) :: names_to_process
       in
-      canonical, Coercion.id, { aliases_of_names; names_to_process }
+      canonical, { aliases_of_names; names_to_process }
     | Some aliases_of_name -> (
       match X.Map.find_opt metadata aliases_of_name with
-      | Some (name_with_metadata, _kind) -> name_with_metadata, Coercion.id, u
+      | Some (name_with_metadata, _kind) -> name_with_metadata, u
       | None ->
         let name_as_string =
           Name.pattern_match canonical ~var:Variable.name
@@ -632,7 +632,7 @@ struct
         let names_to_process =
           (canonical, metadata, kind, Name.var var') :: names_to_process
         in
-        Name.var var', Coercion.id, { aliases_of_names; names_to_process })
+        Name.var var', { aliases_of_names; names_to_process })
 
   let rec rewrite_expanded_head env acc metadata expanded =
     let acc_ref = ref acc in
@@ -804,11 +804,8 @@ struct
                     (Compilation_unit.get_current_exn ()))
             then canonical, acc
             else
-              let canonical_name, coercion_to_name, acc =
+              let canonical_name, acc =
                 get_canonical_with acc env name (TG.kind ty) abs
-              in
-              let coercion =
-                Coercion.compose_exn coercion_to_name ~then_:coercion
               in
               let simple = Simple.name canonical_name in
               Simple.with_coercion simple coercion, acc)
