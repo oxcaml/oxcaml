@@ -1,5 +1,55 @@
+<<<<<<< OxCaml
 OCaml 5.4.1
 -----------
+||||||| Upstream OCaml
+### Bug fixes:
+
+- #14574, #14577, #14589: Fix wrong assembly code generated for ARM64
+  with frame pointer support.
+  (Xavier Leroy, review by Vincent Laviron, report by Richard Jones)
+
+OCaml 5.4.1 (17 February 2026)
+------------------------------
+=======
+OCaml 5.4 maintenance version
+-----------------------------
+
+### Runtime system:
+
+* #14243: Explicit relative paths in ld.conf (".", "..", "./<path...>",
+  "../<path...>") are interpreted as being relative to the directory ld.conf
+  was loaded from, and the default ld.conf now uses relative paths, rather than
+  embedding the absolute path to the Standard Library. The brave may continue to
+  put implicit paths in ld.conf. The interpretation of CAML_LD_LIBRARY_PATH is
+  unaltered. Additionally, ld.conf is loaded from all of $OCAMLLIB/ld.conf,
+  $CAMLLIB/ld.conf and standard_library_default/ld.conf rather than just the
+  first one found. ld.conf files with CRLF line endings are now consistently
+  normalised on both Windows and Unix.
+  (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
+
+### Internal/compiler-libs changes:
+
+- #14243: ocamlc now uses the same code as the runtime to parse ld.conf (via a
+  C primitive), eliminating some highly obscure corner cases.
+  (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
+
+### Build system:
+
+- #14243: New configure option --with-additional-stublibsdir allows an
+  additional directory to be added to the start of ld.conf. Additionally, the
+  stublibs subdirectory is no longer created, nor added to ld.conf, when
+  building OCaml with --disable-shared.
+  (David Allsopp, review by Jonah Beckford, Damien Doligez and Hugo Heuzard)
+
+### Bug fixes:
+
+- #14574, #14577, #14589: Fix wrong assembly code generated for ARM64
+  with frame pointer support.
+  (Xavier Leroy, review by Vincent Laviron, report by Richard Jones)
+
+OCaml 5.4.1 (17 February 2026)
+------------------------------
+>>>>>>> ocaml/ocaml#14243
 
 ### Bug fixes:
 
