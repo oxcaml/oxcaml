@@ -48,11 +48,11 @@ CAMLextern const value * caml_named_value (char const * name);
 typedef void (*caml_named_action) (const value*, char *);
 CAMLextern void caml_iterate_named_values(caml_named_action f);
 
-CAMLextern void caml_main (char_os ** argv);
-CAMLextern void caml_startup (char_os ** argv);
-CAMLextern value caml_startup_exn (char_os ** argv);
-CAMLextern void caml_startup_pooled (char_os ** argv);
-CAMLextern value caml_startup_pooled_exn (char_os ** argv);
+CAMLextern void caml_main (char_os const * const * argv);
+CAMLextern void caml_startup (char_os const * const * argv);
+CAMLextern value caml_startup_exn (char_os const * const * argv);
+CAMLextern void caml_startup_pooled (char_os const * const * argv);
+CAMLextern value caml_startup_pooled_exn (char_os const * const * argv);
 CAMLextern void caml_shutdown (void);
 
 #ifdef __cplusplus
