@@ -152,6 +152,7 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
   | Tvar _ | Tunivar _ -> []
   | Tof_kind _ -> []
   | Tpoly (pty, _) -> [pty]
+  | Trepr (_, _) -> []
   | Tconstr (_path, tys, _) -> tys
 
 and immediate_subtypes_object_row acc ty = match get_desc ty with
@@ -452,6 +453,8 @@ let check_type
        under a separating type constructor. *)
     | (Tpoly(pty,_)       , m      ) ->
         check_type hyps pty m
+    | (Trepr(_pty,_)       , _m    ) ->
+        assert false
     | (Tunivar(_)         , _      ) -> empty
     | (Tof_kind(_)         , _      ) -> empty
     (* Type constructor case. *)

@@ -244,6 +244,10 @@ let rec core_type i ppf x =
       core_type i ppf t
   | Ptyp_of_kind jkind ->
       line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i + 1)) jkind
+  | Ptyp_repr (lvars, ct) ->
+      line i ppf "Ptyp_repr\n";
+      list i reprvar ppf lvars;
+      core_type i ppf ct
   | Ptyp_extension (s, arg) ->
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
       payload i ppf arg
@@ -251,6 +255,9 @@ let rec core_type i ppf x =
 and typevar i ppf (s, jkind) =
   line i ppf "var: %s\n" s.txt;
   jkind_annotation_opt (i+1) ppf jkind
+
+and reprvar i ppf s =
+  line i ppf "reprvar: %s\n" s.txt
 
 and package_with i ppf (s, t) =
   line i ppf "with type %a\n" fmt_longident_loc s;

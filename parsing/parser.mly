@@ -1085,6 +1085,7 @@ let maybe_pmod_constraint mode expr =
 %token RBRACKET               "]"
 %token RBRACKETGREATER        "]>"
 %token REC                    "rec"
+%token REPR                   "repr_"
 %token RPAREN                 ")"
 %token SEMI                   ";"
 %token SEMISEMI               ";;"
@@ -4391,19 +4392,35 @@ with_type_binder:
     | LPAREN QUOTE tyvar=mkrhs(ident) COLON jkind=jkind_annotation RPAREN
       { (tyvar, Some jkind) }
 ;
+%inline typevar_repr: (* : string with_loc *)
+  LPAREN REPR QUOTE mkrhs(ident) RPAREN
+    { $4 }
+;
 %inline typevar_list:
   (* : (string with_loc * jkind_annotation option) list *)
   nonempty_llist(typevar)
+    { $1 }
+;
+%inline typevar_repr_list:
+  (* : string with_loc list *)
+  nonempty_llist(typevar_repr)
     { $1 }
 ;
 %inline poly(X):
   typevar_list DOT X
     { ($1, $3) }
 ;
+%inline repr(X):
+  typevar_repr_list DOT X
+    { ($1, $3) }
+;
 %inline strictly_poly(X):
 | poly(X)
     { let bound_vars, inner_type = $1 in
       mktyp ~loc:$sloc (Ptyp_poly (bound_vars, inner_type)) }
+| repr(X)
+    { let bound_vars, inner_type = $1 in
+      mktyp ~loc:$sloc (Ptyp_repr (bound_vars, inner_type)) }
 ;
 
 possibly_poly(X):
@@ -4676,6 +4693,11 @@ optional_atat_modalities_expr:
   | mktyp(
     LPAREN bound_vars = typevar_list DOT inner_type = core_type RPAREN
       { Ptyp_poly (bound_vars, inner_type) }
+    )
+    { $1 }
+  | mktyp(
+    LPAREN bound_vars = typevar_repr_list DOT inner_type = core_type RPAREN
+      { Ptyp_repr (bound_vars, inner_type) }
     )
     { $1 }
   | ty = tuple_type

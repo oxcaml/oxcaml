@@ -616,6 +616,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->
               tree_of_val (depth - 1) obj ty
+          | Trepr (ty, _) ->
+              tree_of_val (depth - 1) obj ty
           | Tpackage _ ->
               Oval_stuff "<module>"
         end

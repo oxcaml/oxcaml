@@ -290,6 +290,11 @@ module Type_shape = struct
                This code used to only work for [_type_vars = []]. Consider
                alternatively introducing abstractions here? *)
             of_type_expr_go ~depth ~visited type_expr subst shape_for_constr
+          | Trepr (type_expr, _type_vars) ->
+            (* CR aivaskovic: Just like in the Tpoly case, we ignore the
+               layout-polymorphic variables.
+               If changes are made to the Tpoly case, change this one too. *)
+            of_type_expr_go ~depth ~visited type_expr subst shape_for_constr
           | Tunboxed_tuple exprs ->
             Shape.unboxed_tuple (of_expr_list (List.map snd exprs))
           | Tobject _ | Tnil | Tfield _ ->
@@ -310,6 +315,7 @@ module Type_shape = struct
                 | Tfield (_, _, _, _)
                 | Tvariant _ | Tunivar _
                 | Tpoly (_, _)
+                | Trepr (_, _)
                 | Tpackage (_, _)
                 | Tquote _ | Tsplice _ | Tof_kind _ ->
                   assert false

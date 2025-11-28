@@ -199,6 +199,8 @@ module T = struct
         splice ~loc ~attrs (sub.typ sub t)
     | Ptyp_of_kind jkind ->
         of_kind ~loc ~attrs (sub.jkind_annotation sub jkind)
+    | Ptyp_repr (lvars, t) ->
+        repr ~loc ~attrs lvars (sub.typ sub t)
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
 
   let map_type_declaration sub

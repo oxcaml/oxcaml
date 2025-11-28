@@ -263,6 +263,10 @@ let rec core_type i ppf x =
   | Ptyp_splice t ->
       line i ppf "Ptyp_splice\n";
       core_type i ppf t
+  | Ptyp_repr (lv, ct) ->
+      line i ppf "Ptyp_repr\n";
+      list i reprvar ppf lv;
+      core_type i ppf ct;
   | Ptyp_of_kind jkind ->
       line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i+1)) jkind
   | Ptyp_extension (s, arg) ->
@@ -273,6 +277,9 @@ let rec core_type i ppf x =
 and typevar i ppf (s, jkind) =
   line i ppf "var: %s\n" s.txt;
   jkind_annotation_opt (i+1) ppf jkind
+
+and reprvar i ppf s =
+  line i ppf "sort var: %s\n" s.txt
 
 and package_with i ppf (s, t) =
   line i ppf "with type %a\n" fmt_longident_loc s;
