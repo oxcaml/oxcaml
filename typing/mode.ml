@@ -2102,6 +2102,10 @@ module Report = struct
     | Record_field s -> fprintf ppf "mutable field %a" Misc.Style.inline_code s
     | Array_elements -> fprintf ppf "array elements"
 
+  let print_always_dynamic = function
+    | Application -> dprintf "function applications"
+    | Try_with -> dprintf "try-with clauses"
+
   (** Given a pinpoint and a const, where the pinpoint has been expressed,
   prints the const to explain the mode on the pinpoint. *)
   let print_const (type l r) (_, pp_desc) ppf : (l * r) const -> unit = function
@@ -2151,9 +2155,8 @@ module Report = struct
       fprintf ppf "it is used in %t"
         (print_pp ~definite:false ~capitalize:false)
     | Always_dynamic x ->
-      let s = match x with Application -> "function applications" in
-      fprintf ppf "%s are always dynamic" s
-    | Branching -> fprintf ppf "it is branched"
+      fprintf ppf "%t are always dynamic" (print_always_dynamic x)
+    | Branching -> fprintf ppf "it has branches"
 
   let print_allocation_l : allocation -> formatter -> unit =
    fun { txt; loc } ->

@@ -20,9 +20,29 @@ Lines 2-3, characters 4-16:
 2 | ....if b then "hello"
 3 |     else "world"
 Error: The expression is "dynamic"
-       because it is branched.
+       because it has branches.
        However, the expression highlighted is expected to be "static".
 |}]
+
+let f (b @ static) @ static =
+    if b then "hello"
+    else "world"
+[%%expect{|
+Lines 2-3, characters 4-16:
+2 | ....if b then "hello"
+3 |     else "world"
+Error: The expression is "dynamic"
+       because it has branches.
+       However, the expression highlighted is expected to be "static".
+|}]
+
+let f (b @ dynamic) @ dynamic =
+    if b then "hello"
+    else "world"
+[%%expect{|
+val f : bool -> string = <fun>
+|}]
+
 
 (* CR-someday zqian: make it finer grained once slambda support static branching *)
 let (f @ static) b =
@@ -92,7 +112,7 @@ Lines 2-4, characters 4-22:
 3 |     | true -> "hello"
 4 |     | false -> "hello"
 Error: The result of the cases is "dynamic"
-       because it is branched.
+       because it has branches.
        However, the result of the cases highlighted is expected to be "static".
 |}]
 
@@ -108,7 +128,7 @@ Line 3, characters 27-28:
 Error: This value is "dynamic"
        because it is contained (via constructor "Some") in the value at Line 3, characters 6-12
        which is "dynamic"
-       because it is branched.
+       because it has branches.
        However, the highlighted expression is expected to be "static".
 |}]
 
@@ -138,7 +158,7 @@ Line 3, characters 36-37:
 Error: This value is "dynamic"
        because it is contained (via constructor "Baz") in the value at Line 3, characters 15-20
        which is "dynamic"
-       because it is branched.
+       because it has branches.
        However, the highlighted expression is expected to be "static".
 |}]
 
@@ -191,7 +211,7 @@ Lines 2-4, characters 4-28:
 3 |     | x -> "hello"
 4 |     | exception _ -> "world"
 Error: The result of the cases is "dynamic"
-       because it is branched.
+       because it has branches.
        However, the result of the cases highlighted is expected to be "static".
 |}]
 
@@ -251,7 +271,7 @@ Line 1, characters 61-62:
 Error: This value is "dynamic"
        because it is contained (via constructor "Baz") in the value at Line 1, characters 50-55
        which is "dynamic"
-       because it is branched.
+       because it has branches.
        However, the highlighted expression is expected to be "static".
 |}]
 
@@ -324,7 +344,7 @@ Line 3, characters 15-16:
 Error: This value is "dynamic"
        because it is contained (via constructor "Baz") in the value at Line 2, characters 17-22
        which is "dynamic"
-       because it is branched.
+       because it has branches.
        However, the highlighted expression is expected to be "static".
 |}]
 
@@ -335,10 +355,30 @@ Line 2, characters 4-27:
 2 |     try b with e -> "hello"
         ^^^^^^^^^^^^^^^^^^^^^^^
 Error: The expression is "dynamic"
-       because it is branched.
+       because try-with clauses are always dynamic.
        However, the expression highlighted is expected to be "static".
 |}]
 
+let foo (b : t @ static) @ static =
+    try b with e -> "hello"
+[%%expect{|
+Line 2, characters 4-27:
+2 |     try b with e -> "hello"
+        ^^^^^^^^^^^^^^^^^^^^^^^
+Error: The expression is "dynamic"
+       because try-with clauses are always dynamic.
+       However, the expression highlighted is expected to be "static".
+|}]
+
+let foo (b : t @ static) @ dynamic =
+    try b with e -> "hello"
+[%%expect{|
+Line 2, characters 20-27:
+2 |     try b with e -> "hello"
+                        ^^^^^^^
+Error: This expression has type "string" but an expression was expected of type
+         "t"
+|}]
 
 let foo (b : t @ dynamic) @ static =
     let (Foo x) = b in
