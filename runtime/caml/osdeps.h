@@ -151,6 +151,14 @@ CAMLextern value caml_win32_xdg_defaults(void);
 
 CAMLextern value caml_win32_get_temp_path(void);
 
+#define CAML_DIR_SEP T("\\")
+#define Is_separator(c) (c == '\\' || c == '/')
+
+#else
+
+#define CAML_DIR_SEP T("/")
+#define Is_separator(c) (c == '/')
+
 #endif /* _WIN32 */
 
 /* Returns the current value of a counter that increments once per nanosecond.
