@@ -709,7 +709,7 @@ let datalog_schedule =
      [ any_source base;
        rev_accessor ~base relation ~to_;
        when1 Field.is_local relation ]
-     ==> and_ [reading_field relation to_ (*; field_sources base relation to_*)]);
+     ==> reading_field relation to_);
     (let$ [relation; from; to_] = ["relation"; "from"; "to_"] in
      [escaping_field relation from; reading_field relation to_]
      ==> alias ~to_ ~from);
