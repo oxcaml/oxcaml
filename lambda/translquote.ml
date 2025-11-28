@@ -1689,7 +1689,7 @@ and Exp_desc : sig
   val let_rec_simple :
     Location.t ->
     Loc.t ->
-    Name.t list ->
+    (Name.t * Type.t option) list ->
     (Var.Value.t list -> Exp.t list * Exp.t) lam ->
     t'
 
@@ -1810,7 +1810,11 @@ end = struct
 
   let let_rec_simple loc a1 a2 a3 =
     apply3 "Exp_desc" "let_rec_simple" loc (extract a1)
-      (mk_list (List.map extract a2))
+      (mk_list
+         (List.map
+            (fun (name, typ) ->
+              pair (extract name, option (Option.map extract typ)))
+            a2))
       (extract a3)
 
   let let_ loc a1 a2 a3 a4 a5 =
@@ -2839,15 +2843,23 @@ and quote_expression_desc transl stage e =
         let names_defs =
           List.map
             (fun vb ->
+              let cstr =
+                match vb.vb_pat.pat_extra with
+                | [(Tpat_constraint ct, _, _)] -> Some ct
+                | [] -> None
+                | _ -> assert false
+              in
               match vb.vb_pat.pat_desc with
-              | Tpat_var (ident, _, _, _, _) -> ident, vb.vb_expr
+              | Tpat_var (ident, _, _, _, _) -> (ident, cstr), vb.vb_expr
               | _ -> assert false)
             vbs
         in
-        let idents, defs = List.split names_defs in
+        let idents_with_cstrs, defs = List.split names_defs in
+        let idents, cstrs = List.split idents_with_cstrs in
         with_new_idents_values idents;
         let names_lam = List.map (name_of_ident loc) idents in
         let defs_lam = List.map (quote_expression transl stage) defs in
+        let cstrs_lam = List.map (Option.map quote_core_type) cstrs in
         let frest =
           Lam.list_param_binding Var_value
             (fun (defs, body) ->
@@ -2856,7 +2868,9 @@ and quote_expression_desc transl stage e =
             (defs_lam, quote_expression transl stage exp)
         in
         without_idents_values idents;
-        Exp_desc.let_rec_simple loc (quote_loc loc) names_lam frest
+        Exp_desc.let_rec_simple loc (quote_loc loc)
+          (List.combine names_lam cstrs_lam)
+          frest
       | Nonrecursive ->
         let val_l, _, pats, defs =
           List.fold_left

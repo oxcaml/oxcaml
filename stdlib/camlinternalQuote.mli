@@ -538,7 +538,10 @@ and Exp_desc : sig
   val constant : Constant.t -> t
 
   val let_rec_simple :
-    Loc.t -> Name.t list -> (Var.Value.t list -> Exp.t list * Exp.t) lam -> t
+    Loc.t ->
+    (Name.t * Type.t option) list ->
+    (Var.Value.t list -> Exp.t list * Exp.t) lam ->
+    t
 
   val let_ :
     Loc.t ->
