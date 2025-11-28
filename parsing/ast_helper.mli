@@ -93,6 +93,7 @@ module Typ :
     val quote : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val splice : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val of_kind : ?loc:loc -> ?attrs:attrs -> jkind_annotation -> core_type
+    val repr: ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type
 
     val force_poly: core_type -> core_type

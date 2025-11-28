@@ -2206,6 +2206,7 @@ let rec extract_concrete_typedecl env ty =
           end
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
+  | Trepr(ty, _) -> extract_concrete_typedecl env ty
   | Tquote ty -> extract_concrete_typedecl env ty
   | Tsplice ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
@@ -2350,6 +2351,7 @@ let contained_without_boxing env ty =
   | Tunboxed_tuple labeled_tys ->
     List.map snd labeled_tys
   | Tpoly (ty, _) -> [ty]
+  | Trepr (ty, _) -> [ty]
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
   | Tquote _ | Tsplice _ -> []
@@ -2474,6 +2476,9 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
        node, and so just returning it here would be wrong. Instead, we need
        to eliminate these variables. We do this by replacing them with
        [Tof_kind]s. *)
+    instance_poly_for_jkind univars ty
+    |> estimate_type_jkind ~expand_component ~ignore_mod_bounds env
+  | Trepr (ty, univars) ->
     instance_poly_for_jkind univars ty
     |> estimate_type_jkind ~expand_component ~ignore_mod_bounds env
   | Tof_kind jkind ->
@@ -3536,9 +3541,14 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs env t1 t2
         | (Tpoly (t1, tl1), Tpoly (t2, tl2), _, _) ->
             (try
-               enter_poly env univar_pairs
-                 t1 tl1 t2 tl2 (mcomp type_pairs env)
-             with Escape _ -> raise Incompatible)
+              enter_poly env univar_pairs
+                t1 tl1 t2 tl2 (mcomp type_pairs env)
+            with Escape _ -> raise Incompatible)
+        | (Trepr (t1, []), Trepr (t2, []), _, _) ->
+            mcomp type_pairs env t1 t2
+        | (Trepr _, Trepr _, _, _) ->
+            (* CR aivaskovic: implement mcomp for Trepr *)
+            assert false
         | (Tunivar {jkind=jkind1}, Tunivar {jkind=jkind2}, _, _) ->
             (try unify_univar t1' t2' jkind1 jkind2 !univar_pairs
              with Cannot_unify_universal_variables -> raise Incompatible)
@@ -4283,6 +4293,11 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
           enter_poly_for Unify (get_env uenv) univar_pairs t1 tl1 t2 tl2
             (unify uenv)
+      | (Trepr (t1, []), Trepr (t2, [])) ->
+          unify uenv t1 t2
+      | (Trepr _, Trepr _) ->
+          (* CR aivaskovic: properly handle unification for Trepr *)
+          assert false
       | (Tpackage (p1, fl1), Tpackage (p2, fl2)) ->
           begin try
             unify_package (get_env uenv) (unify_list uenv)
@@ -4807,8 +4822,8 @@ exception Filter_mono_failed
 
 let filter_mono ty =
   match get_desc ty with
-  | Tpoly(ty, []) -> ty
-  | Tpoly _ -> raise Filter_mono_failed
+  | Tpoly(ty, []) | Trepr(ty, []) -> ty
+  | Tpoly _ | Trepr _ -> raise Filter_mono_failed
   | _ -> assert false
 
 exception Filter_arrow_mono_failed
@@ -5452,6 +5467,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
               enter_poly_for Moregen env univar_pairs t1 tl1 t2 tl2
                 (moregen inst_nongen variance type_pairs env)
+          | (Trepr (t1, []), Trepr (t2, [])) ->
+              moregen inst_nongen variance type_pairs env t1 t2
+          | (Trepr _, Trepr _) ->
+              assert false (* CR aivaskovic: properly handle Trepr moregen *)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Moregen t1' t2' k1 k2 !univar_pairs
           | (Tquote t1, Tquote t2) ->
@@ -5916,6 +5935,11 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
               enter_poly_for Equality env univar_pairs t1 tl1 t2 tl2
                 (eqtype rename type_pairs subst env ~do_jkind_check)
+          | (Trepr (t1, []), Trepr (t2, [])) ->
+              eqtype rename type_pairs subst env t1 t2 ~do_jkind_check
+          | (Trepr _, Trepr _) ->
+              (* CR aivaskovic: properly handle Trepr type equality *)
+              assert false
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Equality t1' t2' k1 k2 !univar_pairs
           | (Tquote t1, Tquote t2) ->
@@ -6647,6 +6671,9 @@ let rec build_subtype env (visited : transient_expr list)
       let (t1', c) = build_subtype env visited loops posi level t1 in
       if c > Unchanged then (newty (Tpoly(t1', tl)), c)
       else (t, Unchanged)
+  | Trepr _ ->
+      (* CR aivaskovic: implement build_subtype for Trepr *)
+      assert false
   | Tunivar _ | Tpackage _ | Tof_kind _ -> (t, Unchanged)
 
 and build_subtype_tuple env visited loops posi level t labeled_tlist
@@ -6799,6 +6826,14 @@ let rec subtype_rec env trace t1 t2 cstrs =
         with Escape _ ->
           (trace, t1, t2, !univar_pairs)::cstrs
         end
+    | (Trepr (u1, []), Trepr (u2, [])) ->
+        subtype_rec env trace u1 u2 cstrs
+    | (Trepr (u1, tl1), Trepr (u2, [])) ->
+        let u1' = instance_poly tl1 u1 in
+        subtype_rec env trace u1' u2 cstrs
+    | (Trepr _, Trepr _) ->
+        (* CR aivaskovic: implement subtype for Trepr *)
+        assert false
     | (Tpackage (p1, fl1), Tpackage (p2, fl2)) ->
         begin try
           let ntl1 =
