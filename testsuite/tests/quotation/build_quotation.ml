@@ -548,7 +548,7 @@ type rcd_u = #{ xu : int; yu : string; }
 
 <[ fun () -> #{xu = 42; yu = "foo"} ]>;;
 [%%expect {|
-- : <[unit -> rcd_u]> expr = <[fun () -> { xu = 42; yu = "foo"; }]>
+- : <[unit -> rcd_u]> expr = <[fun () -> #{ xu = 42; yu = "foo"; }]>
 |}];;
 
 <[ fun r -> r.x ]>;;
