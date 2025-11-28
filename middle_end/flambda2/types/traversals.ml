@@ -1027,7 +1027,10 @@ struct
     let other_closures, acc =
       match other_closures with
       | Bottom -> Or_bottom.Bottom, acc
-      | Ok { maps_to = _; env_extension = _; index = _ } -> assert false
+      | Ok { maps_to = _; env_extension = _; index = _ } ->
+        (* CR bclement and vlaviron: The [other_closures] field is currently
+           always [Bottom] and should be removed completely. *)
+        Misc.fatal_error "Found non-bottom `other_closures`"
     in
     TG.Row_like_for_closures.create_raw ~known_closures ~other_closures, acc
 
