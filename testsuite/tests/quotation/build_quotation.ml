@@ -27,8 +27,7 @@
 
 <[ '\n' ]>;;
 [%%expect {|
-- : <[char]> expr = <['
-']>
+- : <[char]> expr = <['\n']>
 |}];;
 
 <[ "foo" ]>;;
@@ -38,8 +37,7 @@
 
 <[ "\b\n\t" ]>;;
 [%%expect {|
-- : <[string]> expr = <["
-	"]>
+- : <[string]> expr = <["\b\n\t"]>
 |}];;
 
 <[ {foo|bar|foo} ]>;;
@@ -54,8 +52,7 @@
 [%%expect {|
 - : <[string]> expr =
 <[
-  {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|
-  foobar|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+  {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|foobar|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
 ]>
 |}];;
 
@@ -798,11 +795,11 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
      (x:$('a) -> ?y:$('b) -> $('c) -> unit) ->
      $('a) -> $('d) -> $('c) -> unit]>
     expr
-= <[fun (f : ~x:'a -> ?y:'b -> 'c -> unit) x y z -> f ~x:x ?y:None z]>
+= <[fun (f : x:'a -> ?y:'b -> 'c -> unit) x y z -> f ~x:x ?y:None z]>
 |}];;
 
 <[ fun x -> function None -> 0 | Some x -> x ]>
 [%%expect {|
 - : <[$('a) -> int option -> int]> expr =
-<[function | None -> 0 | Some (x) -> x]>
+<[fun x -> function | None -> 0 | Some (x__1) -> x__1]>
 |}];;
