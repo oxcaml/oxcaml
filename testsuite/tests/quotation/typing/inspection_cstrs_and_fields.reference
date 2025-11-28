@@ -1,0 +1,4 @@
+Stdlib.ignore A.Foo
+
+Stdlib.ignore { A.foo = 123; A.bar = "abc"; }.A.foo
+
