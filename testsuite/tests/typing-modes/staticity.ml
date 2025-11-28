@@ -349,35 +349,31 @@ Error: This value is "dynamic"
 |}]
 
 let foo (b : t @ dynamic) @ static =
-    try b with e -> "hello"
+    try b with e -> Foo true
 [%%expect{|
-Line 2, characters 4-27:
-2 |     try b with e -> "hello"
-        ^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 4-28:
+2 |     try b with e -> Foo true
+        ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The expression is "dynamic"
        because try-with clauses are always dynamic.
        However, the expression highlighted is expected to be "static".
 |}]
 
 let foo (b : t @ static) @ static =
-    try b with e -> "hello"
+    try b with e -> Foo true
 [%%expect{|
-Line 2, characters 4-27:
-2 |     try b with e -> "hello"
-        ^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 4-28:
+2 |     try b with e -> Foo true
+        ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The expression is "dynamic"
        because try-with clauses are always dynamic.
        However, the expression highlighted is expected to be "static".
 |}]
 
 let foo (b : t @ static) @ dynamic =
-    try b with e -> "hello"
+    try b with e -> Foo true
 [%%expect{|
-Line 2, characters 20-27:
-2 |     try b with e -> "hello"
-                        ^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
-         "t"
+val foo : t -> t = <fun>
 |}]
 
 let foo (b : t @ dynamic) @ static =
