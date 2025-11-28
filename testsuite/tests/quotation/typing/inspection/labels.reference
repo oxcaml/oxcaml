@@ -1,0 +1,23 @@
+Stdlib.ignore ((fun x -> x) { A.foo = 123; A.bar = "abc"; } : A.rcd)
+
+Stdlib.ignore ((fun x -> x) (fun r -> r.A.foo) : A.rcd -> int)
+
+Stdlib.ignore ((fun x -> x) (fun r -> r.A.bar <- "xyz") : A.rcd -> unit)
+
+Stdlib.ignore
+  ((fun x -> x) (function | {A.foo=foo; _} -> foo) : A.rcd -> int)
+
+Stdlib.ignore ((fun x -> x) A.Foo : A.vrt)
+
+Stdlib.ignore
+  ((fun x -> x) (function | A.Foo -> 0 | A.Bar -> 1) : A.vrt -> int)
+
+Stdlib.ignore
+  ((fun x -> x) { A.box = #{ A.foo = 0; A.bar = 0; }; } : (A.urcd)
+  A.box_imm_imm)
+
+Stdlib.ignore
+  ((fun x -> x) (fun r -> let _ = (r.#A.foo) in ()) : A.urcd -> unit)
+
+Stdlib.ignore
+  ((fun x -> x) (function | #{A.foo = foo; _} -> foo) : A.urcd -> int)
