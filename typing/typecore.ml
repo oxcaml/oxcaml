@@ -6424,7 +6424,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_try(sbody, caselist) ->
-      check_dynamic (loc, Expression) Branching expected_mode;
+      check_dynamic (loc, Expression) (Always_dynamic Try_with) expected_mode;
       let body =
         type_expect env (mode_trywith expected_mode)
           sbody ty_expected_explained
@@ -9606,7 +9606,6 @@ and map_half_typed_cases
     if erase_either
     then Some false else None
   in
-
   let half_typed_cases, ty_res, do_copy_types, ty_arg' =
    (* propagation of the argument *)
     with_local_level begin fun () ->
@@ -9879,8 +9878,10 @@ and type_cases
     List.map (fun case -> Parmatch.untyped_case case, case) caselist
   in
   let n_non_refute =
-    List.fold_left (fun acc ({Parmatch.needs_refute = x; _}, _) ->
-      if x then acc else acc + 1) 0 caselist
+    List.fold_left
+      (fun acc ({Parmatch.needs_refute = x; _}, _) ->
+        if x then acc else acc + 1)
+      0 caselist
   in
   let pat_mode =
     if n_non_refute > 1 then begin

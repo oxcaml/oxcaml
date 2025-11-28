@@ -37,7 +37,9 @@ type mutable_part =
   | Record_field of string
   | Array_elements
 
-type always_dynamic = Application
+type always_dynamic =
+  | Application
+  | Try_with
 
 (** Hint for a constant bound. See [Mode.Report.print_const] for what each non-trivial constructor means. *)
 type 'd const =
