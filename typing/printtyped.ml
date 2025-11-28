@@ -391,6 +391,10 @@ let rec core_type i ppf x =
   | Ttyp_splice t ->
       line i ppf "Ttyp_splice\n";
       core_type i ppf t
+  | Ttyp_repr (lv, ct) ->
+      line i ppf "Ttyp_repr%a\n"
+        (fun ppf -> List.iter (Pprintast.tyvar ppf)) lv;
+      core_type i ppf ct
   | Ttyp_of_kind jkind ->
       line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";

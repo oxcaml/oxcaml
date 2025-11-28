@@ -89,6 +89,7 @@ and type_desc =
   | Tvariant of row_desc
   | Tunivar of { name : string option; jkind : jkind_lr }
   | Tpoly of type_expr * type_expr list
+  | Trepr of type_expr * type_expr list
   | Tpackage of Path.t * (Longident.t * type_expr) list
   | Tof_kind of jkind_lr
 
@@ -1255,6 +1256,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tconstr (_, _, _) -> 5
         | Tpoly (_, _) -> 6
         | Tof_kind _ -> 7
+        | Trepr (_, _) -> 8
         (* Types we should never see *)
         | Tlink _ -> Misc.fatal_error "Tlink encountered in With_bounds_types"
       in
@@ -1273,7 +1275,8 @@ let best_effort_compare_type_expr te1 te2 =
         if p = 0
         then List.compare (aux (depth + 1)) args1 args2
         else p
-      | Tpoly (t1, ts1), Tpoly (t2, ts2) ->
+      | Tpoly (t1, ts1), Tpoly (t2, ts2)
+      | Trepr (t1, ts1), Trepr (t2, ts2) ->
         (* NOTE: this is mostly broken according to the semantics of type_expr, but probably
            fine for the particular "best-effort" comparison we want. *)
         List.compare (aux (depth + 1)) (t1 :: ts1) (t2 :: ts2)

@@ -729,6 +729,10 @@ and raw_type_desc ppf = function
       fprintf ppf "@[<hov1>Tpoly(@,%a,@,%a)@]"
         raw_type t
         raw_type_list tl
+  | Trepr (t, tl) ->
+      fprintf ppf "@[<hov1>Trepr(@,%a,@,%a)@]"
+        raw_type t
+        raw_type_list tl
   | Tvariant row ->
     raw_row_desc ppf row
   | Tpackage (p, fl) ->
@@ -1322,7 +1326,7 @@ let add_printed_alias ty = add_printed_alias_proxy (proxy ty)
 
 let aliasable ty =
   match get_desc ty with
-    Tvar _ | Tunivar _ | Tpoly _ -> false
+    Tvar _ | Tunivar _ | Tpoly _ | Trepr _ -> false
   | Tconstr (p, _, _) ->
       not (is_nth (snd (best_type_path p)))
   | _ -> true
@@ -1345,7 +1349,7 @@ let rec mark_loops_rec visited ty =
             visited_objects := px :: !visited_objects;
           printer_iter_type_expr (mark_loops_rec visited) ty
         end
-    | Tpoly(ty, tyl) ->
+    | Tpoly(ty, tyl) | Trepr(ty, tyl) ->
         List.iter add_alias tyl;
         mark_loops_rec visited ty
     | _ ->
@@ -1621,9 +1625,9 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_stuff "<Tsubst>"
     | Tlink _ ->
         fatal_error "Printtyp.tree_of_typexp"
-    | Tpoly (ty, []) ->
+    | Tpoly (ty, []) | Trepr (ty, []) ->
         tree_of_typexp mode alloc_mode ty
-    | Tpoly (ty, tyl) ->
+    | Tpoly (ty, tyl) | Trepr (ty, tyl) ->
         (*let print_names () =
           List.iter (fun (_, name) -> prerr_string (name ^ " ")) !names;
           prerr_string "; " in *)
@@ -1633,7 +1637,13 @@ let rec tree_of_modal_typexp mode modal ty =
            printed once when used as proxy *)
         List.iter add_delayed tyl;
         let tl = tree_of_qtvs tyl in
-        let tr = Otyp_poly (tl, tree_of_typexp mode alloc_mode ty) in
+        let tr =
+          (match tty.desc with
+           | Tpoly _ -> Otyp_poly (tl, tree_of_typexp mode alloc_mode ty)
+           | Trepr _ -> Otyp_repr (List.map (fun (s, _jk) -> s) tl,
+                                   tree_of_typexp mode alloc_mode ty)
+           | _ -> assert false)
+        in
         (* Forget names when we leave scope *)
         Names.remove_names tyl;
         delayed := old_delayed; tr

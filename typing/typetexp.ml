@@ -174,6 +174,10 @@ module TyVarEnv : sig
     poly_univars -> (string * Parsetree.jkind_annotation option) list
   (* something suitable as an argument to [Ttyp_poly] *)
 
+  val ttyp_repr_arg :
+    poly_univars -> string list
+  (* something suitable as an argument to [Ttyp_repr] *)
+
   val make_poly_univars :
     Env.t -> (string Location.loc * Env.stage) list -> poly_univars
   (* a version of [make_poly_univars_jkinds] that doesn't take jkinds *)
@@ -363,6 +367,10 @@ end = struct
         name,
         Jkind.get_annotation pending_univar.jkind_info.original_jkind)
       poly_univars
+
+  let ttyp_repr_arg (repr_univars : poly_univars) = List.map
+      (fun (name, _pending_univar, _stage) -> name)
+      repr_univars
 
   let mk_pending_univar name jkind jkind_info =
     { univar = newvar ~name jkind; associated = []; jkind_info }
@@ -1135,6 +1143,14 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           vars st
       in
       ctyp desc typ
+  | Ptyp_repr(vars, st) ->
+      Language_extension.assert_enabled ~loc Layout_poly
+        Language_extension.Alpha;
+      let desc, typ =
+        transl_type_repr env ~policy ~row_context mode styp.ptyp_loc
+          vars st
+      in
+      ctyp desc typ
   | Ptyp_package (p, l) ->
     (* CR layouts: right now we're doing a real gross hack where we demand
        everything in a package type with constraint be value.
@@ -1254,6 +1270,26 @@ and transl_type_poly env ~policy ~row_context mode loc vars st =
   let ty' = Btype.newgenty (Tpoly(ty, ty_list)) in
   unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)) ty';
   Ttyp_poly (typed_vars, cty), ty'
+
+and transl_type_repr env ~policy ~row_context mode loc vars st =
+  let typed_vars, new_univars, cty =
+    with_local_level begin fun () ->
+      let vars = List.map (fun n -> (n, None, Env.stage env)) vars in
+      let new_univars = transl_bound_vars env vars in
+      let typed_vars = TyVarEnv.ttyp_repr_arg new_univars in
+      let cty = TyVarEnv.with_univars new_univars begin fun () ->
+        transl_type env ~policy ~row_context mode st
+      end in
+      (typed_vars, new_univars, cty)
+    end
+      ~post:(fun (_,_,cty) -> generalize_ctyp cty)
+  in
+  let ty = cty.ctyp_type in
+  let ty_list = TyVarEnv.check_poly_univars env loc new_univars in
+  let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in
+  let ty' = Btype.newgenty (Trepr(ty, ty_list)) in
+  unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)) ty';
+  Ttyp_repr (typed_vars, cty), ty'
 
 and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
       jkind_annot_opt =
