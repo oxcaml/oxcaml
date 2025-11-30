@@ -341,6 +341,8 @@ let binding_time_resolver resolver name =
 
 let resolver t = t.resolver
 
+let get_imported_names t = t.get_imported_names
+
 let code_age_relation_resolver t comp_unit =
   match t.resolver comp_unit with
   | None -> None

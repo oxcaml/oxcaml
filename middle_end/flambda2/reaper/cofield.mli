@@ -13,14 +13,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val run :
-  machine_width:Target_system.Machine_width.t ->
-  cmx_loader:Flambda_cmx.loader ->
-  all_code:Exported_code.t ->
-  final_typing_env:Typing_env.t option ->
-  Flambda_unit.t ->
-  Flambda_unit.t
-  * Name_occurrences.t
-  * Exported_code.t
-  * Slot_offsets.t
-  * Typing_env.t option
+type view = private Param of int
+
+type t
+
+val view : t -> view
+
+val param : int -> t
+
+include Datalog.Column.S with type t := t

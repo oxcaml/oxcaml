@@ -82,6 +82,18 @@ let reaper_preserve_direct_calls () =
   !Oxcaml_flags.Flambda2.reaper_preserve_direct_calls
   |> with_default ~f:(fun d -> d.reaper_preserve_direct_calls)
 
+let reaper_local_fields () =
+  !Oxcaml_flags.Flambda2.reaper_local_fields
+  |> with_default ~f:(fun d -> d.reaper_local_fields)
+
+let reaper_unbox () =
+  !Oxcaml_flags.Flambda2.reaper_unbox
+  |> with_default ~f:(fun d -> d.reaper_unbox)
+
+let reaper_change_calling_conventions () =
+  !Oxcaml_flags.Flambda2.reaper_change_calling_conventions
+  |> with_default ~f:(fun d -> d.reaper_change_calling_conventions)
+
 let flat_float_array () = Config.flat_float_array
 
 let function_result_types ~is_a_functor =

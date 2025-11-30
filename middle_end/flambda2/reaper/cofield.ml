@@ -13,14 +13,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val run :
-  machine_width:Target_system.Machine_width.t ->
-  cmx_loader:Flambda_cmx.loader ->
-  all_code:Exported_code.t ->
-  final_typing_env:Typing_env.t option ->
-  Flambda_unit.t ->
-  Flambda_unit.t
-  * Name_occurrences.t
-  * Exported_code.t
-  * Slot_offsets.t
-  * Typing_env.t option
+type view = Param of int
+
+include Datalog.Column.Make (struct
+  let name = "cofield"
+
+  let print ppf i = Format.fprintf ppf "Param %d" i
+end)
+
+let view i = Param i
+
+let param i = i

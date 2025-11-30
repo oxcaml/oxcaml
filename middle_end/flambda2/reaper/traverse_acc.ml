@@ -95,14 +95,18 @@ let bound_parameter_kind (bp : Bound_parameter.t) t =
   let name = Name.var (Bound_parameter.var bp) in
   t.kinds <- Name.Map.add name kind t.kinds
 
-let simple_to_name t ~all_constants simple =
+(* CR-someday ncourant: it would be great if we kept constants and symbols from
+   external compilation units in the graph as well, making effectively all
+   simples be representable. In this case, we should however be *very* careful
+   with coercions... *)
+let simple_to_node t ~all_constants simple =
   Simple.pattern_match' simple
-    ~const:(fun _ -> all_constants)
-    ~var:(fun v ~coercion:_ -> Name.var v)
+    ~const:(fun _ -> Code_id_or_name.name all_constants)
+    ~var:(fun v ~coercion:_ -> Code_id_or_name.var v)
     ~symbol:(fun s ~coercion:_ ->
       if not (Compilation_unit.is_current (Symbol.compilation_unit s))
       then Graph.add_any_source t.deps (Code_id_or_name.symbol s);
-      Name.symbol s)
+      Code_id_or_name.symbol s)
 
 let alias_kind name simple t =
   let kind =
@@ -136,50 +140,55 @@ let add_code code_id dep t = t.code <- Code_id.Map.add code_id dep t.code
 
 let find_code t code_id = Code_id.Map.find code_id t.code
 
-let alias_dep ~(denv : Env.t) pat dep t =
-  Graph.add_alias t.deps ~to_:(Code_id_or_name.var pat)
-    ~from:
-      (Code_id_or_name.name
-         (simple_to_name t ~all_constants:denv.all_constants dep))
+let add_alias t ~to_ ~from = Graph.add_alias t.deps ~to_ ~from
 
-let root v t = Graph.add_use t.deps (Code_id_or_name.var v)
+let add_use_dep t ~to_ ~from = Graph.add_use_dep t.deps ~to_ ~from
 
-let used ~(denv : Env.t) dep t =
-  let name = simple_to_name t ~all_constants:denv.all_constants dep in
+let add_accessor_dep t ~to_ relation ~base =
+  Graph.add_accessor_dep t.deps ~to_ relation ~base
+
+let add_constructor_dep t ~base relation ~from =
+  Graph.add_constructor_dep t.deps ~base relation ~from
+
+let add_coaccessor_dep t ~to_ relation ~base =
+  Graph.add_coaccessor_dep t.deps ~to_ relation ~base
+
+let add_coconstructor_dep t ~base relation ~from =
+  Graph.add_coconstructor_dep t.deps ~base relation ~from
+
+let add_propagate_dep t ~if_used ~to_ ~from =
+  Graph.add_propagate_dep t.deps ~if_used ~to_ ~from
+
+let add_any_source t x = Graph.add_any_source t.deps x
+
+let add_any_usage t x = Graph.add_any_usage t.deps x
+
+let add_code_id_my_closure t code_id my_closure =
+  Graph.add_code_id_my_closure t.deps code_id my_closure
+
+let add_cond_any_usage t ~(denv : Env.t) simple =
+  let node = simple_to_node t ~all_constants:denv.all_constants simple in
   match denv.current_code_id with
-  | None -> Graph.add_use t.deps (Code_id_or_name.name name)
+  | None -> add_any_usage t node
   | Some code_id ->
-    Graph.add_use_dep t.deps
-      ~to_:(Code_id_or_name.code_id code_id)
-      ~from:(Code_id_or_name.name name)
+    (* CR ncourant: this always makes [node] any_source, we should improve
+       that. *)
+    add_use_dep t ~to_:(Code_id_or_name.code_id code_id) ~from:node
 
-let any_source ~(denv : Env.t) v t =
+let add_cond_any_source t ~(denv : Env.t) v =
   match denv.current_code_id with
-  | None -> Graph.add_any_source t.deps (Code_id_or_name.var v)
+  | None -> add_any_source t (Code_id_or_name.var v)
   | Some code_id ->
-    Graph.add_propagate_dep t.deps
+    add_propagate_dep t
       ~if_used:(Code_id_or_name.code_id code_id)
       ~from:(Code_id_or_name.name denv.le_monde_exterieur)
       ~to_:(Code_id_or_name.var v)
 
 let cond_alias t ~(denv : Env.t) ~from ~to_ =
   match denv.current_code_id with
-  | None -> Graph.add_alias t.deps ~from ~to_
+  | None -> add_alias t ~from ~to_
   | Some code_id ->
-    Graph.add_propagate_dep t.deps
-      ~if_used:(Code_id_or_name.code_id code_id)
-      ~from ~to_
-
-let used_code_id code_id t =
-  Graph.add_use t.deps (Code_id_or_name.code_id code_id)
-
-let called ~(denv : Env.t) code_id t =
-  match denv.current_code_id with
-  | None -> used_code_id code_id t
-  | Some code_id2 ->
-    Graph.add_use_dep t.deps
-      ~to_:(Code_id_or_name.code_id code_id2)
-      ~from:(Code_id_or_name.code_id code_id)
+    add_propagate_dep t ~if_used:(Code_id_or_name.code_id code_id) ~from ~to_
 
 let fixed_arity_continuation t k =
   t.fixed_arity_conts <- Continuation.Set.add k t.fixed_arity_conts
@@ -209,7 +218,7 @@ let add_set_of_closures_dep let_bound_name_of_the_closure closure_code_id
  * associated code_ids p (param a, return s) and q (param b, return t).
  * We will name the respective witnesses n and m, and ignore exception returns
  * to make the diagram simpler.
- 
+
  * We will create a widget looking like this:
  *  ┌──╔═══╗─────[g]────>╔═══╗──┐
  * [f] ║ f ║             ║ g ║ [g]
@@ -249,17 +258,17 @@ let create_known_arity_call_witness t code_id ~params ~returns ~exn =
   let witness = Code_id_or_name.var witness in
   List.iteri
     (fun i v ->
-      Graph.add_coconstructor_dep t.deps ~base:witness (Param i)
+      add_coconstructor_dep t ~base:witness (Cofield.param i)
         ~from:(Code_id_or_name.var v))
     params;
   List.iteri
     (fun i v ->
-      Graph.add_constructor_dep t.deps ~base:witness (Apply (Normal i))
+      add_constructor_dep t ~base:witness (Field.apply (Normal i))
         ~from:(Code_id_or_name.var v))
     returns;
-  Graph.add_constructor_dep t.deps ~base:witness (Apply Exn)
+  add_constructor_dep t ~base:witness (Field.apply Exn)
     ~from:(Code_id_or_name.var exn);
-  Graph.add_constructor_dep t.deps ~base:witness Code_id_of_call_witness
+  add_constructor_dep t ~base:witness Field.code_id_of_call_witness
     ~from:(Code_id_or_name.code_id code_id);
   witness
 
@@ -270,24 +279,21 @@ let make_known_arity_apply_widget t ~(denv : Env.t) ~params ~returns ~exn =
   in
   List.iteri
     (fun i v ->
-      Graph.add_coaccessor_dep t.deps ~base:witness (Param i)
-        ~to_:
-          (Code_id_or_name.name
-             (simple_to_name t ~all_constants:denv.all_constants v)))
+      add_coaccessor_dep t ~base:witness (Cofield.param i)
+        ~to_:(simple_to_node t ~all_constants:denv.all_constants v))
     params;
   List.iteri
     (fun i v ->
-      Graph.add_accessor_dep t.deps ~base:witness (Apply (Normal i))
+      add_accessor_dep t ~base:witness (Field.apply (Normal i))
         ~to_:(Code_id_or_name.var v))
     returns;
-  Graph.add_accessor_dep t.deps ~base:witness (Apply Exn)
+  add_accessor_dep t ~base:witness (Field.apply Exn)
     ~to_:(Code_id_or_name.var exn);
   let called =
     Code_id_or_name.var (Variable.create "called" Flambda_kind.rec_info)
   in
-  Graph.add_accessor_dep t.deps ~base:witness Code_id_of_call_witness
-    ~to_:called;
-  Graph.add_use t.deps called;
+  add_accessor_dep t ~base:witness Field.code_id_of_call_witness ~to_:called;
+  add_any_usage t called;
   let apply =
     Code_id_or_name.var (Variable.create "apply" Flambda_kind.rec_info)
   in
@@ -307,22 +313,22 @@ let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
     let witness = Code_id_or_name.var witness in
     List.iteri
       (fun i v ->
-        Graph.add_constructor_dep t.deps ~base:witness (Apply (Normal i))
+        add_constructor_dep t ~base:witness (Field.apply (Normal i))
           ~from:(Code_id_or_name.var v))
       returns;
-    Graph.add_constructor_dep t.deps ~base:witness (Apply Exn)
+    add_constructor_dep t ~base:witness (Field.apply Exn)
       ~from:(Code_id_or_name.var exn);
-    Graph.add_constructor_dep t.deps ~base:witness Code_id_of_call_witness
+    add_constructor_dep t ~base:witness Field.code_id_of_call_witness
       ~from:(Code_id_or_name.code_id code_id);
     let untuple_var =
       Code_id_or_name.var (Variable.create "untuple_var" Flambda_kind.value)
     in
-    Graph.add_coconstructor_dep t.deps ~base:witness (Param 0) ~from:untuple_var;
+    add_coconstructor_dep t ~base:witness (Cofield.param 0) ~from:untuple_var;
     (* CR ncourant: this should be changed if we ever allow non-value tuples *)
     List.iteri
       (fun i v ->
-        Graph.add_accessor_dep t.deps ~to_:(Code_id_or_name.var v)
-          (Block (i, Flambda_kind.value))
+        add_accessor_dep t ~to_:(Code_id_or_name.var v)
+          (Field.block i Flambda_kind.value)
           ~base:untuple_var)
       params;
     [witness])
@@ -333,30 +339,30 @@ let create_unknown_arity_call_witnesses t code_id ~is_tupled ~arity ~params
       | (first, witness) :: rest -> (
         List.iteri
           (fun i arg ->
-            Graph.add_coconstructor_dep t.deps ~from:(Code_id_or_name.var arg)
-              (Param i) ~base:witness)
+            add_coconstructor_dep t ~from:(Code_id_or_name.var arg)
+              (Cofield.param i) ~base:witness)
           first;
-        Graph.add_constructor_dep t.deps ~base:witness Code_id_of_call_witness
+        add_constructor_dep t ~base:witness Field.code_id_of_call_witness
           ~from:(Code_id_or_name.code_id code_id);
         match rest with
         | [] ->
-          Graph.add_constructor_dep t.deps ~base:witness (Apply Exn)
+          add_constructor_dep t ~base:witness (Field.apply Exn)
             ~from:(Code_id_or_name.var exn);
           List.iteri
             (fun i return_arg ->
-              Graph.add_constructor_dep t.deps
+              add_constructor_dep t
                 ~from:(Code_id_or_name.var return_arg)
-                (Apply (Normal i)) ~base:witness)
+                (Field.apply (Normal i)) ~base:witness)
             returns
         | (_, next_witness) :: _ ->
           let v =
             Code_id_or_name.var
               (Variable.create "partial_apply" Flambda_kind.value)
           in
-          Graph.add_constructor_dep t.deps ~from:v (Apply (Normal 0))
-            ~base:witness;
-          Graph.add_constructor_dep t.deps ~from:next_witness
-            (Code_of_closure Unknown_arity_code_pointer) ~base:v;
+          add_constructor_dep t ~from:v (Field.apply (Normal 0)) ~base:witness;
+          add_constructor_dep t ~from:next_witness
+            (Field.code_of_closure Unknown_arity_code_pointer)
+            ~base:v;
           add_deps rest)
     in
     let params = Flambda_arity.group_by_parameter arity params in
@@ -378,27 +384,24 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
   let called =
     Code_id_or_name.var (Variable.create "called" Flambda_kind.rec_info)
   in
-  Graph.add_use t.deps called;
+  add_any_usage t called;
   let rec add_deps params_and_witnesses =
     match params_and_witnesses with
     | [] -> Misc.fatal_error "add_deps: no params"
     | (first, witness) :: rest -> (
       List.iteri
         (fun i v ->
-          Graph.add_coaccessor_dep t.deps ~base:witness (Param i)
-            ~to_:
-              (Code_id_or_name.name
-                 (simple_to_name t ~all_constants:denv.all_constants v)))
+          add_coaccessor_dep t ~base:witness (Cofield.param i)
+            ~to_:(simple_to_node t ~all_constants:denv.all_constants v))
         first;
-      Graph.add_accessor_dep t.deps ~base:witness (Apply Exn)
+      add_accessor_dep t ~base:witness (Field.apply Exn)
         ~to_:(Code_id_or_name.var exn);
-      Graph.add_accessor_dep t.deps ~base:witness Code_id_of_call_witness
-        ~to_:called;
+      add_accessor_dep t ~base:witness Field.code_id_of_call_witness ~to_:called;
       match rest with
       | [] ->
         List.iteri
           (fun i v ->
-            Graph.add_accessor_dep t.deps ~base:witness (Apply (Normal i))
+            add_accessor_dep t ~base:witness (Field.apply (Normal i))
               ~to_:(Code_id_or_name.var v))
           returns
       | (_, next_witness) :: _ ->
@@ -406,9 +409,10 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) ~arity ~params ~returns
           Code_id_or_name.var
             (Variable.create "partial_apply" Flambda_kind.value)
         in
-        Graph.add_accessor_dep t.deps ~base:witness (Apply (Normal 0)) ~to_:v;
-        Graph.add_accessor_dep t.deps ~base:v
-          (Code_of_closure Unknown_arity_code_pointer) ~to_:next_witness;
+        add_accessor_dep t ~base:witness (Field.apply (Normal 0)) ~to_:v;
+        add_accessor_dep t ~base:v
+          (Field.code_of_closure Unknown_arity_code_pointer)
+          ~to_:next_witness;
         add_deps rest)
   in
   let params = Flambda_arity.group_by_parameter arity params in
@@ -452,30 +456,28 @@ let record_set_of_closure_deps t =
                   (Code_id.name code_id))
                Flambda_kind.value)
         in
-        Graph.add_any_source t.deps witness;
-        Graph.add_constructor_dep t.deps ~from:witness
-          (Code_of_closure Known_arity_code_pointer)
+        add_any_source t witness;
+        add_constructor_dep t ~from:witness
+          (Field.code_of_closure Known_arity_code_pointer)
           ~base:(Code_id_or_name.name name);
-        Graph.add_constructor_dep t.deps ~from:witness
-          (Code_of_closure Unknown_arity_code_pointer)
+        add_constructor_dep t ~from:witness
+          (Field.code_of_closure Unknown_arity_code_pointer)
           ~base:(Code_id_or_name.name name);
-        Graph.add_constructor_dep t.deps ~base:witness Code_id_of_call_witness
+        add_constructor_dep t ~base:witness Field.code_id_of_call_witness
           ~from:(Code_id_or_name.name name)
       | code_dep ->
-        Graph.add_propagate_dep t.deps
+        add_propagate_dep t
           ~to_:(Code_id_or_name.var code_dep.my_closure)
           ~from:(Code_id_or_name.name name)
           ~if_used:(Code_id_or_name.code_id code_id);
-        Graph.add_constructor_dep t.deps ~from:code_dep.known_arity_call_witness
-          (Code_of_closure Known_arity_code_pointer)
+        add_constructor_dep t ~from:code_dep.known_arity_call_witness
+          (Field.code_of_closure Known_arity_code_pointer)
           ~base:(Code_id_or_name.name name);
-        Graph.add_constructor_dep t.deps
+        add_constructor_dep t
           ~from:(List.hd code_dep.unknown_arity_call_witnesses)
-          (Code_of_closure Unknown_arity_code_pointer)
+          (Field.code_of_closure Unknown_arity_code_pointer)
           ~base:(Code_id_or_name.name name))
     t.set_of_closures_dep
-
-let graph t = t.deps
 
 let deps t ~all_constants =
   List.iter
@@ -485,26 +487,24 @@ let deps t ~all_constants =
            apply_call_witness
          } ->
       let code_dep = find_code t apply_code_id in
-      Graph.add_alias t.deps ~from:code_dep.known_arity_call_witness
+      add_alias t ~from:code_dep.known_arity_call_witness
         ~to_:apply_call_witness;
       match apply_closure with
       | None -> ()
       | Some closure -> (
         match function_containing_apply_expr with
         | None ->
-          Graph.add_alias t.deps
+          add_alias t
             ~to_:(Code_id_or_name.var code_dep.my_closure)
-            ~from:
-              (Code_id_or_name.name (simple_to_name t ~all_constants closure))
+            ~from:(simple_to_node t ~all_constants closure)
         | Some code_id ->
-          Graph.add_propagate_dep t.deps
+          add_propagate_dep t
             ~to_:(Code_id_or_name.var code_dep.my_closure)
-            ~from:
-              (Code_id_or_name.name (simple_to_name t ~all_constants closure))
+            ~from:(simple_to_node t ~all_constants closure)
             ~if_used:(Code_id_or_name.code_id code_id)))
     t.apply_deps;
   record_set_of_closure_deps t;
   t.deps
 
-let simple_to_name t ~denv s =
-  simple_to_name t ~all_constants:denv.Env.all_constants s
+let simple_to_node t ~denv s =
+  simple_to_node t ~all_constants:denv.Env.all_constants s

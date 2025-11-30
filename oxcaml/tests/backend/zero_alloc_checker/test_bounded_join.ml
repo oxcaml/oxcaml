@@ -8,20 +8,20 @@ type t =
   | E of r
   | F of r
 
-let[@inline never] [@local never] next x y = Sys.opaque_identity (x + y)
+let[@opaque] next x y = Sys.opaque_identity (x + y)
 
 let[@zero_alloc] rec foo t x =
-  let[@inline never] [@local never] rec do_a x y =
+  let[@opaque] rec do_a x y =
     if Sys.opaque_identity false then foo t (next x y) else x
-  and[@inline never] [@local never] do_b x y =
+  and[@opaque] do_b x y =
     if Sys.opaque_identity false then foo t (next x y) else x
-  and[@inline never] [@local never] do_c x y =
+  and[@opaque] do_c x y =
     if Sys.opaque_identity false then foo t (next x y) else x
-  and[@inline never] [@local never] do_d x y =
+  and[@opaque] do_d x y =
     if Sys.opaque_identity false then foo t (next x y) else x
-  and[@inline never] [@local never] do_e x y =
+  and[@opaque] do_e x y =
     if Sys.opaque_identity false then foo t (next x y) else x
-  and[@inline never] [@local never] do_f x y =
+  and[@opaque] do_f x y =
     if Sys.opaque_identity false then foo t (next x y) else x
   in
   match t with
