@@ -29,11 +29,11 @@ let simplify_array_set (array_kind : P.Array_kind.t)
   | Ok array_kind ->
     let () =
       match array_kind with
-      | Immediates -> ()
+      | Immediates | Gc_ignorable_values -> ()
       | Values -> (
         match array_set_kind with
         | Values _ -> ()
-        | Immediates
+        | Immediates | Gc_ignorable_values
         (* We don't expect specialisation regressions from Immediates to
            Values. *)
         | Naked_floats | Naked_float32s | Naked_int32s | Naked_int64s

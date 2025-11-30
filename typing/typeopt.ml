@@ -302,7 +302,8 @@ let array_type_kind ~elt_sort ~elt_ty env loc ty =
       begin match kind with
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
         raise (Error (loc, Product_iarrays_unsupported))
-      | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
+      | Pgenarray | Paddrarray | Pgcignorableaddrarray
+      | Pintarray | Pfloatarray | Punboxedfloatarray _
       | Punboxedoruntaggedintarray _ | Punboxedvectorarray _  ->
         kind
       end

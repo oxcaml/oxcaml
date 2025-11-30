@@ -290,6 +290,9 @@ val addr_array_set :
   Debuginfo.t ->
   expression
 
+val addr_array_set_gc_ignorable :
+  expression -> expression -> expression -> Debuginfo.t -> expression
+
 val int_array_set :
   expression -> expression -> expression -> Debuginfo.t -> expression
 

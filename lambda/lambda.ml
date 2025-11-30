@@ -426,7 +426,7 @@ and constructor_shape =
   | Constructor_mixed of mixed_block_shape
 
 and array_kind =
-    Pgenarray | Paddrarray | Pintarray | Pfloatarray
+    Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray of unboxed_float
   | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
@@ -436,6 +436,7 @@ and array_kind =
 and array_ref_kind =
   | Pgenarray_ref of locality_mode
   | Paddrarray_ref
+  | Pgcignorableaddrarray_ref
   | Pintarray_ref
   | Pfloatarray_ref of locality_mode
   | Punboxedfloatarray_ref of unboxed_float
@@ -447,6 +448,7 @@ and array_ref_kind =
 and array_set_kind =
   | Pgenarray_set of modify_mode
   | Paddrarray_set of modify_mode
+  | Pgcignorableaddrarray_set
   | Pintarray_set
   | Pfloatarray_set
   | Punboxedfloatarray_set of unboxed_float
@@ -2022,12 +2024,12 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Parraylength _ -> None
   | Parrayblit _
   | Parraysetu _ | Parraysets _
-  | Parrayrefu ((Paddrarray_ref | Pintarray_ref
+  | Parrayrefu ((Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
       | Punboxedfloatarray_ref _ | Punboxedoruntaggedintarray_ref _
       | Punboxedvectorarray_ref _
       | Pgcscannableproductarray_ref _
       | Pgcignorableproductarray_ref _), _, _)
-  | Parrayrefs ((Paddrarray_ref | Pintarray_ref
+  | Parrayrefs ((Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
       | Punboxedfloatarray_ref _ | Punboxedoruntaggedintarray_ref _
       | Punboxedvectorarray_ref _
       | Pgcscannableproductarray_ref _
@@ -2374,7 +2376,8 @@ let array_ref_kind_result_layout = function
   | Pintarray_ref -> layout_int
   | Pfloatarray_ref _ -> layout_boxed_float Boxed_float64
   | Punboxedfloatarray_ref bf -> layout_unboxed_float bf
-  | Pgenarray_ref _ | Paddrarray_ref -> layout_value_field
+  | Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref ->
+    layout_value_field
   | Punboxedoruntaggedintarray_ref i -> layout_unboxed_int i
   | Punboxedvectorarray_ref bv -> layout_unboxed_vector bv
   | Pgcscannableproductarray_ref kinds -> layout_of_scannable_kinds kinds
@@ -2724,6 +2727,7 @@ let compute_expr_layout free_vars_kind lam =
 let array_ref_kind mode = function
   | Pgenarray -> Pgenarray_ref mode
   | Paddrarray -> Paddrarray_ref
+  | Pgcignorableaddrarray -> Pgcignorableaddrarray_ref
   | Pintarray -> Pintarray_ref
   | Pfloatarray -> Pfloatarray_ref mode
   | Punboxedoruntaggedintarray int_kind ->
@@ -2736,6 +2740,7 @@ let array_ref_kind mode = function
 let array_set_kind mode = function
   | Pgenarray -> Pgenarray_set mode
   | Paddrarray -> Paddrarray_set mode
+  | Pgcignorableaddrarray -> Pgcignorableaddrarray_set
   | Pintarray -> Pintarray_set
   | Pfloatarray -> Pfloatarray_set
   | Punboxedoruntaggedintarray int_kind ->
@@ -2758,6 +2763,7 @@ let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
     Pgcignorableproductarray_ref ignorables
   | Pgenarray_set _ -> Pgenarray_ref mode
   | Paddrarray_set _ -> Paddrarray_ref
+  | Pgcignorableaddrarray_set -> Pgcignorableaddrarray_ref
   | Pfloatarray_set -> Pfloatarray_ref mode
 
 let may_allocate_in_region lam =
@@ -2878,7 +2884,8 @@ let rec count_initializers_ignorable
 
 let count_initializers_array_kind (lambda_array_kind : array_kind) =
   match lambda_array_kind with
-  | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
+  | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
+  | Punboxedfloatarray _
   | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ -> 1
   | Pgcscannableproductarray scannables ->
     List.fold_left
@@ -2893,7 +2900,8 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
    Flambda 2 -> WASM backend *)
 let array_element_size_in_bytes (array_kind : array_kind) =
   match array_kind with
-  | Pgenarray | Paddrarray | Pintarray | Pfloatarray -> 8
+  | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray ->
+    8
   | Punboxedfloatarray Unboxed_float32 ->
     (* float32# arrays are packed *)
     4

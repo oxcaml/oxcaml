@@ -1043,6 +1043,7 @@ module With_subkind = struct
       | Parrayval Pfloatarray -> Float_array
       | Parrayval Pintarray -> Immediate_array
       | Parrayval Paddrarray -> Value_array
+      | Parrayval Pgcignorableaddrarray -> Value_array
       | Parrayval Pgenarray -> Generic_array
       | Parrayval (Punboxedfloatarray Unboxed_float64) -> Float_array
       | Parrayval (Punboxedfloatarray Unboxed_float32) -> Unboxed_float32_array

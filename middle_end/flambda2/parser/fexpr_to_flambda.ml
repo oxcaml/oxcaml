@@ -504,6 +504,7 @@ let array_kind : 'a -> Fexpr.array_kind -> Flambda_primitive.Array_kind.t =
  fun _env -> function
   | Immediates -> Immediates
   | Naked_floats -> Naked_floats
+  | Gc_ignorable_values -> Gc_ignorable_values
   | Values -> Values
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
   | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
@@ -514,8 +515,9 @@ let array_set_kind :
     'a -> Fexpr.array_set_kind -> Flambda_primitive.Array_set_kind.t =
  fun env -> function
   | Immediates -> Immediates
-  | Naked_floats -> Naked_floats
+  | Gc_ignorable_values -> Gc_ignorable_values
   | Values ia -> Values (init_or_assign env ia)
+  | Naked_floats -> Naked_floats
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
   | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
     Misc.fatal_error

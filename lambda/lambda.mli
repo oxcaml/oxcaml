@@ -388,7 +388,7 @@ and extern_repr =
 and external_call_description = extern_repr Primitive.description_gen
 
 and array_kind =
-    Pgenarray | Paddrarray | Pintarray | Pfloatarray
+    Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray of unboxed_float
   | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
@@ -401,6 +401,7 @@ and array_kind =
 and array_ref_kind =
   | Pgenarray_ref of locality_mode (* This might be a flat float array *)
   | Paddrarray_ref
+  | Pgcignorableaddrarray_ref
   | Pintarray_ref
   | Pfloatarray_ref of locality_mode
   | Punboxedfloatarray_ref of unboxed_float
@@ -415,6 +416,7 @@ and array_ref_kind =
 and array_set_kind =
   | Pgenarray_set of modify_mode (* This might be an array of pointers *)
   | Paddrarray_set of modify_mode
+  | Pgcignorableaddrarray_set
   | Pintarray_set
   | Pfloatarray_set
   | Punboxedfloatarray_set of unboxed_float

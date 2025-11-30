@@ -56,6 +56,7 @@ let keyword_table =
     "exn", KWD_EXN;
     "float", KWD_FLOAT;
     "generic", KWD_GENERIC;
+    "gc_ignorable", KWD_GC_IGNORABLE;
     "halt_and_catch_fire", KWD_HCF;
     "heap_or_local", KWD_HEAP_OR_LOCAL;
     "hint", KWD_HINT;
