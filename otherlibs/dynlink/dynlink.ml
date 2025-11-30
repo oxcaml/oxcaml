@@ -58,6 +58,17 @@ let loadfile_private file =
   if is_native then N.loadfile_private file
   else B.loadfile_private file
 
+let loadfile_unsafe file ~check_dependency_order ~check_imports =
+  if is_native then
+    N.loadfile_unsafe file ~check_dependency_order ~check_imports
+  else B.loadfile_unsafe file ~check_dependency_order ~check_imports
+
+let loadfile_private_unsafe file ~check_dependency_order ~check_imports =
+  if is_native then
+    N.loadfile_private_unsafe file ~check_dependency_order ~check_imports
+  else
+    B.loadfile_private_unsafe file ~check_dependency_order ~check_imports
+
 let unsafe_get_global_value ~bytecode_or_asm_symbol =
   if is_native then N.unsafe_get_global_value ~bytecode_or_asm_symbol
   else B.unsafe_get_global_value ~bytecode_or_asm_symbol

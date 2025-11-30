@@ -66,6 +66,30 @@ val loadfile_private : string -> unit
     "allowed units" list (see {!set_allowed_units}) since they cannot
     be referenced from other compilation units. *)
 
+val loadfile_unsafe :
+  string ->
+  check_dependency_order:bool ->
+  check_imports:bool ->
+  unit
+(** Same as [loadfile], but with control over safety checks.
+
+    The [check_dependency_order] parameter controls whether to verify
+    that dependencies are loaded before the units that depend on them.
+
+    The [check_imports] parameter controls whether to verify that interface
+    and implementation checksums match those of previously loaded units.
+
+    Setting either flag to [false] can break safety and lead to undefined
+    behavior. Use with caution. *)
+
+val loadfile_private_unsafe :
+  string ->
+  check_dependency_order:bool ->
+  check_imports:bool ->
+  unit
+(** Combines [loadfile_private] with the safety check controls from
+    [loadfile_unsafe]. *)
+
 val adapt_filename : string -> string
 (** In bytecode, the identity function. In native code, replace the last
     extension with [.cmxs]. *)

@@ -46,3 +46,9 @@ type error =
 exception Error of error
 
 val error_message : error -> string
+
+type consolidated_imports =
+  | Requires_per_unit_checks
+  | Supports_consolidated_imports of
+    { cmi_imports : (string * Digest.t option) array;
+      cmx_imports : (string * Digest.t option) array }

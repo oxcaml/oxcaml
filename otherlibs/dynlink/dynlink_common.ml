@@ -31,6 +31,7 @@ end
 module Make (P : Dynlink_platform_intf.S) = struct
   module DT = Dynlink_types
   module UH = P.Unit_header
+  module LH = P.Dynlink_library_header
 
   type interface_dep =
     | Name  (* the only use of the interface can be via a module alias *)
@@ -183,8 +184,8 @@ module Make (P : Dynlink_platform_intf.S) = struct
   let set_loaded filename ui (state : State.t) =
     { state with implems = set_loaded_implem filename ui state.implems }
 
-  let check_interface_imports filename ui ifaces =
-    List.fold_left (fun ifaces (name, crc) ->
+  let check_interface_imports ~check_imports filename imports ifaces =
+    Array.fold_left (fun ifaces (name, crc) ->
         match String.Map.find name ifaces with
         | exception Not_found -> begin
             match crc with
@@ -197,13 +198,42 @@ module Make (P : Dynlink_platform_intf.S) = struct
           | Name, Some crc ->
             String.Map.add name (Contents crc, filename) ifaces
           | Contents old_crc, Some crc ->
-            if old_crc <> crc then raise (DT.Error (Inconsistent_import name))
+            if check_imports && old_crc <> crc then
+              raise (DT.Error (Inconsistent_import name))
             else ifaces)
       ifaces
-      (UH.interface_imports ui)
+      imports
 
-  let check_implementation_imports ~allowed_units filename ui implems =
-    List.iter (fun (name, crc) ->
+  let check_unit_initialized filename name unit_state =
+    match unit_state with
+    | DT.Not_initialized ->
+      raise (DT.Error (Linking_error (filename, Uninitialized_global name)))
+    | DT.Check_inited i ->
+      if P.num_globals_inited () < i then begin
+        raise (DT.Error (Linking_error (filename, Uninitialized_global name)))
+      end
+    | DT.Loaded -> ()
+  [@@inline]
+
+  let check_unit_load_order library_header units filename cmx_imports implems =
+    let load_status = Array.map (fun (name, _crc) ->
+        match String.Map.find name implems with
+        | exception Not_found -> DT.Not_initialized
+        | (_crc, _src, unit_state) -> unit_state)
+      cmx_imports
+    in
+    List.iter (fun ui ->
+        UH.iter_imports_cmx library_header ui (fun i import ->
+          let name, _crc = import in
+          check_unit_initialized filename name load_status.(i));
+        match UH.imports_cmx_self_index ui with
+        | None -> ()
+        | Some self_idx -> load_status.(self_idx) <- DT.Loaded)
+      units
+
+  let check_implementation_imports ~allowed_units ~check_unit_dependency_order
+      filename imports implems =
+    Array.iter (fun (name, crc) ->
       if not (String.Set.mem name allowed_units) then begin
         raise (DT.Error (Unavailable_unit name))
       end;
@@ -220,17 +250,9 @@ module Make (P : Dynlink_platform_intf.S) = struct
             raise (DT.Error (Inconsistent_implementation name))
           end
         end;
-        match unit_state with
-        | Not_initialized ->
-          raise (DT.Error (Linking_error (
-            filename, Uninitialized_global name)))
-        | Check_inited i ->
-          if P.num_globals_inited () < i then begin
-            raise (DT.Error (Linking_error (
-              filename, Uninitialized_global name)))
-          end
-        | Loaded -> ())
-      (UH.implementation_imports ui)
+        if check_unit_dependency_order then
+          check_unit_initialized filename name unit_state)
+      imports
 
   let check_name filename ui priv ifaces implems =
     let name = UH.name ui in
@@ -247,8 +269,9 @@ module Make (P : Dynlink_platform_intf.S) = struct
       raise (DT.Error Unsafe_file)
     end
 
-  let check filename (units : UH.t list) (state : State.t)
-      ~unsafe_allowed ~priv =
+  let check filename (library_header : LH.t) (units : UH.t list)
+      (state : State.t) ~unsafe_allowed ~priv ~check_dependency_order
+      ~check_imports =
     List.iter (fun ui -> check_unsafe_module unsafe_allowed ui) units;
     let new_units =
       String.Set.of_list (List.map (fun ui -> UH.name ui) units)
@@ -258,18 +281,47 @@ module Make (P : Dynlink_platform_intf.S) = struct
           check_name filename ui priv state.ifaces implems)
         state.implems units
     in
-    let ifaces =
-      List.fold_left (fun ifaces ui ->
-          check_interface_imports filename ui ifaces)
-        state.ifaces units
-    in
     let allowed_units = String.Set.union state.allowed_units new_units in
-    let (_ : implem String.Map.t) =
-      List.fold_left
-        (fun acc ui ->
-           check_implementation_imports ~allowed_units filename ui acc;
-           set_loaded_implem filename ui acc)
-        implems units
+    let ifaces =
+      match LH.consolidated_imports library_header with
+      | DT.Requires_per_unit_checks ->
+        (* Bytecode: check imports per-unit *)
+        let ifaces =
+          List.fold_left (fun ifaces ui ->
+            let imports =
+              UH.interface_imports library_header ui |> Array.of_list
+            in
+            check_interface_imports ~check_imports filename imports ifaces)
+          state.ifaces units
+        in
+        let allowed_units = String.Set.union state.allowed_units new_units in
+        let (_ : implem String.Map.t) =
+          List.fold_left
+            (fun acc ui ->
+              let imports =
+                UH.implementation_imports library_header ui |> Array.of_list
+              in
+              if check_imports then
+                check_implementation_imports ~allowed_units
+                  ~check_unit_dependency_order:check_dependency_order
+                  filename imports acc;
+              set_loaded_implem filename ui acc)
+            implems units
+        in
+        ifaces
+      | DT.Supports_consolidated_imports { cmi_imports; cmx_imports } ->
+        (* Native: check consolidated imports once from header *)
+        let ifaces =
+          check_interface_imports ~check_imports filename cmi_imports
+            state.ifaces
+        in
+        if check_imports then
+          check_implementation_imports ~allowed_units
+            ~check_unit_dependency_order:false filename cmx_imports implems;
+        if check_dependency_order then
+          check_unit_load_order library_header units filename cmx_imports
+            implems;
+        ifaces
     in
     let defined_symbols =
       List.fold_left (fun defined_symbols ui ->
@@ -351,17 +403,16 @@ module Make (P : Dynlink_platform_intf.S) = struct
     if Filename.is_implicit fname then Filename.concat (Sys.getcwd ()) fname
     else fname
 
-  let load priv filename =
+  let load priv filename ~check_dependency_order ~check_imports =
     init ();
     let filename = dll_filename filename in
     match P.load ~filename ~priv with
     | exception exn -> raise (DT.Error (Cannot_open_dynamic_library exn))
-    | handle, units ->
+    | handle, library_header, units ->
       try
         with_lock (fun ({unsafe_allowed; _ } as global) ->
-            global.state <- check filename units global.state
-                ~unsafe_allowed
-                ~priv;
+            global.state <- check filename library_header units global.state
+                ~unsafe_allowed ~priv ~check_dependency_order ~check_imports;
             (* [register] must be called after [check]:
                1. so as not to leave outdated entries in the frame table
                   list (etc) after a failure of [check];
@@ -390,8 +441,17 @@ module Make (P : Dynlink_platform_intf.S) = struct
         P.finish handle;
         raise exn
 
-  let loadfile filename = load false filename
-  let loadfile_private filename = load true filename
+  let loadfile filename =
+    load false filename ~check_dependency_order:true ~check_imports:true
+
+  let loadfile_private filename =
+    load true filename ~check_dependency_order:true ~check_imports:true
+
+  let loadfile_unsafe filename ~check_dependency_order ~check_imports =
+    load false filename ~check_dependency_order ~check_imports
+
+  let loadfile_private_unsafe filename ~check_dependency_order ~check_imports =
+    load true filename ~check_dependency_order ~check_imports
 
   let unsafe_get_global_value ~bytecode_or_asm_symbol =
     with_lock (fun _ ->

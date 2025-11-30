@@ -21,14 +21,44 @@
 module type S = sig
   type handle
 
+  module Dynlink_library_header : sig
+    type t
+
+    val consolidated_imports : t -> Dynlink_types.consolidated_imports
+  end
+
   module Unit_header : sig
     type t
 
     val name : t -> string
     val crc : t -> Digest.t option
 
-    val interface_imports : t -> (string * Digest.t option) list
-    val implementation_imports : t -> (string * Digest.t option) list
+    val interface_imports
+       : Dynlink_library_header.t
+      -> t
+      -> (string * Digest.t option) list
+
+    val implementation_imports
+       : Dynlink_library_header.t
+      -> t
+      -> (string * Digest.t option) list
+
+    val iter_imports_cmx
+       : Dynlink_library_header.t
+      -> t
+      -> (int -> (string * Digest.t option) -> unit)
+      -> unit
+    (** Iterate over implementation imports for this unit.
+
+        The index semantics depend on the platform:
+        - Native (consolidated imports): [i] is an index into the consolidated
+          [cmx_imports] array in the header
+        - Bytecode (per-unit imports): [i] is an index into this unit's
+          [implementation_imports] list *)
+
+    val imports_cmx_self_index : t -> int option
+    (** If this unit appears in the imports it depends on (for initialization
+        order tracking), returns its index. [None] for bytecode. *)
 
     val defined_symbols : t -> string list
     val unsafe_module : t -> bool
@@ -55,7 +85,7 @@ module type S = sig
   val load
      : filename:Dynlink_types.filename
     -> priv:bool
-    -> handle * (Unit_header.t list)
+    -> handle * Dynlink_library_header.t * (Unit_header.t list)
 
   val register
      : handle
