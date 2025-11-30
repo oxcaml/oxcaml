@@ -1,0 +1,4 @@
+File "implicit_kinds_syntax_error.ml", line 8, characters 19-20:
+8 | [@@@implicit_kind ('a : float64)]
+                       ^
+Error: Syntax error: "operator" expected.
