@@ -284,3 +284,84 @@ module Avx = struct
     let y = Int32s.to_int32x4 1l 0l 3l 0l in
     eq_int32x4 ~result:x ~expect:y
 end
+
+module AVX2 = struct
+
+  external vec128_gather32_index32 : scale:int64# -> onto:(int32x4[@unboxed]) -> addr -> idx:(int32x4[@unboxed]) -> mask:(int32x4[@unboxed]) -> (int32x4[@unboxed]) = "" "caml_avx2_vec128_gather32_index32"
+  [@@noalloc] [@@builtin]
+  external vec256_gather32_index32 : scale:int64# -> onto:(int32x8[@unboxed]) -> addr -> idx:(int32x8[@unboxed]) -> mask:(int32x8[@unboxed]) -> (int32x8[@unboxed]) = "" "caml_avx2_vec256_gather32_index32"
+  [@@noalloc] [@@builtin]
+
+  external vec128_gather32_index64 : scale:int64# -> onto:(int32x4[@unboxed]) -> addr -> idx:(int64x2[@unboxed]) -> mask:(int32x4[@unboxed]) -> (int32x4[@unboxed]) = "" "caml_avx2_vec128_gather32_index64"
+  [@@noalloc] [@@builtin]
+  external vec256_gather32_index64 : scale:int64# -> onto:(int32x4[@unboxed]) -> addr -> idx:(int64x4[@unboxed]) -> mask:(int32x4[@unboxed]) -> (int32x4[@unboxed]) = "" "caml_avx2_vec256_gather32_index64"
+  [@@noalloc] [@@builtin]
+
+  let () =
+    let mem = aligned_alloc ~align:#32n ~size:#32n in
+    let _ = Avx.store_aligned32 mem (Int32s.to_int32x8 1l 2l 3l 4l 5l 6l 7l 8l) in
+    let x = vec128_gather32_index32 mem
+        ~scale:#4L
+        ~onto:(Int32s.to_int32x4 9l 10l 11l 12l)
+        ~idx:(Int32s.to_int32x4 7l 5l 3l 1l)
+        ~mask:(Int32s.to_int32x4 (-1l) (-1l) (-1l) 0l) in
+    eq_int32x4 ~result:x ~expect:(Int32s.to_int32x4 8l 6l 4l 12l);
+    let x = vec128_gather32_index64 mem
+        ~scale:#4L
+        ~onto:(Int32s.to_int32x4 9l 10l 11l 12l)
+        ~idx:(int64x2_of_int64s 7L 5L)
+        ~mask:(Int32s.to_int32x4 (-1l) 0l 0l 0l) in
+    (* Top half is zeroed *)
+    eq_int32x4 ~result:x ~expect:(Int32s.to_int32x4 8l 10l 0l 0l);
+    let x = vec256_gather32_index32 mem
+        ~scale:#4L
+        ~onto:(Int32s.to_int32x8 9l 10l 11l 12l 13l 14l 15l 16l)
+        ~idx:(Int32s.to_int32x8 7l 5l 3l 1l 0l 2l 4l 6l)
+        ~mask:(Int32s.to_int32x8 (-1l) (-1l) (-1l) 0l 0l (-1l) (-1l) (-1l)) in
+    eq_int32x8 ~result:x ~expect:(Int32s.to_int32x8 8l 6l 4l 12l 13l 3l 5l 7l);
+    let x = vec256_gather32_index64 mem
+        ~scale:#4L
+        ~onto:(Int32s.to_int32x4 9l 10l 11l 12l)
+        ~idx:(int64x4_of_int64s 7L 5L 3L 1L)
+        ~mask:(Int32s.to_int32x4 (-1l) (-1l) (-1l) 0l) in
+    eq_int32x4 ~result:x ~expect:(Int32s.to_int32x4 8l 6l 4l 12l)
+
+  external vec128_gather64_index32 : scale:int64# -> onto:(int64x2[@unboxed]) -> addr -> idx:(int32x4[@unboxed]) -> mask:(int64x2[@unboxed]) -> (int64x2[@unboxed]) = "" "caml_avx2_vec128_gather64_index32"
+  [@@noalloc] [@@builtin]
+  external vec256_gather64_index32 : scale:int64# -> onto:(int64x4[@unboxed]) -> addr -> idx:(int32x4[@unboxed]) -> mask:(int64x4[@unboxed]) -> (int64x4[@unboxed]) = "" "caml_avx2_vec256_gather64_index32"
+  [@@noalloc] [@@builtin]
+
+  external vec128_gather64_index64 : scale:int64# -> onto:(int64x2[@unboxed]) -> addr -> idx:(int64x2[@unboxed]) -> mask:(int64x2[@unboxed]) -> (int64x2[@unboxed]) = "" "caml_avx2_vec128_gather64_index64"
+  [@@noalloc] [@@builtin]
+  external vec256_gather64_index64 : scale:int64# -> onto:(int64x4[@unboxed]) -> addr -> idx:(int64x4[@unboxed]) -> mask:(int64x4[@unboxed]) -> (int64x4[@unboxed]) = "" "caml_avx2_vec256_gather64_index64"
+  [@@noalloc] [@@builtin]
+
+  let () =
+    let mem = aligned_alloc ~align:#32n ~size:#32n in
+    let _ = Avx.store_aligned mem (int64x4_of_int64s 1L 2L 3L 4L) in
+    let x = vec128_gather64_index32 mem
+        ~scale:#8L
+        ~onto:(int64x2_of_int64s 5L 6L)
+        ~idx:(Int32s.to_int32x4 3l 1l 0l 0l)
+        ~mask:(int64x2_of_int64s (-1L) 0L) in
+    eq_int64x2 ~result:x ~expect:(int64x2_of_int64s 4L 6L);
+    let x = vec128_gather64_index64 mem
+        ~scale:#8L
+        ~onto:(int64x2_of_int64s 5L 6L)
+        ~idx:(int64x2_of_int64s 3L 1L)
+        ~mask:(int64x2_of_int64s (-1L) 0L) in
+    eq_int64x2 ~result:x ~expect:(int64x2_of_int64s 4L 6L);
+    let x = vec256_gather64_index32 mem
+        ~scale:#8L
+        ~onto:(int64x4_of_int64s 5L 6L 7L 8L)
+        ~idx:(Int32s.to_int32x4 3l 2l 1l 0l)
+        ~mask:(int64x4_of_int64s (-1L) 0L (-1L) 0L) in
+    eq_int64x4 ~result:x ~expect:(int64x4_of_int64s 4L 6L 2L 8L);
+    let x = vec256_gather64_index64 mem
+        ~scale:#8L
+        ~onto:(int64x4_of_int64s 5L 6L 7L 8L)
+        ~idx:(int64x4_of_int64s 3L 2L 1L 0L)
+        ~mask:(int64x4_of_int64s (-1L) 0L (-1L) 0L) in
+    eq_int64x4 ~result:x ~expect:(int64x4_of_int64s 4L 6L 2L 8L)
+
+end

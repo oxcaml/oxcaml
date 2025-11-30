@@ -78,13 +78,17 @@ type regf =
   | YMM of int
   | ZMM of int
 
+type reg_idx =
+  | Scalar of reg64
+  | Vector of regf
+
 type arch = X64 | X86
 
 type addr =
   {
     arch: arch;
     typ: data_type;
-    idx: reg64;
+    idx: reg_idx;
     scale: int;
     base: reg64 option;
     sym: string option;

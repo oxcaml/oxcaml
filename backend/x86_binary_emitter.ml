@@ -313,6 +313,10 @@ let rd_of_reg64 = function
   | R14 -> 14
   | R15 -> 15
 
+let rd_of_reg_idx = function
+  | Scalar reg -> rd_of_reg64 reg
+  | Vector reg -> rd_of_regf reg
+
 let rd_of_reg8 = function
   | Reg8L r -> rd_of_reg64 r
   | Reg8H AH -> 4
@@ -486,7 +490,7 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
         | Some s -> OImm32 (Some s, displ)
       in
       let idx_reg = idx in
-      let idx = rd_of_reg64 idx in
+      let idx = rd_of_reg_idx idx in
       if scale = 0 then (
         assert (Option.is_none base && (is_x86 arch));
         match offset with
@@ -500,20 +504,20 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
         match base with
         | None -> (
             match (idx_reg, scale, offset) with
-            | (RSP | R12), 1, OImm8 0L ->
+            | Scalar (RSP | R12), 1, OImm8 0L ->
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)
                          ~rexb:(rexb_base idx) ~rexx:0;
                 buf_opcodes b opcodes;
                 buf_int8 b (mod_rm_reg 0b00 idx reg);
                 buf_int8 b (sib 1 0b100 idx)
-            | (RSP | R12), 1, OImm8 offset8 ->
+            | Scalar (RSP | R12), 1, OImm8 offset8 ->
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)
                          ~rexb:(rexb_base idx) ~rexx:0;
                 buf_opcodes b opcodes;
                 buf_int8 b (mod_rm_reg 0b01 0b100 reg);
                 buf_int8 b (sib 1 0b100 idx);
                 buf_int8L b offset8
-            | (RSP | R12), 1, OImm32 (sym, offset) ->
+            | Scalar (RSP | R12), 1, OImm32 (sym, offset) ->
                 (* to 0x??(%rsp) *)
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)
                          ~rexb:(rexb_base idx) ~rexx:0;
@@ -521,7 +525,7 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
                 buf_int8 b (mod_rm_reg 0b10 0b100 reg);
                 buf_int8 b (sib 1 0b100 idx);
                 buf_sym b sym offset
-            | (RBP | R13), 1, OImm8 _ -> (
+            | Scalar (RBP | R13), 1, OImm8 _ -> (
                 (* to 0x??(%rbp) *)
                 (* TODO check if offset8 = 0 is enough *)
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)

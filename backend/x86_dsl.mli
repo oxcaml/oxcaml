@@ -84,10 +84,10 @@ val ebp : arg
 val esp : arg
 
 val mem32 :
-  data_type -> ?scale:int -> ?base:reg64 -> ?sym:string -> int -> reg64 -> arg
+  data_type -> ?scale:int -> ?base:reg64 -> ?sym:string -> int -> reg_idx -> arg
 
 val mem64 :
-  data_type -> ?scale:int -> ?base:reg64 -> ?sym:string -> int -> reg64 -> arg
+  data_type -> ?scale:int -> ?base:reg64 -> ?sym:string -> int -> reg_idx -> arg
 
 val mem64_rip : data_type -> ?ofs:int -> string -> arg
 

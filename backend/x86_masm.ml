@@ -49,8 +49,12 @@ let string_of_datatype_ptr = function
   | PROC -> "PROC PTR "
 
 let arg_mem b { arch; typ; idx; scale; base; sym; displ } =
-  let string_of_register =
+  let string_of_gpr =
     match arch with X86 -> string_of_reg32 | X64 -> string_of_reg64
+  in
+  let string_of_reg_idx = function
+    | Scalar reg -> string_of_gpr reg
+    | Vector reg -> string_of_regf reg
   in
   Buffer.add_string b (string_of_datatype_ptr typ);
   Buffer.add_char b '[';
@@ -58,14 +62,14 @@ let arg_mem b { arch; typ; idx; scale; base; sym; displ } =
   if scale <> 0
   then (
     if Option.is_some sym then Buffer.add_char b '+';
-    Buffer.add_string b (string_of_register idx);
+    Buffer.add_string b (string_of_reg_idx idx);
     if scale <> 1 then bprintf b "*%d" scale);
   (match base with
   | None -> ()
   | Some r ->
     assert (scale > 0);
     Buffer.add_char b '+';
-    Buffer.add_string b (string_of_register r));
+    Buffer.add_string b (string_of_gpr r));
   if displ > 0
   then bprintf b "+%d" displ
   else if displ < 0
