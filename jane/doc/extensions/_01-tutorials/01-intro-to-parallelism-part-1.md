@@ -1354,7 +1354,7 @@ let average_par (par : Parallel.t) tree =
   let rec (total @ portable) par tree =
     match tree with
     | Tree.Leaf x -> ~total:(Thing.price x), ~count:1
-    | Tree.Node arr ->
+    | Tree.Nodes arr ->
       let seq = Parallel.Sequence.of_iarray arr in
       Parallel.Sequence.fold' par
         seq
