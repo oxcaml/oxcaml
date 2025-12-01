@@ -450,8 +450,6 @@ module Exp_attribute : sig
   val loop : t
 
   val tail_mod_cons : t
-
-  val quotation : t
 end
 
 module rec Case : sig

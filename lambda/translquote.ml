@@ -248,6 +248,7 @@ end = struct
   let func ~loc arg_sort body_lam id body =
     func_ ~loc arg_sort id (body_lam body)
 
+  (* See comment on signature above. *)
   let list_param_binding (type a b) ~loc (arg_sort : a param)
       (body_lam : b -> lambda) idents (body : b) =
     let fun_body, t_opt =
@@ -283,11 +284,13 @@ let option_extract ~loc opt =
 (* Environments in the context of translating quotations refer to the
  * various variables that quotations need to keep track of. *)
 
-(* free variables referred to by Ident.t throughout the code *)
+(* free variables referred to using [Ident.t]s throughout the code currently
+ * being transl'd *)
 type 'a fv_env = (Ident.t, 'a) Hashtbl.t (* maps identifiers to lambda *)
 
-(* free variables referred to by strings throughout the code;
- * Type_var polymorphic type variables *)
+(* free variables referred to using [string]s throughout the code currently
+ * being transl'd; which is used by [Var.Type_var.t] polymorphic type
+ * variables *)
 type 'b pv_env =
   (string, Ident.t * 'b) Hashtbl.t (* maps identifiers to lambda *)
 
@@ -557,8 +560,6 @@ module Exp_attribute : sig
   val loop : t'
 
   val tail_mod_cons : t'
-
-  val quotation : t'
 end = struct
   type s = lambda
 
@@ -587,8 +588,6 @@ end = struct
   let loop = use "Exp_attribute" "loop"
 
   let tail_mod_cons = use "Exp_attribute" "tail_mod_cons"
-
-  let quotation = use "Exp_attribute" "quotation"
 end
 
 module Identifier : sig
@@ -2079,7 +2078,6 @@ let quote_attributes e =
     | "poll" -> Exp_attribute.poll
     | "loop" -> Exp_attribute.loop
     | "tail_mod_cons" -> Exp_attribute.tail_mod_cons
-    | "quotation" -> Exp_attribute.quotation
     | _ -> fatal_error "Translquote: unknown attribute")
     |> Exp_attribute.wrap
   in
@@ -2221,7 +2219,8 @@ let rec print_path = function
   | Path.Pextra_ty (p, _) -> print_path p ^ "[extra]"
 
 let quote_value_ident_path loc env path ident_kind =
-  (* TODO: This could probably be better. *)
+  (* CR metaprogramming jrickard: This probably doesn't work with parameterised
+     libraries etc. *)
   (match ident_kind with
   | Id_prim _ -> ()
   | Id_value -> (
@@ -2394,23 +2393,6 @@ let without_param fp =
   List.iter
     (fun (id, _, _, _) -> without_idents_types_constr [id])
     fp.fp_newtypes
-
-type case_binding =
-  | Non_binding of Pat.t * Exp.t
-  | Simple of Name.t * (Var.Value.t -> Exp.t) lam
-  | Pattern of
-      Name.t list
-      * Name.t list
-      * (Var.Value.t list -> (Var.Module.t list -> Pat.t * Exp.t) lam) lam
-  | Guarded of
-      Name.t list
-      * Name.t list
-      * (Var.Value.t list -> (Var.Module.t list -> Pat.t * Exp.t * Exp.t) lam)
-        lam
-  | Refutation of
-      Name.t list
-      * Name.t list
-      * (Var.Value.t list -> (Var.Module.t list -> Pat.t) lam) lam
 
 let rec quote_module_path loc = function
   (* CR metaprogramming jrickard: I think this should probably use
@@ -2650,6 +2632,23 @@ and quote_core_type ~scopes ty =
   | Ttyp_open _ -> fatal_error "Translquote: Ttyp_open not implemented."
   | Ttyp_of_kind _ -> fatal_error "Trasnlquote: Ttyp_of_kind not implemented."
   | Ttyp_call_pos -> Type.wrap Type.call_pos
+
+type case_binding =
+  | Non_binding of Pat.t * Exp.t
+  | Simple of Name.t * (Var.Value.t -> Exp.t) lam
+  | Pattern of
+      Name.t list
+      * Name.t list
+      * (Var.Value.t list -> (Var.Module.t list -> Pat.t * Exp.t) lam) lam
+  | Guarded of
+      Name.t list
+      * Name.t list
+      * (Var.Value.t list -> (Var.Module.t list -> Pat.t * Exp.t * Exp.t) lam)
+        lam
+  | Refutation of
+      Name.t list
+      * Name.t list
+      * (Var.Value.t list -> (Var.Module.t list -> Pat.t) lam) lam
 
 let rec case_binding ~scopes transl stage case =
   let pat = case.c_lhs in

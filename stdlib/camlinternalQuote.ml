@@ -1248,7 +1248,6 @@ module Ast = struct
     | Poll
     | Loop
     | Tail_mod_cons
-    | Quotation
 
   let attribute_as_string = function
     | Inline -> "inline"
@@ -1261,7 +1260,6 @@ module Ast = struct
     | Poll -> "poll"
     | Loop -> "loop"
     | Tail_mod_cons -> "tail_mod_cons"
-    | Quotation -> "quotation"
 
   type expression =
     { desc : expression_desc;
@@ -2185,8 +2183,6 @@ module Exp_attribute = struct
   let loop = Ast.Loop
 
   let tail_mod_cons = Ast.Tail_mod_cons
-
-  let quotation = Ast.Quotation
 end
 
 module Variant_type = struct
