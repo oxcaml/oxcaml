@@ -424,23 +424,23 @@ module Predef = struct
       | Unboxed_simd s -> simd_vec_split_to_layout s
 
     let to_layout : t -> Layout.t = function
-      | Array -> Base Value
-      | Bytes -> Base Value
-      | Char -> Base Value
-      | Extension_constructor -> Base Value
-      | Float -> Base Value
-      | Float32 -> Base Value
-      | Floatarray -> Base Value
-      | Int -> Base Value
-      | Int8 -> Base Value
-      | Int16 -> Base Value
-      | Int32 -> Base Value
-      | Int64 -> Base Value
-      | Lazy_t -> Base Value
-      | Nativeint -> Base Value
-      | String -> Base Value
-      | Simd _ -> Base Value
-      | Exception -> Base Value
+      | Array -> Base Scannable
+      | Bytes -> Base Scannable
+      | Char -> Base Scannable
+      | Extension_constructor -> Base Scannable
+      | Float -> Base Scannable
+      | Float32 -> Base Scannable
+      | Floatarray -> Base Scannable
+      | Int -> Base Scannable
+      | Int8 -> Base Scannable
+      | Int16 -> Base Scannable
+      | Int32 -> Base Scannable
+      | Int64 -> Base Scannable
+      | Lazy_t -> Base Scannable
+      | Nativeint -> Base Scannable
+      | String -> Base Scannable
+      | Simd _ -> Base Scannable
+      | Exception -> Base Scannable
       | Unboxed u -> Base (unboxed_type_to_base_layout u)
 
     let equal_simd_vec_split s1 s2 =

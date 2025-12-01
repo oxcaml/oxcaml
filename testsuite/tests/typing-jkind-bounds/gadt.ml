@@ -190,9 +190,9 @@ type 'x u : immediate =
 Lines 1-2, characters 0-27:
 1 | type 'x u : immediate =
 2 | | P1 : ('b, 'a1) t -> 'a1 u
-Error: The kind of type "u" is value mod non_float
+Error: The layout of type "u" is value non_float
          because it's a boxed variant type.
-       But the kind of type "u" must be a subkind of immediate
+       But the layout of type "u" must be a sublayout of immediate
          because of the annotation on the declaration of the type u.
 |}]
 
@@ -202,7 +202,7 @@ type 'a u : immutable_data =
 Lines 1-2, characters 0-25:
 1 | type 'a u : immutable_data =
 2 | | P1 : ('b, 'a) t -> 'a u
-Error: The kind of type "u" is value mod non_float
+Error: The kind of type "u" is value non_float
          because it's a boxed variant type.
        But the kind of type "u" must be a subkind of immutable_data
          because of the annotation on the declaration of the type u.
@@ -222,9 +222,9 @@ type 'a t : immediate =
 Lines 1-2, characters 0-25:
 1 | type 'a t : immediate =
 2 |   | A : 'b -> 'b option t
-Error: The kind of type "t" is value mod non_float
+Error: The layout of type "t" is value non_float
          because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immediate
+       But the layout of type "t" must be a sublayout of immediate
          because of the annotation on the declaration of the type t.
 |}]
 
@@ -242,7 +242,7 @@ Lines 1-2, characters 0-48:
 2 |   | A : ('b : immutable_data). 'b -> 'b option t
 Error: The kind of type "t" is immutable_data
          because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immediate
+       But the layout of type "t" must be a sublayout of immediate
          because of the annotation on the declaration of the type t.
 |}]
 
@@ -298,7 +298,7 @@ Lines 2-3, characters 0-70:
 Error: The kind of type "existential_abstract" is
            immutable_data with (type : value mod portable) abstract
          because it's a boxed variant type.
-       But the kind of type "existential_abstract" must be a subkind of
+       But the layout of type "existential_abstract" must be a sublayout of
            immediate
          because of the annotation on the declaration of the type existential_abstract.
 |}]
@@ -492,7 +492,7 @@ Line 1, characters 0-59:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "(int ref, int ref) box2" is mutable_data
          because of the definition of box2 at line 1, characters 0-45.
-       But the kind of type "(int ref, int ref) box2" must be a subkind of
+       But the layout of type "(int ref, int ref) box2" must be a sublayout of
            immediate
          because of the definition of show_me_the_kind at line 1, characters 0-59.
 |}]
@@ -506,7 +506,7 @@ Line 1, characters 0-43:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "box" is immutable_data with _
          because it's a boxed variant type.
-       But the kind of type "box" must be a subkind of immediate
+       But the layout of type "box" must be a sublayout of immediate
          because of the annotation on the declaration of the type box.
 |}]
 
@@ -547,7 +547,7 @@ Lines 2-3, characters 0-21:
 3 |   | K : 'd t -> 'd t2
 Error: The kind of type "t2" is immutable_data with (type : value) option t
          because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of immediate
+       But the layout of type "t2" must be a sublayout of immediate
          because of the annotation on the declaration of the type t2.
 |}]
 
@@ -566,7 +566,7 @@ Line 1, characters 0-46:
 Error: The kind of type "exist_row1" is
            immutable_data with [< `A | `B of int ref ]
          because of the definition of exist_row1 at line 1, characters 0-67.
-       But the kind of type "exist_row1" must be a subkind of immediate
+       But the layout of type "exist_row1" must be a sublayout of immediate
          because of the definition of show_me_the_kind at line 1, characters 0-46.
 |}]
 
@@ -600,7 +600,7 @@ Line 1, characters 0-46:
 Error: The kind of type "exist_row2" is
            immutable_data with [> `A | `B of int ref ]
          because of the definition of exist_row2 at line 1, characters 0-67.
-       But the kind of type "exist_row2" must be a subkind of immediate
+       But the layout of type "exist_row2" must be a sublayout of immediate
          because of the definition of show_me_the_kind at line 1, characters 0-46.
 |}]
 
@@ -634,7 +634,7 @@ Line 1, characters 0-59:
 Error: The kind of type "'a option exist_row3" is
            immutable_data with [> `A | `B of int ref ]
          because of the definition of exist_row3 at line 1, characters 0-80.
-       But the kind of type "'a option exist_row3" must be a subkind of
+       But the layout of type "'a option exist_row3" must be a sublayout of
            immediate
          because of the definition of show_me_the_kind at line 1, characters 0-59.
 |}]
