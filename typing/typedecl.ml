@@ -1514,7 +1514,7 @@ let narrow_to_manifest_jkind env loc path decl =
        until we have proper subsumption working, as this hack will likely hold
        up for a little while. Internal ticket 5115. *)
     begin match Jkind.try_allow_r decl.type_jkind with
-    |  None ->
+    | None ->
         (* Under -ikinds, or when [decl.type_jkind] cannot allow-right
            (e.g. due to with-bounds/Best), route through Ikinds. *)
         let type_equal = Ctype.type_equal env in
