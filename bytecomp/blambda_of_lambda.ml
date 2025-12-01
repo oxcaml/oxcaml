@@ -891,8 +891,8 @@ and comp_binary_scalar_intrinsic :
       | Mul -> c "mul"
       | Div ((Safe | Unsafe), Signed) -> c "div"
       | Mod ((Safe | Unsafe), Signed) -> c "mod"
-      | Div ((Safe | Unsafe), Unsigned) -> failwith "CR jrayman"
-      | Mod ((Safe | Unsafe), Unsigned) -> failwith "CR jrayman"
+      | Div ((Safe | Unsafe), Unsigned) -> c "unsigned_div"
+      | Mod ((Safe | Unsafe), Unsigned) -> c "unsigned_mod"
       | And -> c "and"
       | Or -> c "or"
       | Xor -> c "xor"))

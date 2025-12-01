@@ -950,6 +950,7 @@ module For_nativeints : Boxable_int_number_kind = struct
     let div = checked_div ~f:div
 
     let div_unsigned = checked_div ~f:unsigned_div
+    (* CR jrayman: `s/div_unsigned/unsigned_div/g` *)
 
     let mod_ = checked_div ~f:rem
 

@@ -1142,10 +1142,9 @@ let[@inline] get_const = function
 
     However, if division crashes on overflow, we will insert a runtime check for a divisor
     of -1, and fall back to [if_divisor_is_minus_one]. *)
-let make_safe_divmod operator ~if_divisor_is_negative_one ~signed
+let make_safe_divmod operator ~if_divisor_is_negative_one
     ?(dividend_cannot_be_min_int = false) c1 c2 ~dbg =
-  if dividend_cannot_be_min_int || (not signed)
-     || not Arch.division_crashes_on_overflow
+  if dividend_cannot_be_min_int || not Arch.division_crashes_on_overflow
   then Cop (operator, [c1; c2], dbg)
   else
     bind "divisor" c2 (fun c2 ->
@@ -1166,12 +1165,14 @@ let divide_by_zero dividend ~dbg =
 
 let div_int ?dividend_cannot_be_min_int ~signed c1 c2 dbg =
   let if_divisor_is_negative_one ~dividend ~dbg = neg_int dividend dbg in
+  (* CR jrayman: [signed_div_int] and [unsigned_div_int] *)
   match get_const c1, get_const c2 with
   | _, Some 0n -> divide_by_zero c1 ~dbg
   | _, Some 1n -> c1
-  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.div n1 n2)
+  | Some n1, Some n2 when signed ->
+    natint_const_untagged dbg (Nativeint.div n1 n2)
   | _, Some -1n when signed -> if_divisor_is_negative_one ~dividend:c1 ~dbg
-  | _, Some divisor ->
+  | _, Some divisor when signed ->
     if divisor = Nativeint.min_int
     then
       (* integer division (signed or unsigned) by min_int always returns 0
@@ -1185,8 +1186,6 @@ let div_int ?dividend_cannot_be_min_int ~signed c1 c2 dbg =
           dbg )
     else if is_power_of_2_or_zero divisor
     then
-      (* CR jrayman: unsigned? *)
-
       (* [divisor] must be positive be here since we already handled zero and
          min_int (the only negative power of 2) *)
       let l = Misc.log2_nativeint divisor in
@@ -1238,10 +1237,12 @@ let div_int ?dividend_cannot_be_min_int ~signed c1 c2 dbg =
           in
           add_int q sign_bit dbg)
   | _, _ ->
-    make_safe_divmod ?dividend_cannot_be_min_int ~if_divisor_is_negative_one
-      ~signed
-      (Cdivi { signed })
-      c1 c2 ~dbg
+    if not signed
+    then Cop (Cdivi { signed }, [c1; c2], dbg)
+    else
+      make_safe_divmod ?dividend_cannot_be_min_int ~if_divisor_is_negative_one
+        (Cdivi { signed })
+        c1 c2 ~dbg
 
 let mod_int ?dividend_cannot_be_min_int ~signed c1 c2 dbg =
   let if_divisor_is_positive_or_negative_one ~dividend ~dbg =
@@ -1249,10 +1250,10 @@ let mod_int ?dividend_cannot_be_min_int ~signed c1 c2 dbg =
   in
   match get_const c1, get_const c2 with
   | _, Some 0n -> divide_by_zero c1 ~dbg
-  | _, Some (1n | -1n) ->
+  | _, Some (1n | -1n) when signed ->
     if_divisor_is_positive_or_negative_one ~dividend:c1 ~dbg
   | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.rem n1 n2)
-  | _, Some n ->
+  | _, Some n when signed ->
     if n = Nativeint.min_int
     then
       (* Similarly to the division by min_int almost always being 0, modulo
@@ -1269,7 +1270,6 @@ let mod_int ?dividend_cannot_be_min_int ~signed c1 c2 dbg =
               dbg ))
     else if is_power_of_2_or_zero n
     then
-      (* CR jrayman: unsigned? *)
       (* [divisor] must be positive be here since we already handled zero and
          min_int (the only negative power of 2). *)
       let l = Misc.log2_nativeint n in
@@ -1295,10 +1295,13 @@ let mod_int ?dividend_cannot_be_min_int ~signed c1 c2 dbg =
       bind "dividend" c1 (fun c1 ->
           sub_int c1 (mul_int (div_int ~signed c1 c2 dbg) c2 dbg) dbg)
   | _, _ ->
-    make_safe_divmod ?dividend_cannot_be_min_int
-      ~if_divisor_is_negative_one:if_divisor_is_positive_or_negative_one ~signed
-      (Cmodi { signed })
-      c1 c2 ~dbg
+    if not signed
+    then Cop (Cmodi { signed }, [c1; c2], dbg)
+    else
+      make_safe_divmod ?dividend_cannot_be_min_int
+        ~if_divisor_is_negative_one:if_divisor_is_positive_or_negative_one
+        (Cmodi { signed })
+        c1 c2 ~dbg
 
 (* Bool *)
 
