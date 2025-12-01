@@ -664,7 +664,9 @@ let _ : string @ global = f ()
 Line 1, characters 26-30:
 1 | let _ : string @ global = f ()
                               ^^^^
-Error: This value is "local" but is expected to be "global".
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Error: This expression has type "unit -> string"
+       but an expression was expected of type "string"
+       Hint: Did you forget to provide "()" as argument?
+  Hint: This function application is partial,
+  maybe some arguments are missing.
 |}]
