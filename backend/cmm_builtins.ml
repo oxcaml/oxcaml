@@ -1242,6 +1242,14 @@ let transl_builtin name args dbg typ_res =
   | "caml_bigstring_compare_and_swap_int32_unboxed" ->
     bigstring_cas Thirtytwo (four_args name args) dbg
   | "caml_pause_hint" -> Some (Cop (Cpause, args, dbg))
+  | "caml_vec128_load_aligned" ->
+    Some (Cop (mk_load_mut Onetwentyeight_aligned, args, dbg))
+  | "caml_vec128_load_unaligned" ->
+    Some (Cop (mk_load_mut Onetwentyeight_unaligned, args, dbg))
+  | "caml_vec128_store_aligned" ->
+    Some (Cop (mk_store_assign Onetwentyeight_aligned, args, dbg))
+  | "caml_vec128_store_unaligned" ->
+    Some (Cop (mk_store_assign Onetwentyeight_unaligned, args, dbg))
   | _ -> transl_vec_builtin name args dbg typ_res
 
 let builtin_even_if_not_annotated = function

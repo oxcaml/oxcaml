@@ -118,6 +118,9 @@ let mk_load_mut memory_chunk =
 let mk_load_atomic memory_chunk =
   Cload { memory_chunk; mutability = Mutable; is_atomic = true }
 
+(* Stores *)
+let mk_store_assign memory_chunk = Cstore (memory_chunk, Assignment)
+
 (* Block headers. Meaning of the tag field: see stdlib/obj.ml *)
 
 let floatarray_tag dbg = Cconst_int (Obj.double_array_tag, dbg)
