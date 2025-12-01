@@ -507,6 +507,7 @@ module Generate (Target : Target_sig.S) = struct
     register_bin_prim "caml_int64_and" `Pure (fun i j -> int64_bin_op And i j);
     register_bin_prim "caml_int64_or" `Pure (fun i j -> int64_bin_op Or i j);
     register_bin_prim "caml_int64_xor" `Pure (fun i j -> int64_bin_op Xor i j);
+    (* CR jrayman *)
     register_bin_prim_ctx "caml_int64_div" (fun context i j ->
         let res = Var.fresh () in
         (*ZZZ Can we do better?*)
@@ -905,7 +906,7 @@ module Generate (Target : Target_sig.S) = struct
                         | "%int_mod"
                         | "caml_int32_div"
                         | "caml_int32_mod"
-                        | "caml_int64_div"
+                        | "caml_int64_div" (* CR jrayman *)
                         | "caml_int64_mod"
                         | "caml_nativeint_div"
                         | "caml_nativeint_mod" )

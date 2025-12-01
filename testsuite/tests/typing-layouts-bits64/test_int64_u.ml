@@ -343,8 +343,6 @@ let () =
   test_binary_of "equal"               Int64.equal               Int64_u.equal                bool_result;
   test_binary    "min"                 Int64.min                 Int64_u.min;
   test_binary    "max"                 Int64.max                 Int64_u.max;
-
-  (* Testing unsigned primitives *)
   test_division "%unsigned_div" Int64.unsigned_div unsigned_div;
   test_division "%unsafe_unsigned_div" Int64.unsigned_div unsafe_unsigned_div;
   test_division "%unsigned_mod" Int64.unsigned_rem unsigned_mod;
@@ -458,10 +456,10 @@ let () =
   assert (I.equal (unsigned_div #42L (id minus_one)) #0x0L);
   assert (I.equal (unsigned_div (id #42L) minus_one) #0x0L);
   assert (I.equal (unsigned_div (id #42L) (id minus_one)) #0x0L);
-  assert (I.equal (unsigned_mod #42L minus_one) #0x42L);
-  assert (I.equal (unsigned_mod #42L (id minus_one)) #0x42L);
-  assert (I.equal (unsigned_mod (id #42L) minus_one) #0x42L);
-  assert (I.equal (unsigned_mod (id #42L) (id minus_one)) #0x42L);
+  assert (I.equal (unsigned_mod #42L minus_one) #42L);
+  assert (I.equal (unsigned_mod #42L (id minus_one)) #42L);
+  assert (I.equal (unsigned_mod (id #42L) minus_one) #42L);
+  assert (I.equal (unsigned_mod (id #42L) (id minus_one)) #42L);
 
   (* Test div-by-min-int optimization does not occur *)
   assert (I.equal (unsigned_div #0x8000_0000_0000_0042L min_int) #1L);
