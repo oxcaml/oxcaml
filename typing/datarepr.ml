@@ -76,7 +76,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
          jkinds that are cheaper to deal with later. But doing so runs into some
          confusing mutual recursion that's non-trivial to debug. Reinvestigate
          later. Internal ticket 5102.  *)
-      let jkind = Jkind.for_boxed_record lbls in
+      let jkind = Jkind_jkind.for_boxed_record lbls in
       let tdecl =
         {
           type_params;
@@ -100,7 +100,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
       [
         {
           ca_type = newgenconstr path type_params;
-          ca_sort = Jkind.Sort.Const.value;
+          ca_sort = Jkind_types.Sort.Const.value;
           ca_modalities = Mode.Modality.Const.id;
           ca_loc = Location.none
         }
@@ -137,14 +137,14 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
          users to write their own null constructors. *)
       (* CR layouts v3.3: generalize to [any]. *)
       [| Constructor_uniform_value, [| |]
-       ; Constructor_uniform_value, [| Jkind.Sort.Const.value |] |],
+       ; Constructor_uniform_value, [| Jkind_types.Sort.Const.value |] |],
       false
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
   let cstr_constant =
     Array.map
       (fun (_, sorts) ->
-         let all_void = Array.for_all Jkind.Sort.Const.all_void sorts in
+         let all_void = Array.for_all Jkind_types.Sort.Const.all_void sorts in
          (* constant constructors are constructors of non-[@@unboxed] variants
             with 0 bits of payload *)
          let is_const = all_void && not is_unboxed in
@@ -245,7 +245,7 @@ let dummy_label (type rep) (record_form : rep record_form)
   in
   { lbl_name = ""; lbl_res = none; lbl_arg = none;
     lbl_mut = Immutable; lbl_modalities = Mode.Modality.Const.id;
-    lbl_sort = Jkind.Sort.Const.void;
+    lbl_sort = Jkind_types.Sort.Const.void;
     lbl_pos = -1; lbl_all = [||];
     lbl_repres = repres;
     lbl_private = Public;

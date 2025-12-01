@@ -129,7 +129,6 @@
   types
   oprint
   typemode
-  jkind
   value_rec_types
   btype
   lazy_backtrack
@@ -145,6 +144,7 @@
   cmi_format
   persistent_env
   env
+  jkind
   errortrace
   ctype
   signature_group
@@ -703,7 +703,6 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Oprint.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typemode.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Btype.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Subst.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Signature_with_global_bindings.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Bytesections.cmo
@@ -720,6 +719,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Predef.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Errortrace.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ctype.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Signature_group.cmo
@@ -817,7 +817,6 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Oprint.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typemode.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Btype.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Subst.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Signature_with_global_bindings.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Bytesections.cmx
@@ -834,6 +833,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Predef.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Errortrace.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ctype.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Signature_group.cmx
