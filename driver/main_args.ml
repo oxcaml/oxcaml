@@ -36,11 +36,11 @@ let mk_no_absname f =
 
 let mk_locs f =
     "-locs", Arg.Unit f,
-    " Print line numbers in error messages (default)"
+    " Print line and column numbers in error messages (default)"
 
 let mk_no_locs f =
     "-no-locs", Arg.Unit f,
-    " Do not print line numbers in error messages"
+    " Do not print line and column numbers in error messages"
 
 let mk_annot f =
   "-annot", Arg.Unit f, " (deprecated) Save information in <filename>.annot"
