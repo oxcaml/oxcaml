@@ -32,6 +32,8 @@ type compile_time_constant =
   | Ostype_cygwin
   | Backend_type
   | Runtime5
+  | Arch_amd64
+  | Arch_arm64
 
 type immediate_or_pointer =
   | Immediate
@@ -332,7 +334,7 @@ type primitive =
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
-  | Pprobe_is_enabled of { name: string }
+  | Pprobe_is_enabled of { name: string; enabled_at_init: bool option }
   (* Primitives for [Obj] *)
   | Pobj_dup
   | Pobj_magic of layout
@@ -948,17 +950,24 @@ type runtime_param =
   | Rp_main_module_block of Global_module.t
   | Rp_unit
 
+type module_representation =
+  | Module_value_only of { field_count : int }
+  | Module_mixed of mixed_block_shape * mixed_block_shape_with_locality_mode
+
+let module_representation_field_count = function
+  | Module_value_only { field_count } -> field_count
+  | Module_mixed (shape, _) -> Array.length shape
+
 type main_module_block_format =
-  | Mb_struct of { mb_size : int }
+  | Mb_struct of { mb_repr : module_representation }
   | Mb_instantiating_functor of
       { mb_runtime_params : runtime_param list;
-        mb_returned_size : int;
+        mb_returned_repr : module_representation;
       }
 
-let main_module_block_size format =
-  match format with
-  | Mb_struct { mb_size } -> mb_size
-  | Mb_instantiating_functor _ -> 1
+let main_module_representation = function
+  | Mb_struct { mb_repr } -> mb_repr
+  | Mb_instantiating_functor _ -> Module_value_only { field_count = 1 }
 
 type program =
   { compilation_unit : Compilation_unit.t;
@@ -969,7 +978,8 @@ type program =
 
 type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
-    arg_block_idx: int; }
+    arg_block_idx: int;
+    main_repr: module_representation; }
 
 let const_int n = Const_base (Const_int n)
 
@@ -1052,7 +1062,6 @@ let layout_function = non_null_value Pgenval
 let layout_object = non_null_value Pgenval
 let layout_class = non_null_value Pgenval
 let layout_module = non_null_value Pgenval
-let layout_module_field = nullable_value Pgenval
 let layout_functor = non_null_value Pgenval
 let layout_boxed_float f = non_null_value (Pboxedfloatval f)
 let layout_unboxed_float f = Punboxed_float f
@@ -1066,6 +1075,7 @@ let layout_unboxed_int ubi = Punboxed_or_untagged_integer ubi
 let layout_boxed_int bi = non_null_value (Pboxedintval bi)
 let layout_unboxed_vector v = Punboxed_vector v
 let layout_boxed_vector v =  non_null_value (Pboxedvectorval v)
+let layout_predef_value = nullable_value Pgenval
 
 let layout_lazy = nullable_value Pgenval
 let layout_lazy_contents = nullable_value Pgenval
@@ -1082,6 +1092,9 @@ let unboxed_vector_of_boxed_vector = function
 (* CR ncourant: use [Ptop] or remove this as soon as possible. *)
 let layout_top = layout_any_value
 let layout_bottom = Pbottom
+
+let mixed_block_element_for_module = Value generic_value
+let mixed_block_element_with_locality_mode_for_module = Value generic_value
 
 let default_function_attribute = {
   inline = Default_inline;
@@ -1415,6 +1428,84 @@ let rec patch_guarded patch = function
       Levent (patch_guarded patch lam, ev)
   | _ -> fatal_error "Lambda.patch_guarded"
 
+let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
+  match elt with
+  | Value -> Value generic_value
+  | Float_boxed -> Float_boxed ()
+  | Float64 -> Float64
+  | Float32 -> Float32
+  | Bits8 -> Bits8
+  | Bits16 -> Bits16
+  | Bits32 -> Bits32
+  | Bits64 -> Bits64
+  | Vec128 -> Vec128
+  | Vec256 -> Vec256
+  | Vec512 -> Vec512
+  | Word -> Word
+  | Untagged_immediate -> Untagged_immediate
+  | Product shapes ->
+    Product (transl_mixed_product_shape shapes)
+  | Void -> Product [||]
+
+and transl_mixed_product_shape shape =
+  Array.map transl_mixed_block_element shape
+
+let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
+  Array.mapi (fun i (elt : Types.mixed_block_element) ->
+    match elt with
+    | Value -> Value (get_value_kind i)
+    | Float_boxed -> Float_boxed (get_mode i)
+    | Float64 -> Float64
+    | Float32 -> Float32
+    | Bits8 -> Bits8
+    | Bits16 -> Bits16
+    | Bits32 -> Bits32
+    | Bits64 -> Bits64
+    | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
+    | Word -> Word
+    | Untagged_immediate -> Untagged_immediate
+    | Product shapes ->
+      let get_value_kind _ = generic_value in
+      Product
+        (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
+    | Void -> Product [||]
+  ) shape
+
+let mod_field ?(read_semantics=Reads_agree) pos = function
+  | Module_value_only _ ->
+    Pfield(pos, Pointer, read_semantics)
+  | Module_mixed (_, shape_for_read) ->
+    Pmixedfield([pos], shape_for_read, read_semantics)
+
+let transl_module_representation repr =
+  let shape =
+    Array.map
+      (fun sort ->
+         sort
+         |> Jkind.Sort.default_for_transl_and_get
+         |> Types.mixed_block_element_of_const_sort)
+      repr
+  in
+  let is_value (elt : Types.mixed_block_element) =
+    match elt with
+    | Value -> true
+    | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
+    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
+    | Product _ | Void -> false
+  in
+  if Array.for_all is_value shape
+  then Module_value_only { field_count = Array.length shape }
+  else
+    Module_mixed
+      ( transl_mixed_product_shape shape,
+        transl_mixed_product_shape_for_read
+        ~get_value_kind:(fun _ -> generic_value)
+        ~get_mode:(fun _ ->
+           fatal_error "Lambda.transl_module_representation: \
+                          unexpected [Float_boxed].") shape)
+
 (* Translate an access path *)
 
 let rec transl_address loc = function
@@ -1423,9 +1514,9 @@ let rec transl_address loc = function
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
       else Lvar id
-  | Env.Adot(addr, pos) ->
-      Lprim(Pfield(pos, Pointer, Reads_agree),
-                   [transl_address loc addr], loc)
+  | Env.Adot(addr, module_repr, pos) ->
+      let module_repr = transl_module_representation module_repr in
+      Lprim(mod_field pos module_repr, [transl_address loc addr], loc)
 
 let transl_path find loc env path =
   match find path env with
@@ -1456,49 +1547,27 @@ let transl_prim mod_name name =
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
 
-let rec transl_mixed_product_shape shape =
-  Array.map (fun (elt : Types.mixed_block_element) ->
-    match elt with
-    | Value -> Value generic_value
-    | Float_boxed -> Float_boxed ()
-    | Float64 -> Float64
-    | Float32 -> Float32
-    | Bits8 -> Bits8
-    | Bits16 -> Bits16
-    | Bits32 -> Bits32
-    | Bits64 -> Bits64
-    | Vec128 -> Vec128
-    | Vec256 -> Vec256
-    | Vec512 -> Vec512
-    | Word -> Word
-    | Untagged_immediate -> Untagged_immediate
-    | Product shapes ->
-      Product (transl_mixed_product_shape shapes)
-    | Void -> Product [||]
-  ) shape
-
-let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
-  Array.mapi (fun i (elt : Types.mixed_block_element) ->
-    match elt with
-    | Value -> Value (get_value_kind i)
-    | Float_boxed -> Float_boxed (get_mode i)
-    | Float64 -> Float64
-    | Float32 -> Float32
-    | Bits8 -> Bits8
-    | Bits16 -> Bits16
-    | Bits32 -> Bits32
-    | Bits64 -> Bits64
-    | Vec128 -> Vec128
-    | Vec256 -> Vec256
-    | Vec512 -> Vec512
-    | Word -> Word
-    | Untagged_immediate -> Untagged_immediate
-    | Product shapes ->
-      let get_value_kind _ = generic_value in
-      Product
-        (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
-    | Void -> Product [||]
-  ) shape
+let block_of_module_representation ~loc = function
+  | Module_value_only _ -> Pmakeblock(0, Immutable, None, alloc_heap)
+  | Module_mixed (shape, _) ->
+    let rec count_values shape =
+      Array.fold_left
+        (fun acc elt ->
+          match elt with
+          | Value _ -> acc + 1
+          | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+          | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate -> acc
+          | Product product_shape -> acc + count_values product_shape
+          (* CR layout poly: We need to support this for relatively simple
+             layout poly usecases, however it should be easy to move this assert
+             to after slambdaeval (or maybe during?). *)
+          | Splice_variable _ ->
+            Misc.fatal_error "Layout poly doesn't support mixed modules yet")
+        0 shape
+    in
+    Typedecl.assert_mixed_product_support loc Module
+      ~value_prefix_len:(count_values shape);
+    Pmakemixedblock(0, Immutable, shape, alloc_heap)
 
 (* Compile a sequence of expressions *)
 
@@ -1834,12 +1903,6 @@ let find_exact_application kind ~arity args =
 
 let reset () =
   Static_label.reset static_label_sequence
-
-let mod_field ?(read_semantics=Reads_agree) pos =
-  Pfield (pos, Pointer, read_semantics)
-
-let mod_setfield pos =
-  Psetfield (pos, Pointer, Root_initialization)
 
 let locality_mode_of_primitive_description (p : external_call_description) =
   if not Config.stack_allocation then
@@ -2326,30 +2389,36 @@ let array_ref_kind_result_layout = function
   | Pgcscannableproductarray_ref kinds -> layout_of_scannable_kinds kinds
   | Pgcignorableproductarray_ref kinds -> layout_of_ignorable_kinds kinds
 
+let rec layout_of_mixed_block_element element =
+  match element with
+  | Value value_kind -> Pvalue value_kind
+  | Float_boxed _ -> layout_boxed_float Boxed_float64
+  | Float64 -> layout_unboxed_float Unboxed_float64
+  | Float32 -> layout_unboxed_float Unboxed_float32
+  | Bits8 -> layout_unboxed_int8
+  | Bits16 -> layout_unboxed_int16
+  | Bits32 -> layout_unboxed_int32
+  | Bits64 -> layout_unboxed_int64
+  | Word -> layout_unboxed_nativeint
+  | Untagged_immediate -> layout_unboxed_int Untagged_int
+  | Vec128 -> layout_unboxed_vector Unboxed_vec128
+  | Vec256 -> layout_unboxed_vector Unboxed_vec256
+  | Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Product shape ->
+    Punboxed_product
+      (Array.to_list (Array.map layout_of_mixed_block_element shape))
+  | Splice_variable id -> Psplicevar id
+
 let layout_of_mixed_block_shape
     : 'a. 'a mixed_block_element array -> path:int list -> layout
     = fun shape ~path ->
-  let rec layout_of_mixed_block_element element =
-    match element with
-    | Value value_kind -> Pvalue value_kind
-    | Float_boxed _ -> layout_boxed_float Boxed_float64
-    | Float64 -> layout_unboxed_float Unboxed_float64
-    | Float32 -> layout_unboxed_float Unboxed_float32
-    | Bits8 -> layout_unboxed_int8
-    | Bits16 -> layout_unboxed_int16
-    | Bits32 -> layout_unboxed_int32
-    | Bits64 -> layout_unboxed_int64
-    | Word -> layout_unboxed_nativeint
-    | Untagged_immediate -> layout_unboxed_int Untagged_int
-    | Vec128 -> layout_unboxed_vector Unboxed_vec128
-    | Vec256 -> layout_unboxed_vector Unboxed_vec256
-    | Vec512 -> layout_unboxed_vector Unboxed_vec512
-    | Product shape ->
-      Punboxed_product
-        (Array.to_list (Array.map layout_of_mixed_block_element shape))
-    | Splice_variable id -> Psplicevar id
-  in
   layout_of_mixed_block_element (project_from_mixed_block_shape shape ~path)
+
+let layout_of_module_field repr pos =
+  match repr with
+  | Module_value_only _ -> layout_value_field
+  | Module_mixed (shape, _) ->
+    layout_of_mixed_block_element shape.(pos)
 
 let rec mixed_block_element_of_layout (layout : layout) :
     unit mixed_block_element =
@@ -2476,7 +2545,9 @@ let primitive_result_layout (p : primitive) =
   | Punboxed_nativeint_array_set_vec _
   | Parrayblit _
     -> layout_unit
-  | Pgetglobal _ | Pgetpredef _ -> layout_module_field
+  | Pgetglobal _ -> layout_module
+    (* Note the assumption that predefs are always values *)
+  | Pgetpredef _ -> layout_predef_value
   | Pmakeblock _ | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
   | Pduprecord _ | Pmakeufloatblock _ | Pmakemixedblock _ | Pmakelazyblock _
   | Pduparray _ | Pbigarraydim _ | Pobj_dup -> layout_block
@@ -2575,6 +2646,7 @@ let primitive_result_layout (p : primitive) =
   | Pctconst (
     Big_endian | Word_size | Int_size | Max_wosize
     | Ostype_unix | Ostype_cygwin | Ostype_win32 | Backend_type | Runtime5
+    | Arch_amd64 | Arch_arm64
   ) ->
     (* Compile-time constants only ever return ints for now,
        enumerate them all to be sure to modify this if it becomes wrong. *)

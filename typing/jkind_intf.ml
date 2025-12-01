@@ -136,11 +136,13 @@ module type Sort = sig
 
     val for_constructor : t
 
-    val for_module_field : t
-
     val for_boxed_variant : t
 
     val for_exception : t
+
+    val for_type_extension : t
+
+    val for_class : t
   end
 
   module Var : sig
@@ -239,10 +241,11 @@ module History = struct
     | Layout_poly_in_external
     | Unboxed_tuple_element
     | Peek_or_poke
-    | Mutable_var_assignment
     | Old_style_unboxed_type
     | Array_element
     | Idx_element
+    | Structure_item
+    | Signature_item
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
@@ -284,7 +287,6 @@ module History = struct
     | Tuple_element
     | Separability_check
     | Polymorphic_variant_field
-    | Structure_element
     | V1_safety_check
     | Probe
     | Captured_in_object

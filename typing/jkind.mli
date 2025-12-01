@@ -496,6 +496,7 @@ val of_const :
   annotation:Parsetree.jkind_annotation option ->
   why:History.creation_reason ->
   quality:'d Types.jkind_quality ->
+  ran_out_of_fuel_during_normalize:bool ->
   'd Const.t ->
   'd Types.jkind
 
@@ -759,6 +760,10 @@ val set_raw_type_expr : (Format.formatter -> Types.type_expr -> unit) -> unit
 
 val format : Format.formatter -> 'd Types.jkind -> unit
 
+(** Similar to [format], but the kind is expanded as much as possible rather
+    than written in terms of a kind abbreviation. This is used by Merlin. *)
+val format_expanded : Format.formatter -> 'd Types.jkind -> unit
+
 (** Format the history of this jkind: what interactions it has had and why
     it is the jkind that it is. Might be a no-op: see [display_histories]
     in the implementation of the [Jkind] module.
@@ -869,11 +874,13 @@ val map_type_expr :
   (allowed * 'r) Types.jkind ->
   (allowed * 'r) Types.jkind
 
-(** Checks to see whether a jkind is {iobviously} the maximum jkind. Never does any
-    mutation, preferring a quick check over a thorough one, and doesn't expand any
-    with-bounds. Might return [false] even when the input is actually the maximum
-    jkind. *)
-val is_obviously_max : ('l * allowed) Types.jkind -> bool
+(** Checks to see whether a right-jkind is the maximum jkind. Never does any
+    mutation. *)
+val is_max : ('l * allowed) Types.jkind -> bool
+
+(** Checks to see whether a right-jkind's mod-bounds are the maximum
+    mod-bounds. Never does any mutation. *)
+val mod_bounds_are_max : ('l * allowed) Types.jkind -> bool
 
 (** Checks to see whether a jkind has layout any. Never does any mutation. *)
 val has_layout_any : ('l * allowed) Types.jkind -> bool

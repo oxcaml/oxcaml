@@ -175,7 +175,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       (* Res_none implies one argument is already an address. *)
       May_still_have_spilled_registers
     | 1, First_arg -> May_still_have_spilled_registers
-    | 1, Res { loc = res_loc; _ } ->
+    | 1, Res [| { loc = res_loc; _ } |] ->
       let arg_mem = Simd.loc_allows_mem simd.args.(0).loc in
       let res_mem = Simd.loc_allows_mem res_loc in
       assert (not (arg_mem && res_mem));
@@ -190,7 +190,9 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
         may_use_stack_operand_for_second_argument map instr ~num_args
           ~res_is_fst:true
       else May_still_have_spilled_registers
-    | num_args, Res { loc = res_loc; _ } ->
+    | num_args, Res rr ->
+      (* We don't attempt to allow spilling additional result regs. *)
+      let res_loc = rr.(0).loc in
       let arg_mem = Simd.loc_allows_mem simd.args.(1).loc in
       let res_mem = Simd.loc_allows_mem res_loc in
       assert (not (arg_mem && res_mem));
@@ -261,6 +263,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Csel _) (* CR gyorsh: optimize *)
   | Op (Specific (Ilfence | Isfence | Imfence))
   | Op (Intop (Imulh _ | Imul | Idiv | Imod))
+  | Op (Int128op (Iadd128 | Isub128 | Imul64 _))
   | Op (Intop_imm ((Imulh _ | Imul | Idiv | Imod), _))
   | Op (Specific (Irdtsc | Irdpmc))
   | Op (Intop (Ipopcnt | Iclz _ | Ictz _))

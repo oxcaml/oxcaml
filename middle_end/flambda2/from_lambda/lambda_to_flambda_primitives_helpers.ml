@@ -17,6 +17,8 @@
 open! Flambda.Import
 open Closure_conversion_aux
 module P = Flambda_primitive
+module K = Flambda_kind
+module L = Lambda
 module VB = Bound_var
 
 type failure =
@@ -490,3 +492,26 @@ and bind_rec_primitive acc exn_cont ~register_const0 (prim : simple_or_prim)
         (acc, body) (List.rev vars') (List.rev nameds)
     in
     bind_recs acc exn_cont ~register_const0 p dbg cont
+
+let convert_block_access_field_kind_from_value_kind
+    ({ raw_kind; nullable = _ } : L.value_kind) : P.Block_access_field_kind.t =
+  match raw_kind with
+  | Pintval -> Immediate
+  | Pvariant { consts = _; non_consts } -> (
+    match non_consts with [] -> Immediate | _ :: _ -> Any_value)
+  | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
+  | Pboxedvectorval _ ->
+    Any_value
+
+let mixed_block_access_field_kind
+    (elt : 'a Mixed_block_shape.Singleton_mixed_block_element.t) :
+    P.Mixed_block_access_field_kind.t =
+  match elt with
+  | Value value_kind ->
+    Value_prefix (convert_block_access_field_kind_from_value_kind value_kind)
+  | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+    | Vec512 | Word | Untagged_immediate ) as mixed_block_element ->
+    Flat_suffix
+      (K.Flat_suffix_element.from_singleton_mixed_block_element
+         mixed_block_element)
+  | Float_boxed _ -> Flat_suffix K.Flat_suffix_element.naked_float

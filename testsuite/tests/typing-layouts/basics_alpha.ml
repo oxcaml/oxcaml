@@ -196,16 +196,9 @@ module F2 (X : sig val x : t_void end) = struct
   let f () = X.x
 end;;
 [%%expect{|
-Line 1, characters 27-33:
-1 | module F2 (X : sig val x : t_void end) = struct
-                               ^^^^^^
-Error: This type signature for "x" is not a value type.
-       The layout of type t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of type t_void must be a sublayout of value
-         because it's the type of something stored in a module structure.
+module F2 :
+  functor (X : sig val x : t_void end) -> sig val f : unit -> t_void end
 |}];;
-(* CR layouts v5: the test above should be made to work *)
 
 module F2 (X : sig val f : void_record -> unit end) = struct
   let g z = X.f { vr_void = z; vr_int = 42 }
@@ -1712,11 +1705,11 @@ external foo33 : t_any = "foo33";;
 Line 1, characters 17-22:
 1 | external foo33 : t_any = "foo33";;
                      ^^^^^
-Error: This type signature for "foo33" is not a value type.
+Error: The type of a module-level value must have a representable layout.
        The layout of type t_any is any
          because of the definition of t_any at line 1, characters 0-18.
-       But the layout of type t_any must be a sublayout of value
-         because it's the type of something stored in a module structure.
+       But the layout of type t_any must be representable
+         because it's the type of something stored in a module.
 |}]
 
 

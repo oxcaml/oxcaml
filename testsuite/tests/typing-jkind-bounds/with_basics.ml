@@ -1186,7 +1186,6 @@ Error: This value is "nonportable" but is expected to be "portable".
 
 (*********************************************)
 (* Reduction of error seen in the tree *)
-(* This requires the [is_open] technology in Ctype. *)
 
 type 'k t1 = T of Obj.t [@@unboxed]
 

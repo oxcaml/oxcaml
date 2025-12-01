@@ -447,18 +447,36 @@ val get_level: type_expr -> int
 val get_scope: type_expr -> int
 val get_id: type_expr -> int
 
+(** Access to marks. They are stored in the scope field. *)
+type type_mark
+val with_type_mark: (type_mark -> 'a) -> 'a
+        (* run a computation using exclusively an available type mark *)
+
+val not_marked_node: type_mark -> type_expr -> bool
+        (* Return true if a type node is not yet marked *)
+
+val try_mark_node: type_mark -> type_expr -> bool
+        (* Mark a type node if it is not yet marked.
+           Marks will be automatically removed when leaving the
+           scope of [with_type_mark].
+
+           Return false if it was already marked *)
+
 (** Transient [type_expr].
     Should only be used immediately after [Transient_expr.repr] *)
 type transient_expr = private
       { mutable desc: type_desc;
         mutable level: int;
-        mutable scope: int;
+        mutable scope: scope_field;
         id: int }
+and scope_field (* abstract *)
 
 module Transient_expr : sig
   (** Operations on [transient_expr] *)
 
   val create: type_desc -> level: int -> scope: int -> id: int -> transient_expr
+  val get_scope: transient_expr -> int
+  val get_marks: transient_expr -> int
   val set_desc: transient_expr -> type_desc -> unit
   val set_level: transient_expr -> int -> unit
   val set_scope: transient_expr -> int -> unit
@@ -470,6 +488,8 @@ module Transient_expr : sig
   val set_stub_desc: type_expr -> type_desc -> unit
       (** Instantiate a not yet instantiated stub.
           Fail if already instantiated. *)
+
+  val try_mark_node: type_mark -> transient_expr -> bool
 end
 
 val create_expr: type_desc -> level: int -> scope: int -> id: int -> type_expr
@@ -490,6 +510,8 @@ module TransientTypeOps : sig
   val equal : t -> t -> bool
   val hash : t -> int
 end
+
+module TransientTypeHash : Hashtbl.S with type key = transient_expr
 
 (** Comparisons for [type_expr]; cannot be used for functors *)
 
@@ -641,7 +663,7 @@ module Vars  : Map.S with type key = string
 (* Value descriptions *)
 
 type value_kind =
-    Val_reg                             (* Regular value *)
+    Val_reg of Jkind_types.Sort.t       (* Regular value *)
   | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable variable *)
   | Val_prim of Primitive.description   (* Primitive *)
@@ -836,6 +858,8 @@ and type_origin =
     Definition
   | Rec_check_regularity       (* See Typedecl.transl_type_decl *)
   | Existential of string
+
+and module_representation = Jkind_types.Sort.t array
 
 and record_representation =
   | Record_unboxed
@@ -1063,6 +1087,10 @@ module type Wrapped = sig
     mtd_loc: Location.t;
     mtd_uid: Uid.t;
   }
+
+  (* Returns [None] for items that have no runtime representation (see
+     [Includemod.is_runtime_component]). *)
+  val sort_of_signature_item : signature_item -> Jkind_types.Sort.t option
 end
 
 module Make_wrapped(Wrap : Wrap) : Wrapped with type 'a wrapped = 'a Wrap.t
@@ -1174,11 +1202,18 @@ type record_form_packed =
 
 val record_form_to_string : _ record_form -> string
 
+val mixed_block_element_of_const_sort :
+  Jkind_types.Sort.Const.t -> mixed_block_element
+
 (** Extracts the list of "value" identifiers bound by a signature.
     "Value" identifiers are identifiers for signature components that
     correspond to a run-time value: values, extensions, modules, classes.
     Note: manifest primitives do not correspond to a run-time value! *)
 val bound_value_identifiers: signature -> Ident.t list
+
+(** Like [bound_value_identifiers], but also return sorts *)
+val bound_value_identifiers_and_sorts :
+  signature -> (Ident.t * Jkind_types.Sort.t) list
 
 val signature_item_id : signature_item -> Ident.t
 

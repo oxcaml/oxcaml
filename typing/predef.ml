@@ -26,6 +26,10 @@ let wrap create s =
   builtin_idents := (s, id) :: !builtin_idents;
   id
 
+(* Note: [ident_create] creates identifiers with [Ident.Predef], and later
+   portions of the compiler assume that expressions with these identifiers must
+   have types with layout value (see, e.g., the compilation of [Pgetpredef]
+   in `lambda.ml`). *)
 let ident_create = wrap Ident.create_predef
 
 let ident_int = ident_create "int"
@@ -271,6 +275,7 @@ and type_unboxed_float64x8 =
 
 let ident_match_failure = ident_create "Match_failure"
 and ident_out_of_memory = ident_create "Out_of_memory"
+and ident_out_of_fibers = ident_create "Out_of_fibers"
 and ident_invalid_argument = ident_create "Invalid_argument"
 and ident_failure = ident_create "Failure"
 and ident_not_found = ident_create "Not_found"
@@ -286,6 +291,7 @@ and ident_undefined_recursive_module =
 let all_predef_exns = [
   ident_match_failure;
   ident_out_of_memory;
+  ident_out_of_fibers;
   ident_invalid_argument;
   ident_failure;
   ident_not_found;
@@ -708,6 +714,7 @@ let build_initial_env add_type add_extension empty_env =
        Jkind.Sort.Const.value]
   |> add_extension ident_not_found []
   |> add_extension ident_out_of_memory []
+  |> add_extension ident_out_of_fibers []
   |> add_extension ident_stack_overflow []
   |> add_extension ident_sys_blocked_io []
   |> add_extension ident_sys_error [type_string,

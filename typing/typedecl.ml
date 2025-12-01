@@ -49,11 +49,13 @@ module Mixed_product_kind = struct
     | Record
     | Cstr_tuple
     | Cstr_record
+    | Module
 
   let to_plural_string = function
     | Record -> "records"
     | Cstr_tuple -> "constructors"
     | Cstr_record -> "inline record arguments to constructors"
+    | Module -> "modules"
 end
 
 type mixed_product_violation =
@@ -119,7 +121,7 @@ type error =
       ; err : Jkind.Violation.t
       }
   | Jkind_empty_record
-  | Non_value_in_sig of Jkind.Violation.t * string * type_expr
+  | Non_representable_in_module of Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
   | Separability of Typedecl_separability.error
@@ -2231,31 +2233,25 @@ let check_unboxed_paths decls ~unboxed_version_banned =
   (* We iterate on all subexpressions of the declaration to check "in depth"
      that no non-existent unboxed version is used. *)
   let open Btype in
-  let checked =
-    (* [checked] remembers the types that the iterator already
-        checked, to avoid looping on cyclic types. *)
-    ref TypeSet.empty
-  in
-  let check_ty loc ty =
-    match get_desc ty with
-    | Tconstr(Pextra_ty (path, Punboxed_ty), _, _)
-      when unboxed_version_banned path ->
-        raise (Error (loc, No_unboxed_version path))
-    | _ -> ()
-  in
-  let check_decl d =
-    let it =
-      {type_iterators with it_type_expr =
-        (fun self ty ->
-          if not (TypeSet.mem ty !checked) then begin
-            check_ty d.type_loc ty;
-            checked := TypeSet.add ty !checked;
-            self.it_do_type_expr self ty
-          end)}
+  with_type_mark (fun mark ->
+    let super = type_iterators mark in
+    let check_ty loc ty =
+      match get_desc ty with
+      | Tconstr(Pextra_ty (path, Punboxed_ty), _, _)
+        when unboxed_version_banned path ->
+          raise (Error (loc, No_unboxed_version path))
+      | _ -> ()
     in
-    it.it_type_declaration it (Ctype.generic_instance_declaration d)
-  in
-  List.iter (fun (_, d) -> check_decl d) decls
+    let check_decl d =
+      let it =
+        {super with it_do_type_expr =
+          (fun self ty ->
+              check_ty d.type_loc ty;
+              super.it_do_type_expr self ty)}
+      in
+      it.it_type_declaration it (Ctype.generic_instance_declaration d)
+    in
+    List.iter (fun (_, d) -> check_decl d) decls)
 
 (* Note: Well-foundedness for OCaml types
 
@@ -2484,11 +2480,8 @@ let check_well_founded_decl  ~abs_env env loc path decl to_check =
   let open Btype in
   (* We iterate on all subexpressions of the declaration to check
      "in depth" that no ill-founded type exists. *)
-  let it =
-    let checked =
-      (* [checked] remembers the types that the iterator already
-         checked, to avoid looping on cyclic types. *)
-      ref TypeSet.empty in
+  with_type_mark begin fun mark ->
+    let super = type_iterators mark in
     let visited =
       (* [visited] remembers the inner visits performed by
          [check_well_founded] on each type expression reachable from
@@ -2496,14 +2489,14 @@ let check_well_founded_decl  ~abs_env env loc path decl to_check =
          [check_well_founded] work when invoked on two parts of the
          type declaration that have common subexpressions. *)
       ref TypeMap.empty in
-    {type_iterators with it_type_expr =
-     (fun self ty ->
-       if TypeSet.mem ty !checked then () else begin
-         check_well_founded  ~abs_env env loc path to_check visited ty;
-         checked := TypeSet.add ty !checked;
-         self.it_do_type_expr self ty
-       end)} in
-  it.it_type_declaration it (Ctype.generic_instance_declaration decl)
+    let it =
+      {super with it_do_type_expr =
+       (fun self ty ->
+         check_well_founded ~abs_env env loc path to_check visited ty;
+         super.it_do_type_expr self ty
+       )} in
+    it.it_type_declaration it (Ctype.generic_instance_declaration decl)
+  end
 
 (* We only allow recursion in unboxed product types to occur through boxes,
    otherwise the type is uninhabitable and usually also infinite-size.
@@ -3841,16 +3834,15 @@ let check_for_hidden_arrow env loc ty =
   | Assert_default -> ()
 
 (* Translate a value declaration *)
-let transl_value_decl env loc ~modalities valdecl =
+let transl_value_decl env loc ~modalities ~why valdecl =
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
-  (* CR layouts v5: relax this to check for representability. *)
-  begin match Ctype.constrain_type_jkind env cty.ctyp_type
-                (Jkind.Builtin.value_or_null ~why:Structure_element) with
-  | Ok () -> ()
-  | Error err ->
-    raise(Error(cty.ctyp_loc,
-                Non_value_in_sig(err,valdecl.pval_name.txt,cty.ctyp_type)))
-  end;
+  let sort =
+    match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with
+    | Ok sort -> sort
+    | Error err ->
+      raise
+        (Error (cty.ctyp_loc, Non_representable_in_module (err, cty.ctyp_type)))
+  in
   let ty = cty.ctyp_type in
   let v =
   match valdecl.pval_prim with
@@ -3899,7 +3891,9 @@ let transl_value_decl env loc ~modalities valdecl =
         | Assume _ ->
           raise (Error(valdecl.pval_loc, Zero_alloc_attr_unsupported zero_alloc))
       in
-      { val_type = ty; val_kind = Val_reg; Types.val_loc = loc;
+      { val_type = ty;
+        val_kind = Val_reg sort;
+        Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities = modalities;
         val_zero_alloc = zero_alloc;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -3962,9 +3956,9 @@ let transl_value_decl env loc ~modalities valdecl =
   in
   desc, newenv
 
-let transl_value_decl env ~modalities loc valdecl =
+let transl_value_decl env ~modalities ~why loc valdecl =
   Builtin_attributes.warning_scope valdecl.pval_attributes
-    (fun () -> transl_value_decl env ~modalities loc valdecl)
+    (fun () -> transl_value_decl env ~modalities ~why loc valdecl)
 
 (* Translate a "with" constraint -- much simplified version of
    transl_type_decl. For a constraint [Sig with t = sdecl],
@@ -4740,10 +4734,10 @@ let report_error ppf = function
          ~level:(Ctype.get_current_level ())) err
   | Jkind_empty_record ->
     fprintf ppf "@[Records must contain at least one runtime value.@]"
-  | Non_value_in_sig (err, val_name, ty) ->
+  | Non_representable_in_module (err, ty) ->
     let offender ppf = fprintf ppf "type %a" Printtyp.type_expr ty in
-    fprintf ppf "@[This type signature for %a is not a value type.@ %a@]"
-      Style.inline_code val_name
+    fprintf ppf "@[The type of a module-level value must have a@ \
+                   representable layout.@ %a@]"
       (Jkind.Violation.report_with_offender ~offender
          ~level:(Ctype.get_current_level ()))
       err

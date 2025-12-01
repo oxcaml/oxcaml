@@ -61,7 +61,9 @@
  (flags
   (:standard -w -27))
  (ocamlopt_flags
-  (:standard -O3))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)
+   -O3))
  (libraries ocamlcommon)
  (modules doubly_linked_list file_sections lru))
 

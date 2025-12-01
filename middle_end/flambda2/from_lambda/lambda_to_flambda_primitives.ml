@@ -110,16 +110,6 @@ let vec_kind = function
 let convert_block_access_field_kind i_or_p : P.Block_access_field_kind.t =
   match i_or_p with L.Immediate -> Immediate | L.Pointer -> Any_value
 
-let convert_block_access_field_kind_from_value_kind
-    ({ raw_kind; nullable = _ } : L.value_kind) : P.Block_access_field_kind.t =
-  match raw_kind with
-  | Pintval -> Immediate
-  | Pvariant { consts = _; non_consts } -> (
-    match non_consts with [] -> Immediate | _ :: _ -> Any_value)
-  | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
-  | Pboxedvectorval _ ->
-    Any_value
-
 let convert_init_or_assign (i_or_a : L.initialization_or_assignment) :
     P.Init_or_assign.t =
   match i_or_a with
@@ -2427,18 +2417,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         check_non_negative_imm imm "Pmixedfield";
         let mutability = convert_field_read_semantics sem in
         let block_access : P.Block_access_kind.t =
-          let field_kind : P.Mixed_block_access_field_kind.t =
-            match flattened_reordered_shape.(new_index) with
-            | Value value_kind ->
-              Value_prefix
-                (convert_block_access_field_kind_from_value_kind value_kind)
-            | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-              | Vec256 | Vec512 | Word | Untagged_immediate ) as
-              mixed_block_element ->
-              Flat_suffix
-                (K.Flat_suffix_element.from_singleton_mixed_block_element
-                   mixed_block_element)
-            | Float_boxed _ -> Flat_suffix K.Flat_suffix_element.naked_float
+          let field_kind =
+            H.mixed_block_access_field_kind
+              flattened_reordered_shape.(new_index)
           in
           Mixed
             { tag = Unknown; field_kind; shape = kind_shape; size = Unknown }
@@ -2519,19 +2500,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           let block_access : P.Block_access_kind.t =
             Mixed
               { field_kind =
-                  (match flattened_reordered_shape.(new_index) with
-                  | Value value_kind ->
-                    Value_prefix
-                      (convert_block_access_field_kind_from_value_kind
-                         value_kind)
-                  | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                    | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ) as
-                    mixed_block_element ->
-                    Flat_suffix
-                      (K.Flat_suffix_element.from_singleton_mixed_block_element
-                         mixed_block_element)
-                  | Float_boxed _ ->
-                    Flat_suffix K.Flat_suffix_element.naked_float);
+                  H.mixed_block_access_field_kind
+                    flattened_reordered_shape.(new_index);
                 shape = kind_shape;
                 tag = Unknown;
                 size = Unknown
@@ -2661,6 +2631,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         [ Simple
             (Simple.const_bool machine_width
                (String.equal Sys.os_type "Cygwin")) ]
+      (* CR-someday gyorsh: replace string comparisons with dedicated types for
+         [arch] and [os_type]. *)
+      | Arch_amd64 ->
+        [ Simple
+            (Simple.const_bool machine_width
+               (String.equal Config.architecture "amd64")) ]
+      | Arch_arm64 ->
+        [ Simple
+            (Simple.const_bool machine_width
+               (String.equal Config.architecture "arm64")) ]
       | Backend_type ->
         [Simple (Simple.const_zero machine_width)]
         (* constructor 0 is the same as Native here *)
@@ -2879,8 +2859,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
         ~vec_kind:(vec_kind size) Naked_int32s array ~index_kind index new_value
     ]
-  | Pprobe_is_enabled { name }, [] ->
-    [tag_int (Nullary (Probe_is_enabled { name }))]
+  | Pprobe_is_enabled { name; enabled_at_init }, [] ->
+    [tag_int (Nullary (Probe_is_enabled { name; enabled_at_init }))]
   | Pobj_dup, [[v]] -> [Unary (Obj_dup, v)]
   | Pget_header m, [[obj]] -> [get_header obj m ~current_region]
   | Patomic_load_field { immediate_or_pointer }, [[atomic]; [field]] ->

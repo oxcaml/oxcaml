@@ -193,7 +193,7 @@ let map_summary f = function
 type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * int
+  | Adot of address * module_representation * int
 
 module TycompTbl =
   struct
@@ -709,7 +709,10 @@ and functor_components = {
 }
 
 and address_unforced =
-  | Projection of { parent : address_lazy; pos : int; }
+  | Projection of
+    { parent : address_lazy;
+      module_repr: module_representation;
+      pos : int }
   | ModAlias of { env : t; path : Path.t; }
 
 and address_lazy = (address_unforced, address) Lazy_backtrack.t
@@ -1032,7 +1035,7 @@ let normalize_mda_mode mda =
 let rec print_address ppf = function
   | Aunit cu -> Format.fprintf ppf "%s" (Compilation_unit.full_path_as_string cu)
   | Alocal id -> Format.fprintf ppf "%s" (Ident.name id)
-  | Adot(a, pos) -> Format.fprintf ppf "%a.[%i]" print_address a pos
+  | Adot(a, _, pos) -> Format.fprintf ppf "%a.[%i]" print_address a pos
 
 type address_head =
   | AHunit of Compilation_unit.t
@@ -1041,7 +1044,7 @@ type address_head =
 let rec address_head = function
   | Aunit cu -> AHunit cu
   | Alocal id -> AHlocal id
-  | Adot (a, _) -> address_head a
+  | Adot (a, _, _) -> address_head a
 
 (* The name of the compilation unit currently compiled. *)
 module Current_unit_name : sig
@@ -1603,7 +1606,8 @@ and find_ident_module_address id env =
   get_address (find_ident_module id env).mda_address
 
 and force_address = function
-  | Projection { parent; pos } -> Adot(get_address parent, pos)
+  | Projection { parent; module_repr; pos } ->
+    Adot(get_address parent, module_repr, pos)
   | ModAlias { env; path } -> find_module_address path env
 
 and get_address a =
@@ -2123,6 +2127,9 @@ let add_to_tbl id decl tbl =
 let primitive_address_error =
   Invalid_argument "Primitives don't have addresses"
 
+let mutable_variable_address_error =
+  Invalid_argument "Mutable variables don't have addresses"
+
 let value_declaration_address (_ : t) id decl =
   match decl.Subst.Lazy.val_kind with
   | Val_prim _ -> Lazy_backtrack.create_failed primitive_address_error
@@ -2173,9 +2180,16 @@ let rec components_of_module_maker
       in
       let env = ref cm_env in
       let pos = ref 0 in
+      let module_repr =
+        List.filter_map
+          (fun (item, _) -> Subst.Lazy.sort_of_signature_item item)
+          items_and_paths
+        |> Array.of_list
+      in
       let next_address () =
         let addr : address_unforced =
-          Projection { parent = cm_addr; pos = !pos }
+          Projection
+            { parent = cm_addr; module_repr; pos = !pos }
         in
         incr pos;
         Lazy_backtrack.create addr
@@ -2187,7 +2201,11 @@ let rec components_of_module_maker
             let addr =
               match decl.val_kind with
               | Val_prim _ -> Lazy_backtrack.create_failed primitive_address_error
-              | _ -> next_address ()
+              | Val_reg _ -> next_address ()
+              | Val_ivar _ | Val_self _ | Val_anc _ ->
+                next_address ()
+              | Val_mut _ ->
+                Lazy_backtrack.create_failed mutable_variable_address_error
             in
             let vda_shape = Shape.proj cm_shape (Shape.Item.value id) in
             let vda =
@@ -3029,11 +3047,16 @@ let unit_name_of_filename fn =
       else None
   | _ -> None
 
-let persistent_structures_of_dir dir =
-  Load_path.Dir.basenames dir
+let persistent_structures_of_basenames basenames =
+  basenames
   |> List.to_seq
   |> Seq.filter_map unit_name_of_filename
   |> String.Set.of_seq
+
+
+let persistent_structures_of_dir dir =
+  Load_path.Dir.basenames dir
+  |> persistent_structures_of_basenames
 
 (* Save a signature to a file *)
 let save_signature_with_transform cmi_transform ~alerts sg modname kind
@@ -4340,7 +4363,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
       | Val_mut _, _ -> assert false
       (* Unreachable because only [type_pat] creates mutable variables
          and it checks that they are simple identifiers. *)
-      | ((Val_reg | Val_prim _ | Val_self _ | Val_anc _), _) ->
+      | ((Val_reg _ | Val_prim _ | Val_self _ | Val_anc _), _) ->
           lookup_error loc env (Not_a_settable_variable name)
     end
   | Ok (_, _, Val_unbound Val_unbound_instance_variable) ->
@@ -4443,10 +4466,7 @@ let fold_modules f lid env acc =
            match entry with
            | Mod_unbound _ -> acc
            | Mod_local (mda, _) ->
-               let md =
-                 Subst.Lazy.force_module_decl mda.mda_declaration
-               in
-               f name p md acc
+               f name p mda.mda_declaration acc
            | Mod_persistent ->
                (* CR lmaurer: Setting instance args to [] here isn't right. We
                   really should have [IdTbl.fold_name] provide the whole ident
@@ -4457,10 +4477,7 @@ let fold_modules f lid env acc =
                match Persistent_env.find_in_cache !persistent_env modname with
                | None -> acc
                | Some mda ->
-                   let md =
-                     Subst.Lazy.force_module_decl mda.mda_declaration
-                   in
-                   f name p md acc)
+                   f name p mda.mda_declaration acc)
         env.modules
         acc
   | Some l ->
@@ -4472,10 +4489,7 @@ let fold_modules f lid env acc =
       | Structure_comps c ->
           NameMap.fold
             (fun s mda acc ->
-               let md =
-                 Subst.Lazy.force_module_decl mda.mda_declaration
-               in
-               f s (Pdot (p, s)) md acc)
+               f s (Pdot (p, s)) mda.mda_declaration acc)
             c.comp_modules
             acc
       | Functor_comps _ ->
@@ -4504,7 +4518,6 @@ and fold_types f =
     (fun env -> env.types) (fun sc -> sc.comp_types)
     (fun k p tda acc -> f k p tda.tda_declaration acc)
 and fold_modtypes f =
-  let f l path data acc = f l path (Subst.Lazy.force_modtype_decl data) acc in
   find_all wrap_identity
     (fun env -> env.modtypes) (fun sc -> sc.comp_modtypes)
     (fun k p mta acc -> f k p mta.mtda_declaration acc)

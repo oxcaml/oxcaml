@@ -3072,10 +3072,10 @@ module Comonadic_with (Areality : Areality) = struct
   end
 
   let min_with ax m =
-    Solver.apply Obj.obj (Min_with ax) (Solver.disallow_right m)
+    Solver.apply ~hint:Skip Obj.obj (Min_with ax) (Solver.disallow_right m)
 
   let max_with ax m =
-    Solver.apply Obj.obj (Max_with ax) (Solver.disallow_left m)
+    Solver.apply ~hint:Skip Obj.obj (Max_with ax) (Solver.disallow_left m)
 
   let meet_with ax c m = meet_const (Const.max_with ax c) m
 
@@ -3212,7 +3212,7 @@ module Monadic = struct
   let join_with ax c m = join_const (Const.min_with ax c) m
 
   let min_with ax m =
-    Solver.apply Obj.obj (Max_with ax) (Solver.disallow_left m)
+    Solver.apply ~hint:Skip Obj.obj (Max_with ax) (Solver.disallow_left m)
 
   let zap_to_legacy m : Const.t =
     let uniqueness = proj Uniqueness m |> Uniqueness.zap_to_legacy in

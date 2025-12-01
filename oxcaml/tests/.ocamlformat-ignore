@@ -3,6 +3,7 @@ backend/vectorizer/test_int64_unboxed.ml
 backend/vectorizer/test_float_unboxed.ml
 backend/vectorizer/test_int32_unboxed.ml
 backend/vectorizer/test_float32_unboxed.ml
+simd/int128.ml
 simd/*_u.ml
 simd/let_mutable.ml
 simd/unbox_types.ml
@@ -12,12 +13,15 @@ simd/consts_u.ml
 simd/consts256_u.ml
 simd/arrays.ml
 simd/arrays256.ml
+simd/amd64/int_ops.ml
 simd/amd64/load_store.ml
+simd/mixed_modules.ml
 simd/disabled/disabled256.ml
 small_numbers/float32_u_lib.ml
 backend/zero_alloc_checker/fail27.ml
 backend/zero_alloc_checker/test_arch_specific_witness.ml
 intrinsics/select_float.ml
+intrinsics/test_arch.ml
 backend/zero_alloc_checker/test_remove_inferred_assume.ml
 backend/zero_alloc_checker/test_remove_inferred_assume_workaround.ml
 backend/zero_alloc_checker/test_flambda2_invalid.ml

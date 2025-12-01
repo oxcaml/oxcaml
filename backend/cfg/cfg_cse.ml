@@ -319,6 +319,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Store (_, _, asg) -> Op_store asg
     | Alloc _ | Poll -> assert false (* treated specially *)
     | Intop _ -> Op_pure
+    | Int128op _ -> Op_pure
     | Intop_imm (_, _) -> Op_pure
     | Intop_atomic _ -> Op_store true
     | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _ -> Op_pure
@@ -337,7 +338,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Const_int _ -> true
     | Move | Spill | Reload | Const_float32 _ | Const_float _ | Const_symbol _
     | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Opaque | Stackoffset _
-    | Load _ | Store _ | Alloc _ | Poll | Pause | Intop _
+    | Load _ | Store _ | Alloc _ | Poll | Pause | Intop _ | Int128op _
     | Intop_imm (_, _)
     | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
     | Specific _ | Name_for_debugger _ | Probe_is_enabled _ | Begin_region
@@ -384,7 +385,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
          | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
          | Store (_, _, _)
-         | Intop _
+         | Intop _ | Int128op _
          | Intop_imm (_, _)
          | Intop_atomic _
          | Floatop (_, _)

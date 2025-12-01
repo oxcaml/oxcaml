@@ -152,7 +152,9 @@ Line 3, characters 13-14:
                  ^
 Error: This value is "local"
        because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "local" to the parent region or "global".
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+       because it is a function return value.
+       Hint: Use exclave_ to return a local value.
 |}]
 
 let returning_regional () x =

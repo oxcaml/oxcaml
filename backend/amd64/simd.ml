@@ -239,7 +239,18 @@ type operation_class =
   | Load of { is_mutable : bool }
   | Store
 
-let class_of_operation _op = Pure
+let class_of_operation op =
+  (* Operations with implicit memory operands must also appear in
+     [Emit.emit_implicit_simd_sanitize]. *)
+  match[@warning "-4"] (Pseudo_instr.instr op.instr).id with
+  | Maskmovdqu | Vmaskmovdqu -> Store
+  | _ -> Pure
+
+let is_memory_operation op =
+  match class_of_operation op with
+  | Pure -> false
+  | Load _ -> true
+  | Store -> true
 
 let is_pure_operation op =
   match class_of_operation op with

@@ -620,6 +620,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%ostype_win32" -> Primitive ((Pctconst Ostype_win32), 1)
     | "%ostype_cygwin" -> Primitive ((Pctconst Ostype_cygwin), 1)
     | "%runtime5" -> Primitive ((Pctconst Runtime5), 1)
+    | "%arch_amd64" -> Primitive ((Pctconst Arch_amd64), 1)
+    | "%arch_arm64" -> Primitive ((Pctconst Arch_arm64), 1)
     | "%frame_pointers" -> Frame_pointers
     | "%negint" -> unary (Integral (int, Neg))
     | "%succint" -> unary (Integral (int, Succ))

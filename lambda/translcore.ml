@@ -310,7 +310,7 @@ let transl_ident loc env ty path desc kind =
       Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort (Some path)
   | Val_anc _, Id_value ->
       raise(Error(to_location loc, Free_super_var))
-  | (Val_reg | Val_self _), Id_value ->
+  | (Val_reg _ | Val_self _), Id_value ->
       transl_value_path loc env path
   |  _ -> fatal_error "Translcore.transl_exp: bad Texp_ident"
 
@@ -1144,14 +1144,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | _ ->
           let oid = Ident.create_local "open" in
           let oid_duid = Lambda.debug_uid_none in
+          let open_repr = transl_module_representation od.open_items_repr in
           let body, _ =
-            (* CR layouts v5: Currently we only allow values at the top of a
-               module.  When that changes, some adjustments may be needed
-               here. *)
             List.fold_left (fun (body, pos) id ->
-              Llet(Alias, Lambda.layout_module_field, id,
+              Llet(Alias, layout_of_module_field open_repr pos, id,
                    Lambda.debug_uid_none,
-                   Lprim(mod_field pos, [Lvar oid],
+                   Lprim(mod_field pos open_repr, [Lvar oid],
                          of_location ~scopes od.open_loc), body),
               pos + 1
             ) (transl_exp ~scopes sort e, 0)
@@ -1270,27 +1268,45 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (* CR zqian: the handler function doesn't have a region. However, the
              [region] field is currently broken. *)
       in
-      let app =
+      let ap_loc = of_location e.exp_loc ~scopes in
+      let app ~ap_probe =
         { ap_func = Lvar funcid;
           ap_args;
           ap_result_layout = return_layout;
           ap_region_close = Rc_normal;
           ap_mode = alloc_local;
-          ap_loc = of_location e.exp_loc ~scopes;
+          ap_loc;
           ap_tailcall = Default_tailcall;
           ap_inlined = Never_inlined;
           ap_specialised = Always_specialise;
-          ap_probe = Some {name; enabled_at_init};
+          ap_probe;
         }
       in
-      Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler,
-            Lapply app)
+      let lam =
+        if !Clflags.emit_optimized_probes then
+          let ap_probe = Some {name; enabled_at_init} in
+          Lapply (app ~ap_probe)
+        else
+          (* Slower implementation of probes where there isn't clever
+             architecture-specific codegen. Read the semaphore each time. *)
+          (Lifthenelse
+             ( Lprim
+                 (Pprobe_is_enabled
+                    { name; enabled_at_init = Some enabled_at_init },
+                      [], ap_loc),
+               (* probe handler has type [unit] *)
+               Lapply (app ~ap_probe:None),
+               lambda_unit,
+               layout_unit ))
+      in
+      Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler, lam)
     end else begin
       lambda_unit
     end
   | Texp_probe_is_enabled {name} ->
     if !Clflags.native_code && !Clflags.probes then
-      Lprim(Pprobe_is_enabled {name}, [], of_location ~scopes e.exp_loc)
+      Lprim(Pprobe_is_enabled {name; enabled_at_init = None},
+            [], of_location ~scopes e.exp_loc)
     else
       lambda_unit
   | Texp_exclave e ->

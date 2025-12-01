@@ -1104,10 +1104,14 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let ty = newty (Tof_kind tjkind) in
       ctyp (Ttyp_of_kind jkind) ty
   | Ptyp_quote t ->
+      if not (Language_extension.is_enabled Runtime_metaprogramming) then
+        raise (Error (loc, env, Unsupported_extension Runtime_metaprogramming));
       let new_env = Env.enter_quotation env in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_quote cty) (newty (Tquote cty.ctyp_type))
   | Ptyp_splice t ->
+      if not (Language_extension.is_enabled Runtime_metaprogramming) then
+        raise (Error (loc, env, Unsupported_extension Runtime_metaprogramming));
       let new_env = Env.enter_splice ~loc env in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_splice cty) (newty (Tsplice cty.ctyp_type))
@@ -1358,8 +1362,8 @@ and transl_fields env ~policy ~row_context o fields =
   ty, object_fields
 
 (* Make the rows "fixed" in this type, to make universal check easier *)
-let rec make_fixed_univars ty =
-  if Btype.try_mark_node ty then
+let rec make_fixed_univars mark ty =
+  if try_mark_node mark ty then
     begin match get_desc ty with
     | Tvariant row ->
         let Row {fields; more; name; closed} = row_repr row in
@@ -1376,17 +1380,16 @@ let rec make_fixed_univars ty =
             (Tvariant
                (create_row ~fields ~more ~name ~closed
                   ~fixed:(Some (Univar more))));
-        Btype.iter_row make_fixed_univars row
+        Btype.iter_row (make_fixed_univars mark) row
     | _ ->
-        Btype.iter_type_expr make_fixed_univars ty
+        Btype.iter_type_expr (make_fixed_univars mark) ty
     end
+
+let make_fixed_univars ty =
+  with_type_mark (fun mark -> make_fixed_univars mark ty)
 
 let transl_type env policy mode styp =
   transl_type env ~policy ~row_context:[] mode styp
-
-let make_fixed_univars ty =
-  make_fixed_univars ty;
-  Btype.unmark_type ty
 
 let transl_simple_type_impl env ~new_var_jkind ?univars ~policy mode styp =
   TyVarEnv.reset_locals ?univars ();

@@ -521,13 +521,18 @@ let destroyed_by_simd_instr (instr : Simd.instr) =
   | _ ->
     match instr.res with
     | Res_none | First_arg -> [||]
-    | Res { loc; _ } ->
-      match Simd.loc_is_pinned loc with
-      | Some RAX -> [|rax|]
-      | Some RCX -> [|rcx|]
-      | Some RDX -> [|rdx|]
-      | Some XMM0 -> destroy_xmm 0
-      | None -> [||]
+    | Res rr ->
+      Array.fold_left (fun acc ({loc; _} : Simd.arg) ->
+        match Simd.loc_is_pinned loc with
+        | Some RAX -> rax :: acc
+        | Some RDI -> rdi :: acc
+        | Some RCX -> rcx :: acc
+        | Some RDX -> rdx :: acc
+        | Some XMM0 ->
+          let xmm0 = Array.to_list (destroy_xmm 0) in
+          xmm0 @ acc
+        | None -> acc) [] rr
+      |> Array.of_list
 
 let destroyed_by_simd_op (op : Simd.operation) =
   match op.instr with
@@ -604,9 +609,11 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
        | Stackoffset _
        | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr
-               | Iasr | Ipopcnt | Iclz _ | Ictz _)
-       | Intop_imm ((Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor
-                    | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _),_)
+               | Iasr | Ipopcnt | Iclz _ | Ictz _
+               )
+       | Int128op (Iadd128 | Isub128 | Imul64 _)
+       | Intop_imm ((Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl
+                    | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ ),_)
        | Floatop _
        | Csel _
        | Reinterpret_cast _
@@ -747,6 +754,7 @@ let operation_supported = function
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+  | Caddi128 | Csubi128 | Cmuli64 _
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
   | Ccsel _
   | Cbswap _

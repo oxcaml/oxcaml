@@ -162,6 +162,24 @@ let eq_float64x2 ~result ~expect =
   eqf' hv h;
   ()
 
+let eq_int64x2 ~result ~expect =
+  eq (int64x2_low_int64 result)
+    (int64x2_high_int64 result)
+    (int64x2_low_int64 expect)
+    (int64x2_high_int64 expect)
+
+let eq_int32x4 ~result ~expect =
+  eq (int32x4_low_int64 result)
+    (int32x4_high_int64 result)
+    (int32x4_low_int64 expect)
+    (int32x4_high_int64 expect)
+
+let eq_int8x16 ~result ~expect =
+  eq (int8x16_low_int64 result)
+    (int8x16_high_int64 result)
+    (int8x16_low_int64 expect)
+    (int8x16_high_int64 expect)
+
 let () =
   (failmsg := fun () -> Printf.printf "basic_checks!");
   let a : int8x16 = int8x16_of_int64s 1L 2L in

@@ -78,7 +78,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
           | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
           | Stackoffset _ | Load _
           | Store (_, _, _)
-          | Intop _
+          | Intop _ | Int128op _
           | Intop_imm (_, _)
           | Intop_atomic _
           | Floatop (_, _)
@@ -155,7 +155,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
               | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
               | Const_vec512 _ | Stackoffset _ | Load _
               | Store (_, _, _)
-              | Intop _
+              | Intop _ | Int128op _
               | Intop_imm (_, _)
               | Intop_atomic _
               | Floatop (_, _)

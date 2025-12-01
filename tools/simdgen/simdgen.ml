@@ -76,14 +76,15 @@ let rec parse_args mnemonic acc encs args imm res =
     if !imm <> Imm_none then failwith mnemonic;
     imm := i
   in
-  (* MULX has two results *)
   let set_res_fst () =
     if not (!res = Res_none) then raise Unsupported;
     res := First_arg
   in
   let set_res loc enc =
-    if not (!res = Res_none) then raise Unsupported;
-    res := Res { loc; enc }
+    match !res with
+    | First_arg -> raise Unsupported
+    | Res_none -> res := Res [| { loc; enc } |]
+    | Res rr -> res := Res (Array.append rr [| { loc; enc } |])
   in
   match args, encs with
   | [], _ -> List.rev acc
@@ -92,6 +93,7 @@ let rec parse_args mnemonic acc encs args imm res =
     let loc : loc option =
       match String.trim arg with
       | "<RAX>" -> Some (Pin RAX)
+      | "<RDI>" -> Some (Pin RDI)
       | "<RCX>" -> Some (Pin RCX)
       | "<RDX>" -> Some (Pin RDX)
       | "<XMM0>" -> Some (Pin XMM0)
@@ -152,7 +154,8 @@ let rec parse_args mnemonic acc encs args imm res =
       | "ModRM:reg" -> RM_r
       | "ModRM:r/m" -> RM_rm
       | "VEX.vvvv" -> Vex_v
-      | "NA" | "<XMM0>" | "<RAX>" | "<RCX>" | "<RDX>" | "implicit" -> Implicit
+      | "NA" | "<XMM0>" | "<RAX>" | "<RDI>" | "<RCX>" | "<RDX>" | "implicit" ->
+        Implicit
       | "Imm8" | "imm8" | "imm8[3:0]" | "imm8[7:4]" ->
         if Option.is_some loc
         then (
@@ -297,6 +300,7 @@ let mangle_loc (loc : loc) =
   in
   match loc with
   | Pin RAX -> "rax"
+  | Pin RDI -> "rdi"
   | Pin RCX -> "rcx"
   | Pin RDX -> "rdx"
   | Pin XMM0 -> "xmm0"
@@ -320,7 +324,8 @@ let binding instr =
     let res =
       match instr.res with
       | Res_none | First_arg -> ""
-      | Res { loc; _ } -> mangle_loc loc ^ "_"
+      | Res rr ->
+        Array.fold_left (fun acc { loc; _ } -> acc ^ mangle_loc loc ^ "_") "" rr
     in
     instr.mnemonic ^ "_" ^ res ^ args
   else instr.mnemonic
@@ -333,7 +338,10 @@ let print_one bind instr =
     | SSSE3 -> "SSSE3"
     | SSE4_1 -> "SSE4_1"
     | SSE4_2 -> "SSE4_2"
+    | POPCNT -> "POPCNT"
+    | LZCNT -> "LZCNT"
     | PCLMULQDQ -> "PCLMULQDQ"
+    | BMI -> "BMI"
     | BMI2 -> "BMI2"
     | AVX -> "AVX"
     | AVX2 -> "AVX2"
@@ -357,6 +365,7 @@ let print_one bind instr =
   in
   let print_loc : loc -> string = function
     | Pin RAX -> "Pin RAX"
+    | Pin RDI -> "Pin RDI"
     | Pin RCX -> "Pin RCX"
     | Pin RDX -> "Pin RDX"
     | Pin XMM0 -> "Pin XMM0"
@@ -378,11 +387,18 @@ let print_one bind instr =
     | Imm_reg -> "Imm_reg"
     | Imm_spec -> "Imm_spec"
   in
+  let print_args args =
+    Array.map
+      (fun (arg : arg) ->
+        sprintf "{ loc = %s; enc = %s }" (print_loc arg.loc)
+          (print_arg_enc arg.enc))
+      args
+    |> Array.to_list |> String.concat ";"
+  in
   let print_res : res -> string = function
     | Res_none -> "Res_none"
     | First_arg -> "First_arg"
-    | Res { loc; enc } ->
-      sprintf "Res { loc = %s; enc = %s }" (print_loc loc) (print_arg_enc enc)
+    | Res rr -> sprintf "Res [|%s|]" (print_args rr)
   in
   let print_legacy_prefix : legacy_prefix -> string = function
     | Prx_none -> "Prx_none"
@@ -429,14 +445,7 @@ let print_one bind instr =
   let ext =
     Array.map print_ext instr.ext |> Array.to_list |> String.concat ";"
   in
-  let args =
-    Array.map
-      (fun (arg : arg) ->
-        sprintf "{ loc = %s; enc = %s }" (print_loc arg.loc)
-          (print_arg_enc arg.enc))
-      instr.args
-    |> Array.to_list |> String.concat ";"
-  in
+  let args = print_args instr.args in
   let res = print_res instr.res in
   let imm = print_imm instr.imm in
   let enc = print_enc instr.enc in
@@ -472,8 +481,11 @@ let parse_ext = function
   | "SSSE3" -> Some [| SSSE3 |]
   | "SSE4_1" -> Some [| SSE4_1 |]
   | "SSE4_2" -> Some [| SSE4_2 |]
+  | "POPCNT" -> Some [| POPCNT |]
+  | "LZCNT" -> Some [| LZCNT |]
   | "PCLMULQDQ" -> Some [| PCLMULQDQ |]
   | "PCLMULQDQ AVX" -> Some [| PCLMULQDQ; AVX |]
+  | "BMI1" -> Some [| BMI |]
   | "BMI2" -> Some [| BMI2 |]
   | "AVX" -> Some [| AVX |]
   | "AVX2" -> Some [| AVX2 |]

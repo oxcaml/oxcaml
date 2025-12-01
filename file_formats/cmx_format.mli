@@ -51,7 +51,7 @@ type generic_fns =
     apply_fun: apply_fn list;
     send_fun: apply_fn list }
 
-type unit_infos =
+type 'format unit_infos_gen =
   { mutable ui_unit: Compilation_unit.t;  (* Compilation unit implemented *)
     mutable ui_defines: Compilation_unit.t list;
                                           (* All compilation units in the
@@ -66,7 +66,7 @@ type unit_infos =
                                           (* Infos imported *)
     mutable ui_quoted_globals: Compilation_unit.Name.t list;
                                           (* Globals that are used in quotes *)
-    mutable ui_format: Lambda.main_module_block_format;
+    mutable ui_format: 'format;
                                           (* Structure of the main module block *)
     mutable ui_generic_fns: generic_fns;  (* Generic functions needed *)
     mutable ui_export_info: Flambda2_cmx.Flambda_cmx_format.t option;
@@ -74,6 +74,8 @@ type unit_infos =
     mutable ui_force_link: bool;          (* Always linked *)
     mutable ui_external_symbols: string list; (* Set of external symbols *)
   }
+
+type unit_infos = Lambda.main_module_block_format unit_infos_gen
 
 type unit_infos_raw =
   { uir_unit: Compilation_unit.t;

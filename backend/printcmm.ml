@@ -277,6 +277,9 @@ let operation d = function
   | Cmulhi { signed } -> "*h" ^ if signed then "" else "u"
   | Cdivi -> "/"
   | Cmodi -> "mod"
+  | Caddi128 -> "+128"
+  | Csubi128 -> "-128"
+  | Cmuli64 { signed } -> "*128" ^ if signed then "" else "u"
   | Cand -> "and"
   | Cor -> "or"
   | Cxor -> "xor"
@@ -314,7 +317,11 @@ let operation d = function
   | Cprobe { name; handler_code_sym; enabled_at_init } ->
     Printf.sprintf "probe[%s %s%s]" name handler_code_sym
       (if enabled_at_init then " enabled_at_init" else "")
-  | Cprobe_is_enabled { name } -> Printf.sprintf "probe_is_enabled[%s]" name
+  | Cprobe_is_enabled { name; enabled_at_init } ->
+    Printf.sprintf "probe_is_enabled[%s%s]" name
+      (match enabled_at_init with
+      | None | Some false -> ""
+      | Some true -> " enabled_at_init")
   | Cprefetch { is_write; locality } ->
     Printf.sprintf "prefetch is_write=%b prefetch_temporal_locality_hint=%s"
       is_write

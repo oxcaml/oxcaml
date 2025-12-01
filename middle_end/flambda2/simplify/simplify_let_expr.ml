@@ -22,6 +22,8 @@ let keep_lifted_constant_only_if_used uacc acc lifted_constant =
     match UA.reachable_code_ids uacc with
     | Unknown -> Bound_static.binds_code bound
     | Known { live_code_ids = _; ancestors_of_live_code_ids } ->
+      (* CR bclement for gbury: This is likely no longer needed now that the
+         code age relation join has been removed. *)
       not
         (Code_id.Set.disjoint
            (Bound_static.code_being_defined bound)
