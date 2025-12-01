@@ -37,6 +37,10 @@ BUILTIN(caml_avx_vec128_store_mask64);
 BUILTIN(caml_avx_vec256_store_mask64);
 BUILTIN(caml_avx_vec128_store_mask32);
 BUILTIN(caml_avx_vec256_store_mask32);
+BUILTIN(caml_avx_load_aligned);
+BUILTIN(caml_avx_load_unaligned);
+BUILTIN(caml_avx_store_aligned);
+BUILTIN(caml_avx_store_unaligned);
 
 BUILTIN(caml_sse2_float64_add);
 BUILTIN(caml_sse2_float64_sub);

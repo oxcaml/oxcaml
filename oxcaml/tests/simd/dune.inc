@@ -404,6 +404,29 @@
 (executable
  (name load_store)
  (modules load_store)
+ (enabled_if (= %{context_name} "main"))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   load_store.out
+   (run ./load_store.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff empty.expected load_store.out)))
+
+(executable
+ (name avx_load_store)
+ (modules avx_load_store)
  (enabled_if
       (and (= %{context_name} "main")
            (= %{architecture} "amd64")
@@ -421,8 +444,8 @@
            (<> %{system} macosx)))
  (action
   (with-outputs-to
-   load_store.out
-   (run ./load_store.exe))))
+   avx_load_store.out
+   (run ./avx_load_store.exe))))
 
 (rule
  (alias runtest)
@@ -431,7 +454,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
-   (diff empty.expected load_store.out)))
+   (diff empty.expected avx_load_store.out)))
 
 (executable
  (name let_mutable)
@@ -2201,16 +2224,45 @@
 
 (rule
  (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
+ (enabled_if (= %{context_name} "main"))
  (action
   (copy load_store.ml load_store_nodynlink.ml)))
 
 (executable
  (name load_store_nodynlink)
  (modules load_store_nodynlink)
+ (enabled_if (= %{context_name} "main"))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   load_store_nodynlink.out
+   (run ./load_store_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff empty.expected load_store_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy avx_load_store.ml avx_load_store_nodynlink.ml)))
+
+(executable
+ (name avx_load_store_nodynlink)
+ (modules avx_load_store_nodynlink)
  (enabled_if
       (and (= %{context_name} "main")
            (= %{architecture} "amd64")
@@ -2228,8 +2280,8 @@
            (<> %{system} macosx)))
  (action
   (with-outputs-to
-   load_store_nodynlink.out
-   (run ./load_store_nodynlink.exe))))
+   avx_load_store_nodynlink.out
+   (run ./avx_load_store_nodynlink.exe))))
 
 (rule
  (alias runtest)
@@ -2238,7 +2290,7 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
-   (diff empty.expected load_store_nodynlink.out)))
+   (diff empty.expected avx_load_store_nodynlink.out)))
 
 (rule
  (alias runtest)
@@ -4505,6 +4557,47 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected load_store_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (copy avx_load_store.ml avx_load_store_internal_assembler.ml)))
+
+(executable
+ (name avx_load_store_internal_assembler)
+ (modules avx_load_store_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   avx_load_store_internal_assembler.out
+   (run ./avx_load_store_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected avx_load_store_internal_assembler.out)))
 
 (rule
  (alias runtest)

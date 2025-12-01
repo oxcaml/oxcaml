@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-void* vec_aligned_alloc(intnat align, intnat size) 
+void* vec_aligned_alloc(intnat align, intnat size)
 {
   return aligned_alloc(align, size);
 }
@@ -357,6 +357,11 @@ BUILTIN(caml_int_clz_tagged_to_untagged);
 
 BUILTIN(caml_simd_vec128_interleave_low_32)
 BUILTIN(caml_simd_vec128_interleave_low_64)
+
+BUILTIN(caml_vec128_load_aligned);
+BUILTIN(caml_vec128_load_unaligned);
+BUILTIN(caml_vec128_store_aligned);
+BUILTIN(caml_vec128_store_unaligned);
 
 #include <float.h>
 #include <math.h>
