@@ -278,14 +278,14 @@ let print_filename ppf file =
   Format.pp_print_string ppf (show_filename file)
 
 let linenum ppf line =
-  if !Clflags.no_locs
-  then Format.fprintf ppf "_"
-  else Format.fprintf ppf "%i" line
+  if !Clflags.locs
+  then Format.fprintf ppf "%i" line
+  else Format.fprintf ppf "_"
 
 let colnum ppf char =
-  if !Clflags.no_locs
-  then Format.fprintf ppf "_"
-  else Format.fprintf ppf "%i" char
+  if !Clflags.locs
+  then Format.fprintf ppf "%i" char
+  else Format.fprintf ppf "_"
 
 (* Best-effort printing of the text describing a location, of the form
    'File "foo.ml", line 3, characters 10-12'.
@@ -581,10 +581,10 @@ let highlight_quote ppf
           let line_nb =
             match
               ISet.find_bound_in iset ~range:(start_pos, end_pos),
-              !Clflags.no_locs
+              !Clflags.locs
             with
-            | None, _ | _, true -> None
-            | Some (p, _), false -> Some p.pos_lnum
+            | None, _ | _, false -> None
+            | Some (p, _), true -> Some p.pos_lnum
           in
           (line_nb, line))
         |> infer_line_numbers
