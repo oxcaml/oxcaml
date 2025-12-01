@@ -222,17 +222,37 @@ Error: This type "#(int * int64)" should be an instance of type
 type t6_wrong_inner_record = #{ i : int; i64 : int64 }
 and ('a : value & bits64) t6_wrong = 'a t7_wrong
 and 'a t7_wrong = { x : t6_wrong_inner_record t6_wrong }
+(* CR zeisbach: previous error message
+
+-Line 1, characters 0-54:
+-1 | type t6_wrong_inner_record = #{ i : int; i64 : int64 }
+-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-Error:
+-       The layout of t6_wrong_inner_record is value maybe_separable & bits64
+-         because it is an unboxed record.
+-       But the layout of t6_wrong_inner_record must be a sublayout of
+-           value & bits64
+-         because of the annotation on 'a in the declaration of the type
+-                                      t6_wrong.
+
+*)
 [%%expect{|
-Line 1, characters 0-54:
-1 | type t6_wrong_inner_record = #{ i : int; i64 : int64 }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of t6_wrong_inner_record is value maybe_separable & bits64
-         because it is an unboxed record.
-       But the layout of t6_wrong_inner_record must be a sublayout of
-           value & bits64
-         because of the annotation on 'a in the declaration of the type
-                                      t6_wrong.
+Line 2, characters 37-48:
+2 | and ('a : value & bits64) t6_wrong = 'a t7_wrong
+                                         ^^^^^^^^^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The layout of 'a is value
+           because it instantiates an unannotated type parameter of t7_wrong,
+           chosen to have layout value.
+         But the layout of 'a must overlap with value & bits64
+           because of the annotation on 'a in the declaration of the type
+                                        t6_wrong.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
 |}]
 (* CR layouts v7.2: The above has a very bad error message. *)
 
@@ -2067,10 +2087,8 @@ let rec f : ('a : any mod separable & value). unit -> 'a -> 'a = fun () -> f ()
 let g (x : 'a) = f () x
 
 [%%expect{|
-val f : ('a : any separable & value_or_null separable). unit -> 'a -> 'a =
-  <fun>
-val g : ('a : value_or_null separable & value_or_null separable). 'a -> 'a =
-  <fun>
+val f : ('a : any separable & value). unit -> 'a -> 'a = <fun>
+val g : ('a : value maybe_null & value). 'a -> 'a = <fun>
 |}]
 
 (* test subjkinding *)
@@ -2079,13 +2097,12 @@ let rec f : ('a : any mod separable & value). unit -> 'a -> 'a = fun () -> f ()
 let g (type a) (x : a) = f () x
 
 [%%expect{|
-val f : ('a : any separable & value_or_null separable). unit -> 'a -> 'a =
-  <fun>
+val f : ('a : any separable & value). unit -> 'a -> 'a = <fun>
 Line 3, characters 30-31:
 3 | let g (type a) (x : a) = f () x
                                   ^
 Error: This expression has type "a" but an expression was expected of type
-         "('a : '_representable_layout_21 separable & value_or_null separable)"
+         "('a : '_representable_layout_21 separable & value)"
        The layout of a is value
          because it is or unifies with an unannotated universal variable.
        But the layout of a must be representable
@@ -2340,15 +2357,15 @@ type ('a : any mod non_null) s
 
 type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
 [%%expect{|
-type ('a : any mod non_null) s
+type ('a : any non_null) s
 Line 3, characters 0-66:
 3 | type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The kind of t is value_or_null & bits32
+Error: The layout of type "t" is immediate & value & value non_float
+         because it is an unboxed record.
+       But the layout of type "t" must be a sublayout of
+           value maybe_separable maybe_null & bits32
          because of the annotation on the declaration of the type t.
-       But the kind of t must be a subkind of any mod non_null
-         because of the definition of s at line 1, characters 0-30.
 |}]
 
 (* modal axes have the same problem *)
@@ -2373,14 +2390,14 @@ type ('a : any mod non_null) s
 type t : (value_or_null & bits32) mod non_null =
   #{ a : int; b : t s; c : int32 }
 [%%expect{|
-type ('a : any mod non_null) s
+type ('a : any non_null) s
 Lines 3-4, characters 0-34:
 3 | type t : (value_or_null & bits32) mod non_null =
 4 |   #{ a : int; b : t s; c : int32 }
 Error: The layout of type "t" is immediate & value & value non_float
          because it is an unboxed record.
        But the layout of type "t" must be a sublayout of
-           value maybe_separable & bits32
+           value maybe_separable maybe_null & bits32
          because of the annotation on the declaration of the type t.
 |}]
 
@@ -2397,6 +2414,6 @@ Lines 3-4, characters 0-34:
 Error: The layout of type "t" is immediate & value & value non_float
          because it is an unboxed record.
        But the layout of type "t" must be a sublayout of
-           value maybe_separable & bits32
+           value maybe_separable maybe_null & bits32
          because of the annotation on the declaration of the type t.
 |}]

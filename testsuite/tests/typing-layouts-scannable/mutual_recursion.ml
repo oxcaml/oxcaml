@@ -19,7 +19,9 @@ and b = #{ i : t_nonptr_val; j : t_nonptr_val }
 Line 1, characters 0-59:
 1 | type a : value non_pointer & value non_pointer = #{ b : b }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "a" is value maybe_separable & value maybe_separable
+Error: The layout of type "a" is
+           value maybe_separable maybe_null
+           & value maybe_separable maybe_null
          because it is an unboxed record.
        But the layout of type "a" must be a sublayout of immediate & immediate
          because of the annotation on the declaration of the type a.
@@ -42,7 +44,9 @@ Lines 1-3, characters 0-68:
 1 | type a : value non_pointer & value non_pointer
 2 |        (* BUT an annotation here does not change anything... *)
 3 |        = #{ b : (b as (_ : value non_pointer & value non_pointer)) }
-Error: The layout of type "a" is value maybe_separable & value maybe_separable
+Error: The layout of type "a" is
+           value maybe_separable maybe_null
+           & value maybe_separable maybe_null
          because it is an unboxed record.
        But the layout of type "a" must be a sublayout of immediate & immediate
          because of the annotation on the declaration of the type a.

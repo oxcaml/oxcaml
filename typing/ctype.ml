@@ -2733,7 +2733,7 @@ let is_always_gc_ignorable env ty =
 
 let check_type_nullability env ty null =
   let upper_bound =
-    Jkind.set_nullability_upper_bound (Jkind.Builtin.any ~why:Dummy_jkind) null
+    Jkind.set_root_nullability (Jkind.Builtin.any ~why:Dummy_jkind) null
   in
   match check_type_jkind env ty upper_bound with
   | Ok () -> true

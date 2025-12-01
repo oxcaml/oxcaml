@@ -152,12 +152,11 @@ Line 1, characters 32-41:
 Error: The externality axis has already been specified.
 |}]
 
+(* CR zeisbach: this no longer reports an error.
+   But also, these tests should be changed to deprecate the old syntax *)
 type t13 : value mod maybe_null non_null
 [%%expect {|
-Line 1, characters 32-40:
-1 | type t13 : value mod maybe_null non_null
-                                    ^^^^^^^^
-Error: The nullability axis has already been specified.
+type t13
 |}]
 
 type t14 : value mod unique aliased

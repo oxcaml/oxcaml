@@ -446,6 +446,12 @@ and r = { x : int; y : float#; }
 and u = r#
 |}]
 
+(* CR zeisbach: the error message got way worse, specifically the history:
+BEFORE: the message had
+-       But the layout of r must be a sublayout of value & float64
+-         because of the definition of t at line 1, characters 0-29.
+*)
+
 (* CR layouts v7.2: improve this error message *)
 type s_bad = r# t
 and r = {x:int; y:bool}
@@ -453,25 +459,27 @@ and r = {x:int; y:bool}
 Line 2, characters 0-23:
 2 | and r = {x:int; y:bool}
     ^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of r# is value maybe_separable & float64
+Error: The layout of type "r#" is immediate & immediate
          because it is an unboxed record.
-       But the layout of r# must be a sublayout of value & float64
-         because of the definition of t at line 1, characters 0-29.
+       But the layout of type "r#" must be a sublayout of
+           value maybe_separable maybe_null & float64
+         because it is an unboxed record.
 |}]
 
+(* CR zeisbach: this used to blame line 3.
+   also, the error message / history reporting is still bad! *)
 type s_bad = q t
 and r = {x:int; y:bool}
 and q = r#
 [%%expect{|
-Line 3, characters 0-10:
-3 | and q = r#
-    ^^^^^^^^^^
-Error:
-       The layout of q is value maybe_separable & float64
+Line 2, characters 0-23:
+2 | and r = {x:int; y:bool}
+    ^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "r#" is immediate & immediate
          because it is an unboxed record.
-       But the layout of q must be a sublayout of value & float64
-         because of the definition of t at line 1, characters 0-29.
+       But the layout of type "r#" must be a sublayout of
+           value maybe_separable maybe_null & float64
+         because it is an unboxed record.
 |}]
 
 module rec M : sig

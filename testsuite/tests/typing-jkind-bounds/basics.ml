@@ -1827,9 +1827,9 @@ Error: Signature mismatch:
          type 'a t : value_or_null mod everything
        is not included in
          type 'a t : immediate_or_null separable
-       The layout of the first is value maybe_separable
+       The layout of the first is value maybe_separable maybe_null
          because of the definition of t at line 4, characters 2-42.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a sublayout of value maybe_null
          because of the definition of t at line 2, characters 2-52.
 |}]
 
