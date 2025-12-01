@@ -50,13 +50,13 @@ type t1 : any mod non_null separable
 type t2 : value
 type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2};;
 [%%expect{|
-type t1 : any mod non_null separable
+type t1 : any separable mod non_null
 type t2
 Line 3, characters 42-51:
 3 | type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2};;
                                               ^^^^^^^^^
 Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
+       The layout of t1 is any separable
          because of the definition of t1 at line 1, characters 0-36.
        But the layout of t1 must be representable
          because it is the type of record field t1.
@@ -69,13 +69,13 @@ type t1 : any mod non_null separable
 type t2 : value
 type t3 : any & value mod non_null separable = #{ t1 : t1 ; t2 : t2};;
 [%%expect{|
-type t1 : any mod non_null separable
+type t1 : any separable mod non_null
 type t2
 Line 3, characters 50-59:
 3 | type t3 : any & value mod non_null separable = #{ t1 : t1 ; t2 : t2};;
                                                       ^^^^^^^^^
 Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
+       The layout of t1 is any separable
          because of the definition of t1 at line 1, characters 0-36.
        But the layout of t1 must be representable
          because it is the type of record field t1.
@@ -85,13 +85,13 @@ type t1 : any mod non_null separable
 type t2 : value
 type t3 : (any mod non_null separable) & (value mod non_null separable) = #{ t1 : t1 ; t2 : t2};;
 [%%expect{|
-type t1 : any mod non_null separable
+type t1 : any separable mod non_null
 type t2
 Line 3, characters 77-86:
 3 | type t3 : (any mod non_null separable) & (value mod non_null separable) = #{ t1 : t1 ; t2 : t2};;
                                                                                  ^^^^^^^^^
 Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
+       The layout of t1 is any separable
          because of the definition of t1 at line 1, characters 0-36.
        But the layout of t1 must be representable
          because it is the type of record field t1.
@@ -102,7 +102,7 @@ type t2 : any mod non_null separable
 type t3 : any & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
-type t2 : any mod non_null separable
+type t2 : any separable mod non_null
 Line 3, characters 50-59:
 3 | type t3 : any & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
                                                       ^^^^^^^^^
@@ -119,7 +119,7 @@ type t2 : any mod non_null separable
 type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
-type t2 : any mod non_null separable
+type t2 : any separable mod non_null
 Line 3, characters 42-51:
 3 | type t3 : any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
                                               ^^^^^^^^^
@@ -135,7 +135,7 @@ type t2 : any mod non_null separable
 type t3 : any & any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
-type t2 : any mod non_null separable
+type t2 : any separable mod non_null
 Line 3, characters 48-57:
 3 | type t3 : any & any mod non_null separable = #{ t1 : t1 ; t2 : t2 };;
                                                     ^^^^^^^^^
@@ -151,7 +151,7 @@ type t2 : any mod non_null separable
 type t3 : (any mod non_null separable) & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
 [%%expect{|
 type t1 : any
-type t2 : any mod non_null separable
+type t2 : any separable mod non_null
 Line 3, characters 75-84:
 3 | type t3 : (any mod non_null separable) & (any mod non_null separable) = #{ t1 : t1 ; t2 : t2 };;
                                                                                ^^^^^^^^^

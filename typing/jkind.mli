@@ -86,7 +86,7 @@ end
 module Scannable_axes : sig
   type t = Jkind_types.Scannable_axes.t
 
-  (* CR layouts-scannable: It might be unnecessary to have this module exposed,
+  (* CR zeisbach: It might be unnecessary to have this module exposed,
      since most of it goes unused (even internally to this file). *)
   include Jkind_axis.Axis_ops with type t := t
 
@@ -483,14 +483,6 @@ val of_new_sort_var :
 val of_new_sort :
   why:History.concrete_creation_reason -> level:int -> 'd Types.jkind
 
-(** Same as [of_new_sort_var], but the jkind is lowered to [Non_null]
-    to mirror "legacy" OCaml values.
-    Defaulting the sort variable produces exactly [value].  *)
-val of_new_legacy_sort_var :
-  why:History.concrete_legacy_creation_reason ->
-  level:int ->
-  'd Types.jkind * sort
-
 (** Same as [of_new_sort], but the jkind is lowered to [Non_null]
     to mirror "legacy" OCaml values.
     Defaulting the sort variable produces exactly [value].  *)
@@ -634,19 +626,19 @@ end
 (** Get a description of a jkind. *)
 val get : 'd Types.jkind -> 'd Desc.t
 
-(** [get_layout_defaulting_to_value] extracts a constant layout, defaulting
-    any sort variable to [value]. *)
-val get_layout_defaulting_to_value : 'd Types.jkind -> Layout.Const.t
+(** [get_layout_defaulting_to_scannable] extracts a constant layout, defaulting
+    any sort variable to [scannable]. *)
+val get_layout_defaulting_to_scannable : 'd Types.jkind -> Layout.Const.t
 
 (** [get_const] returns a [Const.t] if the layout has no sort variables,
     returning [None] otherwise *)
 val get_const : 'd Types.jkind -> 'd Const.t option
 
-(** [default_to_value t] is [ignore (get_layout_defaulting_to_value t)] *)
-val default_to_value : 'd Types.jkind -> unit
+(** [default_to_scannable t] is [ignore (get_layout_defaulting_to_scannable t)] *)
+val default_to_scannable : 'd Types.jkind -> unit
 
-(** [is_void t] is [Void = get_layout_defaulting_to_value t].  In particular, it
-    will default the jkind to value if needed to make this false. *)
+(** [is_void t] is [Void = get_layout_defaulting_to_scannable t].  In particular, it
+    will default the jkind to scannable if needed to make this false. *)
 val is_void_defaulting : 'd Types.jkind -> bool
 (* CR layouts v5: When we have proper support for void, we'll want to change
    these three functions to default to void - it's the most efficient thing
@@ -690,7 +682,7 @@ val set_nullability_upper_bound :
 
 (** Computes a jkind that is the same as the input but with an updated maximum
     mode for the separability axis *)
-val set_separability_upper_bound :
+val set_root_separability :
   Types.jkind_r -> Jkind_axis.Separability.t -> Types.jkind_r
 
 (** Sets the layout in a jkind. *)
