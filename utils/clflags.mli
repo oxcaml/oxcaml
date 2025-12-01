@@ -119,8 +119,7 @@ val open_modules : string list ref
 val preprocessor : string option ref
 val all_ppx : string list ref
 val absname : bool ref
-val no_linenums : bool ref
-val no_colnums : bool ref
+val no_locs : bool ref
 val directory : string option ref
 val annotations : bool ref
 val binary_annotations : bool ref

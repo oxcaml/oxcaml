@@ -278,12 +278,12 @@ let print_filename ppf file =
   Format.pp_print_string ppf (show_filename file)
 
 let linenum ppf line =
-  if !Clflags.no_linenums
+  if !Clflags.no_locs
   then Format.fprintf ppf "_"
   else Format.fprintf ppf "%i" line
 
 let colnum ppf char =
-  if !Clflags.no_colnums
+  if !Clflags.no_locs
   then Format.fprintf ppf "_"
   else Format.fprintf ppf "%i" char
 
@@ -581,7 +581,7 @@ let highlight_quote ppf
           let line_nb =
             match
               ISet.find_bound_in iset ~range:(start_pos, end_pos),
-              !Clflags.no_linenums
+              !Clflags.no_locs
             with
             | None, _ | _, true -> None
             | Some (p, _), false -> Some p.pos_lnum
