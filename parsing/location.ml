@@ -336,15 +336,19 @@ let print_loc ~capitalize_first ppf loc =
   comma ();
   let startline = if line_valid startline then startline else 1 in
   let endline = if line_valid endline then endline else startline in
+
   begin if startline = endline then
-    Format.fprintf ppf "%s %a" (capitalize "line") linenum startline
+    Format.fprintf ppf "%s %a"
+      (capitalize "line") linenum startline
   else
-    Format.fprintf ppf "%s %a-%a" (capitalize "lines") linenum startline linenum endline
+    Format.fprintf ppf "%s %a-%a"
+      (capitalize "lines") linenum startline linenum endline
   end;
 
   if chars_valid ~startchar ~endchar then (
     comma ();
-    Format.fprintf ppf "%s %a-%a" (capitalize "characters") colnum startchar colnum endchar
+    Format.fprintf ppf "%s %a-%a"
+      (capitalize "characters") colnum startchar colnum endchar
   );
 
   Format.fprintf ppf "@}"
