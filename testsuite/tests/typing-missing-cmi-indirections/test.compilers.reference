@@ -1,7 +1,7 @@
 File "client.ml", line 2, characters 0-19:
 2 | and alias = missing
     ^^^^^^^^^^^^^^^^^^^
-Error:
+Error: 
        The layout of alias is any
          because the .cmi file for Missing.t is missing.
        But the layout of alias must be a value layout

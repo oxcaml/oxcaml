@@ -484,15 +484,15 @@ module Layout = struct
     | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
     | (Any _ | Sort _ | Product _), _ -> false
 
-  let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
-    | Any sa -> Some sa
-    | Sort (b, sa) -> if Sort.is_scannable_or_var b then Some sa else None
-    | Product _ -> None
-
   let is_scannable_or_var : _ t -> bool = function
     | Any _ -> false
     | Sort (b, _) -> Sort.is_scannable_or_var b
     | Product _ -> false
+
+  let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
+    | Any sa -> Some sa
+    | Sort (b, sa) -> if Sort.is_scannable_or_var b then Some sa else None
+    | Product _ -> None
 
   (* CR zeisbach: this duplication is a little bit sad.
      But I also think things like Axis_set are a bit overkill. *)
