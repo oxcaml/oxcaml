@@ -3470,8 +3470,11 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
           Typedecl.transl_value_decl env ~modal:Str_primitive
             ~why:Structure_item loc sdesc
         in
+        assert
+          (desc.val_val.val_modalities
+           |> Modality.to_const_exn
+           |> Modality.Const.is_id);
         let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
-        (* the original val_modalities must be id *)
         let val_val = {desc.val_val with val_modalities} in
         let desc = {desc with val_val} in
         Signature_names.check_value names desc.val_loc desc.val_id;

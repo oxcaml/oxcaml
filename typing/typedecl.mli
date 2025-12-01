@@ -36,13 +36,13 @@ val transl_type_extension:
 
 type transl_value_decl_modal =
   | Str_primitive
-  (** A primitive in structure, in which case the modalities are treated as
-    modes. *)
+  (** A primitive in structure, in which case the modality syntax is treated as
+    modes, and the returned value description will have empty modalities. *)
   (* CR zqian: avoid the above hack *)
   | Sig_value of Mode.Value.l * Mode.Modality.Const.t
   (** A value description in a signature, in which case we require the mode of
-      the structure that the modalities are based on, as well as the default
-      modalities of the signature. *)
+      the structure that the value lives in, as well as the default modalities
+      of the signature. *)
 
 (** Returns a value description and the mode that the VD is based on, and a new
 environment that contains the VD at the mode. *)
