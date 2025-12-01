@@ -1978,6 +1978,10 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
 and transl_signature env {psg_items; psg_modalities; psg_loc} =
   let names = Signature_names.create () in
 
+  (* We assume the structure (described by the signature) to be at legacy mode,
+  for backward compatibility *)
+  let md_mode = Value.legacy in
+
   let sig_modalities = transl_modalities psg_modalities in
 
   let transl_include ~loc env sig_acc sincl modalities =
@@ -2011,8 +2015,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
       | true -> sg
       | false -> apply_modalities_signature ~recursive env modalities sg
     in
-    (* Assume the structure is legacy, for backward compatibility *)
-    let sg, newenv = Env.enter_signature ~scope sg ~mode:Value.legacy env in
+    let sg, newenv = Env.enter_signature ~scope sg ~mode:md_mode env in
     Signature_group.iter
       (Signature_names.check_sig_item names loc)
       sg;
@@ -2035,7 +2038,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
     | Psig_value sdesc ->
         let (tdesc, _, newenv) =
           Typedecl.transl_value_decl env loc sdesc
-            ~modal:(Sig_value (Value.(disallow_right legacy), sig_modalities))
+            ~modal:(Sig_value (Value.disallow_right md_mode, sig_modalities))
             ~why:Signature_item
         in
         Signature_names.check_value names tdesc.val_loc tdesc.val_id;
@@ -2133,10 +2136,8 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           | None -> None, env
           | Some name ->
             let id, newenv =
-              (* Assume the enclosing structure is legacy, for backward
-                 compatibility *)
               Env.enter_module_declaration ~scope name pres md
-                ~mode:Value.legacy env
+                ~mode:md_mode env
             in
             Signature_names.check_module names pmd.pmd_name.loc id;
             Some id, newenv
@@ -2178,11 +2179,9 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           | Mty_alias _ -> Mp_absent
           | _ -> Mp_present
         in
-        (* Assume the enclosing structure is legacy, for backward
-            compatibility *)
         let id, newenv =
           Env.enter_module_declaration ~scope pms.pms_name.txt pres md
-            ~mode:Value.legacy env
+            ~mode:md_mode env
         in
         let info =
           `Substituted_away (Subst.add_module id path Subst.identity)
