@@ -1363,7 +1363,7 @@ let get_component = function
 
 let () =
   match Jkind.Sort.Const.for_module with
-  | Base Value -> ()
+  | Base Scannable -> ()
   | _ -> Misc.fatal_error "Lambda.transl_package: expected modules to be values"
     (* If this assumption is broken, [transl_package] should return a
        module representation instead of a size *)

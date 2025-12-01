@@ -238,7 +238,7 @@ let base_layout_to_byte_size (sort : base_layout) =
   | Vec128 -> 16
   | Vec256 -> 32
   | Vec512 -> 64
-  | Value -> Arch.size_addr
+  | Scannable -> Arch.size_addr
 
 (* CR sspies: This handling is incorrect for [Void] layout. Once we support
    putting [Void] data into records, we have to adjust the code below to filter
@@ -420,7 +420,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   match ly with
   | Base base -> (
     match base with
-    | Value -> Value
+    | Scannable -> Scannable
     | Float64 -> Float64
     (* This is a case, where we potentially have mapped [Float_boxed] to
        [Float64], but that is fine, because they are reordered like other mixed
@@ -452,7 +452,7 @@ let rec project_layout (layout : Layout.t) path =
         Layout.format layout
         (Format.pp_print_list Format.pp_print_int)
         path
-    else Sort.Value
+    else Sort.Scannable
 
 let rec field_name_with_path base path =
   match path with
@@ -477,7 +477,7 @@ let project_field_given_path (fields : Layout.t projected_field array) path :
         (Format.pp_print_list ~pp_sep:Format.pp_print_space pp_projected_field)
         (Array.to_list fields)
       (* field should exist *)
-    else None, Shape.leaf' None, Sort.Value
+    else None, Shape.leaf' None, Sort.Scannable
   | [i] -> (
     match Array.get fields i with
     | name, sh, Base ly -> name, sh, ly
@@ -490,7 +490,7 @@ let project_field_given_path (fields : Layout.t projected_field array) path :
           (Format.pp_print_option Format.pp_print_string)
           name Layout.format (Layout.Product prod_layouts)
       else
-        name, sh, Sort.Value
+        name, sh, Sort.Scannable
         (* If this is a product type, then the flattening of the record fields
            has failed. *))
   | i :: subpath ->
@@ -1262,7 +1262,7 @@ let create_base_layout_type ?(simd_vec_split = None) ~reference
     (sort : base_layout) ?name ~parent_proto_die ~fallback_value_die () =
   let byte_size = base_layout_to_byte_size sort in
   match sort with
-  | Value ->
+  | Scannable ->
     create_typedef_die ~reference ~parent_proto_die ?name fallback_value_die
   | Float32 | Float64 ->
     create_unboxed_base_layout_die ~reference ~parent_proto_die ?name ~byte_size
@@ -1283,11 +1283,11 @@ let create_base_layout_type ?(simd_vec_split = None) ~reference
 let rec create_packed_layout_type (layout : Layout.t) ~parent_proto_die
     ~fallback_value_die =
   match layout with
-  | Base Value -> fallback_value_die, Arch.size_addr
+  | Base Scannable -> fallback_value_die, Arch.size_addr
   | Base b ->
     let encoding =
       match b with
-      | Value -> assert false (* ruled out by the previous case *)
+      | Scannable -> assert false (* ruled out by the previous case *)
       | Float32 | Float64 -> Encoding_attribute.float
       | Void | Bits8 | Bits16 | Bits32 | Bits64 | Word | Untagged_immediate ->
         Encoding_attribute.signed
@@ -1448,7 +1448,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
                     "[Record_boxed] and [Record_floats] records must only have \
                      fields of [Base] layout:@ %a"
                     S.print type_shape
-                else Sort.Value
+                else Sort.Scannable
             in
             ( name,
               Arch.size_addr,
@@ -1568,7 +1568,7 @@ let rec type_shape_to_dwarf_die (type_shape : Shape.t)
               "[Product] layout in [Variant_unboxed] constructor is not \
                allowed:@ %a"
               S.print type_shape
-          else Sort.Value
+          else Sort.Scannable
       in
       let arg_die =
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die arg_shape
@@ -1640,7 +1640,7 @@ and type_shape_to_dwarf_die_tuple ?name ~reference ~parent_proto_die
     List.map
       (fun sh ->
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die ~rec_env
-          sh Sort.Value)
+          sh Sort.Scannable)
       fields
   in
   (* CR sspies: In the future, tuples will also be allowed to have unboxed
@@ -1668,7 +1668,7 @@ and type_shape_to_dwarf_die_predef ?name ~reference ~parent_proto_die
        below. We currently default to [Value] layout. *)
     let argument_layout =
       match argument_layout with
-      | None -> Layout.Base Value
+      | None -> Layout.Base Scannable
       (* CR sspies: Risky, can be false. A different default here would be
          better. *)
       | Some l -> l
@@ -1697,7 +1697,7 @@ and type_shape_to_dwarf_die_predef ?name ~reference ~parent_proto_die
         (Format.pp_print_list Shape.print)
         args
     else
-      create_base_layout_type ~reference Value ?name ~parent_proto_die
+      create_base_layout_type ~reference Scannable ?name ~parent_proto_die
         ~fallback_value_die ()
   | Char, _ -> create_char_die ~reference ~parent_proto_die ?name ()
   | Unboxed b, _ ->
@@ -1726,7 +1726,7 @@ and type_shape_to_dwarf_die_predef ?name ~reference ~parent_proto_die
   | ( ( Bytes | Extension_constructor | Float | Float32 | Floatarray | Int
       | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint | String ),
       _ ) ->
-    create_base_layout_type ~reference Value ?name ~parent_proto_die
+    create_base_layout_type ~reference Scannable ?name ~parent_proto_die
       ~fallback_value_die ()
 
 and type_shape_to_dwarf_die_arrow ~reference ?name ~parent_proto_die
@@ -1740,7 +1740,7 @@ and type_shape_to_dwarf_die_poly_variant ~reference ~parent_proto_die
     S.poly_variant_constructors_map
       (fun sh ->
         type_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die ~rec_env
-          sh Sort.Value)
+          sh Sort.Scannable)
       (* At the moment, polymorphic variant constructor arguments always have
          layout [value]. *)
       constructors
@@ -1770,10 +1770,10 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
     let base_sorts = flatten_to_base_sorts layout in
     List.map (fun base_sort -> Unknown base_sort) base_sorts
   in
-  let known_value = [Known (type_shape, Sort.Value)] in
+  let known_value = [Known (type_shape, Sort.Scannable)] in
   match type_shape.desc, type_layout with
   | Leaf, _ -> unknown_base_layouts type_layout
-  | Tuple _, Base Value ->
+  | Tuple _, Base Scannable ->
     known_value (* boxed tuples are only a single base layout wide *)
   | Tuple _, _ ->
     if !Clflags.dwarf_pedantic
@@ -1812,14 +1812,14 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
       Misc.fatal_errorf "predefined type must have base layout, but got: %a"
         Layout.format type_layout
     else unknown_base_layouts type_layout
-  | Arrow, Base Value -> known_value
+  | Arrow, Base Scannable -> known_value
   | Arrow, _ ->
     if !Clflags.dwarf_pedantic
     then
       Misc.fatal_errorf "arrow must have value layout, but got: %a"
         Layout.format type_layout
     else unknown_base_layouts type_layout
-  | Poly_variant _, Base Value -> known_value
+  | Poly_variant _, Base Scannable -> known_value
   | Poly_variant _, _ ->
     if !Clflags.dwarf_pedantic
     then
@@ -1827,7 +1827,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
         Layout.format type_layout
     else unknown_base_layouts type_layout
   | ( Record { fields = _; kind = Record_boxed | Record_mixed _ | Record_floats },
-      Base Value ) ->
+      Base Scannable ) ->
     known_value
   | ( Record { fields = _; kind = Record_boxed | Record_mixed _ | Record_floats },
       _ ) ->
@@ -1879,7 +1879,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
           "unboxed record must have product layout, but has layout %a"
           Layout.format type_layout
       else unknown_base_layouts type_layout)
-  | Variant _, Base Value -> known_value
+  | Variant _, Base Scannable -> known_value
   | Variant _, _ ->
     if !Clflags.dwarf_pedantic
     then
@@ -1887,7 +1887,7 @@ let rec flatten_shape (type_shape : Shape.t) (type_layout : Layout.t) =
         Layout.format type_layout
     else unknown_base_layouts type_layout
   | ( Variant_unboxed { name = _; arg_name = _; arg_layout; arg_shape = _ },
-      Base Value )
+      Base Scannable )
     when Layout.equal arg_layout type_layout ->
     known_value
   | Variant_unboxed { name = _; arg_name = _; arg_layout; arg_shape = _ }, _ ->
@@ -2095,7 +2095,7 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
             "uid %a: product layout not flattened by unarization for type \
              '%s':@ %a"
             Uid.print var_uid type_name S.print type_shape
-        else Unknown Sort.Value
+        else Unknown Sort.Scannable
       | Some i, _ ->
         let flattened = flatten_shape type_shape type_layout in
         let flattened_length = List.length flattened in
@@ -2106,7 +2106,7 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
             Misc.fatal_errorf
               "uid %a: unboxed projection index %d out of bounds 0...%d:@ %a"
               Uid.print var_uid i (flattened_length - 1) S.print type_shape
-          else Unknown Sort.Value
+          else Unknown Sort.Scannable
         else List.nth flattened i
     in
     let type_name =

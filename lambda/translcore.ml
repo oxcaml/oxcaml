@@ -905,12 +905,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       Transl_array_comprehension.comprehension
         ~transl_exp ~scopes ~loc ~array_kind comp
   | Texp_ifthenelse(cond, ifso, Some ifnot) ->
-      Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
+      Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable cond,
                   event_before ~scopes ifso (transl_exp ~scopes sort ifso),
                   event_before ~scopes ifnot (transl_exp ~scopes sort ifnot),
                   layout_exp sort e)
   | Texp_ifthenelse(cond, ifso, None) ->
-      Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
+      Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable cond,
                   event_before ~scopes ifso (transl_exp ~scopes sort ifso),
                   lambda_unit,
                   Lambda.layout_unit)
@@ -920,7 +920,9 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 event_before ~scopes expr2 (transl_exp ~scopes sort expr2))
   | Texp_while {wh_body; wh_body_sort; wh_cond} ->
       let wh_body_sort = Jkind.Sort.default_for_transl_and_get wh_body_sort in
-      let cond = transl_exp ~scopes Jkind.Sort.Const.for_predef_value wh_cond in
+      let cond =
+        transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable wh_cond
+      in
       let body = transl_exp ~scopes wh_body_sort wh_body in
       Lwhile {
         wh_cond = maybe_region_layout layout_int cond;
@@ -935,8 +937,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         for_id;
         for_debug_uid;
         for_loc = of_location ~scopes e.exp_loc;
-        for_from = transl_exp ~scopes Jkind.Sort.Const.for_predef_value for_from;
-        for_to = transl_exp ~scopes Jkind.Sort.Const.for_predef_value for_to;
+        for_from = transl_exp ~scopes
+                     Jkind.Sort.Const.for_predef_scannable for_from;
+        for_to = transl_exp ~scopes
+                   Jkind.Sort.Const.for_predef_scannable for_to;
         for_dir;
         for_body = event_before ~scopes for_body
                      (maybe_region_layout layout_unit body);
@@ -1053,7 +1057,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       then lambda_unit
       else begin
         Lifthenelse
-          (transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
+          (transl_exp ~scopes Jkind.Sort.Const.for_predef_scannable cond,
            lambda_unit,
            assert_failed loc ~scopes e,
            Lambda.layout_unit)
@@ -1370,7 +1374,8 @@ and transl_guard ~scopes guard rhs_sort rhs =
   | None -> expr
   | Some cond ->
       event_before ~scopes cond
-        (Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
+        (Lifthenelse(transl_exp ~scopes
+                       Jkind.Sort.Const.for_predef_scannable cond,
                      expr, staticfail, layout))
 
 and transl_case ~scopes rhs_sort {c_lhs; c_guard; c_rhs} =
@@ -2030,7 +2035,7 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
 
 and transl_letmutable ~scopes ~return_layout
       {vb_pat=pat; vb_expr=expr; vb_attributes=attr; vb_loc; vb_sort} body =
-  let arg_sort = Jkind_types.Sort.default_to_value_and_get vb_sort in
+  let arg_sort = Jkind_types.Sort.default_to_scannable_and_get vb_sort in
   let lam =
     transl_bound_exp ~scopes ~in_structure:false pat arg_sort expr vb_loc attr
   in
@@ -2399,7 +2404,7 @@ and transl_idx ~scopes loc env ba uas =
   | Baccess_array { mut = _; index_kind; index; base_ty; elt_ty; elt_sort } ->
     let index_sort, index_kind = match index_kind with
       | Index_int ->
-        Jkind.Sort.Const.value, Ptagged_int_index
+        Jkind.Sort.Const.scannable, Ptagged_int_index
       | Index_unboxed_int64 ->
         Jkind.Sort.Const.bits64,
         Punboxed_or_untagged_integer_index Unboxed_int64

@@ -138,7 +138,7 @@ type t12 : bits64
 
 [%%expect{|
 type t1 : any
-type t2 : any mod separable
+type t2 : any separable
 type t3 : value_or_null
 type t4
 type t5 : void
@@ -936,7 +936,7 @@ let f x =
   | _ -> assert false;;
 
 [%%expect{|
-val f : ('a : value_or_null mod separable). 'a iarray -> 'a iarray = <fun>
+val f : ('a : value_or_null separable). 'a iarray -> 'a iarray = <fun>
 |}]
 
 (******************)
@@ -1312,38 +1312,31 @@ let idx_mut x = (.idx_mut(x))
 type 'a r = { foo : 'a; }
 val idx_r : unit -> ('a r, 'a) idx_imm = <fun>
 val idx_r_r : unit -> ('a r# r, 'a) idx_imm = <fun>
-val idx_array :
-  ('a : value_or_null mod non_float). int -> ('a array, 'a) idx_mut = <fun>
+val idx_array : ('a : value_or_null non_float). int -> ('a array, 'a) idx_mut =
+  <fun>
 val idx_array_L :
-  ('a : value_or_null mod non_float). int64# -> ('a array, 'a) idx_mut =
-  <fun>
+  ('a : value_or_null non_float). int64# -> ('a array, 'a) idx_mut = <fun>
 val idx_array_l :
-  ('a : value_or_null mod non_float). int32# -> ('a array, 'a) idx_mut =
-  <fun>
+  ('a : value_or_null non_float). int32# -> ('a array, 'a) idx_mut = <fun>
 val idx_array_S :
-  ('a : value_or_null mod non_float). int16# -> ('a array, 'a) idx_mut =
-  <fun>
+  ('a : value_or_null non_float). int16# -> ('a array, 'a) idx_mut = <fun>
 val idx_array_s :
-  ('a : value_or_null mod non_float). int8# -> ('a array, 'a) idx_mut = <fun>
+  ('a : value_or_null non_float). int8# -> ('a array, 'a) idx_mut = <fun>
 val idx_array_n :
-  ('a : value_or_null mod non_float). nativeint# -> ('a array, 'a) idx_mut =
+  ('a : value_or_null non_float). nativeint# -> ('a array, 'a) idx_mut =
   <fun>
 val idx_iarray :
-  ('a : value_or_null mod non_float). int -> ('a iarray, 'a) idx_imm = <fun>
+  ('a : value_or_null non_float). int -> ('a iarray, 'a) idx_imm = <fun>
 val idx_iarray_L :
-  ('a : value_or_null mod non_float). int64# -> ('a iarray, 'a) idx_imm =
-  <fun>
+  ('a : value_or_null non_float). int64# -> ('a iarray, 'a) idx_imm = <fun>
 val idx_iarray_l :
-  ('a : value_or_null mod non_float). int32# -> ('a iarray, 'a) idx_imm =
-  <fun>
+  ('a : value_or_null non_float). int32# -> ('a iarray, 'a) idx_imm = <fun>
 val idx_iarray_S :
-  ('a : value_or_null mod non_float). int16# -> ('a iarray, 'a) idx_imm =
-  <fun>
+  ('a : value_or_null non_float). int16# -> ('a iarray, 'a) idx_imm = <fun>
 val idx_iarray_s :
-  ('a : value_or_null mod non_float). int8# -> ('a iarray, 'a) idx_imm =
-  <fun>
+  ('a : value_or_null non_float). int8# -> ('a iarray, 'a) idx_imm = <fun>
 val idx_iarray_n :
-  ('a : value_or_null mod non_float). nativeint# -> ('a iarray, 'a) idx_imm =
+  ('a : value_or_null non_float). nativeint# -> ('a iarray, 'a) idx_imm =
   <fun>
 val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
 val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
@@ -1374,7 +1367,7 @@ type 'a abstract
 Lines 2-3, characters 0-67:
 2 | type existential_abstract : immutable_data with (type : value mod portable) abstract =
 3 |   | Mk : ('a : value mod portable) abstract -> existential_abstract
-Error: The kind of type "existential_abstract" is value mod non_float
+Error: The kind of type "existential_abstract" is value non_float
          because it's a boxed variant type.
        But the kind of type "existential_abstract" must be a subkind of
            immutable_data with (type : value mod portable) abstract
@@ -1525,7 +1518,7 @@ Error: This expression has type "float#" but an expression was expected of type
          "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because of the annotation on the wildcard _ at line 1, characters 22-33.
          need a value
 |}]

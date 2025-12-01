@@ -29,7 +29,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "'a A.t" = "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the type argument of A.t has this layout.
 |}]
 
@@ -42,7 +42,7 @@ Line 1, characters 9-15:
 Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the type argument of A.t has this layout.
 |}]
 
@@ -57,7 +57,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "'a B.t" = "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the type argument of B.t has this layout.
 |}]
 
@@ -70,7 +70,7 @@ Line 1, characters 9-15:
 Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the type argument of B.t has this layout.
 |}]
 
@@ -84,7 +84,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a, 'b) A.t2" = "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the 1st type argument of A.t2 has this layout.
 |}]
 
@@ -97,7 +97,7 @@ Line 1, characters 10-16:
 Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the 1st type argument of A.t2 has this layout.
 |}]
 
@@ -110,7 +110,7 @@ Line 1, characters 19-25:
 Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the 2nd type argument of A.t5 has this layout.
 |}]
 
@@ -123,7 +123,7 @@ Line 1, characters 28-34:
 Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the 3rd type argument of A.t5 has this layout.
 |}]
 
@@ -136,7 +136,7 @@ Line 1, characters 37-43:
 Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the 4th type argument of A.t5 has this layout.
 |}]
 
@@ -150,7 +150,7 @@ Line 1, characters 46-52:
 Error: This type "t_void" should be an instance of type "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
-       But the layout of t_void must be a sublayout of value
+       But the layout of t_void must be a value layout
          because the 5th type argument of A.t5 has this layout.
 |}]
 
@@ -174,7 +174,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 2, characters 0-18.
-       But the layout of t_void must be a sublayout of value.
+       But the layout of t_void must be a value layout.
 |}]
 
 type ('a : value) t_v = 'a
@@ -249,6 +249,6 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is void
          because of the definition of t at line 2, characters 2-25.
-       But the layout of 'a must overlap with value
+       But the layout of 'a must be a value layout
          because of the definition of t at line 8, characters 2-16.
 |}]
