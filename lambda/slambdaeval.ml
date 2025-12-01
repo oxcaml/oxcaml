@@ -2,8 +2,10 @@ module SL = Slambda
 
 (* Helpers for asserting that slambda is trivial. *)
 
+exception Found_a_splice
+
 let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
-  | Psplicevar _ -> raise Exit
+  | Psplicevar _ -> raise Found_a_splice
   | Ptop | Pbottom | Pvalue _ | Punboxed_float _
   | Punboxed_or_untagged_integer _ | Punboxed_vector _ ->
     ()
@@ -12,7 +14,7 @@ let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
 
 let rec assert_mixed_block_element_contains_no_splices :
     type a. a Lambda.mixed_block_element -> unit = function
-  | Splice_variable _ -> raise Exit
+  | Splice_variable _ -> raise Found_a_splice
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
     ()
@@ -45,7 +47,7 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
     assert_mixed_block_element_contains_no_splices element
   | _ -> ()
 
-let assert_function_no_splices { Lambda.params; return; _ } =
+let assert_function_contains_no_splices { Lambda.params; return; _ } =
   List.iter
     (fun { Lambda.layout; _ } -> assert_layout_contains_no_splices layout)
     params;
@@ -56,11 +58,13 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lvar _ | Lmutvar _ | Lconst _ -> ()
   | Lapply { ap_result_layout; _ } ->
     assert_layout_contains_no_splices ap_result_layout
-  | Lfunction func -> assert_function_no_splices func
+  | Lfunction func -> assert_function_contains_no_splices func
   | Llet (_, layout, _, _, _, _) -> assert_layout_contains_no_splices layout
   | Lmutlet (layout, _, _, _, _) -> assert_layout_contains_no_splices layout
   | Lletrec (bindings, _) ->
-    List.iter (fun { Lambda.def; _ } -> assert_function_no_splices def) bindings
+    List.iter
+      (fun { Lambda.def; _ } -> assert_function_contains_no_splices def)
+      bindings
   | Lprim (prim, _, _) -> assert_primitive_contains_no_splices prim
   | Lswitch (_, _, _, layout) -> assert_layout_contains_no_splices layout
   | Lstringswitch (_, _, _, _, layout) ->
@@ -79,7 +83,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Levent _ | Lifused _ -> ()
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
-  | Lsplice _ -> raise Exit);
+  | Lsplice _ -> raise Found_a_splice);
   Lambda.iter_head_constructor assert_no_splices lam
 
 (* Check that slambda is trivial (a quote and contains no splices) *)
@@ -87,7 +91,7 @@ let assert_slambda_is_trivial slam =
   match slam with
   | SL.Quote lam -> (
     try assert_no_splices lam
-    with Exit ->
+    with Found_a_splice ->
       Misc.fatal_error
         "Slambda contains splices but layout_poly extension is disabled")
 
