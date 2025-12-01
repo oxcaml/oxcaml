@@ -557,7 +557,7 @@ val for_unboxed_record : Types.label_declaration list -> Types.jkind_l
     should be [Ctype.apply] partially applied to an [env].
 
     [free_vars] is a function that, given a list of [Types.type_expr]s that are used in
-    the boxed variant computes, returns all type variables that are free within the
+    the boxed variant, returns all type variables that are free within the
     [Types.type_expr]s. [Ctype.free_variable_set_of_list] is a good candidate for
     implementing this function. *)
 val for_boxed_variant :
