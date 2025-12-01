@@ -17,6 +17,7 @@
 #define CAML_MAJOR_GC_H
 
 #ifdef CAML_INTERNALS
+#include <stdbool.h>
 
 typedef enum {
   Phase_sweep_main,
@@ -41,7 +42,11 @@ void caml_opportunistic_major_collection_slice (intnat);
 void caml_major_collection_slice (intnat);
 void caml_finish_sweeping(void);
 void caml_finish_marking (void);
-int caml_init_major_gc(caml_domain_state*);
+/* Allocate data structures for major GC for a given domain. Return false on failure. */
+bool caml_alloc_major_gc(caml_domain_state*);
+/* Enroll a given (new) domain in major GC activity. Cannot fail. */
+void caml_enroll_major_gc(caml_domain_state*);
+/* Free data structures for major GC for the current domain. */
 void caml_teardown_major_gc(void);
 void caml_darken(void*, value, volatile value* ignored);
 void caml_darken_cont(value);
