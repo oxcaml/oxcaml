@@ -196,6 +196,7 @@ let default_timings_precision  = 3
 let timings_precision = ref default_timings_precision (* -dtimings-precision *)
 let profile_columns : profile_column list ref = ref [] (* -dprofile/-dtimings/-dcounters *)
 let profile_granularity : profile_granularity_level ref = ref File_level (* -dgranularity *)
+let profile_output_name : string option ref = ref None (* -dprofile-output *)
 
 let profile_granularity_level_mapping = [
   "file", File_level;

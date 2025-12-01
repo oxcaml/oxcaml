@@ -168,7 +168,8 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
 
 let call_linker_shared ?(native_toplevel = false) file_list output_name =
   let exitcode =
-    Ccomp.call_linker ~native_toplevel Ccomp.Dll output_name file_list ""
+    Profile.record_call "link_object" (fun () ->
+        Ccomp.call_linker ~native_toplevel Ccomp.Dll output_name file_list "")
   in
   if not (exitcode = 0) then raise (Linkenv.Error (Linking_error exitcode))
 
@@ -177,7 +178,8 @@ let call_linker_shared ?(native_toplevel = false) file_list output_name =
 let not_output_to_dev_null output_name =
   not (String.equal output_name "/dev/null")
 
-let link_shared unix ml_objfiles output_name ~genfns ~units_tolink ~ppf_dump =
+let link_shared_actual unix ml_objfiles output_name ~genfns ~units_tolink
+    ~ppf_dump =
   if !Oxcaml_flags.use_cached_generic_functions
   then
     (* When doing shared linking do not use the shared generated startup file.
@@ -202,14 +204,21 @@ let link_shared unix ml_objfiles output_name ~genfns ~units_tolink ~ppf_dump =
   Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:startup
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
-      make_shared_startup_file unix ~ppf_dump
-        ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns units_tolink);
+      Profile.record_call "make_shared_startup_file" (fun () ->
+          make_shared_startup_file unix ~ppf_dump
+            ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns
+            units_tolink));
   call_linker_shared (startup_obj :: objfiles) output_name;
   if !Oxcaml_flags.internal_assembler
   then
     (* CR gyorsh: restore after workaround. *)
     Emitaux.binary_backend_available := true;
   remove_file startup_obj
+
+let link_shared unix ml_objfiles output_name ~genfns ~units_tolink ~ppf_dump =
+  Profile.record_call "link_shared" (fun () ->
+      link_shared_actual unix ml_objfiles output_name ~genfns ~units_tolink
+        ~ppf_dump)
 
 let call_linker file_list_rev startup_file output_name =
   let main_dll =
@@ -251,7 +260,10 @@ let call_linker file_list_rev startup_file output_name =
     then Filename.temp_file (Filename.basename output_name) ".tmp"
     else output_name
   in
-  let exitcode = Ccomp.call_linker mode link_output_name files c_lib in
+  let exitcode =
+    Profile.record_call "link_object" (fun () ->
+        Ccomp.call_linker mode link_output_name files c_lib)
+  in
   if not (exitcode = 0)
   then (
     if needs_objcopy_workflow then Misc.remove_file link_output_name;
@@ -281,7 +293,10 @@ let call_linker file_list_rev startup_file output_name =
             (Filename.quote link_output_name)
             (Filename.quote debug_file)
         in
-        let objcopy_exit = Ccomp.command objcopy_cmd_create_debug in
+        let objcopy_exit =
+          Profile.record_call "objcopy_create_debug" (fun () ->
+              Ccomp.command objcopy_cmd_create_debug)
+        in
         if objcopy_exit <> 0
         then (
           Misc.remove_file link_output_name;
@@ -295,7 +310,10 @@ let call_linker file_list_rev startup_file output_name =
             (Filename.quote link_output_name)
             (Filename.quote output_name)
         in
-        let objcopy_exit = Ccomp.command objcopy_cmd_create_stripped_exe in
+        let objcopy_exit =
+          Profile.record_call "objcopy_create_stripped_exe" (fun () ->
+              Ccomp.command objcopy_cmd_create_stripped_exe)
+        in
         Misc.remove_file link_output_name;
         if objcopy_exit <> 0 then raise (Error (Objcopy_error objcopy_exit)))
     | Fission_dsymutil ->
@@ -309,12 +327,14 @@ let call_linker file_list_rev startup_file output_name =
         let dsymutil_cmd =
           Printf.sprintf "dsymutil %s" (Filename.quote output_name)
         in
-        let dsymutil_exit = Ccomp.command dsymutil_cmd in
+        let dsymutil_exit =
+          Profile.record_call "dsymutil" (fun () -> Ccomp.command dsymutil_cmd)
+        in
         if dsymutil_exit <> 0 then raise (Error (Dsymutil_error dsymutil_exit))
 
 (* Main entry point *)
 
-let link unix ml_objfiles output_name ~cached_genfns_imports ~genfns
+let link_actual unix ml_objfiles output_name ~cached_genfns_imports ~genfns
     ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump : unit =
   if !Oxcaml_flags.internal_assembler
   then Emitaux.binary_backend_available := true;
@@ -340,13 +360,20 @@ let link unix ml_objfiles output_name ~cached_genfns_imports ~genfns
   Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:startup
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
-      make_startup_file unix ~ppf_dump
-        ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns units_tolink
-        cached_genfns_imports);
+      Profile.record_call "make_startup_file" (fun () ->
+          make_startup_file unix ~ppf_dump
+            ~sourcefile_for_dwarf:(Some sourcefile_for_dwarf) genfns
+            units_tolink cached_genfns_imports));
   Emitaux.reduce_heap_size ~reset:(fun () -> Linkenv.reset ());
   Misc.try_finally
     (fun () -> call_linker ml_objfiles startup_obj output_name)
     ~always:(fun () -> remove_file startup_obj)
+
+let link unix ml_objfiles output_name ~cached_genfns_imports ~genfns
+    ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump : unit =
+  Profile.record_call "link" (fun () ->
+      link_actual unix ml_objfiles output_name ~cached_genfns_imports ~genfns
+        ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump)
 
 (* Error report *)
 

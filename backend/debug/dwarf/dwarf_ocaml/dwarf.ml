@@ -129,10 +129,10 @@ let format_variable_json (variable : DS.Diagnostics.variable_reduction) =
         (Json.array (List.map Json.string variable.cms_files_unreadable)) ]
 
 let emit_stats_file t =
-  let sourcefile = DS.sourcefile t.state in
   let stats_filename =
-    let base = Filename.remove_extension sourcefile in
-    base ^ ".debug-stats.json"
+    match !Dwarf_flags.ddwarf_metrics_output_file with
+    | Some filename -> filename
+    | None -> DS.sourcefile t.state ^ ".debug-stats.json"
   in
   let { DS.Diagnostics.variables } = DS.diagnostics t.state in
   let oc = open_out stats_filename in

@@ -559,6 +559,11 @@ let mk_dgranularity f =
   " Specify granularity level for profile information (-dtimings, -dcounters, -dprofile)";
 ;;
 
+let mk_dprofile_output f =
+  "-dprofile-output", Arg.String f,
+  "<file>  Set output filename for profile data (e.g., array-profile.csv)"
+;;
+
 let mk_unbox_closures f =
   "-unbox-closures", Arg.Unit f,
   " Pass free variables via specialised arguments rather than closures"
@@ -1159,6 +1164,7 @@ module type Compiler_options = sig
   val _dcounters : unit -> unit
   val _dprofile : unit -> unit
   val _dgranularity : string -> unit
+  val _dprofile_output : string -> unit
   val _dump_into_file : unit -> unit
   val _dump_into_csv : unit -> unit
   val _dump_dir : string -> unit
@@ -1475,6 +1481,7 @@ struct
     mk_dcounters F._dcounters;
     mk_dprofile F._dprofile;
     mk_dgranularity F._dgranularity;
+    mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
     mk_dump_into_csv F._dump_into_csv;
     mk_dump_dir F._dump_dir;
@@ -1745,6 +1752,7 @@ struct
     mk_dcounters F._dcounters;
     mk_dprofile F._dprofile;
     mk_dgranularity F._dgranularity;
+    mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
     mk_dump_into_csv F._dump_into_csv;
     mk_dump_dir F._dump_dir;
@@ -2009,6 +2017,7 @@ struct
     mk_dcounters F._dcounters;
     mk_dprofile F._dprofile;
     mk_dgranularity F._dgranularity;
+    mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
     mk_dump_into_csv F._dump_into_csv;
     mk_dump_dir F._dump_dir;
@@ -2352,6 +2361,7 @@ module Default = struct
     let _dtimings_precision n = timings_precision := n
     let _dcounters () = profile_columns := [`Counters]
     let _dgranularity = Clflags.set_profile_granularity
+    let _dprofile_output s = profile_output_name := Some s
     let _dump_into_file = set dump_into_file
     let _dump_into_csv = set dump_into_csv
     let _dump_dir s = dump_dir := Some s

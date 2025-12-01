@@ -2074,12 +2074,19 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
         Env.empty
     in
     D.record_before_reduction reduction_diagnostics type_shape;
-    let type_shape = shape_reduce type_shape in
+    let type_shape =
+      Profile.record "shape_reduce"
+        (fun () -> shape_reduce type_shape)
+        ~accumulate:true ()
+    in
     D.record_after_reduction reduction_diagnostics type_shape;
     let type_shape =
-      Type_shape.unfold_and_evaluate
-        ~diagnostics:(D.shape_evaluation_diagnostics reduction_diagnostics)
-        type_shape
+      Profile.record "unfold_and_evaluate"
+        (fun () ->
+          Type_shape.unfold_and_evaluate
+            ~diagnostics:(D.shape_evaluation_diagnostics reduction_diagnostics)
+            type_shape)
+        ~accumulate:true ()
     in
     D.record_after_evaluation reduction_diagnostics type_shape;
     let type_shape =
@@ -2119,26 +2126,29 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
     in
     D.record_before_dwarf_generation reduction_diagnostics parent_proto_die;
     let reference =
-      match type_shape with
-      | Known (type_shape, base_layout) ->
-        let reference =
-          type_shape_to_dwarf_die_with_aliased_name type_name type_shape
-            base_layout ~parent_proto_die ~fallback_value_die
-        in
-        if Debugging_the_compiler.enabled ()
-        then (
-          Format.eprintf "%a has become %a@." Uid.print var_uid
-            Asm_targets.Asm_label.print reference;
-          Debugging_the_compiler.print ~die:parent_proto_die);
-        reference
-      | Unknown base_layout ->
-        let reference = Proto_die.create_reference () in
-        create_base_layout_type ~reference ~parent_proto_die
-          ~name:("unknown @ " ^ Sort.to_string_base base_layout)
-          ~fallback_value_die base_layout ();
-        (* CR sspies: We do have the type name available here, so we could be
-           more precise in principle. *)
-        reference
+      Profile.record "dwarf_produce_dies"
+        (fun () ->
+          match type_shape with
+          | Known (type_shape, base_layout) ->
+            let reference =
+              type_shape_to_dwarf_die_with_aliased_name type_name type_shape
+                base_layout ~parent_proto_die ~fallback_value_die
+            in
+            if Debugging_the_compiler.enabled ()
+            then (
+              Format.eprintf "%a has become %a@." Uid.print var_uid
+                Asm_targets.Asm_label.print reference;
+              Debugging_the_compiler.print ~die:parent_proto_die);
+            reference
+          | Unknown base_layout ->
+            let reference = Proto_die.create_reference () in
+            create_base_layout_type ~reference ~parent_proto_die
+              ~name:("unknown @ " ^ Sort.to_string_base base_layout)
+              ~fallback_value_die base_layout ();
+            (* CR sspies: We do have the type name available here, so we could
+               be more precise in principle. *)
+            reference)
+        ~accumulate:true ()
     in
     D.record_after_dwarf_generation reduction_diagnostics parent_proto_die;
     D.append_diagnostics_to_dwarf_state state reduction_diagnostics;

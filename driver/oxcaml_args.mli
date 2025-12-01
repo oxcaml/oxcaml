@@ -29,6 +29,7 @@ module type Oxcaml_options = sig
   val ddebug_available_regs : unit -> unit
   val ddwarf_types : unit -> unit
   val ddwarf_metrics : unit -> unit
+  val ddwarf_metrics_output_file : string -> unit
   val dcfg : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : Clflags.Register_allocator.t -> unit

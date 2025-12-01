@@ -143,3 +143,15 @@ let with_ppf_dump ?stdout ~file_prefix f =
       if Option.is_some stdout then Format.std_formatter else Format.err_formatter in
     Misc.try_finally (fun () -> f formatter)
   | true -> with_ppf_file ~file_prefix ~file_extension:".dump" f
+
+let get_profile_file_prefix ~expected_suffix ~default_name =
+  match !Clflags.profile_output_name with
+  | None -> default_name
+  | Some filename ->
+    if Filename.check_suffix filename expected_suffix then
+      Filename.chop_suffix filename expected_suffix
+    else
+      Compenv.fatal
+        (Printf.sprintf
+          "Profile output filename must have %s extension, got: %s"
+          expected_suffix filename)

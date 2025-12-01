@@ -218,8 +218,17 @@ let main unix argv ppf ~flambda2 =
       end;
       Profile.print ppf !Clflags.profile_columns ~timings_precision:!Clflags.timings_precision
     in
-    if !Clflags.dump_into_csv then
-      Compmisc.with_ppf_file ~file_prefix:"profile" ~file_extension:".csv" output_profile_csv
+    (if !Clflags.dump_into_csv then
+      let file_prefix =
+        Compmisc.get_profile_file_prefix
+          ~expected_suffix:".csv" ~default_name:"profile"
+      in
+      Compmisc.with_ppf_file
+        ~file_prefix ~file_extension:".csv" output_profile_csv
     else if !Oxcaml_flags.gc_timings || !Clflags.profile_columns <> [] then
-      Compmisc.with_ppf_dump ~stdout:() ~file_prefix:"profile" output_profile_standard;
+      let file_prefix =
+        Compmisc.get_profile_file_prefix
+          ~expected_suffix:".dump" ~default_name:"profile"
+      in
+      Compmisc.with_ppf_dump ~stdout:() ~file_prefix output_profile_standard);
     0

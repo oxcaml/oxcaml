@@ -1155,6 +1155,9 @@ module Json : sig
   val int : int -> string
   (** [int value] formats an integer value as a JSON number. *)
 
+  val float : float -> string
+  (** [float value] formats a float value as a JSON number. *)
+
   val object_ : string list -> string
   (** [object_ fields] creates a JSON object from a list of field strings. *)
 
