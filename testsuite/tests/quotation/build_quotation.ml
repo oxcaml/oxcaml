@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension runtime_metaprogramming";
+ flags = "-no-linenums -no-colnums -extension runtime_metaprogramming";
  expect;
 *)
 
@@ -290,9 +290,9 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 
 <[ let Some x = Some "foo" in x ]>;;
 [%%expect {|
-Line 291, characters 3-31:
-291 | <[ let Some x = Some "foo" in x ]>;;
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line _, characters _-_:
+ | <[ let Some x = Some "foo" in x ]>;;
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 None
@@ -302,9 +302,9 @@ None
 
 <[ let x::xs = [1; 2; 3] in x ]>;;
 [%%expect {|
-Line 303, characters 3-29:
-303 | <[ let x::xs = [1; 2; 3] in x ]>;;
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line _, characters _-_:
+ | <[ let x::xs = [1; 2; 3] in x ]>;;
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 []
@@ -314,9 +314,9 @@ Here is an example of a case that is not matched:
 
 <[ let x::xs = [1; 2; 3] in xs ]>;;
 [%%expect {|
-Line 315, characters 3-30:
-315 | <[ let x::xs = [1; 2; 3] in xs ]>;;
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line _, characters _-_:
+ | <[ let x::xs = [1; 2; 3] in xs ]>;;
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
 []
@@ -644,42 +644,42 @@ module Mod : sig type t = int val mk : 'a -> 'a end
 
 <[ fun (module _ : S) x -> 42 ]>;;
 [%%expect {|
-Line 645, characters 19-20:
-645 | <[ fun (module _ : S) x -> 42 ]>;;
-                         ^
-Error: Identifier "S" is used at Line 645, characters 19-20,
+Line _, characters _-_:
+ | <[ fun (module _ : S) x -> 42 ]>;;
+                      ^
+Error: Identifier "S" is used at Line _, characters _-_,
        inside a quotation (<[ ... ]>);
-       it is introduced at Lines 1-7, characters 0-3, outside any quotations.
+       it is introduced at Lines _-_, characters _-_, outside any quotations.
 |}];;
 
 <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
 [%%expect {|
-Line 655, characters 18-52:
-655 | <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line _, characters _-_:
+ | <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Module definition using "struct..end"
        is not supported inside quoted expressions,
-       as seen at Line 655, characters 18-52.
+       as seen at Line _, characters _-_.
 |}];;
 
 <[ Mod.mk 42 ]>;;
 [%%expect {|
-Line 665, characters 3-9:
-665 | <[ Mod.mk 42 ]>;;
-         ^^^^^^
-Error: Identifier "Mod" is used at Line 665, characters 3-9,
+Line _, characters _-_:
+ | <[ Mod.mk 42 ]>;;
+      ^^^^^^
+Error: Identifier "Mod" is used at Line _, characters _-_,
        inside a quotation (<[ ... ]>);
-       it is introduced at File "_none_", line 1, outside any quotations.
+       it is introduced at File "_none_", line _, outside any quotations.
 |}];;
 
 let x = 42 in <[ x ]>;;
 [%%expect {|
-Line 675, characters 17-18:
-675 | let x = 42 in <[ x ]>;;
-                       ^
-Error: Identifier "x" is used at Line 675, characters 17-18,
+Line _, characters _-_:
+ | let x = 42 in <[ x ]>;;
+                    ^
+Error: Identifier "x" is used at Line _, characters _-_,
        inside a quotation (<[ ... ]>);
-       it is introduced at Line 1, characters 4-5, outside any quotations.
+       it is introduced at Line _, characters _-_, outside any quotations.
 |}];;
 
 let x = <[ 123 ]> in <[ $x ]>;;
@@ -689,21 +689,21 @@ let x = <[ 123 ]> in <[ $x ]>;;
 
 <[ let o = object method f = 1 end in o#f ]>;;
 [%%expect {|
-Line 690, characters 11-34:
-690 | <[ let o = object method f = 1 end in o#f ]>;;
-                 ^^^^^^^^^^^^^^^^^^^^^^^
+Line _, characters _-_:
+ | <[ let o = object method f = 1 end in o#f ]>;;
+              ^^^^^^^^^^^^^^^^^^^^^^^
 Error: Object definition using "object..end"
        is not supported inside quoted expressions,
-       as seen at Line 690, characters 11-34.
+       as seen at Line _, characters _-_.
 |}];;
 
 <[ let open List in map ]>;;
 [%%expect {|
-Line 700, characters 3-23:
-700 | <[ let open List in map ]>;;
-         ^^^^^^^^^^^^^^^^^^^^
+Line _, characters _-_:
+ | <[ let open List in map ]>;;
+      ^^^^^^^^^^^^^^^^^^^^
 Error: Opening modules is not supported inside quoted expressions,
-       as seen at Line 700, characters 3-23.
+       as seen at Line _, characters _-_.
 |}];;
 
 <[ fun x -> $ (<[ x ]>) ]>;;
