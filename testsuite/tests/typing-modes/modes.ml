@@ -658,7 +658,7 @@ let f : unit -> (unit -> string) @ local = fun () -> fun () -> "hello"
 val f : unit -> (unit -> string) @ local = <fun>
 |}]
 
-(* type error should preempts mode error *)
+(* type error should preempt the mode error *)
 let _ : string @ global = f ()
 [%%expect{|
 Line 1, characters 26-30:
