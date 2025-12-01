@@ -32,7 +32,7 @@ Line 1, characters 9-15:
 Error: This type "float#" should be an instance of type "('a : value_or_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -44,7 +44,7 @@ Line 1, characters 11-17:
 Error: This type "float#" should be an instance of type "('a : value_or_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -56,7 +56,7 @@ Line 1, characters 14-20:
 Error: This type "float#" should be an instance of type "('a : value_or_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -68,7 +68,7 @@ Line 1, characters 13-19:
 Error: This type "float#" should be an instance of type "('a : value_or_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -90,7 +90,7 @@ Line 1, characters 9-15:
 Error: This type "float#" should be an instance of type "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -102,7 +102,7 @@ Line 1, characters 11-17:
 Error: This type "float#" should be an instance of type "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -114,7 +114,7 @@ Line 1, characters 14-20:
 Error: This type "float#" should be an instance of type "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -126,7 +126,7 @@ Line 1, characters 13-19:
 Error: This type "float#" should be an instance of type "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -141,7 +141,7 @@ Line 1, characters 9-15:
 Error: This type "float#" should be an instance of type "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -153,7 +153,7 @@ Line 1, characters 11-17:
 Error: This type "float#" should be an instance of type "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -165,7 +165,7 @@ Line 1, characters 14-20:
 Error: This type "float#" should be an instance of type "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -177,7 +177,7 @@ Line 1, characters 13-19:
 Error: This type "float#" should be an instance of type "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 

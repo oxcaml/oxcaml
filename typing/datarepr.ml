@@ -99,7 +99,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
       [
         {
           ca_type = newgenconstr path type_params;
-          ca_sort = Jkind.Sort.Const.value;
+          ca_sort = Jkind.Sort.Const.scannable;
           ca_modalities = Mode.Modality.Const.id;
           ca_loc = Location.none
         }
@@ -136,7 +136,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
          users to write their own null constructors. *)
       (* CR layouts v3.3: generalize to [any]. *)
       [| Constructor_uniform_value, [| |]
-       ; Constructor_uniform_value, [| Jkind.Sort.Const.value |] |],
+       ; Constructor_uniform_value, [| Jkind.Sort.Const.scannable |] |],
       false
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in

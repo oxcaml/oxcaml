@@ -23,11 +23,11 @@ let f1_1 (x : t_untagged_immediate) = x;;
 let f1_2 (x : 'a t_untagged_immediate_id) = x;;
 let f1_3 (x : int#) = x;;
 [%%expect{|
-type t_untagged_immediate : untagged_immediate mod non_float
-type ('a : untagged_immediate mod non_float) t_untagged_immediate_id = 'a
+type t_untagged_immediate : untagged_immediate
+type ('a : untagged_immediate) t_untagged_immediate_id = 'a
 val f1_1 : t_untagged_immediate -> t_untagged_immediate = <fun>
 val f1_2 :
-  ('a : untagged_immediate mod non_float).
+  ('a : untagged_immediate).
     'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
   <fun>
 val f1_3 : int# -> int# = <fun>
@@ -49,7 +49,7 @@ let f2_3 (x : int#) =
 [%%expect{|
 val f2_1 : t_untagged_immediate -> t_untagged_immediate = <fun>
 val f2_2 :
-  ('a : untagged_immediate mod non_float).
+  ('a : untagged_immediate).
     'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
   <fun>
 val f2_3 : int# -> int# = <fun>
@@ -121,7 +121,7 @@ Error: This expression has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value
+       But the layout of t_untagged_immediate must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -131,12 +131,11 @@ Line 1, characters 44-45:
 1 | let f4_2 (x : 'a t_untagged_immediate_id) = x, false;;
                                                 ^
 Error: This expression has type
-         "'a t_untagged_immediate_id" = "('a : untagged_immediate mod non_float)"
+         "'a t_untagged_immediate_id" = "('a : untagged_immediate)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_untagged_immediate_id is untagged_immediate
          because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
-       But the layout of 'a t_untagged_immediate_id must be a sublayout of
-           value
+       But the layout of 'a t_untagged_immediate_id must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -149,7 +148,7 @@ Error: This expression has type "int#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a sublayout of value
+       But the layout of int# must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -161,7 +160,7 @@ Line 1, characters 12-32:
 Error: Tuple element types must have layout value.
        The layout of "t_untagged_immediate" is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of "t_untagged_immediate" must be a sublayout of value
+       But the layout of "t_untagged_immediate" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -173,7 +172,7 @@ Line 1, characters 18-22:
 Error: Tuple element types must have layout value.
        The layout of "int#" is untagged_immediate
          because it is the unboxed version of the primitive type int.
-       But the layout of "int#" must be a sublayout of value
+       But the layout of "int#" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -185,7 +184,7 @@ Line 1, characters 38-40:
 Error: Tuple element types must have layout value.
        The layout of "'a" is untagged_immediate
          because of the annotation on 'a in the declaration of the type t4_6.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -198,7 +197,7 @@ Line 1, characters 57-59:
 Error: Tuple element types must have layout value.
        The layout of "'a" is untagged_immediate
          because of the annotation on 'a in the declaration of the type t4_7.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must be a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -238,8 +237,8 @@ type t5_5 = A of int * t_untagged_immediate
 type ('a : untagged_immediate) t5_7 = A of int
 type ('a : untagged_immediate) t5_8 = A of 'a;;
 [%%expect{|
-type ('a : untagged_immediate mod non_float) t5_7 = A of int
-type ('a : untagged_immediate mod non_float) t5_8 = A of 'a
+type ('a : untagged_immediate) t5_7 = A of int
+type ('a : untagged_immediate) t5_8 = A of 'a
 |}]
 
 (* No mixed block restriction: the compiler reorders the block for you, moving
@@ -272,8 +271,7 @@ Line 1, characters 31-51:
 Error: This type signature for "x" is not a value type.
        The layout of type t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of type t_untagged_immediate must be a sublayout of
-           value
+       But the layout of type t_untagged_immediate must be a value layout
          because it's the type of something stored in a module structure.
 |}];;
 
@@ -285,8 +283,8 @@ Line 1, characters 31-57:
 Error: This type signature for "x" is not a value type.
        The layout of type 'a t_untagged_immediate_id is untagged_immediate
          because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
-       But the layout of type 'a t_untagged_immediate_id must be a sublayout of
-         value
+       But the layout of type 'a t_untagged_immediate_id must be
+         a value layout
          because it's the type of something stored in a module structure.
 |}];;
 
@@ -298,7 +296,7 @@ Line 1, characters 31-35:
 Error: This type signature for "x" is not a value type.
        The layout of type int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
-       But the layout of type int# must be a sublayout of value
+       But the layout of type int# must be a value layout
          because it's the type of something stored in a module structure.
 |}];;
 
@@ -314,7 +312,7 @@ Error: This expression has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value
+       But the layout of t_untagged_immediate must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -324,12 +322,11 @@ Line 1, characters 47-48:
 1 | let f7_2 (x : 'a t_untagged_immediate_id) = `A x;;
                                                    ^
 Error: This expression has type
-         "'a t_untagged_immediate_id" = "('a : untagged_immediate mod non_float)"
+         "'a t_untagged_immediate_id" = "('a : untagged_immediate)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_untagged_immediate_id is untagged_immediate
          because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
-       But the layout of 'a t_untagged_immediate_id must be a sublayout of
-           value
+       But the layout of 'a t_untagged_immediate_id must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -342,7 +339,7 @@ Error: This expression has type "int#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a sublayout of value
+       But the layout of int# must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -354,7 +351,7 @@ Line 1, characters 20-40:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "t_untagged_immediate" is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of "t_untagged_immediate" must be a sublayout of value
+       But the layout of "t_untagged_immediate" must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -366,7 +363,7 @@ Line 1, characters 46-48:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "'a" is untagged_immediate
          because of the annotation on 'a in the declaration of the type f7_5.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -381,8 +378,7 @@ let id_value x = x;;
 [%%expect{|
 val make_t_untagged_immediate : unit -> t_untagged_immediate = <fun>
 val make_t_untagged_immediate_id :
-  ('a : untagged_immediate mod non_float). unit -> 'a t_untagged_immediate_id =
-  <fun>
+  ('a : untagged_immediate). unit -> 'a t_untagged_immediate_id = <fun>
 val make_intu : unit -> int# = <fun>
 val id_value : 'a -> 'a = <fun>
 |}];;
@@ -396,7 +392,7 @@ Error: This expression has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value
+       But the layout of t_untagged_immediate must be a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -406,12 +402,11 @@ Line 1, characters 20-53:
 1 | let x8_2 = id_value (make_t_untagged_immediate_id ());;
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type
-         "'a t_untagged_immediate_id" = "('a : untagged_immediate mod non_float)"
+         "'a t_untagged_immediate_id" = "('a : untagged_immediate)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_untagged_immediate_id is untagged_immediate
          because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
-       But the layout of 'a t_untagged_immediate_id must be a sublayout of
-           value
+       But the layout of 'a t_untagged_immediate_id must be a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -424,7 +419,7 @@ Error: This expression has type "int#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a sublayout of value
+       But the layout of int# must be a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -438,13 +433,12 @@ let f9_2 () = twice f1_2 (make_t_untagged_immediate_id ())
 let f9_3 () = twice f1_3 (make_intu ());;
 [%%expect{|
 val twice :
-  ('a : untagged_immediate mod non_float).
+  ('a : untagged_immediate).
     ('a t_untagged_immediate_id -> 'a t_untagged_immediate_id) ->
     'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
   <fun>
 val f9_1 : unit -> t_untagged_immediate t_untagged_immediate_id = <fun>
-val f9_2 :
-  ('a : untagged_immediate mod non_float). unit -> 'a t_untagged_immediate_id =
+val f9_2 : ('a : untagged_immediate). unit -> 'a t_untagged_immediate_id =
   <fun>
 val f9_3 : unit -> int# t_untagged_immediate_id = <fun>
 |}];;
@@ -549,7 +543,7 @@ type 'a t11_2 += A of int
 type 'a t11_2 += B of 'a;;
 
 [%%expect{|
-type ('a : untagged_immediate mod non_float) t11_2 = ..
+type ('a : untagged_immediate) t11_2 = ..
 type 'a t11_2 += A of int
 Line 5, characters 17-24:
 5 | type 'a t11_2 += B of 'a;;
@@ -581,7 +575,7 @@ Line 1, characters 15-39:
 Error: Object field types must have layout value.
        The layout of "t_untagged_immediate" is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of "t_untagged_immediate" must be a sublayout of value
+       But the layout of "t_untagged_immediate" must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -593,7 +587,7 @@ Line 1, characters 41-47:
 Error: Object field types must have layout value.
        The layout of "'a" is untagged_immediate
          because of the annotation on 'a in the declaration of the type t12_2.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must be a value layout
          because it's the type of an object field.
 |}]
 
@@ -606,7 +600,7 @@ Error: The method "x" has type "t_untagged_immediate"
        but is expected to have type "('a : value)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value
+       But the layout of t_untagged_immediate must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -618,7 +612,7 @@ Line 2, characters 13-15:
 2 |   method x : 'a t_untagged_immediate_id -> 'a t_untagged_immediate_id = assert false
                  ^^
 Error: This type "('a : value)" should be an instance of type
-         "('b : untagged_immediate mod non_float)"
+         "('b : untagged_immediate)"
        The layout of 'a is value
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with untagged_immediate
@@ -633,7 +627,7 @@ Line 1, characters 25-26:
 Error: Variables bound in a class must have layout value.
        The layout of x is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a value layout
          because it's the type of a class field.
 |}];;
 
@@ -645,7 +639,7 @@ Line 1, characters 26-41:
 Error: The method "x" has type "int#" but is expected to have type "('a : value)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a sublayout of value
+       But the layout of int# must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -657,7 +651,7 @@ Line 1, characters 26-38:
 Error: Variables bound in a class must have layout value.
        The layout of x is untagged_immediate
          because it is the unboxed version of the primitive type int.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a value layout
          because it's the type of an instance variable.
 |}];;
 
@@ -669,7 +663,7 @@ Line 2, characters 10-12:
 2 |   val x : 'a t_untagged_immediate_id -> 'a t_untagged_immediate_id
               ^^
 Error: This type "('a : value)" should be an instance of type
-         "('b : untagged_immediate mod non_float)"
+         "('b : untagged_immediate)"
        The layout of 'a is value
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with untagged_immediate
@@ -714,7 +708,7 @@ Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type "t_untagged_immediate"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value
+       But the layout of t_untagged_immediate must be a value layout
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -731,7 +725,7 @@ Line 3, characters 17-19:
 Error: "m1" must have a type of layout value because it is captured by an object.
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value
+       But the layout of t_untagged_immediate must be a value layout
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -750,7 +744,7 @@ Error: This expression has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value.
+       But the layout of t_untagged_immediate must be a value layout.
 |}];;
 
 let f13_2 (x : t_untagged_immediate) = compare x x;;
@@ -762,7 +756,7 @@ Error: This expression has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value.
+       But the layout of t_untagged_immediate must be a value layout.
 |}];;
 
 let f13_3 (x : t_untagged_immediate) = Marshal.to_bytes x;;
@@ -774,7 +768,7 @@ Error: This expression has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value.
+       But the layout of t_untagged_immediate must be a value layout.
 |}];;
 
 let f13_4 (x : t_untagged_immediate) = Hashtbl.hash x;;
@@ -786,5 +780,5 @@ Error: This expression has type "t_untagged_immediate"
        but an expression was expected of type "('a : value)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value.
+       But the layout of t_untagged_immediate must be a value layout.
 |}];;
