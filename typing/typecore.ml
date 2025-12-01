@@ -5751,11 +5751,6 @@ and type_expect_
       unify_exp ~sdesc_for_hint:desc env (re exp) (instance ty_expected));
     exp
   in
-  let rupe ~post exp =
-    let exp = rue exp in
-    post ();
-    exp
-  in
   let type_expect_record (type rep) ~overwrite (record_form : rep record_form)
         (lid_sexp_list: (Longident.t loc * Parsetree.expression) list)
         (opt_sexp : Parsetree.expression option) =
@@ -6339,10 +6334,6 @@ and type_expect_
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
-      let check_mode_ret () =
-        submode ~loc ~env ~reason:(Application ty_ret) mode_ret expected_mode;
-        check_tail_call_local_returning loc env ap_mode pm;
-      in
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
           ~on_application:true
@@ -6350,13 +6341,17 @@ and type_expect_
         |> Builtin_attributes.zero_alloc_attribute_only_assume_allowed
       in
 
-      rupe ~post:check_mode_ret {
+      let exp = rue {
         exp_desc = Texp_apply(funct, args, pm.apply_position, ap_mode,
                               zero_alloc);
         exp_loc = loc; exp_extra = [];
         exp_type = ty_ret;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
+      in
+      submode ~loc ~env ~reason:(Application ty_ret) mode_ret expected_mode;
+      check_tail_call_local_returning loc env ap_mode pm;
+      exp
   | Pexp_match(sarg, caselist) ->
       let arg_pat_mode, arg_expected_mode =
         match cases_tuple_arity caselist with
