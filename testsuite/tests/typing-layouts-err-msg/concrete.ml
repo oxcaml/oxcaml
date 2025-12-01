@@ -63,7 +63,7 @@ Line 2, characters 9-14:
 2 | and t2 = t_any t
              ^^^^^
 Error: This type "t_any" should be an instance of type
-         "('a : '_representable_layout_2)"
+         "('a : '_representable_layout_2 separable)"
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
        But the layout of t_any must be representable

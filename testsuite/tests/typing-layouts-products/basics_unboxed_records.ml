@@ -330,9 +330,9 @@ Error: Signature mismatch:
          type t = #{ s : string; r : string; }
        is not included in
          type t
-       The layout of the first is value & value
+       The layout of the first is value non_float & value non_float
          because of the definition of t at line 4, characters 2-36.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a value layout
          because of the definition of t at line 2, characters 2-8.
 |}]
 
@@ -430,7 +430,7 @@ Error: Layout mismatch in final type declaration consistency check.
        message, so we'll say this instead:
          The layout of 'a is float64
            because of the definition of t_float64_id at line 1, characters 0-37.
-         But the layout of 'a must overlap with value
+         But the layout of 'a must be a value layout
            because it instantiates an unannotated type parameter of t,
            chosen to have layout value.
        A good next step is to add a layout annotation on a parameter to
@@ -764,8 +764,8 @@ Line 1, characters 0-61:
 1 | type q : any mod portable = #{ x : int -> int; y : int -> q }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "q" is
-           value mod aliased immutable non_float
-           & value mod aliased immutable non_float
+           value non_float mod aliased immutable
+           & value non_float mod aliased immutable
          because it is an unboxed record.
        But the kind of type "q" must be a subkind of
            value_or_null mod portable & value_or_null mod portable

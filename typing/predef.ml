@@ -330,7 +330,7 @@ and ident_some = ident_create "Some"
 and ident_null = ident_create "Null"
 and ident_this = ident_create "This"
 
-let option_argument_sort = Jkind.Sort.Const.value
+let option_argument_sort = Jkind.Sort.Const.scannable
 let option_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_option; position = 1; arity = 1})
 
@@ -339,8 +339,8 @@ let list_jkind param =
   Jkind.add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param |>
   Jkind.mark_best
 
-let list_sort = Jkind.Sort.Const.value
-let list_argument_sort = Jkind.Sort.Const.value
+let list_sort = Jkind.Sort.Const.scannable
+let list_argument_sort = Jkind.Sort.Const.scannable
 let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
@@ -475,7 +475,7 @@ let mk_add_extension add_extension id args =
           "sanity check failed: non-value jkind in predef extension \
             constructor; should this have Constructor_mixed shape?" in
       match (sort : Jkind.Sort.Const.t) with
-      | Base Value -> ()
+      | Base Scannable -> ()
       | Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _ -> raise_error ())
@@ -648,7 +648,7 @@ let build_initial_env add_type add_extension empty_env =
                ld_mutable=Immutable;
                ld_modalities=Mode.Modality.Const.id;
                ld_type=field_type;
-               ld_sort=Jkind.Sort.Const.value;
+               ld_sort=Jkind.Sort.Const.scannable;
                ld_loc=Location.none;
                ld_attributes=[];
                ld_uid=Uid.of_predef_id id;
@@ -702,26 +702,26 @@ let build_initial_env add_type add_extension empty_env =
   (* Predefined exceptions - alphabetical order *)
   |> add_extension ident_assert_failure
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
-        Jkind.Sort.Const.value]
+        Jkind.Sort.Const.scannable]
   |> add_extension ident_division_by_zero []
   |> add_extension ident_end_of_file []
   |> add_extension ident_failure [type_string,
-       Jkind.Sort.Const.value]
+       Jkind.Sort.Const.scannable]
   |> add_extension ident_invalid_argument [type_string,
-       Jkind.Sort.Const.value]
+       Jkind.Sort.Const.scannable]
   |> add_extension ident_match_failure
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
-       Jkind.Sort.Const.value]
+       Jkind.Sort.Const.scannable]
   |> add_extension ident_not_found []
   |> add_extension ident_out_of_memory []
   |> add_extension ident_out_of_fibers []
   |> add_extension ident_stack_overflow []
   |> add_extension ident_sys_blocked_io []
   |> add_extension ident_sys_error [type_string,
-       Jkind.Sort.Const.value]
+       Jkind.Sort.Const.scannable]
   |> add_extension ident_undefined_recursive_module
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
-       Jkind.Sort.Const.value]
+       Jkind.Sort.Const.scannable]
 
 let add_simd_stable_extension_types add_type env =
   let _, add_type = mk_add_type add_type in
@@ -788,7 +788,7 @@ let add_small_number_extension_types add_type env =
 let add_small_number_beta_extension_types _add_type env =
   env
 
-let or_null_argument_sort = Jkind.Sort.Const.value
+let or_null_argument_sort = Jkind.Sort.Const.scannable
 
 let or_null_kind tvar =
   let cstrs =

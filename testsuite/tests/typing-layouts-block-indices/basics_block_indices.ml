@@ -364,38 +364,31 @@ let idx_iarray_n x = (.:n(x))
 let idx_imm x = (.idx_imm(x))
 let idx_mut x = (.idx_mut(x))
 [%%expect{|
-val idx_array :
-  ('a : value_or_null mod non_float). int -> ('a array, 'a) idx_mut = <fun>
+val idx_array : ('a : value_or_null non_float). int -> ('a array, 'a) idx_mut =
+  <fun>
 val idx_array_L :
-  ('a : value_or_null mod non_float). int64# -> ('a array, 'a) idx_mut =
-  <fun>
+  ('a : value_or_null non_float). int64# -> ('a array, 'a) idx_mut = <fun>
 val idx_array_l :
-  ('a : value_or_null mod non_float). int32# -> ('a array, 'a) idx_mut =
-  <fun>
+  ('a : value_or_null non_float). int32# -> ('a array, 'a) idx_mut = <fun>
 val idx_array_S :
-  ('a : value_or_null mod non_float). int16# -> ('a array, 'a) idx_mut =
-  <fun>
+  ('a : value_or_null non_float). int16# -> ('a array, 'a) idx_mut = <fun>
 val idx_array_s :
-  ('a : value_or_null mod non_float). int8# -> ('a array, 'a) idx_mut = <fun>
+  ('a : value_or_null non_float). int8# -> ('a array, 'a) idx_mut = <fun>
 val idx_array_n :
-  ('a : value_or_null mod non_float). nativeint# -> ('a array, 'a) idx_mut =
+  ('a : value_or_null non_float). nativeint# -> ('a array, 'a) idx_mut =
   <fun>
 val idx_iarray :
-  ('a : value_or_null mod non_float). int -> ('a iarray, 'a) idx_imm = <fun>
+  ('a : value_or_null non_float). int -> ('a iarray, 'a) idx_imm = <fun>
 val idx_iarray_L :
-  ('a : value_or_null mod non_float). int64# -> ('a iarray, 'a) idx_imm =
-  <fun>
+  ('a : value_or_null non_float). int64# -> ('a iarray, 'a) idx_imm = <fun>
 val idx_iarray_l :
-  ('a : value_or_null mod non_float). int32# -> ('a iarray, 'a) idx_imm =
-  <fun>
+  ('a : value_or_null non_float). int32# -> ('a iarray, 'a) idx_imm = <fun>
 val idx_iarray_S :
-  ('a : value_or_null mod non_float). int16# -> ('a iarray, 'a) idx_imm =
-  <fun>
+  ('a : value_or_null non_float). int16# -> ('a iarray, 'a) idx_imm = <fun>
 val idx_iarray_s :
-  ('a : value_or_null mod non_float). int8# -> ('a iarray, 'a) idx_imm =
-  <fun>
+  ('a : value_or_null non_float). int8# -> ('a iarray, 'a) idx_imm = <fun>
 val idx_iarray_n :
-  ('a : value_or_null mod non_float). nativeint# -> ('a iarray, 'a) idx_imm =
+  ('a : value_or_null non_float). nativeint# -> ('a iarray, 'a) idx_imm =
   <fun>
 val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
 val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
@@ -677,7 +670,7 @@ Error: Block indices do not yet support non-default modalities. In particular,
 let bad () = (.(0).#mut_not_many)
 [%%expect{|
 val bad :
-  ('a : value mod non_float). unit -> ('a mut_not_many# array, 'a) idx_mut =
+  ('a : value non_float). unit -> ('a mut_not_many# array, 'a) idx_mut =
   <fun>
 |}]
 
@@ -708,7 +701,7 @@ val ok : unit -> ('a many# global# ref, 'a) idx_mut = <fun>
 let ok () = (.(0).#global.#many.#aliased.#unyielding)
 [%%expect{|
 val ok :
-  ('a : value mod non_float).
+  ('a : value non_float).
     unit -> ('a unyielding# aliased# many# global# array, 'a) idx_mut =
   <fun>
 |}]
@@ -729,10 +722,9 @@ Line 1, characters 40-46:
                                             ^^^^^^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
-       The kind of float is
-           value mod forkable unyielding many stateless immutable
+       The layout of float is value
          because it is the primitive type float.
-       But the kind of float must be a subkind of value_or_null mod non_float
+       But the layout of float must be a sublayout of value non_float
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]
@@ -753,10 +745,9 @@ Line 2, characters 43-49:
                                                ^^^^^^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(abstract array, 'b) idx_mut"
-       The kind of abstract is value
+       The layout of abstract is value
          because of the definition of abstract at line 1, characters 0-13.
-       But the kind of abstract must be a subkind of
-           value_or_null mod non_float
+       But the layout of abstract must be a sublayout of value non_float
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]
@@ -768,10 +759,9 @@ Line 1, characters 41-48:
                                              ^^^^^^^
 Error: This expression has type "('a iarray, 'a) idx_imm"
        but an expression was expected of type "(float iarray, 'b) idx_imm"
-       The kind of float is
-           value mod forkable unyielding many stateless immutable
+       The layout of float is value
          because it is the primitive type float.
-       But the kind of float must be a subkind of value_or_null mod non_float
+       But the layout of float must be a sublayout of value non_float
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]
@@ -786,10 +776,9 @@ Line 3, characters 23-24:
                            ^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
-       The kind of float is
-           value mod forkable unyielding many stateless immutable
+       The layout of float is value
          because it is the primitive type float.
-       But the kind of float must be a subkind of value_or_null mod non_float
+       But the layout of float must be a sublayout of value non_float
          because of the definition of y at line 2, characters 10-17.
 |}]
 
@@ -809,10 +798,9 @@ Line 2, characters 44-51:
                                                 ^^^^^^^
 Error: This expression has type "('a iarray, 'a) idx_imm"
        but an expression was expected of type "(abstract iarray, 'b) idx_imm"
-       The kind of abstract is value
+       The layout of abstract is value
          because of the definition of abstract at line 1, characters 0-13.
-       But the kind of abstract must be a subkind of
-           value_or_null mod non_float
+       But the layout of abstract must be a sublayout of value non_float
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]

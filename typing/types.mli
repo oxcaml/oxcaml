@@ -88,7 +88,6 @@ module Jkind_mod_bounds : sig
   module Crossing = Mode.Crossing
   module Externality = Jkind_axis.Externality
   module Nullability = Jkind_axis.Nullability
-  module Separability = Jkind_axis.Separability
 
   type t
 
@@ -96,18 +95,15 @@ module Jkind_mod_bounds : sig
     Crossing.t->
     externality:Externality.t ->
     nullability:Nullability.t ->
-    separability:Separability.t ->
     t
 
   val crossing : t -> Crossing.t
   val externality : t -> Externality.t
   val nullability : t -> Nullability.t
-  val separability : t -> Separability.t
 
   val set_crossing : Crossing.t -> t -> t
   val set_externality : Externality.t -> t -> t
   val set_nullability : Nullability.t -> t -> t
-  val set_separability : Separability.t -> t -> t
 
   (** [set_max_in_set bounds axes] sets all the axes in [axes] to their [max] within
       [bounds] *)
@@ -834,7 +830,7 @@ and tag = Ordinary of {src_index: int;  (* Unique name (per type) *)
    to appear in any order in a record, and later stages of the compiler
    re-arrange the block. *)
 and mixed_block_element =
-  | Value
+  | Scannable
   | Float_boxed
   (* A [Float_boxed] is a float that's stored flat but boxed upon projection. *)
   | Float64

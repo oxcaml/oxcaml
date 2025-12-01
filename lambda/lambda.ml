@@ -1432,7 +1432,7 @@ let rec patch_guarded patch = function
 
 let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   match elt with
-  | Value -> Value generic_value
+  | Scannable -> Value generic_value
   | Float_boxed -> Float_boxed ()
   | Float64 -> Float64
   | Float32 -> Float32
@@ -1455,7 +1455,7 @@ and transl_mixed_product_shape shape =
 let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   Array.mapi (fun i (elt : Types.mixed_block_element) ->
     match elt with
-    | Value -> Value (get_value_kind i)
+    | Scannable -> Value (get_value_kind i)
     | Float_boxed -> Float_boxed (get_mode i)
     | Float64 -> Float64
     | Float32 -> Float32
@@ -1492,7 +1492,7 @@ let transl_module_representation repr =
   in
   let is_value (elt : Types.mixed_block_element) =
     match elt with
-    | Value -> true
+    | Scannable -> true
     | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
     | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
     | Product _ | Void -> false
@@ -2326,7 +2326,7 @@ let structured_constant_layout = function
 
 let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   match c with
-  | Base Value -> layout_any_value
+  | Base Scannable -> layout_any_value
   | Base Float64 -> layout_unboxed_float Unboxed_float64
   | Base Float32 -> layout_unboxed_float Unboxed_float32
   | Base Word -> layout_unboxed_nativeint
@@ -2804,8 +2804,9 @@ let simple_prim_on_values ~name ~arity ~alloc =
     ~native_name:""
     ~native_repr_args:
       (Primitive.make_prim_repr_args arity
-        (Primitive.Prim_global,Same_as_ocaml_repr Jkind.Sort.Const.value))
-    ~native_repr_res:(Prim_global, Same_as_ocaml_repr Jkind.Sort.Const.value)
+        (Primitive.Prim_global,Same_as_ocaml_repr Jkind.Sort.Const.scannable))
+    ~native_repr_res:
+      (Prim_global, Same_as_ocaml_repr Jkind.Sort.Const.scannable)
     ~is_layout_poly:false
 
 let rec try_to_find_location lam =
