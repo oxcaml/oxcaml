@@ -69,8 +69,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
   let final_typing_env =
     Option.map
       (Dep_solver.rewrite_typing_env solved_dep
-         ~unit_symbol:(Flambda_unit.module_symbol unit)
-         [])
+         ~unit_symbol:(Flambda_unit.module_symbol unit))
       final_typing_env
   in
   unit_with_body unit body, free_names, all_code, slot_offsets, final_typing_env

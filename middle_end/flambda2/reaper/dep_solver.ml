@@ -3100,7 +3100,7 @@ end
 
 module TypesRewrite = Flambda2_types.Rewriter.Make (Rewriter)
 
-let rewrite_typing_env result ~unit_symbol:_ vars_to_keep typing_env =
+let rewrite_typing_env result ~unit_symbol:_ typing_env =
   if debug_types
   then Format.eprintf "OLD typing env: %a@." Typing_env.print typing_env;
   let db = result.db in
@@ -3124,34 +3124,7 @@ let rewrite_typing_env result ~unit_symbol:_ vars_to_keep typing_env =
               Rewriter.Many_sources_usages
                 (get_direct_usages db (Code_id_or_name.Map.singleton sym ())) )
   in
-  let variable_metadata var =
-    let () = Misc.fatal_errorf "Variable metadata %a ??@." Variable.print var in
-    let kind = Variable.kind var in
-    let var = Code_id_or_name.var var in
-    let metadata =
-      if not (has_source db var)
-      then result, Rewriter.No_source
-      else if not (has_use db var)
-      then result, Rewriter.No_usages
-      else
-        match get_allocation_point db var with
-        | Some alloc_point -> result, Rewriter.Single_source alloc_point
-        | None ->
-          if is_top db var
-          then result, Rewriter.Many_sources_any_usage
-          else
-            ( result,
-              Rewriter.Many_sources_usages
-                (get_direct_usages db (Code_id_or_name.Map.singleton var ())) )
-    in
-    metadata, kind
-  in
-  let r =
-    TypesRewrite.rewrite typing_env symbol_metadata
-      (List.fold_left
-         (fun m v -> Variable.Map.add v (variable_metadata v) m)
-         Variable.Map.empty vars_to_keep)
-  in
+  let r = TypesRewrite.rewrite typing_env symbol_metadata in
   if debug_types then Format.eprintf "NEW typing env: %a@." Typing_env.print r;
   r
 
