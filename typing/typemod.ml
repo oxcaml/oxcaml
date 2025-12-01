@@ -158,6 +158,55 @@ let rec path_concat head p =
   | Papply _ -> assert false
   | Pextra_ty (p, extra) -> Pextra_ty (path_concat head p, extra)
 
+let infer_modalities ~loc ~env ~md_mode ~mode =
+    (* Values are packed into a structure at modes weaker than they actually
+      are. This is to allow our legacy zapping behavior. For example:
+
+      module M = struct
+        let foo x = x
+        let bar = use_portable foo
+      end
+      module type S = module type of M
+      use_portable M.foo
+
+      would type error at the last line.
+    *)
+    let mode, _ = Mode.Value.newvar_above mode in
+    (* Upon construction, for comonadic (prescriptive) axes, module
+    must be weaker than the values therein, for otherwise operations
+    would be allowed to performed on the module (and extended to the
+    values) that's disallowed for the values.
+
+    For monadic (descriptive) axes, the restriction is not on the
+    construction but on the projection, which is modelled by the
+    [Diff] modality in [mode.ml]. *)
+    begin match Mode.Value.Comonadic.submode
+      mode.Mode.comonadic
+      md_mode.Mode.comonadic with
+      | Ok () -> ()
+      | Error e ->
+          raise (Error (loc, env, Item_weaker_than_structure (Comonadic e)))
+    end;
+    Mode.Modality.infer ~md_mode ~mode
+
+(** Given a signature [sg] and a [mode], where the modalities in [sg] are based
+on [mode], return a signature equivalent to [sg] but modalities based on
+[md_mode]. *)
+let rebase_modalities ~loc ~env ~md_mode ~mode sg =
+  List.map (function
+    | Sig_value (id, vd, vis) ->
+        let mode = Mode.Modality.apply vd.val_modalities mode in
+        let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
+        let vd = {vd with val_modalities} in
+        Sig_value (id, vd, vis)
+    | Sig_module (id, pres, md, rec_, vis) ->
+        let mode = Mode.Modality.apply md.md_modalities mode in
+        let md_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
+        let md = {md with md_modalities} in
+        Sig_module (id, pres, md, rec_, vis)
+    | item -> item
+    ) sg
+
 (* Extract a signature from a module type *)
 
 let extract_sig env loc mty =
@@ -2837,55 +2886,6 @@ let simplify_app_summary app_view = match app_view.arg with
     | true , _      -> Includemod.Error.Empty_struct, mty, mode
     | false, Some p -> Includemod.Error.Named p, mty, mode
     | false, None   -> Includemod.Error.Anonymous, mty, mode
-
-let infer_modalities ~loc ~env ~md_mode ~mode =
-    (* Values are packed into a structure at modes weaker than they actually
-      are. This is to allow our legacy zapping behavior. For example:
-
-      module M = struct
-        let foo x = x
-        let bar = use_portable foo
-      end
-      module type S = module type of M
-      use_portable M.foo
-
-      would type error at the last line.
-    *)
-    let mode, _ = Mode.Value.newvar_above mode in
-    (* Upon construction, for comonadic (prescriptive) axes, module
-    must be weaker than the values therein, for otherwise operations
-    would be allowed to performed on the module (and extended to the
-    values) that's disallowed for the values.
-
-    For monadic (descriptive) axes, the restriction is not on the
-    construction but on the projection, which is modelled by the
-    [Diff] modality in [mode.ml]. *)
-    begin match Mode.Value.Comonadic.submode
-      mode.Mode.comonadic
-      md_mode.Mode.comonadic with
-      | Ok () -> ()
-      | Error e ->
-          raise (Error (loc, env, Item_weaker_than_structure (Comonadic e)))
-    end;
-    Mode.Modality.infer ~md_mode ~mode
-
-(** Given a signature [sg] to be included in a structure. The signature contains
-  modalities relative to [mode], this function returns a signature with
-  modalities relative to [md_mode].  *)
-let rebase_modalities ~loc ~env ~md_mode ~mode sg =
-  List.map (function
-    | Sig_value (id, vd, vis) ->
-        let mode = Mode.Modality.apply vd.val_modalities mode in
-        let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
-        let vd = {vd with val_modalities} in
-        Sig_value (id, vd, vis)
-    | Sig_module (id, pres, md, rec_, vis) ->
-        let mode = Mode.Modality.apply md.md_modalities mode in
-        let md_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
-        let md = {md with md_modalities} in
-        Sig_module (id, pres, md, rec_, vis)
-    | item -> item
-    ) sg
 
 let rec type_module ?alias sttn funct_body anchor env ?expected_mode smod =
   let md, shape =
