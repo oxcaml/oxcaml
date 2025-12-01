@@ -89,6 +89,8 @@
 
    # Encoding of function calls
 
+   [CR ncourant: move here the explanation about how my_closure is handled.]
+
    Closures have a special field, [Code_of_closure], which represents what
    happens when the closure is called. Schematically, if we have a function
    named [f], with a code_id [p], which has a parameter [x] and returns a result
@@ -182,7 +184,42 @@
    reads from a local field $f$, missing $v$ as uses of $u$. Fortunately,
    disabling this optimisation for local fields is enough to restore
    correctness: in that case, we simply add an alias [let v = u], which
-   correctly accounts for the usages of $u$. *)
+   correctly accounts for the usages of $u$.
+
+   # Unboxing
+
+   Unboxing in the reaper starts by considering the set of values whose runtime
+   representation can be changed (other than by replacing fields that are never
+   read by a poison value). The criterion used for this is that the value must
+   have a unique allocation point for each of its uses that read from it.
+   Formally, a value allocated at a given point $x$ can be unboxed if, for each
+   usage $y$ of $x$ that reads from $x$ for one of the fields [Block],
+   [Value_slot], [Function_slot], [Is_int] or [Get_tag], (but not
+   [Code_of_closure] which connects the call witness which is not read at
+   runtime from $x$, nor [Apply] or [Code_id_of_call_witnes] which are only read
+   from call witnesses), $y$ has known sources, and the only source of $y$ is
+   $x$.
+
+   In the case where $x$ has unknown usages, we can assume any field defined in
+   $x$ that is not local might be read from it. As such, as soon as $x$ has a
+   non-local field other than [Code_of_closure], the representation of $x$ may
+   not be changed. Besides, if $x$ has a local field $f$ that is read from a
+   value with an unknown source, the criterion above fails as well.
+
+   Once we have identified the values whose runtime representation can be
+   changed, we must decide which of those to unbox. There are additionnal
+   criteria for this:
+
+   - Symbols may not be unboxed, as non-value symbols are not possible, and
+   symbols may contain non-symbol non-constant values that cannot be turned into
+   a symbol.
+
+   - A closure that is indirectly called may not be unboxed, where a closure is
+   considered indirectly called if, at the point of apply, we are unable to
+   identify precisely which call witness is in the closure.
+
+   - A value that is stored inside another whose representation cannot be
+   changed cannot be unboxed. *)
 
 (* Disable [not-principal] warning in this file. We often write code that looks
    like [let@ [x; y] = a in b] where the list constructor is an [hlist], and [a]
