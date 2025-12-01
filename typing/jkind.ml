@@ -2885,6 +2885,7 @@ let for_boxed_variant ~loc ~decl_params ~type_apply ~free_vars cstrs =
         in
         let domain, range, seen =
           List.fold_left2
+            (* CR ocaml-5.4: Use labeled tuples for the accumulator here *)
             (fun ((domain, range, seen) as acc) arg param ->
               if Btype.TypeSet.mem arg seen
               then
