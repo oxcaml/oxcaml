@@ -42,7 +42,7 @@ Line 1, characters 9-17:
 Error: This type "int64x2#" should be an instance of type "('a : value_or_null)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of a value layout
+       But the layout of int64x2# must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -54,7 +54,7 @@ Line 1, characters 11-19:
 Error: This type "int64x2#" should be an instance of type "('a : value_or_null)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of a value layout
+       But the layout of int64x2# must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -66,7 +66,7 @@ Line 1, characters 14-22:
 Error: This type "int64x2#" should be an instance of type "('a : value_or_null)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of a value layout
+       But the layout of int64x2# must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -78,7 +78,7 @@ Line 1, characters 13-21:
 Error: This type "int64x2#" should be an instance of type "('a : value_or_null)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of a value layout
+       But the layout of int64x2# must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -100,7 +100,7 @@ Line 1, characters 9-17:
 Error: This type "int64x2#" should be an instance of type "('a : value)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of a value layout
+       But the layout of int64x2# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -112,7 +112,7 @@ Line 1, characters 11-19:
 Error: This type "int64x2#" should be an instance of type "('a : value)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of a value layout
+       But the layout of int64x2# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -124,7 +124,7 @@ Line 1, characters 14-22:
 Error: This type "int64x2#" should be an instance of type "('a : value)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of a value layout
+       But the layout of int64x2# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -136,7 +136,7 @@ Line 1, characters 13-21:
 Error: This type "int64x2#" should be an instance of type "('a : value)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of a value layout
+       But the layout of int64x2# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -151,7 +151,7 @@ Line 1, characters 9-17:
 Error: This type "int64x2#" should be an instance of type "('a : value)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of a value layout
+       But the layout of int64x2# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -163,7 +163,7 @@ Line 1, characters 11-19:
 Error: This type "int64x2#" should be an instance of type "('a : value)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of a value layout
+       But the layout of int64x2# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -175,7 +175,7 @@ Line 1, characters 14-22:
 Error: This type "int64x2#" should be an instance of type "('a : value)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of a value layout
+       But the layout of int64x2# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 
@@ -187,7 +187,7 @@ Line 1, characters 13-21:
 Error: This type "int64x2#" should be an instance of type "('a : value)"
        The layout of int64x2# is vec128
          because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a sublayout of a value layout
+       But the layout of int64x2# must be a value layout
          because it's a type argument to a class constructor.
 |}];;
 

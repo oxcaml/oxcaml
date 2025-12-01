@@ -3782,11 +3782,7 @@ module Violation = struct
 
   type locale =
     | Mode
-    (* Sometimes, when reporting a layout conflict, the scannable axes of
-       the expected jkind need not be shown, even when it is scannable.
-       For now, this condition is when the type on the left is known to
-       not be scannable. *)
-    | Layout of { can_omit_right_sa : bool }
+    | Layout
 
   let report_reason ppf violation =
     (* Print out per-axis information about why the error occurred. This only
@@ -3881,24 +3877,33 @@ module Violation = struct
     if first_ran_out then report_fuel_for_type "first";
     if second_ran_out then report_fuel_for_type "second"
 
+  (* CR layouts-scannable: When there is a layout violation and both are
+     value (scannable) layouts, a more useful error should be reported.
+     Specifically, the first mismatched axis should be reported as a reason,
+     like "because it is not non_pointer" for a value vs immediate error. *)
   let report_general preamble pp_former former ppf t =
-    let mismatch_type =
+    (* Sometimes, when reporting a layout conflict, the scannable axes of
+       the expected layout should not be shown since the information is
+       unnecessary. For now, this condition is when the layout on the left is
+       known to not be scannable, but the layout on the right is scannable
+       (so printing as "a value layout" is sensible). *)
+    let mismatch_type, print_as_value_layout =
       match t.violation with
       | Not_a_subjkind (k1, k2, _) ->
         let l1, l2 = k1.jkind.layout, k2.jkind.layout in
         if Sub_result.is_le (Layout.sub l1 l2)
-        then Mode
+        then Mode, false
         else
-          (* If the type on the left is known to be not scannable, there
-             is no need to report the scannable axes on the right. *)
-          Layout { can_omit_right_sa = not (Layout.is_scannable_or_var l1) }
-      | No_intersection (k1, _k2) ->
-        Layout
-          { can_omit_right_sa = not (Layout.is_scannable_or_var k1.jkind.layout)
-          }
+          ( Layout,
+            (not (Layout.is_scannable_or_var l1))
+            && Layout.is_scannable_or_var l2 )
+      | No_intersection (k1, k2) ->
+        ( Layout,
+          (not (Layout.is_scannable_or_var k1.jkind.layout))
+          && Layout.is_scannable_or_var k2.jkind.layout )
     in
     let layout_or_kind =
-      match mismatch_type with Mode -> "kind" | Layout _ -> "layout"
+      match mismatch_type with Mode -> "kind" | Layout -> "layout"
     in
     let rec has_sort_var : Sort.Flat.t Layout.t -> bool = function
       | Sort (Var _, _) -> true
@@ -3906,29 +3911,22 @@ module Violation = struct
       | Sort (Base _, _) | Any _ -> false
     in
     let indent = pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "") in
-    (* On the left / for actual kinds, always print out the entire thing *)
-    let format_full_layout_or_kind ppf jkind =
+    (* On the left / for actual kinds, always print out the entire layout,
+       even if [mismatch_type] says to print as "a value layout" *)
+    let format_layout_or_kind ppf jkind =
       match mismatch_type with
       | Mode -> fprintf ppf "%t%a" indent format jkind
-      | Layout _ -> fprintf ppf "%t%a" indent Layout.format jkind.jkind.layout
-    in
-    (* On the right / for expected kinds, we may omit the scannable axes. *)
-    (* CR layouts-scannable: When there is a layout violation and both are
-       value (scannable) layouts, a more useful error should be reported.
-       Specifically, the first mismatched axis should be reported as a reason,
-       like "because it is not non_pointer" for a value vs immediate error. *)
-    let format_layout_or_kind ppf jkind =
-      match mismatch_type, Layout.get jkind.jkind.layout with
-      | Layout { can_omit_right_sa = true }, Sort (Base Scannable, _) ->
-        fprintf ppf "%ta value layout" indent
-      | _ -> format_full_layout_or_kind ppf jkind
+      | Layout -> fprintf ppf "%t%a" indent Layout.format jkind.jkind.layout
     in
     let subjkind_format verb k2 =
       if has_sort_var (get k2).layout
       then dprintf "%s representable" verb
+      else if print_as_value_layout
+      then
+        (* avoid printing "a sublayout of a value layout" *)
+        dprintf "%s@ a value layout" verb
       else
-        dprintf "%s a sub%s of@ %a" verb layout_or_kind
-          format_full_layout_or_kind k2
+        dprintf "%s a sub%s of@ %a" verb layout_or_kind format_layout_or_kind k2
     in
     let Pack_jkind k1, Pack_jkind k2, fmt_k1, fmt_k2, missing_cmi_option =
       match t with
@@ -3946,7 +3944,7 @@ module Violation = struct
         | None ->
           ( Pack_jkind k1,
             Pack_jkind k2,
-            dprintf "%s@ %a" layout_or_kind format_full_layout_or_kind k1,
+            dprintf "%s@ %a" layout_or_kind format_layout_or_kind k1,
             subjkind_format "is not" k2,
             None )
         | Some p ->
@@ -3957,27 +3955,36 @@ module Violation = struct
             Some p ))
       | { violation = No_intersection (k1, k2); missing_cmi } ->
         assert (Option.is_none missing_cmi);
+        let fmt_k2 =
+          if print_as_value_layout
+          then dprintf "does not overlap with@ %a" format_layout_or_kind k2
+          else dprintf "is not@ a value layout"
+        in
         ( Pack_jkind k1,
           Pack_jkind k2,
-          dprintf "%s@ %a" layout_or_kind format_full_layout_or_kind k1,
-          dprintf "does not overlap with@ %a" format_layout_or_kind k2,
+          dprintf "%s@ %a" layout_or_kind format_layout_or_kind k1,
+          fmt_k2,
           None )
     in
     if display_histories
     then
       let connective =
-        match t.violation, has_sort_var (get k2).layout with
-        | Not_a_subjkind _, false ->
-          dprintf "be a sub%s of@ %a" layout_or_kind format_layout_or_kind k2
-        | No_intersection _, false ->
-          dprintf "overlap with@ %a" format_layout_or_kind k2
-        | _, true -> dprintf "be representable"
+        if has_sort_var (get k2).layout
+        then dprintf "be representable"
+        else if print_as_value_layout
+        then dprintf "be@ a value layout"
+        else
+          match t.violation with
+          | Not_a_subjkind _ ->
+            dprintf "be a sub%s of@ %a" layout_or_kind format_layout_or_kind k2
+          | No_intersection _ ->
+            dprintf "overlap with@ %a" format_layout_or_kind k2
       in
       fprintf ppf "@[<v>%a@;%a@]"
         (Format_history.format_history
            ~intro:
              (dprintf "@[<hov 2>The %s of %a is@ %a@]" layout_or_kind pp_former
-                former format_full_layout_or_kind k1)
+                former format_layout_or_kind k1)
            ~layout_or_kind)
         k1
         (Format_history.format_history

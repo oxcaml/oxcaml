@@ -31,7 +31,7 @@ Error: Object field types must have layout value.
        The layout of "'left 'right. < left : 'left; right : 'right > pair" is
            any
          because the .cmi file for pair is missing.
-       But the layout of "'left 'right. < left : 'left; right : 'right > pair" must be a sublayout of
+       But the layout of "'left 'right. < left : 'left; right : 'right > pair" must be
          a value layout
          because it's the type of an object field.
        No .cmi file found containing pair.

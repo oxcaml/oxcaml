@@ -64,7 +64,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "('a0 : float64)"
        The layout of 'a is float64
          because of the definition of t at line 2, characters 2-23.
-       But the layout of 'a must overlap with a value layout
+       But the layout of 'a must be a value layout
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
 |}];;
@@ -83,7 +83,7 @@ Error: In this "with" constraint, the new definition of "s"
          type s
        The layout of the first is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of the first must be a sublayout of a value layout
+       But the layout of the first must be a value layout
          because of the definition of s at line 3, characters 2-8.
 |}]
 
@@ -269,7 +269,7 @@ Error: This type "('a : float64)" should be an instance of type
          "('b : value_or_null)"
        The layout of 'a is float64
          because of the annotation on 'a in the declaration of the type t.
-       But the layout of 'a must overlap with a value layout
+       But the layout of 'a must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -497,7 +497,7 @@ Error: In this "with" constraint, the new definition of "t"
          type t
        The layout of the first is float64
          because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of the first must be a sublayout of a value layout
+       But the layout of the first must be a value layout
          because of the definition of t at line 2, characters 2-16.
 |}];;
 
@@ -579,7 +579,7 @@ Line 1, characters 28-33:
 Error: This type signature for "x" is not a value type.
        The layout of type t_any is any
          because of the definition of t_any at line 5, characters 0-18.
-       But the layout of type t_any must be a sublayout of a value layout
+       But the layout of type t_any must be a value layout
          because it's the type of something stored in a module structure.
 |}]
 
@@ -796,7 +796,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-19.
-       But the layout of 'a must be a sublayout of a value layout
+       But the layout of 'a must be a value layout
          because of the definition of t at line 4, characters 2-11.
 |}]
 
@@ -834,7 +834,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-19.
-       But the layout of 'a must be a sublayout of a value layout
+       But the layout of 'a must be a value layout
          because of the definition of t at line 4, characters 2-16.
 |}]
 
@@ -897,7 +897,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-24.
-       But the layout of 'a must be a sublayout of a value layout
+       But the layout of 'a must be a value layout
          because of the definition of t at line 4, characters 2-26.
 |}]
 
@@ -939,7 +939,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t2 at line 2, characters 2-20.
-       But the layout of 'a must be a sublayout of a value layout
+       But the layout of 'a must be a value layout
          because of the definition of t2 at line 6, characters 2-29.
 |}]
 
@@ -976,7 +976,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-38.
-       But the layout of 'a must be a sublayout of a value layout
+       But the layout of 'a must be a value layout
          because of the definition of t at line 4, characters 2-40.
 |}]
 
@@ -1013,7 +1013,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-38.
-       But the layout of 'a must be a sublayout of a value layout
+       But the layout of 'a must be a value layout
          because of the definition of t at line 4, characters 2-40.
 |}]
 
@@ -1050,7 +1050,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-44.
-       But the layout of 'a must be a sublayout of a value layout
+       But the layout of 'a must be a value layout
          because of the definition of t at line 4, characters 2-46.
 |}]
 
@@ -1087,7 +1087,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of _ is any
          because of the definition of t at line 2, characters 2-40.
-       But the layout of _ must be a sublayout of a value layout
+       But the layout of _ must be a value layout
          because of the definition of t at line 4, characters 2-32.
 |}]
 
@@ -1351,7 +1351,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-32.
-       But the layout of 'a must be a sublayout of a value layout
+       But the layout of 'a must be a value layout
          because of the definition of t at line 4, characters 2-26.
 |}]
 
@@ -1388,7 +1388,7 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-32.
-       But the layout of 'a must be a sublayout of a value layout
+       But the layout of 'a must be a value layout
          because of the definition of t at line 4, characters 2-34.
 |}]
 
@@ -1431,6 +1431,6 @@ Error: Signature mismatch:
        The problem is in the kinds of a parameter:
        The layout of 'a is any
          because of the definition of t at line 2, characters 2-32.
-       But the layout of 'a must be a sublayout of a value layout
+       But the layout of 'a must be a value layout
          because of the definition of t at line 4, characters 2-31.
 |}]

@@ -47,7 +47,7 @@ Line 1, characters 9-14:
 Error: Tuple element types must have layout value.
        The layout of "t_any" is any
          because of the definition of t_any at line 1, characters 0-18.
-       But the layout of "t_any" must be a sublayout of a value layout
+       But the layout of "t_any" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -63,8 +63,7 @@ Line 1, characters 36-37:
 Error: Object types must have layout value.
        The layout of the type of this expression is void
          because of the annotation on the type variable 'a.
-       But the layout of the type of this expression must overlap with
-           a value layout
+       But the layout of the type of this expression must be a value layout
          because it's the type of an object.
 |}];;
 
@@ -82,7 +81,7 @@ Line 4, characters 6-22:
 Error: Variables bound in a class must have layout value.
        The layout of baz is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of baz must be a sublayout of a value layout
+       But the layout of baz must be a value layout
          because it's the type of an instance variable.
 |}];;
 
@@ -96,7 +95,7 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of a value layout
+       But the layout of t_void must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -112,7 +111,7 @@ Line 3, characters 8-11:
 Error: Variables bound in a class must have layout value.
        The layout of bar is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of bar must be a sublayout of a value layout
+       But the layout of bar must be a value layout
          because it's the type of a class field.
 |}];;
 
@@ -176,7 +175,7 @@ Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a sublayout of a value layout
+       But the layout of t_void must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -268,7 +267,7 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type "('b : void)"
        The layout of 'b is void
          because of the annotation on the type variable 'b.
-       But the layout of 'b must overlap with a value layout
+       But the layout of 'b must be a value layout
          because it is or unifies with an unannotated universal variable.
 |}];;
 
@@ -282,7 +281,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
-       But the layout of t_float64 must be a sublayout of a value layout
+       But the layout of t_float64 must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -316,7 +315,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
-       But the layout of t_float64 must be a sublayout of a value layout
+       But the layout of t_float64 must be a value layout
          because it's the element type of array comprehension.
 |}];;
 
@@ -330,7 +329,7 @@ Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
-       But the layout of t_float64 must be a sublayout of a value layout
+       But the layout of t_float64 must be a value layout
          because it's the type of a lazy expression.
 |}];;
 
@@ -365,7 +364,7 @@ Error: This pattern matches values of type "t_float64"
        but a pattern was expected which matches values of type "('a : value)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
-       But the layout of t_float64 must be a sublayout of a value layout
+       But the layout of t_float64 must be a value layout
          because it's the type of a term-level argument to a class constructor.
 |}];;
 
@@ -378,7 +377,7 @@ Line 1, characters 28-34:
 Error: This type signature for "x" is not a value type.
        The layout of type t_void is void
          because of the definition of t_void at line 6, characters 0-19.
-       But the layout of type t_void must be a sublayout of a value layout
+       But the layout of type t_void must be a value layout
          because it's the type of something stored in a module structure.
 |}];;
 
@@ -404,7 +403,7 @@ Line 2, characters 20-22:
 Error: "m1" must have a type of layout value because it is captured by an object.
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 5, characters 0-24.
-       But the layout of t_float64 must be a sublayout of a value layout
+       But the layout of t_float64 must be a value layout
          because it's the type of a variable captured in an object.
 |}];;
 

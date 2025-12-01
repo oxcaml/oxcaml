@@ -55,7 +55,7 @@ Line 2, characters 0-38:
 Error:
        The layout of bad# is value & value
          because it is an unboxed record.
-       But the layout of bad# must be a sublayout of a value layout
+       But the layout of bad# must be a value layout
          because of the definition of pair at line 1, characters 0-40.
 |}]
 

@@ -39,7 +39,7 @@ Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "('a0 : void)"
        The layout of 'a is void
          because of the definition of t at line 10, characters 2-20.
-       But the layout of 'a must overlap with a value layout
+       But the layout of 'a must be a value layout
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
 |}];;
@@ -58,7 +58,7 @@ Error: In this "with" constraint, the new definition of "s"
          type s
        The layout of the first is void
          because of the definition of t_void at line 5, characters 0-19.
-       But the layout of the first must be a sublayout of a value layout
+       But the layout of the first must be a value layout
          because of the definition of s at line 11, characters 2-8.
 |}]
 
@@ -218,7 +218,7 @@ Error: This type "('a : void)" should be an instance of type
          "('b : value_or_null)"
        The layout of 'a is void
          because of the annotation on 'a in the declaration of the type t.
-       But the layout of 'a must overlap with a value layout
+       But the layout of 'a must be a value layout
          because the type argument of list has layout value_or_null.
 |}];;
 
@@ -437,7 +437,7 @@ Error: In this "with" constraint, the new definition of "t"
          type t
        The layout of the first is void
          because of the definition of t_void at line 5, characters 0-19.
-       But the layout of the first must be a sublayout of a value layout
+       But the layout of the first must be a value layout
          because of the definition of t at line 2, characters 2-16.
 |}];;
 
@@ -519,7 +519,7 @@ Line 1, characters 28-33:
 Error: This type signature for "x" is not a value type.
        The layout of type t_any is any
          because of the definition of t_any at line 1, characters 0-18.
-       But the layout of type t_any must be a sublayout of a value layout
+       But the layout of type t_any must be a value layout
          because it's the type of something stored in a module structure.
 |}]
 

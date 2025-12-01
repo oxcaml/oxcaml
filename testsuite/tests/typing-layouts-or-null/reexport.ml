@@ -134,7 +134,7 @@ Error: This type "('a : float64)" should be an instance of type
          "('b : value maybe_separable)"
        The layout of 'a is float64
          because of the annotation on 'a in the declaration of the type t.
-       But the layout of 'a must overlap with a value layout
+       But the layout of 'a must be a value layout
          because the type argument of or_null has layout value.
 |}]
 

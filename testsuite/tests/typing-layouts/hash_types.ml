@@ -715,7 +715,7 @@ Error: In this "with" constraint, the new definition of "t"
          type t
        The layout of the first is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of the first must be a sublayout of a value layout
+       But the layout of the first must be a value layout
          because of the definition of t at line 2, characters 2-8.
 |}]
 

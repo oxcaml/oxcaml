@@ -19,7 +19,7 @@ Line 6, characters 23-41:
 Error: This expression has type "Stdlib_upstream_compatible.Float_u.t" = "float#"
        but an expression was expected of type "('a : value)"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be
          a value layout
          because it's the element type of array comprehension.
 |}]
@@ -33,7 +33,7 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be
          a value layout
          because it's the element type of an array that is iterated over in a comprehension.
 |}]
@@ -49,7 +49,7 @@ Line 1, characters 21-39:
 Error: This expression has type "Stdlib_upstream_compatible.Float_u.t" = "float#"
        but an expression was expected of type "('a : value_or_null)"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be
          a value layout
          because the type argument of list has layout value_or_null.
 |}]
@@ -63,7 +63,7 @@ Error: This expression has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be
          a value layout
          because it's the element type of a list that is iterated over in a comprehension.
 |}]

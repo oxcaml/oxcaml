@@ -389,7 +389,7 @@ Error: Layout mismatch in final type declaration consistency check.
        message, so we'll say this instead:
          The layout of 'a is float64
            because of the definition of float64_t at line 2, characters 0-29.
-         But the layout of 'a must overlap with a value layout
+         But the layout of 'a must be a value layout
            because it instantiates an unannotated type parameter of t8_5,
            chosen to have layout value.
        A good next step is to add a layout annotation on a parameter to
@@ -453,7 +453,7 @@ Line 10, characters 10-20:
 Error: This type "t_any M.t2" should be an instance of type "'a M.t2"
        The layout of t_any is any
          because of the definition of t_any at line 3, characters 0-16.
-       But the layout of t_any must be a sublayout of a value layout
+       But the layout of t_any must be a value layout
          because of the definition of t1 at line 2, characters 2-42.
 |}]
 
@@ -477,7 +477,7 @@ Line 10, characters 10-20:
 Error: This type "t_any M.t2" should be an instance of type "'a M.t2"
        The layout of t_any is any
          because of the definition of t_any at line 3, characters 0-16.
-       But the layout of t_any must be a sublayout of a value layout
+       But the layout of t_any must be a value layout
          because of the definition of t1 at line 3, characters 2-41.
 |}]
 
@@ -501,7 +501,7 @@ Line 10, characters 10-20:
 Error: This type "t_any M.t2" should be an instance of type "'a M.t2"
        The layout of t_any is any
          because of the definition of t_any at line 3, characters 0-16.
-       But the layout of t_any must be a sublayout of a value layout
+       But the layout of t_any must be a value layout
          because of the definition of t1 at line 3, characters 2-42.
 |}]
 
