@@ -206,6 +206,9 @@
    not be changed. Besides, if $x$ has a local field $f$ that is read from a
    value with an unknown source, the criterion above fails as well.
 
+   Likewise, we identify the functions whose calling convention can be changed,
+   which are those where at each application point, we know the call witness.
+
    Once we have identified the values whose runtime representation can be
    changed, we must decide which of those to unbox. There are additionnal
    criteria for this:
@@ -219,7 +222,19 @@
    identify precisely which call witness is in the closure.
 
    - A value that is stored inside another whose representation cannot be
-   changed cannot be unboxed. *)
+   changed cannot be unboxed.
+
+   - A value which is passed as argument to, or is the return value of, a
+   function whose calling convention cannot be changed, cannot be unboxed
+   either.
+
+   Once the decisions are taken, we compute the required variables for each
+   value that is unboxed. For that, we simply use one variable for each field
+   that has a use, or we recursively compute the variables needed if the field
+   is unboxed as well.
+
+   Likewise, for values whose representation is changed, we compute for each
+   field the variables needed to represent it at the point of the allocation. *)
 
 (* Disable [not-principal] warning in this file. We often write code that looks
    like [let@ [x; y] = a in b] where the list constructor is an [hlist], and [a]
