@@ -80,6 +80,7 @@ type error =
   | Signature_parameter_expected of module_type
   | Signature_result_expected of module_type
   | Recursive_include_functor
+  | Recursive_jkind_declaration
   | With_no_component of Longident.t
   | With_mismatch of Longident.t * Includemod.explanation
   | With_makes_applicative_functor_ill_typed of
@@ -215,7 +216,8 @@ let extract_sig_functor_open funct_body env loc mty sig_acc =
         match Mtype.scrape extended_env mty_result with
         | Mty_signature sg_result ->
             Tincl_functor { input_coercion; input_repr }, sg_result
-        | Mty_functor (Unit,_) when funct_body && Mtype.contains_type env mty ->
+        | Mty_functor (Unit,_)
+          when funct_body && Mtype.contains_type_or_kind env mty ->
             raise (Error (loc, env, Not_includable_in_functor_body))
         | Mty_functor (Unit,mty_result) -> begin
             match Mtype.scrape extended_env mty_result with
@@ -1361,7 +1363,7 @@ and approx_sig_items env ssg=
   | item :: srem ->
       match item.psig_desc with
       | Psig_type (rec_flag, sdecls) ->
-          let decls = Typedecl.approx_type_decl sdecls in
+          let decls = Typedecl.approx_type_decl env sdecls in
           let rem = approx_sig_items env srem in
           map_rec_type ~rec_flag
             (fun rs (id, info) -> Sig_type(id, info, rs, Exported)) decls rem
@@ -1476,8 +1478,9 @@ and approx_sig_items env ssg=
             ]
           ) decls [rem]
           |> List.flatten
-      | Psig_kind_abbrev _ ->
-          Misc.fatal_error "kind_abbrev not supported!"
+      | Psig_jkind sdecl ->
+          (* CR layouts: support this - internal ticket 5793 *)
+          raise (Error(sdecl.pjkind_loc, env, Recursive_jkind_declaration))
       | _ ->
           approx_sig_items env srem
 
@@ -1556,6 +1559,7 @@ module Signature_names : sig
   val check_modtype   : ?info:info -> t -> Location.t -> Ident.t -> unit
   val check_class     : ?info:info -> t -> Location.t -> Ident.t -> unit
   val check_class_type: ?info:info -> t -> Location.t -> Ident.t -> unit
+  val check_jkind     : ?info:info -> t -> Location.t -> Ident.t -> unit
 
   val check_sig_item:
     ?info:info -> t -> Location.t -> Signature_group.rec_group -> unit
@@ -1603,6 +1607,7 @@ end = struct
     typexts: names_infos;
     classes: names_infos;
     class_types: names_infos;
+    jkinds: names_infos;
   }
 
   let new_names () = {
@@ -1613,6 +1618,7 @@ end = struct
     typexts = Hashtbl.create 16;
     classes = Hashtbl.create 16;
     class_types = Hashtbl.create 16;
+    jkinds = Hashtbl.create 16;
   }
 
   type t = {
@@ -1638,6 +1644,7 @@ end = struct
     | Extension_constructor -> names.typexts
     | Class -> names.classes
     | Class_type -> names.class_types
+    | Jkind -> names.jkinds
 
   let check_unsafe_subst loc env: _ result -> _ = function
     | Ok x -> x
@@ -1691,6 +1698,8 @@ end = struct
     check Sig_component_kind.Class t loc id info
   let check_class_type ?(info=`Exported) t loc id =
     check Sig_component_kind.Class_type t loc id info
+  let check_jkind ?(info=`Exported) t loc id =
+    check Sig_component_kind.Jkind t loc id info
 
   let classify =
     let open Sig_component_kind in
@@ -1702,6 +1711,7 @@ end = struct
     | Sig_value (id, _, _) -> Value, id
     | Sig_class (id, _, _, _) -> Class, id
     | Sig_class_type (id, _, _, _) -> Class_type, id
+    | Sig_jkind (id, _, _) -> Jkind, id
 
   let check_item ?info names loc kind id ids =
     let info =
@@ -1753,6 +1763,7 @@ end = struct
         | Sig_modtype (id, mtd, _) -> Module_type, id, mtd.mtd_loc
         | Sig_class (id, c, _, _) -> Class, id, c.cty_loc
         | Sig_class_type (id, ct, _, _) -> Class_type, id, ct.clty_loc
+        | Sig_jkind (id, jkd, _) -> Jkind, id, jkd.jkind_loc
       in
       if Ident.Map.mem user_id to_remove.hide then
         None
@@ -2312,8 +2323,11 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         mksig (Tsig_attribute attr) env loc, [], env
     | Psig_extension (ext, _attrs) ->
         raise (Error_forward (Builtin_attributes.error_of_extension ext))
-    | Psig_kind_abbrev _ ->
-        Misc.fatal_error "kind_abbrev not supported!"
+    | Psig_jkind sdecl ->
+        let id, newenv, decl = Typedecl.transl_jkind_decl env sdecl in
+        Signature_names.check_jkind names decl.jkind_loc decl.jkind_id;
+        let item = Sig_jkind(id, decl.jkind_jkind, Exported) in
+        mksig (Tsig_jkind decl) env loc, [item], newenv
   in
   let rec transl_sig env sig_items sig_type = function
     | [] -> List.rev sig_items, List.rev sig_type, env
@@ -3059,7 +3073,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
         | _ ->
             raise (Error(smod.pmod_loc, env, Not_a_packed_module exp.exp_type))
       in
-      if funct_body && Mtype.contains_type env mty then
+      if funct_body && Mtype.contains_type_or_kind env mty then
         raise (Error (smod.pmod_loc, env, Not_allowed_in_functor_body));
       { mod_desc = Tmod_unpack(exp, mty);
         mod_type = mty;
@@ -3193,7 +3207,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
           else
             raise (Error (app_view.f_loc, env, Apply_generative));
       end;
-      if funct_body && Mtype.contains_type env funct.mod_type then
+      if funct_body && Mtype.contains_type_or_kind env funct.mod_type then
         raise (Error (apply_loc, env, Not_allowed_in_functor_body));
       { mod_desc = Tmod_apply_unit funct;
         mod_type = mty_res;
@@ -3340,6 +3354,7 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
         | Sig_class(id, cd, rs, _) -> Sig_class(id, cd, rs, visibility)
         | Sig_class_type(id, ctd, rs, _) ->
             Sig_class_type(id, ctd, rs, visibility)
+        | Sig_jkind(id, jkd, _) -> Sig_jkind(id, jkd, visibility)
       ) sg
     in
     let open_descr = {
@@ -3784,8 +3799,14 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         || not (Warnings.is_active (Misplaced_attribute "")) then
           Builtin_attributes.mark_alert_used x;
         Tstr_attribute x, [], shape_map, env
-    | Pstr_kind_abbrev _ ->
-        Misc.fatal_error "kind_abbrev not supported!"
+    | Pstr_jkind x ->
+        let id, env, decl = Typedecl.transl_jkind_decl env x in
+        Signature_names.check_jkind names decl.jkind_loc decl.jkind_id;
+        let shape_map =
+          Shape.Map.add_jkind shape_map id decl.jkind_jkind.jkind_uid
+        in
+        let item = Sig_jkind(id, decl.jkind_jkind, Exported) in
+        Tstr_jkind decl, [item], shape_map, env
   in
   let toplevel_sig = Option.value toplevel ~default:[] in
   let rec type_struct env shape_map sstr str_acc sig_acc
@@ -4531,6 +4552,10 @@ let report_error ~loc _env = function
   | Recursive_include_functor ->
       Location.errorf ~loc
         "@[Including a functor is not supported in recursive module signatures @]"
+  | Recursive_jkind_declaration ->
+      Location.errorf ~loc
+        "@[Kind declarations are not yet supported in recursive module \
+         signatures@]"
   | With_no_component lid ->
       Location.errorf ~loc
         "@[The signature constrained by %a has no component named %a@]"
@@ -4636,7 +4661,7 @@ let report_error ~loc _env = function
         Location.print_filename intf_name
   | Not_allowed_in_functor_body ->
       Location.errorf ~loc
-        "@[This expression creates fresh types.@ %s@]"
+        "@[This expression creates fresh types or fresh kinds.@ %s@]"
         "It is not allowed inside applicative functors."
   | Not_includable_in_functor_body ->
       Location.errorf ~loc

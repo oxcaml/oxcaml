@@ -396,6 +396,8 @@ let type_iterators_without_type_expr =
     | Sig_modtype (_, mtd, _)       -> it.it_modtype_declaration it mtd
     | Sig_class (_, cd, _, _)       -> it.it_class_declaration it cd
     | Sig_class_type (_, ctd, _, _) -> it.it_class_type_declaration it ctd
+    | Sig_jkind (_ , _jkd, _)       -> ()
+    (* currently jkind declarations have nothing interesting to iterate over *)
   and it_value_description it vd =
     it.it_type_expr it vd.val_type
   and it_type_declaration it td =

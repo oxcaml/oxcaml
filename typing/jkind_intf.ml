@@ -192,10 +192,6 @@ module type Sort = sig
 
   val format : Format.formatter -> t -> unit
 
-  (** Checks whether this sort is [void], defaulting to [value] if a sort
-      variable is unfilled. *)
-  val is_void_defaulting : t -> bool
-
   (** [default_to_value_and_get] extracts the sort as a `const`.  If it's a variable,
       it is set to [value] first. *)
   val default_to_value_and_get : t -> Const.t
@@ -270,6 +266,7 @@ module History = struct
     | Type_variable : string -> (allowed * allowed) annotation_context
     | Type_wildcard : Location.t -> (allowed * allowed) annotation_context
     | Type_of_kind : Location.t -> (allowed * allowed) annotation_context
+    | Jkind_declaration : Path.t -> (allowed * allowed) annotation_context
     | With_error_message :
         string * 'd annotation_context
         -> 'd annotation_context
@@ -373,6 +370,8 @@ module History = struct
     | Unboxed_tuple
     | Unboxed_record
 
+  type abstract_creation_reason = Strengthening of Ident.t * Path.t
+
   type creation_reason =
     | Annotated : ('l * 'r) annotation_context * Location.t -> creation_reason
     | Missing_cmi of Path.t
@@ -385,6 +384,7 @@ module History = struct
     | Product_creation of product_creation_reason
     | Concrete_creation of concrete_creation_reason
     | Concrete_legacy_creation of concrete_legacy_creation_reason
+    | Abstract_creation_reason of abstract_creation_reason
     | Primitive of Ident.t
     | Unboxed_primitive of Ident.t
     | Imported

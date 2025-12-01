@@ -32,7 +32,7 @@ module G (X : sig end) : S = F ();; (* fail *)
 Line 1, characters 29-33:
 1 | module G (X : sig end) : S = F ();; (* fail *)
                                  ^^^^
-Error: This expression creates fresh types.
+Error: This expression creates fresh types or fresh kinds.
        It is not allowed inside applicative functors.
 |}];;
 module H() = F();; (* ok *)

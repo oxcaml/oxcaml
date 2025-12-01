@@ -981,6 +981,7 @@ and print_out_sig_item ppf =
         oval_attributes
   | Osig_ellipsis ->
       fprintf ppf "..."
+  | Osig_jkind jkd -> print_out_jkind_decl ppf jkd
 
 and print_out_type_decl kwd ppf td =
   let print_constraints ppf =
@@ -1147,6 +1148,14 @@ and print_out_type_extension ppf te =
     (if te.otyext_private = Asttypes.Private then " private" else "")
     (print_list print_out_constr (fun ppf -> fprintf ppf "@ | "))
      te.otyext_constructors
+
+and print_out_jkind_decl ppf jkd =
+  let print_manifest ppf =
+    function
+      None -> ()
+    | Some jkind -> fprintf ppf " =@ %a" print_out_jkind jkind
+  in
+  fprintf ppf "@[kind_ %s%a@]" jkd.ojkind_name print_manifest jkd.ojkind_jkind
 
 let out_constr = ref print_out_constr
 let out_constr_args = ref print_out_constr_args

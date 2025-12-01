@@ -138,6 +138,17 @@ and strengthen_lazy_sig' ~aliasable sg p =
       sigelt :: strengthen_lazy_sig' ~aliasable rem p
   | (Sig_class_type _ as sigelt) :: rem ->
       sigelt :: strengthen_lazy_sig' ~aliasable rem p
+  | Sig_jkind(id, decl, vis) :: rem ->
+      let decl =
+        match decl.jkind_manifest with
+        | Some _ -> decl
+        | None ->
+          let manif =
+            Some (Jkind.Const.kconstr (Pdot(p, Ident.name id)))
+          in
+          { decl with jkind_manifest = manif }
+      in
+      Sig_jkind(id, decl, vis) :: strengthen_lazy_sig' ~aliasable rem p
 
 and strengthen_lazy_sig ~aliasable sg p =
   let sg = Subst.Lazy.force_signature_once sg in
@@ -288,7 +299,7 @@ and expand_paths_lazy_sig_items paths env sg =
           let env = Env.add_modtype_lazy ~update_summary:false id mtd env in
           env, Sig_modtype (id,mtd,vis)
       | Sig_value _ | Sig_type _ | Sig_typext _ | Sig_class _
-      | Sig_class_type _ as item ->
+      | Sig_class_type _ | Sig_jkind _ as item ->
           env, item
   in
   List.fold_left_map expand_item env sg |> snd
@@ -352,6 +363,16 @@ let rec sig_make_manifest sg =
                    | Some _ -> decl.mtd_type }
     in
     Sig_modtype(Ident.rename id, newdecl, vis) :: sig_make_manifest rem
+  | Sig_jkind (id, decl, vis) as sigelt :: rem ->
+    let sigelt =
+      match decl.jkind_manifest with
+      | Some _ -> sigelt
+      | None ->
+        let manifest = Jkind.Const.kconstr (Pident id) in
+        let newdecl = { decl with jkind_manifest = Some manifest } in
+        Sig_jkind (Ident.rename id, newdecl, vis)
+    in
+    sigelt :: sig_make_manifest rem
 
 let rec make_aliases_absent ~aliased pres mty =
   (* aliased=true means that mty is subject to aliasable strengthening
@@ -373,7 +394,7 @@ let rec make_aliases_absent ~aliased pres mty =
           in
           Sig_module(id, pres, md, rs, priv)
         | Sig_value _ | Sig_type _ | Sig_typext _ | Sig_modtype _
-        | Sig_class _ | Sig_class_type _ as item ->
+        | Sig_class _ | Sig_class_type _ | Sig_jkind _ as item ->
           item
       in
       pres, Mty_signature(List.map make_item sg)
@@ -519,6 +540,8 @@ and nondep_sig_item env va ids = function
       Sig_class(id, Ctype.nondep_class_declaration env ids d, rs, vis)
   | Sig_class_type(id, d, rs, vis) ->
       Sig_class_type(id, Ctype.nondep_cltype_declaration env ids d, rs, vis)
+  | Sig_jkind (id, d, vis) ->
+      Sig_jkind (id, Ctype.nondep_jkind_declaration env ids d, vis)
 
 and nondep_sig env va ids sg =
   let scope = Ctype.create_scope () in
@@ -616,9 +639,9 @@ and type_paths_sig env p sg =
         p rem
   | Sig_modtype(id, decl, _) :: rem ->
       type_paths_sig (Env.add_modtype id decl env) p rem
-  | (Sig_value _ | Sig_typext _ | Sig_class _ | Sig_class_type _) :: rem ->
-      type_paths_sig env p rem
-
+  | ( Sig_value _ | Sig_typext _ | Sig_class _ | Sig_class_type _
+    | Sig_jkind _ ) :: rem ->
+    type_paths_sig env p rem
 
 let rec no_code_needed_mod env pres mty =
   match pres with
@@ -644,7 +667,7 @@ and no_code_needed_sig env sg =
       no_code_needed_mod env pres md.md_type &&
       no_code_needed_sig
         (Env.add_module_declaration ~check:false id pres md env) rem
-  | (Sig_type _ | Sig_modtype _ | Sig_class_type _) :: rem ->
+  | (Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _) :: rem ->
       no_code_needed_sig env rem
   | (Sig_typext _ | Sig_class _) :: _ ->
       false
@@ -653,22 +676,23 @@ let no_code_needed env mty = no_code_needed_mod env Mp_present mty
 
 (* Check whether a module type may return types *)
 
-let rec contains_type env mty =
+let rec contains_type_or_kind env mty =
   match scrape env mty with
     Mty_ident _ -> raise Exit (* PR#6427 *)
   | Mty_signature sg ->
-      contains_type_sig env sg
+      contains_type_or_kind_sig env sg
   | Mty_functor (_, body) ->
-      contains_type env body
+      contains_type_or_kind env body
   | Mty_alias _ ->
       ()
   | Mty_strengthen _ -> raise Exit
 
-and contains_type_sig env = List.iter (contains_type_item env)
+and contains_type_or_kind_sig env = List.iter (contains_type_or_kind_item env)
 
-and contains_type_item env = function
+and contains_type_or_kind_item env = function
     Sig_type (_,({type_manifest = None} |
                  {type_kind = Type_abstract _; type_private = Private}),_, _)
+  | Sig_jkind (_, {jkind_manifest = None; _}, _)
   | Sig_modtype _
   | Sig_typext (_, {ext_args = Cstr_record _}, _, _) ->
       (* We consider that extension constructors with an inlined
@@ -678,16 +702,17 @@ and contains_type_item env = function
          is kept local to expressions.  *)
       raise Exit
   | Sig_module (_, _, {md_type = mty}, _, _) ->
-      contains_type env mty
+      contains_type_or_kind env mty
   | Sig_value _
   | Sig_type _
   | Sig_typext _
   | Sig_class _
-  | Sig_class_type _ ->
+  | Sig_class_type _
+  | Sig_jkind _ ->
       ()
 
-let contains_type env mty =
-  try contains_type env mty; false with Exit -> true
+let contains_type_or_kind env mty =
+  try contains_type_or_kind env mty; false with Exit -> true
 
 
 (* Remove module aliases from a signature *)

@@ -59,7 +59,7 @@ let next_group = function
             | _ -> assert false
            end
         | Types.(Sig_module _ | Sig_value _ | Sig_type _ | Sig_typext _
-                | Sig_modtype _) ->
+                | Sig_modtype _ | Sig_jkind _) ->
             [],q
       in
       Some({src; post_ghosts=ghosts}, q)
@@ -69,7 +69,7 @@ let recursive_sigitem = function
   | Types.Sig_class(ident,_,rs,_)
   | Types.Sig_class_type (ident,_,rs,_)
   | Types.Sig_module(ident, _, _, rs, _) -> Some (ident,rs)
-  | Types.(Sig_value _ | Sig_modtype _ | Sig_typext _ )  -> None
+  | Types.(Sig_value _ | Sig_modtype _ | Sig_typext _ | Sig_jkind _)  -> None
 
 let next x =
   let cons_group pre group q =

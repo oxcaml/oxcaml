@@ -28,7 +28,7 @@ module type S = sig exception A of { x : int; } end
 Line 3, characters 13-22:
 3 |   module A = (val X.x)
                  ^^^^^^^^^
-Error: This expression creates fresh types.
+Error: This expression creates fresh types or fresh kinds.
        It is not allowed inside applicative functors.
 Line 5, characters 2-29:
 5 |   exception A of {x : string}

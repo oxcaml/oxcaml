@@ -1370,29 +1370,59 @@ Error: The kind of type "existential_abstract" is value mod non_float
          because of the annotation on the declaration of the type existential_abstract.
 |}]
 
+module _ : sig
+  kind_ immediate = value mod global many uncontended
+  kind_ immutable_data = value mod uncontended many
+  kind_ immutable = value mod uncontended
+  kind_ data = value mod many
+  kind_ abstract
+end = struct
+  kind_ immediate = value mod global many uncontended
+  kind_ immutable_data = value mod uncontended many
+  kind_ immutable = value mod uncontended
+  kind_ data = value mod many
+  kind_ abstract
+end
+[%%expect{|
+Line 2, characters 2-53:
+2 |   kind_ immediate = value mod global many uncontended
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [unused-kind-declaration]: unused kind immediate.
+
+Line 3, characters 2-51:
+3 |   kind_ immutable_data = value mod uncontended many
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [unused-kind-declaration]: unused kind immutable_data.
+
+Line 4, characters 2-41:
+4 |   kind_ immutable = value mod uncontended
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [unused-kind-declaration]: unused kind immutable.
+
+Line 5, characters 2-29:
+5 |   kind_ data = value mod many
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [unused-kind-declaration]: unused kind data.
+
+Line 6, characters 2-16:
+6 |   kind_ abstract
+      ^^^^^^^^^^^^^^
+Warning 191 [unused-kind-declaration]: unused kind abstract.
+|}]
+
 (* not yet supported *)
 module _ : sig
   type 'a gel : kind_of_ 'a mod global
   type 'a t : _
-  kind_abbrev_ immediate = value mod global unique many sync uncontended
-  kind_abbrev_ immutable_data = value mod sync uncontended many
-  kind_abbrev_ immutable = value mod uncontended
-  kind_abbrev_ data = value mod sync many
 end = struct
   type 'a gel : kind_of_ 'a mod global
   type 'a t : _
-  kind_abbrev_ immediate = value mod global unique many sync uncontended
-  kind_abbrev_ immutable_data = value mod sync uncontended many
-  kind_abbrev_ immutable = value mod uncontended
-  kind_abbrev_ data = value mod sync many
 end
 
-(* CR layouts v2.8: Expect this output to change once modal kinds are
-   supported. Internal ticket 5118. *)
-
+(* CR layouts v2.8: Expect this output to change once `kind_of_` is supported *)
 [%%expect{|
-Line 9, characters 16-27:
-9 |   type 'a gel : kind_of_ 'a mod global
+Line 5, characters 16-27:
+5 |   type 'a gel : kind_of_ 'a mod global
                     ^^^^^^^^^^^
 Error: Unimplemented kind syntax
 |}]

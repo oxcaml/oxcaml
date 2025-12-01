@@ -112,6 +112,7 @@ module Typedtree_search =
       | Typedtree.Tstr_include _ -> ()
       | Typedtree.Tstr_eval _ -> ()
       | Typedtree.Tstr_attribute _ -> ()
+      | Typedtree.Tstr_jkind _ -> Misc.fatal_error "Tstr_jkind"
 
     let tables typedtree =
       let t = Hashtbl.create 13 in
@@ -1022,7 +1023,7 @@ module Analyser =
    and analyse_structure_item env current_module_name loc pos_limit comment_opt parsetree_item_desc _typedtree
         table table_values =
       match parsetree_item_desc with
-      | Parsetree.Pstr_kind_abbrev _ -> Misc.fatal_error "Pstr_kind_abbrev"
+      | Parsetree.Pstr_jkind _ -> Misc.fatal_error "Pstr_kind"
       | Parsetree.Pstr_eval _ ->
           (* don't care *)
           (0, env, [])

@@ -13,7 +13,7 @@ type t : unboxed = { single_field : string }
 Line 1, characters 9-16:
 1 | type t : unboxed = { single_field : string }
              ^^^^^^^
-Error: Unknown layout unboxed
+Error: Unbound jkind "unboxed"
 |}]
 
 (* The below tests make sure that a layout is given only as an

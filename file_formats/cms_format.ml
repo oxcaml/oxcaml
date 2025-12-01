@@ -94,6 +94,7 @@ let uid_tables_of_binary_annots binary_annots =
         | Module_type v -> v.mtd_attributes
         | Class v -> v.ci_attributes
         | Class_type v -> v.ci_attributes
+        | Jkind v -> v.jkind_attributes
       in
       Types.Uid.Tbl.add cms_uid_to_loc uid loc;
       Types.Uid.Tbl.add cms_uid_to_attributes uid attrs

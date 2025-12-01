@@ -354,14 +354,23 @@ and 'd with_bounds =
     : with_bounds_types -> ('l * Allowance.disallowed) with_bounds
     (** Invariant : there must always be at least one type in this set **)
 
-and ('layout, 'd) layout_and_axes =
-  { layout : 'layout;
+and 'layout jkind_base =
+  | Layout of 'layout
+  | Kconstr of Path.t
+
+and ('layout, 'd) base_and_axes =
+  { base : 'layout jkind_base;
     mod_bounds : Jkind_mod_bounds.t;
     with_bounds : 'd with_bounds
   }
   constraint 'd = 'l * 'r
 
-and 'd jkind_desc = (Jkind_types.Sort.t Jkind_types.Layout.t, 'd) layout_and_axes
+and 'd jkind_const_desc = (Jkind_types.Layout.Const.t, 'd) base_and_axes
+  constraint 'd = 'l * 'r
+and jkind_const_desc_lr =
+  (Jkind_types.Layout.Const.t, allowed * allowed) base_and_axes
+
+and 'd jkind_desc = (Jkind_types.Sort.t Jkind_types.Layout.t, 'd) base_and_axes
   constraint 'd = 'l * 'r
 
 and jkind_desc_packed = Pack_jkind_desc : ('l * 'r) jkind_desc -> jkind_desc_packed
@@ -394,6 +403,14 @@ and jkind_l = (allowed * disallowed) jkind  (* the jkind of an actual type *)
 and jkind_r = (disallowed * allowed) jkind  (* the jkind expected of a type *)
 and jkind_lr = (allowed * allowed) jkind    (* the jkind of a variable *)
 and jkind_packed = Pack_jkind : ('l * 'r) jkind -> jkind_packed
+
+and jkind_declaration =
+  {
+    jkind_manifest : jkind_const_desc_lr option;
+    jkind_attributes : Parsetree.attributes;
+    jkind_uid : Shape.Uid.t;
+    jkind_loc : Location.t
+  }
 
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
@@ -1083,6 +1100,7 @@ module type Wrapped = sig
   | Sig_modtype of Ident.t * modtype_declaration * visibility
   | Sig_class of Ident.t * class_declaration * rec_status * visibility
   | Sig_class_type of Ident.t * class_type_declaration * rec_status * visibility
+  | Sig_jkind of Ident.t * jkind_declaration * visibility
 
   and module_declaration =
   {
@@ -1310,28 +1328,31 @@ module Jkind_with_bounds : sig
 
   val map_type_expr :
     (type_expr -> type_expr) -> ('l * 'r) with_bounds -> ('l * 'r) with_bounds
+
+  val is_empty : ('l * 'r) with_bounds -> bool
 end
 
 (* This module exists here to resolve a dependency cycle: [Subst], [Predef],
    [Datarepr], and [Env] must not depend on [Jkind]. It is not intended for use
    outside of [Jkind]. *)
-module Jkind_layout_and_axes : sig
+module Jkind_base_and_axes : sig
   include Allowance.Allow_disallow
-    with type (_, 'layout, 'd) sided = ('layout, 'd) layout_and_axes
+    with type (_, 'layout, 'd) sided = ('layout, 'd) base_and_axes
 
-  val map : ('a -> 'b) -> ('a, 'd) layout_and_axes -> ('b, 'd) layout_and_axes
+  val map_layout :
+    ('a -> 'b) -> ('a, 'd) base_and_axes -> ('b, 'd) base_and_axes
 
-  val map_option :
-    ('a -> 'b option) -> ('a, 'd) layout_and_axes ->
-    ('b, 'd) layout_and_axes option
+  val map_option_layout :
+    ('a -> 'b option) -> ('a, 'd) base_and_axes ->
+    ('b, 'd) base_and_axes option
 
   val try_allow_l :
-    ('layout, 'l * 'r) layout_and_axes ->
-    ('layout, allowed * 'r) layout_and_axes option
+    ('layout, 'l * 'r) base_and_axes ->
+    ('layout, allowed * 'r) base_and_axes option
 
   val try_allow_r :
-    ('layout, 'l * 'r) layout_and_axes ->
-    ('layout, 'l * allowed) layout_and_axes option
+    ('layout, 'l * 'r) base_and_axes ->
+    ('layout, 'l * allowed) base_and_axes option
 end
 
 (* This module exists here to resolve a dependency cycle: [Subst], [Predef],
@@ -1339,7 +1360,7 @@ end
    use outside of those modules are re-exported as [Jkind.Const] and documented
    in [jkind.mli]. *)
 module Jkind_const : sig
-  type 'd t = (Jkind_types.Layout.Const.t, 'd) layout_and_axes
+  type 'd t = 'd jkind_const_desc
 
   val shallow_no_with_bounds_and_equal : 'd1 t -> 'd2 t -> bool
 
@@ -1387,7 +1408,8 @@ module Jkind_const : sig
     val kind_of_unboxed_128bit_vectors : t
     val kind_of_unboxed_256bit_vectors : t
     val kind_of_unboxed_512bit_vectors : t
-    val all : t list
+    val builtins : t list
+    val common_jkinds : t list
 
     val of_attribute : Builtin_attributes.jkind_attribute -> t
   end

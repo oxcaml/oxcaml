@@ -43,6 +43,7 @@ type mapper = {
     mapper -> Typedtree.include_declaration -> include_declaration;
   include_description:
     mapper -> Typedtree.include_description -> include_description;
+  jkind_declaration: mapper -> Typedtree.jkind_declaration -> jkind_declaration;
   label_declaration:
     mapper -> Typedtree.label_declaration -> label_declaration;
   location: mapper -> Location.t -> Location.t;

@@ -113,6 +113,7 @@ module Sig_component_kind : sig
     | Extension_constructor
     | Class
     | Class_type
+    | Jkind
 
   val to_string : t -> string
 
@@ -141,6 +142,7 @@ module Item : sig
   val extension_constructor : Ident.t -> t
   val class_ : Ident.t -> t
   val class_type : Ident.t -> t
+  val jkind : Ident.t -> t
 
   val print : Format.formatter -> t -> unit
 
@@ -436,6 +438,9 @@ module Map : sig
 
   val add_class_type : t -> Ident.t -> Uid.t -> t
   val add_class_type_proj : t -> Ident.t -> shape -> t
+
+  val add_jkind : t -> Ident.t -> Uid.t -> t
+  val add_jkind_proj : t -> Ident.t -> shape -> t
 end
 
 val dummy_mod : t
