@@ -3070,7 +3070,8 @@ let local_non_recursive_abbrev uenv p ty =
    They carry redundant information but are added to save two calls to
    [get_desc] which are usually performed already at the call site. *)
 let unify_univar t1 t2 jkind1 jkind2 pairs =
-  if not (Jkind.equal jkind1 jkind2) then raise Cannot_unify_universal_variables;
+  if not (Jkind.equal ~level:!current_level jkind1 jkind2)
+  then raise Cannot_unify_universal_variables;
   let rec inner t1 t2 = function
     (cl1, cl2) :: rem ->
       let find_univ t cl =
@@ -3794,7 +3795,7 @@ let add_jkind_equation ~reason uenv destination jkind1 =
                ticket 5112. *)
             match Jkind.try_allow_r jkind, Jkind.try_allow_r decl.type_jkind with
             | Some jkind, Some decl_jkind when
-                   not (Jkind.equal jkind decl_jkind) ->
+                   not (Jkind.equal ~level:!current_level jkind decl_jkind) ->
                let refined_decl = { decl with type_jkind = Jkind.disallow_right jkind } in
                set_env uenv (Env.add_local_constraint p refined_decl env)
             | _ -> ()
@@ -5775,7 +5776,7 @@ let all_distinct_vars_with_original_jkinds env vars =
          tys := TypeSet.add ty !tys;
          match get_desc ty with
          | Tvar { jkind = inferred_jkind } ->
-           if Jkind.equate inferred_jkind original_jkind
+           if Jkind.equate ~level:!current_level inferred_jkind original_jkind
            then All_good
            else Jkind_mismatch { original_jkind; inferred_jkind; ty }
          | _ -> Unification_failure { name; ty }
@@ -5831,7 +5832,7 @@ let eqtype_subst type_pairs subst t1 k1 t2 k2 ~do_jkind_check =
       !subst
   then ()
   else begin
-    if do_jkind_check && not (Jkind.equal k1 k2)
+    if do_jkind_check && not (Jkind.equal ~level:!current_level k1 k2)
       then raise_for Equality (Unequal_var_jkinds (t1, k1, t2, k2));
     subst := (t1, t2) :: !subst;
     TypePairs.add type_pairs (t1, t2)
@@ -5862,7 +5863,7 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
     | (Tof_kind k1, Tof_kind k2) ->
-      if not (Jkind.equal k1 k2)
+      if not (Jkind.equal ~level:!current_level k1 k2)
       then raise_for Equality (Unequal_tof_kind_jkinds (k1, k2))
     | _ ->
         let t1' = expand_head_rigid env t1 in

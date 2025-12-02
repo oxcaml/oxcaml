@@ -393,7 +393,8 @@ end = struct
       in
       begin match get_desc v with
       | Tvar { jkind } when
-          not (Jkind.equate jkind jkind_info.original_jkind) ->
+          not (Jkind.equate ~level:(get_current_level ())
+                jkind jkind_info.original_jkind) ->
         let reason =
           Bad_univar_jkind { name; jkind_info; inferred_jkind = jkind }
         in

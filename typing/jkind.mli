@@ -783,14 +783,14 @@ val format_history :
 (** This checks for equality, and sets any variables to make two jkinds
     equal, if possible. e.g. [equate] on a var and [value] will set the
     variable to be [value] *)
-val equate : Types.jkind_lr -> Types.jkind_lr -> bool
+val equate : level:int -> Types.jkind_lr -> Types.jkind_lr -> bool
 
 (** This checks for equality, but has the invariant that it can only be called
     when there is no need for unification; e.g. [equal] on a var and [value]
     will crash.
 
     CR layouts (v1.5): At the moment, this is actually the same as [equate]! *)
-val equal : Types.jkind_lr -> Types.jkind_lr -> bool
+val equal : level:int -> Types.jkind_lr -> Types.jkind_lr -> bool
 
 (** Checks whether two jkinds have a non-empty intersection. Might mutate
     sort variables. Works over any mix of l- and r-jkinds, because the only
