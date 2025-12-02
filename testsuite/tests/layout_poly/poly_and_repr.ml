@@ -11,36 +11,33 @@ let const_one : (repr_ 'a). 'a -> int =
 ;;
 [%%expect {|
 exception Force_type
-Line 4, characters 4-13:
-4 | let const_one : (repr_ 'a). 'a -> int =
-        ^^^^^^^^^
-Error: This pattern matches values of type "(repr_ 'a). 'a -> int"
-       but a pattern was expected which matches values of type "'b"
-       The universal variable "'a" would escape its scope
+Line 5, characters 17-18:
+5 |   let f x = 1 in f
+                     ^
+Error: This expression has type "'b -> int"
+       but an expression was expected of type "(repr_ 'a). 'a -> int"
 |}];;
 
 let const_one_with_fun : (repr_ 'a). 'a -> int =
-  fun x -> 1
+  fun (x : any) -> 1
 ;;
 [%%expect {|
-Line 1, characters 4-22:
-1 | let const_one_with_fun : (repr_ 'a). 'a -> int =
-        ^^^^^^^^^^^^^^^^^^
-Error: This pattern matches values of type "(repr_ 'a). 'a -> int"
-       but a pattern was expected which matches values of type "'b"
-       The universal variable "'a" would escape its scope
+Line 2, characters 2-20:
+2 |   fun (x : any) -> 1
+      ^^^^^^^^^^^^^^^^^^
+Error: This expression should not be a function, the expected type is
+       "(repr_ 'a). 'a -> int"
 |}];;
 
 let ident : (repr_ 'a). 'a -> 'a =
   fun x -> x
 ;;
 [%%expect {|
-Line 1, characters 4-9:
-1 | let ident : (repr_ 'a). 'a -> 'a =
-        ^^^^^
-Error: This pattern matches values of type "(repr_ 'a). 'a -> 'a"
-       but a pattern was expected which matches values of type "'b"
-       The universal variable "'a" would escape its scope
+Line 2, characters 2-12:
+2 |   fun x -> x
+      ^^^^^^^^^^
+Error: This expression should not be a function, the expected type is
+       "(repr_ 'a). 'a -> 'a"
 |}];;
 
 let forced : (repr_ 'a). unit =
