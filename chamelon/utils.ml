@@ -164,12 +164,73 @@ let replace_id id n_id =
 let make_command c output_files =
   List.fold_left (fun c output -> c ^ " " ^ output) c output_files
 
-let compile (filename : string) compile_command =
-  Sys.command (!compile_command ^ " " ^ filename)
+exception Not_equal
+
+let str_sub_equal s ofs s' =
+  String.length s >= String.length s' + ofs
+  &&
+  try
+    for i = 0 to String.length s' - 1 do
+      let c = String.unsafe_get s (ofs + i) in
+      let c' = String.unsafe_get s' i in
+      if c <> c' then raise Not_equal
+    done;
+    true
+  with Not_equal -> false
+
+exception Found
+
+let str_contains needle haystack =
+  if String.length needle <= 0 then true
+  else
+    try
+      for i = 0 to String.length haystack - String.length needle - 1 do
+        if str_sub_equal haystack i needle then raise Found
+      done;
+      false
+    with Found -> true
+
+let shell = "/bin/sh"
+
+let create_process_system command stdin stdout stderr =
+  Unix.create_process shell [| shell; "-c"; command |] stdin stdout stderr
+
+let rec waitpid_non_intr pid =
+  try snd (Unix.waitpid [] pid)
+  with Unix.Unix_error (EINTR, _, _) -> waitpid_non_intr pid
 
 let raise_error compile_command =
-  Sys.command (compile_command ^ " 2>&1 | grep " ^ !error_str ^ " > /dev/null")
-  = 0
+  (* Note: we use [create_process] with an explicit call to the shell rather
+     than [open_process] (which does similar things under the hood) so that we can
+     control the file descriptors used and avoid potential deadlocks due to pipe
+     buffers filling up -- the oxcaml compiler tends to output very large error
+     messages when crashing. *)
+  let stdin_read, stdin_write = Unix.pipe ~cloexec:true () in
+  let stdout_read, stdout_write = Unix.pipe ~cloexec:true () in
+  let stderr_write = Unix.dup ~cloexec:true stdout_write in
+  let pid =
+    create_process_system compile_command stdin_read stdout_write stderr_write
+  in
+  Unix.close stdin_read;
+  Unix.close stdin_write;
+  Unix.close stdout_write;
+  Unix.close stderr_write;
+  let rec loop buf scratch =
+    let n = Unix.read stdout_read scratch 0 (Bytes.length scratch) in
+    if n = 0 then (
+      Unix.close stdout_read;
+      Buffer.contents buf)
+    else (
+      Buffer.add_subbytes buf scratch 0 n;
+      loop buf scratch)
+  in
+  let stdout = loop (Buffer.create 1024) (Bytes.create 1024) in
+  match waitpid_non_intr pid with
+  | WEXITED 0 -> false
+  | WEXITED _exitcode -> str_contains !error_str stdout
+  | WSIGNALED _signum -> false
+  | WSTOPPED _ ->
+      failwith "internal error: waitpid returned WSTOPPED without WUNTRACED"
 
 let generate_cmt typing_command (filenames : string list) =
   let params = List.fold_left (fun s output -> s ^ " " ^ output) "" filenames in
@@ -203,7 +264,7 @@ let replace_all src dst s =
     let i = ref 0 and buf_pos = ref 0 in
     let bound = String.length s - String.length src in
     while !i < bound do
-      if String.equal (String.sub s !i (String.length src)) src then (
+      if str_sub_equal s !i src then (
         Buffer.add_substring buffer s !buf_pos (!i - !buf_pos);
         Buffer.add_string buffer dst;
         i := !i + String.length src;

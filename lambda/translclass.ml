@@ -785,6 +785,9 @@ let free_methods l =
     | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
     | Lifthenelse _ | Lsequence _ | Lwhile _
     | Levent _ | Lifused _ | Lregion _ | Lexclave _ -> ()
+    | Lsplice _ ->
+      (* CR layout poly: we could definitely do better here. *)
+      Misc.fatal_error "Layout polymorphism is not supported in classes"
   in free l; !fv
 
 let transl_class ~scopes ids cl_id pub_meths cl vflag =

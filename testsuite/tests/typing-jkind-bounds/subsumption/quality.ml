@@ -388,7 +388,7 @@ end = struct
 end
 [%%expect {|
 type gadt = Foo : int -> gadt
-module M : sig type t end
+module M : sig type t : value mod portable end
 |}]
 
 type gadt = Foo : int -> gadt
@@ -397,10 +397,26 @@ module M : sig
 end = struct
   type t
 end
-(* CR layouts v2.8: This should not be accepted. Internal ticket 4973 *)
 [%%expect {|
 type gadt = Foo : int -> gadt
-module M : sig type t end
+Lines 4-6, characters 6-3:
+4 | ......struct
+5 |   type t
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t end
+       is not included in
+         sig type t : value mod forkable unyielding end
+       Type declarations do not match:
+         type t
+       is not included in
+         type t : value mod forkable unyielding
+       The kind of the first is value
+         because of the definition of t at line 5, characters 2-8.
+       But the kind of the first must be a subkind of
+           value mod forkable unyielding
+         because of the definition of t at line 3, characters 2-37.
 |}]
 
 type gadt = Foo : int -> gadt [@@unboxed]
@@ -475,36 +491,29 @@ module M : sig type a = { foo : 'a. 'a ref; } [@@unboxed] type t end
 |}]
 
 module M : sig
+  type a = { foo : ('a : value). 'a }
+  type t : value mod contended with a
+end = struct
+  type a = { foo : ('a : value). 'a }
+  type t
+end
+(* CR layouts v2.8: If we ever give univars min mod-bounds, this should get
+   rejected. Internal ticket 5746. *)
+[%%expect {|
+module M : sig type a = { foo : 'a. 'a; } type t end
+|}]
+
+module M : sig
   type a = { foo : ('a : value). 'a } [@@unboxed]
   type t : value mod contended with a
 end = struct
   type a = { foo : ('a : value). 'a } [@@unboxed]
   type t
 end
-(* CR layouts v2.8: maybe this should be accepted? *)
+(* CR layouts v2.8: If we ever give univars min mod-bounds, this should get
+   rejected. Internal ticket 5746. *)
 [%%expect {|
-Lines 4-7, characters 6-3:
-4 | ......struct
-5 |   type a = { foo : ('a : value). 'a } [@@unboxed]
-6 |   type t
-7 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type a = { foo : 'a. 'a; } [@@unboxed] type t end
-       is not included in
-         sig
-           type a = { foo : 'a. 'a; } [@@unboxed]
-           type t : value mod contended with a
-         end
-       Type declarations do not match:
-         type t
-       is not included in
-         type t : value mod contended with a
-       The kind of the first is value
-         because of the definition of t at line 6, characters 2-8.
-       But the kind of the first must be a subkind of
-           value mod contended with a
-         because of the definition of t at line 3, characters 2-37.
+module M : sig type a = { foo : 'a. 'a; } [@@unboxed] type t end
 |}]
 
 module type S = sig

@@ -1882,9 +1882,9 @@ POP GS,0F A9,,NA,NA,NA,NA
 POP GS,0F A9,,NA,NA,NA,NA
 POPA,61,,NA,NA,NA,NA
 POPAD,61,,NA,NA,NA,NA
-"POPCNT r16, r/m16",F3 0F B8 /r,,ModRM:reg (w),ModRM:r/m (r),NA,NA
-"POPCNT r32, r/m32",F3 0F B8 /r,,ModRM:reg (w),ModRM:r/m (r),NA,NA
-"POPCNT r64, r/m64",F3 REX.W 0F B8 /r,,ModRM:reg (w),ModRM:r/m (r),NA,NA
+"POPCNT r16, r/m16",F3 0F B8 /r,POPCNT,ModRM:reg (w),ModRM:r/m (r),NA,NA
+"POPCNT r32, r/m32",F3 0F B8 /r,POPCNT,ModRM:reg (w),ModRM:r/m (r),NA,NA
+"POPCNT r64, r/m64",F3 REX.W 0F B8 /r,POPCNT,ModRM:reg (w),ModRM:r/m (r),NA,NA
 POPF,9D,,NA,NA,NA,NA
 POPFD,9D,,NA,NA,NA,NA
 POPFQ,9D,,NA,NA,NA,NA

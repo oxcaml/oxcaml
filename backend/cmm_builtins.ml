@@ -838,6 +838,18 @@ let transl_vec_builtin name args dbg _typ_res =
   tagging before the result is returned to the user. *)
 let transl_builtin name args dbg typ_res =
   match name with
+  | "caml_int128_add" ->
+    let op = Caddi128 in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int128_sub" ->
+    let op = Csubi128 in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int64_mul128" ->
+    let op = Cmuli64 { signed = true } in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_unsigned_int64_mul128" ->
+    let op = Cmuli64 { signed = false } in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_int64_bits_of_float_unboxed" ->
     Some (Cop (Creinterpret_cast Int64_of_float, args, dbg))
   | "caml_int64_float_of_bits_unboxed" ->

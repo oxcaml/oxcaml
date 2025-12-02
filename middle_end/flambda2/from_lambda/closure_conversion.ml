@@ -358,7 +358,7 @@ module Inlining = struct
       |> Inlining_history.Absolute.compilation_unit
     in
     match (callee_approx : Env.value_approximation option) with
-    | None | Some Value_unknown ->
+    | None | Some (Unknown _) ->
       Inlining_report.record_decision_at_call_site_for_unknown_function ~tracker
         ~apply ~pass:After_closure_conversion ();
       Not_inlinable
@@ -1336,7 +1336,7 @@ type simplified_block_load =
 
 let simplify_block_load acc body_env ~block ~field : simplified_block_load =
   match find_value_approximation_through_symbol acc body_env block with
-  | Value_unknown -> Unknown
+  | Unknown _ -> Unknown
   | Closure_approximation _ | Value_symbol _ | Value_const _ -> Not_a_block
   | Block_approximation (_tag, _shape, approx, _alloc_mode) -> (
     let approx =
@@ -1509,7 +1509,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                   Static_const.immutable_float_block static_fields
                 in
                 (* Note: no approximations are currently provided for these. *)
-                let approx = Value_approximation.Value_unknown in
+                let approx = Value_approximation.Unknown Flambda_kind.value in
                 approx, static_const
             in
             match fields_kind with
@@ -1599,7 +1599,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
           in
           let acc =
             Acc.add_symbol_approximation acc symbol
-              Value_approximation.Value_unknown
+              (Value_approximation.Unknown Flambda_kind.value)
           in
           let acc, body = body acc body_env in
           Let_with_acc.create acc
@@ -1756,9 +1756,8 @@ let close_exact_or_unknown_apply acc env
           in
           acc, Call_kind.direct_function_call code_id mode, can_erase_callee
       | None -> acc, Call_kind.indirect_function_call_unknown_arity mode, false
-      | Some
-          ( Value_unknown | Value_symbol _ | Value_const _
-          | Block_approximation _ ) ->
+      | Some (Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _)
+        ->
         assert false (* See [close_apply] *))
     | Method { kind; obj } ->
       let acc, obj = find_simple acc env obj in
@@ -3570,7 +3569,7 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
           Code_metadata.param_modes metadata,
           Code_metadata.first_complex_local_param metadata,
           Code_metadata.result_mode metadata )
-    | Value_unknown -> None
+    | Unknown _ -> None
     | Value_symbol _ | Value_const _ | Block_approximation _ ->
       if Flambda_features.check_invariants ()
       then
@@ -3984,7 +3983,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     | Some [Value_approximation.Value_symbol s] ->
       Acc.find_symbol_approximation acc s
     | Some [approx] -> approx
-    | _ -> Value_approximation.Value_unknown
+    | _ -> Value_approximation.Unknown Flambda_kind.value
   in
   (* We must make sure there is always an outer [Let_symbol] binding so that
      lifted constants not in the scope of any other [Let_symbol] binding get put

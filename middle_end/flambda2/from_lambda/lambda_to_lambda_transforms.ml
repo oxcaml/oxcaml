@@ -413,8 +413,9 @@ let makearray_dynamic_scannable_unboxed_product env
         | Pproduct_scannable kinds -> List.exists must_be_scanned kinds
       in
       List.exists must_be_scanned kinds
-    | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
-    | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ ->
+    | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
+    | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
+    | Punboxedvectorarray _ ->
       Misc.fatal_errorf
         "%s: should have been sent to [makearray_dynamic_singleton]"
         (Printlambda.array_kind lambda_array_kind)
@@ -437,8 +438,9 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
    * heap and local modes.
    * Additionally, if the initializer is omitted, an uninitialized array will
    * be returned.  Initializers must however be provided when the array kind is
-   * Pgenarray, Paddrarray, Pintarray, Pfloatarray or Pgcscannableproductarray;
-   * or when a Pgcignorablearray involves an [int].  (See comment below.)
+   * Pgenarray, Paddrarray, Pgcignorableaddrarray, Pintarray, Pfloatarray or
+   * Pgcscannableproductarray; or when a Pgcignorableproductarray involves an
+   * [int].  (See comment below.)
    *)
   let dbg = Debuginfo.from_location loc in
   let length, init =
@@ -467,9 +469,9 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
            breaking soundness:@ %a"
           (Printlambda.array_kind lambda_array_kind)
           Debuginfo.print_compact dbg
-      | Pgenarray | Paddrarray | Pfloatarray | Punboxedfloatarray _
-      | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
-      | Pgcscannableproductarray _ ->
+      | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
+      | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
+      | Punboxedvectorarray _ | Pgcscannableproductarray _ ->
         Misc.fatal_errorf
           "Cannot compile Pmakearray_dynamic at layout %s without an \
            initializer:@ %a"
@@ -477,7 +479,7 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
           Debuginfo.print_compact dbg)
   in
   match lambda_array_kind with
-  | Pgenarray | Paddrarray | Pintarray | Pfloatarray ->
+  | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray ->
     let init = must_have_initializer () in
     ( env,
       Transformed
@@ -670,7 +672,7 @@ let arrayblit_runtime env args loc =
 let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
     loc =
   match dst_array_set_kind with
-  | Pgenarray_set _ | Paddrarray_set _ ->
+  | Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set ->
     (* Take advantage of various GC-related tricks in [caml_array_blit]. *)
     arrayblit_runtime env args loc
   | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _

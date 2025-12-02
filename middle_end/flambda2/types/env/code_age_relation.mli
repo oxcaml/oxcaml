@@ -38,17 +38,6 @@ val meet :
   Code_id.t ->
   Code_id.t Or_bottom.t
 
-(** [join] calculates the newest common ancestor of the given pieces of code, or
-    identifies that the pieces of code are unrelated. *)
-val join :
-  target_t:t ->
-  resolver:(Compilation_unit.t -> t option) ->
-  t ->
-  t ->
-  Code_id.t ->
-  Code_id.t ->
-  Code_id.t Or_unknown.t
-
 val union : t -> t -> t
 
 val all_code_ids_for_export : t -> Code_id.Set.t

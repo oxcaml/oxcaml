@@ -92,10 +92,10 @@ Error: Splices ($) are not allowed in the initial stage,
 
 let p x = <[x]>;;
 [%%expect {|
-Line 93, characters 12-13:
-93 | let p x = <[x]>;;
-                 ^
-Error: Identifier "x" is used at Line 93, characters 12-13,
+Line 1, characters 12-13:
+1 | let p x = <[x]>;;
+                ^
+Error: Identifier "x" is used at Line 1, characters 12-13,
        inside a quotation (<[ ... ]>);
        it is introduced at Line 1, characters 6-7, outside any quotations.
 |}];;
@@ -117,9 +117,9 @@ val foo1 : 'a -> <[$('a) -> int]> expr = <fun>
 
 let foo2 (x: 'a) = <[fun (y : 'a) -> 1]>;;
 [%%expect {|
-Line 118, characters 30-32:
-118 | let foo2 (x: 'a) = <[fun (y : 'a) -> 1]>;;
-                                    ^^
+Line 1, characters 30-32:
+1 | let foo2 (x: 'a) = <[fun (y : 'a) -> 1]>;;
+                                  ^^
 Error: Type variable "'a" is used inside a quotation (<[ ... ]>),
        it already occurs outside any quotations.
        Hint: Consider using "$'a".
@@ -127,9 +127,9 @@ Error: Type variable "'a" is used inside a quotation (<[ ... ]>),
 
 let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
 [%%expect {|
-Line 128, characters 32-34:
-128 | let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
-                                      ^^
+Line 1, characters 32-34:
+1 | let foo3 (x: 'a) = <[fun (y : <['a]>) -> 1]>;;
+                                    ^^
 Error: Type variable "'a" is used inside 2 layers of quotation (<[ ... ]>),
        it already occurs outside any quotations.
        Hint: Consider using "$($'a)".
@@ -147,10 +147,10 @@ val foo5 : 'a expr -> <[$('a) -> $('a) * $('a)]> expr = <fun>
 
 let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
 [%%expect {|
-Line 148, characters 42-43:
-148 | let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
-                                                ^
-Error: Identifier "a" is used at Line 148, characters 42-43,
+Line 1, characters 42-43:
+1 | let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
+                                              ^
+Error: Identifier "a" is used at Line 1, characters 42-43,
        inside a quotation (<[ ... ]>);
        it is introduced at Line 1, characters 15-16, outside any quotations.
 |}];;
@@ -195,10 +195,10 @@ type t4 = A | B;;
 <[A]>;;
 [%%expect {|
 type t4 = A | B
-Line 195, characters 2-3:
-195 | <[A]>;;
-        ^
-Error: Constructor "A" used at Line 195, characters 2-3
+Line 3, characters 2-3:
+3 | <[A]>;;
+      ^
+Error: Constructor "A" used at Line 3, characters 2-3
        cannot be used in this context;
        "A" is not defined inside a quotation (<[ ... ]>).
 |}];;

@@ -168,6 +168,9 @@ let pseudoregs_for_operation op arg res =
      rcx. *)
   | Intop Idiv -> [| rax; rcx |], [| rax |]
   | Intop Imod -> [| rax; rcx |], [| rdx |]
+  | Int128op (Iadd128 | Isub128) ->
+    [| res.(0); res.(1); arg.(2); arg.(3) |], res
+  | Int128op (Imul64 _) -> [| rax; arg.(1) |], [| rax; rdx |]
   | Floatop (Float64, Icompf cond) ->
     (* We need to temporarily store the result of the comparison in a float
        register, but we don't want to clobber any of the inputs if they would

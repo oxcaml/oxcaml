@@ -532,7 +532,7 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
         | Load _
         | Store (_, _, _)
-        | Intop _
+        | Intop _ | Int128op _
         | Intop_imm (_, _)
         | Intop_atomic _
         | Floatop (_, _)

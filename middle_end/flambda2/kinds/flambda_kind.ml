@@ -1043,6 +1043,7 @@ module With_subkind = struct
       | Parrayval Pfloatarray -> Float_array
       | Parrayval Pintarray -> Immediate_array
       | Parrayval Paddrarray -> Value_array
+      | Parrayval Pgcignorableaddrarray -> Value_array
       | Parrayval Pgenarray -> Generic_array
       | Parrayval (Punboxedfloatarray Unboxed_float64) -> Float_array
       | Parrayval (Punboxedfloatarray Unboxed_float32) -> Unboxed_float32_array
@@ -1089,6 +1090,7 @@ module With_subkind = struct
         "Flambda_kind.from_lambda_values_and_unboxed_numbers_only: cannot \
          convert %a"
         Printlambda.layout layout
+    | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
 
   include Container_types.Make (struct
     type nonrec t = t
@@ -1172,12 +1174,6 @@ module With_subkind = struct
       | Unboxed_vec256_array | Unboxed_vec512_array | Unboxed_product_array ->
         true)
     | Naked_number _ | Region | Rec_info -> false
-
-  let may_be_gc_scannable t =
-    match kind t with
-    | Value -> true
-    | Naked_number _ | Region -> false
-    | Rec_info -> Misc.fatal_error "No runtime values of kind [Rec_info] exist"
 end
 
 module Flat_suffix_element = struct

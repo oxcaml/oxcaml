@@ -268,8 +268,9 @@ let initial_env ~loc ~initially_opened_module
       units
       env
   in
+  let { Load_path.dirs; basenames } = Load_path.get_visible () in
   let units =
-    List.map Env.persistent_structures_of_dir (Load_path.get_visible ())
+    List.map Env.persistent_structures_of_dir (dirs)
   in
   let env, units =
     match initially_opened_module with
@@ -297,6 +298,12 @@ let initial_env ~loc ~initially_opened_module
         (open_module env m, units)
   in
   let env = List.fold_left add_units env units in
+  (* Adding [basenames] after [initially_opened_module] check, since the
+     [initially_opened_module] cannot come from [basenames] (hence no need to
+     search for it in there). *)
+  let units_from_filenames =
+    Env.persistent_structures_of_basenames basenames in
+  let env = add_units env units_from_filenames in
   List.fold_left open_module env open_implicit_modules
 
 let type_open_descr ?used_slot ?toplevel env sod =
@@ -417,9 +424,8 @@ let rec instance_name ~loc env syntax =
   | Error (Duplicate { name; value1 = _; value2 = _ }) ->
     raise (Error (loc, env, Duplicate_parameter_name name))
 
-let iterator_with_env env =
+let iterator_with_env super env =
   let env = ref (lazy env) in
-  let super = Btype.type_iterators in
   env, { super with
     Btype.it_signature = (fun self sg ->
       (* add all items to the env before recursing down, to handle recursive
@@ -498,7 +504,8 @@ let check_usage_of_path_of_substituted_item paths ~loc ~lid env super =
     }
 
 let do_check_after_substitution env ~loc ~lid paths sg =
-  let env, iterator = iterator_with_env env in
+  with_type_mark begin fun mark ->
+  let env, iterator = iterator_with_env (Btype.type_iterators mark) env in
   let last, rest = match List.rev paths with
     | [] -> assert false
     | last :: rest -> last, rest
@@ -511,8 +518,8 @@ let do_check_after_substitution env ~loc ~lid paths sg =
     | _ :: _ ->
         check_usage_of_path_of_substituted_item rest ~loc ~lid env iterator
   in
-  iterator.Btype.it_signature iterator sg;
-  Btype.(unmark_iterators.it_signature unmark_iterators) sg
+  iterator.Btype.it_signature iterator sg
+  end
 
 let check_usage_after_substitution env ~loc ~lid paths sg =
   match paths with
@@ -531,7 +538,7 @@ let check_well_formed_module env loc context mty =
   (* Format.eprintf "@[check_well_formed_module@ %a@]@."
      Printtyp.modtype mty; *)
   let open Btype in
-  let iterator =
+  let make_iterator mark =
     let rec check_signature env = function
       | [] -> ()
       | Sig_module (id, _, mty, Trec_first, _) :: rem ->
@@ -546,7 +553,8 @@ let check_well_formed_module env loc context mty =
       | _ :: rem ->
           check_signature env rem
     in
-    let env, super = iterator_with_env env in
+    let env, super =
+      iterator_with_env (Btype.type_iterators mark) env in
     { super with
       it_type_expr = (fun self ty ->
         (* Check that an unboxed path is valid because substitutions can
@@ -581,8 +589,9 @@ let check_well_formed_module env loc context mty =
         super.it_signature self sg);
     }
   in
-  iterator.it_module_type iterator mty;
-  Btype.(unmark_iterators.it_module_type unmark_iterators) mty
+  with_type_mark (fun mark ->
+    let iterator = make_iterator mark in
+    iterator.it_module_type iterator mty)
 
 let () = Env.check_well_formed_module := check_well_formed_module
 
@@ -1969,6 +1978,10 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
 and transl_signature env {psg_items; psg_modalities; psg_loc} =
   let names = Signature_names.create () in
 
+  (* We assume the structure (described by the signature) to be at legacy mode,
+  for backward compatibility *)
+  let md_mode = Value.legacy in
+
   let sig_modalities = transl_modalities psg_modalities in
 
   let transl_include ~loc env sig_acc sincl modalities =
@@ -2002,8 +2015,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
       | true -> sg
       | false -> apply_modalities_signature ~recursive env modalities sg
     in
-    (* Assume the structure is legacy, for backward compatibility *)
-    let sg, newenv = Env.enter_signature ~scope sg ~mode:Value.legacy env in
+    let sg, newenv = Env.enter_signature ~scope sg ~mode:md_mode env in
     Signature_group.iter
       (Signature_names.check_sig_item names loc)
       sg;
@@ -2024,15 +2036,10 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
     let loc = item.psig_loc in
     match item.psig_desc with
     | Psig_value sdesc ->
-        let modalities =
-          match sdesc.pval_modalities with
-          | [] -> sig_modalities
-          | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
-        in
-        let modalities = Mode.Modality.of_const modalities in
-        let (tdesc, newenv) =
-          Typedecl.transl_value_decl
-            env ~modalities ~why:Signature_item item.psig_loc sdesc
+        let (tdesc, _, newenv) =
+          Typedecl.transl_value_decl env loc sdesc
+            ~modal:(Sig_value (Value.disallow_right md_mode, sig_modalities))
+            ~why:Signature_item
         in
         Signature_names.check_value names tdesc.val_loc tdesc.val_id;
         mksig (Tsig_value tdesc) env loc,
@@ -2129,10 +2136,8 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           | None -> None, env
           | Some name ->
             let id, newenv =
-              (* Assume the enclosing structure is legacy, for backward
-                 compatibility *)
               Env.enter_module_declaration ~scope name pres md
-                ~mode:Value.legacy env
+                ~mode:md_mode env
             in
             Signature_names.check_module names pmd.pmd_name.loc id;
             Some id, newenv
@@ -2174,11 +2179,9 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
           | Mty_alias _ -> Mp_absent
           | _ -> Mp_present
         in
-        (* Assume the enclosing structure is legacy, for backward
-            compatibility *)
         let id, newenv =
           Env.enter_module_declaration ~scope pms.pms_name.txt pres md
-            ~mode:Value.legacy env
+            ~mode:md_mode env
         in
         let info =
           `Substituted_away (Subst.add_module id path Subst.identity)
@@ -3463,22 +3466,17 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         shape_map,
         newenv
     | Pstr_primitive sdesc ->
-        (* primitive in structure still carries modalities, which doesn't make
-        sense. We convert them to modes. *)
-        (* CR zqian: remove this hack *)
-        let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
-        let modes = List.map modality_to_mode sdesc.pval_modalities in
-        let mode =
-          modes
-          |> Typemode.transl_alloc_mode
-          |> Alloc.of_const
-          |> alloc_as_value
+        let (desc, mode, newenv) =
+          Typedecl.transl_value_decl env ~modal:Str_primitive
+            ~why:Structure_item loc sdesc
         in
-        let modalities = infer_modalities ~loc ~env ~md_mode ~mode in
-        let (desc, newenv) =
-          Typedecl.transl_value_decl
-            env ~modalities ~why:Structure_item loc sdesc
-        in
+        assert
+          (desc.val_val.val_modalities
+           |> Modality.to_const_exn
+           |> Modality.Const.is_id);
+        let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
+        let val_val = {desc.val_val with val_modalities} in
+        let desc = {desc with val_val} in
         Signature_names.check_value names desc.val_loc desc.val_id;
         Tstr_primitive desc,
         [Sig_value(desc.val_id, desc.val_val, Exported)],

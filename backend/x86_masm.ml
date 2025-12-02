@@ -130,6 +130,7 @@ let i1_call_jmp b s = function
 
 let print_instr b = function
   | ADD (arg1, arg2) -> i2 b "add" arg1 arg2
+  | ADC (arg1, arg2) -> i2 b "adc" arg1 arg2
   | AND (arg1, arg2) -> i2 b "and" arg1 arg2
   | BSF (arg1, arg2) -> i2 b "bsf" arg1 arg2
   | BSR (arg1, arg2) -> i2 b "bsr" arg1 arg2
@@ -174,7 +175,6 @@ let print_instr b = function
   | OR (arg1, arg2) -> i2 b "or" arg1 arg2
   | PAUSE -> i0 b "pause"
   | POP arg -> i1 b "pop" arg
-  | POPCNT (arg1, arg2) -> i2 b "popcnt" arg1 arg2
   | PREFETCH (is_write, hint, arg1) -> (
     match is_write, hint with
     | true, T0 -> i1 b "prefetchw" arg1
@@ -193,11 +193,10 @@ let print_instr b = function
   | SET (c, arg) -> i1 b ("set" ^ string_of_condition c) arg
   | SHR (arg1, arg2) -> i2 b "shr" arg1 arg2
   | SUB (arg1, arg2) -> i2 b "sub" arg1 arg2
+  | SBB (arg1, arg2) -> i2 b "sbb" arg1 arg2
   | TEST (arg1, arg2) -> i2 b "test" arg1 arg2
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2 b "xor" arg1 arg2
-  | LZCNT (arg1, arg2) -> i2 b "lzcnt" arg1 arg2
-  | TZCNT (arg1, arg2) -> i2 b "tzcnt" arg1 arg2
   | SIMD (instr, args) -> (
     match instr.id, args with
     (* The assembler won't accept these mnemonics directly. *)

@@ -1,7 +1,7 @@
 File "test_bounded_join3.ml", line 13, characters 5-15:
 Error: Annotation check for zero_alloc failed on function Test_bounded_join3.foo (camlTest_bounded_join3.foo_HIDE_STAMP).
 
-File "test_bounded_join3.ml", lines 14-15, characters 45-61:
+File "test_bounded_join3.ml", lines 14-15, characters 24-61:
 Error: allocation of 200 bytes for closure
 
 File "test_bounded_join3.ml", line 28, characters 11-19:

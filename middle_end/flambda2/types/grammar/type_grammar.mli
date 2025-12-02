@@ -490,6 +490,8 @@ module Closures_entry : sig
   val find_function_type :
     t -> exact:bool -> Function_slot.t -> Function_type.t Or_unknown_or_bottom.t
 
+  val function_slot_types : t -> flambda_type Function_slot.Map.t
+
   val value_slot_types : t -> flambda_type Value_slot.Map.t
 end
 

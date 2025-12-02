@@ -148,6 +148,7 @@ let convert_array_kind (kind : L.array_kind) : converted_array_kind =
     check_float_array_optimisation_enabled "Pgenarray";
     Float_array_opt_dynamic
   | Paddrarray -> Array_kind Values
+  | Pgcignorableaddrarray -> Array_kind Gc_ignorable_values
   | Pintarray -> Array_kind Immediates
   | Pfloatarray | Punboxedfloatarray Unboxed_float64 -> Array_kind Naked_floats
   | Punboxedfloatarray Unboxed_float32 -> Array_kind Naked_float32s
@@ -198,6 +199,7 @@ module Array_ref_kind = struct
      engineered, and the same for the set kind. *)
   type no_float_array_opt =
     | Immediates
+    | Gc_ignorable_values
     | Values
     | Naked_floats
     | Naked_float32s
@@ -231,6 +233,8 @@ let convert_array_ref_kind (kind : L.array_ref_kind) : converted_array_ref_kind
        check_float_array_optimisation_enabled (); *)
     Float_array_opt_dynamic_ref mode
   | Paddrarray_ref -> Array_ref_kind (No_float_array_opt Values)
+  | Pgcignorableaddrarray_ref ->
+    Array_ref_kind (No_float_array_opt Gc_ignorable_values)
   | Pintarray_ref -> Array_ref_kind (No_float_array_opt Immediates)
   | Pfloatarray_ref mode -> Array_ref_kind (Naked_floats_to_be_boxed mode)
   | Punboxedfloatarray_ref Unboxed_float64 ->
@@ -287,6 +291,7 @@ let rec convert_unboxed_product_array_ref_kind
   match kind with
   | Immediates -> Immediates
   | Values -> Values
+  | Gc_ignorable_values -> Gc_ignorable_values
   | Naked_floats -> Naked_floats
   | Naked_float32s -> Naked_float32s
   | Naked_int32s -> Naked_int32s
@@ -305,6 +310,7 @@ let convert_array_ref_kind_to_array_kind (array_ref_kind : Array_ref_kind.t) :
   | No_float_array_opt nfo -> (
     match nfo with
     | Values -> Values
+    | Gc_ignorable_values -> Gc_ignorable_values
     | Immediates -> Immediates
     | Naked_floats -> Naked_floats
     | Naked_float32s -> Naked_float32s
@@ -327,6 +333,7 @@ let convert_array_ref_kind_for_length array_ref_kind : P.Array_kind_for_length.t
     | No_float_array_opt nfo -> (
       match nfo with
       | Values -> Array_kind Values
+      | Gc_ignorable_values -> Array_kind Gc_ignorable_values
       | Immediates -> Array_kind Immediates
       | Naked_floats -> Array_kind Naked_floats
       | Naked_float32s -> Array_kind Naked_float32s
@@ -345,6 +352,7 @@ module Array_set_kind = struct
   type no_float_array_opt =
     | Immediates
     | Values of P.Init_or_assign.t
+    | Gc_ignorable_values
     | Naked_floats
     | Naked_float32s
     | Naked_int32s
@@ -376,6 +384,8 @@ let convert_array_set_kind (kind : L.array_set_kind) : converted_array_set_kind
     Array_set_kind
       (No_float_array_opt
          (Values (Assignment (Alloc_mode.For_assignments.from_lambda mode))))
+  | Pgcignorableaddrarray_set ->
+    Array_set_kind (No_float_array_opt Gc_ignorable_values)
   | Pintarray_set -> Array_set_kind (No_float_array_opt Immediates)
   | Pfloatarray_set -> Array_set_kind Naked_floats_to_be_unboxed
   | Punboxedfloatarray_set Unboxed_float64 ->
@@ -432,6 +442,7 @@ let rec convert_unboxed_product_array_set_kind
     (kind : Array_set_kind.no_float_array_opt) : P.Array_kind.t =
   match kind with
   | Immediates -> Immediates
+  | Gc_ignorable_values -> Gc_ignorable_values
   | Values _init_or_assign -> Values
   | Naked_floats -> Naked_floats
   | Naked_float32s -> Naked_float32s
@@ -450,8 +461,9 @@ let convert_array_set_kind_to_array_kind (array_set_kind : Array_set_kind.t) :
   | Naked_floats_to_be_unboxed -> Naked_floats
   | No_float_array_opt nfo -> (
     match nfo with
-    | Values _ -> Values
     | Immediates -> Immediates
+    | Gc_ignorable_values -> Gc_ignorable_values
+    | Values _ -> Values
     | Naked_floats -> Naked_floats
     | Naked_float32s -> Naked_float32s
     | Naked_int32s -> Naked_int32s
@@ -470,8 +482,9 @@ let convert_array_set_kind_for_length array_set_kind : P.Array_kind_for_length.t
   | Array_set_kind Naked_floats_to_be_unboxed -> Array_kind Naked_floats
   | Array_set_kind (No_float_array_opt nfo) -> (
     match nfo with
-    | Values _ -> Array_kind Values
     | Immediates -> Array_kind Immediates
+    | Gc_ignorable_values -> Array_kind Gc_ignorable_values
+    | Values _ -> Array_kind Values
     | Naked_floats -> Array_kind Naked_floats
     | Naked_float32s -> Array_kind Naked_float32s
     | Naked_int32s -> Array_kind Naked_int32s
@@ -496,6 +509,7 @@ let convert_array_kind_to_duplicate_array_kind (kind : L.array_kind) :
     check_float_array_optimisation_enabled "Pgenarray";
     Float_array_opt_dynamic
   | Paddrarray -> Duplicate_array_kind Values
+  | Pgcignorableaddrarray -> Duplicate_array_kind Values
   | Pintarray -> Duplicate_array_kind Immediates
   | Pfloatarray | Punboxedfloatarray Unboxed_float64 ->
     Duplicate_array_kind (Naked_floats { length = None })
@@ -1019,7 +1033,7 @@ let array_vector_access_validity_condition array ~machine_width
     | Naked_vec512s -> 64
     | Naked_floats | Immediates | Naked_int64s | Naked_nativeints -> 8
     | Naked_int32s | Naked_float32s -> 4
-    | Values ->
+    | Gc_ignorable_values | Values ->
       Misc.fatal_error
         "Attempted to load/store a SIMD vector from/to a value array."
     | Unboxed_product _ ->
@@ -1276,6 +1290,8 @@ let rec array_load_unsafe ~machine_width ~array ~index
       match array_ref_kind with
       | Immediates -> [Array_ref_kind.No_float_array_opt Immediates]
       | Values -> [Array_ref_kind.No_float_array_opt Values]
+      | Gc_ignorable_values ->
+        [Array_ref_kind.No_float_array_opt Gc_ignorable_values]
       | Naked_floats -> [Array_ref_kind.No_float_array_opt Naked_floats]
       | Naked_float32s -> [Array_ref_kind.No_float_array_opt Naked_float32s]
       | Naked_int32s -> [Array_ref_kind.No_float_array_opt Naked_int32s]
@@ -1306,13 +1322,14 @@ let rec array_load_unsafe ~machine_width ~array ~index
           array_ref_kind ~current_region)
       (List.combine indexes unarized)
   | No_float_array_opt
-      (( Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
-       | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-       | Naked_vec512s ) as nfo) ->
+      (( Immediates | Gc_ignorable_values | Values | Naked_floats
+       | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
+       | Naked_vec128s | Naked_vec256s | Naked_vec512s ) as nfo) ->
     let array_load_kind : P.Array_load_kind.t =
       match nfo with
       | Immediates -> Immediates
       | Values -> Values
+      | Gc_ignorable_values -> Gc_ignorable_values
       | Naked_floats -> Naked_floats
       | Naked_float32s -> Naked_float32s
       | Naked_int32s -> Naked_int32s
@@ -1352,6 +1369,8 @@ let rec array_set_unsafe ~machine_width dbg ~array ~index array_kind
       | Immediates -> [Array_set_kind.No_float_array_opt Immediates]
       | Values init_or_assign ->
         [Array_set_kind.No_float_array_opt (Values init_or_assign)]
+      | Gc_ignorable_values ->
+        [Array_set_kind.No_float_array_opt Gc_ignorable_values]
       | Naked_floats -> [Array_set_kind.No_float_array_opt Naked_floats]
       | Naked_float32s -> [Array_set_kind.No_float_array_opt Naked_float32s]
       | Naked_int32s -> [Array_set_kind.No_float_array_opt Naked_int32s]
@@ -1389,12 +1408,13 @@ let rec array_set_unsafe ~machine_width dbg ~array ~index array_kind
                array_set_kind ~new_values:[new_value])
            (List.combine indexes (List.combine unarized new_values))) ]
   | No_float_array_opt
-      (( Immediates | Values _ | Naked_floats | Naked_float32s | Naked_int32s
-       | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-       | Naked_vec512s ) as nfo) -> (
+      (( Immediates | Gc_ignorable_values | Values _ | Naked_floats
+       | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
+       | Naked_vec128s | Naked_vec256s | Naked_vec512s ) as nfo) -> (
     match nfo with
     | Immediates -> normal_case Immediates new_values
     | Values init_or_assign -> normal_case (Values init_or_assign) new_values
+    | Gc_ignorable_values -> normal_case Gc_ignorable_values new_values
     | Naked_floats -> normal_case Naked_floats new_values
     | Naked_float32s -> normal_case Naked_float32s new_values
     | Naked_int32s -> normal_case Naked_int32s new_values
@@ -1647,6 +1667,7 @@ let block_index_access_offsets ~machine_width layout idx =
                   (Int64.of_int
                      (BC.on_64_bit_arch cts.value
                      + BC.on_64_bit_arch to_left.flat))))
+        | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
       in
       let prim = add offset offset_from_offset in
       MPB.add to_left (MPB.count mbe), prim
@@ -1927,7 +1948,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Punboxedoruntaggedintarray
             (Untagged_int8 | Untagged_int16 | Untagged_int) ->
           Misc.unboxed_small_int_arrays_are_not_implemented ()
-        | Pgenarray | Paddrarray | Pintarray
+        | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray
         | Punboxedfloatarray (Unboxed_float64 | Unboxed_float32)
         | Punboxedoruntaggedintarray
             (Unboxed_int32 | Unboxed_int64 | Unboxed_nativeint)
@@ -2238,9 +2259,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let prim : H.expr_primitive = Unary (Array_length array_kind, arg) in
     match array_kind with
     | Array_kind
-        ( Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
-        | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-        | Naked_vec512s )
+        ( Immediates | Gc_ignorable_values | Values | Naked_floats
+        | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
+        | Naked_vec128s | Naked_vec256s | Naked_vec512s )
     | Float_array_opt_dynamic ->
       [prim]
     | Array_kind (Unboxed_product _ as array_kind) ->
@@ -2858,8 +2879,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
         ~vec_kind:(vec_kind size) Naked_int32s array ~index_kind index new_value
     ]
-  | Pprobe_is_enabled { name }, [] ->
-    [tag_int (Nullary (Probe_is_enabled { name }))]
+  | Pprobe_is_enabled { name; enabled_at_init }, [] ->
+    [tag_int (Nullary (Probe_is_enabled { name; enabled_at_init }))]
   | Pobj_dup, [[v]] -> [Unary (Obj_dup, v)]
   | Pget_header m, [[obj]] -> [get_header obj m ~current_region]
   | Patomic_load_field { immediate_or_pointer }, [[atomic]; [field]] ->
@@ -3022,15 +3043,15 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Punboxed_float32_array_load_vec _ | Punboxed_int32_array_load_vec _
       | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
       | Parrayrefu
-          ( ( Pgenarray_ref _ | Paddrarray_ref | Pintarray_ref
-            | Pfloatarray_ref _ | Punboxedfloatarray_ref _
+          ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
+            | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
             | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
             _,
             _ )
       | Parrayrefs
-          ( ( Pgenarray_ref _ | Paddrarray_ref | Pintarray_ref
-            | Pfloatarray_ref _ | Punboxedfloatarray_ref _
+          ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
+            | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
             | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
             _,
@@ -3049,14 +3070,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | ( ( Psetfield_computed _ | Pbytessetu | Pbytessets
       | Parraysetu
-          ( ( Pgenarray_set _ | Paddrarray_set _ | Pintarray_set
-            | Pfloatarray_set | Punboxedfloatarray_set _
+          ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
+            | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
             | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
             _ )
       | Parraysets
-          ( ( Pgenarray_set _ | Paddrarray_set _ | Pintarray_set
-            | Pfloatarray_set | Punboxedfloatarray_set _
+          ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
+            | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
             | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
             _ )

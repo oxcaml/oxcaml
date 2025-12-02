@@ -79,8 +79,8 @@ val compile_only : bool ref
 val output_name : string option ref
 val include_dirs : string list ref
 val hidden_include_dirs : string list ref
-val include_paths_files : string list ref
-val hidden_include_paths_files : string list ref
+val include_manifests : string list ref
+val hidden_include_manifests : string list ref
 val no_std_include : bool ref
 val no_cwd : bool ref
 val print_types : bool ref
@@ -119,6 +119,7 @@ val open_modules : string list ref
 val preprocessor : string option ref
 val all_ppx : string list ref
 val absname : bool ref
+val locs : bool ref
 val directory : string option ref
 val annotations : bool ref
 val binary_annotations : bool ref
@@ -244,6 +245,9 @@ val afl_instrument : bool ref
 val afl_inst_ratio : int ref
 val function_sections : bool ref
 val probes : bool ref
+val emit_optimized_probes : bool ref
+val supports_optimized_probes : bool
+
 val llvm_backend : bool ref
 
 val all_passes : string list ref

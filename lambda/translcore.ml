@@ -137,6 +137,9 @@ let maybe_region get_layout lam =
        Lsend (k, lmet, lobj, largs, Rc_normal, mode, loc, layout)
     | Lregion _ as lam -> lam
     | Lexclave lam -> lam
+    | Lsplice _ ->
+      fatal_error "Translcore.remove_tail_markers_and_exclave: \
+        splices shouldn't be reachable"
     | lam ->
        Lambda.shallow_map ~tail:remove_tail_markers_and_exclave ~non_tail:Fun.id lam
   in
@@ -865,7 +868,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 imm_array
               else
                 match kind with
-                | Paddrarray | Pintarray ->
+                | Paddrarray | Pgcignorableaddrarray | Pintarray ->
                   Lconst(Const_block(0, cl))
                 | Pfloatarray ->
                   Lconst(Const_float_array(List.map extract_float cl))
@@ -895,7 +898,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
       let array_kind = Typeopt.array_kind e elt_sort in
       begin match array_kind with
-      | Pgenarray | Paddrarray | Pintarray | Pfloatarray
+      | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
       | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ -> ()
       | Punboxedvectorarray _ ->
         raise (Error(e.exp_loc, Unboxed_vector_in_array_comprehension))
@@ -1265,27 +1268,45 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (* CR zqian: the handler function doesn't have a region. However, the
              [region] field is currently broken. *)
       in
-      let app =
+      let ap_loc = of_location e.exp_loc ~scopes in
+      let app ~ap_probe =
         { ap_func = Lvar funcid;
           ap_args;
           ap_result_layout = return_layout;
           ap_region_close = Rc_normal;
           ap_mode = alloc_local;
-          ap_loc = of_location e.exp_loc ~scopes;
+          ap_loc;
           ap_tailcall = Default_tailcall;
           ap_inlined = Never_inlined;
           ap_specialised = Always_specialise;
-          ap_probe = Some {name; enabled_at_init};
+          ap_probe;
         }
       in
-      Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler,
-            Lapply app)
+      let lam =
+        if !Clflags.emit_optimized_probes then
+          let ap_probe = Some {name; enabled_at_init} in
+          Lapply (app ~ap_probe)
+        else
+          (* Slower implementation of probes where there isn't clever
+             architecture-specific codegen. Read the semaphore each time. *)
+          (Lifthenelse
+             ( Lprim
+                 (Pprobe_is_enabled
+                    { name; enabled_at_init = Some enabled_at_init },
+                      [], ap_loc),
+               (* probe handler has type [unit] *)
+               Lapply (app ~ap_probe:None),
+               lambda_unit,
+               layout_unit ))
+      in
+      Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler, lam)
     end else begin
       lambda_unit
     end
   | Texp_probe_is_enabled {name} ->
     if !Clflags.native_code && !Clflags.probes then
-      Lprim(Pprobe_is_enabled {name}, [], of_location ~scopes e.exp_loc)
+      Lprim(Pprobe_is_enabled {name; enabled_at_init = None},
+            [], of_location ~scopes e.exp_loc)
     else
       lambda_unit
   | Texp_exclave e ->

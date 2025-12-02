@@ -710,6 +710,10 @@ module type S = sig
     val min_with_comonadic :
       'a Comonadic.Axis.t -> ('a, 'l * 'r) mode -> ('l * disallowed) t
 
+    (* [min_with_monadic ax elt] returns [min] but with the monadic axis [ax] set to [elt]. *)
+    val min_with_monadic :
+      'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
+
     val meet_with : 'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 
     val join_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t

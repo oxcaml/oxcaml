@@ -34,6 +34,14 @@ let mk_no_absname f =
     "-no-absname", Arg.Unit f,
     " Do not try to show absolute filenames in error messages (default)"
 
+let mk_locs f =
+    "-locs", Arg.Unit f,
+    " Print line and column numbers in error messages (default)"
+
+let mk_no_locs f =
+    "-no-locs", Arg.Unit f,
+    " Do not print line and column numbers in error messages"
+
 let mk_annot f =
   "-annot", Arg.Unit f, " (deprecated) Save information in <filename>.annot"
 
@@ -175,17 +183,24 @@ let mk_H f =
   "<dir>  Add <dir> to the list of \"hidden\" include directories\n\
  \     (Like -I, but the program can not directly reference these dependencies)"
 
-let mk_I_paths f =
-  "-I-paths", Arg.String f, "<file>  Read list of paths that compiler can\n\
-  \    reference from a given file. This option is alternative to -I flag,\n\
-  \    but specifies available files directly instead of adding the whole\n\
-  \    directory to the search path. Each line of files passed to -I-paths\n\
-  \    should be in format '<filename> <path>', which tells compiler that\n\
-  \    <filename> can be found at <path> relative to file given to -I-paths."
+let mk_I_manifest f =
+  "-I-manifest", Arg.String f, "<file>  Get paths that the compiler can\n\
+  \    reference from a given manifest file. This option is an alternative\n\
+  \    to the -I flag, but specifies available files directly instead of\n\
+  \    adding whole directories to the search path. Each line of the\n\
+  \    manifest file should be in the format\n\
+  \    'file|manifest <visible_path> <actual_path>', where 'file' means\n\
+  \    that the line describes a file that the compiler can reference,\n\
+  \    'manifest' means that the compiler should read the specified\n\
+  \    manifest file recursively, <visible_path> is the path as interpreted\n\
+  \    by the compiler, <actual_path> is where this file is in the\n\
+  \    filesystem (relative to [$MANIFEST_FILES_ROOT]). The manifest file\n\
+  \    passed to the [-I-manifest] flag should itself be relative to\n\
+  \    [$MANIFEST_FILES_ROOT]."
 
-let mk_H_paths f =
-  "-H-paths", Arg.String f, "<file>  Same as -I-paths, but adds given paths\n\
-  \    to the list of \"hidden\" files (see -H for more details)"
+let mk_H_manifest f =
+  "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given\n\
+  \    paths to the list of \"hidden\" files (see -H for more details)"
 
 let mk_impl f =
   "-impl", Arg.String f, "<file>  Compile <file> as a .ml file"
@@ -323,6 +338,26 @@ let mk_probes f =
 
 let mk_no_probes f =
     "-no-probes", Arg.Unit f, " Ignore [%%probe ..]"
+;;
+
+let mk_probes_optimized f =
+  if Clflags.supports_optimized_probes then
+    "-probes-optimized", Arg.Unit f,
+    " Emit efficient code for [%%probe ..]."
+  else
+    let err () =
+      raise
+        (Arg.Bad
+          "OCaml has been configured without support for \
+           tracing probes; or optimized probes are not supported on the \
+           target: -probes-optimized not available.")
+    in
+    "-probes-optimized", Arg.Unit err, " (option not available)"
+;;
+
+
+let mk_no_probes_optimized f =
+    "-no-probes-optimized", Arg.Unit f, " Emit naive code for [%%probe ..]"
 ;;
 
 let mk_labels f =
@@ -1031,11 +1066,13 @@ let mk__ f =
 module type Common_options = sig
   val _absname : unit -> unit
   val _no_absname : unit -> unit
+  val _locs : unit -> unit
+  val _no_locs : unit -> unit
   val _alert : string -> unit
   val _I : string -> unit
   val _H : string -> unit
-  val _I_paths : string -> unit
-  val _H_paths : string -> unit
+  val _I_manifest : string -> unit
+  val _H_manifest : string -> unit
   val _labels : unit -> unit
   val _alias_deps : unit -> unit
   val _no_alias_deps : unit -> unit
@@ -1274,6 +1311,8 @@ module type Optcomp_options = sig
   val _save_ir_before : string -> unit
   val _probes : unit -> unit
   val _no_probes : unit -> unit
+  val _probes_optimized : unit -> unit
+  val _no_probes_optimized : unit -> unit
   val _gdwarf_config_shape_reduce_depth : string -> unit
   val _gdwarf_config_shape_eval_depth : string -> unit
   val _gdwarf_config_max_cms_files_per_unit : string -> unit
@@ -1348,6 +1387,8 @@ struct
     mk_alert F._alert;
     mk_absname F._absname;
     mk_no_absname F._no_absname;
+    mk_locs F._locs;
+    mk_no_locs F._no_locs;
     mk_annot F._annot;
     mk_as_argument_for F._as_argument_for;
     mk_as_parameter F._as_parameter;
@@ -1380,8 +1421,8 @@ struct
     mk_i F._i;
     mk_I F._I;
     mk_H F._H;
-    mk_I_paths F._I_paths;
-    mk_H_paths F._H_paths;
+    mk_I_manifest F._I_manifest;
+    mk_H_manifest F._H_manifest;
     mk_impl F._impl;
     mk_instantiate_byt F._instantiate;
     mk_intf F._intf;
@@ -1495,11 +1536,13 @@ struct
   let list = [
     mk_absname F._absname;
     mk_no_absname F._no_absname;
+    mk_locs F._locs;
+    mk_no_locs F._no_locs;
     mk_alert F._alert;
     mk_I F._I;
     mk_H F._H;
-    mk_I_paths F._I_paths;
-    mk_H_paths F._H_paths;
+    mk_I_manifest F._I_manifest;
+    mk_H_manifest F._H_manifest;
     mk_init F._init;
     mk_labels F._labels;
     mk_alias_deps F._alias_deps;
@@ -1583,6 +1626,8 @@ struct
     mk_alert F._alert;
     mk_absname F._absname;
     mk_no_absname F._no_absname;
+    mk_locs F._locs;
+    mk_no_locs F._no_locs;
     mk_afl_instrument F._afl_instrument;
     mk_afl_inst_ratio F._afl_inst_ratio;
     mk_annot F._annot;
@@ -1619,11 +1664,13 @@ struct
     mk_save_ir_before ~native:true F._save_ir_before;
     mk_probes F._probes;
     mk_no_probes F._no_probes;
+    mk_probes_optimized F._probes_optimized;
+    mk_no_probes_optimized F._no_probes_optimized;
     mk_i F._i;
     mk_I F._I;
     mk_H F._H;
-    mk_I_paths F._I_paths;
-    mk_H_paths F._H_paths;
+    mk_I_manifest F._I_manifest;
+    mk_H_manifest F._H_manifest;
     mk_impl F._impl;
     mk_inline F._inline;
     mk_inline_toplevel F._inline_toplevel;
@@ -1784,12 +1831,14 @@ module Make_opttop_options (F : Opttop_options) = struct
   let list = [
     mk_absname F._absname;
     mk_no_absname F._no_absname;
+    mk_locs F._locs;
+    mk_no_locs F._no_locs;
     mk_alert F._alert;
     mk_compact F._compact;
     mk_I F._I;
     mk_H F._H;
-    mk_I_paths F._I_paths;
-    mk_H_paths F._H_paths;
+    mk_I_manifest F._I_manifest;
+    mk_H_manifest F._H_manifest;
     mk_init F._init;
     mk_inline F._inline;
     mk_inline_toplevel F._inline_toplevel;
@@ -1902,6 +1951,8 @@ struct
     mk_alert F._alert;
     mk_absname F._absname;
     mk_no_absname F._no_absname;
+    mk_locs F._locs;
+    mk_no_locs F._no_locs;
     mk_annot F._annot;
     mk_as_argument_for F._as_argument_for;
     mk_as_parameter F._as_parameter;
@@ -1931,8 +1982,8 @@ struct
     mk_i F._i;
     mk_I F._I;
     mk_H F._H;
-    mk_I_paths F._I_paths;
-    mk_H_paths F._H_paths;
+    mk_I_manifest F._I_manifest;
+    mk_H_manifest F._H_manifest;
     mk_impl F._impl;
     mk_instantiate_byt F._instantiate;
     mk_intf F._intf;
@@ -2057,11 +2108,13 @@ struct
   let list = [
     mk_absname F._absname;
     mk_no_absname F._no_absname;
+    mk_locs F._locs;
+    mk_no_locs F._no_locs;
     mk_alert F._alert;
     mk_I F._I;
     mk_H F._H;
-    mk_I_paths F._I_paths;
-    mk_H_paths F._H_paths;
+    mk_I_manifest F._I_manifest;
+    mk_H_manifest F._H_manifest;
     mk_impl F._impl;
     mk_intf F._intf;
     mk_intf_suffix F._intf_suffix;
@@ -2166,11 +2219,13 @@ module Default = struct
 
   module Common = struct
     let _absname = set Clflags.absname
+    let _locs = set Clflags.locs
     let _alert = Warnings.parse_alert_option
     let _alias_deps = clear transparent_modules
     let _app_funct = set applicative_functors
     let _labels = clear classic
     let _no_absname = clear Clflags.absname
+    let _no_locs = clear Clflags.locs
     let _no_alias_deps = set transparent_modules
     let _no_app_funct = clear applicative_functors
     let _directory d = Clflags.directory := Some d
@@ -2218,9 +2273,9 @@ module Default = struct
     include Common
     let _I dir = include_dirs := dir :: (!include_dirs)
     let _H dir = hidden_include_dirs := dir :: (!hidden_include_dirs)
-    let _I_paths file = include_paths_files := file :: !include_paths_files
-    let _H_paths file =
-      hidden_include_paths_files := file :: !hidden_include_paths_files
+    let _I_manifest file = include_manifests := file :: !include_manifests
+    let _H_manifest file =
+      hidden_include_manifests := file :: !hidden_include_manifests
     let _color = Misc.set_or_ignore color_reader.parse color
     let _dlambda = set dump_lambda
     let _dblambda = set dump_blambda
@@ -2482,6 +2537,8 @@ module Default = struct
     let _v () = Compenv.print_version_and_library "native-code compiler"
     let _no_probes = clear probes
     let _probes = set probes
+    let _no_probes_optimized = clear emit_optimized_probes
+    let _probes_optimized = set emit_optimized_probes
     let _gdwarf_config_shape_reduce_depth s =
       gdwarf_config_shape_reduce_depth :=
         parse_int_option ~parameter:"-gdwarf-config-shape-reduce-depth" s
@@ -2526,8 +2583,8 @@ module Default = struct
          Odoc_global.hidden_include_dirs :=
            (s :: (!Odoc_global.hidden_include_dirs))
       *) ()
-    let _I_paths(_:string) = ()
-    let _H_paths(_:string) = ()
+    let _I_manifest(_:string) = ()
+    let _H_manifest(_:string) = ()
     let _impl (_:string) =
       (* placeholder:
          Odoc_global.files := ((!Odoc_global.files) @ [Odoc_global.Impl_file s])

@@ -1141,7 +1141,20 @@ let components_of_module ~alerts ~uid env ps path addr mty mode shape =
     }
   }
 
-let mode_unit = Mode.Value.legacy
+let mode_unit =
+  Mode.Value.of_const
+    { areality = Global;
+      linearity = Many;
+      uniqueness = Aliased;
+      portability = Nonportable;
+      contention = Uncontended;
+      forkable = Forkable;
+      yielding = Unyielding;
+      statefulness = Stateful;
+      visibility = Read_write;
+      staticity = Dynamic;
+      (* CR-soon zqian: persistent modules are always static *)
+    }
 
 let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
   let id = Ident.create_global name in
@@ -3047,11 +3060,16 @@ let unit_name_of_filename fn =
       else None
   | _ -> None
 
-let persistent_structures_of_dir dir =
-  Load_path.Dir.basenames dir
+let persistent_structures_of_basenames basenames =
+  basenames
   |> List.to_seq
   |> Seq.filter_map unit_name_of_filename
   |> String.Set.of_seq
+
+
+let persistent_structures_of_dir dir =
+  Load_path.Dir.basenames dir
+  |> persistent_structures_of_basenames
 
 (* Save a signature to a file *)
 let save_signature_with_transform cmi_transform ~alerts sg modname kind
@@ -4461,10 +4479,7 @@ let fold_modules f lid env acc =
            match entry with
            | Mod_unbound _ -> acc
            | Mod_local (mda, _) ->
-               let md =
-                 Subst.Lazy.force_module_decl mda.mda_declaration
-               in
-               f name p md acc
+               f name p mda.mda_declaration acc
            | Mod_persistent ->
                (* CR lmaurer: Setting instance args to [] here isn't right. We
                   really should have [IdTbl.fold_name] provide the whole ident
@@ -4475,10 +4490,7 @@ let fold_modules f lid env acc =
                match Persistent_env.find_in_cache !persistent_env modname with
                | None -> acc
                | Some mda ->
-                   let md =
-                     Subst.Lazy.force_module_decl mda.mda_declaration
-                   in
-                   f name p md acc)
+                   f name p mda.mda_declaration acc)
         env.modules
         acc
   | Some l ->
@@ -4490,10 +4502,7 @@ let fold_modules f lid env acc =
       | Structure_comps c ->
           NameMap.fold
             (fun s mda acc ->
-               let md =
-                 Subst.Lazy.force_module_decl mda.mda_declaration
-               in
-               f s (Pdot (p, s)) md acc)
+               f s (Pdot (p, s)) mda.mda_declaration acc)
             c.comp_modules
             acc
       | Functor_comps _ ->
@@ -4522,7 +4531,6 @@ and fold_types f =
     (fun env -> env.types) (fun sc -> sc.comp_types)
     (fun k p tda acc -> f k p tda.tda_declaration acc)
 and fold_modtypes f =
-  let f l path data acc = f l path (Subst.Lazy.force_modtype_decl data) acc in
   find_all wrap_identity
     (fun env -> env.modtypes) (fun sc -> sc.comp_modtypes)
     (fun k p mta acc -> f k p mta.mtda_declaration acc)

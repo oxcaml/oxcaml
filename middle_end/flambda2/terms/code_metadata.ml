@@ -245,6 +245,8 @@ let with_param_modes param_modes t = { t with param_modes }
 
 let with_is_tupled is_tupled t = { t with is_tupled }
 
+let with_result_types result_types t = { t with result_types }
+
 module Option = struct
   include Option
 

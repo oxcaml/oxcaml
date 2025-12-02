@@ -2099,7 +2099,14 @@ let rec update_decl_jkind env dpath decl =
           (idx+1,cstr::cstrs)
         ) (0,[]) cstrs
       in
-      let jkind = Jkind.for_boxed_variant ~loc cstrs in
+      let jkind =
+        Jkind.for_boxed_variant
+          ~loc
+          ~decl_params:decl.type_params
+          ~type_apply:(Ctype.apply env)
+          ~free_vars:(Ctype.free_variable_set_of_list env)
+          cstrs
+      in
       List.rev cstrs, rep, jkind
     | (([] | (_ :: _)), Variant_unboxed | _, Variant_extensible) ->
       assert false
@@ -2233,31 +2240,25 @@ let check_unboxed_paths decls ~unboxed_version_banned =
   (* We iterate on all subexpressions of the declaration to check "in depth"
      that no non-existent unboxed version is used. *)
   let open Btype in
-  let checked =
-    (* [checked] remembers the types that the iterator already
-        checked, to avoid looping on cyclic types. *)
-    ref TypeSet.empty
-  in
-  let check_ty loc ty =
-    match get_desc ty with
-    | Tconstr(Pextra_ty (path, Punboxed_ty), _, _)
-      when unboxed_version_banned path ->
-        raise (Error (loc, No_unboxed_version path))
-    | _ -> ()
-  in
-  let check_decl d =
-    let it =
-      {type_iterators with it_type_expr =
-        (fun self ty ->
-          if not (TypeSet.mem ty !checked) then begin
-            check_ty d.type_loc ty;
-            checked := TypeSet.add ty !checked;
-            self.it_do_type_expr self ty
-          end)}
+  with_type_mark (fun mark ->
+    let super = type_iterators mark in
+    let check_ty loc ty =
+      match get_desc ty with
+      | Tconstr(Pextra_ty (path, Punboxed_ty), _, _)
+        when unboxed_version_banned path ->
+          raise (Error (loc, No_unboxed_version path))
+      | _ -> ()
     in
-    it.it_type_declaration it (Ctype.generic_instance_declaration d)
-  in
-  List.iter (fun (_, d) -> check_decl d) decls
+    let check_decl d =
+      let it =
+        {super with it_do_type_expr =
+          (fun self ty ->
+              check_ty d.type_loc ty;
+              super.it_do_type_expr self ty)}
+      in
+      it.it_type_declaration it (Ctype.generic_instance_declaration d)
+    in
+    List.iter (fun (_, d) -> check_decl d) decls)
 
 (* Note: Well-foundedness for OCaml types
 
@@ -2486,11 +2487,8 @@ let check_well_founded_decl  ~abs_env env loc path decl to_check =
   let open Btype in
   (* We iterate on all subexpressions of the declaration to check
      "in depth" that no ill-founded type exists. *)
-  let it =
-    let checked =
-      (* [checked] remembers the types that the iterator already
-         checked, to avoid looping on cyclic types. *)
-      ref TypeSet.empty in
+  with_type_mark begin fun mark ->
+    let super = type_iterators mark in
     let visited =
       (* [visited] remembers the inner visits performed by
          [check_well_founded] on each type expression reachable from
@@ -2498,14 +2496,14 @@ let check_well_founded_decl  ~abs_env env loc path decl to_check =
          [check_well_founded] work when invoked on two parts of the
          type declaration that have common subexpressions. *)
       ref TypeMap.empty in
-    {type_iterators with it_type_expr =
-     (fun self ty ->
-       if TypeSet.mem ty !checked then () else begin
-         check_well_founded  ~abs_env env loc path to_check visited ty;
-         checked := TypeSet.add ty !checked;
-         self.it_do_type_expr self ty
-       end)} in
-  it.it_type_declaration it (Ctype.generic_instance_declaration decl)
+    let it =
+      {super with it_do_type_expr =
+       (fun self ty ->
+         check_well_founded ~abs_env env loc path to_check visited ty;
+         super.it_do_type_expr self ty
+       )} in
+    it.it_type_declaration it (Ctype.generic_instance_declaration decl)
+  end
 
 (* We only allow recursion in unboxed product types to occur through boxes,
    otherwise the type is uninhabitable and usually also infinite-size.
@@ -3842,8 +3840,35 @@ let check_for_hidden_arrow env loc ty =
       check()
   | Assert_default -> ()
 
+type transl_value_decl_modal =
+  | Str_primitive
+  | Sig_value of Mode.Value.l * Mode.Modality.Const.t
+
 (* Translate a value declaration *)
-let transl_value_decl env loc ~modalities ~why valdecl =
+let transl_value_decl env loc ~modal ~why valdecl =
+  let mode, val_modalities =
+    match modal with
+    | Str_primitive ->
+        let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
+        let modes = List.map modality_to_mode valdecl.pval_modalities in
+        let mode =
+          modes
+          |> Typemode.transl_mode_annots
+          |> Mode.Alloc.Const.(
+              Option.value ~default:{legacy with staticity = Static})
+          |> Mode.Alloc.of_const
+          |> Mode.alloc_as_value
+        in
+        mode, Mode.Modality.id
+    | Sig_value (md_mode, sig_modalities) ->
+        let modalities =
+          match valdecl.pval_modalities with
+          | [] -> sig_modalities
+          | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
+        in
+        let modalities = Mode.Modality.of_const modalities in
+        md_mode, modalities
+  in
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
   let sort =
     match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with
@@ -3903,7 +3928,7 @@ let transl_value_decl env loc ~modalities ~why valdecl =
       { val_type = ty;
         val_kind = Val_reg sort;
         Types.val_loc = loc;
-        val_attributes = valdecl.pval_attributes; val_modalities = modalities;
+        val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = zero_alloc;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
       }
@@ -3943,13 +3968,13 @@ let transl_value_decl env loc ~modalities ~why valdecl =
       then raise(Error(valdecl.pval_type.ptyp_loc, Missing_native_external));
       check_unboxable env loc ty;
       { val_type = ty; val_kind = Val_prim prim; Types.val_loc = loc;
-        val_attributes = valdecl.pval_attributes; val_modalities = modalities;
+        val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = Zero_alloc.default;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
       }
   in
   let (id, newenv) =
-    Env.enter_value ~mode:Mode.Value.legacy valdecl.pval_name.txt v env
+    Env.enter_value ~mode valdecl.pval_name.txt v env
       ~check:(fun s -> Warnings.Unused_value_declaration s)
   in
   Ctype.check_and_update_generalized_ty_jkind ~name:id ~loc newenv ty;
@@ -3963,11 +3988,11 @@ let transl_value_decl env loc ~modalities ~why valdecl =
      val_attributes = valdecl.pval_attributes;
     }
   in
-  desc, newenv
+  desc, mode, newenv
 
-let transl_value_decl env ~modalities ~why loc valdecl =
+let transl_value_decl env ~modal ~why loc valdecl =
   Builtin_attributes.warning_scope valdecl.pval_attributes
-    (fun () -> transl_value_decl env ~modalities ~why loc valdecl)
+    (fun () -> transl_value_decl env ~modal ~why loc valdecl)
 
 (* Translate a "with" constraint -- much simplified version of
    transl_type_decl. For a constraint [Sig with t = sdecl],

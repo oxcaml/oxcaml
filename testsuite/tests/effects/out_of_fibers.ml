@@ -7,4 +7,6 @@
 
 external out_of_fibers : unit -> 'a = "test_out_of_fibers"
 
-let () = out_of_fibers ()
+let () =
+  Printexc.record_backtrace false;
+  out_of_fibers ()

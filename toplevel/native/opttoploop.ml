@@ -326,7 +326,7 @@ let default_load ppf (program : Lambda.program) =
      files) *)
   res
 
-let load_slambda ppf ~compilation_unit ~required_globals program repr =
+let load_slambda ppf ~compilation_unit program repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_slambda then fprintf ppf "%a@." Printslambda.program program;
   let program = Slambdaeval.eval program in
@@ -345,7 +345,7 @@ let load_slambda ppf ~compilation_unit ~required_globals program repr =
       main_module_block_format = Mb_struct { mb_repr = repr };
       arg_block_idx = None;
       compilation_unit;
-      required_globals;
+      required_globals = program.required_globals;
     }
   in
   match !jit with
@@ -486,9 +486,9 @@ let execute_phrase print_outcome ppf phr =
             str, sg', true
         | _ -> str, sg', false
       in
-      let compilation_unit, program, required_globals, repr =
-        let { Lambda.compilation_unit; main_module_block_format;
-              required_globals; code = res } as program =
+      let compilation_unit, program, repr =
+        let { SL.compilation_unit; main_module_block_format;
+              code = res } as program =
           Translmod.transl_implementation compilation_unit
             (str, coercion, None) ~loc:Location.none
         in
@@ -500,14 +500,14 @@ let execute_phrase print_outcome ppf phr =
         in
         remember compilation_unit sg' repr;
         let program = { program with code = close_slambda_phrase res } in
-        compilation_unit, program, required_globals, repr
+        compilation_unit, program, repr
       in
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;
         toplevel_sig := List.rev_append sg' oldsig;
         let res =
-          load_slambda ppf ~required_globals ~compilation_unit program repr
+          load_slambda ppf ~compilation_unit program repr
         in
         let out_phr =
           match res with

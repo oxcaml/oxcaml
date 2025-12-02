@@ -1557,3 +1557,12 @@ Error: Signature mismatch:
        First is "nonportable"
        but second is "portable".
 |}]
+
+module M = struct
+  external foo : unit -> unit @@ static = "%identity"
+
+  let _ @ static = foo
+end
+[%%expect{|
+module M : sig external foo : unit -> unit = "%identity" end
+|}]

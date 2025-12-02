@@ -262,7 +262,7 @@ let pseudoregs_for_operation op arg res =
   | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
   | Stackoffset _ | Load _
   | Store (_, _, _)
-  | Intop _
+  | Intop _ | Int128op _
   | Intop_imm (_, _)
   | Intop_atomic _
   | Floatop (_, _)

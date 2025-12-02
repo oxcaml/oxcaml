@@ -691,6 +691,108 @@ module SSE3_Util = struct
     [@@noalloc] [@@unboxed] [@@builtin]
 end
 
+module Int64 = struct
+  type t = int64
+
+  external andn : t -> t -> t = "caml_vec128_unreachable" "caml_bmi_andn_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external bextr : t -> t -> t
+    = "caml_vec128_unreachable" "caml_bmi_bextr_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external blsi : t -> t = "caml_vec128_unreachable" "caml_bmi_blsi_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external blsmsk : t -> t = "caml_vec128_unreachable" "caml_bmi_blsmsk_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external blsr : t -> t = "caml_vec128_unreachable" "caml_bmi_blsr_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external bzhi : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_bzhi_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external pext : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_pext_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external pdep : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_pdep_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external rorx : (int[@untagged]) -> (t[@unboxed]) -> (t[@unboxed])
+    = "caml_vec128_unreachable" "caml_bmi2_rorx_int64"
+    [@@noalloc] [@@builtin]
+
+  external sarx : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_sarx_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external shrx : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_shrx_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external shlx : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_shlx_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external popcnt : t -> t = "caml_vec128_unreachable" "caml_popcnt_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external lzcnt : t -> t = "caml_vec128_unreachable" "caml_lzcnt_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external tzcnt : t -> t = "caml_vec128_unreachable" "caml_bmi_tzcnt_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+end
+
+module Int32 = struct
+  type t = int32
+
+  external andn : t -> t -> t = "caml_vec128_unreachable" "caml_bmi_andn_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external bextr : t -> t -> t
+    = "caml_vec128_unreachable" "caml_bmi_bextr_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external blsi : t -> t = "caml_vec128_unreachable" "caml_bmi_blsi_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external blsmsk : t -> t = "caml_vec128_unreachable" "caml_bmi_blsmsk_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external blsr : t -> t = "caml_vec128_unreachable" "caml_bmi_blsr_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external bzhi : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_bzhi_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external pext : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_pext_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external pdep : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_pdep_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external rorx : (int[@untagged]) -> (t[@unboxed]) -> (t[@unboxed])
+    = "caml_vec128_unreachable" "caml_bmi2_rorx_int32"
+    [@@noalloc] [@@builtin]
+
+  external sarx : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_sarx_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external shrx : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_shrx_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external shlx : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_shlx_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external popcnt : t -> t = "caml_vec128_unreachable" "caml_popcnt_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external lzcnt : t -> t = "caml_vec128_unreachable" "caml_lzcnt_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external tzcnt : t -> t = "caml_vec128_unreachable" "caml_bmi_tzcnt_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+end
+
 module Sse_other_builtins = struct
   (* CR gyorsh: Add arm64 support for intrinsics below. This file contains amd64
      intrinsics that don't have an equivalent arm64 neon intrinsic. They can be
@@ -763,18 +865,6 @@ module Sse_other_builtins = struct
 
     external mul_even_unsigned : t -> t -> int64x2
       = "caml_vec128_unreachable" "caml_sse2_int32x4_mul_even_unsigned"
-      [@@noalloc] [@@unboxed] [@@builtin]
-  end
-
-  module Int64 = struct
-    type t = int64
-
-    external bit_deposit : t -> t -> t
-      = "caml_vec128_unreachable" "caml_bmi2_int64_deposit_bits"
-      [@@noalloc] [@@unboxed] [@@builtin]
-
-    external bit_extract : t -> t -> t
-      = "caml_vec128_unreachable" "caml_bmi2_int64_extract_bits"
       [@@noalloc] [@@unboxed] [@@builtin]
   end
 
