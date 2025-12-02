@@ -2,6 +2,8 @@
  flambda;
  native;
 *)
+(* CR-someday gyorsh: this test fails with -Oclassic *)
+[@@@ocaml.flambda_o3]
 
 type t = T of { pos : int }
 

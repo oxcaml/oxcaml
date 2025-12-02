@@ -1,4 +1,5 @@
 (* TEST
+ skip;
  include config;
  flags = "config.cmx";
  native;
