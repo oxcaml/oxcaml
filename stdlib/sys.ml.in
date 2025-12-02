@@ -112,10 +112,13 @@ external readdir : string -> string array @@ portable = "caml_sys_read_directory
 
 let interactive = ref false
 
+type external_signal_handler (* abstract *)
+
 type signal_behavior =
     Signal_default
   | Signal_ignore
   | Signal_handle of (int -> unit)
+  | Signal_external of external_signal_handler
 
 module Safe = struct
   external signal

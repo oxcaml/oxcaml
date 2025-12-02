@@ -247,17 +247,22 @@ external poll_actions : unit -> unit = "%poll"
 
 (** {1 Signal handling} *)
 
+type external_signal_handler (* abstract *)
 
 type signal_behavior =
     Signal_default
   | Signal_ignore
   | Signal_handle of (int -> unit)   (** *)
+  | Signal_external of external_signal_handler
 (** What to do when receiving a signal:
    - [Signal_default]: take the default behavior
      (usually: abort the program)
    - [Signal_ignore]: ignore the signal
    - [Signal_handle f]: call function [f], giving it the signal
-   number as argument. *)
+     number as argument
+   - [Signal_external e]: run external signal handler defined by abstract
+    value [e].
+*)
 
 external signal :
   int -> signal_behavior -> signal_behavior @@ nonportable = "caml_install_signal_handler"
