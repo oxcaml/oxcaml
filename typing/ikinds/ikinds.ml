@@ -486,7 +486,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
         | Types.Type_open ->
           let kind : JK.ckind =
            fun _ctx ->
-            Ldd.const Axis_lattice.value
+            Ldd.const Axis_lattice.nonfloat_value
           in
           JK.Ty { args = decl.type_params; kind; abstract = false }
         end

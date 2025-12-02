@@ -411,7 +411,7 @@ let nonfloat_value : t =
     ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.max
     ~contention:Mode.Contention.Const.Uncontended
-    ~forkable:Mode.Forkable.Const.min
+    ~forkable:Mode.Forkable.Const.max
     ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
