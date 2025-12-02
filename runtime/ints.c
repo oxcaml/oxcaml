@@ -136,6 +136,22 @@ CAMLprim value caml_int_compare(value v1, value v2)
   return Val_long(COMPARE_INT(v1, v2));
 }
 
+CAMLprim value caml_int_unsigned_div(value v1, value v2)
+{
+  uintnat dividend = Unsigned_long_val(v1);
+  uintnat divisor = Unsigned_long_val(v2);
+  if (divisor == 0) caml_raise_zero_divide();
+  return Val_long(dividend / divisor);
+}
+
+CAMLprim value caml_int_unsigned_mod(value v1, value v2)
+{
+  uintnat dividend = Unsigned_long_val(v1);
+  uintnat divisor = Unsigned_long_val(v2);
+  if (divisor == 0) caml_raise_zero_divide();
+  return Val_long(dividend % divisor);
+}
+
 CAMLprim value caml_int_of_string(value s)
 {
     return Val_long(parse_intnat(s, 8 * sizeof(value) - 1, INT_ERRMSG));
