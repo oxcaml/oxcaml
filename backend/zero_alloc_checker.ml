@@ -2572,8 +2572,8 @@ end = struct
       type error = unit
 
       let transform_call_indirect t ~next ~exn callees wkind ~desc dbg =
-        report t next ~msg:"transform_call next" ~desc dbg;
-        report t exn ~msg:"transform_call exn" ~desc dbg;
+        report t next ~msg:"transform_call_indirect next" ~desc dbg;
+        report t exn ~msg:"transform_call_indirect exn" ~desc dbg;
         let effect =
           List.fold_left
             (fun all_effects { Cmm.sym_name = callee; _ } ->
@@ -2715,8 +2715,8 @@ end = struct
         | Call { op = Indirect None; _ } ->
           let w = create_witnesses t Indirect_call dbg in
           transform_top t ~next ~exn w "indirect call" dbg
-        | Call { op = Indirect (Some _callees); _ } ->
-          transform_call_indirect t ~next ~exn _callees
+        | Call { op = Indirect (Some callees); _ } ->
+          transform_call_indirect t ~next ~exn callees
             (fun callee -> Witness.Direct_call { callee })
             ~desc:"indirect call" dbg
         | Call { op = Direct { sym_name = func; _ }; _ } ->
