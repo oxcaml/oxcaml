@@ -1742,15 +1742,7 @@ let instance_labels ~fixed lbls ty_res =
   )
 
 let instance_label_update' copy_scope ~fixed ~all lbl =
-  let vars, ty_arg, ty_res = instance_label' copy_scope ~fixed lbl in
-  let ty_arg =
-    match vars with
-    | [] -> ty_arg
-    | tl ->
-      (* CR lmaurer: Check that this is right *)
-      newty3 ~level:(get_level ty_arg) ~scope:(get_scope ty_arg)
-        (Tpoly (ty_arg, tl))
-  in
+  let _, ty_arg, ty_res = instance_label' copy_scope ~fixed lbl in
   { lbl with lbl_arg = ty_arg; lbl_res = ty_res; lbl_all = all }
 
 let instance_labels_update ~fixed lbls =

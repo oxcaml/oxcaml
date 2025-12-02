@@ -1922,14 +1922,16 @@ let solve_Ppat_construct ~refine tps penv loc constr no_existentials
 let solve_Ppat_record_field ~refine loc penv label label_lid record_ty
       record_form =
   with_local_level_iter ~post:generalize_structure begin fun () ->
-    let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
+    let { lbl_arg = ty_arg; lbl_res = ty_res; _ } as updated_lbl =
+      instance_label_update ~fixed:false label
+    in
     begin try
       unify_pat_types_refine ~refine loc penv ty_res (instance record_ty)
     with Error(_loc, _env, Pattern_type_clash(err, _)) ->
       raise(Error(label_lid.loc, !!penv,
                   Label_mismatch(P record_form, label_lid.txt, err)))
     end;
-    (ty_arg, [ty_res; ty_arg])
+    (updated_lbl, [ty_res; ty_arg])
   end
 
 let solve_Ppat_array ~refine loc env mutability expected_ty =
@@ -2592,10 +2594,10 @@ let map_fold_cont f xs k =
 let check_recordpat_labels loc lbl_pat_list closed record_form =
   match lbl_pat_list with
   | [] -> ()                            (* should not happen *)
-  | (_, label1, _, _) :: _ ->
+  | (_, label1, _, _, _) :: _ ->
       let all = Lazy.force label1.lbl_all in
       let defined = Array.make (Iarray.length all) false in
-      let check_defined (_, label, _, _) =
+      let check_defined (_, label, _, _, _) =
         if defined.(label.lbl_pos)
         then raise(Error(loc, Env.empty, Label_multiply_defined label.lbl_name))
         else defined.(label.lbl_pos) <- true in
@@ -2818,7 +2820,7 @@ let as_comp_pattern
 let components_have_label (labeled_components : (string option * 'a) list) =
   List.exists (function Some _, _ -> true | _ -> false) labeled_components
 
-let forbid_atomic_field_patterns loc penv (label_lid, label, _, pat) =
+let forbid_atomic_field_patterns loc penv (label_lid, label, _, _, pat) =
   (* Pattern-matching under atomic record fields is not allowed. We
      still allow wildcard patterns, so that it is valid to list all
      record fields exhaustively. *)
@@ -3001,7 +3003,7 @@ and type_pat_aux
           raise (Error (loc, !!penv, error))
       in
       let type_label_pat (label_lid, label, sarg) =
-        let ty_arg =
+        let { lbl_arg = ty_arg; _ } as updated_lbl =
           solve_Ppat_record_field ~refine:false loc penv label label_lid
             record_ty record_form in
         check_project_mutability ~loc ~env:!!penv (Record_field label.lbl_name)
@@ -3021,19 +3023,72 @@ and type_pat_aux
           | Error err -> raise (Error (label.lbl_loc, !!penv,
                                        Field_projection_not_rep (ty_arg, err)))
         in
-        (label_lid, label, ty_sort, type_pat tps Value ~alloc_mode sarg ty_arg
-          ty_sort)
+        (label_lid, label, updated_lbl, ty_sort,
+          type_pat tps Value ~alloc_mode sarg ty_arg ty_sort)
       in
       let make_record_pat
-            (lbl_pat_list : (_ * rep gen_label_description * _ * _) list) =
+            (lbl_pat_list : (_ * rep gen_label_description * rep gen_label_description * _ * _) list) =
         check_recordpat_labels loc lbl_pat_list closed record_form;
         let rep = match lbl_pat_list with
           | [] -> assert false
-          | (_, lbl, _, _) :: _ ->
-              representation_for_label !!penv lbl record_form ~loc
+          | (_, _, updated_lbl, _, _) :: _ ->
+              representation_for_label !!penv updated_lbl record_form ~loc
                 ~containing_type:record_ty
         in
         List.iter (forbid_atomic_field_patterns loc penv) lbl_pat_list;
+        let all_lbls, all_updated_lbls = match lbl_pat_list with
+          | [] -> assert false
+          | (_, label, updated_lbl, _, _) :: _ ->
+              Lazy.force label.lbl_all, Lazy.force updated_lbl.lbl_all
+        in
+        let explicit_lbl_pats =
+          Array.make (Iarray.length all_updated_lbls) None
+        in
+        List.iter
+          (fun (loc, lbl, _, a, pat) ->
+             explicit_lbl_pats.(lbl.lbl_pos) <- Some (loc, lbl, a, pat))
+          lbl_pat_list;
+        let lbl_pat_list : (_ * rep gen_label_description * _ * _) list =
+          Iarray.mapi
+            (fun i updated_lbl ->
+               match explicit_lbl_pats.(i) with
+               | Some lbl_pat -> lbl_pat
+               | None ->
+                   (* Use the non-updated labels so that the returned labels are
+                      consistent with each other *)
+                   let lid =
+                     Longident.Lident updated_lbl.lbl_name |> Location.mknoloc
+                   in
+                   let lbl = all_lbls.:(i) in
+                   let sort =
+                     (* [updated_lbl] doesn't have an updated sort so don't
+                        bother using it *)
+                     match lbl.lbl_sort with
+                     | None ->
+                         begin match
+                           type_sort ~why:Field_projection ~fixed:false !!penv
+                             updated_lbl.lbl_arg
+                         with
+                         | Ok sort -> sort
+                         | Error e ->
+                             raise (Error (loc, !!penv,
+                                           Field_projection_not_rep(
+                                             updated_lbl.lbl_arg, e)))
+                         end
+                     | Some sort -> sort |> Jkind.Sort.of_const
+                   in
+                   let pat =
+                     {
+                       pat_desc = Tpat_any; pat_loc = Location.none;
+                       pat_extra = []; pat_type = updated_lbl.lbl_arg;
+                       pat_attributes = []; pat_env = !!penv;
+                       pat_unique_barrier = Unique_barrier.not_computed ()
+                     }
+                   in
+                   lid, lbl, sort, pat)
+            all_updated_lbls
+          |> Iarray.to_list
+        in
         let pat_desc = match record_form with
           | Legacy ->
             Tpat_record (lbl_pat_list, rep, closed)
@@ -3847,7 +3902,7 @@ let rec check_counter_example_pat
         (record_form : rep record_form) =
     let record_ty = generic_instance expected_ty in
     let type_label_pat (label_lid, label, sort, targ) k =
-      let ty_arg =
+      let { lbl_arg = ty_arg; _ } =
         solve_Ppat_record_field ~refine loc penv label label_lid record_ty
           record_form in
       check_rec targ ty_arg (fun arg -> k (label_lid, label, sort, arg))
