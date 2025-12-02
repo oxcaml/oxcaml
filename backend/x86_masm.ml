@@ -49,13 +49,8 @@ let string_of_datatype_ptr = function
   | PROC -> "PROC PTR "
 
 let arg_mem b { arch; typ; idx; scale; base; sym; displ } =
-  let string_of_gpr =
-    match arch with X86 -> string_of_reg32 | X64 -> string_of_reg64
-  in
-  let string_of_reg_idx = function
-    | Scalar reg -> string_of_gpr reg
-    | Vector reg -> string_of_regf reg
-  in
+  let string_of_gpr = string_of_gpr arch in
+  let string_of_reg_idx = string_of_reg_idx arch in
   Buffer.add_string b (string_of_datatype_ptr typ);
   Buffer.add_char b '[';
   (match sym with None -> () | Some s -> Buffer.add_string b s);

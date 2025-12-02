@@ -212,7 +212,7 @@ let ext_to_string : ext -> string = function
 let exts_to_string exts =
   Array.map ext_to_string exts |> Array.to_list |> String.concat ", "
 
-module Width = struct
+module Layout = struct
   type reg =
     | R8
     | R16
@@ -238,18 +238,18 @@ let loc_register_width = function
   | Pin _ -> None
   | Temp temps ->
     let width = ref None in
-    let set (w : Width.reg) =
+    let set w =
       assert (Option.is_none !width);
       width := Some w
     in
     Array.iter
       (function
-        | R8 -> set Width.R8
-        | R16 -> set Width.R16
-        | R32 -> set Width.R32
-        | R64 | MM -> set Width.R64
-        | XMM -> set Width.R128
-        | YMM -> set Width.R256
+        | R8 -> set Layout.R8
+        | R16 -> set Layout.R16
+        | R32 -> set Layout.R32
+        | R64 | MM -> set Layout.R64
+        | XMM -> set Layout.R128
+        | YMM -> set Layout.R256
         | M8 | M16 | M32 | M64 | M128 | M256 | VM32X | VM32Y | VM64X | VM64Y ->
           ())
       temps;
@@ -259,22 +259,22 @@ let loc_memory_width = function
   | Pin _ -> assert false
   | Temp temps ->
     let width = ref None in
-    let set (w : Width.mem) =
+    let set w =
       assert (Option.is_none !width);
       width := Some w
     in
     Array.iter
       (function
-        | M8 -> set Width.M8
-        | M16 -> set Width.M16
-        | M32 -> set Width.M32
-        | M64 -> set Width.M64
-        | M128 -> set Width.M128
-        | M256 -> set Width.M256
-        | VM32X -> set Width.M32X
-        | VM32Y -> set Width.M32Y
-        | VM64X -> set Width.M64X
-        | VM64Y -> set Width.M64Y
+        | M8 -> set Layout.M8
+        | M16 -> set Layout.M16
+        | M32 -> set Layout.M32
+        | M64 -> set Layout.M64
+        | M128 -> set Layout.M128
+        | M256 -> set Layout.M256
+        | VM32X -> set Layout.M32X
+        | VM32Y -> set Layout.M32Y
+        | VM64X -> set Layout.M64X
+        | VM64Y -> set Layout.M64Y
         | R8 | R16 | R32 | R64 | MM | XMM | YMM -> ())
       temps;
     Option.get !width

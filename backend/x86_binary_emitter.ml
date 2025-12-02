@@ -535,19 +535,19 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
                 match offset with
                 | OImm8 offset8 -> buf_int8L b offset8
                 | _ -> assert false)
-            | _, 1, OImm8 0L ->
+            | Scalar _, 1, OImm8 0L ->
                 (* to 0x00(%r??) except %rsp and %rbp *)
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)
                          ~rexb:(rexb_rm idx) ~rexx:0;
                 buf_opcodes b opcodes;
                 buf_int8 b (mod_rm_reg 0b00 idx reg)
-            | _, 1, OImm8 offset8 ->
+            | Scalar _, 1, OImm8 offset8 ->
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)
                          ~rexb:(rexb_rm idx) ~rexx:0;
                 buf_opcodes b opcodes;
                 buf_int8 b (mod_rm_reg 0b01 idx reg);
                 buf_int8L b offset8
-            | _, 1, OImm32 (sym, offset) ->
+            | Scalar _, 1, OImm32 (sym, offset) ->
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)
                          ~rexb:(rexb_rm idx) ~rexx:0;
                 buf_opcodes b opcodes;

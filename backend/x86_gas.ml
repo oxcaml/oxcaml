@@ -34,13 +34,8 @@ let opt_displ b displ =
   else bprintf b "%d" displ
 
 let arg_mem b { arch; typ = _; idx; scale; base; sym; displ } =
-  let string_of_gpr =
-    match arch with X86 -> string_of_reg32 | X64 -> string_of_reg64
-  in
-  let string_of_reg_idx = function
-    | Scalar reg -> string_of_gpr reg
-    | Vector reg -> string_of_regf reg
-  in
+  let string_of_gpr = string_of_gpr arch in
+  let string_of_reg_idx = string_of_reg_idx arch in
   (match sym with
   | None ->
     if displ <> 0 || scale = 0 then Buffer.add_string b (Int.to_string displ)

@@ -2,6 +2,7 @@
 
 open! Utils
 open! Utils256
+open Builtins
 
 type void : void
 type addr = nativeint#
@@ -310,8 +311,8 @@ module AVX2 = struct
         ~scale:#4L
         ~onto:(Int32s.to_int32x4 9l 10l 11l 12l)
         ~idx:(int64x2_of_int64s 7L 5L)
-        ~mask:(Int32s.to_int32x4 (-1l) 0l 0l 0l) in
-    (* Top half is zeroed *)
+        (* Top half is zeroed regardless of mask *)
+        ~mask:(Int32s.to_int32x4 (-1l) 0l 0l (-1l)) in
     eq_int32x4 ~result:x ~expect:(Int32s.to_int32x4 8l 10l 0l 0l);
     let x = vec256_gather32_index32 mem
         ~scale:#4L
@@ -323,6 +324,36 @@ module AVX2 = struct
         ~scale:#4L
         ~onto:(Int32s.to_int32x4 9l 10l 11l 12l)
         ~idx:(int64x4_of_int64s 7L 5L 3L 1L)
+        ~mask:(Int32s.to_int32x4 (-1l) (-1l) (-1l) 0l) in
+    eq_int32x4 ~result:x ~expect:(Int32s.to_int32x4 8l 6l 4l 12l)
+
+  (* Same as above, but half scale and double indices *)
+  let () =
+    let mem = aligned_alloc ~align:#32n ~size:#32n in
+    let _ = Avx.store_aligned32 mem (Int32s.to_int32x8 1l 2l 3l 4l 5l 6l 7l 8l) in
+    let x = vec128_gather32_index32 mem
+        ~scale:#2L
+        ~onto:(Int32s.to_int32x4 9l 10l 11l 12l)
+        ~idx:(Int32x4.slli 1 (Int32s.to_int32x4 7l 5l 3l 1l))
+        ~mask:(Int32s.to_int32x4 (-1l) (-1l) (-1l) 0l) in
+    eq_int32x4 ~result:x ~expect:(Int32s.to_int32x4 8l 6l 4l 12l);
+    let x = vec128_gather32_index64 mem
+        ~scale:#2L
+        ~onto:(Int32s.to_int32x4 9l 10l 11l 12l)
+        ~idx:(Int64x2.slli 1 (int64x2_of_int64s 7L 5L))
+        (* Top half is zeroed regardless of mask *)
+        ~mask:(Int32s.to_int32x4 (-1l) 0l 0l (-1l)) in
+    eq_int32x4 ~result:x ~expect:(Int32s.to_int32x4 8l 10l 0l 0l);
+    let x = vec256_gather32_index32 mem
+        ~scale:#2L
+        ~onto:(Int32s.to_int32x8 9l 10l 11l 12l 13l 14l 15l 16l)
+        ~idx:(Int32x8.slli 1 (Int32s.to_int32x8 7l 5l 3l 1l 0l 2l 4l 6l))
+        ~mask:(Int32s.to_int32x8 (-1l) (-1l) (-1l) 0l 0l (-1l) (-1l) (-1l)) in
+    eq_int32x8 ~result:x ~expect:(Int32s.to_int32x8 8l 6l 4l 12l 13l 3l 5l 7l);
+    let x = vec256_gather32_index64 mem
+        ~scale:#2L
+        ~onto:(Int32s.to_int32x4 9l 10l 11l 12l)
+        ~idx:(Int64x4.slli 1 (int64x4_of_int64s 7L 5L 3L 1L))
         ~mask:(Int32s.to_int32x4 (-1l) (-1l) (-1l) 0l) in
     eq_int32x4 ~result:x ~expect:(Int32s.to_int32x4 8l 6l 4l 12l)
 
@@ -342,6 +373,7 @@ module AVX2 = struct
     let x = vec128_gather64_index32 mem
         ~scale:#8L
         ~onto:(int64x2_of_int64s 5L 6L)
+        (* Top half is ignored *)
         ~idx:(Int32s.to_int32x4 3l 1l 0l 0l)
         ~mask:(int64x2_of_int64s (-1L) 0L) in
     eq_int64x2 ~result:x ~expect:(int64x2_of_int64s 4L 6L);
@@ -364,4 +396,33 @@ module AVX2 = struct
         ~mask:(int64x4_of_int64s (-1L) 0L (-1L) 0L) in
     eq_int64x4 ~result:x ~expect:(int64x4_of_int64s 4L 6L 2L 8L)
 
+  (* Same as above, but half scale and double indices *)
+  let () =
+    let mem = aligned_alloc ~align:#32n ~size:#32n in
+    let _ = Avx.store_aligned mem (int64x4_of_int64s 1L 2L 3L 4L) in
+    let x = vec128_gather64_index32 mem
+        ~scale:#4L
+        ~onto:(int64x2_of_int64s 5L 6L)
+        (* Top half is ignored *)
+        ~idx:(Int32x4.slli 1 (Int32s.to_int32x4 3l 1l 0l 0l))
+        ~mask:(int64x2_of_int64s (-1L) 0L) in
+    eq_int64x2 ~result:x ~expect:(int64x2_of_int64s 4L 6L);
+    let x = vec128_gather64_index64 mem
+        ~scale:#4L
+        ~onto:(int64x2_of_int64s 5L 6L)
+        ~idx:(Int64x2.slli 1 (int64x2_of_int64s 3L 1L))
+        ~mask:(int64x2_of_int64s (-1L) 0L) in
+    eq_int64x2 ~result:x ~expect:(int64x2_of_int64s 4L 6L);
+    let x = vec256_gather64_index32 mem
+        ~scale:#4L
+        ~onto:(int64x4_of_int64s 5L 6L 7L 8L)
+        ~idx:(Int32x4.slli 1 (Int32s.to_int32x4 3l 2l 1l 0l))
+        ~mask:(int64x4_of_int64s (-1L) 0L (-1L) 0L) in
+    eq_int64x4 ~result:x ~expect:(int64x4_of_int64s 4L 6L 2L 8L);
+    let x = vec256_gather64_index64 mem
+        ~scale:#4L
+        ~onto:(int64x4_of_int64s 5L 6L 7L 8L)
+        ~idx:(Int64x4.slli 1 (int64x4_of_int64s 3L 2L 1L 0L))
+        ~mask:(int64x4_of_int64s (-1L) 0L (-1L) 0L) in
+    eq_int64x4 ~result:x ~expect:(int64x4_of_int64s 4L 6L 2L 8L)
 end
