@@ -20,14 +20,49 @@
 - : <[float]> expr = <[3.14]>
 |}];;
 
+<[ 'x' ]>;;
+[%%expect {|
+- : <[char]> expr = <['x']>
+|}];;
+
+<[ '\n' ]>;;
+[%%expect {|
+- : <[char]> expr = <['
+']>
+|}];;
+
 <[ "foo" ]>;;
 [%%expect {|
 - : <[string]> expr = <["foo"]>
 |}];;
 
+<[ "\b\n\t" ]>;;
+[%%expect {|
+- : <[string]> expr = <["
+	"]>
+|}];;
+
 <[ {foo|bar|foo} ]>;;
 [%%expect {|
 - : <[string]> expr = <[{foo|bar|foo}]>
+|}];;
+
+(* Cannot introduce line breaks across quoted strings - default [pp_margin] is 78.
+   This is a silly counter-example to a [pp_open_box] after the quote identifier,
+   but an easy one to construct. *)
+<[ {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|foobar|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx} ]>;;
+[%%expect {|
+- : <[string]> expr =
+<[
+  {xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|
+  foobar|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+]>
+|}];;
+
+(* No escaping in quoted strings *)
+<[ {foo|\b\n\t|foo} ]>;;
+[%%expect {|
+- : <[string]> expr = <[{foo|\b\n\t|foo}]>
 |}];;
 
 <[ true ]>;;
@@ -755,4 +790,19 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 <[ raise Out_of_fibers ]>;;
 [%%expect {|
 - : 'a expr = <[Stdlib.raise Out_of_fibers]>
+|}];;
+
+<[ fun (f : x:'a -> ?y:'b -> 'c -> unit) x y z -> f ~x ?y:None z ]>
+[%%expect {|
+- : <[
+     (x:$('a) -> ?y:$('b) -> $('c) -> unit) ->
+     $('a) -> $('d) -> $('c) -> unit]>
+    expr
+= <[fun (f : ~x:'a -> ?y:'b -> 'c -> unit) x y z -> f ~x:x ?y:None z]>
+|}];;
+
+<[ fun x -> function None -> 0 | Some x -> x ]>
+[%%expect {|
+- : <[$('a) -> int option -> int]> expr =
+<[function | None -> 0 | Some (x) -> x]>
 |}];;
