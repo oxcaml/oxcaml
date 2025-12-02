@@ -1048,7 +1048,7 @@ let has_poly_constraint spat =
   match spat.ppat_desc with
   | Ppat_constraint(_, Some styp, _) -> begin
       match styp.ptyp_desc with
-      | Ptyp_poly _ -> true
+      | Ptyp_poly _ | Ptyp_repr _ -> true
       | _ -> false
     end
   | _ -> false

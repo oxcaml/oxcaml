@@ -398,7 +398,7 @@ let rec core_type i ppf x =
       core_type i ppf t
   | Ttyp_repr (lv, ct) ->
       line i ppf "Ttyp_repr%a\n"
-        (fun ppf -> List.iter (Pprintast.tyvar ppf)) lv;
+        (fun ppf -> List.iter (typevar_jkind ~print_quote:true ppf)) lv;
       core_type i ppf ct
   | Ttyp_of_kind jkind ->
       line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;

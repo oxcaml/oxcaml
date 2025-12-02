@@ -1086,7 +1086,7 @@ let core_type sub ct =
     | Ttyp_quote t -> Ptyp_quote (sub.typ sub t)
     | Ttyp_splice t -> Ptyp_splice (sub.typ sub t)
     | Ttyp_repr (list, ct) ->
-        let bound_vars = List.map (fun v -> mkloc v loc) list in
+        let bound_vars = List.map (fun (v, _) -> mkloc v loc) list in
         Ptyp_repr (bound_vars, sub.typ sub ct)
     | Ttyp_of_kind jkind -> Ptyp_of_kind jkind
     | Ttyp_call_pos ->
