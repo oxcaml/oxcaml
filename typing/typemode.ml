@@ -356,7 +356,7 @@ let transl_mod_bounds annots =
       raw_modifiers.externality
   in
   let crossing = Crossing.modality modality Crossing.max in
-  create crossing ~externality, (raw_modifiers.separability, raw_modifiers.nullability)
+  create crossing ~externality, (raw_modifiers.nullability, raw_modifiers.separability)
 
 let default_mode_annots (annots : Alloc.Const.Option.t) =
   (* [forkable] has a different default depending on whether [areality]
@@ -599,20 +599,12 @@ let untransl_mod_bounds (bounds : Types.Jkind_mod_bounds.t) : Parsetree.modes =
            in
            { Location.txt = Parsetree.Mode s; loc = Location.none })
   in
-  let nonmodal_annots =
-    let open Types.Jkind_mod_bounds in
-    let mk_annot default print value =
-      if value = default
-      then None
-      else
-        let s = Format.asprintf "%a" print value in
-        Some { Location.txt = Parsetree.Mode s; loc = Location.none }
-    in
-    [ mk_annot Externality.max Externality.print (externality bounds);
-      mk_annot Nullability.max Nullability.print (nullability bounds) ]
-    |> List.filter_map Fun.id
-  in
-  modality_annots @ nonmodal_annots
+  let externality = Types.Jkind_mod_bounds.externality bounds in
+  if externality = Externality.max
+  then modality_annots
+  else
+    modality_annots
+    @ [ Location.mknoloc (Parsetree.Mode (Externality.to_string externality)) ]
 
 let sort_dedup_modalities ~warn l =
   let open Modality in

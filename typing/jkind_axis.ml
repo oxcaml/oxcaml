@@ -15,6 +15,8 @@
 module type Axis_ops = sig
   include Mode_intf.Lattice
 
+  val to_string : t -> string
+
   val less_or_equal : t -> t -> Misc.Le_result.t
 
   val equal : t -> t -> bool
@@ -39,10 +41,12 @@ module Externality = struct
   let less_or_equal s1 s2 : Misc.Le_result.t =
     if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
 
-  let print ppf = function
-    | External -> Format.fprintf ppf "external_"
-    | External64 -> Format.fprintf ppf "external64"
-    | Internal -> Format.fprintf ppf "internal"
+  let to_string = function
+    | External -> "external_"
+    | External64 -> "external64"
+    | Internal ->"internal"
+
+  let print ppf t = Format.fprintf ppf "%s" (to_string t)
 
   let upper_bound_if_is_always_gc_ignorable () =
     (* We check that we're compiling to (64-bit) native code before counting

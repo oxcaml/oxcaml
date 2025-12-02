@@ -16,6 +16,8 @@
 module type Axis_ops = sig
   include Mode_intf.Lattice
 
+  val to_string : t -> string
+
   val less_or_equal : t -> t -> Misc.Le_result.t
 
   val equal : t -> t -> bool
@@ -40,11 +42,6 @@ module Nullability : sig
     | Maybe_null
 
   include Axis_ops with type t := t
-
-  (* CR zeisbach: edit that interface to include this stuff.
-     and then figure out what to do with externality.
-     and probably fix the scannable axes interface too when I do that... *)
-  val to_string : t -> string
 end
 
 module Separability : sig
@@ -55,12 +52,7 @@ module Separability : sig
     | Separable
     | Maybe_separable
 
-  (* CR layouts-scannable: This included module may get refined over time.
-     There are more operations that make sense here. But also, this will
-     probably change as more things get refactored. Seems ok for now. *)
   include Axis_ops with type t := t
-
-  val to_string : t -> string
 
   (* CR layouts-scannable: As more axes are ported, consider adding [is_max]
      to the [Axis_ops] signature (which helps with printing) *)

@@ -95,7 +95,8 @@ module Scannable_axes = struct
 
   let immediate_axes = { nullability = Non_null; separability = Non_pointer }
 
-  let immediate64_axes = { nullability = Non_null; separability = Non_pointer64 }
+  let immediate64_axes =
+    { nullability = Non_null; separability = Non_pointer64 }
 
   let equal { nullability = n1; separability = s1 }
       { nullability = n2; separability = s2 } =
@@ -127,7 +128,9 @@ module Scannable_axes = struct
      it has to have Axis_ops. I should probably refactor that anyways, then
      this isn't a problem. I'd rather do that then print out something *)
   let print _ _ = failwith "FIXME"
-  (*= Separability.print ppf separability *)
+
+  (* CR zeisbach: fix this one too obviously *)
+  let to_string _ = failwith "FIXME"
 
   let to_string_list_diff
       ~base:{ nullability = n_against; separability = s_against }
@@ -194,7 +197,9 @@ module Layout = struct
             { nullability = Non_null; separability = Non_pointer } )
 
       let scannable_non_null_non_pointer64 =
-        Base (Sort.Scannable, { nullability = Non_null; separability = Non_pointer64 })
+        Base
+          ( Sort.Scannable,
+            { nullability = Non_null; separability = Non_pointer64 } )
 
       let scannable_non_null_non_float =
         Base
@@ -2221,14 +2226,7 @@ module Const = struct
           then Externality.max
           else Mod_bounds.externality actual
         in
-        let nullability =
-          if Nullability.equal
-               (Mod_bounds.nullability base)
-               (Mod_bounds.nullability actual)
-          then Nullability.max
-          else Mod_bounds.nullability actual
-        in
-        Some (Mod_bounds.create crossing_diff ~externality ~nullability)
+        Some (Mod_bounds.create crossing_diff ~externality)
 
     let get_modal_bounds ~(base : Mod_bounds.t) (actual : Mod_bounds.t) =
       match diff base actual with
@@ -2864,9 +2862,7 @@ let has_with_bounds (type r) (t : (_ * r) jkind) =
 (* construction *)
 
 let of_new_sort_var ~why ~level =
-  let jkind, sort =
-    Jkind_desc.of_new_sort_var ~level Scannable_axes.max
-  in
+  let jkind, sort = Jkind_desc.of_new_sort_var ~level Scannable_axes.max in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
 let of_new_sort ~why ~level = fst (of_new_sort_var ~why ~level)
@@ -2880,7 +2876,7 @@ let of_new_legacy_sort_var ~why ~level =
 let of_new_non_float_sort_var ~why ~level =
   let jkind, sort =
     Jkind_desc.of_new_sort_var ~level
-      { nullability = ~level Maybe_null; separability = Non_float }
+      { nullability = Maybe_null; separability = Non_float }
   in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
