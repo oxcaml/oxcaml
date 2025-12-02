@@ -2317,10 +2317,10 @@ module Const = struct
   (*******************************)
   (* converting user annotations *)
 
-  let set_nullability ~abbrev nul t =
+  let set_nullability ~abbrev (nul : Nullability.t Location.loc option) t =
     match nul with
     | None -> t
-    | Some (new_nullability, loc) ->
+    | Some { txt = new_nullability; loc } ->
       (match Layout.Const.get_root_scannable_axes t.layout with
       | None -> ()
       | Some { nullability; separability = _ } ->
@@ -2332,10 +2332,10 @@ module Const = struct
       in
       { t with layout = new_layout }
 
-  let set_separability ~abbrev sep t =
+  let set_separability ~abbrev (sep : Separability.t Location.loc option) t =
     match sep with
     | None -> t
-    | Some (new_separability, loc) ->
+    | Some { txt = new_separability; loc } ->
       (match Layout.Const.get_root_scannable_axes t.layout with
       | None -> ()
       | Some { nullability = _; separability } ->
@@ -2365,11 +2365,12 @@ module Const = struct
   let transl_scannable_axes sa_annots =
     let set_or_warn ~loc ~to_ ~to_string cur_axis =
       match cur_axis with
-      | Some (overridden_by, _overriding_loc) ->
+      | Some overridden_by ->
         Location.prerr_warning loc
-          (Warnings.Overridden_kind_modifier (to_string overridden_by));
+          (Warnings.Overridden_kind_modifier
+             (to_string (Location.get_txt overridden_by)));
         cur_axis
-      | None -> Some (to_, loc)
+      | None -> Some (Location.mkloc to_ loc)
     in
     (* This will compute and report errors from right-to-left, which enables
        better error messages while traversing the list only once. It comes at
@@ -2453,30 +2454,16 @@ module Const = struct
         Typemode.transl_mod_bounds modifiers
       in
       let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
-      (* CR layouts-scannable: There are no warnings that are raised when these
-         annotations are redundant/etc, since any warnings would be reported
-         3 times. If callers only call this function once before the old syntax
-         is deprecated, additional warnings should be added here. *)
-      (* CR zeisbach: this organization is not great! I mean, it's just a
-         stop-gap, but maybe it should be improved if the road to turning off
-         the old syntax is still long. *)
-      let layout =
-        match nullability with
-        | None -> base.layout
-        | Some nullability ->
-          (* CR zeisbach: is there a way to get rid of this const helper?
-             a call above could be replaced with set_root_sa but this can't *)
-          Layout.Const.set_root_nullability base.layout
-            (Location.get_txt nullability)
-      in
-      let layout =
-        match separability with
-        | None -> layout
-        | Some separability ->
-          Layout.Const.set_root_separability layout
-            (Location.get_txt separability)
-      in
-      { layout; mod_bounds; with_bounds = No_with_bounds }
+      { layout = base.layout; mod_bounds; with_bounds = No_with_bounds }
+      (* CR zeisbach: these errors aren't getting reported anyways, so
+         [~abbrev:""] doesn't really matter now. the cases where there isn't
+         a base abbreviation is the same as the cases where scannable axes
+         don't make sense, so maybe there is a way to drill down?
+         But thinking about this before the warnings are enabled is pointless,
+         and we may want to depr syntax first? OR, we just say that this
+         actually shouldn't warn as to not break backwards compatibility *)
+      |> set_nullability ~abbrev:"" nullability
+      |> set_separability ~abbrev:"" separability
     | Pjk_product ts ->
       let jkinds =
         List.map (of_user_written_annotation_unchecked_level context) ts
