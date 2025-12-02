@@ -447,10 +447,10 @@ let () =
   assert (I.equal (unsigned_mod (id #0xFFFF_FFFF_FFFF_FFFFn) (id #256n)) #255n);
 
   (* Test div-by-minus-one optimization does not occur *)
-  assert (I.equal (unsigned_div #42n minus_one) #0x0n);
-  assert (I.equal (unsigned_div #42n (id minus_one)) #0x0n);
-  assert (I.equal (unsigned_div (id #42n) minus_one) #0x0n);
-  assert (I.equal (unsigned_div (id #42n) (id minus_one)) #0x0n);
+  assert (I.equal (unsigned_div #42n minus_one) #0n);
+  assert (I.equal (unsigned_div #42n (id minus_one)) #0n);
+  assert (I.equal (unsigned_div (id #42n) minus_one) #0n);
+  assert (I.equal (unsigned_div (id #42n) (id minus_one)) #0n);
   assert (I.equal (unsigned_mod #42n minus_one) #42n);
   assert (I.equal (unsigned_mod #42n (id minus_one)) #42n);
   assert (I.equal (unsigned_mod (id #42n) minus_one) #42n);
