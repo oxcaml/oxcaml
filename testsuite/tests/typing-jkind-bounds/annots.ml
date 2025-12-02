@@ -152,12 +152,13 @@ Line 1, characters 32-41:
 Error: The externality axis has already been specified.
 |}]
 
+(* CR layouts-scannable: Currently, this syntax is being parsed into scannable
+   axes without reporting errors. This test previously reported an error. If the
+   warnings are enabled before the [mod] syntax is deprecated, then this test
+   should be updated. *)
 type t13 : value mod maybe_null non_null
 [%%expect {|
-Line 1, characters 32-40:
-1 | type t13 : value mod maybe_null non_null
-                                    ^^^^^^^^
-Error: The nullability axis has already been specified.
+type t13
 |}]
 
 type t14 : value mod unique aliased

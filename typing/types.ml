@@ -55,7 +55,6 @@ module Jkind_mod_bounds = struct
   type t = {
     crossing : Crossing.t;
     externality: Externality.t;
-    nullability: Nullability.t;
   }
 
   let crossing t = t.crossing
@@ -72,21 +71,17 @@ module Jkind_mod_bounds = struct
   let visibility = Crossing.Axis.Monadic Visibility
   let staticity = Crossing.Axis.Monadic Staticity
   let[@inline] externality t = t.externality
-  let[@inline] nullability t = t.nullability
 
   let[@inline] create
       crossing
-      ~externality
-      ~nullability =
+      ~externality =
     {
       crossing;
       externality;
-      nullability;
     }
 
   let[@inline] set_crossing crossing t = { t with crossing }
   let[@inline] set_externality externality t = { t with externality }
-  let[@inline] set_nullability nullability t = { t with nullability }
 
   let[@inline] set_max_in_set t max_axes =
     let open Jkind_axis.Axis_set in
@@ -112,11 +107,6 @@ module Jkind_mod_bounds = struct
       then Externality.max
       else t.externality
     in
-    let nullability =
-      if mem max_axes (Nonmodal Nullability)
-      then Nullability.max
-      else t.nullability
-    in
     let monadic =
       Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
     in
@@ -128,7 +118,6 @@ module Jkind_mod_bounds = struct
     {
       crossing;
       externality;
-      nullability;
     }
 
   let[@inline] set_min_in_set t min_axes =
@@ -155,11 +144,6 @@ module Jkind_mod_bounds = struct
       then Externality.min
       else t.externality
     in
-    let nullability =
-      if mem min_axes (Nonmodal Nullability)
-      then Nullability.min
-      else t.nullability
-    in
     let monadic =
       Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
     in
@@ -171,7 +155,6 @@ module Jkind_mod_bounds = struct
     {
       crossing;
       externality;
-      nullability;
     }
 
   let[@inline] is_max_within_set t axes =
@@ -192,25 +175,19 @@ module Jkind_mod_bounds = struct
     modal visibility &&
     modal staticity &&
     (not (mem axes (Nonmodal Externality)) ||
-     Externality.(le max (externality t))) &&
-    (not (mem axes (Nonmodal Nullability)) ||
-     Nullability.(le max (nullability t)))
+     Externality.(le max (externality t)))
 
   let max =
     { crossing = Mode.Crossing.max;
-      externality = Externality.max;
-      nullability = Nullability.max }
+      externality = Externality.max }
 
   let[@inline] is_max m = m = max
   let debug_print ppf
         { crossing;
-          externality;
-          nullability } =
-    Format.fprintf ppf "@[{ crossing = %a;@ externality = %a;@ \
-      nullability = %a }@]"
+          externality } =
+    Format.fprintf ppf "@[{ crossing = %a;@ externality = %a }@]"
       Crossing.print crossing
       Externality.print externality
-      Nullability.print nullability
 end
 
 
