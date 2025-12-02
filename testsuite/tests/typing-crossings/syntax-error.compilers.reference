@@ -1,0 +1,83 @@
+Line 10, characters 32-33:
+10 | let foo : type a. (a -> a) mod  = fun x -> x;;
+                                     ^
+Error: Syntax error: "crossing expression" expected.
+Line 2, characters 15-16:
+2 | let (x, y) mod = "hello", "world";;
+                   ^
+Error: Syntax error: "crossing expression" expected.
+Line 2, characters 19-20:
+2 | let (x, y) : _ mod = "hello", "world";;
+                       ^
+Error: Syntax error: "crossing expression" expected.
+Line 2, characters 12-13:
+2 | let foo mod = "hello";;
+                ^
+Error: Syntax error: "crossing expression" expected.
+Line 2, characters 27-28:
+2 | let foo = ("hello" : _ mod );;
+                               ^
+Error: Syntax error: "crossing expression" expected.
+Line 2, characters 23-24:
+2 | let foo = ("hello" mod );;
+                           ^
+Error: Syntax error
+val foo : bar:string -> string = <fun>
+Line 5, characters 16-19:
+5 |   foo ~(bar : _ mod )
+                    ^^^
+Error: Syntax error
+Line 4, characters 12-15:
+4 |   foo ~(bar mod )
+                ^^^
+Error: Syntax error
+type r = { a : string; b : string; }
+Line 3, characters 15-18:
+3 | let r = {a : _ mod = "hello";
+                   ^^^
+Error: Syntax error: "}" expected
+Line 3, characters 8-9:
+3 | let r = {a : _ mod = "hello";
+            ^
+  This "{" might be unmatched
+Line 3, characters 5-8:
+3 |   {a mod  = "hello";
+         ^^^
+Error: Syntax error: "}" expected
+Line 3, characters 2-3:
+3 |   {a mod  = "hello";
+      ^
+  This "{" might be unmatched
+Line 5, characters 8-11:
+5 |   ~(bar mod ), ~(biz mod )
+            ^^^
+Error: Syntax error
+Line 4, characters 0-1:
+4 | }
+    ^
+Error: Syntax error: "crossing expression" expected.
+Line 2, characters 12-15:
+2 | let foo ((x mod ), (y@)) = x + y ;;
+                ^^^
+Error: Syntax error: ")" expected
+Line 2, characters 9-10:
+2 | let foo ((x mod ), (y@)) = x + y ;;
+             ^
+  This "(" might be unmatched
+Line 2, characters 16-19:
+2 | let foo ((x : _ mod ), (y : _ mod )) = x + y;;
+                    ^^^
+Error: Syntax error: ")" expected
+Line 2, characters 9-10:
+2 | let foo ((x : _ mod ), (y : _ mod )) = x + y;;
+             ^
+  This "(" might be unmatched
+Line 3, characters 15-16:
+3 |   let (bar mod ) a b = () in
+                   ^
+Error: Syntax error: "crossing expression" expected.
+Line 2, characters 10-38:
+2 | let foo = ("bar" :> int mod contended);;
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Syntax error: "mode annotations" not expected.
+
