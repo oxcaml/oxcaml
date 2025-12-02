@@ -365,8 +365,8 @@ external[@layout_poly] makearray_dynamic_uninit
   : ('a : any mod separable) . int -> 'a array = "%makearray_dynamic_uninit"
 [%%expect{|
 external makearray_dynamic_uninit_local :
-  ('a : any mod separable). int -> 'a array @ local
-  = "%makearray_dynamic_uninit" [@@layout_poly]
+  ('a : any separable). int -> 'a array @ local = "%makearray_dynamic_uninit"
+  [@@layout_poly]
 external makearray_dynamic_uninit : ('a : any separable). int -> 'a array
   = "%makearray_dynamic_uninit" [@@layout_poly]
 |}]

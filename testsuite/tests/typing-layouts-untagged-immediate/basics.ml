@@ -252,10 +252,7 @@ val f6 : (module S6_1) -> t_untagged_immediate = <fun>
 module type S6_2 = sig val x : 'a t_untagged_immediate_id end
 [%%expect{|
 module type S6_2 =
-  sig
-    val x :
-      ('a : untagged_immediate non_float). 'a t_untagged_immediate_id
-  end
+  sig val x : ('a : untagged_immediate). 'a t_untagged_immediate_id end
 |}];;
 
 module type S6_3 = sig val x : int# end
