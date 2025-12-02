@@ -159,6 +159,9 @@ let add_coconstructor_dep t ~base relation ~from =
 let add_propagate_dep t ~if_used ~to_ ~from =
   Graph.add_propagate_dep t.deps ~if_used ~to_ ~from
 
+let add_copropagate_dep t ~if_any_source ~to_ ~from =
+  Graph.add_copropagate_dep t.deps ~if_any_source ~to_ ~from
+
 let add_any_source t x = Graph.add_any_source t.deps x
 
 let add_any_usage t x = Graph.add_any_usage t.deps x
@@ -177,12 +180,12 @@ let add_cond_any_usage t ~(denv : Env.t) simple =
 
 let add_cond_any_source t ~(denv : Env.t) v =
   match denv.current_code_id with
-  | None -> add_any_source t (Code_id_or_name.var v)
+  | None -> add_any_source t v
   | Some code_id ->
     add_propagate_dep t
       ~if_used:(Code_id_or_name.code_id code_id)
       ~from:(Code_id_or_name.name denv.le_monde_exterieur)
-      ~to_:(Code_id_or_name.var v)
+      ~to_:v
 
 let cond_alias t ~(denv : Env.t) ~from ~to_ =
   match denv.current_code_id with

@@ -532,15 +532,16 @@ let mk_no_flambda2_reaper f =
 
 let mk_reaper_preserve_direct_calls f =
   ( "-reaper-preserve-direct-calls",
-    Arg.Symbol ([ "never"; "always"; "zero-alloc" ], f),
+    Arg.Symbol ([ "never"; "always"; "zero-alloc"; "auto" ], f),
     Printf.sprintf
       " Choose the direct call preservation strategy of the reaper (Flambda2 \
        only)\n\
       \      Valid values are: \n\
       \       \"never\": do not try to preserve direct calls to old functions;\n\
       \       \"always\": always preserve existing direct calls;\n\
-      \       \"zero-alloc\": preserve direct calls only in zero-alloc checked \
-       functions." )
+      \       \"zero-alloc\": preserve direct calls only in zero-alloc checked;\n\
+      \       \"auto\": preserve direct calls only when the reaper is unable \
+       to identify a set of possibly called functions." )
 
 let mk_reaper_local_fields f =
   ( "-reaper-local-fields",

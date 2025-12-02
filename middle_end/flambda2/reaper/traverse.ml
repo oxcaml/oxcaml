@@ -554,8 +554,11 @@ and traverse_apply denv acc apply : rev_expr =
     (match Apply.callee apply with
     | None -> ()
     | Some callee -> Acc.add_cond_any_usage acc ~denv callee);
-    Acc.add_cond_any_source acc ~denv exn_arg;
-    List.iter (fun param -> Acc.add_cond_any_source acc ~denv param) return_args;
+    Acc.add_cond_any_source acc ~denv (Code_id_or_name.var exn_arg);
+    List.iter
+      (fun param ->
+        Acc.add_cond_any_source acc ~denv (Code_id_or_name.var param))
+      return_args;
     match Apply.call_kind apply with
     | Function _ -> ()
     | Method { obj; kind = _; alloc_mode = _ } ->
@@ -584,14 +587,6 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id; _ } -> (
     (* CR ncourant: think about cross-module propagation *)
-    (* if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
-       then ( let apply_dep = { Traverse_acc.function_containing_apply_expr =
-       denv.current_code_id; apply_code_id = code_id; apply_args = Apply.args
-       apply; apply_closure = Apply.callee apply; params_of_apply_return_cont =
-       return_args; param_of_apply_exn_cont = exn_arg; not_pure_call_witness =
-       calls_are_not_pure } in Acc.add_apply apply_dep acc; if Option.is_some
-       (Apply.callee apply) then add_call_widget function_call) else default_acc
-       acc *)
     let call_widget =
       Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
         ~returns:return_args ~exn:exn_arg
@@ -600,9 +595,31 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
     let is_external =
       not (Compilation_unit.is_current (Code_id.get_compilation_unit code_id))
     in
-    let[@local] add_apply acc =
+    let[@local] add_apply acc ~only_if_closure_any_source =
+      let callee, call_widget =
+        if only_if_closure_any_source
+        then (
+          let callee = Acc.simple_to_node acc ~denv (Option.get callee) in
+          let callee_if_any_source =
+            Variable.create "callee_if_any_source" Flambda_kind.value
+          in
+          let widget_if_any_source =
+            Code_id_or_name.var
+              (Variable.create "widget_if_any_source" Flambda_kind.rec_info)
+          in
+          Acc.add_copropagate_dep acc ~if_any_source:callee ~from:callee
+            ~to_:(Code_id_or_name.var callee_if_any_source);
+          Acc.add_copropagate_dep acc ~if_any_source:callee
+            ~from:widget_if_any_source ~to_:call_widget;
+          Some (Simple.var callee_if_any_source), widget_if_any_source)
+        else callee, call_widget
+      in
       if is_external
-      then default_acc acc
+      then (
+        Acc.add_cond_any_source acc ~denv call_widget;
+        match callee with
+        | None -> ()
+        | Some callee -> Acc.add_cond_any_usage acc ~denv callee)
       else
         let apply_dep =
           { Traverse_acc.function_containing_apply_expr = denv.current_code_id;
@@ -614,24 +631,22 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         Acc.add_apply apply_dep acc
     in
     match callee with
-    | None -> add_apply acc
-    | Some callee ->
-      if is_external
-      then
-        (* External call. We always want to escape the closure here, as we will
-           not be able to recover the code_id from the sources of the closure.
-           [default_acc] escapes everything, including the witness of the
-           closure if it was not, in fact, an external call. *)
-        default_acc acc
-      else (
-        (let closure = Acc.simple_to_node acc ~denv callee in
-         Acc.add_accessor_dep acc ~to_:call_widget
-           (Field.code_of_closure Known_arity_code_pointer)
-           ~base:closure);
-        match denv.should_preserve_direct_calls with
-        | Yes -> add_apply acc
-        | No -> ()
-        | Auto -> failwith "todo"))
+    | None -> add_apply acc ~only_if_closure_any_source:false
+    | Some callee -> (
+      let closure = Acc.simple_to_node acc ~denv callee in
+      Acc.add_accessor_dep acc ~to_:call_widget
+        (Field.code_of_closure Known_arity_code_pointer)
+        ~base:closure;
+      match denv.should_preserve_direct_calls with
+      | Yes -> add_apply acc ~only_if_closure_any_source:false
+      | Auto -> add_apply acc ~only_if_closure_any_source:true
+      | No ->
+        if is_external
+        then
+          (* External call. We always want to escape everything here, as we will
+             not be able to recover the code_id from the sources of the closure,
+             and the call is very likely to indeed be a call to that code_id. *)
+          add_apply acc ~only_if_closure_any_source:false))
   | Function { function_call = Indirect_known_arity _; _ } ->
     let call_widget =
       Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)

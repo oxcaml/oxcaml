@@ -877,9 +877,8 @@ let rewrite_call_kind env (call_kind : Call_kind.t) =
 
 let decide_whether_apply_needs_calling_convention_change env apply =
   let call_kind = rewrite_call_kind env (Apply.call_kind apply) in
-  let code_id_actually_called, call_kind, _should_break_call =
-    let called c alloc_mode call_kind was_indirect_unknown_arity =
-      assert (not was_indirect_unknown_arity);
+  let code_id_actually_called, call_kind =
+    let called c alloc_mode call_kind_if_unknown =
       let code_ids =
         Simple.pattern_match c
           ~const:(fun _ -> Or_unknown.Unknown)
@@ -887,8 +886,18 @@ let decide_whether_apply_needs_calling_convention_change env apply =
             DS.code_id_actually_directly_called env.uses name)
       in
       match code_ids with
-      | Unknown -> None, call_kind, false
+      | Unknown -> None, call_kind_if_unknown
       | Known code_ids ->
+        if Code_id.Set.is_empty code_ids
+        then
+          (* ncourant: I don't think this can happen if the closure is not dead
+             code, in which case we shouldn't even call this function. Failing
+             here is a way to catch bugs that would incorrectly rewrite
+             call_kinds. *)
+          Misc.fatal_errorf
+            "Empty potentially called code_ids while trying to rewrite \
+             call_kind %a@."
+            Call_kind.print call_kind;
         let singleton_code_id = Code_id.Set.get_singleton code_ids in
         let new_call_kind =
           match singleton_code_id with
@@ -897,49 +906,46 @@ let decide_whether_apply_needs_calling_convention_change env apply =
             Call_kind.indirect_function_call_known_arity
               ~code_ids:(Known code_ids) alloc_mode
         in
-        singleton_code_id, new_call_kind, was_indirect_unknown_arity
+        singleton_code_id, new_call_kind
     in
     match call_kind with
     | Function { function_call = Direct code_id; alloc_mode } -> (
       match Apply.callee apply with
-      | None -> Some code_id, call_kind, false
+      | None -> Some code_id, call_kind
       | Some c ->
-        let call_kind =
-          if not
-               (Compilation_unit.is_current
-                  (Code_id.get_compilation_unit code_id))
-          then call_kind
-          else
-            match env.should_preserve_direct_calls with
-            | Yes -> call_kind
-            | No ->
+        let call_kind_if_unknown =
+          match env.should_preserve_direct_calls with
+          | Yes -> call_kind
+          | No ->
+            if not
+                 (Compilation_unit.is_current
+                    (Code_id.get_compilation_unit code_id))
+            then call_kind
+            else
               Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
                 alloc_mode
-            | Auto ->
-              (* In [auto] mode, the direct call is preserved if and only if we
-                 cannot identify which set of code_ids can be called. Since this
-                 is exactly the same situation as the one where we do not
-                 replace the call_kind, we can leave the direct call here. *)
-              call_kind
+          | Auto ->
+            (* In [auto] mode, the direct call is preserved if and only if we
+               cannot identify which set of code_ids can be called. Since this
+               is exactly the same situation as the one where we do not replace
+               the call_kind, we can leave the direct call here. *)
+            call_kind
         in
-        called c alloc_mode call_kind false)
+        called c alloc_mode call_kind_if_unknown)
     | Function { function_call = Indirect_unknown_arity; alloc_mode = _ } ->
-      (* called (Option.get (Apply.callee apply)) alloc_mode call_kind true *)
-      None, call_kind, false
+      (* CR-someday ncourant: when possible, try to identify direct calls. *)
+      None, call_kind
     | Function { function_call = Indirect_known_arity _; alloc_mode } ->
       called
         (Option.get (Apply.callee apply))
         alloc_mode
         (Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
            alloc_mode)
-        false
-    | C_call _ | Method _ | Effect _ -> None, call_kind, false
+    | C_call _ | Method _ | Effect _ -> None, call_kind
   in
   match code_id_actually_called with
   | None -> Not_changing_calling_convention, call_kind
   | Some code_id -> (
-    (* Format.eprintf "CODE ID %a: %a@." (Format.pp_print_option Simple.print)
-       (Apply.callee apply) Code_id.print code_id; *)
     match Code_id.Map.find_opt code_id env.code_deps with
     | None -> Not_changing_calling_convention, call_kind
     | Some _ ->

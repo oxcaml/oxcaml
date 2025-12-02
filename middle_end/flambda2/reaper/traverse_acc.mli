@@ -111,6 +111,13 @@ val add_propagate_dep :
   from:Code_id_or_name.t ->
   unit
 
+val add_copropagate_dep :
+  t ->
+  if_any_source:Code_id_or_name.t ->
+  to_:Code_id_or_name.t ->
+  from:Code_id_or_name.t ->
+  unit
+
 val add_any_usage : t -> Code_id_or_name.t -> unit
 
 val add_any_source : t -> Code_id_or_name.t -> unit
@@ -123,7 +130,7 @@ val simple_to_node : t -> denv:Env.t -> Simple.t -> Code_id_or_name.t
 
 val add_cond_any_usage : t -> denv:Env.t -> Simple.t -> unit
 
-val add_cond_any_source : t -> denv:Env.t -> Variable.t -> unit
+val add_cond_any_source : t -> denv:Env.t -> Code_id_or_name.t -> unit
 
 val add_apply : apply_dep -> t -> unit
 

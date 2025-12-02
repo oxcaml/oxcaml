@@ -586,6 +586,11 @@ let datalog_schedule =
        intended meaning of this rule, that is, an alias if [is_used] is used. *)
     (let$ [if_used; to_; from] = ["if_used"; "to_"; "from"] in
      [any_usage if_used; propagate ~if_used ~to_ ~from] ==> alias ~to_ ~from);
+    (* Likewise, [copropagate] means an alias if [is_any_source] has any
+       source. *)
+    (let$ [if_any_source; to_; from] = ["if_any_source"; "to_"; "from"] in
+     [any_source if_any_source; copropagate ~if_any_source ~to_ ~from]
+     ==> alias ~to_ ~from);
     (* has_usage/has_source *)
     (let$ [x] = ["x"] in
      [any_usage x] ==> has_usage x);
@@ -3521,7 +3526,7 @@ let unknown_code_id_actually_directly_called_query =
 let code_id_actually_directly_called_query =
   query
     (let^$ [closure], [apply_widget; call_witness; codeid] =
-       ["closure"], ["apply_widget"; "call_withness"; "codeid"]
+       ["closure"], ["apply_widget"; "call_witness"; "codeid"]
      in
      [ rev_accessor ~base:closure
          !!(Field.code_of_closure Known_arity_code_pointer)

@@ -57,6 +57,12 @@ module Relations : sig
     from:Code_id_or_name.t term ->
     _ atom
 
+  val copropagate :
+    if_any_source:Code_id_or_name.t term ->
+    to_:Code_id_or_name.t term ->
+    from:Code_id_or_name.t term ->
+    _ atom
+
   val any_usage : Code_id_or_name.t term -> _ atom
 
   val any_source : Code_id_or_name.t term -> _ atom
@@ -89,6 +95,13 @@ val add_coconstructor_dep :
 val add_propagate_dep :
   graph ->
   if_used:Code_id_or_name.t ->
+  to_:Code_id_or_name.t ->
+  from:Code_id_or_name.t ->
+  unit
+
+val add_copropagate_dep :
+  graph ->
+  if_any_source:Code_id_or_name.t ->
   to_:Code_id_or_name.t ->
   from:Code_id_or_name.t ->
   unit
