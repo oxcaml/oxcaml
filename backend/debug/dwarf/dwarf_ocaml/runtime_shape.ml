@@ -44,6 +44,8 @@ module DeBruijn_index = struct
 
   let equal n1 n2 = Int.equal n1 n2
 
+  let hash n = n
+
   let print fmt n = Format.fprintf fmt "%d" n
 end
 
@@ -56,7 +58,10 @@ module DeBruijn_env = struct
 
   let push t x = x :: t
 
-  let is_empty = function [] -> true | _ -> false
+  let equal equal_elem = List.equal equal_elem
+
+  let hash hash_elem l =
+    List.fold_left (fun acc v -> Hashtbl.hash (hash_elem v, acc)) 0 l
 end
 
 type 'a or_void =

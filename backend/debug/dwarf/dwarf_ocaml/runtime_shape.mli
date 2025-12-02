@@ -42,6 +42,8 @@ module DeBruijn_index : sig
 
   val equal : t -> t -> bool
 
+  val hash : t -> int
+
   val print : Format.formatter -> t -> unit
 end
 
@@ -51,11 +53,13 @@ module DeBruijn_env : sig
 
   val empty : 'a t
 
-  val is_empty : 'a t -> bool
-
   val push : 'a t -> 'a -> 'a t
 
   val get_opt : 'a t -> de_bruijn_index:DeBruijn_index.t -> 'a option
+
+  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
+  val hash : ('a -> int) -> 'a t -> int
 end
 
 type 'a or_void =

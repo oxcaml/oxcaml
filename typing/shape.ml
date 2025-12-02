@@ -131,7 +131,14 @@ module Rec_var_ident = struct
   let print fmt n = Format.fprintf fmt "rv%d" n
 end
 
-module Rec_var_env = Map.Make (Rec_var_ident)
+module Rec_var_env = struct
+  include Map.Make (Rec_var_ident)
+
+  let hash hash_value m =
+    fold
+      (fun k v acc -> Hashtbl.hash (Rec_var_ident.hash k, hash_value v, acc))
+      m 0
+end
 
 module Sig_component_kind = struct
   type t =
