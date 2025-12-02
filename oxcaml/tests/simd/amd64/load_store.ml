@@ -2,7 +2,11 @@
 
 open! Utils
 open! Utils256
-open Builtins
+
+module Int32x4 = Builtins.Int32x4
+module Int32x8 = Builtins.Int32x8
+module Int64x2 = Builtins.Int64x2
+module Int64x4 = Builtins.Int64x4
 
 type void : void
 type addr = nativeint#
