@@ -67,18 +67,11 @@ let[@inline] unsigned_to_int t = to_int t land ((1 lsl size) - 1)
 
 external unsigned_compare : int16 -> int16 -> int @@ portable
   = "%int16_unsigned_compare"
-external unsigned_lt : int16 -> int16 -> bool @@ portable
-  = "%int16_unsigned_lessthan"
 
-(* Unsigned division from signed division of the same bitness. See Warren Jr.,
-   Henry S. (2013). Hacker's Delight (2 ed.), Sec 9-3. *)
-let[@inline] unsigned_div n d =
-  if d < zero then if unsigned_lt n d then zero else one
-  else
-    let q = shift_left (div (shift_right_logical n 1) d) 1 in
-    let r = sub n (mul q d) in
-    if unsigned_lt r d then q else succ q
+external unsigned_div : int16 -> int16 -> int16 @@ portable
+  = "%int16_unsigned_div"
+external unsigned_rem : int16 -> int16 -> int16 @@ portable
+  = "%int16_unsigned_mod"
 
-let[@inline] unsigned_rem n d = sub n (mul (unsigned_div n d) d)
 let seeded_hash seed x = Stdlib.Hashtbl.seeded_hash seed (to_int x)
 let hash x = Stdlib.Hashtbl.hash (to_int x)

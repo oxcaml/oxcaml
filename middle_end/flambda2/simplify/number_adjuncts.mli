@@ -98,9 +98,9 @@ module type Int_number_kind = sig
 
     val xor : t -> t -> t
 
-    val div_unsigned : t -> t -> t option
+    val unsigned_div : t -> t -> t option
 
-    val mod_unsigned : t -> t -> t option
+    val unsigned_mod : t -> t -> t option
 
     val shift_left : t -> Target_ocaml_int.t -> t
 

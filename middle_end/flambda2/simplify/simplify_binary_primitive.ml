@@ -327,8 +327,8 @@ end = struct
     | Mul -> always_some I.Num.mul
     | Div Signed -> I.Num.div n1 n2
     | Mod Signed -> I.Num.mod_ n1 n2
-    | Div Unsigned -> I.Num.div_unsigned n1 n2
-    | Mod Unsigned -> I.Num.mod_unsigned n1 n2
+    | Div Unsigned -> I.Num.unsigned_div n1 n2
+    | Mod Unsigned -> I.Num.unsigned_mod n1 n2
     | And -> always_some I.Num.and_
     | Or -> always_some I.Num.or_
     | Xor -> always_some I.Num.xor

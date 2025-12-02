@@ -75,11 +75,11 @@ module type S = sig
 
   val mod_ : t -> t -> t
 
-  val mod_unsigned : t -> t -> t
+  val unsigned_mod : t -> t -> t
 
   val div : t -> t -> t
 
-  val div_unsigned : t -> t -> t
+  val unsigned_div : t -> t -> t
 
   val and_ : t -> t -> t
 
