@@ -21,3 +21,9 @@ val implementation : formatter -> structure -> unit
 
 val implementation_with_coercion :
   formatter -> Typedtree.implementation -> unit
+
+val record_representation :
+  int -> formatter -> Types.record_representation -> unit
+
+val record_unboxed_product_representation :
+  int -> formatter -> Types.record_unboxed_product_representation -> unit

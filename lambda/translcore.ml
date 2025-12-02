@@ -2238,7 +2238,12 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         match repres with
           Record_boxed _ ->
             let shape = List.map must_be_value shape in
-            Lprim(Pmakeblock(0, mut, Some shape, Option.get mode), ll, loc)
+            let mode =
+              match mode with
+              | Some mode -> mode
+              | None -> Misc.fatal_errorf "LOL @@ %a" Location.print_loc (Debuginfo.Scoped_location.to_location loc)
+            in
+            Lprim(Pmakeblock(0, mut, Some shape, mode), ll, loc)
         | Record_inlined (Ordinary {runtime_tag},
                           Constructor_uniform_value, Variant_boxed _) ->
             let shape = List.map must_be_value shape in

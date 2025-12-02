@@ -154,17 +154,13 @@ let expand_representable_labels lbls =
   match lbls with
   | [] -> fatal_error "Matching.expand_representable_labels"
   | ({ lbl_all; _ }, _) :: _ ->
-      (* Since the record has a representation, each label must have a sort *)
-      let get_sort lbl =
-        match lbl.lbl_sort with
-        | None -> fatal_errorf "Unrepresentable label %s" lbl.lbl_name
-        | Some sort -> Jkind.Sort.of_const sort
-      in
-      Lazy.force lbl_all
-      |> Iarray.map (fun lbl -> lbl, get_sort lbl)
-      |> Iarray.to_list
+      if List.length lbls <> Iarray.length (Lazy.force lbl_all) then
+        Misc.fatal_error "missing labels";
+      lbls
 
 let expand_record_head h =
+  (* CR lmaurer: Patterns are now expanded in the typechecker. We should be able
+     to remove this. *)
   let open Patterns.Head in
   match h.pat_desc with
   | Record (lbls, r) ->
@@ -2352,13 +2348,25 @@ let get_pat_args_record_unboxed_product num_fields p rem =
 
 let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
   let loc = head_loc ~scopes head in
-  let all_labels =
+  let fields, rep =
     let open Patterns.Head in
     match head.pat_desc with
-    | Record ((lbl, _) :: _, _) -> Lazy.force lbl.lbl_all
-    | Record ([], _)
+    | Record (fields, rep) -> fields, rep
     | _ ->
         assert false
+  in
+  let all_labels =
+    match fields with
+    | (lbl, _) :: _ -> Lazy.force lbl.lbl_all
+    | [] ->
+        assert false
+  in
+  let all_sorts = Array.make (List.length fields) None in
+  List.iter (fun (lbl, sort) -> all_sorts.(lbl.lbl_pos) <- Some sort) fields;
+  let all_sorts =
+    match Misc.Stdlib.Array.all_somes all_sorts with
+    | Some sorts -> Iarray.of_array sorts
+    | None -> Misc.fatal_error "missing fields"
   in
   let rec make_args pos =
     if pos >= Iarray.length all_labels then
@@ -2367,11 +2375,7 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
       let lbl = all_labels.:(pos) in
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
       let lbl_sort =
-        match lbl.lbl_sort with
-        | None ->
-            (* TODO: Be more confident that this can't happen *)
-            Misc.fatal_errorf "Unexpected unknown sort in label %s" lbl.lbl_name
-        | Some sort -> sort
+        all_sorts.:(pos) |> Jkind.Sort.default_for_transl_and_get
       in
       let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       let sem =
@@ -2379,16 +2383,8 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
       in
       let ubr = Translmode.transl_unique_barrier head.pat_unique_barrier in
       let sem = add_barrier_to_read ubr sem in
-      let lbl_repres =
-        match lbl.lbl_repres with
-        | None ->
-          (* TODO: Be more confident that this can't happen *)
-          Misc.fatal_errorf "Unexpected unknown record representation in label %s"
-            lbl.lbl_name
-        | Some repres -> repres
-      in
       let access, sort, layout =
-        match lbl_repres with
+        match rep with
         | Record_boxed _
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
             Lprim (Pfield (lbl.lbl_pos, ptr, sem), [ arg ], loc),
@@ -2439,7 +2435,8 @@ let get_expr_args_record_unboxed_product ~scopes head
     let open Patterns.Head in
     match head.pat_desc with
     | Record_unboxed_product
-        (({ lbl_all ; lbl_repres = Some (Record_unboxed_product _)}, _) :: _, _) ->
+        (({ lbl_all ; lbl_repres = None | Some (Record_unboxed_product _)}, _)
+         :: _, _) ->
       Lazy.force lbl_all
     | _ ->
       assert false

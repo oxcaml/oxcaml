@@ -1745,9 +1745,9 @@ let instance_label_update' copy_scope ~fixed ~all lbl =
   let _, ty_arg, ty_res = instance_label' copy_scope ~fixed lbl in
   { lbl with lbl_arg = ty_arg; lbl_res = ty_res; lbl_all = all }
 
-let instance_labels_update ~fixed lbls =
+let instance_all_labels_update ~fixed lbls =
   begin fun f ->
-    if (Sys.getenv_opt "NOISY" |> Option.is_some) && Iarray.length lbls > 1 then begin
+    if false && (Sys.getenv_opt "NOISY" |> Option.is_some) && Iarray.length lbls > 1 then begin
       let pp_lbl ppf lbl =
         Format.fprintf ppf "%s : %a" lbl.lbl_name !Btype.printtyp_type_expr_fwd lbl.lbl_arg
       in
@@ -1770,8 +1770,14 @@ let instance_labels_update ~fixed lbls =
     Lazy.force new_lbls
   )
 
+let instance_labels_update ~fixed lbls =
+  let all_lbls =
+    instance_all_labels_update ~fixed (Lazy.force lbls.:(0).lbl_all)
+  in
+  Iarray.map (fun lbl -> all_lbls.:(lbl.lbl_pos)) lbls
+
 let instance_label_update ~fixed lbl =
-  let lbls = instance_labels_update ~fixed (Lazy.force lbl.lbl_all) in
+  let lbls = instance_all_labels_update ~fixed (Lazy.force lbl.lbl_all) in
   lbls.:(lbl.lbl_pos)
 
 (* CR dkalinichenko: we must vary yieldingness together with locality to get

@@ -548,7 +548,6 @@ Line 4, characters 4-33:
 Error: Atomic record fields are not permitted in mixed blocks.
 |}]
 
-
 (* Test atomic record fields with non-value layouts *)
 
 module Non_value_atomic = struct

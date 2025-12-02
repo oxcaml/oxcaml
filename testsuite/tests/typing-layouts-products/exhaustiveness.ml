@@ -43,7 +43,7 @@ Lines 2-4, characters 2-26:
 4 |   | #{ y = B; _ } -> false
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
-#{y=A; x=B}
+#{x=B; y=A}
 
 val g : t -> t -> bool = <fun>
 |}]
@@ -71,7 +71,7 @@ Lines 2-4, characters 2-26:
 4 |   | #{ y = B; _ } -> false
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
-#{y=A; x=B}
+#{x=B; y=A}
 
 val g : t -> t -> bool = <fun>
 |}]

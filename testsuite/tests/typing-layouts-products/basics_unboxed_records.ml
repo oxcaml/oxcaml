@@ -706,7 +706,11 @@ type ('a : any) t = #{ x : int; y : 'a; }
 
 (* CR layouts v7.2: once we allow record declarations with unknown kind (right
    now, ['a] in the decl above is defaulted to value), then this should give an
-   error saying that records being projected from must be representable. *)
+   error saying that records being projected from must be representable.
+
+   Update: The record declaration is now allowed, but it's actually difficult to
+   get that exact error in this situation, since one variable or another needs
+   to be given an unrepresentable type. *)
 let f : ('a : any). 'a t -> 'a = fun t -> t.#y
 [%%expect{|
 Line 1, characters 33-46:

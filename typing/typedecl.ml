@@ -2127,8 +2127,33 @@ let update_record_kind (type rep) env loc (form : rep record_form) lbls
       "Typedecl.update_record_kind: unexpected record representation"
 
 let update_record_representation env loc form lbls rep =
-  let _lbls, rep, _jkind = update_record_kind env loc form lbls rep in
-  rep
+  let lbls, rep, _jkind = update_record_kind env loc form lbls rep in
+  lbls, rep
+
+let update_record_representation_in_label_descriptions env loc form lbls rep =
+  let lds = lbls |> List.map Types.label_declaration_of_label_description in
+  let lds, rep_res = update_record_representation env loc form lds rep in
+  let lbls =
+    match rep_res with
+    | Error _ -> lbls
+    | Ok rep ->
+      (* CR lmaurer: This is really awesome and I'm pleased to be writing this
+         code. Especially the part where we have to track exactly what gets
+         updated by [update_record_representation] and mediate between label
+         descriptions and label declarations. *)
+      let rec new_lbls = lazy begin
+        List.map2
+          (fun lbl ld ->
+             { lbl with lbl_sort = ld.ld_sort;
+                        lbl_repres = Some rep;
+                        lbl_all = new_lbls; })
+          lbls
+          lds
+        |> Iarray.of_list
+      end in
+      Lazy.force new_lbls |> Iarray.to_list
+  in
+  lbls, rep_res
 
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
