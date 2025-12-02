@@ -893,8 +893,16 @@ and comp_binary_scalar_intrinsic :
       | Mul -> prim Mulint |> sign_extend taggable
       | Div ((Safe | Unsafe), Signed) -> prim Divint |> sign_extend taggable
       | Mod ((Safe | Unsafe), Signed) -> prim Modint |> sign_extend taggable
-      | Div ((Safe | Unsafe), Unsigned) -> failwith "CR jrayman"
-      | Mod ((Safe | Unsafe), Unsigned) -> failwith "CR jrayman"
+      | Div ((Safe | Unsafe), Unsigned) ->
+        Prim
+          ( Ccall "caml_int_unsigned_div",
+            [zero_extend taggable x; zero_extend taggable y] )
+        |> sign_extend taggable
+      | Mod ((Safe | Unsafe), Unsigned) ->
+        Prim
+          ( Ccall "caml_int_unsigned_mod",
+            [zero_extend taggable x; zero_extend taggable y] )
+        |> sign_extend taggable
       | And -> prim Andint
       | Or -> prim Orint
       | Xor -> prim Xorint)

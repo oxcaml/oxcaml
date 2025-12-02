@@ -149,11 +149,11 @@ val mul : t -> t -> t
     zero, as specified for {!Stdlib.(/)}. *)
 val div : t -> t -> t
 
-val div_unsigned : t -> t -> t
+val unsigned_div : t -> t -> t
 
 val mod_ : t -> t -> t
 
-val mod_unsigned : t -> t -> t
+val unsigned_mod : t -> t -> t
 
 (** Bitwise logical and. *)
 val and_ : t -> t -> t
