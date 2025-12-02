@@ -25,15 +25,17 @@ open Stdlib_upstream_compatible
 (* This test is auto-generated from the corresponding mutable array test in
    typing-layouts-arrays/ using gen_iarray_test.sh. Do not edit directly.
    See README.md in this test directory. *)
-type boxed_t = float * int * int64
-type unboxed_t = #(float# * int * int64#)
+type boxed_t = float * float * float
 
-let elem : boxed_t elem = Tup3 (float_elem, int_elem, int64_elem)
+type unboxed_t = #(float * float * float)
+
+let elem : boxed_t elem = Tup3 (float_elem, float_elem, float_elem)
+
 let words_wide : int = 3
-let zero () : unboxed_t = #(#0., 0, #0L)
+let zero () : unboxed_t = #(0., 0., 0.)
 
-let to_boxed #(a, b, c) = (Float_u.to_float a, b, Int64_u.to_int64 c)
-let of_boxed (a, b, c) = #(Float_u.of_float a, b, Int64_u.of_int64 c)
+let to_boxed #(a, b, c) = a, b, c
+let of_boxed (a, b, c) = #(a, b, c)
 (* Below here is copy pasted due to the absence of layout polymorphism. Don't
    change it.  See README.md in this test directory. *)
 module Element_ops = (val Gen_product_iarray_helpers.make_element_ops elem)

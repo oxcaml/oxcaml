@@ -1,3 +1,39 @@
+#!/bin/bash
+# Generates an iarray test from a mutable array test.
+#
+# Usage: ./gen_iarray_test.sh <mutable_test.ml> <output_iarray_test.ml>
+#
+# Example:
+#   ./gen_iarray_test.sh ../typing-layouts-arrays/test_ignorable_product_array_1.ml \
+#                        test_ignorable_product_iarray_1.ml
+
+set -e
+
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 <mutable_test.ml> <output_iarray_test.ml>" >&2
+    exit 1
+fi
+
+INPUT="$1"
+OUTPUT="$2"
+
+if [ ! -f "$INPUT" ]; then
+    echo "Error: Input file '$INPUT' not found" >&2
+    exit 1
+fi
+
+# Extract the customizable section between the two marker comments.
+# The customizable section starts after "test directory. *)" and ends before
+# "(* Below here is copy pasted".
+# We use awk to avoid issues with multi-line comments containing similar text.
+CUSTOMIZABLE=$(awk '
+    /test directory\. \*\)/ && !started { started=1; next }
+    /^\(\* Below here is copy pasted/ { exit }
+    started { print }
+' "$INPUT")
+
+# Write the header
+cat > "$OUTPUT" << 'HEADER_EOF'
 (* TEST
  include stdlib_stable;
  include stdlib_upstream_compatible;
@@ -25,15 +61,13 @@ open Stdlib_upstream_compatible
 (* This test is auto-generated from the corresponding mutable array test in
    typing-layouts-arrays/ using gen_iarray_test.sh. Do not edit directly.
    See README.md in this test directory. *)
-type boxed_t = float * int * int64
-type unboxed_t = #(float# * int * int64#)
+HEADER_EOF
 
-let elem : boxed_t elem = Tup3 (float_elem, int_elem, int64_elem)
-let words_wide : int = 3
-let zero () : unboxed_t = #(#0., 0, #0L)
+# Append the customizable section
+echo "$CUSTOMIZABLE" >> "$OUTPUT"
 
-let to_boxed #(a, b, c) = (Float_u.to_float a, b, Int64_u.to_int64 c)
-let of_boxed (a, b, c) = #(Float_u.of_float a, b, Int64_u.of_int64 c)
+# Append the boilerplate
+cat >> "$OUTPUT" << 'BOILERPLATE_EOF'
 (* Below here is copy pasted due to the absence of layout polymorphism. Don't
    change it.  See README.md in this test directory. *)
 module Element_ops = (val Gen_product_iarray_helpers.make_element_ops elem)
@@ -105,3 +139,6 @@ module UTuple_array_boxed = Test_gen_u_iarray.Make_boxed (struct
     end
   end)
 module _ = Test_gen_u_iarray.Test (UTuple_array_boxed)
+BOILERPLATE_EOF
+
+echo "Generated $OUTPUT from $INPUT"

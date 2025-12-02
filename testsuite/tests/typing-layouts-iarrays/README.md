@@ -1,5 +1,6 @@
-This directory has tests for iarrays (immutable arrays) of unboxed types. The tests assume the array
-contains something that is like a number or a product of numbers.
+This directory has tests for iarrays (immutable arrays) of unboxed types. The
+tests assume the array contains something that is like a number or a product of
+numbers.
 
 Using the test framework here still involves a fair amount of copy and paste to
 build your new test. This is mainly because we don't have layout polymorphism,
@@ -24,9 +25,21 @@ be improved.
 ## Unboxed products
 
 The file `gen_product_iarray_helpers.ml` has additional infrastructure for
-testing iarrays of unboxed products. To add a new test, copy one of the existing
-ones (e.g., `test_ignorable_product_iarray_1.ml`) and follow the instructions
-in its comments about which parts you need to edit.
+testing iarrays of unboxed products.
 
-Note that tests in this directory use `%makearray_dynamic` to create mutable arrays
-which are then frozen to create iarrays.
+**Important:** The product iarray tests (`test_*_product_iarray_*.ml`) are
+generated from the corresponding mutable array tests in `typing-layouts-arrays/`
+using the `gen_iarray_test.sh` script. When adding or modifying product tests:
+
+1. Make changes to the mutable array test in `typing-layouts-arrays/`
+2. Regenerate the iarray test using:
+   ```
+   ./gen_iarray_test.sh ../typing-layouts-arrays/test_foo_product_array.ml \
+                        test_foo_product_iarray.ml
+   ```
+
+This ensures the customizable sections (types, conversions) stay in sync between
+mutable and immutable array tests.
+
+Note that tests in this directory use `%makearray_dynamic` to create mutable
+arrays which are then frozen to create iarrays.

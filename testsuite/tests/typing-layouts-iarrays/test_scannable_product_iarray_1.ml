@@ -22,26 +22,25 @@ open Gen_product_iarray_helpers
 open Stdlib_stable
 open Stdlib_upstream_compatible
 
-(* If copying this test for a new product shape, you should only have to
-   change the bit between here and the next comment. See README.md in this
-   test directory. *)
-type boxed_t = float * int
-type unboxed_t = #(float# * int)
+(* This test is auto-generated from the corresponding mutable array test in
+   typing-layouts-arrays/ using gen_iarray_test.sh. Do not edit directly.
+   See README.md in this test directory. *)
+type boxed_t = int * int64
+type unboxed_t = #(int * int64)
 
-let elem : boxed_t elem = Tup2 (float_elem, int_elem)
+let elem : boxed_t elem = Tup2 (int_elem, int64_elem)
 let words_wide : int = 2
-let zero () : unboxed_t = #(#0., 0)
+let zero () : unboxed_t = #(0, 0L)
 
-let to_boxed #(a, b) = (Float_u.to_float a, b)
-let of_boxed (a, b) = #(Float_u.of_float a, b)
-
+let to_boxed #(i, i64) = (i, i64)
+let of_boxed (i, i64) = #(i, i64)
 (* Below here is copy pasted due to the absence of layout polymorphism. Don't
    change it.  See README.md in this test directory. *)
 module Element_ops = (val Gen_product_iarray_helpers.make_element_ops elem)
 
 module UTuple_array0 :
   Gen_u_iarray.S0 with type element_t = unboxed_t
-                  and type ('a : any) array_t = 'a iarray 
+                  and type ('a : any) array_t = 'a iarray
                   and type mutable_t = unboxed_t array = struct
   type element_t = unboxed_t
 
@@ -70,7 +69,7 @@ module UTuple_array0 :
 
   external unsafe_set_mutable: element_t array -> int -> element_t -> unit =
     "%array_unsafe_set"
-  
+
   let unsafe_set_mutable t i e = unsafe_set_mutable t i (e ())
 
   external unsafe_get_mutable: element_t array -> int -> element_t =
@@ -85,7 +84,7 @@ module UTuple_array0 :
 
   external freeze : element_t array -> element_t iarray = "%array_to_iarray"
 
-  let empty () : unboxed_t iarray = 
+  let empty () : unboxed_t iarray =
     let m = unsafe_create_mutable 0 in
     freeze m
 

@@ -25,15 +25,37 @@ open Stdlib_upstream_compatible
 (* This test is auto-generated from the corresponding mutable array test in
    typing-layouts-arrays/ using gen_iarray_test.sh. Do not edit directly.
    See README.md in this test directory. *)
-type boxed_t = float * int * int64
-type unboxed_t = #(float# * int * int64#)
+type boxed_t =
+  int64 option
+  * (int * int32 * float)
+  * float
+  * (float32 * (nativeint * nativeint) option)
+  * int32
 
-let elem : boxed_t elem = Tup3 (float_elem, int_elem, int64_elem)
-let words_wide : int = 3
-let zero () : unboxed_t = #(#0., 0, #0L)
+type unboxed_t =
+  #(int64 option
+    * #(int * int32 * float)
+    * float
+    * #(float32 * (nativeint * nativeint) option)
+    * int32)
 
-let to_boxed #(a, b, c) = (Float_u.to_float a, b, Int64_u.to_int64 c)
-let of_boxed (a, b, c) = #(Float_u.of_float a, b, Int64_u.of_int64 c)
+let elem : boxed_t elem =
+  Tup5 (Option int64_elem,
+        Tup3 (int_elem, int32_elem, float_elem),
+        float_elem,
+        Tup2 (float32_elem, Option (Tup2 (nativeint_elem, nativeint_elem))),
+        int32_elem)
+
+let words_wide : int = 8
+let zero () : unboxed_t =
+  #(Some 0L,
+    #(0, 0l, 0.),
+    0.,
+    #(0.s, Some (0n, 0n)),
+    0l)
+
+let to_boxed #(a, #(b, c, d), e, #(f, g), h) = (a, (b, c, d), e, (f, g), h)
+let of_boxed (a, (b, c, d), e, (f, g), h) = #(a, #(b, c, d), e, #(f, g), h)
 (* Below here is copy pasted due to the absence of layout polymorphism. Don't
    change it.  See README.md in this test directory. *)
 module Element_ops = (val Gen_product_iarray_helpers.make_element_ops elem)

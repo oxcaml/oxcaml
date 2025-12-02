@@ -22,26 +22,46 @@ open Gen_product_iarray_helpers
 open Stdlib_stable
 open Stdlib_upstream_compatible
 
-(* If copying this test for a new product shape, you should only have to
-   change the bit between here and the next comment. See README.md in this
-   test directory. *)
-type boxed_t = float * int64
-type unboxed_t = #(float# * int64#)
+(* This test is auto-generated from the corresponding mutable array test in
+   typing-layouts-arrays/ using gen_iarray_test.sh. Do not edit directly.
+   See README.md in this test directory. *)
+type boxed_t =
+  float * (int * int64) * float32 * (int32 * (float32 * float)) * int
+type unboxed_t =
+  #(float# * #(int * int64#) * float32# * #(int32# * #(float32# * float#))
+    * int)
 
-let elem : boxed_t elem = Tup2 (float_elem, int64_elem)
-let words_wide : int = 2
-let zero () : unboxed_t = #(#0., #0L)
+let elem : boxed_t elem =
+  Tup5 (float_elem,
+        Tup2 (int_elem, int64_elem),
+        float32_elem,
+        Tup2 (int32_elem, (Tup2 (float32_elem, float_elem))),
+        int_elem)
 
-let to_boxed #(a, b) = (Float_u.to_float a, Int64_u.to_int64 b)
-let of_boxed (a, b) = #(Float_u.of_float a, Int64_u.of_int64 b)
+let words_wide : int = 8
+let zero () : unboxed_t =
+  #(#0., #(0, #0L), #0.s, #(#0l, #(#0.s, #0.)), 0)
 
+let to_boxed #(a, #(b, c), d, #(e, #(f, g)), h) =
+  (Float_u.to_float a,
+   (b, Int64_u.to_int64 c),
+   Float32_u.to_float32 d,
+   (Int32_u.to_int32 e, (Float32_u.to_float32 f, Float_u.to_float g)),
+   h)
+
+let of_boxed (a, (b, c), d, (e, (f, g)), h) =
+  #(Float_u.of_float a,
+    #(b, Int64_u.of_int64 c),
+    Float32_u.of_float32 d,
+    #(Int32_u.of_int32 e, #(Float32_u.of_float32 f, Float_u.of_float g)),
+    h)
 (* Below here is copy pasted due to the absence of layout polymorphism. Don't
    change it.  See README.md in this test directory. *)
 module Element_ops = (val Gen_product_iarray_helpers.make_element_ops elem)
 
 module UTuple_array0 :
   Gen_u_iarray.S0 with type element_t = unboxed_t
-                  and type ('a : any) array_t = 'a iarray 
+                  and type ('a : any) array_t = 'a iarray
                   and type mutable_t = unboxed_t array = struct
   type element_t = unboxed_t
 
@@ -70,7 +90,7 @@ module UTuple_array0 :
 
   external unsafe_set_mutable: element_t array -> int -> element_t -> unit =
     "%array_unsafe_set"
-  
+
   let unsafe_set_mutable t i e = unsafe_set_mutable t i (e ())
 
   external unsafe_get_mutable: element_t array -> int -> element_t =
@@ -85,7 +105,7 @@ module UTuple_array0 :
 
   external freeze : element_t array -> element_t iarray = "%array_to_iarray"
 
-  let empty () : unboxed_t iarray = 
+  let empty () : unboxed_t iarray =
     let m = unsafe_create_mutable 0 in
     freeze m
 
