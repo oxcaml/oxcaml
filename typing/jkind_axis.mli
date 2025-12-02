@@ -53,10 +53,6 @@ module Separability : sig
     | Maybe_separable
 
   include Axis_ops with type t := t
-
-  (* CR layouts-scannable: As more axes are ported, consider adding [is_max]
-     to the [Axis_ops] signature (which helps with printing) *)
-  val is_max : t -> bool
 end
 
 module Axis : sig

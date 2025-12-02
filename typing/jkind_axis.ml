@@ -112,8 +112,6 @@ module Separability = struct
     | Maybe_separable -> "maybe_separable"
 
   let print ppf t = Format.fprintf ppf "%s" (to_string t)
-
-  let is_max p = equal p max
 end
 
 module Axis = struct
