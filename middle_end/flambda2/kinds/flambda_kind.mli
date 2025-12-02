@@ -343,8 +343,6 @@ module With_subkind : sig
   val equal_ignoring_subkind : t -> t -> bool
 
   val must_be_gc_scannable : t -> bool
-
-  val may_be_gc_scannable : t -> bool
 end
 
 module Flat_suffix_element : sig

@@ -1724,12 +1724,6 @@ let addr_array_set (mode : Lambda.modify_mode) arr ofs newval dbg =
 
 (* arrays below can be written to uniformly regardless of their mode *)
 
-let addr_array_set_gc_ignorable arr ofs newval dbg =
-  Cop
-    ( Cstore (Word_val, Assignment),
-      [array_indexing log2_size_addr arr ofs dbg; newval],
-      dbg )
-
 let int_array_set arr ofs newval dbg =
   Cop
     ( Cstore (Word_int, Assignment),

@@ -421,12 +421,9 @@ let addr_array_store init ~arr ~index ~new_value dbg =
 let array_set0 ~dbg (array_kind : P.Array_kind.t)
     (set_kind : P.Array_set_kind.t) ~arr ~index ~new_value =
   match array_kind, set_kind with
-  | (Immediates | Gc_ignorable_values | Values | Unboxed_product _), Immediates
-    ->
-    C.int_array_set arr index new_value dbg
   | ( (Immediates | Gc_ignorable_values | Values | Unboxed_product _),
-      Gc_ignorable_values ) ->
-    C.addr_array_set_gc_ignorable arr index new_value dbg
+      (Immediates | Gc_ignorable_values) ) ->
+    C.int_array_set arr index new_value dbg
   | (Immediates | Gc_ignorable_values | Values | Unboxed_product _), Values init
     ->
     addr_array_store init ~arr ~index ~new_value dbg

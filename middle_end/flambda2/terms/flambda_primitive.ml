@@ -154,10 +154,7 @@ module Array_kind = struct
   let rec element_kinds t =
     match t with
     | Immediates -> [K.With_subkind.tagged_immediate]
-    | Gc_ignorable_values ->
-      [K.With_subkind.any_value]
-      (* There is no kind for external/ignorable values, at least yet. *)
-    | Values -> [K.With_subkind.any_value]
+    | Gc_ignorable_values | Values -> [K.With_subkind.any_value]
     | Naked_floats -> [K.With_subkind.naked_float]
     | Naked_float32s -> [K.With_subkind.naked_float32]
     | Naked_int32s -> [K.With_subkind.naked_int32]

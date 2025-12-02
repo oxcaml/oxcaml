@@ -1174,12 +1174,6 @@ module With_subkind = struct
       | Unboxed_vec256_array | Unboxed_vec512_array | Unboxed_product_array ->
         true)
     | Naked_number _ | Region | Rec_info -> false
-
-  let may_be_gc_scannable t =
-    match kind t with
-    | Value -> true
-    | Naked_number _ | Region -> false
-    | Rec_info -> Misc.fatal_error "No runtime values of kind [Rec_info] exist"
 end
 
 module Flat_suffix_element = struct
