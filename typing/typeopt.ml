@@ -500,10 +500,12 @@ let nullable raw_kind = { raw_kind; nullable = Nullable }
    accurate nullability. The later is conservative but cheaper when we already
    have a jkind. We should pick one, or rationalize why there are two.
 *)
-let add_nullability_from_jkind env jkind raw_kind =
-  let context = Ctype.mk_jkind_context_always_principal env in
+
+(* CR zeisbach: figure out if this works or not, and change accordingly.
+   Also a lot of documentation may become stale. Probably ask about this! *)
+let add_nullability_from_jkind jkind raw_kind =
   let nullable =
-    match Jkind.get_nullability ~context jkind with
+    match Jkind.get_nullability jkind with
     | Non_null -> Non_nullable
     | Maybe_null -> Nullable
   in
@@ -644,7 +646,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       if cannot_proceed () then
         num_nodes_visited,
-        add_nullability_from_jkind env decl.type_jkind
+        add_nullability_from_jkind decl.type_jkind
           (value_kind_of_value_jkind env decl.type_jkind)
       else
         let visited = Numbers.Int.Set.add (get_id ty) visited in
@@ -677,7 +679,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
             "Typeopt.value_kind: non-unary unboxed record can't have kind value"
         | Type_abstract _ ->
           num_nodes_visited,
-          add_nullability_from_jkind env decl.type_jkind
+          add_nullability_from_jkind decl.type_jkind
             (value_kind_of_value_jkind env decl.type_jkind)
         | Type_open -> num_nodes_visited, non_nullable Pgenval
     end
@@ -710,7 +712,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     else non_nullable Pintval
   | _ ->
     num_nodes_visited,
-    add_nullability_from_jkind env (Ctype.estimate_type_jkind env ty) Pgenval
+    add_nullability_from_jkind (Ctype.estimate_type_jkind env ty) Pgenval
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty

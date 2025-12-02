@@ -207,11 +207,20 @@ Error:
          because of the definition of t1 at line 1, characters 0-38.
 |}]
 
+(* CR zeisbach: this accidentally broke. maybe this is an example of the
+   same mutual recursion badness that was present already? Poke around! *)
 type 'a t = #{ a : 'a ; a' : 'a } constraint 'a = r#
 and r = { i : int ; f : float# }
 [%%expect{|
-type 'a t = #{ a : 'a; a' : 'a; } constraint 'a = r#
-and r = { i : int; f : float#; }
+Line 2, characters 0-32:
+2 | and r = { i : int ; f : float# }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "r#" is immediate & float64
+         because it is an unboxed record.
+       But the layout of type "r#" must be a sublayout of
+           value maybe_separable maybe_null
+           & value maybe_separable maybe_null
+         because it is an unboxed record.
 |}]
 
 type 'a t = #{ a : 'a ; a' : 'a } constraint 'a = r#

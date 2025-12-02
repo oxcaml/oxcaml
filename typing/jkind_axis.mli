@@ -40,6 +40,11 @@ module Nullability : sig
     | Maybe_null
 
   include Axis_ops with type t := t
+
+  (* CR zeisbach: edit that interface to include this stuff.
+     and then figure out what to do with externality.
+     and probably fix the scannable axes interface too when I do that... *)
+  val to_string : t -> string
 end
 
 module Separability : sig
@@ -64,9 +69,7 @@ end
 
 module Axis : sig
   module Nonmodal : sig
-    type 'a t =
-      | Externality : Externality.t t
-      | Nullability : Nullability.t t
+    type 'a t = Externality : Externality.t t
   end
 
   (** Represents an axis of a jkind *)

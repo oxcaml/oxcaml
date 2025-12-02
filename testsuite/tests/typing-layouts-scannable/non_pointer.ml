@@ -521,7 +521,8 @@ Error: Signature mismatch:
 (* CR zeisbach: mod syntax actually applys on individual components of a
    product, which might be another change from the existing behavior??
    but when i tested it, it looked like the existing behavior did this,
-   at least for non-modal axes. but it also seemed to throw some away. *)
+   at least for non-modal axes. but it also seemed to throw some away.
+   Oh btw this should go away once I rebase properly *)
 
 module M : sig
   type t : value non_float & value non_float
