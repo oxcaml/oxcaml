@@ -399,7 +399,8 @@ type operation =
       { result_type : machtype;
         region : Lambda.region_close;
         callees : symbol list option
-            (* List of possible callees, or [None] if not known *)
+        (* List of possible callees, or [None] if not known. The actual
+           callee might be a re-optimized versions of one these callees. *)
       }
   | Cextcall of
       { func : string;

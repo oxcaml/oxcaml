@@ -37,8 +37,8 @@ module Witness = struct
         { bytes : int;
           dbginfo : Cmm.alloc_dbginfo
         }
-    | Indirect_call
-    | Indirect_tailcall
+    | Indirect_call of { callee : string option }
+    | Indirect_tailcall of { callee : string option }
     | Direct_call of { callee : string }
     | Direct_tailcall of { callee : string }
     | Extcall of { callee : string }
@@ -92,8 +92,10 @@ module Witness = struct
     let open Format in
     match kind with
     | Alloc { bytes; dbginfo = _ } -> fprintf ppf "allocation of %d bytes" bytes
-    | Indirect_call -> fprintf ppf "indirect call"
-    | Indirect_tailcall -> fprintf ppf "indirect tailcall"
+    | Indirect_call { callee = None } -> fprintf ppf "indirect call"
+    | Indirect_tailcall { callee = None } -> fprintf ppf "indirect tailcall"
+    | Indirect_call { callee = Some callee } -> fprintf ppf "indirect call %s" callee
+    | Indirect_tailcall { callee = Some callee } -> fprintf ppf "indirect tailcall %s" callee
     | Direct_call { callee } -> fprintf ppf "direct call %s" callee
     | Direct_tailcall { callee : string } ->
       fprintf ppf "direct tailcall %s" callee
@@ -1789,7 +1791,7 @@ end = struct
                increase compilation time.\n\
                (widening applied in function %s%s)" t.fun_name component_msg,
             [] )
-        | Indirect_call | Indirect_tailcall | Direct_call _ | Direct_tailcall _
+        | Indirect_call _ | Indirect_tailcall _ | Direct_call _ | Direct_tailcall _
         | Extcall _ ->
           ( Format.dprintf "called function may allocate%s (%a)" component_msg
               Witness.print_kind w.kind,
@@ -2676,15 +2678,14 @@ end = struct
           transform_tailcall_imm t t.current_fun_name dbg
         | Tailcall_func (Direct { sym_name; _ }) ->
           transform_tailcall_imm t sym_name dbg
-        | Tailcall_func (Indirect (Some _callees)) ->
+        | Tailcall_func (Indirect (Some callees)) ->
           transform_call_indirect t ~next:Value.normal_return
-            ~exn:Value.exn_escape _callees
-            (fun callee -> Witness.Direct_tailcall { callee })
+            ~exn:Value.exn_escape callees
+            (fun callee -> Witness.Indirect_tailcall { callee = Some callee })
             ~desc:"indirect tailcall" dbg
-        (* XXX what to do here? *)
         | Tailcall_func (Indirect None) ->
           (* Sound to ignore [next] and [exn] because the call never returns. *)
-          let w = create_witnesses t Indirect_tailcall dbg in
+          let w = create_witnesses t (Indirect_tailcall { callee = None }) dbg in
           transform_top t ~next:Value.normal_return ~exn:Value.exn_escape w
             "indirect tailcall" dbg
         | Call_no_return { alloc = false; _ } ->
@@ -2713,11 +2714,11 @@ end = struct
           let k = Witness.Probe { name; handler_code_sym } in
           transform_call t ~next ~exn handler_code_sym k ~desc dbg
         | Call { op = Indirect None; _ } ->
-          let w = create_witnesses t Indirect_call dbg in
+          let w = create_witnesses t (Indirect_call { callee = None }) dbg in
           transform_top t ~next ~exn w "indirect call" dbg
         | Call { op = Indirect (Some callees); _ } ->
           transform_call_indirect t ~next ~exn callees
-            (fun callee -> Witness.Direct_call { callee })
+            (fun callee -> Witness.Indirect_call { callee = Some callee })
             ~desc:"indirect call" dbg
         | Call { op = Direct { sym_name = func; _ }; _ } ->
           let k = Witness.Direct_call { callee = func } in
