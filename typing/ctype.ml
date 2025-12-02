@@ -3070,8 +3070,8 @@ let local_non_recursive_abbrev uenv p ty =
    They carry redundant information but are added to save two calls to
    [get_desc] which are usually performed already at the call site. *)
 let unify_univar t1 t2 jkind1 jkind2 pairs =
-  if not (Jkind.equal ~level:!current_level jkind1 jkind2)
-  then raise Cannot_unify_universal_variables;
+  if not (Jkind.equal ~level:!current_level jkind1 jkind2) then
+    raise Cannot_unify_universal_variables;
   let rec inner t1 t2 = function
     (cl1, cl2) :: rem ->
       let find_univ t cl =
@@ -5863,8 +5863,8 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
     | (Tof_kind k1, Tof_kind k2) ->
-      if not (Jkind.equal ~level:!current_level k1 k2)
-      then raise_for Equality (Unequal_tof_kind_jkinds (k1, k2))
+      if not (Jkind.equal ~level:!current_level k1 k2) then
+        raise_for Equality (Unequal_tof_kind_jkinds (k1, k2))
     | _ ->
         let t1' = expand_head_rigid env t1 in
         let t2' = expand_head_rigid env t2 in
