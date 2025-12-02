@@ -341,43 +341,86 @@ and flatten_product_layout_exn (cs : t) =
   | Unboxed_product { components; kind = Unboxed_tuple } ->
     List.map (fun arg -> None, arg) components
 
-module Shape_cache : sig
-  val find_in_cache :
-    Layout.t -> Shape.t -> rec_env:'a S.Rec_var_env.t -> t option
+module Rec_env : sig
+  type t
 
-  val add_to_cache :
-    Shape.t -> Layout.t -> t -> rec_env:'a S.Rec_var_env.t -> unit
+  include Hashtbl.HashedType with type t := t
+
+  val empty : t
+
+  val add_binder : t -> S.Rec_var_ident.t -> Layout.t option -> t
+
+  val find_opt :
+    S.Rec_var_ident.t -> t -> (RS.DeBruijn_index.t * Layout.t option) option
+end = struct
+  (* We deduplicate the recursive environment for efficiency. Modifications to
+     the environment are rare compared to equality checks and hashing, so we
+     wrap each environment value with its precomputed hash. This enables O(1)
+     equality checks when used as a key in [Shape_cache]. Without deduplication,
+     cache lookups would require O(n) structural comparison of environment
+     maps. *)
+  include Hash_consed.Dedup (struct
+    type t = (RS.DeBruijn_index.t * Layout.t option) S.Rec_var_env.t
+
+    let initial_size = 256
+
+    let hash_value (idx, ly_opt) =
+      Hashtbl.hash (RS.DeBruijn_index.hash idx, ly_opt)
+
+    let equal_value (i1, l1) (i2, l2) =
+      RS.DeBruijn_index.equal i1 i2 && Option.equal Layout.equal l1 l2
+
+    let hash = S.Rec_var_env.hash hash_value
+
+    let equal = S.Rec_var_env.equal equal_value
+  end)
+
+  let empty = create S.Rec_var_env.empty
+
+  let add_binder t rv type_layout =
+    let map =
+      S.Rec_var_env.map
+        (fun (idx, ly) -> RS.DeBruijn_index.move_under_binder idx, ly)
+        (value t)
+    in
+    let map =
+      S.Rec_var_env.add rv (RS.DeBruijn_index.create 0, type_layout) map
+    in
+    create map
+
+  let find_opt rv t = S.Rec_var_env.find_opt rv (value t)
+end
+
+module Shape_cache : sig
+  val find : Layout.t -> Shape.t -> rec_env:Rec_env.t -> t option
+
+  val add : Shape.t -> Layout.t -> t -> rec_env:Rec_env.t -> unit
 end = struct
   type t =
     { type_shape : Shape.t;
-      type_layout : Layout.t
+      type_layout : Layout.t;
+      rec_env : Rec_env.t
     }
 
-  (* CR sspies: This caching will need performance improvements along with the
-     other caches in the future. *)
   module Cache = Hashtbl.Make (struct
     type nonrec t = t
 
-    let equal ({ type_shape = x1; type_layout = y1 } : t)
-        ({ type_shape = x2; type_layout = y2 } : t) =
-      Shape.equal x1 x2 && Layout.equal y1 y2
+    let equal ({ type_shape = x1; type_layout = y1; rec_env = r1 } : t)
+        ({ type_shape = x2; type_layout = y2; rec_env = r2 } : t) =
+      Shape.equal x1 x2 && Layout.equal y1 y2 && Rec_env.equal r1 r2
 
-    let hash { type_shape; type_layout } =
-      Hashtbl.hash (type_shape.hash, type_layout)
+    let hash { type_shape; type_layout; rec_env } =
+      Hashtbl.hash (type_shape.hash, type_layout, Rec_env.hash rec_env)
     (* CR sspies: Add a hash function to Layout.t *)
   end)
 
   let cache = Cache.create 100
 
-  let find_in_cache type_layout type_shape ~rec_env =
-    if S.Rec_var_env.is_empty rec_env
-    then Cache.find_opt cache { type_shape; type_layout }
-    else None
+  let find type_layout type_shape ~rec_env =
+    Cache.find_opt cache { type_shape; type_layout; rec_env }
 
-  let add_to_cache type_shape type_layout value ~rec_env =
-    (* [rec_env] being empty means that the shape is closed. *)
-    if S.Rec_var_env.is_empty rec_env
-    then Cache.add cache { type_shape; type_layout } value
+  let add type_shape type_layout value ~rec_env =
+    Cache.add cache { type_shape; type_layout; rec_env } value
 end
 
 (** Lays out the elements in the shape sequentially while erasing all voids.
@@ -456,16 +499,11 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
        layout by forcing the runtime shape below. *)
     (* CR sspies: We should guess the layout from the recursive body [sh]
        instead of just using the current layout. *)
-    let rec_env =
-      rec_env
-      |> Shape.Rec_var_env.map (fun (idx, ly) ->
-             RS.DeBruijn_index.move_under_binder idx, ly)
-      |> Shape.Rec_var_env.add rv (RS.DeBruijn_index.create 0, type_layout)
-    in
+    let rec_env = Rec_env.add_binder rec_env rv type_layout in
     type_shape_to_complex_shape_exn ~rec_env sh type_layout
     |> force_runtime_shape_exn |> RS.mu |> runtime
   | Rec_var rv, layout -> (
-    match Shape.Rec_var_env.find_opt rv rec_env, layout with
+    match Rec_env.find_opt rv rec_env, layout with
     | Some (i, Some (Layout.Base base as ly1)), ly2_opt
     (* We combine the [None] and [Some] layout cases with the guard: *)
       when Option.value ~default:true (Option.map (Layout.equal ly1) ly2_opt)
@@ -791,16 +829,15 @@ and predef_to_complex_shape_exn ~rec_env (predef : S.Predef.t) ~args : RS.predef
           args)
 
 and type_shape_to_complex_shape ~rec_env type_shape type_layout : t =
-  match Shape_cache.find_in_cache type_layout type_shape ~rec_env with
+  match Shape_cache.find type_layout type_shape ~rec_env with
   | Some shape -> shape
   | None ->
     let shape =
       try type_shape_to_complex_shape_exn ~rec_env type_shape (Some type_layout)
       with Layout_missing -> layout_to_unknown_shape type_layout
     in
-    Shape_cache.add_to_cache type_shape type_layout shape ~rec_env;
+    Shape_cache.add type_shape type_layout shape ~rec_env;
     shape
 
 let type_shape_to_complex_shape type_shape type_layout =
-  type_shape_to_complex_shape ~rec_env:Shape.Rec_var_env.empty type_shape
-    type_layout
+  type_shape_to_complex_shape ~rec_env:Rec_env.empty type_shape type_layout
