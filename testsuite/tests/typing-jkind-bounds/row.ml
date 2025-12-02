@@ -415,14 +415,67 @@ Error: The kind of type "t2" is immutable_data
          because of the annotation on the declaration of the type t2.
 |}]
 
+type t2 : immediate with string = M1.t
+[%%expect{|
+Line 1, characters 0-38:
+1 | type t2 : immediate with string = M1.t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "M1.t" is value mod non_float
+         because it's a polymorphic variant type.
+       But the kind of type "M1.t" must be a subkind of immutable_data
+         because of the definition of t2 at line 1, characters 0-38.
+|}]
+
+type t2 : value mod portable = M1.t
+[%%expect{|
+Line 1, characters 0-35:
+1 | type t2 : value mod portable = M1.t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "M1.t" is value mod non_float
+         because it's a polymorphic variant type.
+       But the kind of type "M1.t" must be a subkind of value mod portable
+         because of the definition of t2 at line 1, characters 0-35.
+|}]
+
+module type S = sig
+  type t = private [< `A of string | `B ]
+end
+module M1 : S = struct
+  type t = [ `B ]
+end
+[%%expect{|
+module type S = sig type t = private [< `A of string | `B ] end
+module M1 : S
+|}]
+
+(* This should not be accepted. *)
+type t2 : immediate with M1.t = C of string
+[%%expect{|
+Line 1, characters 0-43:
+1 | type t2 : immediate with M1.t = C of string
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t2" is immutable_data
+         because it's a boxed variant type.
+       But the kind of type "t2" must be a subkind of immediate with M1.t
+         because of the annotation on the declaration of the type t2.
+|}]
+
 module M2 : S with type t = [ `A of string | `B of int ] = struct
   type t = [ `A of string | `B of int ]
 end
 type t3 : immediate with M2.t = C of string (* should be accepted *)
 (* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
-module M2 : sig type t = [ `A of string | `B of int ] end
-type t3 = C of string
+Line 1, characters 12-56:
+1 | module M2 : S with type t = [ `A of string | `B of int ] = struct
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this "with" constraint, the new definition of "t"
+       does not match its original definition in the constrained signature:
+       Type declarations do not match:
+         type t = [ `A of string | `B of int ]
+       is not included in
+         type t = private [< `A of string | `B ]
+       Types for tag `B are incompatible
 |}]
 
 let sneaky (x : (M1.t, [ `A of string | `B of int ]) eq) = match x with
@@ -430,11 +483,11 @@ let sneaky (x : (M1.t, [ `A of string | `B of int ]) eq) = match x with
     type t4 : immediate with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
   end in ()
 [%%expect{|
-Line 3, characters 4-47:
-3 |     type t4 : immediate with M1.t = C of string  (* not sure what will happen, but we should eventually accept *)
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t4" is immutable_data
-         because it's a boxed variant type.
-       But the kind of type "t4" must be a subkind of immediate with M1.t
-         because of the annotation on the declaration of the type t4.
+Line 2, characters 4-8:
+2 |   | Refl -> let open struct
+        ^^^^
+Error: This pattern matches values of type "(M1.t, M1.t) eq"
+       but a pattern was expected which matches values of type
+         "(M1.t, [ `A of string | `B of int ]) eq"
+       Type "M1.t" is not compatible with type "[ `A of string | `B of int ]"
 |}]
