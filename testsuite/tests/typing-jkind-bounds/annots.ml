@@ -152,8 +152,10 @@ Line 1, characters 32-41:
 Error: The externality axis has already been specified.
 |}]
 
-(* CR zeisbach: this no longer reports an error.
-   But also, these tests should be changed to deprecate the old syntax *)
+(* CR layouts-scannable: Currently, this syntax is being parsed into scannable
+   axes without reporting errors. This test previously reported an error. If the
+   warnings are enabled before the [mod] syntax is deprecated, then this test
+   should be updated. *)
 type t13 : value mod maybe_null non_null
 [%%expect {|
 type t13

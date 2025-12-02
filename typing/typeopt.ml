@@ -498,7 +498,7 @@ let nullable raw_kind = { raw_kind; nullable = Nullable }
    have a jkind. We should pick one, or rationalize why there are two.
 *)
 
-(* CR zeisbach: figure out of this works or not, and change accordingly.
+(* CR zeisbach: figure out if this works or not, and change accordingly.
    Also a lot of documentation may become stale. Probably ask about this! *)
 let add_nullability_from_jkind jkind raw_kind =
   let nullable =

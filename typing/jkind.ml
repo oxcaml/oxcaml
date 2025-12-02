@@ -3322,7 +3322,7 @@ let apply_modality_r modality jk =
 let apply_or_null_l jkind =
   match get_root_scannable_axes jkind with
   | Some { nullability = Non_null; separability } -> (
-    (* CR zeisbach: should this be a scannable axis set?
+    (* CR zeisbach: should this be a set_scannable_axes? See CRs above too
        Also, maybe the structure here could be simplified? *)
     let jkind = set_root_nullability jkind Maybe_null in
     match separability with
@@ -3335,7 +3335,7 @@ let apply_or_null_l jkind =
 let apply_or_null_r jkind =
   match get_root_scannable_axes jkind with
   | Some { nullability = Maybe_null; separability } -> (
-    (* CR zeisbach: should this be a scannable axis set?
+    (* CR zeisbach: should this be a set_scannable_axes? See CRs above too
        Also, maybe the structure here could be simplified? *)
     let jkind = set_root_nullability jkind Non_null in
     match separability with
@@ -3926,12 +3926,6 @@ module Violation = struct
      value (scannable) layouts, a more useful error should be reported.
      Specifically, the first mismatched axis should be reported as a reason,
      like "because it is not non_pointer" for a value vs immediate error. *)
-  (* CR zeisbach: now that we have multiple axes here, it might be the time to
-     implement the change where the first error gets reported. right now,
-     irrelevant axes get reported. But at least it's too much info, instead
-     of not enough. Also having to know that [any] and [value] have different
-     defaults is a bit of friction: could always have [any] report them all? *)
-
   let report_general preamble pp_former former ppf t =
     (* Sometimes, when reporting a layout conflict, the scannable axes of
        the expected layout should not be shown since the information is
