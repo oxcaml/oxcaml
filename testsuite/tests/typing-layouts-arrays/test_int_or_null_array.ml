@@ -12,34 +12,40 @@
  {
    native;
  }
- {
-   flags = "-O3";
-   native;
- }
- {
-   flags = "-Oclassic";
-   native;
- }
 *)
 
 open Gen_product_array_helpers
 open Stdlib_stable
 open Stdlib_upstream_compatible
 
-(* If copying this test for a new product shape, you should only have to
+(* If copying this test for a new shape, you should only have to
    change the bit between here and the next comment. See README.md in this
    test directory. *)
-type boxed_t = (float or_null) * (int or_null)
 
-type unboxed_t = #((float or_null) * (int or_null))
+(* CR or-null: separability isn't inferred without the signature, investigate. *)
+module Elt : sig
+  type boxed_t
+  type unboxed_t : value_or_null mod non_float
+  val elem : boxed_t elem
+  val words_wide : int
+  val zero : unit -> unboxed_t
+  val to_boxed : unboxed_t -> boxed_t
+  val of_boxed : boxed_t -> unboxed_t
+end = struct
+  type boxed_t = int option
 
-let elem : boxed_t elem = Tup2 (Or_null float_elem, Or_null int_elem)
+  type unboxed_t = int or_null
 
-let words_wide : int = 2
-let zero () : unboxed_t = #(Or_null.Null, Or_null.Null)
+  let elem : boxed_t elem = Option int_elem
 
-let to_boxed #(a, b) = (a, b)
-let of_boxed (a, b) = #(a, b)
+  let words_wide : int = 2
+  let zero () : unboxed_t = Or_null.Null
+
+  let to_boxed a = Or_null.to_option a
+  let of_boxed a = Or_null.of_option a
+end
+
+open Elt
 
 (* Below here is copy pasted due to the absence of layout polymorphism. Don't
    change it.  See README.md in this test directory. *)

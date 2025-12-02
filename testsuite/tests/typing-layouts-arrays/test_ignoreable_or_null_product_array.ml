@@ -29,17 +29,20 @@ open Stdlib_upstream_compatible
 (* If copying this test for a new product shape, you should only have to
    change the bit between here and the next comment. See README.md in this
    test directory. *)
-type boxed_t = (float or_null) * (int or_null)
+type boxed_t = (int or_null) * nativeint
 
-type unboxed_t = #((float or_null) * (int or_null))
+type unboxed_t = #((int or_null) * nativeint#)
 
-let elem : boxed_t elem = Tup2 (Or_null float_elem, Or_null int_elem)
+let elem : boxed_t elem =
+  Tup2 (Or_null int_elem, nativeint_elem)
 
 let words_wide : int = 2
-let zero () : unboxed_t = #(Or_null.Null, Or_null.Null)
+let zero () : unboxed_t =
+  #(Or_null.Null, Nativeint_u.of_nativeint 0n)
 
-let to_boxed #(a, b) = (a, b)
-let of_boxed (a, b) = #(a, b)
+let to_boxed #(a, b) = (a, Nativeint_u.to_nativeint b)
+let of_boxed (a, b) =
+  #(a, Nativeint_u.of_nativeint b)
 
 (* Below here is copy pasted due to the absence of layout polymorphism. Don't
    change it.  See README.md in this test directory. *)
