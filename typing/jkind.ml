@@ -499,24 +499,22 @@ module Layout = struct
     | Sort (b, sa) -> if Sort.is_scannable_or_var b then Some sa else None
     | Product _ -> None
 
-  (* CR zeisbach: this duplication is a little bit sad.
-     But I also think things like Axis_set are a bit overkill. *)
   let set_root_nullability t nullability =
     match t with
     | Any sa -> Any { sa with nullability }
-    | Sort (b, sa) ->
-      if Sort.is_scannable_or_var b
+    | Sort (b, sa) -> Sort (b, { sa with nullability })
+      (*= if Sort.is_scannable_or_var b
       then Sort (b, { sa with nullability })
-      else t
+      else t *)
     | Product _ -> t
 
   let set_root_separability t separability =
     match t with
     | Any sa -> Any { sa with separability }
-    | Sort (b, sa) ->
-      if Sort.is_scannable_or_var b
+    | Sort (b, sa) -> Sort (b, { sa with separability })
+      (*= if Sort.is_scannable_or_var b
       then Sort (b, { sa with separability })
-      else t
+      else t *)
     | Product _ -> t
 
   (* only meets at the root, meaning products are left unchanged. *)
@@ -2826,14 +2824,7 @@ let unsafely_set_bounds (type l r) ~(from : (l * r) jkind) t =
   { t with jkind = Jkind_desc.unsafely_set_bounds t.jkind ~from:from.jkind }
 
 let add_with_bounds ~modality ~type_expr t =
-  { t with
-    jkind =
-      Jkind_desc.add_with_bounds
-      (* CR zeisbach: this comment is stale now, right? *)
-      (* We only care about types in fields of unboxed products for the
-         nullability of the overall kind *)
-        ~type_expr ~modality t.jkind
-  }
+  { t with jkind = Jkind_desc.add_with_bounds ~type_expr ~modality t.jkind }
 
 let has_with_bounds (type r) (t : (_ * r) jkind) =
   match t.jkind.with_bounds with
@@ -3335,7 +3326,6 @@ let set_root_nullability jk nullability =
   { jk with
     jkind =
       { jk.jkind with
-        (* CR zeisbach: try to improve upon this interface. *)
         layout = Layout.set_root_nullability jk.jkind.layout nullability
       }
   }
@@ -3344,7 +3334,6 @@ let set_root_separability jk separability =
   { jk with
     jkind =
       { jk.jkind with
-        (* CR zeisbach: try to improve upon this interface. *)
         layout = Layout.set_root_separability jk.jkind.layout separability
       }
   }
@@ -3377,8 +3366,6 @@ let apply_modality_r modality jk =
 let apply_or_null_l jkind =
   match get_root_scannable_axes jkind with
   | Some { nullability = Non_null; separability } -> (
-    (* CR zeisbach: should this be a set_scannable_axes? See CRs above too
-       Also, maybe the structure here could be simplified? *)
     let jkind = set_root_nullability jkind Maybe_null in
     match separability with
     | Maybe_separable -> Ok jkind
@@ -3390,8 +3377,6 @@ let apply_or_null_l jkind =
 let apply_or_null_r jkind =
   match get_root_scannable_axes jkind with
   | Some { nullability = Maybe_null; separability } -> (
-    (* CR zeisbach: should this be a set_scannable_axes? See CRs above too
-       Also, maybe the structure here could be simplified? *)
     let jkind = set_root_nullability jkind Non_null in
     match separability with
     | Maybe_separable -> Ok jkind
