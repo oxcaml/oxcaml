@@ -262,7 +262,7 @@ and expression_desc =
       alloc_mode
   | Texp_field of
       expression * Jkind.sort * Longident.t loc * label_description *
-        texp_field_boxing * Unique_barrier.t
+        texp_field_boxing * Unique_barrier.t * ambiguity
   | Texp_unboxed_field of
       expression * Jkind.sort * Longident.t loc * unboxed_label_description *
         unique_use
@@ -1354,7 +1354,7 @@ let rec exp_is_nominal exp =
   | Texp_variant (_, None)
   | Texp_construct (_, _, [], _, _) ->
       true
-  | Texp_field (parent, _, _, _, _, _) | Texp_send (parent, _, _) ->
+  | Texp_field (parent, _, _, _, _, _, _) | Texp_send (parent, _, _) ->
       exp_is_nominal parent
   | _ -> false
 
@@ -1435,7 +1435,7 @@ let rec fold_antiquote_exp f  acc exp =
         ~none:acc
         ~some:(fun (e, _) -> fold_antiquote_exp f acc e)
         extended_expression
-  | Texp_field (exp, _, _, _, _, _) ->
+  | Texp_field (exp, _, _, _, _, _, _) ->
       fold_antiquote_exp f acc exp
   | Texp_unboxed_field (exp, _, _, _, _) ->
       fold_antiquote_exp f acc exp

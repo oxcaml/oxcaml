@@ -2575,6 +2575,17 @@ and quote_core_type ty =
   | Ttyp_of_kind _ -> fatal_error "Still not implemented."
   | Ttyp_call_pos -> Type.wrap Type.call_pos
 
+let type_constraint_of_ambiguity loc ambiguity =
+  match ambiguity with
+  | Unambiguous -> None
+  | Ambiguous { path; arity } -> Some (type_constr_for_path loc path arity)
+
+let constrain_with_type loc typ exp =
+  Type_constraint.constraint_ loc typ
+  |> Type_constraint.wrap
+  |> Exp_desc.constraint_ loc exp
+  |> Exp_desc.wrap |> mk_exp_noattr loc
+
 let rec case_binding transl stage case =
   let pat = case.c_lhs in
   match case.c_guard with
@@ -2950,12 +2961,6 @@ and quote_expression_desc transl stage e =
       in
       Exp_desc.tuple loc exps, None
     | Texp_construct (lid, constr, args, _, ambiguity) ->
-      let typ =
-        match ambiguity with
-        | Ambiguous { path; arity } ->
-          Some (type_constr_for_path loc path arity)
-        | Unambiguous -> None
-      in
       let constr = quote_constructor env lid.loc constr in
       let args =
         match args with
@@ -2971,20 +2976,15 @@ and quote_expression_desc transl stage e =
           let as_tuple = Exp_desc.tuple loc with_labels |> Exp_desc.wrap in
           Some (mk_exp_noattr loc as_tuple)
       in
-      Exp_desc.construct loc constr args, typ
+      ( Exp_desc.construct loc constr args,
+        type_constraint_of_ambiguity loc ambiguity )
     | Texp_variant (variant, argo) ->
       let variant = quote_variant loc variant
       and argo =
         Option.map (fun (arg, _) -> quote_expression transl stage arg) argo
       in
       Exp_desc.variant loc variant argo, None
-    | Texp_record record ->
-      let typ =
-        match record.ambiguity with
-        | Unambiguous -> None
-        | Ambiguous { path; arity } ->
-          Some (type_constr_for_path loc path arity)
-      in
+    | Texp_record { fields; extended_expression; ambiguity; _ } ->
       let lbl_exps =
         Array.map
           (fun (lbl, def) ->
@@ -2996,16 +2996,22 @@ and quote_expression_desc transl stage e =
                 fatal_error "No support for record update syntax in quotations"
             in
             lbl, exp)
-          record.fields
+          fields
       in
       let base =
         Option.map
           (fun (e, _, _) -> quote_expression transl stage e)
-          record.extended_expression
+          extended_expression
       in
-      Exp_desc.record loc (Array.to_list lbl_exps) base, typ
-    | Texp_field (rcd, _, lid, lbl, _, _) ->
+      ( Exp_desc.record loc (Array.to_list lbl_exps) base,
+        type_constraint_of_ambiguity loc ambiguity )
+    | Texp_field (rcd, _, lid, lbl, _, _, ambiguity) ->
       let rcd = quote_expression transl stage rcd in
+      let rcd =
+        match type_constraint_of_ambiguity loc ambiguity with
+        | Some typ -> constrain_with_type loc typ rcd
+        | None -> rcd
+      in
       let lbl = quote_record_field env lid.loc lbl in
       Exp_desc.field loc rcd lbl, None
     | Texp_setfield (rcd, _, lid, lbl, exp) ->
@@ -3171,13 +3177,7 @@ and quote_expression transl stage e =
   and attributes = quote_attributes e
   and loc = e.exp_loc in
   let e = Exp.mk loc desc attributes |> Exp.wrap in
-  match maybe_cstr with
-  | None -> e
-  | Some t ->
-    t
-    |> Type_constraint.constraint_ loc
-    |> Type_constraint.wrap |> Exp_desc.constraint_ loc e |> Exp_desc.wrap
-    |> mk_exp_noattr loc
+  match maybe_cstr with None -> e | Some t -> constrain_with_type loc t e
 
 let transl_quote transl exp loc =
   let exp_quoted = quote_expression transl 0 exp in

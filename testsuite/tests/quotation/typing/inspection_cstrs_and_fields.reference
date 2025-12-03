@@ -3,3 +3,5 @@ Stdlib.ignore ((fun x -> x) (A.Foo : A.vrt) : A.vrt)
 Stdlib.ignore
   ((fun x -> x) ({ A.foo = 123; A.bar = "abc"; } : A.rcd) : A.rcd)
 
+Stdlib.ignore ((fun x -> x) (fun r -> (r : A.rcd).A.foo) : A.rcd -> int)
+

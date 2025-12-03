@@ -654,7 +654,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let loc = of_location ~scopes e.exp_loc in
       Lprim (Pmakeblock (0, Immutable, shape, transl_alloc_mode alloc_mode),
              [arg; lbl], loc)
-  | Texp_field(arg, arg_sort, _id, lbl, float, ubr) ->
+  | Texp_field(arg, arg_sort, _id, lbl, float, ubr, _amb) ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let targ = transl_exp ~scopes arg_sort arg in
       let sem =

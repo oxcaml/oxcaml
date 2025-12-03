@@ -2555,7 +2555,7 @@ and check_uniqueness_exp_as_value ienv exp : Value.t * UF.t =
       | Some value -> value
     in
     value, UF.unused
-  | Texp_field (e, _, _, l, float, unique_barrier) -> (
+  | Texp_field (e, _, _, l, float, unique_barrier, _) -> (
     let value, uf = check_uniqueness_exp_as_value ienv e in
     match Value.paths value with
     | None ->

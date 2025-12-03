@@ -4550,7 +4550,7 @@ let rec is_nonexpansive exp =
         fields
       && is_nonexpansive_opt (Option.map fst extended_expression)
   | Texp_atomic_loc(exp, _, _, _, _) -> is_nonexpansive exp
-  | Texp_field(exp, _, _, _, _, _) -> is_nonexpansive exp
+  | Texp_field(exp, _, _, _, _, _, _) -> is_nonexpansive exp
   | Texp_unboxed_field(exp, _, _, _, _) -> is_nonexpansive exp
   | Texp_idx (ba, _uas) ->
       let block_access = function
@@ -6524,7 +6524,7 @@ and type_expect_
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
   | Pexp_field(srecord, lid) ->
-      let (record, record_sort, rmode, label, _) =
+      let (record, record_sort, rmode, label, _, ambiguity) =
         type_label_access Legacy env srecord Env.Projection lid
       in
       let ty_arg =
@@ -6580,14 +6580,14 @@ and type_expect_
       rue {
         exp_desc =
           Texp_field(record, record_sort, lid, label, boxing,
-                     Unique_barrier.not_computed ());
+                     Unique_barrier.not_computed (), ambiguity);
         exp_loc = loc; exp_extra = [];
         exp_type = ty_arg;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_unboxed_field(srecord, lid) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      let (record, record_sort, rmode, label, _) =
+      let (record, record_sort, rmode, label, _, _ambiguity) =
         type_label_access Unboxed_product env srecord Env.Projection lid
       in
       let ty_arg =
@@ -6620,7 +6620,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
-      let (record, _, rmode, label, expected_type) =
+      let (record, _, rmode, label, expected_type, _ambiguity) =
         type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
         if expected_type = None
@@ -7438,7 +7438,7 @@ and type_expect_
                     { pexp_desc = Pexp_field (srecord, lid); _ } as sexp, _
                   )
                } ] ->
-          let (record, record_sort, rmode, label, _) =
+          let (record, record_sort, rmode, label, _, _ambiguity) =
             type_label_access Legacy env srecord Env.Mutation lid
           in
           Env.mark_label_used Env.Projection label.lbl_uid;
@@ -7525,7 +7525,7 @@ and type_expect_
       | Texp_variant (_, Some (_, alloc_mode))
       | Texp_record {alloc_mode = Some alloc_mode; _}
       | Texp_array (_, _, _, alloc_mode)
-      | Texp_field (_, _, _, _, Boxing (alloc_mode, _), _) ->
+      | Texp_field (_, _, _, _, Boxing (alloc_mode, _), _, _) ->
         begin
           submode ~loc ~env
             Value.(of_const ~hint_comonadic:Stack_expression
@@ -8406,7 +8406,7 @@ and type_function
 
 and type_label_access
   : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
-    _ * _ * _ * 'rep gen_label_description * _
+    _ * _ * _ * 'rep gen_label_description * _ * ambiguity
   = fun record_form env srecord usage lid ->
   let mode = Value.newvar () in
   let record_jkind, record_sort =
@@ -8434,10 +8434,10 @@ and type_label_access
   in
   let labels =
     Env.lookup_all_labels ~record_form ~loc:lid.loc usage lid.txt env in
-  let label, _ambiguity =
+  let label, ambiguity =
     wrap_disambiguate "This expression has" (mk_expected ty_exp)
       (label_disambiguate record_form usage lid env expected_type) labels in
-  (record, record_sort, Mode.Value.disallow_right mode, label, expected_type)
+  (record, record_sort, Mode.Value.disallow_right mode, label, expected_type, ambiguity)
 
 (* Typing format strings for printing or reading.
    These formats are used by functions in modules Printf, Format, and Scanf.

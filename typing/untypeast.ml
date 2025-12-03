@@ -627,7 +627,7 @@ let expression sub exp =
                                     (sub.expr sub exp)
                                     (map_loc sub lid))
                              ])
-    | Texp_field (exp, _sort, lid, _label, _, _) ->
+    | Texp_field (exp, _sort, lid, _label, _, _, _) ->
         Pexp_field (sub.expr sub exp, map_loc sub lid)
     | Texp_unboxed_field (exp, _, lid, _label, _) ->
         Pexp_unboxed_field (sub.expr sub exp, map_loc sub lid)
