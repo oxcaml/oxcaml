@@ -96,3 +96,51 @@ end
 [%%expect{|
 module M : sig type a : value non_pointer and b : value non_pointer end
 |}]
+
+(* More bad mutual recursion behavior:
+   (taken from [basics_(implicit_)unboxed_records.ml]) *)
+
+type 'a t = #{ a : 'a ; a' : 'a } constraint 'a = r
+and r = #{ i : int ; f : float# }
+[%%expect{|
+Line 2, characters 0-33:
+2 | and r = #{ i : int ; f : float# }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "r" is immediate & float64
+         because it is an unboxed record.
+       But the layout of type "r" must be a sublayout of
+           value maybe_separable maybe_null
+           & value maybe_separable maybe_null
+         because it is an unboxed record.
+|}]
+
+(* Adding the annotation fixes this, like the case above *)
+type 'a t = #{ a : 'a ; a' : 'a } constraint 'a = r
+and r : immediate & float64 = #{ i : int ; f : float# }
+[%%expect{|
+type 'a t = #{ a : 'a; a' : 'a; } constraint 'a = r
+and r = #{ i : int; f : float#; }
+|}]
+
+(* Similarly, when the unboxed record is implicit, an annotation (albeit one
+   in a different spot) saves the day again *)
+type 'a t = #{ a : 'a ; a' : 'a } constraint 'a = r#
+and r = { i : int ; f : float# }
+[%%expect{|
+Line 2, characters 0-32:
+2 | and r = { i : int ; f : float# }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "r#" is immediate & float64
+         because it is an unboxed record.
+       But the layout of type "r#" must be a sublayout of
+           value maybe_separable maybe_null
+           & value maybe_separable maybe_null
+         because it is an unboxed record.
+|}]
+
+type 'a t = #{ a : 'a ; a' : 'a } constraint ('a : immediate & float64) = r#
+and r = { i : int ; f : float# }
+[%%expect{|
+type 'a t = #{ a : 'a; a' : 'a; } constraint 'a = r#
+and r = { i : int; f : float#; }
+|}]
