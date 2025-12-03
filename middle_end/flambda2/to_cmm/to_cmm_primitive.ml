@@ -757,10 +757,16 @@ let naked_int64 : C.Scalar_type.Integral.t =
 let naked_nativeint : C.Scalar_type.Integral.t =
   Untagged C.Scalar_type.Integer.nativeint
 
+let unsigned_naked_nativeint : C.Scalar_type.Integral.t =
+  Untagged C.Scalar_type.Integer.unsigned_nativeint
+
 let naked_immediate : C.Scalar_type.Integral.t =
   Untagged C.Scalar_type.Tagged_integer.(untagged immediate)
 
 let tagged_immediate : C.Scalar_type.Integral.t =
+  Tagged C.Scalar_type.Tagged_integer.immediate
+
+let unsigned_tagged_immediate : C.Scalar_type.Integral.t =
   Tagged C.Scalar_type.Tagged_integer.immediate
 
 let integral_of_standard_int : K.Standard_int.t -> C.Scalar_type.Integral.t =
@@ -859,6 +865,7 @@ let phys_equal _env dbg op x y =
   | Eq -> C.eq ~dbg x y
   | Neq -> C.neq ~dbg x y
 
+(* CR jrayman: A bit of a misnomer. Should be sign_or_zero_extended *)
 let requires_sign_extended_operands : P.binary_int_arith_op -> bool = function
   | Div (Signed | Unsigned) | Mod (Signed | Unsigned) ->
     (* Note that it would be wrong to apply [C.low_bits] to operands for div and
@@ -921,30 +928,24 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
   in
   match kind with
   | Tagged _ -> (
-    let wrap f =
-      (* the operators below operate on tagged immediates directly *)
-      wrap tagged_immediate f
-    in
+    (* the operators below operate on tagged immediates directly *)
+    let unsigned_wrap f = wrap unsigned_tagged_immediate f in
+    let wrap f = wrap tagged_immediate f in
     match op with
     | Add -> wrap C.add_int_caml
     | Sub -> wrap C.sub_int_caml
     | Mul -> wrap C.mul_int_caml
-    | Div signedness ->
-      wrap
-        (C.div_int_caml
-           ~signed:(match signedness with Signed -> true | Unsigned -> false))
-    | Mod signedness ->
-      wrap
-        (C.mod_int_caml
-           ~signed:(match signedness with Signed -> true | Unsigned -> false))
+    | Div Signed -> wrap C.div_int_caml
+    | Div Unsigned -> unsigned_wrap C.unsigned_div_int_caml
+    | Mod Signed -> wrap C.mod_int_caml
+    | Mod Unsigned -> unsigned_wrap C.unsigned_mod_int_caml
     | And -> wrap C.and_int_caml
     | Or -> wrap C.or_int_caml
     | Xor -> wrap C.xor_int_caml)
   | Untagged untagged -> (
-    let wrap f =
-      (* the operators below operate on register-width naked nativeints *)
-      wrap naked_nativeint f
-    in
+    (* the operators below operate on register-width naked nativeints *)
+    let unsigned_wrap f = wrap unsigned_naked_nativeint f in
+    let wrap f = wrap naked_nativeint f in
     let dividend_cannot_be_min_int =
       C.Scalar_type.Integer.bit_width untagged < C.arch_bits
     in
@@ -952,16 +953,10 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Add -> wrap C.add_int
     | Sub -> wrap C.sub_int
     | Mul -> wrap C.mul_int
-    | Div signedness ->
-      wrap
-        (C.div_int
-           ~signed:(match signedness with Signed -> true | Unsigned -> false)
-           ~dividend_cannot_be_min_int)
-    | Mod signedness ->
-      wrap
-        (C.mod_int
-           ~signed:(match signedness with Signed -> true | Unsigned -> false)
-           ~dividend_cannot_be_min_int)
+    | Div Signed -> wrap (C.div_int ~dividend_cannot_be_min_int)
+    | Div Unsigned -> unsigned_wrap C.unsigned_div_int
+    | Mod Signed -> wrap (C.mod_int ~dividend_cannot_be_min_int)
+    | Mod Unsigned -> unsigned_wrap C.unsigned_mod_int
     | And -> wrap C.and_int
     | Or -> wrap C.or_int
     | Xor -> wrap C.xor_int)
