@@ -21,7 +21,7 @@ module Name : sig
   val to_string : t -> string
 end
 
-(* Every temp and physical register has a unique stamp, but physical registers
+(*= Every temp and physical register has a unique stamp, but physical registers
    aliased at different types share stamps.
 
    Comparisons and containers for [t] consider both [t.stamp] and [t.typ], so
@@ -50,7 +50,7 @@ and stack_location =
   | Outgoing of int
   | Domainstate of int
 
-(* The [stack_location] describes the location of pseudo-registers
+(*= The [stack_location] describes the location of pseudo-registers
    that reside in memory.
  - [Local] is a local variable or spilled register residing in the stack frame
    of the current function
