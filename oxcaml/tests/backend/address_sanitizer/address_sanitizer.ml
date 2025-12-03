@@ -967,6 +967,8 @@ module Test_out_of_bounds_accesses = struct
   [@@noalloc] [@@builtin]
   external vec128_load_unaligned : nativeint# -> int64x2# = "" "caml_sse_vec128_load_unaligned"
   [@@noalloc] [@@builtin]
+  external vec128_load_known_unaligned : nativeint# -> int64x2# = "" "caml_sse3_vec128_load_known_unaligned"
+  [@@noalloc] [@@builtin]
   external vec128_store_aligned : nativeint# -> int64x2# -> void = "" "caml_sse_vec128_store_aligned"
   [@@noalloc] [@@builtin]
   external vec128_store_unaligned : nativeint# -> int64x2# -> void = "" "caml_sse_vec128_store_unaligned"
@@ -1010,6 +1012,14 @@ module Test_out_of_bounds_accesses = struct
 
   let vec128_load_unaligned () =
     let test () = let _ = vec128_load_unaligned (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:16)
+  ;;
+
+  let vec128_load_known_unaligned () =
+    let test () = let _ = vec128_load_known_unaligned (malloc #1n) |> Sys.opaque_identity in () in
     run_test
       __FUNCTION__
       ~test
@@ -1178,6 +1188,8 @@ module Test_out_of_bounds_accesses = struct
   [@@noalloc] [@@builtin]
   external vec256_load_unaligned : nativeint# -> int64x4# = "" "caml_avx_vec256_load_unaligned"
   [@@noalloc] [@@builtin]
+  external vec256_load_known_unaligned : nativeint# -> int64x4# = "" "caml_avx_vec256_load_known_unaligned"
+  [@@noalloc] [@@builtin]
   external vec256_store_aligned : nativeint# -> int64x4# -> void = "" "caml_avx_vec256_store_aligned"
   [@@noalloc] [@@builtin]
   external vec256_store_unaligned : nativeint# -> int64x4# -> void = "" "caml_avx_vec256_store_unaligned"
@@ -1222,6 +1234,14 @@ module Test_out_of_bounds_accesses = struct
 
   let vec256_load_unaligned () =
     let test () = let _ = vec256_load_unaligned (malloc #1n) |> Sys.opaque_identity in () in
+    run_test
+      __FUNCTION__
+      ~test
+      ~validate:(assert_asan_detected_out_of_bounds_read ~access_size:32)
+  ;;
+
+  let vec256_load_known_unaligned () =
+    let test () = let _ = vec256_load_known_unaligned (malloc #1n) |> Sys.opaque_identity in () in
     run_test
       __FUNCTION__
       ~test
@@ -1440,6 +1460,7 @@ let () =
       (* Out-of-bounds sse load/store tests *)
       vec128_load_aligned ();
       vec128_load_unaligned ();
+      vec128_load_known_unaligned ();
       vec128_store_aligned ();
       vec128_store_unaligned ();
       vec128_load_aligned_uncached ();
@@ -1464,6 +1485,7 @@ let () =
       vec256_load_aligned ();
       vec256_load_aligned ();
       vec256_load_unaligned ();
+      vec256_load_known_unaligned ();
       vec256_store_aligned ();
       vec256_store_unaligned ();
       vec256_load_aligned_uncached ();
