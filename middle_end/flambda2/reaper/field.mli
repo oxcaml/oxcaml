@@ -15,10 +15,12 @@
 
 type closure_entry_point =
   | Unknown_arity_code_pointer
+      (** Entry point used for an [Indirect_known_arity] call. *)
   | Known_arity_code_pointer
+      (** Entry point used for a [Direct] or [Indirect_known_arity] call. *)
 
 type return_kind =
-  | Normal of int
+  | Normal of int (* n-th return value, for unboxed calls *)
   | Exn
 
 type view = private
@@ -33,32 +35,59 @@ type view = private
 
 type t
 
+include Datalog.Column.S with type t := t
+
 val view : t -> view
 
+(** {1 Constructing fields} *)
+
+(** {2 Real fields}
+
+    These are fields that "exist at runtime" in the sense that they can be
+    accessed through primitives. *)
+
+(* CR bclement: [block] is confusing, because it actually refers to a specific
+   field of the block. Maybe we could call this [block_field] or [obj_field]
+   instead? *)
 val block : int -> Flambda_kind.t -> t
 
 val value_slot : Value_slot.t -> t
 
 val function_slot : Function_slot.t -> t
 
-val code_of_closure : closure_entry_point -> t
-
 val is_int : t
 
 val get_tag : t
+
+(** {2 Virtual fields}
+
+    These fields cannot be accessed through primitives and are used internally
+    by the reaper to model function calls. *)
+
+val code_of_closure : closure_entry_point -> t
 
 val apply : return_kind -> t
 
 val code_id_of_call_witness : t
 
-include Datalog.Column.S with type t := t
+(** {1 Inspecting fields} *)
 
 val kind : t -> Flambda_kind.t
+
+(** [is_virtual_field f] returns [true] if [f] is a virtual field. *)
+val is_virtual_field : t -> bool
+
+(** [is_real_field f] returns [true] if [f] is a real field, i.e. not a virtual
+    field. *)
+val is_real_field : t -> bool
 
 val is_value_slot : t -> bool
 
 val is_function_slot : t -> bool
 
+(** @raise Misc.Fatal_error if the field is not a function slot. *)
 val must_be_function_slot : t -> Function_slot.t
 
+(* CR bclement: Should this be called [is_local_slot] instead, to make it clear
+   that this relates to function/value slots? *)
 val is_local : t -> bool

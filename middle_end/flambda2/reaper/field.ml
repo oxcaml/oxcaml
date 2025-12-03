@@ -107,6 +107,8 @@ module Table = Table_by_int_id.Make (struct
   let equal = equal_view
 end)
 
+(* CR bclement: Should this table be hooked up to
+   [Flambda2.reset_symbol_tables]? *)
 let grand_table_of_fields = Table.create ()
 
 let create view = Table.add grand_table_of_fields view
@@ -157,6 +159,13 @@ let is_function_slot t =
   | Block _ | Value_slot _ | Is_int | Get_tag | Code_of_closure _ | Apply _
   | Code_id_of_call_witness ->
     false
+
+let is_real_field t =
+  match view t with
+  | Code_of_closure _ | Apply _ | Code_id_of_call_witness -> false
+  | Is_int | Get_tag | Block _ | Value_slot _ | Function_slot _ -> true
+
+let is_virtual_field t = not (is_real_field t)
 
 let must_be_function_slot t =
   match view t with

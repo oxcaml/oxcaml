@@ -1367,11 +1367,6 @@ let dominated_by_allocation_point =
 let allocation_point_dominator = rel2 "allocation_point_dominator" Cols.[n; n]
 
 let datalog_rules =
-  let real_field f =
-    match Field.view f with
-    | Code_of_closure _ | Apply _ | Code_id_of_call_witness -> false
-    | Is_int | Get_tag | Block _ | Value_slot _ | Function_slot _ -> true
-  in
   saturate_in_order
     [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
        [ constructor ~base relation ~from;
@@ -1471,7 +1466,7 @@ let datalog_rules =
       (let$ [x; field; y] = ["x"; "field"; "y"] in
        [ any_usage x;
          unless1 Field.is_local field;
-         when1 real_field field;
+         when1 Field.is_real_field field;
          constructor ~base:x field ~from:y ]
        ==> cannot_change_representation0 x);
       (* If a block with a local field escapes, and that field is read again
@@ -1515,7 +1510,7 @@ let datalog_rules =
        [ usages allocation_id alias;
          sources alias alias_source;
          distinct Cols.n alias_source allocation_id;
-         when1 real_field field;
+         when1 Field.is_real_field field;
          field_usages alias field _v ]
        ==> cannot_change_representation0 allocation_id);
       (let$ [allocation_id; alias; alias_source; field] =
@@ -1524,7 +1519,7 @@ let datalog_rules =
        [ usages allocation_id alias;
          sources alias alias_source;
          distinct Cols.n alias_source allocation_id;
-         when1 real_field field;
+         when1 Field.is_real_field field;
          field_usages_top alias field ]
        ==> cannot_change_representation0 allocation_id);
       (let$ [allocation_id; alias; field; _v] =
@@ -1532,7 +1527,7 @@ let datalog_rules =
        in
        [ usages allocation_id alias;
          any_source alias;
-         when1 real_field field;
+         when1 Field.is_real_field field;
          field_usages alias field _v ]
        ==> cannot_change_representation0 allocation_id);
       (let$ [allocation_id; alias; field] =
@@ -1540,7 +1535,7 @@ let datalog_rules =
        in
        [ usages allocation_id alias;
          any_source alias;
-         when1 real_field field;
+         when1 Field.is_real_field field;
          field_usages_top alias field ]
        ==> cannot_change_representation0 allocation_id);
       (* If the allocation has a source distinct from itself, its representation
@@ -1735,7 +1730,7 @@ let datalog_rules =
          rev_constructor ~from:alias relation ~base:to_;
          field_of_constructor_is_used to_ relation;
          cannot_change_representation to_;
-         when1 real_field relation;
+         when1 Field.is_real_field relation;
          cannot_unbox0 to_ ]
        ==> cannot_unbox0 allocation_id);
       (* CR-someday ncourant: allowing a symbol to be unboxed is difficult, due
