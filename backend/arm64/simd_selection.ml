@@ -103,14 +103,14 @@ let select_simd_instr op args dbg =
   | "caml_neon_int8x16_ext" ->
     let n, args = extract_constant args ~max:15 op dbg in
     Some (Extq_u8 n, args)
-  | "caml_neon_vec128_shift_left_bytes" ->
+  | "caml_simd_vec128_shift_left_bytes"| "caml_neon_vec128_shift_left_bytes" ->
     let n, args = extract_constant args ~max:15 op dbg in
     let n' = 16 - n in
     let arg = one_arg op args in
     let zero = Cmm.Cconst_vec128 ({ word0 = 0L; word1 = 0L }, dbg) in
     let args = [zero; arg] in
     Some (Extq_u8 n', args)
-  | "caml_neon_vec128_shift_right_bytes" ->
+  | "caml_simd_vec128_shift_right_bytes" | "caml_neon_vec128_shift_right_bytes" ->
     let n, args = extract_constant args ~max:15 op dbg in
     let arg = one_arg op args in
     let zero = Cmm.Cconst_vec128 ({ word0 = 0L; word1 = 0L }, dbg) in
@@ -261,26 +261,26 @@ let select_simd_instr op args dbg =
   | "caml_neon_int64x2_bitwise_and" -> Some (Andq_s64, args)
   | "caml_neon_int64x2_bitwise_xor" -> Some (Eorq_s64, args)
   | "caml_neon_int64x2_neg" -> Some (Negq_s64, args)
-  | "caml_neon_int32x4_slli" ->
+  | "caml_simd_int32x4_slli" | "caml_neon_int32x4_slli" ->
     let n, args = extract_constant args ~max:32 op dbg in
     Some (Shlq_n_u32 n, args)
-  | "caml_neon_int64x2_slli" ->
+  | "caml_simd_int64x2_slli" | "caml_neon_int64x2_slli" ->
     let n, args = extract_constant args ~max:64 op dbg in
     Some (Shlq_n_u64 n, args)
   | "caml_neon_int32x4_ushl" -> Some (Shlq_u32, args)
   | "caml_neon_int64x2_ushl" -> Some (Shlq_u64, args)
-  | "caml_neon_int32x4_srli" ->
+  | "caml_simd_int32x4_srli" | "caml_neon_int32x4_srli" ->
     let n, args = extract_constant args ~max:32 op dbg in
     Some (Shrq_n_u32 n, args)
-  | "caml_neon_int64x2_srli" ->
+  | "caml_simd_int64x2_srli" | "caml_neon_int64x2_srli" ->
     let n, args = extract_constant args ~max:64 op dbg in
     Some (Shrq_n_u64 n, args)
   | "caml_neon_int32x4_sshl" -> Some (Shlq_s32, args)
   | "caml_neon_int64x2_sshl" -> Some (Shlq_s64, args)
-  | "caml_neon_int32x4_srai" ->
+  | "caml_simd_int32x4_srai"| "caml_neon_int32x4_srai" ->
     let n, args = extract_constant args ~max:32 op dbg in
     Some (Shrq_n_s32 n, args)
-  | "caml_neon_int64x2_srai" ->
+  | "caml_simd_int64x2_srai" | "caml_neon_int64x2_srai" ->
     let n, args = extract_constant args ~max:64 op dbg in
     Some (Shrq_n_s64 n, args)
   | "caml_neon_int32x4_extract" ->
@@ -331,13 +331,13 @@ let select_simd_instr op args dbg =
   | "caml_neon_int8x16_cmpgt" -> Some (Cmp_s8 GT, args)
   | "caml_neon_int8x16_cmple" -> Some (Cmp_s8 LE, args)
   | "caml_neon_int8x16_cmplt" -> Some (Cmp_s8 LT, args)
-  | "caml_neon_int8x16_slli" ->
+  | "caml_simd_int8x16_slli" | "caml_neon_int8x16_slli" ->
     let n, args = extract_constant args ~max:8 op dbg in
     Some (Shlq_n_u8 n, args)
-  | "caml_neon_int8x16_srli" ->
+  | "caml_simd_int8x16_srli" | "caml_neon_int8x16_srli" ->
     let n, args = extract_constant args ~max:8 op dbg in
     Some (Shrq_n_u8 n, args)
-  | "caml_neon_int8x16_srai" ->
+  | "caml_simd_int8x16_srai" | "caml_neon_int8x16_srai" ->
     let n, args = extract_constant args ~max:8 op dbg in
     Some (Shrq_n_s8 n, args)
   | "caml_neon_int8x16_ushl" -> Some (Shlq_u8, args)
@@ -380,13 +380,13 @@ let select_simd_instr op args dbg =
   | "caml_neon_int16x8_cmpgt" -> Some (Cmp_s16 GT, args)
   | "caml_neon_int16x8_cmple" -> Some (Cmp_s16 LE, args)
   | "caml_neon_int16x8_cmplt" -> Some (Cmp_s16 LT, args)
-  | "caml_neon_int16x8_slli" ->
+  | "caml_simd_int16x8_slli" | "caml_neon_int16x8_slli" ->
     let n, args = extract_constant args ~max:16 op dbg in
     Some (Shlq_n_u16 n, args)
-  | "caml_neon_int16x8_srli" ->
+  | "caml_simd_int16x8_srli" | "caml_neon_int16x8_srli" ->
     let n, args = extract_constant args ~max:16 op dbg in
     Some (Shrq_n_u16 n, args)
-  | "caml_neon_int16x8_srai" ->
+  | "caml_simd_int16x8_srai" | "caml_neon_int16x8_srai" ->
     let n, args = extract_constant args ~max:16 op dbg in
     Some (Shrq_n_s16 n, args)
   | "caml_neon_int16x8_ushl" -> Some (Shlq_u16, args)
