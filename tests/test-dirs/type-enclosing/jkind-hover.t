@@ -41,6 +41,10 @@ Test that hovering over jkind annotations shows their full expansion.
   > type t6 : bits32
   > type t7 : bits32 mod portable contended
   > type t8 : void
+  > module type S = sig
+  >   val f : ('a : immediate). 'a -> 'a
+  >   val g : ('b : bits32) -> ('b : value mod portable)
+  > end
   > EOF
 
   $ hover 1 14 1
@@ -94,3 +98,20 @@ Test that hovering over jkind annotations shows their full expansion.
   type t8 : void
              ^
   "void" : "void mod non_float"
+
+  $ hover 10 18 1
+    val f : ('a : immediate). 'a -> 'a
+                    ^
+  "immediate)" : "value mod global many stateless immutable external_ non_float"
+
+  $ hover 11 18 1
+    val g : ('b : bits32) -> ('b : value mod portable)
+                    ^
+  "bits32)" : "bits32 mod non_float"
+
+# CR-someday: This is failing because of poor error recovery.
+  $ hover 11 35 2
+    val g : ('b : bits32) -> ('b : value mod portable)
+                                     ^
+  "('b : value mod portable)" : "'a"
+  "('b : bits32) -> ('b : value mod portable)" : "'b -> 'a"
