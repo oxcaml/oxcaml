@@ -97,8 +97,8 @@ end
 module M : sig type a : value non_pointer and b : value non_pointer end
 |}]
 
-(* More bad mutual recursion behavior:
-   (taken from [basics_(implicit_)unboxed_records.ml]) *)
+(* CR layouts-scannable: More bad mutual recursion behavior,
+   taken from [basics_(implicit_)unboxed_records.ml] *)
 
 type 'a t = #{ a : 'a ; a' : 'a } constraint 'a = r
 and r = #{ i : int ; f : float# }

@@ -1682,9 +1682,6 @@ module Const = struct
       let ax : _ Crossing.Axis.t = Monadic Staticity in
       Crossing.(set ax (Per_axis.max ax) min)
 
-    (* CR layouts-scannable: It may be convenient to add another helper to
-       construct scannable axes, especially as more axes are added/ported. *)
-
     let mk_jkind ~crossing ~externality (layout : Layout.Const.t) =
       let mod_bounds = Mod_bounds.create crossing ~externality in
       { layout; mod_bounds; with_bounds = No_with_bounds }
