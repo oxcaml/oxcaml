@@ -505,19 +505,19 @@ module Layout = struct
   let set_root_nullability t nullability =
     match t with
     | Any sa -> Any { sa with nullability }
-    | Sort (b, sa) -> Sort (b, { sa with nullability })
-      (*= if Sort.is_scannable_or_var b
+    | Sort (b, sa) ->
+      if Sort.is_scannable_or_var b
       then Sort (b, { sa with nullability })
-      else t *)
+      else t
     | Product _ -> t
 
   let set_root_separability t separability =
     match t with
     | Any sa -> Any { sa with separability }
-    | Sort (b, sa) -> Sort (b, { sa with separability })
-      (*= if Sort.is_scannable_or_var b
+    | Sort (b, sa) ->
+      if Sort.is_scannable_or_var b
       then Sort (b, { sa with separability })
-      else t *)
+      else t
     | Product _ -> t
 
   (* only meets at the root, meaning products are left unchanged. *)
