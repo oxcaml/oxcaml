@@ -94,8 +94,10 @@ module Witness = struct
     | Alloc { bytes; dbginfo = _ } -> fprintf ppf "allocation of %d bytes" bytes
     | Indirect_call { callee = None } -> fprintf ppf "indirect call"
     | Indirect_tailcall { callee = None } -> fprintf ppf "indirect tailcall"
-    | Indirect_call { callee = Some callee } -> fprintf ppf "indirect call %s" callee
-    | Indirect_tailcall { callee = Some callee } -> fprintf ppf "indirect tailcall %s" callee
+    | Indirect_call { callee = Some callee } ->
+      fprintf ppf "indirect call %s" callee
+    | Indirect_tailcall { callee = Some callee } ->
+      fprintf ppf "indirect tailcall %s" callee
     | Direct_call { callee } -> fprintf ppf "direct call %s" callee
     | Direct_tailcall { callee : string } ->
       fprintf ppf "direct tailcall %s" callee
@@ -1791,8 +1793,8 @@ end = struct
                increase compilation time.\n\
                (widening applied in function %s%s)" t.fun_name component_msg,
             [] )
-        | Indirect_call _ | Indirect_tailcall _ | Direct_call _ | Direct_tailcall _
-        | Extcall _ ->
+        | Indirect_call _ | Indirect_tailcall _ | Direct_call _
+        | Direct_tailcall _ | Extcall _ ->
           ( Format.dprintf "called function may allocate%s (%a)" component_msg
               Witness.print_kind w.kind,
             [] )
@@ -2685,7 +2687,9 @@ end = struct
             ~desc:"indirect tailcall" dbg
         | Tailcall_func (Indirect None) ->
           (* Sound to ignore [next] and [exn] because the call never returns. *)
-          let w = create_witnesses t (Indirect_tailcall { callee = None }) dbg in
+          let w =
+            create_witnesses t (Indirect_tailcall { callee = None }) dbg
+          in
           transform_top t ~next:Value.normal_return ~exn:Value.exn_escape w
             "indirect tailcall" dbg
         | Call_no_return { alloc = false; _ } ->
