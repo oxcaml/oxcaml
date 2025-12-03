@@ -292,9 +292,6 @@ Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no 
 type t : void
 |}]
 
-(* CR zeisbach: should a better warning be reported here? It's a bit awkward
-   to have all of the different kind modifiers jammed into one thing here. *)
-
 type t : void non_pointer non_null
 [%%expect{|
 Line 1, characters 9-34:

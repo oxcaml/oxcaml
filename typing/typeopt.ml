@@ -403,7 +403,7 @@ let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
   | _ ->
       (kind, layout)
 
-let value_kind_of_value_jkind env jkind =
+let value_kind_of_scannable_jkind env jkind =
   let layout = Jkind.get_layout_defaulting_to_scannable jkind in
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
      the principality check, as we're just trying to compute optimizations. *)
@@ -421,7 +421,7 @@ let value_kind_of_value_jkind env jkind =
     ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
       | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512),
       _ ) ->
-    Misc.fatal_error "expected a layout of value"
+    Misc.fatal_error "expected a layout of scannable"
 
 (* [value_kind] has a pre-condition that it is only called on values.  With the
    current set of sort restrictions, there are two reasons this invariant may
@@ -491,9 +491,9 @@ let nullable raw_kind = { raw_kind; nullable = Nullable }
 (* CR layouts v3: This file has two approaches for checking
    nullability. [representation_properties_type] does this by calling
    [Ctype.check_type_nullability] (which is just [constrain_type_jkind] on [any
-   mod non_null]), while [add_nullability_from_jkind] just pulls it out of a
-   kind (and sometimes we compute a jkind with [estimate_type_jkind] for that
-   purpose).
+   mod non_null]), while [add_nullability_from_scannable_jkind] just pulls it
+   out of a kind (and sometimes we compute a jkind with [estimate_type_jkind]
+   for that purpose).
 
    The former is a bit more expensive (though quite cheap in the places where we
    are doing it now, as the type has already been scraped) but will give a fully
@@ -501,13 +501,12 @@ let nullable raw_kind = { raw_kind; nullable = Nullable }
    have a jkind. We should pick one, or rationalize why there are two.
 *)
 
-(* CR zeisbach: figure out if this works or not, and change accordingly.
-   Also a lot of documentation may become stale. Probably ask about this! *)
-let add_nullability_from_jkind jkind raw_kind =
+let add_nullability_from_scannable_jkind jkind raw_kind =
   let nullable =
     match Jkind.get_nullability jkind with
-    | Non_null -> Non_nullable
-    | Maybe_null -> Nullable
+    | Some Non_null -> Non_nullable
+    | Some Maybe_null -> Nullable
+    | None -> Misc.fatal_error "expected a layout of scannable"
   in
   { raw_kind; nullable }
 
@@ -646,8 +645,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       if cannot_proceed () then
         num_nodes_visited,
-        add_nullability_from_jkind decl.type_jkind
-          (value_kind_of_value_jkind env decl.type_jkind)
+        add_nullability_from_scannable_jkind decl.type_jkind
+          (value_kind_of_scannable_jkind env decl.type_jkind)
       else
         let visited = Numbers.Int.Set.add (get_id ty) visited in
         (* Default of [Pgenval] is currently safe for the missing cmi fallback
@@ -679,8 +678,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
             "Typeopt.value_kind: non-unary unboxed record can't have kind value"
         | Type_abstract _ ->
           num_nodes_visited,
-          add_nullability_from_jkind decl.type_jkind
-            (value_kind_of_value_jkind env decl.type_jkind)
+          add_nullability_from_scannable_jkind decl.type_jkind
+            (value_kind_of_scannable_jkind env decl.type_jkind)
         | Type_open -> num_nodes_visited, non_nullable Pgenval
     end
   | Ttuple labeled_fields ->
@@ -712,7 +711,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     else non_nullable Pintval
   | _ ->
     num_nodes_visited,
-    add_nullability_from_jkind (Ctype.estimate_type_jkind env ty) Pgenval
+    add_nullability_from_scannable_jkind (Ctype.estimate_type_jkind env ty) Pgenval
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty
