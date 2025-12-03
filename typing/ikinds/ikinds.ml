@@ -103,8 +103,7 @@ module JK = struct
             ConstrTbl.add ctx.constr_to_coeffs c (base_node, coeff_nodes);
             let instantiate (name : Ldd.Name.t) : kind =
               match name with
-              | Ldd.Name.Param _ -> Ldd.var (Ldd.rigid name)
-              | Ldd.Name.Unknown _ -> Ldd.var (Ldd.rigid name)
+              | Ldd.Name.Param _  | Ldd.Name.Unknown _ -> Ldd.var (Ldd.rigid name)
               | Ldd.Name.Atom { constr = constr'; arg_index } ->
                   if Path.compare constr' c = 0
                   then Ldd.var (Ldd.rigid name)
