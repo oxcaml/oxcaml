@@ -1299,8 +1299,6 @@ let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
 let unsigned_div_int c1 c2 dbg =
   match get_const c1, get_const c2 with
   | _, Some 0n -> divide_by_zero c1 ~dbg
-  | _, Some 1n -> c1
-  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.unsigned_div n1 n2)
   | _, _ -> Cop (Cdivi { signed = false }, [c1; c2], dbg)
 
 let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
@@ -1362,8 +1360,6 @@ let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
 let unsigned_mod_int c1 c2 dbg =
   match get_const c1, get_const c2 with
   | _, Some 0n -> divide_by_zero c1 ~dbg
-  | _, Some 1n -> bind "dividend" c1 (fun _ -> Cconst_int (0, dbg))
-  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.unsigned_rem n1 n2)
   | _, _ -> Cop (Cmodi { signed = false }, [c1; c2], dbg)
 
 (* Bool *)
