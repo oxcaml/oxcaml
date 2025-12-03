@@ -82,12 +82,7 @@ let emit_jsir i
     ({ program; imported_compilation_units } :
       Flambda2_to_jsir.To_jsir_result.program) =
   let cmj = Unit_info.cmj i.target in
-  let oc = open_out_bin (Unit_info.Artifact.filename cmj) in
-  Misc.try_finally
-    ~always:(fun () -> close_out oc)
-    ~exceptionally:(fun () ->
-      Misc.remove_file (Unit_info.Artifact.filename cmj))
-    (fun () ->
+  Misc.protect_output_to_file (Unit_info.Artifact.filename cmj) (fun oc ->
       output_string oc Config.cmj_magic_number;
       (* We include the highest used variable in the translation, so that Js_of_ocaml
          can read this number and update its own state accordingly. *)

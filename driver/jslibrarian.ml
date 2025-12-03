@@ -54,11 +54,7 @@ let copy_object_file oc name =
       raise x
 
 let create_archive file_list lib_name =
-  let outchan = open_out_bin lib_name in
-  Misc.try_finally
-    ~always:(fun () -> close_out outchan)
-    ~exceptionally:(fun () -> remove_file lib_name)
-    (fun () ->
+  Misc.protect_output_to_file lib_name (fun outchan ->
       output_string outchan cmja_magic_number;
       let ofs_pos_toc = pos_out outchan in
       output_binary_int outchan 0;

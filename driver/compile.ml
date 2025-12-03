@@ -86,13 +86,7 @@ let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
 let emit_bytecode i
       (bytecode, required_globals, main_module_block_format, arg_descr) =
   let cmo = Unit_info.cmo i.target in
-  let oc = open_out_bin (Unit_info.Artifact.filename cmo) in
-  Misc.try_finally
-    ~always:(fun () -> close_out oc)
-    ~exceptionally:(fun () ->
-       Misc.remove_file (Unit_info.Artifact.filename cmo)
-    )
-    (fun () ->
+  Misc.protect_output_to_file (Unit_info.Artifact.filename cmo) (fun oc ->
        bytecode
        |> Profile.(record ~accumulate:true generate)
          (Emitcode.to_file oc i.module_name cmo ~required_globals

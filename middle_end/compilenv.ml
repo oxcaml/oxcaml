@@ -289,14 +289,13 @@ let write_unit_info info filename =
     uir_sections_length = total_length;
     uir_external_symbols = Array.of_list info.ui_external_symbols;
   } in
-  let oc = open_out_bin filename in
+  Misc.protect_output_to_file filename (fun oc ->
   output_string oc cmx_magic_number;
   output_value oc raw_info;
   Array.iter (output_string oc) serialized_sections;
   flush oc;
   let crc = Digest.file filename in
-  Digest.output oc crc;
-  close_out oc
+  Digest.output oc crc)
 
 let save_unit_info filename ~main_module_block_format ~arg_descr =
   current_unit.ui_imports_cmi <- Env.imports();

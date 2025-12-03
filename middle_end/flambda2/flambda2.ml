@@ -39,7 +39,7 @@ let dump_to_target_if_any main_dump_ppf target ~header ~f a =
     Format.fprintf main_dump_ppf "\n%t%s:%t@ %a@." Flambda_colours.each_file
       header Flambda_colours.pop f a
   | File filename ->
-    Misc.protect_writing_to_file ~filename ~f:(fun out ->
+    Misc.protect_output_to_file filename (fun out ->
         let ppf = Format.formatter_of_out_channel out in
         f ppf a;
         Format.pp_print_flush ppf ())

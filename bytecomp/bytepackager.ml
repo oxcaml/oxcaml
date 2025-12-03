@@ -274,8 +274,7 @@ let package_object_files ~ppf_dump files target coercion =
             List.fold_right CU.Set.add cu_required_compunits required_compunits)
       members CU.Set.empty
   in
-  let oc = open_out_bin targetfile in
-  Fun.protect ~finally:(fun () -> close_out oc) (fun () ->
+  Misc.protect_output_to_file targetfile (fun oc ->
     output_string oc Config.cmo_magic_number;
     let pos_depl = pos_out oc in
     output_binary_int oc 0;

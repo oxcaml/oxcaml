@@ -476,14 +476,15 @@ val output_to_file_via_temporary:
            the channel is closed and the temporary file is renamed to
            [filename]. *)
 
-val protect_writing_to_file
-   : filename:string
-  -> f:(out_channel -> 'a)
-  -> 'a
-      (** Open the given [filename] for writing (in binary mode), pass
-          the [out_channel] to the given function, then close the
-          channel. If the function raises an exception then [filename]
-          will be removed. *)
+val protect_output_to_file : string -> (out_channel -> 'a) -> 'a
+      (** Open the given filename for binary writing, pass the [out_channel] to
+          the given function, then close the channel. If the function raises an
+          exception, then [filename] will be removed and the backtrace is
+          printed; otherwise, the file name is recorded, and the file can still
+          be retroactively removed by [remove_output_files]. *)
+
+val remove_output_files : unit -> unit
+(** Remove all successful writes done by [protect_output_to_file]. *)
 
 val mk_temp_dir : ?perms: int -> string -> string -> string
        (** Create a temporary directory with a random number in the name. *)
