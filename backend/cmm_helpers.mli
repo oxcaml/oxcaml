@@ -163,23 +163,30 @@ val tag_int : expression -> Debuginfo.t -> expression
 (** Integer untagging. [untag_int x = (x asr 1)] *)
 val untag_int : expression -> Debuginfo.t -> expression
 
-(** division of two register-width integers *)
+(** Unsigned integer untagging. [untag_int x = (x lsr 1)] *)
+val unsigned_untag_int : expression -> Debuginfo.t -> expression
+
+(** signed division of two register-width integers *)
 val div_int :
   ?dividend_cannot_be_min_int:bool ->
-  signed:bool ->
   expression ->
   expression ->
   Debuginfo.t ->
   expression
 
-(** remainder of two register-width integers *)
+(** unsigned division of two register-width integers *)
+val unsigned_div_int : expression -> expression -> Debuginfo.t -> expression
+
+(** signed remainder of two register-width integers *)
 val mod_int :
   ?dividend_cannot_be_min_int:bool ->
-  signed:bool ->
   expression ->
   expression ->
   Debuginfo.t ->
   expression
+
+(** unsigned remainder of two register-width integers *)
+val unsigned_mod_int : expression -> expression -> Debuginfo.t -> expression
 
 (** Boolean negation *)
 val mk_not : Debuginfo.t -> expression -> expression
@@ -650,9 +657,13 @@ val sub_int_caml : binary_primitive
 
 val mul_int_caml : binary_primitive
 
-val div_int_caml : signed:bool -> binary_primitive
+val div_int_caml : binary_primitive
 
-val mod_int_caml : signed:bool -> binary_primitive
+val unsigned_div_int_caml : binary_primitive
+
+val mod_int_caml : binary_primitive
+
+val unsigned_mod_int_caml : binary_primitive
 
 val and_int_caml : binary_primitive
 
@@ -1619,6 +1630,8 @@ module Scalar_type : sig
 
     val nativeint : t
 
+    val unsigned_nativeint : t
+
     val create_exn : bit_width:int -> signedness:Signedness.t -> t
 
     val bit_width : t -> int
@@ -1632,6 +1645,8 @@ module Scalar_type : sig
     type t [@@immediate]
 
     val immediate : t
+
+    val unsigned_immediate : t
 
     val create_exn :
       bit_width_including_tag_bit:int -> signedness:Signedness.t -> t
@@ -1651,6 +1666,8 @@ module Scalar_type : sig
       | Tagged of Tagged_integer.t
 
     val nativeint : t
+
+    val unsigned_nativeint : t
 
     (** Gets the integer resulting from untagging the integeral iff it is tagged.
 

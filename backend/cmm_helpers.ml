@@ -1006,6 +1006,14 @@ let untag_int i dbg =
     lsr_const c (n + 1) dbg
   | c -> asr_const c 1 dbg
 
+let unsigned_untag_int i dbg =
+  match i with
+  | Cconst_int (n, _) -> Cconst_int (n lsr 1, dbg)
+  | Cop (Cor, [Cop (Clsr, [c; Cconst_int (n, _)], _); Cconst_int (1, _)], _)
+    when n > 0 && is_defined_shift (n + 1) ->
+    lsr_const c (n + 1) dbg
+  | c -> lsr_const c 1 dbg
+
 let mk_not dbg cmm =
   match cmm with
   | Cop
@@ -1211,20 +1219,18 @@ let divide_by_zero dividend ~dbg =
   bind "dividend" dividend (fun _ ->
       raise_symbol dbg "caml_exn_Division_by_zero")
 
-let div_int ?dividend_cannot_be_min_int ~signed c1 c2 dbg =
+let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
   let if_divisor_is_negative_one ~dividend ~dbg = neg_int dividend dbg in
-  (* CR jrayman: [signed_div_int] and [unsigned_div_int] *)
   match get_const c1, get_const c2 with
   | _, Some 0n -> divide_by_zero c1 ~dbg
   | _, Some 1n -> c1
-  | Some n1, Some n2 when signed ->
-    natint_const_untagged dbg (Nativeint.div n1 n2)
-  | _, Some -1n when signed -> if_divisor_is_negative_one ~dividend:c1 ~dbg
-  | _, Some divisor when signed ->
+  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.div n1 n2)
+  | _, Some -1n -> if_divisor_is_negative_one ~dividend:c1 ~dbg
+  | _, Some divisor ->
     if divisor = Nativeint.min_int
     then
-      (* integer division (signed or unsigned) by min_int always returns 0
-         unless the dividend is also min_int, in which case it's 1. *)
+      (* integer division by min_int always returns 0 unless the dividend is
+         also min_int, in which case it's 1. *)
       Cifthenelse
         ( Cop (Ccmpi Ceq, [c1; Cconst_natint (divisor, dbg)], dbg),
           dbg,
@@ -1285,23 +1291,27 @@ let div_int ?dividend_cannot_be_min_int ~signed c1 c2 dbg =
           in
           add_int q sign_bit dbg)
   | _, _ ->
-    if not signed
-    then Cop (Cdivi { signed }, [c1; c2], dbg)
-    else
-      make_safe_divmod ?dividend_cannot_be_min_int ~if_divisor_is_negative_one
-        (Cdivi { signed })
-        c1 c2 ~dbg
+    make_safe_divmod ?dividend_cannot_be_min_int ~if_divisor_is_negative_one
+      (Cdivi { signed = true })
+      c1 c2 ~dbg
 
-let mod_int ?dividend_cannot_be_min_int ~signed c1 c2 dbg =
+let unsigned_div_int c1 c2 dbg =
+  match get_const c1, get_const c2 with
+  | _, Some 0n -> divide_by_zero c1 ~dbg
+  | _, Some 1n -> c1
+  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.unsigned_div n1 n2)
+  | _, _ -> Cop (Cdivi { signed = false }, [c1; c2], dbg)
+
+let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
   let if_divisor_is_positive_or_negative_one ~dividend ~dbg =
     bind "dividend" dividend (fun _ -> Cconst_int (0, dbg))
   in
   match get_const c1, get_const c2 with
   | _, Some 0n -> divide_by_zero c1 ~dbg
-  | _, Some (1n | -1n) when signed ->
+  | _, Some (1n | -1n) ->
     if_divisor_is_positive_or_negative_one ~dividend:c1 ~dbg
   | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.rem n1 n2)
-  | _, Some n when signed ->
+  | _, Some n ->
     if n = Nativeint.min_int
     then
       (* Similarly to the division by min_int almost always being 0, modulo
@@ -1341,15 +1351,19 @@ let mod_int ?dividend_cannot_be_min_int ~signed c1 c2 dbg =
           sub_int c1 t dbg)
     else
       bind "dividend" c1 (fun c1 ->
-          sub_int c1 (mul_int (div_int ~signed c1 c2 dbg) c2 dbg) dbg)
+          sub_int c1 (mul_int (div_int c1 c2 dbg) c2 dbg) dbg)
   | _, _ ->
-    if not signed
-    then Cop (Cmodi { signed }, [c1; c2], dbg)
-    else
-      make_safe_divmod ?dividend_cannot_be_min_int
-        ~if_divisor_is_negative_one:if_divisor_is_positive_or_negative_one
-        (Cmodi { signed })
-        c1 c2 ~dbg
+    make_safe_divmod ?dividend_cannot_be_min_int
+      ~if_divisor_is_negative_one:if_divisor_is_positive_or_negative_one
+      (Cmodi { signed = true })
+      c1 c2 ~dbg
+
+let unsigned_mod_int c1 c2 dbg =
+  match get_const c1, get_const c2 with
+  | _, Some 0n -> divide_by_zero c1 ~dbg
+  | _, Some 1n -> bind "dividend" c1 (fun _ -> Cconst_int (0, dbg))
+  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.unsigned_rem n1 n2)
+  | _, _ -> Cop (Cmodi { signed = false }, [c1; c2], dbg)
 
 (* Bool *)
 
@@ -4087,26 +4101,42 @@ let mul_int_caml arg1 arg2 dbg =
     incr_int (mul_int (untag_int c1 dbg) (decr_int c2 dbg) dbg) dbg
   | c1, c2 -> incr_int (mul_int (decr_int c1 dbg) (untag_int c2 dbg) dbg) dbg
 
-let div_int_caml ~signed arg1 arg2 dbg =
+let div_int_caml arg1 arg2 dbg =
   let dividend_cannot_be_min_int =
     (* Since caml integers are tagged, we know that they when they're untagged,
        they can't be [Nativeint.min_int] *)
     true
   in
   tag_int
-    (div_int ~dividend_cannot_be_min_int ~signed (untag_int arg1 dbg)
+    (div_int ~dividend_cannot_be_min_int (untag_int arg1 dbg)
        (untag_int arg2 dbg) dbg)
     dbg
 
-let mod_int_caml ~signed arg1 arg2 dbg =
+let unsigned_div_int_caml arg1 arg2 dbg =
+  tag_int
+    (unsigned_div_int
+       (unsigned_untag_int arg1 dbg)
+       (unsigned_untag_int arg2 dbg)
+       dbg)
+    dbg
+
+let mod_int_caml arg1 arg2 dbg =
   let dividend_cannot_be_min_int =
     (* Since caml integers are tagged, we know that they when they're untagged,
        they can't be [Nativeint.min_int] *)
     true
   in
   tag_int
-    (mod_int ~dividend_cannot_be_min_int ~signed (untag_int arg1 dbg)
+    (mod_int ~dividend_cannot_be_min_int (untag_int arg1 dbg)
        (untag_int arg2 dbg) dbg)
+    dbg
+
+let unsigned_mod_int_caml arg1 arg2 dbg =
+  tag_int
+    (unsigned_mod_int
+       (unsigned_untag_int arg1 dbg)
+       (unsigned_untag_int arg2 dbg)
+       dbg)
     dbg
 
 let and_int_caml arg1 arg2 dbg = and_int arg1 arg2 dbg
@@ -5340,6 +5370,9 @@ module Scalar_type = struct
         (bit_width t)
 
     let nativeint = create_exn ~bit_width:arch_bits ~signedness:Signed
+
+    let unsigned_nativeint =
+      create_exn ~bit_width:arch_bits ~signedness:Unsigned
   end
 
   (** An {!Integer.t} but with the additional stipulation that its container must
@@ -5353,6 +5386,9 @@ module Scalar_type = struct
 
     let immediate =
       create_exn ~bit_width_including_tag_bit:arch_bits ~signedness:Signed
+
+    let unsigned_immediate =
+      create_exn ~bit_width_including_tag_bit:arch_bits ~signedness:Unsigned
 
     let[@inline] bit_width_including_tag_bit t = bit_width t
 
@@ -5379,6 +5415,8 @@ module Scalar_type = struct
       | Tagged of Tagged_integer.t
 
     let nativeint = Untagged Integer.nativeint
+
+    let unsigned_nativeint = Untagged Integer.unsigned_nativeint
 
     let[@inline] untagged_or_identity = function
       | Untagged t -> t
