@@ -37,6 +37,10 @@ Test that hovering over jkind annotations shows their full expansion.
   > type t2 : value mod portable
   > type ('a : immediate) t3 : value
   > type 'a t4 : immutable_data mod global with 'a
+  > type t5 : value mod everything
+  > type t6 : bits32
+  > type t7 : bits32 mod portable contended
+  > type t8 : void
   > EOF
 
   $ hover 1 14 1
@@ -68,3 +72,25 @@ Test that hovering over jkind annotations shows their full expansion.
   "immutable_data " : "value mod forkable unyielding many stateless immutable non_float"
   "immutable_data mod global " : "value mod global many stateless immutable non_float"
   "type 'a t4 : immutable_data mod global with 'a" : "type 'a t4 : immutable_data mod global unforkable yielding with 'a"
+
+  $ hover 5 11 2
+  type t5 : value mod everything
+             ^
+  "value " : "value"
+  "value mod everything" : "value mod global many stateless immutable external_"
+
+  $ hover 6 11 1
+  type t6 : bits32
+             ^
+  "bits32" : "bits32 mod non_float"
+
+  $ hover 7 11 2
+  type t7 : bits32 mod portable contended
+             ^
+  "bits32 " : "bits32 mod non_float"
+  "bits32 mod portable contended" : "bits32 mod portable contended non_float"
+
+  $ hover 8 11 1
+  type t8 : void
+             ^
+  "void" : "void mod non_float"
