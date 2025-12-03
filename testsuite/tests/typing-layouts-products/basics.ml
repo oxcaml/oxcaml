@@ -222,20 +222,6 @@ Error: This type "#(int * int64)" should be an instance of type
 type t6_wrong_inner_record = #{ i : int; i64 : int64 }
 and ('a : value & bits64) t6_wrong = 'a t7_wrong
 and 'a t7_wrong = { x : t6_wrong_inner_record t6_wrong }
-(* CR zeisbach: previous error message
-
--Line 1, characters 0-54:
--1 | type t6_wrong_inner_record = #{ i : int; i64 : int64 }
--    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
--Error:
--       The layout of t6_wrong_inner_record is value maybe_separable & bits64
--         because it is an unboxed record.
--       But the layout of t6_wrong_inner_record must be a sublayout of
--           value & bits64
--         because of the annotation on 'a in the declaration of the type
--                                      t6_wrong.
-
-*)
 [%%expect{|
 Line 2, characters 37-48:
 2 | and ('a : value & bits64) t6_wrong = 'a t7_wrong
@@ -254,7 +240,6 @@ Error: Layout mismatch in final type declaration consistency check.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}]
-(* CR layouts v7.2: The above has a very bad error message. *)
 
 (* Just like t6/t7, but with the annotation on the other (the order doesn't
    matter) *)

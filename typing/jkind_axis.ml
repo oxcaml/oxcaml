@@ -115,7 +115,6 @@ module Separability = struct
 end
 
 module Axis = struct
-  (* CR zeisbach: should this be eliminated? Or is this not worth doing *)
   module Nonmodal = struct
     type 'a t = Externality : Externality.t t
   end
@@ -171,7 +170,6 @@ module Per_axis = struct
     let print : type a. a t -> Format.formatter -> a -> unit = function
       | Externality -> Externality.print
 
-    (* CR zeisbach: is this necessary any more? *)
     let eq_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
      fun a b -> match a, b with Externality, Externality -> Some Refl
   end
