@@ -663,7 +663,7 @@ let tagged_immediate : C.Scalar_type.Integral.t =
   Tagged C.Scalar_type.Tagged_integer.immediate
 
 let unsigned_tagged_immediate : C.Scalar_type.Integral.t =
-  Tagged C.Scalar_type.Tagged_integer.immediate
+  Tagged C.Scalar_type.Tagged_integer.unsigned_immediate
 
 let integral_of_standard_int : K.Standard_int.t -> C.Scalar_type.Integral.t =
   function
@@ -761,9 +761,12 @@ let phys_equal _env dbg op x y =
   | Eq -> C.eq ~dbg x y
   | Neq -> C.neq ~dbg x y
 
-(* CR jrayman: A bit of a misnomer. Should be sign_or_zero_extended *)
-let requires_sign_extended_operands : P.binary_int_arith_op -> bool = function
-  | Div (Signed | Unsigned) | Mod (Signed | Unsigned) ->
+(* Does sign extension, zero extension, or none have to be performed on `%eax`
+   and `%ebx` before `op %eax %ebx` is transformed into `op %rax %rbx`? *)
+let required_operand_extension :
+    P.binary_int_arith_op -> Scalar.Signedness.t option = function
+  | Div signedness | Mod signedness ->
+    Some signedness
     (* Note that it would be wrong to apply [C.low_bits] to operands for div and
        mod.
 
@@ -781,14 +784,13 @@ let requires_sign_extended_operands : P.binary_int_arith_op -> bool = function
        backend insert sign-extensions if it doesn't support operations on n-bit
        physical registers. There was a prototype developed of this but it was
        quite complicated and didn't get merged.) *)
-    true
   | Add | Sub | Mul ->
     (* https://en.wikipedia.org/wiki/Modular_arithmetic - these operations are
        compatible with modular arithmetic *)
-    false
+    None
   | And | Or | Xor ->
     (* bitwise operations are clearly compatible *)
-    false
+    None
 
 let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     (op : P.binary_int_arith_op) x y =
@@ -801,16 +803,25 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
         C.Scalar_type.Integral.static_cast ~dbg ~src:kind ~dst:operator_type
           operand
       in
-      if requires_sign_extended_operands op
-      then operand
-      else
-        let bits =
-          match kind with
-          | Untagged untagged -> C.Scalar_type.Integer.bit_width untagged
-          | Tagged tagged ->
-            C.Scalar_type.Tagged_integer.bit_width_including_tag_bit tagged
-        in
-        C.low_bits ~bits operand ~dbg
+      let bits =
+        match kind with
+        | Untagged untagged -> C.Scalar_type.Integer.bit_width untagged
+        | Tagged tagged ->
+          C.Scalar_type.Tagged_integer.bit_width_including_tag_bit tagged
+      in
+      match required_operand_extension op with
+      | None -> C.low_bits ~bits operand ~dbg
+      | Some Signed -> operand
+      | Some Unsigned ->
+        if bits = C.arch_bits
+        then C.low_bits ~bits operand ~dbg
+        else
+          Cmm.Cop
+            ( Cand,
+              [ C.low_bits ~bits operand ~dbg;
+                Cconst_natint
+                  (Nativeint.pred (Nativeint.shift_left 1n bits), dbg) ],
+              dbg )
     in
     let x = prepare_operand x in
     let y = prepare_operand y in
