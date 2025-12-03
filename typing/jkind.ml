@@ -479,19 +479,19 @@ module Layout = struct
   let set_root_nullability t nullability =
     match t with
     | Any sa -> Any { sa with nullability }
-    | Sort (b, sa) -> Sort (b, { sa with nullability })
-      (*= if Sort.is_scannable_or_var b
+    | Sort (b, sa) ->
+      if Sort.is_scannable_or_var b
       then Sort (b, { sa with nullability })
-      else t *)
+      else t
     | Product _ -> t
 
   let set_root_separability t separability =
     match t with
     | Any sa -> Any { sa with separability }
-    | Sort (b, sa) -> Sort (b, { sa with separability })
-      (*= if Sort.is_scannable_or_var b
+    | Sort (b, sa) ->
+      if Sort.is_scannable_or_var b
       then Sort (b, { sa with separability })
-      else t *)
+      else t
     | Product _ -> t
 
   (* only meets at the root, meaning products are left unchanged. *)
@@ -2139,8 +2139,7 @@ module Const = struct
           then Externality.max
           else Mod_bounds.externality actual
         in
-        Some
-          (Mod_bounds.create crossing_diff ~externality)
+        Some (Mod_bounds.create crossing_diff ~externality)
 
     let get_modal_bounds ~(base : Mod_bounds.t) (actual : Mod_bounds.t) =
       match diff base actual with
@@ -2765,9 +2764,7 @@ let has_with_bounds (type r) (t : (_ * r) jkind) =
 (* construction *)
 
 let of_new_sort_var ~why ~level =
-  let jkind, sort =
-    Jkind_desc.of_new_sort_var ~level Scannable_axes.max
-  in
+  let jkind, sort = Jkind_desc.of_new_sort_var ~level Scannable_axes.max in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
 let of_new_sort ~why ~level = fst (of_new_sort_var ~why ~level)
@@ -3141,8 +3138,7 @@ let for_array_argument =
 let for_array_element_sort ~level =
   let jkind_desc, sort =
     Jkind_desc.of_new_sort_var ~level
-      { nullability = Maybe_null; separability = Separable
-  }
+      { nullability = Maybe_null; separability = Separable }
   in
   let jkind = { for_array_argument.jkind with layout = jkind_desc.layout } in
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
@@ -4283,7 +4279,8 @@ let is_max (t : (_ * allowed) jkind) =
   match t with
   (* This doesn't do any mutation because mutating a sort variable can't make it
      any, and modal upper bounds are constant. *)
-  | { jkind = { layout = Any sa; mod_bounds; with_bounds = No_with_bounds }; _ } ->
+  | { jkind = { layout = Any sa; mod_bounds; with_bounds = No_with_bounds }; _ }
+    ->
     Scannable_axes.is_max sa && Mod_bounds.is_max mod_bounds
   | { jkind = { layout = _; mod_bounds = _; with_bounds = No_with_bounds }; _ }
     ->

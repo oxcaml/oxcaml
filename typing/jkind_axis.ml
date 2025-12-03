@@ -70,7 +70,7 @@ module Externality = struct
   let to_string = function
     | External -> "external_"
     | External64 -> "external64"
-    | Internal ->"internal"
+    | Internal -> "internal"
 
   let print ppf t = Format.fprintf ppf "%s" (to_string t)
 
