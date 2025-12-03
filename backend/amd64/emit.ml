@@ -1653,6 +1653,18 @@ let to_res_with_width loc instr i =
   | Some R32 -> res32 instr i
   | Some (R64 | R128 | R256) | None -> res instr i
 
+let to_addr_width loc : X86_ast.data_type =
+  match Simd.loc_memory_width loc with
+  | M8 -> BYTE
+  | M16 -> WORD
+  | M32 -> DWORD
+  | M64 -> QWORD
+  | M128 -> VEC128
+  | M256 -> VEC256
+  | M32X | M32Y | M64X | M64Y ->
+    (* Will not be used by the assembler. *)
+    NONE
+
 let emit_simd_sanitize ~address ~instr ~loc ~kind =
   if Config.with_address_sanitizer && !Arch.is_asan_enabled
   then
@@ -1689,8 +1701,8 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
           match Simd.loc_allows_mem arg.loc, mode with
           | true, Some (mode, kind) ->
             let n = num_args_addressing mode in
-            (* Emitter does not use [typ], so NONE is ok. *)
-            let address = addressing mode NONE instr idx in
+            let typ = to_addr_width arg.loc in
+            let address = addressing mode typ instr idx in
             emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
             idx + n, address :: args
           | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args)

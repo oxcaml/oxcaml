@@ -22,6 +22,8 @@ module Sse = struct
   [@@noalloc] [@@builtin]
   external load_unaligned : addr -> (int64x2[@unboxed]) = "" "caml_sse_vec128_load_unaligned"
   [@@noalloc] [@@builtin]
+  external load_known_unaligned : addr -> (int64x2[@unboxed]) = "" "caml_sse3_vec128_load_known_unaligned"
+  [@@noalloc] [@@builtin]
   external store_aligned : addr -> (int64x2[@unboxed]) -> void = "" "caml_sse_vec128_store_aligned"
   [@@noalloc] [@@builtin]
   external store_unaligned : addr -> (int64x2[@unboxed]) -> void = "" "caml_sse_vec128_store_unaligned"
@@ -34,8 +36,14 @@ module Sse = struct
     let x' = load_unaligned mem in
     eq (int64x2_low_int64 x) (int64x2_high_int64 x)
        (int64x2_low_int64 x') (int64x2_high_int64 x');
+    let x' = load_known_unaligned mem in
+    eq (int64x2_low_int64 x) (int64x2_high_int64 x)
+       (int64x2_low_int64 x') (int64x2_high_int64 x');
     let _ = store_unaligned (next mem) x in
     let x' = load_unaligned (next mem) in
+    eq (int64x2_low_int64 x) (int64x2_high_int64 x)
+       (int64x2_low_int64 x') (int64x2_high_int64 x');
+    let x' = load_known_unaligned (next mem) in
     eq (int64x2_low_int64 x) (int64x2_high_int64 x)
        (int64x2_low_int64 x') (int64x2_high_int64 x');
     let x = int64x2_of_int64s 3L 4L in
@@ -153,6 +161,8 @@ module Avx = struct
   [@@noalloc] [@@builtin]
   external load_unaligned : addr -> (int64x4[@unboxed]) = "" "caml_avx_vec256_load_unaligned"
   [@@noalloc] [@@builtin]
+  external load_known_unaligned : addr -> (int64x4[@unboxed]) = "" "caml_avx_vec256_load_known_unaligned"
+  [@@noalloc] [@@builtin]
   external store_aligned : addr -> (int64x4[@unboxed]) -> void = "" "caml_avx_vec256_store_aligned"
   [@@noalloc] [@@builtin]
   external store_unaligned : addr -> (int64x4[@unboxed]) -> void = "" "caml_avx_vec256_store_unaligned"
@@ -164,8 +174,12 @@ module Avx = struct
     let _ = store_unaligned mem x in
     let x' = load_unaligned mem in
     eq_int64x4 ~result:x' ~expect:x;
+    let x' = load_known_unaligned mem in
+    eq_int64x4 ~result:x' ~expect:x;
     let _ = store_unaligned (next mem) x in
     let x' = load_unaligned (next mem) in
+    eq_int64x4 ~result:x' ~expect:x;
+    let x' = load_known_unaligned (next mem) in
     eq_int64x4 ~result:x' ~expect:x;
     let x = int64x4_of_int64s 5L 6L 7L 8L in
     let _ = store_aligned mem x in

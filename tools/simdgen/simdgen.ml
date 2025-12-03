@@ -154,7 +154,8 @@ let rec parse_args mnemonic acc encs args imm res =
     let enc =
       match String.trim enc with
       | "ModRM:reg" -> RM_r
-      | "ModRM:r/m" | "BaseReg" -> RM_rm
+      | "ModRM:r/m" -> RM_rm
+      | "BaseReg" (* Vector address, always r/m *) -> RM_rm
       | "VEX.vvvv" -> Vex_v
       | "NA" | "<XMM0>" | "<RAX>" | "<RDI>" | "<RCX>" | "<RDX>" | "implicit" ->
         Implicit

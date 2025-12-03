@@ -16,7 +16,13 @@
 
 open! Int_replace_polymorphic_compare
 
-(* SIMD instruction selection for AMD64 *)
+(* SIMD instruction selection for AMD64.
+
+   Some SIMD instructions have two encodings that exhibit identical behavior,
+   but are intended for use on integer vs. float data (e.g. pxor vs xorpd). On
+   some CPUs, it can be more efficient to forward the result of an integer
+   instruction to further integer instructions, and likewise for floats.
+   However, we ignore this distinction and only expose one variant. *)
 
 open Arch
 open Amd64_simd_instrs
@@ -444,8 +450,12 @@ let select_operation_sse3 ~dbg:_ op args =
   then None
   else
     match op with
+    | "caml_sse3_vec128_load_known_unaligned" ->
+      simd_load_sse_or_avx ~mode:Arch.identity_addressing lddqu vlddqu_X_m128
+        args
     | "caml_sse3_vec128_load_broadcast64" ->
-      simd_load_sse_or_avx ~mode:(Iindexed 0) movddup vmovddup_X_Xm64 args
+      simd_load_sse_or_avx ~mode:Arch.identity_addressing movddup
+        vmovddup_X_Xm64 args
     | "caml_sse3_float32x4_addsub" ->
       sse_or_avx addsubps vaddsubps_X_X_Xm128 args
     | "caml_sse3_float64x2_addsub" ->
@@ -504,7 +514,8 @@ let select_operation_sse41 ~dbg op args =
   else
     match op with
     | "caml_sse41_vec128_load_aligned_uncached" ->
-      simd_load_sse_or_avx ~mode:(Iindexed 0) movntdqa vmovntdqa_X_m128 args
+      simd_load_sse_or_avx ~mode:Arch.identity_addressing movntdqa
+        vmovntdqa_X_m128 args
     | "caml_sse41_vec128_blend_16" ->
       let i, args = extract_constant args ~max:255 op in
       sse_or_avx pblendw vpblendw_X_X_Xm128 ~i args
@@ -711,6 +722,8 @@ let select_operation_avx ~dbg:_ op args =
       simd_load ~mode:Arch.identity_addressing vmovapd_Y_Ym256 args
     | "caml_avx_vec256_load_unaligned" ->
       simd_load ~mode:Arch.identity_addressing vmovupd_Y_Ym256 args
+    | "caml_avx_vec256_load_known_unaligned" ->
+      simd_load ~mode:Arch.identity_addressing vlddqu_Y_m256 args
     | "caml_avx_vec256_store_aligned" ->
       simd_store ~mode:Arch.identity_addressing vmovapd_m256_Y args
     | "caml_avx_vec256_store_unaligned" ->

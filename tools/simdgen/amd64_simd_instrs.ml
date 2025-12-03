@@ -1647,7 +1647,7 @@ let lddqu = {
     id = Lddqu
   ; ext = [|SSE3|]
   ; args = [|{ loc = Temp [|M128|]; enc = RM_rm }|]
-  ; res = Res { loc = Temp [|XMM|]; enc = RM_r }
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "lddqu"
   ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 240 }
