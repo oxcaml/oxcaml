@@ -23,6 +23,9 @@ arm64/vectorize_specific.ml
 arm64/regalloc_stack_operands.ml
 arm64_ast.ml
 arm64_ast.mli
+arm64_binary_emitter.ml
+arm64_logical_immediates.ml
+arm64_logical_immediates.mli
 asm_targets/**/*.ml
 asm_targets/**/*.mli
 branch_relaxation.ml
