@@ -23,7 +23,9 @@ module Function_call : sig
             must be called. *)
     | Indirect_unknown_arity
     | Indirect_known_arity of Code_id.Set.t Or_unknown.t
-        (** If a [Code_id.Set.t] is provided, only *)
+        (** If a [Code_id.Set.t] is provided, only the provided functions
+             (or a simplified version thereof) can be called, but we don't
+             statically know which. *)
 end
 
 module Method_kind : sig

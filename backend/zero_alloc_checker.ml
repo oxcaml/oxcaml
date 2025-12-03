@@ -95,9 +95,9 @@ module Witness = struct
     | Indirect_call { callee = None } -> fprintf ppf "indirect call"
     | Indirect_tailcall { callee = None } -> fprintf ppf "indirect tailcall"
     | Indirect_call { callee = Some callee } ->
-      fprintf ppf "indirect call %s" callee
+      fprintf ppf "indirect call (possibly calling %s)" callee
     | Indirect_tailcall { callee = Some callee } ->
-      fprintf ppf "indirect tailcall %s" callee
+      fprintf ppf "indirect tailcall (possibly calling %s)" callee
     | Direct_call { callee } -> fprintf ppf "direct call %s" callee
     | Direct_tailcall { callee : string } ->
       fprintf ppf "direct tailcall %s" callee

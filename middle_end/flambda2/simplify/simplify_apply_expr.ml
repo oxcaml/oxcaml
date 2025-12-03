@@ -1037,8 +1037,7 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
       (* If this records a non-simplified code id, we can't continue keeping
          track of the possible code ids without maintaining this non-simplified
          code id alive, so we just forget everything. *)
-      if Code_id.Set.is_empty
-           (Code_id.Set.inter code_ids (DA.code_ids_never_simplified dacc))
+      if Code_id.Set.disjoint code_ids (DA.code_ids_never_simplified dacc)
       then
         Call_kind.indirect_function_call_known_arity ~code_ids:(Known code_ids)
           apply_alloc_mode

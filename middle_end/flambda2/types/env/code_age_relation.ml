@@ -61,7 +61,7 @@ let meet_set t ~resolver ids1 ids2 : _ Or_bottom.t =
   else
     let should_keep_id other_ids id =
       let ids_to_root = all_ids_up_to_root t ~resolver id in
-      not (Code_id.Set.is_empty (Code_id.Set.inter ids_to_root other_ids))
+      not (Code_id.Set.disjoint ids_to_root other_ids)
     in
     let ids =
       Code_id.Set.union
