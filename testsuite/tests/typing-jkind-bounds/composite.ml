@@ -646,16 +646,22 @@ type ('a : immutable_data) t : immutable_data = Flat | Nested of 'a t t
 (* CR layouts v2.8: If we can't get this accepted, investigate the terrible
    /2 stuff in the error message. That scares me a bit. *)
 [%%expect {|
-Line 1, characters 0-71:
+Line 1, characters 65-71:
 1 | type ('a : immutable_data) t : immutable_data = Flat | Nested of 'a t t
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is
-           immutable_data with 'a t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2 t/2
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
+                                                                     ^^^^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The kind of 'a t/2 is immutable_data with 'a t/2 t/2 t/2 t/2 t/2
+           because of the definition of t at line 1, characters 0-71.
+         But the kind of 'a t/2 must be a subkind of immutable_data
+           because of the definition of t at line 1, characters 0-71.
+         Note: I gave up trying to find the simplest kind for the first,
+         as it is very large or deeply recursive.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
@@ -712,15 +718,30 @@ type 'a t =
   | Some of ('a * 'a) t u
 [%%expect {|
 type 'a u
-type 'a t = None | Some of ('a * 'a) t u
+Line 4, characters 12-25:
+4 |   | Some of ('a * 'a) t u
+                ^^^^^^^^^^^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The layout of ('a * 'a) t is any
+           because the .cmi file for t is missing.
+         But the layout of ('a * 'a) t must be a value layout
+           because of the definition of u at line 1, characters 0-9.
+         No .cmi file found containing t.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
 [%%expect {|
-Line 1, characters 50-51:
+Line 1, characters 13-18:
 1 | let foo (t : int t @ contended) = use_uncontended t
-                                                      ^
-Error: This value is "contended" but is expected to be "uncontended".
+                 ^^^^^
+Error: The type constructor "t" expects 0 argument(s),
+       but is here applied to 1 argument(s)
 |}]
 
 (***********************************************************************)
@@ -730,32 +751,49 @@ type 'a t =
   | Some of ('a * 'a) t u
 [%%expect {|
 type 'a u : immutable_data with 'a
-type 'a t = None | Some of ('a * 'a) t u
+Line 4, characters 12-25:
+4 |   | Some of ('a * 'a) t u
+                ^^^^^^^^^^^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The layout of ('a * 'a) t is any
+           because the .cmi file for t is missing.
+         But the layout of ('a * 'a) t must be a value layout
+           because of the definition of u at line 1, characters 0-34.
+         No .cmi file found containing t.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
 (* CR layouts v2.8: this should work when we get tuples working. Internal ticket 4770 *)
 [%%expect {|
-Line 1, characters 50-51:
+Line 1, characters 13-18:
 1 | let foo (t : int t @ contended) = use_uncontended t
-                                                      ^
-Error: This value is "contended" but is expected to be "uncontended".
+                 ^^^^^
+Error: The type constructor "t" expects 0 argument(s),
+       but is here applied to 1 argument(s)
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
 [%%expect {|
-Line 1, characters 48-49:
+Line 1, characters 13-16:
 1 | let foo (t : _ t @ contended) = use_uncontended t
-                                                    ^
-Error: This value is "contended" but is expected to be "uncontended".
+                 ^^^
+Error: The type constructor "t" expects 0 argument(s),
+       but is here applied to 1 argument(s)
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
 [%%expect {|
-Line 1, characters 43-44:
+Line 1, characters 13-18:
 1 | let foo (t : int t @ aliased) = use_unique t
-                                               ^
-Error: This value is "aliased" but is expected to be "unique".
+                 ^^^^^
+Error: The type constructor "t" expects 0 argument(s),
+       but is here applied to 1 argument(s)
 |}]
 
 (***********************************************************************)

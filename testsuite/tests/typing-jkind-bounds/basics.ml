@@ -1585,7 +1585,21 @@ type 'a t =
 
 [%%expect{|
 type 'a u
-type 'a t = None | Some of ('a * 'a) t u
+Line 4, characters 12-25:
+4 |   | Some of ('a * 'a) t u
+                ^^^^^^^^^^^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The layout of ('a * 'a) t is any
+           because the .cmi file for t is missing.
+         But the layout of ('a * 'a) t must be a value layout
+           because of the definition of u at line 1, characters 0-9.
+         No .cmi file found containing t.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
 |}]
 
 (*********************************)

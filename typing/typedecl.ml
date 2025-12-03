@@ -1827,6 +1827,18 @@ let add_types_to_env ~shapes decls env =
       add_type ~check:true ~shape id decl env)
     decls shapes env
 
+let delayed_error : exn option ref = ref None
+
+let raise_later e =
+  match !delayed_error with
+  | Some _ -> ()
+  | None -> delayed_error := Some e
+
+let raise_delayed_error () =
+  match !delayed_error with
+  | Some e -> raise e
+  | None -> ()
+
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
    have happened, so we can fully compute jkinds of types.
@@ -2170,13 +2182,14 @@ let rec update_decl_jkind env dpath decl =
   with
   | Not_le reason ->
     let context = Ctype.mk_jkind_context_always_principal env in
-    raise (Error (
+    raise_later (Error (
       decl.type_loc,
       Jkind_mismatch_of_path (
         dpath,
         Jkind.Violation.of_ ~context (
           Not_a_subjkind (
-            new_decl.type_jkind, decl.type_jkind, Nonempty_list.to_list reason)))))
+            new_decl.type_jkind, decl.type_jkind, Nonempty_list.to_list reason)))));
+    new_decl
   | Less | Equal -> new_decl
 
 let update_decls_jkind_reason env decls =
@@ -2845,8 +2858,9 @@ let normalize_decl_jkinds env decls =
           { decl with type_jkind; type_kind; }
         else decl
       | Error err ->
-        raise(Error(decl.type_loc,
-                    Jkind_mismatch_of_path (path, err)))
+        raise_later(Error(decl.type_loc,
+                          Jkind_mismatch_of_path (path, err)));
+        decl
     end
     else decl
   in
@@ -3060,6 +3074,7 @@ let transl_type_decl env rec_flag sdecl_list =
   (* Check that constraints are enforced *)
   List.iter2 (check_constraints new_env) sdecl_list decls;
   (* Add type properties to declarations *)
+  delayed_error := None;
   let new_env, decls =
     try
       let new_env, decls =
@@ -3081,6 +3096,9 @@ let transl_type_decl env rec_flag sdecl_list =
     | Typedecl_separability.Error (loc, err) ->
         raise (Error (loc, Separability err))
   in
+  let env_for_rhs_checks = add_types_to_env ~shapes:None decls env in
+  List.iter2 (check_constraints env_for_rhs_checks) sdecl_list decls;
+  raise_delayed_error ();
   (* Check re-exportation, updating [type_jkind] from the manifest *)
   let decls = List.map2 (check_abbrev new_env) sdecl_list decls in
   let shapes = shape_declarations env decls in

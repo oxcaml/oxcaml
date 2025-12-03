@@ -456,14 +456,20 @@ BEFORE: the message had
 type s_bad = r# t
 and r = {x:int; y:bool}
 [%%expect{|
-Line 2, characters 0-23:
-2 | and r = {x:int; y:bool}
-    ^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "r#" is immediate & immediate
-         because it is an unboxed record.
-       But the layout of type "r#" must be a sublayout of
-           value maybe_separable maybe_null & float64
-         because it is an unboxed record.
+Line 1, characters 13-17:
+1 | type s_bad = r# t
+                 ^^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The layout of r# is immediate & immediate
+           because it is an unboxed record.
+         But the layout of r# must be a sublayout of value & float64
+           because of the definition of t at line 1, characters 0-29.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
 |}]
 
 (* CR zeisbach: this used to blame line 3.
@@ -472,14 +478,20 @@ type s_bad = q t
 and r = {x:int; y:bool}
 and q = r#
 [%%expect{|
-Line 2, characters 0-23:
-2 | and r = {x:int; y:bool}
-    ^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "r#" is immediate & immediate
-         because it is an unboxed record.
-       But the layout of type "r#" must be a sublayout of
-           value maybe_separable maybe_null & float64
-         because it is an unboxed record.
+Line 1, characters 13-16:
+1 | type s_bad = q t
+                 ^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The layout of q is immediate & immediate
+           because it is an unboxed record.
+         But the layout of q must be a sublayout of value & float64
+           because of the definition of t at line 1, characters 0-29.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
 |}]
 
 module rec M : sig

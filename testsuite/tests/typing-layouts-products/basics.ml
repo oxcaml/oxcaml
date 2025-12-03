@@ -2408,12 +2408,21 @@ type t : (value_or_null & bits32) mod portable =
   #{ a : int; b : t s; c : int32 }
 [%%expect{|
 type ('a : any mod portable) s
-Lines 3-4, characters 0-34:
-3 | type t : (value_or_null & bits32) mod portable =
+Line 4, characters 18-21:
 4 |   #{ a : int; b : t s; c : int32 }
-Error: The layout of type "t" is immediate & value & value non_float
-         because it is an unboxed record.
-       But the layout of type "t" must be a sublayout of
-           value maybe_separable maybe_null & bits32
-         because of the annotation on the declaration of the type t.
+                      ^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The kind of t is
+             immutable_data non_pointer with t s
+             & immutable_data separable with t s
+             & immutable_data with t s
+           because of the definition of t at lines 3-4, characters 0-34.
+         But the kind of t must be a subkind of any mod portable
+           because of the definition of s at line 1, characters 0-30.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
 |}]

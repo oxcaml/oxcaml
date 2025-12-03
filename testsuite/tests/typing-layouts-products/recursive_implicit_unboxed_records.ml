@@ -434,12 +434,18 @@ type bad = r# t
 and r = { x:int; y:bool }
 [%%expect{|
 type ('a : value & float64) t
-Line 3, characters 0-25:
-3 | and r = { x:int; y:bool }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "r#" is immediate & immediate
-         because it is an unboxed record.
-       But the layout of type "r#" must be a sublayout of
-           value maybe_separable maybe_null & float64
-         because it is an unboxed record.
+Line 2, characters 11-15:
+2 | type bad = r# t
+               ^^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The layout of r# is immediate & immediate
+           because it is an unboxed record.
+         But the layout of r# must be a sublayout of value & float64
+           because of the definition of t at line 1, characters 0-29.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
 |}]
