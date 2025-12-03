@@ -446,13 +446,7 @@ and r = { x : int; y : float#; }
 and u = r#
 |}]
 
-(* CR zeisbach: the error message got way worse, specifically the history:
-BEFORE: the message had
--       But the layout of r must be a sublayout of value & float64
--         because of the definition of t at line 1, characters 0-29.
-*)
-
-(* CR layouts v7.2: improve this error message *)
+(* CR layouts-scannable: improve this error message *)
 type s_bad = r# t
 and r = {x:int; y:bool}
 [%%expect{|
@@ -466,8 +460,7 @@ Error: The layout of type "r#" is immediate & immediate
          because it is an unboxed record.
 |}]
 
-(* CR zeisbach: this used to blame line 3.
-   also, the error message / history reporting is still bad! *)
+(* CR layouts-scannable: improve this error message *)
 type s_bad = q t
 and r = {x:int; y:bool}
 and q = r#

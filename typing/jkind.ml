@@ -832,11 +832,6 @@ module With_bounds = struct
     | No_with_bounds -> With_bounds_types.empty
     | With_bounds bounds -> bounds
 
-  (*= let for_all (type l r) f (t : (l * r) t) =
-    match t with
-    | No_with_bounds -> true
-    | With_bounds tys -> With_bounds_types.for_all f tys *)
-
   let to_list : type d. d with_bounds -> _ = function
     | No_with_bounds -> []
     | With_bounds tys -> tys |> With_bounds_types.to_seq |> List.of_seq
@@ -2458,13 +2453,10 @@ module Const = struct
       in
       let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
       { layout = base.layout; mod_bounds; with_bounds = No_with_bounds }
-      (* CR zeisbach: these errors aren't getting reported anyways, so
-         [~abbrev:""] doesn't really matter now. the cases where there isn't
-         a base abbreviation is the same as the cases where scannable axes
-         don't make sense, so maybe there is a way to drill down?
-         But thinking about this before the warnings are enabled is pointless,
-         and we may want to depr syntax first? OR, we just say that this
-         actually shouldn't warn as to not break backwards compatibility *)
+      (* CR layouts-scannable: The redundant kind modifier warning isn't enabled
+         currently, so the placeholder [~abbrev:""] is okay. If the warning is
+         enabled before the mod syntax for scannable axes is deprecated, then
+         [~abbrev] should be fixed. *)
       |> set_nullability ~abbrev:"" nullability
       |> set_separability ~abbrev:"" separability
     | Pjk_product ts ->
@@ -2500,14 +2492,10 @@ module Const = struct
     let rec scan_layout (l : Layout.Const.t) : Language_extension.maturity =
       match l with
       | Base
-          ( ( Float64 | Float32 | Word | Bits8 | Bits16 | Bits32 | Bits64
-            | Vec128 | Vec256 | Vec512 | Untagged_immediate ),
+          ( ( Scannable | Float64 | Float32 | Word | Bits8 | Bits16 | Bits32
+            | Bits64 | Vec128 | Vec256 | Vec512 | Untagged_immediate ),
             _ )
-      | Any _
-      (* CR zeisbach: do we want to peek inside the sa at all here?
-         It looks like this always returns [Stable]. Do we want to keep
-         it around, in that case? What is the release story here?? *)
-      | Base (Scannable, _) ->
+      | Any _ ->
         Stable
       | Product layouts ->
         List.fold_left
@@ -3267,19 +3255,9 @@ let set_externality_upper_bound jk externality_upper_bound =
       }
   }
 
-(* CR zeisbach: this might be entirely wrong! *)
 let get_nullability jk =
-  (* do we have to always normalize in here? maybe some places were relying
-     on this doing normalization and now it doesn't?? Not sure why else huge
-     with blobs are getting printed out... *)
-  match get_root_scannable_axes jk with
-  | Some { nullability; _ } -> nullability
-  (* CR zeisbach: this might be the entirely wrong default! But this might
-     not matter either? THINK AND ASK!
-     UPDATE: after trying this both ways, it doesn't make a difference
-     at least on the tests. Nor does [assert false]. It's worth experimenting
-     a little more with this though; maybe this can be deleted! *)
-  | None -> Nullability.Non_null
+  get_root_scannable_axes jk
+  |> Option.map (fun ({ nullability; _ } : Scannable_axes.t) -> nullability)
 
 let set_root_nullability jk nullability =
   { jk with

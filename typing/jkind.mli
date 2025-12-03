@@ -669,7 +669,7 @@ val set_externality_upper_bound :
   Types.jkind_r -> Jkind_axis.Externality.t -> Types.jkind_r
 
 (** Gets the nullability from a jkind. *)
-val get_nullability : Types.jkind_l -> Jkind_axis.Nullability.t
+val get_nullability : Types.jkind_l -> Jkind_axis.Nullability.t option
 
 (** Computes a jkind that is the same as the input but with an updated maximum
     mode for the nullability axis *)

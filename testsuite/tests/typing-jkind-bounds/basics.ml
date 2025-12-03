@@ -1805,7 +1805,6 @@ module M : sig
 end = struct
   type 'a t : value_or_null mod everything
 end
-(* CR layouts v2.8: Fix printing ([mod everything mod separable] is wrong) *)
 [%%expect{|
 Lines 3-5, characters 6-3:
 3 | ......struct

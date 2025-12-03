@@ -485,13 +485,7 @@ Error: Unboxed record element types must have a representable layout.
          because it is the type of record field a.
 |}]
 
-(* CR layouts v7.2: improve this error message *)
-
-(* CR zeisbach: the error message got way worse, specifically the history:
-BEFORE: the message had
--       But the layout of r must be a sublayout of value & float64
--         because of the definition of t at line 1, characters 0-29.
-*)
+(* CR layouts-scannable: improve this error message *)
 type ('a : value & float64) t
 type bad = r t
 and r = #{ x:int; y:bool }
