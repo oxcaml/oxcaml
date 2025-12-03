@@ -173,7 +173,7 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_exclave e ->
         classify_expression env e
 
-    | Texp_construct (_, {cstr_repr = Variant_unboxed}, [e], _) ->
+    | Texp_construct (_, {cstr_repr = Variant_unboxed}, [e], _, _) ->
         classify_expression env e
     | Texp_construct _ ->
         Static
@@ -772,7 +772,7 @@ let rec expression : Typedtree.expression -> term_judg =
       let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
       join ((expression comp_body << array_mode exp elt_sort) ::
             comprehension_clauses comp_clauses)
-    | Texp_construct (_, desc, exprs, _) ->
+    | Texp_construct (_, desc, exprs, _, _) ->
       let access_constructor =
         match desc.cstr_tag with
         | Extension pth ->

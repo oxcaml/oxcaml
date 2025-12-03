@@ -2146,6 +2146,11 @@ let type_for_path loc = function
     Identifier.Type.dot loc (module_for_path loc p) s |> Identifier.Type.wrap
   | _ -> raise Exit
 
+let type_constr_for_path loc path arity =
+  Type.constr loc (type_for_path loc path)
+    (List.init arity (fun _ -> Type.var loc None |> Type.wrap))
+  |> Type.wrap
+
 let value_for_path loc = function
   | Path.Pdot (p, s) ->
     Identifier.Value.dot loc (module_for_path loc p) s |> Identifier.Value.wrap
@@ -2944,7 +2949,13 @@ and quote_expression_desc transl stage e =
           exps
       in
       Exp_desc.tuple loc exps, None
-    | Texp_construct (lid, constr, args, _) ->
+    | Texp_construct (lid, constr, args, _, ambiguity) ->
+      let typ =
+        match ambiguity with
+        | Ambiguous { path; arity } ->
+          Some (type_constr_for_path loc path arity)
+        | Unambiguous -> None
+      in
       let constr = quote_constructor env lid.loc constr in
       let args =
         match args with
@@ -2960,7 +2971,7 @@ and quote_expression_desc transl stage e =
           let as_tuple = Exp_desc.tuple loc with_labels |> Exp_desc.wrap in
           Some (mk_exp_noattr loc as_tuple)
       in
-      Exp_desc.construct loc constr args, None
+      Exp_desc.construct loc constr args, typ
     | Texp_variant (variant, argo) ->
       let variant = quote_variant loc variant
       and argo =
@@ -2968,6 +2979,12 @@ and quote_expression_desc transl stage e =
       in
       Exp_desc.variant loc variant argo, None
     | Texp_record record ->
+      let typ =
+        match record.ambiguity with
+        | Unambiguous -> None
+        | Ambiguous { path; arity } ->
+          Some (type_constr_for_path loc path arity)
+      in
       let lbl_exps =
         Array.map
           (fun (lbl, def) ->
@@ -2986,7 +3003,7 @@ and quote_expression_desc transl stage e =
           (fun (e, _, _) -> quote_expression transl stage e)
           record.extended_expression
       in
-      Exp_desc.record loc (Array.to_list lbl_exps) base, None
+      Exp_desc.record loc (Array.to_list lbl_exps) base, typ
     | Texp_field (rcd, _, lid, lbl, _, _) ->
       let rcd = quote_expression transl stage rcd in
       let lbl = quote_record_field env lid.loc lbl in

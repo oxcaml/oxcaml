@@ -1167,7 +1167,7 @@ let classify_lazy_argument : Typedtree.expression ->
         | Const_float32 _ (* There is no float32 array optimization *)
         | Const_int32 _ | Const_int64 _ | Const_nativeint _ )
     | Texp_function _
-    | Texp_construct (_, {cstr_arity = 0}, _, _) ->
+    | Texp_construct (_, {cstr_arity = 0}, _, _, _) ->
        `Constant_or_function
     | Texp_constant(Const_float _) ->
        if Config.flat_float_array

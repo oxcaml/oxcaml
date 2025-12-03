@@ -370,7 +370,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       List.iter (sub.case sub) cases
   | Texp_tuple (list, _) -> List.iter (fun (_,e) -> sub.expr sub e) list
   | Texp_unboxed_tuple list -> List.iter (fun (_,e,_) -> sub.expr sub e) list
-  | Texp_construct (lid, _, args, _) ->
+  | Texp_construct (lid, _, args, _, _) ->
       iter_loc sub lid;
       List.iter (sub.expr sub) args
   | Texp_variant (_, expo) ->

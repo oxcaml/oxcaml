@@ -111,6 +111,13 @@ val print_unique_use : Format.formatter -> unique_use -> unit
 
 type alloc_mode = Mode.Alloc.r
 
+(** Whether this construction required disambiguating at the time it was constructed.
+    If so, the disambiguated path and arity of the underlying type constructor
+    is preserved for inserting an annotation. *)
+type ambiguity =
+  | Ambiguous of { path: Path.t; arity : int }
+  | Unambiguous
+
 type texp_field_boxing =
   | Boxing of alloc_mode * unique_use
   (** Projection requires boxing. [unique_use] describes the usage of the
@@ -401,7 +408,7 @@ and expression_desc =
           *)
   | Texp_construct of
       Longident.t loc * Types.constructor_description *
-      expression list * alloc_mode option
+      expression list * alloc_mode option * ambiguity
         (** C                []
             C E              [E]
             C (E1, ..., En)  [E1;...;En]
@@ -419,7 +426,8 @@ and expression_desc =
       fields : ( Types.label_description * record_label_definition ) array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
-      alloc_mode : alloc_mode option
+      alloc_mode : alloc_mode option;
+      ambiguity : ambiguity
     }
         (** { l1=P1; ...; ln=Pn }           (extended_expression = None)
             { E0 with l1=P1; ...; ln=Pn }   (extended_expression = Some E0)

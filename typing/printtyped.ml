@@ -560,7 +560,7 @@ and expression i ppf x =
   | Texp_unboxed_tuple l ->
       line i ppf "Texp_unboxed_tuple\n";
       list i labeled_sorted_expression ppf l;
-  | Texp_construct (li, _, eo, am) ->
+  | Texp_construct (li, _, eo, am, _) ->
       line i ppf "Texp_construct %a\n" fmt_longident li;
       alloc_mode_option i ppf am;
       list i expression ppf eo;

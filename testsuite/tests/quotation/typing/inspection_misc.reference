@@ -47,7 +47,8 @@ Stdlib.Format.printf
       (CamlinternalFormatBasics.Char_literal
        ('\n', CamlinternalFormatBasics.End_of_format)))),
     "%d\n"))
-  (len Stdlib.List.length (B.Nested (B.List ([[1; 2; 3]; [4; 5; 6; 7]; []]))))
+  (len Stdlib.List.length
+     (B.Nested (B.List ([[1; 2; 3]; [4; 5; 6; 7]; []]) : _ B.nested)))
 
 e_format6 says: abc xyz
 

@@ -592,7 +592,7 @@ let expression sub exp =
     | Texp_unboxed_tuple list ->
         Pexp_unboxed_tuple
           (List.map (fun (lbl, e, _) -> lbl, sub.expr sub e) list)
-    | Texp_construct (lid, _, args, _) ->
+    | Texp_construct (lid, _, args, _, _) ->
         Pexp_construct (map_loc sub lid,
           (match args with
               [] -> None

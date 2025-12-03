@@ -2295,7 +2295,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
       (List.map
          (fun (_, e, _) -> check_uniqueness_exp ~overwrite:None ienv e)
          es)
-  | Texp_construct (lbl, _, es, _) ->
+  | Texp_construct (lbl, _, es, _, _) ->
     let name = Longident.last lbl.txt in
     UF.pars
       (List.mapi
@@ -2507,7 +2507,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
     let value, uf = check_uniqueness_exp_as_value ienv e1 in
     let uf_tag =
       match e2.exp_desc with
-      | Texp_construct (lbl, cd, _, _) ->
+      | Texp_construct (lbl, cd, _, _, _) ->
         Value.overwrite_tag { tag = cd.cstr_tag; name_for_error = lbl } value
       | Texp_record _ | Texp_tuple _ -> UF.unused
       | _ ->

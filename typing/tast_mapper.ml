@@ -518,17 +518,18 @@ let expr sub x =
     | Texp_unboxed_tuple list ->
         Texp_unboxed_tuple
           (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list)
-    | Texp_construct (lid, cd, args, am) ->
-        Texp_construct (map_loc sub lid, cd, List.map (sub.expr sub) args, am)
+    | Texp_construct (lid, cd, args, am, amb) ->
+        Texp_construct (map_loc sub lid, cd, List.map (sub.expr sub) args, am, amb)
     | Texp_variant (l, expo) ->
         Texp_variant (l, Option.map (fun (e, am) -> (sub.expr sub e, am)) expo)
-    | Texp_record { fields; representation; extended_expression; alloc_mode } ->
+    | Texp_record { fields; representation; extended_expression; alloc_mode; ambiguity } ->
         Texp_record {
           fields = map_fields fields; representation;
           extended_expression =
             Option.map (fun (exp, sort, ubr) -> (sub.expr sub exp, sort, ubr))
               extended_expression;
-          alloc_mode
+          alloc_mode;
+          ambiguity
         }
     | Texp_record_unboxed_product
           { fields; representation; extended_expression } ->

@@ -120,6 +120,10 @@ let print_unique_use ppf (u,l) =
 
 type alloc_mode = Mode.Alloc.r
 
+type ambiguity =
+  | Ambiguous of { path: Path.t; arity : int }
+  | Unambiguous
+
 type texp_field_boxing =
   | Boxing of alloc_mode * unique_use
   | Non_boxing of unique_use
@@ -237,13 +241,15 @@ and expression_desc =
   | Texp_tuple of (string option * expression) list * alloc_mode
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
   | Texp_construct of
-      Longident.t loc * constructor_description * expression list * alloc_mode option
+      Longident.t loc * constructor_description * expression list *
+        alloc_mode option * ambiguity
   | Texp_variant of label * (expression * alloc_mode) option
   | Texp_record of {
       fields : ( Types.label_description * record_label_definition ) array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
-      alloc_mode : alloc_mode option
+      alloc_mode : alloc_mode option;
+      ambiguity : ambiguity
     }
   | Texp_record_unboxed_product of {
       fields :
@@ -1346,7 +1352,7 @@ let rec exp_is_nominal exp =
   | _ when exp.exp_attributes <> [] -> false
   | Texp_ident _ | Texp_instvar _ | Texp_constant _
   | Texp_variant (_, None)
-  | Texp_construct (_, _, [], _) ->
+  | Texp_construct (_, _, [], _, _) ->
       true
   | Texp_field (parent, _, _, _, _, _) | Texp_send (parent, _, _) ->
       exp_is_nominal parent
@@ -1410,7 +1416,7 @@ let rec fold_antiquote_exp f  acc exp =
       List.fold_left (fun acc (_, e) -> fold_antiquote_exp f acc e) acc list
   | Texp_unboxed_tuple list ->
       List.fold_left (fun acc (_, e, _) -> fold_antiquote_exp f acc e) acc list
-  | Texp_construct (_, _, args, _) ->
+  | Texp_construct (_, _, args, _, _) ->
       fold_antiquote_exps f acc args
   | Texp_variant (_, expo) ->
       Option.fold

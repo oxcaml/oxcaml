@@ -222,7 +222,7 @@ let iter_on_occurrences
       (match exp_desc with
       | Texp_ident (path, lid, _, _, _) ->
           f ~namespace:Value exp_env path lid
-      | Texp_construct (lid, constr_desc, _, _) ->
+      | Texp_construct (lid, constr_desc, _, _, _) ->
           add_constructor_description exp_env lid constr_desc
       | Texp_field (_, _, lid, label_desc, _, _)
       | Texp_setfield (_, _, lid, label_desc, _) ->
