@@ -4,7 +4,7 @@ module RigidName : sig
   type t =
     | Atom of { constr : constr; arg_index : int }
     | Param of int
-    | Unknown
+    | Unknown of int
 
   val compare : t -> t -> int
 
@@ -14,7 +14,9 @@ module RigidName : sig
 
   val param : int -> t
 
-  val unknown : t
+  val unknown : int -> t
+
+  val fresh_unknown : unit -> t
 end
 
 module Ldd : sig
