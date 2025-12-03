@@ -798,6 +798,17 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 = <[fun (f : x:'a -> ?y:'b -> 'c -> unit) x y z -> f ~x:x ?y:None z]>
 |}];;
 
+<[ let rec id : int * int -> int = fun (x, y) -> x + y in id ]>
+[%%expect {|
+- : <[int * int -> int]> expr =
+<[let rec id = (fun (x, y) -> x + y : (int) * (int) -> int) in id]>
+|}];;
+
+<[ let rec id : 'a. 'a -> 'a = fun x -> x in id ]>
+[%%expect {|
+- : <[$('a) -> $('a)]> expr = <[let rec id = (fun x -> x) in id]>
+|}];;
+
 <[ fun x -> function None -> 0 | Some x -> x ]>
 [%%expect {|
 - : <[$('a) -> int option -> int]> expr =
