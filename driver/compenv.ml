@@ -174,6 +174,13 @@ let check_int ppf name s =
         "bad value %s for %s" s name;
       None
 
+let check_relative_path ~on_error name s =
+  if Filename.is_relative s then Some s
+  else begin
+    on_error (Printf.sprintf "%s path must be relative, got: %s" name s);
+    None
+  end
+
 let decode_compiler_pass ppf v ~name ~filter =
   let module P = Clflags.Compiler_pass in
   let passes = P.available_pass_names ~filter ~native:!native_code in
@@ -530,6 +537,9 @@ let read_one_param ppf position name v =
   | "dump-into-file" -> Clflags.dump_into_file := true
   | "dump-into-csv" -> Clflags.dump_into_csv := true
   | "dump-dir" -> Clflags.dump_dir := Some v
+  | "profile-output" ->
+    (check_relative_path ~on_error:(print_error ppf) "profile-output" v)
+    |> Option.iter (fun path -> Clflags.profile_output_name := Some path)
 
   | "extension" -> Language_extension.enable_of_string_exn v
   | "disable-all-extensions" ->

@@ -54,6 +54,8 @@ val setter :
 val int_setter : Format.formatter -> string -> int ref -> string -> unit
 val check_bool : Format.formatter -> string -> string -> bool
 val check_int : Format.formatter -> string -> string -> int option
+val check_relative_path :
+  on_error:(string -> unit) -> string -> string -> string option
 
 (* Deferred actions of the compiler, while parsing arguments *)
 

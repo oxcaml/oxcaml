@@ -2028,8 +2028,8 @@ module Json = struct
 
   (* Use %.17g instead of string_of_float to avoid invalid JSON output.
      [string_of_float] can produce "1." for whole numbers, which is not valid
-     JSON. %.17g provides full double precision and produces valid JSON numbers.
-     *)
+     JSON. %.17g provides full double precision and produces valid JSON
+     numbers. *)
   let float value = Printf.sprintf "%.17g" value
 
   let object_ fields =

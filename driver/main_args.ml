@@ -2361,7 +2361,11 @@ module Default = struct
     let _dtimings_precision n = timings_precision := n
     let _dcounters () = profile_columns := [`Counters]
     let _dgranularity = Clflags.set_profile_granularity
-    let _dprofile_output s = profile_output_name := Some s
+    let _dprofile_output s =
+      Compenv.check_relative_path
+              ~on_error:(fun msg -> raise (Arg.Bad msg))
+              "profile output" s
+      |> Option.iter (fun path -> profile_output_name := Some path)
     let _dump_into_file = set dump_into_file
     let _dump_into_csv = set dump_into_csv
     let _dump_dir s = dump_dir := Some s
