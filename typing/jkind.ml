@@ -85,11 +85,7 @@ module Scannable_axes = struct
       separability : Jkind_axis.Separability.t
     }
 
-  (* adding in the stubs explicitly so that they can be expanded later *)
-
   let max = { nullability = Nullability.max; separability = Separability.max }
-
-  let min = { nullability = Nullability.min; separability = Separability.min }
 
   let value_axes = { nullability = Non_null; separability = Separable }
 
@@ -116,21 +112,7 @@ module Scannable_axes = struct
       separability = Separability.meet s1 s2
     }
 
-  let join { nullability = n1; separability = s1 }
-      { nullability = n2; separability = s2 } =
-    { nullability = Nullability.join n1 n2;
-      separability = Separability.join s1 s2
-    }
-
   let is_max sa = equal sa max
-
-  (* CR zeisbach: this won't compile without having a stub for print, because
-     it has to have Axis_ops. I should probably refactor that anyways, then
-     this isn't a problem. I'd rather do that then print out something *)
-  let print _ _ = failwith "FIXME"
-
-  (* CR zeisbach: fix this one too obviously *)
-  let to_string _ = failwith "FIXME"
 
   let to_string_list_diff
       ~base:{ nullability = n_against; separability = s_against }
