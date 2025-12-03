@@ -258,6 +258,7 @@ let binary_int_arith_primitive ~machine_width kind op =
   | (Naked_int64, Add | Naked_int64, Sub | Naked_int64, Mul)
     when Target_system.Machine_width.is_32_bit machine_width ->
     does_not_need_caml_c_call_extcall_size + 2
+    (* CR jrayman: Make sure this is correct *)
   | (Naked_int64, Div (Signed | Unsigned) | Naked_int64, Mod (Signed | Unsigned))
     when Target_system.Machine_width.is_32_bit machine_width ->
     needs_caml_c_call_extcall_size + 2
