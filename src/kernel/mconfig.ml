@@ -464,7 +464,7 @@ let ocaml_ignored_flags =
     "-i";
     "-inlining-report";
     "-keep-docs";
-    "-keep-docs";
+    "-no-keep-docs";
     "-keep-locs";
     "-linkall";
     "-make_runtime";
@@ -490,6 +490,7 @@ let ocaml_ignored_flags =
     "-only-erasable-extensions";
     "-opaque";
     "-output-complete-obj";
+    "-output-complete-exe";
     "-output-obj";
     "-p";
     "-pack";
@@ -647,7 +648,28 @@ let ocaml_ignored_flags =
     "-probes";
     "-no-probes";
     "-probes-optimized";
-    "-no-probes-optimized"
+    "-no-probes-optimized";
+    "-disable-all-extensions";
+    "-nocwd";
+    "-with-runtime";
+    "-without-runtime";
+    "-ddebug-uids";
+    "-ddebug-uid-tables";
+    "-version";
+    "--version";
+    "-vnum";
+    "-warn-help";
+    "-help";
+    "--help";
+    "-match-context-rows";
+    "-safer-matching";
+    "-dno-unique-ids";
+    "-dunique-ids";
+    "-dno-locations";
+    "-dlocations";
+    "-dcamlprimc";
+    "-dtimings-precision";
+
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -689,6 +711,7 @@ let ocaml_ignored_parametrized_flags =
     (* flambda-backend specific *)
     "-extension";
     "-extension-universe";
+    "-no-extension";
     "-drawfexpr-to";
     "-dfexpr-to";
     "-dflexpect-to";
@@ -738,7 +761,11 @@ let ocaml_ignored_parametrized_flags =
     "-gdwarf-config-shape-reduce-fuel";
     "-gdwarf-fidelity";
     "-llvm-path";
-    "-afl-inst-ratio"
+    "-afl-inst-ratio";
+    "-config-var";
+    "-stop-after";
+    "-plugin";
+    "-dump-into-file"
   ]
 
 let ocaml_warnings_spec ~error =
