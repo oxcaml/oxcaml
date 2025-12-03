@@ -270,10 +270,10 @@ let select_operation_sse2 ~dbg op args =
   | "caml_sse2_vec128_movemask_8" ->
     sse_or_avx pmovmskb_r64_X vpmovmskb_r64_X args
   | "caml_sse2_vec128_movemask_64" -> sse_or_avx movmskpd vmovmskpd_r64_X args
-  | "caml_sse2_vec128_shift_left_bytes" ->
+  | "caml_simd_vec128_shift_left_bytes" | "caml_sse2_vec128_shift_left_bytes" ->
     let i, args = extract_constant args ~max:15 op in
     sse_or_avx pslldq vpslldq_X_X ~i args
-  | "caml_sse2_vec128_shift_right_bytes" ->
+  | "caml_simd_vec128_shift_right_bytes" | "caml_sse2_vec128_shift_right_bytes" ->
     let i, args = extract_constant args ~max:15 op in
     sse_or_avx psrldq vpsrldq_X_X ~i args
   | "caml_sse2_int8x16_cmpeq" -> sse_or_avx pcmpeqb vpcmpeqb_X_X_Xm128 args
@@ -323,28 +323,28 @@ let select_operation_sse2 ~dbg op args =
   | "caml_sse2_int64x2_srl" -> sse_or_avx psrlq_X_Xm128 vpsrlq_X_X_Xm128 args
   | "caml_sse2_int16x8_sra" -> sse_or_avx psraw_X_Xm128 vpsraw_X_X_Xm128 args
   | "caml_sse2_int32x4_sra" -> sse_or_avx psrad_X_Xm128 vpsrad_X_X_Xm128 args
-  | "caml_sse2_int16x8_slli" ->
+  | "caml_simd_int16x8_slli" | "caml_sse2_int16x8_slli" ->
     let i, args = extract_constant args ~max:15 op in
     sse_or_avx psllw_X vpsllw_X_X ~i args
-  | "caml_sse2_int32x4_slli" ->
+  | "caml_simd_int32x4_slli" | "caml_sse2_int32x4_slli" ->
     let i, args = extract_constant args ~max:31 op in
     sse_or_avx pslld_X vpslld_X_X ~i args
-  | "caml_sse2_int64x2_slli" ->
+  | "caml_simd_int64x2_slli" | "caml_sse2_int64x2_slli" ->
     let i, args = extract_constant args ~max:63 op in
     sse_or_avx psllq_X vpsllq_X_X ~i args
-  | "caml_sse2_int16x8_srli" ->
+  | "caml_simd_int16x8_srli" | "caml_sse2_int16x8_srli" ->
     let i, args = extract_constant args ~max:15 op in
     sse_or_avx psrlw_X vpsrlw_X_X ~i args
-  | "caml_sse2_int32x4_srli" ->
+  | "caml_simd_int32x4_srli" | "caml_sse2_int32x4_srli" ->
     let i, args = extract_constant args ~max:31 op in
     sse_or_avx psrld_X vpsrld_X_X ~i args
-  | "caml_sse2_int64x2_srli" ->
+  | "caml_simd_int64x2_srli" | "caml_sse2_int64x2_srli" ->
     let i, args = extract_constant args ~max:63 op in
     sse_or_avx psrlq_X vpsrlq_X_X ~i args
-  | "caml_sse2_int16x8_srai" ->
+  | "caml_simd_int16x8_srai" | "caml_sse2_int16x8_srai" ->
     let i, args = extract_constant args ~max:15 op in
     sse_or_avx psraw_X vpsraw_X_X ~i args
-  | "caml_sse2_int32x4_srai" ->
+  | "caml_simd_int32x4_srai" | "caml_sse2_int32x4_srai" ->
     let i, args = extract_constant args ~max:31 op in
     sse_or_avx psrad_X vpsrad_X_X ~i args
   | "caml_sse2_vec128_shuffle_64" ->
