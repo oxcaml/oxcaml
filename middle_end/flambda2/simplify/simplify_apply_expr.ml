@@ -1129,8 +1129,8 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
       in
       let coming_from_indirect =
         match call with
-        | Direct _ -> true
-        | Indirect_known_arity _ | Indirect_unknown_arity -> false
+        | Direct _ -> false
+        | Indirect_known_arity _ | Indirect_unknown_arity -> true
       in
       let callee's_code_id_from_type = T.Function_type.code_id func_decl_type in
       let callee's_code_or_metadata =

@@ -2582,7 +2582,6 @@ end = struct
           List.fold_left
             (fun all_effects { Cmm.sym_name = callee; _ } ->
               let k = wkind callee in
-              (* Witness.Direct_tailcall { callee } in *)
               let v = find_callee t callee ~desc dbg k in
               let w = create_witnesses t k dbg in
               let effect =
