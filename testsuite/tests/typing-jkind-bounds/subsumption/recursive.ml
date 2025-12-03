@@ -21,29 +21,7 @@ and 'a foo = 'a my_list
 |}]
 
 (* CR layouts v2.8: this should be accepted. Internal ticket 4770 *)
-(* CR zeisbach: why did this test change? seems bad
-   OLD VERSION:
-   Line 3, characters 17-115:
-3 |   | Cons of 'a * 'a my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Layout mismatch in final type declaration consistency check.
-       This is most often caused by the fact that type inference is not
-       clever enough to propagate layouts through variables in different
-       declarations. It is also not clever enough to produce a good error
-       message, so we'll say this instead:
-         The layout of 'a my_list my_list my_list my_list my_list my_list
-                       my_list my_list my_list my_list my_list is any
-           because the .cmi file for my_list is missing.
-         But the layout of 'a my_list my_list my_list my_list my_list my_list
-                           my_list my_list my_list my_list my_list must be
-           a value layout
-           because it instantiates an unannotated type parameter of my_list,
-           chosen to have layout value.
-         No .cmi file found containing my_list.
-       A good next step is to add a layout annotation on a parameter to
-       the declaration where this error is reported.
 
-   *)
 type 'a my_list : immutable_data with 'a =
   | Nil
   | Cons of 'a * 'a my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list my_list
