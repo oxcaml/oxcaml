@@ -3920,9 +3920,9 @@ let rec occur_rec env visited allow_recursive parents ty0 ty =
     if eq_type ty ty0 then raise Occur;
     begin match get_desc ty with
       Tconstr(p, _tl, _abbrev) ->
-        if allow_recursive && is_contractive env p then () else
+        if (allow_recursive && is_contractive env p)
+           || TypeSet.mem ty parents then () else
         begin try
-          if TypeSet.mem ty parents then raise Occur;
           let parents = TypeSet.add ty parents in
           iter_type_expr
             (occur_rec env visited allow_recursive parents ty0)
