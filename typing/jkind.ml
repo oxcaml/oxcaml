@@ -221,6 +221,9 @@ module Layout = struct
           ( Sort.Scannable,
             { nullability = Maybe_null; separability = Maybe_separable } )
 
+      (* For all non-[Scannable] layouts, the scannable axes are ignored. We
+         have to pick something, though, so we pick [Scannable_axes.max]. *)
+
       let void = Base (Sort.Void, Scannable_axes.max)
 
       let float64 = Base (Sort.Float64, Scannable_axes.max)
@@ -1887,8 +1890,6 @@ module Const = struct
         name = "immediate64_or_null"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let float64 =
       { jkind =
           mk_jkind
@@ -1897,41 +1898,30 @@ module Const = struct
         name = "float64"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_float =
       { jkind =
           mk_jkind
-            (* Scannable axes are only relevant for [Value]s, so set to max *)
             (Base (Float64, Scannable_axes.max))
             ~crossing:cross_all_except_staticity ~externality:Externality.min;
         name = "float64 mod everything"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let float32 =
       { jkind =
           mk_jkind
-            (* Scannable axes are only relevant for [Value]s, so set to max *)
             (Base (Float32, Scannable_axes.max))
             ~crossing:Crossing.max ~externality:Externality.max;
         name = "float32"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_float32 =
       { jkind =
           mk_jkind
-            (* Scannable axes are only relevant for [Value]s, so set to max *)
             (Base (Float32, Scannable_axes.max))
             ~crossing:cross_all_except_staticity ~externality:Externality.min;
         name = "float32 mod everything"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let word =
       { jkind =
           mk_jkind
@@ -1940,8 +1930,6 @@ module Const = struct
         name = "word"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_nativeint =
       { jkind =
           mk_jkind
@@ -1966,8 +1954,6 @@ module Const = struct
         name = "untagged_immediate mod everything"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let bits8 =
       { jkind =
           mk_jkind
@@ -1976,8 +1962,6 @@ module Const = struct
         name = "bits8"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int8 =
       { jkind =
           mk_jkind
@@ -1986,8 +1970,6 @@ module Const = struct
         name = "bits8 mod everything"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let bits16 =
       { jkind =
           mk_jkind
@@ -1996,8 +1978,6 @@ module Const = struct
         name = "bits16"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int16 =
       { jkind =
           mk_jkind
@@ -2006,8 +1986,6 @@ module Const = struct
         name = "bits16 mod everything"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let bits32 =
       { jkind =
           mk_jkind
@@ -2016,8 +1994,6 @@ module Const = struct
         name = "bits32"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int32 =
       { jkind =
           mk_jkind
@@ -2026,8 +2002,6 @@ module Const = struct
         name = "bits32 mod everything"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let bits64 =
       { jkind =
           mk_jkind
@@ -2036,8 +2010,6 @@ module Const = struct
         name = "bits64"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_int64 =
       { jkind =
           mk_jkind
@@ -2054,8 +2026,6 @@ module Const = struct
         name = "bits64 mod everything"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let vec128 =
       { jkind =
           mk_jkind
@@ -2064,8 +2034,6 @@ module Const = struct
         name = "vec128"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let vec256 =
       { jkind =
           mk_jkind
@@ -2074,8 +2042,6 @@ module Const = struct
         name = "vec256"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let vec512 =
       { jkind =
           mk_jkind
@@ -2084,8 +2050,6 @@ module Const = struct
         name = "vec512"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_128bit_vectors =
       { jkind =
           mk_jkind
@@ -2094,8 +2058,6 @@ module Const = struct
         name = "vec128 mod everything"
       }
 
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_256bit_vectors =
       { jkind =
           mk_jkind
@@ -2104,9 +2066,6 @@ module Const = struct
         name = "vec256 mod everything"
       }
 
-    (* CR zeisbach: does this matter for us? how is this changing? *)
-    (* CR or_null: nullability here should be [Maybe_null], but is set
-       to [Non_null] for now due to inference limitations. *)
     let kind_of_unboxed_512bit_vectors =
       { jkind =
           mk_jkind
