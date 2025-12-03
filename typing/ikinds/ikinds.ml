@@ -1,9 +1,9 @@
 (* This forces ikinds globally on. *)
-Clflags.ikinds := false
+Clflags.ikinds := true
 
-(* Types.ikind_debug := true *)
-let enable_crossing = false
-let enable_sub_jkind_l = false
+(* Types.ikind_debug := false *)
+let enable_crossing = true
+let enable_sub_jkind_l = true
 let enable_sub_or_intersect = false
 let enable_sub_or_error = false
 
@@ -104,6 +104,7 @@ module JK = struct
             let instantiate (name : Ldd.Name.t) : kind =
               match name with
               | Ldd.Name.Param _ -> Ldd.var (Ldd.rigid name)
+              | Ldd.Name.Unknown -> Ldd.var (Ldd.rigid name)
               | Ldd.Name.Atom { constr = constr'; arg_index } ->
                   if Path.compare constr' c = 0
                   then Ldd.var (Ldd.rigid name)
@@ -319,8 +320,10 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
               Ldd.join acc k)
             base row
         else
-          (* Open row: conservative non-float value (boxed). *)
-          Ldd.const Axis_lattice.nonfloat_value
+          (* Open row: conservative non-float value (boxed) intersected with an
+             unknown rigid so the solver treats it as an unknown element. *)
+          let unknown = Ldd.var (Ldd.rigid Ldd.Name.unknown) in
+          Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown
       else
         (* All-constant (immediate) polymorphic variant. *)
         Ldd.const Axis_lattice.immediate
@@ -738,6 +741,7 @@ let substitute_decl_ikind_with_lookup
       let map_name (name : Ldd.Name.t) : Ldd.node =
         match name with
         | Ldd.Name.Param _ -> Ldd.var (Ldd.rigid name)
+        | Ldd.Name.Unknown -> Ldd.var (Ldd.rigid name)
         | Ldd.Name.Atom { constr = p; arg_index } ->
             (match lookup p with
              | None -> Ldd.var (Ldd.rigid name)

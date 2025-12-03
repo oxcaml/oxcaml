@@ -11,9 +11,13 @@ module RigidName = struct
           arg_index : int
         }
     | Param of int
+    | Unknown
 
   let compare a b =
     match a, b with
+    | Unknown, Unknown -> 1
+    | Unknown, _ -> 1
+    | _, Unknown -> -1
     | Atom a1, Atom a2 -> (
       match Path.compare a1.constr a2.constr with
       | 0 -> Int.compare a1.arg_index a2.arg_index
@@ -26,10 +30,13 @@ module RigidName = struct
     | Atom { constr; arg_index } ->
       Printf.sprintf "%s.%d" (Format.asprintf "%a" Path.print constr) arg_index
     | Param i -> Printf.sprintf "param%d" i
+    | Unknown -> "unknown"
 
   let atomic constr arg_index = Atom { constr; arg_index }
 
   let param i = Param i
+
+  let unknown = Unknown
 end
 
 module Ldd = struct

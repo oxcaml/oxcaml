@@ -55,26 +55,6 @@ module T0 :
   end
 type q
 type r
-Line 25, characters 0-43:
-25 | type t : immutable_data with r = q T0.value
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "q T0.value" is
-           immutable_data
-             with unit T0.bar
-
-             with unit T0.derived
-
-             with unit T0.foo
-
-             with unit T0.indexable
-
-             with unit T0.optional
-
-             with unit T0.record
-
-             with unit T0.variant
-         because it's a tuple type.
-       But the kind of type "q T0.value" must be a subkind of
-           immutable_data with r
-         because of the definition of t at line 25, characters 0-43.
+type t = q T0.value
+- : unit = ()
 |}]

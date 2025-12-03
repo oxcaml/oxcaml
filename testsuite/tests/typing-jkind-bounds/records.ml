@@ -517,12 +517,6 @@ let foo (t : ('a : immutable_data) t @ nonportable contended once) =
 [%%expect {|
 type 'a t = { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
-|}, Principal{|
-type 'a t = { x : 'a; }
-Line 3, characters 15-16:
-3 |   use_portable t;
-                   ^
-Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
@@ -550,12 +544,6 @@ let foo (t : _ t @ nonportable contended once) =
 [%%expect {|
 type ('a : immutable_data) t = { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
-|}, Principal{|
-type ('a : immutable_data) t = { x : 'a; }
-Line 3, characters 15-16:
-3 |   use_portable t;
-                   ^
-Error: This value is "once" but is expected to be "many".
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]
