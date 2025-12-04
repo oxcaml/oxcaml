@@ -190,3 +190,11 @@ let equal t1 t2 =
       | Functor _ | Recursive | Jsir_inlining_disabled ),
       _ ) ->
     false
+
+let is_stub t =
+  match t with
+  | Stub -> true
+  | Not_yet_decided | Never_inline_attribute | Function_body_too_large _
+  | Attribute_inline | Small_function _ | Speculatively_inlinable _ | Functor _
+  | Recursive | Jsir_inlining_disabled ->
+    false
