@@ -2428,8 +2428,8 @@ let rec quote_module_path loc = function
     | Some global ->
       Identifier.Module.global_module loc global |> Identifier.Module.wrap
     | None ->
-      failwith "Translquote [at %a]: non-global module %a" Location.print_loc
-        (to_location loc) Ident.print s)
+      fatal_errorf "Translquote [at %a]: non-global module %a"
+        Location.print_loc (to_location loc) Ident.print s)
   | Path.Pdot (p, s) ->
     Identifier.Module.dot loc (quote_module_path loc p) s
     |> Identifier.Module.wrap
