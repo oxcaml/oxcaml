@@ -630,6 +630,12 @@ val is_bottom : Typing_env.t -> t -> bool
 
 val is_unknown : Typing_env.t -> t -> bool
 
+(** Whether the given type contains no information, except about nullability
+    (i.e. returns `true` for both `value` and `value_or_null`, whereas
+    `is_unknown` returns `false` for `value` because we know something -- it
+    can't be `null`). *)
+val is_unknown_maybe_null : Typing_env.t -> t -> bool
+
 val is_alias_to_a_symbol : t -> bool
 
 val type_for_const : Reg_width_const.t -> t
