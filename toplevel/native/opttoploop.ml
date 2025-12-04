@@ -24,6 +24,8 @@ open Typedtree
 open Outcometree
 open Ast_helper
 
+module SL = Slambda
+
 module Genprintval = Genprintval_native
 
 type res = Ok of Obj.t | Err of string
@@ -94,7 +96,7 @@ type directive_info = {
 
 let remembered = ref Ident.empty
 
-let remember phrase_name signature =
+let remember phrase_name signature repr =
   let exported = List.filter Includemod.is_runtime_component signature in
   List.iteri (fun i sg ->
     match sg with
@@ -102,7 +104,7 @@ let remember phrase_name signature =
     | Sig_module (id, _, _, _, _)
     | Sig_typext (id, _, _, _)
     | Sig_class  (id, _, _, _) ->
-      remembered := Ident.add id (phrase_name, i) !remembered
+      remembered := Ident.add id (phrase_name, i, repr) !remembered
     | _ -> ())
     exported
 
@@ -113,28 +115,68 @@ let toplevel_value id =
 let close_phrase lam =
   let open Lambda in
   Ident.Set.fold (fun id l ->
-    let glb, pos = toplevel_value id in
+    let glb, pos, repr = toplevel_value id in
+    let layout = Lambda.layout_of_module_field repr pos in
     let glob =
-      Lprim (mod_field pos,
+      Lprim (mod_field pos repr,
              [Lprim (Pgetglobal glb, [], Loc_unknown)],
              Loc_unknown)
     in
-    Llet(Strict, Lambda.layout_module_field, id, Lambda.debug_uid_none, glob, l)
+    Llet(Strict, layout, id, Lambda.debug_uid_none, glob, l)
   ) (free_variables lam) lam
 
-let toplevel_value id =
-  let glob, pos = toplevel_value id in
-  (Obj.magic (global_symbol glob)).(pos)
+let close_slambda_phrase slam =
+  match slam with
+  | SL.Quote lam -> SL.Quote (close_phrase lam)
 
 (* Return the value referred to by a path *)
+
+(* Like [Obj.field], but handles field reordering in mixed modules.
+   Returns [None] if the selected field is not a value, [Some field] otherwise.
+   Copied from [Topcommon] *)
+let mod_field obj (module_repr : Lambda.module_representation) pos =
+  if not !Clflags.native_code then
+    Some (Obj.field obj pos)
+  else
+  match module_repr with
+  | Module_value_only _ -> Some (Obj.field obj pos)
+  | Module_mixed (shape, _) ->
+    let shape =
+      Mixed_block_shape.of_mixed_block_elements shape
+        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+    in
+    let new_pos =
+      match Mixed_block_shape.lookup_path_producing_new_indexes shape [pos] with
+      | [new_pos] -> Some new_pos
+      | _ -> None (* [pos] points to an unboxed product or void *)
+    in
+    Option.bind new_pos
+      (fun new_pos ->
+        if new_pos < Mixed_block_shape.value_prefix_len shape
+        then Some (Obj.field obj new_pos)
+        else None (* [pos] points to an unboxed singleton *))
 
 let rec eval_address = function
   | Env.Aunit cu ->
       global_symbol cu
   | Env.Alocal id ->
-      toplevel_value id
-  | Env.Adot(a, pos) ->
-      Obj.field (eval_address a) pos
+      let glob, pos, repr = toplevel_value id in
+      begin match mod_field (global_symbol glob) repr pos with
+      | Some field -> field
+      | None ->
+        Location.raise_errorf
+          ~loc:Location.none
+          "Opttoploop.eval_address: Can't return a non-value"
+      end
+  | Env.Adot(a, module_repr, pos) ->
+      let module_repr = Lambda.transl_module_representation module_repr in
+      begin match mod_field (eval_address a) module_repr pos with
+      | Some field -> field
+      | None ->
+        Location.raise_errorf
+          ~loc:Location.none
+          "Opttoploop.eval_address: Can't return a non-value"
+      end
 
 let eval_path find env path =
   match find path env with
@@ -284,8 +326,11 @@ let default_load ppf (program : Lambda.program) =
      files) *)
   res
 
-let load_lambda ppf ~compilation_unit ~required_globals lam size =
+let load_slambda ppf ~compilation_unit program repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
+  if !Clflags.dump_slambda then fprintf ppf "%a@." Printslambda.program program;
+  let program = Slambdaeval.eval program in
+  let lam = program.code in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
   let slam =
     Simplif.simplify_lambda lam
@@ -297,23 +342,29 @@ let load_lambda ppf ~compilation_unit ~required_globals lam size =
   let program =
     { Lambda.
       code = slam;
-      main_module_block_format = Mb_struct { mb_size = size };
+      main_module_block_format = Mb_struct { mb_repr = repr };
       arg_block_idx = None;
       compilation_unit;
-      required_globals;
+      required_globals = program.required_globals;
     }
   in
   match !jit with
   | None -> default_load ppf program
   | Some {Jit.load; _} -> load ppf program
 
+let outval_of_id env id val_type =
+  let glob, pos, (repr : Lambda.module_representation) = toplevel_value id in
+  match mod_field (global_symbol glob) repr pos with
+  | Some obj_to_print -> outval_of_value env obj_to_print val_type
+  | None -> Oval_stuff "<abstr>"
+
 (* Print the outcome of an evaluation *)
 
 let pr_item =
   Printtyp.print_items
     (fun env -> function
-       | Sig_value(id, {val_kind = Val_reg; val_type; _}, _) ->
-          Some (outval_of_value env (toplevel_value id) val_type)
+      | Sig_value(id, {val_kind = Val_reg _; val_type; _}, _) ->
+         Some (outval_of_id env id val_type)
       | _ -> None
     )
 
@@ -351,7 +402,7 @@ let name_expression ~loc ~attrs sort exp =
   let id = Ident.create_local name in
   let vd =
     { val_type = exp.exp_type;
-      val_kind = Val_reg;
+      val_kind = Val_reg sort;
       val_loc = loc;
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
@@ -361,8 +412,7 @@ let name_expression ~loc ~attrs sort exp =
   let sg = [Sig_value(id, vd, Exported)] in
   let pat =
     { pat_desc =
-        Tpat_var(id, mknoloc name, vd.val_uid,
-          Jkind.Sort.(of_const Const.for_module_field),
+        Tpat_var(id, mknoloc name, vd.val_uid, sort,
           Mode.Value.disallow_right Mode.Value.legacy);
       pat_loc = loc;
       pat_extra = [];
@@ -436,27 +486,28 @@ let execute_phrase print_outcome ppf phr =
             str, sg', true
         | _ -> str, sg', false
       in
-      let compilation_unit, res, required_globals, size =
-        let { Lambda.compilation_unit; main_module_block_format;
-              required_globals; code = res } =
+      let compilation_unit, program, repr =
+        let { SL.compilation_unit; main_module_block_format;
+              code = res } as program =
           Translmod.transl_implementation compilation_unit
-            (str, coercion, None)
+            (str, coercion, None) ~loc:Location.none
         in
-        remember compilation_unit sg';
-        let size =
+        let repr =
           match main_module_block_format with
-          | Mb_struct { mb_size } -> mb_size;
+          | Mb_struct { mb_repr } -> mb_repr
           | Mb_instantiating_functor _ ->
             Misc.fatal_error "Unexpected parameterised module in toplevel"
         in
-        compilation_unit, close_phrase res, required_globals, size
+        remember compilation_unit sg' repr;
+        let program = { program with code = close_slambda_phrase res } in
+        compilation_unit, program, repr
       in
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;
         toplevel_sig := List.rev_append sg' oldsig;
         let res =
-          load_lambda ppf ~required_globals ~compilation_unit res size
+          load_slambda ppf ~compilation_unit program repr
         in
         let out_phr =
           match res with
@@ -471,10 +522,7 @@ let execute_phrase print_outcome ppf phr =
                     if rewritten then
                       match sg' with
                       | [ Sig_value (id, vd, _) ] ->
-                          let outv =
-                            outval_of_value newenv (toplevel_value id)
-                              vd.val_type
-                          in
+                          let outv = outval_of_id newenv id vd.val_type in
                           let ty = Printtyp.tree_of_type_scheme vd.val_type in
                           Ophr_eval (outv, ty)
                       | _ -> assert false

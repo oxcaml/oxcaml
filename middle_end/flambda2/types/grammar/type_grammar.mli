@@ -31,7 +31,7 @@ end
 
 type is_null =
   | Not_null
-  | Maybe_null
+  | Maybe_null of { is_null : Variable.t option }
 
 type t = private
   | Value of head_of_kind_value Type_descr.t
@@ -56,7 +56,9 @@ and head_of_kind_value =
 
 and head_of_kind_value_non_null = private
   | Variant of
-      { immediates : t Or_unknown.t;
+      { is_int : Variable.t option;
+        immediates : t Or_unknown.t;
+        get_tag : Variable.t option;
         blocks : row_like_for_blocks Or_unknown.t;
         extensions : variant_extensions;
         is_unique : bool
@@ -488,6 +490,8 @@ module Closures_entry : sig
   val find_function_type :
     t -> exact:bool -> Function_slot.t -> Function_type.t Or_unknown_or_bottom.t
 
+  val function_slot_types : t -> flambda_type Function_slot.Map.t
+
   val value_slot_types : t -> flambda_type Value_slot.Map.t
 end
 
@@ -828,6 +832,8 @@ module Head_of_kind_value_non_null : sig
     blocks:Row_like_for_blocks.t Or_unknown.t ->
     immediates:flambda_type Or_unknown.t ->
     extensions:variant_extensions ->
+    is_int:Variable.t option ->
+    get_tag:Variable.t option ->
     t
 
   val create_mutable_block : Alloc_mode.For_types.t -> t

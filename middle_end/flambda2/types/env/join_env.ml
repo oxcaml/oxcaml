@@ -622,11 +622,6 @@ module Source_env : sig
 
   val machine_width : t -> Target_system.Machine_width.t
 
-  val code_age_relation : t -> Code_age_relation.t
-
-  val code_age_relation_resolver :
-    t -> Compilation_unit.t -> Code_age_relation.t option
-
   val exists_in_source_env : t -> Variable.t -> Variable_in_source_env.t option
 
   type candidate_canonical_in_source_env =
@@ -655,12 +650,7 @@ end = struct
 
   let create source_env = { source_env }
 
-  let machine_width { source_env } = TE.machine_width source_env
-
-  let code_age_relation { source_env } = TE.code_age_relation source_env
-
-  let code_age_relation_resolver { source_env } =
-    TE.code_age_relation_resolver source_env
+  let machine_width { source_env; _ } = TE.machine_width source_env
 
   let exists_in_source_env { source_env } var =
     if TE.mem ~min_name_mode:Name_mode.in_types source_env (Name.var var)
@@ -1320,15 +1310,8 @@ type n_way_join_type = t -> TG.t join_arg list -> TG.t Or_unknown.t * t
 
 let joined_env t index = Joined_envs.get_nth_joined_env t.joined_envs index
 
-let code_age_relation t =
-  Source_env.code_age_relation (Bindings_in_target_env.source_env t.bindings)
-
 let machine_width t =
   Source_env.machine_width (Bindings_in_target_env.source_env t.bindings)
-
-let code_age_relation_resolver t =
-  Source_env.code_age_relation_resolver
-    (Bindings_in_target_env.source_env t.bindings)
 
 type canonical_in_target_env =
   | Canonical_in_source_env of Simple_in_source_env.t
@@ -1596,30 +1579,21 @@ let n_way_join_symbol_projections t symbol_projections_to_join =
         | None -> symbol_projections)
     joined_projections Variable_in_target_env.Map.empty
 
-let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after source_env
-    joined_envs =
-  let joined_envs, equations_to_join, symbol_projections_to_join =
-    Index.fold_list
-      (fun index typing_env
-           (joined_envs, equations_to_join, symbol_projections_to_join) ->
-        let level = TE.cut typing_env ~cut_after in
-        let equations =
-          Type_in_one_joined_env.create_equations (TEL.equations level)
-        in
-        let incremental_equations =
-          { previous = Name.Map.empty; diff = equations; current = equations }
-        in
-        let symbol_projections =
-          Variable_in_one_joined_env.create_map (TEL.symbol_projections level)
-        in
-        ( Index.Map.add index typing_env joined_envs,
-          Index.Map.add index
-            (typing_env, incremental_equations)
-            equations_to_join,
-          Index.Map.add index symbol_projections symbol_projections_to_join ))
-      joined_envs
-      (Index.Map.empty, Index.Map.empty, Index.Map.empty)
+let cut_for_join typing_env ~cut_after =
+  let level = TE.cut typing_env ~cut_after in
+  let equations =
+    Type_in_one_joined_env.create_equations (TEL.equations level)
   in
+  let incremental_equations =
+    { previous = Name.Map.empty; diff = equations; current = equations }
+  in
+  let symbol_projections =
+    Variable_in_one_joined_env.create_map (TEL.symbol_projections level)
+  in
+  incremental_equations, symbol_projections
+
+let cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
+    joined_envs equations_to_join symbol_projections_to_join =
   try
     let empty_bindings =
       Bindings_in_target_env.from_source_env
@@ -1697,7 +1671,8 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after source_env
             symbol_projection)
         symbol_projections target_env
     in
-    target_env
+    ( target_env,
+      Bindings_in_target_env.new_bindings bindings ~since:empty_bindings )
   with Misc.Fatal_error ->
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf "\n@[<v 2>%tContext is:%t cut and join of levels:@ %a@]\n"
@@ -1705,6 +1680,134 @@ let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after source_env
       (Index.Map.print (fun ppf env -> TEL.print ppf (TE.cut ~cut_after env)))
       joined_envs;
     Printexc.raise_with_backtrace Misc.Fatal_error bt
+
+(* Join analysis *)
+
+module Analysis = struct
+  type 'a t =
+    { definitions_in_joined_envs :
+        Bindings_in_target_env.definition_in_joined_envs
+        Name_in_target_env.Map.t;
+      external_ids : 'a Index.Map.t
+    }
+
+  let print ppf { definitions_in_joined_envs; _ } =
+    Name_in_target_env.Map.print
+      (fun ppf (def : Bindings_in_target_env.definition_in_joined_envs) ->
+        match def with
+        | Imported_var (var, _) ->
+          Format.fprintf ppf "@[<hov 1>(imported@ %a)@]"
+            Variable_in_one_joined_env.print var
+        | These_canonicals (simples, _) ->
+          Index.Map.print Simple_in_one_joined_env.print ppf simples)
+      ppf definitions_in_joined_envs
+
+  let create ~external_ids definitions_in_joined_envs =
+    { definitions_in_joined_envs; external_ids }
+
+  module Variable_refined_at_join = struct
+    type 'a t =
+      { canonicals_in_joined_envs : Simple_in_one_joined_env.t Index.Map.t;
+        kind : K.t;
+        external_ids : 'a Index.Map.t
+      }
+
+    let fold_values_at_uses f t init =
+      Index.Map.fold
+        (fun index simple acc ->
+          match Index.Map.find_opt index t.external_ids with
+          | None -> Misc.fatal_error "Missing environment for use"
+          | Some external_id ->
+            Simple_in_one_joined_env.pattern_match simple
+              ~const:(fun const -> f external_id (Or_unknown.Known const) acc)
+              ~name:(fun _ ~coercion:_ -> f external_id Or_unknown.Unknown acc))
+        t.canonicals_in_joined_envs init
+  end
+
+  type 'a simple_refined_at_join =
+    | Not_refined_at_join
+    | Invariant_in_all_uses of Simple.t
+    | Variable_refined_at_these_uses of 'a Variable_refined_at_join.t
+
+  let simple_refined_at_join t env simple =
+    let simple = TE.get_canonical_simple_ignoring_name_mode env simple in
+    Simple.pattern_match' simple
+      ~const:(fun _ -> Invariant_in_all_uses simple)
+      ~symbol:(fun _ ~coercion:_ -> Invariant_in_all_uses simple)
+      ~var:(fun var ~coercion:_ ->
+        match
+          Name_in_target_env.Map.find_opt
+            (Name_in_target_env.create (Name.var var))
+            t.definitions_in_joined_envs
+        with
+        | None ->
+          (* CR bclement: This is not entirely true -- variables in the source
+             env could have been refined at some (but not all!) of the uses, in
+             which case we won't have a [definition_in_join_env].
+
+             This could be fixed by storing a [definition_in_join_env] in the
+             [Latest_bound_source_var] / [Canonical_in_source_env] case in
+             [join_aliases_into_bindings]. *)
+          Not_refined_at_join
+        | Some (Imported_var (var, _)) ->
+          Invariant_in_all_uses
+            (Simple.var (var : Variable_in_one_joined_env.t :> Variable.t))
+        | Some (These_canonicals (canonicals_in_joined_envs, kind)) ->
+          Variable_refined_at_these_uses
+            { Variable_refined_at_join.canonicals_in_joined_envs;
+              kind;
+              external_ids = t.external_ids
+            })
+end
+
+let cut_and_n_way_join ~n_way_join_type ~meet_type ~cut_after source_env
+    joined_envs =
+  let joined_envs, equations_to_join, symbol_projections_to_join =
+    Index.fold_list
+      (fun index typing_env
+           (joined_envs, equations_to_join, symbol_projections_to_join) ->
+        let equations, symbol_projections =
+          cut_for_join typing_env ~cut_after
+        in
+        ( Index.Map.add index typing_env joined_envs,
+          Index.Map.add index (typing_env, equations) equations_to_join,
+          Index.Map.add index symbol_projections symbol_projections_to_join ))
+      joined_envs
+      (Index.Map.empty, Index.Map.empty, Index.Map.empty)
+  in
+  let target_env, _ =
+    cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
+      joined_envs equations_to_join symbol_projections_to_join
+  in
+  target_env
+
+let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_type ~cut_after
+    source_env joined_envs =
+  let external_ids, joined_envs, equations_to_join, symbol_projections_to_join =
+    Index.fold_list
+      (fun index (external_id, typing_env)
+           ( external_ids,
+             joined_envs,
+             equations_to_join,
+             symbol_projections_to_join ) ->
+        let equations, symbol_projections =
+          cut_for_join typing_env ~cut_after
+        in
+        ( Index.Map.add index external_id external_ids,
+          Index.Map.add index typing_env joined_envs,
+          Index.Map.add index (typing_env, equations) equations_to_join,
+          Index.Map.add index symbol_projections symbol_projections_to_join ))
+      joined_envs
+      (Index.Map.empty, Index.Map.empty, Index.Map.empty, Index.Map.empty)
+  in
+  let source_env = ME.create source_env in
+  let target_env, bindings =
+    cut_and_n_way_join0 ~n_way_join_type ~meet_type ~cut_after source_env
+      joined_envs equations_to_join symbol_projections_to_join
+  in
+  let target_env = ME.typing_env target_env in
+  let join_analysis = Analysis.create ~external_ids bindings in
+  target_env, join_analysis
 
 let n_way_join_canonicals ~bindings ~joined_envs kind simples =
   match get_canonical_in_target_env ~bindings ~joined_envs simples with

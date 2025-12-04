@@ -37,7 +37,7 @@ let foo (t : int option @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : int option @ aliased) =
@@ -83,7 +83,7 @@ let foo (t : ('a -> 'a) option @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : ('a -> 'a) option @ aliased) =
@@ -120,7 +120,7 @@ let foo (t : int ref option @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : int ref option @ aliased) =
@@ -171,7 +171,7 @@ let foo (t : ('a -> 'a) ref option @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : ('a -> 'a) ref option @ aliased) =
@@ -220,7 +220,7 @@ let foo (t : 'a option @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : 'a option @ aliased) =
@@ -240,7 +240,7 @@ let foo (type a : value mod contended portable)
   use_portable t
 
 [%%expect{|
-val foo : ('a : value mod contended portable). 'a option @ contended -> unit =
+val foo : ('a : value mod portable contended). 'a option @ contended -> unit =
   <fun>
 |}]
 
@@ -250,7 +250,7 @@ let foo (t : ('a : value mod contended portable) option @ contended nonportable)
   use_portable t
 
 [%%expect{|
-val foo : ('a : value mod contended portable). 'a option @ contended -> unit =
+val foo : ('a : value mod portable contended). 'a option @ contended -> unit =
   <fun>
 |}, Principal{|
 Line 2, characters 18-19:
@@ -276,7 +276,7 @@ let foo (t : ('a : value mod contended portable) option @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (type a : value mod aliased) (t : a option @ aliased) =
@@ -307,7 +307,7 @@ let foo (t : int list @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : int list @ aliased) =
@@ -353,7 +353,7 @@ let foo (t : ('a -> 'a) list @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : ('a -> 'a) list @ aliased) =
@@ -390,7 +390,7 @@ let foo (t : int ref list @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : int ref list @ aliased) =
@@ -441,7 +441,7 @@ let foo (t : ('a -> 'a) ref list @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : ('a -> 'a) ref list @ aliased) =
@@ -490,7 +490,7 @@ let foo (t : 'a list @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : 'a list @ aliased) =
@@ -510,7 +510,7 @@ let foo (type a : value mod contended portable)
   use_portable t
 
 [%%expect{|
-val foo : ('a : value mod contended portable). 'a list @ contended -> unit =
+val foo : ('a : value mod portable contended). 'a list @ contended -> unit =
   <fun>
 |}]
 
@@ -531,7 +531,7 @@ let foo (type a : value mod contended portable) (t : a list @ local) =
 Line 2, characters 13-14:
 2 |   use_global t [@nontail]
                  ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (type a : value mod contended portable) (t : a list @ aliased) =
@@ -1130,7 +1130,7 @@ let foo (t : int t @ local) = use_global t [@nontail]
 Line 1, characters 41-42:
 1 | let foo (t : int t @ local) = use_global t [@nontail]
                                              ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -1186,7 +1186,6 @@ Error: This value is "nonportable" but is expected to be "portable".
 
 (*********************************************)
 (* Reduction of error seen in the tree *)
-(* This requires the [is_open] technology in Ctype. *)
 
 type 'k t1 = T of Obj.t [@@unboxed]
 

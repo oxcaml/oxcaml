@@ -78,7 +78,8 @@ let rec address path event = function
             not_found ()
         end
     end
-  | Env.Adot(root, pos) ->
+  | Env.Adot(root, _field_sorts, pos) ->
+      (* We can ignore [_field_sorts] since the debugger runs only bytecode *)
       let v = address path event root in
       if not (Debugcom.Remote_value.is_block v) then
         raise(Error(Not_initialized_yet path));
@@ -98,7 +99,7 @@ let rec expression event env = function
             match valdesc.val_kind with
             | Val_ivar (_, cl_num) ->
                 let (p0, _) =
-                  Env.find_value_by_name
+                  Env.find_value_by_name_lazy
                     (Longident.Lident ("self-" ^ cl_num)) env
                 in
                 let v = value_path event env p0 in

@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-bin-annot-cms";
  modules = "stubs.c";
  reference = "${test_source_directory}/unboxed_return2.reference";
  include stdlib_stable;

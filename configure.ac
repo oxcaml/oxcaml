@@ -2644,6 +2644,33 @@ AC_LINK_IFELSE(
     AC_DEFINE([HAS_BSD_GETAFFINITY_NP])],
     [AC_MSG_RESULT([pthread_getaffinity_np not found])])])
 
+## prctl
+AC_CHECK_FUNCS(
+  [prctl],
+  [AC_DEFINE([HAS_PRCTL], [1])])
+
+## pthread_setname_np
+AC_CHECK_FUNCS(
+  [pthread_setname_np],
+  [AC_DEFINE([HAS_PTHREAD_SETNAME_NP], [1])])
+
+## pthread_set_name_np
+AC_CHECK_FUNCS(
+  [pthread_set_name_np],
+  [AC_DEFINE([HAS_PTHREAD_SET_NAME_NP], [1])])
+
+## SetThreadDescription
+AC_CHECK_FUNCS(
+  [SetThreadDescription],
+  [AC_DEFINE([HAS_SETTHREADDESCRIPTION], [1])
+  AC_CHECK_DECL(
+    [SetThreadDescription],
+    [AC_DEFINE([HAS_DECL_SETTHREADDESCRIPTION], [1])],
+    [],
+    [[#define WIN32_LEAN_AND_MEAN
+      #include <windows.h>
+      #include <processthreadsapi.h>]])])
+
 ## Activate the systhread library
 
 AS_IF(
@@ -2880,9 +2907,9 @@ AS_IF([test x"$enable_function_sections" = "xno"],
     [])])
 
 AS_CASE([$arch],
-  [amd64],
+  [amd64|arm64],
     [AS_CASE([$target],
-      [*-cygwin*|*-mingw*|*-windows],[probes=false],
+      [*-cygwin*|*-mingw*|*-windows|*-apple-darwin*],[probes=false],
       [*],[probes=true])],
   [*],[probes=false])
 
@@ -2948,6 +2975,17 @@ int main(void) {
   }
 }
 ]])], AC_DEFINE([HAS_POPCNT]) has_popcnt=yes, [])
+
+AC_SUBST([has_lzcnt])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <cpuid.h>
+int main(void) {
+    // Clang doesn't accept "lzcnt" in __builtin_cpu_supports
+    unsigned int eax, ebx, ecx, edx;
+    if (!__get_cpuid(0x80000001, &eax, &ebx, &ecx, &edx)) return 1;
+    return (ecx & bit_LZCNT) == 0;
+}
+]])], AC_DEFINE([HAS_LZCNT]) has_lzcnt=yes, [])
 
 AC_SUBST([has_pclmul])
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
@@ -3056,6 +3094,29 @@ int main(void) {
   }
 }
 ]])], AC_DEFINE([HAS_AVX2]) has_avx2=yes, [])
+
+AC_SUBST([has_f16c])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <cpuid.h>
+int main(void) {
+    // Old versions of gcc don't accept "f16c" in __builtin_cpu_supports
+    unsigned int eax, ebx, ecx, edx;
+    if (!__get_cpuid(1, &eax, &ebx, &ecx, &edx)) return 1;
+    return (ecx & bit_F16C) == 0;
+}
+]])], AC_DEFINE([HAS_F16C]) has_f16c=yes, [])
+
+AC_SUBST([has_fma])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("fma")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_FMA]) has_fma=yes, [])
 
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"

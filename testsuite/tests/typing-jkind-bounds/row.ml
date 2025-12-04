@@ -59,7 +59,7 @@ let don't_cross_locality (x : int t @ local) = use_global x [@nontail]
 Line 1, characters 58-59:
 1 | let don't_cross_locality (x : int t @ local) = use_global x [@nontail]
                                                               ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 
@@ -434,4 +434,46 @@ Error: The kind of type "t4" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t4" must be a subkind of immediate with M1.t
          because of the annotation on the declaration of the type t4.
+|}]
+
+type json : immutable_data =
+  [ `Null
+  | `False
+  | `True
+  | `String of string
+  | `Number of string
+  | `Object of (string * json) list
+  | `Array of json list
+  ]
+[%%expect {|
+type json =
+    [ `Array of json list
+    | `False
+    | `Null
+    | `Number of string
+    | `Object of (string * json) list
+    | `String of string
+    | `True ]
+|}]
+
+type json =
+  [ `Null
+  | `False
+  | `True
+  | `String of string
+  | `Number of string
+  | `Object of (string * json) list
+  | `Array of json list
+  ]
+let f (x : json @ nonportable) = use_portable x
+[%%expect {|
+type json =
+    [ `Array of json list
+    | `False
+    | `Null
+    | `Number of string
+    | `Object of (string * json) list
+    | `String of string
+    | `True ]
+val f : json -> unit = <fun>
 |}]

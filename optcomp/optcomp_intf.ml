@@ -63,6 +63,7 @@ module type Backend = sig
     unit
 
   val link :
+    Linkenv.t ->
     string list ->
     string ->
     cached_genfns_imports:Generic_fns.Partition.Set.t ->
@@ -87,8 +88,11 @@ module type Backend = sig
 
   val emit : emit option
 
-  (** This function may have the side effect of updating the load path. *)
+  (** This function is side-effect free. *)
   val support_files_for_eval : unit -> string list
+
+  (** This function may have the side effect of updating the load path. *)
+  val set_load_path_for_eval : unit -> unit
 
   include File_extensions
 end

@@ -128,7 +128,7 @@ let simplify : State.t -> unit =
 
 let ok : State.t -> Reg.t -> Reg.t -> bool =
  fun state t r ->
-  WorkList.equal (State.work_list state t) WorkList.Precolored
+  RegWorkList.equal (State.reg_work_list state t) RegWorkList.Precolored
   || State.degree state t < k t
   || State.mem_adj_set state t r
 

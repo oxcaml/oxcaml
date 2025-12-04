@@ -304,8 +304,9 @@ let mutability ~space ppf mut =
 let array_kind ~space ppf (ak : array_kind) =
   let str =
     match ak with
-    | Values -> None
     | Immediates -> Some "imm"
+    | Gc_ignorable_values -> Some "gc_ignorable"
+    | Values -> None
     | Naked_floats -> Some "float"
     | Naked_float32s -> Some "float32"
     | Naked_int32s -> Some "int32"
@@ -537,6 +538,9 @@ let string_accessor_width ppf saw =
 let array_load_kind ~space ppf (load_kind : array_load_kind) =
   let str =
     match[@ocaml.warning "-fragile-match"] load_kind with
+    | Immediates -> None
+    | Gc_ignorable_values -> Some "gc_ignorable"
+    | Values -> None
     | Naked_vec128s -> Some "vec128"
     | Naked_vec256s -> Some "vec256"
     | Naked_vec512s -> Some "vec512"
@@ -658,8 +662,9 @@ let ternop ppf t a1 a2 a3 =
     let ia =
       match set_kind with
       | Values ia -> ia
-      | Immediates | Naked_floats | Naked_float32s | Naked_int32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
+      | Gc_ignorable_values | Immediates | Naked_floats | Naked_float32s
+      | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+      | Naked_vec256s | Naked_vec512s ->
         Initialization (* Will be ignored anyway *)
     in
     Format.fprintf ppf "@[<2>%%array_set%a%a@ %a.(%a) %a %a@]"

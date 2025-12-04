@@ -184,6 +184,7 @@ let oper_result_type = function
   | Calloc _ -> typ_val
   | Cstore (_c, _) -> typ_void
   | Cdls_get -> typ_val
+  | Ctls_get -> typ_val
   | Cprefetch _ -> typ_void
   | Catomic
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
@@ -192,6 +193,7 @@ let oper_result_type = function
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
   | Clsr | Casr | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
     typ_int
+  | Caddi128 | Csubi128 | Cmuli64 _ -> typ_int128
   | Caddv -> typ_val
   | Cadda -> typ_addr
   | Cnegf Float64
@@ -224,16 +226,22 @@ let oper_result_type = function
   | Cstatic_cast (V128_of_scalar _) -> typ_vec128
   | Cstatic_cast (Scalar_of_v128 Float64x2) -> typ_float
   | Cstatic_cast (Scalar_of_v128 Float32x4) -> typ_float32
+  | Cstatic_cast (Scalar_of_v128 Float16x8) ->
+    Misc.fatal_error "float16x8: scalar type not supported"
   | Cstatic_cast (Scalar_of_v128 (Int8x16 | Int16x8 | Int32x4 | Int64x2)) ->
     typ_int
   | Cstatic_cast (V256_of_scalar _) -> typ_vec256
   | Cstatic_cast (Scalar_of_v256 Float64x4) -> typ_float
   | Cstatic_cast (Scalar_of_v256 Float32x8) -> typ_float32
+  | Cstatic_cast (Scalar_of_v256 Float16x16) ->
+    Misc.fatal_error "float16x16: scalar type not supported"
   | Cstatic_cast (Scalar_of_v256 (Int8x32 | Int16x16 | Int32x8 | Int64x4)) ->
     typ_int
   | Cstatic_cast (V512_of_scalar _) -> typ_vec512
   | Cstatic_cast (Scalar_of_v512 Float64x8) -> typ_float
   | Cstatic_cast (Scalar_of_v512 Float32x16) -> typ_float32
+  | Cstatic_cast (Scalar_of_v512 Float16x32) ->
+    Misc.fatal_error "float16x32: scalar type not supported"
   | Cstatic_cast (Scalar_of_v512 (Int8x64 | Int16x32 | Int32x16 | Int64x8)) ->
     typ_int
   | Craise _ -> typ_void
@@ -539,10 +547,10 @@ module Stack_offset_and_exn = struct
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _ | Store _ | Intop _ | Intop_imm _ | Intop_atomic _ | Floatop _
-        | Csel _ | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _
-        | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
-        | Dls_get | Poll | Pause | Alloc _ )
+        | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
+        | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
+        | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
+        | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause | Alloc _ )
     | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->

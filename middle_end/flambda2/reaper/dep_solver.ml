@@ -13,19 +13,254 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* This file performs an analysis where, for each variable, we track how it is
+   used and what sources it can have. It then uses the results of this analysis
+   to compute the transformations we want to do: removing unused arguments of
+   constructors, continuations, and even functions when possible, unboxing
+   values which do not escape, and changing the representation of some values.
+
+   # Core analysis
+
+   At its core, we have a graph with a given number of nodes (corresponding to
+   variables in the input program), and three types of arrows between nodes:
+
+   - [alias], which means that a variable can flow to another variable,
+
+   - [constructor], which means that a variable can flow to a given field of
+   another variable,
+
+   - and [accessor], which means that a given field of a variable can flow to
+   another variable.
+
+   Some nodes are also labelled as having unknown sources (for variables outside
+   the compilation unit, for instance), or unknown usages (for arguments to
+   functions outside the compilation unit, for instance).
+
+   The analysis then tracks, for each node in the graph, what sources that node
+   can have (unknown sources, or for each field, what is the source of each of
+   its fields), and how it could be used (unknown usages, or for each field, how
+   that field could be used).
+
+   With this presentation, sources and usages are symmetrical, up to reversing
+   the direction of arrows and exchanging constructors and accessors, so let us
+   focus on usages for the moment. The result we want is for each node $x$, the
+   sequences of field accesses for which the result has unknown usages. We can
+   specify this as a language $Lₓ$ of words over the alphabet of fields. Then,
+   the result we want is the least fixed point of the equations:
+
+   - for each node $x$ with unknown usages, $ε ∈ Lₓ$,
+
+   - for each alias [let t = s], $Lₜ ⊆ Lₛ$ (the source has at least as many uses
+   as the target)
+
+   - for each accessor [let t = s.f], $f ⋅ Lₜ ⊆ Lₛ$ (each access to the target
+   corresponds to an access to the source after taking the field $f$)
+
+   - for each constructor [let t = { f = s; ... }], $f⁻¹ ⋅ Lₜ ⊆ Lₛ$ (each access
+   to the target that starts with $f$ corresponds to an access to the sources
+   after removing the initial $f$), where $f⁻¹ ⋅ Lₜ$ is the Brzozowski
+   derivative of $Lₜ$ with respect to $f$, i.e. { u / f ⋅ u ∈ Lₜ }.
+
+   Given all these operations preserve regular languages, it is easy to see the
+   output will be a regular language as well. In practice, we will represent the
+   result by saying that for each variable, its usages are either unknown, or
+   that for each field, the usages for that field correspond to the union of the
+   usages of a given set of variables, essentially specifying the language $Lₓ$
+   by its Brzozowski derivatives.
+
+   # Implementation of the core analysis
+
+   We still consider only usages, as sources are symmetrical. One problem we
+   have is, in an alias chain, the $Lₓ$ will be repeated a large number of
+   times, leading to quadratic behaviour. To avoid this, we only represent
+   explicitely $Lₓ$ when $x$ is the source of an accessor. For other variables,
+   we represent it implicitely with a set $Uₓ$ of usages of $x$, corresponding
+   to accessors only, and such that $Lₓ = ⋃_{t ∈ Uₓ} Lₜ$. However, if a variable
+   has unknown usages, we do not represent $Uₓ$, as it would be useless once the
+   variable has unknown usages.
+
+   In practice we have several Datalog relations to represent this: first,
+   [any_usage x] means that [x] has unknown usages. Then, [usages x y] means
+   that [y] is a point where [x] is accessed, corresponding to $y ∈ Uₓ$.
+   Finally, we have, for [s] the source of an accessor the relations
+   [field_usages s f t], which mean $f ⋅ Lₜ ⊆ Lₛ$. For performance, we also have
+   an additionnal relation [field_usages_top s f], which means $f ⋅ ε ∈ Lₛ$,
+   that is, the field [f] of [s] has unknown usages.
+
+   # Encoding of function calls
+
+   [CR ncourant: move here the explanation about how my_closure is handled.]
+
+   Closures have a special field, [Code_of_closure], which represents what
+   happens when the closure is called. Schematically, if we have a function
+   named [f], with a code_id [p], which has a parameter [x] and returns a result
+   [r], and that this function flows to a point where there is an application
+   where it is named [g], it takes as argument [y] and names the result [s], the
+   graph will look like the following: *)
+(*
+ *    ╔═══╗                    ╔═══╗
+ *    ║ f ║───────────────────>║ g ║
+ *    ╚═══╝                    ╚═══╝
+ *      ^                        │
+ *      │                        │
+ *    [wit]                    [wit]
+ *      │                        │
+ *      │                        v
+ *    ╔═══╗                    ╔═══╗
+ *    ║   ║                    ║   ║
+ *    ╚═══╝                    ╚═══╝
+ *     ^^^                      ││║
+ *     ││║          ╔═══╗       ││║          ╔═══╗
+ *     ││╚[param0]══║ a ║       ││╚[param0]═>║ b ║
+ *     ││           ╚═══╝       ││           ╚═══╝
+ *     ││           ╔═══╗       ││           ╔═══╗
+ *     │└[return0]──║ r ║       │└[return0]─>║ s ║
+ *     │            ╚═══╝       │            ╚═══╝
+ *     │            ╔═══╗       │            ╔═══╗
+ *     └─[code_id]──║ p ║       └─[code_id]─>║ T ║
+ *                  ╚═══╝                    ╚═══╝
+ *  ╰──────────╮╭──────────╯ ╰─────────╮╭───────────╯
+ *      (co)constructors         (co)accessors
+ *)
+(* On the left side of the graph, the construction of the [Code_of_closure]
+   field of the closure (named [wit] in the graph, for compactness) is done. On
+   the right side, the access to that field representing the application is
+   done. When the function is applied, we need to do three things:
+
+   - Mark the code_id [p] as used. This is easy, since it corresponds exactly to
+   what happens with standard block constructors and accessors.
+
+   - Add an alias [let s = r]. Again, this is easy and corresponds precisely to
+   what happens with constructors and accessors.
+
+   - Add an alias [let a = b]. This is the direction opposite to what would
+   happen with constructors and accessors. Thus, for parameters, we use
+   coconstructors and coaccessors that put this alias in the opposite direction.
+
+   # Local fields
+
+   Fields that are value slots or function slots originating from the current
+   compilation unit are said to be *local*. Local fields are special, because we
+   know all the places they are used: any constructor or accessor to a local
+   field in a different compilation unit comes necessarily from inlining such a
+   use from the current compilation unit, or type-based changed from the types
+   exported by the current compilation unit. As such, we can perform a much more
+   precise analysis on them.
+
+   Thus, let us assume we have a block $a$, with a local field $f$ containing a
+   value $u$, and a block $b$, from which we read a value $v$ from the field
+   $f$. We must add an alias [let v = u] if there is a way $a$ could possibly
+   flow to $b$.
+
+   Let us consider three cases:
+
+   - $a$ has known usages. Then, $b$ is in the usages of $a$, making the usual
+   mechanism of handling usages for fields of constructors add the alias [let v
+   = u].
+
+   - $b$ has known sources. Then, $a$ is in the sources of $b$, making the usual
+   mechanism of handling sources for the result of accessors add the alias [let
+   v = u].
+
+   - Both $a$ has unknown usages and $b$ has unknown sources. Then, neither of
+   the above will apply, and we need to do something. Fortunately, when this
+   happens, we cannot do any better than assuming $a$ will flow to $b$, so it is
+   enough to mark all local fields stored in blocks that have unknown usages,
+   and all local fields read from block that have unknown sources, and add
+   aliases between both.
+
+   Still, there is a subtlety in the other cases we must take care not to
+   overlook. The usual mechanism of handling usages for fields of constructors
+   (and likewise for the sources of the result of accessors) only add an alias
+   if the result has known usages (resp. sources) as an optimisation. However,
+   this optimisation is incorrect in the case of local fields! Remember the
+   above example, and assume that $a$ has unknown usages, $b$ has known sources
+   (including $a$), and that $u$ has unknown sources. If we used the
+   optimisation we use for other fields, then we would mark that the field $f$
+   of $a$ has unknown sources, therefore $v$ has unknown sources, without adding
+   an alias [let v = u]. While this is correct for the sources of $v$, this
+   misses the usages of $u$! Indeed, $u$ is correctly marked as being in a local
+   field $f$ of a block with unknown usages, but no block with unknown sources
+   reads from a local field $f$, missing $v$ as uses of $u$. Fortunately,
+   disabling this optimisation for local fields is enough to restore
+   correctness: in that case, we simply add an alias [let v = u], which
+   correctly accounts for the usages of $u$.
+
+   # Unboxing
+
+   Unboxing in the reaper starts by considering the set of values whose runtime
+   representation can be changed (other than by replacing fields that are never
+   read by a poison value). The criterion used for this is that the value must
+   have a unique allocation point for each of its uses that read from it.
+   Formally, a value allocated at a given point $x$ can be unboxed if, for each
+   usage $y$ of $x$ that reads from $x$ for one of the fields [Block],
+   [Value_slot], [Function_slot], [Is_int] or [Get_tag], (but not
+   [Code_of_closure] which connects the call witness which is not read at
+   runtime from $x$, nor [Apply] or [Code_id_of_call_witnes] which are only read
+   from call witnesses), $y$ has known sources, and the only source of $y$ is
+   $x$.
+
+   In the case where $x$ has unknown usages, we can assume any field defined in
+   $x$ that is not local might be read from it. As such, as soon as $x$ has a
+   non-local field other than [Code_of_closure], the representation of $x$ may
+   not be changed. Besides, if $x$ has a local field $f$ that is read from a
+   value with an unknown source, the criterion above fails as well.
+
+   Likewise, we identify the functions whose calling convention can be changed,
+   which are those where at each application point, we know the call witness.
+
+   Once we have identified the values whose runtime representation can be
+   changed, we must decide which of those to unbox. There are additionnal
+   criteria for this:
+
+   - Symbols may not be unboxed, as non-value symbols are not possible, and
+   symbols may contain non-symbol non-constant values that cannot be turned into
+   a symbol.
+
+   - A closure that is indirectly called may not be unboxed, where a closure is
+   considered indirectly called if, at the point of apply, we are unable to
+   identify precisely which call witness is in the closure.
+
+   - A value that is stored inside another whose representation cannot be
+   changed cannot be unboxed.
+
+   - A value which is passed as argument to, or is the return value of, a
+   function whose calling convention cannot be changed, cannot be unboxed
+   either.
+
+   Once the decisions are taken, we compute the required variables for each
+   value that is unboxed. For that, we simply use one variable for each field
+   that has a use, or we recursively compute the variables needed if the field
+   is unboxed as well.
+
+   Likewise, for values whose representation is changed, we compute for each
+   field the variables needed to represent it at the point of the allocation. *)
+
+(* Disable [not-principal] warning in this file. We often write code that looks
+   like [let@ [x; y] = a in b] where the list constructor is an [hlist], and [a]
+   is used to determine the type of that [hlist]. Unfortunately, due to how
+   [let@] is expansed, this is not principal. *)
+[@@@ocaml.warning "-not-principal"]
+
+open Global_flow_graph.Relations
+
 let reaperdbg_env = Sys.getenv_opt "REAPERDBG"
 
 let reaperdbg_flags =
   String.split_on_char ',' (Option.value ~default:"" reaperdbg_env)
 
-let debug = reaperdbg_env <> None
+let debug_types = List.mem "types" reaperdbg_flags
+
+let debug_stats = List.mem "stats" reaperdbg_flags
+
+let debug_unbox = List.mem "unbox" reaperdbg_flags
+
+let debug_db = List.mem "db" reaperdbg_flags
 
 (* This needs to be set before creating any datalog rules. *)
 let () =
-  if debug && List.mem "prov" reaperdbg_flags
+  if List.mem "prov" reaperdbg_flags
   then Datalog.Schedule.enable_provenance_for_debug ()
-
-module Field = Global_flow_graph.Field
 
 type 'a unboxed_fields =
   | Not_unboxed of 'a
@@ -75,7 +310,8 @@ let pp_changed_representation ff = function
 type result =
   { db : Datalog.database;
     unboxed_fields : unboxed Code_id_or_name.Map.t;
-    changed_representation : changed_representation Code_id_or_name.Map.t
+    changed_representation :
+      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
   }
 
 let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
@@ -83,34 +319,76 @@ let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
 module Syntax = struct
   include Datalog
 
+  let query q = q
+
   let ( let$ ) xs f = compile xs f
 
-  let ( ==> ) h c = where h (deduce c)
+  let ( let^$ ) (ps, xs) f =
+    compile_with_parameters ps xs (fun ps xs -> f (ps, xs))
+
+  let rec flatten_hypotheses l =
+    match l with
+    | [] -> []
+    | `And l1 :: l2 -> flatten_hypotheses l1 @ flatten_hypotheses l2
+    | `Only_if (l1, x) :: l2 ->
+      (x :: flatten_hypotheses l1) @ flatten_hypotheses l2
+    | (#hypothesis as x) :: l -> x :: flatten_hypotheses l
+
+  let ( ==> ) h c =
+    match c with
+    | #deduction as c -> where (flatten_hypotheses h) (deduce c)
+    | `Only_if (l, c) -> where (l @ flatten_hypotheses h) (deduce c)
+
+  let ( =>? ) h l = where (flatten_hypotheses h) (yield l)
+
+  let ( !! ) = Term.constant
+
+  let saturate_in_order = List.map (fun r -> Schedule.saturate [r])
+
+  let ( ~~ ) = not
+
+  (* Prevent shadowing [not] *)
+  let not = Stdlib.not
+
+  let ( % ) = atom
+
+  let when1 f x = filter (fun [x] -> f x) [x]
+
+  let unless1 f x = when1 (fun x -> not (f x)) x
+
+  let ( let^? ) (params, existentials) f =
+    let q =
+      query
+        (let^$ params, existentials = params, existentials in
+         f (params, existentials) =>? [])
+    in
+    fun params db ->
+      Cursor.fold_with_parameters q params db ~init:false ~f:(fun [] _ -> true)
 end
+
+open! Syntax
 
 module Cols = struct
   let n = Code_id_or_name.datalog_column_id
 
-  let f = Global_flow_graph.Field.Encoded.datalog_column_id
+  let f = Field.datalog_column_id
 
-  let cf = Global_flow_graph.CoField.Encoded.datalog_column_id
+  let cf = Cofield.datalog_column_id
 end
 
-let rel1_r ?provenance name schema =
-  let r = Datalog.create_relation ?provenance ~name schema in
-  r, fun x -> Datalog.atom r [x]
+let nrel name schema = Datalog.create_relation ~provenance:false ~name schema
 
-let rel1 ?provenance name schema = snd (rel1_r ?provenance name schema)
+let rel1 name schema =
+  let tbl = Datalog.create_relation ~name schema in
+  fun x -> tbl % [x]
 
-let rel2_r ?provenance name schema =
-  let r = Datalog.create_relation ?provenance ~name schema in
-  r, fun x y -> Datalog.atom r [x; y]
+let rel2 name schema =
+  let tbl = Datalog.create_relation ~name schema in
+  fun x y -> tbl % [x; y]
 
-let rel2 ?provenance name schema = snd (rel2_r ?provenance name schema)
-
-let rel3 ?provenance name schema =
-  let r = Datalog.create_relation ?provenance ~name schema in
-  fun x y z -> Datalog.atom r [x; y; z]
+let rel3 name schema =
+  let tbl = Datalog.create_relation ~name schema in
+  fun x y z -> tbl % [x; y; z]
 
 (**
    [usages] and [sources] are dual. They build the same relation
@@ -132,7 +410,7 @@ let rel3 ?provenance name schema =
 
     [usages x x] is used to represent the actual use of x.
 *)
-let usages_rel = rel2 "usages" Cols.[n; n]
+let usages = rel2 "usages" Cols.[n; n]
 
 (** [field_usages x f y] y is an use of the field f of x
     and there is an actual use for y.
@@ -142,18 +420,20 @@ let usages_rel = rel2 "usages" Cols.[n; n]
     We avoid building this relation if [field_usages_top x f], but it is possible to have both
     [field_usages x f _] and [field_usages_top x f] depending on the resolution order.
 *)
-let field_usages_rel = rel3 "field_usages" Cols.[n; f; n]
+let field_usages = rel3 "field_usages" Cols.[n; f; n]
 
 (** [any_usage x] x is used in an uncontrolled way *)
-let _any_usage_pred = Global_flow_graph.any_usage_pred
+let any_usage = any_usage
 
-(** [field_usages_top x f] the field f of x is used in an uncontroled way.
+(** [field_usages_top x f] the field f of x is used in an uncontrolled way.
     It could be for instance, a value escaping the current compilation unit,
     or passed as argument to an non axiomatized function or primitive.
-    Exists only if [accessor y f x] for some y.
-    (this avoids propagating large number of fields properties on many variables)
+    Exists only if [accessor y f x] for some y (this avoids propagating large
+    number of fields properties on many variables).
+
+    For local fields, this relation is not used.
 *)
-let field_usages_top_rel = rel2 "field_usages_top" Cols.[n; f]
+let field_usages_top = rel2 "field_usages_top" Cols.[n; f]
 
 (** [sources x y] y is a source of x, and there is an actual source for y.
 
@@ -166,14 +446,14 @@ let field_usages_top_rel = rel2 "field_usages_top" Cols.[n; f]
 
     [sources x x] is used to represent the actual source of x.
 *)
-let sources_rel = rel2 "sources" Cols.[n; n]
+let sources = rel2 "sources" Cols.[n; n]
 
 (** [any_source x] the special extern value 'any_source' is a source of x
     it represents the top for the sources.
     It can be produced for instance by an argument from an escaping function
     or the result of non axiomatized primitives and external symbols.
     Right now functions coming from other files are considered unknown *)
-let _any_source_pred = Global_flow_graph.any_source_pred
+let any_source = any_source
 
 (** [field_sources x f y] y is a source of the field f of x,
     and there is an actual source for y.
@@ -184,28 +464,40 @@ let _any_source_pred = Global_flow_graph.any_source_pred
     [field_sources x f _] and [field_sources_top x f] depending on the resolution order.
 
 *)
-let field_sources_rel = rel3 "field_sources" Cols.[n; f; n]
+let field_sources = rel3 "field_sources" Cols.[n; f; n]
 
 (** [field_sources_top x f] the special extern value is a source for the field f of x *)
-let field_sources_top_rel = rel2 "field_sources_top" Cols.[n; f]
+let field_sources_top = rel2 "field_sources_top" Cols.[n; f]
 (* CR pchambart: is there a reason why this is called top an not any source ? *)
 
-let cofield_sources_rel = rel3 "cofield_sources" Cols.[n; cf; n]
+let cofield_sources = rel3 "cofield_sources" Cols.[n; cf; n]
 
-let cofield_usages_rel = rel3 "cofield_usages" Cols.[n; cf; n]
+let cofield_usages = rel3 "cofield_usages" Cols.[n; cf; n]
 
-let rev_alias_rel = rel2 ~provenance:false "rev_alias" Cols.[n; n]
+(* Reverse relations *)
+let rev_alias =
+  let tbl = nrel "rev_alias" Cols.[n; n] in
+  fun ~from ~to_ -> tbl % [from; to_]
 
-let rev_use_rel = rel2 ~provenance:false "rev_use" Cols.[n; n]
+let rev_use =
+  let tbl = nrel "rev_use" Cols.[n; n] in
+  fun ~from ~to_ -> tbl % [from; to_]
 
-let rev_constructor_rel = rel3 ~provenance:false "rev_constructor" Cols.[n; f; n]
+let rev_constructor =
+  let tbl = nrel "rev_constructor" Cols.[n; f; n] in
+  fun ~from relation ~base -> tbl % [from; relation; base]
 
-let rev_accessor_rel = rel3 ~provenance:false "rev_accessor" Cols.[n; f; n]
+let rev_accessor =
+  let tbl = nrel "rev_accessor" Cols.[n; f; n] in
+  fun ~base relation ~to_ -> tbl % [base; relation; to_]
 
-let rev_coaccessor_rel = rel3 ~provenance:false "rev_coaccessor" Cols.[n; cf; n]
+let rev_coconstructor =
+  let tbl = nrel "rev_coconstructor" Cols.[n; cf; n] in
+  fun ~from relation ~base -> tbl % [from; relation; base]
 
-let rev_coconstructor_rel =
-  rel3 ~provenance:false "rev_coconstructor" Cols.[n; cf; n]
+let rev_coaccessor =
+  let tbl = nrel "rev_coaccessor" Cols.[n; cf; n] in
+  fun ~base relation ~to_ -> tbl % [base; relation; to_]
 
 (* The program is abstracted as a series of relations concerning the reading and
    writing of fields of values.
@@ -231,580 +523,569 @@ let rev_coconstructor_rel =
    come from: either an arbitrary source (for use and values coming from outside
    the compilation unit), or a given constructor. *)
 
+(* Local fields are value and function slots that originate from the current
+   compilation unit. As such, all sources and usages from these fields will
+   necessarily correspond to either code in the current compilation unit, or a
+   resimplified version of it.
+
+   The consequence of this is that we can consider them not to have [any_usage],
+   nor to have [any_source], even if the block containing them has [any_usage]
+   or [any_source]. Instead, we need to add an alias from [x] to [y] if [x] if
+   stored in a field of [source], [y] is read from the same field of [usage],
+   and [source] might flow to [usage]. *)
+
+let reading_field = rel2 "reading_field" Cols.[f; n]
+
+let escaping_field = rel2 "escaping_field" Cols.[f; n]
+
+let nontop_usages x y = `Only_if ([~~(any_usage x)], usages x y)
+
+let nontop_sources x y = `Only_if ([~~(any_source x)], sources x y)
+
+(* [has_usage x] means that we have either [any_usage x] or [usages x y] for
+   some [y]. *)
+let has_usage = rel1 "has_usage" Cols.[n]
+
+(* Likewise, [has_source x] means that we have either [any_source x] or [sources
+   x y] for some [y]. *)
+let has_source = rel1 "has_source" Cols.[n]
+
 let datalog_schedule =
-  let open Global_flow_graph in
-  let open! Syntax in
-  (* Reverse relations, because datalog does not implement a more efficient
-     representation yet. Datalog iterates on the first key of a relation first.
-     those reversed relations allows to select a different key. *)
-  (*
-   rev_alias
-   * alias To From
-   * => rev_alias From To
-
-   rev_accessor
-   * accessor To Rel Base
-   * => rev_accessor Base Rel To
-
-   rev_constructor
-   * constructor Base Rel From
-   * => rev_constructor From Rel Base
-
-   rev_coaccessor
-   * coaccessor To Rel Base
-   * => rev_coaccessor Base Rel To
-
-   rev_coconstructor
-   * coconstructor Base Rel From
-   * => rev_coconstructor From Rel Base
-   *)
-  let rev_alias =
-    let$ [to_; from] = ["to_"; "from"] in
-    [alias_rel to_ from] ==> rev_alias_rel from to_
+  (* Group rules by priority. Rules with (let$) are executed first, then the
+     rules with (let$$) are executed. *)
+  let with_priority p x f = p, ( let$ ) x f in
+  let ( let$ ) x f = with_priority 0 x f in
+  let ( let$$ ) x f = with_priority 1 x f in
+  let make_schedule l =
+    Schedule.fixpoint
+      (List.init 2 (fun i ->
+           Schedule.saturate
+             (List.filter_map (fun (p, r) -> if i = p then Some r else None) l)))
   in
-  let rev_use =
-    let$ [to_; from] = ["to_"; "from"] in
-    [use_rel to_ from] ==> rev_use_rel from to_
-  in
-  let rev_accessor =
-    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [accessor_rel to_ relation base] ==> rev_accessor_rel base relation to_
-  in
-  let rev_constructor =
-    let$ [base; relation; from] = ["base"; "relation"; "from"] in
-    [constructor_rel base relation from]
-    ==> rev_constructor_rel from relation base
-  in
-  let rev_coaccessor =
-    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [coaccessor_rel to_ relation base] ==> rev_coaccessor_rel base relation to_
-  in
-  let rev_coconstructor =
-    let$ [base; relation; from] = ["base"; "relation"; "from"] in
-    [coconstructor_rel base relation from]
-    ==> rev_coconstructor_rel from relation base
-  in
-  (* propagate
+  [ (* Reverse relations, because datalog does not implement a more efficient
+       representation yet. Datalog iterates on the first key of a relation
+       first, those reversed relations allows to select a different key. Of
+       these, only [alias] has both priorities, because it is the only of those
+       relations that is extended after graph construction. *)
+    (let$ [to_; from] = ["to_"; "from"] in
+     [alias ~to_ ~from] ==> rev_alias ~from ~to_);
+    (let$$ [to_; from] = ["to_"; "from"] in
+     [alias ~to_ ~from] ==> rev_alias ~from ~to_);
+    (let$ [to_; from] = ["to_"; "from"] in
+     [use ~to_ ~from] ==> rev_use ~from ~to_);
+    (let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [accessor ~to_ relation ~base] ==> rev_accessor ~base relation ~to_);
+    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+     [constructor ~base relation ~from] ==> rev_constructor ~from relation ~base);
+    (let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [coaccessor ~to_ relation ~base] ==> rev_coaccessor ~base relation ~to_);
+    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+     [coconstructor ~base relation ~from]
+     ==> rev_coconstructor ~from relation ~base);
+    (* The [propagate] relation is part of the input of the solver, with the
+       intended meaning of this rule, that is, an alias if [is_used] is used. *)
+    (let$ [if_used; to_; from] = ["if_used"; "to_"; "from"] in
+     [any_usage if_used; propagate ~if_used ~to_ ~from] ==> alias ~to_ ~from);
+    (* has_usage/has_source *)
+    (let$ [x] = ["x"] in
+     [any_usage x] ==> has_usage x);
+    (let$$ [x; y] = ["x"; "y"] in
+     [usages x y] ==> has_usage x);
+    (let$ [x] = ["x"] in
+     [any_source x] ==> has_source x);
+    (let$$ [x; y] = ["x"; "y"] in
+     [sources x y] ==> has_source x);
+    (* usages rules:
 
-     The [propagate] relation is part of the input of the solver, with the
-     intended meaning of this rule. That is an alias if [is_used] is used. *)
-  let alias_from_usage_propagate =
-    let$ [if_used; to_; from] = ["if_used"; "to_"; "from"] in
-    [any_usage_pred if_used; propagate_rel if_used to_ from]
-    ==> alias_rel to_ from
-  in
-  (* usages rules:
+       By convention the [base] name applies to something that represents a
+       block value (something on which an accessor or a constructor applies)
 
-     By convention the Base name applies to something that represents a block value
-     (something on which an accessor or a constructor applies)
+       usage_accessor and usage_coaccessor are the relation initialisation: they
+       define what we mean by 'actually using' something. usage_alias
+       propagatess usage to aliases.
 
-     usage_accessor and usage_coaccessor are the relation initialisation: they define
-     what we mean by 'actually using' something. usage_alias propagatess usage to aliases.
+       An 'actual use' comes from either a top (any_usage predicate) or through
+       an accessor (or coaccessor) on an used variable
 
-     An 'actual use' comes from either a top (any_usage predicate) or through an accessor
-     (or coaccessor) on an used variable
+       All those rules are constrained not to apply when any_usage is valid.
+       (see [usages] definition comment) *)
+    (let$ [to_; from] = ["to_"; "from"] in
+     [alias ~to_ ~from; any_usage to_] ==> any_usage from);
+    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [accessor ~to_ relation ~base; has_usage to_] ==> nontop_usages base base);
+    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [has_source to_; coaccessor ~to_ relation ~base]
+     ==> nontop_usages base base);
+    (let$$ [to_; from; usage] = ["to_"; "from"; "usage"] in
+     [nontop_usages to_ usage; alias ~to_ ~from] ==> nontop_usages from usage);
+    (* accessor-usage *)
+    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [ ~~(any_usage base);
+       any_usage to_;
+       accessor ~to_ relation ~base;
+       unless1 Field.is_local relation ]
+     ==> field_usages_top base relation);
+    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [ ~~(any_usage base);
+       any_usage to_;
+       accessor ~to_ relation ~base;
+       when1 Field.is_local relation ]
+     ==> field_usages base relation to_);
+    (let$$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
+     [ ~~(any_usage base);
+       nontop_usages to_ _var;
+       ~~(field_usages_top base relation);
+       accessor ~to_ relation ~base ]
+     ==> field_usages base relation to_);
+    (* coaccessor-usages *)
+    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+     [~~(any_usage base); has_source to_; coaccessor ~to_ relation ~base]
+     ==> cofield_usages base relation to_);
+    (* constructor-usages *)
+    (let$$ [base; base_use; relation; from; to_] =
+       ["base"; "base_use"; "relation"; "from"; "to_"]
+     in
+     [ ~~(any_usage from);
+       ~~(field_usages_top base_use relation);
+       constructor ~base relation ~from;
+       nontop_usages base base_use;
+       field_usages base_use relation to_ ]
+     ==> alias ~to_ ~from);
+    (let$$ [base; base_use; relation; from; to_] =
+       ["base"; "base_use"; "relation"; "from"; "to_"]
+     in
+     [ when1 Field.is_local relation;
+       constructor ~base relation ~from;
+       usages base base_use;
+       field_usages base_use relation to_ ]
+     ==> alias ~to_ ~from);
+    (let$ [base; base_use; relation; from] =
+       ["base"; "base_use"; "relation"; "from"]
+     in
+     [ constructor ~base relation ~from;
+       nontop_usages base base_use;
+       field_usages_top base_use relation ]
+     ==> any_usage from);
+    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+     [ any_usage base;
+       constructor ~base relation ~from;
+       unless1 Field.is_local relation ]
+     ==> any_usage from);
+    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+     [ any_usage base;
+       constructor ~base relation ~from;
+       when1 Field.is_local relation ]
+     ==> escaping_field relation from);
+    (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
+     [any_source base; rev_coaccessor ~base relation ~to_] ==> any_usage to_);
+    (* sources: see explanation on usage *)
+    (let$ [from; to_] = ["from"; "to_"] in
+     [rev_alias ~from ~to_; any_source from] ==> any_source to_);
+    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+     [has_source from; rev_constructor ~from relation ~base]
+     ==> nontop_sources base base);
+    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+     [has_usage from; rev_coconstructor ~from relation ~base]
+     ==> nontop_sources base base);
+    (let$$ [from; to_; source] = ["from"; "to_"; "source"] in
+     [nontop_sources from source; rev_alias ~from ~to_]
+     ==> nontop_sources to_ source);
+    (* constructor-sources *)
+    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+     [ ~~(any_source base);
+       any_source from;
+       rev_constructor ~from relation ~base;
+       unless1 Field.is_local relation ]
+     ==> field_sources_top base relation);
+    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+     [ ~~(any_source base);
+       any_source from;
+       rev_constructor ~from relation ~base;
+       when1 Field.is_local relation ]
+     ==> field_sources base relation from);
+    (let$$ [from; relation; base; _var] =
+       ["from"; "relation"; "base"; "_var"]
+     in
+     [ ~~(any_source base);
+       ~~(field_sources_top base relation);
+       rev_constructor ~from relation ~base;
+       nontop_sources from _var ]
+     ==> field_sources base relation from);
+    (* coaccessor-sources *)
+    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+     [ ~~(any_source base);
+       has_usage from;
+       rev_coconstructor ~from relation ~base ]
+     ==> cofield_sources base relation from);
+    (* coconstructor-uses *)
+    (let$$ [base; base_use; relation; from; to_] =
+       ["base"; "base_use"; "relation"; "from"; "to_"]
+     in
+     [ coconstructor ~base relation ~from;
+       nontop_usages base base_use;
+       cofield_usages base_use relation to_ ]
+     ==> alias ~to_:from ~from:to_);
+    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+     [any_usage base; coconstructor ~base relation ~from] ==> any_source from);
+    (* accessor-sources *)
+    (let$$ [base; base_source; relation; to_; from] =
+       ["base"; "base_source"; "relation"; "to_"; "from"]
+     in
+     [ ~~(any_source to_);
+       ~~(field_sources_top base_source relation);
+       rev_accessor ~base relation ~to_;
+       nontop_sources base base_source;
+       field_sources base_source relation from ]
+     ==> alias ~to_ ~from);
+    (let$$ [base; base_source; relation; to_; from] =
+       ["base"; "base_source"; "relation"; "to_"; "from"]
+     in
+     [ when1 Field.is_local relation;
+       rev_accessor ~base relation ~to_;
+       sources base base_source;
+       field_sources base_source relation from ]
+     ==> alias ~to_ ~from);
+    (let$ [base; base_source; relation; to_] =
+       ["base"; "base_source"; "relation"; "to_"]
+     in
+     [ rev_accessor ~base relation ~to_;
+       nontop_sources base base_source;
+       field_sources_top base_source relation ]
+     ==> any_source to_);
+    (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
+     [ any_source base;
+       rev_accessor ~base relation ~to_;
+       unless1 Field.is_local relation ]
+     ==> any_source to_);
+    (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
+     [ any_source base;
+       rev_accessor ~base relation ~to_;
+       when1 Field.is_local relation ]
+     ==> reading_field relation to_);
+    (let$ [relation; from; to_] = ["relation"; "from"; "to_"] in
+     [escaping_field relation from; reading_field relation to_]
+     ==> alias ~to_ ~from);
+    (let$$ [base; base_source; relation; to_; from] =
+       ["base"; "base_source"; "relation"; "to_"; "from"]
+     in
+     [ rev_coaccessor ~base relation ~to_;
+       nontop_sources base base_source;
+       cofield_sources base_source relation from ]
+     ==> alias ~to_:from ~from:to_);
+    (* use *)
+    (let$ [to_; from] = ["to_"; "from"] in
+     [has_usage to_; use ~to_ ~from] ==> any_usage from);
+    (let$ [from; to_] = ["from"; "to_"] in
+     [has_source from; rev_use ~from ~to_] ==> any_source to_) ]
+  |> make_schedule
 
-     All those rules are constrained not to apply when any_usage is valid. (see [usages]
-     definition comment)
+module Fixit : sig
+  type (_, _, _) stmt
 
-   any_usage_from_alias_any_usage
-   *  alias To From
-   *  /\ any_usage To
-   *  => any_usage From
+  val ( let+ ) : ('a, 'b, 'c) stmt -> ('a -> 'd) -> ('d, 'b, 'c) stmt
 
-   usage_accessor (1 & 2)
-   *  not (any_usage Base)
-   *  /\ accessor To Rel Base
-   *  /\ (usages To Var \/ any_usage To)
-   *  => usages Base Base
+  val ( and+ ) :
+    ('a, 'b, 'b) stmt -> ('c, 'b, 'b) stmt -> ('a * 'c, 'b, 'b) stmt
 
-   usage_coaccessor (1 & 2)
-   *  not (any_usage Base)
-   *  /\ coaccessor To Rel Var
-   *  /\ (sources To Var \/ any_source To)
-   *  => usages Base Base
+  val run : ('a, 'a, 'b) stmt -> Datalog.database -> 'b
 
-   usage_alias
-   * not (any_usage From)
-   * /\ not (any_usage To)
-   * /\ usages To Usage
-   * /\ alias To From
-   * => usages From Usage
+  (* Don't try to write to this one ;) *)
+  val empty :
+    ('t, 'k, unit) Datalog.Column.hlist -> ('t, 'k, unit) Datalog.table
 
-   *)
-  let any_usage_from_alias_any_usage =
-    let$ [to_; from] = ["to_"; "from"] in
-    [alias_rel to_ from; any_usage_pred to_] ==> any_usage_pred from
-  in
-  let usages_accessor_1 =
-    let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [ not (any_usage_pred base);
-      accessor_rel to_ relation base;
-      usages_rel to_ _var ]
-    ==> usages_rel base base
-  in
-  let usages_accessor_2 =
-    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [ not (any_usage_pred base);
-      accessor_rel to_ relation base;
-      any_usage_pred to_ ]
-    ==> usages_rel base base
-  in
-  let usages_coaccessor_1 =
-    let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [ not (any_usage_pred base);
-      sources_rel to_ _var;
-      coaccessor_rel to_ relation base ]
-    ==> usages_rel base base
-  in
-  let usages_coaccessor_2 =
-    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [ not (any_usage_pred base);
-      any_source_pred to_;
-      coaccessor_rel to_ relation base ]
-    ==> usages_rel base base
-  in
-  let usages_alias =
-    let$ [to_; from; usage] = ["to_"; "from"; "usage"] in
-    [ not (any_usage_pred from);
-      not (any_usage_pred to_);
-      usages_rel to_ usage;
-      alias_rel to_ from ]
-    ==> usages_rel from usage
-  in
-  (* accessor-usage
+  val param :
+    string ->
+    ('a, 'b, unit) Datalog.Column.hlist ->
+    (('a, 'b, unit) Datalog.table -> ('x, 'y, 'd) stmt) ->
+    ('x, 'y, 'a -> 'd) stmt
 
-   field_usages_from_accessor_field_usages_top
-   *  not (any_usage Base)
-   *  /\ any_usage To
-   *  /\ accessor To Rel Base
-   *  => field_usages_top Base Rel
+  val paramc :
+    string ->
+    ('a, 'b, unit) Datalog.Column.hlist ->
+    ('e -> 'a) ->
+    (('a, 'b, unit) Datalog.table -> ('x, 'y, 'd) stmt) ->
+    ('x, 'y, 'e -> 'd) stmt
 
-   field_usages_from_accessor_field_usages
-   * not (any_usage Base)
-   * /\ not (any_usage To)
-   * /\ not (field_usages_top Base Rel)
-   * /\ accessor To Rel Base
-   * /\ usages To Var
-   * => field_usages Base Rel To
+  val param0 :
+    ('a -> 'b) ->
+    (('b, 'c, 'c) stmt -> ('d, 'e, 'f) stmt) ->
+    ('d, 'e, 'a -> 'f) stmt
 
-   *)
-  let field_usages_from_accessor_field_usages_top =
-    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [ not (any_usage_pred base);
-      any_usage_pred to_;
-      accessor_rel to_ relation base ]
-    ==> field_usages_top_rel base relation
-  in
-  let field_usages_from_accessor_field_usages =
-    let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [ not (any_usage_pred base);
-      not (any_usage_pred to_);
-      not (field_usages_top_rel base relation);
-      accessor_rel to_ relation base;
-      usages_rel to_ _var ]
-    ==> field_usages_rel base relation to_
-  in
-  (* coaccessor-usages
+  val local0 :
+    ('a, 'b, unit) Datalog.Column.hlist ->
+    ('a, 'c, 'c) stmt ->
+    (('a, 'b, unit) Datalog.table -> ('d, 'c, 'c) stmt) ->
+    ('d, 'c, 'c) stmt
 
-   cofield_usages_from_coaccessor (1 & 2)
-   * not (any_usage Base)
-   * /\ coaccessor To Rel Base
-   * /\ (sources To Var \/ any_source To)
-   * => cofield_usages Base Rel To
+  module Table : sig
+    type (_, _) hlist =
+      | [] : (Datalog.nil, Datalog.nil) hlist
+      | ( :: ) :
+          ('t, 'k, unit) Datalog.table * ('ts, 'xs) hlist
+          -> ('t -> 'ts, ('t, 'k, unit) Datalog.table -> 'xs) hlist
+  end
 
-   *)
-  let cofield_usages_from_coaccessor1 =
-    let$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-    [ not (any_usage_pred base);
-      coaccessor_rel to_ relation base;
-      sources_rel to_ _var ]
-    ==> cofield_usages_rel base relation to_
-  in
-  let cofield_usages_from_coaccessor2 =
-    let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-    [ not (any_usage_pred base);
-      any_source_pred to_;
-      coaccessor_rel to_ relation base ]
-    ==> cofield_usages_rel base relation to_
-  in
-  (* constructor-usages
+  val return : ('a, 'b, unit) Datalog.table -> ('a, 'c, 'c) stmt
 
-   alias_from_accessed_constructor_1
-   * not (any_usage From)
-   * /\ not (field_usages_top BaseUse Rel)
-   * /\ not (any_usage Base)
-   * /\ constructor Base Rel From
-   * /\ usages Base BaseUse
-   * /\ field_usages BaseUse Rel To
-   * => alias To From
+  val fix :
+    ('a, 'b) Table.hlist ->
+    (('a, 'b) Table.hlist -> Datalog.rule list) ->
+    (('a, 'b) Table.hlist -> ('x, 'y, 'd) stmt) ->
+    ('x, 'y, 'd) stmt
 
-   *)
-  let alias_from_accessed_constructor_1 =
-    let$ [base; base_use; relation; from; to_] =
-      ["base"; "base_use"; "relation"; "from"; "to_"]
+  val seq :
+    ('a, 'b) Table.hlist ->
+    (('a, 'b) Table.hlist -> Datalog.rule list) ->
+    (('a, 'b) Table.hlist -> ('x, 'y, 'd) stmt) ->
+    ('x, 'y, 'd) stmt
+
+  val fix1 :
+    ('t, 'k, unit) Datalog.table ->
+    (('t, 'k, unit) Datalog.table -> Datalog.rule list) ->
+    (('t, 'k, unit) Datalog.table -> ('x, 'y, 'd) stmt) ->
+    ('x, 'y, 'd) stmt
+
+  val fix' :
+    ('a, 'b) Table.hlist ->
+    (('a, 'b) Table.hlist -> Datalog.rule list) ->
+    ('a Datalog.Constant.hlist, 'c, 'c) stmt
+
+  val seq' :
+    ('a, 'b) Table.hlist ->
+    (('a, 'b) Table.hlist -> Datalog.rule list) ->
+    ('a Datalog.Constant.hlist, 'c, 'c) stmt
+
+  val fix1' :
+    ('t, 'k, unit) Datalog.table ->
+    (('t, 'k, unit) Datalog.table -> Datalog.rule list) ->
+    ('t, 'c, 'c) stmt
+
+  val ( let@ ) : ('a -> 'b) -> 'a -> 'b
+end = struct
+  let empty columns =
+    Datalog.create_table ~name:"empty" ~default_value:() columns
+
+  let local name columns = Datalog.create_table ~name ~default_value:() columns
+
+  module Table = struct
+    type ('t, 'k, 'v) t = ('t, 'k, 'v) Datalog.table
+
+    type (_, _) hlist =
+      | [] : (Datalog.nil, Datalog.nil) hlist
+      | ( :: ) :
+          ('t, 'k, unit) t * ('ts, 'xs) hlist
+          -> ('t -> 'ts, ('t, 'k, unit) Datalog.table -> 'xs) hlist
+
+    let rec locals : type a b. (a, b) hlist -> (a, b) hlist = function
+      | [] -> []
+      | table :: tables ->
+        let columns = Datalog.columns table in
+        local "fix" columns :: locals tables
+
+    let rec copy :
+        type a b.
+        (a, b) hlist -> (a, b) hlist -> Datalog.database -> Datalog.database =
+     fun from_tables to_tables db ->
+      match from_tables, to_tables with
+      | [], [] -> db
+      | from_table :: from_tables, to_table :: to_tables ->
+        let db =
+          Datalog.set_table to_table (Datalog.get_table from_table db) db
+        in
+        copy from_tables to_tables db
+
+    let rec get :
+        type a b. (a, b) hlist -> Datalog.database -> a Datalog.Constant.hlist =
+     fun tables db ->
+      match tables with
+      | [] -> []
+      | table :: tables -> Datalog.get_table table db :: get tables db
+  end
+
+  (* In [('s, 'r, 'f) stmt] the type variables have the following meaning:
+
+     - ['s] is the value associated with the statement (i.e. the value that can
+     be inspected using [let+]).
+
+     - ['r] is the global return type of the program this statement is a part
+     of. For instance, in [s = let+ x = s1 and+ y = s2 in (x, y)], all of [s1],
+     [s2] and [s] have the same value of ['r = 'x * 'y], but have different
+     values for ['s] (['x], ['y] and ['x * 'y] respectively).
+
+     - ['f] is the global parametric type of the program this istatement is a
+     part of. It is a n-ary function type ultimately returning values of type
+     ['r], but with the parameters introduced by the [param*] family of
+     functions. *)
+  type (_, _, _) stmt =
+    | Return : ('t, 'k, unit) Datalog.table -> ('t, 'c, 'c) stmt
+    | Value : 'a option ref -> ('a, 'c, 'c) stmt
+    | Run : Datalog.Schedule.t -> (unit, 'c, 'c) stmt
+    | Seq : (unit, 'c, 'c) stmt * ('a, 'b, 'c) stmt -> ('a, 'b, 'c) stmt
+    | Call : ('b, 'c, 'a -> 'c) stmt * ('a, 'c, 'c) stmt -> ('b, 'c, 'c) stmt
+    | Map :
+        ('a, 'c, 'j) stmt * (Datalog.database -> 'a -> 'b)
+        -> ('b, 'c, 'j) stmt
+    | Inspect :
+        ('a, 'c, 'j) stmt * (Datalog.database -> 'a -> unit)
+        -> ('a, 'c, 'j) stmt
+    | Conj : ('a, 'c, 'c) stmt * ('b, 'c, 'c) stmt -> ('a * 'b, 'c, 'c) stmt
+    | Now :
+        ('a, 'b, 'j) stmt * (Datalog.database -> Datalog.database)
+        -> ('a, 'b, 'j) stmt
+    | Input :
+        ('x, 'y, 'j) stmt * (Datalog.database -> 'a -> Datalog.database)
+        -> ('x, 'y, 'a -> 'j) stmt
+
+  let rec run :
+      type d f e.
+      (d, f, e) stmt -> (Datalog.database -> d -> f) -> Datalog.database -> e =
+   fun stmt k db ->
+    match stmt with
+    | Return table -> k db (Datalog.get_table table db)
+    | Value v -> k db (Option.get !v)
+    | Call (stmt_f, stmt_arg) ->
+      run stmt_arg (fun db arg -> run stmt_f k db arg) db
+    | Run schedule -> k (Datalog.Schedule.run schedule db) ()
+    | Seq (stmt1, stmt2) -> run stmt1 (fun db () -> run stmt2 k db) db
+    | Map (stmt, later) -> run stmt (fun db value -> k db (later db value)) db
+    | Inspect (stmt, f) ->
+      run stmt
+        (fun db value ->
+          f db value;
+          k db value)
+        db
+    | Conj (stmt1, stmt2) ->
+      run stmt1
+        (fun db value1 -> run stmt2 (fun db value2 -> k db (value1, value2)) db)
+        db
+    | Now (stmt, f) -> run stmt k (f db)
+    | Input (stmt, set_input) ->
+      fun arg ->
+        let db = set_input db arg in
+        run stmt k db
+
+  let run stmt db = run stmt (fun _ out -> out) db
+
+  let return table = Return table
+
+  let ( let+ ) stmt f = Map (stmt, fun _ value -> f value)
+
+  let ( and+ ) stmt1 stmt2 = Conj (stmt1, stmt2)
+
+  let param0 g f =
+    let cell = ref None in
+    Inspect
+      ( Input
+          ( f (Value cell),
+            fun db x ->
+              cell := Some (g x);
+              db ),
+        fun _db _value -> cell := None )
+
+  let param name columns f =
+    let table = local name columns in
+    Input (f table, fun db x -> Datalog.set_table table x db)
+
+  let paramc name columns g f =
+    let table = local name columns in
+    Input (f table, fun db x -> Datalog.set_table table (g x) db)
+
+  let local0 columns body f =
+    let table = local "local" columns in
+    Call (Input (f table, fun db x -> Datalog.set_table table x db), body)
+
+  let fix x f g =
+    let y = Table.locals x in
+    let schedule = Datalog.Schedule.saturate (f y) in
+    let body = g y in
+    Now (Seq (Run schedule, body), fun db -> Table.copy x y db)
+
+  let seq x f g =
+    let y = Table.locals x in
+    let rules = f y in
+    let body = g y in
+    let go =
+      List.fold_right
+        (fun r acc -> Seq (Run (Datalog.Schedule.saturate [r]), acc))
+        rules body
     in
-    [ not (any_usage_pred from);
-      not (field_usages_top_rel base_use relation);
-      not (any_usage_pred base);
-      constructor_rel base relation from;
-      usages_rel base base_use;
-      field_usages_rel base_use relation to_ ]
-    ==> alias_rel to_ from
-  in
-  (*
-   any_usage_from_accessed_constructor
-   * constructor Base Rel From
-   * /\ not (any_usage Base)
-   * /\ usages Base BaseUse
-   * /\ field_usages_top BaseUse Rel
-   * => any_usage From
-   *)
-  let any_usage_from_accessed_constructor =
-    let$ [base; base_use; relation; from] =
-      ["base"; "base_use"; "relation"; "from"]
+    Now (go, fun db -> Table.copy x y db)
+
+  let fix1 x f g =
+    let y = local "fix" (Datalog.columns x) in
+    let schedule = Datalog.Schedule.saturate (f y) in
+    let body = g y in
+    Now
+      ( Seq (Run schedule, body),
+        fun db -> Datalog.set_table y (Datalog.get_table x db) db )
+
+  let fix' x f =
+    let y = Table.locals x in
+    let schedule = Datalog.Schedule.saturate (f y) in
+    Now
+      ( Map (Run schedule, fun db () -> Table.get y db),
+        fun db -> Table.copy x y db )
+
+  let seq' x f =
+    let y = Table.locals x in
+    let rules = f y in
+    let go =
+      Option.get
+        (List.fold_right
+           (fun r acc ->
+             let r = Run (Datalog.Schedule.saturate [r]) in
+             match acc with None -> Some r | Some acc -> Some (Seq (r, acc)))
+           rules None)
     in
-    [ constructor_rel base relation from;
-      not (any_usage_pred base);
-      usages_rel base base_use;
-      field_usages_top_rel base_use relation ]
-    ==> any_usage_pred from
-  in
-  (*
-   any_usage_from_constructor_any_usage
-   * any_usage Base
-   * /\ constructor Base Rel From
-   * => any_usage From
+    Now (Map (go, fun db () -> Table.get y db), fun db -> Table.copy x y db)
 
-   any_usage_from_coaccessor_any_source
-   * any_source Base
-   * /\ rev_coaccessor Base Rel To
-   * => any_usage To
-   *)
-  let any_usage_from_constructor_any_usage =
-    let$ [base; relation; from] = ["base"; "relation"; "from"] in
-    [any_usage_pred base; constructor_rel base relation from]
-    ==> any_usage_pred from
-  in
-  let any_usage_from_coaccessor_any_source =
-    let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
-    [any_source_pred base; rev_coaccessor_rel base relation to_]
-    ==> any_usage_pred to_
-  in
-  (* sources: see explanation on usage
+  let fix1' x f =
+    let y = local "fix" (Datalog.columns x) in
+    let schedule = Datalog.Schedule.saturate (f y) in
+    Now
+      ( Map (Run schedule, fun db () -> Datalog.get_table y db),
+        fun db -> Datalog.set_table y (Datalog.get_table x db) db )
 
-   any_source_from_alias_any_source
-   * rev_alias From To
-   * /\ any_source From
-   * => any_source To
+  let ( let@ ) f x = f x
+end
 
-   sources_constructor (1 & 2)
-   *  not (any_source Base)
-   *  /\ rev_constructor From Rel Base
-   *  /\ (sources From Var \/ any_source From)
-   *  => sources Base Base
+module One : sig
+  type t
 
-   sources_coconstructor (1 & 2)
-   *  not (any_source Base)
-   *  /\ rev_coconstructor From Rel Var
-   *  /\ (sources From Var \/ any_source From)
-   *  => sources Base Base
+  include Datalog.Column.S with type t := t
 
-   usage_alias
-   * not (any_source From)
-   * /\ not (any_source From)
-   * /\ sources From Source
-   * /\ rev_alias From To
-   * => sources To Source
+  val top : t
 
-   *)
-  let any_source_from_alias_any_source =
-    let$ [from; to_] = ["from"; "to_"] in
-    [rev_alias_rel from to_; any_source_pred from] ==> any_source_pred to_
-  in
-  let sources_constructor_1 =
-    let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [ not (any_source_pred base);
-      sources_rel from _var;
-      rev_constructor_rel from relation base ]
-    ==> sources_rel base base
-  in
-  let sources_constructor_2 =
-    let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [ not (any_source_pred base);
-      any_source_pred from;
-      rev_constructor_rel from relation base ]
-    ==> sources_rel base base
-  in
-  let sources_coconstructor_1 =
-    let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [ not (any_source_pred base);
-      usages_rel from _var;
-      rev_coconstructor_rel from relation base ]
-    ==> sources_rel base base
-  in
-  let sources_coconstructor_2 =
-    let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [ not (any_source_pred base);
-      any_usage_pred from;
-      rev_coconstructor_rel from relation base ]
-    ==> sources_rel base base
-  in
-  let sources_alias =
-    let$ [from; to_; source] = ["from"; "to_"; "source"] in
-    [ not (any_source_pred from);
-      not (any_source_pred to_);
-      sources_rel from source;
-      rev_alias_rel from to_ ]
-    ==> sources_rel to_ source
-  in
-  (* constructor-sources
-   field_sources_from_constructor_field_sources_top
-   * not (any_source Base)
-   * /\ any_source From
-   * /\ rev_constructor From Rel Base
-   * => field_sources_top Base Rel
+  val flag :
+    (unit Map.t, t -> Datalog.nil, unit) Datalog.table ->
+    [> `Atom of Datalog.atom]
 
-   field_sources_from_constructor_field_sources
-   * not (any_source Base)
-   * /\ not (any_source From)
-   * /\ not (field_sources_top Base Rel)
-   * /\ rev_constructor From Rel Base
-   * /\ sources From Var
-   * => field_sources Base Rel From
-   *)
-  let field_sources_from_constructor_field_sources_top =
-    let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [ not (any_source_pred base);
-      any_source_pred from;
-      rev_constructor_rel from relation base ]
-    ==> field_sources_top_rel base relation
-  in
-  let field_sources_from_constructor_field_sources =
-    let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [ not (any_source_pred base);
-      not (any_source_pred from);
-      not (field_sources_top_rel base relation);
-      rev_constructor_rel from relation base;
-      sources_rel from _var ]
-    ==> field_sources_rel base relation from
-  in
-  (* coaccessor-sources
+  val to_bool : unit Map.t -> bool
 
-   cofield_sources_from_coconstructor (1 & 2)
-   * not (any_source Base)
-   * /\ rev_coconstructor From Rel Base
-   * /\ (usages From Var \/ any_usage From)
-   * => cofield_sources Base Rel From
+  val of_bool : bool -> unit Map.t
 
-   *)
-  let cofield_sources_from_coconstrucor1 =
-    let$ [from; relation; base; _var] = ["from"; "relation"; "base"; "_var"] in
-    [ not (any_source_pred base);
-      rev_coconstructor_rel from relation base;
-      usages_rel from _var ]
-    ==> cofield_sources_rel base relation from
-  in
-  let cofield_sources_from_coconstrucor2 =
-    let$ [from; relation; base] = ["from"; "relation"; "base"] in
-    [ not (any_source_pred base);
-      any_usage_pred from;
-      rev_coconstructor_rel from relation base ]
-    ==> cofield_sources_rel base relation from
-  in
-  (* coconstructor-uses XXX
+  val cols : (unit Map.t, t -> Datalog.nil, unit) Datalog.Column.hlist
+end = struct
+  include Datalog.Column.Make (struct
+    let name = "one"
 
-   alias_from_coaccessed_coconstructor
-   * not (any_usage Base)
-   * /\ coconstructor Base Rel From
-   * /\ usages Base BaseUse
-   * /\ cofield_usages BaseUse Rel To
-   * => alias From To
+    let print ppf _ = Format.fprintf ppf "T"
+  end)
 
-   *)
-  let alias_from_coaccessed_coconstructor =
-    let$ [base; base_use; relation; from; to_] =
-      ["base"; "base_use"; "relation"; "from"; "to_"]
-    in
-    [ not (any_usage_pred base);
-      coconstructor_rel base relation from;
-      usages_rel base base_use;
-      cofield_usages_rel base_use relation to_ ]
-    ==> alias_rel from to_
-  in
-  (*
-   any_source_from_coconstructor_any_usage
-   * any_usage Base
-   * /\ coconstructor Base Rel From
-   * => any_source From
-   *)
-  let any_source_from_coconstructor_any_usage =
-    let$ [base; relation; from] = ["base"; "relation"; "from"] in
-    [any_usage_pred base; coconstructor_rel base relation from]
-    ==> any_source_pred from
-  in
-  (* accessor-sources
-   alias_from_accessed_constructor_2
-   * not (any_source To)
-   * /\ not (field_sources_top BaseSource Rel)
-   * /\ not (any_source Base)
-   * /\ rev_accessor Base Rel To
-   * /\ sources Base BaseSource
-   * /\ field_sources BaseSource Rel From
-   * => alias To From
+  let top = 0
 
-   any_source_from_accessed_constructor
-   * rev_accessor Base Rel To
-   * /\ not (any_source Base)
-   * /\ sources Base BaseSource
-   * /\ field_sources_top BaseSource Rel
-   * => any_source To
-   *)
-  let alias_from_accessed_constructor_2 =
-    let$ [base; base_source; relation; to_; from] =
-      ["base"; "base_source"; "relation"; "to_"; "from"]
-    in
-    [ not (any_source_pred to_);
-      not (field_sources_top_rel base_source relation);
-      not (any_source_pred base);
-      rev_accessor_rel base relation to_;
-      sources_rel base base_source;
-      field_sources_rel base_source relation from ]
-    ==> alias_rel to_ from
-  in
-  let any_source_from_accessed_constructor =
-    let$ [base; base_source; relation; to_] =
-      ["base"; "base_source"; "relation"; "to_"]
-    in
-    [ rev_accessor_rel base relation to_;
-      not (any_source_pred base);
-      sources_rel base base_source;
-      field_sources_top_rel base_source relation ]
-    ==> any_source_pred to_
-  in
-  (*
-   any_source_from_accessor_any_source
-   * any_source Base
-   * /\ rev_accessor Base Rel To
-   * => any_source To
-   *)
-  let any_source_from_accessor_any_source =
-    let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
-    [any_source_pred base; rev_accessor_rel base relation to_]
-    ==> any_source_pred to_
-  in
-  (* ... *)
-  (*
-   alias_from_coaccessed_coconstructor_2
-   * not (any_source Base)
-   * /\ rev_coaccessor Base Rel To
-   * /\ sources Base BaseSource
-   * /\ cofield_sources BaseSource Rel From
-   * => alias From To
-   *)
-  let alias_from_coaccessed_coconstructor_2 =
-    let$ [base; base_source; relation; to_; from] =
-      ["base"; "base_source"; "relation"; "to_"; "from"]
-    in
-    [ not (any_source_pred base);
-      rev_coaccessor_rel base relation to_;
-      sources_rel base base_source;
-      cofield_sources_rel base_source relation from ]
-    ==> alias_rel from to_
-  in
-  (* use *)
-  (*
-   any_usage_from_use (1 & 2)
-   * use To From
-   * /\ (usages To Var \/ any_usage To)
-   * => any_usage From
-   *)
-  (*
-   any_source_use (1 & 2)
-   * rev_use From To
-   * /\ (sources From Var \/ any_source From)
-   * => any_source To
-   *)
-  let any_usage_from_use_1 =
-    let$ [to_; from; _var] = ["to_"; "from"; "_var"] in
-    [usages_rel to_ _var; use_rel to_ from] ==> any_usage_pred from
-  in
-  let any_usage_from_use_2 =
-    let$ [to_; from] = ["to_"; "from"] in
-    [any_usage_pred to_; use_rel to_ from] ==> any_usage_pred from
-  in
-  let any_source_use_1 =
-    let$ [from; to_; _var] = ["from"; "to_"; "_var"] in
-    [sources_rel from _var; rev_use_rel from to_] ==> any_source_pred to_
-  in
-  let any_source_use_2 =
-    let$ [from; to_] = ["from"; "to_"] in
-    [any_source_pred from; rev_use_rel from to_] ==> any_source_pred to_
-  in
-  Datalog.Schedule.(
-    fixpoint
-      [ saturate
-          [ rev_accessor;
-            rev_constructor;
-            rev_coaccessor;
-            rev_coconstructor;
-            rev_use;
-            any_source_use_1;
-            any_source_use_2;
-            alias_from_usage_propagate;
-            any_usage_from_alias_any_usage;
-            any_source_from_alias_any_source;
-            any_usage_from_constructor_any_usage;
-            any_usage_from_coaccessor_any_source;
-            any_usage_from_use_1;
-            any_usage_from_use_2;
-            any_usage_from_accessed_constructor;
-            any_source_from_accessed_constructor;
-            any_source_from_accessor_any_source;
-            any_source_from_coconstructor_any_usage;
-            rev_alias ];
-        saturate
-          [ alias_from_accessed_constructor_1;
-            alias_from_accessed_constructor_2;
-            alias_from_coaccessed_coconstructor;
-            alias_from_coaccessed_coconstructor_2;
-            field_usages_from_accessor_field_usages;
-            field_usages_from_accessor_field_usages_top;
-            cofield_usages_from_coaccessor1;
-            cofield_usages_from_coaccessor2;
-            field_sources_from_constructor_field_sources;
-            field_sources_from_constructor_field_sources_top;
-            cofield_sources_from_coconstrucor1;
-            cofield_sources_from_coconstrucor2;
-            usages_accessor_1;
-            usages_accessor_2;
-            usages_coaccessor_1;
-            usages_coaccessor_2;
-            usages_alias;
-            sources_constructor_1;
-            sources_constructor_2;
-            sources_coconstructor_1;
-            sources_coconstructor_2;
-            sources_alias;
-            rev_alias ] ])
+  let flag tbl = Datalog.atom tbl [Datalog.Term.constant top]
 
-let exists_with_parameters cursor params db =
-  Datalog.Cursor.fold_with_parameters cursor params db ~init:false
-    ~f:(fun [] _ -> true)
+  let to_bool m = not (Map.is_empty m)
 
-let mk_exists_query params existentials f =
-  Datalog.(
-    compile_with_parameters params [] (fun params [] ->
-        foreach existentials (fun existentials ->
-            where (f params existentials) (yield []))))
+  let of_bool b = if b then Map.singleton top () else Map.empty
 
-let is_function_slot : Field.t -> _ = function[@ocaml.warning "-4"]
-  | Function_slot _ -> true
-  | _ -> false
+  let cols =
+    let open! Datalog.Column in
+    [datalog_column_id]
+end
 
-let filter_field f x =
-  let open! Syntax in
-  filter (fun [x] -> f (Field.decode x)) [x]
+let () = ignore (One.top, Fixit.fix, Fixit.seq, Fixit.fix1, Fixit.return)
 
 type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
 
@@ -834,15 +1115,15 @@ let get_all_usages :
     Datalog.database ->
     unit Code_id_or_name.Map.t ->
     usages =
-  (* CR-someday ncourant: once the datalog API supports something cleaner, use
-     it. *)
-  let out_tbl, out = rel1_r "out" Cols.[n] in
-  let in_tbl, in_ = rel1_r "in_" Cols.[n] in
-  let open! Syntax in
-  let open! Global_flow_graph in
-  let base, for_closures, function_slots =
-    ( (let$ [x; y] = ["x"; "y"] in
-       [in_ x; usages_rel x y] ==> out y),
+  let open! Fixit in
+  let stmt =
+    let@ follow_known_arity_calls =
+      paramc "follow_known_arity_calls" One.cols One.of_bool
+    in
+    let@ in_ = param "in_" Cols.[n] in
+    let@ out = fix1' (empty Cols.[n]) in
+    [ (let$ [x; y] = ["x"; "y"] in
+       [in_ % [x]; usages x y] ==> out % [y]);
       (let$ [x; apply_witness; call_witness; code_id; my_closure_of_code_id; y]
            =
          [ "x";
@@ -852,88 +1133,160 @@ let get_all_usages :
            "my_closure_of_code_id";
            "y" ]
        in
-       [ out x;
-         rev_accessor_rel x
-           (Term.constant
-              (Field.encode (Code_of_closure Known_arity_code_pointer)))
-           apply_witness;
-         sources_rel apply_witness call_witness;
-         constructor_rel call_witness
-           (Term.constant (Field.encode Code_id_of_call_witness))
-           code_id;
-         code_id_my_closure_rel code_id my_closure_of_code_id;
-         usages_rel my_closure_of_code_id y ]
-       ==> out y),
-      let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
-      [ out x;
-        field_usages_rel x field y;
-        filter_field is_function_slot field;
-        usages_rel y z ]
-      ==> out z )
+       [ One.flag follow_known_arity_calls;
+         out % [x];
+         rev_accessor ~base:x
+           !!(Field.code_of_closure Known_arity_code_pointer)
+           ~to_:apply_witness;
+         sources apply_witness call_witness;
+         constructor ~base:call_witness
+           !!Field.code_id_of_call_witness
+           ~from:code_id;
+         code_id_my_closure ~code_id ~my_closure:my_closure_of_code_id;
+         usages my_closure_of_code_id y ]
+       ==> out % [y]);
+      (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
+       [ out % [x];
+         field_usages x field y;
+         when1 Field.is_function_slot field;
+         usages y z ]
+       ==> out % [z]) ]
   in
   fun ~follow_known_arity_calls db s ->
-    let db = Datalog.set_table in_tbl s db in
-    let rs =
-      if follow_known_arity_calls
-      then [base; for_closures; function_slots]
-      else [base; function_slots]
-    in
-    let db = Datalog.Schedule.run (Datalog.Schedule.saturate rs) db in
-    Usages (Datalog.get_table out_tbl db)
+    Usages (run stmt db follow_known_arity_calls s)
 
-let fieldc_map_to_field_map m =
-  Global_flow_graph.Field.Encoded.Map.fold
-    (fun k r acc -> Field.Map.add (Field.decode k) r acc)
-    m Field.Map.empty
+let get_direct_usages :
+    Datalog.database -> unit Code_id_or_name.Map.t -> unit Code_id_or_name.Map.t
+    =
+  let open! Fixit in
+  run
+    (let@ in_ = param "in_" Cols.[n] in
+     let@ out = fix1' (empty Cols.[n]) in
+     [ (let$ [x; y] = ["x"; "y"] in
+        [in_ % [x]; usages x y] ==> out % [y]) ])
 
 type field_usage =
   | Used_as_top
   | Used_as_vars of unit Code_id_or_name.Map.t
 
-(** For an usage set (argument s), compute the way its fields are used.
+(** For an usage set (coaccessor s), compute the way its fields are used.
     As function slots are transparent for [get_usages], functions slot
     usages are ignored here.
 *)
+let get_one_field : Datalog.database -> Field.t -> usages -> field_usage =
+  (* CR-someday ncourant: likewise here; I find this function particulartly
+     ugly. *)
+  let open! Fixit in
+  run
+    (let@ in_field =
+       paramc "in_field" Cols.[f] (fun field -> Field.Map.singleton field ())
+     in
+     let@ in_ = paramc "in_" Cols.[n] (fun (Usages s) -> s) in
+     let+ [used_as_top; used_as_vars] =
+       let@ [used_as_top; used_as_vars] =
+         seq' [empty One.cols; empty Cols.[n]]
+       in
+       [ (let$ [x; field] = ["x"; "field"] in
+          [in_ % [x]; in_field % [field]; field_usages_top x field]
+          ==> One.flag used_as_top);
+         (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ ~~(One.flag used_as_top);
+            in_ % [x];
+            in_field % [field];
+            field_usages x field y ]
+          ==> used_as_vars % [y]) ]
+     in
+     if One.to_bool used_as_top then Used_as_top else Used_as_vars used_as_vars)
+
 let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
   (* CR-someday ncourant: likewise here; I find this function particulartly
      ugly. *)
-  let out_tbl1, out1 = rel1_r "out1" Cols.[f] in
-  let out_tbl2, out2 = rel2_r "out2" Cols.[f; n] in
-  let in_tbl, in_ = rel1_r "in_" Cols.[n] in
-  let open! Syntax in
-  let open! Global_flow_graph in
-  let rs =
-    [ (let$ [x; field] = ["x"; "field"] in
-       [ in_ x;
-         field_usages_top_rel x field;
-         filter_field (fun x -> Stdlib.not (is_function_slot x)) field ]
-       ==> out1 field);
-      (let$ [x; field; y] = ["x"; "field"; "y"] in
-       [ in_ x;
-         field_usages_rel x field y;
-         not (out1 field);
-         filter_field (fun x -> Stdlib.not (is_function_slot x)) field ]
-       ==> out2 field y) ]
-  in
-  fun db (Usages s) ->
-    let db = Datalog.set_table in_tbl s db in
-    let db =
-      List.fold_left
-        (fun db r -> Datalog.Schedule.(run (saturate [r])) db)
-        db rs
-    in
-    fieldc_map_to_field_map
-      (Field.Encoded.Map.merge
-         (fun k x y ->
-           match x, y with
-           | None, None -> assert false
-           | Some _, Some _ ->
-             Misc.fatal_errorf "Got two results for field %a" Field.print
-               (Field.decode k)
-           | Some (), None -> Some Used_as_top
-           | None, Some m -> Some (Used_as_vars m))
-         (Datalog.get_table out_tbl1 db)
-         (Datalog.get_table out_tbl2 db))
+  let open! Fixit in
+  run
+    (let@ in_ = paramc "in_" Cols.[n] (fun (Usages s) -> s) in
+     let+ [out1; out2] =
+       let@ [out1; out2] = seq' [empty Cols.[f]; empty Cols.[f; n]] in
+       [ (let$ [x; field] = ["x"; "field"] in
+          [ in_ % [x];
+            field_usages_top x field;
+            unless1 Field.is_function_slot field ]
+          ==> out1 % [field]);
+         (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ in_ % [x];
+            field_usages x field y;
+            ~~(out1 % [field]);
+            unless1 Field.is_function_slot field ]
+          ==> out2 % [field; y]) ]
+     in
+     Field.Map.merge
+       (fun k x y ->
+         match x, y with
+         | None, None -> assert false
+         | Some _, Some _ ->
+           Misc.fatal_errorf "Got two results for field %a" Field.print k
+         | Some (), None -> Some Used_as_top
+         | None, Some m -> Some (Used_as_vars m))
+       out1 out2)
+
+let field_of_constructor_is_used =
+  rel2 "field_of_constructor_is_used" Cols.[n; f]
+
+let field_of_constructor_is_used_top =
+  rel2 "field_of_constructor_is_used_top" Cols.[n; f]
+
+let field_of_constructor_is_used_as =
+  rel3 "field_of_constructor_is_used_as" Cols.[n; f; n]
+
+let get_one_field_usage_of_constructors :
+    Datalog.database -> unit Code_id_or_name.Map.t -> Field.t -> field_usage =
+  let open! Fixit in
+  run
+    (let@ in_ = param "in_" Cols.[n] in
+     let@ fieldt =
+       paramc "field" Cols.[f] (fun f -> Field.Map.singleton f ())
+     in
+     let+ [out1; out2] =
+       let@ [out1; out2] = seq' [empty One.cols; empty Cols.[n]] in
+       [ (let$ [x; field] = ["x"; "field"] in
+          [in_ % [x]; fieldt % [field]; field_of_constructor_is_used_top x field]
+          ==> One.flag out1);
+         (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ in_ % [x];
+            fieldt % [field];
+            field_of_constructor_is_used_as x field y;
+            ~~(One.flag out1) ]
+          ==> out2 % [y]) ]
+     in
+     if One.to_bool out1 then Used_as_top else Used_as_vars out2)
+
+let get_fields_usage_of_constructors :
+    Datalog.database -> unit Code_id_or_name.Map.t -> field_usage Field.Map.t =
+  let open! Fixit in
+  run
+    (let@ in_ = param "in_" Cols.[n] in
+     let+ [out1; out2] =
+       let@ [out1; out2] = seq' [empty Cols.[f]; empty Cols.[f; n]] in
+       [ (let$ [x; field] = ["x"; "field"] in
+          [ in_ % [x];
+            field_of_constructor_is_used_top x field;
+            unless1 Field.is_function_slot field ]
+          ==> out1 % [field]);
+         (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ in_ % [x];
+            field_of_constructor_is_used_as x field y;
+            ~~(out1 % [field]);
+            unless1 Field.is_function_slot field ]
+          ==> out2 % [field; y]) ]
+     in
+     Field.Map.merge
+       (fun k x y ->
+         match x, y with
+         | None, None -> assert false
+         | Some _, Some _ ->
+           Misc.fatal_errorf "Got two results for field %a" Field.print k
+         | Some (), None -> Some Used_as_top
+         | None, Some m -> Some (Used_as_vars m))
+       out1 out2)
 
 type set_of_closures_def =
   | Not_a_set_of_closures
@@ -942,104 +1295,72 @@ type set_of_closures_def =
 let get_set_of_closures_def :
     Datalog.database -> Code_id_or_name.t -> set_of_closures_def =
   let q =
-    Datalog.(
-      compile_with_parameters ["x"] [] (fun [x] [] ->
-          foreach ["field"; "y"] (fun [field; y] ->
-              where
-                [ Global_flow_graph.constructor_rel x field y;
-                  filter_field is_function_slot field ]
-                (yield [field; y]))))
+    query
+      (let^$ [x], [relation; y] = ["x"], ["relation"; "y"] in
+       [ constructor ~base:x relation ~from:y;
+         when1 Field.is_function_slot relation ]
+       =>? [relation; y])
   in
   fun db v ->
     let l =
-      Datalog.Cursor.fold_with_parameters q [v] db ~init:[] ~f:(fun [f; y] l ->
-          ( (match[@ocaml.warning "-4"] Field.decode f with
-            | Function_slot fs -> fs
-            | _ -> assert false),
-            y )
-          :: l)
+      Cursor.fold_with_parameters q [v] db ~init:[] ~f:(fun [f; y] l ->
+          (Field.must_be_function_slot f, y) :: l)
     in
     match l with [] -> Not_a_set_of_closures | _ :: _ -> Set_of_closures l
 
-let any_usage_pred_query =
-  let open! Global_flow_graph in
-  mk_exists_query ["X"] [] (fun [x] [] -> [any_usage_pred x])
+let any_usage_query =
+  let^? [x], [] = ["x"], [] in
+  [any_usage x]
+
+let has_usage_query =
+  let^? [x], [] = ["x"], [] in
+  [has_usage x]
 
 (* CR pchambart: should rename: mutiple potential top is_used_as_top (should be
    obviously different from has use) *)
-let is_top db x = exists_with_parameters any_usage_pred_query [x] db
+let is_top db x = any_usage_query [x] db
 
 (* CR pchambart: field_used should rename to mean that this is the specific
    field of a given variable. *)
-let has_use, field_used =
-  let open! Global_flow_graph in
-  let usages_query =
-    mk_exists_query ["X"] ["Y"] (fun [x] [y] -> [usages_rel x y])
+let has_use db x = has_usage_query [x] db
+
+let field_used =
+  let field_of_constructor_is_used_query =
+    let^? [x; f], [] = ["x"; "f"], [] in
+    [field_of_constructor_is_used x f]
   in
-  let used_field_top_query =
-    mk_exists_query ["X"; "F"] ["U"] (fun [x; f] [u] ->
-        [usages_rel x u; field_usages_top_rel u f])
-  in
-  let used_field_query =
-    mk_exists_query ["X"; "F"] ["U"; "V"] (fun [x; f] [u; v] ->
-        [usages_rel x u; field_usages_rel u f v])
-  in
-  ( (fun db x ->
-      exists_with_parameters any_usage_pred_query [x] db
-      || exists_with_parameters usages_query [x] db),
-    fun db x field ->
-      let field = Field.encode field in
-      exists_with_parameters any_usage_pred_query [x] db
-      || exists_with_parameters used_field_top_query [x; field] db
-      || exists_with_parameters used_field_query [x; field] db )
+  fun db x field -> field_of_constructor_is_used_query [x; field] db
 
 let any_source_query =
-  let open! Global_flow_graph in
-  mk_exists_query ["X"] [] (fun [x] [] -> [any_source_pred x])
+  let^? [x], [] = ["x"], [] in
+  [any_source x]
 
-let has_source =
-  let open! Global_flow_graph in
-  let has_source_query =
-    mk_exists_query ["X"] ["Y"] (fun [x] [y] -> [sources_rel x y])
-  in
-  fun db x ->
-    exists_with_parameters any_source_query [x] db
-    || exists_with_parameters has_source_query [x] db
+let has_source_query =
+  let^? [x], [] = ["x"], [] in
+  [has_source x]
+
+let has_source db x = has_source_query [x] db
 
 let cofield_has_use =
-  let open! Global_flow_graph in
   let cofield_query =
-    mk_exists_query ["X"; "F"] ["S"; "T"] (fun [x; f] [s; t] ->
-        [sources_rel x s; cofield_sources_rel s f t])
+    let^? [x; f], [s; t] = ["x"; "f"], ["s"; "t"] in
+    [sources x s; cofield_sources s f t]
   in
-  fun db x cofield ->
-    let cofield = CoField.encode cofield in
-    exists_with_parameters any_source_query [x] db
-    || exists_with_parameters cofield_query [x; cofield] db
+  fun db x cofield -> any_source_query [x] db || cofield_query [x; cofield] db
 
-(* CR pchambart: Should rename to remove not local in the name (the notion does
-   not exists right now)*)
 let not_local_field_has_source =
-  let open! Global_flow_graph in
-  let any_source_query =
-    mk_exists_query ["X"] [] (fun [x] [] -> [any_source_pred x])
-  in
   let field_any_source_query =
-    mk_exists_query ["X"; "F"] ["S"] (fun [x; f] [s] ->
-        [sources_rel x s; field_sources_top_rel s f])
+    let^? [x; f], [s] = ["x"; "f"], ["s"] in
+    [sources x s; field_sources_top s f]
   in
   let field_source_query =
-    mk_exists_query ["X"; "F"] ["S"; "V"] (fun [x; f] [s; v] ->
-        [sources_rel x s; field_sources_rel s f v])
+    let^? [x; f], [s; v] = ["x"; "f"], ["s"; "v"] in
+    [sources x s; field_sources s f v]
   in
   fun db x field ->
-    let field = Field.encode field in
-    exists_with_parameters any_source_query [x] db
-    || exists_with_parameters field_any_source_query [x; field] db
-    || exists_with_parameters field_source_query [x; field] db
-
-let field_of_constructor_is_used =
-  rel2 "field_of_constructor_is_used" Cols.[n; f]
+    any_source_query [x] db
+    || field_any_source_query [x; field] db
+    || field_source_query [x; field] db
 
 let cannot_change_witness_calling_convention =
   rel1 "cannot_change_witness_calling_convention" Cols.[n]
@@ -1061,367 +1382,437 @@ let to_unbox = rel1 "to_unbox" Cols.[n]
 
 let to_change_representation = rel1 "to_change_representation" Cols.[n]
 
-let datalog_rules =
-  let open! Syntax in
-  let open! Global_flow_graph in
-  let fld f = Term.constant (Field.encode f) in
-  let real_field (i : Field.t) =
-    match[@ocaml.warning "-4"] i with
-    | Code_of_closure _ | Apply _ | Code_id_of_call_witness -> false
-    | _ -> true
-  in
-  let _is_code_field : Field.t -> _ = function[@ocaml.warning "-4"]
-    | Code_of_closure _ -> true
-    | _ -> false
-  in
-  let _is_apply_field : Field.t -> _ = function[@ocaml.warning "-4"]
-    | Apply _ -> true
-    | _ -> false
-  in
-  [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
-     [constructor_rel base relation from; any_usage_pred base]
-     ==> field_of_constructor_is_used base relation);
-    (let$ [base; relation; from; usage] =
-       ["base"; "relation"; "from"; "usage"]
-     in
-     [ constructor_rel base relation from;
-       usages_rel base usage;
-       field_usages_top_rel usage relation ]
-     ==> field_of_constructor_is_used base relation);
-    (let$ [base; relation; from; usage; _v] =
-       ["base"; "relation"; "from"; "usage"; "_v"]
-     in
-     [ constructor_rel base relation from;
-       usages_rel base usage;
-       field_usages_rel usage relation _v ]
-     ==> field_of_constructor_is_used base relation);
-    (* CR ncourant: this marks any [Apply] field as
-       [field_of_constructor_is_used], as long as the function is called.
-       Shouldn't that be gated behind a [cannot_change_calling_convetion]? *)
-    (* (let$ [base; relation; from; coderel; call_witness] = ["base";
-       "relation"; "from"; "coderel"; "call_witness"] in [ constructor_rel base
-       relation from; filter_field is_apply_field relation; constructor_rel base
-       coderel call_witness; any_usage_pred indirect_call_witness; filter_field
-       is_code_field coderel ] ==> field_of_constructor_is_used base
-       relation); *)
-    (* CR ncourant: should this be reenabled? I think this is no longer
-       necessary because we remove unused arguments of continuations, including
-       return continuations. *)
-    (* If any usage is possible, do not change the representation. Note that
-       this rule will change in the future, when local value slots are properly
-       tracked: a closure will only local value slots that has any_use will
-       still be able to have its representation changed. *)
-    (let$ [x] = ["x"] in
-     [any_usage_pred x] ==> cannot_change_representation0 x);
-    (* If there exists an alias which has another source, and which uses any
-       real field of our allocation, we cannot change the representation. This
-       currently requires 4 rules due to the absence of disjunction in the
-       datalog engine. *)
-    (let$ [allocation_id; alias; alias_source; field; _v] =
-       ["allocation_id"; "alias"; "alias_source"; "field"; "_v"]
-     in
-     [ usages_rel allocation_id alias;
-       sources_rel alias alias_source;
-       distinct Cols.n alias_source allocation_id;
-       filter_field real_field field;
-       field_usages_rel alias field _v ]
-     ==> cannot_change_representation0 allocation_id);
-    (let$ [allocation_id; alias; alias_source; field] =
-       ["allocation_id"; "alias"; "alias_source"; "field"]
-     in
-     [ usages_rel allocation_id alias;
-       sources_rel alias alias_source;
-       distinct Cols.n alias_source allocation_id;
-       filter_field real_field field;
-       field_usages_top_rel alias field ]
-     ==> cannot_change_representation0 allocation_id);
-    (let$ [allocation_id; alias; field; _v] =
-       ["allocation_id"; "alias"; "field"; "_v"]
-     in
-     [ usages_rel allocation_id alias;
-       any_source_pred alias;
-       filter_field real_field field;
-       field_usages_rel alias field _v ]
-     ==> cannot_change_representation0 allocation_id);
-    (let$ [allocation_id; alias; field] = ["allocation_id"; "alias"; "field"] in
-     [ usages_rel allocation_id alias;
-       any_source_pred alias;
-       filter_field real_field field;
-       field_usages_top_rel alias field ]
-     ==> cannot_change_representation0 allocation_id);
-    (* If the allocation has a source distinct from itself, its representation
-       cannot be changed (in fact, in that case, it shouldn't even be an
-       allocation). *)
-    (let$ [allocation_id; source] = ["allocation_id"; "source"] in
-     [sources_rel allocation_id source; distinct Cols.n source allocation_id]
-     ==> cannot_change_representation0 allocation_id);
-    (* Used but not its own source: either from any source, or it has no source
-       at all and it is dead code. In either case, do not unbox or change the
-       representation. *)
-    (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
-     [ usages_rel allocation_id usage;
-       not (sources_rel allocation_id allocation_id) ]
-     ==> cannot_change_representation0 allocation_id);
-    (let$ [allocation_id] = ["allocation_id"] in
-     [any_source_pred allocation_id]
-     ==> cannot_change_representation0 allocation_id);
-    (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
-     [constructor_rel call_witness (fld Code_id_of_call_witness) code_id]
-     ==> cannot_change_representation0 call_witness);
-    (* Note this rule is here to still allow changing the calling convention of
-       symbols /!\ when adding back the local value slots, there should be a few
-       more rules here *)
-    (* TODO this is wrong: some closures can have their representation changed
-       but not their calling convention *)
-    (let$ [x] = ["x"] in
-     [any_usage_pred x] ==> cannot_change_witness_calling_convention x);
-    (let$ [allocation_id; alias; alias_source; _v] =
-       ["allocation_id"; "alias"; "alias_source"; "_v"]
-     in
-     [ usages_rel allocation_id alias;
-       sources_rel alias alias_source;
-       distinct Cols.n alias_source allocation_id;
-       field_usages_rel alias (fld Code_id_of_call_witness) _v ]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (let$ [allocation_id; alias; alias_source] =
-       ["allocation_id"; "alias"; "alias_source"]
-     in
-     [ usages_rel allocation_id alias;
-       sources_rel alias alias_source;
-       distinct Cols.n alias_source allocation_id;
-       field_usages_top_rel alias (fld Code_id_of_call_witness) ]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (let$ [allocation_id; alias; _v] = ["allocation_id"; "alias"; "_v"] in
-     [ usages_rel allocation_id alias;
-       any_source_pred alias;
-       field_usages_rel alias (fld Code_id_of_call_witness) _v ]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (let$ [allocation_id; alias] = ["allocation_id"; "alias"] in
-     [ usages_rel allocation_id alias;
-       any_source_pred alias;
-       field_usages_top_rel alias (fld Code_id_of_call_witness) ]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (let$ [allocation_id; source] = ["allocation_id"; "source"] in
-     [sources_rel allocation_id source; distinct Cols.n source allocation_id]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (* Used but not its own source: either from any source, or it has no source
-       at all and it is dead code. In either case, do not unbox *)
-    (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
-     [ usages_rel allocation_id usage;
-       not (sources_rel allocation_id allocation_id) ]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (let$ [allocation_id] = ["allocation_id"] in
-     [any_source_pred allocation_id]
-     ==> cannot_change_witness_calling_convention allocation_id);
-    (* If the calling convention of a witness cannot be changed, the calling
-       convention of its code_id cannot be either. From now on,
-       [cannot_change_witness_calling_convention] should no longer be used. *)
-    (let$ [call_witness; code_id; _v] = ["call_witness"; "code_id"; "_v"] in
-     [ constructor_rel call_witness (fld Code_id_of_call_witness) code_id;
-       usages_rel call_witness _v;
-       cannot_change_witness_calling_convention call_witness ]
-     ==> cannot_change_calling_convention code_id);
-    (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
-     [ constructor_rel call_witness (fld Code_id_of_call_witness) code_id;
-       any_usage_pred call_witness;
-       cannot_change_witness_calling_convention call_witness ]
-     ==> cannot_change_calling_convention code_id);
-    (* CR ncourant: we're preventing changing the calling convention of
-       functions called with Indirect_unknown_arity. We could still allow
-       changing the calling convention, but this would require wrappers for
-       over- and partial applications, as well as untupling. As these wrappers
-       are complex to write correctly, this is not done yet. *)
-    (let$ [call_witness; codeid; set_of_closures] =
-       ["call_witness"; "codeid"; "set_of_closures"]
-     in
-     [ rev_constructor_rel call_witness
-         (fld (Code_of_closure Unknown_arity_code_pointer))
-         set_of_closures;
-       any_usage_pred call_witness;
-       constructor_rel call_witness (fld Code_id_of_call_witness) codeid ]
-     ==> cannot_change_calling_convention codeid);
-    (let$ [call_witness; codeid; set_of_closures; _v] =
-       ["call_witness"; "codeid"; "set_of_closures"; "_v"]
-     in
-     [ rev_constructor_rel call_witness
-         (fld (Code_of_closure Unknown_arity_code_pointer))
-         set_of_closures;
-       usages_rel call_witness _v;
-       constructor_rel call_witness (fld Code_id_of_call_witness) codeid ]
-     ==> cannot_change_calling_convention codeid);
-    (* CR-someday ncourant: we completely prevent changing the representation of
-       symbols. While allowing them to be unboxed is difficult, due to symbols
-       being always values, we could at least change their representation. This
-       would require rewriting in the types, which is not done yet. *)
-    (let$ [x; _source] = ["x"; "_source"] in
-     [ sources_rel x _source;
-       filter
-         (fun [x] ->
-           Code_id_or_name.pattern_match x
-             ~symbol:(fun _ -> true)
-             ~var:(fun _ -> false)
-             ~code_id:(fun _ -> false))
-         [x] ]
-     ==> cannot_change_representation0 x);
-    (* If the representation of any closure in a set of closures cannot be
-       changed, the representation of all the closures in the set cannot be
-       changed. *)
-    (let$ [x] = ["x"] in
-     [cannot_change_representation0 x] ==> cannot_change_representation1 x);
-    (let$ [x; field; y] = ["x"; "field"; "y"] in
-     [ constructor_rel x field y;
-       filter_field is_function_slot field;
-       cannot_change_representation0 x ]
-     ==> cannot_change_representation1 y);
-    (let$ [x] = ["x"] in
-     [cannot_change_representation1 x] ==> cannot_change_representation x);
-    (* Due to value_kinds rewriting not taking representation changes into
-       account for now, blocks cannot have their representation changed, so we
-       prevent it here. *)
-    (let$ [x; field; y] = ["x"; "field"; "y"] in
-     [ constructor_rel x field y;
-       filter_field
-         (fun (f : Field.t) ->
-           match f with
-           | Block _ | Is_int | Get_tag -> true
-           | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
-           | Code_id_of_call_witness ->
-             false)
-         field ]
-     ==> cannot_change_representation x);
-    (* The use of [cannot_change_representation1] is here to still allow
-       unboxing of blocks, even if we cannot change their representation due to
-       the value_kind limitation. *)
-    (let$ [x] = ["x"] in
-     [cannot_change_representation1 x] ==> cannot_unbox0 x);
-    (* This is repeated from the earlier occurrence in
-       [cannot_change_representation0]. It is here because in the future, when
-       we want to allow the changing of the representation of local value slots,
-       it will remain necessary. *)
-    (let$ [x] = ["x"] in
-     [any_usage_pred x] ==> cannot_unbox0 x);
-    (* (let$ [x; field] = ["x"; "field"] in [ field_of_constructor_is_used x
-       field; filter_field field_cannot_be_destructured field ] ==>
-       cannot_unbox0 x); *)
-    (* Unboxing a closure requires changing its calling convention, as we must
-       pass the value slots as extra arguments. Thus, we prevent unboxing of
-       closures if their calling convention cannot be changed. *)
-    (let$ [x; call_witness; codeid] = ["x"; "call_witness"; "codeid"] in
-     [ constructor_rel x
-         (Term.constant
-            (Field.encode (Code_of_closure Known_arity_code_pointer)))
-         call_witness;
-       constructor_rel call_witness
-         (Term.constant (Field.encode Code_id_of_call_witness))
-         codeid;
-       cannot_change_calling_convention codeid ]
-     ==> cannot_unbox0 x);
-    (* An allocation that is one of the results of a function can only be
-       unboxed if the function's calling conventation can be changed. *)
-    (let$ [alias; allocation_id; relation; call_witness; codeid] =
-       ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
-     in
-     [ sources_rel alias allocation_id;
-       rev_constructor_rel alias relation call_witness;
-       filter_field
-         (fun (f : Field.t) ->
-           match[@ocaml.warning "-4"] f with Apply _ -> true | _ -> false)
-         relation;
-       constructor_rel call_witness
-         (Term.constant (Field.encode Code_id_of_call_witness))
-         codeid;
-       cannot_change_calling_convention codeid ]
-     ==> cannot_unbox0 allocation_id);
-    (* Likewise, an allocation passed as a parameter of a function can only be
-       unboxed if the function's calling convention can be changed. *)
-    (* CR ncourant: note that this can fail to trigger if the alias is
-       any_source but has no use! This is not a problem but makes it necessary
-       to replace unused params in calls with poison values. In the future, we
-       could modify this check to ensure it only triggers if the variable is
-       indeed used, allowing slightly more unboxing. *)
-    (let$ [alias; allocation_id; relation; call_witness; codeid] =
-       ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
-     in
-     [ sources_rel alias allocation_id;
-       rev_coconstructor_rel alias relation call_witness;
-       constructor_rel call_witness
-         (Term.constant (Field.encode Code_id_of_call_witness))
-         codeid;
-       cannot_change_calling_convention codeid ]
-     ==> cannot_unbox0 allocation_id);
-    (* Cannot unbox parameters of [Indirect_unknown_arity] calls, even if they
-       do not escape. *)
-    (* (let$ [usage; allocation_id; relation; _v] = ["usage"; "allocation_id";
-       "relation"; "_v"] in [ sources_rel usage allocation_id; coaccessor_rel
-       usage relation _v; filter (fun [f] -> match CoField.decode f with | Param
-       (Unknown_arity_code_pointer, _) -> true | Param
-       (Known_arity_code_pointer, _) -> false) [relation] ] ==> cannot_unbox0
-       allocation_id); *)
-    (* CR ncourant: I'm not sure this is useful? *)
-    (* An allocation that is stored in another can only be unboxed if either the
-       representation of the other allocation can be changed, of it the field it
-       is stored in is never read, as in that case a poison value will be stored
-       instead. *)
-    (let$ [alias; allocation_id; relation; to_] =
-       ["alias"; "allocation_id"; "relation"; "to_"]
-     in
-     [ sources_rel alias allocation_id;
-       rev_constructor_rel alias relation to_;
-       field_of_constructor_is_used to_ relation;
-       cannot_change_representation to_;
-       cannot_unbox0 to_ ]
-     ==> cannot_unbox0 allocation_id);
-    (* As previously: if any closure of a set of closures cannot be unboxed,
-       then every closure in the set cannot be unboxed. *)
-    (let$ [x] = ["x"] in
-     [cannot_unbox0 x] ==> cannot_unbox x);
-    (let$ [x; field; y] = ["x"; "field"; "y"] in
-     [ cannot_unbox0 x;
-       constructor_rel x field y;
-       filter_field is_function_slot field ]
-     ==> cannot_unbox y);
-    (* Compute allocations to unbox or to change representation. This requires
-       the rules to be executed in order. *)
-    (let$ [x] = ["x"] in
-     [any_usage_pred x; not (cannot_unbox x)] ==> to_unbox x);
-    (let$ [x; _y] = ["x"; "_y"] in
-     [usages_rel x _y; not (cannot_unbox x)] ==> to_unbox x);
-    (let$ [x] = ["x"] in
-     [any_usage_pred x; not (cannot_change_representation x); not (to_unbox x)]
-     ==> to_change_representation x);
-    (let$ [x; _y] = ["x"; "_y"] in
-     [usages_rel x _y; not (cannot_change_representation x); not (to_unbox x)]
-     ==> to_change_representation x) ]
+let multiple_allocation_points = rel1 "multiple_allocations_points" Cols.[n]
 
-let map_from_allocation_points_to_dominated =
-  (* let open! Syntax in let map_rule = let$ [x; y; z] = ["x"; "y"; "z"] in [
-     sources_rel x y; sources_rel x z; distinct y z ] ==>
-     multiple_allocation_points x in let dominator_rule = let$ [x; y] = ["x";
-     "y"] in [ sources_rel x y; not (multiple_allocation_points x) ] ==>
-     dominator y x in [ map_rule; dominator_rule ] *)
-  let open! Syntax in
-  let sources_query =
-    compile ["x"; "y"] (fun [x; y] -> where [sources_rel x y] (yield [x; y]))
+let dominated_by_allocation_point =
+  rel2 "dominated_by_allocation_point" Cols.[n; n]
+
+let allocation_point_dominator = rel2 "allocation_point_dominator" Cols.[n; n]
+
+let datalog_rules =
+  let real_field f =
+    match Field.view f with
+    | Code_of_closure _ | Apply _ | Code_id_of_call_witness -> false
+    | Is_int | Get_tag | Block _ | Value_slot _ | Function_slot _ -> true
   in
-  fun db ->
-    let h = Hashtbl.create 17 in
-    Cursor.iter
-      ~f:(fun [x; y] ->
-        if Hashtbl.mem h x
-        then Hashtbl.replace h x None
-        else Hashtbl.add h x (Some y))
-      sources_query db;
-    Hashtbl.fold
-      (fun id elt acc ->
-        match elt with
-        | None -> acc
-        | Some elt ->
-          Code_id_or_name.Map.update elt
-            (function
-              | None -> Some (Code_id_or_name.Set.singleton id)
-              | Some set -> Some (Code_id_or_name.Set.add id set))
-            acc)
-      h Code_id_or_name.Map.empty
+  saturate_in_order
+    [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+       [ constructor ~base relation ~from;
+         any_usage base;
+         unless1 Field.is_local relation ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_top base relation ]);
+      (let$ [base; relation; from; usage] =
+         ["base"; "relation"; "from"; "usage"]
+       in
+       [ constructor ~base relation ~from;
+         usages base usage;
+         field_usages_top usage relation ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_top base relation ]);
+      (let$ [base; relation; from; usage; v] =
+         ["base"; "relation"; "from"; "usage"; "v"]
+       in
+       [ constructor ~base relation ~from;
+         usages base usage;
+         field_usages usage relation v;
+         any_usage v ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_top base relation ]);
+      (let$ [base; relation; from; usage; v] =
+         ["base"; "relation"; "from"; "usage"; "v"]
+       in
+       [ constructor ~base relation ~from;
+         usages base usage;
+         field_usages usage relation v ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_as base relation v ]);
+      (let$ [base; relation; from; x] = ["base"; "relation"; "from"; "x"] in
+       [ constructor ~base relation ~from;
+         any_usage base;
+         reading_field relation x;
+         any_usage x ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_top base relation ]);
+      (let$ [base; relation; from; x; y] =
+         ["base"; "relation"; "from"; "x"; "y"]
+       in
+       [ constructor ~base relation ~from;
+         any_usage base;
+         reading_field relation x;
+         usages x y ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_as base relation x ]);
+      (let$ [usage; base; relation; from; v; u] =
+         ["usage"; "base"; "relation"; "from"; "v"; "u"]
+       in
+       [ constructor ~base relation ~from;
+         sources usage base;
+         when1 Field.is_local relation;
+         any_usage base;
+         rev_accessor ~base:usage relation ~to_:v;
+         usages v u ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_as base relation v ]);
+      (let$ [usage; base; relation; from; v] =
+         ["usage"; "base"; "relation"; "from"; "v"]
+       in
+       [ constructor ~base relation ~from;
+         sources usage base;
+         when1 Field.is_local relation;
+         any_usage base;
+         (* field_usages_top usage relation *)
+         rev_accessor ~base:usage relation ~to_:v;
+         any_usage v ]
+       ==> and_
+             [ field_of_constructor_is_used base relation;
+               field_of_constructor_is_used_top base relation ]);
+      (* CR ncourant: this marks any [Apply] field as
+         [field_of_constructor_is_used], as long as the function is called.
+         Shouldn't that be gated behind a [cannot_change_calling_convetion]? *)
+      (* (let$ [base; relation; from; coderel; call_witness] = ["base";
+         "relation"; "from"; "coderel"; "call_witness"] in [ constructor base
+         relation from; when1 is_apply_field relation; constructor base coderel
+         call_witness; any_usage indirect_call_witness; when1 is_code_field
+         coderel ] ==> field_of_constructor_is_used base relation); *)
+      (* CR ncourant: should this be reenabled? I think this is no longer
+         necessary because we remove unused arguments of continuations,
+         including return continuations. *)
+      (* If any usage is possible, do not change the representation. Note that
+         this rule will change in the future, when local value slots are
+         properly tracked: a closure will only local value slots that has
+         any_use will still be able to have its representation changed. *)
+      (* (let$ [x] = ["x"] in [any_usage x] ==> cannot_change_representation0
+         x); *)
+      (let$ [x; field; y] = ["x"; "field"; "y"] in
+       [ any_usage x;
+         unless1 Field.is_local field;
+         when1 real_field field;
+         constructor ~base:x field ~from:y ]
+       ==> cannot_change_representation0 x);
+      (* If a block with a local field escapes, and that field is read again
+         from an [any_source] value, prevent changing the representation. This
+         ensures that for a block whose representation is changed, we can know
+         the source at each point. *)
+      (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
+       [ any_usage x;
+         when1 Field.is_local field;
+         reading_field field z;
+         constructor ~base:x field ~from:y ]
+       ==> cannot_change_representation0 x);
+      (* Likewise, if a block with a local field escapes, and that field is read
+         again from a value with several sources, prevent changing the
+         representation. *)
+      (let$ [usage; field; source1; source2; _v] =
+         ["usage"; "field"; "source1"; "source2"; "_v"]
+       in
+       [ field_usages usage field _v;
+         when1 Field.is_local field;
+         sources usage source1;
+         sources usage source2;
+         distinct Cols.n source1 source2 ]
+       ==> cannot_change_representation0 source1);
+      (let$ [usage; field; source1; source2] =
+         ["usage"; "field"; "source1"; "source2"]
+       in
+       [ field_usages_top usage field;
+         when1 Field.is_local field;
+         sources usage source1;
+         sources usage source2;
+         distinct Cols.n source1 source2 ]
+       ==> cannot_change_representation0 source1);
+      (* If there exists an alias which has another source, and which uses any
+         real field of our allocation, we cannot change the representation. This
+         currently requires 4 rules due to the absence of disjunction in the
+         datalog engine. *)
+      (let$ [allocation_id; alias; alias_source; field; _v] =
+         ["allocation_id"; "alias"; "alias_source"; "field"; "_v"]
+       in
+       [ usages allocation_id alias;
+         sources alias alias_source;
+         distinct Cols.n alias_source allocation_id;
+         when1 real_field field;
+         field_usages alias field _v ]
+       ==> cannot_change_representation0 allocation_id);
+      (let$ [allocation_id; alias; alias_source; field] =
+         ["allocation_id"; "alias"; "alias_source"; "field"]
+       in
+       [ usages allocation_id alias;
+         sources alias alias_source;
+         distinct Cols.n alias_source allocation_id;
+         when1 real_field field;
+         field_usages_top alias field ]
+       ==> cannot_change_representation0 allocation_id);
+      (let$ [allocation_id; alias; field; _v] =
+         ["allocation_id"; "alias"; "field"; "_v"]
+       in
+       [ usages allocation_id alias;
+         any_source alias;
+         when1 real_field field;
+         field_usages alias field _v ]
+       ==> cannot_change_representation0 allocation_id);
+      (let$ [allocation_id; alias; field] =
+         ["allocation_id"; "alias"; "field"]
+       in
+       [ usages allocation_id alias;
+         any_source alias;
+         when1 real_field field;
+         field_usages_top alias field ]
+       ==> cannot_change_representation0 allocation_id);
+      (* If the allocation has a source distinct from itself, its representation
+         cannot be changed (in fact, in that case, it shouldn't even be an
+         allocation). *)
+      (let$ [allocation_id; source] = ["allocation_id"; "source"] in
+       [sources allocation_id source; distinct Cols.n source allocation_id]
+       ==> cannot_change_representation0 allocation_id);
+      (* Used but not its own source: either from any source, or it has no
+         source at all and it is dead code. In either case, do not unbox or
+         change the representation. *)
+      (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
+       [usages allocation_id usage; ~~(sources allocation_id allocation_id)]
+       ==> cannot_change_representation0 allocation_id);
+      (let$ [allocation_id] = ["allocation_id"] in
+       [any_source allocation_id]
+       ==> cannot_change_representation0 allocation_id);
+      (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
+       [ constructor ~base:call_witness
+           !!Field.code_id_of_call_witness
+           ~from:code_id ]
+       ==> cannot_change_representation0 call_witness);
+      (let$ [x] = ["x"] in
+       [any_usage x] ==> cannot_change_witness_calling_convention x);
+      (let$ [allocation_id; alias; alias_source; _v] =
+         ["allocation_id"; "alias"; "alias_source"; "_v"]
+       in
+       [ usages allocation_id alias;
+         sources alias alias_source;
+         distinct Cols.n alias_source allocation_id;
+         field_usages alias !!Field.code_id_of_call_witness _v ]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (let$ [allocation_id; alias; alias_source] =
+         ["allocation_id"; "alias"; "alias_source"]
+       in
+       [ usages allocation_id alias;
+         sources alias alias_source;
+         distinct Cols.n alias_source allocation_id;
+         field_usages_top alias !!Field.code_id_of_call_witness ]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (let$ [allocation_id; alias; _v] = ["allocation_id"; "alias"; "_v"] in
+       [ usages allocation_id alias;
+         any_source alias;
+         field_usages alias !!Field.code_id_of_call_witness _v ]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (let$ [allocation_id; alias] = ["allocation_id"; "alias"] in
+       [ usages allocation_id alias;
+         any_source alias;
+         field_usages_top alias !!Field.code_id_of_call_witness ]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (let$ [allocation_id; source] = ["allocation_id"; "source"] in
+       [sources allocation_id source; distinct Cols.n source allocation_id]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (* Used but not its own source: either from any source, or it has no
+         source at all and it is dead code. In either case, do not unbox *)
+      (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
+       [usages allocation_id usage; ~~(sources allocation_id allocation_id)]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (let$ [allocation_id] = ["allocation_id"] in
+       [any_source allocation_id]
+       ==> cannot_change_witness_calling_convention allocation_id);
+      (* If the calling convention of a witness cannot be changed, the calling
+         convention of its code_id cannot be either. From now on,
+         [cannot_change_witness_calling_convention] should no longer be used. *)
+      (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
+       [ constructor ~base:call_witness
+           !!Field.code_id_of_call_witness
+           ~from:code_id;
+         has_usage call_witness;
+         cannot_change_witness_calling_convention call_witness ]
+       ==> cannot_change_calling_convention code_id);
+      (* CR ncourant: we're preventing changing the calling convention of
+         functions called with Indirect_unknown_arity. We could still allow
+         changing the calling convention, but this would require wrappers for
+         over- and partial applications, as well as untupling. As these wrappers
+         are complex to write correctly, this is not done yet. *)
+      (let$ [call_witness; codeid; set_of_closures] =
+         ["call_witness"; "codeid"; "set_of_closures"]
+       in
+       [ rev_constructor ~from:call_witness
+           !!(Field.code_of_closure Unknown_arity_code_pointer)
+           ~base:set_of_closures;
+         has_usage call_witness;
+         constructor ~base:call_witness
+           !!Field.code_id_of_call_witness
+           ~from:codeid ]
+       ==> cannot_change_calling_convention codeid);
+      (* If the representation of any closure in a set of closures cannot be
+         changed, the representation of all the closures in the set cannot be
+         changed. *)
+      (let$ [x] = ["x"] in
+       [cannot_change_representation0 x] ==> cannot_change_representation1 x);
+      (let$ [x; field; y] = ["x"; "field"; "y"] in
+       [ constructor ~base:x field ~from:y;
+         when1 Field.is_function_slot field;
+         cannot_change_representation0 x ]
+       ==> cannot_change_representation1 y);
+      (let$ [x] = ["x"] in
+       [cannot_change_representation1 x] ==> cannot_change_representation x);
+      (* Due to value_kinds rewriting not taking representation changes into
+         account for now, blocks cannot have their representation changed, so we
+         prevent it here. *)
+      (let$ [x; field; y] = ["x"; "field"; "y"] in
+       [ constructor ~base:x field ~from:y;
+         when1
+           (fun f ->
+             match Field.view f with
+             | Block _ | Is_int | Get_tag -> true
+             | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
+             | Code_id_of_call_witness ->
+               false)
+           field ]
+       ==> cannot_change_representation x);
+      (* The use of [cannot_change_representation1] is here to still allow
+         unboxing of blocks, even if we cannot change their representation due
+         to the value_kind limitation. *)
+      (let$ [x] = ["x"] in
+       [cannot_change_representation1 x] ==> cannot_unbox0 x);
+      (* This is repeated from the earlier occurrence in
+         [cannot_change_representation0]. It is here because in the future, when
+         we want to allow the changing of the representation of local value
+         slots, it will remain necessary. *)
+      (let$ [x] = ["x"] in
+       [any_usage x] ==> cannot_unbox0 x);
+      (* (let$ [x; field] = ["x"; "field"] in [ field_of_constructor_is_used x
+         field; when1 field_cannot_be_destructured field ] ==> cannot_unbox0
+         x); *)
+      (* Unboxing a closure requires changing its calling convention, as we must
+         pass the value slots as extra arguments. Thus, we prevent unboxing of
+         closures if their calling convention cannot be changed. *)
+      (let$ [x; call_witness; codeid] = ["x"; "call_witness"; "codeid"] in
+       [ constructor ~base:x
+           !!(Field.code_of_closure Known_arity_code_pointer)
+           ~from:call_witness;
+         constructor ~base:call_witness
+           !!Field.code_id_of_call_witness
+           ~from:codeid;
+         cannot_change_calling_convention codeid ]
+       ==> cannot_unbox0 x);
+      (* An allocation that is one of the results of a function can only be
+         unboxed if the function's calling conventation can be changed. *)
+      (let$ [alias; allocation_id; relation; call_witness; codeid] =
+         ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
+       in
+       [ sources alias allocation_id;
+         rev_constructor ~from:alias relation ~base:call_witness;
+         when1
+           (fun f ->
+             match[@ocaml.warning "-4"] Field.view f with
+             | Apply _ -> true
+             | _ -> false)
+           relation;
+         constructor ~base:call_witness
+           !!Field.code_id_of_call_witness
+           ~from:codeid;
+         cannot_change_calling_convention codeid ]
+       ==> cannot_unbox0 allocation_id);
+      (* Likewise, an allocation passed as a parameter of a function can only be
+         unboxed if the function's calling convention can be changed. *)
+      (* CR ncourant: note that this can fail to trigger if the alias is
+         any_source but has no use! This is not a problem but makes it necessary
+         to replace unused params in calls with poison values. In the future, we
+         could modify this check to ensure it only triggers if the variable is
+         indeed used, allowing slightly more unboxing. *)
+      (let$ [alias; allocation_id; relation; call_witness; codeid] =
+         ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
+       in
+       [ sources alias allocation_id;
+         rev_coconstructor ~from:alias relation ~base:call_witness;
+         constructor ~base:call_witness
+           !!Field.code_id_of_call_witness
+           ~from:codeid;
+         cannot_change_calling_convention codeid ]
+       ==> cannot_unbox0 allocation_id);
+      (* Cannot unbox parameters of [Indirect_unknown_arity] calls, even if they
+         do not escape. *)
+      (* (let$ [usage; allocation_id; relation; _v] = ["usage"; "allocation_id";
+         "relation"; "_v"] in [ sources usage allocation_id; coaccessor usage
+         relation _v; filter (fun [f] -> match CoField.decode f with | Param
+         (Unknown_arity_code_pointer, _) -> true | Param
+         (Known_arity_code_pointer, _) -> false) [relation] ] ==> cannot_unbox0
+         allocation_id); *)
+      (* CR ncourant: I'm not sure this is useful? *)
+      (* An allocation that is stored in another can only be unboxed if either
+         the representation of the other allocation can be changed, of it the
+         field it is stored in is never read, as in that case a poison value
+         will be stored instead. *)
+      (let$ [alias; allocation_id; relation; to_] =
+         ["alias"; "allocation_id"; "relation"; "to_"]
+       in
+       [ sources alias allocation_id;
+         rev_constructor ~from:alias relation ~base:to_;
+         field_of_constructor_is_used to_ relation;
+         cannot_change_representation to_;
+         when1 real_field relation;
+         cannot_unbox0 to_ ]
+       ==> cannot_unbox0 allocation_id);
+      (* CR-someday ncourant: allowing a symbol to be unboxed is difficult, due
+         to symbols being always values; thus we prevent it. *)
+      (let$ [x; _source] = ["x"; "_source"] in
+       [ sources x _source;
+         when1
+           (fun x ->
+             Code_id_or_name.pattern_match x
+               ~symbol:(fun _ -> true)
+               ~var:(fun _ -> false)
+               ~code_id:(fun _ -> false))
+           x ]
+       ==> cannot_unbox0 x);
+      (* As previously: if any closure of a set of closures cannot be unboxed,
+         then every closure in the set cannot be unboxed. *)
+      (let$ [x] = ["x"] in
+       [cannot_unbox0 x] ==> cannot_unbox x);
+      (let$ [x; field; y] = ["x"; "field"; "y"] in
+       [ cannot_unbox0 x;
+         constructor ~base:x field ~from:y;
+         when1 Field.is_function_slot field ]
+       ==> cannot_unbox y);
+      (* Compute allocations to unbox or to change representation. This requires
+         the rules to be executed in order. *)
+      (let$ [x] = ["x"] in
+       [has_usage x; ~~(cannot_unbox x)] ==> to_unbox x);
+      (let$ [x] = ["x"] in
+       [has_usage x; ~~(cannot_change_representation x); ~~(to_unbox x)]
+       ==> to_change_representation x);
+      (let$ [x] = ["x"] in
+       [any_source x] ==> multiple_allocation_points x);
+      (let$ [x; y; z] = ["x"; "y"; "z"] in
+       [sources x y; sources x z; distinct Cols.n y z]
+       ==> multiple_allocation_points x);
+      (* [allocation_point_dominator x y] is the same as
+         [dominated_by_allocation_point y x], which is that [y] is the
+         allocation point dominator of [x]. *)
+      (let$ [x; y] = ["x"; "y"] in
+       [sources x y; ~~(multiple_allocation_points x)]
+       ==> and_
+             [allocation_point_dominator x y; dominated_by_allocation_point y x])
+    ]
+
+let get_allocation_point =
+  let dom =
+    query
+      (let^$ [x], [y] = ["x"], ["y"] in
+       [allocation_point_dominator x y] =>? [y])
+  in
+  fun db x ->
+    Cursor.fold_with_parameters dom [x] db ~init:None ~f:(fun [y] acc ->
+        assert (Option.is_none acc);
+        Some y)
 
 let rec mapi_unboxed_fields (not_unboxed : 'a -> 'b -> 'c)
     (unboxed : Field.t -> 'a -> 'a) (acc : 'a) (uf : 'b unboxed_fields) :
@@ -1437,6 +1828,87 @@ let rec mapi_unboxed_fields (not_unboxed : 'a -> 'b -> 'c)
 
 let map_unboxed_fields f uf =
   mapi_unboxed_fields (fun () x -> f x) (fun _ () -> ()) () uf
+
+type 'a block_or_closure_fields =
+  | Empty
+  | Block_fields of
+      { is_int : 'a option;
+        get_tag : 'a option;
+        fields : (Flambda_kind.t * 'a) option list
+      }
+  | Closure_fields of 'a Value_slot.Map.t * 'a Function_slot.Map.t
+  | Could_not_classify
+
+let classify_field_map fields =
+  let r =
+    Field.Map.fold
+      (fun field x acc ->
+        match acc with
+        | `Could_not_classify -> `Could_not_classify
+        | (`Block_fields _ | `Closure_fields _ | `Empty) as acc -> (
+          let[@inline] block_fields k =
+            let[@local] k is_int get_tag fields =
+              (k [@inlined hint]) ~is_int ~get_tag ~fields
+            in
+            match acc with
+            | `Closure_fields _ -> `Could_not_classify
+            | `Block_fields (is_int, get_tag, fields) -> k is_int get_tag fields
+            | `Empty -> k None None Numeric_types.Int.Map.empty
+          in
+          let[@inline] closure_fields k =
+            let[@local] k value_slots function_slots =
+              (k [@inlined hint]) ~value_slots ~function_slots
+            in
+            match acc with
+            | `Closure_fields (value_slots, function_slots) ->
+              k value_slots function_slots
+            | `Block_fields _ -> `Could_not_classify
+            | `Empty -> k Value_slot.Map.empty Function_slot.Map.empty
+          in
+          match Field.view field with
+          | Code_of_closure _ | Apply _ | Code_id_of_call_witness ->
+            `Could_not_classify
+          | Value_slot vs ->
+            closure_fields (fun ~value_slots ~function_slots ->
+                `Closure_fields
+                  (Value_slot.Map.add vs x value_slots, function_slots))
+          | Function_slot fs ->
+            closure_fields (fun ~value_slots ~function_slots ->
+                `Closure_fields
+                  (value_slots, Function_slot.Map.add fs x function_slots))
+          | Is_int ->
+            block_fields (fun ~is_int ~get_tag ~fields ->
+                assert (Option.is_none is_int);
+                `Block_fields (Some x, get_tag, fields))
+          | Get_tag ->
+            block_fields (fun ~is_int ~get_tag ~fields ->
+                assert (Option.is_none get_tag);
+                `Block_fields (is_int, Some x, fields))
+          | Block (i, kind) ->
+            block_fields (fun ~is_int ~get_tag ~fields ->
+                if Numeric_types.Int.Map.mem i fields
+                then `Could_not_classify
+                else
+                  `Block_fields
+                    ( is_int,
+                      get_tag,
+                      Numeric_types.Int.Map.add i (kind, x) fields ))))
+      fields `Empty
+  in
+  match r with
+  | `Empty -> Empty
+  | `Could_not_classify -> Could_not_classify
+  | `Closure_fields (vs, fs) -> Closure_fields (vs, fs)
+  | `Block_fields (is_int, get_tag, fields) ->
+    let n =
+      if Numeric_types.Int.Map.is_empty fields
+      then 0
+      else fst (Numeric_types.Int.Map.max_binding fields) + 1
+    in
+    let fields =
+      List.init n (fun i -> Numeric_types.Int.Map.find_opt i fields)
+    in
+    Block_fields { is_int; get_tag; fields }
 
 (* Note that this depends crucially on the fact that the poison value is not
    nullable. If it was, we could instead keep the subkind but erase the
@@ -1479,8 +1951,7 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom db flow_to kind =
             List.mapi
               (fun i kind ->
                 let field =
-                  Global_flow_graph.Field.Block
-                    (i, Flambda_kind.With_subkind.kind kind)
+                  Field.block i (Flambda_kind.With_subkind.kind kind)
                 in
                 match Field.Map.find_opt field fields with
                 | None -> (* maybe poison *) erase kind
@@ -1509,44 +1980,1360 @@ let rewrite_kind_with_subkind uses var kind =
       (Code_id_or_name.Map.singleton var ())
       kind
 
-let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db usages name_prefix =
-  let fields = get_fields db usages in
+let forget_all_types = Sys.getenv_opt "FORGETALL" <> None
+
+type single_field_source =
+  | No_source
+  | One of Code_id_or_name.t
+  | Many
+
+let get_single_field_source =
+  let q_any_source1 =
+    let^? [block; field], [] = ["block"; "field"], [] in
+    [field_sources_top block field]
+  in
+  let q_any_source2 =
+    let^? [block; field], [source] = ["block"; "field"], ["source"] in
+    [field_sources block field source; any_source source]
+  in
+  let q_source =
+    query
+      (let^$ [block; field], [field_source; source] =
+         ["block"; "field"], ["field_source"; "source"]
+       in
+       [field_sources block field field_source; sources field_source source]
+       =>? [source])
+  in
+  fun db block field ->
+    if q_any_source1 [block; field] db || q_any_source2 [block; field] db
+    then Many
+    else
+      Cursor.fold_with_parameters q_source [block; field] db ~init:No_source
+        ~f:(fun [source] acc ->
+          match acc with No_source -> One source | One _ | Many -> Many)
+
+module Rewriter = struct
+  type t0 =
+    | No_source
+    | Single_source of Code_id_or_name.t
+    | Many_sources_any_usage
+    | Many_sources_usages of unit Code_id_or_name.Map.t
+    | No_usages
+
+  type t = result * t0
+
+  let compare_t0 x y =
+    match x, y with
+    | No_source, No_source -> 0
+    | Single_source source1, Single_source source2 ->
+      Code_id_or_name.compare source1 source2
+    | Many_sources_any_usage, Many_sources_any_usage -> 0
+    | Many_sources_usages usages1, Many_sources_usages usages2 ->
+      Code_id_or_name.Map.compare Unit.compare usages1 usages2
+    | No_usages, No_usages -> 0
+    | ( No_source,
+        ( Single_source _ | Many_sources_any_usage | Many_sources_usages _
+        | No_usages ) ) ->
+      -1
+    | ( ( Single_source _ | Many_sources_any_usage | Many_sources_usages _
+        | No_usages ),
+        No_source ) ->
+      1
+    | ( Single_source _,
+        (Many_sources_any_usage | Many_sources_usages _ | No_usages) ) ->
+      -1
+    | ( (Many_sources_any_usage | Many_sources_usages _ | No_usages),
+        Single_source _ ) ->
+      1
+    | Many_sources_any_usage, (Many_sources_usages _ | No_usages) -> -1
+    | (Many_sources_usages _ | No_usages), Many_sources_any_usage -> 1
+    | Many_sources_usages _, No_usages -> -1
+    | No_usages, Many_sources_usages _ -> 1
+
+  let compare (_result1, t1) (_result2, t2) = compare_t0 t1 t2
+
+  let print_t0 ff t =
+    match t with
+    | No_source -> Format.fprintf ff "No_source"
+    | Single_source source ->
+      Format.fprintf ff "(Single_source %a)" Code_id_or_name.print source
+    | Many_sources_any_usage -> Format.fprintf ff "Many_sources_any_usage"
+    | Many_sources_usages usages ->
+      Format.fprintf ff "(Many_sources_usages %a)" Code_id_or_name.Set.print
+        (Code_id_or_name.Map.keys usages)
+    | No_usages -> Format.fprintf ff "No_usages"
+
+  let print ppf (_, t) = print_t0 ppf t
+
+  module T = Container_types.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+
+    let equal t1 t2 = compare t1 t2 = 0
+
+    let hash _t = failwith "hash"
+
+    let print ff (_result, t) = print_t0 ff t
+  end)
+
+  module Map = T.Map
+
+  module CNMSet = Stdlib.Set.Make (struct
+    type t = unit Code_id_or_name.Map.t
+
+    let compare = Code_id_or_name.Map.compare Unit.compare
+  end)
+
+  let identify_set_of_closures_with_one_code_id :
+      Datalog.database -> Code_id.t -> unit Code_id_or_name.Map.t list =
+    let open! Fixit in
+    run
+      (let@ in_ =
+         paramc "in_"
+           Cols.[n]
+           (fun code_id ->
+             Code_id_or_name.Map.singleton (Code_id_or_name.code_id code_id) ())
+       in
+       let+ out =
+         let@ out = fix1' (empty Cols.[n; n]) in
+         [ (let$ [code_id; witness; closure; function_slot; all_closures] =
+              ["code_id"; "witness"; "closure"; "function_slot"; "all_closures"]
+            in
+            [ in_ % [code_id];
+              rev_constructor ~from:code_id
+                !!Field.code_id_of_call_witness
+                ~base:witness;
+              rev_constructor ~from:witness
+                !!(Field.code_of_closure Known_arity_code_pointer)
+                ~base:closure;
+              rev_constructor ~from:closure function_slot ~base:all_closures;
+              when1 Field.is_function_slot function_slot ]
+            ==> out % [closure; all_closures]) ]
+       in
+       List.map snd (Code_id_or_name.Map.bindings out))
+
+  let identify_function_slots_of_closure :
+      Datalog.database ->
+      Code_id_or_name.t ->
+      Code_id_or_name.t Function_slot.Map.t =
+    (* CR ncourant: we should use [get_set_of_closures_def] here *)
+    let q =
+      query
+        (let^$ [base], [function_slot; target] =
+           ["base"], ["function_slot"; "target"]
+         in
+         [ constructor ~base function_slot ~from:target;
+           when1 Field.is_function_slot function_slot ]
+         =>? [function_slot; target])
+    in
+    fun db closure ->
+      Cursor.fold_with_parameters q [closure] db ~init:Function_slot.Map.empty
+        ~f:(fun [function_slot; c] acc ->
+          let function_slot = Field.must_be_function_slot function_slot in
+          assert (not (Function_slot.Map.mem function_slot acc));
+          Function_slot.Map.add function_slot c acc)
+
+  let identify_set_of_closures_with_code_ids db code_ids =
+    let code_ids =
+      List.filter
+        (fun code_id ->
+          Compilation_unit.is_current (Code_id.get_compilation_unit code_id))
+        code_ids
+    in
+    match code_ids with
+    | [] -> None
+    | code_id :: code_ids ->
+      let r =
+        List.fold_left
+          (fun r code_id ->
+            CNMSet.inter r
+              (CNMSet.of_list
+                 (identify_set_of_closures_with_one_code_id db code_id)))
+          (CNMSet.of_list
+             (identify_set_of_closures_with_one_code_id db code_id))
+          code_ids
+      in
+      if CNMSet.cardinal r = 1
+      then (
+        let set_of_closures = CNMSet.min_elt r in
+        let one_closure, () = Code_id_or_name.Map.min_binding set_of_closures in
+        let by_function_slot =
+          identify_function_slots_of_closure db one_closure
+        in
+        assert (
+          Code_id_or_name.Map.equal Unit.equal set_of_closures
+            (Function_slot.Map.fold
+               (fun _ c acc -> Code_id_or_name.Map.add c () acc)
+               by_function_slot Code_id_or_name.Map.empty));
+        Some by_function_slot)
+      else None
+
+  type use_of_function_slot =
+    | Never_called
+    | Only_called_with_known_arity
+    | Any_call
+
+  type usages_of_value_slots =
+    | Dead_code
+    | From_set_of_closures of Code_id_or_name.t Function_slot.Map.t
+    | Value_slots_usages of unit Code_id_or_name.Map.t
+    | Value_slots_any_usages
+
+  let uses_of_function_slots_for_set_of_closures db set_of_closures =
+    Function_slot.Map.map
+      (fun closure ->
+        ( Single_source closure,
+          if field_used db closure
+               (Field.code_of_closure Unknown_arity_code_pointer)
+          then Any_call
+          else if field_used db closure
+                    (Field.code_of_closure Known_arity_code_pointer)
+          then Only_called_with_known_arity
+          else Never_called ))
+      set_of_closures
+
+  let uses_for_set_of_closures :
+      Datalog.database ->
+      t0 ->
+      Function_slot.t ->
+      Code_id.t Or_unknown.t Function_slot.Map.t ->
+      usages_of_value_slots * (t0 * use_of_function_slot) Function_slot.Map.t =
+    let open! Fixit in
+    let stmt =
+      let@ in_ = param "in_" Cols.[n] in
+      let@ in_fs =
+        paramc "in_fs"
+          Cols.[f]
+          (fun fs -> Field.Map.singleton (Field.function_slot fs) ())
+      in
+      let@ mk_any = param0 (fun mk_any -> mk_any) in
+      let@ code_ids_of_function_slots =
+        param0 (fun code_ids_of_function_slots ->
+            Function_slot.Map.fold
+              (fun fs code_id m ->
+                Field.Map.add (Field.function_slot fs) code_id m)
+              code_ids_of_function_slots Field.Map.empty)
+      in
+      let@ in_all_fs =
+        local0
+          Cols.[f]
+          (let+ code_ids_of_function_slots = code_ids_of_function_slots in
+           Field.Map.map (fun _ -> ()) code_ids_of_function_slots)
+      in
+      let@ in_code_id =
+        local0
+          Cols.[f; n]
+          (let+ code_ids_of_function_slots = code_ids_of_function_slots in
+           Field.Map.filter_map
+             (fun _ (code_id : _ Or_unknown.t) ->
+               match code_id with
+               | Unknown -> None
+               | Known code_id ->
+                 Some
+                   (Code_id_or_name.Map.singleton
+                      (Code_id_or_name.code_id code_id)
+                      ()))
+             code_ids_of_function_slots)
+      in
+      let@ in_unknown_code_id =
+        local0
+          Cols.[f]
+          (let+ code_ids_of_function_slots = code_ids_of_function_slots in
+           Field.Map.filter_map
+             (fun _ (code_id : _ Or_unknown.t) ->
+               match code_id with Unknown -> Some () | Known _ -> None)
+             code_ids_of_function_slots)
+      in
+      let+ ([out1; out2; known_arity; unknown_arity; any] :
+             _ Datalog.Constant.hlist) =
+        let@ [out1; out2; known_arity; unknown_arity; any] =
+          fix'
+            [ empty Cols.[n];
+              empty Cols.[f; n];
+              empty Cols.[f];
+              empty Cols.[f];
+              empty One.cols ]
+        in
+        [ (let$ [x; y] = ["x"; "y"] in
+           [in_fs % [x]; in_ % [y]] ==> out2 % [x; y]);
+          (let$ [fs; usage; field; field_usage] =
+             ["fs"; "usage"; "field"; "field_usage"]
+           in
+           [ out2 % [fs; usage];
+             field_usages usage field field_usage;
+             when1 Field.is_value_slot field ]
+           ==> out1 % [usage]);
+          (let$ [fs; usage; field] = ["fs"; "usage"; "field"] in
+           [ out2 % [fs; usage];
+             field_usages_top usage field;
+             when1 Field.is_value_slot field ]
+           ==> out1 % [usage]);
+          (let$ [fs0; usage; fs; to_; fs_usage] =
+             ["fs0"; "usage"; "fs"; "to_"; "fs_usage"]
+           in
+           [ out2 % [fs0; usage];
+             field_usages usage fs to_;
+             in_all_fs % [fs];
+             usages to_ fs_usage ]
+           ==> out2 % [fs; fs_usage]);
+          (let$ [fs; usage] = ["fs"; "usage"] in
+           [ out2 % [fs; usage];
+             field_usages_top usage
+               !!(Field.code_of_closure Known_arity_code_pointer) ]
+           ==> known_arity % [fs]);
+          (let$ [fs; usage; _v] = ["fs"; "usage"; "_v"] in
+           [ out2 % [fs; usage];
+             field_usages usage
+               !!(Field.code_of_closure Known_arity_code_pointer)
+               _v ]
+           ==> known_arity % [fs]);
+          (let$ [fs; usage] = ["fs"; "usage"] in
+           [ out2 % [fs; usage];
+             field_usages_top usage
+               !!(Field.code_of_closure Unknown_arity_code_pointer) ]
+           ==> unknown_arity % [fs]);
+          (let$ [fs; usage; _v] = ["fs"; "usage"; "_v"] in
+           [ out2 % [fs; usage];
+             field_usages usage
+               !!(Field.code_of_closure Unknown_arity_code_pointer)
+               _v ]
+           ==> unknown_arity % [fs]);
+          (let$ [fs; code_id; my_closure; usage] =
+             ["fs"; "code_id"; "my_closure"; "usage"]
+           in
+           [ known_arity % [fs];
+             in_code_id % [fs; code_id];
+             code_id_my_closure ~code_id ~my_closure;
+             usages my_closure usage ]
+           ==> out2 % [fs; usage]);
+          (let$ [fs; code_id; my_closure; usage] =
+             ["fs"; "code_id"; "my_closure"; "usage"]
+           in
+           [ unknown_arity % [fs];
+             in_code_id % [fs; code_id];
+             code_id_my_closure ~code_id ~my_closure;
+             usages my_closure usage ]
+           ==> out2 % [fs; usage]);
+          (let$ [fs0; x; fs] = ["fs0"; "x"; "fs"] in
+           [out2 % [fs0; x]; field_usages_top x fs; in_all_fs % [fs]]
+           ==> One.flag any);
+          (let$ [fs0; x] = ["fs0"; "x"] in
+           [out2 % [fs0; x]; any_usage x] ==> One.flag any);
+          (let$ [fs] = ["fs"] in
+           [known_arity % [fs]; in_unknown_code_id % [fs]] ==> One.flag any);
+          (let$ [fs] = ["fs"] in
+           [unknown_arity % [fs]; in_unknown_code_id % [fs]] ==> One.flag any)
+        ]
+      and+ mk_any = mk_any in
+      if One.to_bool any
+      then mk_any ()
+      else
+        ( Value_slots_usages out1,
+          Field.Map.fold
+            (fun fs uses m ->
+              let calls =
+                if Field.Map.mem fs unknown_arity
+                then Any_call
+                else if Field.Map.mem fs known_arity
+                then Only_called_with_known_arity
+                else Never_called
+              in
+              Function_slot.Map.add
+                (Field.must_be_function_slot fs)
+                (Many_sources_usages uses, calls)
+                m)
+            out2 Function_slot.Map.empty )
+    in
+    fun db usages current_function_slot code_ids_of_function_slots ->
+      let any () =
+        ( Value_slots_any_usages,
+          Function_slot.Map.map
+            (fun _ -> Many_sources_any_usage, Any_call)
+            code_ids_of_function_slots )
+      in
+      let dead_code () =
+        ( Dead_code,
+          Function_slot.Map.map
+            (fun _ -> No_source, Never_called)
+            code_ids_of_function_slots )
+      in
+      match usages with
+      | No_source | No_usages -> assert false
+      | Many_sources_any_usage -> any ()
+      | Many_sources_usages s ->
+        Fixit.run stmt db s current_function_slot any code_ids_of_function_slots
+      | Single_source source -> (
+        match
+          Function_slot.Map.mapi
+            (fun function_slot _ ->
+              match
+                get_single_field_source db source
+                  (Field.function_slot function_slot)
+              with
+              | No_source -> raise Exit
+              | One source -> source
+              | Many ->
+                Misc.fatal_errorf
+                  "[get_single_field_source] of function slot %a of %a \
+                   returned [Many]"
+                  Function_slot.print function_slot Code_id_or_name.print source)
+            code_ids_of_function_slots
+        with
+        | exception Exit -> dead_code ()
+        | function_slot_sources ->
+          ( From_set_of_closures function_slot_sources,
+            uses_of_function_slots_for_set_of_closures db function_slot_sources
+          ))
+
+  let rec patterns_for_unboxed_fields ~machine_width ~bind_function_slots db
+      ~var fields unboxed_fields unboxed_block acc =
+    let open Flambda2_types.Rewriter in
+    if debug_types
+    then
+      Format.eprintf
+        "[patterns_for_unboxed_fields] unboxed_block = \
+         %a@.[patterns_for_unboxed_fields] fields_usage = \
+         %a@.[patterns_for_unboxed_fields] unboxed_fields = %a@."
+        Code_id_or_name.print unboxed_block
+        (Field.Map.print (fun ff -> function
+           | Used_as_top -> Format.fprintf ff "Top"
+           | Used_as_vars vs -> Code_id_or_name.Map.print Unit.print ff vs))
+        fields
+        (Field.Map.print (pp_unboxed_elt (fun ff _ -> Format.fprintf ff "_")))
+        unboxed_fields;
+    let combined =
+      Field.Map.merge
+        (fun field field_use unboxed_field ->
+          match field_use, unboxed_field with
+          | None, None -> assert false
+          | Some _, None ->
+            None
+            (* This should only happen for fields like [Code_of_closure _],
+               which are ignored when creating unboxed fields. TODO: check
+               this? *)
+          | None, Some _ ->
+            (* This should not happen if we only start
+               [patterns_for_unboxed_fields] on the same name we started
+               [mk_unboxed_fields]. *)
+            Misc.fatal_errorf
+              "In [patterns_for_unboxed_fields], field %a existed in \
+               [unboxed_fields] but not in [fields]"
+              Field.print field
+          | Some field_use, Some unboxed_fields ->
+            Some (field_use, unboxed_fields))
+        fields unboxed_fields
+    in
+    let rec forget unboxed_fields acc =
+      match unboxed_fields with
+      | Not_unboxed x -> (None, x) :: acc
+      | Unboxed unboxed_fields ->
+        Field.Map.fold
+          (fun _ unboxed_fields acc -> forget unboxed_fields acc)
+          unboxed_fields acc
+    in
+    let for_one_use field (field_use, unboxed_fields) acc =
+      let field_source = get_single_field_source db unboxed_block field in
+      match unboxed_fields with
+      | Not_unboxed x ->
+        let v = Var.create () in
+        (Some v, x) :: acc, Pattern.var v (var x field_source field_use)
+      | Unboxed unboxed_fields -> (
+        match field_use with
+        | Used_as_top ->
+          Misc.fatal_errorf
+            "In [patterns_for_unboxed_fields], field was unboxed but has \
+             [Used_as_top] usage"
+        | Used_as_vars flow_to -> (
+          match field_source with
+          | No_source ->
+            Misc.fatal_errorf
+              "In [patterns_for_unboxed_fields], field was unboxed but has no \
+               source"
+          | Many ->
+            Misc.fatal_errorf
+              "In [patterns_for_unboxed_fields], field was unboxed but has \
+               many sources"
+          | One field_source ->
+            let fields =
+              get_fields db
+                (get_all_usages ~follow_known_arity_calls:true db flow_to)
+            in
+            patterns_for_unboxed_fields ~machine_width ~bind_function_slots:None
+              db ~var fields unboxed_fields field_source acc))
+    in
+    let[@local] closure value_slots =
+      let value_slots = Value_slot.Map.bindings value_slots in
+      let acc, pats =
+        List.fold_left_map
+          (fun acc (value_slot, use) ->
+            let acc, pat = for_one_use (Field.value_slot value_slot) use acc in
+            acc, Pattern.value_slot value_slot pat)
+          acc value_slots
+      in
+      let pats =
+        match bind_function_slots with None -> pats | Some p -> p @ pats
+      in
+      acc, Pattern.closure pats
+    in
+    match classify_field_map combined with
+    | Empty when Option.is_some bind_function_slots ->
+      closure Value_slot.Map.empty
+    | Empty | Could_not_classify ->
+      ( Field.Map.fold
+          (fun _ (_, unboxed_fields) acc -> forget unboxed_fields acc)
+          combined acc,
+        Pattern.any )
+    | Block_fields { is_int; get_tag; fields } ->
+      if Option.is_some bind_function_slots
+      then
+        Misc.fatal_errorf
+          "[patterns_for_unboxed_fields] sees a block but needs to bind \
+           function slots";
+      let acc =
+        match is_int with
+        | None -> acc
+        | Some (_, unboxed_fields) -> forget unboxed_fields acc
+      in
+      let acc =
+        match get_tag with
+        | None -> acc
+        | Some (_, unboxed_fields) -> forget unboxed_fields acc
+      in
+      let acc = ref acc in
+      let pats = ref [] in
+      List.iteri
+        (fun i use ->
+          match use with
+          | None -> ()
+          | Some (kind, use) ->
+            let nacc, pat = for_one_use (Field.block i kind) use !acc in
+            acc := nacc;
+            pats
+              := Pattern.block_field
+                   (Target_ocaml_int.of_int machine_width i)
+                   kind pat
+                 :: !pats)
+        fields;
+      !acc, Pattern.block !pats
+    | Closure_fields (value_slots, function_slots) ->
+      assert (Function_slot.Map.is_empty function_slots);
+      closure value_slots
+
+  let follow_field result t field =
+    let[@local] for_usages usages =
+      match get_one_field result.db field (Usages usages) with
+      | Used_as_top -> Many_sources_any_usage
+      | Used_as_vars vs ->
+        let usages = get_direct_usages result.db vs in
+        if Code_id_or_name.Map.is_empty usages
+        then No_usages
+        else Many_sources_usages usages
+    in
+    match t with
+    | No_source | No_usages -> assert false
+    | Many_sources_any_usage -> Many_sources_any_usage
+    | Many_sources_usages usages -> for_usages usages
+    | Single_source source -> (
+      if not (field_used result.db source field)
+      then No_usages (* The field has been deleted when building the value *)
+      else
+        match get_single_field_source result.db source field with
+        | No_source -> No_source
+        | One field_source -> Single_source field_source
+        | Many ->
+          if any_usage_query [source] result.db
+          then Many_sources_any_usage
+          else
+            for_usages
+              (get_direct_usages result.db
+                 (Code_id_or_name.Map.singleton source ())))
+
+  let follow_field_for_set_of_closures result set_of_closures value_slot =
+    let field = Field.value_slot value_slot in
+    if Function_slot.Map.for_all
+         (fun _ closure -> not (field_used result.db closure field))
+         set_of_closures
+    then No_usages
+    else
+      let sources =
+        Function_slot.Map.map
+          (fun closure -> get_single_field_source result.db closure field)
+          set_of_closures
+      in
+      let _, source = Function_slot.Map.min_binding sources in
+      let () =
+        assert (
+          Function_slot.Map.for_all
+            (fun _ (source' : single_field_source) ->
+              match source, source' with
+              | No_source, No_source | Many, Many -> true
+              | One source, One source' -> Code_id_or_name.equal source source'
+              | (No_source | One _ | Many), _ -> false)
+            sources)
+      in
+      match source with
+      | No_source -> No_source
+      | One source -> Single_source source
+      | Many -> (
+        let c =
+          Function_slot.Map.fold
+            (fun _ c acc -> Code_id_or_name.Map.add c () acc)
+            set_of_closures Code_id_or_name.Map.empty
+        in
+        match get_one_field_usage_of_constructors result.db c field with
+        | Used_as_top -> Many_sources_any_usage
+        | Used_as_vars vs ->
+          let usages = get_direct_usages result.db vs in
+          if Code_id_or_name.Map.is_empty usages
+          then No_usages
+          else Many_sources_usages usages)
+
+  let rewrite (result, usages) typing_env flambda_type =
+    let open Flambda2_types.Rewriter in
+    let db = result.db in
+    let[@local] forget_type () =
+      (* CR ncourant: we should preserve the nullability of the type here. *)
+      if debug_types
+         && (not (Flambda2_types.is_unknown typing_env flambda_type))
+         && not
+              (List.mem
+                 (Flambda_colours.without_colours ~f:(fun () ->
+                      Format.asprintf "%a" Flambda2_types.print flambda_type))
+                 ["(Val? ⊤)"; "(Val! ⊤)"])
+      then
+        Format.eprintf "Forgetting: %a@.Usages = %a@." Flambda2_types.print
+          flambda_type print_t0 usages;
+      Rule.rewrite Pattern.any (Expr.unknown (Flambda2_types.kind flambda_type))
+    in
+    if debug_types then Format.eprintf "REWRITE usages = %a@." print_t0 usages;
+    match usages with
+    | _ when forget_all_types -> forget_type ()
+    | No_usages -> forget_type ()
+    | Many_sources_usages m when Code_id_or_name.Map.is_empty m ->
+      forget_type ()
+    | No_source ->
+      Rule.rewrite Pattern.any (Expr.bottom (Flambda2_types.kind flambda_type))
+    | Single_source _ | Many_sources_any_usage | Many_sources_usages _ -> (
+      match
+        Flambda2_types.meet_single_closures_entry typing_env flambda_type
+      with
+      | Invalid ->
+        (* Not a closure. For now, we can never change the representation of
+           this, so no rewrite is necessary. *)
+        Rule.identity
+      | Need_meet ->
+        (* Multiple closures are possible. We are never able to use this
+           information currently; convert to Unknown. Note that this case
+           includes the case where the type is unknown. *)
+        forget_type ()
+      | Known_result
+          (current_function_slot, alloc_mode, closures_entry, _function_type)
+        -> (
+        let value_slot_types =
+          Flambda2_types.Closures_entry.value_slot_types closures_entry
+        in
+        let function_slot_types =
+          Flambda2_types.Closures_entry.function_slot_types closures_entry
+        in
+        let code_id_of_function_slots =
+          Function_slot.Map.mapi
+            (fun function_slot _ ->
+              let function_type =
+                Closures_entry.find_function_type closures_entry function_slot
+              in
+              Or_unknown.map function_type ~f:Function_type.code_id)
+            function_slot_types
+        in
+        let usages_for_value_slots, usages_of_function_slots =
+          uses_for_set_of_closures db usages current_function_slot
+            code_id_of_function_slots
+        in
+        let[@local] change_representation_of_closures fields closure_source
+            value_slots_reprs function_slots_reprs =
+          let patterns = ref [] in
+          if debug_types
+          then (
+            Format.eprintf "OLD type: %a@." Flambda2_types.print flambda_type;
+            Format.eprintf "OLD->NEW function slots: %a@."
+              (Function_slot.Map.print Function_slot.print)
+              function_slots_reprs);
+          let all_function_slots_in_set =
+            Function_slot.Map.fold
+              (fun function_slot (_, uses) m ->
+                if debug_types
+                then
+                  Format.eprintf "OLD function slot: %a@." Function_slot.print
+                    function_slot;
+                let new_function_slot =
+                  Function_slot.Map.find function_slot function_slots_reprs
+                in
+                let r =
+                  match uses with
+                  | Never_called -> Or_unknown.Unknown
+                  | Only_called_with_known_arity | Any_call ->
+                    let v = Var.create () in
+                    patterns
+                      := Pattern.rec_info function_slot
+                           (Pattern.var v (result, Many_sources_any_usage))
+                         :: !patterns;
+                    let function_type =
+                      Flambda2_types.Closures_entry.find_function_type
+                        closures_entry function_slot
+                    in
+                    Or_unknown.map function_type ~f:(fun function_type ->
+                        Expr.Function_type.create
+                          (Function_type.code_id function_type)
+                          ~rec_info:(Expr.var v))
+                in
+                Function_slot.Map.add new_function_slot r m)
+              usages_of_function_slots Function_slot.Map.empty
+          in
+          let all_closure_types_in_set =
+            Function_slot.Map.fold
+              (fun function_slot (metadata, _uses) m ->
+                let v = Var.create () in
+                patterns
+                  := Pattern.function_slot function_slot
+                       (Pattern.var v (result, metadata))
+                     :: !patterns;
+                let new_function_slot =
+                  Function_slot.Map.find function_slot function_slots_reprs
+                in
+                Function_slot.Map.add new_function_slot (Expr.var v) m)
+              usages_of_function_slots Function_slot.Map.empty
+          in
+          let bind_function_slots = Some !patterns in
+          let bound, pat =
+            patterns_for_unboxed_fields
+              ~machine_width:(Typing_env.machine_width typing_env)
+              ~bind_function_slots db
+              ~var:(fun _ (field_source : single_field_source) field_use ->
+                let metadata =
+                  match field_source, field_use with
+                  | No_source, _ -> No_source
+                  | One source, _ -> Single_source source
+                  | Many, Used_as_top -> Many_sources_any_usage
+                  | Many, Used_as_vars flow_to ->
+                    let usages = get_direct_usages result.db flow_to in
+                    Many_sources_usages usages
+                in
+                result, metadata)
+              fields value_slots_reprs closure_source []
+          in
+          let all_value_slots_in_set =
+            List.fold_left
+              (fun m (var, value_slot) ->
+                let e =
+                  match var with
+                  | None -> Expr.unknown (Value_slot.kind value_slot)
+                  | Some var -> Expr.var var
+                in
+                Value_slot.Map.add value_slot e m)
+              Value_slot.Map.empty bound
+          in
+          let new_function_slot =
+            Function_slot.Map.find current_function_slot function_slots_reprs
+          in
+          Rule.rewrite pat
+            (Expr.exactly_this_closure new_function_slot
+               ~all_function_slots_in_set ~all_closure_types_in_set
+               ~all_value_slots_in_set alloc_mode)
+        in
+        let[@local] no_representation_change function_slot value_slots_metadata
+            function_slots_metadata_and_uses =
+          let all_patterns = ref [] in
+          let all_value_slots_in_set =
+            Value_slot.Map.filter_map
+              (fun value_slot metadata ->
+                match metadata with
+                | No_usages -> None
+                | No_source -> assert false
+                | Single_source _ | Many_sources_any_usage
+                | Many_sources_usages _ ->
+                  let v = Var.create () in
+                  all_patterns
+                    := Pattern.value_slot value_slot
+                         (Pattern.var v (result, metadata))
+                       :: !all_patterns;
+                  Some (Expr.var v))
+              value_slots_metadata
+          in
+          let all_closure_types_in_set =
+            Function_slot.Map.mapi
+              (fun function_slot (metadata, _uses) ->
+                let v = Var.create () in
+                all_patterns
+                  := Pattern.function_slot function_slot
+                       (Pattern.var v (result, metadata))
+                     :: !all_patterns;
+                Expr.var v)
+              function_slots_metadata_and_uses
+          in
+          let all_function_slots_in_set =
+            Function_slot.Map.mapi
+              (fun function_slot (_, uses) ->
+                match uses with
+                | Never_called -> Or_unknown.Unknown
+                | Only_called_with_known_arity | Any_call ->
+                  let v = Var.create () in
+                  all_patterns
+                    := Pattern.rec_info function_slot
+                         (Pattern.var v (result, Many_sources_any_usage))
+                       :: !all_patterns;
+                  let function_type =
+                    Flambda2_types.Closures_entry.find_function_type
+                      closures_entry function_slot
+                  in
+                  Or_unknown.map function_type ~f:(fun function_type ->
+                      Expr.Function_type.create
+                        (Function_type.code_id function_type)
+                        ~rec_info:(Expr.var v)))
+              function_slots_metadata_and_uses
+          in
+          let known_sources =
+            Function_slot.Map.for_all
+              (fun _ (use, _) ->
+                match use with
+                | Single_source _ -> true
+                | No_source | No_usages | Many_sources_usages _
+                | Many_sources_any_usage ->
+                  false)
+              function_slots_metadata_and_uses
+          in
+          let expr =
+            if known_sources
+            then
+              Expr.exactly_this_closure function_slot ~all_function_slots_in_set
+                ~all_closure_types_in_set ~all_value_slots_in_set alloc_mode
+            else
+              Expr.at_least_this_closure function_slot
+                ~at_least_these_function_slots:all_function_slots_in_set
+                ~at_least_these_closure_types:all_closure_types_in_set
+                ~at_least_these_value_slots:all_value_slots_in_set alloc_mode
+          in
+          Rule.rewrite (Pattern.closure !all_patterns) expr
+        in
+        match usages_for_value_slots with
+        | Dead_code ->
+          Rule.rewrite Pattern.any
+            (Expr.bottom (Flambda2_types.kind flambda_type))
+        | From_set_of_closures set_of_closures ->
+          if Function_slot.Map.exists
+               (fun _ clos ->
+                 Code_id_or_name.Map.mem clos result.changed_representation)
+               set_of_closures
+          then (
+            assert (
+              Function_slot.Map.for_all
+                (fun _ clos ->
+                  Code_id_or_name.Map.mem clos result.changed_representation)
+                set_of_closures);
+            let changed_representation =
+              List.map
+                (fun (_, clos) ->
+                  let repr, clos' =
+                    Code_id_or_name.Map.find clos result.changed_representation
+                  in
+                  assert (Code_id_or_name.equal clos clos');
+                  repr)
+                (Function_slot.Map.bindings set_of_closures)
+            in
+            let value_slots_reprs, function_slots_reprs =
+              match List.hd changed_representation with
+              | Closure_representation
+                  (value_slots_reprs, function_slots_reprs, _) ->
+                value_slots_reprs, function_slots_reprs
+              | Block_representation _ ->
+                Misc.fatal_errorf
+                  "Changed representation of a closure with \
+                   [Block_representation]"
+            in
+            List.iter
+              (function
+                | Closure_representation (vs, fs, _) ->
+                  if vs != value_slots_reprs || fs != function_slots_reprs
+                  then
+                    Misc.fatal_errorf
+                      "In set of closures, all closures do not have the same \
+                       representation changes."
+                | Block_representation _ ->
+                  Misc.fatal_errorf
+                    "Changed representation of a closure with \
+                     [Block_representation]")
+              changed_representation;
+            let fields =
+              get_fields_usage_of_constructors db
+                (Function_slot.Map.fold
+                   (fun _ c acc -> Code_id_or_name.Map.add c () acc)
+                   set_of_closures Code_id_or_name.Map.empty)
+            in
+            if debug_types
+            then
+              Format.eprintf "ZZZ: %a@."
+                (Field.Map.print (fun ff t ->
+                     match t with
+                     | Used_as_top -> Format.fprintf ff "Top"
+                     | Used_as_vars m ->
+                       Code_id_or_name.Map.print Unit.print ff m))
+                fields;
+            change_representation_of_closures fields
+              (Function_slot.Map.find current_function_slot set_of_closures)
+              value_slots_reprs function_slots_reprs)
+          else
+            no_representation_change current_function_slot
+              (Value_slot.Map.mapi
+                 (fun value_slot _value_slot_type ->
+                   follow_field_for_set_of_closures result set_of_closures
+                     value_slot)
+                 value_slot_types)
+              usages_of_function_slots
+        | Value_slots_usages usages_for_value_slots ->
+          if Code_id_or_name.Map.exists
+               (fun clos () ->
+                 Code_id_or_name.Map.mem clos result.changed_representation)
+               usages_for_value_slots
+          then (
+            assert (
+              Code_id_or_name.Map.for_all
+                (fun clos () ->
+                  Code_id_or_name.Map.mem clos result.changed_representation)
+                usages_for_value_slots);
+            if debug_types
+            then
+              Format.eprintf "USAGES_FOR_VALUE_SLOTS is: %a@."
+                (Code_id_or_name.Map.print Unit.print)
+                usages_for_value_slots;
+            let changed_representation =
+              Code_id_or_name.Map.bindings
+                (Code_id_or_name.Map.mapi
+                   (fun clos () ->
+                     Code_id_or_name.Map.find clos result.changed_representation)
+                   usages_for_value_slots)
+            in
+            let value_slots_reprs, function_slots_reprs, alloc_point =
+              match snd (List.hd changed_representation) with
+              | ( Closure_representation
+                    (value_slots_reprs, function_slots_reprs, _),
+                  alloc_point ) ->
+                value_slots_reprs, function_slots_reprs, alloc_point
+              | Block_representation _, _ ->
+                Misc.fatal_errorf
+                  "Changed representation of a closure with \
+                   [Block_representation]"
+            in
+            List.iter
+              (fun (_, (_, alloc_point')) ->
+                assert (alloc_point == alloc_point'))
+              changed_representation;
+            let fields =
+              get_fields_usage_of_constructors db
+                (Code_id_or_name.Map.singleton alloc_point ())
+            in
+            change_representation_of_closures fields alloc_point
+              value_slots_reprs function_slots_reprs)
+          else
+            let usages_of_value_slots =
+              Value_slot.Map.mapi
+                (fun value_slot _value_slot_type ->
+                  match
+                    get_one_field db
+                      (Field.value_slot value_slot)
+                      (Usages usages_for_value_slots)
+                  with
+                  | Used_as_top -> Many_sources_any_usage
+                  | Used_as_vars vs ->
+                    Many_sources_usages (get_direct_usages db vs))
+                value_slot_types
+            in
+            no_representation_change current_function_slot usages_of_value_slots
+              usages_of_function_slots
+        | Value_slots_any_usages ->
+          let is_local_value_slot vs _ =
+            Compilation_unit.is_current (Value_slot.get_compilation_unit vs)
+          in
+          let is_local_function_slot fs _ =
+            Compilation_unit.is_current (Function_slot.get_compilation_unit fs)
+          in
+          if Value_slot.Map.exists is_local_value_slot value_slot_types
+             || Function_slot.Map.exists is_local_function_slot
+                  function_slot_types
+          then (
+            if not
+                 (Value_slot.Map.for_all is_local_value_slot value_slot_types
+                 && Function_slot.Map.for_all is_local_function_slot
+                      function_slot_types)
+            then
+              Misc.fatal_errorf
+                "Some slots in this closure are local while other are not:@\n\
+                 Value slots: %a@\n\
+                 Function slots: %a@." Value_slot.Set.print
+                (Value_slot.Map.keys value_slot_types)
+                Function_slot.Set.print
+                (Function_slot.Map.keys function_slot_types);
+            let code_ids =
+              Function_slot.Map.fold
+                (fun function_slot _ l ->
+                  match
+                    Flambda2_types.Closures_entry.find_function_type
+                      closures_entry function_slot
+                  with
+                  | Unknown -> l
+                  | Known function_type ->
+                    Function_type.code_id function_type :: l)
+                function_slot_types []
+            in
+            let set_of_closures =
+              identify_set_of_closures_with_code_ids db code_ids
+            in
+            match set_of_closures with
+            | None ->
+              Format.eprintf "COULD NOT IDENTIFY@.";
+              forget_type ()
+            | Some set_of_closures ->
+              if Function_slot.Map.exists
+                   (fun _ clos ->
+                     Code_id_or_name.Map.mem clos result.changed_representation)
+                   set_of_closures
+              then (
+                assert (
+                  Function_slot.Map.for_all
+                    (fun _ clos ->
+                      Code_id_or_name.Map.mem clos result.changed_representation)
+                    set_of_closures);
+                let changed_representation =
+                  List.map
+                    (fun (_, clos) ->
+                      let repr, clos' =
+                        Code_id_or_name.Map.find clos
+                          result.changed_representation
+                      in
+                      assert (Code_id_or_name.equal clos clos');
+                      repr)
+                    (Function_slot.Map.bindings set_of_closures)
+                in
+                let value_slots_reprs, function_slots_reprs =
+                  match List.hd changed_representation with
+                  | Closure_representation
+                      (value_slots_reprs, function_slots_reprs, _) ->
+                    value_slots_reprs, function_slots_reprs
+                  | Block_representation _ ->
+                    Misc.fatal_errorf
+                      "Changed representation of a closure with \
+                       [Block_representation]"
+                in
+                List.iter
+                  (function
+                    | Closure_representation (vs, fs, _) ->
+                      if vs != value_slots_reprs || fs != function_slots_reprs
+                      then
+                        Misc.fatal_errorf
+                          "In set of closures, all closures do not have the \
+                           same representation changes."
+                    | Block_representation _ ->
+                      Misc.fatal_errorf
+                        "Changed representation of a closure with \
+                         [Block_representation]")
+                  changed_representation;
+                let fields =
+                  get_fields_usage_of_constructors db
+                    (Function_slot.Map.fold
+                       (fun _ c acc -> Code_id_or_name.Map.add c () acc)
+                       set_of_closures Code_id_or_name.Map.empty)
+                in
+                if debug_types
+                then
+                  Format.eprintf "ZZZ: %a@."
+                    (Field.Map.print (fun ff t ->
+                         match t with
+                         | Used_as_top -> Format.fprintf ff "Top"
+                         | Used_as_vars m ->
+                           Code_id_or_name.Map.print Unit.print ff m))
+                    fields;
+                change_representation_of_closures fields
+                  (Function_slot.Map.find current_function_slot set_of_closures)
+                  value_slots_reprs function_slots_reprs)
+              else
+                let usages_of_function_slots =
+                  uses_of_function_slots_for_set_of_closures db set_of_closures
+                in
+                no_representation_change current_function_slot
+                  (Value_slot.Map.mapi
+                     (fun value_slot _value_slot_type ->
+                       follow_field_for_set_of_closures result set_of_closures
+                         value_slot)
+                     value_slot_types)
+                  usages_of_function_slots)
+          else
+            no_representation_change current_function_slot
+              (Value_slot.Map.map
+                 (fun _value_slot_type -> Many_sources_any_usage)
+                 value_slot_types)
+              usages_of_function_slots))
+
+  let block_slot ?tag:_ (result, t) index _typing_env flambda_type =
+    let r =
+      let field_kind = Flambda2_types.kind flambda_type in
+      let field = Field.block (Target_ocaml_int.to_int index) field_kind in
+      follow_field result t field
+    in
+    if debug_types
+    then (
+      Format.eprintf "%a -[%d]-> %a@." print_t0 t
+        (Target_ocaml_int.to_int index)
+        print_t0 r;
+      Format.eprintf "%a@." Flambda2_types.print flambda_type);
+    result, r
+
+  let array_slot (result, _t) _index _typing_env _flambda_type =
+    (* Array primitives are opaque. Thus, anything put inside the array when it
+       was created has been treated as escaping, thus giving a
+       [Many_sources_any_usage] result. *)
+    result, Many_sources_any_usage
+
+  let set_of_closures _t _function_slot _typing_env _closures_entry =
+    Misc.fatal_error
+      "[set_of_closures] should never be called, because all sets of closures \
+       should be handled by [rewrite]"
+
+  type set_of_closures = |
+
+  (* Because all sets of closures are handled by [rewrite], these cases can
+     never happen. *)
+
+  let value_slot (s : set_of_closures) _value_slot _typing_env _flambda_type =
+    match s with _ -> .
+
+  let function_slot (s : set_of_closures) _function_slot _typing_env
+      _flambda_type =
+    match s with _ -> .
+
+  let rec_info _typing_env (s : set_of_closures) _function_slot _code_id
+      _flambda_type =
+    match s with _ -> .
+end
+
+module TypesRewrite = Flambda2_types.Rewriter.Make (Rewriter)
+
+let rewrite_typing_env result ~unit_symbol:_ typing_env =
+  if debug_types
+  then Format.eprintf "OLD typing env: %a@." Typing_env.print typing_env;
+  let db = result.db in
+  let symbol_metadata sym =
+    if not (Compilation_unit.is_current (Symbol.compilation_unit sym))
+    then result, Rewriter.Many_sources_any_usage
+    else
+      let sym = Code_id_or_name.symbol sym in
+      if not (has_source db sym)
+      then result, Rewriter.No_source
+      else if not (has_use db sym)
+      then result, Rewriter.No_usages
+      else
+        match get_allocation_point db sym with
+        | Some alloc_point -> result, Rewriter.Single_source alloc_point
+        | None ->
+          if is_top db sym
+          then result, Rewriter.Many_sources_any_usage
+          else
+            ( result,
+              Rewriter.Many_sources_usages
+                (get_direct_usages db (Code_id_or_name.Map.singleton sym ())) )
+  in
+  let r = TypesRewrite.rewrite typing_env symbol_metadata in
+  if debug_types then Format.eprintf "NEW typing env: %a@." Typing_env.print r;
+  r
+
+let rewrite_result_types result ~old_typing_env func_params func_results
+    result_types =
+  if debug_types
+  then Format.eprintf "OLD result types: %a@." Result_types.print result_types;
+  let params, results, env_extension =
+    Result_types.pattern_match result_types ~f:(fun ~params ~results tee ->
+        params, results, tee)
+  in
+  let variable_pattern var =
+    let kind = Variable.kind var in
+    let name = Variable.name var in
+    let var = Code_id_or_name.var var in
+    let db = result.db in
+    if Code_id_or_name.Map.mem var result.unboxed_fields
+    then (
+      let unboxed_fields = Code_id_or_name.Map.find var result.unboxed_fields in
+      if is_top db var
+      then
+        Misc.fatal_errorf "In [rewrite_result_types], var %a is unboxed but top"
+          Code_id_or_name.print var;
+      let fields =
+        get_fields db
+          (get_all_usages ~follow_known_arity_calls:true db
+             (Code_id_or_name.Map.singleton var ()))
+      in
+      let bound, pat =
+        Rewriter.patterns_for_unboxed_fields
+          ~machine_width:(Typing_env.machine_width old_typing_env)
+          ~bind_function_slots:None db
+          ~var:(fun v field_source field_use ->
+            let metadata =
+              match field_source, field_use with
+              | No_source, _ -> Rewriter.No_source
+              | One source, _ -> Rewriter.Single_source source
+              | Many, Used_as_top -> Rewriter.Many_sources_any_usage
+              | Many, Used_as_vars flow_to ->
+                let usages = get_direct_usages db flow_to in
+                Rewriter.Many_sources_usages usages
+            in
+            Variable.name v, (result, metadata))
+          fields unboxed_fields
+          (Option.get (get_allocation_point db var))
+          []
+      in
+      let all_vars =
+        List.rev_map
+          (fun (pattern_var, v) ->
+            if Option.is_none pattern_var
+            then
+              Format.eprintf
+                "In [rewrite_result_types], could not get a pattern variable \
+                 for unboxed var %a@."
+                Variable.print v;
+            Option.get pattern_var)
+          bound
+      in
+      (pat, kind), all_vars)
+    else
+      let metadata =
+        if not (has_source db var)
+        then result, Rewriter.No_source
+        else if not (has_use db var)
+        then result, Rewriter.No_usages
+        else
+          match get_allocation_point db var with
+          | Some alloc_point -> result, Rewriter.Single_source alloc_point
+          | None ->
+            if is_top db var
+            then result, Rewriter.Many_sources_any_usage
+            else
+              ( result,
+                Rewriter.Many_sources_usages
+                  (get_direct_usages db (Code_id_or_name.Map.singleton var ()))
+              )
+      in
+      let v = Flambda2_types.Rewriter.Var.create () in
+      let pat = Flambda2_types.Rewriter.Pattern.var v (name, metadata) in
+      (pat, kind), [v]
+  in
+  let patterns_list func_vars type_vars =
+    let patterns, vars =
+      List.fold_left2
+        (fun (patterns, vars) funcv typev ->
+          let pat, vs = variable_pattern funcv in
+          ( Variable.Map.add (Bound_parameter.var typev) pat patterns,
+            List.rev_append vs vars ))
+        (Variable.Map.empty, []) func_vars
+        (Bound_parameters.to_list type_vars)
+    in
+    patterns, List.rev vars
+  in
+  let params_patterns, params_vars = patterns_list func_params params in
+  let results_patterns, results_vars = patterns_list func_results results in
+  let new_vars, new_env_extension =
+    TypesRewrite.rewrite_env_extension_with_extra_variables old_typing_env
+      (Variable.Map.disjoint_union params_patterns results_patterns)
+      env_extension
+      (params_vars @ results_vars)
+  in
+  let make_bp vars =
+    Bound_parameters.create
+      (List.map
+         (fun v ->
+           let var = Flambda2_types.Rewriter.Var.Map.find v new_vars in
+           Bound_parameter.create var
+             (Flambda_kind.With_subkind.anything (Variable.kind var))
+             Flambda_debug_uid.none)
+         vars)
+  in
+  let new_result_types =
+    Result_types.create ~params:(make_bp params_vars)
+      ~results:(make_bp results_vars) new_env_extension
+  in
+  if debug_types
+  then
+    Format.eprintf "NEW result types: %a@." Result_types.print new_result_types;
+  new_result_types
+
+let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
+    name_prefix =
   Field.Map.filter_map
     (fun field field_use ->
-      match field with
+      match Field.view field with
       | Function_slot _ | Code_id_of_call_witness | Apply _ -> assert false
       | Code_of_closure _ -> None
       | Block _ | Value_slot _ | Is_int | Get_tag -> (
-        let new_name =
-          Flambda_colours.without_colours ~f:(fun () ->
-              Format.asprintf "%s_field_%a" name_prefix Field.print field)
-        in
-        let[@local] default () =
-          Some (Not_unboxed (mk (Field.kind field) new_name))
-        in
-        match field_use with
-        | Used_as_top -> default ()
-        | Used_as_vars flow_to ->
-          if Code_id_or_name.Map.is_empty flow_to
-          then Misc.fatal_errorf "Empty set in [get_fields]";
-          if Code_id_or_name.Map.for_all
-               (fun k () -> has_to_be_unboxed k)
-               flow_to
-          then
-            Some
-              (Unboxed
-                 (mk_unboxed_fields ~has_to_be_unboxed ~mk db
-                    (get_all_usages ~follow_known_arity_calls:true db flow_to)
-                    new_name))
-          else if Code_id_or_name.Map.exists
-                    (fun k () -> has_to_be_unboxed k)
-                    flow_to
-          then
-            Misc.fatal_errorf
-              "Field %a of %s flows to both unboxed and non-unboxed variables"
-              Field.print field name_prefix
-          else default ()))
+        let field_source = get_single_field_source db unboxed_block field in
+        match field_source with
+        | No_source -> None
+        | One _ | Many -> (
+          let new_name =
+            Flambda_colours.without_colours ~f:(fun () ->
+                Format.asprintf "%s_field_%a" name_prefix Field.print field)
+          in
+          let[@local] default () =
+            Some (Not_unboxed (mk (Field.kind field) new_name))
+          in
+          match field_use with
+          | Used_as_top -> default ()
+          | Used_as_vars flow_to ->
+            if Code_id_or_name.Map.is_empty flow_to
+            then Misc.fatal_errorf "Empty set in [get_fields]";
+            if Code_id_or_name.Map.for_all
+                 (fun k () -> has_to_be_unboxed k)
+                 flow_to
+            then
+              let new_unboxed_block =
+                match field_source with
+                | No_source -> assert false
+                | Many ->
+                  Misc.fatal_errorf
+                    "[mk_unboxed_fields]: unboxed fields, but [Many] sources"
+                | One v -> v
+              in
+              let unboxed_fields =
+                mk_unboxed_fields ~has_to_be_unboxed ~mk db new_unboxed_block
+                  (get_fields db
+                     (get_all_usages ~follow_known_arity_calls:true db flow_to))
+                  new_name
+              in
+              if false && Field.Map.is_empty unboxed_fields
+              then None
+              else Some (Unboxed unboxed_fields)
+            else if Code_id_or_name.Map.exists
+                      (fun k () -> has_to_be_unboxed k)
+                      flow_to
+            then
+              Misc.fatal_errorf
+                "Field %a of %s flows to both unboxed and non-unboxed variables"
+                Field.print field name_prefix
+            else default ())))
     fields
+
+let has_to_be_unboxed =
+  let^? [x], [alloc_point] = ["x"], ["alloc_point"] in
+  [allocation_point_dominator x alloc_point; to_unbox alloc_point]
+
+let query_to_unbox =
+  query
+    (let$ [x; y] = ["x"; "y"] in
+     [to_unbox x; dominated_by_allocation_point x y] =>? [x; y])
+
+let query_to_change_representation =
+  query
+    (let$ [x] = ["x"] in
+     [to_change_representation x] =>? [x])
+
+let query_dominated_by =
+  query
+    (let^$ [x], [y] = ["x"], ["y"] in
+     [dominated_by_allocation_point x y] =>? [y])
 
 let fixpoint (graph : Global_flow_graph.graph) =
   let datalog = Global_flow_graph.to_datalog graph in
@@ -1554,99 +3341,53 @@ let fixpoint (graph : Global_flow_graph.graph) =
   let db = Datalog.Schedule.run ~stats datalog_schedule datalog in
   let db =
     List.fold_left
-      (fun db rule ->
-        Datalog.Schedule.run ~stats (Datalog.Schedule.saturate [rule]) db)
+      (fun db rule -> Datalog.Schedule.run ~stats rule db)
       db datalog_rules
   in
-  if debug then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
-  if Sys.getenv_opt "DUMPDB" <> None then Format.eprintf "%a@." Datalog.print db;
-  let dominated_by_allocation_points =
-    map_from_allocation_points_to_dominated db
+  if debug_stats then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
+  if debug_db then Format.eprintf "%a@." Datalog.print db;
+  let has_to_be_unboxed code_or_name = has_to_be_unboxed [code_or_name] db in
+  let unboxed =
+    Datalog.Cursor.fold query_to_unbox db ~init:Code_id_or_name.Map.empty
+      ~f:(fun [code_or_name; to_patch] unboxed ->
+        (* CR-someday ncourant: produce ghost makeblocks/set of closures for
+           debugging *)
+        let new_name =
+          Flambda_colours.without_colours ~f:(fun () ->
+              Format.asprintf "%a_into_%a" Code_id_or_name.print code_or_name
+                Code_id_or_name.print to_patch)
+        in
+        let fields =
+          mk_unboxed_fields ~has_to_be_unboxed
+            ~mk:(fun kind name -> Variable.create name kind)
+            db code_or_name
+            (get_fields db
+               (get_all_usages ~follow_known_arity_calls:true db
+                  (Code_id_or_name.Map.singleton to_patch ())))
+            new_name
+        in
+        Code_id_or_name.Map.add to_patch fields unboxed)
   in
-  let allocation_point_dominator =
-    Code_id_or_name.Map.fold
-      (fun alloc_point dominated acc ->
-        Code_id_or_name.Set.fold
-          (fun dom acc -> Code_id_or_name.Map.add dom alloc_point acc)
-          dominated acc)
-      dominated_by_allocation_points Code_id_or_name.Map.empty
-  in
-  let unboxed : unboxed Code_id_or_name.Map.t ref =
-    ref Code_id_or_name.Map.empty
-  in
-  let query_to_unbox =
-    Datalog.(compile ["X"] (fun [x] -> where [to_unbox x] (yield [x])))
-  in
-  let query_to_change_representation =
-    Datalog.(
-      compile ["X"] (fun [x] -> where [to_change_representation x] (yield [x])))
-  in
-  let to_unbox = Hashtbl.create 17 in
-  let to_change_representation = Hashtbl.create 17 in
-  Datalog.Cursor.iter query_to_unbox db ~f:(fun [u] ->
-      Hashtbl.replace to_unbox u ());
-  Datalog.Cursor.iter query_to_change_representation db ~f:(fun [u] ->
-      Hashtbl.replace to_change_representation u ());
-  let has_to_be_unboxed code_or_name =
-    match
-      Code_id_or_name.Map.find_opt code_or_name allocation_point_dominator
-    with
-    | None -> false
-    | Some alloc_point -> Hashtbl.mem to_unbox alloc_point
-  in
-  Hashtbl.iter
-    (fun code_or_name () ->
-      (* Format.eprintf "%a@." Code_id_or_name.print code_or_name; *)
-      let to_patch =
-        match
-          Code_id_or_name.Map.find_opt code_or_name
-            dominated_by_allocation_points
-        with
-        | None -> Code_id_or_name.Set.empty
-        | Some x -> x
-      in
-      Code_id_or_name.Set.iter
-        (fun to_patch ->
-          (* CR-someday ncourant: produce ghost makeblocks/set of closures for
-             debugging *)
-          let new_name =
-            Flambda_colours.without_colours ~f:(fun () ->
-                Format.asprintf "%a_into_%a" Code_id_or_name.print code_or_name
-                  Code_id_or_name.print to_patch)
-          in
-          let fields =
-            mk_unboxed_fields ~has_to_be_unboxed
-              ~mk:(fun kind name -> Variable.create name kind)
-              db
-              (get_all_usages ~follow_known_arity_calls:true db
-                 (Code_id_or_name.Map.singleton to_patch ()))
-              new_name
-          in
-          unboxed := Code_id_or_name.Map.add to_patch fields !unboxed)
-        to_patch)
-    to_unbox;
-  if debug
+  if debug_unbox
   then
-    Format.printf "new vars: %a"
+    Format.printf "TO UNBOX: %a@."
       (Code_id_or_name.Map.print
          (Field.Map.print (pp_unboxed_elt Variable.print)))
-      !unboxed;
+      unboxed;
   let changed_representation = ref Code_id_or_name.Map.empty in
-  Hashtbl.iter
-    (fun code_id_or_name () ->
+  Datalog.Cursor.iter query_to_change_representation db
+    ~f:(fun [code_id_or_name] ->
+      (* This can happen because we change the representation of each function
+         slot of a set of closures at the same time. *)
       if Code_id_or_name.Map.mem code_id_or_name !changed_representation
       then ()
       else
-        let add_to_s repr c =
-          Code_id_or_name.Set.iter
-            (fun c ->
+        let add_to_s repr alloc_point =
+          Datalog.Cursor.iter_with_parameters query_dominated_by [alloc_point]
+            db ~f:(fun [c] ->
               changed_representation
-                := Code_id_or_name.Map.add c repr !changed_representation)
-            (match
-               Code_id_or_name.Map.find_opt c dominated_by_allocation_points
-             with
-            | None -> Code_id_or_name.Set.empty
-            | Some s -> s)
+                := Code_id_or_name.Map.add c (repr, alloc_point)
+                     !changed_representation)
         in
         match get_set_of_closures_def db code_id_or_name with
         | Not_a_set_of_closures ->
@@ -1668,7 +3409,10 @@ let fixpoint (graph : Global_flow_graph.graph) =
             get_all_usages ~follow_known_arity_calls:false db
               (Code_id_or_name.Map.singleton code_id_or_name ())
           in
-          let repr = mk_unboxed_fields ~has_to_be_unboxed ~mk db uses "" in
+          let repr =
+            mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name
+              (get_fields db uses) ""
+          in
           add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
         | Set_of_closures l ->
           let mk kind name =
@@ -1676,14 +3420,15 @@ let fixpoint (graph : Global_flow_graph.graph) =
               (Compilation_unit.get_current_exn ())
               ~name ~is_always_immediate:false kind
           in
-          let uses =
-            get_all_usages ~follow_known_arity_calls:false db
+          let fields =
+            get_fields_usage_of_constructors db
               (List.fold_left
                  (fun acc (_, x) -> Code_id_or_name.Map.add x () acc)
                  Code_id_or_name.Map.empty l)
           in
           let repr =
-            mk_unboxed_fields ~has_to_be_unboxed ~mk db uses "unboxed"
+            mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name fields
+              "unboxed"
           in
           let fss =
             List.fold_left
@@ -1698,20 +3443,26 @@ let fixpoint (graph : Global_flow_graph.graph) =
           in
           List.iter
             (fun (fs, f) -> add_to_s (Closure_representation (repr, fss, fs)) f)
-            l)
-    to_change_representation;
-  if debug
+            l);
+  if debug_unbox
   then
     Format.eprintf "@.TO_CHG: %a@."
-      (Code_id_or_name.Map.print pp_changed_representation)
+      (Code_id_or_name.Map.print (fun ff (repr, alloc_point) ->
+           Format.fprintf ff "[from %a]%a" Code_id_or_name.print alloc_point
+             pp_changed_representation repr))
       !changed_representation;
-  { db;
-    unboxed_fields = !unboxed;
-    changed_representation =
-      !changed_representation
-      (* unboxed_fields = Code_id_or_name.Map.empty; changed_representation =
-         Code_id_or_name.Map.empty *)
-  }
+  if Flambda_features.reaper_unbox ()
+     && Flambda_features.reaper_change_calling_conventions ()
+  then
+    { db;
+      unboxed_fields = unboxed;
+      changed_representation = !changed_representation
+    }
+  else
+    { db;
+      unboxed_fields = Code_id_or_name.Map.empty;
+      changed_representation = Code_id_or_name.Map.empty
+    }
 
 let print_color { db; unboxed_fields; changed_representation } v =
   let red =
@@ -1722,14 +3473,10 @@ let print_color { db; unboxed_fields; changed_representation } v =
     else "ff"
   in
   let green =
-    if exists_with_parameters any_usage_pred_query [v] db
-    then "22"
-    else if has_use db v
-    then "88"
-    else "ff"
+    if any_usage_query [v] db then "22" else if has_use db v then "88" else "ff"
   in
   let blue =
-    if exists_with_parameters any_source_query [v] db
+    if any_source_query [v] db
     then "22"
     else if has_source db v
     then "88"
@@ -1741,7 +3488,7 @@ let get_unboxed_fields uses cn =
   Code_id_or_name.Map.find_opt cn uses.unboxed_fields
 
 let get_changed_representation uses cn =
-  Code_id_or_name.Map.find_opt cn uses.changed_representation
+  Option.map fst (Code_id_or_name.Map.find_opt cn uses.changed_representation)
 
 let has_use uses v = has_use uses.db v
 
@@ -1754,54 +3501,46 @@ let has_source uses v = has_source uses.db v
 let not_local_field_has_source uses v f = not_local_field_has_source uses.db v f
 
 let cannot_change_calling_convention_query =
-  mk_exists_query ["X"] [] (fun [x] [] -> [cannot_change_calling_convention x])
+  let^? [x], [] = ["x"], [] in
+  [cannot_change_calling_convention x]
 
 let cannot_change_calling_convention uses v =
-  (not (Compilation_unit.is_current (Code_id.get_compilation_unit v)))
-  || exists_with_parameters cannot_change_calling_convention_query
-       [Code_id_or_name.code_id v]
-       uses.db
+  (not (Flambda_features.reaper_change_calling_conventions ()))
+  || (not (Compilation_unit.is_current (Code_id.get_compilation_unit v)))
+  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
 
 let unknown_code_id_actually_directly_called_query =
-  let open Syntax in
-  let open! Global_flow_graph in
-  mk_exists_query ["set_of_closures"] ["known_arity_call_witness"]
-    (fun [set_of_closures] [known_arity_call_witness] ->
-      [ rev_accessor_rel set_of_closures
-          (Term.constant
-             (Field.encode (Code_of_closure Known_arity_code_pointer)))
-          known_arity_call_witness;
-        any_source_pred known_arity_call_witness ])
+  let^? [closure], [known_arity_call_witness] =
+    ["closure"], ["known_arity_call_witness"]
+  in
+  [ rev_accessor ~base:closure
+      !!(Field.code_of_closure Known_arity_code_pointer)
+      ~to_:known_arity_call_witness;
+    any_source known_arity_call_witness ]
 
 let code_id_actually_directly_called_query =
-  let open Syntax in
-  let open! Global_flow_graph in
-  compile_with_parameters ["set_of_closures"] [] (fun [set_of_closures] [] ->
-      foreach ["apply_widget"; "call_witness"; "codeid"]
-        (fun [apply_widget; call_witness; codeid] ->
-          where
-            [ rev_accessor_rel set_of_closures
-                (Term.constant
-                   (Field.encode (Code_of_closure Known_arity_code_pointer)))
-                apply_widget;
-              sources_rel apply_widget call_witness;
-              constructor_rel call_witness
-                (Term.constant (Field.encode Code_id_of_call_witness))
-                codeid ]
-            (yield [codeid])))
+  query
+    (let^$ [closure], [apply_widget; call_witness; codeid] =
+       ["closure"], ["apply_widget"; "call_withness"; "codeid"]
+     in
+     [ rev_accessor ~base:closure
+         !!(Field.code_of_closure Known_arity_code_pointer)
+         ~to_:apply_widget;
+       sources apply_widget call_witness;
+       constructor ~base:call_witness
+         !!Field.code_id_of_call_witness
+         ~from:codeid ]
+     =>? [codeid])
 
-let code_id_actually_directly_called uses v =
-  if exists_with_parameters unknown_code_id_actually_directly_called_query
-       [Code_id_or_name.name v]
-       uses.db
+let code_id_actually_directly_called uses closure =
+  let closure = Code_id_or_name.name closure in
+  if unknown_code_id_actually_directly_called_query [closure] uses.db
   then Or_unknown.Unknown
   else
     Or_unknown.Known
       (Datalog.Cursor.fold_with_parameters
-         code_id_actually_directly_called_query
-         [Code_id_or_name.name v]
-         uses.db ~init:Code_id.Set.empty
-         ~f:(fun [codeid] acc ->
+         code_id_actually_directly_called_query [closure] uses.db
+         ~init:Code_id.Set.empty ~f:(fun [codeid] acc ->
            let codeid =
              Code_id_or_name.pattern_match' codeid
                ~code_id:(fun code_id -> code_id)

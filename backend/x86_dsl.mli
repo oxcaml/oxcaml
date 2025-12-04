@@ -96,6 +96,8 @@ module I : sig
 
   val add : arg -> arg -> unit
 
+  val adc : arg -> arg -> unit
+
   val and_ : arg -> arg -> unit
 
   val bsf : arg -> arg -> unit
@@ -184,8 +186,6 @@ module I : sig
 
   val pop : arg -> unit
 
-  val popcnt : arg -> arg -> unit
-
   val prefetch : bool -> prefetch_temporal_locality_hint -> arg -> unit
 
   val push : arg -> unit
@@ -212,17 +212,13 @@ module I : sig
 
   val sub : arg -> arg -> unit
 
+  val sbb : arg -> arg -> unit
+
   val test : arg -> arg -> unit
 
   val xchg : arg -> arg -> unit
 
   val xor : arg -> arg -> unit
-
-  (* BMI instructions *)
-
-  val lzcnt : arg -> arg -> unit
-
-  val tzcnt : arg -> arg -> unit
 
   (* SIMD instructions *)
 

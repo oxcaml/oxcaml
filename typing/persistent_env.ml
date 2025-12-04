@@ -290,7 +290,7 @@ let is_parameter_import t modname =
   let import = CU.Name.of_head_of_global_name modname in
   match find_import_info_in_cache t import with
   | Some { imp_is_param; _ } -> imp_is_param
-  | None -> Misc.fatal_errorf "is_parameter_import %a" CU.Name.print import
+  | None -> is_registered_parameter_import t modname
 
 let can_load_cmis penv =
   !(penv.can_load_cmis)
@@ -776,7 +776,7 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
 type address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * int
+  | Adot of address * Types.module_representation * int
 
 type 'a sig_reader =
   Subst.Lazy.signature

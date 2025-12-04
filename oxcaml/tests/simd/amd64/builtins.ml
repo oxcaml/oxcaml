@@ -691,6 +691,108 @@ module SSE3_Util = struct
     [@@noalloc] [@@unboxed] [@@builtin]
 end
 
+module Int64 = struct
+  type t = int64
+
+  external andn : t -> t -> t = "caml_vec128_unreachable" "caml_bmi_andn_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external bextr : t -> t -> t
+    = "caml_vec128_unreachable" "caml_bmi_bextr_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external blsi : t -> t = "caml_vec128_unreachable" "caml_bmi_blsi_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external blsmsk : t -> t = "caml_vec128_unreachable" "caml_bmi_blsmsk_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external blsr : t -> t = "caml_vec128_unreachable" "caml_bmi_blsr_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external bzhi : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_bzhi_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external pext : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_pext_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external pdep : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_pdep_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external rorx : (int[@untagged]) -> (t[@unboxed]) -> (t[@unboxed])
+    = "caml_vec128_unreachable" "caml_bmi2_rorx_int64"
+    [@@noalloc] [@@builtin]
+
+  external sarx : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_sarx_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external shrx : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_shrx_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external shlx : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_shlx_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external popcnt : t -> t = "caml_vec128_unreachable" "caml_popcnt_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external lzcnt : t -> t = "caml_vec128_unreachable" "caml_lzcnt_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external tzcnt : t -> t = "caml_vec128_unreachable" "caml_bmi_tzcnt_int64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+end
+
+module Int32 = struct
+  type t = int32
+
+  external andn : t -> t -> t = "caml_vec128_unreachable" "caml_bmi_andn_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external bextr : t -> t -> t
+    = "caml_vec128_unreachable" "caml_bmi_bextr_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external blsi : t -> t = "caml_vec128_unreachable" "caml_bmi_blsi_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external blsmsk : t -> t = "caml_vec128_unreachable" "caml_bmi_blsmsk_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external blsr : t -> t = "caml_vec128_unreachable" "caml_bmi_blsr_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external bzhi : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_bzhi_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external pext : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_pext_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external pdep : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_pdep_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external rorx : (int[@untagged]) -> (t[@unboxed]) -> (t[@unboxed])
+    = "caml_vec128_unreachable" "caml_bmi2_rorx_int32"
+    [@@noalloc] [@@builtin]
+
+  external sarx : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_sarx_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external shrx : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_shrx_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external shlx : t -> t -> t = "caml_vec128_unreachable" "caml_bmi2_shlx_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external popcnt : t -> t = "caml_vec128_unreachable" "caml_popcnt_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external lzcnt : t -> t = "caml_vec128_unreachable" "caml_lzcnt_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external tzcnt : t -> t = "caml_vec128_unreachable" "caml_bmi_tzcnt_int32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+end
+
 module Sse_other_builtins = struct
   (* CR gyorsh: Add arm64 support for intrinsics below. This file contains amd64
      intrinsics that don't have an equivalent arm64 neon intrinsic. They can be
@@ -763,18 +865,6 @@ module Sse_other_builtins = struct
 
     external mul_even_unsigned : t -> t -> int64x2
       = "caml_vec128_unreachable" "caml_sse2_int32x4_mul_even_unsigned"
-      [@@noalloc] [@@unboxed] [@@builtin]
-  end
-
-  module Int64 = struct
-    type t = int64
-
-    external bit_deposit : t -> t -> t
-      = "caml_vec128_unreachable" "caml_bmi2_int64_deposit_bits"
-      [@@noalloc] [@@unboxed] [@@builtin]
-
-    external bit_extract : t -> t -> t
-      = "caml_vec128_unreachable" "caml_bmi2_int64_extract_bits"
       [@@noalloc] [@@unboxed] [@@builtin]
   end
 
@@ -1816,5 +1906,171 @@ module Int64x4 = struct
 
   external srlv : t -> t -> t
     = "caml_vec256_unreachable" "caml_avx2_int64x4_srlv"
+    [@@noalloc] [@@unboxed] [@@builtin]
+end
+
+module F16C = struct
+  external cvt_float16x8_float32x4 : float16x8 -> float32x4
+    = "caml_vec128_unreachable" "caml_f16c_cvt_float16x8_float32x4"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external cvt_float32x4_float16x8 :
+    (int[@untagged]) -> (float32x4[@unboxed]) -> (float16x8[@unboxed])
+    = "caml_vec128_unreachable" "caml_f16c_cvt_float32x4_float16x8"
+    [@@noalloc] [@@builtin]
+
+  external cvt_float16x8_float32x8 : float16x8 -> float32x8
+    = "caml_vec256_unreachable" "caml_f16c_cvt_float16x8_float32x8"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external cvt_float32x8_float16x8 :
+    (int[@untagged]) -> (float32x8[@unboxed]) -> (float16x8[@unboxed])
+    = "caml_vec256_unreachable" "caml_f16c_cvt_float32x8_float16x8"
+    [@@noalloc] [@@builtin]
+end
+
+module FMA = struct
+  external float64_mul_add : float -> float -> float -> float
+    = "caml_float_unreachable" "caml_fma_float64_mul_add"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64_mul_sub : float -> float -> float -> float
+    = "caml_float_unreachable" "caml_fma_float64_mul_sub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64_neg_mul_add : float -> float -> float -> float
+    = "caml_float_unreachable" "caml_fma_float64_neg_mul_add"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64_neg_mul_sub : float -> float -> float -> float
+    = "caml_float_unreachable" "caml_fma_float64_neg_mul_sub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32_mul_add : float32 -> float32 -> float32 -> float32
+    = "caml_float_unreachable" "caml_fma_float32_mul_add"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32_mul_sub : float32 -> float32 -> float32 -> float32
+    = "caml_float_unreachable" "caml_fma_float32_mul_sub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32_neg_mul_add : float32 -> float32 -> float32 -> float32
+    = "caml_float_unreachable" "caml_fma_float32_neg_mul_add"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32_neg_mul_sub : float32 -> float32 -> float32 -> float32
+    = "caml_float_unreachable" "caml_fma_float32_neg_mul_sub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64x2_mul_add : float64x2 -> float64x2 -> float64x2 -> float64x2
+    = "caml_vec128_unreachable" "caml_fma_float64x2_mul_add"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64x2_mul_sub : float64x2 -> float64x2 -> float64x2 -> float64x2
+    = "caml_vec128_unreachable" "caml_fma_float64x2_mul_sub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64x2_mul_addsub :
+    float64x2 -> float64x2 -> float64x2 -> float64x2
+    = "caml_vec128_unreachable" "caml_fma_float64x2_mul_addsub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64x2_mul_subadd :
+    float64x2 -> float64x2 -> float64x2 -> float64x2
+    = "caml_vec128_unreachable" "caml_fma_float64x2_mul_subadd"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64x2_neg_mul_add :
+    float64x2 -> float64x2 -> float64x2 -> float64x2
+    = "caml_vec128_unreachable" "caml_fma_float64x2_neg_mul_add"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64x2_neg_mul_sub :
+    float64x2 -> float64x2 -> float64x2 -> float64x2
+    = "caml_vec128_unreachable" "caml_fma_float64x2_neg_mul_sub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32x4_mul_add : float32x4 -> float32x4 -> float32x4 -> float32x4
+    = "caml_vec128_unreachable" "caml_fma_float32x4_mul_add"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32x4_mul_sub : float32x4 -> float32x4 -> float32x4 -> float32x4
+    = "caml_vec128_unreachable" "caml_fma_float32x4_mul_sub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32x4_mul_addsub :
+    float32x4 -> float32x4 -> float32x4 -> float32x4
+    = "caml_vec128_unreachable" "caml_fma_float32x4_mul_addsub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32x4_mul_subadd :
+    float32x4 -> float32x4 -> float32x4 -> float32x4
+    = "caml_vec128_unreachable" "caml_fma_float32x4_mul_subadd"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32x4_neg_mul_add :
+    float32x4 -> float32x4 -> float32x4 -> float32x4
+    = "caml_vec128_unreachable" "caml_fma_float32x4_neg_mul_add"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32x4_neg_mul_sub :
+    float32x4 -> float32x4 -> float32x4 -> float32x4
+    = "caml_vec128_unreachable" "caml_fma_float32x4_neg_mul_sub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64x4_mul_add : float64x4 -> float64x4 -> float64x4 -> float64x4
+    = "caml_vec256_unreachable" "caml_fma_float64x4_mul_add"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64x4_mul_sub : float64x4 -> float64x4 -> float64x4 -> float64x4
+    = "caml_vec256_unreachable" "caml_fma_float64x4_mul_sub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64x4_mul_addsub :
+    float64x4 -> float64x4 -> float64x4 -> float64x4
+    = "caml_vec256_unreachable" "caml_fma_float64x4_mul_addsub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64x4_mul_subadd :
+    float64x4 -> float64x4 -> float64x4 -> float64x4
+    = "caml_vec256_unreachable" "caml_fma_float64x4_mul_subadd"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64x4_neg_mul_add :
+    float64x4 -> float64x4 -> float64x4 -> float64x4
+    = "caml_vec256_unreachable" "caml_fma_float64x4_neg_mul_add"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float64x4_neg_mul_sub :
+    float64x4 -> float64x4 -> float64x4 -> float64x4
+    = "caml_vec256_unreachable" "caml_fma_float64x4_neg_mul_sub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32x8_mul_add : float32x8 -> float32x8 -> float32x8 -> float32x8
+    = "caml_vec256_unreachable" "caml_fma_float32x8_mul_add"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32x8_mul_sub : float32x8 -> float32x8 -> float32x8 -> float32x8
+    = "caml_vec256_unreachable" "caml_fma_float32x8_mul_sub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32x8_mul_addsub :
+    float32x8 -> float32x8 -> float32x8 -> float32x8
+    = "caml_vec256_unreachable" "caml_fma_float32x8_mul_addsub"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32x8_mul_subadd :
+    float32x8 -> float32x8 -> float32x8 -> float32x8
+    = "caml_vec256_unreachable" "caml_fma_float32x8_mul_subadd"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32x8_neg_mul_add :
+    float32x8 -> float32x8 -> float32x8 -> float32x8
+    = "caml_vec256_unreachable" "caml_fma_float32x8_neg_mul_add"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external float32x8_neg_mul_sub :
+    float32x8 -> float32x8 -> float32x8 -> float32x8
+    = "caml_vec256_unreachable" "caml_fma_float32x8_neg_mul_sub"
     [@@noalloc] [@@unboxed] [@@builtin]
 end

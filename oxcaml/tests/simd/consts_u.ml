@@ -213,7 +213,7 @@ module Int16x8 = struct
 
     type t = int16x8
 
-    external low_to : (t [@unboxed]) -> int16# = "" "caml_int16x8_low_to_int"
+    external low_to : (t [@unboxed]) -> int16# = "" "caml_int16x8_low_to_int16"
         [@@noalloc] [@@builtin]
 
     external const1 : int16# -> (t [@unboxed]) = "" "caml_int16x8_const1"
@@ -265,7 +265,7 @@ module Int8x16 = struct
 
     type t = int8x16
 
-    external low_to : (t [@unboxed]) -> int8# = "" "caml_int8x16_low_to_int"
+    external low_to : (t [@unboxed]) -> int8# = "" "caml_int8x16_low_to_int8"
         [@@noalloc] [@@builtin]
 
     external const1 : int8# -> (t [@unboxed]) = "" "caml_int8x16_const1"

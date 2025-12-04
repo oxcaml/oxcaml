@@ -428,11 +428,13 @@ let ( let$ ) (name, kind, prim, dbg) k uacc ~dacc_before_switch =
     let body, uacc = k (Simple.var var) uacc ~dacc_before_switch in
     let duid = Flambda_debug_uid.none in
     let machine_width = UE.machine_width (UA.uenv uacc) in
-    let binding : EB.binding_to_place =
-      { let_bound = BPt.singleton (BV.create var duid NM.normal);
-        simplified_defining_expr = Simplified_named.create ~machine_width named;
-        original_defining_expr = None
-      }
+    let binding =
+      EB.Keep_binding
+        { let_bound = BPt.singleton (BV.create var duid NM.normal);
+          simplified_defining_expr =
+            Simplified_named.create ~machine_width named;
+          original_defining_expr = None
+        }
     in
     EB.make_new_let_bindings uacc ~bindings_outermost_first:[binding] ~body
 

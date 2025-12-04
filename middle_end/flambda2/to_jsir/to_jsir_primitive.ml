@@ -104,6 +104,7 @@ let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
     (* CR selee: we should eventually use this debuginfo *)
     no_op ~env ~res
   | Dls_get -> use_prim' (Extern "caml_domain_dls_get")
+  | Tls_get -> use_prim' (Extern "caml_domain_tls_get")
   | Poll ->
     (* See [parse_bytecode.ml] in jsoo - treated as a noop *)
     no_op ~env ~res
@@ -336,10 +337,11 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
            (x, Target_ocaml_int.to_int field, block_access_kind_exn kind, y)) )
   | Array_load (kind, load_kind, _mut) -> (
     match kind, load_kind with
-    | ( ( Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
-        | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
-        ( Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
-        | Naked_int64s | Naked_nativeints ) ) ->
+    | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
+        | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
+        | Unboxed_product _ ),
+        ( Immediates | Gc_ignorable_values | Values | Naked_floats
+        | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints ) ) ->
       use_prim' Array_get
     | (Naked_vec128s | Naked_vec256s | Naked_vec512s), _
     | _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
@@ -514,10 +516,11 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   match f with
   | Array_set (kind, set_kind) -> (
     match kind, set_kind with
-    | ( ( Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
-        | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
-        ( Immediates | Values _ | Naked_floats | Naked_float32s | Naked_int32s
-        | Naked_int64s | Naked_nativeints ) ) ->
+    | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
+        | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
+        | Unboxed_product _ ),
+        ( Immediates | Gc_ignorable_values | Values _ | Naked_floats
+        | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints ) ) ->
       let arr, res =
         match prim_arg ~env ~res x with
         | Pv v, res -> v, res
@@ -598,7 +601,7 @@ let variadic_exn ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
   | Make_array (kind, mut, _mode) ->
     let tag =
       match kind with
-      | Immediates | Values -> 0
+      | Immediates | Gc_ignorable_values | Values -> 0
       | Naked_int32s ->
         if List.length xs mod 2 = 0
         then Cmm_helpers.Unboxed_array_tags.unboxed_int32_array_even_tag

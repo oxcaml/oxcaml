@@ -1078,6 +1078,8 @@ module Identifier = struct
 
     let out_of_memory = CBuiltin "Out_of_memory" |> mk
 
+    let out_of_fibers = CBuiltin "Out_of_fibers" |> mk
+
     let invalid_argument = CBuiltin "Invalid_argument" |> mk
 
     let failure = CBuiltin "Failure" |> mk
@@ -2524,13 +2526,18 @@ module Code = struct
       With_free_vars.value ~free:Binding_error.code_not_closed code
 
     let open_ = With_free_vars.return
+
+    let to_exp code = code |> open_ |> to_exp
+
+    let print fmt c =
+      Format.fprintf fmt "@[<2><[@,%a@]@,]>"
+        (Ast.print_exp (new_env ()))
+        c.exp
   end
 
   let print fmt c =
     let ast_exp = With_free_vars.value ~free:(fun _ _ -> ()) c in
-    Format.fprintf fmt "@[<2><[@,%a@]@,]>"
-      (Ast.print_exp (new_env ()))
-      ast_exp.exp
+    Closed.print fmt ast_exp
 end
 
 module Exp_desc = struct

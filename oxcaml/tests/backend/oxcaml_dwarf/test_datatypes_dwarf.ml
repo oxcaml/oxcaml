@@ -1,6 +1,7 @@
 let[@inline never] [@local never] f_start () = ()
 let _ = f_start ()
 
+
 (* Simple variants *)
 type simple_variant = A | B | C of int | D of float
 
@@ -25,17 +26,29 @@ let _ = f_complex_variant (Pair (42, 1.5))
 let _ = f_complex_variant (Record { x = 10; y = 2.5 })
 let _ = f_complex_variant (Mixed { a = 100; b = #3.14; c = true })
 
+(* Test that the same type works across multiple functions when cached *)
+let[@inline never] [@local never] f_complex_variant_second (x: complex_variant) = x
+let _ = f_complex_variant_second (Single 456)
+let _ = f_complex_variant_second (Pair (999, 9.99))
+let _ = f_complex_variant_second (Record { x = 20; y = 5.0 })
+
+(* Test that the same type works across multiple functions when cached *)
+let[@inline never] [@local never] f_complex_variant_third (x: complex_variant) = x
+let _ = f_complex_variant_third Empty
+let _ = f_complex_variant_third (Mixed { a = 200; b = #1.41; c = false })
+let _ = f_complex_variant_third (Pair (777, 7.77))
+
 (* Regular records *)
 type basic_record = { x: int; y: float }
 type mixed_record = { a: int; b: float#; c: bool; d: int32 }
 
-let[@inline never] [@local never] f_basic_record (x: basic_record) = 
+let[@inline never] [@local never] f_basic_record (x: basic_record) =
   let { x; y } = x in { x; y }
 let _ = f_basic_record { x = 42; y = 3.14 }
 let _ = f_basic_record { x = 0; y = 0.0 }
 let _ = f_basic_record { x = -123; y = -2.5 }
 
-let[@inline never] [@local never] f_mixed_record (x: mixed_record) = 
+let[@inline never] [@local never] f_mixed_record (x: mixed_record) =
   let { a; b; c; d } = x in { a; b; c; d }
 let _ = f_mixed_record { a = 42; b = #3.14; c = true; d = 1000l }
 let _ = f_mixed_record { a = 0; b = #0.0; c = false; d = 0l }
@@ -127,8 +140,8 @@ type mixed_combo = {
   record_field: basic_record
 }
 
-let[@inline never] [@local never] f_mixed_combo (x: mixed_combo) = 
-  let { boxed_field; unboxed_field; variant_field; record_field } = x in 
+let[@inline never] [@local never] f_mixed_combo (x: mixed_combo) =
+  let { boxed_field; unboxed_field; variant_field; record_field } = x in
   { boxed_field; unboxed_field; variant_field; record_field }
 let _ = f_mixed_combo {
   boxed_field = 42;
@@ -161,7 +174,7 @@ let _ = f_poly_bits32 (-#123l)
 (* Unboxed tuple field *)
 type t = { f : #(int64# * int); s : string; b : bool }
 
-let[@inline never] [@local never] f_unboxed_tuple_field (x: t) = 
+let[@inline never] [@local never] f_unboxed_tuple_field (x: t) =
   let { f; s; b } = x in { f; s; b }
 let _ = f_unboxed_tuple_field { f = #(#42L, 24); s = "hello"; b = true }
 let _ = f_unboxed_tuple_field { f = #(#0L, 1); s = ""; b = false }
@@ -202,7 +215,7 @@ let _ = f_exception_poly (Failure "polymorphic failure")
 
 let[@inline never] [@local never] f_exception_with_record (x: exn) =
   match x with
-  | Exception_with_record data -> 
+  | Exception_with_record data ->
     let { code; message } = data in
     let _ = { code; message } in x
   | _ -> x
@@ -210,7 +223,7 @@ let _ = f_exception_with_record
     (Exception_with_record { code = 300; message = "redirect" })
 
 let[@inline never] [@local never] f_exception_with_unboxed (x: exn) =
-  match x with  
+  match x with
   | Exception_with_unboxed_record data ->
     let { value; flag } = data in
     let _ = { value; flag } in x
@@ -219,7 +232,7 @@ let _ = f_exception_with_unboxed
     (Exception_with_unboxed_record { value = #1.41; flag = true })
 
 (* Mutually recursive types - tree and forest *)
-type tree = 
+type tree =
   | Empty
   | Node of { value: int [@warning "-69"]; children: forest [@warning "-69"] }
 and forest =
@@ -279,3 +292,70 @@ let _ = f_forest (WithTree {
     }
   }
 })
+(* Regular tuples *)
+let[@inline never] [@local never] f_tuple_int_int (x: int * int) = x
+let _ = f_tuple_int_int (42, 123)
+let _ = f_tuple_int_int (0, -1)
+let _ = f_tuple_int_int (-999, 1000)
+
+let[@inline never] [@local never] f_tuple_mixed_two (x: float * string) = x
+let _ = f_tuple_mixed_two (3.14, "hello")
+let _ = f_tuple_mixed_two (0.0, "")
+let _ = f_tuple_mixed_two (-2.5, "world")
+
+let[@inline never] [@local never] f_tuple_three (x: int * bool * float) = x
+let _ = f_tuple_three (42, true, 3.14)
+let _ = f_tuple_three (0, false, 0.0)
+let _ = f_tuple_three (-123, true, -1.5)
+
+let[@inline never] [@local never] f_tuple_nested (x: (int * int) * (float * bool)) = x
+let _ = f_tuple_nested ((1, 2), (3.14, true))
+let _ = f_tuple_nested ((0, 0), (0.0, false))
+let _ = f_tuple_nested ((-5, 10), (-2.5, true))
+
+let[@inline never] [@local never] f_tuple_with_complex
+    (x: int list * char array * string option) = x
+let _ = f_tuple_with_complex ([1; 2; 3], [|'a'; 'b'|], Some "test")
+let _ = f_tuple_with_complex ([], [||], None)
+let _ = f_tuple_with_complex ([42], [|'x'|], Some "")
+
+let[@inline never] [@local never] f_tuple_large
+    (x: int * float * string * bool * char * int32) = x
+let _ = f_tuple_large (42, 3.14, "hello", true, 'A', 123l)
+let _ = f_tuple_large (0, 0.0, "", false, '\000', 0l)
+
+let[@inline never] [@local never] f_poly_tuple (x: 'a * 'b) = x
+let _ = f_poly_tuple (42, "test")
+let _ = f_poly_tuple (3.14, true)
+let _ = f_poly_tuple ("hello", [1; 2; 3])
+
+(* Bigarrays *)
+let[@inline never] [@local never] f_bigarray1_int (x: (int, Bigarray.int_elt, Bigarray.c_layout) Bigarray.Array1.t) = x
+let bigarray1_int = Bigarray.Array1.create Bigarray.int Bigarray.c_layout 5
+let _ = for i = 0 to 4 do Bigarray.Array1.set bigarray1_int i (i * 10) done
+let _ = f_bigarray1_int bigarray1_int
+
+let[@inline never] [@local never] f_bigarray1_float (x: (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t) = x
+let bigarray1_float = Bigarray.Array1.create Bigarray.float64 Bigarray.c_layout 4
+let _ = for i = 0 to 3 do Bigarray.Array1.set bigarray1_float i (Float.of_int i +. 0.5) done
+let _ = f_bigarray1_float bigarray1_float
+
+let[@inline never] [@local never] f_bigarray2_int (x: (int, Bigarray.int_elt, Bigarray.c_layout) Bigarray.Array2.t) = x
+let bigarray2_int = Bigarray.Array2.create Bigarray.int Bigarray.c_layout 3 3
+let _ = for i = 0 to 2 do for j = 0 to 2 do Bigarray.Array2.set bigarray2_int i j (i + j) done done
+let _ = f_bigarray2_int bigarray2_int
+
+let[@inline never] [@local never] f_bigarray2_float (x: (float, Bigarray.float64_elt, Bigarray.fortran_layout) Bigarray.Array2.t) = x
+let bigarray2_float = Bigarray.Array2.create Bigarray.float64 Bigarray.fortran_layout 2 4
+let _ = for i = 1 to 2 do for j = 1 to 4 do Bigarray.Array2.set bigarray2_float i j (Float.of_int (i * j) *. 0.1) done done
+let _ = f_bigarray2_float bigarray2_float
+
+let[@inline never] [@local never] f_bigarray3_int32 (x: (int32, Bigarray.int32_elt, Bigarray.c_layout) Bigarray.Array3.t) = x
+let bigarray3_int32 = Bigarray.Array3.create Bigarray.int32 Bigarray.c_layout 2 2 2
+let _ = for i = 0 to 1 do for j = 0 to 1 do for k = 0 to 1 do
+  Bigarray.Array3.set bigarray3_int32 i j k (Int32.of_int (i + j + k))
+done done done
+let _ = f_bigarray3_int32 bigarray3_int32
+
+
+(* CR sspies: Add testing for Maps and Hashtables once oxcaml dwarf is enabled on the compiler. *)

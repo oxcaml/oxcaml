@@ -191,6 +191,7 @@ module Runtime_4 = struct
   let self () = 0
   let is_main_domain () = true
   let recommended_domain_count () = 1
+  let self_index () = 0
 end
 
 module Runtime_5 = struct
@@ -353,6 +354,9 @@ module Runtime_5 = struct
 
   let is_main_domain () = (self () :> int) = 0
 
+  external self_index : unit -> int @@ portable
+    = "caml_ml_domain_index" [@@noalloc]
+
   (******** Callbacks **********)
 
   (* first spawn, domain startup and at exit functionality *)
@@ -470,6 +474,7 @@ module type S = sig
   val self : unit -> id @@ portable
   val is_main_domain : unit -> bool @@ portable
   val recommended_domain_count : unit -> int @@ portable
+  val self_index : unit -> int @@ portable
   val before_first_spawn : (unit -> unit) -> unit @@ nonportable
   val at_exit : (unit -> unit) @ portable -> unit @@ portable
   val do_at_exit : unit -> unit @@ nonportable
@@ -488,7 +493,7 @@ module TLS0 = struct
   type tls_state = Obj_opt.t array
 
   external get_tls_state
-    : unit -> tls_state @@ portable = "caml_domain_tls_get"
+    : unit -> tls_state @@ portable = "%tls_get"
   [@@noalloc]
   external set_tls_state
     : tls_state -> unit @@ portable = "caml_domain_tls_set"

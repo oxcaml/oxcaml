@@ -173,7 +173,7 @@ let block_load (kind : Flambda_primitive.Block_access_kind.t) =
 let array_load (kind : Flambda_primitive.Array_load_kind.t) =
   match kind with
   | Immediates -> 1 (* cadda + load *)
-  | Naked_floats | Values -> 1
+  | Naked_floats | Gc_ignorable_values | Values -> 1
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
   | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
     (* more computation is needed because of the representation using a custom
@@ -195,6 +195,7 @@ let array_set (kind : Flambda_primitive.Array_set_kind.t) =
   match kind with
   | Values (Assignment Heap) -> does_not_need_caml_c_call_extcall_size
   | Values (Assignment Local | Initialization) -> 1
+  | Gc_ignorable_values -> 1
   | Immediates | Naked_floats -> 1
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
   | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
@@ -384,9 +385,10 @@ let nullary_prim_size prim =
   (* CR gbury: check this *)
   | Invalid _ -> 0
   | Optimised_out _ -> 0
-  | Probe_is_enabled { name = _ } -> 4
+  | Probe_is_enabled { name = _; enabled_at_init = _ } -> 4
   | Enter_inlined_apply _ -> 0
   | Dls_get -> 1
+  | Tls_get -> 1
   | Poll | Cpu_relax -> alloc_size
 
 let unary_prim_size ~machine_width prim =
@@ -398,8 +400,9 @@ let unary_prim_size ~machine_width prim =
   | Array_length array_kind -> (
     match array_kind with
     | Array_kind
-        ( Immediates | Values | Naked_floats | Naked_int64s | Naked_nativeints
-        | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ) ->
+        ( Immediates | Values | Gc_ignorable_values | Naked_floats
+        | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+        | Naked_vec512s | Unboxed_product _ ) ->
       array_length_size
     | Array_kind (Naked_int32s | Naked_float32s) ->
       (* There is a dynamic check here to see if the array has an odd or even

@@ -178,7 +178,7 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 
 # flags.sexp
 	echo '(:standard $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_upstream_flags.sexp
-	echo '(:standard $(OXCAML_DWARF_FLAGS_FOR_COMPILER) $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_oxcaml_flags.sexp
+	echo '(:standard $(OXCAML_DWARF_FLAGS_FOR_COMPILER) -bin-annot-cms $(ASSEMBLY_FLAG_FOR_COMPILER) $(if $(filter true,$(FUNCTION_SECTIONS)),-function-sections,))' > ocamlopt_oxcaml_flags.sexp
 	echo '( )' > boot_oc_cflags.sexp
 	echo '( $(OC_CFLAGS) )' > oc_cflags.sexp
 	echo '( $(OC_CPPFLAGS) )' > oc_cppflags.sexp
@@ -234,9 +234,14 @@ _install: compiler
 	done
 	mkdir _install/lib/stublibs
 	cp _build/main/parser.cmly _install/lib/ocaml/compiler-libs/
-	find _build/main/ \( -name "flambda2*.cmi" \
+	find _build/main/ \( -name "flambda2*.cmi" -or -name "flambda2*.cms" \
           -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
           -exec cp -f {} _install/lib/ocaml/compiler-libs \;
+	# CR-sspies: Hack to copy the .cms files into the install directory.
+	# Fix this once the upstream dune has support for -bin-annot-cms.
+	# This only copies part of the files, mainly meant for metrics. It only covers
+	# about half of the files which we would want to copy over.
+	find _build/runtime_stdlib/stdlib/ -name '*.cms' -exec cp -f {} _install/lib/ocaml/ \;
 
 # Copy _install to the final install directory (no-op if they are the same)
 install: _install
@@ -314,7 +319,7 @@ install_for_test: _install
 	 done; \
 	 ln -s . lex; ln -s . yacc; \
 	 ln -s _install/lib/ocaml/compiler-libs compilerlibs; \
-	 mkdir -p otherlibs/{unix,dynlink/native,str,bigarray,runtime_events,camlinternaleval}; \
+	 mkdir -p otherlibs/{unix,dynlink/native,str,bigarray,runtime_events}; \
 	 ln -s ../stdlib/threads otherlibs/systhreads$(RUNTIME_SUFFIX); \
          $(cpl) stdlib/unix/{lib,}unix* otherlibs/unix; \
          $(cpl) stdlib/dynlink/dynlink* otherlibs/dynlink; \

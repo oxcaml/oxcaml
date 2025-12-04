@@ -80,16 +80,6 @@ let transl_object =
   ref (fun ~scopes:_ _id _s _cl -> assert false :
        scopes:scopes -> Ident.t -> string list -> class_expr -> lambda)
 
-(* Probe handlers are generated from %probe as closed functions
-   during transl_exp and immediately lifted to top level. *)
-let probe_handlers = ref []
-let clear_probe_handlers () = probe_handlers := []
-let declare_probe_handlers lam =
-  List.fold_left (fun acc (funcid, func_duid, func) ->
-      Llet(Strict, Lambda.layout_function, funcid, func_duid, func, acc))
-    lam
-    !probe_handlers
-
 (* Compile an exception/extension definition *)
 
 let prim_fresh_oo_id =
@@ -147,6 +137,9 @@ let maybe_region get_layout lam =
        Lsend (k, lmet, lobj, largs, Rc_normal, mode, loc, layout)
     | Lregion _ as lam -> lam
     | Lexclave lam -> lam
+    | Lsplice _ ->
+      fatal_error "Translcore.remove_tail_markers_and_exclave: \
+        splices shouldn't be reachable"
     | lam ->
        Lambda.shallow_map ~tail:remove_tail_markers_and_exclave ~non_tail:Fun.id lam
   in
@@ -317,7 +310,7 @@ let transl_ident loc env ty path desc kind =
       Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort (Some path)
   | Val_anc _, Id_value ->
       raise(Error(to_location loc, Free_super_var))
-  | (Val_reg | Val_self _), Id_value ->
+  | (Val_reg _ | Val_self _), Id_value ->
       transl_value_path loc env path
   |  _ -> fatal_error "Translcore.transl_exp: bad Texp_ident"
 
@@ -875,7 +868,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 imm_array
               else
                 match kind with
-                | Paddrarray | Pintarray ->
+                | Paddrarray | Pgcignorableaddrarray | Pintarray ->
                   Lconst(Const_block(0, cl))
                 | Pfloatarray ->
                   Lconst(Const_float_array(List.map extract_float cl))
@@ -905,7 +898,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
       let array_kind = Typeopt.array_kind e elt_sort in
       begin match array_kind with
-      | Pgenarray | Paddrarray | Pintarray | Pfloatarray
+      | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
       | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ -> ()
       | Punboxedvectorarray _ ->
         raise (Error(e.exp_loc, Unboxed_vector_in_array_comprehension))
@@ -1151,14 +1144,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | _ ->
           let oid = Ident.create_local "open" in
           let oid_duid = Lambda.debug_uid_none in
+          let open_repr = transl_module_representation od.open_items_repr in
           let body, _ =
-            (* CR layouts v5: Currently we only allow values at the top of a
-               module.  When that changes, some adjustments may be needed
-               here. *)
             List.fold_left (fun (body, pos) id ->
-              Llet(Alias, Lambda.layout_module_field, id,
+              Llet(Alias, layout_of_module_field open_repr pos, id,
                    Lambda.debug_uid_none,
-                   Lprim(mod_field pos, [Lvar oid],
+                   Lprim(mod_field pos open_repr, [Lvar oid],
                          of_location ~scopes od.open_loc), body),
               pos + 1
             ) (transl_exp ~scopes sort e, 0)
@@ -1277,38 +1268,45 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           (* CR zqian: the handler function doesn't have a region. However, the
              [region] field is currently broken. *)
       in
-      let app =
+      let ap_loc = of_location e.exp_loc ~scopes in
+      let app ~ap_probe =
         { ap_func = Lvar funcid;
           ap_args;
           ap_result_layout = return_layout;
           ap_region_close = Rc_normal;
           ap_mode = alloc_local;
-          ap_loc = of_location e.exp_loc ~scopes;
+          ap_loc;
           ap_tailcall = Default_tailcall;
           ap_inlined = Never_inlined;
           ap_specialised = Always_specialise;
-          ap_probe = Some {name; enabled_at_init};
+          ap_probe;
         }
       in
-      begin match Config.flambda || Config.flambda2 with
-      | true ->
-          Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler,
-               Lapply app)
-      | false ->
-        (* Needs to be lifted to top level manually here,
-           because functions that contain other function declarations
-           are not inlined by Closure. For example, adding a probe into
-           the body of function foo will prevent foo from being inlined
-           into another function. *)
-        probe_handlers := (funcid, funcid_duid, handler)::!probe_handlers;
-        Lapply app
-      end
+      let lam =
+        if !Clflags.emit_optimized_probes then
+          let ap_probe = Some {name; enabled_at_init} in
+          Lapply (app ~ap_probe)
+        else
+          (* Slower implementation of probes where there isn't clever
+             architecture-specific codegen. Read the semaphore each time. *)
+          (Lifthenelse
+             ( Lprim
+                 (Pprobe_is_enabled
+                    { name; enabled_at_init = Some enabled_at_init },
+                      [], ap_loc),
+               (* probe handler has type [unit] *)
+               Lapply (app ~ap_probe:None),
+               lambda_unit,
+               layout_unit ))
+      in
+      Llet(Strict, Lambda.layout_function, funcid, funcid_duid, handler, lam)
     end else begin
       lambda_unit
     end
   | Texp_probe_is_enabled {name} ->
     if !Clflags.native_code && !Clflags.probes then
-      Lprim(Pprobe_is_enabled {name}, [], of_location ~scopes e.exp_loc)
+      Lprim(Pprobe_is_enabled {name; enabled_at_init = None},
+            [], of_location ~scopes e.exp_loc)
     else
       lambda_unit
   | Texp_exclave e ->

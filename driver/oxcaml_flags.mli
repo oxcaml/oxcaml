@@ -40,6 +40,9 @@ val cfg_prologue_validate : bool ref
 val cfg_prologue_shrink_wrap : bool ref
 val cfg_prologue_shrink_wrap_threshold : int ref
 
+val cfg_value_propagation : bool ref
+val cfg_value_propagation_float : bool ref
+
 val reorder_blocks_random : int option ref
 val basic_block_sections : bool ref
 val module_entry_functions_section : bool ref
@@ -130,6 +133,9 @@ module Flambda2 : sig
     val function_result_types : function_result_types
     val enable_reaper : bool
     val reaper_preserve_direct_calls : reaper_preserve_direct_calls
+    val reaper_local_fields : bool
+    val reaper_unbox : bool
+    val reaper_change_calling_conventions : bool
     val unicode : bool
     val kind_checks : bool
   end
@@ -148,6 +154,9 @@ module Flambda2 : sig
     function_result_types : function_result_types;
     enable_reaper : bool;
     reaper_preserve_direct_calls : reaper_preserve_direct_calls;
+    reaper_local_fields : bool;
+    reaper_unbox : bool;
+    reaper_change_calling_conventions : bool;
     unicode : bool;
     kind_checks : bool;
   }
@@ -165,6 +174,9 @@ module Flambda2 : sig
   val join_algorithm : join_algorithm or_default ref
   val enable_reaper : bool or_default ref
   val reaper_preserve_direct_calls : reaper_preserve_direct_calls or_default ref
+  val reaper_local_fields : bool or_default ref
+  val reaper_unbox : bool or_default ref
+  val reaper_change_calling_conventions : bool or_default ref
   val unicode : bool or_default ref
   val kind_checks : bool or_default ref
 

@@ -931,6 +931,14 @@ let float_op t (i : Cfg.basic Cfg.instruction) (width : Cmm.float_width)
   in
   store_into_reg t i.res.(0) res
 
+let int128_op _t (i : Cfg.basic Cfg.instruction)
+    (op : Operation.int128_operation) =
+  (* CR-soon mslater for gyorsh: implement these in llvm intrinsics *)
+  match op with
+  | Iadd128 -> not_implemented_basic ~msg:"Iadd128" i
+  | Isub128 -> not_implemented_basic ~msg:"Isub128" i
+  | Imul64 { signed = _ } -> not_implemented_basic ~msg:"Imul64" i
+
 (* CR yusumez: add a generic Cfg instruction for bswap *)
 let bswap t (i : Cfg.basic Cfg.instruction) (bitwidth : Arch.bswap_bitwidth) =
   let typ =
@@ -1225,6 +1233,7 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
   | Store (memory_chunk, addressing_mode, _is_modify) ->
     store t i memory_chunk addressing_mode
   | Intop op -> int_op t i op ~imm:None
+  | Int128op op -> int128_op t i op
   | Intop_imm (op, n) -> int_op t i op ~imm:(Some n)
   | Floatop (width, op) -> float_op t i width op
   | Begin_region ->
@@ -1276,11 +1285,18 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
   | Specific op -> specific t i op
   | Intop_atomic { op; size; addr } -> atomic t i op ~size ~addr
   | Pause -> call_llvm_intrinsic_no_res t "x86.sse2.pause" []
+  | Dls_get ->
+    let dls_state_ptr = load_domainstate_addr t Domain_dls_state in
+    let dls_state = emit_ins t (I.load ~ptr:dls_state_ptr ~typ:T.i64) in
+    store_into_reg t i.res.(0) dls_state
+  | Tls_get ->
+    let tls_state_ptr = load_domainstate_addr t Domain_tls_state in
+    let tls_state = emit_ins t (I.load ~ptr:tls_state_ptr ~typ:T.i64) in
+    store_into_reg t i.res.(0) tls_state
   | Poll -> () (* CR yusumez: insert poll call *)
   | Stackoffset _ -> () (* Handled separately via [statepoint_id_attr] *)
   | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
-  | Probe_is_enabled _ | Name_for_debugger _ | Dls_get ->
-    not_implemented_basic i
+  | Probe_is_enabled _ | Name_for_debugger _ -> not_implemented_basic i
 
 let emit_basic t (i : Cfg.basic Cfg.instruction) =
   emit_comment t "%a" F.pp_dbg_instr_basic i;
@@ -1465,7 +1481,9 @@ let prepare_fun_info t (cfg : Cfg.t) =
         fun_num_stack_slots = _ (* only available after regalloc *);
         fun_poll = _ (* not needed after poll insertion *);
         next_instruction_id = _;
-        fun_ret_type
+        fun_ret_type;
+        allowed_to_be_irreducible = _;
+        register_locations_are_set = _
       } =
     cfg
   in

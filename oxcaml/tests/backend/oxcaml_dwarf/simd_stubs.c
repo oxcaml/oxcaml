@@ -18,6 +18,14 @@ __m128 vec128_of_floats(float f0, float f1, float f2, float f3)
   return _mm_set_ps(f3, f2, f1, f0);
 }
 
+__m128i vec128_of_float16s(float f0, float f1, float f2, float f3,
+                           float f4, float f5, float f6, float f7)
+{
+  __m128i v0 = _mm_cvtps_ph(_mm_set_ps(f3, f2, f1, f0), 0);
+  __m128i v1 = _mm_cvtps_ph(_mm_set_ps(f7, f6, f5, f4), 0);
+  return _mm_unpacklo_epi64(v0, v1);
+}
+
 __m128d vec128_of_doubles(double d0, double d1)
 {
   return _mm_set_pd(d1, d0);
@@ -42,6 +50,17 @@ __m256i vec256_of_int32s(int32_t i0, int32_t i1, int32_t i2, int32_t i3, int32_t
 __m256 vec256_of_floats(float f0, float f1, float f2, float f3, float f4, float f5, float f6, float f7)
 {
   return _mm256_set_ps(f7, f6, f5, f4, f3, f2, f1, f0);
+}
+
+__m256i vec256_of_float16s(float f0, float f1, float f2, float f3,
+                           float f4, float f5, float f6, float f7,
+                           float f8, float f9, float f10, float f11,
+                           float f12, float f13, float f14, float f15)
+{
+  __m128i v0 = _mm256_cvtps_ph(_mm256_set_ps(f7, f6, f5, f4, f3, f2, f1, f0), 0);
+  __m128i v1 = _mm256_cvtps_ph(_mm256_set_ps(f15, f14, f13, f12, f11, f10, f9, f8), 0);
+  __m256i v = _mm256_castsi128_si256(v0);
+  return _mm256_inserti128_si256(v, v1, 1);
 }
 
 __m256d vec256_of_doubles(double d0, double d1, double d2, double d3)

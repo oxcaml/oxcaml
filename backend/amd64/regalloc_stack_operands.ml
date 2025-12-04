@@ -171,8 +171,11 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
         instr
     in
     match Array.length simd.args, simd.res with
+    | _, Res_none ->
+      (* Res_none implies one argument is already an address. *)
+      May_still_have_spilled_registers
     | 1, First_arg -> May_still_have_spilled_registers
-    | 1, Res { loc = res_loc; _ } ->
+    | 1, Res [| { loc = res_loc; _ } |] ->
       let arg_mem = Simd.loc_allows_mem simd.args.(0).loc in
       let res_mem = Simd.loc_allows_mem res_loc in
       assert (not (arg_mem && res_mem));
@@ -187,7 +190,9 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
         may_use_stack_operand_for_second_argument map instr ~num_args
           ~res_is_fst:true
       else May_still_have_spilled_registers
-    | num_args, Res { loc = res_loc; _ } ->
+    | num_args, Res rr ->
+      (* We don't attempt to allow spilling additional result regs. *)
+      let res_loc = rr.(0).loc in
       let arg_mem = Simd.loc_allows_mem simd.args.(1).loc in
       let res_mem = Simd.loc_allows_mem res_loc in
       assert (not (arg_mem && res_mem));
@@ -198,12 +203,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       else if res_mem
       then may_use_stack_operand_for_result map instr ~num_args
       else May_still_have_spilled_registers)
-  | Op
-      (Specific
-        (Isimd_mem
-          ( ( Add_f64 | Sub_f64 | Mul_f64 | Div_f64 | Add_f32 | Sub_f32
-            | Mul_f32 | Div_f32 ),
-            _ ))) ->
+  | Op (Specific (Isimd_mem ((Load _ | Store _), _))) ->
     May_still_have_spilled_registers
   | Op
       (Reinterpret_cast
@@ -216,6 +216,10 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Static_cast (V512_of_scalar Float64x8 | Scalar_of_v512 Float64x8))
   | Op (Static_cast (V512_of_scalar Float32x16 | Scalar_of_v512 Float32x16)) ->
     unary_operation_argument_or_result_on_stack map instr
+  | Op (Static_cast (V128_of_scalar Float16x8 | Scalar_of_v128 Float16x8))
+  | Op (Static_cast (V256_of_scalar Float16x16 | Scalar_of_v256 Float16x16))
+  | Op (Static_cast (V512_of_scalar Float16x32 | Scalar_of_v512 Float16x32)) ->
+    Misc.fatal_error "float16 scalar type not supported"
   | Op (Reinterpret_cast (Float_of_int64 | Float32_of_int32))
   | Op (Static_cast (V128_of_scalar (Int64x2 | Int32x4 | Int16x8 | Int8x16)))
   | Op (Static_cast (V256_of_scalar (Int64x4 | Int32x8 | Int16x16 | Int8x32)))
@@ -223,15 +227,11 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     ->
     may_use_stack_operand_for_only_argument map instr ~has_result:true
   | Op (Reinterpret_cast (Int64_of_float | Int32_of_float32))
-  | Op (Static_cast (Scalar_of_v128 (Int64x2 | Int32x4)))
-  | Op (Static_cast (Scalar_of_v256 (Int64x4 | Int32x8)))
-  | Op (Static_cast (Scalar_of_v512 (Int64x8 | Int32x16))) ->
+  | Op (Static_cast (Scalar_of_v128 (Int64x2 | Int32x4 | Int16x8 | Int8x16)))
+  | Op (Static_cast (Scalar_of_v256 (Int64x4 | Int32x8 | Int16x16 | Int8x32)))
+  | Op (Static_cast (Scalar_of_v512 (Int64x8 | Int32x16 | Int16x32 | Int8x64)))
+    ->
     may_use_stack_operand_for_result map instr ~num_args:1
-  | Op (Static_cast (Scalar_of_v128 (Int16x8 | Int8x16)))
-  | Op (Static_cast (Scalar_of_v256 (Int16x16 | Int8x32)))
-  | Op (Static_cast (Scalar_of_v512 (Int16x32 | Int8x64))) ->
-    (* CR mslater: (SIMD) replace once we have unboxed int16/int8 *)
-    May_still_have_spilled_registers
   | Op
       (Static_cast
         ( Float_of_int (Float32 | Float64)
@@ -263,6 +263,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Csel _) (* CR gyorsh: optimize *)
   | Op (Specific (Ilfence | Isfence | Imfence))
   | Op (Intop (Imulh _ | Imul | Idiv | Imod))
+  | Op (Int128op (Iadd128 | Isub128 | Imul64 _))
   | Op (Intop_imm ((Imulh _ | Imul | Idiv | Imod), _))
   | Op (Specific (Irdtsc | Irdpmc))
   | Op (Intop (Ipopcnt | Iclz _ | Ictz _))
@@ -272,8 +273,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       | Floatop (_, (Inegf | Iabsf | Icompf _))
       | Const_float _ | Const_float32 _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Name_for_debugger _
-      | Probe_is_enabled _ | Opaque | Begin_region | End_region | Dls_get | Poll
-      | Pause | Alloc _ )
+      | Probe_is_enabled _ | Opaque | Begin_region | End_region | Dls_get
+      | Tls_get | Poll | Pause | Alloc _ )
   | Op (Reinterpret_cast (Int_of_value | Value_of_int))
   | Op
       (Specific

@@ -17,6 +17,7 @@
 
 open Misc
 open Compile_common
+module SL = Slambda
 
 module type S = sig
   include Optcomp_intf.File_extensions
@@ -35,14 +36,15 @@ module type S = sig
     output_prefix:string ->
     compilation_unit:Compilation_unit.t ->
     runtime_args:Translmod.runtime_arg list ->
-    main_module_block_size:int ->
+    main_module_block_repr:Lambda.module_representation ->
     arg_descr:Lambda.arg_descr option ->
     keep_symbol_tables:bool ->
     unit
 
   val link : ppf_dump:Format.formatter -> string list -> string -> unit
 
-  val link_shared : ppf_dump:Format.formatter -> string list -> string -> unit
+  val link_shared :
+    ppf_dump:Format.formatter -> Linkenv.t -> string list -> string -> unit
 
   val create_archive : string list -> string -> unit
 
@@ -77,21 +79,27 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   (** Native compilation backend for .ml files. *)
 
-  let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
+  let make_arg_descr ~param ~arg_block_idx ~main_repr : Lambda.arg_descr option
+      =
     match param, arg_block_idx with
-    | Some arg_param, Some arg_block_idx -> Some { arg_param; arg_block_idx }
+    | Some arg_param, Some arg_block_idx ->
+      Some { arg_param; arg_block_idx; main_repr }
     | None, None -> None
     | Some _, None -> Misc.fatal_error "No argument field"
     | None, Some _ -> Misc.fatal_error "Unexpected argument field"
 
-  let compile_from_raw_lambda i raw_lambda ~keep_symbol_tables ~as_arg_for =
-    raw_lambda
-    |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
-           Type_shape.print_debug_uid_tables ppf)
-    |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
-    |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
-    |> Profile.(record generate) (fun (program : Lambda.program) ->
+  let compile_from_slambda i slambda ~keep_symbol_tables ~as_arg_for =
+    slambda
+    |> Profile.(record generate) (fun (program : SL.program) ->
            Builtin_attributes.warn_unused ();
+           program
+           |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program
+           |> Slambdaeval.eval
+           |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
+                  Type_shape.print_debug_uid_tables ppf)
+           |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
+           |> Compiler_hooks.execute_and_pipe Compiler_hooks.Raw_lambda
+           |> fun program ->
            let code =
              Simplif.simplify_lambda program.Lambda.code
                ~restrict_to_upstream_dwarf:
@@ -112,6 +120,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
              let arg_descr =
                make_arg_descr ~param:as_arg_for
                  ~arg_block_idx:program.arg_block_idx
+                 ~main_repr:
+                   (Lambda.main_module_representation
+                      program.main_module_block_format)
              in
              Compilenv.save_unit_info
                (Unit_info.Artifact.filename
@@ -121,16 +132,18 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                ~arg_descr))
 
   let compile_from_typed i typed ~keep_symbol_tables ~as_arg_for =
+    let loc = Location.in_file (Unit_info.original_source_file i.target) in
     typed
-    |> Profile.(record transl) (Translmod.transl_implementation i.module_name)
-    |> compile_from_raw_lambda i ~keep_symbol_tables ~as_arg_for
+    |> Profile.(record transl)
+         (Translmod.transl_implementation ~loc i.module_name)
+    |> compile_from_slambda i ~keep_symbol_tables ~as_arg_for
 
   type starting_point =
     | Parsing
     | Emit of Optcomp_intf.emit
     | Instantiation of
         { runtime_args : Translmod.runtime_arg list;
-          main_module_block_size : int;
+          main_module_block_repr : Lambda.module_representation;
           arg_descr : Lambda.arg_descr option
         }
 
@@ -176,7 +189,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
         info ~backend
     | Emit emit -> emit info (* Emit assembly directly from Linear IR *)
-    | Instantiation { runtime_args; main_module_block_size; arg_descr } ->
+    | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
       (match !Clflags.as_argument_for with
       | Some _ ->
         (* CR lmaurer: Needs nicer error message (this is a user error) *)
@@ -191,10 +204,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       in
       let impl =
         Translmod.transl_instance info.module_name ~runtime_args
-          ~main_module_block_size ~arg_block_idx
+          ~main_module_block_repr ~arg_block_idx
       in
       if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-      compile_from_raw_lambda info impl ~as_arg_for ~keep_symbol_tables
+      compile_from_slambda info impl ~as_arg_for ~keep_symbol_tables
 
   let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables
       =
@@ -203,9 +216,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       ~keep_symbol_tables ~compilation_unit:Inferred_from_output_prefix
 
   let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
-      ~main_module_block_size ~arg_descr ~keep_symbol_tables =
+      ~main_module_block_repr ~arg_descr ~keep_symbol_tables =
     let start_from =
-      Instantiation { runtime_args; main_module_block_size; arg_descr }
+      Instantiation { runtime_args; main_module_block_repr; arg_descr }
     in
     implementation_aux ~start_from ~source_file ~output_prefix
       ~keep_symbol_tables ~compilation_unit:(Exactly compilation_unit)
@@ -297,10 +310,12 @@ let native unix
         "camlinternaleval" ]
 
     let support_files_for_eval () =
+      List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval
+
+    let set_load_path_for_eval () =
       List.iter
         (fun lib ->
           Load_path.add_dir ~hidden:false
             (Misc.expand_directory Config.standard_library ("+" ^ lib)))
-        extra_load_paths_for_eval;
-      List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval
+        extra_load_paths_for_eval
   end) : S)

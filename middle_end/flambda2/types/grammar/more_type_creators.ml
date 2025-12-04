@@ -88,11 +88,13 @@ let any_tagged_immediate =
 let any_tagged_immediate_non_null =
   TG.Head_of_kind_value_non_null.create_variant ~is_unique:false
     ~immediates:Unknown ~blocks:(Known TG.Row_like_for_blocks.bottom)
-    ~extensions:No_extensions
+    ~extensions:No_extensions ~is_int:None ~get_tag:None
 
 let any_tagged_immediate_or_null =
   TG.create_from_head_value
-    { non_null = Ok any_tagged_immediate_non_null; is_null = Maybe_null }
+    { non_null = Ok any_tagged_immediate_non_null;
+      is_null = Maybe_null { is_null = None }
+    }
 
 let these_tagged_immediates0 imms =
   match Target_ocaml_int.Set.get_singleton imms with
@@ -244,7 +246,7 @@ let immutable_block_non_null ~machine_width ~is_unique tag ~shape alloc_mode
         (Known
            (TG.Row_like_for_blocks.create ~machine_width ~shape
               ~field_tys:fields (Closed tag) alloc_mode))
-      ~extensions:No_extensions
+      ~extensions:No_extensions ~is_int:None ~get_tag:None
 
 let immutable_block_with_size_at_least ~machine_width ~tag ~n ~shape
     ~field_n_minus_one =
@@ -292,7 +294,7 @@ let variant_non_null ~machine_width ~const_ctors ~non_const_ctors alloc_mode =
   in
   TG.Head_of_kind_value_non_null.create_variant ~is_unique:false
     ~immediates:(Known const_ctors) ~blocks:(Known blocks)
-    ~extensions:No_extensions
+    ~extensions:No_extensions ~is_int:None ~get_tag:None
 
 let exactly_this_closure function_slot ~all_function_slots_in_set:function_types
     ~all_closure_types_in_set:closure_types
@@ -311,6 +313,28 @@ let exactly_this_closure function_slot ~all_function_slots_in_set:function_types
         (Value_slot.Map.keys value_slot_types)
     in
     TG.Row_like_for_closures.create_exactly function_slot
+      set_of_closures_contents closures_entry
+  in
+  TG.create_closures alloc_mode by_function_slot
+
+let at_least_this_closure function_slot
+    ~at_least_these_function_slots:function_types
+    ~at_least_these_closure_types:closure_types
+    ~at_least_these_value_slots:value_slot_types alloc_mode =
+  let closure_types = TG.Product.Function_slot_indexed.create closure_types in
+  let closures_entry =
+    let value_slot_types =
+      TG.Product.Value_slot_indexed.create value_slot_types
+    in
+    TG.Closures_entry.create ~function_types ~closure_types ~value_slot_types
+  in
+  let by_function_slot =
+    let set_of_closures_contents =
+      Set_of_closures_contents.create
+        (Function_slot.Map.keys function_types)
+        (Value_slot.Map.keys value_slot_types)
+    in
+    TG.Row_like_for_closures.create_at_least function_slot
       set_of_closures_contents closures_entry
   in
   TG.create_closures alloc_mode by_function_slot
@@ -558,7 +582,7 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
     in
     let is_null : TG.is_null =
       match Flambda_kind.With_subkind.nullable kind with
-      | Nullable -> Maybe_null
+      | Nullable -> Maybe_null { is_null = None }
       | Non_nullable -> Not_null
     in
     TG.create_from_head_value { non_null; is_null }

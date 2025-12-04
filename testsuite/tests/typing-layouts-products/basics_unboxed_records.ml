@@ -69,28 +69,18 @@ let combine_ts #{ f = _f1; i = i1 } #{ f = f2; i = _i2 } =
 val combine_ts : t -> t -> t = <fun>
 |}]
 
-(* We still cannot have top-level products *)
+(* Top-level products *)
 
-let disallowed = #{ f = #3.14; i = 0 }
+let unboxed_product = #{ f = #3.14; i = 0 }
 [%%expect{|
-Line 1, characters 4-14:
-1 | let disallowed = #{ f = #3.14; i = 0 }
-        ^^^^^^^^^^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "disallowed" has layout "float64 & value".
+val unboxed_product : t = #{f = <abstr>; i = 0}
 |}]
 
 ;;
 #{ f = #3.14; i = 0};;
 [%%expect{|
-Line 1, characters 0-20:
-1 | #{ f = #3.14; i = 0};;
-    ^^^^^^^^^^^^^^^^^^^^
-Error: Types of unnamed expressions must have layout value when using
-       the toplevel, but this expression has layout "float64 & value".
+- : t = #{f = <abstr>; i = 0}
 |}]
-
-(* However, we can have a top-level unboxed record if its kind is value *)
 
 type m_record = #{ i1 : int }
 module M = struct
@@ -149,7 +139,7 @@ let f_unboxed_record (local_ left) (local_ right) =
 [%%expect{|
 type ('a, 'b) ab = { left : 'a; right : 'b; }
 type ('a, 'b) ab_u = #{ left : 'a; right : 'b; }
-val f_unboxed_record : local_ 'a -> local_ 'b -> local_ 'a = <fun>
+val f_unboxed_record : 'a @ local -> 'b @ local -> 'a @ local = <fun>
 |}]
 
 let f_boxed_record (local_ left) (local_ right) =
@@ -161,7 +151,11 @@ Line 4, characters 2-7:
 4 |   left'
       ^^^^^
 Error: This value is "local"
-       but is expected to be in the parent region or "global"
+       because it is the field "left" of the record at Line 3, characters 6-25
+       which is "local"
+       because it is allocated at Line 2, characters 10-25 containing data
+       which is "local" to the parent region.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
        because it is a function return value.
        Hint: Use exclave_ to return a local value.
 |}]

@@ -58,11 +58,11 @@ module Native = struct
   module Unit_header = struct
     type t = Cmxs_format.dynunit
 
-    let name (t : t) = t.dynu_name |> Compilation_unit.name_as_string
+    let name (t : t) = t.dynu_name |> Compilation_unit.full_path_as_string
     let crc (t : t) = Some t.dynu_crc
 
     let convert_cmx_import import =
-      let cu = Import_info.cu import |> Compilation_unit.name_as_string in
+      let cu = Import_info.cu import |> Compilation_unit.full_path_as_string in
       let crc = Import_info.crc import in
       cu, crc
 

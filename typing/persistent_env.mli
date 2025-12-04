@@ -92,7 +92,7 @@ val fold : 'a t -> (Global_module.Name.t -> 'a -> 'b -> 'b) -> 'b -> 'b
 type address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * int
+  | Adot of address * Types.module_representation * int
 
 type 'a sig_reader =
   Subst.Lazy.signature
@@ -118,8 +118,8 @@ val check : allow_hidden:bool -> 'a t -> 'a sig_reader
    been imported as a non-parameter. *)
 val register_parameter : 'a t -> Global_module.Parameter_name.t -> unit
 
-(* [is_parameter_import penv md] checks if [md] is a parameter. Raises a fatal
-   error if the module has not been imported. *)
+(* [is_parameter_import penv md] checks if [md] is a loaded parameter or has
+   been registered as a parameter. *)
 val is_parameter_import : 'a t -> Global_module.Name.t -> bool
 
 (* [looked_up penv md] checks if one has already tried

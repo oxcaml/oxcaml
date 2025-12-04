@@ -29,13 +29,23 @@
 
 #include "caml/mlvalues.h"
 
-extern char caml_bundled_cmis[];
-extern char caml_bundled_cmxs[];
+extern char caml_bundled_cmis[] __attribute__((weak));
+extern char caml_bundled_cmxs[] __attribute__((weak));
+// CR mshinwell: it's a shame that "cmxs" clashes with the extension of
+// a shared library file
 
-CAMLprim value bundled_cmis() {
-    return (value) &caml_bundled_cmis;
+value caml_bundled_cmis_this_exe()
+{
+  return (value) &caml_bundled_cmis;
 }
 
-CAMLprim value bundled_cmxs() {
-    return (value) &caml_bundled_cmxs;
+value caml_bundled_cmxs_this_exe()
+{
+  return (value) &caml_bundled_cmxs;
 }
+
+value caml_bundle_available(value bundle)
+{
+  return (bundle == (value) 0) ? Val_false : Val_true;
+}
+

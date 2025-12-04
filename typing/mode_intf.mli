@@ -24,8 +24,6 @@ module type Lattice = sig
 
   val max : t
 
-  val legacy : t
-
   val le : t -> t -> bool
 
   (** [equal a b] is equivalent to [le a b && le b a], but defined separately for
@@ -39,8 +37,14 @@ module type Lattice = sig
   val print : Format.formatter -> t -> unit
 end
 
-module type Lattice_product = sig
+module type Const = sig
   include Lattice
+
+  val legacy : t
+end
+
+module type Const_product = sig
+  include Const
 
   type 'a axis
 
@@ -76,7 +80,7 @@ type print_error_result =
 type print_error = (Format.formatter -> print_error_result) simple_error
 
 module type Common = sig
-  module Const : Lattice
+  module Const : Const
 
   type error
 
@@ -162,7 +166,8 @@ module type Common = sig
 
   (** Similiar to [submode], but crashes the compiler if errors. Use this
     function if the submode is guaranteed to succeed. *)
-  val submode_exn : (allowed * 'r) t -> ('l * allowed) t -> unit
+  val submode_exn :
+    ?pp:Mode_hint.pinpoint -> (allowed * 'r) t -> ('l * allowed) t -> unit
 
   val equate_exn : lr -> lr -> unit
 
@@ -182,7 +187,7 @@ module type Common = sig
 end
 
 module type Common_axis = sig
-  module Const : Lattice
+  module Const : Const
 
   include
     Common
@@ -217,7 +222,7 @@ module type Common_product = sig
 
   type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error
 
-  module Const : Lattice_product with type 'a axis := 'a Axis.t
+  module Const : Const_product with type 'a axis := 'a Axis.t
 
   include
     Common with type simple_error := simple_error and module Const := Const
@@ -253,6 +258,12 @@ module type S = sig
 
   module Hint = Mode_hint
 
+  (** Prints a [pinpoint]. Say "a foo" if [definite] is [false], say "the foo"
+      otherwise. Defaults to the latter. *)
+  val print_pinpoint :
+    Hint.pinpoint ->
+    (definite:bool -> capitalize:bool -> Format.formatter -> unit) option
+
   type nonrec 'a simple_error = 'a simple_error
 
   type changes
@@ -275,7 +286,7 @@ module type S = sig
     }
 
   module type Common_axis_pos = sig
-    module Const : Lattice
+    module Const : Const
 
     include
       Common_axis
@@ -285,7 +296,7 @@ module type S = sig
   end
 
   module type Common_axis_neg = sig
-    module Const : Lattice
+    module Const : Const
 
     include
       Common_axis
@@ -300,7 +311,7 @@ module type S = sig
         | Global
         | Local
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -333,7 +344,7 @@ module type S = sig
         | Regional
         | Local
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -351,7 +362,7 @@ module type S = sig
         | Many
         | Once
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -365,9 +376,10 @@ module type S = sig
     module Const : sig
       type t =
         | Portable
+        | Shareable
         | Nonportable
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -379,7 +391,7 @@ module type S = sig
         | Unique
         | Aliased
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_neg with module Const := Const
@@ -396,7 +408,7 @@ module type S = sig
         | Shared
         | Contended
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_neg with module Const := Const
@@ -408,7 +420,7 @@ module type S = sig
         | Forkable
         | Unforkable
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -424,7 +436,7 @@ module type S = sig
         | Unyielding
         | Yielding
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -441,7 +453,7 @@ module type S = sig
         | Observing
         | Stateful
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_pos with module Const := Const
@@ -460,7 +472,7 @@ module type S = sig
         | Read
         | Immutable
 
-      include Lattice with type t := t
+      include Const with type t := t
     end
 
     include Common_axis_neg with module Const := Const
@@ -470,6 +482,15 @@ module type S = sig
     val read : lr
 
     val read_write : lr
+  end
+
+  (* CR-soon zqian: rewrite other axes into this shape as well. *)
+  module Staticity : sig
+    type const =
+      | Static
+      | Dynamic
+
+    include Common_axis_neg with type Const.t = const
   end
 
   type 'a comonadic_with =
@@ -484,7 +505,8 @@ module type S = sig
   type monadic =
     { uniqueness : Uniqueness.Const.t;
       contention : Contention.Const.t;
-      visibility : Visibility.Const.t
+      visibility : Visibility.Const.t;
+      staticity : Staticity.Const.t
     }
 
   module Axis : sig
@@ -502,6 +524,7 @@ module type S = sig
       | Uniqueness : (monadic, Uniqueness.Const.t) t
       | Visibility : (monadic, Visibility.Const.t) t
       | Contention : (monadic, Contention.Const.t) t
+      | Staticity : (monadic, Staticity.Const.t) t
 
     val print : Format.formatter -> ('p, 'r) t -> unit
 
@@ -559,7 +582,7 @@ module type S = sig
       include Axis with type 'a t := 'a t
     end
 
-    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) modes =
+    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes =
       { areality : 'a;
         linearity : 'b;
         uniqueness : 'c;
@@ -568,12 +591,13 @@ module type S = sig
         forkable : 'f;
         yielding : 'g;
         statefulness : 'h;
-        visibility : 'i
+        visibility : 'i;
+        staticity : 'j
       }
 
     module Const : sig
       include
-        Lattice
+        Const
           with type t =
             ( Areality.Const.t,
               Linearity.Const.t,
@@ -583,7 +607,8 @@ module type S = sig
               Forkable.Const.t,
               Yielding.Const.t,
               Statefulness.Const.t,
-              Visibility.Const.t )
+              Visibility.Const.t,
+              Staticity.Const.t )
             modes
 
       module Option : sig
@@ -598,7 +623,8 @@ module type S = sig
             Forkable.Const.t option,
             Yielding.Const.t option,
             Statefulness.Const.t option,
-            Visibility.Const.t option )
+            Visibility.Const.t option,
+            Staticity.Const.t option )
           modes
 
         val none : t
@@ -630,6 +656,9 @@ module type S = sig
       (** Similar to [Alloc.partial_apply] but for constants *)
       val partial_apply : t -> Comonadic.Const.t
 
+      (** Similar to [comonadic_to_monadic_min] but for constants *)
+      val comonadic_to_monadic_min : Comonadic.Const.t -> Monadic.Const.t
+
       (** Prints a constant on any axis. *)
       val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
     end
@@ -657,6 +686,8 @@ module type S = sig
       Const.t ->
       ('l * 'r) t
 
+    val to_const_exn : lr -> Const.t
+
     module List : sig
       (* No new types exposed to avoid too many type names *)
       include Allow_disallow with type (_, _, 'd) sided = 'd t list
@@ -679,14 +710,20 @@ module type S = sig
     val min_with_comonadic :
       'a Comonadic.Axis.t -> ('a, 'l * 'r) mode -> ('l * disallowed) t
 
+    (* [min_with_monadic ax elt] returns [min] but with the monadic axis [ax] set to [elt]. *)
+    val min_with_monadic :
+      'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
+
     val meet_with : 'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 
     val join_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 
     val zap_to_legacy : lr -> Const.t
 
-    val comonadic_to_monadic :
-      ?hint:('l * 'r) Hint.morph -> ('l * 'r) Comonadic.t -> ('r * 'l) Monadic.t
+    val comonadic_to_monadic_min :
+      ?hint:('r * disallowed) neg Hint.morph ->
+      ('l * 'r) Comonadic.t ->
+      ('r * disallowed) Monadic.t
 
     val monadic_to_comonadic_max :
       ('r * disallowed) Monadic.t -> (disallowed * 'r) Comonadic.t
@@ -964,6 +1001,7 @@ module type S = sig
         uniqueness:Uniqueness.Const.t Atom.t ->
         contention:Contention.Const.t Atom.t ->
         visibility:Visibility.Const.t Atom.t ->
+        staticity:Staticity.Const.t Atom.t ->
         t
     end
 
@@ -992,6 +1030,9 @@ module type S = sig
         yielding:Yielding.Const.t Atom.t ->
         statefulness:Statefulness.Const.t Atom.t ->
         t
+
+      (** Create the mode crossing for a type whose values are always constructed at the given mode. *)
+      val always_constructed_at : Value.Comonadic.Const.t -> t
     end
 
     (** The mode crossing capability on all axes, split into monadic and
@@ -1029,16 +1070,24 @@ module type S = sig
       yielding:bool ->
       statefulness:bool ->
       visibility:bool ->
+      staticity:bool ->
       t
 
     (** Project a mode crossing (of all axes) onto the specified axis. *)
     val proj : 'a Axis.t -> t -> 'a
+
+    (** Set the specified axis to the specified crossing. *)
+    val set : 'a Axis.t -> 'a -> t -> t
 
     include Lattice with type t := t
 
     (** [modality m t] gives the mode crossing of type [T] wrapped in modality
     [m] where [T] has mode crossing [t]. *)
     val modality : Modality.Const.t -> t -> t
+
+    (** Takes a mode crossing [t], returns the modality needed to make [max] into [t].
+      More precisely, [to_modality] is the inverse of [modality _ max]. *)
+    val to_modality : t -> Modality.Const.t
 
     (** Apply mode crossing on a left mode, making it stronger. *)
     val apply_left : t -> Value.l -> Value.l

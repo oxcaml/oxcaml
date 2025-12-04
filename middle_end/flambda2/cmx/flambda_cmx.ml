@@ -63,7 +63,7 @@ let load_symbol_approx loader symbol : Code_or_metadata.t Value_approximation.t
     =
   let comp_unit = Symbol.compilation_unit symbol in
   match load_cmx_file_contents loader comp_unit with
-  | None -> Value_unknown
+  | None -> Unknown Flambda_kind.value
   | Some typing_env ->
     let find_code code_id =
       match Exported_code.find loader.imported_code code_id with
@@ -220,13 +220,16 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   let exported_offsets =
     exported_offsets
     |> Exported_offsets.reexport_function_slots
-         (Name_occurrences.all_function_slots free_names_of_all_code)
+         (Name_occurrences.all_function_slots_at_normal_mode
+            free_names_of_all_code)
     |> Exported_offsets.reexport_value_slots
-         (Name_occurrences.all_value_slots free_names_of_all_code)
+         (Name_occurrences.all_value_slots_at_normal_mode free_names_of_all_code)
     |> Exported_offsets.reexport_function_slots
-         (Name_occurrences.all_function_slots slots_used_in_typing_env)
+         (Name_occurrences.all_function_slots_at_normal_mode
+            slots_used_in_typing_env)
     |> Exported_offsets.reexport_value_slots
-         (Name_occurrences.all_value_slots slots_used_in_typing_env)
+         (Name_occurrences.all_value_slots_at_normal_mode
+            slots_used_in_typing_env)
   in
   let cmx =
     Flambda_cmx_format.create ~final_typing_env ~all_code ~exported_offsets

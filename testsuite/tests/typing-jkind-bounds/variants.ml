@@ -132,7 +132,7 @@ type 'a t : value mod non_null = Foo of 'a
 [%%expect {|
 type t = Foo of { x : unit -> unit; }
 type 'a t = Foo of ('a -> 'a) | Bar
-type ('a : value mod contended portable, 'b : value mod portable) t =
+type ('a : value mod portable contended, 'b : value mod portable) t =
     Foo of 'a
   | Bar of 'b
 type ('a : value mod many) t = Foo of { x : 'a; }
@@ -397,7 +397,7 @@ let foo (t : t @ local) = use_global t [@nontail]
 Line 1, characters 37-38:
 1 | let foo (t : t @ local) = use_global t [@nontail]
                                          ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -422,7 +422,7 @@ let foo (t : t @ local) = use_global t [@nontail]
 Line 1, characters 37-38:
 1 | let foo (t : t @ local) = use_global t [@nontail]
                                          ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : t @ aliased) = use_unique t
@@ -456,7 +456,7 @@ let foo (t : int t @ local) = use_global t [@nontail]
 Line 1, characters 41-42:
 1 | let foo (t : int t @ local) = use_global t [@nontail]
                                              ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -499,7 +499,7 @@ let foo (t : _ t @ local) = use_global t [@nontail]
 Line 1, characters 39-40:
 1 | let foo (t : _ t @ local) = use_global t [@nontail]
                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -532,7 +532,7 @@ let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
 Line 1, characters 59-60:
 1 | let foo (t : ('a : immutable_data) t @ local) = use_global t [@nontail]
                                                                ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : ('a : immutable_data) t @ aliased) = use_unique t
@@ -565,7 +565,7 @@ let foo (t : _ t @ local) = use_global t [@nontail]
 Line 1, characters 39-40:
 1 | let foo (t : _ t @ local) = use_global t [@nontail]
                                            ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let foo (t : _ t @ aliased) = use_unique t
@@ -1024,4 +1024,21 @@ and 'a t2 : immutable_data with 'a = Base of 'a | T1 of 'a t1
 [%%expect{|
 type 'a t1 = Base of 'a | T2 of 'a t2
 and 'a t2 = Base of 'a | T1 of 'a t1
+|}]
+
+type 'a t = Degen of ('a * 'a) t | Leaf
+let f (x : int t) = cross_portable x
+[%%expect {|
+type 'a t = Degen of ('a * 'a) t | Leaf
+Line 2, characters 35-36:
+2 | let f (x : int t) = cross_portable x
+                                       ^
+Error: This expression has type "int t" but an expression was expected of type
+         "('a : value mod portable)"
+       The kind of int t is immutable_data with (int * int) t
+         because of the definition of t at line 1, characters 0-39.
+       But the kind of int t must be a subkind of value mod portable
+         because of the definition of cross_portable at line 10, characters 57-68.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
 |}]

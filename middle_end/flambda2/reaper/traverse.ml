@@ -17,7 +17,6 @@ open! Flambda.Import
 open! Rev_expr
 open! Traverse_acc.Env
 module Acc = Traverse_acc
-module Graph = Global_flow_graph
 module Dot = Dot_printer
 
 type denv = Acc.Env.t
@@ -29,11 +28,16 @@ let apply_cont_deps denv acc apply_cont =
   let args = Apply_cont_expr.args apply_cont in
   let params = Continuation.Map.find cont denv.conts in
   let (Normal params) = params in
-  List.iter2 (fun param dep -> Acc.alias_dep ~denv param dep acc) params args
+  List.iter2
+    (fun param dep ->
+      Acc.add_alias acc
+        ~to_:(Code_id_or_name.var param)
+        ~from:(Acc.simple_to_node acc ~denv dep))
+    params args
 
 let reaper_test_opaque = Sys.getenv_opt "REAPEROPAQUE" <> None
 
-let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
+let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
   let return =
     List.mapi
       (fun i kind ->
@@ -54,6 +58,8 @@ let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
       (Flambda_arity.unarize arity)
   in
   let has_unsafe_result_type =
+    false
+    &&
     match Code.result_types code with
     | Unknown -> false
     | Bottom -> false
@@ -87,18 +93,18 @@ let prepare_code ~denv acc (code_id : Code_id.t) (code : Code.t) =
       unknown_arity_call_witnesses
     }
   in
-  Graph.add_any_source (Acc.graph acc) (Code_id_or_name.code_id code_id);
+  Acc.add_any_source acc (Code_id_or_name.code_id code_id);
   if has_unsafe_result_type || never_delete
   then (
     List.iter
-      (fun var -> Acc.used ~denv (Simple.var var) acc)
+      (fun var -> Acc.add_any_usage acc (Code_id_or_name.var var))
       ((my_closure :: params) @ (exn :: return));
     List.iter
       (fun param ->
         let param = Code_id_or_name.var param in
-        Graph.add_any_source (Acc.graph acc) param)
+        Acc.add_any_source acc param)
       (my_closure :: params));
-  if never_delete then Acc.used_code_id code_id acc;
+  if never_delete then Acc.add_any_usage acc (Code_id_or_name.code_id code_id);
   Acc.add_code code_id code_dep acc
 
 let record_set_of_closures_deps denv names_and_function_slots set_of_closures
@@ -125,17 +131,17 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
     (fun _function_slot function_slot_name ->
       Value_slot.Map.iter
         (fun value_slot simple ->
-          let name = Acc.simple_to_name acc ~denv simple in
-          Graph.add_constructor_dep (Acc.graph acc)
+          let from = Acc.simple_to_node acc ~denv simple in
+          Acc.add_constructor_dep acc
             ~base:(Code_id_or_name.name function_slot_name)
-            (Value_slot value_slot)
-            ~from:(Code_id_or_name.name name))
+            (Field.value_slot value_slot)
+            ~from)
         (Set_of_closures.value_slots set_of_closures);
       Function_slot.Lmap.iter
         (fun function_slot name ->
-          Graph.add_constructor_dep (Acc.graph acc)
+          Acc.add_constructor_dep acc
             ~base:(Code_id_or_name.name function_slot_name)
-            (Function_slot function_slot)
+            (Field.function_slot function_slot)
             ~from:(Code_id_or_name.name name))
         names_and_function_slots)
     names_and_function_slots
@@ -165,8 +171,7 @@ and traverse_let denv acc let_expr : rev_expr =
     Name_occurrences.fold_names
       ~f:(fun () free_name ->
         default_bp (fun to_ ->
-            Graph.add_use_dep (Acc.graph acc) ~to_
-              ~from:(Code_id_or_name.name free_name)))
+            Acc.add_use_dep acc ~to_ ~from:(Code_id_or_name.name free_name)))
       ~init:()
       (Named.free_names defining_expr)
   in
@@ -180,8 +185,8 @@ and traverse_let denv acc let_expr : rev_expr =
     Acc.alias_kind
       (Name.var (Bound_var.var (Bound_pattern.must_be_singleton bound_pattern)))
       s acc;
-    let name = Code_id_or_name.name (Acc.simple_to_name acc ~denv s) in
-    default_bp (fun to_ -> Graph.add_alias (Acc.graph acc) ~to_ ~from:name)
+    default_bp (fun to_ ->
+        Acc.add_alias acc ~to_ ~from:(Acc.simple_to_node acc ~denv s))
   | Rec_info _ -> default acc);
   let make_set_of_closures set_of_closures =
     let function_decls = Set_of_closures.function_decls set_of_closures in
@@ -251,69 +256,66 @@ and traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     List.iteri
       (fun i field ->
         let kind = Flambda_kind.Block_shape.element_kind block_shape i in
-        let name = Acc.simple_to_name acc ~denv field in
+        let from = Acc.simple_to_node acc ~denv field in
         default_bp (fun base ->
-            Graph.add_constructor_dep (Acc.graph acc) ~base
-              (Block (i, kind))
-              ~from:(Code_id_or_name.name name)))
+            Acc.add_constructor_dep acc ~base (Field.block i kind) ~from))
       fields;
     default_bp (fun base ->
-        Graph.add_constructor_dep (Acc.graph acc) ~base Is_int
+        Acc.add_constructor_dep acc ~base Field.is_int
           ~from:(Code_id_or_name.name denv.all_constants);
-        Graph.add_constructor_dep (Acc.graph acc) ~base Get_tag
+        Acc.add_constructor_dep acc ~base Field.get_tag
           ~from:(Code_id_or_name.name denv.all_constants))
   | Unary (Opaque_identity { middle_end_only = true; _ }, arg)
     when reaper_test_opaque ->
     (* XXX TO REMOVE !!! *)
-    let arg = Code_id_or_name.name (Acc.simple_to_name acc ~denv arg) in
-    default_bp (fun to_ -> Graph.add_alias (Acc.graph acc) ~to_ ~from:arg)
+    let from = Acc.simple_to_node acc ~denv arg in
+    default_bp (fun to_ -> Acc.add_alias acc ~to_ ~from)
   | Unary (Project_function_slot { move_from = _; move_to }, block) ->
-    let block = Code_id_or_name.name (Acc.simple_to_name acc ~denv block) in
+    let block = Acc.simple_to_node acc ~denv block in
     default_bp (fun to_ ->
-        Graph.add_accessor_dep (Acc.graph acc) ~to_ (Function_slot move_to)
-          ~base:block)
+        Acc.add_accessor_dep acc ~to_ (Field.function_slot move_to) ~base:block)
   | Unary (Project_value_slot { project_from = _; value_slot }, block) ->
-    let block = Code_id_or_name.name (Acc.simple_to_name acc ~denv block) in
+    let block = Acc.simple_to_node acc ~denv block in
     default_bp (fun to_ ->
-        Graph.add_accessor_dep (Acc.graph acc) ~to_ (Value_slot value_slot)
-          ~base:block)
+        Acc.add_accessor_dep acc ~to_ (Field.value_slot value_slot) ~base:block)
   | Unary (Block_load { kind; mut; field }, block) -> (
     (* Loads from mutable blocks are also tracked here. This is ok because
        stores automatically escape the block. CR ncourant: think about whether
        we can make stores only escape the corresponding fields of the block
        instead of the whole block. *)
     let kind = Flambda_primitive.Block_access_kind.element_kind_for_load kind in
-    let block = Code_id_or_name.name (Acc.simple_to_name acc ~denv block) in
+    let block = Acc.simple_to_node acc ~denv block in
     default_bp (fun to_ ->
-        Graph.add_accessor_dep (Acc.graph acc) ~to_
-          (Block (Target_ocaml_int.to_int field, kind))
+        Acc.add_accessor_dep acc ~to_
+          (Field.block (Target_ocaml_int.to_int field) kind)
           ~base:block);
     match mut with
     | Immutable | Immutable_unique -> ()
     | Mutable ->
       default_bp (fun to_ ->
-          Graph.add_alias (Acc.graph acc) ~to_
+          Acc.add_alias acc ~to_
             ~from:(Code_id_or_name.name denv.le_monde_exterieur)))
   | Unary (Is_int { variant_only = true }, arg) ->
-    let name = Code_id_or_name.name (Acc.simple_to_name acc ~denv arg) in
+    let name = Acc.simple_to_node acc ~denv arg in
     default_bp (fun to_ ->
-        Graph.add_accessor_dep (Acc.graph acc) ~to_ Is_int ~base:name)
+        Acc.add_accessor_dep acc ~to_ Field.is_int ~base:name)
   | Unary (Get_tag, arg) ->
-    let name = Code_id_or_name.name (Acc.simple_to_name acc ~denv arg) in
+    let name = Acc.simple_to_node acc ~denv arg in
     default_bp (fun to_ ->
-        Graph.add_accessor_dep (Acc.graph acc) ~to_ Get_tag ~base:name)
+        Acc.add_accessor_dep acc ~to_ Field.get_tag ~base:name)
   | prim ->
     let () =
       match Flambda_primitive.effects_and_coeffects prim with
       | Arbitrary_effects, _, _ ->
         let bound_to = Bound_pattern.free_names bound_pattern in
         Name_occurrences.fold_names bound_to
-          ~f:(fun () bound_to -> Acc.used ~denv (Simple.name bound_to) acc)
+          ~f:(fun () bound_to ->
+            Acc.add_cond_any_usage acc ~denv (Simple.name bound_to))
           ~init:()
       | _ -> ()
     in
     default_bp (fun to_ ->
-        Graph.add_use_dep (Acc.graph acc)
+        Acc.add_use_dep acc
           ~from:(Code_id_or_name.name denv.le_monde_exterieur)
           ~to_);
     default acc
@@ -346,7 +348,7 @@ and traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
     | Singleton _ | Set_of_closures _ -> assert false
   in
   Static_const_group.match_against_bound_static group bound_static ~init:()
-    ~code:(fun () -> prepare_code ~denv acc)
+    ~code:(fun () -> prepare_code acc)
     ~deleted_code:(fun _ _ -> ())
     ~set_of_closures:(fun _ ~closure_symbols:_ _ -> ())
     ~block_like:(fun _ _ _ -> ());
@@ -373,25 +375,24 @@ and traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
         List.iteri
           (fun i (field : Simple.With_debuginfo.t) ->
             let kind = block_field_kind i in
-            let field_name =
-              Acc.simple_to_name acc ~denv (Simple.With_debuginfo.simple field)
+            let from =
+              Acc.simple_to_node acc ~denv (Simple.With_debuginfo.simple field)
             in
-            Graph.add_constructor_dep (Acc.graph acc)
+            Acc.add_constructor_dep acc
               ~base:(Code_id_or_name.name name)
-              (Block (i, kind))
-              ~from:(Code_id_or_name.name field_name))
+              (Field.block i kind) ~from)
           fields;
-        Graph.add_constructor_dep (Acc.graph acc)
+        Acc.add_constructor_dep acc
           ~base:(Code_id_or_name.name name)
-          Is_int
+          Field.is_int
           ~from:(Code_id_or_name.name denv.all_constants);
-        Graph.add_constructor_dep (Acc.graph acc)
+        Acc.add_constructor_dep acc
           ~base:(Code_id_or_name.name name)
-          Get_tag
+          Field.get_tag
           ~from:(Code_id_or_name.name denv.all_constants)
       | Set_of_closures _ -> assert false
       | _ ->
-        Graph.add_alias (Acc.graph acc)
+        Acc.add_alias acc
           ~to_:(Code_id_or_name.name name)
           ~from:(Code_id_or_name.name denv.all_constants))
 
@@ -538,37 +539,42 @@ and traverse_apply denv acc apply : rev_expr =
     | [] -> assert false
     | exn_param :: extra_params ->
       List.iter2
-        (fun param (arg, _kind) -> Acc.alias_dep ~denv param arg acc)
+        (fun param (arg, _kind) ->
+          Acc.add_alias acc
+            ~to_:(Code_id_or_name.var param)
+            ~from:(Acc.simple_to_node acc ~denv arg))
         extra_params extra_args;
       exn_param
   in
   let default_acc acc =
     (* CR ncourant: track regions properly *)
-    List.iter (fun arg -> Acc.used ~denv arg acc) (Apply.args apply);
+    List.iter
+      (fun arg -> Acc.add_cond_any_usage acc ~denv arg)
+      (Apply.args apply);
     (match Apply.callee apply with
     | None -> ()
-    | Some callee -> Acc.used ~denv callee acc);
-    Acc.any_source ~denv exn_arg acc;
-    Acc.alias_dep ~denv exn_arg (Simple.name denv.le_monde_exterieur) acc;
-    List.iter (fun param -> Acc.any_source ~denv param acc) return_args;
+    | Some callee -> Acc.add_cond_any_usage acc ~denv callee);
+    Acc.add_cond_any_source acc ~denv exn_arg;
+    List.iter (fun param -> Acc.add_cond_any_source acc ~denv param) return_args;
     match Apply.call_kind apply with
     | Function _ -> ()
-    | Method { obj; kind = _; alloc_mode = _ } -> Acc.used ~denv obj acc
+    | Method { obj; kind = _; alloc_mode = _ } ->
+      Acc.add_cond_any_usage acc ~denv obj
     | C_call _ -> ()
-    | Effect (Perform { eff }) -> Acc.used ~denv eff acc
+    | Effect (Perform { eff }) -> Acc.add_cond_any_usage acc ~denv eff
     | Effect (Reperform { eff; cont; last_fiber }) ->
-      Acc.used ~denv eff acc;
-      Acc.used ~denv cont acc;
-      Acc.used ~denv last_fiber acc
+      Acc.add_cond_any_usage acc ~denv eff;
+      Acc.add_cond_any_usage acc ~denv cont;
+      Acc.add_cond_any_usage acc ~denv last_fiber
     | Effect (Run_stack { stack; f; arg }) ->
-      Acc.used ~denv stack acc;
-      Acc.used ~denv f acc;
-      Acc.used ~denv arg acc
+      Acc.add_cond_any_usage acc ~denv stack;
+      Acc.add_cond_any_usage acc ~denv f;
+      Acc.add_cond_any_usage acc ~denv arg
     | Effect (Resume { stack; f; arg; last_fiber }) ->
-      Acc.used ~denv stack acc;
-      Acc.used ~denv f acc;
-      Acc.used ~denv arg acc;
-      Acc.used ~denv last_fiber acc
+      Acc.add_cond_any_usage acc ~denv stack;
+      Acc.add_cond_any_usage acc ~denv f;
+      Acc.add_cond_any_usage acc ~denv arg;
+      Acc.add_cond_any_usage acc ~denv last_fiber
   in
   traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc;
   let expr = Apply apply in
@@ -590,41 +596,53 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
         ~returns:return_args ~exn:exn_arg
     in
+    let callee = Apply.callee apply in
+    let is_external =
+      not (Compilation_unit.is_current (Code_id.get_compilation_unit code_id))
+    in
     let[@local] add_apply acc =
-      if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
-      then
+      if is_external
+      then default_acc acc
+      else
         let apply_dep =
           { Traverse_acc.function_containing_apply_expr = denv.current_code_id;
             apply_code_id = code_id;
-            apply_closure = Apply.callee apply;
+            apply_closure = callee;
             apply_call_witness = call_widget
           }
         in
         Acc.add_apply apply_dep acc
-      else default_acc acc
     in
-    match Apply.callee apply with
+    match callee with
     | None -> add_apply acc
-    | Some callee -> (
-      (let closure = Acc.simple_to_name acc ~denv callee in
-       Graph.add_accessor_dep (Acc.graph acc) ~to_:call_widget
-         (Code_of_closure Known_arity_code_pointer)
-         ~base:(Code_id_or_name.name closure));
-      match denv.should_preserve_direct_calls with
-      | Yes -> add_apply acc
-      | No -> ()
-      | Auto -> failwith "todo"))
+    | Some callee ->
+      if is_external
+      then
+        (* External call. We always want to escape the closure here, as we will
+           not be able to recover the code_id from the sources of the closure.
+           [default_acc] escapes everything, including the witness of the
+           closure if it was not, in fact, an external call. *)
+        default_acc acc
+      else (
+        (let closure = Acc.simple_to_node acc ~denv callee in
+         Acc.add_accessor_dep acc ~to_:call_widget
+           (Field.code_of_closure Known_arity_code_pointer)
+           ~base:closure);
+        match denv.should_preserve_direct_calls with
+        | Yes -> add_apply acc
+        | No -> ()
+        | Auto -> failwith "todo"))
   | Function { function_call = Indirect_known_arity; _ } ->
     let call_widget =
       Acc.make_known_arity_apply_widget acc ~denv ~params:(Apply.args apply)
         ~returns:return_args ~exn:exn_arg
     in
     let closure =
-      Acc.simple_to_name acc ~denv (Option.get (Apply.callee apply))
+      Acc.simple_to_node acc ~denv (Option.get (Apply.callee apply))
     in
-    Graph.add_accessor_dep (Acc.graph acc) ~to_:call_widget
-      (Code_of_closure Known_arity_code_pointer)
-      ~base:(Code_id_or_name.name closure)
+    Acc.add_accessor_dep acc ~to_:call_widget
+      (Field.code_of_closure Known_arity_code_pointer)
+      ~base:closure
   | Function { function_call = Indirect_unknown_arity; _ } ->
     let call_widget =
       Acc.make_unknown_arity_apply_widget acc ~denv
@@ -632,11 +650,11 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         ~returns:return_args ~exn:exn_arg
     in
     let closure =
-      Acc.simple_to_name acc ~denv (Option.get (Apply.callee apply))
+      Acc.simple_to_node acc ~denv (Option.get (Apply.callee apply))
     in
-    Graph.add_accessor_dep (Acc.graph acc) ~to_:call_widget
-      (Code_of_closure Unknown_arity_code_pointer)
-      ~base:(Code_id_or_name.name closure)
+    Acc.add_accessor_dep acc ~to_:call_widget
+      (Field.code_of_closure Unknown_arity_code_pointer)
+      ~base:closure
   | Method _ | C_call _ | Effect _ -> default_acc acc
 
 and traverse_apply_cont denv acc apply_cont : rev_expr =
@@ -646,7 +664,7 @@ and traverse_apply_cont denv acc apply_cont : rev_expr =
 
 and traverse_switch denv acc switch : rev_expr =
   let expr = Switch switch in
-  Acc.used ~denv (Switch_expr.scrutinee switch) acc;
+  Acc.add_cond_any_usage acc ~denv (Switch_expr.scrutinee switch);
   Target_ocaml_int.Map.iter
     (fun _ apply_cont -> apply_cont_deps denv acc apply_cont)
     (Switch_expr.arms switch);
@@ -695,7 +713,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     | Check _ -> true
   in
   let code_dep = Acc.find_code acc code_id in
-  Graph.add_code_id_my_closure (Acc.graph acc) code_id my_closure;
+  Acc.add_code_id_my_closure acc code_id my_closure;
   let maybe_opaque var = if is_opaque then Variable.rename var else var in
   let return = List.map maybe_opaque code_dep.return in
   let exn = maybe_opaque code_dep.exn in
@@ -744,10 +762,14 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   Acc.kind (Name.var my_depth) Flambda_kind.rec_info acc;
   if is_opaque
   then (
-    List.iter (fun arg -> Acc.used ~denv (Simple.var arg) acc) code_dep.params;
-    List.iter (fun v -> Acc.used ~denv (Simple.var v) acc) (exn :: return);
+    List.iter
+      (fun arg -> Acc.add_cond_any_usage acc ~denv (Simple.var arg))
+      code_dep.params;
+    List.iter
+      (fun v -> Acc.add_cond_any_usage acc ~denv (Simple.var v))
+      (exn :: return);
     let[@inline] any_source v =
-      Graph.add_any_source (Acc.graph acc) (Code_id_or_name.var v)
+      Acc.add_any_source acc (Code_id_or_name.var v)
     in
     List.iter
       (fun param -> any_source (Bound_parameter.var param))
@@ -760,15 +782,15 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   else
     List.iter2
       (fun param arg ->
-        Graph.add_alias (Acc.graph acc)
+        Acc.add_alias acc
           ~to_:(Code_id_or_name.var (Bound_parameter.var param))
           ~from:(Code_id_or_name.var arg))
       (Bound_parameters.to_list params)
       code_dep.params;
   if is_opaque
-  then Acc.used ~denv (Simple.var code_dep.my_closure) acc
+  then Acc.add_cond_any_usage acc ~denv (Simple.var code_dep.my_closure)
   else
-    Graph.add_alias (Acc.graph acc)
+    Acc.add_alias acc
       ~to_:(Code_id_or_name.var my_closure)
       ~from:(Code_id_or_name.var code_dep.my_closure);
   let body = traverse denv acc body in
@@ -801,18 +823,13 @@ let run (unit : Flambda_unit.t) =
       (Compilation_unit.get_current_exn ())
       (Linkage_name.of_string "le_monde_extérieur")
   in
-  (* Graph.add_use_dep (Acc.graph acc) ~to_:(Code_id_or_name.symbol
-     le_monde_exterieur) ~from:(Code_id_or_name.symbol le_monde_exterieur); *)
-  Graph.add_any_source (Acc.graph acc)
-    (Code_id_or_name.symbol le_monde_exterieur);
+  Acc.add_any_source acc (Code_id_or_name.symbol le_monde_exterieur);
   let all_constants =
     Symbol.create
       (Compilation_unit.get_current_exn ())
       (Linkage_name.of_string "all_constants")
   in
-  (* Graph.add_use_dep (Acc.graph acc) ~to_:(Code_id_or_name.symbol
-     all_constants) ~from:(Code_id_or_name.symbol all_constants); *)
-  Graph.add_any_source (Acc.graph acc) (Code_id_or_name.symbol all_constants);
+  Acc.add_any_source acc (Code_id_or_name.symbol all_constants);
   let create_holed () =
     let dummy_toplevel_return =
       Variable.create "dummy_toplevel_return" Flambda_kind.value
@@ -820,8 +837,8 @@ let run (unit : Flambda_unit.t) =
     let dummy_toplevel_exn =
       Variable.create "dummy_toplevel_exn" Flambda_kind.value
     in
-    Acc.root dummy_toplevel_return acc;
-    Acc.root dummy_toplevel_exn acc;
+    Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
+    Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_exn);
     let return_continuation = Flambda_unit.return_continuation unit in
     let exn_continuation = Flambda_unit.exn_continuation unit in
     let conts =

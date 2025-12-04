@@ -119,6 +119,7 @@ end
 module Array_kind = struct
   type t =
     | Immediates
+    | Gc_ignorable_values
     | Values
     | Naked_floats
     | Naked_float32s
@@ -133,6 +134,7 @@ module Array_kind = struct
   let rec print ppf t =
     match t with
     | Immediates -> Format.pp_print_string ppf "Immediates"
+    | Gc_ignorable_values -> Format.pp_print_string ppf "Gc_ignorable_values"
     | Naked_floats -> Format.pp_print_string ppf "Naked_floats"
     | Naked_float32s -> Format.pp_print_string ppf "Naked_float32s"
     | Values -> Format.pp_print_string ppf "Values"
@@ -152,7 +154,7 @@ module Array_kind = struct
   let rec element_kinds t =
     match t with
     | Immediates -> [K.With_subkind.tagged_immediate]
-    | Values -> [K.With_subkind.any_value]
+    | Gc_ignorable_values | Values -> [K.With_subkind.any_value]
     | Naked_floats -> [K.With_subkind.naked_float]
     | Naked_float32s -> [K.With_subkind.naked_float32]
     | Naked_int32s -> [K.With_subkind.naked_int32]
@@ -166,13 +168,34 @@ module Array_kind = struct
   let element_kinds_for_primitive t =
     element_kinds t |> List.map K.With_subkind.kind
 
+  let rec scannability_info t =
+    match t with
+    | Immediates -> false, true
+    | Gc_ignorable_values -> false, true
+    | Values -> true, true
+    | Naked_floats -> false, false
+    | Naked_float32s -> false, false
+    | Naked_int32s -> false, false
+    | Naked_int64s -> false, false
+    | Naked_nativeints -> false, false
+    | Naked_vec128s -> false, false
+    | Naked_vec256s -> false, false
+    | Naked_vec512s -> false, false
+    | Unboxed_product kinds ->
+      let must_any, all_may =
+        List.fold_left
+          (fun (must_any, all_may) kind ->
+            let must, may = scannability_info kind in
+            must_any || must, all_may && may)
+          (false, true) kinds
+      in
+      must_any, all_may
+
   let must_be_gc_scannable t =
-    let kinds = element_kinds t in
-    if not (List.exists K.With_subkind.must_be_gc_scannable kinds)
-    then false
-    else if List.for_all K.With_subkind.may_be_gc_scannable kinds
-    then true
-    else
+    match scannability_info t with
+    | false, _ -> false
+    | true, true -> true
+    | true, false ->
       Misc.fatal_errorf
         "Unboxed product array kind contains both elements that must be \
          scannable and that cannot be scanned:@ %a"
@@ -180,9 +203,9 @@ module Array_kind = struct
 
   let rec width_in_scalars t =
     match t with
-    | Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
-    | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-    | Naked_vec512s ->
+    | Immediates | Gc_ignorable_values | Values | Naked_floats | Naked_float32s
+    | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+    | Naked_vec256s | Naked_vec512s ->
       1
     | Unboxed_product kinds ->
       List.fold_left
@@ -193,6 +216,7 @@ end
 module Array_load_kind = struct
   type t =
     | Immediates
+    | Gc_ignorable_values
     | Values
     | Naked_floats
     | Naked_float32s
@@ -206,6 +230,7 @@ module Array_load_kind = struct
   let print ppf t =
     match t with
     | Immediates -> Format.pp_print_string ppf "Immediates"
+    | Gc_ignorable_values -> Format.pp_print_string ppf "Gc_ignorable_values"
     | Values -> Format.pp_print_string ppf "Values"
     | Naked_floats -> Format.fprintf ppf "Naked_floats"
     | Naked_float32s -> Format.pp_print_string ppf "Naked_float32s"
@@ -221,6 +246,7 @@ module Array_load_kind = struct
   let kind_of_loaded_value t =
     match t with
     | Immediates -> Flambda_kind.With_subkind.tagged_immediate
+    | Gc_ignorable_values -> Flambda_kind.With_subkind.any_value
     | Values -> Flambda_kind.With_subkind.any_value
     | Naked_floats -> Flambda_kind.With_subkind.naked_float
     | Naked_float32s -> Flambda_kind.With_subkind.naked_float32
@@ -235,6 +261,7 @@ end
 module Array_set_kind = struct
   type t =
     | Immediates
+    | Gc_ignorable_values
     | Values of Init_or_assign.t
     | Naked_floats
     | Naked_float32s
@@ -248,6 +275,7 @@ module Array_set_kind = struct
   let print ppf t =
     match t with
     | Immediates -> Format.pp_print_string ppf "Immediates"
+    | Gc_ignorable_values -> Format.pp_print_string ppf "Gc_ignorable_values"
     | Values init_or_assign ->
       Format.fprintf ppf "@[<hov 1>(Values %a)@]" Init_or_assign.print
         init_or_assign
@@ -265,6 +293,7 @@ module Array_set_kind = struct
   let kind_of_new_value t =
     match t with
     | Immediates -> Flambda_kind.With_subkind.tagged_immediate
+    | Gc_ignorable_values -> Flambda_kind.With_subkind.any_value
     | Values _ -> Flambda_kind.With_subkind.any_value
     | Naked_floats -> Flambda_kind.With_subkind.naked_float
     | Naked_float32s -> Flambda_kind.With_subkind.naked_float32
@@ -634,9 +663,9 @@ let reading_from_an_array (array_kind : Array_kind.t)
     (mutable_or_immutable : Mutability.t) =
   let effects : Effects.t =
     match array_kind with
-    | Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
-    | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-    | Naked_vec512s | Unboxed_product _ ->
+    | Immediates | Values | Gc_ignorable_values | Naked_floats | Naked_float32s
+    | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
+    | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
       No_effects
   in
   let coeffects =
@@ -954,51 +983,66 @@ type result_kind =
 type nullary_primitive =
   | Invalid of K.t
   | Optimised_out of K.t
-  | Probe_is_enabled of { name : string }
+  | Probe_is_enabled of
+      { name : string;
+        enabled_at_init : bool option
+      }
   | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
   | Dls_get
+  | Tls_get
   | Poll
   | Cpu_relax
 
 let nullary_primitive_eligible_for_cse = function
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Poll | Cpu_relax ->
     false
 
 let compare_nullary_primitive p1 p2 =
   match p1, p2 with
   | Invalid k1, Invalid k2 -> K.compare k1 k2
   | Optimised_out k1, Optimised_out k2 -> K.compare k1 k2
-  | Probe_is_enabled { name = name1 }, Probe_is_enabled { name = name2 } ->
-    String.compare name1 name2
+  | ( Probe_is_enabled { name = name1; enabled_at_init = enabled_at_init1 },
+      Probe_is_enabled { name = name2; enabled_at_init = enabled_at_init2 } ) ->
+    let c = String.compare name1 name2 in
+    if c <> 0
+    then c
+    else Option.compare Bool.compare enabled_at_init1 enabled_at_init2
   | Enter_inlined_apply { dbg = dbg1 }, Enter_inlined_apply { dbg = dbg2 } ->
     Inlined_debuginfo.compare dbg1 dbg2
   | Dls_get, Dls_get -> 0
+  | Tls_get, Tls_get -> 0
   | Poll, Poll -> 0
   | Cpu_relax, Cpu_relax -> 0
   | ( Invalid _,
       ( Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _ | Dls_get
-      | Poll | Cpu_relax ) ) ->
+      | Tls_get | Poll | Cpu_relax ) ) ->
     -1
   | ( Optimised_out _,
-      (Probe_is_enabled _ | Enter_inlined_apply _ | Dls_get | Poll | Cpu_relax)
-    ) ->
+      ( Probe_is_enabled _ | Enter_inlined_apply _ | Dls_get | Tls_get | Poll
+      | Cpu_relax ) ) ->
     -1
   | Optimised_out _, Invalid _ -> 1
-  | Probe_is_enabled _, (Enter_inlined_apply _ | Dls_get | Poll | Cpu_relax) ->
+  | ( Probe_is_enabled _,
+      (Enter_inlined_apply _ | Dls_get | Tls_get | Poll | Cpu_relax) ) ->
     -1
   | Probe_is_enabled _, (Invalid _ | Optimised_out _) -> 1
   | Enter_inlined_apply _, (Invalid _ | Optimised_out _ | Probe_is_enabled _) ->
     1
-  | Enter_inlined_apply _, (Dls_get | Poll | Cpu_relax) -> -1
+  | Enter_inlined_apply _, (Dls_get | Tls_get | Poll | Cpu_relax) -> -1
   | ( Dls_get,
       (Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _)
     ) ->
     1
-  | Dls_get, (Poll | Cpu_relax) -> -1
+  | Dls_get, (Tls_get | Poll | Cpu_relax) -> -1
+  | ( Tls_get,
+      ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
+      | Dls_get ) ) ->
+    1
+  | Tls_get, (Poll | Cpu_relax) -> -1
   | ( (Poll | Cpu_relax),
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Cpu_relax ) ) ->
+      | Dls_get | Tls_get | Cpu_relax ) ) ->
     1
   | Cpu_relax, Poll -> -1
 
@@ -1012,12 +1056,16 @@ let print_nullary_primitive ppf p =
   | Optimised_out _ ->
     Format.fprintf ppf "%tOptimised_out%t" Flambda_colours.elide
       Flambda_colours.pop
-  | Probe_is_enabled { name } ->
-    Format.fprintf ppf "@[<hov 1>(Probe_is_enabled@ %s)@]" name
+  | Probe_is_enabled { name; enabled_at_init } ->
+    Format.fprintf ppf "@[<hov 1>(Probe_is_enabled@ %s%s)@]" name
+      (match enabled_at_init with
+      | None | Some false -> ""
+      | Some true -> " enabled_at_init")
   | Enter_inlined_apply { dbg } ->
     Format.fprintf ppf "@[<hov 1>(Enter_inlined_apply@ %a)@]"
       Inlined_debuginfo.print dbg
   | Dls_get -> Format.pp_print_string ppf "Dls_get"
+  | Tls_get -> Format.pp_print_string ppf "Tls_get"
   | Poll -> Format.pp_print_string ppf "Poll"
   | Cpu_relax -> Format.pp_print_string ppf "Cpu_relax"
 
@@ -1027,7 +1075,7 @@ let result_kind_of_nullary_primitive p : result_kind =
   | Optimised_out k -> Singleton k
   | Probe_is_enabled _ -> Singleton K.naked_immediate
   | Enter_inlined_apply _ -> Unit
-  | Dls_get -> Singleton K.value
+  | Dls_get | Tls_get -> Singleton K.value
   | Poll | Cpu_relax -> Unit
 
 let coeffects_of_mode : Alloc_mode.For_allocations.t -> Coeffects.t = function
@@ -1046,13 +1094,13 @@ let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
     (* This doesn't really have effects, but without effects, these primitives
        get deleted during lambda_to_flambda. *)
     Arbitrary_effects, Has_coeffects, Strict
-  | Dls_get -> No_effects, Has_coeffects, Strict
+  | Dls_get | Tls_get -> No_effects, Has_coeffects, Strict
   | Poll | Cpu_relax -> Arbitrary_effects, Has_coeffects, Strict
 
 let nullary_classify_for_printing p =
   match p with
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Poll | Cpu_relax ->
     Neither
 
 module Reinterpret_64_bit_word = struct
@@ -2502,7 +2550,7 @@ let free_names t =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Poll | Cpu_relax ) ->
+      | Dls_get | Tls_get | Poll | Cpu_relax ) ->
     Name_occurrences.empty
   | Unary (prim, x0) ->
     Name_occurrences.union
@@ -2536,7 +2584,7 @@ let apply_renaming t renaming =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Poll | Cpu_relax ) ->
+      | Dls_get | Tls_get | Poll | Cpu_relax ) ->
     t
   | Unary (prim, x0) ->
     let prim' = apply_renaming_unary_primitive prim renaming in
@@ -2575,7 +2623,7 @@ let ids_for_export t =
   match t with
   | Nullary
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Poll | Cpu_relax ) ->
+      | Dls_get | Tls_get | Poll | Cpu_relax ) ->
     Ids_for_export.empty
   | Unary (prim, x0) ->
     Ids_for_export.union

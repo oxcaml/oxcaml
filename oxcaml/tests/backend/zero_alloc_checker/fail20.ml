@@ -15,7 +15,7 @@ let[@zero_alloc strict] foo1 x =
   else nor x
 
 let[@zero_alloc] [@inline never] [@local never] foo x =
-  let[@inline never] [@local never] bar x y = Sys.opaque_identity (x + y), x in
+  let[@opaque] bar x y = Sys.opaque_identity (x + y), x in
   fst (bar x (x * x))
 
 let[@zero_alloc] zee x f = foo (Sys.opaque_identity x + 1)

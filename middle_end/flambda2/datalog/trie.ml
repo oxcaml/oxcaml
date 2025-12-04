@@ -110,6 +110,26 @@ let rec union :
         if is_empty w' s then None else Some s)
       t1 t2
 
+let rec iter :
+    type t k v.
+    (t, k, v) is_trie -> (k Constant.hlist -> v -> unit) -> t -> unit =
+ fun is_trie f t ->
+  match is_trie with
+  | Map_is_trie -> Int.Map.iter (fun k v -> f [k] v) t
+  | Nested_trie is_trie' ->
+    Int.Map.iter (fun k t' -> iter is_trie' (fun ks v -> f (k :: ks) v) t') t
+
+let rec fold :
+    type t k v.
+    (t, k, v) is_trie -> (k Constant.hlist -> v -> 'a -> 'a) -> t -> 'a -> 'a =
+ fun is_trie f t acc ->
+  match is_trie with
+  | Map_is_trie -> Int.Map.fold (fun k v acc -> f [k] v acc) t acc
+  | Nested_trie is_trie' ->
+    Int.Map.fold
+      (fun k t' acc -> fold is_trie' (fun ks v acc -> f (k :: ks) v acc) t' acc)
+      t acc
+
 module Iterator = struct
   include Leapfrog.Map (Int)
 

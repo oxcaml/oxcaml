@@ -520,14 +520,19 @@ let destroyed_by_simd_instr (instr : Simd.instr) =
   | Vzeroall -> all_simd_regs
   | _ ->
     match instr.res with
-    | First_arg -> [||]
-    | Res { loc; _ } ->
-      match Simd.loc_is_pinned loc with
-      | Some RAX -> [|rax|]
-      | Some RCX -> [|rcx|]
-      | Some RDX -> [|rdx|]
-      | Some XMM0 -> destroy_xmm 0
-      | None -> [||]
+    | Res_none | First_arg -> [||]
+    | Res rr ->
+      Array.fold_left (fun acc ({loc; _} : Simd.arg) ->
+        match Simd.loc_is_pinned loc with
+        | Some RAX -> rax :: acc
+        | Some RDI -> rdi :: acc
+        | Some RCX -> rcx :: acc
+        | Some RDX -> rdx :: acc
+        | Some XMM0 ->
+          let xmm0 = Array.to_list (destroy_xmm 0) in
+          xmm0 @ acc
+        | None -> acc) [] rr
+      |> Array.of_list
 
 let destroyed_by_simd_op (op : Simd.operation) =
   match op.instr with
@@ -544,8 +549,7 @@ let destroyed_by_simd_op (op : Simd.operation) =
 
 let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with
-  | Add_f32 | Sub_f32 | Mul_f32 | Div_f32
-  | Add_f64 | Sub_f64 | Mul_f64 | Div_f64 -> [||]
+  | Load op | Store op -> destroyed_by_simd_op op
 
 let destroyed_at_raise = all_phys_regs
 
@@ -605,9 +609,11 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
        | Stackoffset _
        | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr
-               | Iasr | Ipopcnt | Iclz _ | Ictz _)
-       | Intop_imm ((Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor
-                    | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _),_)
+               | Iasr | Ipopcnt | Iclz _ | Ictz _
+               )
+       | Int128op (Iadd128 | Isub128 | Imul64 _)
+       | Intop_imm ((Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl
+                    | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ ),_)
        | Floatop _
        | Csel _
        | Reinterpret_cast _
@@ -619,7 +625,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
                   | Isextend32 | Izextend32
                   | Ilfence | Isfence | Imfence)
-       | Name_for_debugger _ | Dls_get | Pause)
+       | Name_for_debugger _ | Dls_get | Tls_get | Pause)
   | Poptrap _ | Prologue | Epilogue ->
     if fp then [| rbp |] else [||]
   | Stack_check _ ->
@@ -748,6 +754,7 @@ let operation_supported = function
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+  | Caddi128 | Csubi128 | Cmuli64 _
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
   | Ccsel _
   | Cbswap _
@@ -759,6 +766,7 @@ let operation_supported = function
   | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion | Cendregion
   | Ctuple_field _
   | Cdls_get
+  | Ctls_get
   | Cpoll
   | Cpause
   | Creinterpret_cast (Int_of_value | Value_of_int |

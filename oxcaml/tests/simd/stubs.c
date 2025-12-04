@@ -300,6 +300,11 @@ simd_int64x2_t vectors_and_floats_and_ints(
 
 #define BUILTIN(name) void name() { assert(0); }
 
+BUILTIN(caml_int128_add);
+BUILTIN(caml_int128_sub);
+BUILTIN(caml_int64_mul128);
+BUILTIN(caml_unsigned_int64_mul128);
+
 BUILTIN(caml_vec128_unreachable);
 BUILTIN(caml_vec128_cast);
 BUILTIN(caml_float32x4_low_of_float32);
@@ -322,13 +327,13 @@ BUILTIN(caml_int32x4_low_to_int32);
 BUILTIN(caml_int32x4_const1);
 BUILTIN(caml_int32x4_const4);
 
-BUILTIN(caml_int16x8_low_of_int);
-BUILTIN(caml_int16x8_low_to_int);
+BUILTIN(caml_int16x8_low_of_int16);
+BUILTIN(caml_int16x8_low_to_int16);
 BUILTIN(caml_int16x8_const1);
 BUILTIN(caml_int16x8_const8);
 
-BUILTIN(caml_int8x16_low_of_int);
-BUILTIN(caml_int8x16_low_to_int);
+BUILTIN(caml_int8x16_low_of_int8);
+BUILTIN(caml_int8x16_low_to_int8);
 BUILTIN(caml_int8x16_const1);
 BUILTIN(caml_int8x16_const16);
 

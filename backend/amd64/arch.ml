@@ -20,6 +20,7 @@ module Extension = struct
   module T = struct
     type t =
       | POPCNT
+      | LZCNT
       | PREFETCHW
       | PREFETCHWT1
       | SSE3
@@ -31,22 +32,27 @@ module Extension = struct
       | BMI2
       | AVX
       | AVX2
+      | F16C
+      | FMA
       | AVX512F
 
     let rank = function
       | POPCNT -> 0
-      | PREFETCHW -> 1
-      | PREFETCHWT1 -> 2
-      | SSE3 -> 3
-      | SSSE3 -> 4
-      | SSE4_1 -> 5
-      | SSE4_2 -> 6
-      | CLMUL -> 7
-      | BMI -> 8
-      | BMI2 -> 9
-      | AVX -> 10
-      | AVX2 -> 11
-      | AVX512F -> 12
+      | LZCNT -> 1
+      | PREFETCHW -> 2
+      | PREFETCHWT1 -> 3
+      | SSE3 -> 4
+      | SSSE3 -> 5
+      | SSE4_1 -> 6
+      | SSE4_2 -> 7
+      | CLMUL -> 8
+      | BMI -> 9
+      | BMI2 -> 10
+      | AVX -> 11
+      | AVX2 -> 12
+      | F16C -> 13
+      | FMA -> 14
+      | AVX512F -> 15
 
     let compare left right = Int.compare (rank left) (rank right)
   end
@@ -56,6 +62,7 @@ module Extension = struct
 
   let name = function
     | POPCNT -> "POPCNT"
+    | LZCNT -> "LZCNT"
     | PREFETCHW -> "PREFETCHW"
     | PREFETCHWT1 -> "PREFETCHWT1"
     | SSE3 -> "SSE3"
@@ -67,10 +74,13 @@ module Extension = struct
     | BMI2 -> "BMI2"
     | AVX -> "AVX"
     | AVX2 -> "AVX2"
+    | F16C -> "F16C"
+    | FMA -> "FMA"
     | AVX512F -> "AVX512F"
 
   let generation = function
     | POPCNT -> "Nehalem+"
+    | LZCNT -> "Haswell+"
     | PREFETCHW -> "Broadwell+"
     | PREFETCHWT1 -> "Xeon Phi"
     | SSE3 -> "Prescott+"
@@ -82,6 +92,8 @@ module Extension = struct
     | BMI2 -> "Haswell+"
     | AVX -> "Sandybridge+"
     | AVX2 -> "Haswell+"
+    | F16C -> "Ivybridge+"
+    | FMA -> "Haswell+"
     | AVX512F -> "SkylakeXeon+"
 
   let enabled_by_default = function
@@ -89,6 +101,7 @@ module Extension = struct
        was configured on a CPU without support. Note SSE/SSE2 cannot be
        disabled as they are included in baseline x86_64. *)
     | POPCNT -> Config.has_popcnt
+    | LZCNT -> Config.has_lzcnt
     | CLMUL -> Config.has_pclmul
     | SSE3 -> Config.has_sse3
     | SSSE3 -> Config.has_ssse3
@@ -98,12 +111,14 @@ module Extension = struct
     | BMI2 -> Config.has_bmi2
     | AVX -> Config.has_avx
     | AVX2 -> Config.has_avx2
+    | F16C -> Config.has_f16c
+    | FMA -> Config.has_fma
     | PREFETCHW | PREFETCHWT1 | AVX512F -> false
 
   let all =
     Set.of_list
-      [ POPCNT; PREFETCHW; PREFETCHWT1; SSE3; SSSE3; SSE4_1; SSE4_2; CLMUL;
-        BMI; BMI2; AVX; AVX2; AVX512F ]
+      [ POPCNT; LZCNT; PREFETCHW; PREFETCHWT1; SSE3; SSSE3; SSE4_1; SSE4_2;
+        CLMUL; BMI; BMI2; AVX; AVX2; F16C; FMA; AVX512F ]
 
   let directly_implied_by e1 e2 =
     match e1, e2 with
@@ -114,8 +129,9 @@ module Extension = struct
     | AVX, AVX2
     | AVX2, AVX512F
     | BMI, BMI2 -> true
-    | (POPCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1
-      | SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | AVX512F), _ -> false
+    | (POPCNT | LZCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1 |
+       SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F), _
+       -> false
 
   let rec fix set less =
     let closure =
@@ -166,10 +182,15 @@ module Extension = struct
       | SSSE3 -> enabled SSSE3
       | SSE4_1 -> enabled SSE4_1
       | SSE4_2 -> enabled SSE4_2
+      | POPCNT -> enabled POPCNT
+      | LZCNT -> enabled LZCNT
       | PCLMULQDQ -> enabled CLMUL
+      | BMI -> enabled BMI
       | BMI2 -> enabled BMI2
       | AVX -> enabled AVX
       | AVX2 -> enabled AVX2
+      | F16C -> enabled F16C
+      | FMA -> enabled FMA
     in
     Array.for_all enabled instr.ext
 end
@@ -404,7 +425,9 @@ let print_specific_operation printreg op ppf arg =
   | Isimd simd ->
       Simd.print_operation printreg simd ppf arg
   | Isimd_mem (simd, addr) ->
-      Simd.Mem.print_operation printreg (print_addressing printreg addr) simd ppf arg
+      Simd.Mem.print_operation printreg
+        (print_addressing printreg addr) (num_args_addressing addr)
+        simd ppf arg
   | Icldemote _ ->
       fprintf ppf "cldemote %a" printreg arg.(0)
   | Iprefetch { is_write; locality; _ } ->

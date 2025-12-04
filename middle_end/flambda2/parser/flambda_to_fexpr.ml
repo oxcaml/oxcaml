@@ -548,7 +548,7 @@ let init_or_assign env (ia : Flambda_primitive.Init_or_assign.t) :
 let nullop _env (op : Flambda_primitive.nullary_primitive) : _ =
   match op with
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-  | Dls_get | Poll | Cpu_relax ->
+  | Dls_get | Tls_get | Poll | Cpu_relax ->
     Misc.fatal_errorf "TODO: Nullary primitive: %a" Flambda_primitive.print
       (Flambda_primitive.Nullary op)
 
@@ -637,6 +637,7 @@ let binop env (op : Flambda_primitive.binary_primitive) : Fexpr.binop =
 let fexpr_of_array_kind : Flambda_primitive.Array_kind.t -> Fexpr.array_kind =
   function
   | Immediates -> Immediates
+  | Gc_ignorable_values -> Gc_ignorable_values
   | Naked_floats -> Naked_floats
   | Values -> Values
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
@@ -649,6 +650,7 @@ let fexpr_of_array_set_kind env
     =
   match array_set_kind with
   | Immediates -> Immediates
+  | Gc_ignorable_values -> Gc_ignorable_values
   | Naked_floats -> Naked_floats
   | Values ia -> Values (init_or_assign env ia)
   | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints

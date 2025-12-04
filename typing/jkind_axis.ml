@@ -30,8 +30,6 @@ module Externality = struct
 
   let min = External
 
-  let legacy = Internal
-
   let equal e1 e2 =
     match e1, e2 with
     | External, External -> true
@@ -88,8 +86,6 @@ module Nullability = struct
 
   let min = Non_null
 
-  let legacy = Non_null
-
   let equal n1 n2 =
     match n1, n2 with
     | Non_null, Non_null -> true
@@ -129,8 +125,6 @@ module Separability = struct
   let max = Maybe_separable
 
   let min = Non_float
-
-  let legacy = Separable
 
   let equal s1 s2 =
     match s1, s2 with
@@ -198,6 +192,8 @@ module Axis = struct
       Pack (Modal (Comonadic Yielding));
       Pack (Modal (Comonadic Statefulness));
       Pack (Modal (Monadic Visibility));
+      Pack (Modal (Monadic Staticity));
+      (* CR-soon zqian: call [Mode.Crossing.Axis.all] for modal axes *)
       Pack (Nonmodal Externality);
       Pack (Nonmodal Nullability);
       Pack (Nonmodal Separability) ]
@@ -322,9 +318,11 @@ module Axis_set = struct
     | Modal (Comonadic Yielding) -> 6
     | Modal (Comonadic Statefulness) -> 7
     | Modal (Monadic Visibility) -> 8
-    | Nonmodal Externality -> 9
-    | Nonmodal Nullability -> 10
-    | Nonmodal Separability -> 11
+    | Modal (Monadic Staticity) -> 9
+    (* CR-soon zqian: call [Mode.Crossing.Axis.index] for modal axes *)
+    | Nonmodal Externality -> 10
+    | Nonmodal Nullability -> 11
+    | Nonmodal Separability -> 12
 
   let[@inline] axis_mask ax = 1 lsl axis_index ax
 
@@ -353,6 +351,7 @@ module Axis_set = struct
     |> set_axis (Modal (Comonadic Yielding))
     |> set_axis (Modal (Comonadic Statefulness))
     |> set_axis (Modal (Monadic Visibility))
+    |> set_axis (Modal (Monadic Staticity))
     |> set_axis (Nonmodal Externality)
     |> set_axis (Nonmodal Nullability)
     |> set_axis (Nonmodal Separability)

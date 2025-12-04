@@ -708,7 +708,7 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       ( Mutable,
         Lprim (Pmakearray (Pgenarray, Immutable, Lambda.alloc_heap), [], loc) )
     (* Case 2: Fixed size, known array kind *)
-    | Fixed_size, (Pintarray | Paddrarray) ->
+    | Fixed_size, (Pintarray | Paddrarray | Pgcignorableaddrarray) ->
       Immutable StrictOpt, make_vect ~loc ~length:array_size.var ~init:(int 0)
     | Fixed_size, (Pfloatarray | Punboxedfloatarray Unboxed_float64) ->
       (* The representations of these two are the same, it's only
@@ -729,7 +729,7 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
     | Fixed_size, Punboxedvectorarray Unboxed_vec512 ->
       Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
     (* Case 3: Unknown size, known array kind *)
-    | Dynamic_size, (Pintarray | Paddrarray) ->
+    | Dynamic_size, (Pintarray | Paddrarray | Pgcignorableaddrarray) ->
       Mutable, Resizable_array.make ~loc array_kind (int 0)
     | Dynamic_size, Pfloatarray ->
       Mutable, Resizable_array.make ~loc array_kind (float 0.)
@@ -844,7 +844,7 @@ let body ~loc ~array_kind ~array_size ~array_sizing ~array ~index ~body =
              Lassign (array.id, make_array),
              set_element_in_bounds elt.var,
              layout_unit ))
-    | Pintarray | Paddrarray | Pfloatarray
+    | Pintarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
     | Punboxedfloatarray (Unboxed_float64 | Unboxed_float32)
     | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ ->
       set_element_in_bounds body
@@ -857,7 +857,8 @@ let body ~loc ~array_kind ~array_size ~array_sizing ~array ~index ~body =
 let comprehension ~transl_exp ~scopes ~loc ~(array_kind : Lambda.array_kind)
     { comp_body; comp_clauses } =
   (match array_kind with
-  | Pgenarray | Paddrarray | Pintarray | Pfloatarray -> ()
+  | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray ->
+    ()
   | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
     ->
     if not !Clflags.native_code

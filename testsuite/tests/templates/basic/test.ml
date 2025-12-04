@@ -1,5 +1,6 @@
 (* TEST
  readonly_files = "\
+   bad_alias_of_param.ml bad_alias_of_param.reference \
    bad_arg_impl.ml bad_arg_impl.reference \
    bad_arg_intf.mli bad_arg_intf.reference \
    bad_instance_arg_name_not_found.ml \
@@ -72,6 +73,15 @@
      ocamlc.byte;
 
      compiler_reference = "bad_ref_direct.reference";
+     check-ocamlc.byte-output;
+   }{
+     flags = "-parameter Monoid";
+     module = "bad_alias_of_param.ml";
+     compiler_output = "bad_alias_of_param.output";
+     ocamlc_byte_exit_status = "2";
+     ocamlc.byte;
+
+     compiler_reference = "bad_alias_of_param.reference";
      check-ocamlc.byte-output;
    }{
      flags = "-parameter Monoid -as-parameter";
@@ -613,6 +623,15 @@
      ocamlopt.byte;
 
      compiler_reference = "bad_ref_direct.reference";
+     check-ocamlopt.byte-output;
+   }{
+     flags = "-parameter Monoid";
+     module = "bad_alias_of_param.ml";
+     compiler_output = "bad_alias_of_param.output";
+     ocamlopt_byte_exit_status = "2";
+     ocamlopt.byte;
+
+     compiler_reference = "bad_alias_of_param.reference";
      check-ocamlopt.byte-output;
    }{
      flags = "-parameter Monoid -as-parameter";

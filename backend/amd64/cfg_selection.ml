@@ -168,6 +168,9 @@ let pseudoregs_for_operation op arg res =
      rcx. *)
   | Intop Idiv -> [| rax; rcx |], [| rax |]
   | Intop Imod -> [| rax; rcx |], [| rdx |]
+  | Int128op (Iadd128 | Isub128) ->
+    [| res.(0); res.(1); arg.(2); arg.(3) |], res
+  | Int128op (Imul64 _) -> [| rax; arg.(1) |], [| rax; rdx |]
   | Floatop (Float64, Icompf cond) ->
     (* We need to temporarily store the result of the comparison in a float
        register, but we don't want to clobber any of the inputs if they would
@@ -196,10 +199,8 @@ let pseudoregs_for_operation op arg res =
        and rax and rdx clobbered *)
     [| rcx |], res
   | Specific (Isimd op) -> Simd_selection.pseudoregs_for_operation op arg res
-  | Specific (Isimd_mem (op, _addr)) -> (
-    match Simd_selection.pseudoregs_for_mem_operation op arg res with
-    | None -> raise Use_default_exn
-    | Some (arg, res) -> arg, res)
+  | Specific (Isimd_mem (op, _addr)) ->
+    Simd_selection.pseudoregs_for_mem_operation op arg res
   | Csel _ ->
     (* last arg must be the same as res.(0) *)
     let len = Array.length arg in
@@ -221,7 +222,7 @@ let pseudoregs_for_operation op arg res =
   | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
-  | Begin_region | End_region | Poll | Dls_get ->
+  | Begin_region | End_region | Poll | Dls_get | Tls_get ->
     raise Use_default_exn
   | Specific (Illvm_intrinsic intr) ->
     Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"

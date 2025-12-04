@@ -924,8 +924,11 @@ let full_match closing env =  match env with
           (fun (tag,f) ->
             row_field_repr f = Rabsent || List.mem tag fields)
           (row_fields row)
-  | Constant Const_char _ ->
-      List.length env = 256
+  | Constant (Const_char _ | Const_untagged_char _
+            | Const_int8 _ | Const_untagged_int8 _) ->
+      List.length env = 0x1_00
+  | Constant (Const_int16 _ | Const_untagged_int16 _) ->
+      List.length env = 0x1_00_00
   | Constant _
   | Array _ -> false
   | Tuple _
@@ -1061,6 +1064,19 @@ let build_other_constant proj make first next p env =
     else make_pat (make i) p.pat_type p.pat_env
   in try_const first
 
+let build_exhaustable_constant ~to_int ~proj ~make ranges d env =
+  let all = List.map (fun (p, _) -> proj p.pat_desc) env in
+  let rec find_other i imax =
+    if i > imax then None
+    else
+      if List.mem i all then
+        find_other (i+1) imax
+      else
+        Some (make_pat (Tpat_constant (make i)) d.pat_type d.pat_env)
+  in
+  List.find_map (fun (c1, c2) -> find_other (to_int c1) (to_int c2)) ranges
+  |> Option.value ~default:Patterns.omega
+
 (*
   Builds a pattern that is incompatible with all patterns in
   the first column of env
@@ -1135,39 +1151,57 @@ let build_other ext env =
                   pat other_pats
             end
       | Constant Const_char _ ->
-          let all_chars =
-            List.map
-              (fun (p,_) -> match p.pat_desc with
-              | Constant (Const_char c) -> c
-              | _ -> assert false)
-              env
-          in
-          let rec find_other i imax =
-            if i > imax then raise Not_found
-            else
-              let ci = Char.chr i in
-              if List.mem ci all_chars then
-                find_other (i+1) imax
-              else
-                make_pat (Tpat_constant (Const_char ci))
-                  d.pat_type d.pat_env
-          in
-          let rec try_chars = function
-            | [] -> Patterns.omega
-            | (c1,c2) :: rest ->
-                try
-                  find_other (Char.code c1) (Char.code c2)
-                with
-                | Not_found -> try_chars rest
-          in
-          try_chars
+          build_exhaustable_constant
+            ~to_int:Char.code
+            ~proj:(function Constant(Const_char c) -> Char.code c
+                          | _ -> assert false)
+            ~make:(fun i -> Const_char (Char.chr i))
             [ 'a', 'z' ; 'A', 'Z' ; '0', '9' ;
-              ' ', '~' ; Char.chr 0 , Char.chr 255]
+              ' ', '~' ; Char.chr 0 , Char.chr 255] d env
+      | Constant Const_untagged_char _ ->
+          build_exhaustable_constant
+            ~to_int:Char.code
+            ~proj:(function Constant(Const_untagged_char c) -> Char.code c
+                          | _ -> assert false)
+            ~make:(fun i -> Const_untagged_char (Char.chr i))
+            [ 'a', 'z' ; 'A', 'Z' ; '0', '9' ;
+              ' ', '~' ; Char.chr 0 , Char.chr 255] d env
       | Constant Const_int _ ->
           build_other_constant
             (function Constant(Const_int i) -> i | _ -> assert false)
             (function i -> Tpat_constant(Const_int i))
             0 succ d env
+      | Constant Const_untagged_int _ ->
+          build_other_constant
+            (function Constant(Const_untagged_int i) -> i | _ -> assert false)
+            (function i -> Tpat_constant(Const_untagged_int i))
+            0 succ d env
+      | Constant Const_int8 _ ->
+          build_exhaustable_constant
+            ~to_int:Fun.id
+            ~proj:(function Constant(Const_int8 i) -> i | _ -> assert false)
+            ~make:(fun i -> Const_int8 i)
+            [0, 0x7f; -0x80, -1] d env
+      | Constant Const_untagged_int8 _ ->
+          build_exhaustable_constant
+            ~to_int:Fun.id
+            ~proj:(function Constant(Const_untagged_int8 i) -> i
+                          | _ -> assert false)
+            ~make:(fun i -> Const_untagged_int8 i)
+            [0, 0x7f; -0x80, -1] d env
+      | Constant Const_int16 _ ->
+          build_exhaustable_constant
+            ~to_int:Fun.id
+            ~proj:(function Constant(Const_int16 i) -> i | _ -> assert false)
+            ~make:(fun i -> Const_int16 i)
+            [0, 0x7f_ff; -0x80_00, -1] d env
+      | Constant Const_untagged_int16 _ ->
+          build_exhaustable_constant
+            ~to_int:Fun.id
+            ~proj:(function Constant(Const_untagged_int16 i) -> i
+                          | _ -> assert false)
+            ~make:(fun i -> Const_untagged_int16 i)
+            [0, 0x7f_ff; -0x80_00, -1] d env
       | Constant Const_int32 _ ->
           build_other_constant
             (function Constant(Const_int32 i) -> i | _ -> assert false)

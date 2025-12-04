@@ -228,6 +228,8 @@ module Identifier : sig
 
     val out_of_memory : t
 
+    val out_of_fibers : t
+
     val invalid_argument : t
 
     val failure : t
@@ -652,9 +654,13 @@ and Code : sig
 
     type t
 
+    val to_exp : t -> Exp.t
+
     val close : exp -> t
 
     val open_ : t -> exp
+
+    val print : Format.formatter -> t -> unit
   end
 
   val print : Format.formatter -> t -> unit

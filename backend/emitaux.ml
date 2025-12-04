@@ -405,10 +405,6 @@ let emit_debug_info_gen ?discriminator dbg file_emitter loc_emitter =
         let file_num = get_file_num ~file_emitter file_name in
         loc_emitter ~file_num ~line ~col ?discriminator ()
 
-let reset () =
-  reset_debug_info ();
-  frame_descriptors := []
-
 let binary_backend_available = ref false
 
 let reduce_heap_size ~reset =
@@ -532,11 +528,11 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
     | Lprologue | Lepilogue_open | Lepilogue_close
     | Lop
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _
+        | Tls_get | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
         | Load _
         | Store (_, _, _)
-        | Intop _
+        | Intop _ | Int128op _
         | Intop_imm (_, _)
         | Intop_atomic _
         | Floatop (_, _)
@@ -579,3 +575,51 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
       in
       { fundecl with fun_body }
     else fundecl
+
+let stapsdt_base_emitted = ref false
+
+let emit_stapsdt_base_section () =
+  let module D = Asm_targets.Asm_directives in
+  let module S = Asm_targets.Asm_symbol in
+  if not !stapsdt_base_emitted
+  then (
+    stapsdt_base_emitted := true;
+    D.switch_to_section Stapsdt_base;
+    (* Note that the Stapsdt symbols do not follow the usual symbol encoding
+       convention. Hence, in this rare case, we create the symbol as a raw
+       symbol for which no subsequent encoding will be done.*)
+    let stapsdt_sym = S.Predef.stapsdt_base in
+    if not (Target_system.is_macos ())
+    then (
+      D.weak stapsdt_sym;
+      D.hidden stapsdt_sym);
+    D.define_symbol_label ~section:Stapsdt_base stapsdt_sym;
+    D.space ~bytes:1;
+    D.size_const stapsdt_sym
+      1L (* 1 byte; alternative would be . - _.stapsdt.base *))
+
+let emit_elf_note ~section ~owner ~typ ~emit_desc =
+  let module D = Asm_targets.Asm_directives in
+  let module L = Asm_targets.Asm_label in
+  let bytes = if Target_system.is_macos () then 8 else 4 in
+  D.align ~fill_x86_bin_emitter:Zero ~bytes;
+  let a = L.create section in
+  let b = L.create section in
+  let c = L.create section in
+  let d = L.create section in
+  D.between_labels_32_bit ~upper:b ~lower:a ();
+  D.between_labels_32_bit ~upper:d ~lower:c ();
+  D.int32 typ;
+  D.define_label a;
+  D.string (owner ^ "\000");
+  D.define_label b;
+  D.align ~fill_x86_bin_emitter:Zero ~bytes;
+  D.define_label c;
+  emit_desc ();
+  D.define_label d;
+  D.align ~fill_x86_bin_emitter:Zero ~bytes
+
+let reset () =
+  reset_debug_info ();
+  frame_descriptors := [];
+  stapsdt_base_emitted := false

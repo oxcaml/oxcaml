@@ -65,6 +65,11 @@
           "aarch64-linux"
           "aarch64-darwin"
         ] self.checks;
+        platforms = {
+          "x86_64-linux" = "warp-ubuntu-latest-x64-8x";
+          "aarch64-linux" = "warp-ubuntu-latest-arm64-8x";
+          "aarch64-darwin" = "warp-macos-15-arm64-6x";
+        };
       };
     };
 }

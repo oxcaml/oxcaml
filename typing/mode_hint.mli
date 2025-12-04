@@ -1,26 +1,5 @@
 open Allowance
 
-type mutable_part =
-  | Record_field of string
-  | Array_elements
-
-(** Hint for a constant bound. See [Mode.Report.print_const] for what each non-trivial constructor means. *)
-type 'd const =
-  | Unknown : ('l * 'r) const  (** The constant bound is not explained. *)
-  | Lazy_allocated_on_heap : (disallowed * 'r) pos const
-  | Class_legacy_monadic : ('l * disallowed) neg const
-  | Class_legacy_comonadic : ('l * disallowed) pos const
-  | Tailcall_function : (disallowed * 'r) pos const
-  | Tailcall_argument : (disallowed * 'r) pos const
-  | Mutable_read : mutable_part -> (disallowed * 'r) neg const
-  | Mutable_write : mutable_part -> (disallowed * 'r) neg const
-  | Lazy_forced : (disallowed * 'r) neg const
-  | Function_return : (disallowed * 'r) pos const
-  | Stack_expression : ('l * disallowed) pos const
-  | Module_allocated_on_heap : (disallowed * 'r) pos const
-  constraint 'd = _ * _
-[@@ocaml.warning "-62"]
-
 (** A description of what type of item is being closed over *)
 type lock_item =
   | Value
@@ -45,20 +24,80 @@ type pinpoint_desc =
   | Lazy  (** A lazy expression *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
+  | Class  (** An class declaration *)
+  | Object  (** An object declaration *)
+  | Loop  (** a loop *)
+  | Letop  (** let op *)
+  | Cases_result  (** the result of cases *)
 
 (** A pinpoint is a location in the source code, accompanied by additional description *)
 type pinpoint = Location.t * pinpoint_desc
 
-type polarity =
-  | Monadic
-  | Comonadic
+type mutable_part =
+  | Record_field of string
+  | Array_elements
+
+type always_dynamic =
+  | Application
+  | Try_with
+
+(** Hint for a constant bound. See [Mode.Report.print_const] for what each non-trivial constructor means. *)
+type 'd const =
+  | Unknown : ('l * 'r) const  (** The constant bound is not explained. *)
+  | Lazy_allocated_on_heap : (disallowed * 'r) pos const
+  | Class_legacy_monadic : ('l * disallowed) neg const
+  | Class_legacy_comonadic : ('l * disallowed) pos const
+  | Tailcall_function : (disallowed * 'r) pos const
+  | Tailcall_argument : (disallowed * 'r) pos const
+  | Mutable_read : mutable_part -> (disallowed * 'r) neg const
+  | Mutable_write : mutable_part -> (disallowed * 'r) neg const
+  | Lazy_forced : (disallowed * 'r) neg const
+  | Function_return : (disallowed * 'r) pos const
+  | Stack_expression : ('l * disallowed) pos const
+  | Module_allocated_on_heap : (disallowed * 'r) pos const
+  | Always_dynamic : always_dynamic -> ('l * disallowed) neg const
+  | Branching : ('l * disallowed) neg const
+  | Is_used_in : pinpoint -> (disallowed * 'r) const
+      (** A variant of [Is_closed_by] where the closure mode is constant.
+        INVARIANT: The [pinpoint] cannot be [Unknown]. *)
+  constraint 'd = _ * _
+[@@ocaml.warning "-62"]
+
+type ('d0, 'd1) polarity =
+  | Monadic : ('l * 'r, 'r * 'l) polarity
+  | Comonadic : ('l * 'r, 'l * 'r) polarity
+  constraint 'd0 = _ * _ constraint 'd1 = _ * _
+[@@warning "-62"]
 
 type closure_details =
-  { closure : pinpoint_desc;
-    (* CR-soon zqian: add location to [closure]. *)
-    closed : pinpoint;
-    polarity : polarity
+  { closure : pinpoint;
+    closed : pinpoint
   }
+
+type containing =
+  | Tuple
+  | Record of string
+  | Array
+  | Constructor of string
+(* CR-soon zqian: add the relation between structure and items *)
+
+type contains =
+  { containing : containing;
+    contained : pinpoint
+  }
+
+type is_contained_by =
+  { containing : containing;
+    container : Location.t
+  }
+
+type allocation_desc =
+  | Unknown
+  | Optional_argument
+  | Function_coercion
+  | Float_projection
+
+type allocation = allocation_desc Location.loc
 
 (** Hint for morphisms. When acompanied by a destination [pinpoint], [morph]
    gives a source [pinpoint] and explains the relation between them. See
@@ -72,8 +111,12 @@ type 'd morph =
      corresponding proper hints *)
   | Skip : ('l * 'r) morph
       (** The morphism doesn't change the bound and should be skipped in printing. *)
-  | Close_over : closure_details -> ('l * disallowed) morph
-  | Is_closed_by : closure_details -> (disallowed * 'r) morph
+  | Close_over :
+      ('d, 'l * disallowed) polarity * closure_details
+      -> ('l * disallowed) morph
+  | Is_closed_by :
+      ('d, disallowed * 'r) polarity * closure_details
+      -> (disallowed * 'r) morph
   (* CR-soon zqian: currently [Close_over] and [Is_closed_by] both store both
      the source and destination pinpoints. Once we make [pinpoint] mandatory for
      submode calls, each constructor only needs to store the info of its source
@@ -81,5 +124,10 @@ type 'd morph =
   | Captured_by_partial_application : (disallowed * 'r) morph
   | Adj_captured_by_partial_application : ('l * disallowed) morph
   | Crossing : ('l * 'r) morph
+  | Allocation_r : allocation -> (disallowed * 'r) morph
+  | Allocation_l : allocation -> ('l * disallowed) morph
+  | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph
+  | Is_contained_by : ('l * 'r, 'd) polarity * is_contained_by -> 'd morph
+  | Contains_r : (disallowed * 'r, 'd) polarity * contains -> 'd morph
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]

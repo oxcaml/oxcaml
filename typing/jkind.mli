@@ -103,7 +103,7 @@ module Layout : sig
 
   val of_const : Const.t -> Sort.t t
 
-  val sub : Sort.t t -> Sort.t t -> Sub_result.t
+  val sub : level:int -> Sort.t t -> Sort.t t -> Sub_result.t
 
   module Debug_printers : sig
     val t :
@@ -220,16 +220,25 @@ module Violation : sig
   (** Prints a violation and the thing that had an unexpected jkind
       ([offender], which you supply an arbitrary printer for). *)
   val report_with_offender :
-    offender:(Format.formatter -> unit) -> Format.formatter -> t -> unit
+    offender:(Format.formatter -> unit) ->
+    level:int ->
+    Format.formatter ->
+    t ->
+    unit
 
   (** Like [report_with_offender], but additionally prints that the issue is
       that a representable jkind was expected. *)
   val report_with_offender_sort :
-    offender:(Format.formatter -> unit) -> Format.formatter -> t -> unit
+    offender:(Format.formatter -> unit) ->
+    level:int ->
+    Format.formatter ->
+    t ->
+    unit
 
   (** Simpler version of [report_with_offender] for when the thing that had an
       unexpected jkind is available as a string. *)
-  val report_with_name : name:string -> Format.formatter -> t -> unit
+  val report_with_name :
+    name:string -> level:int -> Format.formatter -> t -> unit
 end
 
 (******************************)
@@ -282,7 +291,7 @@ module Const : sig
     (** Immutable non-float values that don't contain functions. *)
     val immutable_data : t
 
-    (** Exceptions; only crossing portability *)
+    (** Exceptions; crossing portability, contention, statelessness and visibility. *)
     val exn : t
 
     (** Atomically mutable non-float values that don't contain functions. *)
@@ -427,7 +436,7 @@ module Builtin : sig
       mode-cross (and has kind [Not_best] accordingly), even though unboxed products
       generally should. This is useful when creating an initial jkind in Typedecl. *)
   val product_of_sorts :
-    why:History.product_creation_reason -> int -> Types.jkind_l
+    why:History.product_creation_reason -> level:int -> int -> Types.jkind_l
 end
 
 (** Forcibly change the mod- and with-bounds of a [t] based on the mod- and with-bounds of [from]. *)
@@ -457,33 +466,37 @@ val is_best : ('l * disallowed) Types.jkind -> bool
 (** Create a fresh sort variable, packed into a jkind, returning both
     the resulting kind and the sort. *)
 val of_new_sort_var :
-  why:History.concrete_creation_reason -> 'd Types.jkind * sort
+  why:History.concrete_creation_reason -> level:int -> 'd Types.jkind * sort
 
 (** Create a fresh sort variable, packed into a jkind. *)
-val of_new_sort : why:History.concrete_creation_reason -> 'd Types.jkind
+val of_new_sort :
+  why:History.concrete_creation_reason -> level:int -> 'd Types.jkind
 
 (** Same as [of_new_sort_var], but the jkind is lowered to [Non_null]
     to mirror "legacy" OCaml values.
     Defaulting the sort variable produces exactly [value].  *)
 val of_new_legacy_sort_var :
-  why:History.concrete_legacy_creation_reason -> 'd Types.jkind * sort
+  why:History.concrete_legacy_creation_reason ->
+  level:int ->
+  'd Types.jkind * sort
 
 (** Same as [of_new_sort], but the jkind is lowered to [Non_null]
     to mirror "legacy" OCaml values.
     Defaulting the sort variable produces exactly [value].  *)
 val of_new_legacy_sort :
-  why:History.concrete_legacy_creation_reason -> 'd Types.jkind
+  why:History.concrete_legacy_creation_reason -> level:int -> 'd Types.jkind
 
 (** Same as [of_new_sort_var], but the jkind is lowered to [Non_float].
     Defaulting the sort variable produces exactly the sort [value].  *)
 val of_new_non_float_sort_var :
-  why:History.concrete_creation_reason -> 'd Types.jkind * sort
+  why:History.concrete_creation_reason -> level:int -> 'd Types.jkind * sort
 
 (** Construct a jkind from a constant jkind, at quality [Not_best] *)
 val of_const :
   annotation:Parsetree.jkind_annotation option ->
   why:History.creation_reason ->
   quality:'d Types.jkind_quality ->
+  ran_out_of_fuel_during_normalize:bool ->
   'd Const.t ->
   'd Types.jkind
 
@@ -539,9 +552,26 @@ val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 (** Choose an appropriate jkind for an unboxed record type. *)
 val for_unboxed_record : Types.label_declaration list -> Types.jkind_l
 
-(** Choose an appropriate jkind for a boxed variant type. *)
+(** Choose an appropriate jkind for a boxed variant type.
+
+    [decl_params] is the parameters in the head of the type declaration. [type_apply]
+    should be [Ctype.apply] partially applied to an [env].
+
+    [free_vars] is a function that, given a list of [Types.type_expr]s that are used in
+    the boxed variant, returns all type variables that are free within the
+    [Types.type_expr]s. [Ctype.free_variable_set_of_list] is a good candidate for
+    implementing this function. *)
 val for_boxed_variant :
-  loc:Location.t -> Types.constructor_declaration list -> Types.jkind_l
+  loc:Location.t ->
+  decl_params:Types.type_expr list ->
+  type_apply:
+    (Types.type_expr list ->
+    Types.type_expr ->
+    Types.type_expr list ->
+    Types.type_expr) ->
+  free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
+  Types.constructor_declaration list ->
+  Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed tuple type. *)
 val for_boxed_tuple : (string option * Types.type_expr) list -> Types.jkind_l
@@ -592,7 +622,7 @@ val for_abbreviation :
 val for_array_argument : Types.jkind_lr
 
 (** The jkind for array elements, creating a new sort variable. *)
-val for_array_element_sort : unit -> Types.jkind_lr * sort
+val for_array_element_sort : level:int -> Types.jkind_lr * sort
 (******************************)
 (* elimination and defaulting *)
 
@@ -729,8 +759,8 @@ val normalize :
 (** Call these before trying to print. *)
 val set_outcometree_of_type : (Types.type_expr -> Outcometree.out_type) -> unit
 
-val set_outcometree_of_modalities_new :
-  (Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode_new list) ->
+val set_outcometree_of_modalities :
+  (Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list) ->
   unit
 
 (** Provides the [Printtyp.path] formatter back up the dependency chain to
@@ -746,6 +776,10 @@ val set_print_type_expr : (Format.formatter -> Types.type_expr -> unit) -> unit
 val set_raw_type_expr : (Format.formatter -> Types.type_expr -> unit) -> unit
 
 val format : Format.formatter -> 'd Types.jkind -> unit
+
+(** Similar to [format], but the kind is expanded as much as possible rather
+    than written in terms of a kind abbreviation. This is used by Merlin. *)
+val format_expanded : Format.formatter -> 'd Types.jkind -> unit
 
 (** Format the history of this jkind: what interactions it has had and why
     it is the jkind that it is. Might be a no-op: see [display_histories]
@@ -775,7 +809,7 @@ val equal : Types.jkind_lr -> Types.jkind_lr -> bool
     sort variables. Works over any mix of l- and r-jkinds, because the only
     way not to have an intersection is by looking at the layout: all axes
     have a bottom element. *)
-val has_intersection : 'd1 Types.jkind -> 'd2 Types.jkind -> bool
+val has_intersection : level:int -> 'd1 Types.jkind -> 'd2 Types.jkind -> bool
 
 (** Finds the intersection of two jkinds, constraining sort variables to
     create one if needed, or returns a [Violation.t] if an intersection does
@@ -788,6 +822,7 @@ val intersection_or_error :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
   reason:History.interact_reason ->
+  level:int ->
   ('l1 * allowed) Types.jkind ->
   ('l2 * allowed) Types.jkind ->
   (('l1 * allowed) Types.jkind, Violation.t) Result.t
@@ -797,6 +832,7 @@ val intersection_or_error :
 val sub :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
+  level:int ->
   Types.jkind_l ->
   Types.jkind_r ->
   bool
@@ -814,6 +850,7 @@ type sub_or_intersect =
 val sub_or_intersect :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
+  level:int ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
   sub_or_intersect
@@ -823,6 +860,7 @@ val sub_or_intersect :
 val sub_or_error :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
+  level:int ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
   (unit, Violation.t) result
@@ -834,6 +872,7 @@ val sub_or_error :
 val sub_jkind_l :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
+  level:int ->
   ?allow_any_crossing:bool ->
   Types.jkind_l ->
   Types.jkind_l ->
@@ -852,11 +891,13 @@ val map_type_expr :
   (allowed * 'r) Types.jkind ->
   (allowed * 'r) Types.jkind
 
-(** Checks to see whether a jkind is {iobviously} the maximum jkind. Never does any
-    mutation, preferring a quick check over a thorough one, and doesn't expand any
-    with-bounds. Might return [false] even when the input is actually the maximum
-    jkind. *)
-val is_obviously_max : ('l * allowed) Types.jkind -> bool
+(** Checks to see whether a right-jkind is the maximum jkind. Never does any
+    mutation. *)
+val is_max : ('l * allowed) Types.jkind -> bool
+
+(** Checks to see whether a right-jkind's mod-bounds are the maximum
+    mod-bounds. Never does any mutation. *)
+val mod_bounds_are_max : ('l * allowed) Types.jkind -> bool
 
 (** Checks to see whether a jkind has layout any. Never does any mutation. *)
 val has_layout_any : ('l * allowed) Types.jkind -> bool

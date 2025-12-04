@@ -68,14 +68,14 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : unit -> local_ int end
+         sig val f : unit -> int @ local end
        is not included in
          sig val f : unit -> int end
        Values do not match:
-         val f : unit -> local_ int
+         val f : unit -> int @ local
        is not included in
          val f : unit -> int
-       The type "unit -> local_ int" is not compatible with the type
+       The type "unit -> int @ local" is not compatible with the type
          "unit -> int"
 |}]
 
@@ -85,7 +85,7 @@ end = struct
     let f (_ @ global) = 42
 end
 [%%expect{|
-module M : sig val f : local_ int -> int end
+module M : sig val f : int @ local -> int end
 |}]
 
 (* Check all the mode crossing coercions *)
@@ -121,7 +121,7 @@ type cross_uncontended
 
 let cross_global (x : cross_global @ local) : _ @ global = x
 [%%expect{|
-val cross_global : local_ cross_global -> cross_global = <fun>
+val cross_global : cross_global @ local -> cross_global = <fun>
 |}]
 
 let cross_local (x : cross_local @ local) : _ @ global = x
@@ -129,7 +129,7 @@ let cross_local (x : cross_local @ local) : _ @ global = x
 Line 1, characters 57-58:
 1 | let cross_local (x : cross_local @ local) : _ @ global = x
                                                              ^
-Error: This value is "local" but is expected to be "global".
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let cross_many (x : cross_many @ once) : _ @ many = x
@@ -231,7 +231,7 @@ type t
 type s : value mod global = { v : t @@ global } [@@unboxed]
 [%%expect{|
 type t
-type s = { global_ v : t; } [@@unboxed]
+type s = { v : t @@ global; } [@@unboxed]
 |}]
 type s : value mod many = { v : t @@ many } [@@unboxed]
 [%%expect{|

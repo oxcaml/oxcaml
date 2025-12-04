@@ -1,4 +1,5 @@
 (* TEST
+  flags = "-extension runtime_metaprogramming";
   arch_amd64;
   native;
 *)
@@ -67,3 +68,9 @@ let test_late_compilation_error =
     Printf.printf "Output: %s\n" output;
   with Failure error -> Printf.printf "Error: %s\n" error
 ;;
+
+let test_warning =
+  Printf.printf "\nTest warnings emitted during eval\n";
+  (* Unused variable *)
+  [%eval: unit] <[ let a = () in $( if false then <[ a ]> else <[ () ]>) ]>;
+  Printf.printf "Done\n"

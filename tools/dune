@@ -50,8 +50,13 @@
 
 (rule
   (target opnames.ml)
-  (deps make_opcodes.exe (universe))
-  (action (system "./make_opcodes.exe -opnames < ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/instruct.h > opnames.ml")))
+  (deps
+     (:make_opcodes make_opcodes.exe)
+     (:input ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/instruct.h))
+  (action
+    (with-stdin-from %{input}
+      (with-stdout-to %{target}
+        (run %{make_opcodes} -opnames)))))
 
 (library
   (name opnames)

@@ -17,8 +17,12 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 module Extension : sig
+  (* LZCNT/TZCNT are interpreted as BSR/BSF on architectures prior to Haswell
+     (i.e. without LZCNT/BMI), and do not cause an illegal instruction fault.
+     That means code using LZCNT/TZCNT will silently produce wrong results. *)
   type t =
     | POPCNT
+    | LZCNT
     | PREFETCHW
     | PREFETCHWT1
     | SSE3
@@ -26,13 +30,12 @@ module Extension : sig
     | SSE4_1
     | SSE4_2
     | CLMUL
-    | BMI (* IMPORTANT: LZCNT/TZCNT are interpreted as BSR/BSF on architectures
-             prior to Haswell (i.e. without BMI), and do not cause an illegal
-             instruction fault. That means code using LZCNT/TZCNT will silently
-             produce wrong results. *)
+    | BMI
     | BMI2
     | AVX
     | AVX2
+    | F16C
+    | FMA
     | AVX512F
 
   val name : t -> string

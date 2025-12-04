@@ -22,10 +22,10 @@ BUILTIN(caml_int32x8_low_of_int32);
 BUILTIN(caml_int32x8_low_to_int32);
 BUILTIN(caml_int64x4_low_of_int64);
 BUILTIN(caml_int64x4_low_to_int64);
-BUILTIN(caml_int16x16_low_of_int);
-BUILTIN(caml_int16x16_low_to_int);
-BUILTIN(caml_int8x32_low_of_int);
-BUILTIN(caml_int8x32_low_to_int);
+BUILTIN(caml_int16x16_low_of_int16);
+BUILTIN(caml_int16x16_low_to_int16);
+BUILTIN(caml_int8x32_low_of_int8);
+BUILTIN(caml_int8x32_low_to_int8);
 
 // 256-bit vector constants
 BUILTIN(caml_float32x8_const1);

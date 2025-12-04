@@ -66,11 +66,16 @@ type integer_operation =
   | Ipopcnt
   | Icomp of integer_comparison
 
+type int128_operation =
+  | Iadd128
+  | Isub128
+  | Imul64 of { signed : bool }
+
 let string_of_integer_operation = function
   | Iadd -> " + "
   | Isub -> " - "
   | Imul -> " * "
-  | Imulh { signed } -> " *h " ^ if signed then "" else "u"
+  | Imulh { signed } -> " *h" ^ if signed then " " else "u "
   | Idiv -> " div "
   | Imod -> " mod "
   | Iand -> " & "
@@ -83,6 +88,11 @@ let string_of_integer_operation = function
   | Ictz { arg_is_non_zero } -> Printf.sprintf "ctz %B " arg_is_non_zero
   | Ipopcnt -> "popcnt "
   | Icomp cmp -> string_of_integer_comparison cmp
+
+let string_of_int128_operation = function
+  | Iadd128 -> " + "
+  | Isub128 -> " - "
+  | Imul64 { signed } -> " *" ^ if signed then " " else "u "
 
 let is_unary_integer_operation = function
   | Iclz _ | Ictz _ | Ipopcnt -> true
@@ -161,6 +171,12 @@ let equal_integer_operation left right =
       ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
       | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ) ) ->
     false
+
+let equal_int128_operation left right =
+  match left, right with
+  | Iadd128, Iadd128 | Isub128, Isub128 -> true
+  | Imul64 { signed = left }, Imul64 { signed = right } -> Bool.equal left right
+  | (Iadd128 | Isub128 | Imul64 _), _ -> false
 
 type float_width = Cmm.float_width
 
@@ -282,6 +298,7 @@ type t =
       }
   | Store of Cmm.memory_chunk * Arch.addressing_mode * bool
   | Intop of integer_operation
+  | Int128op of int128_operation
   | Intop_imm of integer_operation * int
   | Intop_atomic of
       { op : Cmm.atomic_op;
@@ -292,7 +309,10 @@ type t =
   | Csel of test
   | Reinterpret_cast of Cmm.reinterpret_cast
   | Static_cast of Cmm.static_cast
-  | Probe_is_enabled of { name : string }
+  | Probe_is_enabled of
+      { name : string;
+        enabled_at_init : bool option
+      }
   | Opaque
   | Begin_region
   | End_region
@@ -304,6 +324,7 @@ type t =
         regs : Reg.t array
       }
   | Dls_get
+  | Tls_get
   | Poll
   | Pause
   | Alloc of
@@ -327,6 +348,7 @@ let is_pure = function
   | Load _ -> true
   | Store _ -> false
   | Intop _ -> true
+  | Int128op _ -> true
   | Intop_imm _ -> true
   | Intop_atomic _ -> false
   | Floatop _ -> true
@@ -347,6 +369,7 @@ let is_pure = function
   | Specific s -> Arch.operation_is_pure s
   | Name_for_debugger _ -> false
   | Dls_get -> true
+  | Tls_get -> true
   | Poll -> false
   | Pause -> false
   | Alloc _ -> false
@@ -379,6 +402,11 @@ let intop (op : integer_operation) =
   | Iclz _ -> " clz "
   | Ictz _ -> " ctz "
   | Icomp cmp -> intcomp cmp
+
+let int128op = function
+  | Iadd128 -> " + "
+  | Isub128 -> " - "
+  | Imul64 { signed } -> " *" ^ if signed then " " else "u "
 
 let floatop ppf (op : float_operation) =
   match op with
@@ -413,6 +441,7 @@ let dump ppf op =
   | Load _ -> Format.fprintf ppf "load"
   | Store _ -> Format.fprintf ppf "store"
   | Intop op -> Format.fprintf ppf "intop %s" (intop op)
+  | Int128op op -> Format.fprintf ppf "int128op %s" (int128op op)
   | Intop_imm (op, n) -> Format.fprintf ppf "intop %s %d" (intop op) n
   | Intop_atomic { op; size = _; addr = _ } ->
     Format.fprintf ppf "intop atomic %s" (Printcmm.atomic_op op)
@@ -424,12 +453,17 @@ let dump ppf op =
   | Static_cast cast -> Format.fprintf ppf "%s" (Printcmm.static_cast cast)
   | Specific specific ->
     Format.fprintf ppf "specific %s" (Arch.specific_operation_name specific)
-  | Probe_is_enabled { name } -> Format.fprintf ppf "probe_is_enabled %s" name
+  | Probe_is_enabled { name; enabled_at_init } ->
+    Format.fprintf ppf "probe_is_enabled %s%s" name
+      (match enabled_at_init with
+      | None | Some false -> ""
+      | Some true -> " enabled_at_init")
   | Opaque -> Format.fprintf ppf "opaque"
   | Begin_region -> Format.fprintf ppf "beginregion"
   | End_region -> Format.fprintf ppf "endregion"
   | Name_for_debugger _ -> Format.fprintf ppf "name_for_debugger"
   | Dls_get -> Format.fprintf ppf "dls_get"
+  | Tls_get -> Format.fprintf ppf "tls_get"
   | Poll -> Format.fprintf ppf "poll"
   | Pause -> Format.fprintf ppf "pause"
   | Alloc { bytes; dbginfo = _; mode = Heap } ->

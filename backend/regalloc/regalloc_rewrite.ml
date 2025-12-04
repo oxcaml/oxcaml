@@ -88,12 +88,12 @@ let coalesce_temp_spills_and_reloads (block : Cfg.basic_block)
     | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
     | Stack_check _
     | Op
-        ( Move | Opaque | Begin_region | End_region | Dls_get | Poll | Pause
-        | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+        ( Move | Opaque | Begin_region | End_region | Dls_get | Tls_get | Poll
+        | Pause | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
         | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
         | Load _
         | Store (_, _, _)
-        | Intop _
+        | Intop _ | Int128op _
         | Intop_imm (_, _)
         | Intop_atomic _
         | Floatop (_, _)
@@ -489,6 +489,7 @@ let postlude :
     Utils.dedent ());
   update_live_fields cfg_with_layout (Cfg_with_infos.liveness cfg_with_infos);
   f ();
+  (Cfg_with_layout.cfg cfg_with_layout).register_locations_are_set <- true;
   if debug && Lazy.force invariants
   then (
     Utils.log "postcondition";

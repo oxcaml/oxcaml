@@ -69,7 +69,6 @@ type error =
   | Wrong_arity_builtin_primitive of string
   | Wrong_layout_for_peek_or_poke of string
   | Invalid_floatarray_glb
-  | Product_iarrays_unsupported
   | Invalid_array_kind_for_uninitialized_makearray_dynamic
   | Invalid_stack_primitive of invalid_stack_primitive
 

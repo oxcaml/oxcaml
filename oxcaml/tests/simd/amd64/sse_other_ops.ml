@@ -97,18 +97,6 @@ module Float64x2 = struct
         eq_float64x2 ~result ~expect)
 end
 
-module Int64 = struct
-  include Builtins.Sse_other_builtins.Int64
-
-  let eq' x y = if x <> y then Printf.printf "%016Lx <> %016Lx\n" x y
-
-  let () =
-    eq' (bit_deposit 3L 4L) 0x4L;
-    eq' (bit_deposit 235L 522L) 0xAL;
-    eq' (bit_extract 3L 4L) 0x0L;
-    eq' (bit_extract 235L 522L) 0x3L
-end
-
 module Int64x2 = struct
   type t = int64x2
 

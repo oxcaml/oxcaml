@@ -74,6 +74,8 @@ val typ_vec256 : machtype
 
 val typ_vec512 : machtype
 
+val typ_int128 : machtype
+
 (** Least upper bound of two [machtype_component]s. *)
 val lub_component :
   machtype_component -> machtype_component -> machtype_component
@@ -251,6 +253,7 @@ type vec128_type =
   | Int16x8
   | Int32x4
   | Int64x2
+  | Float16x8
   | Float32x4
   | Float64x2
 
@@ -259,6 +262,7 @@ type vec256_type =
   | Int16x16
   | Int32x8
   | Int64x4
+  | Float16x16
   | Float32x8
   | Float64x4
 
@@ -267,6 +271,7 @@ type vec512_type =
   | Int16x32
   | Int32x16
   | Int64x8
+  | Float16x32
   | Float32x16
   | Float64x8
 
@@ -395,6 +400,9 @@ type operation =
   | Cmulhi of { signed : bool }
   | Cdivi
   | Cmodi
+  | Caddi128
+  | Csubi128
+  | Cmuli64 of { signed : bool }
   | Cand
   | Cor
   | Cxor
@@ -433,13 +441,17 @@ type operation =
         handler_code_sym : string;
         enabled_at_init : bool
       }
-  | Cprobe_is_enabled of { name : string }
+  | Cprobe_is_enabled of
+      { name : string;
+        enabled_at_init : bool option
+      }
   | Copaque (* Sys.opaque_identity *)
   | Cbeginregion
   | Cendregion
   | Ctuple_field of int * machtype array
     (* the [machtype array] refers to the whole tuple *)
   | Cdls_get
+  | Ctls_get
   | Cpoll
   | Cpause
 

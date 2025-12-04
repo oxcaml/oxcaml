@@ -1722,7 +1722,7 @@ let addr_array_set (mode : Lambda.modify_mode) arr ofs newval dbg =
   | Modify_heap -> addr_array_set_heap arr ofs newval dbg
   | Modify_maybe_stack -> addr_array_set_local arr ofs newval dbg
 
-(* int and float arrays can be written to uniformly regardless of their mode *)
+(* arrays below can be written to uniformly regardless of their mode *)
 
 let int_array_set arr ofs newval dbg =
   Cop
@@ -2075,6 +2075,7 @@ module Extended_machtype = struct
     | Ptop -> Misc.fatal_error "No Extended_machtype for layout [Ptop]"
     | Pbottom ->
       Misc.fatal_error "No unique Extended_machtype for layout [Pbottom]"
+    | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
     | Punboxed_float Unboxed_float64 -> typ_float
     | Punboxed_float Unboxed_float32 -> typ_float32
     | Punboxed_vector Unboxed_vec128 -> typ_vec128
@@ -4991,6 +4992,8 @@ let allocate_unboxed_vec512_array ~elements mode dbg =
 let block_header x y = block_header x y
 
 let dls_get ~dbg = Cop (Cdls_get, [], dbg)
+
+let tls_get ~dbg = Cop (Ctls_get, [], dbg)
 
 let perform ~dbg eff =
   let cont =

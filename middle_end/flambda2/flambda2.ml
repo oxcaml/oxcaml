@@ -100,8 +100,8 @@ let build_run_result unit ~free_names ~final_typing_env ~all_code slot_offsets :
   let value_slots_in_normal_projections =
     NO.value_slots_in_normal_projections free_names
   in
-  let all_function_slots = NO.all_function_slots free_names in
-  let all_value_slots = NO.all_value_slots free_names in
+  let all_function_slots = NO.all_function_slots_at_normal_mode free_names in
+  let all_value_slots = NO.all_value_slots_at_normal_mode free_names in
   let ({ used_value_slots; exported_offsets } : Slot_offsets.result) =
     let used_slots : Slot_offsets.used_slots =
       { function_slots_in_normal_projections;
@@ -131,10 +131,10 @@ type flambda_result =
 
 let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
     (program : Lambda.program) =
-  let compilation_unit = program.compilation_unit in
-  let module_block_size_in_words =
-    Lambda.main_module_block_size program.main_module_block_format
+  let module_repr =
+    Lambda.main_module_representation program.main_module_block_format
   in
+  let compilation_unit = program.compilation_unit in
   let module_initializer = program.code in
   (* Make sure -linscan is enabled in classic mode. Doing this here to be sure
      it happens exactly when -Oclassic is in effect, which we don't know at CLI
@@ -175,8 +175,8 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
       } =
     Profile.record_call "lambda_to_flambda" (fun () ->
         Lambda_to_flambda.lambda_to_flambda ~mode ~machine_width
-          ~big_endian:Arch.big_endian ~cmx_loader ~compilation_unit
-          ~module_block_size_in_words module_initializer)
+          ~big_endian:Arch.big_endian ~cmx_loader ~compilation_unit ~module_repr
+          module_initializer)
   in
   Compiler_hooks.execute Raw_flambda2 raw_flambda;
   print_rawflambda ppf raw_flambda;
@@ -216,17 +216,33 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
         (Flambda_features.dump_simplify ())
         ppf flambda;
       print_flexpect "simplify" ppf ~raw_flambda flambda;
-      let flambda, free_names, all_code, slot_offsets, last_pass_name =
+      let ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
+            last_pass_name ) =
         if Flambda_features.enable_reaper ()
         then (
-          let flambda, free_names, all_code, slot_offsets =
+          let flambda, free_names, all_code, slot_offsets, final_typing_env =
             Profile.record_call ~accumulate:true "reaper" (fun () ->
                 Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
-                  flambda)
+                  ~final_typing_env flambda)
           in
           print_flexpect "reaper" ppf ~raw_flambda flambda;
-          flambda, free_names, all_code, slot_offsets, "reaper")
-        else flambda, free_names, all_code, slot_offsets, last_pass_name
+          ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
+            "reaper" ))
+        else
+          ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
+            last_pass_name )
       in
       print_flambda last_pass_name
         (Flambda_features.dump_flambda ())

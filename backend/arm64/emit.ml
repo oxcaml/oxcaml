@@ -1056,10 +1056,10 @@ let num_call_gc_points instr =
           | Ibswap _ | Isignext _ | Isimd _ ))
     | Lop
         ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
-        | Dls_get | Const_int _ | Const_float32 _ | Const_float _
+        | Dls_get | Tls_get | Const_int _ | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
         | Store (_, _, _)
-        | Intop _
+        | Intop _ | Int128op _
         | Intop_imm (_, _)
         | Intop_atomic _
         | Floatop (_, _)
@@ -1128,10 +1128,11 @@ module BR = Branch_relaxation.Make (struct
       | Lcondbranch3 _ -> Some Bcc
       | Lop
           ( Specific _ | Move | Spill | Reload | Opaque | Begin_region | Pause
-          | End_region | Dls_get | Const_int _ | Const_float32 _ | Const_float _
-          | Const_symbol _ | Const_vec128 _ | Stackoffset _ | Load _
+          | End_region | Dls_get | Tls_get | Const_int _ | Const_float32 _
+          | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
+          | Load _
           | Store (_, _, _)
-          | Intop _
+          | Intop _ | Int128op _
           | Intop_imm (_, _)
           | Intop_atomic _
           | Floatop (_, _)
@@ -1238,6 +1239,7 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Floatop (Float64, Icompf _)) -> 2
     | Lop (Floatop (Float32, Icompf _)) -> 2
     | Lop (Intop_imm (Icomp _, _)) -> 2
+    | Lop (Int128op (Iadd128 | Isub128 | Imul64 _)) -> 2
     | Lop (Intop Imod) -> 2
     | Lop (Intop (Imulh _)) -> 1
     | Lop (Intop (Iclz _)) -> 1
@@ -1278,6 +1280,8 @@ module BR = Branch_relaxation.Make (struct
           | Int_of_float Float32
           | Float_of_float32 | Float32_of_float )) ->
       1
+    | Lop (Static_cast (Scalar_of_v128 Float16x8 | V128_of_scalar Float16x8)) ->
+      Misc.fatal_error "float16 scalar type not supported"
     | Lop (Static_cast (Scalar_of_v128 (Int8x16 | Int16x8))) -> 2
     | Lop
         (Static_cast
@@ -1301,9 +1305,11 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Specific Imove32) -> 1
     | Lop (Specific (Isignext _)) -> 1
     | Lop (Name_for_debugger _) -> 0
-    | Lcall_op (Lprobe _) | Lop (Probe_is_enabled _) ->
-      fatal_error "Probes not supported."
+    | Lcall_op (Lprobe _) ->
+      fatal_error "Optimized probes not supported on arm64."
+    | Lop (Probe_is_enabled _) -> 3
     | Lop Dls_get -> 1
+    | Lop Tls_get -> 1
     | Lreloadretaddr -> 0
     | Lreturn -> epilogue_size ()
     | Llabel _ -> 0
@@ -1617,6 +1623,7 @@ let emit_static_cast (cast : Cmm.static_cast) i =
       DSL.ins I.UXTH [| DSL.emit_reg dst; DSL.emit_reg_w dst |]
     | Int32x4 -> DSL.ins I.FMOV [| DSL.emit_reg_w dst; DSL.emit_reg_s src |]
     | Int64x2 -> DSL.ins I.FMOV [| DSL.emit_reg dst; DSL.emit_reg_d src |]
+    | Float16x8 -> Misc.fatal_error "float16 scalar type not supported"
     | Float32x4 ->
       if distinct
       then (
@@ -1634,6 +1641,7 @@ let emit_static_cast (cast : Cmm.static_cast) i =
     | Int16x8 -> DSL.ins I.FMOV [| DSL.emit_reg_s dst; DSL.emit_reg_w src |]
     | Int32x4 -> DSL.ins I.FMOV [| DSL.emit_reg_s dst; DSL.emit_reg_w src |]
     | Int64x2 -> DSL.ins I.FMOV [| DSL.emit_reg_d dst; DSL.emit_reg src |]
+    | Float16x8 -> Misc.fatal_error "float16 scalar type not supported"
     | Float32x4 ->
       if distinct
       then (
@@ -1984,6 +1992,9 @@ let emit_instr i =
          DSL.emit_reg i.arg.(0);
          DSL.emit_reg i.arg.(1)
       |]
+  | Lop (Int128op _) ->
+    (* CR mslater: restore after the arm DSL is merged *)
+    Misc.fatal_error "arm64: got int128 op"
   | Lop (Intop Ipopcnt) ->
     if !Arch.feat_cssc
     then DSL.ins I.CNT [| DSL.emit_reg i.res.(0); DSL.emit_reg i.arg.(0) |]
@@ -2133,8 +2144,20 @@ let emit_instr i =
       |]
   | Lop (Specific (Isimd simd)) -> DSL.simd_instr simd i
   | Lop (Name_for_debugger _) -> ()
-  | Lcall_op (Lprobe _) | Lop (Probe_is_enabled _) ->
-    fatal_error "Probes not supported."
+  | Lcall_op (Lprobe _) ->
+    fatal_error "Optimized probes not supported on arm64."
+  | Lop (Probe_is_enabled { name; enabled_at_init }) ->
+    let semaphore_sym =
+      Probe_emission.find_or_add_semaphore name enabled_at_init i.dbg
+    in
+    (* Load address of the semaphore symbol *)
+    emit_load_symbol_addr reg_tmp1 (S.create semaphore_sym);
+    (* Load unsigned 2-byte integer value from offset 2 *)
+    DSL.ins I.LDRH
+      [| DSL.emit_reg_w i.res.(0); DSL.emit_addressing (Iindexed 2) reg_tmp1 |];
+    (* Compare with 0 and set result to 1 if non-zero, 0 if zero *)
+    DSL.ins I.CMP [| DSL.emit_reg_w i.res.(0); DSL.imm 0 |];
+    DSL.ins I.CSET [| DSL.emit_reg i.res.(0); DSL.cond NE |]
   | Lop Dls_get ->
     if Config.runtime5
     then
@@ -2144,6 +2167,12 @@ let emit_instr i =
            DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
         |]
     else Misc.fatal_error "Dls is not supported in runtime4."
+  | Lop Tls_get ->
+    let offset = Domainstate.(idx_of_field Domain_tls_state) * 8 in
+    DSL.ins I.LDR
+      [| DSL.emit_reg i.res.(0);
+         DSL.emit_addressing (Iindexed offset) reg_domain_state_ptr
+      |]
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in
@@ -2469,6 +2498,7 @@ let file_emitter ~file_num ~file_name =
 
 let begin_assembly _unix =
   reset_debug_info ();
+  Probe_emission.reset ();
   Asm_targets.Asm_label.initialize ~new_label:(fun () ->
       Cmm.new_label () |> Label.to_int);
   let asm_line_buffer = Buffer.create 200 in
@@ -2559,4 +2589,5 @@ let end_assembly () =
   D.size frametable_sym;
   if not !Oxcaml_flags.internal_assembler
   then Emitaux.Dwarf_helpers.emit_dwarf ();
+  Probe_emission.emit_probe_notes ~slot_offset ~add_def_symbol:(fun _ -> ());
   D.mark_stack_non_executable ()

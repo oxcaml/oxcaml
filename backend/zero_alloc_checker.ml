@@ -2590,6 +2590,7 @@ end = struct
         | Intop
             ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
             | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ | Icomp _ )
+        | Int128op (Iadd128 | Isub128 | Imul64 _)
         | Reinterpret_cast
             ( Float32_of_float | Float_of_float32 | Float_of_int64
             | Int64_of_float | Float32_of_int32 | Int32_of_float32
@@ -2619,7 +2620,7 @@ end = struct
           in
           transform t ~effect ~next ~exn:Value.bot "heap allocation" dbg
         | Specific s -> transform_specific t s ~next ~exn:Value.bot dbg
-        | Dls_get -> next
+        | Dls_get | Tls_get -> next
 
       let basic next (i : Cfg.basic Cfg.instruction) t : (domain, error) result
           =

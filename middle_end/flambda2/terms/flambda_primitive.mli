@@ -52,6 +52,8 @@ end
 module Array_kind : sig
   type t =
     | Immediates  (** An array consisting only of immediate values. *)
+    | Gc_ignorable_values
+        (** An array consisting of [value]-kind elements that the GC may ignore. *)
     | Values
         (** An array consisting of elements of kind [value]. With the float
             array optimisation enabled, such elements must never be [float]s. *)
@@ -100,6 +102,8 @@ end
 module Array_load_kind : sig
   type t =
     | Immediates  (** An array consisting only of immediate values. *)
+    | Gc_ignorable_values
+        (** An array consisting of [value]-kind elements that the GC may ignore. *)
     | Values
         (** An array consisting of elements of kind [value]. With the float
             array optimisation enabled, such elements must never be [float]s. *)
@@ -122,6 +126,8 @@ end
 module Array_set_kind : sig
   type t =
     | Immediates  (** An array consisting only of immediate values. *)
+    | Gc_ignorable_values
+        (** An array of [value]-kind elements that the GC may ignore. *)
     | Values of Init_or_assign.t
         (** An array consisting of elements of kind [value]. With the float
         array optimisation enabled, such elements must never be [float]s. *)
@@ -332,12 +338,19 @@ type nullary_primitive =
       (** Used for phantom bindings for which there is not enough information
           remaining to build a meaningful value. Can only be used in a phantom
           let-binding. *)
-  | Probe_is_enabled of { name : string }
-      (** Returns a boolean saying whether the given tracing probe is enabled. *)
+  | Probe_is_enabled of
+      { name : string;
+        enabled_at_init : bool option
+      }
+      (** Returns a boolean saying whether the given tracing probe is enabled.
+          Semaphore initialization code may be emitted as a consequence of
+          seeing this instruction, but the emitter checks that all occurrences
+          of [enabled_at_init] are consistent for a given probe [name]. *)
   | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
       (** Used in classic mode to denote the start of an inlined function body.
           This is then used in to_cmm to correctly add inlined debuginfo. *)
   | Dls_get  (** Obtain the domain-local state block. *)
+  | Tls_get  (** Obtain the thread-local state block. *)
   | Poll
       (** Poll for runtime actions. May run pending actions such as signal
           handlers, finalizers, memprof callbacks, etc, as well as GCs and

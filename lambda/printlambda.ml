@@ -85,6 +85,7 @@ and ignorable_product_element_kind = function
 let array_kind = function
   | Pgenarray -> "gen"
   | Paddrarray -> "addr"
+  | Pgcignorableaddrarray -> "gcignorableaddr"
   | Pintarray -> "int"
   | Pfloatarray -> "float"
   | Punboxedfloatarray f -> unboxed_float f
@@ -107,6 +108,7 @@ let array_ref_kind ppf k =
   match k with
   | Pgenarray_ref mode -> fprintf ppf "gen%a" pp_mode mode
   | Paddrarray_ref -> fprintf ppf "addr"
+  | Pgcignorableaddrarray_ref -> fprintf ppf "gcignorableaddr"
   | Pintarray_ref -> fprintf ppf "int"
   | Pfloatarray_ref mode -> fprintf ppf "float%a" pp_mode mode
   | Punboxedfloatarray_ref Unboxed_float64 -> fprintf ppf "unboxed_float"
@@ -134,6 +136,7 @@ let array_set_kind ppf k =
   match k with
   | Pgenarray_set mode -> fprintf ppf "gen%a" pp_mode mode
   | Paddrarray_set mode -> fprintf ppf "addr%a" pp_mode mode
+  | Pgcignorableaddrarray_set -> fprintf ppf "gcignorableaddr"
   | Pintarray_set -> fprintf ppf "int"
   | Pfloatarray_set -> fprintf ppf "float"
   | Punboxedfloatarray_set Unboxed_float64 -> fprintf ppf "unboxed_float"
@@ -175,6 +178,7 @@ let rec mixed_block_element print_value_kind ppf el =
     fprintf ppf "product %a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
          (mixed_block_element print_value_kind)) (Array.to_list shape)
+  | Splice_variable id -> fprintf ppf "$%a" Ident.print id
 
 let constructor_shape print_value_kind ppf shape =
   match shape with
@@ -238,6 +242,7 @@ let rec layout ppf layout_ =
     fprintf ppf "@[<hov 1>#(%a)@]"
       (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") layout)
       layouts
+  | Psplicevar id -> fprintf ppf "$%a" Ident.print id
 
 let layout_annotation ppf layout_ =
   match layout_ with
@@ -277,6 +282,7 @@ let return_kind ppf (mode, kind) =
   | Punboxed_product _ -> fprintf ppf ": %a@ " layout kind
   | Ptop -> fprintf ppf ": top@ "
   | Pbottom -> fprintf ppf ": bottom@ "
+  | Psplicevar id -> fprintf ppf ": $%a@ " Ident.print id
 
 let field_kind = value_kind
 
@@ -347,6 +353,7 @@ let rec mixed_block_element
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
   | Product shape ->
     fprintf ppf "product %a" (mixed_block_shape (fun _ _ -> ())) shape
+  | Splice_variable id -> fprintf ppf "$%a" Ident.print id
 
 and mixed_block_shape
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element array -> _
@@ -615,6 +622,8 @@ let primitive ppf = function
        | Ostype_win32 -> "ostype_win32"
        | Ostype_cygwin -> "ostype_cygwin"
        | Backend_type -> "backend_type"
+       | Arch_amd64 -> "arch_amd64"
+       | Arch_arm64 -> "arch_arm64"
        | Runtime5 -> "runtime5" in
      fprintf ppf "sys.constant_%s" const_name
   | Pisint { variant_only } ->
@@ -824,6 +833,7 @@ let primitive ppf = function
   | Patomic_lxor_field -> fprintf ppf "atomic_lxor_field"
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
+  | Ptls_get -> fprintf ppf "tls_get"
   | Ppoll -> fprintf ppf "poll"
   | Pcpu_relax -> fprintf ppf "cpu_relax"
   | Pprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled[%s]" name
@@ -1006,6 +1016,7 @@ let name_of_primitive = function
   | Pperform -> "Pperform"
   | Preperform -> "Preperform"
   | Pdls_get -> "Pdls_get"
+  | Ptls_get -> "Ptls_get"
   | Ppoll -> "Ppoll"
   | Pprobe_is_enabled _ -> "Pprobe_is_enabled"
   | Pobj_dup -> "Pobj_dup"
@@ -1357,6 +1368,8 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(region@ %a)@]" lam expr
   | Lexclave expr ->
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
+  | Lsplice { splice_loc = _;  slambda } ->
+      fprintf ppf "$(%a)" (Printslambda0.slambda0 lam) slambda
 
 and sequence ppf = function
   | Lsequence(l1, l2) ->
