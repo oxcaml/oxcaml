@@ -2140,8 +2140,8 @@ let print_ternary_primitive ppf p =
     Format.fprintf ppf "@[(Write_offset@ %a %a)@]"
       Flambda_kind.With_subkind.print kind Alloc_mode.For_assignments.print mode
   | Write_ptr (kind, mode) ->
-    Format.fprintf ppf "@[(Write_ptr@ %a %a)@]"
-      Flambda_kind.With_subkind.print kind Alloc_mode.For_assignments.print mode
+    Format.fprintf ppf "@[(Write_ptr@ %a %a)@]" Flambda_kind.With_subkind.print
+      kind Alloc_mode.For_assignments.print mode
 
 let print_quaternary_primitive ppf p =
   let fprintf = Format.fprintf in

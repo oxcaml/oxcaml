@@ -18,7 +18,7 @@
     different installable tools and (b) override default implementations
     of arguments. *)
 
-(** Command line arguments required for flambda backend.  *)
+(** Command line arguments required for flambda backend. *)
 module type Oxcaml_options = sig
   val ocamlcfg : unit -> unit
   val no_ocamlcfg : unit -> unit
@@ -194,25 +194,24 @@ module type Opttop_options = sig
   include Debugging_options
 end
 
-(** Transform required command-line arguments into actual arguments.
-    Each tool can define its own argument implementations and
-    call the right functor to actualize them into [Arg.t] list. *)
+(** Transform required command-line arguments into actual arguments. Each tool
+    can define its own argument implementations and call the right functor to
+    actualize them into [Arg.t] list. *)
 module Make_optcomp_options (_ : Optcomp_options) : Main_args.Arg_list
 
 module Make_opttop_options (_ : Opttop_options) : Main_args.Arg_list
 
-(** Default implementations of required arguments for each tool.  *)
+(** Default implementations of required arguments for each tool. *)
 module Default : sig
   module Optmain : Optcomp_options
   module Opttopmain : Opttop_options
 end
 
-(** Extra_params module provides a way to read oxcaml
-    flags from OCAMLPARAM. All command line flags should support it,
-    with the exception of debug printing, such as -dcfg.
-*)
+(** Extra_params module provides a way to read oxcaml flags from OCAMLPARAM. All
+    command line flags should support it, with the exception of debug printing,
+    such as -dcfg. *)
 module Extra_params : sig
   val read_param :
     Format.formatter -> Compenv.readenv_position -> string -> string -> bool
-  (** [read_param ppf pos name value] returns whether the param was handled.  *)
+  (** [read_param ppf pos name value] returns whether the param was handled. *)
 end
