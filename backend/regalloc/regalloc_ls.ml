@@ -158,22 +158,35 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
       in
       DLL.iter intervals.inactive_dll ~f:remove_bound_overlapping;
       DLL.iter intervals.fixed_dll ~f:remove_bound_overlapping;
-      let rec assign idx =
+      (* effectively assigns the passed physical register to `reg` *)
+      let do_assign ~phys_reg =
+        reg.loc <- Reg phys_reg;
+        Interval.DLL.insert_sorted intervals.active_dll interval;
+        if debug
+        then (
+          indent ();
+          log "assigning %d to register %a" phys_reg Printreg.reg reg;
+          dedent ());
+        Not_spilling
+      in
+      (* assigns the first available physical register to `reg` *)
+      let rec assign_first idx =
         if idx >= num_available_registers
         then Misc.fatal_error "No_free_register should have been raised earlier"
         else if available.(idx)
-        then (
-          reg.loc <- Reg (first_available + idx);
-          Interval.DLL.insert_sorted intervals.active_dll interval;
-          if debug
-          then (
-            indent ();
-            log "assigning %d to register %a" idx Printreg.reg reg;
-            dedent ());
-          Not_spilling)
-        else assign (succ idx)
+        then do_assign ~phys_reg:(first_available + idx)
+        else assign_first (succ idx)
       in
-      assign 0)
+      (* assigns the available register with the highest affinity *)
+      let rec assign_affinity = function
+        | [] -> assign_first 0
+        | { Regalloc_affinity.priority = _; phys_reg } :: tl ->
+          let idx = phys_reg - first_available in
+          if idx >= 0 && idx < num_available_registers && available.(idx)
+          then do_assign ~phys_reg
+          else assign_affinity tl
+      in
+      assign_affinity (Regalloc_affinity.get (State.affinity state) reg))
   | Reg _ | Stack _ -> Not_spilling
 
 let allocate_blocked_register : State.t -> Interval.t -> spilling_reg =
@@ -266,7 +279,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_infos ->
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
-  let cfg_infos, stack_slots =
+  let cfg_infos, stack_slots, affinity =
     Regalloc_rewrite.prelude
       (module Utils)
       ~on_fatal_callback:(fun () ->
@@ -286,7 +299,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
       cfg_with_infos
   in
   let spilling_because_unused = Reg.Set.diff cfg_infos.res cfg_infos.arg in
-  let state = State.make ~stack_slots in
+  let state = State.make ~stack_slots ~affinity in
   (match Reg.Set.elements spilling_because_unused with
   | [] -> ()
   | _ :: _ as spilled_nodes ->

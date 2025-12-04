@@ -7,7 +7,8 @@ type t
 
 val for_fatal : t -> Interval.t DLL.t * ClassIntervals.t Reg_class.Tbl.t
 
-val make : stack_slots:Regalloc_stack_slots.t -> t
+val make :
+  stack_slots:Regalloc_stack_slots.t -> affinity:Regalloc_affinity.t -> t
 
 val update_intervals : t -> Interval.t Reg.Tbl.t -> unit
 
@@ -22,6 +23,8 @@ val active : t -> reg_class:Reg_class.t -> ClassIntervals.t
 val active_classes : t -> ClassIntervals.t Reg_class.Tbl.t
 
 val stack_slots : t -> Regalloc_stack_slots.t
+
+val affinity : t -> Regalloc_affinity.t
 
 val set_ls_order : t -> instruction_id:InstructionId.t -> ls_order:int -> unit
 
