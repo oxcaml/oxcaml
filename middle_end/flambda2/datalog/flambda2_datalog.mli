@@ -449,15 +449,6 @@ module Datalog : sig
   type rule
 
   module Schedule : sig
-    (** Enable provenance tracking in rules.
-
-      This makes the computation of rules slower and should only be enabled for
-      debugging.
-
-      {b Warning}: This flag is used during the compilation of rules. Enabling it
-      will {b not} allow provenance tracking for rules that already exist. *)
-    val enable_provenance_for_debug : unit -> unit
-
     type t
 
     (** [saturate rules] is a schedule that repeatedly applies the rules in
@@ -478,7 +469,7 @@ module Datalog : sig
 
     type stats
 
-    val create_stats : database -> stats
+    val create_stats : ?with_provenance:bool -> database -> stats
 
     val print_stats : Format.formatter -> stats -> unit
 

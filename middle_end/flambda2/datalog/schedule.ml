@@ -15,14 +15,6 @@
 
 open Heterogenous_list
 
-(* CR bclement: It's a shame that we can't easily have provenance information as
-   a runtime flag due to the way we evaluate rules before parsing arguments.
-   There might be a better way, but we need to be cautious not to degrade
-   performance when not using provenance. *)
-let use_provenance = ref false
-
-let enable_provenance_for_debug () = use_provenance := true
-
 (** An ['a incremental] represents a value (database or table), paired with
     another copy representing the latest changes to the value. *)
 type 'a incremental =
@@ -126,6 +118,7 @@ type rule =
   | Rule :
       { cursor : 'a Cursor.t;
         binders : binder list;
+        enable_provenance : (bool -> unit) list;
         provenance_table_ref : provenance FactMap.t ref;
         rule_id : rule_id
       }
@@ -158,9 +151,9 @@ let deduce (atoms : deduction) =
   let rule_id = fresh_rule_id () in
   let binders : (int, binder) Hashtbl.t = Hashtbl.create 17 in
   let provenance_table_ref = ref FactMap.empty in
-  let callbacks =
+  let enable_provenance, callbacks =
     fold
-      (fun (Datalog.Atom (tid, args)) callbacks ->
+      (fun (Datalog.Atom (tid, args)) (enable_provenance_list, callbacks) ->
         let is_trie = Table.Id.is_trie tid in
         let table_ref = find_or_create_ref binders tid in
         let[@inline] callback_fn ~accept keys =
@@ -178,36 +171,44 @@ let deduce (atoms : deduction) =
                      (Trie.add_or_replace is_trie keys ()
                         incremental_table.difference)
         in
+        let callback_with_provenance bindings keys =
+          callback_fn
+            ~accept:(fun [@inline] () ->
+              provenance_table_ref
+                := add_if_not_exists !provenance_table_ref tid keys
+                     (Rule (rule_id, Datalog.get_bindings bindings)
+                       : provenance))
+            keys
+        in
+        let callback_without_provenance _ keys =
+          callback_fn ~accept:(fun [@inline] () -> ()) keys
+        in
+        let callback_ref = ref callback_without_provenance in
+        let enable_provenance b =
+          callback_ref
+            := if b
+               then callback_with_provenance
+               else callback_without_provenance
+        in
         let name = Table.Id.name tid ^ ".insert" in
         let callback =
-          if !use_provenance
-          then
-            Datalog.create_callback_with_bindings ~name
-              (fun bindings keys ->
-                callback_fn
-                  ~accept:(fun [@inline] () ->
-                    provenance_table_ref
-                      := add_if_not_exists !provenance_table_ref tid keys
-                           (Rule (rule_id, bindings) : provenance))
-                  keys)
-              args
-          else
-            Datalog.create_callback ~name
-              (fun keys -> callback_fn ~accept:(fun [@inline] () -> ()) keys)
-              args
+          Datalog.create_callback_with_bindings ~name
+            (fun bindings keys -> !callback_ref bindings keys)
+            args
         in
-        callback :: callbacks)
-      atoms []
+        enable_provenance :: enable_provenance_list, callback :: callbacks)
+      atoms ([], [])
   in
   let binders =
     Hashtbl.fold (fun _ binder binders -> binder :: binders) binders []
   in
   Datalog.map_program (Datalog.execute callbacks) (fun cursor ->
       let cursor = Cursor.With_parameters.without_parameters cursor in
-      Rule { cursor; binders; provenance_table_ref; rule_id })
+      Rule { cursor; binders; enable_provenance; provenance_table_ref; rule_id })
 
 type stats =
   { timings : (rule_id, rule * float) Hashtbl.t;
+    with_provenance : bool;
     mutable provenance : provenance FactMap.t
   }
 
@@ -228,11 +229,11 @@ let provenance_from_db db =
         (fun args provenance -> add_if_not_exists provenance tid args Input)
         provenance)
 
-let create_stats db =
+let create_stats ?(with_provenance = false) db =
   let provenance =
-    if !use_provenance then provenance_from_db db else FactMap.empty
+    if with_provenance then provenance_from_db db else FactMap.empty
   in
-  { timings = Hashtbl.create 17; provenance }
+  { timings = Hashtbl.create 17; provenance; with_provenance }
 
 let add_timing ~stats (Rule { rule_id; _ } as rule) time =
   Hashtbl.replace stats.timings rule_id
@@ -378,7 +379,7 @@ let print_provenance char_trie rule_defs ppf provenance =
 let print_stats ppf stats =
   let char_trie = { count = 0; trie = CharMap.empty } in
   let char_trie =
-    if !use_provenance
+    if stats.with_provenance
     then
       Hashtbl.fold
         (fun _ (Rule { rule_id; _ }, _time) char_trie ->
@@ -393,7 +394,7 @@ let print_stats ppf stats =
       Hashtbl.replace rule_defs rule_id rule;
       Format.fprintf ppf "@[<v 2>%a@,: %f@]@ " (print_rule char_trie) rule time)
     stats.timings;
-  if !use_provenance
+  if stats.with_provenance
   then (
     Format.fprintf ppf "Provenance@ ==========@ ";
     print_provenance char_trie rule_defs ppf stats.provenance);
@@ -450,6 +451,18 @@ let run_rule_incremental ?stats ~previous ~diff ~current incremental_db
 type t =
   | Saturate of rule list
   | Fixpoint of t list
+
+let rec enable_provenance_for_debug schedule b =
+  match schedule with
+  | Fixpoint schedules ->
+    List.iter (fun schedule -> enable_provenance_for_debug schedule b) schedules
+  | Saturate rules ->
+    List.iter
+      (fun (Rule { enable_provenance; _ }) ->
+        List.iter
+          (fun enable_provenance -> enable_provenance b)
+          enable_provenance)
+      rules
 
 let fixpoint schedule = Fixpoint schedule
 
@@ -541,7 +554,18 @@ let rec run_incremental ?stats schedule ~previous ~diff ~current =
       (List.map (run_incremental ?stats) schedules)
       ~previous ~diff ~current
 
+let maybe_with_provenance stats schedule f =
+  match stats with
+  | None | Some { with_provenance = false; _ } -> f schedule
+  | Some { with_provenance = true; _ } ->
+    Fun.protect
+      ~finally:(fun () -> enable_provenance_for_debug schedule false)
+      (fun () ->
+        enable_provenance_for_debug schedule true;
+        f schedule)
+
 let run ?stats schedule db =
-  (run_incremental ?stats schedule ~previous:Table.Map.empty ~diff:db
-     ~current:db)
-    .current
+  maybe_with_provenance stats schedule (fun schedule ->
+      (run_incremental ?stats schedule ~previous:Table.Map.empty ~diff:db
+         ~current:db)
+        .current)

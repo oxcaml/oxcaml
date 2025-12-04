@@ -120,8 +120,9 @@ end) : sig
       associated with levels in the stack at the point the [call] instruction
       is executed, and {b must not} be [None] at that point. *)
   val call :
-    ('a Constant.hlist -> unit) ->
+    ('c -> 'a Constant.hlist -> unit) ->
     name:string ->
+    context:'c ->
     'a Option_receiver.hlist with_names ->
     ('x, 's) instruction ->
     ('x, 's) instruction

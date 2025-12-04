@@ -257,10 +257,7 @@ let debug_unbox = List.mem "unbox" reaperdbg_flags
 
 let debug_db = List.mem "db" reaperdbg_flags
 
-(* This needs to be set before creating any datalog rules. *)
-let () =
-  if List.mem "prov" reaperdbg_flags
-  then Datalog.Schedule.enable_provenance_for_debug ()
+let debug_provenance = List.mem "prov" reaperdbg_flags
 
 type 'a unboxed_fields =
   | Not_unboxed of 'a
@@ -3337,7 +3334,9 @@ let query_dominated_by =
 
 let fixpoint (graph : Global_flow_graph.graph) =
   let datalog = Global_flow_graph.to_datalog graph in
-  let stats = Datalog.Schedule.create_stats datalog in
+  let stats =
+    Datalog.Schedule.create_stats ~with_provenance:debug_provenance datalog
+  in
   let db = Datalog.Schedule.run ~stats datalog_schedule datalog in
   let db =
     List.fold_left
