@@ -1525,6 +1525,7 @@ module Ast = struct
     | Record (_, None)
     | Field _ | Array _ | Send _ | Unreachable | Src_pos | Unboxed_tuple _
     | Unboxed_record_product (_, None)
+    | ConstraintExp _ | CoerceExp _
     | List_comprehension _ | Array_comprehension _ | Quote _ ->
       (print_exp env) fmt exp
     | _ -> pp fmt "(@[%a@])" (print_exp env) exp
@@ -1855,12 +1856,12 @@ module Ast = struct
     | Send (exp, meth) ->
       pp fmt "%a#@[%a@]" (print_exp_with_parens env) exp Method.print meth
     | ConstraintExp (exp, ty) ->
-      pp fmt "%a@ :@ %a" (print_exp env) exp (print_core_type env) ty
+      pp fmt "(%a@ :@ %a)" (print_exp env) exp (print_core_type env) ty
     | CoerceExp (exp, opt_ty, ty) -> (
       match opt_ty with
-      | None -> pp fmt "%a@ :>@ %a" (print_exp env) exp (print_core_type env) ty
+      | None -> pp fmt "(%a@ :>@ %a)" (print_exp env) exp (print_core_type env) ty
       | Some ty_constr ->
-        pp fmt "%a@ :@ %a@ :>@ %a" (print_exp env) exp (print_core_type env)
+        pp fmt "(%a@ :@ %a@ :>@ %a)" (print_exp env) exp (print_core_type env)
           ty_constr (print_core_type env) ty)
     | Match (exp, cases) ->
       pp fmt "@[<2>match@ @[%a@]@ with" (print_exp env) exp;
