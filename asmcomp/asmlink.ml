@@ -369,11 +369,11 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     (fun () -> call_linker ml_objfiles startup_obj output_name)
     ~always:(fun () -> remove_file startup_obj)
 
-let link unix ml_objfiles output_name ~cached_genfns_imports ~genfns
+let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns
     ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump : unit =
   Profile.record_call "link" (fun () ->
-      link_actual unix ml_objfiles output_name ~cached_genfns_imports ~genfns
-        ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump)
+      link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
+        ~genfns ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump)
 
 (* Error report *)
 
