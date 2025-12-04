@@ -1685,6 +1685,26 @@ let block_index_access_offsets ~machine_width layout idx =
     in
     snd (List.fold_left_map f MPB.zero (L.mixed_block_element_leaves mbe))
 
+let write_offset write_offset_kind layout mode ~machine_width ~ptr ~idx
+    ~new_values =
+  let mode = Alloc_mode.For_assignments.from_lambda mode in
+  let offsets = block_index_access_offsets ~machine_width layout idx in
+  let kinds =
+    Flambda_arity.unarize
+      (Flambda_arity.from_lambda_list [layout] ~machine_width)
+  in
+  let writes =
+    Misc.Stdlib.List.map3
+      (fun kind offset new_value ->
+        H.Ternary
+          ( Write_offset (write_offset_kind, kind, mode),
+            ptr,
+            Prim offset,
+            new_value ))
+      kinds offsets new_values
+  in
+  [H.Sequence writes]
+
 (* Primitive conversion *)
 let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (prim : L.primitive) (args : Simple.t list list) (dbg : Debuginfo.t)
@@ -2979,22 +2999,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       "Closure_convertion.convert_primitive: The argument to Pget_ptr should \
        be an unboxed product of length 2"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
-  | Pset_idx (layout, mode), [[ptr]; [idx]; new_values]
+  | Pset_idx (layout, mode), [[ptr]; [idx]; new_values] ->
+    needs_64_bit_target prim dbg;
+    write_offset Into_block layout mode ~machine_width ~ptr ~idx ~new_values
   | Pset_ptr (layout, mode), [[ptr; idx]; new_values] ->
     needs_64_bit_target prim dbg;
-    let mode = Alloc_mode.For_assignments.from_lambda mode in
-    let offsets = block_index_access_offsets ~machine_width layout idx in
-    let kinds =
-      Flambda_arity.unarize
-        (Flambda_arity.from_lambda_list [layout] ~machine_width)
-    in
-    let writes =
-      Misc.Stdlib.List.map3
-        (fun kind offset new_value ->
-          H.Ternary (Write_offset (kind, mode), ptr, Prim offset, new_value))
-        kinds offsets new_values
-    in
-    [H.Sequence writes]
+    write_offset Into_block_or_off_heap layout mode ~machine_width ~ptr ~idx
+      ~new_values
   | Pset_ptr _, [([] | [_] | _ :: _ :: _ :: _); _] ->
     Misc.fatal_errorf
       "Closure_convertion.convert_primitive: The first argument to Pset_ptr \

@@ -1189,20 +1189,36 @@ let ternary_primitive _env dbg f x y z =
     C.atomic_exchange_field ~dbg
       (imm_or_ptr block_access_kind)
       x ~field:y ~new_value:z
-  | Write_offset (kind, mode) ->
-    let addr = C.add_int x y dbg in
+  | Write_offset (write_offset_kind, kind, mode) ->
     let memory_chunk = C.memory_chunk_of_kind kind in
     let store =
       if KS.must_be_gc_scannable kind
       then
-        match mode with
-        | Heap -> C.caml_modify ~dbg addr z
-        | Local ->
-          (* divide to convert offset from bytes to field number *)
-          C.caml_modify_local ~dbg x
-            (C.lsr_int y (Cconst_int (C.log2_size_addr, dbg)) dbg)
-            z
-      else C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
+        (* x = base, y = byte offset, z = new value *)
+        let write_into_block =
+          match mode with
+          | Heap ->
+            let addr = C.add_int x y dbg in
+            C.caml_modify ~dbg addr z
+          | Local ->
+            (* divide to convert offset from bytes to field number *)
+            C.caml_modify_local ~dbg x
+              (C.lsr_int y (Cconst_int (C.log2_size_addr, dbg)) dbg)
+              z
+        in
+        (* If [write_offset_kind] is [Into_block_or_off_heap], the base may be
+           NULL, in which case byte_offset is a pointer we store to directly.
+           See comment under [Write_offset] in [flambda_primitive.mli]. *)
+        match write_offset_kind with
+        | Into_block -> write_into_block
+        | Into_block_or_off_heap ->
+          let base_is_null = C.eq ~dbg x (C.nativeint ~dbg 0n) in
+          C.ite ~dbg base_is_null
+            ~then_:(C.store ~dbg memory_chunk Assignment ~addr:y ~new_value:z)
+            ~else_:write_into_block ~then_dbg:dbg ~else_dbg:dbg
+      else
+        let addr = C.add_int x y dbg in
+        C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
     in
     C.return_unit dbg store
 

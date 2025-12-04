@@ -2002,6 +2002,20 @@ let print_int_atomic_op ppf op =
   | Or -> fprintf ppf "or"
   | Xor -> fprintf ppf "xor"
 
+module Write_offset_kind = struct
+  type t =
+    | Into_block
+    | Into_block_or_off_heap
+
+  let compare = Stdlib.compare
+
+  let print ppf t =
+    match t with
+    | Into_block -> Format.pp_print_string ppf "Into_block"
+    | Into_block_or_off_heap ->
+      Format.pp_print_string ppf "Into_block_or_off_heap"
+end
+
 type ternary_primitive =
   | Array_set of Array_kind.t * Array_set_kind.t
   | Bytes_or_bigstring_set of bytes_like_value * string_accessor_width
@@ -2009,7 +2023,10 @@ type ternary_primitive =
   | Atomic_field_int_arith of int_atomic_op
   | Atomic_set_field of Block_access_field_kind.t
   | Atomic_exchange_field of Block_access_field_kind.t
-  | Write_offset of Flambda_kind.With_subkind.t * Alloc_mode.For_assignments.t
+  | Write_offset of
+      Write_offset_kind.t
+      * Flambda_kind.With_subkind.t
+      * Alloc_mode.For_assignments.t
 
 type quaternary_primitive =
   | Atomic_compare_and_set_field of Block_access_field_kind.t
@@ -2072,10 +2089,14 @@ let compare_ternary_primitive p1 p2 =
       Atomic_exchange_field block_access_field_kind2 ) ->
     Block_access_field_kind.compare block_access_field_kind1
       block_access_field_kind2
-  | Write_offset (array_set_kind1, mode1), Write_offset (array_set_kind2, mode2)
-    ->
-    let c = Array_set_kind.compare array_set_kind1 array_set_kind2 in
-    if c <> 0 then c else Alloc_mode.For_assignments.compare mode1 mode2
+  | ( Write_offset (write_offset_kind1, array_set_kind1, mode1),
+      Write_offset (write_offset_kind2, array_set_kind2, mode2) ) ->
+    let c = Write_offset_kind.compare write_offset_kind1 write_offset_kind2 in
+    if c <> 0
+    then c
+    else
+      let c = Array_set_kind.compare array_set_kind1 array_set_kind2 in
+      if c <> 0 then c else Alloc_mode.For_assignments.compare mode1 mode2
   | ( ( Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
       | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
       | Write_offset _ ),
@@ -2131,9 +2152,10 @@ let print_ternary_primitive ppf p =
   | Atomic_exchange_field block_access_field_kind ->
     fprintf ppf "@[(Atomic_exchange_field@ %a)@]" Block_access_field_kind.print
       block_access_field_kind
-  | Write_offset (kind, mode) ->
-    Format.fprintf ppf "@[(Write_offset@ %a %a)@]"
-      Flambda_kind.With_subkind.print kind Alloc_mode.For_assignments.print mode
+  | Write_offset (write_offset_kind, kind, mode) ->
+    Format.fprintf ppf "@[(Write_offset@ %a %a %a)@]" Write_offset_kind.print
+      write_offset_kind Flambda_kind.With_subkind.print kind
+      Alloc_mode.For_assignments.print mode
 
 let print_quaternary_primitive ppf p =
   let fprintf = Format.fprintf in
@@ -2187,7 +2209,8 @@ let args_kind_of_ternary_primitive p =
   | Atomic_set_field (Immediate | Any_value)
   | Atomic_exchange_field (Immediate | Any_value) ->
     K.value, K.value, K.value
-  | Write_offset (kind, _) -> K.value, K.naked_int64, K.With_subkind.kind kind
+  | Write_offset (_, kind, _) ->
+    K.value, K.naked_int64, K.With_subkind.kind kind
 
 let args_kind_of_quaternary_primitive p =
   match p with
