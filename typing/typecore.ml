@@ -2182,6 +2182,11 @@ let get_constr_type_path ty =
   | Tconstr(p, _, _) -> p
   | _ -> assert false
 
+let get_constr_type_arity ty =
+  match get_desc ty with
+  | Tconstr(_, ts, _) -> List.length ts
+  | _ -> assert false
+
 module NameChoice(Name : sig
   type t
   type usage
@@ -2199,6 +2204,7 @@ end) = struct
   open Name
 
   let get_type_path d = get_constr_type_path (get_type d)
+  let get_type_arity d = get_constr_type_arity (get_type d)
 
   let lookup_from_type env type_path usage lid =
     let descrs = lookup_all_from_type lid.loc usage type_path env in
@@ -2278,17 +2284,19 @@ end) = struct
         (Warnings.Name_out_of_scope (path_s, Name (Longident.last lid.txt)))
     end
 
+  let check_disambiguated_name lbl scope =
+    match scope with
+    | Ok ((lab1,_) :: _) when lab1 == lbl -> false
+    | _ -> true
+
   (* warn if the selected name is not the last introduced in scope
      -- in these cases the resolution is different from pre-disambiguation OCaml
      (this warning is not enabled by default, it is specifically for people
       wishing to write backward-compatible code).
    *)
-  let warn_if_disambiguated_name warn lid lbl scope =
-    match scope with
-    | Ok ((lab1,_) :: _) when lab1 == lbl -> ()
-    | _ ->
-        warn lid.loc
-          (Warnings.Disambiguated_name (get_name lbl))
+  let warn_for_disambiguated_name warn lid lbl =
+    warn lid.loc
+      (Warnings.Disambiguated_name (get_name lbl))
 
   let force_error : ('a, _) result -> 'a = function
     | Ok lbls -> lbls
@@ -2325,7 +2333,8 @@ end) = struct
         ?(filter : nonempty_candidate_filter = Result.ok)
         usage lid env
         expected_type
-        candidates_in_scope =
+        candidates_in_scope
+        : t * ambiguity =
     let lbl = match expected_type with
     | None ->
         (* no expected type => no disambiguation *)
@@ -2396,9 +2405,15 @@ end) = struct
         end
     in
     (* warn only on nominal labels *)
-    if in_env lbl then
-      warn_if_disambiguated_name warn lid lbl candidates_in_scope;
-    lbl
+    let (ambiguity : ambiguity) =
+      match check_disambiguated_name lbl candidates_in_scope with
+      | true ->
+        if in_env lbl then
+          warn_for_disambiguated_name warn lid lbl;
+        Ambiguous { path = get_type_path lbl; arity = get_type_arity lbl }
+      | false -> Unambiguous
+    in
+    lbl, ambiguity
 end
 
 let wrap_disambiguate msg ty f x =
@@ -2476,7 +2491,7 @@ let label_disambiguate
       : (rep candidates -> (rep candidates, rep candidates) result) option)
     (record_form : rep record_form) usage lid env expected_type
     (scope : (rep candidates, _) result)
-  : rep gen_label_description =
+  : rep gen_label_description * ambiguity =
   match record_form with
   | Legacy ->
     Label.disambiguate ?warn ?filter usage lid env expected_type scope
@@ -2562,7 +2577,7 @@ let disambiguate_sort_lid_a_list
     match List.rev !w_amb with
       (_,types,ex)::_ as amb ->
         let paths =
-          List.map (fun (_,lbl,_) -> label_get_type_path record_form lbl)
+          List.map (fun (_,(lbl,_),_) -> label_get_type_path record_form lbl)
             lbl_a_list in
         let path = List.hd paths in
         let fst3 (x,_,_) = x in
@@ -2576,15 +2591,28 @@ let disambiguate_sort_lid_a_list
             amb
     | _ -> ()
   end;
+  (* The ambiguity check warnings could probably use paths on [Ambiguous] *)
+  (* At this point we are sure all disambiguations are consistent, so we collapse them *)
+  let ambiguity, lbl_a_list =
+    List.fold_left_map
+      (fun amb (lid,(lbl, amb'),a) ->
+        match amb' with
+        | Unambiguous -> amb, (lid, lbl, a)
+        | Ambiguous _ as amb -> amb, (lid, lbl, a))
+      Unambiguous lbl_a_list
+  in
   (if !w_scope <> [] then
     let record_form = record_form_to_string record_form in
     let warning = Warnings.Fields { record_form; fields = List.rev !w_scope} in
     Location.prerr_warning loc
       (Warnings.Name_out_of_scope (!w_scope_ty, warning)));
   (* Invariant: records are sorted in the typed tree *)
-  List.sort
-    (fun (_,lbl1,_) (_,lbl2,_) -> compare lbl1.lbl_pos lbl2.lbl_pos)
-    lbl_a_list
+  let lbl_a_list =
+    List.sort
+      (fun (_,lbl1,_) (_,lbl2,_) -> compare lbl1.lbl_pos lbl2.lbl_pos)
+      lbl_a_list
+  in
+  lbl_a_list, ambiguity
 
 let map_fold_cont f xs k =
   List.fold_right (fun x k ys -> f x (fun y -> k (y :: ys)))
@@ -2997,7 +3025,7 @@ and type_pat_aux
           pat_unique_barrier = Unique_barrier.not_computed ();
         }
       in
-      let lbl_a_list =
+      let lbl_a_list, _ambiguity =
         wrap_disambiguate
           ("This " ^ (record_form_to_string record_form) ^
            " pattern is expected to have")
@@ -3141,7 +3169,7 @@ and type_pat_aux
             let error = Wrong_expected_kind(srt, Pattern, expected_ty) in
             raise (Error (loc, !!penv, error))
       in
-      let constr, locks =
+      let (constr, locks), _ambiguity =
         let candidates =
           Env.lookup_all_constructors Env.Pattern ~loc:lid.loc lid.txt !!penv in
         wrap_disambiguate "This variant pattern is expected to have"
@@ -5833,7 +5861,7 @@ and type_expect_
             ty, opt_exp_opath
       in
       let closed = (opt_sexp = None && overwrite = No_overwrite) in
-      let lbl_a_list =
+      let lbl_a_list, _ambiguity =
         wrap_disambiguate
           ("This " ^ (record_form_to_string record_form)
             ^ " expression is expected to have")
@@ -6498,7 +6526,7 @@ and type_expect_
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
   | Pexp_field(srecord, lid) ->
-      let (record, record_sort, rmode, label, _) =
+      let (record, record_sort, rmode, label, _, _ambiguity) =
         type_label_access Legacy env srecord Env.Projection lid
       in
       let ty_arg =
@@ -6561,7 +6589,7 @@ and type_expect_
         exp_env = env }
   | Pexp_unboxed_field(srecord, lid) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      let (record, record_sort, rmode, label, _) =
+      let (record, record_sort, rmode, label, _, _ambiguity) =
         type_label_access Unboxed_product env srecord Env.Projection lid
       in
       let ty_arg =
@@ -6594,7 +6622,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
-      let (record, _, rmode, label, expected_type) =
+      let (record, _, rmode, label, expected_type, _ambiguity) =
         type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
         if expected_type = None
@@ -7412,7 +7440,7 @@ and type_expect_
                     { pexp_desc = Pexp_field (srecord, lid); _ } as sexp, _
                   )
                } ] ->
-          let (record, record_sort, rmode, label, _) =
+          let (record, record_sort, rmode, label, _, _ambiguity) =
             type_label_access Legacy env srecord Env.Mutation lid
           in
           Env.mark_label_used Env.Projection label.lbl_uid;
@@ -7662,7 +7690,7 @@ and type_block_access env expected_base_ty principal
       Env.lookup_all_labels ~record_form:Legacy ~loc:lid.loc Projection
         lid.txt env
     in
-    let label =
+    let label, _ambiguity =
       wrap_disambiguate "This block index is expected to have base"
         (mk_expected expected_base_ty)
         (label_disambiguate Legacy Projection lid env expected_record_type)
@@ -7760,7 +7788,7 @@ and type_unboxed_access env loc el_ty ua =
       Env.lookup_all_labels ~record_form:Unboxed_product ~loc:lid.loc
         Projection lid.txt env
     in
-    let label =
+    let label, _ambiguity =
       wrap_disambiguate "This unboxed access is expected to have base"
         (mk_expected el_ty)
         (label_disambiguate Unboxed_product Projection lid env
@@ -8380,7 +8408,7 @@ and type_function
 
 and type_label_access
   : 'rep . 'rep record_form -> _ -> _ -> _ -> _ ->
-    _ * _ * _ * 'rep gen_label_description * _
+    _ * _ * _ * 'rep gen_label_description * _ * ambiguity
   = fun record_form env srecord usage lid ->
   let mode = Value.newvar () in
   let record_jkind, record_sort =
@@ -8408,10 +8436,10 @@ and type_label_access
   in
   let labels =
     Env.lookup_all_labels ~record_form ~loc:lid.loc usage lid.txt env in
-  let label =
+  let label, ambiguity =
     wrap_disambiguate "This expression has" (mk_expected ty_exp)
       (label_disambiguate record_form usage lid env expected_type) labels in
-  (record, record_sort, Mode.Value.disallow_right mode, label, expected_type)
+  (record, record_sort, Mode.Value.disallow_right mode, label, expected_type, ambiguity)
 
 (* Typing format strings for printing or reading.
    These formats are used by functions in modules Printf, Format, and Scanf.
@@ -9312,7 +9340,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
   let constrs =
     Env.lookup_all_constructors ~loc:lid.loc Env.Positive lid.txt env
   in
-  let constr, locks =
+  let (constr, locks), _ambiguity =
     wrap_disambiguate "This variant expression is expected to have"
       ty_expected_explained
       (Constructor.disambiguate Env.Positive lid env expected_type) constrs

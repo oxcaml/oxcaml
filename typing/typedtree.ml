@@ -120,6 +120,10 @@ let print_unique_use ppf (u,l) =
 
 type alloc_mode = Mode.Alloc.r
 
+type ambiguity =
+  | Ambiguous of { path: Path.t; arity : int }
+  | Unambiguous
+
 type texp_field_boxing =
   | Boxing of alloc_mode * unique_use
   | Non_boxing of unique_use
