@@ -668,8 +668,7 @@ let ocaml_ignored_flags =
     "-dno-locations";
     "-dlocations";
     "-dcamlprimc";
-    "-dtimings-precision";
-
+    "-dtimings-precision"
   ]
 
 let ocaml_ignored_parametrized_flags =
