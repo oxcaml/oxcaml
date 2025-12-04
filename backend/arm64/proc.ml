@@ -90,9 +90,10 @@ let phys_reg ty n =
        for the LLVM backend. However, this breaks an invariant the IRC register
        allocator relies on. It is safe to guard it with this flag since the LLVM
        backend doesn't get that far. *)
+    let r = hard_int_reg.(n) in
     if !Clflags.llvm_backend
-    then Reg.create_alias hard_int_reg.(n) ~typ:ty
-    else hard_int_reg.(n)
+    then Reg.create_alias r ~typ:ty
+    else r
   | Float -> hard_float_reg.(n - 100)
   | Float32 -> hard_float32_reg.(n - 100)
   | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)
