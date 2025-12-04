@@ -123,7 +123,7 @@ val to_bytes : string -> bytes
 *)
 
 val blit :
-  string -> int -> bytes -> int -> int -> unit
+  string @ local -> int -> bytes @ local -> int -> int -> unit
 (** Same as {!Bytes.blit_string} which should be preferred. *)
 
 (** {1:concat Concatenating}

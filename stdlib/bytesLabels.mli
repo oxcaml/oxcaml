@@ -132,7 +132,7 @@ val fill : bytes -> pos:int -> len:int -> char -> unit
     valid range of [s]. *)
 
 val blit :
-  src:bytes -> src_pos:int -> dst:bytes -> dst_pos:int -> len:int
+  src:bytes @ read -> src_pos:int -> dst:bytes @ local -> dst_pos:int -> len:int
   -> unit
 (** [blit ~src ~src_pos ~dst ~dst_pos ~len] copies [len] bytes from byte
     sequence [src], starting at index [src_pos], to byte sequence [dst],
@@ -144,7 +144,7 @@ val blit :
     do not designate a valid range of [dst]. *)
 
 val blit_string :
-  src:string -> src_pos:int -> dst:bytes -> dst_pos:int -> len:int
+  src:string @ local -> src_pos:int -> dst:bytes @ local -> dst_pos:int -> len:int
   -> unit
 (** [blit_string ~src ~src_pos ~dst ~dst_pos ~len] copies [len] bytes from
     string [src], starting at index [src_pos], to byte sequence [dst],
