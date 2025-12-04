@@ -33,4 +33,6 @@ val print : Format.formatter -> t -> unit
 
 val bound_continuations : t -> Continuation.t list
 
+val is_wrapper : t -> bool
+
 val add_params_to_lift : t -> Lifted_cont_params.t -> t
