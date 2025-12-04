@@ -35,7 +35,8 @@ external get :
 external set :
   (bytes[@local_opt]) -> int -> char -> unit @@ portable = "%bytes_safe_set"
 external create : int -> bytes @@ portable = "caml_create_bytes"
-external create__stack : int -> bytes @ local @@ portable = "caml_create_local_bytes"
+external create__stack : int -> bytes @ local @@ portable
+  = "caml_create_local_bytes"
 external unsafe_get :
   (bytes[@local_opt]) @ read -> int -> char @@ portable = "%bytes_unsafe_get"
 external unsafe_set :

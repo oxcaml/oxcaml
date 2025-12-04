@@ -125,7 +125,12 @@ val to_bytes : string -> bytes
 *)
 
 val blit :
-  src:string @ local -> src_pos:int -> dst:bytes @ local -> dst_pos:int -> len:int -> unit
+  src:string @ local ->
+  src_pos:int ->
+  dst:bytes @ local ->
+  dst_pos:int ->
+  len:int ->
+  unit
 (** Same as {!Bytes.blit_string} which should be preferred. *)
 
 (** {1:concat Concatenating}

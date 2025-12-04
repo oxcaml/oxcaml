@@ -144,8 +144,12 @@ val blit :
     do not designate a valid range of [dst]. *)
 
 val blit_string :
-  src:string @ local -> src_pos:int -> dst:bytes @ local -> dst_pos:int -> len:int
-  -> unit
+  src:string @ local ->
+  src_pos:int ->
+  dst:bytes @ local ->
+  dst_pos:int ->
+  len:int ->
+  unit
 (** [blit_string ~src ~src_pos ~dst ~dst_pos ~len] copies [len] bytes from
     string [src], starting at index [src_pos], to byte sequence [dst],
     starting at index [dst_pos].
