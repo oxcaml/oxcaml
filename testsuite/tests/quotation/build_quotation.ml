@@ -850,3 +850,20 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 - : <[($('a) -> $('b)) -> $('a) -> $('b)]> expr =
 <[fun f x -> ((f [@inlined]) x [@nontail])]>
 |}];;
+
+<[ fun x -> [ x ; x + 1 ] ]>
+[%%expect {|
+- : <[int -> int list]> expr = <[fun x -> [x; x + 1]]>
+|}];;
+
+(* Constraints must be parenthesised in tuple and list elements *)
+
+<[ fun x -> ((x : int), (x + 1 : int)) ]>
+[%%expect {|
+- : <[int -> int * int]> expr = <[fun x -> ((x : int), (x + 1 : int))]>
+|}];;
+
+<[ fun x -> [(x : int); (x + 1 : int)] ]>
+[%%expect {|
+- : <[int -> int list]> expr = <[fun x -> [(x : int); (x + 1 : int)]]>
+|}];;
