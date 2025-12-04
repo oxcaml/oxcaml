@@ -157,7 +157,7 @@ let deduce (atoms : deduction) =
       (fun (Datalog.Atom (tid, args)) callbacks ->
         let is_trie = Table.Id.is_trie tid in
         let table_ref = find_or_create_ref binders tid in
-        let[@inline] callback_fn bindings keys =
+        let callback_fn bindings keys =
           let incremental_table = !table_ref in
           match Trie.find_opt is_trie keys incremental_table.current with
           | Some _ -> ()
