@@ -1900,8 +1900,8 @@ module Extra_params = struct
     | "ddwarf-types" -> set' Dwarf_flags.ddwarf_types
     | "ddwarf-metrics" -> set' Dwarf_flags.ddwarf_metrics
     | "ddwarf-metrics-output-file" ->
-      Dwarf_flags.ddwarf_metrics_output_file := Some v;
-      true
+        Dwarf_flags.ddwarf_metrics_output_file := Some v;
+        true
     | "reorder-blocks-random" ->
         set_int_option' Oxcaml_flags.reorder_blocks_random
     | "basic-block-sections" -> set' Oxcaml_flags.basic_block_sections
