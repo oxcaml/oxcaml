@@ -907,24 +907,31 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
         C.Scalar_type.Integral.static_cast ~dbg ~src:kind ~dst:operator_type
           operand
       in
-      let bits =
+      let bits, untagged_bits =
         match kind with
-        | Untagged untagged -> C.Scalar_type.Integer.bit_width untagged
+        | Untagged untagged ->
+          let bits = C.Scalar_type.Integer.bit_width untagged in
+          bits, bits
         | Tagged tagged ->
-          C.Scalar_type.Tagged_integer.bit_width_including_tag_bit tagged
+          let bits =
+            C.Scalar_type.Tagged_integer.bit_width_including_tag_bit tagged
+          in
+          bits, bits - 1
       in
       match required_operand_extension op with
       | None -> C.low_bits ~bits operand ~dbg
       | Some Signed -> operand
       | Some Unsigned ->
-        if bits = C.arch_bits
+        (* CR jrayman: this is bad *)
+        if untagged_bits = C.arch_bits
         then C.low_bits ~bits operand ~dbg
         else
           Cmm.Cop
             ( Cand,
               [ C.low_bits ~bits operand ~dbg;
                 Cconst_natint
-                  (Nativeint.pred (Nativeint.shift_left 1n bits), dbg) ],
+                  (Nativeint.pred (Nativeint.shift_left 1n untagged_bits), dbg)
+              ],
               dbg )
     in
     let x = prepare_operand x in
