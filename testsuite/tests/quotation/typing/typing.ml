@@ -162,7 +162,7 @@ val foo7 : 'b -> <[$('a) -> $('a)]> expr = <fun>
 
 let foo7' = (fun (type a) (type b) x -> <[fun (y : $a) -> y]>) 42;;
 [%%expect {|
-val foo7' : <[$('_a) -> $('_a)]> expr = <[fun (y : _) -> (y : _)]>
+val foo7' : <[$('_a) -> $('_a)]> expr = <[fun (y : _) -> y]>
 |}];;
 
 let foo8 (type a) (type b) x = <[fun ((p, q) : $a * $b) -> ($x, (p, q))]> <["foo"]>;;
@@ -187,7 +187,7 @@ Error: Type variable "'a" is used outside any quotations,
 <[fun (type a) (type b) (x : a) (y : b) -> (x, y)]>;;
 [%%expect {|
 - : <[$('a) -> $('b) -> $('a) * $('b)]> expr =
-<[fun (type a) (type b) (x : a) (y : b) -> ((x : _), (y : _))]>
+<[fun (type a) (type b) (x : a) (y : b) -> (x, y)]>
 |}];;
 
 type t4 = A | B;;
@@ -206,25 +206,25 @@ Error: Constructor "A" used at Line 3, characters 2-3
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
 [%%expect {|
 - : <[$('a) -> $('b) -> $('a) * $('b)]> expr =
-<[fun (x : 'a) (y : 'b) -> ((x : _), (y : _))]>
+<[fun (x : 'a) (y : 'b) -> (x, y)]>
 |}];;
 
 <[fun (f : 'a. 'a -> 'a) (x : 'b) -> f x]>;;
 [%%expect {|
 - : <[('a. 'a -> 'a) -> $('b) -> $('b)]> expr =
-<[fun (f : 'a. 'a -> 'a) (x : 'b) -> (f : _) (x : _)]>
+<[fun (f : 'a. 'a -> 'a) (x : 'b) -> f x]>
 |}];;
 
 <[fun (f : 'a. 'a -> 'a) (x : 'a) -> f x]>;;
 [%%expect {|
 - : <[('a. 'a -> 'a) -> $('a) -> $('a)]> expr =
-<[fun (f : 'a. 'a -> 'a) (x : 'a__1) -> (f : _) (x : _)]>
+<[fun (f : 'a. 'a -> 'a) (x : 'a__1) -> f x]>
 |}];;
 
 <[fun (x : 'a) (f : 'a. 'a -> 'a) -> f x]>;;
 [%%expect {|
 - : <[$('a) -> ('a0. 'a0 -> 'a0) -> $('a)]> expr =
-<[fun (x : 'a) (f : 'a__1. 'a__1 -> 'a__1) -> (f : _) (x : _)]>
+<[fun (x : 'a) (f : 'a__1. 'a__1 -> 'a__1) -> f x]>
 |}];;
 
 <[fun (f : 'a. 'a -> 'a) (g: 'b 'c. 'b list -> ('b -> 'c) -> 'c list) -> f g]>;;
@@ -235,9 +235,7 @@ Error: Constructor "A" used at Line 3, characters 2-3
      $('d) list -> ($('d) -> $('e)) -> $('e) list]>
     expr
 =
-<[
-  fun (f : 'a. 'a -> 'a) (g : 'b 'c. 'b list -> ('b -> 'c) -> 'c list) ->
-    (f : _) (g : _)
+<[fun (f : 'a. 'a -> 'a) (g : 'b 'c. 'b list -> ('b -> 'c) -> 'c list) -> f g
 ]>
 |}];;
 
@@ -286,7 +284,7 @@ mk_pair <[fun () -> 42]>;;
 mk_pair <[fun x -> x]>;;
 [%%expect {|
 - : <['_weak1 -> '_weak1 * '_weak1 -> '_weak1]> expr =
-<[((fun x -> (x : _)), (fun x -> (x : _)))]>
+<[((fun x -> x), (fun x -> x))]>
 |}];;
 
 (* Type algebra checks. *)
