@@ -60,6 +60,8 @@ module Separability : sig
   (* CR layouts-scannable: As more axes are ported, consider adding [is_max]
      to the [Axis_ops] signature (which helps with printing) *)
   val is_max : t -> bool
+
+  val upper_bound_if_is_always_gc_ignorable : unit -> t
 end
 
 module Axis : sig
