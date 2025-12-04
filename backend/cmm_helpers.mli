@@ -974,12 +974,6 @@ val caml_modify : dbg:Debuginfo.t -> expression -> expression -> expression
 val caml_modify_local :
   dbg:Debuginfo.t -> expression -> expression -> expression -> expression
 
-(** [caml_modify_ptr ~dbg base byte_offset new_value] - Write to a pointer
-    where base may be NULL. If base is NULL, byte_offset is treated as
-    a raw pointer address. *)
-val caml_modify_ptr :
-  dbg:Debuginfo.t -> expression -> expression -> expression -> expression
-
 (** [direct_call ty f_code args] creates a direct call to the function code
     [f_code] with arguments [args], with a return value of type [ty].
 

@@ -574,25 +574,6 @@ CAMLexport void caml_modify_local (value obj, intnat i, value val)
   }
 }
 
-/* This function handles pointer writes where the base may be NULL.
-   If base is NULL, byte_offset is treated as a raw pointer address.
-   If base is non-NULL, it's a local block and we use caml_modify_local
-   with the field offset computed from byte_offset. */
-CAMLexport void caml_modify_ptr (value base, intnat byte_offset, value val)
-{
-  if (base == 0) {
-    /* base is NULL, byte_offset is a raw pointer address.
-       We do a direct store since the NULL+ptr representation is used
-       for off-heap values or values that won't be moved by GC. */
-    value *addr = (value *)byte_offset;
-    *addr = val;
-  } else {
-    /* base is a valid block, convert byte offset to field offset */
-    intnat field_offset = byte_offset / sizeof(value);
-    caml_modify_local(base, field_offset, val);
-  }
-}
-
 CAMLexport caml_local_arenas* caml_refresh_locals(struct stack_info* stack)
 {
   caml_local_arenas* s = stack->local_arenas;

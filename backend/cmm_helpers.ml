@@ -1711,21 +1711,6 @@ let caml_modify_local ~dbg addr i newval =
       [addr; i; newval],
       dbg )
 
-let caml_modify_ptr ~dbg base byte_offset newval =
-  Cop
-    ( Cextcall
-        { func = "caml_modify_ptr";
-          ty = typ_void;
-          alloc = false;
-          builtin = false;
-          returns = true;
-          effects = Arbitrary_effects;
-          coeffects = Has_coeffects;
-          ty_args = []
-        },
-      [base; byte_offset; newval],
-      dbg )
-
 let addr_array_set_heap arr ofs newval dbg =
   caml_modify (array_indexing log2_size_addr arr ofs dbg) newval ~dbg
 
