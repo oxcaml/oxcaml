@@ -118,7 +118,7 @@ type rule =
   | Rule :
       { cursor : 'a Cursor.t;
         binders : binder list;
-        enable_provenance : (bool -> unit) list;
+        enable_provenance : bool ref;
         provenance_table_ref : provenance FactMap.t ref;
         rule_id : rule_id
       }
@@ -151,17 +151,23 @@ let deduce (atoms : deduction) =
   let rule_id = fresh_rule_id () in
   let binders : (int, binder) Hashtbl.t = Hashtbl.create 17 in
   let provenance_table_ref = ref FactMap.empty in
-  let enable_provenance, callbacks =
+  let enable_provenance = ref false in
+  let callbacks =
     fold
-      (fun (Datalog.Atom (tid, args)) (enable_provenance_list, callbacks) ->
+      (fun (Datalog.Atom (tid, args)) callbacks ->
         let is_trie = Table.Id.is_trie tid in
         let table_ref = find_or_create_ref binders tid in
-        let[@inline] callback_fn ~accept keys =
+        let[@inline] callback_fn bindings keys =
           let incremental_table = !table_ref in
           match Trie.find_opt is_trie keys incremental_table.current with
           | Some _ -> ()
           | None ->
-            (accept [@inlined hint]) ();
+            if !enable_provenance
+            then
+              provenance_table_ref
+                := add_if_not_exists !provenance_table_ref tid keys
+                     (Rule (rule_id, Datalog.get_bindings bindings)
+                       : provenance);
             table_ref
               := incremental
                    ~current:
@@ -171,33 +177,12 @@ let deduce (atoms : deduction) =
                      (Trie.add_or_replace is_trie keys ()
                         incremental_table.difference)
         in
-        let callback_with_provenance bindings keys =
-          callback_fn
-            ~accept:(fun [@inline] () ->
-              provenance_table_ref
-                := add_if_not_exists !provenance_table_ref tid keys
-                     (Rule (rule_id, Datalog.get_bindings bindings)
-                       : provenance))
-            keys
-        in
-        let callback_without_provenance _ keys =
-          callback_fn ~accept:(fun [@inline] () -> ()) keys
-        in
-        let callback_ref = ref callback_without_provenance in
-        let enable_provenance b =
-          callback_ref
-            := if b
-               then callback_with_provenance
-               else callback_without_provenance
-        in
         let name = Table.Id.name tid ^ ".insert" in
         let callback =
-          Datalog.create_callback_with_bindings ~name
-            (fun bindings keys -> !callback_ref bindings keys)
-            args
+          Datalog.create_callback_with_bindings ~name callback_fn args
         in
-        enable_provenance :: enable_provenance_list, callback :: callbacks)
-      atoms ([], [])
+        callback :: callbacks)
+      atoms []
   in
   let binders =
     Hashtbl.fold (fun _ binder binders -> binder :: binders) binders []
@@ -458,10 +443,7 @@ let rec enable_provenance_for_debug schedule b =
     List.iter (fun schedule -> enable_provenance_for_debug schedule b) schedules
   | Saturate rules ->
     List.iter
-      (fun (Rule { enable_provenance; _ }) ->
-        List.iter
-          (fun enable_provenance -> enable_provenance b)
-          enable_provenance)
+      (fun (Rule { enable_provenance; _ }) -> enable_provenance := b)
       rules
 
 let fixpoint schedule = Fixpoint schedule
