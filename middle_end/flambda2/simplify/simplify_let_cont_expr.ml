@@ -1709,6 +1709,11 @@ and after_downwards_traversal_of_body ~simplify_expr ~down_to_up
   let denv_for_join = data.denv_for_join in
   match DA.are_lifting_conts dacc with
   | Lifting_out_of { continuation = _ } ->
+      if Original_handlers.is_wrapper data.handlers then
+        (* wrapper continuations are not lifted, and will be duplicated and re-simplified
+           for each specialized continuation, so we can just not simplify their handler *)
+      down_to_up dacc ~rebuild:rebuild_body
+    else begin
     (* In this case, we have decided to lift the continuation being bound out of
        its defining handler. Therefore we save the non-simplified version of the
        continuation in the dacc, so that we can simplify during the `down_to_up`
@@ -1725,6 +1730,7 @@ and after_downwards_traversal_of_body ~simplify_expr ~down_to_up
       DA.add_to_lifted_constant_accumulator dacc data.prior_lifted_constants
     in
     down_to_up dacc ~rebuild:rebuild_body
+  end
   | Not_lifting | Analyzing _ ->
     simplify_handlers data dacc ~simplify_expr ~down_to_up ~denv_for_join
       ~rebuild_body
@@ -1804,24 +1810,37 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     | Replayed continuation_mapping -> (
       match data.handlers with
       | Non_recursive non_rec_handler ->
-        let lifted_cont =
-          Continuation.Map.find non_rec_handler.cont continuation_mapping
-        in
-        let new_handler =
-          let args =
-            List.map
-              (fun bp -> Simple.var (Bound_parameter.var bp))
-              (Bound_parameters.to_list non_rec_handler.params)
+        if non_rec_handler.is_wrapper then
+          (* wrapper continuations (such as the ones introduced for over-applications),
+             are not lifted, and are duplicated.
+
+            CR gbury: this might end up duplicating a fair bit of code, e.g. if an
+            application in a wrapper continuation (such as the ones introduced for
+            over-application wrapper continuations) is inlined. The "correct" way to solve this
+            is to either better handle symbols introduced while simplifying downwards,
+            or partially rebuild the generic handler to use as base for the specialized handlers.
+          *)
+          data.handlers
+        else begin
+          let lifted_cont =
+            Continuation.Map.find non_rec_handler.cont continuation_mapping
           in
-          let apply_cont =
-            Apply_cont.create lifted_cont ~dbg:Debuginfo.none ~args
+          let new_handler =
+            let args =
+              List.map
+                (fun bp -> Simple.var (Bound_parameter.var bp))
+                (Bound_parameters.to_list non_rec_handler.params)
+            in
+            let apply_cont =
+              Apply_cont.create lifted_cont ~dbg:Debuginfo.none ~args
+            in
+            Flambda.Expr.create_apply_cont apply_cont
           in
-          Flambda.Expr.create_apply_cont apply_cont
-        in
-        let new_non_rec_handler =
-          Non_recursive_handler.with_handler new_handler non_rec_handler
-        in
-        Original_handlers.create_non_recursive new_non_rec_handler
+          let new_non_rec_handler =
+            Non_recursive_handler.with_handler new_handler non_rec_handler
+          in
+          Original_handlers.create_non_recursive new_non_rec_handler
+      end
       | Recursive { invariant_params; lifted_params; continuation_handlers } ->
         assert (Lifted_cont_params.is_empty lifted_params);
         let continuation_handlers =

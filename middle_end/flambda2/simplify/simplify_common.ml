@@ -245,7 +245,7 @@ let split_direct_over_application apply ~callee's_code_id
           ~free_names_of_handler:(Known handler_expr_free_names)
           ~is_exn_handler:false ~is_cold:false
       in
-      Let_cont.create_non_recursive after_over_application handler
+      Let_cont.create_wrapper after_over_application handler
         ~body:(Expr.create_apply perform_over_application)
         ~free_names_of_body:(Known perform_over_application_free_names)
   in
@@ -293,7 +293,7 @@ let split_direct_over_application apply ~callee's_code_id
       ~relative_history:(Apply.relative_history apply)
   in
   let both_applications =
-    Let_cont.create_non_recursive after_full_application
+    Let_cont.create_wrapper after_full_application
       after_full_application_handler
       ~body:(Expr.create_apply full_apply)
       ~free_names_of_body:(Known (Apply.free_names full_apply))
