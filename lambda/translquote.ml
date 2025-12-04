@@ -787,7 +787,7 @@ end = struct
          impls (for example Stdlib.Buffer should reference Stdlib__Buffer but
          this references Stdlib). *)
       Env.require_global_for_quote
-        (Global_module.Name.of_head_of_global_name a1);
+        (Compilation_unit.Name.of_head_of_global_name a1);
       let a1 = Global_module.Name.to_string a1 in
       apply1 "Identifier.Module" "global_module" loc (string ~loc a1)
 
@@ -1056,7 +1056,7 @@ end = struct
   let of_string loc a1 = apply1 "Module_type" "of_string" loc (string ~loc a1)
 end
 
-module Fragment : sig
+module Modtype_path : sig
   type s
 
   type t' = s lazy_t
@@ -1077,9 +1077,10 @@ end = struct
 
   let wrap = inject_force
 
-  let name loc a1 = apply1 "Fragment" "name" loc (string ~loc a1)
+  let name loc a1 = apply1 "Modtype_path" "name" loc (string ~loc a1)
 
-  let dot loc a1 a2 = apply2 "Fragment" "dot" loc (extract a1) (string ~loc a2)
+  let dot loc a1 a2 =
+    apply2 "Modtype_path" "dot" loc (extract a1) (string ~loc a2)
 end
 
 module Variant : sig
@@ -1333,7 +1334,10 @@ and Type : sig
     t'
 
   val package :
-    Debuginfo.Scoped_location.t -> Module_type.t -> (Fragment.t * t) list -> t'
+    Debuginfo.Scoped_location.t ->
+    Module_type.t ->
+    (Modtype_path.t * t) list ->
+    t'
 
   val quote : Debuginfo.Scoped_location.t -> t -> t'
 
@@ -2238,7 +2242,7 @@ let quote_value_ident_path loc env path ident_kind =
   | Id_prim _ -> ()
   | Id_value -> (
     match Env.address_head (Env.find_value_address path env) with
-    | Env.AHunit cu -> Env.require_global_for_quote (Global_module.name cu)
+    | Env.AHunit cu -> Env.require_global_for_quote (Compilation_unit.name cu)
     | _ | (exception Not_found) -> ()));
   match value_for_path_opt loc path with
   | Some ident_val -> ident_val
@@ -2311,11 +2315,12 @@ let quote_constructor env loc constr =
    with Non_builtin name -> Constructor.of_string loc name)
   |> Constructor.wrap
 
-let rec quote_fragment_of_lid loc = function
-  | Lident id -> Fragment.name loc id |> Fragment.wrap
+let rec quote_modtype_path_of_lid loc = function
+  | Lident id -> Modtype_path.name loc id |> Modtype_path.wrap
   | Ldot (p, s) ->
-    Fragment.dot loc (quote_fragment_of_lid loc p) s |> Fragment.wrap
-  | _ -> fatal_error "Translquote: unsupported fragment type detected."
+    Modtype_path.dot loc (quote_modtype_path_of_lid loc p) s
+    |> Modtype_path.wrap
+  | _ -> fatal_error "Translquote: unsupported modtype_path type detected."
 
 let quote_variant loc name = Variant.of_string loc name |> Variant.wrap
 
@@ -2633,7 +2638,7 @@ and quote_core_type ~scopes ty =
     and with_types =
       List.map
         (fun (lid, ty) ->
-          ( quote_fragment_of_lid
+          ( quote_modtype_path_of_lid
               (of_location ~scopes Asttypes.(lid.loc))
               lid.txt,
             quote_core_type ~scopes ty ))

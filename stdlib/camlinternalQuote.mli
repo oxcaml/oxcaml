@@ -286,7 +286,7 @@ module Method : sig
   val of_string : string -> t
 end
 
-module Fragment : sig
+module Modtype_path : sig
   type t
 
   val name : string -> t
@@ -383,7 +383,7 @@ and Type : sig
 
   val poly : Loc.t -> Name.t list -> (Var.Type_var.t list -> t) lam -> t
 
-  val package : Module_type.t -> (Fragment.t * t) list -> t
+  val package : Module_type.t -> (Modtype_path.t * t) list -> t
 
   val quote : t -> t
 

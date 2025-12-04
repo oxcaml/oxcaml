@@ -1208,11 +1208,11 @@ module Ast = struct
     | Vtag of Variant.t * bool * core_type list
     | Vinherit of core_type
 
-  and package_type = module_type * (fragment * core_type) list
+  and package_type = module_type * (modtype_path * core_type) list
 
-  and fragment =
+  and modtype_path =
     | Name of Name.t
-    | Dot of fragment * Name.t
+    | Dot of modtype_path * Name.t
 
   type type_constraint =
     | Constraint of core_type
@@ -1556,9 +1556,9 @@ module Ast = struct
         (fun ty -> pp fmt "@ &@ %a" (print_core_type_with_arrow env) ty)
         tys
 
-  and print_fragment fmt = function
+  and print_modtype_path fmt = function
     | Name s -> Name.print fmt s
-    | Dot (frag, s) -> pp fmt "%a.%a" print_fragment frag Name.print s
+    | Dot (frag, s) -> pp fmt "%a.%a" print_modtype_path frag Name.print s
 
   and print_core_type_with_arrow env fmt ty =
     match ty with
@@ -1653,12 +1653,12 @@ module Ast = struct
       print_tuple_like "" "" "." (Var.Type_var.print env) fmt (tv :: tvs);
       pp fmt "@ %a" (print_core_type env) ty
     | TypePackage (ident, []) -> print_module_type env fmt ident
-    | TypePackage (ident, (fragment, core_type) :: wcs) ->
+    | TypePackage (ident, (modtype_path, core_type) :: wcs) ->
       pp fmt "@[%a@ with@ type@ %a@ =@ %a" (print_module_type env) ident
-        print_fragment fragment (print_core_type env) core_type;
+        print_modtype_path modtype_path (print_core_type env) core_type;
       List.iter
-        (fun (fragment, core_type) ->
-          pp fmt "@ and@ type@ %a@ =@ %a" print_fragment fragment
+        (fun (modtype_path, core_type) ->
+          pp fmt "@ and@ type@ %a@ =@ %a" print_modtype_path modtype_path
             (print_core_type env) core_type)
         wcs;
       pp fmt "@]"
@@ -1946,8 +1946,8 @@ module Label = struct
   let optional s = Ast.Optional s
 end
 
-module Fragment = struct
-  type t = Ast.fragment
+module Modtype_path = struct
+  type t = Ast.modtype_path
 
   let name s = Ast.Name s
 
