@@ -114,7 +114,7 @@ module Identifier : sig
   module Module : sig
     type t
 
-    val compilation_unit : string -> t
+    val global_module : string -> t
 
     val dot : t -> string -> t
 
@@ -517,7 +517,7 @@ and Comprehension : sig
 
   val body : Exp.t -> t
 
-  val when_clause : Exp.t -> t -> t
+  val when_clause : t -> Exp.t -> t
 
   val for_range :
     Loc.t -> Name.t -> Exp.t -> Exp.t -> bool -> (Var.Value.t -> t) lam -> t

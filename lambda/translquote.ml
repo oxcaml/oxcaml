@@ -239,7 +239,7 @@ end = struct
       }
     in
     lfunction
-      ~kind:(Curried { nlocal = 1 })
+      ~kind:(Curried { nlocal = 0 })
       ~params:[param_from_name id]
       ~return:(Pvalue { raw_kind = Pgenval; nullable = Non_nullable })
       ~attr:default_function_attribute ~body ~loc ~mode:alloc_heap
@@ -600,7 +600,7 @@ module Identifier : sig
 
     val wrap : t' -> t
 
-    val compilation_unit :
+    val global_module :
       Debuginfo.Scoped_location.t -> Global_module.Name.t -> t'
 
     val dot : Debuginfo.Scoped_location.t -> t -> string -> t'
@@ -781,15 +781,15 @@ end = struct
 
     let wrap = inject_force
 
-    let compilation_unit loc a1 =
+    let global_module loc a1 =
       (* CR metaprogramming jrickard: I'm pretty confident this is bugged:
          it ignores parameterized libraries, and references the wrong file for
          impls (for example Stdlib.Buffer should reference Stdlib__Buffer but
          this references Stdlib). *)
       Env.require_global_for_quote
-        (Compilation_unit.Name.of_head_of_global_name a1);
+        (Global_module.Name.of_head_of_global_name a1);
       let a1 = Global_module.Name.to_string a1 in
-      apply1 "Identifier.Module" "compilation_unit" loc (string ~loc a1)
+      apply1 "Identifier.Module" "global_module" loc (string ~loc a1)
 
     let dot loc a1 a2 =
       apply2 "Identifier.Module" "dot" loc (extract a1) (string ~loc a2)
@@ -1685,7 +1685,7 @@ and Comprehension : sig
 
   val body : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
-  val when_clause : Debuginfo.Scoped_location.t -> Exp.t -> t -> t'
+  val when_clause : Debuginfo.Scoped_location.t -> t -> Exp.t -> t'
 
   val for_range :
     Debuginfo.Scoped_location.t ->
@@ -1695,6 +1695,14 @@ and Comprehension : sig
     Exp.t ->
     bool ->
     (Var.Value.t -> t) lam ->
+    t'
+
+  val for_in :
+    Debuginfo.Scoped_location.t ->
+    Loc.t ->
+    Exp.t ->
+    Name.t list ->
+    (Var.Value.t list -> Pat.t * t) lam ->
     t'
 end = struct
   type s = lambda
@@ -1713,6 +1721,11 @@ end = struct
   let for_range loc a1 a2 a3 a4 a5 a6 =
     apply6 "Comprehension" "for_range" loc (extract a1) (extract a2)
       (extract a3) (extract a4) (transl_bool a5) (extract a6)
+
+  let for_in loc a1 a2 a3 a4 =
+    apply4 "Comprehension" "for_in" loc (extract a1) (extract a2)
+      (mk_list ~loc (List.map extract a3))
+      (extract a4)
 end
 
 and Exp_desc : sig
@@ -2143,7 +2156,7 @@ let rec module_for_path loc = function
     | Some m -> Identifier.Module.var loc m (quote_loc loc)
     | None -> (
       match Ident.to_global id with
-      | Some global -> Identifier.Module.compilation_unit loc global
+      | Some global -> Identifier.Module.global_module loc global
       | None -> raise Exit))
     |> Identifier.Module.wrap
   | Path.Pdot (p, s) ->
@@ -2225,7 +2238,7 @@ let quote_value_ident_path loc env path ident_kind =
   | Id_prim _ -> ()
   | Id_value -> (
     match Env.address_head (Env.find_value_address path env) with
-    | Env.AHunit cu -> Env.require_global_for_quote (Compilation_unit.name cu)
+    | Env.AHunit cu -> Env.require_global_for_quote (Global_module.name cu)
     | _ | (exception Not_found) -> ()));
   match value_for_path_opt loc path with
   | Some ident_val -> ident_val
@@ -2401,7 +2414,7 @@ let rec quote_module_path loc = function
   | Path.Pident s -> (
     match Ident.to_global s with
     | Some global ->
-      Identifier.Module.compilation_unit loc global |> Identifier.Module.wrap
+      Identifier.Module.global_module loc global |> Identifier.Module.wrap
     | None -> failwith "TODO")
   | Path.Pdot (p, s) ->
     Identifier.Module.dot loc (quote_module_path loc p) s
@@ -2650,7 +2663,7 @@ type case_binding =
       * Name.t list
       * (Var.Value.t list -> (Var.Module.t list -> Pat.t) lam) lam
 
-let rec case_binding ~scopes transl stage case =
+let rec case_binding ~scopes ~transl stage case =
   let pat = case.c_lhs in
   let loc = of_location ~scopes pat.pat_loc in
   match case.c_guard with
@@ -2659,13 +2672,13 @@ let rec case_binding ~scopes transl stage case =
       match pat_bound_idents pat with
       | [] ->
         let pat = quote_computation_pattern ~scopes pat in
-        let exp = quote_expression ~scopes transl stage case.c_rhs in
+        let exp = quote_expression ~scopes ~transl stage case.c_rhs in
         Non_binding (pat, exp)
       | ids ->
         let names = List.map (name_of_ident loc) ids in
         let pat = quote_computation_pattern ~scopes pat in
         with_new_idents_values ids;
-        let exp = quote_expression ~scopes transl stage case.c_rhs in
+        let exp = quote_expression ~scopes ~transl stage case.c_rhs in
         let res =
           match case.c_rhs.exp_desc with
           | Texp_unreachable ->
@@ -2691,7 +2704,7 @@ let rec case_binding ~scopes transl stage case =
       match (pat :> value general_pattern).pat_desc with
       | Tpat_var (id, name, _, _, _) ->
         with_new_idents_values [id];
-        let exp = quote_expression ~scopes transl stage case.c_rhs in
+        let exp = quote_expression ~scopes ~transl stage case.c_rhs in
         let res =
           Simple
             (quote_name loc name.txt, Lam.func ~loc Var_value extract id exp)
@@ -2707,8 +2720,8 @@ let rec case_binding ~scopes transl stage case =
     in
     let pat = quote_computation_pattern ~scopes case.c_lhs in
     with_new_idents_values ids;
-    let exp = quote_expression ~scopes transl stage case.c_rhs in
-    let guard = quote_expression ~scopes transl stage guard in
+    let exp = quote_expression ~scopes ~transl stage case.c_rhs in
+    let guard = quote_expression ~scopes ~transl stage guard in
     let body =
       Lam.list_param_binding ~loc Var_value extract ids
         (Lam.list_param_binding ~loc Var_module
@@ -2719,8 +2732,8 @@ let rec case_binding ~scopes transl stage case =
     without_idents_values ids;
     res
 
-and case_value_pattern_binding transl stage case =
-  case_binding transl stage
+and case_value_pattern_binding ~transl stage case =
+  case_binding ~transl stage
     { case with c_lhs = as_computation_pattern case.c_lhs }
 
 and quote_case_binding loc cb =
@@ -2735,11 +2748,11 @@ and quote_case_binding loc cb =
     Case.refutation loc (quote_loc loc) names_vals names_mods body)
   |> Case.wrap
 
-and quote_case ~scopes transl stage loc case =
-  quote_case_binding loc (case_binding ~scopes transl stage case)
+and quote_case ~scopes ~transl stage loc case =
+  quote_case_binding loc (case_binding ~scopes ~transl stage case)
 
-and quote_value_pattern_case ~scopes transl stage loc case =
-  quote_case_binding loc (case_value_pattern_binding ~scopes transl stage case)
+and quote_value_pattern_case ~scopes ~transl stage loc case =
+  quote_case_binding loc (case_value_pattern_binding ~scopes ~transl stage case)
 
 and quote_newtype ~scopes loc ident sloc rest =
   Function.newtype loc (quote_loc loc)
@@ -2747,7 +2760,7 @@ and quote_newtype ~scopes loc ident sloc rest =
     (Lam.func ~loc Var_type_constr extract ident rest)
   |> Function.wrap
 
-and fun_param_binding ~scopes transl stage loc param frest =
+and fun_param_binding ~scopes ~transl stage loc param frest =
   let with_newtypes =
     List.fold_right
       (fun (ident, sloc, _, _) rest ->
@@ -2758,7 +2771,7 @@ and fun_param_binding ~scopes transl stage loc param frest =
     match param.fp_kind with
     | Tparam_pat pat -> pat, None
     | Tparam_optional_default (pat, exp, _) ->
-      pat, Some (quote_expression ~scopes transl stage exp)
+      pat, Some (quote_expression ~scopes ~transl stage exp)
   in
   let idents = pat_bound_idents pat in
   let fun_ =
@@ -2797,27 +2810,27 @@ and fun_param_binding ~scopes transl stage loc param frest =
   in
   Function.wrap fun_
 
-and quote_function ~scopes transl stage loc fn extras =
+and quote_function ~scopes ~transl stage loc fn extras =
   match fn with
   | Texp_function fn ->
     List.iter with_new_param fn.params;
     let fn_body =
       match fn.body with
       | Tfunction_body exp ->
-        Function.body loc (quote_expression ~scopes transl stage exp) None
+        Function.body loc (quote_expression ~scopes ~transl stage exp) None
       | Tfunction_cases cases ->
         Function.cases loc
           (List.map
              (fun fc ->
                quote_case_binding
                  (of_location ~scopes fc.c_lhs.pat_loc)
-                 (case_value_pattern_binding ~scopes transl stage fc))
+                 (case_value_pattern_binding ~scopes ~transl stage fc))
              cases.fc_cases)
           None
     in
     let fn_def =
       List.fold_right
-        (fun_param_binding ~scopes transl stage loc)
+        (fun_param_binding ~scopes ~transl stage loc)
         fn.params (Function.wrap fn_body)
     in
     List.iter without_param fn.params;
@@ -2835,37 +2848,55 @@ and quote_function ~scopes transl stage loc fn extras =
       extras fn_def
   | _ -> fatal_error "Translquote: unexpected usage of quote_function."
 
-and quote_module_exp transl stage loc mod_exp =
+and quote_module_exp ~transl stage loc mod_exp =
   match mod_exp.mod_desc with
   | Tmod_ident (path, _) ->
     let m = quote_module_path loc path in
     Module.ident loc m |> Module.wrap
   | Tmod_apply (funct, arg, _) ->
-    let transl_funct = quote_module_exp transl stage loc funct in
-    let transl_arg = quote_module_exp transl stage loc arg in
+    let transl_funct = quote_module_exp ~transl stage loc funct in
+    let transl_arg = quote_module_exp ~transl stage loc arg in
     Module.apply loc transl_funct transl_arg |> Module.wrap
   | Tmod_apply_unit funct ->
-    let transl_funct = quote_module_exp transl stage loc funct in
+    let transl_funct = quote_module_exp ~transl stage loc funct in
     Module.apply_unit loc transl_funct |> Module.wrap
   | Tmod_constraint (mod_exp, _, _, _) ->
-    quote_module_exp transl stage loc mod_exp
+    quote_module_exp ~transl stage loc mod_exp
   | Tmod_structure _ | Tmod_functor _ ->
     fatal_error "Translquote: cannot quote struct..end blocks"
   | Tmod_unpack _ ->
     fatal_error "Translquote: no support for unpacking first-class modules"
 
-and quote_comprehension ~scopes transl stage loc { comp_body; comp_clauses } =
+and quote_comprehension ~scopes ~transl stage loc { comp_body; comp_clauses } =
+  let add_clb_idents clb =
+    match clb.comp_cb_iterator with
+    | Texp_comp_range { ident; _ } -> with_new_idents_values [ident]
+    | Texp_comp_in { pattern; _ } ->
+      with_new_idents_values (pat_bound_idents pattern)
+  and remove_clb_idents clb =
+    match clb.comp_cb_iterator with
+    | Texp_comp_range { ident; _ } -> without_idents_values [ident]
+    | Texp_comp_in { pattern; _ } ->
+      without_idents_values (pat_bound_idents pattern)
+  in
+  let add_comprehension_idents = function
+    | Texp_comp_when _ -> ()
+    | Texp_comp_for clbs -> List.iter add_clb_idents clbs
+  and remove_comprehension_idents = function
+    | Texp_comp_when _ -> ()
+    | Texp_comp_for clbs -> List.iter remove_clb_idents clbs
+  in
   let add_clause body = function
     | Texp_comp_when exp ->
-      let exp = quote_expression ~scopes transl stage exp in
-      Comprehension.when_clause loc exp body |> Comprehension.wrap
+      let exp = quote_expression ~scopes ~transl stage exp in
+      Comprehension.when_clause loc body exp |> Comprehension.wrap
     | Texp_comp_for clause_bindings ->
       List.fold_left
         (fun body clb ->
-          match clb.comp_cb_iterator with
+          (match clb.comp_cb_iterator with
           | Texp_comp_range rcd ->
-            let start = quote_expression ~scopes transl stage rcd.start
-            and stop = quote_expression ~scopes transl stage rcd.stop
+            let start = quote_expression ~scopes ~transl stage rcd.start
+            and stop = quote_expression ~scopes ~transl stage rcd.stop
             and direction =
               match rcd.direction with Upto -> true | Downto -> false
             in
@@ -2873,20 +2904,35 @@ and quote_comprehension ~scopes transl stage loc { comp_body; comp_clauses } =
             Comprehension.for_range loc (quote_loc loc)
               (quote_name loc (Ident.name rcd.ident))
               start stop direction body_fn
-            |> Comprehension.wrap
-          | Texp_comp_in _ ->
-            fatal_error
-              "Translquote: incomplete support for `in` comprehensions")
+          | Texp_comp_in { pattern; sequence } ->
+            let expr_lam = quote_expression ~scopes ~transl stage sequence in
+            let idents = pat_bound_idents pattern in
+            let names =
+              List.map (fun ident -> quote_name loc (Ident.name ident)) idents
+            in
+            let pat_lam = quote_value_pattern ~scopes pattern in
+            let body_fn =
+              Lam.list_param_binding ~loc Var_value
+                (fun (pat, compr) -> pair ~loc (extract pat, extract compr))
+                idents (pat_lam, body)
+            in
+            Comprehension.for_in loc (quote_loc loc) expr_lam names body_fn)
+          |> Comprehension.wrap)
         body clause_bindings
   in
+  List.iter add_comprehension_idents comp_clauses;
   let body =
-    Comprehension.body loc (quote_expression ~scopes transl stage comp_body)
+    Comprehension.body loc (quote_expression ~scopes ~transl stage comp_body)
   in
-  List.fold_left
-    (fun body clause -> add_clause body clause)
-    (Comprehension.wrap body) comp_clauses
+  let comprehension =
+    List.fold_right
+      (fun comp body -> add_clause body comp)
+      comp_clauses (Comprehension.wrap body)
+  in
+  List.iter remove_comprehension_idents comp_clauses;
+  comprehension
 
-and quote_expression_extra ~scopes _ _ extra lambda =
+and quote_expression_extra ~scopes _stage extra lambda =
   let extra, loc, _ = extra in
   let loc = of_location ~scopes loc in
   match extra with
@@ -2926,7 +2972,7 @@ and update_env_without_extra extra =
   | Texp_poly _ -> fatal_error "Translquote: Texp_poly not implemented"
   | Texp_mode _ -> ()
 
-and quote_expression_desc ~scopes transl stage e =
+and quote_expression_desc ~scopes ~transl stage e =
   let env = e.exp_env in
   let loc = of_location ~scopes e.exp_loc in
   List.iter update_env_with_extra e.exp_extra;
@@ -2951,13 +2997,13 @@ and quote_expression_desc ~scopes transl stage e =
         let idents, defs = List.split names_defs in
         with_new_idents_values idents;
         let names_lam = List.map (name_of_ident loc) idents in
-        let defs_lam = List.map (quote_expression ~scopes transl stage) defs in
+        let defs_lam = List.map (quote_expression ~scopes ~transl stage) defs in
         let frest =
           Lam.list_param_binding ~loc Var_value
             (fun (defs, body) ->
               pair ~loc (mk_list ~loc (List.map extract defs), extract body))
             idents
-            (defs_lam, quote_expression ~scopes transl stage exp)
+            (defs_lam, quote_expression ~scopes ~transl stage exp)
         in
         without_idents_values idents;
         Exp_desc.let_rec_simple loc (quote_loc loc) names_lam frest
@@ -2967,7 +3013,7 @@ and quote_expression_desc ~scopes transl stage e =
             (fun (val_l, _, pats, defs) vb ->
               let pat = vb.vb_pat in
               let idents = pat_bound_idents pat in
-              let def = quote_expression ~scopes transl stage vb.vb_expr in
+              let def = quote_expression ~scopes ~transl stage vb.vb_expr in
               with_new_idents_values idents;
               idents @ val_l, [], pat :: pats, def :: defs)
             ([], [], [], []) (List.rev vbs)
@@ -2987,7 +3033,7 @@ and quote_expression_desc ~scopes transl stage e =
             (Lam.list_param_binding ~loc Var_module
                (fun (p, e) -> pair ~loc (extract p, extract e))
                []
-               (def_pat, quote_expression ~scopes transl stage exp))
+               (def_pat, quote_expression ~scopes ~transl stage exp))
         in
         List.iter
           (fun vb -> without_idents_values (pat_bound_idents vb.vb_pat))
@@ -2995,12 +3041,12 @@ and quote_expression_desc ~scopes transl stage e =
         Exp_desc.let_ loc (quote_loc loc) names_lam [] defs frest)
     | Texp_function fun_spec ->
       let fn =
-        quote_function ~scopes transl stage loc (Texp_function fun_spec)
+        quote_function ~scopes ~transl stage loc (Texp_function fun_spec)
           e.exp_extra
       in
       Exp_desc.function_ loc fn
     | Texp_apply (fn, args, _, _, _) ->
-      let fn = quote_expression ~scopes transl stage fn in
+      let fn = quote_expression ~scopes ~transl stage fn in
       let args =
         List.filter
           (fun (_, exp) -> match exp with Omitted _ -> false | _ -> true)
@@ -3013,26 +3059,26 @@ and quote_expression_desc ~scopes transl stage e =
             | Omitted _ -> assert false
             | Arg (exp, _) ->
               let lbl = quote_arg_label loc lbl in
-              let exp = quote_expression ~scopes transl stage exp in
+              let exp = quote_expression ~scopes ~transl stage exp in
               lbl, exp)
           args
       in
       Exp_desc.apply loc fn args
     | Texp_match (exp, _, cases, _) ->
-      let exp = quote_expression ~scopes transl stage exp in
-      let cases = List.map (quote_case ~scopes transl stage loc) cases in
+      let exp = quote_expression ~scopes ~transl stage exp in
+      let cases = List.map (quote_case ~scopes ~transl stage loc) cases in
       Exp_desc.match_ loc exp cases
     | Texp_try (exp, cases) ->
-      let exp = quote_expression transl ~scopes stage exp
+      let exp = quote_expression ~transl ~scopes stage exp
       and cases =
-        List.map (quote_value_pattern_case ~scopes transl stage loc) cases
+        List.map (quote_value_pattern_case ~scopes ~transl stage loc) cases
       in
       Exp_desc.try_ loc exp cases
     | Texp_tuple (exps, _) ->
       let exps =
         List.map
           (fun (lab, exp) ->
-            quote_nonopt loc lab, quote_expression ~scopes transl stage exp)
+            quote_nonopt loc lab, quote_expression ~scopes ~transl stage exp)
           exps
       in
       Exp_desc.tuple loc exps
@@ -3041,9 +3087,9 @@ and quote_expression_desc ~scopes transl stage e =
       let args =
         match args with
         | [] -> None
-        | [arg] -> Some (quote_expression ~scopes transl stage arg)
+        | [arg] -> Some (quote_expression ~scopes ~transl stage arg)
         | _ :: _ ->
-          let args = List.map (quote_expression ~scopes transl stage) args in
+          let args = List.map (quote_expression ~scopes ~transl stage) args in
           let with_labels =
             List.map
               (fun a -> Label.Nonoptional.wrap Label.Nonoptional.no_label, a)
@@ -3057,7 +3103,7 @@ and quote_expression_desc ~scopes transl stage e =
       let variant = quote_variant loc variant
       and argo =
         Option.map
-          (fun (arg, _) -> quote_expression ~scopes transl stage arg)
+          (fun (arg, _) -> quote_expression ~scopes ~transl stage arg)
           argo
       in
       Exp_desc.variant loc variant argo
@@ -3068,7 +3114,8 @@ and quote_expression_desc ~scopes transl stage e =
             let lbl = quote_record_field env loc lbl in
             let exp =
               match def with
-              | Overridden (_, exp) -> quote_expression ~scopes transl stage exp
+              | Overridden (_, exp) ->
+                quote_expression ~scopes ~transl stage exp
               | Kept _ ->
                 fatal_error "Translquote: record update syntax not implemented"
             in
@@ -3077,88 +3124,88 @@ and quote_expression_desc ~scopes transl stage e =
       in
       let base =
         Option.map
-          (fun (e, _, _) -> quote_expression ~scopes transl stage e)
+          (fun (e, _, _) -> quote_expression ~scopes ~transl stage e)
           record.extended_expression
       in
       Exp_desc.record loc (Array.to_list lbl_exps) base
     | Texp_field (rcd, _, lid, lbl, _, _) ->
-      let rcd = quote_expression ~scopes transl stage rcd in
+      let rcd = quote_expression ~scopes ~transl stage rcd in
       let lbl = quote_record_field env (of_location ~scopes lid.loc) lbl in
       Exp_desc.field loc rcd lbl
     | Texp_setfield (rcd, _, lid, lbl, exp) ->
-      let rcd = quote_expression ~scopes transl stage rcd in
+      let rcd = quote_expression ~scopes ~transl stage rcd in
       let lbl = quote_record_field env (of_location ~scopes lid.loc) lbl in
-      let exp = quote_expression ~scopes transl stage exp in
+      let exp = quote_expression ~scopes ~transl stage exp in
       Exp_desc.setfield loc rcd lbl exp
     | Texp_array (_, _, exps, _) ->
-      let exps = List.map (quote_expression ~scopes transl stage) exps in
+      let exps = List.map (quote_expression ~scopes ~transl stage) exps in
       Exp_desc.array loc exps
     | Texp_ifthenelse (cond, then_, else_) ->
-      let cond = quote_expression ~scopes transl stage cond in
-      let then_ = quote_expression ~scopes transl stage then_ in
-      let else_ = Option.map (quote_expression ~scopes transl stage) else_ in
+      let cond = quote_expression ~scopes ~transl stage cond in
+      let then_ = quote_expression ~scopes ~transl stage then_ in
+      let else_ = Option.map (quote_expression ~scopes ~transl stage) else_ in
       Exp_desc.ifthenelse loc cond then_ else_
     | Texp_sequence (exp1, _, exp2) ->
-      let exp1 = quote_expression ~scopes transl stage exp1 in
-      let exp2 = quote_expression ~scopes transl stage exp2 in
+      let exp1 = quote_expression ~scopes ~transl stage exp1 in
+      let exp2 = quote_expression ~scopes ~transl stage exp2 in
       Exp_desc.sequence loc exp1 exp2
     | Texp_while wh ->
-      let cond = quote_expression ~scopes transl stage wh.wh_cond in
-      let body = quote_expression ~scopes transl stage wh.wh_body in
+      let cond = quote_expression ~scopes ~transl stage wh.wh_cond in
+      let body = quote_expression ~scopes ~transl stage wh.wh_body in
       Exp_desc.while_ loc cond body
     | Texp_for floop ->
-      let low = quote_expression ~scopes transl stage floop.for_from
-      and high = quote_expression ~scopes transl stage floop.for_to
+      let low = quote_expression ~scopes ~transl stage floop.for_from
+      and high = quote_expression ~scopes ~transl stage floop.for_to
       and dir =
         match floop.for_dir with
         | Asttypes.Upto -> true
         | Asttypes.Downto -> false
       and name = quote_name loc (Ident.name floop.for_id) in
       with_new_idents_values [floop.for_id];
-      let body = quote_expression ~scopes transl stage floop.for_body in
+      let body = quote_expression ~scopes ~transl stage floop.for_body in
       without_idents_values [floop.for_id];
       Exp_desc.for_simple loc (quote_loc loc) name low high dir
         (Lam.func ~loc Var_value extract floop.for_id body)
     | Texp_send (obj, meth, _) ->
-      let obj = quote_expression ~scopes transl stage obj in
+      let obj = quote_expression ~scopes ~transl stage obj in
       let meth = quote_method loc meth in
       Exp_desc.send loc obj meth
     | Texp_open _ -> fatal_error "Translquote: Texp_open not implemented"
     | Texp_letmodule (ident, _, _, mod_exp, body) -> (
-      let mod_exp = quote_module_exp transl stage loc mod_exp in
+      let mod_exp = quote_module_exp ~transl stage loc mod_exp in
       match ident with
       | None ->
         Exp_desc.letmodule_nonbinding loc mod_exp
-          (quote_expression ~scopes transl stage body)
+          (quote_expression ~scopes ~transl stage body)
       | Some ident ->
         let name = quote_name loc (Ident.name ident) in
         with_new_idents_modules [ident];
-        let body = quote_expression ~scopes transl stage body in
+        let body = quote_expression ~scopes ~transl stage body in
         without_idents_modules [ident];
         Exp_desc.letmodule loc (quote_loc loc) name mod_exp
           (Lam.func ~loc Var_module extract ident body))
     | Texp_assert (exp, _) ->
-      let exp = quote_expression ~scopes transl stage exp in
+      let exp = quote_expression ~scopes ~transl stage exp in
       Exp_desc.assert_ loc exp
     | Texp_lazy exp ->
-      let exp = quote_expression ~scopes transl stage exp in
+      let exp = quote_expression ~scopes ~transl stage exp in
       Exp_desc.lazy_ loc exp
     | Texp_quotation exp ->
-      let exp = quote_expression ~scopes transl (stage + 1) exp in
+      let exp = quote_expression ~scopes ~transl (stage + 1) exp in
       Exp_desc.quote loc exp
     | Texp_antiquotation exp ->
       if stage > 0
       then
-        let exp = quote_expression ~scopes transl (stage - 1) exp in
+        let exp = quote_expression ~scopes ~transl (stage - 1) exp in
         Exp_desc.antiquote loc exp
       else Exp_desc.splice loc (Code.inject (transl exp))
     | Texp_new (path, _, _, _) ->
       Exp_desc.new_ loc (quote_value_ident_path loc env path Id_value)
-    | Texp_pack m -> Exp_desc.pack loc (quote_module_exp transl stage loc m)
+    | Texp_pack m -> Exp_desc.pack loc (quote_module_exp ~transl stage loc m)
     | Texp_unreachable -> Exp_desc.unreachable
     | Texp_src_pos -> Exp_desc.src_pos
     | Texp_exclave e ->
-      Exp_desc.exclave loc (quote_expression ~scopes transl stage e)
+      Exp_desc.exclave loc (quote_expression ~scopes ~transl stage e)
     | Texp_extension_constructor (_, path) ->
       let name = Name.wrap (Name.mk loc (Path.name path)) in
       Exp_desc.extension_constructor loc name
@@ -3166,7 +3213,7 @@ and quote_expression_desc ~scopes transl stage e =
       let tups =
         List.map
           (fun (lab_opt, exp, _) ->
-            quote_nonopt loc lab_opt, quote_expression ~scopes transl stage exp)
+            quote_nonopt loc lab_opt, quote_expression ~scopes ~transl stage exp)
           ts
       in
       Exp_desc.unboxed_tuple loc tups
@@ -3177,7 +3224,8 @@ and quote_expression_desc ~scopes transl stage e =
             let lbl = quote_record_field env loc lbl in
             let exp =
               match def with
-              | Overridden (_, exp) -> quote_expression ~scopes transl stage exp
+              | Overridden (_, exp) ->
+                quote_expression ~scopes ~transl stage exp
               | Kept _ ->
                 fatal_error "No support for record update syntax in quotations."
             in
@@ -3186,16 +3234,16 @@ and quote_expression_desc ~scopes transl stage e =
       in
       let base =
         Option.map
-          (fun (e, _) -> quote_expression ~scopes transl stage e)
+          (fun (e, _) -> quote_expression ~scopes ~transl stage e)
           record.extended_expression
       in
       Exp_desc.unboxed_record_product loc (Array.to_list lbl_exps) base
     | Texp_unboxed_field (rcd, _, lid, lbl, _) ->
-      let rcd = quote_expression ~scopes transl stage rcd in
+      let rcd = quote_expression ~scopes ~transl stage rcd in
       let lbl = quote_record_field env (of_location ~scopes lid.loc) lbl in
       Exp_desc.unboxed_field loc rcd lbl
     | Texp_letexception (ext_const, exp) ->
-      let exp = quote_expression ~scopes transl stage exp in
+      let exp = quote_expression ~scopes ~transl stage exp in
       Exp_desc.let_exception loc (quote_name loc ext_const.ext_name.txt) exp
     | Texp_letop rcd ->
       let let_l =
@@ -3210,18 +3258,18 @@ and quote_expression_desc ~scopes transl stage e =
               env bop.bop_op_path Id_value)
           rcd.ands
       and defs =
-        quote_expression ~scopes transl stage rcd.let_.bop_exp
+        quote_expression ~scopes ~transl stage rcd.let_.bop_exp
         :: List.map
-             (fun d -> quote_expression ~scopes transl stage d.bop_exp)
+             (fun d -> quote_expression ~scopes ~transl stage d.bop_exp)
              rcd.ands
-      and body = quote_value_pattern_case ~scopes transl stage loc rcd.body in
+      and body = quote_value_pattern_case ~scopes ~transl stage loc rcd.body in
       Exp_desc.let_op loc (let_l :: ands_l) defs body
     | Texp_list_comprehension compr ->
       Exp_desc.list_comprehension loc
-        (quote_comprehension ~scopes transl stage loc compr)
+        (quote_comprehension ~scopes ~transl stage loc compr)
     | Texp_array_comprehension (_, _, compr) ->
       Exp_desc.array_comprehension loc
-        (quote_comprehension ~scopes transl stage loc compr)
+        (quote_comprehension ~scopes ~transl stage loc compr)
     | Texp_overwrite _ -> fatal_error "Translquote: Texp_overwrite"
     | Texp_hole _ -> fatal_error "Translquote: Texp_hole"
     | Texp_instvar _ | Texp_setinstvar _ | Texp_override _ ->
@@ -3238,18 +3286,18 @@ and quote_expression_desc ~scopes transl stage e =
   in
   List.iter update_env_without_extra e.exp_extra;
   List.fold_right
-    (quote_expression_extra ~scopes transl stage)
+    (quote_expression_extra ~scopes stage)
     e.exp_extra (Exp_desc.wrap body)
 
-and quote_expression ~scopes transl stage e =
-  let desc = quote_expression_desc ~scopes transl stage e
+and quote_expression ~scopes ~transl stage e =
+  let desc = quote_expression_desc ~scopes ~transl stage e
   and attributes = quote_attributes e
   and loc = of_location ~scopes e.exp_loc in
   Exp.mk loc desc attributes |> Exp.wrap
 
-let transl_quote ~scopes ~loc transl exp =
+let transl_quote ~scopes ~loc ~transl exp =
   let loc = of_location ~scopes loc in
-  let exp_quoted = quote_expression ~scopes transl 0 exp in
+  let exp_quoted = quote_expression ~scopes ~transl 0 exp in
   let code =
     if Hashtbl.length vars_env.env_poly = 0
     then Code.of_exp loc (quote_loc loc) exp_quoted

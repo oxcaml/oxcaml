@@ -26,9 +26,12 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(** Translate an expression inside a Texp_quotation.
+    The [transl] argument is a function used to translate spliced expressions
+    that need to be translated at compile time. *)
 val transl_quote :
   scopes:Debuginfo.Scoped_location.scopes ->
   loc:Location.t ->
-  (Typedtree.expression -> Lambda.lambda) ->
+  transl:(Typedtree.expression -> Lambda.lambda) ->
   Typedtree.expression ->
   Lambda.lambda

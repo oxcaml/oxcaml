@@ -833,7 +833,7 @@ module With_free_and_bound_vars = struct
 end
 
 type raw_ident_module_t =
-  | Compilation_unit of string
+  | Global_module of string
   | MDot of raw_ident_module_t * string
   | MVar of Var.Module.t * Loc.t
 
@@ -886,7 +886,7 @@ let print_op fmt s =
   else Format.fprintf fmt "%s" s
 
 let rec print_raw_ident_module env fmt = function
-  | Compilation_unit s -> Format.fprintf fmt "%s" s
+  | Global_module s -> Format.fprintf fmt "%s" s
   | MDot (m, s) -> Format.fprintf fmt "%a.%s" (print_raw_ident_module env) m s
   | MVar (vm, _) -> Format.fprintf fmt "%a" (Var.Module.print env) vm
 
@@ -911,7 +911,7 @@ let print_raw_ident_field env fmt = function
   | FDot (m, s) -> Format.fprintf fmt "%a.%s" (print_raw_ident_module env) m s
 
 let rec free_vars_module = function
-  | Compilation_unit _ -> Var.Map.empty
+  | Global_module _ -> Var.Map.empty
   | MDot (t, _) -> free_vars_module t
   | MVar (v, loc) -> Var.Map.singleton (Var.Module.generic v) loc
 
@@ -940,7 +940,7 @@ module Identifier = struct
 
     let mk t = With_free_vars.mk (free_vars_module t) t
 
-    let compilation_unit s = mk (Compilation_unit s)
+    let global_module s = mk (Global_module s)
 
     let dot t s =
       let+ t = t in
@@ -1415,6 +1415,10 @@ module Ast = struct
     | Nonrecursive -> pp fmt "let"
     | Recursive -> pp fmt "let@ rec"
 
+  let print_dir fmt = function
+    | Upto -> pp fmt "to"
+    | Downto -> pp fmt "downto"
+
   let rec print_vb env fmt ({ pat; expr } : value_binding) =
     pp fmt "%a@ =@ @[<2>%a@]"
       (print_pat env) pat (print_exp_with_parens env) expr
@@ -1448,7 +1452,6 @@ module Ast = struct
   and print_field env fmt = function
     | FBasic s -> pp fmt "%s" s
     | FIdent id -> print_raw_ident_field env fmt id
-
 
   and print_pat_with_parens env fmt pat =
     match pat with
@@ -1737,6 +1740,28 @@ module Ast = struct
            (print_exp_with_parens env) fmt items
     else print_tuple_like ";" "[" "]" (print_exp env) fmt items
 
+  and print_comprehension_clause env fmt = function
+    | Range (var, exp_start, exp_stop, dir) ->
+      pp fmt "@[%a = %a@]@ %a@ %a"
+        (Var.Value.print env) var (print_exp env) exp_start
+        (print_dir) dir (print_exp env) exp_stop
+    | In (pat, exp) ->
+      pp fmt "%a@ in@ %a" (print_pat env) pat (print_exp env) exp
+
+  and print_comprehension_body env fmt = function
+    | Body exp -> print_exp env fmt exp
+    | When (comp, _) -> print_comprehension_body env fmt comp
+    | ForComp (comp, _) -> print_comprehension_body env fmt comp
+
+  and print_comprehension env fmt = function
+    | Body _ -> ()
+    | When (comp, exp) ->
+      pp fmt "@ when@ %a%a" (print_exp env) exp (print_comprehension env) comp
+    | ForComp (comp, clause) ->
+      pp fmt "@ for@ %a%a"
+        (print_comprehension_clause env) clause
+        (print_comprehension env) comp
+
   and print_exp_desc env fmt exp =
     match exp.desc with
     | Ident id -> print_raw_ident_value env fmt id
@@ -1834,9 +1859,8 @@ module Ast = struct
         (print_exp_with_parens env)
         body
     | For (it, start, stop, dir, body) ->
-      let dir = match dir with Upto -> "to" | Downto -> "downto" in
-      pp fmt "for@ %a@ =@ %a@ %s@ %a@ do@ @,@[<2>%a@]@ @,done" (print_pat env)
-        it (print_exp env) start dir (print_exp env) stop
+      pp fmt "for@ %a@ =@ %a@ %a@ %a@ do@ @,@[<2>%a@]@ @,done" (print_pat env)
+        it (print_exp env) start print_dir dir (print_exp env) stop
         (print_exp_with_parens env)
         body
     | Send (exp, meth) ->
@@ -1890,8 +1914,12 @@ module Ast = struct
       pp fmt "#%a.%a" (print_exp env) exp (print_field env) rec_field
     | Quote exp -> pp fmt "@[<2><[@,%a@,@]]>" (print_exp env) exp
     | Antiquote exp -> pp fmt "@[<2>$@,%a@]" (print_exp_with_parens env) exp
-    | List_comprehension _ | Array_comprehension _ ->
-      pp fmt "(* comprehension *)"
+    | List_comprehension compr ->
+      pp fmt "@[[@ %a%a@ ]@]"
+        (print_comprehension_body env) compr (print_comprehension env) compr
+    | Array_comprehension compr ->
+      pp fmt "@[[|@ %a%a@ |]@]"
+        (print_comprehension_body env) compr (print_comprehension env) compr
     | Eval typ -> pp fmt "@[<2>[%%eval:@ %a]@]" (print_core_type env) typ
     | Unreachable | Src_pos -> pp fmt "."
 
@@ -2466,8 +2494,8 @@ module Comprehension = struct
     let+ exp = exp in
     Ast.Body exp
 
-  let when_clause exp compr =
-    let+ exp = exp and+ compr = compr in
+  let when_clause compr exp =
+    let+ compr = compr and+ exp = exp in
     Ast.When (compr, exp)
 
   let for_range loc name start stop direction compr =

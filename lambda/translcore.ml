@@ -1332,7 +1332,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
   | Texp_quotation exp ->
       Translquote.transl_quote
-        ~scopes ~loc:e.exp_loc (transl_exp ~scopes sort) exp
+        ~scopes ~loc:e.exp_loc ~transl:(transl_exp ~scopes sort) exp
   (* TODO: update scopes *)
   | Texp_antiquotation exp ->
       fatal_errorf
