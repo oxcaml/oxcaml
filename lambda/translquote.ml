@@ -2384,6 +2384,7 @@ and quote_pat_extra loc pat_lam extra =
   | Tpat_unpack -> pat_lam (* handled elsewhere *)
   | Tpat_type _ -> pat_lam (* TODO: consider adding support for #tconst *)
   | Tpat_open _ -> fatal_error "No support for open patterns."
+  | Tpat_inspected_type Label_disambiguation -> pat_lam
 
 and quote_value_pattern p =
   let env = p.pat_env and loc = p.pat_loc in
@@ -2809,6 +2810,8 @@ and quote_expression_extra _ _ extra lambda =
   | Texp_stack -> Exp_desc.stack loc (mk_exp_noattr loc lambda) |> Exp_desc.wrap
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> lambda (* FIXME: add modes to quotation representation *)
+  | Texp_inspected_type Label_disambiguation -> lambda
+  | Texp_inspected_type Polymorphic_application -> lambda
 
 and update_env_with_extra extra =
   let extra, _, _ = extra in
@@ -2817,6 +2820,8 @@ and update_env_with_extra extra =
   | Texp_constraint _ | Texp_coerce _ | Texp_stack -> ()
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> ()
+  | Texp_inspected_type Label_disambiguation -> ()
+  | Texp_inspected_type Polymorphic_application -> ()
 
 and update_env_without_extra extra =
   let extra, _, _ = extra in
@@ -2825,6 +2830,8 @@ and update_env_without_extra extra =
   | Texp_constraint _ | Texp_coerce _ | Texp_stack -> ()
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> ()
+  | Texp_inspected_type Label_disambiguation -> ()
+  | Texp_inspected_type Polymorphic_application -> ()
 
 and quote_expression_desc transl stage e =
   let env = e.exp_env in

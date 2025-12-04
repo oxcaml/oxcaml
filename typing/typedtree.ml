@@ -128,6 +128,10 @@ let aliased_many_use =
   ( Mode.Uniqueness.disallow_left Mode.Uniqueness.aliased,
     Mode.Linearity.disallow_right Mode.Linearity.many )
 
+type _ type_inspection =
+  | Label_disambiguation : [< `pat | `exp ] type_inspection
+  | Polymorphic_application : [< `exp ] type_inspection
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -146,6 +150,7 @@ and pat_extra =
   | Tpat_type of Path.t * Longident.t loc
   | Tpat_open of Path.t * Longident.t loc * Env.t
   | Tpat_unpack
+  | Tpat_inspected_type of [ `pat ] type_inspection
 
 and 'k pattern_desc =
   (* value patterns *)
@@ -208,6 +213,7 @@ and exp_extra =
                     Parsetree.jkind_annotation option * Uid.t
   | Texp_stack
   | Texp_mode of Mode.Alloc.Const.Option.t
+  | Texp_inspected_type of [ `exp ] type_inspection
 
 and arg_label = Types.arg_label =
   | Nolabel

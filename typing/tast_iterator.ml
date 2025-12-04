@@ -245,6 +245,7 @@ let pat_extra sub (e, loc, attrs) =
   | Tpat_unpack -> ()
   | Tpat_open (_, lid, env) -> iter_loc sub lid; sub.env sub env
   | Tpat_constraint ct -> sub.typ sub ct
+  | Tpat_inspected_type Label_disambiguation -> ()
 
 let pat
   : type k . iterator -> k general_pattern -> unit
@@ -292,6 +293,8 @@ let extra sub = function
   | Texp_poly cto -> Option.iter (sub.typ sub) cto
   | Texp_stack -> ()
   | Texp_mode _ -> ()
+  | Texp_inspected_type Label_disambiguation -> ()
+  | Texp_inspected_type Polymorphic_application -> ()
 
 let function_param sub { fp_loc; fp_kind; fp_newtypes; _ } =
   sub.location sub fp_loc;

@@ -437,6 +437,9 @@ and pattern_extra i ppf (extra_pat, _, attrs) =
   | Tpat_open (id,_,_) ->
      line i ppf "Tpat_extra_open %a\n" fmt_path id;
      attributes i ppf attrs;
+  | Tpat_inspected_type Label_disambiguation ->
+     line i ppf "Tpat_inspected_type Label_disambiguation\n";
+     attributes i ppf attrs;
 
 and function_body i ppf (body : function_body) =
   match[@warning "+9"] body with
@@ -482,6 +485,10 @@ and expression_extra i ppf x attrs =
       line i ppf "Texp_mode\n";
       attributes i ppf attrs;
       alloc_const_option_mode i ppf m
+  | Texp_inspected_type Label_disambiguation ->
+     line i ppf "Tpat_inspected_type Label_disambiguation\n";
+  | Texp_inspected_type Polymorphic_application ->
+     line i ppf "Tpat_inspected_type Polymorphic_application\n";
 
 and alloc_mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
   = fun i ppf m -> line i ppf "alloc_mode %a\n" (Mode.Alloc.print ()) m

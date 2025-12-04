@@ -121,6 +121,10 @@ type texp_field_boxing =
 
 val aliased_many_use : unique_use
 
+type _ type_inspection =
+  | Label_disambiguation : [< `pat | `exp ] type_inspection
+  | Polymorphic_application : [< `exp ] type_inspection
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -155,6 +159,11 @@ and pat_extra =
             (module _)     { pat_desc  = Tpat_any
             ; pat_extra = (Tpat_unpack, _, _) :: ... }
          *)
+  | Tpat_inspected_type of [ `pat ] type_inspection
+        (** Inserted when type inspection was necessary to resolve types
+            during inference. Generally, elaborated to a type constraint.
+
+            See specific [type_inspection] cases for details. *)
 
 and 'k pattern_desc =
   (* value patterns *)
@@ -294,6 +303,11 @@ and exp_extra =
         (** stack_ E *)
   | Texp_mode of Mode.Alloc.Const.Option.t
         (** E : _ @@ M  *)
+  | Texp_inspected_type of [ `exp ] type_inspection
+        (** Inserted when type inspection was necessary to resolve types
+            during inference. Generally, elaborated to a type constraint.
+
+            See specific [type_inspection] cases for details. *)
 
 and arg_label = Types.arg_label =
   | Nolabel
