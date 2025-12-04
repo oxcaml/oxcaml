@@ -2146,6 +2146,11 @@ let type_for_path loc = function
     Identifier.Type.dot loc (module_for_path loc p) s |> Identifier.Type.wrap
   | _ -> raise Exit
 
+let type_constr_for_path loc path arity =
+  Type.constr loc (type_for_path loc path)
+    (List.init arity (fun _ -> Type.var loc None |> Type.wrap))
+  |> Type.wrap
+
 let value_for_path loc = function
   | Path.Pdot (p, s) ->
     Identifier.Value.dot loc (module_for_path loc p) s |> Identifier.Value.wrap
@@ -2334,6 +2339,27 @@ let without_param fp =
     (fun (id, _, _, _) -> without_idents_types_constr [id])
     fp.fp_newtypes
 
+let type_constraint_of_ambiguity loc ambiguity =
+  match ambiguity with
+  | Unambiguous -> None
+  | Ambiguous { path; arity } -> Some (type_constr_for_path loc path arity)
+
+let constrain_exp_with_type loc typ exp_desc =
+  Type_constraint.constraint_ loc typ
+  |> Type_constraint.wrap
+  |> Exp_desc.constraint_ loc (exp_desc |> mk_exp_noattr loc)
+
+let maybe_constrain_exp_desc_with_type loc typ exp_desc =
+  match typ with
+  | Some typ -> constrain_exp_with_type loc typ exp_desc |> Exp_desc.wrap
+  | None -> exp_desc
+
+let constrain_pat_with_type loc typ pat =
+  Pat.constraint_ loc pat typ |> Pat.wrap
+
+let maybe_constrain_pat_with_type loc typ exp =
+  match typ with Some typ -> constrain_pat_with_type loc typ exp | None -> exp
+
 type case_binding =
   | Non_binding of Pat.t * Exp.t
   | Simple of Name.t * (Var.Value.t -> Exp.t) lam
@@ -2384,7 +2410,10 @@ and quote_pat_extra loc pat_lam extra =
   | Tpat_unpack -> pat_lam (* handled elsewhere *)
   | Tpat_type _ -> pat_lam (* TODO: consider adding support for #tconst *)
   | Tpat_open _ -> fatal_error "No support for open patterns."
-  | Tpat_inspected_type Label_disambiguation -> pat_lam
+  | Tpat_inspected_type (Label_disambiguation ambiguity) ->
+    pat_lam
+    |> maybe_constrain_pat_with_type loc
+         (type_constraint_of_ambiguity loc ambiguity)
   | Tpat_inspected_type Polymorphic_parameter -> pat_lam
 
 and quote_value_pattern p =
@@ -2811,7 +2840,10 @@ and quote_expression_extra _ _ extra lambda =
   | Texp_stack -> Exp_desc.stack loc (mk_exp_noattr loc lambda) |> Exp_desc.wrap
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> lambda (* FIXME: add modes to quotation representation *)
-  | Texp_inspected_type Label_disambiguation -> lambda
+  | Texp_inspected_type (Label_disambiguation ambiguity) ->
+    lambda
+    |> maybe_constrain_exp_desc_with_type loc
+         (type_constraint_of_ambiguity loc ambiguity)
   | Texp_inspected_type Polymorphic_parameter -> lambda
 
 and update_env_with_extra extra =
@@ -2821,7 +2853,7 @@ and update_env_with_extra extra =
   | Texp_constraint _ | Texp_coerce _ | Texp_stack -> ()
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> ()
-  | Texp_inspected_type Label_disambiguation -> ()
+  | Texp_inspected_type (Label_disambiguation _) -> ()
   | Texp_inspected_type Polymorphic_parameter -> ()
 
 and update_env_without_extra extra =
@@ -2831,7 +2863,7 @@ and update_env_without_extra extra =
   | Texp_constraint _ | Texp_coerce _ | Texp_stack -> ()
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> ()
-  | Texp_inspected_type Label_disambiguation -> ()
+  | Texp_inspected_type (Label_disambiguation _) -> ()
   | Texp_inspected_type Polymorphic_parameter -> ()
 
 and quote_expression_desc transl stage e =
@@ -2982,7 +3014,7 @@ and quote_expression_desc transl stage e =
         Option.map (fun (arg, _) -> quote_expression transl stage arg) argo
       in
       Exp_desc.variant loc variant argo
-    | Texp_record record ->
+    | Texp_record { fields; extended_expression } ->
       let lbl_exps =
         Array.map
           (fun (lbl, def) ->
@@ -2994,12 +3026,12 @@ and quote_expression_desc transl stage e =
                 fatal_error "No support for record update syntax in quotations"
             in
             lbl, exp)
-          record.fields
+          fields
       in
       let base =
         Option.map
           (fun (e, _, _) -> quote_expression transl stage e)
-          record.extended_expression
+          extended_expression
       in
       Exp_desc.record loc (Array.to_list lbl_exps) base
     | Texp_field (rcd, _, lid, lbl, _, _) ->
@@ -3090,7 +3122,7 @@ and quote_expression_desc transl stage e =
           ts
       in
       Exp_desc.unboxed_tuple loc tups
-    | Texp_record_unboxed_product record ->
+    | Texp_record_unboxed_product { fields; extended_expression } ->
       let lbl_exps =
         Array.map
           (fun (lbl, def) ->
@@ -3102,12 +3134,12 @@ and quote_expression_desc transl stage e =
                 fatal_error "No support for record update syntax in quotations."
             in
             lbl, exp)
-          record.fields
+          fields
       in
       let base =
         Option.map
           (fun (e, _) -> quote_expression transl stage e)
-          record.extended_expression
+          extended_expression
       in
       Exp_desc.unboxed_record_product loc (Array.to_list lbl_exps) base
     | Texp_unboxed_field (rcd, _, lid, lbl, _) ->

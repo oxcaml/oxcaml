@@ -111,13 +111,6 @@ val print_unique_use : Format.formatter -> unique_use -> unit
 
 type alloc_mode = Mode.Alloc.r
 
-(** Whether this construction required disambiguating at the time it was constructed.
-    If so, the disambiguated path and arity of the underlying type constructor
-    is preserved for inserting an annotation. *)
-type ambiguity =
-  | Ambiguous of { path: Path.t; arity : int }
-  | Unambiguous
-
 type texp_field_boxing =
   | Boxing of alloc_mode * unique_use
   (** Projection requires boxing. [unique_use] describes the usage of the
@@ -128,9 +121,16 @@ type texp_field_boxing =
 
 val aliased_many_use : unique_use
 
+(** Whether this construction required type-driven label disambiguation.
+    If so, the disambiguated path and arity of the underlying type constructor
+    is preserved for inserting an explicit annotation. *)
+type ambiguity =
+  | Ambiguous of { path: Path.t; arity : int }
+  | Unambiguous
+
 type _ type_inspection =
-  | Label_disambiguation : [< `pat | `exp ] type_inspection
-  | Polymorphic_parameter : [< `pat | `exp ] type_inspection
+  | Label_disambiguation : ambiguity -> [< `pat | `exp ] type_inspection
+  | Polymorphic_parameter : [<  `pat | `exp ] type_inspection
 
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data

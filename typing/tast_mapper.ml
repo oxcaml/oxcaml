@@ -295,7 +295,7 @@ let pat_extra sub = function
   | Tpat_open (path,loc,env) ->
       Tpat_open (path, map_loc sub loc, sub.env sub env)
   | Tpat_constraint ct -> Tpat_constraint (sub.typ sub ct)
-  | Tpat_inspected_type Label_disambiguation as d -> d
+  | Tpat_inspected_type (Label_disambiguation _) as d -> d
   | Tpat_inspected_type Polymorphic_parameter as d -> d
 
 let pat
@@ -394,7 +394,7 @@ let extra sub = function
   | Texp_poly cto -> Texp_poly (Option.map (sub.typ sub) cto)
   | Texp_stack as d -> d
   | Texp_mode _ as d -> d
-  | Texp_inspected_type Label_disambiguation as d -> d
+  | Texp_inspected_type (Label_disambiguation _) as d -> d
   | Texp_inspected_type Polymorphic_parameter as d -> d
 
 let function_body sub body =
