@@ -102,8 +102,6 @@ module Layout : sig
   module Const : sig
     type t = Jkind_types.Layout.Const.t
 
-    val get_sort : t -> Sort.Const.t option
-
     val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 
     val to_string : t -> string
@@ -263,6 +261,14 @@ module Builtin : sig
 
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
+
+  (* CR zeisbach for rtjoa: It feels a little weird to have this take in an
+     [any_creation_reason] (it's scannable, not any), but none of the other
+     options have [Dummy_jkind] which is the only thing we call this function
+     with. Hard-coding a constant proved to be surprisingly difficult for some
+     confusing reasons (and I'm not even sure that it's better). Curious to
+     hear your thoughts here *)
+  val scannable : why:History.any_creation_reason -> 'd Types.jkind
 
   val value_or_null :
     why:History.value_or_null_creation_reason -> 'd Types.jkind

@@ -416,11 +416,15 @@ let create_simple_variant_die ~reference ~parent_proto_die ?name
     simple_constructors
 
 (* CR mshinwell: it seems like this should move to the frontend *)
+(* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   match ly with
   | Base base -> (
     match base with
-    | Scannable -> Scannable
+    (* CR layouts-scannable: since [Layout.t] does not (currently) store
+       scannable axis information, we are forced to default to max. If
+       [Layout.t] changes to store scannable axis info, change this too. *)
+    | Scannable -> Scannable Jkind_types.Scannable_axes.max
     | Float64 -> Float64
     (* This is a case, where we potentially have mapped [Float_boxed] to
        [Float64], but that is fine, because they are reordered like other mixed
@@ -508,6 +512,9 @@ let flatten_fields_in_mixed_record ~(mixed_block_shapes : Layout.t array)
   (* We go to arrays and back because it makes the reordering of the fields via
      accesses O(n) instead of O(n^2) *)
   let fields = Array.of_list fields in
+  (* The scannable axes in [mixed_block_shapes] are all set to max, but that is
+     OK because that information is (currently) never used as they get turned
+     into base_layouts below. *)
   let mixed_block_shapes =
     Array.map layout_to_types_layout mixed_block_shapes
   in

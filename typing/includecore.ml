@@ -862,7 +862,8 @@ module Record_diffing = struct
   let find_mismatch_in_mixed_record_representations
       (s1 : mixed_product_shape) (s2 : mixed_product_shape)
     =
-    if s1 = s2 then None
+    if Misc.Le_result.is_le (Types.mixed_product_shape_less_or_equal s1 s2)
+    then None
     else
       let has_float_boxed_on_read fields =
         Array.exists (function

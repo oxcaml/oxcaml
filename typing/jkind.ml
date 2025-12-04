@@ -70,12 +70,6 @@ end
 module Scannable_axes = struct
   include Jkind_types.Scannable_axes
 
-  let less_or_equal { nullability = n1; separability = s1 }
-      { nullability = n2; separability = s2 } =
-    Misc.Le_result.combine
-      (Nullability.less_or_equal n1 n2)
-      (Separability.less_or_equal s1 s2)
-
   let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
 
   let meet { nullability = n1; separability = s1 }
@@ -133,14 +127,6 @@ module Layout = struct
             _ ) ->
         false
       | Product _ -> false
-
-    let rec get_sort : t -> Sort.Const.t option = function
-      | Any _ -> None
-      | Base (b, _) -> Some (Base b)
-      | Product ts ->
-        Option.map
-          (fun x -> Sort.Const.Product x)
-          (Misc.Stdlib.List.map_option get_sort ts)
 
     let rec of_sort_const (s : Sort.Const.t) sa =
       match s with
@@ -1503,6 +1489,7 @@ module Const = struct
       let jkind_without_sa =
         (match name.txt with
         | "any" -> Builtin.any.jkind
+        | "scannable" -> Builtin.scannable.jkind
         | "value_or_null" -> Builtin.value_or_null.jkind
         | "value" -> Builtin.value.jkind
         | "void" -> Builtin.void.jkind

@@ -53,6 +53,8 @@ module Separability : sig
     | Maybe_separable
 
   include Axis_ops with type t := t
+
+  val upper_bound_if_is_always_gc_ignorable : unit -> t
 end
 
 module Axis : sig
