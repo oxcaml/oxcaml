@@ -120,10 +120,6 @@ let print_unique_use ppf (u,l) =
 
 type alloc_mode = Mode.Alloc.r
 
-type ambiguity =
-  | Ambiguous of { path: Path.t; arity : int }
-  | Unambiguous
-
 type texp_field_boxing =
   | Boxing of alloc_mode * unique_use
   | Non_boxing of unique_use
@@ -132,8 +128,12 @@ let aliased_many_use =
   ( Mode.Uniqueness.disallow_left Mode.Uniqueness.aliased,
     Mode.Linearity.disallow_right Mode.Linearity.many )
 
+type ambiguity =
+  | Ambiguous of { path: Path.t; arity : int }
+  | Unambiguous
+
 type _ type_inspection =
-  | Label_disambiguation : [< `pat | `exp ] type_inspection
+  | Label_disambiguation : ambiguity -> [< `pat | `exp ] type_inspection
   | Polymorphic_parameter : [< `pat | `exp ] type_inspection
 
 type pattern = value general_pattern
