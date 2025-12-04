@@ -1205,6 +1205,37 @@ let ternary_primitive _env dbg f x y z =
       else C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
     in
     C.return_unit dbg store
+  | Write_ptr (kind, mode) ->
+    let memory_chunk = C.memory_chunk_of_kind kind in
+    let store =
+      if KS.must_be_gc_scannable kind
+      then
+        (* x = base (may be NULL), y = byte offset / raw pointer, z = new value.
+           When x is NULL, y is a raw pointer address and we store directly.
+           When x is non-NULL, y is a byte offset and we use write barriers. *)
+        let is_null = C.eq ~dbg x (C.int ~dbg 0) in
+        let null_case =
+          (* x is NULL, y is raw pointer address, store directly *)
+          C.store ~dbg memory_chunk Assignment ~addr:y ~new_value:z
+        in
+        let non_null_case =
+          (* x is valid block, use write barriers - same as Write_offset *)
+          match mode with
+          | Heap ->
+            let addr = C.add_int x y dbg in
+            C.caml_modify ~dbg addr z
+          | Local ->
+            C.caml_modify_local ~dbg x
+              (C.lsr_int y (Cconst_int (C.log2_size_addr, dbg)) dbg)
+              z
+        in
+        C.ite ~dbg is_null ~then_dbg:dbg ~then_:null_case ~else_dbg:dbg
+          ~else_:non_null_case
+      else
+        let addr = C.add_int x y dbg in
+        C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
+    in
+    C.return_unit dbg store
 
 let quaternary_primitive _env dbg f x y z w =
   match (f : P.quaternary_primitive) with

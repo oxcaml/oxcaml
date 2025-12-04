@@ -2979,8 +2979,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       "Closure_convertion.convert_primitive: The argument to Pget_ptr should \
        be an unboxed product of length 2"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
-  | Pset_idx (layout, mode), [[ptr]; [idx]; new_values]
-  | Pset_ptr (layout, mode), [[ptr; idx]; new_values] ->
+  | Pset_idx (layout, mode), [[ptr]; [idx]; new_values] ->
     needs_64_bit_target prim dbg;
     let mode = Alloc_mode.For_assignments.from_lambda mode in
     let offsets = block_index_access_offsets ~machine_width layout idx in
@@ -2992,6 +2991,21 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Misc.Stdlib.List.map3
         (fun kind offset new_value ->
           H.Ternary (Write_offset (kind, mode), ptr, Prim offset, new_value))
+        kinds offsets new_values
+    in
+    [H.Sequence writes]
+  | Pset_ptr (layout, mode), [[ptr; idx]; new_values] ->
+    needs_64_bit_target prim dbg;
+    let mode = Alloc_mode.For_assignments.from_lambda mode in
+    let offsets = block_index_access_offsets ~machine_width layout idx in
+    let kinds =
+      Flambda_arity.unarize
+        (Flambda_arity.from_lambda_list [layout] ~machine_width)
+    in
+    let writes =
+      Misc.Stdlib.List.map3
+        (fun kind offset new_value ->
+          H.Ternary (Write_ptr (kind, mode), ptr, Prim offset, new_value))
         kinds offsets new_values
     in
     [H.Sequence writes]

@@ -666,7 +666,7 @@ let ternop env (op : Flambda_primitive.ternary_primitive) : Fexpr.ternop =
     Array_set (ak, ask)
   | Bytes_or_bigstring_set (blv, saw) -> Bytes_or_bigstring_set (blv, saw)
   | Bigarray_set _ | Atomic_field_int_arith _ | Atomic_set_field _
-  | Atomic_exchange_field _ | Write_offset _ ->
+  | Atomic_exchange_field _ | Write_offset _ | Write_ptr _ ->
     Misc.fatal_errorf "TODO: Ternary primitive: %a"
       Flambda_primitive.Without_args.print
       (Flambda_primitive.Without_args.Ternary op)

@@ -576,6 +576,9 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
     (* CR selee: This is for block indices, which likely requires changes to
        JSOO to support. We will leave this for now. *)
     raise Primitive_not_supported
+  | Write_ptr _ ->
+    (* Like Write_offset, this is for block indices / pointers *)
+    raise Primitive_not_supported
 
 let quaternary_exn ~env ~res (f : Flambda_primitive.quaternary_primitive) w x y
     z =
