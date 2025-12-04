@@ -57,6 +57,8 @@ let () =
   let i : int = get_y pt in
   Printf.printf "expected 20, got %d\n" i;
   set_y pt 200;
+  (* Use opaque_identity to prevent the compiler from caching pt.y in a register *)
+  let pt = Sys.opaque_identity pt in
   Printf.printf "expected (10, 200), got (%d, %d)\n" pt.x pt.y;
   let (_ : pt) = Sys.opaque_identity pt in (* make sure the [pt] stays live *)
   ()

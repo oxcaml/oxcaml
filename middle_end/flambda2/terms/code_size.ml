@@ -482,6 +482,7 @@ let ternary_prim_size ~machine_width prim =
   | Atomic_exchange_field Immediate -> 1
   | Atomic_exchange_field Any_value -> does_not_need_caml_c_call_extcall_size
   | Write_offset _ -> 1
+  | Write_ptr _ -> does_not_need_caml_c_call_extcall_size
 
 let quaternary_prim_size prim =
   match (prim : Flambda_primitive.quaternary_primitive) with

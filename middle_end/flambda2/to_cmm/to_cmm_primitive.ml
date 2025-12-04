@@ -1205,6 +1205,20 @@ let ternary_primitive _env dbg f x y z =
       else C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
     in
     C.return_unit dbg store
+  | Write_ptr (kind, mode) ->
+    let addr = C.add_int x y dbg in
+    let memory_chunk = C.memory_chunk_of_kind kind in
+    let store =
+      if KS.must_be_gc_scannable kind
+      then
+        match mode with
+        | Heap -> C.caml_modify ~dbg addr z
+        | Local ->
+          (* x = base (may be NULL), y = raw byte offset, z = new value *)
+          C.caml_modify_ptr ~dbg x y z
+      else C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
+    in
+    C.return_unit dbg store
 
 let quaternary_primitive _env dbg f x y z w =
   match (f : P.quaternary_primitive) with

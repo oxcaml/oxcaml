@@ -557,6 +557,10 @@ type ternary_primitive =
   | Atomic_set_field of Block_access_field_kind.t
   | Atomic_exchange_field of Block_access_field_kind.t
   | Write_offset of Flambda_kind.With_subkind.t * Alloc_mode.For_assignments.t
+  | Write_ptr of Flambda_kind.With_subkind.t * Alloc_mode.For_assignments.t
+      (** Write to a pointer (base + raw_byte_offset). Unlike [Write_offset],
+          this handles the case where base may be NULL, in which case the
+          offset is treated as a raw pointer address. *)
 
 (** Primitives taking exactly four arguments. *)
 type quaternary_primitive =

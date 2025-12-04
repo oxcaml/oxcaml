@@ -2010,6 +2010,7 @@ type ternary_primitive =
   | Atomic_set_field of Block_access_field_kind.t
   | Atomic_exchange_field of Block_access_field_kind.t
   | Write_offset of Flambda_kind.With_subkind.t * Alloc_mode.For_assignments.t
+  | Write_ptr of Flambda_kind.With_subkind.t * Alloc_mode.For_assignments.t
 
 type quaternary_primitive =
   | Atomic_compare_and_set_field of Block_access_field_kind.t
@@ -2024,7 +2025,7 @@ let ternary_primitive_eligible_for_cse p =
   | Atomic_field_int_arith _
   | Atomic_set_field (Immediate | Any_value)
   | Atomic_exchange_field (Immediate | Any_value)
-  | Write_offset _ ->
+  | Write_offset _ | Write_ptr _ ->
     false
 
 let quaternary_primitive_eligible_for_cse p =
@@ -2045,6 +2046,7 @@ let compare_ternary_primitive p1 p2 =
     | Atomic_set_field _ -> 4
     | Atomic_exchange_field _ -> 5
     | Write_offset _ -> 6
+    | Write_ptr _ -> 7
   in
   match p1, p2 with
   | Array_set (kind1, set_kind1), Array_set (kind2, set_kind2) ->
@@ -2076,9 +2078,12 @@ let compare_ternary_primitive p1 p2 =
     ->
     let c = Array_set_kind.compare array_set_kind1 array_set_kind2 in
     if c <> 0 then c else Alloc_mode.For_assignments.compare mode1 mode2
+  | Write_ptr (kind1, mode1), Write_ptr (kind2, mode2) ->
+    let c = K.With_subkind.compare kind1 kind2 in
+    if c <> 0 then c else Alloc_mode.For_assignments.compare mode1 mode2
   | ( ( Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
       | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
-      | Write_offset _ ),
+      | Write_offset _ | Write_ptr _ ),
       _ ) ->
     Stdlib.compare
       (ternary_primitive_numbering p1)
@@ -2134,6 +2139,9 @@ let print_ternary_primitive ppf p =
   | Write_offset (kind, mode) ->
     Format.fprintf ppf "@[(Write_offset@ %a %a)@]"
       Flambda_kind.With_subkind.print kind Alloc_mode.For_assignments.print mode
+  | Write_ptr (kind, mode) ->
+    Format.fprintf ppf "@[(Write_ptr@ %a %a)@]"
+      Flambda_kind.With_subkind.print kind Alloc_mode.For_assignments.print mode
 
 let print_quaternary_primitive ppf p =
   let fprintf = Format.fprintf in
@@ -2188,6 +2196,7 @@ let args_kind_of_ternary_primitive p =
   | Atomic_exchange_field (Immediate | Any_value) ->
     K.value, K.value, K.value
   | Write_offset (kind, _) -> K.value, K.naked_int64, K.With_subkind.kind kind
+  | Write_ptr (kind, _) -> K.value, K.naked_int64, K.With_subkind.kind kind
 
 let args_kind_of_quaternary_primitive p =
   match p with
@@ -2205,7 +2214,7 @@ let result_kind_of_ternary_primitive p : result_kind =
     Unit
   | Atomic_field_int_arith Fetch_add | Atomic_exchange_field _ ->
     Singleton K.value
-  | Write_offset _ -> Unit
+  | Write_offset _ | Write_ptr _ -> Unit
 
 let result_kind_of_quaternary_primitive p : result_kind =
   match p with
@@ -2220,7 +2229,7 @@ let effects_and_coeffects_of_ternary_primitive p :
   | Bigarray_set (_, kind, _) -> writing_to_a_bigarray kind
   | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _ ->
     Arbitrary_effects, Has_coeffects, Strict
-  | Write_offset _ -> writing_to_a_block
+  | Write_offset _ | Write_ptr _ -> writing_to_a_block
 
 let effects_and_coeffects_of_quaternary_primitive p :
     Effects.t * Coeffects.t * Placement.t =
@@ -2232,7 +2241,7 @@ let ternary_classify_for_printing p =
   match p with
   | Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
   | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
-  | Write_offset _ ->
+  | Write_offset _ | Write_ptr _ ->
     Neither
 
 let quaternary_classify_for_printing p =
@@ -2243,7 +2252,7 @@ let free_names_ternary_primitive p =
   match p with
   | Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
   | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
-  | Write_offset _ ->
+  | Write_offset _ | Write_ptr _ ->
     Name_occurrences.empty
 
 let free_names_quaternary_primitive p =
@@ -2255,7 +2264,7 @@ let apply_renaming_ternary_primitive p _ =
   match p with
   | Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
   | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
-  | Write_offset _ ->
+  | Write_offset _ | Write_ptr _ ->
     p
 
 let apply_renaming_quaternary_primitive p _ =
@@ -2266,7 +2275,7 @@ let ids_for_export_ternary_primitive p =
   match p with
   | Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
   | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
-  | Write_offset _ ->
+  | Write_offset _ | Write_ptr _ ->
     Ids_for_export.empty
 
 let ids_for_export_quaternary_primitive p =
