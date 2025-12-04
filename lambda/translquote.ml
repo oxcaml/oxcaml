@@ -2830,7 +2830,11 @@ and quote_expression' ~(post : Exp_desc.t' -> Exp.t) transl stage e : Exp.t =
   let exp =
     match e.exp_desc with
     | Texp_ident (path, _, _, ident_kind, _) ->
-      quote_value_ident_path_as_exp loc env path ident_kind |> post
+      let e = quote_value_ident_path_as_exp loc env path ident_kind |> post in
+      Type.var loc None |> Type.wrap
+      |> Type_constraint.constraint_ loc
+      |> Type_constraint.wrap |> Exp_desc.constraint_ loc e |> Exp_desc.wrap
+      |> mk_exp_noattr loc
     | Texp_constant const ->
       let const = quote_constant loc const in
       Exp_desc.constant loc const |> post
