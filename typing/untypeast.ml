@@ -370,7 +370,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
         Ppat_unboxed_tuple
           (List.map (fun (label, p, _) -> label, sub.pat sub p) list,
            Closed)
-    | Tpat_construct (lid, _, args, vto) ->
+    | Tpat_construct (lid, _, args, vto, _) ->
         let tyo =
           match vto with
             None -> None
@@ -395,10 +395,10 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
           | _, None -> None)
     | Tpat_variant (label, pato, _) ->
         Ppat_variant (label, Option.map (sub.pat sub) pato)
-    | Tpat_record (list, closed) ->
+    | Tpat_record (list, closed, _) ->
         Ppat_record (List.map (fun (lid, _, pat) ->
             map_loc sub lid, sub.pat sub pat) list, closed)
-    | Tpat_record_unboxed_product (list, closed) ->
+    | Tpat_record_unboxed_product (list, closed, _) ->
         Ppat_record_unboxed_product (List.map (fun (lid, _, pat) ->
             map_loc sub lid, sub.pat sub pat) list, closed)
     | Tpat_array (am, _, list) ->
@@ -592,7 +592,7 @@ let expression sub exp =
     | Texp_unboxed_tuple list ->
         Pexp_unboxed_tuple
           (List.map (fun (lbl, e, _) -> lbl, sub.expr sub e) list)
-    | Texp_construct (lid, _, args, _) ->
+    | Texp_construct (lid, _, args, _, _) ->
         Pexp_construct (map_loc sub lid,
           (match args with
               [] -> None
@@ -627,11 +627,11 @@ let expression sub exp =
                                     (sub.expr sub exp)
                                     (map_loc sub lid))
                              ])
-    | Texp_field (exp, _sort, lid, _label, _, _) ->
+    | Texp_field (exp, _sort, lid, _label, _, _, _) ->
         Pexp_field (sub.expr sub exp, map_loc sub lid)
-    | Texp_unboxed_field (exp, _, lid, _label, _) ->
+    | Texp_unboxed_field (exp, _, lid, _label, _, _) ->
         Pexp_unboxed_field (sub.expr sub exp, map_loc sub lid)
-    | Texp_setfield (exp1, _, lid, _label, exp2) ->
+    | Texp_setfield (exp1, _, lid, _label, _, exp2) ->
         Pexp_setfield (sub.expr sub exp1, map_loc sub lid,
           sub.expr sub exp2)
     | Texp_array (amut, _, list, _) ->

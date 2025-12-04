@@ -103,13 +103,13 @@ module General = struct
        `Tuple ps
     | Tpat_unboxed_tuple ps ->
        `Unboxed_tuple ps
-    | Tpat_construct (cstr, cstr_descr, args, _) ->
+    | Tpat_construct (cstr, cstr_descr, args, _, _) ->
        `Construct (cstr, cstr_descr, args)
     | Tpat_variant (cstr, arg, row_desc) ->
        `Variant (cstr, arg, row_desc)
-    | Tpat_record (fields, closed) ->
+    | Tpat_record (fields, closed, _) ->
        `Record (fields, closed)
-    | Tpat_record_unboxed_product (fields, closed) ->
+    | Tpat_record_unboxed_product (fields, closed, _) ->
        `Record_unboxed_product (fields, closed)
     | Tpat_array (am, arg_sort, ps) -> `Array (am, arg_sort, ps)
     | Tpat_or (p, q, row_desc) -> `Or (p, q, row_desc)
@@ -127,13 +127,13 @@ module General = struct
     | `Tuple ps -> Tpat_tuple ps
     | `Unboxed_tuple ps -> Tpat_unboxed_tuple ps
     | `Construct (cstr, cst_descr, args) ->
-       Tpat_construct (cstr, cst_descr, args, None)
+       Tpat_construct (cstr, cst_descr, args, None, Unambiguous)
     | `Variant (cstr, arg, row_desc) ->
        Tpat_variant (cstr, arg, row_desc)
     | `Record (fields, closed) ->
-       Tpat_record (fields, closed)
+       Tpat_record (fields, closed, Unambiguous)
     | `Record_unboxed_product (fields, closed) ->
-       Tpat_record_unboxed_product (fields, closed)
+       Tpat_record_unboxed_product (fields, closed, Unambiguous)
     | `Array (am, arg_sort, ps) -> Tpat_array (am, arg_sort, ps)
     | `Or (p, q, row_desc) -> Tpat_or (p, q, row_desc)
     | `Lazy p -> Tpat_lazy p
@@ -265,7 +265,7 @@ end = struct
       | Array (am, arg_sort, n) -> Tpat_array (am, arg_sort, omegas n)
       | Construct c ->
           let lid_loc = mkloc (Longident.Lident c.cstr_name) in
-          Tpat_construct (lid_loc, c, omegas c.cstr_arity, None)
+          Tpat_construct (lid_loc, c, omegas c.cstr_arity, None, Unambiguous)
       | Variant { tag; has_arg; cstr_row } ->
           let arg_opt = if has_arg then Some omega else None in
           Tpat_variant (tag, arg_opt, cstr_row)
@@ -276,7 +276,7 @@ end = struct
               (lid_loc, lbl, omega)
             ) lbls
           in
-          Tpat_record (lst, Closed)
+          Tpat_record (lst, Closed, Unambiguous)
       | Record_unboxed_product lbls ->
           let lst =
             List.map (fun lbl ->
@@ -284,7 +284,7 @@ end = struct
               (lid_loc, lbl, omega)
             ) lbls
           in
-          Tpat_record_unboxed_product (lst, Closed)
+          Tpat_record_unboxed_product (lst, Closed, Unambiguous)
     in
     { t with
       pat_desc;

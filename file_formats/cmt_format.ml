@@ -222,12 +222,12 @@ let iter_on_occurrences
       (match exp_desc with
       | Texp_ident (path, lid, _, _, _) ->
           f ~namespace:Value exp_env path lid
-      | Texp_construct (lid, constr_desc, _, _) ->
+      | Texp_construct (lid, constr_desc, _, _, _) ->
           add_constructor_description exp_env lid constr_desc
-      | Texp_field (_, _, lid, label_desc, _, _)
-      | Texp_setfield (_, _, lid, label_desc, _) ->
+      | Texp_field (_, _, lid, label_desc, _, _, _)
+      | Texp_setfield (_, _, lid, label_desc, _, _) ->
           add_label ~namespace:Label exp_env lid label_desc
-      | Texp_unboxed_field (_, _, lid, label_desc, _) ->
+      | Texp_unboxed_field (_, _, lid, label_desc, _, _) ->
           add_label ~namespace:Unboxed_label exp_env lid label_desc
       | Texp_idx (ba, uas) ->
           iter_block_access exp_env ba;
@@ -294,11 +294,11 @@ let iter_on_occurrences
     (fun (type a) sub
       ({ pat_desc; pat_extra; pat_env; _ } as pat : a general_pattern) ->
       (match pat_desc with
-      | Tpat_construct (lid, constr_desc, _, _) ->
+      | Tpat_construct (lid, constr_desc, _, _, _) ->
           add_constructor_description pat_env lid constr_desc
-      | Tpat_record (fields, _) ->
+      | Tpat_record (fields, _, _) ->
         iter_field_pats ~namespace:Label pat_env fields
-      | Tpat_record_unboxed_product (fields, _) ->
+      | Tpat_record_unboxed_product (fields, _, _) ->
         iter_field_pats ~namespace:Unboxed_label pat_env fields
       | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ | Tpat_tuple _
       | Tpat_unboxed_tuple _
