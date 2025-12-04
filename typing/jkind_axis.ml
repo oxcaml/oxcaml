@@ -119,6 +119,7 @@ end
 module Separability = struct
   type t =
     | Non_pointer
+    | Non_pointer64
     | Non_float
     | Separable
     | Maybe_separable
@@ -130,31 +131,47 @@ module Separability = struct
   let equal p1 p2 =
     match p1, p2 with
     | Non_pointer, Non_pointer -> true
+    | Non_pointer64, Non_pointer64 -> true
     | Non_float, Non_float -> true
     | Separable, Separable -> true
     | Maybe_separable, Maybe_separable -> true
-    | (Non_pointer | Non_float | Separable | Maybe_separable), _ -> false
+    | (Non_pointer | Non_pointer64 | Non_float | Separable | Maybe_separable), _
+      ->
+      false
 
+  (* CR zeisbach: The following three big pattern matches are pretty hard to
+     read (IMO). Not sure what can be done to improve this. Converting to and
+     from an int is probably not great but could be done. *)
   let less_or_equal s1 s2 : Misc.Le_result.t =
     match s1, s2 with
     | Non_pointer, Non_pointer -> Equal
-    | Non_pointer, (Non_float | Separable | Maybe_separable) -> Less
-    | Non_float, Non_pointer -> Not_le
+    | Non_pointer, (Non_pointer64 | Non_float | Separable | Maybe_separable) ->
+      Less
+    | Non_pointer64, Non_pointer -> Not_le
+    | Non_pointer64, Non_pointer64 -> Equal
+    | Non_pointer64, (Non_float | Separable | Maybe_separable) -> Less
+    | Non_float, (Non_pointer | Non_pointer64) -> Not_le
     | Non_float, Non_float -> Equal
     | Non_float, (Separable | Maybe_separable) -> Less
-    | Separable, (Non_pointer | Non_float) -> Not_le
+    | Separable, (Non_pointer | Non_pointer64 | Non_float) -> Not_le
     | Separable, Separable -> Equal
     | Separable, Maybe_separable -> Less
-    | Maybe_separable, (Non_pointer | Non_float | Separable) -> Not_le
+    | Maybe_separable, (Non_pointer | Non_pointer64 | Non_float | Separable) ->
+      Not_le
     | Maybe_separable, Maybe_separable -> Equal
 
   let le p1 p2 = Misc.Le_result.is_le (less_or_equal p1 p2)
 
   let meet p1 p2 =
     match p1, p2 with
-    | Non_pointer, (Non_pointer | Non_float | Separable | Maybe_separable)
-    | (Non_float | Separable | Maybe_separable), Non_pointer ->
+    | ( Non_pointer,
+        (Non_pointer | Non_pointer64 | Non_float | Separable | Maybe_separable)
+      )
+    | (Non_pointer64 | Non_float | Separable | Maybe_separable), Non_pointer ->
       Non_pointer
+    | Non_pointer64, (Non_pointer64 | Non_float | Separable | Maybe_separable)
+    | (Non_float | Separable | Maybe_separable), Non_pointer64 ->
+      Non_pointer64
     | Non_float, (Non_float | Separable | Maybe_separable)
     | (Separable | Maybe_separable), Non_float ->
       Non_float
@@ -164,17 +181,25 @@ module Separability = struct
 
   let join p1 p2 =
     match p1, p2 with
-    | Maybe_separable, (Maybe_separable | Separable | Non_float | Non_pointer)
-    | (Separable | Non_float | Non_pointer), Maybe_separable ->
+    | ( Maybe_separable,
+        (Maybe_separable | Separable | Non_float | Non_pointer64 | Non_pointer)
+      )
+    | (Separable | Non_float | Non_pointer64 | Non_pointer), Maybe_separable ->
       Maybe_separable
-    | Separable, (Separable | Non_float | Non_pointer)
-    | (Non_float | Non_pointer), Separable ->
+    | Separable, (Separable | Non_float | Non_pointer64 | Non_pointer)
+    | (Non_float | Non_pointer64 | Non_pointer), Separable ->
       Separable
-    | Non_float, (Non_float | Non_pointer) | Non_pointer, Non_float -> Non_float
+    | Non_float, (Non_float | Non_pointer64 | Non_pointer)
+    | (Non_pointer64 | Non_pointer), Non_float ->
+      Non_float
+    | Non_pointer64, (Non_pointer64 | Non_pointer) | Non_pointer, Non_pointer64
+      ->
+      Non_pointer64
     | Non_pointer, Non_pointer -> Non_pointer
 
   let to_string = function
     | Non_pointer -> "non_pointer"
+    | Non_pointer64 -> "non_pointer64"
     | Non_float -> "non_float"
     | Separable -> "separable"
     | Maybe_separable -> "maybe_separable"
