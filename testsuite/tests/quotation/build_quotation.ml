@@ -844,3 +844,9 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 - : <[$('a) -> int option -> int]> expr =
 <[fun x -> function | None -> 0 | Some (x__1) -> x__1]>
 |}];;
+
+<[ fun f x -> (f [@inlined]) x [@nontail] ]>
+[%%expect {|
+- : <[($('a) -> $('b)) -> $('a) -> $('b)]> expr =
+<[fun f x -> ((f [@inlined]) x [@nontail])]>
+|}];;

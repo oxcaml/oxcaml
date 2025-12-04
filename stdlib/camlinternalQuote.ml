@@ -1927,8 +1927,10 @@ module Ast = struct
     | Unreachable | Src_pos -> pp fmt "."
 
   and print_exp env fmt exp =
+    if exp.attributes <> [] then pp fmt "(";
     print_exp_desc env fmt exp;
-    List.iter (print_attribute fmt) exp.attributes
+    List.iter (print_attribute fmt) exp.attributes;
+    if exp.attributes <> [] then pp fmt ")"
 end
 
 module Label = struct
