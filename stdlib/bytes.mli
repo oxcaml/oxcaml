@@ -77,6 +77,9 @@ external create : int -> bytes = "caml_create_bytes"
     sequence is uninitialized and contains arbitrary bytes.
     @raise Invalid_argument if [n < 0] or [n > ]{!Sys.max_string_length}. *)
 
+external create__stack : int -> bytes @ local = "caml_create_local_bytes"
+(** [create__stack n] is like {!create} but returns a stack-allocated bytes. *)
+
 val make : int -> char -> bytes
 (** [make n c] returns a new byte sequence of length [n], filled with
     the byte [c].
