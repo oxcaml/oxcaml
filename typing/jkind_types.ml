@@ -652,6 +652,14 @@ module Scannable_axes = struct
     { nullability : Jkind_axis.Nullability.t;
       separability : Jkind_axis.Separability.t
     }
+
+  (* CR zeisbach: refactor to move some things out of jkind and into here *)
+
+  let equal { separability = s1 } { separability = s2 } =
+    Jkind_axis.Separability.equal s1 s2
+
+  let less_or_equal { separability = s1 } { separability = s2 } =
+    Jkind_axis.Separability.less_or_equal s1 s2
 end
 
 module Layout = struct
