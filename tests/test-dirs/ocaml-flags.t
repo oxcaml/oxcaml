@@ -20,11 +20,11 @@ Merlin handle it or add it to the list of ignored flags.
   > }
 
   $ mconfig="../../src/kernel/mconfig.ml"
-  $ while IFS= read -r flag; do
+  $ echo "$OCAML_FLAGS" | while IFS= read -r flag; do
   >   grep -q "\"$flag\"" "$mconfig" || \
   >     is_intentionally_unhandled "$flag" || \
   >     echo "Unhandled flag: $flag"
-  > done <<< "$OCAML_FLAGS"
+  > done
 
 This list is printed to ensure that a change to the help text does not break the parsing
 logic.
