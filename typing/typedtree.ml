@@ -168,19 +168,19 @@ and 'k pattern_desc =
   | Tpat_construct :
       Longident.t loc * Types.constructor_description *
         value general_pattern list *
-        ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
-          option ->
+        ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type) option *
+        ambiguity ->
       value pattern_desc
   | Tpat_variant :
       label * value general_pattern option * row_desc ref ->
       value pattern_desc
   | Tpat_record :
       (Longident.t loc * label_description * value general_pattern) list *
-        closed_flag ->
+        closed_flag * ambiguity ->
       value pattern_desc
   | Tpat_record_unboxed_product :
       (Longident.t loc * unboxed_label_description * value general_pattern) list
-      * closed_flag ->
+      * closed_flag * ambiguity ->
       value pattern_desc
   | Tpat_array :
       mutability * Jkind.sort * value general_pattern list -> value pattern_desc
@@ -241,31 +241,35 @@ and expression_desc =
   | Texp_tuple of (string option * expression) list * alloc_mode
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
   | Texp_construct of
-      Longident.t loc * constructor_description * expression list * alloc_mode option
+      Longident.t loc * constructor_description * expression list *
+        alloc_mode option * ambiguity
   | Texp_variant of label * (expression * alloc_mode) option
   | Texp_record of {
       fields : ( Types.label_description * record_label_definition ) array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
-      alloc_mode : alloc_mode option
+      alloc_mode : alloc_mode option;
+      ambiguity : ambiguity;
     }
   | Texp_record_unboxed_product of {
       fields :
         ( Types.unboxed_label_description * record_label_definition ) array;
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
+      ambiguity : ambiguity;
     }
   | Texp_atomic_loc of
       expression * Jkind.sort * Longident.t loc * label_description *
       alloc_mode
   | Texp_field of
       expression * Jkind.sort * Longident.t loc * label_description *
-        texp_field_boxing * Unique_barrier.t
+        texp_field_boxing * Unique_barrier.t * ambiguity
   | Texp_unboxed_field of
       expression * Jkind.sort * Longident.t loc * unboxed_label_description *
-        unique_use
+        unique_use * ambiguity
   | Texp_setfield of
-      expression * Mode.Locality.l * Longident.t loc * label_description * expression
+      expression * Mode.Locality.l * Longident.t loc * label_description *
+        ambiguity * expression
   | Texp_array of mutability * Jkind.Sort.t * expression list * alloc_mode
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
@@ -1044,11 +1048,11 @@ let shallow_iter_pattern_desc
   | Tpat_alias(p, _, _, _, _, _, _) -> f.f p
   | Tpat_tuple patl -> List.iter (fun (_, p) -> f.f p) patl
   | Tpat_unboxed_tuple patl -> List.iter (fun (_, p, _) -> f.f p) patl
-  | Tpat_construct(_, _, patl, _) -> List.iter f.f patl
+  | Tpat_construct(_, _, patl, _, _) -> List.iter f.f patl
   | Tpat_variant(_, pat, _) -> Option.iter f.f pat
-  | Tpat_record (lbl_pat_list, _) ->
+  | Tpat_record (lbl_pat_list, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
-  | Tpat_record_unboxed_product (lbl_pat_list, _) ->
+  | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
   | Tpat_array (_, _, patl) -> List.iter f.f patl
   | Tpat_lazy p -> f.f p
@@ -1071,13 +1075,13 @@ let shallow_map_pattern_desc
   | Tpat_unboxed_tuple pats ->
       Tpat_unboxed_tuple
         (List.map (fun (label, pat, sort) -> label, f.f pat, sort) pats)
-  | Tpat_record (lpats, closed) ->
-      Tpat_record (List.map (fun (lid, l,p) -> lid, l, f.f p) lpats, closed)
-  | Tpat_record_unboxed_product (lpats, closed) ->
+  | Tpat_record (lpats, closed, amb) ->
+      Tpat_record (List.map (fun (lid, l,p) -> lid, l, f.f p) lpats, closed, amb)
+  | Tpat_record_unboxed_product (lpats, closed, amb) ->
       Tpat_record_unboxed_product
-        (List.map (fun (lid, l,p) -> lid, l, f.f p) lpats, closed)
-  | Tpat_construct (lid, c, pats, ty) ->
-      Tpat_construct (lid, c, List.map f.f pats, ty)
+        (List.map (fun (lid, l,p) -> lid, l, f.f p) lpats, closed, amb)
+  | Tpat_construct (lid, c, pats, ty, amb) ->
+      Tpat_construct (lid, c, List.map f.f pats, ty, amb)
   | Tpat_array (am, arg_sort, pats) ->
       Tpat_array (am, arg_sort, List.map f.f pats)
   | Tpat_lazy p1 -> Tpat_lazy (f.f p1)
@@ -1178,11 +1182,11 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
         if both_sides_of_or then (loop f p1; loop f p2)
         else loop f p1
       | Tpat_value p -> loop f p
-      | Tpat_construct(_, _, patl, _) ->
+      | Tpat_construct(_, _, patl, _, _) ->
           List.iter (loop f) patl
-      | Tpat_record (lbl_pat_list, _) ->
+      | Tpat_record (lbl_pat_list, _, _) ->
           List.iter (fun (_, _, pat) -> (loop f) pat) lbl_pat_list
-      | Tpat_record_unboxed_product (lbl_pat_list, _) ->
+      | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
           List.iter (fun (_, _, pat) -> (loop f) pat) lbl_pat_list
       | Tpat_variant (_, pat, _) -> Option.iter (loop f) pat
       | Tpat_tuple patl ->
@@ -1350,9 +1354,9 @@ let rec exp_is_nominal exp =
   | _ when exp.exp_attributes <> [] -> false
   | Texp_ident _ | Texp_instvar _ | Texp_constant _
   | Texp_variant (_, None)
-  | Texp_construct (_, _, [], _) ->
+  | Texp_construct (_, _, [], _, _) ->
       true
-  | Texp_field (parent, _, _, _, _, _) | Texp_send (parent, _, _) ->
+  | Texp_field (parent, _, _, _, _, _, _) | Texp_send (parent, _, _) ->
       exp_is_nominal parent
   | _ -> false
 
@@ -1414,7 +1418,7 @@ let rec fold_antiquote_exp f  acc exp =
       List.fold_left (fun acc (_, e) -> fold_antiquote_exp f acc e) acc list
   | Texp_unboxed_tuple list ->
       List.fold_left (fun acc (_, e, _) -> fold_antiquote_exp f acc e) acc list
-  | Texp_construct (_, _, args, _) ->
+  | Texp_construct (_, _, args, _, _) ->
       fold_antiquote_exps f acc args
   | Texp_variant (_, expo) ->
       Option.fold
@@ -1433,11 +1437,11 @@ let rec fold_antiquote_exp f  acc exp =
         ~none:acc
         ~some:(fun (e, _) -> fold_antiquote_exp f acc e)
         extended_expression
-  | Texp_field (exp, _, _, _, _, _) ->
+  | Texp_field (exp, _, _, _, _, _, _) ->
       fold_antiquote_exp f acc exp
-  | Texp_unboxed_field (exp, _, _, _, _) ->
+  | Texp_unboxed_field (exp, _, _, _, _, _) ->
       fold_antiquote_exp f acc exp
-  | Texp_setfield (exp1, _, _, _, exp2) ->
+  | Texp_setfield (exp1, _, _, _, _, exp2) ->
       let acc = fold_antiquote_exp f acc exp1 in
       fold_antiquote_exp f acc exp2
   | Texp_array (_, _, list, _) ->

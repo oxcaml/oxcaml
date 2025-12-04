@@ -371,7 +371,7 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_unboxed_tuple (l) ->
       line i ppf "Tpat_unboxed_tuple\n";
       list i labeled_pattern_with_sorts ppf l;
-  | Tpat_construct (li, _, po, vto) ->
+  | Tpat_construct (li, _, po, vto, _) ->
       line i ppf "Tpat_construct %a\n" fmt_longident li;
       list i pattern ppf po;
       option i
@@ -386,10 +386,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_variant (l, po, _) ->
       line i ppf "Tpat_variant \"%s\"\n" l;
       option i pattern ppf po;
-  | Tpat_record (l, _c) ->
+  | Tpat_record (l, _c, _) ->
       line i ppf "Tpat_record\n";
       list i longident_x_pattern ppf l;
-  | Tpat_record_unboxed_product (l, _c) ->
+  | Tpat_record_unboxed_product (l, _c, _) ->
       line i ppf "Tpat_record_unboxed_product\n";
       list i longident_x_pattern ppf l;
   | Tpat_array (am, arg_sort, l) ->
@@ -560,7 +560,7 @@ and expression i ppf x =
   | Texp_unboxed_tuple l ->
       line i ppf "Texp_unboxed_tuple\n";
       list i labeled_sorted_expression ppf l;
-  | Texp_construct (li, _, eo, am) ->
+  | Texp_construct (li, _, eo, am, _) ->
       line i ppf "Texp_construct %a\n" fmt_longident li;
       alloc_mode_option i ppf am;
       list i expression ppf eo;
@@ -587,15 +587,15 @@ and expression i ppf x =
       record_unboxed_product_representation (i+1) ppf representation;
       line i ppf "extended_expression =\n";
       option (i+1) expression ppf (Option.map fst extended_expression);
-  | Texp_field (e, _, li, _, _, _) ->
+  | Texp_field (e, _, li, _, _, _, _) ->
       line i ppf "Texp_field\n";
       expression i ppf e;
       longident i ppf li;
-  | Texp_unboxed_field (e, _, li, _, _) ->
+  | Texp_unboxed_field (e, _, li, _, _, _) ->
       line i ppf "Texp_unboxed_field\n";
       expression i ppf e;
       longident i ppf li;
-  | Texp_setfield (e1, am, li, _, e2) ->
+  | Texp_setfield (e1, am, li, _, _, e2) ->
       line i ppf "Texp_setfield\n";
       locality_mode i ppf am;
       expression i ppf e1;
