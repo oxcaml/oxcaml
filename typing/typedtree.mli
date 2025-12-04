@@ -111,6 +111,13 @@ val print_unique_use : Format.formatter -> unique_use -> unit
 
 type alloc_mode = Mode.Alloc.r
 
+(** Whether this construction required disambiguating at the time it was constructed.
+    If so, the disambiguated path and arity of the underlying type constructor
+    is preserved for inserting an annotation. *)
+type ambiguity =
+  | Ambiguous of { path: Path.t; arity : int }
+  | Unambiguous
+
 type texp_field_boxing =
   | Boxing of alloc_mode * unique_use
   (** Projection requires boxing. [unique_use] describes the usage of the
@@ -191,7 +198,8 @@ and 'k pattern_desc =
       Longident.t loc * Types.constructor_description *
         value general_pattern list *
         ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
-          option ->
+          option *
+        ambiguity ->
       value pattern_desc
         (** C                             ([], None)
             C P                           ([P], None)
@@ -213,7 +221,7 @@ and 'k pattern_desc =
          *)
   | Tpat_record :
       (Longident.t loc * Types.label_description * value general_pattern) list *
-        closed_flag ->
+        closed_flag * ambiguity ->
       value pattern_desc
         (** { l1=P1; ...; ln=Pn }     (flag = Closed)
             { l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -222,7 +230,7 @@ and 'k pattern_desc =
          *)
   | Tpat_record_unboxed_product :
       (Longident.t loc * Types.unboxed_label_description * value general_pattern) list *
-        closed_flag ->
+        closed_flag * ambiguity ->
       value pattern_desc
         (** #{ l1=P1; ...; ln=Pn }     (flag = Closed)
             #{ l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -401,7 +409,7 @@ and expression_desc =
           *)
   | Texp_construct of
       Longident.t loc * Types.constructor_description *
-      expression list * alloc_mode option
+      expression list * alloc_mode option * ambiguity
         (** C                []
             C E              [E]
             C (E1, ..., En)  [E1;...;En]
@@ -419,7 +427,8 @@ and expression_desc =
       fields : ( Types.label_description * record_label_definition ) array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
-      alloc_mode : alloc_mode option
+      alloc_mode : alloc_mode option;
+      ambiguity : ambiguity
     }
         (** { l1=P1; ...; ln=Pn }           (extended_expression = None)
             { E0 with l1=P1; ...; ln=Pn }   (extended_expression = Some E0)
@@ -439,6 +448,7 @@ and expression_desc =
       fields : ( Types.unboxed_label_description * record_label_definition ) array;
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
+      ambiguity : ambiguity;
     }
         (** #{ l1=P1; ...; ln=Pn }           (extended_expression = None)
             #{ E0 with l1=P1; ...; ln=Pn }   (extended_expression = Some E0)
@@ -455,17 +465,17 @@ and expression_desc =
       expression * Jkind.sort * Longident.t loc * Types.label_description *
       alloc_mode
   | Texp_field of expression * Jkind.sort * Longident.t loc *
-      Types.label_description * texp_field_boxing * Unique_barrier.t
+      Types.label_description * texp_field_boxing * Unique_barrier.t * ambiguity
     (** - The sort is the sort of the whole record (which may be non-value if
           the record is @@unboxed).
         - [texp_field_boxing] provides extra information depending on if the
           projection requires boxing. *)
   | Texp_unboxed_field of
       expression * Jkind.sort * Longident.t loc * Types.unboxed_label_description *
-        unique_use
+        unique_use * ambiguity
   | Texp_setfield of
       expression * Mode.Locality.l * Longident.t loc *
-      Types.label_description * expression
+      Types.label_description * ambiguity * expression
     (** [alloc_mode] translates to the [modify_mode] of the record *)
   | Texp_array of Types.mutability * Jkind.Sort.t * expression list * alloc_mode
   | Texp_idx of block_access * unboxed_access list

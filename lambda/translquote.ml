@@ -2142,6 +2142,11 @@ let type_for_path loc = function
     Identifier.Type.dot loc (module_for_path loc p) s |> Identifier.Type.wrap
   | _ -> raise Exit
 
+let type_constr_for_path loc path arity =
+  Type.constr loc (type_for_path loc path)
+    (List.init arity (fun _ -> Type.var loc None |> Type.wrap))
+  |> Type.wrap
+
 let value_for_path loc = function
   | Path.Pdot (p, s) ->
     Identifier.Value.dot loc (module_for_path loc p) s |> Identifier.Value.wrap
@@ -2262,11 +2267,11 @@ let rec with_new_idents_pat pat =
     with_new_idents_pat pat
   | Tpat_constant _ -> ()
   | Tpat_tuple args -> List.iter (fun (_, pat) -> with_new_idents_pat pat) args
-  | Tpat_construct (_, _, args, _) ->
+  | Tpat_construct (_, _, args, _, _) ->
     List.iter (fun pat -> with_new_idents_pat pat) args
   | Tpat_variant (_, argo, _) -> (
     match argo with None -> () | Some pat -> with_new_idents_pat pat)
-  | Tpat_record (lbl_pats, _) ->
+  | Tpat_record (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
   | Tpat_array (_, _, pats) ->
     List.iter (fun pat -> with_new_idents_pat pat) pats
@@ -2275,7 +2280,7 @@ let rec with_new_idents_pat pat =
     with_new_idents_pat pat2
   | Tpat_unboxed_tuple args ->
     List.iter (fun (_, pat, _) -> with_new_idents_pat pat) args
-  | Tpat_record_unboxed_product (lbl_pats, _) ->
+  | Tpat_record_unboxed_product (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
   | Tpat_lazy pat -> with_new_idents_pat pat
 
@@ -2291,11 +2296,11 @@ let rec without_idents_pat pat =
     without_idents_pat pat
   | Tpat_constant _ -> ()
   | Tpat_tuple args -> List.iter (fun (_, pat) -> without_idents_pat pat) args
-  | Tpat_construct (_, _, args, _) ->
+  | Tpat_construct (_, _, args, _, _) ->
     List.iter (fun pat -> without_idents_pat pat) args
   | Tpat_variant (_, argo, _) -> (
     match argo with None -> () | Some pat -> without_idents_pat pat)
-  | Tpat_record (lbl_pats, _) ->
+  | Tpat_record (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
   | Tpat_array (_, _, pats) ->
     List.iter (fun pat -> without_idents_pat pat) pats
@@ -2304,7 +2309,7 @@ let rec without_idents_pat pat =
     without_idents_pat pat2
   | Tpat_unboxed_tuple args ->
     List.iter (fun (_, pat, _) -> without_idents_pat pat) args
-  | Tpat_record_unboxed_product (lbl_pats, _) ->
+  | Tpat_record_unboxed_product (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
   | Tpat_lazy pat -> without_idents_pat pat
 
@@ -2329,6 +2334,26 @@ let without_param fp =
   List.iter
     (fun (id, _, _, _) -> without_idents_types_constr [id])
     fp.fp_newtypes
+
+let type_constraint_of_ambiguity loc ambiguity =
+  match ambiguity with
+  | Unambiguous -> None
+  | Ambiguous { path; arity } -> Some (type_constr_for_path loc path arity)
+
+let constrain_exp_with_type loc typ exp =
+  Type_constraint.constraint_ loc typ
+  |> Type_constraint.wrap
+  |> Exp_desc.constraint_ loc exp
+  |> Exp_desc.wrap |> mk_exp_noattr loc
+
+let maybe_constrain_exp_with_type loc typ exp =
+  match typ with Some typ -> constrain_exp_with_type loc typ exp | None -> exp
+
+let constrain_pat_with_type loc typ pat =
+  Pat.constraint_ loc pat typ |> Pat.wrap
+
+let maybe_constrain_pat_with_type loc typ exp =
+  match typ with Some typ -> constrain_pat_with_type loc typ exp | None -> exp
 
 type case_binding =
   | Non_binding of Pat.t * Exp.t
@@ -2383,27 +2408,33 @@ and quote_pat_extra loc pat_lam extra =
 
 and quote_value_pattern p =
   let env = p.pat_env and loc = p.pat_loc in
+  let post pat_quoted =
+    List.fold_right
+      (fun extra p -> quote_pat_extra loc p extra)
+      p.pat_extra (Pat.wrap pat_quoted)
+  in
   let pat_quoted =
     match p.pat_desc with
-    | Tpat_any -> if is_module p then Pat.any_module else Pat.any
+    | Tpat_any ->
+      if is_module p then Pat.any_module |> post else Pat.any |> post
     | Tpat_var (id, _, _, _, _) ->
       if is_module p
-      then Pat.unpack loc (Var.Module.mk (Lvar id))
-      else Pat.var loc (Var.Value.mk (Lvar id))
+      then Pat.unpack loc (Var.Module.mk (Lvar id)) |> post
+      else Pat.var loc (Var.Value.mk (Lvar id)) |> post
     | Tpat_alias (pat, id, _, _, _, _, _) ->
       let pat = quote_value_pattern pat in
-      Pat.alias loc pat (Var.Value.mk (Lvar id))
+      Pat.alias loc pat (Var.Value.mk (Lvar id)) |> post
     | Tpat_constant const ->
       let const = quote_constant loc const in
-      Pat.constant loc const
+      Pat.constant loc const |> post
     | Tpat_tuple pats ->
       let pats =
         List.map
           (fun (lbl, p) -> quote_nonopt loc lbl, quote_value_pattern p)
           pats
       in
-      Pat.tuple loc pats
-    | Tpat_construct (lid, constr, args, _) ->
+      Pat.tuple loc pats |> post
+    | Tpat_construct (lid, constr, args, _, ambiguity) ->
       let constr = quote_constructor env lid.loc constr in
       let args =
         match args with
@@ -2418,10 +2449,14 @@ and quote_value_pattern p =
           Some (Pat.tuple loc with_labels |> Pat.wrap)
       in
       Pat.construct loc constr args
+      |> post
+      |> maybe_constrain_pat_with_type loc
+           (type_constraint_of_ambiguity loc ambiguity)
     | Tpat_variant (variant, argo, _) ->
       let argo = Option.map quote_value_pattern argo in
       Pat.variant loc (Variant.of_string loc variant |> Variant.wrap) argo
-    | Tpat_record (lbl_pats, closed) ->
+      |> post
+    | Tpat_record (lbl_pats, closed, ambiguity) ->
       let lbl_pats =
         List.map
           (fun (lid, lbl_desc, pat) ->
@@ -2434,21 +2469,24 @@ and quote_value_pattern p =
         match closed with Asttypes.Closed -> true | Asttypes.Open -> false
       in
       Pat.record loc lbl_pats closed
+      |> post
+      |> maybe_constrain_pat_with_type loc
+           (type_constraint_of_ambiguity loc ambiguity)
     | Tpat_array (_, _, pats) ->
       let pats = List.map quote_value_pattern pats in
-      Pat.array loc pats
+      Pat.array loc pats |> post
     | Tpat_or (pat1, pat2, _) ->
       let pat1 = quote_value_pattern pat1 in
       let pat2 = quote_value_pattern pat2 in
-      Pat.or_ loc pat1 pat2
+      Pat.or_ loc pat1 pat2 |> post
     | Tpat_unboxed_tuple pats ->
       let pats =
         List.map
           (fun (lbl, p, _) -> quote_nonopt loc lbl, quote_value_pattern p)
           pats
       in
-      Pat.unboxed_tuple loc pats
-    | Tpat_record_unboxed_product (lbl_pats, closed) ->
+      Pat.unboxed_tuple loc pats |> post
+    | Tpat_record_unboxed_product (lbl_pats, closed, ambiguity) ->
       let lbl_pats =
         List.map
           (fun (lid, lbl_desc, pat) ->
@@ -2461,13 +2499,14 @@ and quote_value_pattern p =
         match closed with Asttypes.Closed -> true | Asttypes.Open -> false
       in
       Pat.unboxed_record loc lbl_pats closed
+      |> post
+      |> maybe_constrain_pat_with_type loc
+           (type_constraint_of_ambiguity loc ambiguity)
     | Tpat_lazy pat ->
       let pat = quote_value_pattern pat in
-      Pat.lazy_ loc pat
+      Pat.lazy_ loc pat |> post
   in
-  List.fold_right
-    (fun extra p -> quote_pat_extra loc p extra)
-    p.pat_extra (Pat.wrap pat_quoted)
+  pat_quoted
 
 and quote_core_type ty =
   let loc = ty.ctyp_loc in
@@ -2930,7 +2969,7 @@ and quote_expression' ~(post : Exp_desc.t' -> Exp.t) transl stage e : Exp.t =
           exps
       in
       Exp_desc.tuple loc exps |> post
-    | Texp_construct (lid, constr, args, _) ->
+    | Texp_construct (lid, constr, args, _, ambiguity) ->
       let constr = quote_constructor env lid.loc constr in
       let args =
         match args with
@@ -2946,14 +2985,17 @@ and quote_expression' ~(post : Exp_desc.t' -> Exp.t) transl stage e : Exp.t =
           let as_tuple = Exp_desc.tuple loc with_labels |> Exp_desc.wrap in
           Some (mk_exp_noattr loc as_tuple)
       in
-      Exp_desc.construct loc constr args |> post
+      Exp_desc.construct loc constr args
+      |> post
+      |> maybe_constrain_exp_with_type loc
+           (type_constraint_of_ambiguity loc ambiguity)
     | Texp_variant (variant, argo) ->
       let variant = quote_variant loc variant
       and argo =
         Option.map (fun (arg, _) -> quote_expression transl stage arg) argo
       in
       Exp_desc.variant loc variant argo |> post
-    | Texp_record record ->
+    | Texp_record { fields; extended_expression; ambiguity; _ } ->
       let lbl_exps =
         Array.map
           (fun (lbl, def) ->
@@ -2965,20 +3007,31 @@ and quote_expression' ~(post : Exp_desc.t' -> Exp.t) transl stage e : Exp.t =
                 fatal_error "No support for record update syntax in quotations"
             in
             lbl, exp)
-          record.fields
+          fields
       in
       let base =
         Option.map
           (fun (e, _, _) -> quote_expression transl stage e)
-          record.extended_expression
+          extended_expression
       in
-      Exp_desc.record loc (Array.to_list lbl_exps) base |> post
-    | Texp_field (rcd, _, lid, lbl, _, _) ->
-      let rcd = quote_expression transl stage rcd in
+      Exp_desc.record loc (Array.to_list lbl_exps) base
+      |> post
+      |> maybe_constrain_exp_with_type loc
+           (type_constraint_of_ambiguity loc ambiguity)
+    | Texp_field (rcd, _, lid, lbl, _, _, ambiguity) ->
+      let rcd =
+        quote_expression transl stage rcd
+        |> maybe_constrain_exp_with_type loc
+             (type_constraint_of_ambiguity loc ambiguity)
+      in
       let lbl = quote_record_field env lid.loc lbl in
       Exp_desc.field loc rcd lbl |> post
-    | Texp_setfield (rcd, _, lid, lbl, exp) ->
-      let rcd = quote_expression transl stage rcd in
+    | Texp_setfield (rcd, _, lid, lbl, ambiguity, exp) ->
+      let rcd =
+        quote_expression transl stage rcd
+        |> maybe_constrain_exp_with_type loc
+             (type_constraint_of_ambiguity loc ambiguity)
+      in
       let lbl = quote_record_field env lid.loc lbl in
       let exp = quote_expression transl stage exp in
       Exp_desc.setfield loc rcd lbl exp |> post
@@ -3066,7 +3119,8 @@ and quote_expression' ~(post : Exp_desc.t' -> Exp.t) transl stage e : Exp.t =
           ts
       in
       Exp_desc.unboxed_tuple loc tups |> post
-    | Texp_record_unboxed_product record ->
+    | Texp_record_unboxed_product { fields; extended_expression; ambiguity; _ }
+      ->
       let lbl_exps =
         Array.map
           (fun (lbl, def) ->
@@ -3078,16 +3132,23 @@ and quote_expression' ~(post : Exp_desc.t' -> Exp.t) transl stage e : Exp.t =
                 fatal_error "No support for record update syntax in quotations."
             in
             lbl, exp)
-          record.fields
+          fields
       in
       let base =
         Option.map
           (fun (e, _) -> quote_expression transl stage e)
-          record.extended_expression
+          extended_expression
       in
-      Exp_desc.unboxed_record_product loc (Array.to_list lbl_exps) base |> post
-    | Texp_unboxed_field (rcd, _, lid, lbl, _) ->
-      let rcd = quote_expression transl stage rcd in
+      Exp_desc.unboxed_record_product loc (Array.to_list lbl_exps) base
+      |> post
+      |> maybe_constrain_exp_with_type loc
+           (type_constraint_of_ambiguity loc ambiguity)
+    | Texp_unboxed_field (rcd, _, lid, lbl, _, ambiguity) ->
+      let rcd =
+        quote_expression transl stage rcd
+        |> maybe_constrain_exp_with_type loc
+             (type_constraint_of_ambiguity loc ambiguity)
+      in
       let lbl = quote_record_field env lid.loc lbl in
       Exp_desc.unboxed_field loc rcd lbl |> post
     | Texp_letexception (ext_const, exp) ->
