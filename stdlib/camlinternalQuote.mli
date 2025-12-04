@@ -114,7 +114,7 @@ module Identifier : sig
   module Module : sig
     type t
 
-    val compilation_unit : string -> t
+    val global_module : string -> t
 
     val dot : t -> string -> t
 
@@ -286,7 +286,7 @@ module Method : sig
   val of_string : string -> t
 end
 
-module Fragment : sig
+module Modtype_path : sig
   type t
 
   val name : string -> t
@@ -383,7 +383,7 @@ and Type : sig
 
   val poly : Loc.t -> Name.t list -> (Var.Type_var.t list -> t) lam -> t
 
-  val package : Module_type.t -> (Fragment.t * t) list -> t
+  val package : Module_type.t -> (Modtype_path.t * t) list -> t
 
   val quote : t -> t
 
@@ -450,8 +450,6 @@ module Exp_attribute : sig
   val loop : t
 
   val tail_mod_cons : t
-
-  val quotation : t
 end
 
 module rec Case : sig
@@ -519,7 +517,7 @@ and Comprehension : sig
 
   val body : Exp.t -> t
 
-  val when_clause : Exp.t -> t -> t
+  val when_clause : t -> Exp.t -> t
 
   val for_range :
     Loc.t -> Name.t -> Exp.t -> Exp.t -> bool -> (Var.Value.t -> t) lam -> t

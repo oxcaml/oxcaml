@@ -833,7 +833,7 @@ module With_free_and_bound_vars = struct
 end
 
 type raw_ident_module_t =
-  | Compilation_unit of string
+  | Global_module of string
   | MDot of raw_ident_module_t * string
   | MVar of Var.Module.t * Loc.t
 
@@ -886,7 +886,7 @@ let print_op fmt s =
   else Format.fprintf fmt "%s" s
 
 let rec print_raw_ident_module env fmt = function
-  | Compilation_unit s -> Format.fprintf fmt "%s" s
+  | Global_module s -> Format.fprintf fmt "%s" s
   | MDot (m, s) -> Format.fprintf fmt "%a.%s" (print_raw_ident_module env) m s
   | MVar (vm, _) -> Format.fprintf fmt "%a" (Var.Module.print env) vm
 
@@ -911,7 +911,7 @@ let print_raw_ident_field env fmt = function
   | FDot (m, s) -> Format.fprintf fmt "%a.%s" (print_raw_ident_module env) m s
 
 let rec free_vars_module = function
-  | Compilation_unit _ -> Var.Map.empty
+  | Global_module _ -> Var.Map.empty
   | MDot (t, _) -> free_vars_module t
   | MVar (v, loc) -> Var.Map.singleton (Var.Module.generic v) loc
 
@@ -940,7 +940,7 @@ module Identifier = struct
 
     let mk t = With_free_vars.mk (free_vars_module t) t
 
-    let compilation_unit s = mk (Compilation_unit s)
+    let global_module s = mk (Global_module s)
 
     let dot t s =
       let+ t = t in
@@ -1208,11 +1208,11 @@ module Ast = struct
     | Vtag of Variant.t * bool * core_type list
     | Vinherit of core_type
 
-  and package_type = module_type * (fragment * core_type) list
+  and package_type = module_type * (modtype_path * core_type) list
 
-  and fragment =
+  and modtype_path =
     | Name of Name.t
-    | Dot of fragment * Name.t
+    | Dot of modtype_path * Name.t
 
   type type_constraint =
     | Constraint of core_type
@@ -1248,7 +1248,6 @@ module Ast = struct
     | Poll
     | Loop
     | Tail_mod_cons
-    | Quotation
 
   let attribute_as_string = function
     | Inline -> "inline"
@@ -1261,7 +1260,6 @@ module Ast = struct
     | Poll -> "poll"
     | Loop -> "loop"
     | Tail_mod_cons -> "tail_mod_cons"
-    | Quotation -> "quotation"
 
   type expression =
     { desc : expression_desc;
@@ -1417,6 +1415,10 @@ module Ast = struct
     | Nonrecursive -> pp fmt "let"
     | Recursive -> pp fmt "let@ rec"
 
+  let print_dir fmt = function
+    | Upto -> pp fmt "to"
+    | Downto -> pp fmt "downto"
+
   let rec print_vb env fmt ({ pat; expr } : value_binding) =
     pp fmt "%a@ =@ @[<2>%a@]"
       (print_pat env) pat (print_exp_with_parens env) expr
@@ -1450,7 +1452,6 @@ module Ast = struct
   and print_field env fmt = function
     | FBasic s -> pp fmt "%s" s
     | FIdent id -> print_raw_ident_field env fmt id
-
 
   and print_pat_with_parens env fmt pat =
     match pat with
@@ -1555,9 +1556,9 @@ module Ast = struct
         (fun ty -> pp fmt "@ &@ %a" (print_core_type_with_arrow env) ty)
         tys
 
-  and print_fragment fmt = function
+  and print_modtype_path fmt = function
     | Name s -> Name.print fmt s
-    | Dot (frag, s) -> pp fmt "%a.%a" print_fragment frag Name.print s
+    | Dot (frag, s) -> pp fmt "%a.%a" print_modtype_path frag Name.print s
 
   and print_core_type_with_arrow env fmt ty =
     match ty with
@@ -1652,12 +1653,12 @@ module Ast = struct
       print_tuple_like "" "" "." (Var.Type_var.print env) fmt (tv :: tvs);
       pp fmt "@ %a" (print_core_type env) ty
     | TypePackage (ident, []) -> print_module_type env fmt ident
-    | TypePackage (ident, (fragment, core_type) :: wcs) ->
+    | TypePackage (ident, (modtype_path, core_type) :: wcs) ->
       pp fmt "@[%a@ with@ type@ %a@ =@ %a" (print_module_type env) ident
-        print_fragment fragment (print_core_type env) core_type;
+        print_modtype_path modtype_path (print_core_type env) core_type;
       List.iter
-        (fun (fragment, core_type) ->
-          pp fmt "@ and@ type@ %a@ =@ %a" print_fragment fragment
+        (fun (modtype_path, core_type) ->
+          pp fmt "@ and@ type@ %a@ =@ %a" print_modtype_path modtype_path
             (print_core_type env) core_type)
         wcs;
       pp fmt "@]"
@@ -1738,6 +1739,28 @@ module Ast = struct
     then print_tuple_like ~with_space:false "::" "" ""
            (print_exp_with_parens env) fmt items
     else print_tuple_like ";" "[" "]" (print_exp env) fmt items
+
+  and print_comprehension_clause env fmt = function
+    | Range (var, exp_start, exp_stop, dir) ->
+      pp fmt "@[%a = %a@]@ %a@ %a"
+        (Var.Value.print env) var (print_exp env) exp_start
+        (print_dir) dir (print_exp env) exp_stop
+    | In (pat, exp) ->
+      pp fmt "%a@ in@ %a" (print_pat env) pat (print_exp env) exp
+
+  and print_comprehension_body env fmt = function
+    | Body exp -> print_exp env fmt exp
+    | When (comp, _) -> print_comprehension_body env fmt comp
+    | ForComp (comp, _) -> print_comprehension_body env fmt comp
+
+  and print_comprehension env fmt = function
+    | Body _ -> ()
+    | When (comp, exp) ->
+      pp fmt "@ when@ %a%a" (print_exp env) exp (print_comprehension env) comp
+    | ForComp (comp, clause) ->
+      pp fmt "@ for@ %a%a"
+        (print_comprehension_clause env) clause
+        (print_comprehension env) comp
 
   and print_exp_desc env fmt exp =
     match exp.desc with
@@ -1836,9 +1859,8 @@ module Ast = struct
         (print_exp_with_parens env)
         body
     | For (it, start, stop, dir, body) ->
-      let dir = match dir with Upto -> "to" | Downto -> "downto" in
-      pp fmt "for@ %a@ =@ %a@ %s@ %a@ do@ @,@[<2>%a@]@ @,done" (print_pat env)
-        it (print_exp env) start dir (print_exp env) stop
+      pp fmt "for@ %a@ =@ %a@ %a@ %a@ do@ @,@[<2>%a@]@ @,done" (print_pat env)
+        it (print_exp env) start print_dir dir (print_exp env) stop
         (print_exp_with_parens env)
         body
     | Send (exp, meth) ->
@@ -1892,8 +1914,12 @@ module Ast = struct
       pp fmt "#%a.%a" (print_exp env) exp (print_field env) rec_field
     | Quote exp -> pp fmt "@[<2><[@,%a@,@]]>" (print_exp env) exp
     | Antiquote exp -> pp fmt "@[<2>$@,%a@]" (print_exp_with_parens env) exp
-    | List_comprehension _ | Array_comprehension _ ->
-      pp fmt "(* comprehension *)"
+    | List_comprehension compr ->
+      pp fmt "@[[@ %a%a@ ]@]"
+        (print_comprehension_body env) compr (print_comprehension env) compr
+    | Array_comprehension compr ->
+      pp fmt "@[[|@ %a%a@ |]@]"
+        (print_comprehension_body env) compr (print_comprehension env) compr
     | Eval typ -> pp fmt "@[<2>[%%eval:@ %a]@]" (print_core_type env) typ
     | Unreachable | Src_pos -> pp fmt "."
 
@@ -1920,8 +1946,8 @@ module Label = struct
   let optional s = Ast.Optional s
 end
 
-module Fragment = struct
-  type t = Ast.fragment
+module Modtype_path = struct
+  type t = Ast.modtype_path
 
   let name s = Ast.Name s
 
@@ -2185,8 +2211,6 @@ module Exp_attribute = struct
   let loop = Ast.Loop
 
   let tail_mod_cons = Ast.Tail_mod_cons
-
-  let quotation = Ast.Quotation
 end
 
 module Variant_type = struct
@@ -2470,8 +2494,8 @@ module Comprehension = struct
     let+ exp = exp in
     Ast.Body exp
 
-  let when_clause exp compr =
-    let+ exp = exp and+ compr = compr in
+  let when_clause compr exp =
+    let+ compr = compr and+ exp = exp in
     Ast.When (compr, exp)
 
   let for_range loc name start stop direction compr =
