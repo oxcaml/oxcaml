@@ -26,44 +26,18 @@ module Externality = struct
     | External64
     | Internal
 
-  let max = Internal
+  include Mode.Lattices.Total (struct
+    type nonrec t = t
 
-  let min = External
+    let min = External
 
-  let equal e1 e2 =
-    match e1, e2 with
-    | External, External -> true
-    | External64, External64 -> true
-    | Internal, Internal -> true
-    | (External | External64 | Internal), _ -> false
+    let max = Internal
 
-  let less_or_equal t1 t2 : Misc.Le_result.t =
-    match t1, t2 with
-    | External, External -> Equal
-    | External, (External64 | Internal) -> Less
-    | External64, External -> Not_le
-    | External64, External64 -> Equal
-    | External64, Internal -> Less
-    | Internal, (External | External64) -> Not_le
-    | Internal, Internal -> Equal
+    let ord = function External -> 0 | External64 -> 1 | Internal -> 2
+  end)
 
-  let le t1 t2 = Misc.Le_result.is_le (less_or_equal t1 t2)
-
-  let meet t1 t2 =
-    match t1, t2 with
-    | External, (External | External64 | Internal)
-    | (External64 | Internal), External ->
-      External
-    | External64, (External64 | Internal) | Internal, External64 -> External64
-    | Internal, Internal -> Internal
-
-  let join t1 t2 =
-    match t1, t2 with
-    | Internal, (Internal | External64 | External)
-    | (External64 | External), Internal ->
-      Internal
-    | External64, (External64 | External) | External, External64 -> External64
-    | External, External -> External
+  let less_or_equal s1 s2 : Misc.Le_result.t =
+    if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
 
   let print ppf = function
     | External -> Format.fprintf ppf "external_"
@@ -82,34 +56,18 @@ module Nullability = struct
     | Non_null
     | Maybe_null
 
-  let max = Maybe_null
+  include Mode.Lattices.Total (struct
+    type nonrec t = t
 
-  let min = Non_null
+    let min = Non_null
 
-  let equal n1 n2 =
-    match n1, n2 with
-    | Non_null, Non_null -> true
-    | Maybe_null, Maybe_null -> true
-    | (Non_null | Maybe_null), _ -> false
+    let max = Maybe_null
 
-  let less_or_equal n1 n2 : Misc.Le_result.t =
-    match n1, n2 with
-    | Non_null, Non_null -> Equal
-    | Non_null, Maybe_null -> Less
-    | Maybe_null, Non_null -> Not_le
-    | Maybe_null, Maybe_null -> Equal
+    let ord = function Non_null -> 0 | Maybe_null -> 1
+  end)
 
-  let le n1 n2 = Misc.Le_result.is_le (less_or_equal n1 n2)
-
-  let meet n1 n2 =
-    match n1, n2 with
-    | Non_null, (Non_null | Maybe_null) | Maybe_null, Non_null -> Non_null
-    | Maybe_null, Maybe_null -> Maybe_null
-
-  let join n1 n2 =
-    match n1, n2 with
-    | Maybe_null, (Maybe_null | Non_null) | Non_null, Maybe_null -> Maybe_null
-    | Non_null, Non_null -> Non_null
+  let less_or_equal s1 s2 : Misc.Le_result.t =
+    if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
 
   let print ppf = function
     | Non_null -> Format.fprintf ppf "non_null"
@@ -119,62 +77,32 @@ end
 module Separability = struct
   type t =
     | Non_pointer
+    | Non_pointer64
     | Non_float
     | Separable
     | Maybe_separable
 
-  let max = Maybe_separable
+  include Mode.Lattices.Total (struct
+    type nonrec t = t
 
-  let min = Non_pointer
+    let min = Non_pointer
 
-  let equal p1 p2 =
-    match p1, p2 with
-    | Non_pointer, Non_pointer -> true
-    | Non_float, Non_float -> true
-    | Separable, Separable -> true
-    | Maybe_separable, Maybe_separable -> true
-    | (Non_pointer | Non_float | Separable | Maybe_separable), _ -> false
+    let max = Maybe_separable
+
+    let ord = function
+      | Non_pointer -> 0
+      | Non_pointer64 -> 1
+      | Non_float -> 2
+      | Separable -> 3
+      | Maybe_separable -> 4
+  end)
 
   let less_or_equal s1 s2 : Misc.Le_result.t =
-    match s1, s2 with
-    | Non_pointer, Non_pointer -> Equal
-    | Non_pointer, (Non_float | Separable | Maybe_separable) -> Less
-    | Non_float, Non_pointer -> Not_le
-    | Non_float, Non_float -> Equal
-    | Non_float, (Separable | Maybe_separable) -> Less
-    | Separable, (Non_pointer | Non_float) -> Not_le
-    | Separable, Separable -> Equal
-    | Separable, Maybe_separable -> Less
-    | Maybe_separable, (Non_pointer | Non_float | Separable) -> Not_le
-    | Maybe_separable, Maybe_separable -> Equal
-
-  let le p1 p2 = Misc.Le_result.is_le (less_or_equal p1 p2)
-
-  let meet p1 p2 =
-    match p1, p2 with
-    | Non_pointer, (Non_pointer | Non_float | Separable | Maybe_separable)
-    | (Non_float | Separable | Maybe_separable), Non_pointer ->
-      Non_pointer
-    | Non_float, (Non_float | Separable | Maybe_separable)
-    | (Separable | Maybe_separable), Non_float ->
-      Non_float
-    | Separable, (Separable | Maybe_separable) | Maybe_separable, Separable ->
-      Separable
-    | Maybe_separable, Maybe_separable -> Maybe_separable
-
-  let join p1 p2 =
-    match p1, p2 with
-    | Maybe_separable, (Maybe_separable | Separable | Non_float | Non_pointer)
-    | (Separable | Non_float | Non_pointer), Maybe_separable ->
-      Maybe_separable
-    | Separable, (Separable | Non_float | Non_pointer)
-    | (Non_float | Non_pointer), Separable ->
-      Separable
-    | Non_float, (Non_float | Non_pointer) | Non_pointer, Non_float -> Non_float
-    | Non_pointer, Non_pointer -> Non_pointer
+    if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
 
   let to_string = function
     | Non_pointer -> "non_pointer"
+    | Non_pointer64 -> "non_pointer64"
     | Non_float -> "non_float"
     | Separable -> "separable"
     | Maybe_separable -> "maybe_separable"
