@@ -3468,13 +3468,13 @@ let native_repr_of_type env kind ty sort_or_poly =
   | Untagged, Tconstr (_, _, _) ->
     let is_immediate = Ctype.is_always_gc_ignorable env ty in
     let is_non_nullable = Ctype.check_type_nullability env ty Non_null in
-    let is_value =
+    let is_scannable =
       match sort_or_poly with
       | Poly -> false
       | Sort (Base Scannable) -> true
       | Sort (Base _ | Product _) -> false
     in
-    if is_immediate && is_non_nullable && is_value
+    if is_immediate && is_non_nullable && is_scannable
     then Some (Unboxed_or_untagged_integer Untagged_int)
     else None
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float ->

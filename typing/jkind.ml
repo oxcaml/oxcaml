@@ -1639,6 +1639,15 @@ module Const = struct
         name = "any mod everything"
       }
 
+    let scannable =
+      { jkind =
+          mk_jkind
+            (Base (Scannable, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max
+            ~nullability:Maybe_null;
+        name = "scannable"
+      }
+
     let value_or_null =
       { jkind =
           mk_jkind
@@ -2408,6 +2417,7 @@ module Const = struct
       let jkind_without_sa =
         (match name.txt with
         | "any" -> Builtin.any.jkind
+        | "scannable" -> Builtin.scannable.jkind
         | "value_or_null" -> Builtin.value_or_null.jkind
         | "value" -> Builtin.value.jkind
         | "void" -> Builtin.void.jkind
@@ -2627,6 +2637,8 @@ module Jkind_desc = struct
   module Builtin = struct
     let any = max
 
+    let scannable = of_const Const.Builtin.scannable.jkind
+
     let value_or_null = of_const Const.Builtin.value_or_null.jkind
 
     let value = of_const Const.Builtin.value.jkind
@@ -2725,6 +2737,10 @@ module Builtin = struct
     fresh_jkind Jkind_desc.Builtin.void ~annotation:(mk_annot "void")
       ~why:(Void_creation why)
     |> mark_best
+
+  let scannable ~(why : History.any_creation_reason) =
+    fresh_jkind Jkind_desc.Builtin.scannable ~annotation:(mk_annot "scannable")
+      ~why:(Any_creation why)
 
   let value_or_null ~why =
     match (why : History.value_or_null_creation_reason) with

@@ -1268,9 +1268,9 @@ val structured_constant_layout : structured_constant -> layout
 val mixed_block_element_of_layout : layout -> unit mixed_block_element
 
 (** [Pintval] if a type of [value] jkind is GC-ignorable based on its provided
-    externality, and [Pgenval] otherwise. *)
-val value_kind_of_value_with_externality
-  : Jkind_axis.Externality.t -> value_kind_non_null
+    externality or separability, and [Pgenval] otherwise. *)
+val value_kind_of_value_with_externality_separability
+  : Jkind_axis.Externality.t -> Jkind_axis.Separability.t -> value_kind_non_null
 
 (* Translates [Float_boxed] as [Punboxed_float Unboxed_float64], for
    compatibility with block indices. *)

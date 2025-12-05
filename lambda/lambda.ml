@@ -2429,9 +2429,11 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_vector Unboxed_vec512 -> Vec512
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
 
-let value_kind_of_value_with_externality ext =
-  let open Jkind_axis.Externality in
-  if le ext (upper_bound_if_is_always_gc_ignorable ()) then Pintval else Pgenval
+let value_kind_of_value_with_externality_separability ext sep =
+  let open Jkind_axis in
+  if Externality.(le ext (upper_bound_if_is_always_gc_ignorable ()))
+     || Separability.(le sep (upper_bound_if_is_always_gc_ignorable ()))
+  then Pintval else Pgenval
 
 let rec layout_of_mixed_block_element_for_idx_set
   ext (mbe : _ mixed_block_element)
@@ -2443,7 +2445,14 @@ let rec layout_of_mixed_block_element_for_idx_set
       (Array.to_list
         (Array.map (layout_of_mixed_block_element_for_idx_set ext) mbes))
   | Value ({ raw_kind = Pgenval; _ } as value_kind) ->
-    let raw_kind = value_kind_of_value_with_externality ext in
+    (* CR zeisbach: maybe this should propagate more information?
+       But probably not: look at call sites to make sure. ideally, the stored
+       value_kind will have already taken scannable axes into account.
+       which might mean the long named helper below should be refactored? *)
+    let sep_placeholder = Jkind_axis.Separability.max in
+    let raw_kind =
+      value_kind_of_value_with_externality_separability ext sep_placeholder
+    in
     Pvalue { value_kind with raw_kind }
   | Value value_kind -> Pvalue value_kind
   | Float64 | Float_boxed _ -> Punboxed_float Unboxed_float64

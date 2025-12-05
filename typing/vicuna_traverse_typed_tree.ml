@@ -94,6 +94,8 @@ let is_always_gc_ignorable env ty =
     if !Clflags.native_code && Sys.word_size = 64 then External64 else External
   in
   Ctype.check_type_externality env ty ext
+(* CR zeisbach: determine whether to add something in here.
+   also maybe (definitely) refactor above to lok more like ctype *)
 
 type classification =
   | Int (* any immediate type *)
