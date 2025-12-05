@@ -28,10 +28,6 @@
 
 (* CR metaprogramming aivaskovic: This file has not been code reviewed *)
 
-module Code : sig
-  type t
-end
-
 val transl_quote :
   (Typedtree.expression -> Lambda.lambda) ->
   Typedtree.expression ->

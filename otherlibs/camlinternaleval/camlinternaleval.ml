@@ -171,10 +171,8 @@ let eval code =
 
   (* Compilation happens here during partial application, not when thunk is
      called *)
-  let code = CamlinternalQuote.Code.Closed.close code in
-  let exp = CamlinternalQuote.Code.Closed.to_exp code in
   let code_string =
-    Format.asprintf "let eval = (%a)" CamlinternalQuote.Exp.print exp
+    Format.asprintf "let eval = (%a)" CamlinternalQuote.Code.print code
   in
   let lexbuf = Lexing.from_string code_string in
   Location.input_lexbuf := Some lexbuf;
