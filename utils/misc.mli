@@ -481,9 +481,9 @@ val protect_output_to_file : string -> (out_channel -> 'a) -> 'a
           the given function, then close the channel. If the function raises an
           exception, then [filename] will be removed and the backtrace is
           printed; otherwise, the file name is recorded, and the file can still
-          be retroactively removed by [remove_output_files]. *)
+          be retroactively removed by [remove_successful_output_files]. *)
 
-val remove_output_files : unit -> unit
+val remove_successful_output_files : unit -> unit
 (** Remove all successful writes done by [protect_output_to_file]. *)
 
 val mk_temp_dir : ?perms: int -> string -> string -> string
