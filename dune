@@ -283,6 +283,7 @@
   printslambda
   runtimedef
   runtimetags
+  runlength_mangling
   tmc
   simplif
   slambda0

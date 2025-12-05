@@ -1,10 +1,11 @@
 (******************************************************************************
  *                                  OxCaml                                    *
- *                       Mark Shinwell, Jane Street                           *
+ *                          Tim McGilchrist, Tarides                          *
+ *                          Simon Spies, Jane Street                          *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2024 Jane Street Group LLC                                   *
+ * Copyright (c) 2025 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -26,34 +27,19 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Management of DWARF "abstract instances" for functions. *)
+type path_item =
+  | Module of string
+  | AnonymousFunction of int * int * string option
+  | NamedFunction of string
+  | PartialFunction
+  | AnonymousModule of int * int * string option
 
-open! Asm_targets
-open! Dwarf_low
-open! Dwarf_high
+type path = path_item list
 
-val attributes : string -> Dwarf_attribute_values.Attribute_value.t list
+(** Transform a [path] into a mangled name suitable for creating a
+    LinkageName.t *)
+val mangle_path : path -> string
 
-(** Add an abstract instance root. *)
-val add_root :
-  Dwarf_state.t ->
-  parent:Proto_die.t ->
-  demangled_name:string option ->
-  Asm_symbol.t ->
-  location_attributes:Dwarf_attribute_values.Attribute_value.t list ->
-  Proto_die.t * Asm_symbol.t
+val mangle_comp_unit : Compilation_unit.t -> string
 
-type find_result = private
-  | Ok of Asm_symbol.t
-  | External_unit of
-      { demangled_name : string;
-        fun_symbol : Asm_symbol.t
-      }
-
-val find :
-  Dwarf_state.t ->
-  compilation_unit_proto_die:Proto_die.t ->
-  Debuginfo.t ->
-  find_result
-(* val find_maybe_in_another_unit_or_add : Dwarf_state.t ->
-   function_proto_die:Proto_die.t -> Linear.fundecl -> Asm_symbol.t option *)
+val mangle_ident : Compilation_unit.t -> path -> string

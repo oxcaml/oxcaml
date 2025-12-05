@@ -138,7 +138,12 @@ let fresh_or_existing_code_id env { Fexpr.txt = name; loc = _ } =
   match DM.find_opt env.code_ids name with
   | Some code_id -> code_id
   | None ->
-    let c = Code_id.create ~name (Compilation_unit.get_current_exn ()) in
+    (* CR sspies: Debuginfo choice here matches the rest of the file. Is this
+       good enough? *)
+    let c =
+      Code_id.create ~name ~debug:Debuginfo.none
+        (Compilation_unit.get_current_exn ())
+    in
     DM.add env.code_ids name c;
     c
 

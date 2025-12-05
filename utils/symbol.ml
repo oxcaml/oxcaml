@@ -146,6 +146,19 @@ let for_name compilation_unit name =
     linkage_name;
     hash = Hashtbl.hash linkage_name; }
 
+let for_runlength_encoding_path ~compilation_unit ~path ~suffix =
+  let cu = Runlength_mangling.mangle_comp_unit compilation_unit in
+  let name = Runlength_mangling.mangle_path path in
+  let linkage_name =
+    (* Note: Compilation unit no longer separated from the rest of the mangled
+       name via the separator in this mangling scheme. *)
+    cu ^ name ^ suffix |> Linkage_name.of_string
+  in
+  { compilation_unit;
+    linkage_name;
+    hash = Hashtbl.hash linkage_name; }
+
+
 let for_local_ident id =
   assert (not (Ident.is_global_or_predef id));
   let compilation_unit = CU.get_current_exn () in
