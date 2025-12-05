@@ -360,7 +360,10 @@ end
 
 module Type_decl_shape = struct
   let rec mixed_block_shape_to_layout = function
-    | Types.Scannable -> Layout.Base Scannable
+    (* CR zeisbach: this indicates to me that this is busted. since we have to
+       synthesize some sa when we make, and we're throwing it away right here
+       when we go back. if the return type was an actual layout -> good *)
+    | Types.Scannable _ -> Layout.Base Scannable
     | Types.Float_boxed ->
       Layout.Base Float64
       (* [Float_boxed] records are unboxed in the variant at runtime,

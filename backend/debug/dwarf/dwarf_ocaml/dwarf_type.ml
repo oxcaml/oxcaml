@@ -420,7 +420,9 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   match ly with
   | Base base -> (
     match base with
-    | Scannable -> Scannable
+    (* CR zeisbach: the fact that scannable axes have to get conjured up is bad
+       / wrong, and gets fixed if layout actually means layout *)
+    | Scannable -> Scannable { separability = Jkind_axis.Separability.max }
     | Float64 -> Float64
     (* This is a case, where we potentially have mapped [Float_boxed] to
        [Float64], but that is fine, because they are reordered like other mixed

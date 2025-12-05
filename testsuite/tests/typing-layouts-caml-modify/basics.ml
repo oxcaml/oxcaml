@@ -591,7 +591,7 @@ let () =
       arr.(0) <- M.mk 7;
       ignore (Sys.opaque_identity arr))
 
-(*= let () =
+let () =
   let module M : sig
     type t : immediate & immediate
     val mk : int -> int -> t
@@ -625,4 +625,4 @@ let () =
     let outer = { x = M.mk 1 "a" } in
     outer.x <- M.mk 2 "b";
     ignore (Sys.opaque_identity outer)
-  ) *)
+  )

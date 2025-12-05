@@ -543,7 +543,10 @@ and type_origin =
   | Existential of string
 
 and mixed_block_element =
-  | Scannable
+  (* CR zeisbach: this vs Jkind_axes.Separability.t ?
+     since that's all that we really care about. for now, just bringing all
+     of the axes around since it seems no harder. *)
+  | Scannable of Jkind_types.Scannable_axes.t
   | Float_boxed
   | Float64
   | Float32
@@ -911,7 +914,11 @@ let compare_tag t1 t2 =
 
 let rec equal_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Scannable, Scannable
+  (* CR zeisbach: (A) this function looks to be dead code, but also (B) double
+     check whether ignoring the scannable axes on the Scannable is right!
+     Not just here but for like the whole file because it seems suspect.
+     May involve looking at call sites / thinking harder about the semantics *)
+  | Scannable _, Scannable _
   | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16
@@ -921,14 +928,14 @@ let rec equal_mixed_block_element e1 e2 =
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
-  | ( Scannable | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
+  | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
     | Product _ | Void ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Scannable, Scannable | Float_boxed, Float_boxed
+  | Scannable _, Scannable _ | Float_boxed, Float_boxed
   | Float64, Float64 | Float32, Float32
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
@@ -937,8 +944,8 @@ let rec compare_mixed_block_element e1 e2 =
     -> 0
   | Product es1, Product es2
     -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
-  | Scannable, _ -> -1
-  | _, Scannable -> 1
+  | Scannable _, _ -> -1
+  | _, Scannable _ -> 1
   | Float_boxed, _ -> -1
   | _, Float_boxed -> 1
   | Float64, _ -> -1
@@ -1058,7 +1065,11 @@ let record_form_to_string (type rep) (record_form : rep record_form) =
 
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
-  | Base Scannable -> Scannable
+  (* the fact that this uses a sort const and not a layout const is unfortunate
+     because we don't have enough scannable axis information. probably change
+     this?? but that might break a lot of things... it also yet again
+     introduces the problem of having to deal with sort products vs layout *)
+  | Base Scannable -> Scannable { separability = Jkind_axis.Separability.max }
   | Base Bits8 -> Bits8
   | Base Bits16 -> Bits16
   | Base Bits32 -> Bits32
@@ -1131,7 +1142,7 @@ let bound_value_identifiers_and_sorts sigs =
   List.filter_map signature_item_representation sigs
 
 let rec mixed_block_element_to_string = function
-  | Scannable -> "Scannable"
+  | Scannable _ -> "Scannable"
   | Float_boxed -> "Float_boxed"
   | Float32 -> "Float32"
   | Float64 -> "Float64"
@@ -1152,7 +1163,9 @@ let rec mixed_block_element_to_string = function
   | Void -> "Void"
 
 let mixed_block_element_to_lowercase_string = function
-  | Scannable -> "value"
+  (* CR zeisbach: check this out! is this proper printing? probably yes,
+     but also look at the call sites to make sure. probably DWARF stuff. *)
+  | Scannable _ -> "value"
   | Float_boxed -> "float"
   | Float32 -> "float32"
   | Float64 -> "float64"

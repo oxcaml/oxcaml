@@ -723,14 +723,22 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty
   : int * unit Lambda.mixed_block_element =
   match field with
-  | Scannable ->
+  | Scannable { separability } ->
     begin match ty with
     | Some ty ->
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       num_nodes_visited, Value kind
-    | None -> num_nodes_visited, Value (nullable Pgenval)
+    | None ->
+      (* CR zeisbach: refactor this, see the other commments where it got
+         copy/pasta-ed *)
+      let raw_kind =
+        let open Jkind_axis.Separability in
+        if le separability (upper_bound_if_is_always_gc_ignorable ())
+          then Pintval else Pgenval
+      in
+      num_nodes_visited, Value { generic_value with raw_kind }
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end

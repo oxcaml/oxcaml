@@ -1433,7 +1433,16 @@ let rec patch_guarded patch = function
 
 let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   match elt with
-  | Scannable -> Value generic_value
+  | Scannable { separability } ->
+    (* CR zeisbach: probably factor this out, and consider replacing calls
+       to [value_kind_of_value_externality_separability] with calls to
+       two separate functions *)
+    let raw_kind =
+      let open Jkind_axis.Separability in
+      if le separability (upper_bound_if_is_always_gc_ignorable ())
+        then Pintval else Pgenval
+    in
+    Value { generic_value with raw_kind }
   | Float_boxed -> Float_boxed ()
   | Float64 -> Float64
   | Float32 -> Float32
@@ -1456,7 +1465,13 @@ and transl_mixed_product_shape shape =
 let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   Array.mapi (fun i (elt : Types.mixed_block_element) ->
     match elt with
-    | Scannable -> Value (get_value_kind i)
+    | Scannable { separability } ->
+      let raw_kind =
+        let open Jkind_axis.Separability in
+        if le separability (upper_bound_if_is_always_gc_ignorable ())
+          then Pintval else Pgenval
+      in
+      Value { (get_value_kind i) with raw_kind }
     | Float_boxed -> Float_boxed (get_mode i)
     | Float64 -> Float64
     | Float32 -> Float32
@@ -1493,7 +1508,7 @@ let transl_module_representation repr =
   in
   let is_value (elt : Types.mixed_block_element) =
     match elt with
-    | Scannable -> true
+    | Scannable _ -> true
     | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
     | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
     | Product _ | Void -> false
