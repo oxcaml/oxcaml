@@ -360,6 +360,14 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     JK.Ty { args = []; kind; abstract = true }
   | Some decl ->
     (* Here we can switch to using the cached ikind or not. *)
+    let allow_any_crossing =
+      match decl.type_kind with
+      | Types.Type_record (_, _, umc_opt)
+      | Types.Type_record_unboxed_product (_, _, umc_opt)
+      | Types.Type_variant (_, _, umc_opt) ->
+        Option.is_some umc_opt
+      | Types.Type_abstract _ | Types.Type_open -> false
+    in
     let fallback () =
       match decl.type_manifest with
       | None ->
@@ -503,18 +511,23 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
         in
         JK.Ty { args; kind; abstract = false }
     in
-    match decl.type_ikind with
-    | Types.Constructor_ikind constructor when !Clflags.ikinds ->
-      let base, coeffs =
-        constructor_ikind_polynomial constructor
-      in
-      JK.Poly (base, coeffs)
-    | Types.No_constructor_ikind reason ->
-      (* Print the reason *)
-      ignore reason;
-      (*= Format.eprintf "[ikind-miss] %s@." reason; *)
-      fallback ()
-    | Types.Constructor_ikind _ -> fallback ()
+    if allow_any_crossing
+    then
+      let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
+      JK.Ty { args = decl.type_params; kind; abstract = false }
+    else
+      match decl.type_ikind with
+      | Types.Constructor_ikind constructor when !Clflags.ikinds ->
+        let base, coeffs =
+          constructor_ikind_polynomial constructor
+        in
+        JK.Poly (base, coeffs)
+      | Types.No_constructor_ikind reason ->
+        (* Print the reason *)
+        ignore reason;
+        (*= Format.eprintf "[ikind-miss] %s@." reason; *)
+        fallback ()
+      | Types.Constructor_ikind _ -> fallback ()
 
 (* Package the above into a full evaluation context. *)
 let make_ctx ~(context : Jkind.jkind_context) : JK.ctx =
