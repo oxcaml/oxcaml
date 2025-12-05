@@ -100,8 +100,8 @@ type location_list_entry =
   | Dwarf_4 of Dwarf_4_location_list_entry.t
   | Dwarf_5 of Location_list_entry.t
 
-let location_list_entry state ~subrange single_location_description :
-    location_list_entry =
+let location_list_entry state ~start_of_code_symbol ~subrange
+    single_location_description : location_list_entry =
   let start_pos =
     Asm_label.create_int Text (ARV.Subrange.start_pos subrange |> Label.to_int)
   in
@@ -114,8 +114,7 @@ let location_list_entry state ~subrange single_location_description :
   | Four ->
     let location_list_entry =
       Dwarf_4_location_list_entry.create_location_list_entry
-        ~start_of_code_symbol:(DS.start_of_code_symbol state)
-        ~first_address_when_in_scope:start_pos
+        ~start_of_code_symbol ~first_address_when_in_scope:start_pos
         ~first_address_when_in_scope_offset:(Some start_pos_offset)
         ~first_address_when_not_in_scope:end_pos
         ~first_address_when_not_in_scope_offset:(Some end_pos_offset)
@@ -123,15 +122,15 @@ let location_list_entry state ~subrange single_location_description :
     in
     Dwarf_4 location_list_entry
   | Five ->
+    (* CR sspies: Version 5 DWARF with function sections is untested. Using
+       [start_of_code_symbol] below might not work as intended.*)
     let start_inclusive =
       Address_table.add (DS.address_table state) start_pos
-        ~adjustment:start_pos_offset
-        ~start_of_code_symbol:(DS.start_of_code_symbol state)
+        ~adjustment:start_pos_offset ~start_of_code_symbol
     in
     let end_exclusive =
       Address_table.add (DS.address_table state) end_pos
-        ~adjustment:end_pos_offset
-        ~start_of_code_symbol:(DS.start_of_code_symbol state)
+        ~adjustment:end_pos_offset ~start_of_code_symbol
     in
     let loc_desc =
       Counted_location_description.create single_location_description
@@ -141,11 +140,10 @@ let location_list_entry state ~subrange single_location_description :
       Startx_endx { start_inclusive; end_exclusive; payload = loc_desc }
     in
     Dwarf_5
-      (Location_list_entry.create location_list_entry
-         ~start_of_code_symbol:(DS.start_of_code_symbol state))
+      (Location_list_entry.create location_list_entry ~start_of_code_symbol)
 
-let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
-    (var : Backend_var.t) ~ident_for_type ~range =
+let dwarf_for_variable state ~function_symbol ~function_proto_die
+    ~proto_dies_for_vars (var : Backend_var.t) ~ident_for_type ~range =
   let range_info = ARV.Range.info range in
   let provenance = ARV.Range_info.provenance range_info in
   let (parent_proto_die : Proto_die.t), hidden =
@@ -191,6 +189,18 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
        found at runtime, indexed by program counter range. The representations
        of location lists (and range lists, used below to describe lexical
        blocks) changed completely between DWARF-4 and DWARF-5. *)
+    (* Determine start_of_code_symbol and whether we need a base address entry
+       based on the code layout. *)
+    let start_of_code_symbol, dwarf_4_base_address_entry =
+      match DS.code_layout state with
+      | Function_sections ->
+        let base_address_entry =
+          Dwarf_4_location_list_entry.create_base_address_selection_entry
+            ~base_address_symbol:function_symbol
+        in
+        function_symbol, [base_address_entry]
+      | Continuous_code_section { code_begin; _ } -> code_begin, []
+    in
     let dwarf_4_location_list_entries, location_list =
       ARV.Range.fold range
         ~init:([], Location_list.create ())
@@ -203,7 +213,8 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
           | None -> dwarf_4_location_list_entries, location_list
           | Some single_location_description -> (
             let location_list_entry =
-              location_list_entry state ~subrange single_location_description
+              location_list_entry state ~start_of_code_symbol ~subrange
+                single_location_description
             in
             match location_list_entry with
             | Dwarf_4 location_list_entry ->
@@ -219,7 +230,9 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
     in
     match !Dwarf_flags.gdwarf_version with
     | Four ->
-      let location_list_entries = dwarf_4_location_list_entries in
+      let location_list_entries =
+        dwarf_4_base_address_entry @ dwarf_4_location_list_entries
+      in
       let location_list = Dwarf_4_location_list.create ~location_list_entries in
       ( [Debug_loc_table.attribute_to_reference_location_list location_list],
         Some location_list )
@@ -263,7 +276,7 @@ let iterate_over_variable_like_things state ~available_ranges_vars ~f =
       let ident_for_type = Some (Compilation_unit.get_current_exn (), var) in
       f var ~ident_for_type ~range)
 
-let dwarf state ~function_proto_die available_ranges_vars =
+let dwarf state ~function_symbol ~function_proto_die available_ranges_vars =
   let proto_dies_for_vars = Backend_var.Tbl.create 42 in
   iterate_over_variable_like_things state ~available_ranges_vars
     ~f:(fun var ~ident_for_type:_ ~range:_ ->
@@ -272,4 +285,6 @@ let dwarf state ~function_proto_die available_ranges_vars =
       assert (not (Backend_var.Tbl.mem proto_dies_for_vars var));
       Backend_var.Tbl.add proto_dies_for_vars var { value_die_lvalue; type_die });
   iterate_over_variable_like_things state ~available_ranges_vars
-    ~f:(dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars)
+    ~f:
+      (dwarf_for_variable state ~function_symbol ~function_proto_die
+         ~proto_dies_for_vars)

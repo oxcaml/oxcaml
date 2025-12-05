@@ -18,6 +18,20 @@ open Asm_targets
 open Dwarf_low
 open Dwarf_high
 
+type function_range =
+  { start_label : Asm_label.t;
+    end_label : Asm_label.t;
+    offset_past_end_label : int option;
+    function_symbol : Asm_symbol.t
+  }
+
+type code_layout =
+  | Continuous_code_section of
+      { code_begin : Asm_symbol.t;
+        code_end : Asm_symbol.t
+      }
+  | Function_sections
+
 module Diagnostics : sig
   type variable_reduction =
     { shape_size_before_reduction_in_bytes : int;
@@ -43,7 +57,7 @@ val create :
   compilation_unit_header_label:Asm_label.t ->
   compilation_unit_proto_die:Proto_die.t ->
   value_type_proto_die:Proto_die.t ->
-  start_of_code_symbol:Asm_symbol.t ->
+  code_layout:code_layout ->
   Debug_loc_table.t ->
   Debug_ranges_table.t ->
   Address_table.t ->
@@ -57,8 +71,6 @@ val compilation_unit_header_label : t -> Asm_label.t
 val compilation_unit_proto_die : t -> Proto_die.t
 
 val value_type_proto_die : t -> Proto_die.t
-
-val start_of_code_symbol : t -> Asm_symbol.t
 
 val debug_loc_table : t -> Debug_loc_table.t
 
@@ -81,6 +93,18 @@ val diagnostics : t -> Diagnostics.t
 
 val add_variable_reduction_diagnostic :
   t -> Diagnostics.variable_reduction -> unit
+
+val code_layout : t -> code_layout
+
+val function_ranges : t -> function_range list
+
+val record_function_range :
+  t ->
+  function_symbol:Asm_symbol.t ->
+  start_label:Asm_label.t ->
+  end_label:Asm_label.t ->
+  offset_past_end_label:int option ->
+  unit
 
 module Debug : sig
   val log : ('a, Format.formatter, unit) format -> 'a
