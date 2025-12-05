@@ -28,13 +28,19 @@ type error = |
 
 module Transfer :
   Cfg_dataflow.Backward_transfer
-    with type domain = domain
+    with type d = domain
      and type error = error
      and type context = unit = struct
   type nonrec domain = domain =
     { before : Reg.Set.t;
       across : Reg.Set.t
     }
+
+  type d = domain
+
+  type input = domain Cfg_dataflow.control
+
+  type output = domain
 
   type context = unit
 
@@ -66,12 +72,11 @@ module Transfer :
       else instruction ~can_raise:false ~exn:Domain.bot domain instr
 
   let terminator :
-      domain ->
-      exn:domain ->
+      input ->
       Cfg.terminator Cfg.instruction ->
       context ->
       (domain, error) result =
-   fun domain ~exn instr () ->
+   fun { normal = domain; exceptional = exn } instr () ->
     Result.ok
     @@
     match instr.desc with
