@@ -2768,10 +2768,6 @@ let check_type_externality env ty ext =
   | Ok () -> true
   | Error _ -> false
 
-let is_always_gc_ignorable env ty =
-  check_type_externality
-    env ty (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
-
 let check_type_nullability env ty null =
   let upper_bound =
     Jkind.set_nullability_upper_bound (Jkind.Builtin.any ~why:Dummy_jkind) null
@@ -2780,13 +2776,26 @@ let check_type_nullability env ty null =
   | Ok () -> true
   | Error _ -> false
 
-let check_type_separability env ty sep =
-  let upper_bound =
-    Jkind.set_root_separability (Jkind.Builtin.any ~why:Dummy_jkind) sep
-  in
+let check_type_separability jkind env ty sep =
+  let upper_bound = Jkind.set_root_separability jkind sep in
   match check_type_jkind env ty upper_bound with
   | Ok () -> true
   | Error _ -> false
+
+let is_always_gc_ignorable env ty =
+  (* CR zeisbach: it would be good if this didn't have to call check_type_jkind
+     twice (meaning Typeopt.maybe_pointer_type actually calls it 3x). IDK how
+     to do this refactor, but seems important to note. Probably add a comment
+     in Typeopt too, and maybe make an internal ticket *)
+  (* CR zeisbach: also what is up with formatting here lol. Also double
+     check the Dummy_jkind *)
+  check_type_externality env ty
+    (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
+  || check_type_separability (Jkind.Builtin.scannable ~why:Dummy_jkind) env ty
+       (Jkind_axis.Separability.upper_bound_if_is_always_gc_ignorable ())
+
+let check_type_separability env ty sep =
+  check_type_separability (Jkind.Builtin.any ~why:Dummy_jkind) env ty sep
 
 let check_type_jkind_exn env texn ty jkind =
   match check_type_jkind env ty jkind with

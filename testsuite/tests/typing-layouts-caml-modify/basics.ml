@@ -565,3 +565,62 @@ let () =
   test ~expect_caml_modifies:1
     (fun () -> unsafe_set_ptr_prod #(t, idx) #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
+
+(* Manipulating abstract non_pointer types, including (nested) unboxed products,
+   should not use unnecessary caml_modifys *)
+
+let () =
+  let module M : sig
+    type t : value non_pointer (* not mod external_ *)
+    val mk : int -> t
+  end = struct
+    type t = int
+    let mk x = x
+  end in
+  let open struct
+    type t = { mutable x : M.t }
+  end in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      let outer = { x = M.mk 6 } in
+      outer.x <- M.mk 7;
+      ignore (Sys.opaque_identity outer));
+  test ~expect_caml_modifies:0
+    (fun () ->
+      let arr = Array.make 1 (M.mk 6) in
+      arr.(0) <- M.mk 7;
+      ignore (Sys.opaque_identity arr))
+
+let () =
+  let module M : sig
+    type t : immediate & immediate
+    val mk : int -> int -> t
+  end = struct
+    type t = #{ x : int; y : int }
+    let mk x y = #{ x ; y }
+  end in
+  let open struct
+    type t = { mutable x : M.t }
+  end in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      let outer = { x = M.mk 1 2 } in
+      outer.x <- M.mk 3 4;
+      ignore (Sys.opaque_identity outer))
+
+let () =
+  let module M : sig
+    type t : immediate & value
+    val mk : int -> string -> t
+  end = struct
+    type t = #{ x : int; y : string }
+    let mk x y = #{ x ; y }
+  end in
+  let open struct
+    type t = { mutable x : M.t }
+  end in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      let outer = { x = M.mk 1 "a" } in
+      outer.x <- M.mk 2 "b";
+      ignore (Sys.opaque_identity outer))

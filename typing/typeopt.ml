@@ -112,6 +112,8 @@ let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 (* CR layouts v3.0: have a better error message
    for nullable jkinds.*)
 let type_sort ~why env loc ty =
+  (* CR zeisbach: maybe this should use a layout and not a sort?
+     but look at the call sites to determine if this is actually right... *)
   match Ctype.type_sort ~why ~fixed:false env ty with
   | Ok sort -> sort
   | Error err -> raise (Error (loc, Not_a_sort (ty, err)))
@@ -137,6 +139,7 @@ type 'a classification =
    See comment on [classification] above to understand [classify_product]. *)
 let classify ~classify_product env ty sort : _ classification =
   let ty = scrape_ty env ty in
+  (* CR zeisbach: it seems plausible that this should be a layout *)
   match (sort : Jkind.Sort.Const.t) with
   | Base Scannable -> begin
   (* CR or_null: [immediate_or_null] arrays can be intarrays once that is
@@ -403,7 +406,7 @@ let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
   | _ ->
       (kind, layout)
 
-let value_kind_of_value_jkind env jkind =
+let value_kind_of_scannable_jkind env jkind =
   let layout = Jkind.get_layout_defaulting_to_scannable jkind in
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
      the principality check, as we're just trying to compute optimizations. *)
@@ -413,8 +416,9 @@ let value_kind_of_value_jkind env jkind =
   in
   match layout with
   (* CR layouts-scannable: Use scannable axes to improve codegen *)
-  | Base (Scannable, _) ->
-    value_kind_of_value_with_externality externality_upper_bound
+  | Base (Scannable, { separability }) ->
+    value_kind_of_value_with_externality_separability
+      externality_upper_bound separability
   | Any _
   | Product _
   | Base
@@ -645,7 +649,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       if cannot_proceed () then
         num_nodes_visited,
         add_nullability_from_jkind env decl.type_jkind
-          (value_kind_of_value_jkind env decl.type_jkind)
+          (value_kind_of_scannable_jkind env decl.type_jkind)
       else
         let visited = Numbers.Int.Set.add (get_id ty) visited in
         (* Default of [Pgenval] is currently safe for the missing cmi fallback
@@ -678,7 +682,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
         | Type_abstract _ ->
           num_nodes_visited,
           add_nullability_from_jkind env decl.type_jkind
-            (value_kind_of_value_jkind env decl.type_jkind)
+            (value_kind_of_scannable_jkind env decl.type_jkind)
         | Type_open -> num_nodes_visited, non_nullable Pgenval
     end
   | Ttuple labeled_fields ->
@@ -710,20 +714,31 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     else non_nullable Pintval
   | _ ->
     num_nodes_visited,
+    (* CR zeisbach: this probably also wants to take the non_pointerness into
+       account? but only if this branch gets hit for scannable stuff. we don't
+       want to accidentally mess something up for the non-scannables *)
     add_nullability_from_jkind env (Ctype.estimate_type_jkind env ty) Pgenval
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty
   : int * unit Lambda.mixed_block_element =
   match field with
-  | Scannable ->
+  | Scannable { separability } ->
     begin match ty with
     | Some ty ->
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       num_nodes_visited, Value kind
-    | None -> num_nodes_visited, Value (nullable Pgenval)
+    | None ->
+      (* CR zeisbach: refactor this, see the other commments where it got
+         copy/pasta-ed *)
+      let raw_kind =
+        let open Jkind_axis.Separability in
+        if le separability (upper_bound_if_is_always_gc_ignorable ())
+          then Pintval else Pgenval
+      in
+      num_nodes_visited, Value { generic_value with raw_kind }
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
@@ -939,6 +954,9 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
     end
   | Record_inlined (_, _, Variant_with_null) -> assert false
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
+  (* CR zeisbach: storing sorts in here is a bit suspect and we may want to
+     change to layouts? or otherwise add scannable axes. but maybe the call
+     to [value_kind] can deal with that? *)
   | Record_boxed _ | Record_float | Record_ufloat | Record_mixed _ -> begin
       let is_mutable =
         List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)

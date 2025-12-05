@@ -404,6 +404,11 @@ module Builtin : sig
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
 
+  (* CR zeisbach: is any_creation_reason the right thing here? do the others
+     have a notion of dummy? there may be a better way to structure what I
+     have currently *)
+  val scannable : why:History.any_creation_reason -> 'd Types.jkind
+
   val value_or_null :
     why:History.value_or_null_creation_reason -> 'd Types.jkind
 
