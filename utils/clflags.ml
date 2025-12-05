@@ -126,8 +126,7 @@ let directory = ref None                (* -directory *)
 let annotations = ref false             (* -annot *)
 let binary_annotations = ref false      (* -bin-annot *)
 let binary_annotations_cms = ref false  (* -bin-annot-cms *)
-let shape_format =                      (* -shape-format *)
-  ref (if Config.oxcaml_dwarf then Debugging_shapes else Old_merlin)
+let shape_format = ref Debugging_shapes (* -shape-format *)
 (* CR sspies: The default here uses the DWARF default (10) for simplicity. It's
    unclear whether this is the right choice. For type shapes without DWARF, a
    lower default (like 2) might be more appropriate to limit the work done. *)
@@ -920,7 +919,3 @@ let set_restrict_to_upstream_dwarf () =
 let no_restrict_to_upstream_dwarf () =
   restrict_to_upstream_dwarf := false;
   shape_format := Debugging_shapes
-(* CR sspies: We should only enable OxCaml DWARF on the compiler once we are
-   ready to switch, since it leads to a new format of shapes in the .cms and
-   .cmt files. Merlin should continue to work, but we should be careful and
-   probably should switch over to debugging shapes in general first. *)
