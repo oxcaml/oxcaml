@@ -7,7 +7,10 @@ val untransl_mode_annots : Mode.Alloc.Const.Option.t -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
     legacy if unspecified *)
-val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t
+val transl_alloc_mode :
+  Parsetree.modes -> Mode.Alloc.Const.Option.t * Mode.Alloc.Const.t
+(* CR-soon zqian: The first return value should be typedtree.modes. Fix the
+   dependency cycle that blocks this. *)
 
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and

@@ -121,6 +121,10 @@ type texp_field_boxing =
 
 val aliased_many_use : unique_use
 
+(* CR-soon zqian: introduce a proper typedtree representation for modes. For
+example, each non-none axis should have a location. *)
+type modes = Mode.Alloc.Const.Option.t
+
 (** [label_ambiguity] specifies the result of type-driven label disambiguation.
     Disambiguation occurs when the same label (record field or variant case)
     occurs in many types, when performing operations like variant construction
@@ -317,7 +321,7 @@ and exp_extra =
         them here, as the cost of tracking this additional information is minimal. *)
   | Texp_stack
         (** stack_ E *)
-  | Texp_mode of Mode.Alloc.Const.Option.t
+  | Texp_mode of modes
         (** E : _ @@ M  *)
   | Texp_inspected_type of [ `exp ] type_inspection
         (** Inserted when type inspection was necessary to resolve types

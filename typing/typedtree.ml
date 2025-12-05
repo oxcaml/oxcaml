@@ -128,6 +128,8 @@ let aliased_many_use =
   ( Mode.Uniqueness.disallow_left Mode.Uniqueness.aliased,
     Mode.Linearity.disallow_right Mode.Linearity.many )
 
+type modes = Mode.Alloc.Const.Option.t
+
 type label_ambiguity =
   | Ambiguous of { path: Path.t; arity : int }
   | Unambiguous
