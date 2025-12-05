@@ -98,6 +98,10 @@ end
 
 module Scannable_axes : sig
   type t = { separability : Jkind_axis.Separability.t }
+
+  val equal : t -> t -> bool
+
+  val less_or_equal : t -> t -> Misc.Le_result.t
 end
 
 module Layout : sig

@@ -1213,13 +1213,16 @@ val bound_value_identifiers_and_sorts :
 
 val signature_item_id : signature_item -> Ident.t
 
-(* CR zeisbach: this is seemingly unused now??? *)
-(*_ val equal_mixed_block_element :
-  mixed_block_element -> mixed_block_element -> bool *)
+(* CR zeisbach: These appear to be dead code; check and maybe remove *)
+val equal_mixed_block_element :
+  mixed_block_element -> mixed_block_element -> bool
 val compare_mixed_block_element :
   mixed_block_element -> mixed_block_element -> int
 val mixed_block_element_to_string : mixed_block_element -> string
 val mixed_block_element_to_lowercase_string : mixed_block_element -> string
+
+val mixed_product_shape_less_or_equal :
+  mixed_product_shape -> mixed_product_shape -> Misc.Le_result.t
 
 val equal_unsafe_mode_crossing :
   type_equal:(type_expr -> type_expr -> bool) ->

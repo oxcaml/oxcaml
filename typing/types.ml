@@ -914,11 +914,9 @@ let compare_tag t1 t2 =
 
 let rec equal_mixed_block_element e1 e2 =
   match e1, e2 with
-  (* CR zeisbach: (A) this function looks to be dead code, but also (B) double
-     check whether ignoring the scannable axes on the Scannable is right!
-     Not just here but for like the whole file because it seems suspect.
-     May involve looking at call sites / thinking harder about the semantics *)
-  | Scannable _, Scannable _
+  (* CR zeisbach: (A) this function looks to be dead code, and (B) double check
+     this. I matched how equal deriving should work. *)
+  | Scannable sa1, Scannable sa2 -> Jkind_types.Scannable_axes.equal sa1 sa2
   | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16
@@ -935,7 +933,12 @@ let rec equal_mixed_block_element e1 e2 =
 
 let rec compare_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Scannable _, Scannable _ | Float_boxed, Float_boxed
+  | Scannable sa1, Scannable sa2 -> (
+    match Jkind_types.Scannable_axes.less_or_equal sa1 sa2 with
+    | Less -> -1
+    | Equal -> 0
+    | Not_le -> 1)
+  | Float_boxed, Float_boxed
   | Float64, Float64 | Float32, Float32
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
@@ -1021,6 +1024,34 @@ let equal_record_representation r1 r2 = match r1, r2 with
 let equal_record_unboxed_product_representation r1 r2 = match r1, r2 with
   | Record_unboxed_product, Record_unboxed_product -> true
 
+(* Returns [Less] when [e1] and [e2] are equal up to the stored scannable axes
+   on a [Scannable], which can be [Less]. *)
+let rec mixed_block_element_less_or_equal e1 e2 =
+  match e1, e2 with
+  | Scannable sa1, Scannable sa2 ->
+    Jkind_types.Scannable_axes.less_or_equal sa1 sa2
+  | Float_boxed, Float_boxed
+  | Float64, Float64 | Float32, Float32
+  | Word, Word | Untagged_immediate, Untagged_immediate
+  | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
+  | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Void, Void
+    -> Misc.Le_result.Equal
+  | Product es1, Product es2 -> mixed_product_shape_less_or_equal es1 es2
+  | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
+    | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
+    | Product _ | Void ), _
+    -> Misc.Le_result.Not_le
+
+and mixed_product_shape_less_or_equal s1 s2 =
+  if Array.length s1 <> Array.length s2
+  then Misc.Le_result.Not_le
+  else
+    Misc.Stdlib.Array.fold_left2
+      (fun acc e1 e2 ->
+        Misc.Le_result.combine acc (mixed_block_element_less_or_equal e1 e2))
+      Misc.Le_result.Equal s1 s2
+
 let may_equal_constr c1 c2 =
   c1.cstr_arity = c2.cstr_arity
   && (match c1.cstr_tag,c2.cstr_tag with
@@ -1063,9 +1094,11 @@ let record_form_to_string (type rep) (record_form : rep record_form) =
   | Legacy -> "record"
   | Unboxed_product -> "unboxed record"
 
+(* CR zeisbach: consdier making this take a layout, see what breaks *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
-  (* the fact that this uses a sort const and not a layout const is unfortunate
+  (* CR zeisbach
+     the fact that this uses a sort const and not a layout const is unfortunate
      because we don't have enough scannable axis information. probably change
      this?? but that might break a lot of things... it also yet again
      introduces the problem of having to deal with sort products vs layout *)

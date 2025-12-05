@@ -603,11 +603,10 @@ let () =
     type t = { mutable x : M.t }
   end in
   test ~expect_caml_modifies:0
-  (fun () ->
-    let outer = { x = M.mk 1 2 } in
-    outer.x <- M.mk 3 4;
-    ignore (Sys.opaque_identity outer)
-  )
+    (fun () ->
+      let outer = { x = M.mk 1 2 } in
+      outer.x <- M.mk 3 4;
+      ignore (Sys.opaque_identity outer))
 
 let () =
   let module M : sig
@@ -621,8 +620,7 @@ let () =
     type t = { mutable x : M.t }
   end in
   test ~expect_caml_modifies:1
-  (fun () ->
-    let outer = { x = M.mk 1 "a" } in
-    outer.x <- M.mk 2 "b";
-    ignore (Sys.opaque_identity outer)
-  )
+    (fun () ->
+      let outer = { x = M.mk 1 "a" } in
+      outer.x <- M.mk 2 "b";
+      ignore (Sys.opaque_identity outer))
