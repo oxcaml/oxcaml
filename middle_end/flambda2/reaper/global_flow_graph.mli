@@ -57,7 +57,7 @@ module Relations : sig
     from:Code_id_or_name.t term ->
     _ atom
 
-  val copropagate :
+  val alias_if_any_source :
     if_any_source:Code_id_or_name.t term ->
     to_:Code_id_or_name.t term ->
     from:Code_id_or_name.t term ->
@@ -99,7 +99,7 @@ val add_propagate_dep :
   from:Code_id_or_name.t ->
   unit
 
-val add_copropagate_dep :
+val add_alias_if_any_source_dep :
   graph ->
   if_any_source:Code_id_or_name.t ->
   to_:Code_id_or_name.t ->

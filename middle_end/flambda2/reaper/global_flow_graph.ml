@@ -30,7 +30,7 @@ type graph =
     mutable coaccessor : NCN.t;
     mutable coconstructor : NCN.t;
     mutable propagate : NNN.t;
-    mutable copropagate : NNN.t;
+    mutable alias_if_any_source : NNN.t;
     mutable any_usage : N.t;
     mutable any_source : N.t;
     mutable code_id_my_closure : NN.t
@@ -65,7 +65,7 @@ let print_iter_edges ~print_edge graph =
     graph.propagate;
   Code_id_or_name.Map.iter
     (fun _if_any_source m -> iter_nn "orange" m)
-    graph.copropagate
+    graph.alias_if_any_source
 
 let alias = NN.create ~name:"alias"
 
@@ -81,7 +81,7 @@ let coconstructor = NCN.create ~name:"coconstructor"
 
 let propagate = NNN.create ~name:"propagate"
 
-let copropagate = NNN.create ~name:"copropagate"
+let alias_if_any_source = NNN.create ~name:"alias_if_any_source"
 
 let any_usage = N.create ~name:"any_usage"
 
@@ -97,7 +97,7 @@ let to_datalog graph =
   @@ Datalog.set_table coaccessor graph.coaccessor
   @@ Datalog.set_table coconstructor graph.coconstructor
   @@ Datalog.set_table propagate graph.propagate
-  @@ Datalog.set_table copropagate graph.copropagate
+  @@ Datalog.set_table alias_if_any_source graph.alias_if_any_source
   @@ Datalog.set_table any_usage graph.any_usage
   @@ Datalog.set_table any_source graph.any_source
   @@ Datalog.set_table code_id_my_closure graph.code_id_my_closure
@@ -132,8 +132,8 @@ module Relations = struct
 
   let propagate ~if_used ~to_ ~from = Datalog.atom propagate [if_used; to_; from]
 
-  let copropagate ~if_any_source ~to_ ~from =
-    Datalog.atom copropagate [if_any_source; to_; from]
+  let alias_if_any_source ~if_any_source ~to_ ~from =
+    Datalog.atom alias_if_any_source [if_any_source; to_; from]
 
   let any_usage var = Datalog.atom any_usage [var]
 
@@ -151,7 +151,7 @@ let create () =
     coaccessor = NCN.empty;
     coconstructor = NCN.empty;
     propagate = NNN.empty;
-    copropagate = NNN.empty;
+    alias_if_any_source = NNN.empty;
     any_usage = N.empty;
     any_source = N.empty;
     code_id_my_closure = NN.empty
@@ -177,9 +177,9 @@ let add_coconstructor_dep t ~base relation ~from =
 let add_propagate_dep t ~if_used ~to_ ~from =
   t.propagate <- NNN.add_or_replace [if_used; to_; from] () t.propagate
 
-let add_copropagate_dep t ~if_any_source ~to_ ~from =
-  t.copropagate
-    <- NNN.add_or_replace [if_any_source; to_; from] () t.copropagate
+let add_alias_if_any_source_dep t ~if_any_source ~to_ ~from =
+  t.alias_if_any_source
+    <- NNN.add_or_replace [if_any_source; to_; from] () t.alias_if_any_source
 
 let add_opaque_let_dependency t ~to_ ~from =
   let bound_to = Bound_pattern.free_names to_ in

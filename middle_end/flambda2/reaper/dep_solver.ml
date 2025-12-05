@@ -586,10 +586,10 @@ let datalog_schedule =
        intended meaning of this rule, that is, an alias if [is_used] is used. *)
     (let$ [if_used; to_; from] = ["if_used"; "to_"; "from"] in
      [any_usage if_used; propagate ~if_used ~to_ ~from] ==> alias ~to_ ~from);
-    (* Likewise, [copropagate] means an alias if [is_any_source] has any
+    (* Likewise, [alias_if_any_source] means an alias if [is_any_source] has any
        source. *)
     (let$ [if_any_source; to_; from] = ["if_any_source"; "to_"; "from"] in
-     [any_source if_any_source; copropagate ~if_any_source ~to_ ~from]
+     [any_source if_any_source; alias_if_any_source ~if_any_source ~to_ ~from]
      ==> alias ~to_ ~from);
     (* has_usage/has_source *)
     (let$ [x] = ["x"] in

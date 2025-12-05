@@ -159,8 +159,8 @@ let add_coconstructor_dep t ~base relation ~from =
 let add_propagate_dep t ~if_used ~to_ ~from =
   Graph.add_propagate_dep t.deps ~if_used ~to_ ~from
 
-let add_copropagate_dep t ~if_any_source ~to_ ~from =
-  Graph.add_copropagate_dep t.deps ~if_any_source ~to_ ~from
+let add_alias_if_any_source_dep t ~if_any_source ~to_ ~from =
+  Graph.add_alias_if_any_source_dep t.deps ~if_any_source ~to_ ~from
 
 let add_any_source t x = Graph.add_any_source t.deps x
 

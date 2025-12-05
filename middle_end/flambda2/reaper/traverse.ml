@@ -607,9 +607,9 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
             Code_id_or_name.var
               (Variable.create "widget_if_any_source" Flambda_kind.rec_info)
           in
-          Acc.add_copropagate_dep acc ~if_any_source:callee ~from:callee
+          Acc.add_alias_if_any_source_dep acc ~if_any_source:callee ~from:callee
             ~to_:(Code_id_or_name.var callee_if_any_source);
-          Acc.add_copropagate_dep acc ~if_any_source:callee
+          Acc.add_alias_if_any_source_dep acc ~if_any_source:callee
             ~from:widget_if_any_source ~to_:call_widget;
           Some (Simple.var callee_if_any_source), widget_if_any_source)
         else callee, call_widget

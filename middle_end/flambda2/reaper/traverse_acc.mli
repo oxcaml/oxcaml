@@ -111,7 +111,7 @@ val add_propagate_dep :
   from:Code_id_or_name.t ->
   unit
 
-val add_copropagate_dep :
+val add_alias_if_any_source_dep :
   t ->
   if_any_source:Code_id_or_name.t ->
   to_:Code_id_or_name.t ->
