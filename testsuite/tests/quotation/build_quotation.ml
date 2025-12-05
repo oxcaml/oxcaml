@@ -798,12 +798,12 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 = <[fun (f : x:'a -> ?y:'b -> 'c -> unit) x y z -> f ~x:x ?y:None z]>
 |}];;
 
-<[ let rec id : int * int -> int = fun (x, y) -> x + y in id ]>
+<[ let rec add : int * int -> int = fun (x, y) -> x + y in add ]>
 [%%expect {|
 - : <[int * int -> int]> expr =
 <[
-  let rec id : (int) * (int) -> int =
-  (fun (x, y) -> x + y : (int) * (int) -> int) in id
+  let rec add : (int) * (int) -> int =
+  (fun (x, y) -> x + y : (int) * (int) -> int) in add
 ]>
 |}];;
 
@@ -811,6 +811,32 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 [%%expect {|
 - : <[$('a) -> $('a)]> expr =
 <[let rec id : 'a. 'a -> 'a = (fun x -> x) in id]>
+|}];;
+
+<[ let rec foo : int -> int = fun x -> if x < 0 then bar x else 0
+   and bar : int -> int = fun x -> if x > 0 then foo x else 0
+   in foo, bar ]>
+[%%expect {|
+- : <[(int -> int) * (int -> int)]> expr =
+<[
+  let rec foo : int -> int =
+  (fun x -> if (x < 0) then (bar x) else 0 : int -> int)
+  and bar : int -> int =
+  (fun x__1 -> if (x__1 > 0) then (foo x__1) else 0 : int -> int) in
+  (foo, bar)
+]>
+|}];;
+
+<[ let rec foo (x : int) : int = if x < 0 then bar x else 0
+   and bar (x : int) : int = if x > 0 then foo x else 0
+   in foo, bar ]>
+[%%expect {|
+- : <[(int -> int) * (int -> int)]> expr =
+<[
+  let rec foo = (fun (x : int) -> if (x < 0) then (bar x) else 0 : int)
+  and bar = (fun (x__1 : int) -> if (x__1 > 0) then (foo x__1) else 0 : int)
+  in (foo, bar)
+]>
 |}];;
 
 <[ fun x -> function None -> 0 | Some x -> x ]>
