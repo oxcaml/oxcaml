@@ -121,6 +121,10 @@ type texp_field_boxing =
 
 val aliased_many_use : unique_use
 
+(* CR-soon zqian: introduce a proper typedtree representation for modes. For
+example, each non-none axis should have a location. *)
+type modes = Mode.Alloc.Const.Option.t
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -292,7 +296,7 @@ and exp_extra =
         them here, as the cost of tracking this additional information is minimal. *)
   | Texp_stack
         (** stack_ E *)
-  | Texp_mode of Mode.Alloc.Const.Option.t
+  | Texp_mode of modes
         (** E : _ @@ M  *)
 
 and arg_label = Types.arg_label =
