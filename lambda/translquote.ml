@@ -2851,7 +2851,11 @@ and quote_expression_desc transl stage e =
               in
               match vb.vb_pat.pat_desc with
               | Tpat_var (ident, _, _, _, _) -> (ident, cstr), vb.vb_expr
-              | _ -> assert false)
+              | _ ->
+                fatal_errorf
+                  "Translquote [at %a]: unexpected pattern in let rec - only a \
+                   single variable is expected"
+                  Location.print_loc_in_lowercase loc)
             vbs
         in
         let idents_with_cstrs, defs = List.split names_defs in
