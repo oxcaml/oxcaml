@@ -2712,13 +2712,7 @@ let check_recmodule_inclusion env bindings =
             ,uid) =
         let mty_decl' = Subst.modtype (Rescope scope) s mty_decl.mty_type
         and mty_actual' = subst_and_strengthen scope s id mty_actual in
-        let mode_actual, locks = modl.mod_mode in
-        let modes : Includemod.modes =
-          Specific (
-            mode_actual,
-            Mode.Value.disallow_left mode_decl,
-            locks)
-        in
+        let modes : Includemod.modes = Specific (modl.mod_mode, mode_decl) in
         let coercion, shape =
           try
             Includemod.modtypes_constraint ~shape
@@ -2823,10 +2817,7 @@ let () = Ctype.package_subtype := package_subtype
 let wrap_constraint_package env mark arg mty mode explicit =
   let mty1 = Subst.modtype Keep Subst.identity arg.mod_type in
   let mty2 = Subst.modtype Keep Subst.identity mty in
-  let arg_mode, held_locks = arg.mod_mode in
-  let modes : Includemod.modes =
-    Specific (arg_mode, Value.disallow_left mode, held_locks)
-  in
+  let modes : Includemod.modes = Specific (arg.mod_mode, mode) in
   let coercion =
     try
       Includemod.modtypes ~loc:arg.mod_loc env ~mark ~modes mty1 mty2
@@ -2841,10 +2832,7 @@ let wrap_constraint_package env mark arg mty mode explicit =
 
 let wrap_constraint_with_shape env mark arg mty mode
   shape explicit =
-  let arg_mode, held_locks = arg.mod_mode in
-  let modes : Includemod.modes =
-    Specific (arg_mode, Value.disallow_left mode, held_locks)
-  in
+  let modes : Includemod.modes = Specific (arg.mod_mode, mode) in
   let coercion, shape =
     try
       Includemod.modtypes_constraint ~shape ~loc:arg.mod_loc env ~mark

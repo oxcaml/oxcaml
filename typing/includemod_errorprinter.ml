@@ -296,7 +296,8 @@ let print_modes ?in_structure ax (modes : Includemod.modes) =
   let mode1, mode2 =
     match modes with
     | All -> assert false
-    | Specific (mode1, mode2, _) -> mode1, mode2
+    | Specific ((mode1, _), mode2) ->
+        Mode.Value.disallow_right mode1, Mode.Value.disallow_left mode2
   in
   let mode1 =
     mode1
@@ -628,13 +629,13 @@ module Functor_suberror = struct
         for single change difference
     *)
     let single_diff ~is_modal g e more =
-      let _arg, mty, (mode1, locks) = g.With_shorthand.item in
+      let _arg, mty, mode1_with_locks = g.With_shorthand.item in
       let mode2 =
         Types.functor_param_mode
         |> Mode.alloc_as_value
         |> Mode.Value.disallow_left
       in
-      let modes : Includemod.modes = Specific (mode1, mode2, locks) in
+      let modes : Includemod.modes = Specific (mode1_with_locks, mode2) in
       let mode1, mode2 = maybe_print_modes ~is_modal modes in
       let e = match e.With_shorthand.item with
         | Types.Unit -> Format.dprintf "()"

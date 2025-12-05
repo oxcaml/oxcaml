@@ -30,7 +30,10 @@ type pos =
 
 type modes = Includecore.mmodes =
   | All
-  | Specific of Mode.Value.l * Mode.Value.r * held_locks option
+  | Specific:
+      ((Mode.allowed * 'r) Mode.Value.t * Typedtree.held_locks option) *
+      ('l * Mode.allowed) Mode.Value.t ->
+      modes
 
 module Error = struct
 
@@ -230,38 +233,21 @@ module Directionality = struct
 end
 
 let modes_unit =
-  Specific (
-    Env.mode_unit |> Mode.Value.disallow_right,
-    Env.mode_unit |> Mode.Value.disallow_left,
-    None
-  )
+  Specific ((Env.mode_unit, None), Env.mode_unit)
 
 let modes_toplevel =
-  Specific (
-    Env.mode_unit |> Mode.Value.disallow_right,
-    Env.mode_unit |> Mode.Value.disallow_left,
-    None
-  )
+  Specific ((Env.mode_unit, None), Env.mode_unit)
 
 let modes_functor_param mod_mode =
   let m = Types.functor_param_mode |> Mode.alloc_as_value in
-  let mode, close_over_coercion = mod_mode in
-  Specific (
-    mode,
-    m |> Mode.Value.disallow_left,
-    close_over_coercion
-  )
+  Specific (mod_mode, m)
 
 let modes_functor_param_legacy =
-  modes_functor_param (Mode.Value.(disallow_right legacy), None)
+  modes_functor_param (Mode.Value.legacy, None)
 
 let modes_functor_res =
   let m = Types.functor_res_mode |> Mode.alloc_as_value in
-  Specific (
-    m |> Mode.Value.disallow_right,
-    m |> Mode.Value.disallow_left,
-    None
-  )
+  Specific ((m, None), m)
 
 (* All functions "blah env x1 x2" check that x1 is included in x2,
    i.e. that x1 is the type of an implementation that fulfills the
