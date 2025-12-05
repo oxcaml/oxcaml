@@ -4854,7 +4854,7 @@ module Crossing = struct
     { monadic; comonadic }
 
   let apply_left t m =
-    m |> Value.unhint |> apply_left_unhint t
+    m |> Value.disallow_right |> Value.unhint |> apply_left_unhint t
     |> Value.hint ~monadic:Crossing ~comonadic:Crossing
 
   let apply_right_unhint t { monadic; comonadic } =
@@ -4863,7 +4863,7 @@ module Crossing = struct
     { monadic; comonadic }
 
   let apply_right t m =
-    m |> Value.unhint |> apply_right_unhint t
+    m |> Value.disallow_left |> Value.unhint |> apply_right_unhint t
     |> Value.hint ~monadic:Crossing ~comonadic:Crossing
 
   (* Our mode crossing is for [Value] modes, but can be extended to [Alloc]

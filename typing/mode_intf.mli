@@ -1097,10 +1097,10 @@ module type S = sig
     val to_modality : t -> Modality.Const.t
 
     (** Apply mode crossing on a left mode, making it stronger. *)
-    val apply_left : t -> Value.l -> Value.l
+    val apply_left : t -> ('l * 'r) Value.t -> ('l * disallowed) Value.t
 
     (** Apply mode crossing on a right mode, making it more permissive. *)
-    val apply_right : t -> Value.r -> Value.r
+    val apply_right : t -> ('l * 'r) Value.t -> (disallowed * 'r) Value.t
 
     (* We extend mode crossing on [Value] to [Alloc] via [alloc_as_value].
        Concretely, two [Alloc] modes are indistinguishable if their images under
