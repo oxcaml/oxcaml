@@ -1762,10 +1762,6 @@ module Debugging_options_impl = struct
   let no_restrict_to_upstream_dwarf () =
     Debugging.restrict_to_upstream_dwarf := false;
     Clflags.shape_format := Clflags.Debugging_shapes
-  (* CR sspies: We should only enable OxCaml DWARF on the compiler once we are
-     ready to switch, since it leads to a new format of shapes in the .cms and
-     .cmt files. Merlin should continue to work, but we should be careful and
-     probably should switch over to debugging shapes in general first. *)
 
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
