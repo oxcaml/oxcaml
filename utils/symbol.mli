@@ -31,8 +31,17 @@ val for_local_ident : Ident.t -> t
 val unsafe_create : Compilation_unit.t -> Linkage_name.t -> t
 
 val for_name : Compilation_unit.t -> string -> t
+
+val for_runlength_encoding_path :
+    compilation_unit:Compilation_unit.t ->
+    path:Runlength_mangling.path ->
+    suffix:string ->
+    t
+
 val for_compilation_unit : Compilation_unit.t -> t
+
 val for_current_unit : unit -> t
+
 val for_new_const_in_current_unit : unit -> t
 
 val compilation_unit : t -> Compilation_unit.t
