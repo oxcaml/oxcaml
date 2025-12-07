@@ -1163,7 +1163,7 @@ module Const = struct
     (** Write [actual] in terms of [base] *)
     let convert_with_base ~(base : Builtin.t) (actual : _ t) =
       let matching_layouts =
-        Jkind_types.Layout.Const.equal base.jkind.layout actual.layout
+        Layout.Const.equal base.jkind.layout actual.layout
       in
       let modal_bounds =
         get_modal_bounds ~base:base.jkind.mod_bounds actual.mod_bounds
@@ -1810,8 +1810,7 @@ let get_nullability ~context jk =
 
 let set_nullability_upper_bound jk nullability_upper_bound =
   let new_bounds =
-    Jkind0.Mod_bounds.set_nullability nullability_upper_bound
-      jk.jkind.mod_bounds
+    Mod_bounds.set_nullability nullability_upper_bound jk.jkind.mod_bounds
   in
   { jk with jkind = { jk.jkind with mod_bounds = new_bounds } }
 

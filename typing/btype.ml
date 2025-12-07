@@ -1235,6 +1235,8 @@ module Jkind0 = struct
         && Mod_bounds.equal t1.mod_bounds t2.mod_bounds
       | None -> false
 
+    (* CR layouts: Remove this once we have a better story for printing with
+       jkind abbreviations. *)
     module Builtin = struct
       type nonrec t =
         { jkind : (allowed * allowed) t;
