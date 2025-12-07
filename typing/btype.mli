@@ -418,6 +418,17 @@ module Jkind0 : sig
   module Const : sig
     type 'd t = (Jkind_types.Layout.Const.t, 'd) layout_and_axes
 
+    (** This returns [true] iff both kinds have no with-bounds and they are
+        shallowly equal. Normally, we want an equality check to happen only on
+        values that are allowed on both the left and the right. But a type with
+        no with-bounds is allowed on the left and the right, so we test for that
+        condition first before doing the proper equality check.
+
+        Note that this function IS NOT SEMANTIC EQUALITY - in particular it does
+        not expand kind aliases, so it may return false for semantically equal
+        kinds.  That's fine for the places where it is used (printing and a memo
+        table), but be aware of this if adding new uses.
+    *)
     val shallow_no_with_bounds_and_equal : 'd1 t -> 'd2 t -> bool
 
     include Allowance.Allow_disallow with type (_, _, 'd) sided = 'd t
@@ -428,42 +439,121 @@ module Jkind0 : sig
           name : string
         }
 
+      (** This jkind is the top of the jkind lattice. All types have jkind
+          [any].  But we cannot compile run-time manipulations of values of
+          types with jkind [any]. *)
       val any : t
+
+      (** Value of types of this jkind are not retained at all at runtime *)
       val void : t
+
+      (** This is the jkind of normal ocaml values or null pointers *)
       val value_or_null : t
+
+      (** Same kind mod everything. *)
       val value_or_null_mod_everything : t
+
+      (** This is the jkind of normal ocaml values *)
       val value : t
+
+      (** Immutable non-float values that don't contain functions. *)
       val immutable_data : t
+
+      (** Exceptions; crossing portability, contention, statelessness and
+          visibility. *)
       val exn : t
+
+      (** Atomically mutable non-float values that don't contain functions. *)
       val sync_data : t
+
+      (** Mutable non-float values that don't contain functions. *)
       val mutable_data : t
+
+      (** Values of types of this jkind are immediate on 64-bit platforms; on
+          other platforms, we know nothing other than that it's a value. *)
       val immediate64 : t
+
+      (** We know for sure that values of types of this jkind are always
+          immediate *)
       val immediate64_or_null : t
+
+      (** Values of types of this jkind are either immediate or null pointers *)
       val immediate : t
+
+      (** Values of types of this jkind are either immediate64 or null pointers
+          *)
       val immediate_or_null : t
+
+      (** The jkind of unboxed 64-bit floats with no mode crossing. *)
       val float64 : t
+
+      (** The jkind of unboxed 64-bit floats with mode crossing. *)
       val kind_of_unboxed_float : t
+
+      (** The jkind of unboxed 32-bit floats with no mode crossing. *)
       val float32 : t
+
+      (** The jkind of unboxed 32-bit floats with mode crossing. *)
       val kind_of_unboxed_float32 : t
+
+      (** The jkind of unboxed native-sized integers with no mode crossing. *)
       val word : t
+
+      (** The jkind of unboxed native-sized integers with mode crossing. *)
       val kind_of_unboxed_nativeint : t
+
+      (** The jkind of untagged immediates ([int#]) with no mode crossing. *)
       val untagged_immediate : t
+
+      (** The jkind of untagged immediates ([int#]) with mode crossing. *)
       val kind_of_untagged_immediate : t
+
+      (** The jkind of unboxed 8-bit integers with no mode crossing. *)
       val bits8 : t
+
+      (** The jkind of unboxed 8-bit integers with mode crossing. *)
       val kind_of_unboxed_int8 : t
+
+      (** The jkind of unboxed 16-bit integers with no mode crossing. *)
       val bits16 : t
+
+      (** The jkind of unboxed 16-bit integers with mode crossing. *)
       val kind_of_unboxed_int16 : t
+
+      (** The jkind of unboxed 32-bit integers with no mode crossing. *)
       val bits32 : t
+
+      (** The jkind of unboxed 32-bit integers with mode crossing. *)
       val kind_of_unboxed_int32 : t
+
+      (** The jkind of unboxed 64-bit integers with no mode crossing. *)
       val bits64 : t
+
+      (** The jkind of unboxed 64-bit integers with mode crossing. *)
       val kind_of_unboxed_int64 : t
+
+      (** The jkind of block indices with mode crossing. *)
       val kind_of_idx : t
+
+      (** The jkind of unboxed 128-bit vectors with no mode crossing. *)
       val vec128 : t
+
+      (** The jkind of unboxed 256-bit vectors with no mode crossing. *)
       val vec256 : t
+
+      (** The jkind of unboxed 256-bit vectors with no mode crossing. *)
       val vec512 : t
+
+      (** The jkind of unboxed 128-bit vectors with mode crossing. *)
       val kind_of_unboxed_128bit_vectors : t
+
+      (** The jkind of unboxed 256-bit vectors with mode crossing. *)
       val kind_of_unboxed_256bit_vectors : t
+
+      (** The jkind of unboxed 512-bit vectors with mode crossing. *)
       val kind_of_unboxed_512bit_vectors : t
+
+      (** A list of all Builtin jkinds *)
       val all : t list
 
       val of_attribute : Builtin_attributes.jkind_attribute -> t
@@ -501,6 +591,7 @@ module Jkind0 : sig
 
     val try_allow_r : ('l * 'r) jkind -> ('l * allowed) jkind option
 
+    (** Construct a jkind from a constant jkind, at quality [Not_best] *)
     val of_const :
       annotation:Parsetree.jkind_annotation option ->
       why:Jkind_intf.History.creation_reason ->
@@ -509,8 +600,11 @@ module Jkind0 : sig
       'd Const.t ->
       'd jkind
 
+    (** [get_const] returns a [Const.t] if the layout has no sort variables,
+        returning [None] otherwise *)
     val get_const : 'd jkind -> 'd Const.t option
 
+    (** Construct a jkind from a builtin kind, at quality [Best]. *)
     val of_builtin :
       why:Jkind_intf.History.creation_reason ->
       Const.Builtin.t -> ('a * disallowed) jkind
@@ -574,7 +668,7 @@ module Jkind0 : sig
       ('a * 'b) jkind
 
     val for_non_float : why:Jkind_intf.History.value_creation_reason -> 'd jkind
-    val for_float : Ident.t -> jkind_l
+
     val for_boxed_record : label_declaration list -> jkind_l
     val for_boxed_variant :
       loc:Location.t ->
@@ -587,18 +681,14 @@ module Jkind0 : sig
       free_vars:(Types.type_expr list -> TypeSet.t) ->
       Types.constructor_declaration list ->
       Types.jkind_l
-    val for_array_argument : jkind_lr
-    val for_or_null_argument : Ident.t -> 'd jkind
-  end
 
-  (** Memoize the built-in jkinds, either best or not-best. Primarily for use by
-      [Subst], but placed here so that [Subst] need not depend on [Jkind]. *)
-  module Builtins_memo : sig
-    val find :
-      quality:('l * 'r) jkind_quality ->
-      ran_out_of_fuel_during_normalize:bool ->
-      ('l * 'r) Const.t ->
-      ('l * 'r) jkind option
+    val for_or_null_argument : Ident.t -> 'd jkind
+
+    (** The jkind of a float. *)
+    val for_float : Ident.t -> jkind_l
+
+    (** The jkind for [array] type arguments. *)
+    val for_array_argument : jkind_lr
   end
 
   include module type of Jkind
