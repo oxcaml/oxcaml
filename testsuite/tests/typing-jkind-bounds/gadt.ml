@@ -104,7 +104,7 @@ Lines 1-3, characters 0-61:
 1 | type 'a t : value mod contended portable =
 2 |   | Shared : ('b : value mod contended portable). 'b  -> 'b t
 3 |   | Unshared : (unit -> 'c) @@ portable               -> 'c t
-Error: The kind of type "t" is value mod portable immutable non_float with 'a
+Error: The kind of type "t" is value non_float mod portable immutable with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of
            value mod portable contended
@@ -240,7 +240,7 @@ type 'a t : immediate =
 Lines 1-2, characters 0-48:
 1 | type 'a t : immediate =
 2 |   | A : ('b : immutable_data). 'b -> 'b option t
-Error: The kind of type "t" is immutable_data
+Error: The layout of type "t" is value non_float
          because it's a boxed variant type.
        But the layout of type "t" must be a sublayout of immediate
          because of the annotation on the declaration of the type t.
@@ -288,18 +288,18 @@ type 'a cell =
    This test intentionally triggers a kind error to check this via the printed kind in the
    error message. *)
 type 'a abstract : value mod portable
-type existential_abstract : immediate =
+type existential_abstract : immediate non_float =
   | P : ('a : value mod portable). 'a abstract -> existential_abstract
 [%%expect{|
 type 'a abstract : value mod portable
 Lines 2-3, characters 0-70:
-2 | type existential_abstract : immediate =
+2 | type existential_abstract : immediate non_float =
 3 |   | P : ('a : value mod portable). 'a abstract -> existential_abstract
 Error: The kind of type "existential_abstract" is
            immutable_data with (type : value mod portable) abstract
          because it's a boxed variant type.
-       But the layout of type "existential_abstract" must be a sublayout of
-           immediate
+       But the kind of type "existential_abstract" must be a subkind of
+           immediate non_float
          because of the annotation on the declaration of the type existential_abstract.
 |}]
 
@@ -485,28 +485,28 @@ Line 1, characters 78-79:
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
-type show_me_the_kind : immediate = (int ref, int ref) box2
+type show_me_the_kind : immediate non_float = (int ref, int ref) box2
 [%%expect{|
-Line 1, characters 0-59:
-1 | type show_me_the_kind : immediate = (int ref, int ref) box2
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-69:
+1 | type show_me_the_kind : immediate non_float = (int ref, int ref) box2
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "(int ref, int ref) box2" is mutable_data
          because of the definition of box2 at line 1, characters 0-45.
-       But the layout of type "(int ref, int ref) box2" must be a sublayout of
-           immediate
-         because of the definition of show_me_the_kind at line 1, characters 0-59.
+       But the kind of type "(int ref, int ref) box2" must be a subkind of
+           immediate non_float
+         because of the definition of show_me_the_kind at line 1, characters 0-69.
 |}]
 
 (* Demonstrate that this is only a printing issue *)
-type _ box : immediate = Box : 'a -> 'a box
+type _ box : immediate non_float = Box : 'a -> 'a box
 
 [%%expect{|
-Line 1, characters 0-43:
-1 | type _ box : immediate = Box : 'a -> 'a box
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-53:
+1 | type _ box : immediate non_float = Box : 'a -> 'a box
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "box" is immutable_data with _
          because it's a boxed variant type.
-       But the layout of type "box" must be a sublayout of immediate
+       But the kind of type "box" must be a subkind of immediate non_float
          because of the annotation on the declaration of the type box.
 |}]
 
@@ -538,16 +538,16 @@ type 'c t2 = K : 'a option t -> 'a option t2
 |}]
 
 type 'a t constraint 'a = 'b option
-type 'c t2 : immediate =
+type 'c t2 : immediate non_float =
   | K : 'd t -> 'd t2
 [%%expect{|
 type 'a t constraint 'a = 'b option
 Lines 2-3, characters 0-21:
-2 | type 'c t2 : immediate =
+2 | type 'c t2 : immediate non_float =
 3 |   | K : 'd t -> 'd t2
 Error: The kind of type "t2" is immutable_data with (type : value) option t
          because it's a boxed variant type.
-       But the layout of type "t2" must be a sublayout of immediate
+       But the kind of type "t2" must be a subkind of immediate non_float
          because of the annotation on the declaration of the type t2.
 |}]
 
@@ -558,16 +558,17 @@ type exist_row1 = Mk : ([< `A | `B of int ref] as 'a) -> exist_row1
 type exist_row1 = Mk : [< `A | `B of int ref ] -> exist_row1
 |}]
 
-type show_me_the_kind : immediate = exist_row1
+type show_me_the_kind : immediate non_float = exist_row1
 [%%expect{|
-Line 1, characters 0-46:
-1 | type show_me_the_kind : immediate = exist_row1
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-56:
+1 | type show_me_the_kind : immediate non_float = exist_row1
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "exist_row1" is
            immutable_data with [< `A | `B of int ref ]
          because of the definition of exist_row1 at line 1, characters 0-67.
-       But the layout of type "exist_row1" must be a sublayout of immediate
-         because of the definition of show_me_the_kind at line 1, characters 0-46.
+       But the kind of type "exist_row1" must be a subkind of
+           immediate non_float
+         because of the definition of show_me_the_kind at line 1, characters 0-56.
 |}]
 
 let foo (x : exist_row1 @ nonportable) = use_portable x
@@ -592,16 +593,17 @@ type exist_row2 = Mk : ([> `A | `B of int ref] as 'a) -> exist_row2
 type exist_row2 = Mk : [> `A | `B of int ref ] -> exist_row2
 |}]
 
-type show_me_the_kind : immediate = exist_row2
+type show_me_the_kind : immediate non_float = exist_row2
 [%%expect{|
-Line 1, characters 0-46:
-1 | type show_me_the_kind : immediate = exist_row2
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-56:
+1 | type show_me_the_kind : immediate non_float = exist_row2
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "exist_row2" is
            immutable_data with [> `A | `B of int ref ]
          because of the definition of exist_row2 at line 1, characters 0-67.
-       But the layout of type "exist_row2" must be a sublayout of immediate
-         because of the definition of show_me_the_kind at line 1, characters 0-46.
+       But the kind of type "exist_row2" must be a subkind of
+           immediate non_float
+         because of the definition of show_me_the_kind at line 1, characters 0-56.
 |}]
 
 let foo (x : exist_row2 @ nonportable) = use_portable x
@@ -626,17 +628,17 @@ type 'a exist_row3 =
     Mk : 'a -> ([> `A | `B of int ref ] as 'a) option exist_row3
 |}]
 
-type 'a show_me_the_kind : immediate = 'a option exist_row3
+type 'a show_me_the_kind : immediate non_float = 'a option exist_row3
 [%%expect{|
-Line 1, characters 0-59:
-1 | type 'a show_me_the_kind : immediate = 'a option exist_row3
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-69:
+1 | type 'a show_me_the_kind : immediate non_float = 'a option exist_row3
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "'a option exist_row3" is
            immutable_data with [> `A | `B of int ref ]
          because of the definition of exist_row3 at line 1, characters 0-80.
-       But the layout of type "'a option exist_row3" must be a sublayout of
-           immediate
-         because of the definition of show_me_the_kind at line 1, characters 0-59.
+       But the kind of type "'a option exist_row3" must be a subkind of
+           immediate non_float
+         because of the definition of show_me_the_kind at line 1, characters 0-69.
 |}]
 
 let foo (x : [`A | `B of int ref] option exist_row3 @ contended) = use_uncontended x
