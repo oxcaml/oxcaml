@@ -219,11 +219,11 @@ let immutable_unboxed_int_array env res updates int_type ~symbol ~elts ~to_int64
     | Int8_u ->
       let fields = (7 + num_elts) / 8 in
       let tag = Tags.untagged_int8_array_tag num_elts in
-      fields, UK.naked_int32s, tag
+      fields, UK.naked_int8s, tag
     | Int16_u ->
       let fields = (3 + num_elts) / 4 in
       let tag = Tags.untagged_int16_array_tag num_elts in
-      fields, UK.naked_int32s, tag
+      fields, UK.naked_int16s, tag
     | Int32_u ->
       let fields = (1 + num_elts) / 2 in
       let tag =
