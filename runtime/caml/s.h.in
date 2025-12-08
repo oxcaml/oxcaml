@@ -124,6 +124,7 @@
 
 #undef HAS_DECL_SETTHREADDESCRIPTION
 
+<<<<<<< OxCaml
 #undef HAS_UNISTD
 
 #undef HAS_PTHREAD_SETNAME_NP
@@ -134,6 +135,13 @@
 
 #undef HAS_DECL_SETTHREADDESCRIPTION
 
+||||||| Upstream OCaml
+=======
+#undef HAS_LIBGEN_H
+
+/* Define HAS_LIBGEN_H if you have /usr/include/libgen.h. */
+
+>>>>>>> ocaml/ocaml#14244
 #undef HAS_DIRENT
 
 /* Define HAS_DIRENT if you have /usr/include/dirent.h and the result of

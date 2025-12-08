@@ -89,12 +89,21 @@ let parse_hidden_include_file ~cmx_guaranteed entry =
 
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
+<<<<<<< OxCaml
 and include_dirs = ref ([] : include_dir list)  (* -I, -Ix *)
 and hidden_include_dirs = ref ([] : include_dir list) (* -H, -Hx *)
 and include_manifests = ref ([] : string list) (* -I-manifest *)
 and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
 and hidden_include_files = (* -H-file, -Hx-file *)
   ref ([] : hidden_include_file list)
+||||||| Upstream OCaml
+and include_dirs = ref ([] : string list) (* -I *)
+and hidden_include_dirs = ref ([] : string list) (* -H *)
+=======
+and include_dirs = ref ([] : string list) (* -I *)
+and hidden_include_dirs = ref ([] : string list) (* -H *)
+and standard_library_default = ref None (* -set-runtime-default *)
+>>>>>>> ocaml/ocaml#14244
 and no_std_include = ref false          (* -nostdlib *)
 and no_cwd = ref false                  (* -nocwd *)
 and print_types = ref false             (* -i *)
