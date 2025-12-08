@@ -50,6 +50,7 @@ type generic_fns =
     send_fun: apply_fn list }
 
 type unit_infos =
+<<<<<<< OxCaml
   { ui_unit: Compilation_unit.t;  (* Compilation unit implemented *)
     ui_defines: Compilation_unit.t list;
                                   (* All compilation units in the
@@ -99,6 +100,32 @@ type unit_infos_raw =
     uir_static_data: Slambdaeval.CU_data.raw;
     uir_sections_length: int;      (* Byte length of all sections *)
   }
+||||||| Upstream OCaml
+  { mutable ui_name: modname;             (* Name of unit implemented *)
+    mutable ui_symbol: string;            (* Prefix for symbols *)
+    mutable ui_defines: string list;      (* Unit and sub-units implemented *)
+    mutable ui_imports_cmi: crcs;         (* Interfaces imported *)
+    mutable ui_imports_cmx: crcs;         (* Infos imported *)
+    mutable ui_curry_fun: int list;       (* Currying functions needed *)
+    mutable ui_apply_fun: int list;       (* Apply functions needed *)
+    mutable ui_send_fun: int list;        (* Send functions needed *)
+    mutable ui_export_info: export_info;
+    mutable ui_force_link: bool;          (* Always linked *)
+    mutable ui_for_pack: string option }  (* Part of a pack *)
+=======
+  { mutable ui_name: modname;             (* Name of unit implemented *)
+    mutable ui_symbol: string;            (* Prefix for symbols *)
+    mutable ui_defines: string list;      (* Unit and sub-units implemented *)
+    mutable ui_imports_cmi: crcs;         (* Interfaces imported *)
+    mutable ui_imports_cmx: crcs;         (* Infos imported *)
+    mutable ui_curry_fun: int list;       (* Currying functions needed *)
+    mutable ui_apply_fun: int list;       (* Apply functions needed *)
+    mutable ui_send_fun: int list;        (* Send functions needed *)
+    mutable ui_export_info: export_info;
+    mutable ui_force_link: bool;          (* Always linked *)
+    mutable ui_for_pack: string option;   (* Part of a pack *)
+    mutable ui_need_stdlib: bool}         (* caml_standard_library_nat needed *)
+>>>>>>> ocaml/ocaml#14244
 
 (* Each .a library has a matching .cmxa file that provides the following
    infos on the library: *)

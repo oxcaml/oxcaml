@@ -23,7 +23,15 @@ DRIVER = ../tools/test_in_prefix$(EXE)
 endif
 
 DRIVER_ARGS = \
+<<<<<<< OxCaml
   $(VERBOSE_FLAG) --bindir "$(BINDIR)" --libdir "$(LIBDIR)" \
+||||||| Upstream OCaml
+  $(VERBOSE_FLAG) --bindir "$(BINDIR)" --libdir "$(LIBDIR)" \
+  $(call bool_to_with, shebangscripts, $(SHEBANGSCRIPTS)) \
+=======
+  $(VERBOSE_FLAG) --bindir "$(BINDIR)" --libdir '$(TARGET_LIBDIR)' \
+  $(call bool_to_with, shebangscripts, $(SHEBANGSCRIPTS)) \
+>>>>>>> ocaml/ocaml#14244
   $(call bool_to_with, ocamlnat, $(INSTALL_OCAMLNAT)) \
   $(call bool_to_with, ocamlopt, $(NATIVE_COMPILER)) \
   $(OTHERLIBRARIES) --pwd "$(SRCDIR_ABS)/testsuite/in_prefix"
