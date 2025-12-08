@@ -656,18 +656,23 @@ end
 module Scannable_axes = struct
   open Jkind_axis
 
-  type t = { separability : Separability.t }
+  type t =
+    { nullability : Jkind_axis.Nullability.t;
+      separability : Jkind_axis.Separability.t
+    }
 
-  let max = { separability = Separability.max }
+  let max = { nullability = Nullability.max; separability = Separability.max }
 
-  let value_axes = { separability = Separable }
+  let value_axes = { nullability = Non_null; separability = Separable }
 
-  let immediate_axes = { separability = Non_pointer }
+  let immediate_axes = { nullability = Non_null; separability = Non_pointer }
 
-  let immediate64_axes = { separability = Non_pointer64 }
+  let immediate64_axes =
+    { nullability = Non_null; separability = Non_pointer64 }
 
-  let equal { separability = s1 } { separability = s2 } =
-    Separability.equal s1 s2
+  let equal { nullability = n1; separability = s1 }
+      { nullability = n2; separability = s2 } =
+    Nullability.equal n1 n2 && Separability.equal s1 s2
 end
 
 module Layout = struct
@@ -704,20 +709,56 @@ module Layout = struct
           (Misc.Stdlib.List.map_option get_sort ts)
 
     module Static = struct
-      let scannable_non_pointer =
-        Base (Sort.Scannable, { separability = Non_pointer })
+      let scannable_non_null_non_pointer =
+        Base
+          ( Sort.Scannable,
+            { nullability = Non_null; separability = Non_pointer } )
 
-      let scannable_non_pointer64 =
-        Base (Sort.Scannable, { separability = Non_pointer64 })
+      let scannable_non_null_non_pointer64 =
+        Base
+          ( Sort.Scannable,
+            { nullability = Non_null; separability = Non_pointer64 } )
 
-      let scannable_non_float =
-        Base (Sort.Scannable, { separability = Non_float })
+      let scannable_non_null_non_float =
+        Base
+          (Sort.Scannable, { nullability = Non_null; separability = Non_float })
 
-      let scannable_separable =
-        Base (Sort.Scannable, { separability = Separable })
+      let scannable_non_null_separable =
+        Base
+          (Sort.Scannable, { nullability = Non_null; separability = Separable })
 
-      let scannable_maybe_separable =
-        Base (Sort.Scannable, { separability = Maybe_separable })
+      let scannable_non_null_maybe_separable =
+        Base
+          ( Sort.Scannable,
+            { nullability = Non_null; separability = Maybe_separable } )
+
+      let scannable_maybe_null_non_pointer =
+        Base
+          ( Sort.Scannable,
+            { nullability = Maybe_null; separability = Non_pointer } )
+
+      let scannable_maybe_null_non_pointer64 =
+        Base
+          ( Sort.Scannable,
+            { nullability = Maybe_null; separability = Non_pointer64 } )
+
+      let scannable_maybe_null_non_float =
+        Base
+          ( Sort.Scannable,
+            { nullability = Maybe_null; separability = Non_float } )
+
+      let scannable_maybe_null_separable =
+        Base
+          ( Sort.Scannable,
+            { nullability = Maybe_null; separability = Separable } )
+
+      let scannable_maybe_null_maybe_separable =
+        Base
+          ( Sort.Scannable,
+            { nullability = Maybe_null; separability = Maybe_separable } )
+
+      (* For all non-[Scannable] layouts, the scannable axes are ignored. We
+         have to pick something, though, so we pick [Scannable_axes.max]. *)
 
       let void = Base (Sort.Void, Scannable_axes.max)
 
@@ -745,16 +786,48 @@ module Layout = struct
 
       let of_base (b : Sort.base) (sa : Scannable_axes.t) =
         match b, sa with
-        | Scannable, { separability = Separability.Non_pointer } ->
-          scannable_non_pointer
-        | Scannable, { separability = Separability.Non_pointer64 } ->
-          scannable_non_pointer64
-        | Scannable, { separability = Separability.Non_float } ->
-          scannable_non_float
-        | Scannable, { separability = Separability.Separable } ->
-          scannable_separable
-        | Scannable, { separability = Separability.Maybe_separable } ->
-          scannable_maybe_separable
+        | Scannable, sa -> (
+          match sa with
+          | { nullability = Nullability.Non_null;
+              separability = Separability.Non_pointer
+            } ->
+            scannable_non_null_non_pointer
+          | { nullability = Nullability.Non_null;
+              separability = Separability.Non_pointer64
+            } ->
+            scannable_non_null_non_pointer64
+          | { nullability = Nullability.Non_null;
+              separability = Separability.Non_float
+            } ->
+            scannable_non_null_non_float
+          | { nullability = Nullability.Non_null;
+              separability = Separability.Separable
+            } ->
+            scannable_non_null_separable
+          | { nullability = Nullability.Non_null;
+              separability = Separability.Maybe_separable
+            } ->
+            scannable_non_null_maybe_separable
+          | { nullability = Nullability.Maybe_null;
+              separability = Separability.Non_pointer
+            } ->
+            scannable_maybe_null_non_pointer
+          | { nullability = Nullability.Maybe_null;
+              separability = Separability.Non_pointer64
+            } ->
+            scannable_maybe_null_non_pointer64
+          | { nullability = Nullability.Maybe_null;
+              separability = Separability.Non_float
+            } ->
+            scannable_maybe_null_non_float
+          | { nullability = Nullability.Maybe_null;
+              separability = Separability.Separable
+            } ->
+            scannable_maybe_null_separable
+          | { nullability = Nullability.Maybe_null;
+              separability = Separability.Maybe_separable
+            } ->
+            scannable_maybe_null_maybe_separable)
         | Void, _ -> void
         | Untagged_immediate, _ -> untagged_immediate
         | Float64, _ -> float64

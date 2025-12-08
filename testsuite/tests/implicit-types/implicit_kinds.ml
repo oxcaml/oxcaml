@@ -27,8 +27,7 @@ module M = struct
 end
 
 [%%expect{|
-module M :
-  sig val f : ('elt : value_or_null separable). 'elt -> 'elt array end
+module M : sig val f : ('elt : value maybe_null). 'elt -> 'elt array end
 |}]
 
 (* Implicit kind without jkind annotation fails. *)
