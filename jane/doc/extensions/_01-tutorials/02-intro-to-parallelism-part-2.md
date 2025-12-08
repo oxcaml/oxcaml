@@ -105,10 +105,11 @@ increment our reference:
 ```ocaml
 let (P key) = Capsule.create () in
 let capsule_ref = Capsule.Data.create (fun () -> ref 0) in
-Capsule.Key.with_password key ~f:(fun password ->
-  Capsule.Data.iter capsule_ref ~password ~f:(fun ref ->
-    ref := !ref + 1
-  ))
+let _ : _ =
+  Capsule.Key.with_password key ~f:(fun password ->
+    Capsule.Data.iter capsule_ref ~password ~f:(fun ref -> ref := !ref + 1))
+in
+()
 ```
 
 ### Locks
@@ -130,13 +131,12 @@ capsule.  In this way, a mutex is like a _dynamically unique_ key&mdash;the
 mutex itself may be `aliased`, but only one domain can have the lock.
 
 ```ocaml
-let (P key) = Capsule.create () in
-let mutex = Capsule.Mutex.create key in
+let (P mutex) = Capsule.Mutex.create () in
 let capsule_ref = Capsule.Data.create (fun () -> ref 0) in
-Capsule.Mutex.with_lock mutex ~f:(fun password ->
-  Capsule.Data.iter capsule_ref ~password ~f:(fun ref ->
-    ref := !ref + 1
-  ))
+Await_blocking.with_await Await.Terminator.never ~f:(fun await ->
+  Capsule.Mutex.with_lock await mutex ~f:(fun access ->
+    let ref = Capsule.Data.unwrap ~access capsule_ref in
+    ref := !ref + 1))
 ```
 
 With mutexes, we have the tools required to safely share mutable data structures
@@ -255,17 +255,17 @@ Since each task can only access a separate portion of the array&mdash;and the
 slices are `local`, so don't escape&mdash;this is safe.
 
 To run our parallel quicksort, we need to get an implementation of parallelism
-from a scheduler.  For example, using `Parallel_scheduler_work_stealing`:
+from a scheduler.  For example, using `Parallel_scheduler`:
 
 ```ocaml
 let quicksort ~scheduler ~mutex array =
-    let monitor = Parallel.Monitor.create_root () in
-    Parallel_scheduler_work_stealing.schedule scheduler ~monitor ~f:(fun parallel ->
-        let array = Par_array.of_array array in
-(*                                     ^^^^^               *)
-(* This value is contended but expected to be uncontended. *)
-        quicksort parallel (Slice.slice array) [@nontail])
-  ;;
+  Parallel_scheduler.parallel scheduler ~f:(fun parallel ->
+    let array = Par_array.of_array array in
+    quicksort parallel (Slice.slice array) [@nontail])
+```
+```mdx-error
+Line 3, characters 38-43:
+Error: This value is contended but is expected to be uncontended.
 ```
 
 There's one last problem: capturing an existing array in `schedule` causes it to
@@ -273,16 +273,15 @@ become `contended`.  Instead, we will operate on an encapsulated array, which
 assures that our caller is not mutating it in parallel.
 
 ```ocaml
-let quicksort ~scheduler ~mutex array =
-  let monitor = Parallel.Monitor.create_root () in
-  Parallel_scheduler_work_stealing.schedule scheduler ~monitor ~f:(fun parallel ->
-      Capsule.Mutex.with_lock mutex ~f:(fun password ->
-        Capsule.Data.iter array ~password ~f:(fun array ->
-          let array = Par_array.of_array array in
+  let quicksort ~scheduler ~mutex array =
+    Parallel_scheduler.parallel scheduler ~f:(fun parallel ->
+      Await_blocking.with_await Await.Terminator.never ~f:(fun await ->
+        Capsule.Mutex.with_lock await mutex ~f:(fun access ->
+          let array = Par_array.of_array (Capsule.Data.unwrap ~access array) in
           quicksort parallel (Slice.slice array) [@nontail])
         [@nontail])
       [@nontail])
-;;
+  ;;
 ```
 
 Finally, we may benchmark our parallel implementation on various numbers of
@@ -318,8 +317,8 @@ val of_array : float array -> width:int -> height:int -> t
 
 val width : t @ contended -> int
 val height : t @ contended -> int
-
-val get : t -> x:int -> y:int -> float
+val of_array : float array -> width:int -> height:int -> t
+val get : t @ shared -> x:int -> y:int -> float
 val set : t -> x:int -> y:int -> float -> unit
 ```
 
@@ -368,21 +367,19 @@ page](../../parallelism/02-capsules).
 
 ```ocaml
 let filter ~scheduler ~mutex image =
-  let monitor = Parallel.Monitor.create_root () in
-  Parallel_scheduler_work_stealing.schedule scheduler ~monitor ~f:(fun parallel ->
-    (* Note [project] produces a contended image *)
-    let width = Image.width (Capsule.Data.project image) in
-    let height = Image.height (Capsule.Data.project image) in
+  Parallel_scheduler.parallel scheduler ~f:(fun parallel ->
+    let width = Image.width (Capsule.Data.get_id image) in
+    let height = Image.height (Capsule.Data.get_id image) in
     let data =
-      Par_array.init parallel (width * height) ~f:(fun i ->
+      Parallel_array.init parallel (width * height) ~f:(fun _ i ->
         let x = i % width in
         let y = i / width in
-        Capsule.Mutex.with_lock mutex ~f:(fun password ->
-          Capsule.access ~password ~f:(fun access ->
+        Await_blocking.with_await Await.Terminator.never ~f:(fun await ->
+          Capsule.Mutex.with_lock await mutex ~f:(fun access ->
             let image = Capsule.Data.unwrap image ~access in
             blur_at image ~x ~y)))
     in
-    Image.of_array (Par_array.to_array data) ~width ~height)
+    Image.of_array (Parallel_array.to_array data) ~width ~height)
 ;;
 ```
 
@@ -428,23 +425,18 @@ input, but that's perfectly fine here.
 
 ```ocaml
 let filter ~scheduler ~key image =
-  let monitor = Parallel.Monitor.create_root () in
-  Parallel_scheduler_work_stealing.schedule scheduler ~monitor ~f:(fun parallel ->
-    let width = Image.width (Capsule.Data.project image) in
-    let height = Image.height (Capsule.Data.project image) in
-    let pixels = width * height in
+  Parallel_scheduler.parallel scheduler ~f:(fun parallel ->
+    let width = Image.width (Capsule.Data.get_id image) in
+    let height = Image.height (Capsule.Data.get_id image) in
     let data =
-      Parallel_array.init parallel pixels ~f:(fun i ->
+      Parallel_array.init parallel (width * height) ~f:(fun _ i ->
         let x = i % width in
         let y = i / width in
-        Capsule.Key.access_shared key ~f:(fun access ->
-          let image =
-            Capsule.Data.unwrap_shared image ~access
-          in
-          blur_at image ~x ~y))
+        (Capsule.Expert.Key.access_shared key ~f:(fun access ->
+           { aliased = blur_at (Capsule.Expert.Data.unwrap_shared image ~access) ~x ~y }))
+          .aliased)
     in
-    Parallel_array.to_array data
-    |> Image.of_array ~width ~height)
+    Image.of_array (Parallel_array.to_array data) ~width ~height)
 ;;
 ```
 
