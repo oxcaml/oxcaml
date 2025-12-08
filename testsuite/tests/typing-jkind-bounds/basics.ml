@@ -282,8 +282,8 @@ type d = c
 |}]
 
 type a : immediate64
-type b : value non_pointer mod global aliased many immutable stateless unyielding external64 = a
-type c : value non_pointer mod global aliased many immutable stateless unyielding external64
+type b : value non_pointer64 mod global aliased many immutable stateless unyielding external64 = a
+type c : value non_pointer64 mod global aliased many immutable stateless unyielding external64
 type d : immediate64 = c
 [%%expect{|
 type a : immediate64

@@ -92,6 +92,8 @@ module Scannable_axes = struct
 
   let immediate_axes = { separability = Non_pointer }
 
+  let immediate64_axes = { separability = Non_pointer64 }
+
   let equal { separability = s1 } { separability = s2 } =
     Separability.equal s1 s2
 
@@ -171,6 +173,9 @@ module Layout = struct
       let scannable_non_pointer =
         Base (Sort.Scannable, { separability = Non_pointer })
 
+      let scannable_non_pointer64 =
+        Base (Sort.Scannable, { separability = Non_pointer64 })
+
       let scannable_non_float =
         Base (Sort.Scannable, { separability = Non_float })
 
@@ -208,6 +213,8 @@ module Layout = struct
         match b, sa with
         | Scannable, { separability = Separability.Non_pointer } ->
           scannable_non_pointer
+        | Scannable, { separability = Separability.Non_pointer64 } ->
+          scannable_non_pointer64
         | Scannable, { separability = Separability.Non_float } ->
           scannable_non_float
         | Scannable, { separability = Separability.Separable } ->
@@ -294,8 +301,13 @@ module Layout = struct
         (* To avoid error messages containing "scannable", we print out all
            layouts with a scannable base in terms of [value], with a special
            case for the (common) immediate. There is room for improvement. *)
+        (* CR layouts-scannable: Consider factoring out layout abbreviations,
+           especially if more of these will be added. *)
         | Base (Scannable, sa) when Scannable_axes.(equal sa immediate_axes) ->
           "immediate"
+        | Base (Scannable, sa) when Scannable_axes.(equal sa immediate64_axes)
+          ->
+          "immediate64"
         | Base (Scannable, sa) ->
           String.concat " "
             ("value" :: Scannable_axes.(to_string_list_diff ~base:value_axes) sa)
@@ -521,6 +533,8 @@ module Layout = struct
         match Sort.get s with
         | Base Scannable when Scannable_axes.(equal sa immediate_axes) ->
           fprintf ppf "immediate"
+        | Base Scannable when Scannable_axes.(equal sa immediate64_axes) ->
+          fprintf ppf "immediate64"
         | Base Scannable ->
           let value_axes_diff =
             Scannable_axes.(to_string_list_diff ~base:value_axes sa)
@@ -1789,21 +1803,19 @@ module Const = struct
     *)
     let immediate64 =
       { jkind =
-          { immediate.jkind with
-            mod_bounds =
-              Mod_bounds.set_externality Externality.External64
-                immediate.jkind.mod_bounds
-          };
+          mk_jkind
+            (Base (Scannable, Scannable_axes.immediate64_axes))
+            ~crossing:cross_all_except_staticity
+            ~externality:Externality.External64 ~nullability:Non_null;
         name = "immediate64"
       }
 
     let immediate64_or_null =
       { jkind =
-          { immediate_or_null.jkind with
-            mod_bounds =
-              Mod_bounds.set_externality Externality.External64
-                immediate_or_null.jkind.mod_bounds
-          };
+          mk_jkind
+            (Base (Scannable, { separability = Non_pointer }))
+            ~crossing:cross_all_except_staticity
+            ~externality:Externality.External64 ~nullability:Maybe_null;
         name = "immediate64_or_null"
       }
 
@@ -2155,8 +2167,7 @@ module Const = struct
           then Nullability.max
           else Mod_bounds.nullability actual
         in
-        Some
-          (Mod_bounds.create crossing_diff ~externality ~nullability)
+        Some (Mod_bounds.create crossing_diff ~externality ~nullability)
 
     let get_modal_bounds ~(base : Mod_bounds.t) (actual : Mod_bounds.t) =
       match diff base actual with
@@ -2375,6 +2386,7 @@ module Const = struct
       (fun ({ txt; loc } : string Location.loc) separability ->
         match txt with
         | "non_pointer" -> set_or_warn ~loc ~to_:Non_pointer separability
+        | "non_pointer64" -> set_or_warn ~loc ~to_:Non_pointer64 separability
         | "non_float" -> set_or_warn ~loc ~to_:Non_float separability
         | "separable" -> set_or_warn ~loc ~to_:Separable separability
         | "maybe_separable" ->
@@ -3159,9 +3171,7 @@ let for_array_argument =
 
 let for_array_element_sort ~level =
   let jkind_desc, sort =
-
-    Jkind_desc.of_new_sort_var ~level Maybe_null { separability = Separable
-  }
+    Jkind_desc.of_new_sort_var ~level Maybe_null { separability = Separable }
   in
   let jkind = { for_array_argument.jkind with layout = jkind_desc.layout } in
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
@@ -3329,7 +3339,7 @@ let apply_or_null_l jkind =
       | Some { separability = Maybe_separable } -> jkind
       | Some { separability = Separable } ->
         set_root_separability jkind Maybe_separable
-      | Some { separability = Non_float | Non_pointer } -> jkind
+      | Some { separability = Non_float | Non_pointer64 | Non_pointer } -> jkind
       | None -> jkind
     in
     Ok jkind
@@ -3344,7 +3354,7 @@ let apply_or_null_r jkind =
       | Some { separability = Maybe_separable } -> jkind
       | Some { separability = Separable } ->
         set_root_separability jkind Non_float
-      | Some { separability = Non_float | Non_pointer } -> jkind
+      | Some { separability = Non_float | Non_pointer64 | Non_pointer } -> jkind
       | None -> jkind
     in
     Ok jkind
@@ -4306,7 +4316,8 @@ let is_max (t : (_ * allowed) jkind) =
   match t with
   (* This doesn't do any mutation because mutating a sort variable can't make it
      any, and modal upper bounds are constant. *)
-  | { jkind = { layout = Any sa; mod_bounds; with_bounds = No_with_bounds }; _ } ->
+  | { jkind = { layout = Any sa; mod_bounds; with_bounds = No_with_bounds }; _ }
+    ->
     Scannable_axes.is_max sa && Mod_bounds.is_max mod_bounds
   | { jkind = { layout = _; mod_bounds = _; with_bounds = No_with_bounds }; _ }
     ->
