@@ -102,6 +102,8 @@ module Scannable_axes : sig
       separability : Jkind_axis.Separability.t
     }
 
+  val max : t
+
   val equal : t -> t -> bool
 
   val less_or_equal : t -> t -> Misc.Le_result.t

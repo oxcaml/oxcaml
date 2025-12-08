@@ -1708,8 +1708,7 @@ module Const = struct
       { jkind =
           mk_jkind
             (Base (Scannable, Scannable_axes.max))
-            ~crossing:Crossing.max ~externality:Externality.max
-            ~nullability:Maybe_null;
+            ~crossing:Crossing.max ~externality:Externality.max;
         name = "scannable"
       }
 

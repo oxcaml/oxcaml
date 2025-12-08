@@ -655,6 +655,12 @@ module Scannable_axes = struct
 
   (* CR zeisbach: refactor to move some things out of jkind and into here *)
 
+  let max =
+    (* CR zeisbach: try to avoid Jkind_axis here? *)
+    { nullability = Jkind_axis.Nullability.max;
+      separability = Jkind_axis.Separability.max
+    }
+
   let equal { separability = s1 } { separability = s2 } =
     Jkind_axis.Separability.equal s1 s2
 

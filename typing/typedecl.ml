@@ -1715,7 +1715,12 @@ module Element_repr = struct
     | Unboxed_element unboxed -> of_unboxed_element unboxed
     | Float_element ->
       (* CR zeisbach: separable is actually pretty reasonable here, right? *)
-      Scannable { separability = Jkind_axis.Separability.Separable }
+      (* CR zeisbach: try to clean this up! IDK about Maybe_null at _all_ here,
+         which indicates maybe we _just_ want the separability? *)
+      Scannable
+        { nullability = Maybe_null;
+          separability = Jkind_axis.Separability.Separable
+        }
     | Value_element sa -> Scannable sa
     | Void -> Void
     and of_unboxed_element : unboxed_element -> mixed_block_element = function

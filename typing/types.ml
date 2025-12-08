@@ -1079,7 +1079,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
      because we don't have enough scannable axis information. probably change
      this?? but that might break a lot of things... it also yet again
      introduces the problem of having to deal with sort products vs layout *)
-  | Base Scannable -> Scannable { separability = Jkind_axis.Separability.max }
+  | Base Scannable -> Scannable Jkind_types.Scannable_axes.max
   | Base Bits8 -> Bits8
   | Base Bits16 -> Bits16
   | Base Bits32 -> Bits32

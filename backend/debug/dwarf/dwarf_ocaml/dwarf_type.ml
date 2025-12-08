@@ -421,8 +421,11 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   | Base base -> (
     match base with
     (* CR zeisbach: the fact that scannable axes have to get conjured up is bad
-       / wrong, and gets fixed if layout actually means layout *)
-    | Scannable -> Scannable { separability = Jkind_axis.Separability.max }
+       / wrong, and gets fixed if layout actually means layout. But if I just
+       project down to the sort for debugger, then making this up seems
+       unavoidable. Check out the call sites to see if this is ever actually
+       problematic? *)
+    | Scannable -> Scannable Jkind_types.Scannable_axes.max
     | Float64 -> Float64
     (* This is a case, where we potentially have mapped [Float_boxed] to
        [Float64], but that is fine, because they are reordered like other mixed
