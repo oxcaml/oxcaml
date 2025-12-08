@@ -298,7 +298,6 @@ and with_bounds_types
 and mod_bounds =
   { crossing : Mode.Crossing.t;
     externality: Jkind_axis.Externality.t;
-    nullability: Jkind_axis.Nullability.t;
   }
 
 and 'd with_bounds =

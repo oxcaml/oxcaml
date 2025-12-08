@@ -261,7 +261,7 @@ type t : value_or_null mod everything
 Line 2, characters 0-20:
 2 | type bad : value = t
     ^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t" is value maybe_separable
+Error: The layout of type "t" is value maybe_separable maybe_null
          because of the definition of t at line 1, characters 0-37.
        But the layout of type "t" must be a sublayout of value
          because of the definition of bad at line 2, characters 0-20.
