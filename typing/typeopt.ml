@@ -590,13 +590,13 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
        fix it, we need a place to store the sort on a [Tconstr]. *)
     let ak = array_type_kind ~elt_ty:(Some arg) ~elt_sort:None env loc ty in
     num_nodes_visited, non_nullable (Parrayval ak)
-  | Tconstr(p, args, _) -> begin
+  | Tconstr(p, params, _) -> begin
       let decl =
         try
-          Env.find_type p env |> Ctype.generic_instance_declaration
+          Env.find_type p env
+          |> Ctype.instance_declaration_with_params env params
         with Not_found -> raise Missing_cmi_fallback
       in
-      List.iter2 (Ctype.unify_var env) decl.type_params args;
       if cannot_proceed () then
         num_nodes_visited,
         estimate_value_kind_from_jkind env ty
