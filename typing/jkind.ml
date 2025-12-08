@@ -1873,16 +1873,18 @@ module Const = struct
           mk_jkind
             (Base (Scannable, Scannable_axes.immediate64_axes))
             ~crossing:cross_all_except_staticity
-            ~externality:Externality.External64 ~nullability:Non_null;
+            ~externality:Externality.External64;
         name = "immediate64"
       }
 
     let immediate64_or_null =
       { jkind =
           mk_jkind
-            (Base (Scannable, { separability = Non_pointer }))
+            (Base
+               ( Scannable,
+                 { nullability = Maybe_null; separability = Non_pointer } ))
             ~crossing:cross_all_except_staticity
-            ~externality:Externality.External64 ~nullability:Maybe_null;
+            ~externality:Externality.External64;
         name = "immediate64_or_null"
       }
 
