@@ -112,6 +112,8 @@ module Scannable_axes : sig
 
   val immediate_axes : t
 
+  val immediate64_axes : t
+
   val equal : t -> t -> bool
 end
 
