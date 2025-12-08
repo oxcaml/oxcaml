@@ -117,14 +117,18 @@ module Scannable_axes = struct
   let to_string_list_diff
       ~base:{ nullability = n_against; separability = s_against }
       { nullability; separability } =
-    let with_nullability =
+    let diff = [] in
+    let diff =
       if Nullability.equal n_against nullability
-      then []
-      else [Nullability.to_string nullability]
+      then diff
+      else Nullability.to_string nullability :: diff
     in
-    if Separability.equal s_against separability
-    then with_nullability
-    else Separability.to_string separability :: with_nullability
+    let diff =
+      if Separability.equal s_against separability
+      then diff
+      else Separability.to_string separability :: diff
+    in
+    diff
 
   let to_string_list = to_string_list_diff ~base:max
 
@@ -3299,25 +3303,37 @@ let apply_modality_r modality jk =
 
 let apply_or_null_l jkind =
   match get_root_scannable_axes jkind with
-  | Some { nullability = Non_null; separability } -> (
+  | Some { nullability = Non_null; separability } ->
     let jkind = set_root_nullability jkind Maybe_null in
-    match separability with
-    | Maybe_separable -> Ok jkind
-    | Separable -> Ok (set_root_separability jkind Maybe_separable)
-    | Non_float | Non_pointer64 | Non_pointer -> Ok jkind)
+    let jkind =
+      match separability with
+      | Maybe_separable -> jkind
+      | Separable -> set_root_separability jkind Maybe_separable
+      | Non_float | Non_pointer64 | Non_pointer -> jkind
+    in
+    Ok jkind
   | Some { nullability = Maybe_null; separability = _ } -> Error ()
-  | None -> Ok jkind
+  (* this function is only called (in [Ctype.ml]) in response to seeing a
+     [Stepped_or_null] when unboxing, which only comes from [Variant_with_null]
+     which in turn requires the type argument's layout be scannable.
+     Thus, hitting this case indicates a mistake has been made. *)
+  | None ->
+    Misc.fatal_error "or_null applied to a type without a scannable layout"
 
 let apply_or_null_r jkind =
   match get_root_scannable_axes jkind with
-  | Some { nullability = Maybe_null; separability } -> (
+  | Some { nullability = Maybe_null; separability } ->
     let jkind = set_root_nullability jkind Non_null in
-    match separability with
-    | Maybe_separable -> Ok jkind
-    | Separable -> Ok (set_root_separability jkind Non_float)
-    | Non_float | Non_pointer64 | Non_pointer -> Ok jkind)
+    let jkind =
+      match separability with
+      | Maybe_separable -> jkind
+      | Separable -> set_root_separability jkind Non_float
+      | Non_float | Non_pointer64 | Non_pointer -> jkind
+    in
+    Ok jkind
   | Some { nullability = Non_null; separability = _ } -> Error ()
-  | None -> Ok jkind
+  | None ->
+    Misc.fatal_error "or_null applied to a type without a scannable layout"
 
 let get_annotation jk = jk.annotation
 
