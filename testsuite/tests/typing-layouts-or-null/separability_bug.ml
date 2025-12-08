@@ -28,7 +28,7 @@ Error: In this "with" constraint, the new definition of "t"
          type t = t
        is not included in
          type t : any separable
-       The layout of the first is value maybe_separable
+       The layout of the first is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of the first must be a sublayout of any separable
          because of the definition of t at line 4, characters 2-28.

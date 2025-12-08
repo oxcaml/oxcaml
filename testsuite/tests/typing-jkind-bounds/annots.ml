@@ -152,12 +152,11 @@ Line 1, characters 32-41:
 Error: The externality axis has already been specified.
 |}]
 
+(* CR layouts-scannable: This test temporarily passes while the overridden
+   kind modifier error is disabled. *)
 type t13 : value mod maybe_null non_null
 [%%expect {|
-Line 1, characters 32-40:
-1 | type t13 : value mod maybe_null non_null
-                                    ^^^^^^^^
-Error: The nullability axis has already been specified.
+type t13
 |}]
 
 type t14 : value mod unique aliased
