@@ -61,6 +61,7 @@ let cached_zero_alloc_info = Zero_alloc_info.create ()
 let cache_zero_alloc_info c = Zero_alloc_info.merge c ~into:cached_zero_alloc_info
 
 let current_unit =
+<<<<<<< OxCaml
   { uib_unit = CU.dummy;
     uib_defines = [];
     uib_imports_cmx = [];
@@ -72,6 +73,32 @@ let current_unit =
     uib_external_symbols = [];
     uib_file_sections = File_sections.Builder.create 0;
   }
+||||||| Upstream OCaml
+  { ui_name = "";
+    ui_symbol = "";
+    ui_defines = [];
+    ui_imports_cmi = [];
+    ui_imports_cmx = [];
+    ui_curry_fun = [];
+    ui_apply_fun = [];
+    ui_send_fun = [];
+    ui_force_link = false;
+    ui_export_info = default_ui_export_info;
+    ui_for_pack = None }
+=======
+  { ui_name = "";
+    ui_symbol = "";
+    ui_defines = [];
+    ui_imports_cmi = [];
+    ui_imports_cmx = [];
+    ui_curry_fun = [];
+    ui_apply_fun = [];
+    ui_send_fun = [];
+    ui_force_link = false;
+    ui_export_info = default_ui_export_info;
+    ui_for_pack = None;
+    ui_need_stdlib = false }
+>>>>>>> ocaml/ocaml#14244
 
 let current_zero_alloc_info () = current_unit.uib_zero_alloc_info
 
@@ -97,11 +124,112 @@ let reset unit_info =
   current_unit.uib_external_symbols <- [];
   File_sections.Builder.clear current_unit.uib_file_sections
 
+<<<<<<< OxCaml
 let record_external_symbols () =
   current_unit.uib_external_symbols <- (List.filter_map (fun prim ->
       if not (Primitive.native_name_is_external prim) then None
       else Some (Primitive.native_name prim))
       !Translmod.primitive_declarations)
+||||||| Upstream OCaml
+let unit_id_from_name name = Ident.create_persistent name
+
+let make_symbol ?(unitname = current_unit.ui_symbol) idopt =
+  let prefix = "caml" ^ unitname in
+  match idopt with
+  | None -> prefix
+  | Some id -> concat_symbol prefix id
+
+let current_unit_linkage_name () =
+  Linkage_name.create (make_symbol ~unitname:current_unit.ui_symbol None)
+
+let reset ?packname name =
+  let packname =
+    Option.map
+      (Misc.replace_substring ~before:"."
+         ~after:(String.make 1 symbol_separator))
+      packname
+  in
+  Hashtbl.clear global_infos_table;
+  Set_of_closures_id.Tbl.clear imported_sets_of_closures_table;
+  let symbol = symbolname_for_pack packname name in
+  current_unit.ui_name <- name;
+  current_unit.ui_symbol <- symbol;
+  current_unit.ui_defines <- [symbol];
+  current_unit.ui_imports_cmi <- [];
+  current_unit.ui_imports_cmx <- [];
+  current_unit.ui_curry_fun <- [];
+  current_unit.ui_apply_fun <- [];
+  current_unit.ui_send_fun <- [];
+  current_unit.ui_force_link <- !Clflags.link_everything;
+  current_unit.ui_for_pack <- packname;
+  Hashtbl.clear exported_constants;
+  structured_constants := structured_constants_empty;
+  current_unit.ui_export_info <- default_ui_export_info;
+  merged_environment := Export_info.empty;
+  Hashtbl.clear export_infos_table;
+  let compilation_unit =
+    Compilation_unit.create
+      (Ident.create_persistent name)
+      (current_unit_linkage_name ())
+  in
+  Compilation_unit.set_current compilation_unit
+
+let current_unit_infos () =
+  current_unit
+
+let current_unit_name () =
+  current_unit.ui_name
+=======
+let unit_id_from_name name = Ident.create_persistent name
+
+let make_symbol ?(unitname = current_unit.ui_symbol) idopt =
+  let prefix = "caml" ^ unitname in
+  match idopt with
+  | None -> prefix
+  | Some id -> concat_symbol prefix id
+
+let current_unit_linkage_name () =
+  Linkage_name.create (make_symbol ~unitname:current_unit.ui_symbol None)
+
+let reset ?packname name =
+  let packname =
+    Option.map
+      (Misc.replace_substring ~before:"."
+         ~after:(String.make 1 symbol_separator))
+      packname
+  in
+  Hashtbl.clear global_infos_table;
+  Set_of_closures_id.Tbl.clear imported_sets_of_closures_table;
+  let symbol = symbolname_for_pack packname name in
+  current_unit.ui_name <- name;
+  current_unit.ui_symbol <- symbol;
+  current_unit.ui_defines <- [symbol];
+  current_unit.ui_imports_cmi <- [];
+  current_unit.ui_imports_cmx <- [];
+  current_unit.ui_curry_fun <- [];
+  current_unit.ui_apply_fun <- [];
+  current_unit.ui_send_fun <- [];
+  current_unit.ui_force_link <- !Clflags.link_everything;
+  current_unit.ui_for_pack <- packname;
+  current_unit.ui_need_stdlib <- false;
+  Hashtbl.clear exported_constants;
+  structured_constants := structured_constants_empty;
+  current_unit.ui_export_info <- default_ui_export_info;
+  merged_environment := Export_info.empty;
+  Hashtbl.clear export_infos_table;
+  let compilation_unit =
+    Compilation_unit.create
+      (Ident.create_persistent name)
+      (current_unit_linkage_name ())
+  in
+  Compilation_unit.set_current compilation_unit
+
+let current_unit_infos () =
+  current_unit
+
+let current_unit_name () =
+  current_unit.ui_name
+>>>>>>> ocaml/ocaml#14244
 
 let read_unit_info filename =
   let ic = open_in_bin filename in
@@ -239,7 +367,158 @@ let cache_unit_info ui =
   Infos_table.add global_infos_table
     (ui.ui_unit |> CU.to_global_name_without_prefix) (Some ui)
 
+<<<<<<< OxCaml
 (* Exporting cross-module information *)
+||||||| Upstream OCaml
+(* Return the approximation of a global identifier *)
+
+let get_clambda_approx ui =
+  assert(not Config.flambda);
+  match ui.ui_export_info with
+  | Flambda _ -> assert false
+  | Clambda approx -> approx
+
+let toplevel_approx :
+  (string, Clambda.value_approximation) Hashtbl.t = Hashtbl.create 16
+
+let record_global_approx_toplevel () =
+  Hashtbl.add toplevel_approx current_unit.ui_name
+    (get_clambda_approx current_unit)
+
+let global_approx id =
+  if Ident.is_predef id then Clambda.Value_unknown
+  else try Hashtbl.find toplevel_approx (Ident.name id)
+  with Not_found ->
+    match get_global_info id with
+      | None -> Clambda.Value_unknown
+      | Some ui -> get_clambda_approx ui
+
+(* Return the symbol used to refer to a global identifier *)
+
+let symbol_for_global id =
+  if Ident.is_predef id then
+    "caml_exn_" ^ Ident.name id
+  else begin
+    let unitname = Ident.name id in
+    match
+      try ignore (Hashtbl.find toplevel_approx unitname); None
+      with Not_found -> get_global_info id
+    with
+    | None -> make_symbol ~unitname:(Ident.name id) None
+    | Some ui -> make_symbol ~unitname:ui.ui_symbol None
+  end
+
+(* Register the approximation of the module being compiled *)
+
+let unit_for_global id =
+  let sym_label = Linkage_name.create (symbol_for_global id) in
+  Compilation_unit.create id sym_label
+
+let predefined_exception_compilation_unit =
+  Compilation_unit.create (Ident.create_persistent "__dummy__")
+    (Linkage_name.create "__dummy__")
+
+let is_predefined_exception sym =
+  Compilation_unit.equal
+    predefined_exception_compilation_unit
+    (Symbol.compilation_unit sym)
+
+let symbol_for_global' id =
+  let sym_label = Linkage_name.create (symbol_for_global id) in
+  if Ident.is_predef id then
+    Symbol.of_global_linkage predefined_exception_compilation_unit sym_label
+  else
+    Symbol.of_global_linkage (unit_for_global id) sym_label
+
+let set_global_approx approx =
+  assert(not Config.flambda);
+  current_unit.ui_export_info <- Clambda approx
+
+(* Exporting and importing cross module information *)
+
+let get_flambda_export_info ui =
+  assert(Config.flambda);
+  match ui.ui_export_info with
+  | Clambda _ -> assert false
+  | Flambda ei -> ei
+=======
+(* Return the approximation of a global identifier *)
+
+let get_clambda_approx ui =
+  assert(not Config.flambda);
+  match ui.ui_export_info with
+  | Flambda _ -> assert false
+  | Clambda approx -> approx
+
+let toplevel_approx :
+  (string, Clambda.value_approximation) Hashtbl.t = Hashtbl.create 16
+
+let record_global_approx_toplevel () =
+  Hashtbl.add toplevel_approx current_unit.ui_name
+    (get_clambda_approx current_unit)
+
+let global_approx id =
+  if Ident.is_predef id then Clambda.Value_unknown
+  else try Hashtbl.find toplevel_approx (Ident.name id)
+  with Not_found ->
+    match get_global_info id with
+      | None -> Clambda.Value_unknown
+      | Some ui -> get_clambda_approx ui
+
+(* The name of the symbol defined globally for %standard_library_default *)
+let stdlib_symbol_name = Ident.create_persistent "caml_standard_library_nat"
+
+(* Return the symbol used to refer to a global identifier *)
+
+let symbol_for_global id =
+  if Ident.is_predef id then
+    "caml_exn_" ^ Ident.name id
+  else if Ident.same stdlib_symbol_name id then
+    Ident.name id
+  else begin
+    let unitname = Ident.name id in
+    match
+      try ignore (Hashtbl.find toplevel_approx unitname); None
+      with Not_found -> get_global_info id
+    with
+    | None -> make_symbol ~unitname:(Ident.name id) None
+    | Some ui -> make_symbol ~unitname:ui.ui_symbol None
+  end
+
+(* Register the approximation of the module being compiled *)
+
+let unit_for_global id =
+  let sym_label = Linkage_name.create (symbol_for_global id) in
+  Compilation_unit.create id sym_label
+
+let predefined_exception_compilation_unit =
+  Compilation_unit.create (Ident.create_persistent "__dummy__")
+    (Linkage_name.create "__dummy__")
+
+let is_predefined_exception sym =
+  Compilation_unit.equal
+    predefined_exception_compilation_unit
+    (Symbol.compilation_unit sym)
+
+let symbol_for_global' id =
+  let sym_label = Linkage_name.create (symbol_for_global id) in
+  if Ident.is_predef id || Ident.same stdlib_symbol_name id then
+    Symbol.of_global_linkage predefined_exception_compilation_unit sym_label
+  else
+    Symbol.of_global_linkage (unit_for_global id) sym_label
+
+let set_global_approx approx =
+  assert(not Config.flambda);
+  current_unit.ui_export_info <- Clambda approx
+
+(* Exporting and importing cross module information *)
+
+let get_flambda_export_info ui =
+  assert(Config.flambda);
+  match ui.ui_export_info with
+  | Clambda _ -> assert false
+  | Flambda ei -> ei
+>>>>>>> ocaml/ocaml#14244
 
 let set_export_info export_info =
   current_unit.uib_export_info <- Some export_info
@@ -264,6 +543,11 @@ let need_send_fun arity result mode =
   if not (List.mem (arity, result, mode) fns.send_fun) then
     current_unit.uib_generic_fns <-
       { fns with send_fun = (arity, result, mode) :: fns.send_fun }
+
+(* Record that caml_standard_library_nat is needed *)
+
+let need_stdlib_location () =
+  current_unit.ui_need_stdlib <- true
 
 (* Write the description of the current unit *)
 
