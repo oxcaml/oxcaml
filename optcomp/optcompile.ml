@@ -102,7 +102,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         |> fun program ->
         let code =
           Simplif.simplify_lambda program.Lambda.code
-            ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
+            ~restrict_to_upstream_dwarf:!Clflags.restrict_to_upstream_dwarf
             ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
         in
         { program with Lambda.code }

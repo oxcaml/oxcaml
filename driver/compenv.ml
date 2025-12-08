@@ -259,6 +259,11 @@ let read_one_param ppf position name v =
   if not handled then
   match name with
   | "g" -> set "g" [ Clflags.debug ] v
+  | "gupstream-dwarf" ->
+      (match v with
+      | "0" -> Clflags.no_restrict_to_upstream_dwarf ()
+      | "1" -> Clflags.set_restrict_to_upstream_dwarf ()
+      | _ -> Printf.ksprintf (print_error ppf) "bad value %s for %s" v name)
   | "bin-annot" -> set "bin-annot" [ Clflags.binary_annotations ] v
   | "bin-annot-cms" -> set "bin-annot-cms" [ Clflags.binary_annotations_cms ] v
   | "afl-instrument" -> set "afl-instrument" [ Clflags.afl_instrument ] v

@@ -77,6 +77,7 @@ and print_types = ref false             (* -i *)
 and make_archive = ref false            (* -a *)
 and debug = ref false                   (* -g *)
 and debug_full = ref false              (* For full DWARF support *)
+and restrict_to_upstream_dwarf = ref (not Config.oxcaml_dwarf)
 and dwarf_c_toolchain_flag = ref ""     (* DWARF compression flag for C *)
 and dwarf_fission = ref Fission_none    (* -gdwarf-fission=... *)
 and dwarf_pedantic = ref false          (* -gdwarf-pedantic *)
@@ -909,3 +910,15 @@ let prepend_directory file_name =
   match !directory with
   | Some directory -> Filename.concat directory file_name
   | None -> file_name
+
+let set_restrict_to_upstream_dwarf () =
+  restrict_to_upstream_dwarf := true;
+  shape_format := Old_merlin
+
+let no_restrict_to_upstream_dwarf () =
+  restrict_to_upstream_dwarf := false;
+  shape_format := Debugging_shapes
+(* CR sspies: We should only enable OxCaml DWARF on the compiler once we are
+   ready to switch, since it leads to a new format of shapes in the .cms and
+   .cmt files. Merlin should continue to work, but we should be careful and
+   probably should switch over to debugging shapes in general first. *)
