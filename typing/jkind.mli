@@ -101,7 +101,8 @@ module Layout : sig
   module Const : sig
     type t = Jkind_types.Layout.Const.t
 
-    val get_sort : t -> Sort.Const.t option
+    (* CR zeisbach: delete *)
+    (*_ val get_sort : t -> Sort.Const.t option *)
 
     val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 

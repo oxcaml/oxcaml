@@ -27,9 +27,9 @@ type error =
   | Small_number_sort_without_extension of Jkind.Sort.t * type_expr option
   | Simd_sort_without_extension of Jkind.Sort.t * type_expr option
   | Not_a_sort of type_expr * Jkind.Violation.t
-  | Unsupported_product_in_lazy of Jkind.Sort.Const.t
+  | Unsupported_product_in_lazy of Jkind.Layout.Const.t
   | Unsupported_vector_in_product_array
-  | Mixed_product_array of Jkind.Sort.Const.t * type_expr
+  | Mixed_product_array of Jkind.Layout.Const.t * type_expr
   | Unsupported_void_in_array
   | Opaque_array_non_value of
       { array_type: type_expr;
@@ -112,7 +112,9 @@ let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
    for nullable jkinds.*)
 let type_sort ~why env loc ty =
   (* CR zeisbach: maybe this should use a layout and not a sort?
-     but look at the call sites to determine if this is actually right... *)
+     but look at the call sites to determine if this is actually right...
+     Changing this looks non-trivial, since it relies on sort variables getting
+     mutated. The layouts don't get mutated, they are manipulated purely. *)
   match Ctype.type_sort ~why ~fixed:false env ty with
   | Ok sort -> sort
   | Error err -> raise (Error (loc, Not_a_sort (ty, err)))
@@ -140,8 +142,9 @@ type 'a classification =
 let classify ~classify_product env ty sort : _ classification =
   let ty = scrape_ty env ty in
   (* CR zeisbach: it seems plausible that this should be a layout *)
-  match (sort : Jkind.Sort.Const.t) with
-  | Base Scannable -> begin
+  match (sort : Jkind.Layout.Const.t) with
+  | Base (Scannable, _sa) -> begin
+  (* CR zeisbach: probably possible to use sa here instead of computing? *)
   if Ctype.is_always_gc_ignorable env ty
   then
     if Ctype.check_type_nullability env ty Non_null
@@ -202,34 +205,39 @@ let classify ~classify_product env ty sort : _ classification =
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _ ->
       assert false
   end
-  | Base Float64 -> Unboxed_float Unboxed_float64
-  | Base Float32 -> Unboxed_float Unboxed_float32
-  | Base Bits8 -> Unboxed_int Untagged_int8
-  | Base Bits16 -> Unboxed_int Untagged_int16
-  | Base Bits32 -> Unboxed_int Unboxed_int32
-  | Base Bits64 -> Unboxed_int Unboxed_int64
-  | Base Vec128 -> Unboxed_vector Unboxed_vec128
-  | Base Vec256 -> Unboxed_vector Unboxed_vec256
-  | Base Vec512 -> Unboxed_vector Unboxed_vec512
-  | Base Word -> Unboxed_int Unboxed_nativeint
-  | Base Untagged_immediate -> Unboxed_int Untagged_int
-  | Base Void -> Void
+  | Base (Float64, _) -> Unboxed_float Unboxed_float64
+  | Base (Float32, _) -> Unboxed_float Unboxed_float32
+  | Base (Bits8, _) -> Unboxed_int Untagged_int8
+  | Base (Bits16, _) -> Unboxed_int Untagged_int16
+  | Base (Bits32, _) -> Unboxed_int Unboxed_int32
+  | Base (Bits64, _) -> Unboxed_int Unboxed_int64
+  | Base (Vec128, _) -> Unboxed_vector Unboxed_vec128
+  | Base (Vec256, _) -> Unboxed_vector Unboxed_vec256
+  | Base (Vec512, _) -> Unboxed_vector Unboxed_vec512
+  | Base (Word, _) -> Unboxed_int Unboxed_nativeint
+  | Base (Untagged_immediate, _) -> Unboxed_int Untagged_int
+  | Base (Void, _) -> Void
   | Product c -> Product (classify_product ty c)
+  | Any _ -> failwith "CR zeisbach:"
 
 let rec scannable_product_array_kind elt_ty_for_error loc sorts =
   List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) sorts
 
 and sort_to_scannable_product_element_kind elt_ty_for_error loc
-      (s : Jkind.Sort.Const.t) =
+      (s : Jkind.Layout.Const.t) =
   (* Unfortunate: this never returns `Pint_scannable`.  Doing so would require
      this to traverse the type, rather than just the kind, or to add product
      kinds. *)
   match s with
-  | Base Scannable -> Paddr_scannable
-  | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word |
-          Untagged_immediate | Vec128 | Vec256 | Vec512) as c ->
+  | Any _ -> failwith "CR zeisbach:"
+  | Base (Scannable, { separability; _ }) ->
+      let open Jkind_axis.Separability in
+      if le separability (upper_bound_if_is_always_gc_ignorable ())
+        then Pint_scannable else Paddr_scannable
+  | Base ((Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word |
+          Untagged_immediate | Vec128 | Vec256 | Vec512), _) as c ->
     raise (Error (loc, Mixed_product_array (c, elt_ty_for_error)))
-  | Base Void ->
+  | Base (Void, _) ->
     raise (Error (loc, Unsupported_void_in_array))
   | Product sorts ->
     Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
@@ -237,20 +245,23 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
 let rec ignorable_product_array_kind loc sorts =
   List.map (sort_to_ignorable_product_element_kind loc) sorts
 
-and sort_to_ignorable_product_element_kind loc (s : Jkind.Sort.Const.t) =
+and sort_to_ignorable_product_element_kind loc (s : Jkind.Layout.Const.t) =
   match s with
-  | Base Scannable -> Pint_ignorable
-  | Base Float64 -> Punboxedfloat_ignorable Unboxed_float64
-  | Base Float32 -> Punboxedfloat_ignorable Unboxed_float32
-  | Base Bits8 -> Punboxedoruntaggedint_ignorable Untagged_int8
-  | Base Bits16 -> Punboxedoruntaggedint_ignorable Untagged_int16
-  | Base Bits32 -> Punboxedoruntaggedint_ignorable Unboxed_int32
-  | Base Bits64 -> Punboxedoruntaggedint_ignorable Unboxed_int64
-  | Base Word -> Punboxedoruntaggedint_ignorable Unboxed_nativeint
-  | Base Untagged_immediate -> Punboxedoruntaggedint_ignorable Untagged_int
-  | Base (Vec128 | Vec256 | Vec512) ->
+  | Any _ -> failwith "CR zeisbach:"
+  (* CR zeisbach: confirm that it is okay to drop these on the floor.
+     Then, add a comment explaining why. *)
+  | Base (Scannable, _) -> Pint_ignorable
+  | Base (Float64, _) -> Punboxedfloat_ignorable Unboxed_float64
+  | Base (Float32, _) -> Punboxedfloat_ignorable Unboxed_float32
+  | Base (Bits8, _) -> Punboxedoruntaggedint_ignorable Untagged_int8
+  | Base (Bits16, _) -> Punboxedoruntaggedint_ignorable Untagged_int16
+  | Base (Bits32, _) -> Punboxedoruntaggedint_ignorable Unboxed_int32
+  | Base (Bits64, _) -> Punboxedoruntaggedint_ignorable Unboxed_int64
+  | Base (Word, _) -> Punboxedoruntaggedint_ignorable Unboxed_nativeint
+  | Base (Untagged_immediate, _) -> Punboxedoruntaggedint_ignorable Untagged_int
+  | Base ((Vec128 | Vec256 | Vec512), _) ->
     raise (Error (loc, Unsupported_vector_in_product_array))
-  | Base Void -> raise (Error (loc, Unsupported_void_in_array))
+  | Base (Void, _) -> raise (Error (loc, Unsupported_void_in_array))
   | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
 
 let array_kind_of_elt ~elt_sort env loc ty =
@@ -271,7 +282,8 @@ let array_kind_of_elt ~elt_sort env loc ty =
   in
   (* CR dkalinichenko: many checks in [classify] are redundant
      with separability. *)
-  match classify ~classify_product env ty elt_sort with
+  (* CR zeisbach: fix this extremely temporary patch! *)
+  match classify ~classify_product env ty (Obj.magic elt_sort) with
   | Any ->
     if Config.flat_float_array
       && not (Language_extension.is_at_least Separability ()
@@ -1150,12 +1162,14 @@ let function_arg_layout env loc sort ty =
 (** Whether a forward block is needed for a lazy thunk on a value, i.e.
     if the value can be represented as a float/forward/lazy *)
 let lazy_val_requires_forward env loc ty =
+  (* CR zeisbach: replace this with the right layout *)
   let sort = Jkind.Sort.Const.for_lazy_body in
-  let classify_product _ sorts =
-    let kind = Jkind.Sort.Const.Product sorts in
+  let classify_product _ layouts =
+    let kind = Jkind_types.Layout.Const.Product layouts in
     raise (Error (loc, Unsupported_product_in_lazy kind))
   in
-  match classify ~classify_product env ty sort with
+  (* CR zeisbach: fix this obviously wrong patch *)
+  match classify ~classify_product env ty (Obj.magic sort) with
   | Any | Lazy -> true
   (* CR layouts: Fix this when supporting lazy unboxed values.
      Blocks with forward_tag can get scanned by the gc thus can't
@@ -1270,9 +1284,10 @@ let report_error ppf = function
            ~level:(Ctype.get_current_level ()) ) err
   | Unsupported_product_in_lazy const ->
       fprintf ppf
-        "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \
+        "Product layout %s detected in [lazy] in [Typeopt.Layout]@ \
          Please report this error to the Jane Street compilers team."
-        Jkind.Sort.Const.format const
+        (* CR zeisbach: maybe change this?? *)
+        (Jkind.Layout.Const.to_string const)
   | Unsupported_vector_in_product_array ->
       fprintf ppf
         "Unboxed vector types are not yet supported in arrays of unboxed@ \
@@ -1287,11 +1302,12 @@ let report_error ppf = function
          types.@ But this array operation is peformed for an array whose@ \
          element type is %a, which is an unboxed product@ \
          that is not external and contains a type with the non-scannable@ \
-         layout %a.@ \
+         layout %s.@ \
          @[Hint: if the array contents should not be scanned, annotating@ \
          contained abstract types as [mod external] may resolve this error.@]"
         Printtyp.type_expr elt_ty
-        Jkind.Sort.Const.format const
+        (* CR zeisbach: maybe replace this with format?? does it matter? *)
+        (Jkind.Layout.Const.to_string const)
   | Opaque_array_non_value { array_type; elt_kinding_failure }  ->
       begin match elt_kinding_failure with
       | Some (ty, err) ->

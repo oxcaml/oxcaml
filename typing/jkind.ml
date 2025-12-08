@@ -320,13 +320,14 @@ module Layout = struct
         false
       | Product _ -> false
 
-    let rec get_sort : t -> Sort.Const.t option = function
+    (* CR zeisbach: delete *)
+    (*= let rec get_sort : t -> Sort.Const.t option = function
       | Any _ -> None
       | Base (b, _) -> Some (Base b)
       | Product ts ->
         Option.map
           (fun x -> Sort.Const.Product x)
-          (Misc.Stdlib.List.map_option get_sort ts)
+          (Misc.Stdlib.List.map_option get_sort ts) *)
 
     let of_sort s sa =
       let rec of_sort (s : Sort.t) sa =
