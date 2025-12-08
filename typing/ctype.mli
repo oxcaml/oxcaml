@@ -209,6 +209,13 @@ val instance_parameterized_type:
 val instance_declaration: type_declaration -> type_declaration
 val generic_instance_declaration: type_declaration -> type_declaration
         (* Same as instance_declaration, but new nodes at generic_level *)
+
+(** [instance_declaration_with_params env params decl] calls
+    [generic_instance_declaration] on [decl] and then unifies passed
+    [params] with [decl.type_params].  *)
+val instance_declaration_with_params:
+    Env.t -> type_expr list -> type_declaration -> type_declaration
+
 val instance_class:
         type_expr list -> class_type -> type_expr list * class_type
 
