@@ -78,7 +78,7 @@ let for_fundecl ~get_file_id state (fundecl : L.fundecl) ~fun_end_label
           ~function_proto_die:concrete_instance_proto_die inlined_frame_ranges)
       ~accumulate:true ()
   in
-  if not !Dwarf_flags.restrict_to_upstream_dwarf
+  if not !Clflags.restrict_to_upstream_dwarf
   then
     Profile.record "dwarf_variables_and_parameters"
       (fun () ->

@@ -247,6 +247,8 @@ module type Optcommon_options = sig
   val _dcse : unit -> unit
   val _dlinear :  unit -> unit
   val _dstartup :  unit -> unit
+  val _restrict_to_upstream_dwarf : unit -> unit
+  val _no_restrict_to_upstream_dwarf : unit -> unit
 end
 
 module type Optcomp_options = sig

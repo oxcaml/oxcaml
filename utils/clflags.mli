@@ -87,6 +87,7 @@ val print_types : bool ref
 val make_archive : bool ref
 val debug : bool ref
 val debug_full : bool ref
+val restrict_to_upstream_dwarf : bool ref
 val dwarf_c_toolchain_flag : string ref
 val dwarf_fission : dwarf_fission ref
 val dwarf_pedantic : bool ref
@@ -367,3 +368,6 @@ val zero_alloc_assert : Zero_alloc_annotations.Assert.t ref
 val no_auto_include_otherlibs : bool ref
 
 val prepend_directory : string -> string
+
+val set_restrict_to_upstream_dwarf : unit -> unit
+val no_restrict_to_upstream_dwarf : unit -> unit
