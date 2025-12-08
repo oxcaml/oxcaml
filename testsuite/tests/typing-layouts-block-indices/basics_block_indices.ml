@@ -724,7 +724,8 @@ Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
        The layout of float is value
          because it is the primitive type float.
-       But the layout of float must be a sublayout of value non_float
+       But the layout of float must be a sublayout of
+           value non_float maybe_null
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]
@@ -747,7 +748,8 @@ Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(abstract array, 'b) idx_mut"
        The layout of abstract is value
          because of the definition of abstract at line 1, characters 0-13.
-       But the layout of abstract must be a sublayout of value non_float
+       But the layout of abstract must be a sublayout of
+           value non_float maybe_null
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]
@@ -761,7 +763,8 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
        but an expression was expected of type "(float iarray, 'b) idx_imm"
        The layout of float is value
          because it is the primitive type float.
-       But the layout of float must be a sublayout of value non_float
+       But the layout of float must be a sublayout of
+           value non_float maybe_null
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]
@@ -778,7 +781,8 @@ Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
        The layout of float is value
          because it is the primitive type float.
-       But the layout of float must be a sublayout of value non_float
+       But the layout of float must be a sublayout of
+           value non_float maybe_null
          because of the definition of y at line 2, characters 10-17.
 |}]
 
@@ -800,7 +804,8 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
        but an expression was expected of type "(abstract iarray, 'b) idx_imm"
        The layout of abstract is value
          because of the definition of abstract at line 1, characters 0-13.
-       But the layout of abstract must be a sublayout of value non_float
+       But the layout of abstract must be a sublayout of
+           value non_float maybe_null
          because it's the element type (the second type parameter) for a
          block index (idx or mut_idx).
 |}]
