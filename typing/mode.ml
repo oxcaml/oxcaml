@@ -280,21 +280,6 @@ end
 (* Even though our lattices are all bi-heyting algebras, that knowledge is
    internal to this module. Externally they are seen as normal lattices. *)
 module Lattices = struct
-  module type Total = sig
-    (** A lattice is total order, if for any [a] [b], [a <= b] or [b <= a].
-
-      If it's also finite, then the ordering can be represented as a monotone
-      injection [ord] into [int], where [a <= b] iff [ord a <= ord b]. *)
-
-    type t
-
-    val ord : t -> int
-
-    val min : t
-
-    val max : t
-  end
-
   module Total (L : Total) = struct
     let min = L.min
 
