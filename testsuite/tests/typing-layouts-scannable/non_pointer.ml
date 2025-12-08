@@ -119,6 +119,52 @@ Error: This type "t_nonptr" should be an instance of type
          because of the definition of accepts_nonptr_val at line 2, characters 0-48.
 |}]
 
+(* non_pointer64 *)
+
+type t_nonptr64_val : value non_pointer64
+
+type succeeds = t_nonptr64_val accepts_maybeptr_val
+[%%expect{|
+type t_nonptr64_val : value non_pointer64
+type succeeds = t_nonptr64_val accepts_maybeptr_val
+|}]
+
+type fails = t_nonptr64_val accepts_nonptr_val
+[%%expect{|
+Line 1, characters 13-27:
+1 | type fails = t_nonptr64_val accepts_nonptr_val
+                 ^^^^^^^^^^^^^^
+Error: This type "t_nonptr64_val" should be an instance of type
+         "('a : value non_pointer)"
+       The layout of t_nonptr64_val is immediate64
+         because of the definition of t_nonptr64_val at line 1, characters 0-41.
+       But the layout of t_nonptr64_val must be a sublayout of immediate
+         because of the definition of accepts_nonptr_val at line 2, characters 0-48.
+|}]
+
+type ('a : value non_pointer64) accepts_nonptr64_val
+
+type succeeds = t_nonptr_val accepts_nonptr64_val
+type succeeds = t_nonptr64_val accepts_nonptr64_val
+[%%expect{|
+type ('a : value non_pointer64) accepts_nonptr64_val
+type succeeds = t_nonptr_val accepts_nonptr64_val
+type succeeds = t_nonptr64_val accepts_nonptr64_val
+|}]
+
+type fails = t_maybeptr_val accepts_nonptr64_val
+[%%expect{|
+Line 1, characters 13-27:
+1 | type fails = t_maybeptr_val accepts_nonptr64_val
+                 ^^^^^^^^^^^^^^
+Error: This type "t_maybeptr_val" should be an instance of type
+         "('a : value non_pointer64)"
+       The layout of t_maybeptr_val is value maybe_separable
+         because of the definition of t_maybeptr_val at line 1, characters 0-43.
+       But the layout of t_maybeptr_val must be a sublayout of immediate64
+         because of the definition of accepts_nonptr64_val at line 1, characters 0-52.
+|}]
+
 (* when the layout is not value, the scannable axes should not be relevant *)
 type succeeds = float# accepts_maybeptr
 type succeeds = float# accepts_nonptr

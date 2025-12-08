@@ -166,8 +166,13 @@ module Layout = struct
         (* To avoid error messages containing "scannable", we print out all
            layouts with a scannable base in terms of [value], with a special
            case for the (common) immediate. There is room for improvement. *)
+        (* CR layouts-scannable: Consider factoring out layout abbreviations,
+           especially if more of these will be added. *)
         | Base (Scannable, sa) when Scannable_axes.(equal sa immediate_axes) ->
           "immediate"
+        | Base (Scannable, sa) when Scannable_axes.(equal sa immediate64_axes)
+          ->
+          "immediate64"
         | Base (Scannable, sa) ->
           String.concat " "
             ("value" :: Scannable_axes.(to_string_list_diff ~base:value_axes) sa)
@@ -366,6 +371,8 @@ module Layout = struct
         match Sort.get s with
         | Base Scannable when Scannable_axes.(equal sa immediate_axes) ->
           fprintf ppf "immediate"
+        | Base Scannable when Scannable_axes.(equal sa immediate64_axes) ->
+          fprintf ppf "immediate64"
         | Base Scannable ->
           let value_axes_diff =
             Scannable_axes.(to_string_list_diff ~base:value_axes sa)
@@ -1463,6 +1470,7 @@ module Const = struct
       (fun ({ txt; loc } : string Location.loc) separability ->
         match txt with
         | "non_pointer" -> set_or_warn ~loc ~to_:Non_pointer separability
+        | "non_pointer64" -> set_or_warn ~loc ~to_:Non_pointer64 separability
         | "non_float" -> set_or_warn ~loc ~to_:Non_float separability
         | "separable" -> set_or_warn ~loc ~to_:Separable separability
         | "maybe_separable" ->
@@ -2052,7 +2060,7 @@ let apply_or_null_l jkind =
       | Some { separability = Maybe_separable } -> jkind
       | Some { separability = Separable } ->
         set_root_separability jkind Maybe_separable
-      | Some { separability = Non_float | Non_pointer } -> jkind
+      | Some { separability = Non_float | Non_pointer64 | Non_pointer } -> jkind
       | None -> jkind
     in
     Ok jkind
@@ -2067,7 +2075,7 @@ let apply_or_null_r jkind =
       | Some { separability = Maybe_separable } -> jkind
       | Some { separability = Separable } ->
         set_root_separability jkind Non_float
-      | Some { separability = Non_float | Non_pointer } -> jkind
+      | Some { separability = Non_float | Non_pointer64 | Non_pointer } -> jkind
       | None -> jkind
     in
     Ok jkind
