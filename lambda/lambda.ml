@@ -1466,6 +1466,7 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
     match elt with
     | Scannable { separability } ->
       let raw_kind =
+        (* CR zeisbach: marking for refactor *)
         let open Jkind_axis.Separability in
         if le separability (upper_bound_if_is_always_gc_ignorable ())
           then Pintval else Pgenval
