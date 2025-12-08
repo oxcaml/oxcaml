@@ -54,7 +54,7 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_layout =
   in
   let compilation_unit_header_label = Asm_label.create (DWARF Debug_info) in
   let value_type_proto_die =
-    if !Dwarf_flags.restrict_to_upstream_dwarf
+    if !Clflags.restrict_to_upstream_dwarf
     then None
     else
       Some
@@ -99,12 +99,12 @@ let dwarf_for_fundecl t fundecl ~fun_end_label ~ppf_dump =
   if
     not
       (!Clflags.debug
-      && ((not !Dwarf_flags.restrict_to_upstream_dwarf)
+      && ((not !Clflags.restrict_to_upstream_dwarf)
          || !Dwarf_flags.dwarf_inlined_frames))
   then { fun_end_label; fundecl }
   else
     let available_ranges_vars, fundecl =
-      if not !Dwarf_flags.restrict_to_upstream_dwarf
+      if not !Clflags.restrict_to_upstream_dwarf
       then
         Profile.record "debug_available_ranges_vars"
           (fun fundecl -> Available_ranges_vars.create ~ppf_dump fundecl)

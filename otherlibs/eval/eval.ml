@@ -215,7 +215,7 @@ let eval (expr : 'a expr) =
       Slambda.eval Fun.id tlambda_program.code
     in
     Simplif.simplify_lambda
-      ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
+      ~restrict_to_upstream_dwarf:!Clflags.restrict_to_upstream_dwarf
       ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
       raw_lambda
   in

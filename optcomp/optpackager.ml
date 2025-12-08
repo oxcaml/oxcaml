@@ -126,7 +126,7 @@ end) : S = struct
         in
         let code =
           Simplif.simplify_lambda code
-            ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
+            ~restrict_to_upstream_dwarf:!Clflags.restrict_to_upstream_dwarf
             ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
         in
         let main_module_block_format : Lambda.main_module_block_format =
