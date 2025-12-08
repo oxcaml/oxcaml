@@ -33,8 +33,13 @@ type compile_time_constant =
   | Ostype_win32
   | Ostype_cygwin
   | Backend_type
+<<<<<<< OxCaml
   | Arch_amd64
   | Arch_arm64
+||||||| Upstream OCaml
+=======
+  | Standard_library_default
+>>>>>>> ocaml/ocaml#14244
 
 type immediate_or_pointer =
   | Immediate

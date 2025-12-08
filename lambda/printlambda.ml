@@ -644,9 +644,16 @@ let primitive ppf = function
        | Ostype_unix -> "ostype_unix"
        | Ostype_win32 -> "ostype_win32"
        | Ostype_cygwin -> "ostype_cygwin"
+<<<<<<< OxCaml
        | Backend_type -> "backend_type"
        | Arch_amd64 -> "arch_amd64"
        | Arch_arm64 -> "arch_arm64" in
+||||||| Upstream OCaml
+       | Backend_type -> "backend_type" in
+=======
+       | Backend_type -> "backend_type"
+       | Standard_library_default -> "standard_library_default" in
+>>>>>>> ocaml/ocaml#14244
      fprintf ppf "sys.constant_%s" const_name
   | Pisint { variant_only } ->
       fprintf ppf (if variant_only then "isint" else "obj_is_int")
