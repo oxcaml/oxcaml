@@ -886,7 +886,8 @@ let set_printing_env env =
 
 let wrap_printing_env env f =
   set_printing_env env; reset_naming_context ();
-  try_finally f ~always:(fun () -> set_printing_env Env.empty)
+  let snap = Btype.snapshot () in
+  try_finally f ~always:(fun () -> Btype.backtrack snap; set_printing_env Env.empty)
 
 let wrap_printing_env ~error env f =
   if error then Env.without_cmis (wrap_printing_env env) f
@@ -1750,13 +1751,7 @@ and tree_of_typfields mode rest = function
       (field :: fields, rest)
 
 let tree_of_typexp mode ty =
-  (* [tree_of_typexp] mutates state, which we need to backtrack. *)
-  (* CR zqian: the backtracking should happen at a higher-level than this. In
-  particular, it should happen only once per user printing command. *)
-  let snap = Btype.snapshot () in
-  let r = tree_of_typexp mode Alloc.Const.legacy ty in
-  Btype.backtrack snap;
-  r
+  tree_of_typexp mode Alloc.Const.legacy ty
 
 let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp mode ty)
@@ -2267,7 +2262,6 @@ let tree_of_value_description id decl =
   let ty = tree_of_type_scheme decl.val_type in
   (* Important: process the fvs *after* the type; tree_of_type_scheme
      resets the naming context *)
-  let snap = Btype.snapshot () in
   let moda =
     Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha decl.val_modalities
   in
@@ -2319,9 +2313,7 @@ let tree_of_value_description id decl =
     | Val_prim p -> Primitive.print p vd
     | _ -> vd
   in
-  let r = Osig_value vd in
-  Btype.backtrack snap;
-  r
+  Osig_value vd
 
 let value_description id ppf decl =
   !Oprint.out_sig_item ppf (tree_of_value_description id decl)
@@ -2772,15 +2764,10 @@ and tree_of_modtype_declaration ?abbrev id decl =
   Osig_modtype (Ident.name id, mty)
 
 and tree_of_module ?abbrev id md rs =
-  let snap = Btype.snapshot () in
   let moda = Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities in
-  let r =
     Osig_module (Ident.name id, tree_of_modtype ?abbrev md.md_type,
     tree_of_modalities Immutable moda,
     tree_of_rec rs)
-  in
-  Btype.backtrack snap;
-  r
 
 let rec functor_parameters ~sep custom_printer = function
   | [] -> ignore

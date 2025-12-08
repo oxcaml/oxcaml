@@ -284,11 +284,7 @@ let maybe_print_mode_l ~is_modal (mode : Mode.Value.l) =
   | None -> fun _ppf -> ()
   | Some ax ->
       let (P ax) : Mode.Value.Axis.packed = ax in
-      let mode =
-        mode
-        (* error printing, so mutation doesn't need to be backtracked *)
-        |> zap_axis_to_floor ax
-      in
+      let mode = mode |> zap_axis_to_floor ax in
       print_out_mode ax mode
 
 let print_modes ?in_structure ax (modes : Includemod.modes) =
@@ -298,15 +294,8 @@ let print_modes ?in_structure ax (modes : Includemod.modes) =
     | All -> assert false
     | Specific (mode1, mode2, _) -> mode1, mode2
   in
-  let mode1 =
-    mode1
-    (* error printing, so mutation doesn't need to be backtracked *)
-    |> zap_axis_to_floor ax
-  in
-  let mode2 =
-    mode2
-    |> zap_axis_to_ceil ax
-  in
+  let mode1 = mode1 |> zap_axis_to_floor ax in
+  let mode2 = mode2 |> zap_axis_to_ceil ax in
   print_out_mode ?in_structure ax mode1, print_out_mode ?in_structure ax mode2
 
 let maybe_print_modes ?in_structure ~is_modal (modes : Includemod.modes) =
