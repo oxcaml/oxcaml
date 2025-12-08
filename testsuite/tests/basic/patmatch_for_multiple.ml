@@ -390,7 +390,8 @@ let _ =fun a b -> match a, b with
 (function {nlocal = 0} a/360[value<int>]
   b/361[value<
          (consts (0))
-          (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>]))>]
+          (non_consts ([0:
+                        value<(consts ()) (non_consts ([0: value<int>, *]))>]))>]
   : (consts ())
      (non_consts ([0: value<int>, value<(consts (0)) (non_consts ([0: *]))>]))
   (catch
@@ -408,7 +409,8 @@ let _ =fun a b -> match a, b with
 (function {nlocal = 0} a/360[value<int>]
   b/361[value<
          (consts (0))
-          (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>]))>]
+          (non_consts ([0:
+                        value<(consts ()) (non_consts ([0: value<int>, *]))>]))>]
   : (consts ())
      (non_consts ([0: value<int>, value<(consts (0)) (non_consts ([0: *]))>]))
   (catch (if a/360 (if b/361 (field_imm 0 b/361) (exit 12)) (exit 12))
@@ -424,7 +426,8 @@ let _ = fun a b -> match a, b with
 (function {nlocal = 0} a/364[value<int>]
   b/365[value<
          (consts (0))
-          (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>]))>]
+          (non_consts ([0:
+                        value<(consts ()) (non_consts ([0: value<int>, *]))>]))>]
   : (consts ())
      (non_consts ([0: value<int>, value<(consts (0)) (non_consts ([0: *]))>]))
   (catch
@@ -449,7 +452,8 @@ let _ = fun a b -> match a, b with
 (function {nlocal = 0} a/364[value<int>]
   b/365[value<
          (consts (0))
-          (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>]))>]
+          (non_consts ([0:
+                        value<(consts ()) (non_consts ([0: value<int>, *]))>]))>]
   : (consts ())
      (non_consts ([0: value<int>, value<(consts (0)) (non_consts ([0: *]))>]))
   (catch

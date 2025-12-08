@@ -35,5 +35,5 @@ let set t ~a =
 
 let () =
   let t = { a = Null; b = #0L } in
-  test ~expect_caml_modifies:1
+  test ~expect_caml_modifies:0
     (fun () -> set t ~a:(This 5))
