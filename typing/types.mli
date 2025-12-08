@@ -94,16 +94,13 @@ module Jkind_mod_bounds : sig
   val create :
     Crossing.t->
     externality:Externality.t ->
-    nullability:Nullability.t ->
     t
 
   val crossing : t -> Crossing.t
   val externality : t -> Externality.t
-  val nullability : t -> Nullability.t
 
   val set_crossing : Crossing.t -> t -> t
   val set_externality : Externality.t -> t -> t
-  val set_nullability : Nullability.t -> t -> t
 
   (** [set_max_in_set bounds axes] sets all the axes in [axes] to their [max] within
       [bounds] *)

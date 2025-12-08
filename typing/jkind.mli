@@ -86,10 +86,6 @@ end
 module Scannable_axes : sig
   type t = Jkind_types.Scannable_axes.t
 
-  (* CR zeisbach: It might be unnecessary to have this module exposed,
-     since most of it goes unused (even internally to this file). *)
-  include Jkind_axis.Axis_ops with type t := t
-
   (** Omits all axes that are max, for printing *)
   val to_string_list : t -> string list
 end
@@ -672,12 +668,11 @@ val set_externality_upper_bound :
   Types.jkind_r -> Jkind_axis.Externality.t -> Types.jkind_r
 
 (** Gets the nullability from a jkind. *)
-val get_nullability :
-  context:jkind_context -> Types.jkind_l -> Jkind_axis.Nullability.t
+val get_nullability : Types.jkind_l -> Jkind_axis.Nullability.t option
 
 (** Computes a jkind that is the same as the input but with an updated maximum
     mode for the nullability axis *)
-val set_nullability_upper_bound :
+val set_root_nullability :
   Types.jkind_r -> Jkind_axis.Nullability.t -> Types.jkind_r
 
 (** Computes a jkind that is the same as the input but with an updated maximum

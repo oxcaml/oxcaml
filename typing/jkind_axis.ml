@@ -15,6 +15,8 @@
 module type Axis_ops = sig
   include Mode_intf.Lattice
 
+  val to_string : t -> string
+
   val less_or_equal : t -> t -> Misc.Le_result.t
 
   val equal : t -> t -> bool
@@ -39,10 +41,12 @@ module Externality = struct
   let less_or_equal s1 s2 : Misc.Le_result.t =
     if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
 
-  let print ppf = function
-    | External -> Format.fprintf ppf "external_"
-    | External64 -> Format.fprintf ppf "external64"
-    | Internal -> Format.fprintf ppf "internal"
+  let to_string = function
+    | External -> "external_"
+    | External64 -> "external64"
+    | Internal -> "internal"
+
+  let print ppf t = Format.fprintf ppf "%s" (to_string t)
 
   let upper_bound_if_is_always_gc_ignorable () =
     (* We check that we're compiling to (64-bit) native code before counting
@@ -69,9 +73,9 @@ module Nullability = struct
   let less_or_equal s1 s2 : Misc.Le_result.t =
     if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
 
-  let print ppf = function
-    | Non_null -> Format.fprintf ppf "non_null"
-    | Maybe_null -> Format.fprintf ppf "maybe_null"
+  let to_string = function Non_null -> "non_null" | Maybe_null -> "maybe_null"
+
+  let print ppf t = Format.fprintf ppf "%s" (to_string t)
 end
 
 module Separability = struct
@@ -108,15 +112,11 @@ module Separability = struct
     | Maybe_separable -> "maybe_separable"
 
   let print ppf t = Format.fprintf ppf "%s" (to_string t)
-
-  let is_max p = equal p max
 end
 
 module Axis = struct
   module Nonmodal = struct
-    type 'a t =
-      | Externality : Externality.t t
-      | Nullability : Nullability.t t
+    type 'a t = Externality : Externality.t t
   end
 
   type 'a t =
@@ -137,8 +137,7 @@ module Axis = struct
       Pack (Modal (Monadic Visibility));
       Pack (Modal (Monadic Staticity));
       (* CR-soon zqian: call [Mode.Crossing.Axis.all] for modal axes *)
-      Pack (Nonmodal Externality);
-      Pack (Nonmodal Nullability) ]
+      Pack (Nonmodal Externality) ]
 
   let name (type a) : a t -> string = function
     | Modal ax ->
@@ -147,7 +146,6 @@ module Axis = struct
       in
       Format.asprintf "%a" Mode.Value.Axis.print ax
     | Nonmodal Externality -> "externality"
-    | Nonmodal Nullability -> "nullability"
 end
 
 module Per_axis = struct
@@ -156,42 +154,24 @@ module Per_axis = struct
   module Nonmodal = struct
     open Axis.Nonmodal
 
-    let min : type a. a t -> a = function
-      | Externality -> Externality.min
-      | Nullability -> Nullability.min
+    let min : type a. a t -> a = function Externality -> Externality.min
 
-    let max : type a. a t -> a = function
-      | Externality -> Externality.max
-      | Nullability -> Nullability.max
+    let max : type a. a t -> a = function Externality -> Externality.max
 
     let le : type a. a t -> a -> a -> bool =
-     fun ax a b ->
-      match ax with
-      | Externality -> Externality.le a b
-      | Nullability -> Nullability.le a b
+     fun ax a b -> match ax with Externality -> Externality.le a b
 
     let meet : type a. a t -> a -> a -> a =
-     fun ax a b ->
-      match ax with
-      | Externality -> Externality.meet a b
-      | Nullability -> Nullability.meet a b
+     fun ax a b -> match ax with Externality -> Externality.meet a b
 
     let join : type a. a t -> a -> a -> a =
-     fun ax a b ->
-      match ax with
-      | Externality -> Externality.join a b
-      | Nullability -> Nullability.join a b
+     fun ax a b -> match ax with Externality -> Externality.join a b
 
     let print : type a. a t -> Format.formatter -> a -> unit = function
       | Externality -> Externality.print
-      | Nullability -> Nullability.print
 
     let eq_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
-     fun a b ->
-      match a, b with
-      | Externality, Externality -> Some Refl
-      | Nullability, Nullability -> Some Refl
-      | _ -> None
+     fun a b -> match a, b with Externality, Externality -> Some Refl
   end
 
   let min : type a. a t -> a = function[@inline available]
@@ -255,7 +235,6 @@ module Axis_set = struct
     | Modal (Monadic Staticity) -> 9
     (* CR-soon zqian: call [Mode.Crossing.Axis.index] for modal axes *)
     | Nonmodal Externality -> 10
-    | Nonmodal Nullability -> 11
 
   let[@inline] axis_mask ax = 1 lsl axis_index ax
 
@@ -286,7 +265,6 @@ module Axis_set = struct
     |> set_axis (Modal (Monadic Visibility))
     |> set_axis (Modal (Monadic Staticity))
     |> set_axis (Nonmodal Externality)
-    |> set_axis (Nonmodal Nullability)
 
   let all = create ~f:(fun ~axis:_ -> true)
 
