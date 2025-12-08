@@ -147,6 +147,7 @@ let llvm_flags = ref "" (* -llvm-flags *)
 
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)
+  let reaper_debug_flags = ref [] (* -reaper-debug-flags *)
 
   module Default = struct
     let classic_mode = false

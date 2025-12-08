@@ -29,6 +29,9 @@ let mk_no_flambda2_debug f =
     Arg.Unit f,
     " Disable debug output for the Flambda2 pass" )
 
+let mk_reaper_debug_flags f =
+  ("-reaper-debug-flags", Arg.String f, " Debug flags for the reaper pass")
+
 let mk_no_mach_ir f =
   ( "-no-mach-ir",
     Arg.Unit f,
@@ -1113,6 +1116,7 @@ module type Oxcaml_options = sig
   val llvm_flags : string -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
+  val reaper_debug_flags : string -> unit
   val flambda2_join_points : unit -> unit
   val no_flambda2_join_points : unit -> unit
   val flambda2_result_types_functors_only : unit -> unit
@@ -1261,6 +1265,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_llvm_flags F.llvm_flags;
       mk_flambda2_debug F.flambda2_debug;
       mk_no_flambda2_debug F.no_flambda2_debug;
+      mk_reaper_debug_flags F.reaper_debug_flags;
       mk_flambda2_join_points F.flambda2_join_points;
       mk_no_flambda2_join_points F.no_flambda2_join_points;
       mk_flambda2_result_types_functors_only
@@ -1500,6 +1505,11 @@ module Oxcaml_options_impl = struct
   let llvm_flags s = Oxcaml_flags.llvm_flags := s
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
+
+  let reaper_debug_flags s =
+    Oxcaml_flags.Flambda2.reaper_debug_flags :=
+      String.split_on_char ',' s @ !Oxcaml_flags.Flambda2.reaper_debug_flags
+
   let flambda2_join_points = set Flambda2.join_points
   let no_flambda2_join_points = clear Flambda2.join_points
 
@@ -1990,6 +2000,10 @@ module Extra_params = struct
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
     | "llvm-flags" -> set_string Oxcaml_flags.llvm_flags
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
+    | "reaper-debug-flags" ->
+        Oxcaml_flags.Flambda2.reaper_debug_flags :=
+          String.split_on_char ',' v @ !Oxcaml_flags.Flambda2.reaper_debug_flags;
+        true
     | "flambda2-join-points" -> set Flambda2.join_points
     | "flambda2-result-types" ->
         (match String.lowercase_ascii v with

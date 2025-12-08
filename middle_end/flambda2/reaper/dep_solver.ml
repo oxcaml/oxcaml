@@ -244,21 +244,6 @@
 
 open Global_flow_graph.Relations
 
-let reaperdbg_env = Sys.getenv_opt "REAPERDBG"
-
-let reaperdbg_flags =
-  String.split_on_char ',' (Option.value ~default:"" reaperdbg_env)
-
-let debug_types = List.mem "types" reaperdbg_flags
-
-let debug_stats = List.mem "stats" reaperdbg_flags
-
-let debug_unbox = List.mem "unbox" reaperdbg_flags
-
-let debug_db = List.mem "db" reaperdbg_flags
-
-let debug_provenance = List.mem "prov" reaperdbg_flags
-
 type 'a unboxed_fields =
   | Not_unboxed of 'a
   | Unboxed of 'a unboxed_fields Field.Map.t
@@ -2014,6 +1999,8 @@ let get_single_field_source =
         ~f:(fun [source] acc ->
           match acc with No_source -> One source | One _ | Many -> Many)
 
+let debug_types = lazy (Flambda_features.debug_reaper "types")
+
 module Rewriter = struct
   type t0 =
     | No_source
@@ -2391,7 +2378,7 @@ module Rewriter = struct
   let rec patterns_for_unboxed_fields ~machine_width ~bind_function_slots db
       ~var fields unboxed_fields unboxed_block acc =
     let open Flambda2_types.Rewriter in
-    if debug_types
+    if Lazy.force debug_types
     then
       Format.eprintf
         "[patterns_for_unboxed_fields] unboxed_block = \
@@ -2596,7 +2583,7 @@ module Rewriter = struct
     let db = result.db in
     let[@local] forget_type () =
       (* CR ncourant: we should preserve the nullability of the type here. *)
-      if debug_types
+      if Lazy.force debug_types
          && (not (Flambda2_types.is_unknown typing_env flambda_type))
          && not
               (List.mem
@@ -2608,7 +2595,8 @@ module Rewriter = struct
           flambda_type print_t0 usages;
       Rule.rewrite Pattern.any (Expr.unknown (Flambda2_types.kind flambda_type))
     in
-    if debug_types then Format.eprintf "REWRITE usages = %a@." print_t0 usages;
+    if Lazy.force debug_types
+    then Format.eprintf "REWRITE usages = %a@." print_t0 usages;
     match usages with
     | _ when forget_all_types -> forget_type ()
     | No_usages -> forget_type ()
@@ -2654,7 +2642,7 @@ module Rewriter = struct
         let[@local] change_representation_of_closures fields closure_source
             value_slots_reprs function_slots_reprs =
           let patterns = ref [] in
-          if debug_types
+          if Lazy.force debug_types
           then (
             Format.eprintf "OLD type: %a@." Flambda2_types.print flambda_type;
             Format.eprintf "OLD->NEW function slots: %a@."
@@ -2663,7 +2651,7 @@ module Rewriter = struct
           let all_function_slots_in_set =
             Function_slot.Map.fold
               (fun function_slot (_, uses) m ->
-                if debug_types
+                if Lazy.force debug_types
                 then
                   Format.eprintf "OLD function slot: %a@." Function_slot.print
                     function_slot;
@@ -2870,7 +2858,7 @@ module Rewriter = struct
                    (fun _ c acc -> Code_id_or_name.Map.add c () acc)
                    set_of_closures Code_id_or_name.Map.empty)
             in
-            if debug_types
+            if Lazy.force debug_types
             then
               Format.eprintf "ZZZ: %a@."
                 (Field.Map.print (fun ff t ->
@@ -2901,7 +2889,7 @@ module Rewriter = struct
                 (fun clos () ->
                   Code_id_or_name.Map.mem clos result.changed_representation)
                 usages_for_value_slots);
-            if debug_types
+            if Lazy.force debug_types
             then
               Format.eprintf "USAGES_FOR_VALUE_SLOTS is: %a@."
                 (Code_id_or_name.Map.print Unit.print)
@@ -3043,7 +3031,7 @@ module Rewriter = struct
                        (fun _ c acc -> Code_id_or_name.Map.add c () acc)
                        set_of_closures Code_id_or_name.Map.empty)
                 in
-                if debug_types
+                if Lazy.force debug_types
                 then
                   Format.eprintf "ZZZ: %a@."
                     (Field.Map.print (fun ff t ->
@@ -3079,7 +3067,7 @@ module Rewriter = struct
       let field = Field.block (Target_ocaml_int.to_int index) field_kind in
       follow_field result t field
     in
-    if debug_types
+    if Lazy.force debug_types
     then (
       Format.eprintf "%a -[%d]-> %a@." print_t0 t
         (Target_ocaml_int.to_int index)
@@ -3118,7 +3106,7 @@ end
 module TypesRewrite = Flambda2_types.Rewriter.Make (Rewriter)
 
 let rewrite_typing_env result ~unit_symbol:_ typing_env =
-  if debug_types
+  if Lazy.force debug_types
   then Format.eprintf "OLD typing env: %a@." Typing_env.print typing_env;
   let db = result.db in
   let symbol_metadata sym =
@@ -3142,12 +3130,13 @@ let rewrite_typing_env result ~unit_symbol:_ typing_env =
                 (get_direct_usages db (Code_id_or_name.Map.singleton sym ())) )
   in
   let r = TypesRewrite.rewrite typing_env symbol_metadata in
-  if debug_types then Format.eprintf "NEW typing env: %a@." Typing_env.print r;
+  if Lazy.force debug_types
+  then Format.eprintf "NEW typing env: %a@." Typing_env.print r;
   r
 
 let rewrite_result_types result ~old_typing_env func_params func_results
     result_types =
-  if debug_types
+  if Lazy.force debug_types
   then Format.eprintf "OLD result types: %a@." Result_types.print result_types;
   let params, results, env_extension =
     Result_types.pattern_match result_types ~f:(fun ~params ~results tee ->
@@ -3258,7 +3247,7 @@ let rewrite_result_types result ~old_typing_env func_params func_results
     Result_types.create ~params:(make_bp params_vars)
       ~results:(make_bp results_vars) new_env_extension
   in
-  if debug_types
+  if Lazy.force debug_types
   then
     Format.eprintf "NEW result types: %a@." Result_types.print new_result_types;
   new_result_types
@@ -3340,7 +3329,9 @@ let query_dominated_by =
 let fixpoint (graph : Global_flow_graph.graph) =
   let datalog = Global_flow_graph.to_datalog graph in
   let stats =
-    Datalog.Schedule.create_stats ~with_provenance:debug_provenance datalog
+    Datalog.Schedule.create_stats
+      ~with_provenance:(Flambda_features.debug_reaper "prov")
+      datalog
   in
   let db = Datalog.Schedule.run ~stats datalog_schedule datalog in
   let db =
@@ -3348,8 +3339,11 @@ let fixpoint (graph : Global_flow_graph.graph) =
       (fun db rule -> Datalog.Schedule.run ~stats rule db)
       db datalog_rules
   in
-  if debug_stats then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
-  if debug_db then Format.eprintf "%a@." Datalog.print db;
+  if Flambda_features.debug_reaper "stats"
+     || Flambda_features.debug_reaper "prov"
+  then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
+  if Flambda_features.debug_reaper "db"
+  then Format.eprintf "%a@." Datalog.print db;
   let has_to_be_unboxed code_or_name = has_to_be_unboxed [code_or_name] db in
   let unboxed =
     Datalog.Cursor.fold query_to_unbox db ~init:Code_id_or_name.Map.empty
@@ -3372,7 +3366,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
         in
         Code_id_or_name.Map.add to_patch fields unboxed)
   in
-  if debug_unbox
+  if Flambda_features.debug_reaper "unbox"
   then
     Format.printf "TO UNBOX: %a@."
       (Code_id_or_name.Map.print
@@ -3448,7 +3442,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
           List.iter
             (fun (fs, f) -> add_to_s (Closure_representation (repr, fss, fs)) f)
             l);
-  if debug_unbox
+  if Flambda_features.debug_reaper "unbox"
   then
     Format.eprintf "@.TO_CHG: %a@."
       (Code_id_or_name.Map.print (fun ff (repr, alloc_point) ->

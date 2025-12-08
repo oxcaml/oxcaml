@@ -16,6 +16,8 @@ val flambda2_is_enabled : unit -> bool
 
 val debug_flambda2 : unit -> bool
 
+val debug_reaper : string -> bool
+
 type 'a mode =
   | Normal : [`Normal] mode
   | Classic : [`Classic] mode

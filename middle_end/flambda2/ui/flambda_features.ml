@@ -16,6 +16,8 @@ let flambda2_is_enabled () = Clflags.is_flambda2 ()
 
 let debug_flambda2 () = !Oxcaml_flags.Flambda2.debug
 
+let debug_reaper s = List.mem s !Oxcaml_flags.Flambda2.reaper_debug_flags
+
 let with_default (r : 'a Oxcaml_flags.or_default)
     ~(f : Oxcaml_flags.Flambda2.flags -> 'a) =
   match r with

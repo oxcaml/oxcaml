@@ -121,6 +121,7 @@ val llvm_flags : string ref
 
 module Flambda2 : sig
   val debug : bool ref
+  val reaper_debug_flags : string list ref
 
   module Default : sig
     val classic_mode : bool
