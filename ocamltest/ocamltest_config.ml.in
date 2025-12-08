@@ -113,5 +113,11 @@ let poll_insertion = @poll_insertion@
 let naked_pointers = false
 
 let tsan = @tsan@
+<<<<<<< OxCaml
 
 let address_sanitizer = @address_sanitizer@
+||||||| Upstream OCaml
+=======
+
+let has_relative_libdir = @target_libdir_is_relative@
+>>>>>>> ocaml/ocaml#14244

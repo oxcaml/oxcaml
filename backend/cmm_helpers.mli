@@ -782,7 +782,16 @@ val code_segment_table : Compilation_unit.t list -> phrase
 (** Generate data for a predefined exception *)
 val predef_exception : int -> string -> phrase
 
+<<<<<<< OxCaml
 val plugin_header : Cmxs_format.dynunit list -> phrase
+||||||| Upstream OCaml
+val plugin_header: (Cmx_format.unit_infos * Digest.t) list -> phrase
+=======
+(** Generate data for a global string constant *)
+val emit_global_string_constant: string -> string -> phrase
+
+val plugin_header: (Cmx_format.unit_infos * Digest.t) list -> phrase
+>>>>>>> ocaml/ocaml#14244
 
 (** Emit constant symbols *)
 
