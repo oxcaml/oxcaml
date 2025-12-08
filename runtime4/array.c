@@ -953,8 +953,6 @@ CAMLprim value caml_unboxed_nativeint_vect_blit(value a1, value ofs1, value a2,
 CAMLprim value caml_untagged_int_vect_blit(value a1, value ofs1, value a2,
                                            value ofs2, value n)
 {
-  /* See memory model [MM] notes in memory.c */
-  atomic_thread_fence(memory_order_acquire);
   memmove((uintnat *)a2 + Long_val(ofs2),
           (uintnat *)a1 + Long_val(ofs1),
           Long_val(n) * sizeof(uintnat));

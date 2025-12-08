@@ -942,6 +942,8 @@ CAMLprim value caml_floatarray_blit(value a1, value ofs1, value a2, value ofs2,
 CAMLprim value caml_untagged_int8_vect_blit(value a1, value ofs1, value a2,
                                             value ofs2, value n)
 {
+  /* See memory model [MM] notes in memory.c */
+  atomic_thread_fence(memory_order_acquire);
   memmove((int8_t *)a2 + Long_val(ofs2),
           (int8_t *)a1 + Long_val(ofs1),
           Long_val(n) * sizeof(int8_t));
@@ -951,6 +953,8 @@ CAMLprim value caml_untagged_int8_vect_blit(value a1, value ofs1, value a2,
 CAMLprim value caml_untagged_int16_vect_blit(value a1, value ofs1, value a2,
                                              value ofs2, value n)
 {
+  /* See memory model [MM] notes in memory.c */
+  atomic_thread_fence(memory_order_acquire);
   memmove((int16_t *)a2 + Long_val(ofs2),
           (int16_t *)a1 + Long_val(ofs1),
           Long_val(n) * sizeof(int16_t));
