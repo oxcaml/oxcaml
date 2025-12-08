@@ -92,6 +92,8 @@ module Scannable_axes = struct
 
   let immediate_axes = { separability = Non_pointer }
 
+  let immediate64_axes = { separability = Non_pointer64 }
+
   let equal { separability = s1 } { separability = s2 } =
     Separability.equal s1 s2
 
@@ -299,8 +301,13 @@ module Layout = struct
         (* To avoid error messages containing "scannable", we print out all
            layouts with a scannable base in terms of [value], with a special
            case for the (common) immediate. There is room for improvement. *)
+        (* CR layouts-scannable: Consider factoring out layout abbreviations,
+           especially if more of these will be added. *)
         | Base (Scannable, sa) when Scannable_axes.(equal sa immediate_axes) ->
           "immediate"
+        | Base (Scannable, sa) when Scannable_axes.(equal sa immediate64_axes)
+          ->
+          "immediate64"
         | Base (Scannable, sa) ->
           String.concat " "
             ("value" :: Scannable_axes.(to_string_list_diff ~base:value_axes) sa)
@@ -526,6 +533,8 @@ module Layout = struct
         match Sort.get s with
         | Base Scannable when Scannable_axes.(equal sa immediate_axes) ->
           fprintf ppf "immediate"
+        | Base Scannable when Scannable_axes.(equal sa immediate64_axes) ->
+          fprintf ppf "immediate64"
         | Base Scannable ->
           let value_axes_diff =
             Scannable_axes.(to_string_list_diff ~base:value_axes sa)
@@ -1802,24 +1811,19 @@ module Const = struct
     *)
     let immediate64 =
       { jkind =
-          { immediate.jkind with
-            layout =
-              Layout.Const.set_root_separability immediate.jkind.layout
-                Non_pointer64;
-            mod_bounds =
-              Mod_bounds.set_externality Externality.External64
-                immediate.jkind.mod_bounds
-          };
+          mk_jkind
+            (Base (Scannable, Scannable_axes.immediate64_axes))
+            ~crossing:cross_all_except_staticity
+            ~externality:Externality.External64 ~nullability:Non_null;
         name = "immediate64"
       }
 
     let immediate64_or_null =
       { jkind =
-          { immediate_or_null.jkind with
-            mod_bounds =
-              Mod_bounds.set_externality Externality.External64
-                immediate_or_null.jkind.mod_bounds
-          };
+          mk_jkind
+            (Base (Scannable, { separability = Non_pointer }))
+            ~crossing:cross_all_except_staticity
+            ~externality:Externality.External64 ~nullability:Maybe_null;
         name = "immediate64_or_null"
       }
 
