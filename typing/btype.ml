@@ -1409,22 +1409,18 @@ module Jkind0 = struct
          meeting the conditions.
       *)
       let immediate64 =
-        let open Mod_bounds in
         { jkind =
-            { immediate.jkind with
-              mod_bounds =
-                set_externality External64 immediate.jkind.mod_bounds
-            };
+            mk_jkind (Base (Scannable, Scannable_axes.immediate64_axes))
+              ~crossing:cross_all_except_staticity
+              ~externality:External64 ~nullability:Non_null;
           name = "immediate64"
         }
 
       let immediate64_or_null =
-        let open Mod_bounds in
         { jkind =
-            { immediate_or_null.jkind with
-              mod_bounds =
-                set_externality External64 immediate_or_null.jkind.mod_bounds
-            };
+            mk_jkind (Base (Scannable, { separability = Non_pointer64 }))
+              ~crossing:cross_all_except_staticity
+              ~externality:External64 ~nullability:Maybe_null;
           name = "immediate64_or_null"
         }
 
