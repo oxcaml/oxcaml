@@ -1025,6 +1025,15 @@ let mk_gdwarf_fidelity f =
   \t- high and above should provide good debugging information at increased \
       compilation times"
 
+let mk_restrict_to_upstream_dwarf f =
+  "-gupstream-dwarf", Arg.Unit f,
+  " Only emit the same DWARF information as the upstream compiler"
+
+let mk_no_restrict_to_upstream_dwarf f =
+  "-gno-upstream-dwarf", Arg.Unit f,
+  " Emit potentially more DWARF information than the upstream compiler. \
+   Implies -shape-format debugging-shapes."
+
 let mk_opaque f =
   "-opaque", Arg.Unit f,
   " Does not generate cross-module optimization information\n\
@@ -1299,6 +1308,8 @@ module type Optcommon_options = sig
   val _dcse : unit -> unit
   val _dlinear :  unit -> unit
   val _dstartup :  unit -> unit
+  val _restrict_to_upstream_dwarf : unit -> unit
+  val _no_restrict_to_upstream_dwarf : unit -> unit
 end;;
 
 module type Optcomp_options = sig
@@ -1829,6 +1840,8 @@ struct
       F._gdwarf_config_max_evaluation_steps_per_variable;
     mk_gdwarf_config_shape_reduce_fuel F._gdwarf_config_shape_reduce_fuel;
     mk_gdwarf_fidelity F._gdwarf_fidelity;
+    mk_restrict_to_upstream_dwarf F._restrict_to_upstream_dwarf;
+    mk_no_restrict_to_upstream_dwarf F._no_restrict_to_upstream_dwarf;
 
     mk_args F._args;
     mk_args0 F._args0;
@@ -1945,6 +1958,8 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_dstartup F._dstartup;
     mk_dump_pass F._dump_pass;
     mk_debug_ocaml F._debug_ocaml;
+    mk_restrict_to_upstream_dwarf F._restrict_to_upstream_dwarf;
+    mk_no_restrict_to_upstream_dwarf F._no_restrict_to_upstream_dwarf;
 
     mk_eval F._eval;
   ]
@@ -2397,6 +2412,8 @@ module Default = struct
     let _unbox_closures = set unbox_closures
     let _unbox_closures_factor f = unbox_closures_factor := f
     let _verbose = set verbose
+    let _restrict_to_upstream_dwarf = Clflags.set_restrict_to_upstream_dwarf
+    let _no_restrict_to_upstream_dwarf = Clflags.no_restrict_to_upstream_dwarf
   end
 
   module Compiler = struct

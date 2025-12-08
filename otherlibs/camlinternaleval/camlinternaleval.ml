@@ -230,7 +230,7 @@ let eval code =
     { raw_lambda_program with
       code =
         Simplif.simplify_lambda
-          ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
+          ~restrict_to_upstream_dwarf:!Clflags.restrict_to_upstream_dwarf
           ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
           raw_lambda_program.code
     }
