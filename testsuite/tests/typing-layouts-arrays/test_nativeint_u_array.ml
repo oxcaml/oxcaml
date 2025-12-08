@@ -199,6 +199,13 @@ let () =
       assert (b = #2n)
     | _ -> assert false);
 
+  let d = [: #1n; #2n :] in
+  (match d with
+    | [: a; b :] ->
+      assert (a = #1n);
+      assert (b = #2n)
+    | _ -> assert false);
+
   (* let statement pattern *)
   let a = [||] in
   let b = [| #1n |] in
