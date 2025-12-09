@@ -526,7 +526,7 @@ let class_description sub x =
 
 let functor_parameter sub = function
   | Unit -> ()
-  | Named (_, s, mtype) -> iter_loc sub s; sub.module_type sub mtype
+  | Named (_, s, mtype, _) -> iter_loc sub s; sub.module_type sub mtype
 
 let module_type sub {mty_loc; mty_desc; mty_env; mty_attributes; _} =
   sub.location sub mty_loc;
@@ -536,7 +536,7 @@ let module_type sub {mty_loc; mty_desc; mty_env; mty_attributes; _} =
   | Tmty_ident (_, lid) -> iter_loc sub lid
   | Tmty_alias (_, lid) -> iter_loc sub lid
   | Tmty_signature sg -> sub.signature sub sg
-  | Tmty_functor (arg, mtype2) ->
+  | Tmty_functor (arg, mtype2, _) ->
       functor_parameter sub arg;
       sub.module_type sub mtype2
   | Tmty_with (mtype, list) ->

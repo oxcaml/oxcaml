@@ -748,7 +748,8 @@ let class_description sub x =
 
 let functor_parameter sub = function
   | Unit -> Unit
-  | Named (id, s, mtype) -> Named (id, map_loc sub s, sub.module_type sub mtype)
+  | Named (id, s, mtype, mmode) ->
+      Named (id, map_loc sub s, sub.module_type sub mtype, mmode)
 
 let module_type sub x =
   let mty_loc = sub.location sub x.mty_loc in
@@ -758,8 +759,9 @@ let module_type sub x =
     | Tmty_ident (path, lid) -> Tmty_ident (path, map_loc sub lid)
     | Tmty_alias (path, lid) -> Tmty_alias (path, map_loc sub lid)
     | Tmty_signature sg -> Tmty_signature (sub.signature sub sg)
-    | Tmty_functor (arg, mtype2) ->
-        Tmty_functor (functor_parameter sub arg, sub.module_type sub mtype2)
+    | Tmty_functor (arg, mtype2, mmode2) ->
+        Tmty_functor (functor_parameter sub arg, sub.module_type sub mtype2,
+          mmode2)
     | Tmty_with (mtype, list) ->
         Tmty_with (
           sub.module_type sub mtype,

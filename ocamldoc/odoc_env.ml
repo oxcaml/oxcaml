@@ -216,9 +216,9 @@ let subst_module_type env t =
     | Mty_alias _
     | Mty_signature _ ->
         t
-    | Mty_functor (Unit, mt) -> Mty_functor (Unit, iter mt)
-    | Mty_functor (Named (name, mt1), mt2) ->
-      Mty_functor (Named (name, iter mt1), iter mt2)
+    | Mty_functor (Unit, mt, mm) -> Mty_functor (Unit, iter mt, mm)
+    | Mty_functor (Named (name, mt1, mm1), mt2, mm2) ->
+      Mty_functor (Named (name, iter mt1, mm1), iter mt2, mm2)
   in
   iter t
 

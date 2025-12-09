@@ -1007,13 +1007,16 @@ and module_type i ppf x =
   | Tmty_signature (s) ->
       line i ppf "Tmty_signature\n";
       signature i ppf s;
-  | Tmty_functor (Unit, mt2) ->
+  | Tmty_functor (Unit, mt2, mm2) ->
       line i ppf "Tmty_functor ()\n";
       module_type i ppf mt2;
-  | Tmty_functor (Named (s, _, mt1), mt2) ->
+      alloc_const_option_mode i ppf mm2
+  | Tmty_functor (Named (s, _, mt1, mm1), mt2, mm2) ->
       line i ppf "Tmty_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt1;
+      alloc_const_option_mode i ppf mm1;
       module_type i ppf mt2;
+      alloc_const_option_mode i ppf mm2
   | Tmty_with (mt, l) ->
       line i ppf "Tmty_with\n";
       module_type i ppf mt;
@@ -1127,9 +1130,10 @@ and module_expr i ppf x =
   | Tmod_functor (Unit, me) ->
       line i ppf "Tmod_functor ()\n";
       module_expr i ppf me;
-  | Tmod_functor (Named (s, _, mt), me) ->
+  | Tmod_functor (Named (s, _, mt, mm), me) ->
       line i ppf "Tmod_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt;
+      alloc_const_option_mode i ppf mm;
       module_expr i ppf me;
   | Tmod_apply (me1, me2, _) ->
       line i ppf "Tmod_apply\n";

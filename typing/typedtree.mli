@@ -830,7 +830,7 @@ and functor_parameter =
   | Unit
   (* CR sspies: We should add an additional [debug_uid] here to support functor
      arguments in the debugger. *)
-  | Named of Ident.t option * string option loc * module_type
+  | Named of Ident.t option * string option loc * module_type * modes
 
 and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
@@ -931,7 +931,7 @@ and module_type =
 and module_type_desc =
     Tmty_ident of Path.t * Longident.t loc
   | Tmty_signature of signature
-  | Tmty_functor of functor_parameter * module_type
+  | Tmty_functor of functor_parameter * module_type * modes
   | Tmty_with of module_type * (Path.t * Longident.t loc * with_constraint) list
   | Tmty_typeof of module_expr
   | Tmty_alias of Path.t * Longident.t loc

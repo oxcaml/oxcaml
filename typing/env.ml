@@ -770,7 +770,13 @@ let clda_mode = Mode.Value.(
   |> of_const ~hint_monadic:Class_legacy_monadic
       ~hint_comonadic:Class_legacy_comonadic)
 
-let fcomp_res_mode = Types.functor_res_mode |> Mode.Alloc.disallow_right
+(** In this file, a functor's return is only used to access the types inside
+(such as F(M).t). Therefore, the return having the weakest mode is sufficient.
+*)
+let fcomp_res_mode = Mode.Value.(max |> disallow_right)
+
+(** Accessing `F(M).t` is not closing over anything *)
+let fcomp_res_mode_with_locks = (fcomp_res_mode, locks_empty)
 
 let empty_structure =
   Structure_comps {
@@ -1293,8 +1299,9 @@ let modtype_of_functor_appl fcomp p1 p2 =
           let subst =
             match fcomp.fcomp_arg with
             | Unit
-            | Named (None, _) -> Subst.identity
-            | Named (Some param, _) -> Subst.add_module param p2 Subst.identity
+            | Named (None, _, _) -> Subst.identity
+            | Named (Some param, _, _) ->
+                Subst.add_module param p2 Subst.identity
           in
           Subst.modtype (Rescope scope) subst mty
         in
@@ -2374,7 +2381,7 @@ let rec components_of_module_maker
               NameMap.add (Ident.name id) cltda c.comp_cltypes)
         items_and_paths;
         Ok (Structure_comps c)
-  | Mty_functor(arg, ty_res) ->
+  | Mty_functor(arg, ty_res, _) ->
       let sub = cm_prefixing_subst in
       let scoping = Subst.Rescope (Path.scope cm_path) in
       let open Subst.Lazy in
@@ -2384,8 +2391,8 @@ let rec components_of_module_maker
           fcomp_arg =
             (match arg with
             | Unit -> Unit
-            | Named (param, ty_arg) ->
-              Named (param, force_modtype (modtype scoping sub ty_arg)));
+            | Named (param, ty_arg, m_arg) ->
+              Named (param, force_modtype (modtype scoping sub ty_arg), m_arg));
           fcomp_res = force_modtype (modtype scoping sub ty_res);
           fcomp_shape = cm_shape;
           fcomp_cache = Hashtbl.create 17;
@@ -2711,8 +2718,8 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
     let sub =
       match f_comp.fcomp_arg with
       | Unit
-      | Named (None, _) -> Subst.identity
-      | Named (Some param, _) -> Subst.add_module param arg Subst.identity
+      | Named (None, _, _) -> Subst.identity
+      | Named (Some param, _, _) -> Subst.add_module param arg Subst.identity
     in
     (* we have to apply eagerly instead of passing sub to [components_of_module]
        because of the call to [check_well_formed_module]. *)
@@ -2729,7 +2736,7 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
         ~uid:Uid.internal_not_actually_unique
         (*???*)
         env Subst.identity p addr (Subst.Lazy.of_modtype mty)
-        (Mode.alloc_as_value fcomp_res_mode) shape
+        fcomp_res_mode shape
     in
     Hashtbl.add f_comp.fcomp_cache arg comps;
     comps
@@ -3708,9 +3715,7 @@ let rec lookup_module_components ~errors ~use ~loc lid env =
       let f_path, f_comp, arg = lookup_apply ~errors ~use ~loc lid env in
       let comps =
         !components_of_functor_appl' ~loc ~f_path ~f_comp ~arg env in
-      (* [Lapply] is for [F(M).t] so nothing is closed over. *)
-      Papply (f_path, arg), (Mode.alloc_as_value fcomp_res_mode, locks_empty),
-        comps
+      Papply (f_path, arg), fcomp_res_mode_with_locks, comps
 
 and lookup_structure_components ~errors ~use ~loc ?(reason = Project) lid env =
   let path, mode_with_locks, comps =
@@ -3731,7 +3736,7 @@ and get_functor_components ~errors ~loc lid env comps =
       match fcomps.fcomp_arg with
       | Unit -> (* PR#7611 *)
           may_lookup_error errors loc env (Generative_used_as_applicative lid)
-      | Named (_, arg) -> fcomps, arg
+      | Named (_, arg, _) -> fcomps, arg
     end
   | Ok (Structure_comps _) ->
       may_lookup_error errors loc env (Structure_used_as_functor lid)
@@ -3809,9 +3814,7 @@ and lookup_module_lazy ~errors ~use ~loc lid env =
         md (modtype_of_functor_appl comp_f path_f path_arg)
         |> Subst.Lazy.of_module_decl
       in
-      (* [Lapply] is for [F(M).t] so nothing is closed over. *)
-      Papply(path_f, path_arg), md,
-      (Mode.alloc_as_value fcomp_res_mode, locks_empty)
+      Papply(path_f, path_arg), md, fcomp_res_mode_with_locks
 
 and lookup_module ~errors ~use ~loc lid env =
   let path, md, mode_with_locks =
@@ -4108,9 +4111,7 @@ let lookup_module_path ~errors ~use ~loc ~load lid env =
       path, (mode, locks)
   | Lapply _ as lid ->
       let path_f, _comp_f, path_arg = lookup_apply ~errors ~use ~loc lid env in
-      (* [Lapply] is for [F(M).t] so nothing is closed over. *)
-      Papply(path_f, path_arg),
-      (Mode.alloc_as_value fcomp_res_mode, locks_empty)
+      Papply(path_f, path_arg), fcomp_res_mode_with_locks
 
 let lookup_module_instance_path ~errors ~use ~loc ~load name env =
   (* The locks are whatever locks we would find if we went through
