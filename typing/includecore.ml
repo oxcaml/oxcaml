@@ -172,7 +172,9 @@ let value_descriptions ~loc env name
      match vd2.val_kind with
      | Val_prim p2 -> begin
          let locality = [ Mode.Locality.global; Mode.Locality.local ] in
-         let forkability = [ Mode.Forkability.spawnable; Mode.Forkability.forkable; Mode.Forkability.unforkable ] in
+         let forkability = [ Mode.Forkability.spawnable;
+                             Mode.Forkability.forkable;
+                             Mode.Forkability.unforkable ] in
          let yielding = [ Mode.Yielding.unyielding; Mode.Yielding.yielding ] in
          List.iter (fun loc ->
           List.iter (fun fork ->

@@ -1154,7 +1154,8 @@ module Layout_and_axes = struct
                     (value_for_axis ~axis:(Modal (Comonadic Linearity)))
                   ~portability:
                     (value_for_axis ~axis:(Modal (Comonadic Portability)))
-                  ~forkability:(value_for_axis ~axis:(Modal (Comonadic Forkability)))
+                  ~forkability:
+                    (value_for_axis ~axis:(Modal (Comonadic Forkability)))
                   ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
                   ~statefulness:
                     (value_for_axis ~axis:(Modal (Comonadic Statefulness)))

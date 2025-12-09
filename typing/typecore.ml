@@ -7946,7 +7946,8 @@ and type_ident env ?(recarg=Rejected) lid =
   - Portability: Closing over a nonportable module only to extract a portable
   value is fine.
   - Yielding: Modules are always unyielding (the strongest mode), so it's fine.
-  - Forkability: Modules are always spawnable (the strongest mode), so it's fine.
+  - Forkability: Modules are always spawnable (the strongest mode), so it's
+    fine.
   - All monadic axes: values are in a module via some join_with_m modality.
   Meanwhile, walking locks causes the mode to go through several join_with_m
   where [m] is the mode of a closure lock. Since join is commutative and

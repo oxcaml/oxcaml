@@ -816,8 +816,8 @@ module Lattices = struct
     let print ppf m =
       Format.fprintf ppf "%a,%a,%a,%a,%a,%a" Areality.print m.areality
         Linearity.print m.linearity Portability.print m.portability
-        Forkability.print m.forkability Yielding.print m.yielding Statefulness.print
-        m.statefulness
+        Forkability.print m.forkability Yielding.print m.yielding
+        Statefulness.print m.statefulness
   end
   [@@inline]
 
@@ -3363,7 +3363,13 @@ module Value_with (Areality : Areality) = struct
     { comonadic; monadic }
 
   let merge { comonadic; monadic } =
-    let ({ areality; linearity; portability; forkability; yielding; statefulness }
+    let ({ areality;
+           linearity;
+           portability;
+           forkability;
+           yielding;
+           statefulness
+         }
           : Comonadic.Const.t) =
       comonadic
     in
@@ -3513,7 +3519,9 @@ module Value_with (Areality : Areality) = struct
           Option.value opt.contention ~default:default.contention
         in
         let yielding = Option.value opt.yielding ~default:default.yielding in
-        let forkability = Option.value opt.forkability ~default:default.forkability in
+        let forkability =
+          Option.value opt.forkability ~default:default.forkability
+        in
         let statefulness =
           Option.value opt.statefulness ~default:default.statefulness
         in
@@ -3615,7 +3623,9 @@ module Value_with (Areality : Areality) = struct
         diff Portability.Const.le m0.portability m1.portability
       in
       let contention = diff Contention.Const.le m0.contention m1.contention in
-      let forkability = diff Forkability.Const.le m0.forkability m1.forkability in
+      let forkability =
+        diff Forkability.Const.le m0.forkability m1.forkability
+      in
       let yielding = diff Yielding.Const.le m0.yielding m1.yielding in
       let statefulness =
         diff Statefulness.Const.le m0.statefulness m1.statefulness
@@ -4913,8 +4923,8 @@ module Crossing = struct
       Monadic.create ~uniqueness ~contention ~visibility ~staticity
     in
     let comonadic =
-      Comonadic.create ~regionality ~linearity ~portability ~yielding ~forkability
-        ~statefulness
+      Comonadic.create ~regionality ~linearity ~portability ~yielding
+        ~forkability ~statefulness
     in
     { monadic; comonadic }
 

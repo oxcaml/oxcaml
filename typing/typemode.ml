@@ -133,7 +133,8 @@ module Transled_modifiers = struct
       portability :
         Mode.Portability.Const.t Comonadic.Atom.t Location.loc option;
       contention : Mode.Contention.Const.t Monadic.Atom.t Location.loc option;
-      forkability : Mode.Forkability.Const.t Comonadic.Atom.t Location.loc option;
+      forkability :
+        Mode.Forkability.Const.t Comonadic.Atom.t Location.loc option;
       yielding : Mode.Yielding.Const.t Comonadic.Atom.t Location.loc option;
       statefulness :
         Mode.Statefulness.Const.t Comonadic.Atom.t Location.loc option;
