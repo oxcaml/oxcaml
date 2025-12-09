@@ -68,7 +68,7 @@ components, and includes both modal and non-modal bounds. The type `int` has all
 the bounds:
 
 ```
-value mod global contended portable aliased many forkable unyielding immutable
+value mod global contended portable aliased many spawnable unyielding immutable
           stateless non_float external_
 ```
 
@@ -229,7 +229,7 @@ Here is the full kind of `'a list`:
 
 ```ocaml
 type 'a list
-  : value mod contended portable many immutable stateless forkable unyielding with 'a
+  : value mod contended portable many immutable stateless spawnable unyielding with 'a
 ```
 
 also written (see our [syntax page](../syntax) for details on `immutable_data`)

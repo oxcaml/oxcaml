@@ -414,9 +414,10 @@ module type S = sig
     include Common_axis_neg with module Const := Const
   end
 
-  module Forkable : sig
+  module Forkability : sig
     module Const : sig
       type t =
+        | Spawnable
         | Forkable
         | Unforkable
 
@@ -424,6 +425,8 @@ module type S = sig
     end
 
     include Common_axis_pos with module Const := Const
+
+    val spawnable : lr
 
     val unforkable : lr
 
@@ -497,7 +500,7 @@ module type S = sig
     { areality : 'a;
       linearity : Linearity.Const.t;
       portability : Portability.Const.t;
-      forkable : Forkable.Const.t;
+      forkability : Forkability.Const.t;
       yielding : Yielding.Const.t;
       statefulness : Statefulness.Const.t
     }
@@ -516,7 +519,7 @@ module type S = sig
     NB: must listed in the order of axis implication. See [typemode.ml]. *)
     type ('p, 'r) t =
       | Areality : ('a comonadic_with, 'a) t
-      | Forkable : ('areality comonadic_with, Forkable.Const.t) t
+      | Forkability : ('areality comonadic_with, Forkability.Const.t) t
       | Yielding : ('areality comonadic_with, Yielding.Const.t) t
       | Linearity : ('areality comonadic_with, Linearity.Const.t) t
       | Statefulness : ('areality comonadic_with, Statefulness.Const.t) t
@@ -588,7 +591,7 @@ module type S = sig
         uniqueness : 'c;
         portability : 'd;
         contention : 'e;
-        forkable : 'f;
+        forkability : 'f;
         yielding : 'g;
         statefulness : 'h;
         visibility : 'i;
@@ -604,7 +607,7 @@ module type S = sig
               Uniqueness.Const.t,
               Portability.Const.t,
               Contention.Const.t,
-              Forkable.Const.t,
+              Forkability.Const.t,
               Yielding.Const.t,
               Statefulness.Const.t,
               Visibility.Const.t,
@@ -620,7 +623,7 @@ module type S = sig
             Uniqueness.Const.t option,
             Portability.Const.t option,
             Contention.Const.t option,
-            Forkable.Const.t option,
+            Forkability.Const.t option,
             Yielding.Const.t option,
             Statefulness.Const.t option,
             Visibility.Const.t option,
@@ -1026,7 +1029,7 @@ module type S = sig
         regionality:Regionality.Const.t Atom.t ->
         linearity:Linearity.Const.t Atom.t ->
         portability:Portability.Const.t Atom.t ->
-        forkable:Forkable.Const.t Atom.t ->
+        forkability:Forkability.Const.t Atom.t ->
         yielding:Yielding.Const.t Atom.t ->
         statefulness:Statefulness.Const.t Atom.t ->
         t
@@ -1066,7 +1069,7 @@ module type S = sig
       uniqueness:bool ->
       portability:bool ->
       contention:bool ->
-      forkable:bool ->
+      forkability:bool ->
       yielding:bool ->
       statefulness:bool ->
       visibility:bool ->

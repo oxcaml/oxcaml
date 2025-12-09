@@ -482,7 +482,7 @@ module Mod_bounds = struct
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Linearity))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Contention))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Portability))
-    @@ Sub_result.combine (modal_less_or_equal (Comonadic Forkable))
+    @@ Sub_result.combine (modal_less_or_equal (Comonadic Forkability))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Yielding))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Statefulness))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Visibility))
@@ -530,7 +530,7 @@ module Mod_bounds = struct
     |> add_crossing_if (Monadic Uniqueness)
     |> add_crossing_if (Comonadic Portability)
     |> add_crossing_if (Monadic Contention)
-    |> add_crossing_if (Comonadic Forkable)
+    |> add_crossing_if (Comonadic Forkability)
     |> add_crossing_if (Comonadic Yielding)
     |> add_crossing_if (Comonadic Statefulness)
     |> add_crossing_if (Monadic Visibility)
@@ -548,7 +548,7 @@ module Mod_bounds = struct
   let for_arrow =
     let crossing =
       Crossing.create ~linearity:false ~regionality:false ~uniqueness:true
-        ~portability:false ~contention:true ~forkable:false ~yielding:false
+        ~portability:false ~contention:true ~forkability:false ~yielding:false
         ~statefulness:false ~visibility:true ~staticity:false
     in
     create crossing ~externality:Externality.max
@@ -1154,7 +1154,7 @@ module Layout_and_axes = struct
                     (value_for_axis ~axis:(Modal (Comonadic Linearity)))
                   ~portability:
                     (value_for_axis ~axis:(Modal (Comonadic Portability)))
-                  ~forkable:(value_for_axis ~axis:(Modal (Comonadic Forkable)))
+                  ~forkability:(value_for_axis ~axis:(Modal (Comonadic Forkability)))
                   ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
                   ~statefulness:
                     (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
@@ -1508,7 +1508,7 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
-                   ~portability:true ~forkable:true ~yielding:true
+                   ~portability:true ~forkability:true ~yielding:true
                    ~uniqueness:false ~contention:true ~statefulness:true
                    ~visibility:true ~staticity:false
                in
@@ -1526,7 +1526,7 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:false
-                   ~portability:true ~forkable:false ~yielding:false
+                   ~portability:true ~forkability:false ~yielding:false
                    ~uniqueness:false ~contention:true ~statefulness:true
                    ~visibility:true ~staticity:false
                in
@@ -1544,7 +1544,7 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
-                   ~portability:true ~forkable:true ~yielding:true
+                   ~portability:true ~forkability:true ~yielding:true
                    ~uniqueness:false ~contention:true ~statefulness:true
                    ~visibility:false ~staticity:false
                in
@@ -1562,7 +1562,7 @@ module Const = struct
             mod_bounds =
               (let crossing =
                  Crossing.create ~regionality:false ~linearity:true
-                   ~portability:true ~forkable:true ~yielding:true
+                   ~portability:true ~forkability:true ~yielding:true
                    ~contention:false ~uniqueness:false ~statefulness:true
                    ~visibility:false ~staticity:false
                in
@@ -3038,7 +3038,7 @@ let for_object =
 let for_float ident =
   let crossing =
     Crossing.create ~regionality:false ~linearity:true ~portability:true
-      ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
+      ~forkability:true ~yielding:true ~uniqueness:false ~contention:true
       ~statefulness:true ~visibility:true ~staticity:false
   in
   let mod_bounds =

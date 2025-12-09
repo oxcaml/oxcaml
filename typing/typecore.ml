@@ -623,7 +623,7 @@ let mode_lazy expected_mode =
     Value.{
       Const.max with
       areality = Regionality.Const.Global;
-      forkable = Forkable.Const.Forkable;
+      forkability = Forkability.Const.Spawnable;
       yielding = Yielding.Const.Unyielding }
   in
   let expected_mode =
@@ -633,7 +633,7 @@ let mode_lazy expected_mode =
   let mode_crossing =
     Crossing.create ~linearity:true ~portability:true
       ~regionality:false ~uniqueness:false ~contention:false ~statefulness:false
-      ~visibility:false ~forkable:false ~yielding:false ~staticity:false
+      ~visibility:false ~forkability:false ~yielding:false ~staticity:false
   in
   let closure_mode =
     expected_mode |> as_single_mode |> Crossing.apply_right mode_crossing
@@ -718,7 +718,7 @@ let global_pat_mode {mode; _}=
   let mode =
     mode
     |> Value.meet_with Areality Regionality.Const.Global
-    |> Value.meet_with Forkable Forkable.Const.Forkable
+    |> Value.meet_with Forkability Forkability.Const.Spawnable
     |> Value.meet_with Yielding Yielding.Const.Unyielding
   in
   simple_pat_mode mode
@@ -7565,7 +7565,7 @@ and type_expect_
         (* CR uniqueness: this shouldn't mention yielding *)
         { Value.Comonadic.Const.max with
           areality = Regionality.Const.Global
-        ; forkable = Forkable.Const.Forkable
+        ; forkability = Forkability.Const.Spawnable
         ; yielding = Yielding.Const.Unyielding }
       in
       let exp2 =
@@ -7946,7 +7946,7 @@ and type_ident env ?(recarg=Rejected) lid =
   - Portability: Closing over a nonportable module only to extract a portable
   value is fine.
   - Yielding: Modules are always unyielding (the strongest mode), so it's fine.
-  - Forkable: Modules are always forkable (the strongest mode), so it's fine.
+  - Forkability: Modules are always spawnable (the strongest mode), so it's fine.
   - All monadic axes: values are in a module via some join_with_m modality.
   Meanwhile, walking locks causes the mode to go through several join_with_m
   where [m] is the mode of a closure lock. Since join is commutative and

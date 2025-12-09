@@ -172,7 +172,7 @@ let value_descriptions ~loc env name
      match vd2.val_kind with
      | Val_prim p2 -> begin
          let locality = [ Mode.Locality.global; Mode.Locality.local ] in
-         let forkable = [ Mode.Forkable.forkable; Mode.Forkable.unforkable ] in
+         let forkability = [ Mode.Forkability.spawnable; Mode.Forkability.forkable; Mode.Forkability.unforkable ] in
          let yielding = [ Mode.Yielding.unyielding; Mode.Yielding.yielding ] in
          List.iter (fun loc ->
           List.iter (fun fork ->
@@ -184,14 +184,14 @@ let value_descriptions ~loc env name
              let mode_f2 = Option.map fst mode_fy2 in
              let mode_y2 = Option.map snd mode_fy2 in
              Option.iter (Mode.Locality.equate_exn loc) mode_l2;
-             Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
+             Option.iter (Mode.Forkability.equate_exn fork) mode_f2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
              try
                Ctype.moregeneral env true ty1 ty2
              with Ctype.Moregen err ->
                raise (Dont_match (Type err))
            ) yielding
-          ) forkable
+          ) forkability
          ) locality;
          match primitive_descriptions p1 p2 with
          | None -> Tcoerce_none
