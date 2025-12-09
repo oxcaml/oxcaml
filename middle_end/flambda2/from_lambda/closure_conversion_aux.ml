@@ -527,7 +527,7 @@ module Acc = struct
       | Immutable_nativeint_array _ | Immutable_vec128_array _
       | Immutable_vec256_array _ | Immutable_vec512_array _ | Mutable_string _
       | Immutable_string _ ->
-        Value_unknown
+        Unknown Flambda_kind.value
     in
     let symbol_approximations =
       Symbol.Map.add symbol approx t.symbol_approximations

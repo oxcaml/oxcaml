@@ -184,6 +184,9 @@ module Array_kind = struct
     | Values -> true, true
     | Naked_floats -> false, false
     | Naked_float32s -> false, false
+    | Naked_ints -> false, false
+    | Naked_int8s -> false, false
+    | Naked_int16s -> false, false
     | Naked_int32s -> false, false
     | Naked_int64s -> false, false
     | Naked_nativeints -> false, false

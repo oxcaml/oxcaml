@@ -1070,7 +1070,7 @@ let array_vector_access_validity_condition array ~machine_width
     | Naked_int32s | Naked_float32s -> 4
     | Naked_int16s -> 2
     | Naked_int8s -> 1
-    | Values ->
+    | Gc_ignorable_values | Values ->
       Misc.fatal_error
         "Attempted to load/store a SIMD vector from/to a value array."
     | Unboxed_product _ ->
@@ -1996,19 +1996,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     | Array_kind array_kind ->
       let args =
         match lambda_array_kind with
-<<<<<<< HEAD
-        | Punboxedoruntaggedintarray
-            (Untagged_int8 | Untagged_int16 | Untagged_int) ->
-          Misc.unboxed_small_int_arrays_are_not_implemented ()
         | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray
-||||||| parent of 91ed94d7 (Revert "Revert small int arrays")
-        | Punboxedoruntaggedintarray
-            (Untagged_int8 | Untagged_int16 | Untagged_int) ->
-          Misc.unboxed_small_int_arrays_are_not_implemented ()
-        | Pgenarray | Paddrarray | Pintarray
-=======
-        | Pgenarray | Paddrarray | Pintarray
->>>>>>> 91ed94d7 (Revert "Revert small int arrays")
         | Punboxedfloatarray (Unboxed_float64 | Unboxed_float32)
         | Punboxedoruntaggedintarray
             ( Untagged_int | Untagged_int8 | Untagged_int16 | Unboxed_int32
@@ -2320,19 +2308,10 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let prim : H.expr_primitive = Unary (Array_length array_kind, arg) in
     match array_kind with
     | Array_kind
-<<<<<<< HEAD
         ( Immediates | Gc_ignorable_values | Values | Naked_floats
-        | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-        | Naked_vec128s | Naked_vec256s | Naked_vec512s )
-||||||| parent of 91ed94d7 (Revert "Revert small int arrays")
-        ( Immediates | Values | Naked_floats | Naked_float32s | Naked_int32s
+        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
         | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
         | Naked_vec512s )
-=======
-        ( Immediates | Values | Naked_floats | Naked_float32s | Naked_ints
-        | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
-        | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s )
->>>>>>> 91ed94d7 (Revert "Revert small int arrays")
     | Float_array_opt_dynamic ->
       [prim]
     | Array_kind (Unboxed_product _ as array_kind) ->
