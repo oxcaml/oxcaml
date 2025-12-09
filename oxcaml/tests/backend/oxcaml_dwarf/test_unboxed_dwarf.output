@@ -66,5 +66,5 @@
     frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_mixed_small_record(r_XXX_unboxed0=#42 : mixed_small_record_unboxed0 @ bits8, r_XXX_unboxed1=true : mixed_small_record_unboxed1 @ value, r_XXX_unboxed2=#1000 : mixed_small_record_unboxed2 @ bits16)
     frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_mixed_small_record(r_XXX_unboxed0=#0 : mixed_small_record_unboxed0 @ bits8, r_XXX_unboxed1=false : mixed_small_record_unboxed1 @ value, r_XXX_unboxed2=#0 : mixed_small_record_unboxed2 @ bits16)
     frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_mixed_small_record(r_XXX_unboxed0=-#25 : mixed_small_record_unboxed0 @ bits8, r_XXX_unboxed1=true : mixed_small_record_unboxed1 @ value, r_XXX_unboxed2=-#2000 : mixed_small_record_unboxed2 @ bits16)
-    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_product(x_XXX_unboxed0=#4L : unknown @ bits64, x_XXX_unboxed1=4L : unknown @ value)
-    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_product(x_XXX_unboxed0=#100L : unknown @ bits64, x_XXX_unboxed1=1 : unknown @ value)
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_product(x_XXX_unboxed0=#4L : a/8_unboxed0 @ bits64, x_XXX_unboxed1=4L : a/8_unboxed1 @ value)
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_poly_product(x_XXX_unboxed0=#100L : a/8_unboxed0 @ bits64, x_XXX_unboxed1=1 : a/8_unboxed1 @ value)
