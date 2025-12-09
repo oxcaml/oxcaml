@@ -1444,12 +1444,12 @@ val unboxed_mutable_int32_unboxed_product_array_set :
   Debuginfo.t ->
   expression
 
-(** Read from an unboxed int64 or unboxed nativeint array (without bounds
-    check).
+(** Read from an untagged int, unboxed int64, or unboxed nativeint array
+    (without bounds check).
 
     The zero-indexed element number is specified as a tagged immediate.
 *)
-val unboxed_int64_or_nativeint_array_ref :
+val naked_int_or_int64_or_nativeint_array_ref :
   expression -> array_index:expression -> Debuginfo.t -> expression
 
 (** Update an unboxed float32 array (without bounds check). *)

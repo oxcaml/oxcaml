@@ -197,11 +197,11 @@ let () =
       assert (b = #2L)
     | _ -> assert false);
 
-  let d = [: #1l; #2l :] in
+  let d = [: #1L; #2L :] in
   (match d with
     | [: a; b :] ->
-      assert (a = #1l);
-      assert (b = #2l)
+      assert (a = #1L);
+      assert (b = #2L)
     | _ -> assert false);
 
   (* let statement pattern *)

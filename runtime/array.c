@@ -589,39 +589,38 @@ CAMLprim value caml_make_float_vect(value len)
 #endif
 }
 
-static value caml_make_untagged_int8_vect0(value len, int local)
-{
-  mlsize_t num_elements = Long_val(len);
-  if (num_elements > Max_untagged_int8_array_wosize)
-    caml_invalid_argument("Array.make");
-
-  /* Empty arrays have tag 0 */
-  if (num_elements == 0) {
-    return Atom(0);
-  }
-
-  mlsize_t num_fields = (num_elements + 7) / 8;
-
-  /* Use appropriate array tag based on length mod 8 */
-  mlsize_t rem = num_elements % 8;
-  tag_t tag =
-    rem == 0 ? Untagged_int8_array_zero_tag :
-    rem == 1 ? Untagged_int8_array_one_tag :
-    rem == 2 ? Untagged_int8_array_two_tag :
-    rem == 3 ? Untagged_int8_array_three_tag :
-    rem == 4 ? Untagged_int8_array_four_tag :
-    rem == 5 ? Untagged_int8_array_five_tag :
-    rem == 6 ? Untagged_int8_array_six_tag :
-               Untagged_int8_array_seven_tag;
-
-  /* Mixed block with no scannable fields */
-  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
-
-  if (local)
-    return caml_alloc_local_reserved(num_fields, tag, reserved);
-  else
-    return caml_alloc_with_reserved(num_fields, tag, reserved);
+#define DEFINE_caml_make_vect0(TYPE, TYPE_UPPERCASE, ELTS_PER_WORD)            \
+static value caml_make_##TYPE##_vect0(value len, int local)                    \
+{                                                                              \
+  mlsize_t num_elements = Long_val(len);                                       \
+  if (num_elements > Max_##TYPE##_array_wosize)                                \
+    caml_invalid_argument("Array.make");                                       \
+                                                                               \
+  /* Empty arrays have tag 0 */                                                \
+  if (num_elements == 0) {                                                     \
+    return Atom(0);                                                            \
+  }                                                                            \
+                                                                               \
+  mlsize_t num_fields = (num_elements - 1) / (ELTS_PER_WORD) + 1;              \
+                                                                               \
+  /* Use appropriate array tag based on length mod (ELTS_PER_WORD) */          \
+  mlsize_t rem = num_elements % (ELTS_PER_WORD);                               \
+  tag_t tag =                                                                  \
+    rem == 0 ? TYPE_UPPERCASE##_array_zero_tag :                               \
+               TYPE_UPPERCASE##_array_one_tag - (rem - 1);                     \
+                                                                               \
+  /* Mixed block with no scannable fields */                                   \
+  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);       \
+                                                                               \
+  if (local)                                                                   \
+    return caml_alloc_local_reserved(num_fields, tag, reserved);               \
+  else                                                                         \
+    return caml_alloc_with_reserved(num_fields, tag, reserved);                \
 }
+
+DEFINE_caml_make_vect0(untagged_int8, Untagged_int8, 8)
+DEFINE_caml_make_vect0(untagged_int16, Untagged_int16, 4)
+DEFINE_caml_make_vect0(unboxed_int32, Unboxed_int32, 2)
 
 CAMLprim value caml_make_untagged_int8_vect(value len)
 {
@@ -638,36 +637,6 @@ CAMLprim value caml_make_untagged_int8_vect_bytecode(value len)
   return caml_make_vect(len, 1);
 }
 
-static value caml_make_untagged_int16_vect0(value len, int local)
-{
-  mlsize_t num_elements = Long_val(len);
-  if (num_elements > Max_untagged_int16_array_wosize)
-    caml_invalid_argument("Array.make");
-
-  /* Empty arrays have tag 0 */
-  if (num_elements == 0) {
-    return Atom(0);
-  }
-
-  mlsize_t num_fields = (num_elements + 3) / 4;
-
-  /* Use appropriate array tag based on length mod 4 */
-  mlsize_t rem = num_elements % 4;
-  tag_t tag =
-    rem == 0 ? Untagged_int16_array_zero_tag :
-    rem == 1 ? Untagged_int16_array_one_tag :
-    rem == 2 ? Untagged_int16_array_two_tag :
-               Untagged_int16_array_three_tag;
-
-  /* Mixed block with no scannable fields */
-  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
-
-  if (local)
-    return caml_alloc_local_reserved(num_fields, tag, reserved);
-  else
-    return caml_alloc_with_reserved(num_fields, tag, reserved);
-}
-
 CAMLprim value caml_make_untagged_int16_vect(value len)
 {
   return caml_make_untagged_int16_vect0(len, 0);
@@ -681,34 +650,6 @@ CAMLprim value caml_make_local_untagged_int16_vect(value len)
 CAMLprim value caml_make_untagged_int16_vect_bytecode(value len)
 {
   return caml_make_vect(len, 1);
-}
-
-static value caml_make_unboxed_int32_vect0(value len, int local)
-{
-  /* This is only used on 64-bit targets. */
-
-  mlsize_t num_elements = Long_val(len);
-  if (num_elements > Max_unboxed_int32_array_wosize)
-    caml_invalid_argument("Array.make");
-
-  /* Empty arrays have tag 0 */
-  if (num_elements == 0) {
-    return Atom(0);
-  }
-
-  mlsize_t num_fields = num_elements / 2 + num_elements % 2;
-  
-  /* Use appropriate unboxed array tag based on even/odd length */
-  tag_t tag = (num_elements % 2 == 0) 
-    ? Unboxed_int32_array_zero_tag : Unboxed_int32_array_one_tag;
-  
-  /* Mixed block with no scannable fields */
-  reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
-
-  if (local)
-    return caml_alloc_local_reserved(num_fields, tag, reserved);
-  else
-    return caml_alloc_with_reserved(num_fields, tag, reserved);
 }
 
 CAMLprim value caml_make_unboxed_int32_vect(value len)

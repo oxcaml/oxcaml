@@ -1884,6 +1884,8 @@ let rec sign_extend ~bits ~dbg e =
 
 let unboxed_or_untagged_packed_array_ref arr index dbg ~log2_size_addr
     ~memory_chunk =
+  (* N.B. The resulting value will be sign extended by the code generated for a
+     [memory_chunk] load if it is an integer. *)
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
           Cop
@@ -1892,85 +1894,69 @@ let unboxed_or_untagged_packed_array_ref arr index dbg ~log2_size_addr
               dbg )))
 
 let untagged_int8_array_ref =
-  (* N.B. The resulting value will be sign extended by the code generated for a
-     [Eight_signed] load. *)
   unboxed_or_untagged_packed_array_ref ~log2_size_addr:0
     ~memory_chunk:Byte_signed
 
 let untagged_int16_array_ref =
-  (* N.B. The resulting value will be sign extended by the code generated for a
-     [Sixteen_signed] load. *)
   unboxed_or_untagged_packed_array_ref ~log2_size_addr:1
     ~memory_chunk:Sixteen_signed
 
 let unboxed_int32_array_ref =
-  (* N.B. The resulting value will be sign extended by the code generated for a
-     [Thirtytwo_signed] load. *)
   unboxed_or_untagged_packed_array_ref ~log2_size_addr:2
     ~memory_chunk:Thirtytwo_signed
 
-let untagged_mutable_int8_unboxed_product_array_ref arr ~array_index dbg =
+let unboxed_or_untagged_unboxed_product_array_ref ~memory_chunk arr ~array_index
+    dbg =
   bind "arr" arr (fun arr ->
       bind "index" array_index (fun index ->
           Cop
-            ( mk_load_mut Byte_signed,
+            ( mk_load_mut memory_chunk,
               [array_indexing log2_size_addr arr index dbg],
               dbg )))
+
+let untagged_mutable_int8_unboxed_product_array_ref arr ~array_index dbg =
+  unboxed_or_untagged_unboxed_product_array_ref ~memory_chunk:Byte_signed arr
+    ~array_index dbg
 
 let untagged_mutable_int16_unboxed_product_array_ref arr ~array_index dbg =
-  bind "arr" arr (fun arr ->
-      bind "index" array_index (fun index ->
-          Cop
-            ( mk_load_mut Sixteen_signed,
-              [array_indexing log2_size_addr arr index dbg],
-              dbg )))
+  unboxed_or_untagged_unboxed_product_array_ref ~memory_chunk:Sixteen_signed arr
+    ~array_index dbg
 
 let unboxed_mutable_int32_unboxed_product_array_ref arr ~array_index dbg =
+  unboxed_or_untagged_unboxed_product_array_ref ~memory_chunk:Thirtytwo_signed
+    arr ~array_index dbg
+
+let unboxed_or_untagged_mutable_unboxed_product_array_set ~bits arr ~array_index
+    ~new_value dbg =
   bind "arr" arr (fun arr ->
       bind "index" array_index (fun index ->
-          Cop
-            ( mk_load_mut Thirtytwo_signed,
-              [array_indexing log2_size_addr arr index dbg],
-              dbg )))
+          bind "new_value" new_value (fun new_value ->
+              let new_value = sign_extend ~bits new_value ~dbg in
+              Cop
+                ( Cstore (Word_int, Assignment),
+                  [array_indexing log2_size_addr arr index dbg; new_value],
+                  dbg ))))
 
 let untagged_mutable_int8_unboxed_product_array_set arr ~array_index ~new_value
     dbg =
-  bind "arr" arr (fun arr ->
-      bind "index" array_index (fun index ->
-          bind "new_value" new_value (fun new_value ->
-              let new_value = sign_extend ~bits:8 new_value ~dbg in
-              Cop
-                ( Cstore (Word_int, Assignment),
-                  [array_indexing log2_size_addr arr index dbg; new_value],
-                  dbg ))))
+  unboxed_or_untagged_mutable_unboxed_product_array_set ~bits:8 arr ~array_index
+    ~new_value dbg
 
 let untagged_mutable_int16_unboxed_product_array_set arr ~array_index ~new_value
     dbg =
-  bind "arr" arr (fun arr ->
-      bind "index" array_index (fun index ->
-          bind "new_value" new_value (fun new_value ->
-              let new_value = sign_extend ~bits:16 new_value ~dbg in
-              Cop
-                ( Cstore (Word_int, Assignment),
-                  [array_indexing log2_size_addr arr index dbg; new_value],
-                  dbg ))))
+  unboxed_or_untagged_mutable_unboxed_product_array_set ~bits:16 arr
+    ~array_index ~new_value dbg
 
 let unboxed_mutable_int32_unboxed_product_array_set arr ~array_index ~new_value
     dbg =
-  bind "arr" arr (fun arr ->
-      bind "index" array_index (fun index ->
-          bind "new_value" new_value (fun new_value ->
-              let new_value = sign_extend ~bits:32 new_value ~dbg in
-              Cop
-                ( Cstore (Word_int, Assignment),
-                  [array_indexing log2_size_addr arr index dbg; new_value],
-                  dbg ))))
+  unboxed_or_untagged_mutable_unboxed_product_array_set ~bits:32 arr
+    ~array_index ~new_value dbg
 
 let unboxed_float32_array_ref =
   unboxed_or_untagged_packed_array_ref ~log2_size_addr:2
     ~memory_chunk:(Single { reg = Float32 })
 
-let unboxed_int64_or_nativeint_array_ref arr ~array_index dbg =
+let naked_int_or_int64_or_nativeint_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
       bind "index" array_index (fun index -> int_array_ref arr index dbg))
 
@@ -5014,12 +5000,9 @@ let make_untagged_int8_array_payload dbg untagged_int8_list =
   in
   aux [] untagged_int8_list
 
-let allocate_untagged_int8_array ~elements mode dbg =
-  let payload = make_untagged_int8_array_payload dbg elements in
-  let tag =
-    Unboxed_or_untagged_array_tags.untagged_int8_array_tag
-      (List.length elements)
-  in
+let allocate_array ~make_payload ~tag_of_length ~alloc_kind ~elements mode dbg =
+  let payload = make_payload dbg elements in
+  let tag = tag_of_length (List.length elements) in
   let header =
     let size = List.length payload in
     match mode with
@@ -5029,10 +5012,12 @@ let allocate_untagged_int8_array ~elements mode dbg =
       local_block_header tag size
         ~block_kind:(Mixed_block { scannable_prefix = 0 })
   in
-  Cop
-    ( Calloc (mode, Alloc_block_kind_int8_u_array),
-      Cconst_natint (header, dbg) :: payload,
-      dbg )
+  Cop (Calloc (mode, alloc_kind), Cconst_natint (header, dbg) :: payload, dbg)
+
+let allocate_untagged_int8_array ~elements mode dbg =
+  allocate_array ~make_payload:make_untagged_int8_array_payload
+    ~tag_of_length:Unboxed_or_untagged_array_tags.untagged_int8_array_tag
+    ~alloc_kind:Alloc_block_kind_int8_u_array ~elements mode dbg
 
 let make_untagged_int16_array_payload dbg untagged_int16_list =
   let rec aux acc = function
@@ -5047,28 +5032,9 @@ let make_untagged_int16_array_payload dbg untagged_int16_list =
   aux [] untagged_int16_list
 
 let allocate_untagged_int16_array ~elements mode dbg =
-  let payload = make_untagged_int16_array_payload dbg elements in
-  let tag =
-    Unboxed_or_untagged_array_tags.untagged_int16_array_tag
-      (List.length elements)
-  in
-  let header =
-    let size = List.length payload in
-    match mode with
-    | Cmm.Alloc_mode.Heap ->
-      white_mixed_block_header tag size ~scannable_prefix_len:0
-    | Cmm.Alloc_mode.Local ->
-      local_block_header tag size
-        ~block_kind:(Mixed_block { scannable_prefix = 0 })
-  in
-  Cop
-    ( Calloc (mode, Alloc_block_kind_int16_u_array),
-      Cconst_natint (header, dbg) :: payload,
-      dbg )
-
-type mod2 =
-  | Zero
-  | One
+  allocate_array ~make_payload:make_untagged_int16_array_payload
+    ~tag_of_length:Unboxed_or_untagged_array_tags.untagged_int16_array_tag
+    ~alloc_kind:Alloc_block_kind_int16_u_array ~elements mode dbg
 
 let make_unboxed_int32_array_payload dbg unboxed_int32_list =
   (* CR mshinwell/gbury: potential big-endian implementations:
@@ -5089,8 +5055,8 @@ let make_unboxed_int32_array_payload dbg unboxed_int32_list =
   then
     Misc.fatal_error "Big-endian platforms not yet supported for unboxed arrays";
   let rec aux acc = function
-    | [] -> Zero, List.rev acc
-    | a :: [] -> One, List.rev (a :: acc)
+    | [] -> List.rev acc
+    | a :: [] -> List.rev (a :: acc)
     | a :: b :: r ->
       let i =
         Cop
@@ -5105,36 +5071,18 @@ let make_unboxed_int32_array_payload dbg unboxed_int32_list =
   in
   aux [] unboxed_int32_list
 
-let allocate_unboxed_packed_mod2_array ~make_payload ~alloc_kind ~zero_tag
-    ~one_tag ~elements mode dbg =
-  let num_elts, payload = make_payload dbg elements in
-  let tag = match num_elts with Zero -> zero_tag | One -> one_tag in
-  let header =
-    let size = List.length payload in
-    match mode with
-    | Cmm.Alloc_mode.Heap ->
-      white_mixed_block_header tag size ~scannable_prefix_len:0
-    | Cmm.Alloc_mode.Local ->
-      local_block_header tag size
-        ~block_kind:(Mixed_block { scannable_prefix = 0 })
-  in
-  Cop (Calloc (mode, alloc_kind), Cconst_natint (header, dbg) :: payload, dbg)
-
 let allocate_unboxed_int32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  allocate_unboxed_packed_mod2_array
-    ~make_payload:make_unboxed_int32_array_payload
-    ~alloc_kind:Alloc_block_kind_int32_u_array
-    ~zero_tag:Unboxed_or_untagged_array_tags.unboxed_int32_array_zero_tag
-    ~one_tag:Unboxed_or_untagged_array_tags.unboxed_int32_array_one_tag
-    ~elements mode dbg
+  allocate_array ~make_payload:make_unboxed_int32_array_payload
+    ~tag_of_length:Unboxed_or_untagged_array_tags.unboxed_int32_array_tag
+    ~alloc_kind:Alloc_block_kind_int32_u_array ~elements mode dbg
 
 let make_unboxed_float32_array_payload dbg unboxed_float32_list =
   if Sys.big_endian
   then
     Misc.fatal_error "Big-endian platforms not yet supported for unboxed arrays";
   let rec aux acc = function
-    | [] -> Zero, List.rev acc
-    | a :: [] -> One, List.rev (a :: acc)
+    | [] -> List.rev acc
+    | a :: [] -> List.rev (a :: acc)
     | a :: b :: r ->
       let i =
         Cop
@@ -5148,66 +5096,34 @@ let make_unboxed_float32_array_payload dbg unboxed_float32_list =
   aux [] unboxed_float32_list
 
 let allocate_unboxed_float32_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  allocate_unboxed_packed_mod2_array
-    ~make_payload:make_unboxed_float32_array_payload
+  allocate_array ~make_payload:make_unboxed_float32_array_payload
     ~alloc_kind:Alloc_block_kind_float32_u_array
-    ~zero_tag:Unboxed_or_untagged_array_tags.unboxed_float32_array_zero_tag
-    ~one_tag:Unboxed_or_untagged_array_tags.unboxed_float32_array_one_tag
+    ~tag_of_length:Unboxed_or_untagged_array_tags.unboxed_float32_array_tag
     ~elements mode dbg
 
 let allocate_untagged_int_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  let header =
-    let size = List.length elements in
-    match mode with
-    | Heap ->
-      white_mixed_block_header
-        Unboxed_or_untagged_array_tags.untagged_int_array_tag size
-        ~scannable_prefix_len:0
-    | Local ->
-      local_block_header Unboxed_or_untagged_array_tags.untagged_int_array_tag
-        size
-        ~block_kind:(Mixed_block { scannable_prefix = 0 })
-  in
-  Cop
-    ( Calloc (mode, Alloc_block_kind_int_u_array),
-      Cconst_natint (header, dbg) :: elements,
-      dbg )
+  allocate_array
+    ~make_payload:(fun _ l -> l)
+    ~alloc_kind:Alloc_block_kind_int_u_array
+    ~tag_of_length:(fun _ ->
+      Unboxed_or_untagged_array_tags.untagged_int_array_tag)
+    ~elements mode dbg
 
 let allocate_unboxed_int64_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  let header =
-    let size = List.length elements in
-    match mode with
-    | Heap ->
-      white_mixed_block_header
-        Unboxed_or_untagged_array_tags.unboxed_int64_array_tag size
-        ~scannable_prefix_len:0
-    | Local ->
-      local_block_header Unboxed_or_untagged_array_tags.unboxed_int64_array_tag
-        size
-        ~block_kind:(Mixed_block { scannable_prefix = 0 })
-  in
-  Cop
-    ( Calloc (mode, Alloc_block_kind_int64_u_array),
-      Cconst_natint (header, dbg) :: elements,
-      dbg )
+  allocate_array
+    ~make_payload:(fun _ l -> l)
+    ~alloc_kind:Alloc_block_kind_int64_u_array
+    ~tag_of_length:(fun _ ->
+      Unboxed_or_untagged_array_tags.unboxed_int64_array_tag)
+    ~elements mode dbg
 
 let allocate_unboxed_nativeint_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
-  let header =
-    let size = List.length elements in
-    match mode with
-    | Heap ->
-      white_mixed_block_header
-        Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag size
-        ~scannable_prefix_len:0
-    | Local ->
-      local_block_header
-        Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag size
-        ~block_kind:(Mixed_block { scannable_prefix = 0 })
-  in
-  Cop
-    ( Calloc (mode, Alloc_block_kind_int64_u_array),
-      Cconst_natint (header, dbg) :: elements,
-      dbg )
+  allocate_array
+    ~make_payload:(fun _ l -> l)
+    ~alloc_kind:Alloc_block_kind_int64_u_array
+    ~tag_of_length:(fun _ ->
+      Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag)
+    ~elements mode dbg
 
 let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~tag ~elements
     (mode : Cmm.Alloc_mode.t) dbg =
