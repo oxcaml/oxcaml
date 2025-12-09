@@ -239,36 +239,25 @@ Error: The module "M" is "nonportable" but is expected to be "portable"
 module F (X : S @ portable) = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
-1 | module F (X : S @ portable) = struct
-                      ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module F : functor (X : S @ portable) -> sig end @@ stateless
 |}]
 
 module type S = functor () (M : S @ portable) (_ : S @ portable) -> S
 [%%expect{|
-Line 1, characters 36-44:
-1 | module type S = functor () (M : S @ portable) (_ : S @ portable) -> S
-                                        ^^^^^^^^
-Error: Mode annotations on functor parameters are not supported yet.
+module type S = functor () (M : S @ portable) -> S @ portable -> S
 |}]
 
 module type S = functor () (M : S) (_ : S) -> S @ portable
 [%%expect{|
-Line 1, characters 50-58:
-1 | module type S = functor () (M : S) (_ : S) -> S @ portable
-                                                      ^^^^^^^^
-Error: Mode annotations on functor return are not supported yet.
+module type S = functor () (M : S) -> S -> S @ portable
 |}]
 
 module F () = struct
     let (foo @ once) () = ()
 end
 [%%expect{|
-Line 2, characters 9-12:
-2 |     let (foo @ once) () = ()
-             ^^^
-Error: This is "once", but expected to be "many" because it is inside a "many" structure.
+module F : functor () -> sig val foo : unit -> unit @@ stateless end @ once
+  @@ stateless
 |}]
 
 module type Empty = sig end

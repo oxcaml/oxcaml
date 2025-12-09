@@ -58,8 +58,8 @@ module Context = struct
         Format.fprintf ppf " :@ %a" context_mty cxt
   and argname = function
     | Types.Unit -> ""
-    | Types.Named (None, _) -> "_"
-    | Types.Named (Some id, _) -> Ident.name id
+    | Types.Named (None, _, _) -> "_"
+    | Types.Named (Some id, _, _) -> Ident.name id
 
   let alt_pp ppf cxt =
     if cxt = [] then () else
@@ -154,9 +154,9 @@ module Illegal_permutation = struct
             find env (Context.Module id :: ctx) q md.md_type
         | _ -> raise Not_found
         end
-    | Mty_functor(Named (_,mt) as arg,_), InArg :: q ->
+    | Mty_functor(Named (_,mt,_) as arg,_,_), InArg :: q ->
         find env (Context.Arg arg :: ctx) q mt
-    | Mty_functor(arg, mt), InBody :: q ->
+    | Mty_functor(arg, mt,_), InBody :: q ->
         find env (Context.Body arg :: ctx) q mt
     | _ -> raise Not_found
 
@@ -246,6 +246,14 @@ module Is_modal = struct
         let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
         Some (Mode.Value.Axis.P ax)
     | _ -> None
+
+  and functor_param_symptom = function
+    | Incompatible_params _ -> None
+    | Mismatch d -> module_type_symptom d.symptom
+
+  and functor_params_symptom = function
+    | Incompatible -> None
+    | Param d -> functor_param_symptom d
 end
 
 let zap_axis_to_floor
@@ -279,7 +287,8 @@ let print_out_mode
   else
     Format.dprintf " @@ %a" print mode
 
-let maybe_print_mode_l ~is_modal (mode : Mode.Value.l) =
+let maybe_print_mode_l ~is_modal mode =
+  let mode = Mode.Value.disallow_right mode in
   match is_modal with
   | None -> fun _ppf -> ()
   | Some ax ->
@@ -289,6 +298,15 @@ let maybe_print_mode_l ~is_modal (mode : Mode.Value.l) =
         (* error printing, so mutation doesn't need to be backtracked *)
         |> zap_axis_to_floor ax
       in
+      print_out_mode ax mode
+
+let maybe_print_mode_r ~is_modal mode =
+  let mode = Mode.Value.disallow_left mode in
+  match is_modal with
+  | None -> fun _ppf -> ()
+  | Some ax ->
+      let (P ax) : Mode.Value.Axis.packed = ax in
+      let mode = mode |> zap_axis_to_ceil ax in
       print_out_mode ax mode
 
 let print_modes ?in_structure ax (modes : Includemod.modes) =
@@ -314,6 +332,16 @@ let maybe_print_modes ?in_structure ~is_modal (modes : Includemod.modes) =
   match is_modal with
   | None -> (fun _ppf -> ()), (fun _ppf -> ())
   | Some ax -> print_modes ?in_structure ax modes
+
+let dthen_mode_l ~is_modal mm t =
+  Format.dprintf "%t%t" t (maybe_print_mode_l ~is_modal mm)
+
+let maybe_print_alloc_mode_r ~is_modal mm =
+  let mm = Mode.alloc_as_value mm in
+  maybe_print_mode_r ~is_modal mm
+
+let dthen_alloc_mode_r ~is_modal mm t =
+  Format.dprintf "%t%t" t (maybe_print_alloc_mode_r ~is_modal mm)
 
 (**
    In order to display a list of functor arguments in a compact format,
@@ -344,7 +372,7 @@ module With_shorthand = struct
 
   type functor_param =
     | Unit
-    | Named of (Ident.t option * Types.module_type t)
+    | Named of (Ident.t option * Types.module_type t * Mode.Alloc.lr)
 
   (** Shorthand generation *)
   type kind =
@@ -403,8 +431,8 @@ module With_shorthand = struct
 
   let functor_param (ua : _ named) = match ua.item with
     | Types.Unit -> Unit
-    | Types.Named (from, mty) ->
-        Named (from, modtype { ua with item = mty })
+    | Types.Named (from, mty, mm) ->
+        Named (from, modtype { ua with item = mty }, mm)
 
   (** Printing of arguments with shorthands *)
   let pp ppx = function
@@ -414,44 +442,41 @@ module With_shorthand = struct
   let pp_orig ppx = function
     | Original x | Synthetic { item=x; _ } -> ppx x
 
-  let definition_aux x = match functor_param x with
+  let definition ~is_modal x = match functor_param x with
     | Unit -> Format.dprintf "()"
-    | Named(_,short_mty) ->
+    | Named(_,short_mty, mm) ->
         match short_mty with
-        | Original mty -> dmodtype mty
+        | Original mty -> dmodtype mty |> dthen_alloc_mode_r ~is_modal mm
         | Synthetic {name; item = mty} ->
             Format.dprintf
               "%s@ =@ %t" name (dmodtype mty)
+            |> dthen_alloc_mode_r ~is_modal mm
 
-  let definition ~is_modal x =
-    let mode =
-      Types.functor_param_mode
-      |> Mode.alloc_as_value
-      |> Mode.Value.disallow_right
-    in
-    let mode = maybe_print_mode_l ~is_modal mode in
-    Format.dprintf "%t%t" (definition_aux x) mode
-
-  let param x = match functor_param x with
+  let param ~is_modal x = match functor_param x with
     | Unit -> Format.dprintf "()"
-    | Named (_, short_mty) ->
+    | Named (_, short_mty, mm) ->
         pp dmodtype short_mty
+        |> dthen_alloc_mode_r ~is_modal mm
 
-  let qualified_param x = match functor_param x with
+  let qualified_param ~is_modal x = match functor_param x with
     | Unit -> Format.dprintf "()"
-    | Named (None, Original (Mty_signature []) ) ->
-        Format.dprintf "(sig end)"
-    | Named (None, short_mty) ->
+    | Named (None, Original (Mty_signature []), mm) ->
+        Format.dprintf "(sig end%t)"
+          (maybe_print_alloc_mode_r ~is_modal mm)
+    | Named (None, short_mty, mm) ->
         pp dmodtype short_mty
-    | Named (Some p, short_mty) ->
+        |> dthen_alloc_mode_r ~is_modal mm
+    | Named (Some p, short_mty, mm) ->
         Format.dprintf "(%s : %t)"
-          (Ident.name p) (pp dmodtype short_mty)
+          (Ident.name p) (pp dmodtype short_mty
+          |> dthen_alloc_mode_r ~is_modal mm)
 
-  let definition_of_argument_aux ua =
-    let arg, mty, _ = ua.item in
+  let definition_of_argument ~is_modal ua =
+    let arg, mty, (mode, _locks) = ua.item in
     match (arg: Err.functor_arg_descr) with
     | Unit -> Format.dprintf "()"
-    | Empty_struct -> Format.dprintf "(struct end)"
+    | Empty_struct ->
+        Format.dprintf "(struct end%t)" (maybe_print_mode_l ~is_modal mode)
     | Named p ->
         let mty = match mty with
           | Types.Mty_strengthen (mty,q,_) when Path.same p q -> mty
@@ -462,34 +487,27 @@ module With_shorthand = struct
           "%a@ :@ %t"
           Printtyp.path p
           (pp_orig dmodtype mty)
+        |> dthen_mode_l ~is_modal mode
     | Anonymous ->
         let short_mty = modtype { ua with item = mty } in
         begin match short_mty with
-        | Original mty -> dmodtype mty
+        | Original mty -> dmodtype mty |> dthen_mode_l ~is_modal mode
         | Synthetic {name; item=mty} ->
             Format.dprintf "%s@ :@ %t" name (dmodtype mty)
+            |> dthen_mode_l ~is_modal mode
         end
 
-  let definition_of_argument ~is_modal ua =
-    let _, _, (mode, _locks) = ua.item in
-    let mode = maybe_print_mode_l ~is_modal mode in
-    Format.dprintf "%t%t" (definition_of_argument_aux ua) mode
-
-  let arg_aux ua =
-    let arg, mty, _ = ua.item in
+  let arg ~is_modal ua =
+    let arg, mty, (mode, _locks) = ua.item in
     match (arg: Err.functor_arg_descr) with
     | Unit -> Format.dprintf "()"
-    | Empty_struct -> Format.dprintf "(struct end)"
+    | Empty_struct ->
+        Format.dprintf "(struct end%t)" (maybe_print_mode_l ~is_modal mode)
     | Named p -> fun ppf -> Printtyp.path ppf p
     | Anonymous ->
         let short_mty = modtype { ua with item=mty } in
         pp dmodtype short_mty
-
-  let arg ~is_modal ua =
-    let _, _, (mode, _locks) = ua.item in
-    let mode = maybe_print_mode_l ~is_modal mode in
-    Format.dprintf "%t%t" (arg_aux ua) mode
-
+        |> dthen_mode_l ~is_modal mode
 end
 
 
@@ -497,8 +515,8 @@ module Functor_suberror = struct
   open Err
 
   let param_id x = match x.With_shorthand.item with
-    | Types.Named (Some _ as x,_) -> x
-    | Types.(Unit | Named(None,_)) -> None
+    | Types.Named (Some _ as x,_,_) -> x
+    | Types.(Unit | Named(None,_,_)) -> None
 
   (** Print the list of params with style *)
   let pretty_params sep proj printer patch =
@@ -512,7 +530,7 @@ module Functor_suberror = struct
     let params = List.filter_map proj @@ List.map snd patch in
     Printtyp.functor_parameters ~sep elt params
 
-  let expected d =
+  let expected ~is_modal d =
     let extract: _ Diffing.change -> _ = function
       | Insert mty
       | Keep(_,mty,_)
@@ -520,7 +538,7 @@ module Functor_suberror = struct
           Some (param_id mty,(x, mty))
       | Delete _ -> None
     in
-    pretty_params space extract With_shorthand.qualified_param d
+    pretty_params space extract (With_shorthand.qualified_param ~is_modal) d
 
   let drop_inserted_suffix patch =
     let rec drop = function
@@ -535,7 +553,7 @@ module Functor_suberror = struct
 
   module Inclusion = struct
 
-    let got d =
+    let got ~is_modal d =
       let extract: _ Diffing.change -> _ = function
       | Delete mty
       | Keep (mty,_,_)
@@ -543,7 +561,7 @@ module Functor_suberror = struct
           Some (param_id mty,(x,mty))
       | Insert _ -> None
       in
-      pretty_params space extract With_shorthand.qualified_param d
+      pretty_params space extract (With_shorthand.qualified_param ~is_modal) d
 
     let insert mty =
       Format.dprintf
@@ -558,12 +576,12 @@ module Functor_suberror = struct
       let ok x y =
         Format.dprintf
           "Module types %t and %t match"
-          (With_shorthand.param x)
-          (With_shorthand.param y)
+          (With_shorthand.param ~is_modal:None x)
+          (With_shorthand.param ~is_modal:None y)
 
-      let diff g e more =
-        let g = With_shorthand.definition ~is_modal:None g in
-        let e = With_shorthand.definition ~is_modal:None e in
+      let diff ~is_modal g e more =
+        let g = With_shorthand.definition ~is_modal g in
+        let e = With_shorthand.definition ~is_modal e in
         Format.dprintf
           "Module types do not match:@ @[%t@]@;<1 -2>does not include@ \
            @[%t@]%t"
@@ -608,7 +626,7 @@ module Functor_suberror = struct
 
     let ok x y =
       let pp_orig_name = match With_shorthand.functor_param y with
-        | With_shorthand.Named (_, Original mty) ->
+        | With_shorthand.Named (_, Original mty, _) ->
             Format.dprintf " %t" (dmodtype mty)
         | _ -> ignore
       in
@@ -629,22 +647,19 @@ module Functor_suberror = struct
         for single change difference
     *)
     let single_diff ~is_modal g e more =
-      let _arg, mty, mode1_with_locks = g.With_shorthand.item in
-      let mode2 =
-        Types.functor_param_mode
-        |> Mode.alloc_as_value
-        |> Mode.Value.disallow_left
+      let _arg, mty1, mode1_with_locks = g.With_shorthand.item in
+      let mty2, mode2 =
+        match e.With_shorthand.item with
+        | Types.Unit -> Format.dprintf "()", Mode.Alloc.legacy
+        | Types.Named(_, mty, mm) -> dmodtype mty, mm
       in
+      let mode2 = Mode.alloc_as_value mode2 in
       let modes : Includemod.modes = Specific (mode1_with_locks, mode2) in
       let mode1, mode2 = maybe_print_modes ~is_modal modes in
-      let e = match e.With_shorthand.item with
-        | Types.Unit -> Format.dprintf "()"
-        | Types.Named(_, mty) -> dmodtype mty
-      in
       Format.dprintf
         "Modules do not match:@ @[%t%t@]@;<1 -2>\
          is not included in@ @[%t%t@]%t"
-        (dmodtype mty) mode1 e mode2 (more ())
+        (dmodtype mty1) mode1 mty2 mode2 (more ())
 
 
     let incompatible = function
@@ -925,10 +940,11 @@ and module_type_symptom ~eqmode ~expansion_token ~env ~before ~ctx = function
       in
       dwith_context ctx printer :: before
 
-and functor_params ~expansion_token ~env ~before ~ctx {got;expected;_} =
+and functor_params ~expansion_token ~env ~before ~ctx {got;expected;symptom} =
+  let is_modal = Is_modal.functor_params_symptom symptom in
   let d = Functor_suberror.Inclusion.patch env got expected in
-  let actual = Functor_suberror.Inclusion.got d in
-  let expected = Functor_suberror.expected d in
+  let actual = Functor_suberror.Inclusion.got ~is_modal d in
+  let expected = Functor_suberror.expected ~is_modal d in
   let main =
     Format.dprintf
       "@[<hv 2>Modules do not match:@ \
@@ -1014,7 +1030,8 @@ and functor_arg_diff ~expansion_token env (patch: _ Diffing.change) =
         module_type_symptom ~eqmode:false ~expansion_token ~env ~before:[]
           ~ctx:[] mty_diff.symptom
       in
-      Functor_suberror.Inclusion.diff g e more
+      let is_modal = Is_modal.module_type_symptom mty_diff.symptom in
+      Functor_suberror.Inclusion.diff ~is_modal g e more
 
 let functor_app_diff ~expansion_token env  (patch: _ Diffing.change) =
   match patch with
@@ -1132,7 +1149,7 @@ let report_apply_error ~loc env (app_name, mty_f, args) =
                  (Style.as_inline_code Printtyp.longident) lid
         in
         let actual = Functor_suberror.App.got ~is_modal:None d in
-        let expected = Functor_suberror.expected d in
+        let expected = Functor_suberror.expected ~is_modal:None d in
         let sub =
           List.rev @@
           Functor_suberror.params functor_app_diff env ~expansion_token:true d
