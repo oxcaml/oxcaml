@@ -1369,7 +1369,45 @@ let rec lam ppf = function
   | Lexclave expr ->
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
   | Lsplice { splice_loc = _;  slambda } ->
-      fprintf ppf "$(%a)" (Printslambda0.slambda0 lam) slambda
+      fprintf ppf "$(%a)" slam slambda
+
+and slam ppf = function
+  | SLquote lambda -> fprintf ppf "⟪ %a ⟫" lam lambda
+  | SLlayout layout -> fprintf ppf "⟪%a⟫" layout_annotation layout
+  | SLvar id -> Ident.print ppf id
+  | SLrecord fields ->
+    let print_fields ppf =
+      Ident.Map.iter
+        (fun ident value ->
+          fprintf ppf "@[<2>%a =@ %a;@]@ " Ident.print ident slam value)
+        fields
+    in
+    fprintf ppf "@[<hv 2>{@ %t}@]" print_fields
+  | SLfield (container, field) ->
+     fprintf ppf "%a.%a" Ident.print container Ident.print field
+  | SLvalue { sval_comptime; sval_runtime } ->
+    fprintf ppf "@[<hv 2>(%a,@ %a)@]" slam sval_comptime slam sval_runtime
+  | SLproj_comptime value -> fprintf ppf "%a.0" slam value
+  | SLproj_runtime value -> fprintf ppf "%a.1" slam value
+  | SLfunction func -> fprintf ppf "(fun %a)" slambda_function func
+  | SLapply apply -> fprintf ppf "(%a)" slambda_apply apply
+  | SLtemplate func -> fprintf ppf "(template %a)" slambda_function func
+  | SLinstantiate apply -> fprintf ppf "[%a]" slambda_apply apply
+  | SLlet { slet_name; slet_value; slet_body } ->
+    fprintf ppf "@[<hv 2>(let %a =@;<1 2>%a in@ %a)@]"
+      Ident.print slet_name slam slet_value slam slet_body
+
+and slambda_function ppf { sfun_params; sfun_body } =
+  let print_params ppf =
+    Array.iter (fun id -> fprintf ppf "%a@ " Ident.print id) sfun_params
+  in
+  fprintf ppf "@[<2>@[<2>%t->@]@ %a@]" print_params slam sfun_body
+
+and slambda_apply ppf { sapp_func; sapp_arguments } =
+  let print_args ppf =
+    Array.iter (fun arg -> fprintf ppf "@ %a" slam arg) sapp_arguments
+  in
+  fprintf ppf "@[<2>%a%t@]" slam sapp_func print_args
 
 and sequence ppf = function
   | Lsequence(l1, l2) ->
@@ -1412,5 +1450,6 @@ and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
 let structured_constant = struct_const
 
 let lambda = lam
+let slambda = slam
 
 let program ppf { code } = lambda ppf code

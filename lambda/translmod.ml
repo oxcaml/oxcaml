@@ -1109,7 +1109,7 @@ let transl_implementation compilation_unit impl ~loc =
   { SL.compilation_unit;
     main_module_block_format;
     arg_block_idx;
-    code = SL.Quote body }
+    code = SLquote body }
 
 
 (* Compile a toplevel phrase *)
@@ -1399,7 +1399,7 @@ let transl_instance_impl
       ap_probe = None;
     }
   in
-  let code = SL.Quote code in
+  let code = SLquote code in
   let main_module_block_format =
     Mb_struct { mb_repr = main_module_block_repr }
   in

@@ -847,7 +847,41 @@ type lambda =
   | Lexclave of lambda
   | Lsplice of lambda_splice
 
-and slambda = lambda Slambda0.t0
+and slambda =
+  | SLquote of lambda
+  | SLlayout of layout
+  | SLvar of Ident.t
+  | SLrecord of slambda Ident.Map.t
+  | SLfield of Ident.t * Ident.t
+  | SLvalue of slambda_value
+  | SLproj_comptime of slambda
+  | SLproj_runtime of slambda
+  | SLfunction of slambda_function
+  | SLapply of slambda_apply
+  | SLtemplate of slambda_function
+  | SLinstantiate of slambda_apply
+  | SLlet of slambda_let
+
+and slambda_value =
+  { sval_comptime: slambda;
+    sval_runtime: slambda
+  }
+
+and slambda_function =
+  { sfun_params: Ident.t array;
+    sfun_body: slambda
+  }
+
+and slambda_apply =
+  { sapp_func: slambda;
+    sapp_arguments: slambda array
+  }
+
+and slambda_let =
+  { slet_name: Ident.t;
+    slet_value: slambda;
+    slet_body: slambda
+  }
 
 and rec_binding = {
   id : Ident.t;
@@ -918,7 +952,7 @@ and lambda_event_kind =
   | Lev_function
   | Lev_pseudo
 
-  and lambda_splice = { splice_loc : scoped_location; slambda : slambda; }
+and lambda_splice = { splice_loc : scoped_location; slambda : slambda; }
 
 (* A description of a parameter to be passed to the runtime representation of a
    parameterised module, namely a function (called the instantiating functor)

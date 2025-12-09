@@ -1,5 +1,3 @@
-module SL = Slambda
-
 (* Helpers for asserting that slambda is trivial. *)
 
 exception Found_a_splice
@@ -87,9 +85,9 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   Lambda.iter_head_constructor assert_no_splices lam
 
 (* Check that slambda is trivial (a quote and contains no splices) *)
-let assert_slambda_is_trivial slam =
+let assert_slambda_is_trivial (slam : Lambda.slambda) =
   match slam with
-  | SL.Quote lam -> (
+  | SLquote lam -> (
     try assert_no_splices lam
     with Found_a_splice ->
       Misc.fatal_error
@@ -132,7 +130,7 @@ let required_globals ~flambda body =
 let do_eval ({ Slambda.code = slam } as p) =
   if not Language_extension.(is_enabled Layout_poly)
   then assert_slambda_is_trivial slam;
-  let (SL.Quote lam) = slam in
+  let (SLquote lam) = slam in
   { Lambda.compilation_unit = p.compilation_unit;
     main_module_block_format = p.main_module_block_format;
     arg_block_idx = p.arg_block_idx;

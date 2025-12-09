@@ -1,6 +1,5 @@
-module SL := Slambda
 open Format
 
-val slambda : formatter -> SL.t -> unit
+val slambda : formatter -> Lambda.slambda -> unit
 
-val program : formatter -> SL.program -> unit
+val program : formatter -> Slambda.program -> unit

@@ -16,8 +16,6 @@
 open Misc
 open Asttypes
 
-module SL = Slambda0
-
 type constant = Typedtree.constant
 
 type mutable_flag = Immutable | Immutable_unique | Mutable
@@ -879,7 +877,41 @@ type lambda =
   | Lexclave of lambda
   | Lsplice of lambda_splice
 
-and slambda = lambda SL.t0
+and slambda =
+  | SLquote of lambda
+  | SLlayout of layout
+  | SLvar of Ident.t
+  | SLrecord of slambda Ident.Map.t
+  | SLfield of Ident.t * Ident.t
+  | SLvalue of slambda_value
+  | SLproj_comptime of slambda
+  | SLproj_runtime of slambda
+  | SLfunction of slambda_function
+  | SLapply of slambda_apply
+  | SLtemplate of slambda_function
+  | SLinstantiate of slambda_apply
+  | SLlet of slambda_let
+
+and slambda_value =
+  { sval_comptime: slambda;
+    sval_runtime: slambda
+  }
+
+and slambda_function =
+  { sfun_params: Ident.t array;
+    sfun_body: slambda
+  }
+
+and slambda_apply =
+  { sapp_func: slambda;
+    sapp_arguments: slambda array
+  }
+
+and slambda_let =
+  { slet_name: Ident.t;
+    slet_value: slambda;
+    slet_body: slambda
+  }
 
 and rec_binding = {
   id : Ident.t;
@@ -1399,7 +1431,7 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lsplice { slambda = (SL.Quote e); _ } ->
+  | Lsplice { slambda = (SLquote e); _ } ->
       free_variables e
 
 and free_variables_list set exprs =
@@ -1735,8 +1767,8 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lregion (subst s l e, layout)
     | Lexclave e ->
         Lexclave (subst s l e)
-    | Lsplice { splice_loc; slambda = (SL.Quote e) } ->
-        Lsplice { splice_loc; slambda = (SL.Quote (subst s l e)) }
+    | Lsplice { splice_loc; slambda = (SLquote e) } ->
+        Lsplice { splice_loc; slambda = (SLquote (subst s l e)) }
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
