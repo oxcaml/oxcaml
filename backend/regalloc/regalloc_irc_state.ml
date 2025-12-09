@@ -30,6 +30,14 @@ let instruction_set_of_instruction_work_list (iwl : InstructionWorkList.t) :
   InstructionWorkList.fold iwl ~init:Instruction.Set.empty ~f:(fun acc elem ->
       Instruction.Set.add elem acc)
 
+module MoveWorkList = Priority_queue.Make (Int)
+
+let instruction_set_of_move_work_list (mwl : Instruction.t MoveWorkList.t) :
+    Instruction.Set.t =
+  MoveWorkList.fold mwl ~init:Instruction.Set.empty
+    ~f:(fun acc { MoveWorkList.priority = _; data = elem } ->
+      Instruction.Set.add elem acc)
+
 type t =
   { mutable initial : Reg.t Doubly_linked_list.t;
     simplify_work_list : RegWorkList.t;
@@ -42,7 +50,7 @@ type t =
     coalesced_moves : InstructionWorkList.t;
     constrained_moves : InstructionWorkList.t;
     frozen_moves : InstructionWorkList.t;
-    work_list_moves : InstructionWorkList.t;
+    work_list_moves : Instruction.t MoveWorkList.t;
     active_moves : InstructionWorkList.t;
     adj_set : RegisterStamp.PairSet.t;
     move_list : Instruction.Set.t Reg.Tbl.t;
@@ -97,7 +105,7 @@ let[@inline] make ~initial ~stack_slots ~affinity () =
   let coalesced_moves = InstructionWorkList.make ~original_capacity in
   let constrained_moves = InstructionWorkList.make ~original_capacity in
   let frozen_moves = InstructionWorkList.make ~original_capacity in
-  let work_list_moves = InstructionWorkList.make ~original_capacity in
+  let work_list_moves = MoveWorkList.make ~initial_capacity:original_capacity in
   let active_moves = InstructionWorkList.make ~original_capacity in
   let adj_set = RegisterStamp.PairSet.make ~num_registers in
   let move_list = Reg.Tbl.create 128 in
@@ -156,6 +164,10 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
     InstructionWorkList.iter iwl ~f:(fun instr ->
         instr.irc_work_list <- Unknown_list)
   in
+  let unknown_move_work_list (mwl : Instruction.t MoveWorkList.t) : unit =
+    MoveWorkList.iter mwl ~f:(fun { priority = _; data = instr } ->
+        instr.Cfg.irc_work_list <- Unknown_list)
+  in
   List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
       Reg.Tbl.replace state.reg_color reg None;
       Reg.Tbl.replace state.reg_alias reg None;
@@ -198,8 +210,8 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
   InstructionWorkList.clear state.constrained_moves;
   unknown_instruction_work_list state.frozen_moves;
   InstructionWorkList.clear state.frozen_moves;
-  unknown_instruction_work_list state.work_list_moves;
-  InstructionWorkList.clear state.work_list_moves;
+  unknown_move_work_list state.work_list_moves;
+  MoveWorkList.clear state.work_list_moves;
   unknown_instruction_work_list state.active_moves;
   InstructionWorkList.clear state.active_moves;
   RegisterStamp.PairSet.clear state.adj_set;
@@ -356,16 +368,22 @@ let[@inline] add_frozen_moves state instr =
   InstructionWorkList.add state.frozen_moves instr
 
 let[@inline] is_empty_work_list_moves state =
-  InstructionWorkList.is_empty state.work_list_moves
+  MoveWorkList.is_empty state.work_list_moves
 
 let[@inline] add_work_list_moves state instr =
   instr.Cfg.irc_work_list <- Work_list;
-  InstructionWorkList.add state.work_list_moves instr
+  let priority =
+    Regalloc_affinity.priority_of_instruction state.affinity instr
+  in
+  MoveWorkList.add state.work_list_moves ~priority ~data:instr
 
 let[@inline] choose_and_remove_work_list_moves state =
-  match InstructionWorkList.choose_and_remove state.work_list_moves with
-  | None -> fatal "work_list_moves is empty"
-  | Some res ->
+  match MoveWorkList.is_empty state.work_list_moves with
+  | true -> fatal "work_list_moves is empty"
+  | false ->
+    let { MoveWorkList.priority = _; data = res } =
+      MoveWorkList.get_and_remove state.work_list_moves
+    in
     res.Cfg.irc_work_list <- Unknown_list;
     res
 
@@ -476,7 +494,10 @@ let[@inline] enable_moves_one state reg =
       | Active ->
         m.irc_work_list <- Work_list;
         InstructionWorkList.remove state.active_moves m;
-        InstructionWorkList.add state.work_list_moves m
+        let priority =
+          Regalloc_affinity.priority_of_instruction state.affinity m
+        in
+        MoveWorkList.add state.work_list_moves ~priority ~data:m
       | Unknown_list | Coalesced | Constrained | Frozen | Work_list -> ())
 
 let[@inline] decr_degree state reg =
@@ -668,7 +689,7 @@ let[@inline] invariant state =
         ( "frozen_moves",
           instruction_set_of_instruction_work_list state.frozen_moves );
         ( "work_list_moves",
-          instruction_set_of_instruction_work_list state.work_list_moves );
+          instruction_set_of_move_work_list state.work_list_moves );
         ( "active_moves",
           instruction_set_of_instruction_work_list state.active_moves ) ];
     List.iter ~f:check_set_and_field_consistency_instr
@@ -682,7 +703,7 @@ let[@inline] invariant state =
           instruction_set_of_instruction_work_list state.frozen_moves,
           Cfg.Frozen );
         ( "work_list_moves",
-          instruction_set_of_instruction_work_list state.work_list_moves,
+          instruction_set_of_move_work_list state.work_list_moves,
           Cfg.Work_list );
         ( "active_moves",
           instruction_set_of_instruction_work_list state.active_moves,
