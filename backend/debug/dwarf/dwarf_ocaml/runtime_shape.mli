@@ -31,6 +31,33 @@ module Int16 = Numbers.Int16
 module Sort = Jkind_types.Sort
 module Layout = Sort.Const
 
+(** De Bruijn indices for recursive binders in runtime shapes. *)
+module DeBruijn_index : sig
+  type t
+
+  (** Initial index, pick [0] for the top-level index. Cannot be negative. *)
+  val create : int -> t
+
+  val move_under_binder : t -> t
+
+  val equal : t -> t -> bool
+
+  val print : Format.formatter -> t -> unit
+end
+
+(** De Bruijn environment for working with recursive binders. *)
+module DeBruijn_env : sig
+  type 'a t
+
+  val empty : 'a t
+
+  val is_empty : 'a t -> bool
+
+  val push : 'a t -> 'a -> 'a t
+
+  val get_opt : 'a t -> de_bruijn_index:DeBruijn_index.t -> 'a option
+end
+
 type 'a or_void =
   | Other of 'a
   | Void
@@ -99,9 +126,7 @@ and desc = private
       }
   | Func
   | Mu of t
-  | Rec_var of Shape.DeBruijn_index.t * Runtime_layout.t
-(* CR sspies: Use regular identifiers beforehand and only switch to DeBruijn at
-   this level. *)
+  | Rec_var of DeBruijn_index.t * Runtime_layout.t
 
 and tuple_kind = private
   | Tuple_boxed
@@ -242,7 +267,7 @@ val func : t
 
 val mu : t -> t
 
-val rec_var : Shape.DeBruijn_index.t -> Runtime_layout.t -> t
+val rec_var : DeBruijn_index.t -> Runtime_layout.t -> t
 
 val runtime_layout_of_unboxed : unboxed -> Runtime_layout.t
 
