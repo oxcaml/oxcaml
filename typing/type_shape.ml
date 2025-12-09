@@ -163,7 +163,7 @@ module Type_shape = struct
   end
 
   let[@inline] is_above_of_type_expr_max_depth depth =
-    match !Clflags.gdwarf_config_max_type_to_shape_depth with
+    match !Clflags.type_to_shape_max_depth with
     | None -> false
     | Some max_depth -> depth > max_depth
 

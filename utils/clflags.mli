@@ -95,7 +95,6 @@ val gdwarf_config_shape_reduce_depth : int option ref
 val gdwarf_config_shape_eval_depth : int option ref
 val gdwarf_config_max_cms_files_per_unit : int option ref
 val gdwarf_config_max_cms_files_per_variable : int option ref
-val gdwarf_config_max_type_to_shape_depth : int option ref
 val gdwarf_config_max_shape_reduce_steps_per_variable : int option ref
 val gdwarf_config_max_evaluation_steps_per_variable : int option ref
 val gdwarf_config_shape_reduce_fuel : int option ref
@@ -126,6 +125,7 @@ val annotations : bool ref
 val binary_annotations : bool ref
 val binary_annotations_cms : bool ref
 val shape_format : shape_format ref
+val type_to_shape_max_depth : int option ref
 val store_occurrences : bool ref
 val use_threads : bool ref
 val noassert : bool ref
