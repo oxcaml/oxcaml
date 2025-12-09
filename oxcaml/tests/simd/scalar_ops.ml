@@ -305,7 +305,7 @@ module Float = struct
 
   let () =
     Float64_reference.check_floats (fun x _ ->
-      eq64 (Float64_reference.c_to_int64 x) (to_int64 x));
+        eq64 (Float64_reference.c_to_int64 x) (to_int64 x));
     Int64.check' ~eq:eqf Float64_reference.c_of_int64 of_int64
 
   let () =
