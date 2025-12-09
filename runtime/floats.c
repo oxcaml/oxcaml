@@ -464,22 +464,6 @@ CAMLprim value caml_exp_float(value f)
   return caml_copy_double(exp(Double_val(f)));
 }
 
-double caml_float64_of_int64(int64_t i) {
-  return (double)i;
-}
-
-CAMLprim value caml_float64_of_int64_bytecode(value i) {
-  return caml_copy_double(caml_float64_of_int64(Int64_val(i)));
-}
-
-int64_t caml_float64_to_int64(double f) {
-  return (int64_t)f;
-}
-
-CAMLprim value caml_float64_to_int64_bytecode(value f) {
-  return caml_copy_int64(caml_float64_to_int64(Double_val(f)));
-}
-
 CAMLexport double caml_exp2(double x)
 {
 #ifdef HAS_C99_FLOAT_OPS
