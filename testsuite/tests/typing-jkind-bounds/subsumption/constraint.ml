@@ -142,7 +142,7 @@ Error: Signature mismatch:
        is not included in
          type 'a t : immutable_data with 'b constraint 'a = 'b ref
        The kind of the first is
-           mutable_data with 'b @@ forkable unyielding many
+           mutable_data with 'b @@ spawnable unyielding many
          because of the definition of t at line 4, characters 2-46.
        But the kind of the first must be a subkind of immutable_data with 'b
          because of the definition of t at line 2, characters 2-59.

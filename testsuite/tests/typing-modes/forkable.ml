@@ -7,7 +7,7 @@ let my_unforkable : (unit -> unit) @ unforkable = print_endline "Hello, world!"
 Line 1, characters 4-79:
 1 | let my_unforkable : (unit -> unit) @ unforkable = print_endline "Hello, world!"
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "unforkable" but is expected to be "forkable".
+Error: This value is "unforkable" but is expected to be "spawnable".
 |}]
 
 let storage = ref ""
@@ -93,10 +93,10 @@ let with_global_unforkable : ((string -> unit) @ unforkable -> 'a) -> 'a =
 
 [%%expect{|
 type 'a t0 = Mk0 of 'a @@ global
-type 'a t1 = Mk1 of 'a @@ global
+type 'a t1 = Mk1 of 'a @@ global forkable
 type 'a t2 = Mk2 of 'a @@ global unforkable
-type 'a t3 = Mk3 of 'a @@ global
-type 'a t4 = Mk4 of 'a @@ global yielding
+type 'a t3 = Mk3 of 'a @@ global forkable
+type 'a t4 = Mk4 of 'a @@ global forkable yielding
 type 'a t5 = Mk5 of 'a @@ global unforkable
 type 'a t6 = Mk6 of 'a @@ global unforkable yielding
 type 'a t7 = Mk7 of 'a @@ forkable unyielding
@@ -116,7 +116,7 @@ let _ = with_global_unforkable (fun k -> let _ = Mk0 k in ())
 Line 1, characters 53-54:
 1 | let _ = with_global_unforkable (fun k -> let _ = Mk0 k in ())
                                                          ^
-Error: This value is "unforkable" but is expected to be "forkable".
+Error: This value is "unforkable" but is expected to be "spawnable".
 |}]
 
 (* [global unforkable] works: *)
@@ -258,7 +258,7 @@ type w2 : value mod global forkable
 type ('a : value mod global) u1
 type ('a : value mod global unforkable) u2
 type w1 : value mod global unforkable
-type w2 : value mod global
+type w2 : value mod global forkable forkable
 |}]
 
 type _z1 = w1 u1
@@ -277,7 +277,14 @@ Error: This type "w1" should be an instance of type "('a : value mod global)"
 type _z2 = w2 u1
 
 [%%expect{|
-type _z2 = w2 u1
+Line 1, characters 11-13:
+1 | type _z2 = w2 u1
+               ^^
+Error: This type "w2" should be an instance of type "('a : value mod global)"
+       The kind of w2 is value mod global forkable forkable
+         because of the definition of w2 at line 7, characters 0-35.
+       But the kind of w2 must be a subkind of value mod global
+         because of the definition of u1 at line 1, characters 0-31.
 |}]
 
 type _z3 = w1 u2

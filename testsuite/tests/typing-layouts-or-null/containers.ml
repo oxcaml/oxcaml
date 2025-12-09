@@ -77,7 +77,7 @@ Line 1, characters 19-32:
 Error: This type "float or_null" should be an instance of type
          "('a : any mod separable)"
        The kind of float or_null is
-           value_or_null mod forkable unyielding many stateless immutable
+           value_or_null mod spawnable unyielding many stateless immutable
          because it is the primitive type or_null.
        But the kind of float or_null must be a subkind of any mod separable
          because it's the type argument to the array type.
@@ -104,7 +104,7 @@ Line 1, characters 32-35:
 Error: This expression has type "float" but an expression was expected of type
          "('a : value mod non_float)"
        The kind of float is
-           value mod forkable unyielding many stateless immutable
+           value mod spawnable unyielding many stateless immutable
          because it is the primitive type float.
        But the kind of float must be a subkind of value mod non_float
          because it's the type of an array element.
@@ -184,7 +184,7 @@ Line 1, characters 19-32:
 Error: This type "float or_null" should be an instance of type
          "('a : any mod separable)"
        The kind of float or_null is
-           value_or_null mod forkable unyielding many stateless immutable
+           value_or_null mod spawnable unyielding many stateless immutable
          because it is the primitive type or_null.
        But the kind of float or_null must be a subkind of any mod separable
          because it's the type argument to the array type.
@@ -210,7 +210,7 @@ Line 1, characters 39-42:
 Error: This expression has type "float" but an expression was expected of type
          "('a : value mod non_float)"
        The kind of float is
-           value mod forkable unyielding many stateless immutable
+           value mod spawnable unyielding many stateless immutable
          because it is the primitive type float.
        But the kind of float must be a subkind of value mod non_float
          because it's the type of an array element.
