@@ -203,32 +203,11 @@ Error: Signature mismatch:
 module M : sig
   type 'a t : immutable_data with 'a ref
 end = struct
-  type 'a t : mutable_data with 'a @@ many unyielding forkable
+  type 'a t : mutable_data with 'a @@ many unyielding spawnable
 end
 [%%expect {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type 'a t : mutable_data with 'a @@ many unyielding forkable
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : mutable_data with 'a @@ unyielding many end
-       is not included in
-         sig
-           type 'a t : mutable_data with 'a @@ spawnable unyielding many
-         end
-       Type declarations do not match:
-         type 'a t : mutable_data with 'a @@ unyielding many
-       is not included in
-         type 'a t : mutable_data with 'a @@ spawnable unyielding many
-       The kind of the first is mutable_data with 'a @@ unyielding many
-         because of the definition of t at line 4, characters 2-62.
-       But the kind of the first must be a subkind of
-           mutable_data with 'a @@ spawnable unyielding many
-         because of the definition of t at line 2, characters 2-40.
-
-       The first mode-crosses less than the second along:
-         forkability: mod spawnable with 'a ≰ mod spawnable
+module M :
+  sig type 'a t : mutable_data with 'a @@ spawnable unyielding many end
 |}]
 
 (* CR layouts v2.8: 'a u's kind should get normalized to just immutable_data.
