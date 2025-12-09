@@ -338,11 +338,11 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
   | Array_load (kind, load_kind, _mut) -> (
     match kind, load_kind with
     | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
-        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
-        | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
+        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+        | Naked_int32s | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
         ( Immediates | Gc_ignorable_values | Values | Naked_floats
-        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
-        | Naked_int64s | Naked_nativeints ) ) ->
+        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+        | Naked_int32s | Naked_int64s | Naked_nativeints ) ) ->
       use_prim' Array_get
     | (Naked_vec128s | Naked_vec256s | Naked_vec512s), _
     | _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
@@ -518,11 +518,11 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   | Array_set (kind, set_kind) -> (
     match kind, set_kind with
     | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
-        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
-        | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
+        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+        | Naked_int32s | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
         ( Immediates | Gc_ignorable_values | Values _ | Naked_floats
-        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
-        | Naked_int64s | Naked_nativeints ) ) ->
+        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
+        | Naked_int32s | Naked_int64s | Naked_nativeints ) ) ->
       let arr, res =
         match prim_arg ~env ~res x with
         | Pv v, res -> v, res
