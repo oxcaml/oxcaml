@@ -592,11 +592,33 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
     end;
     Types.Constructor_ikind ikind
 
+let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
+    ~(params : Types.type_expr list) (type_jkind : Types.jkind_l) :
+    Types.type_ikind =
+  if not !Clflags.ikinds
+  then Types.ikind_reset "ikinds disabled"
+  else
+    let poly = normalize ~context type_jkind in
+    let rigid_vars =
+      List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
+    in
+    let base, coeffs = Ldd.decompose_linear ~universe:rigid_vars poly in
+    let payload =
+      { Types.base; coeffs = Array.of_list coeffs }
+    in
+    if !Types.ikind_debug
+    then begin
+      Format.eprintf "[ikind] from jkind: base=%s; coeffs=[%s]@."
+        (Ikind.Ldd.pp payload.base)
+        (String.concat "; "
+           (Array.to_list (Array.map Ikind.Ldd.pp payload.coeffs)))
+    end;
+    Types.Constructor_ikind payload
+
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) (sub : Types.jkind_l)
     (super : Types.jkind_l) : (unit, Jkind.Violation.t) result =
-  ignore origin;
   let open Misc.Stdlib.Monad.Result.Syntax in
   (* Check layouts first; if that fails, print both sides with full
      info and return the error. *)
@@ -608,16 +630,40 @@ let sub_jkind_l ?allow_any_crossing ?origin
   if not (enable_sub_jkind_l && !Clflags.ikinds)
   then Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context sub super
   else
-    let ctx = make_ctx ~context in
     let allow_any =
       match allow_any_crossing with Some true -> true | _ -> false
     in
+    let origin_suffix =
+      match origin with
+      | None -> ""
+      | Some o -> " origin=" ^ o
+    in
     if allow_any
-    then Ok ()
+    then (
+      if !Types.ikind_debug
+      then
+        Format.eprintf
+          "[ikind-subjkind] call%s allow_any=true@;sub=%a@;super=%a@."
+          origin_suffix Jkind.format sub Jkind.format super;
+      Ok ())
     else
+      let ctx = make_ctx ~context in
       let sub_ckind = ckind_of_jkind_l sub in
       let super_ckind = ckind_of_jkind_l super in
-      let ik_leq = JK.leq_with_reason ctx sub_ckind super_ckind in
+      let sub_poly = sub_ckind ctx in
+      let super_poly = super_ckind ctx in
+      Ldd.solve_pending ();
+      if !Types.ikind_debug
+      then
+        Format.eprintf
+          "[ikind-subjkind] call%s allow_any=false@;sub=%a@;super=%a@;@;\
+           sub_poly=%s@;super_poly=%s@."
+          origin_suffix
+          Jkind.format sub
+          Jkind.format super
+          (Ldd.pp sub_poly)
+          (Ldd.pp super_poly);
+      let ik_leq = Ldd.leq_with_reason sub_poly super_poly in
       match ik_leq with
       | None -> Ok ()
       | Some violating_axes ->

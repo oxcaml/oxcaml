@@ -560,27 +560,5 @@ end = struct
   type t : immutable_data = q list
 end
 [%%expect{|
-Lines 3-7, characters 6-3:
-3 | ......struct
-4 |   type q : immutable_data = { bar : int ref }
-5 |   [@@unsafe_allow_any_mode_crossing]
-6 |   type t : immutable_data = q list
-7 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type q : immutable_data = { bar : int ref; }
-           [@@unsafe_allow_any_mode_crossing]
-           type t = q list
-         end
-       is not included in
-         sig type t : immutable_data end
-       Type declarations do not match:
-         type t = q list
-       is not included in
-         type t : immutable_data
-       The kind of the first is immutable_data
-         because it's a boxed variant type.
-       But the kind of the first must be a subkind of immutable_data
-         because of the definition of t at line 2, characters 2-25.
+module M : sig type t : immutable_data end
 |}]

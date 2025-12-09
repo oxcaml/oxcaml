@@ -12,6 +12,12 @@ val type_declaration_ikind_gated :
   path:Path.t ->
   Types.type_ikind
 
+val type_declaration_ikind_of_jkind :
+  context:Jkind.jkind_context ->
+  params:Types.type_expr list ->
+  Types.jkind_l ->
+  Types.type_ikind
+
 val sub_jkind_l :
   ?allow_any_crossing:bool ->
   ?origin:string ->

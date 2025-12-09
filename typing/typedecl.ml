@@ -2889,10 +2889,6 @@ let normalize_decl_jkinds env decls =
           let type_jkind =
             Jkind.unsafely_set_bounds ~from:original_decl.type_jkind decl.type_jkind
           in
-          let type_ikind =
-            Ikinds.type_declaration_ikind_gated
-              ~context:normalization_context ~path
-          in
           let umc = Some (Jkind.to_unsafe_mode_crossing type_jkind) in
           let type_kind =
             match decl.type_kind with
@@ -2904,7 +2900,14 @@ let normalize_decl_jkinds env decls =
             | Type_variant (cs, rep, _) ->
               Type_variant (cs, rep, umc)
           in
-          { decl with type_jkind; type_ikind; type_kind; }
+          let decl = { decl with type_jkind; type_kind } in
+          let type_ikind =
+            Ikinds.type_declaration_ikind_of_jkind
+              ~context:normalization_context
+              ~params:decl.type_params
+              decl.type_jkind
+          in
+          { decl with type_ikind }
         else decl
       | Error err ->
         raise(Error(decl.type_loc,
