@@ -120,20 +120,22 @@ module Int64 = struct
     = "caml_vec128_unreachable" "caml_int64_popcnt_unboxed_to_untagged"
     [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  let check ?nonzero f g =
+  let check' ~eq ?nonzero f g =
     let nz = Option.value ~default:false nonzero in
     let open Stdlib.Int64 in
     Random.set_state (Random.State.make [| 1234567890 |]);
-    if not nz then eqi (f zero) (g zero);
-    eqi (f one) (g one);
-    eqi (f minus_one) (g minus_one);
-    eqi (f max_int) (g max_int);
-    eqi (f min_int) (g min_int);
+    if not nz then eq (f zero) (g zero);
+    eq (f one) (g one);
+    eq (f minus_one) (g minus_one);
+    eq (f max_int) (g max_int);
+    eq (f min_int) (g min_int);
     for _ = 0 to 100_000 do
       let i = Random.int64 max_int in
       let i = if Random.bool () then i else neg i in
-      if (not nz) || i <> 0L then eqi (f i) (g i)
+      if (not nz) || i <> 0L then eq (f i) (g i)
     done
+
+  let check ?nonzero f g = check' ~eq:eqi ?nonzero f g
 
   let rec clz i =
     if i = 0L
@@ -231,6 +233,14 @@ module Int32 = struct
 end
 
 module Float = struct
+  external to_int64 : float -> int64
+    = "caml_int64_of_float" "caml_int64_of_float_unboxed"
+    [@@unboxed] [@@noalloc] [@@builtin]
+
+  external of_int64 : int64 -> float
+    = "caml_int64_to_float" "caml_int64_to_float_unboxed"
+    [@@unboxed] [@@noalloc] [@@builtin]
+
   external max_f64 : float -> float -> float
     = "caml_vec128_unreachable" "caml_simd_float64_max"
     [@@noalloc] [@@builtin] [@@unboxed]
@@ -292,6 +302,11 @@ module Float = struct
     [@@unboxed] [@@noalloc]
 
   let f32_nan = float32_of_bits 0x7fc00001l
+
+  let () =
+    Float64_reference.check_floats (fun x _ ->
+      eq64 (Float64_reference.c_to_int64 x) (to_int64 x));
+    Int64.check' ~eq:eqf Float64_reference.c_of_int64 of_int64
 
   let () =
     eqf (round_current_f64 0.5) 0.;

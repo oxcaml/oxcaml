@@ -854,9 +854,9 @@ let transl_builtin name args dbg typ_res =
     Some (Cop (Creinterpret_cast Int64_of_float, args, dbg))
   | "caml_int64_float_of_bits_unboxed" ->
     Some (Cop (Creinterpret_cast Float_of_int64, args, dbg))
-  | "caml_float64_to_int64" ->
+  | "caml_int64_of_float_unboxed" ->
     Some (Cop (Cstatic_cast (Int_of_float Float64), args, dbg))
-  | "caml_float64_of_int64" ->
+  | "caml_int64_to_float_unboxed" ->
     Some (Cop (Cstatic_cast (Float_of_int Float64), args, dbg))
   | "caml_float32_of_bits" ->
     Some (Cop (Creinterpret_cast Float32_of_int32, args, dbg))
