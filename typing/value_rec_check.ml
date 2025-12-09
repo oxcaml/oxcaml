@@ -619,7 +619,7 @@ let (>>) : bind_judg -> term_judg -> term_judg =
   fun binder term mode -> binder mode (term mode)
 
 (* Compute the appropriate [mode] for an array expression *)
-let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
+let array_mode exp (* elt_sort *) = match Typeopt.array_kind exp (* elt_sort *)  with
   | Lambda.Pfloatarray ->
     (* (flat) float arrays unbox their elements *)
     Dereference
@@ -745,8 +745,8 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_atomic_loc (expr, _, _, _, _) ->
       expression expr << Guard
     | Texp_array (_, elt_sort, exprs, _) ->
-      let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-      list expression exprs << array_mode exp elt_sort
+      let _elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
+      list expression exprs << array_mode exp (* elt_sort *)
     | Texp_idx (ba, _uas) ->
       let block_access = function
         | Baccess_field _ -> empty
@@ -769,8 +769,8 @@ let rec expression : Typedtree.expression -> term_judg =
       join ((expression comp_body << Guard) ::
             comprehension_clauses comp_clauses)
     | Texp_array_comprehension (_, elt_sort, { comp_body; comp_clauses }) ->
-      let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-      join ((expression comp_body << array_mode exp elt_sort) ::
+      let _elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
+      join ((expression comp_body << array_mode exp (* elt_sort *)) ::
             comprehension_clauses comp_clauses)
     | Texp_construct (_, desc, exprs, _) ->
       let access_constructor =

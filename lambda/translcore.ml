@@ -818,7 +818,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
       let mode = transl_alloc_mode alloc_mode in
       let element_sort = Jkind.Sort.default_for_transl_and_get element_sort in
-      let kind = array_kind e element_sort in
+      let kind = array_kind e (* element_sort *) in
       let ll =
         transl_list ~scopes
           (List.map (fun e -> (e, element_sort)) expr_list)
@@ -895,8 +895,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
          type checker; both mutable and immutable arrays are created the same
          way *)
       let loc = of_location ~scopes e.exp_loc in
-      let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-      let array_kind = Typeopt.array_kind e elt_sort in
+      let _elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
+      let array_kind = Typeopt.array_kind e (* elt_sort *) in
       begin match array_kind with
       | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
       | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ -> ()
@@ -2427,7 +2427,7 @@ and transl_idx ~scopes loc env ba uas =
     let index = transl_exp ~scopes index_sort index in
     let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
     let array_kind =
-      array_type_kind ~elt_ty:(Some elt_ty) ~elt_sort:(Some elt_sort) env loc
+      array_type_kind ~elt_ty:(Some elt_ty) ~elt_layout:None (* Some elt_sort *) env loc
         base_ty
     in
     let elt_layout = layout env loc elt_sort elt_ty in

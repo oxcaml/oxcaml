@@ -27,16 +27,17 @@ val maybe_pointer : Typedtree.expression
 (* Supplying [None] for [elt_sort] should be avoided when possible. It
    will result in a call to [Ctype.type_sort] which can be expensive. *)
 val array_type_kind :
-  elt_sort:(Jkind.Sort.Const.t option) -> elt_ty:(Types.type_expr option)
+  elt_layout:(Jkind.Layout.Const.t option) -> elt_ty:(Types.type_expr option)
   -> Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
 val array_type_mut : Env.t -> Types.type_expr -> Lambda.mutable_flag
 val array_kind_of_elt :
-  elt_sort:(Jkind.Sort.Const.t option)
+  elt_layout:(Jkind.Layout.Const.t option)
   -> Env.t -> Location.t -> Types.type_expr -> Lambda.array_kind
+(* CR zeisbach: it is possible that making these is actually possible *)
 val array_kind :
-  Typedtree.expression -> Jkind.Sort.Const.t -> Lambda.array_kind
+  Typedtree.expression -> (* Jkind.Layout.Const.t -> *) Lambda.array_kind
 val array_pattern_kind :
-  Typedtree.pattern -> Jkind.Sort.Const.t -> Lambda.array_kind
+  Typedtree.pattern -> (* Jkind.Layout.Const.t -> *) Lambda.array_kind
 
 (* If [kind] or [layout] is unknown, attempt to specialize it by examining the
    type parameters of the bigarray. If [kind] or [length] is not unknown, returns

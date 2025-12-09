@@ -26,7 +26,7 @@ type error =
       Jkind.Sort.t * Language_extension.maturity * type_expr option
   | Small_number_sort_without_extension of Jkind.Sort.t * type_expr option
   | Simd_sort_without_extension of Jkind.Sort.t * type_expr option
-  | Not_a_sort of type_expr * Jkind.Violation.t
+  (*= | Not_a_sort of type_expr * Jkind.Violation.t *)
   | Unsupported_product_in_lazy of Jkind.Layout.Const.t
   | Unsupported_vector_in_product_array
   | Mixed_product_array of Jkind.Layout.Const.t * type_expr
@@ -110,14 +110,15 @@ let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
    sort info, or do something else. Internal ticket 5093. *)
 (* CR layouts v3.0: have a better error message
    for nullable jkinds.*)
-let type_sort ~why env loc ty =
-  (* CR zeisbach: maybe this should use a layout and not a sort?
-     but look at the call sites to determine if this is actually right...
-     Changing this looks non-trivial, since it relies on sort variables getting
-     mutated. The layouts don't get mutated, they are manipulated purely. *)
-  match Ctype.type_sort ~why ~fixed:false env ty with
-  | Ok sort -> sort
-  | Error err -> raise (Error (loc, Not_a_sort (ty, err)))
+let type_layout (* ~why *) env _loc ty =
+  let jkind = Ctype.type_jkind env ty in
+  match Jkind.get_layout_defaulting_to_scannable jkind with
+  (* CR zeisbach: why would the previous type_sort raise an error? we should
+     make sure that the behavior isn't lost. *)
+  | Any sa -> (* maybe this should default to value? *)
+    Jkind_types.Layout.Const.Base (Scannable, sa)
+    (* raise (Error (loc, Not_a_sort (ty, err))) *)
+  | layout -> layout
 
 (* [classification]s are used for two things: things in arrays, and things in
    lazys. In the former case, we need detailed information about unboxed
@@ -139,12 +140,12 @@ type 'a classification =
 (* Classify a ty into a [classification]. Looks through synonyms, using
    [scrape_ty].  Returning [Any] is safe, though may skip some optimizations.
    See comment on [classification] above to understand [classify_product]. *)
-let classify ~classify_product env ty sort : _ classification =
+let classify ~classify_product env ty layout : _ classification =
   let ty = scrape_ty env ty in
   (* CR zeisbach: it seems plausible that this should be a layout *)
-  match (sort : Jkind.Layout.Const.t) with
+  match (layout : Jkind.Layout.Const.t) with
   | Base (Scannable, _sa) -> begin
-  (* CR zeisbach: probably possible to use sa here instead of computing? *)
+  (* CR zeisbach: probably possible to use sa here instead of computing. try! *)
   if Ctype.is_always_gc_ignorable env ty
   then
     if Ctype.check_type_nullability env ty Non_null
@@ -220,15 +221,16 @@ let classify ~classify_product env ty sort : _ classification =
   | Product c -> Product (classify_product ty c)
   | Any _ -> failwith "CR zeisbach:"
 
-let rec scannable_product_array_kind elt_ty_for_error loc sorts =
-  List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) sorts
+let rec scannable_product_array_kind elt_ty_for_error loc layouts =
+  List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) layouts
 
 and sort_to_scannable_product_element_kind elt_ty_for_error loc
-      (s : Jkind.Layout.Const.t) =
+      (layout : Jkind.Layout.Const.t) =
+  (* CR zeisbach: stale comment *)
   (* Unfortunate: this never returns `Pint_scannable`.  Doing so would require
      this to traverse the type, rather than just the kind, or to add product
      kinds. *)
-  match s with
+  match layout with
   | Any _ -> failwith "CR zeisbach:"
   | Base (Scannable, { separability; _ }) ->
       let open Jkind_axis.Separability in
@@ -245,8 +247,8 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
 let rec ignorable_product_array_kind loc sorts =
   List.map (sort_to_ignorable_product_element_kind loc) sorts
 
-and sort_to_ignorable_product_element_kind loc (s : Jkind.Layout.Const.t) =
-  match s with
+and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
+  match layout with
   | Any _ -> failwith "CR zeisbach:"
   (* CR zeisbach: confirm that it is okay to drop these on the floor.
      Then, add a comment explaining why. *)
@@ -264,13 +266,13 @@ and sort_to_ignorable_product_element_kind loc (s : Jkind.Layout.Const.t) =
   | Base (Void, _) -> raise (Error (loc, Unsupported_void_in_array))
   | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
 
-let array_kind_of_elt ~elt_sort env loc ty =
-  let elt_sort =
-    match elt_sort with
-    | Some s -> s
-    | None ->
-      Jkind.Sort.default_for_transl_and_get
-        (type_sort ~why:Array_element env loc ty)
+let array_kind_of_elt ~elt_layout env loc ty =
+  let elt_layout =
+    match elt_layout with
+    | Some layout -> layout
+    | None -> type_layout env loc ty
+      (*= Jkind.Sort.default_for_transl_and_get
+        (type_sort ~why:Array_element env loc ty) *)
   in
   let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
   let classify_product ty sorts =
@@ -283,10 +285,12 @@ let array_kind_of_elt ~elt_sort env loc ty =
   (* CR dkalinichenko: many checks in [classify] are redundant
      with separability. *)
   (* CR zeisbach: fix this extremely temporary patch! *)
-  match classify ~classify_product env ty (Obj.magic elt_sort) with
+  match classify ~classify_product env ty elt_layout with
   | Any ->
     if Config.flat_float_array
       && not (Language_extension.is_at_least Separability ()
+          (* CR zeisbach: if we have the layout sitting around here, we probably
+             can eliminate the call to check_type_separability! *)
           && Ctype.check_type_separability env ty Non_float)
     then Pgenarray
     else Paddrarray
@@ -307,11 +311,11 @@ let array_kind_of_elt ~elt_sort env loc ty =
   | Void ->
     raise (Error (loc, Unsupported_void_in_array))
 
-let array_type_kind ~elt_sort ~elt_ty env loc ty =
+let array_type_kind ~elt_layout ~elt_ty env loc ty =
   match scrape_poly env ty with
   | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_array
                               || Path.same p Predef.path_iarray ->
-      array_kind_of_elt ~elt_sort env loc elt_ty
+      array_kind_of_elt ~elt_layout env loc elt_ty
   | Tconstr(p, [], _) when Path.same p Predef.path_floatarray ->
       Pfloatarray
   | _ ->
@@ -353,14 +357,17 @@ let array_type_mut env ty =
   | Tconstr(p, [_], _) when Path.same p Predef.path_iarray -> Immutable
   | _ -> Mutable
 
-let array_kind exp elt_sort =
+(* CR zeisbach: will these ever actually get passed inputs? Maybe these should
+   be optional too? And then trigger the (potentially expensive) computation? *)
+let array_kind exp (* elt_layout *) =
   array_type_kind
-    ~elt_sort:(Some elt_sort) ~elt_ty:None
+    ~elt_layout:None (* Some elt_layout *) ~elt_ty:None
     exp.exp_env exp.exp_loc exp.exp_type
 
-let array_pattern_kind pat elt_sort =
+(* CR zeisbach: see comment above *)
+let array_pattern_kind pat (* elt_layout *) =
   array_type_kind
-    ~elt_sort:(Some elt_sort) ~elt_ty:None
+    ~elt_layout:None (* Some elt_layout *) ~elt_ty:None
     pat.pat_env pat.pat_loc pat.pat_type
 
 let bigarray_decode_type env ty tbl dfl =
@@ -636,9 +643,10 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
   | Tconstr(p, [arg], _)
     when (Path.same p Predef.path_array
           || Path.same p Predef.path_iarray) ->
+    (* CR zeisbach: the existance of this comment is concerning *)
     (* CR layouts: [~elt_sort:None] here is bad for performance. To
        fix it, we need a place to store the sort on a [Tconstr]. *)
-    let ak = array_type_kind ~elt_ty:(Some arg) ~elt_sort:None env loc ty in
+    let ak = array_type_kind ~elt_ty:(Some arg) ~elt_layout:None env loc ty in
     num_nodes_visited, non_nullable (Parrayval ak)
   | Tconstr(p, _, _) -> begin
       (* CR layouts v2.8: The uses of [decl.type_jkind] here are suspect:
@@ -1162,14 +1170,19 @@ let function_arg_layout env loc sort ty =
 (** Whether a forward block is needed for a lazy thunk on a value, i.e.
     if the value can be represented as a float/forward/lazy *)
 let lazy_val_requires_forward env loc ty =
-  (* CR zeisbach: replace this with the right layout *)
-  let sort = Jkind.Sort.Const.for_lazy_body in
+  (* CR zeisbach: replace this with the right layout / fix this!
+     IDK how this is even used. The max SA is suspicious. *)
+  let layout =
+    Jkind.Layout.Const.of_sort_const
+      Jkind.Sort.Const.for_lazy_body
+      Jkind_types.Scannable_axes.max
+  in
   let classify_product _ layouts =
     let kind = Jkind_types.Layout.Const.Product layouts in
     raise (Error (loc, Unsupported_product_in_lazy kind))
   in
   (* CR zeisbach: fix this obviously wrong patch *)
-  match classify ~classify_product env ty (Obj.magic sort) with
+  match classify ~classify_product env ty layout with
   | Any | Lazy -> true
   (* CR layouts: Fix this when supporting lazy unboxed values.
      Blocks with forward_tag can get scanned by the gc thus can't
@@ -1277,11 +1290,11 @@ let report_error ppf = function
          build file.@ \
          Otherwise, please report this error to the Jane Street compilers team."
         extension verb flags
-  | Not_a_sort (ty, err) ->
+  (*= | Not_a_sort (ty, err) ->
       fprintf ppf "A representable layout is required here.@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) ) err
+           ~level:(Ctype.get_current_level ()) ) err *)
   | Unsupported_product_in_lazy const ->
       fprintf ppf
         "Product layout %s detected in [lazy] in [Typeopt.Layout]@ \

@@ -26,8 +26,15 @@ let test ~(call_pos : [%call_pos]) ~expect_caml_modifies f =
         call_pos.pos_lnum expect_caml_modifies actual_modifies
 
 external[@layout_poly] set :
-  ('a : any mod separable) . ('a array[@local_opt]) -> (int[@local_opt]) -> 'a -> unit =
-  "%array_safe_set"
+  ('a : any mod separable).
+  ('a array[@local_opt]) -> (int[@local_opt]) -> 'a -> unit
+  = "%array_safe_set"
+
+external[@layout_poly] unsafe_set_ptr :
+  'a ('b : any).
+  (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  = "%unsafe_set_ptr"
+
 
 (* Mutating abstract types of kind value non_pointer should skip caml_modify *)
 
