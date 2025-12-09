@@ -75,9 +75,9 @@ Error: Signature mismatch:
            val foo : unit -> unit
            val bar : unit -> unit
            val baz : unit -> unit
-         end (* at nonportable *)
+         end @ nonportable
        is not included in
-         sig val baz : unit -> unit @@ portable end (* at nonportable *)
+         sig val baz : unit -> unit @@ portable end @ nonportable
        Values do not match:
          val baz : unit -> unit (* in a structure at nonportable *)
        is not included in

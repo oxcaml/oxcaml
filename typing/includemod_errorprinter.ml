@@ -277,7 +277,7 @@ let print_out_mode
   if in_structure then
     Format.dprintf " (* in a structure at %a *)" print mode
   else
-    Format.dprintf " (* at %a *)" print mode
+    Format.dprintf " @@ %a" print mode
 
 let maybe_print_mode_l ~is_modal (mode : Mode.Value.l) =
   match is_modal with
