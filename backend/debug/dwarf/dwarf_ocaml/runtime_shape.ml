@@ -32,6 +32,33 @@ module S = Shape
 module Sort = Jkind_types.Sort
 module Layout = Sort.Const
 
+module DeBruijn_index = struct
+  type t = int
+
+  let create n =
+    if n < 0
+    then Misc.fatal_errorf "DeBruijn_index.create: negative index %d" n
+    else n
+
+  let move_under_binder n = n + 1
+
+  let equal n1 n2 = Int.equal n1 n2
+
+  let print fmt n = Format.fprintf fmt "%d" n
+end
+
+module DeBruijn_env = struct
+  type 'a t = 'a list
+
+  let empty = []
+
+  let get_opt t ~de_bruijn_index = List.nth_opt t de_bruijn_index
+
+  let push t x = x :: t
+
+  let is_empty = function [] -> true | _ -> false
+end
+
 type 'a or_void =
   | Other of 'a
   | Void
@@ -183,7 +210,7 @@ and desc =
       }
   | Func
   | Mu of t
-  | Rec_var of Shape.DeBruijn_index.t * Runtime_layout.t
+  | Rec_var of DeBruijn_index.t * Runtime_layout.t
 (* The layout is part of [Unknown] and [Rec_var] to ensure that equality can be
    tested by simply comparing the descriptions. That is, the runtime_layout and
    hash fields are just precomputed from the desc field and carry no additional
@@ -686,7 +713,7 @@ let rec print fmt { desc } =
   | Func -> Format.fprintf fmt "Func"
   | Mu shape -> Format.fprintf fmt "Mu(%a)" print shape
   | Rec_var (idx, ly) ->
-    Format.fprintf fmt "Rec_var(%a, %a)" Shape.DeBruijn_index.print idx
+    Format.fprintf fmt "Rec_var(%a, %a)" DeBruijn_index.print idx
       Runtime_layout.print ly
 
 and print_predef fmt p =
@@ -803,7 +830,7 @@ let rec equal { desc = desc1 } { desc = desc2 } =
   | Func, Func -> true
   | Mu shape1, Mu shape2 -> equal shape1 shape2
   | Rec_var (idx1, ly1), Rec_var (idx2, ly2) ->
-    Shape.DeBruijn_index.equal idx1 idx2 && Runtime_layout.equal ly1 ly2
+    DeBruijn_index.equal idx1 idx2 && Runtime_layout.equal ly1 ly2
   | ( ( Unknown _ | Predef _ | Tuple _ | Variant _ | Record _ | Func | Mu _
       | Rec_var _ ),
       _ ) ->
