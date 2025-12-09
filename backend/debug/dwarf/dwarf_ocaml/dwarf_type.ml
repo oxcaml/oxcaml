@@ -1201,21 +1201,21 @@ end
 
 module Dwarf_die_cache : sig
   val find_in_cache :
-    RS.t -> rec_env:'a S.DeBruijn_env.t -> Proto_die.reference option
+    RS.t -> rec_env:'a RS.DeBruijn_env.t -> Proto_die.reference option
 
   val add_to_cache :
-    RS.t -> Proto_die.reference -> rec_env:'a S.DeBruijn_env.t -> unit
+    RS.t -> Proto_die.reference -> rec_env:'a RS.DeBruijn_env.t -> unit
 end = struct
   let cache = RS.Cache.create 100
 
   let find_in_cache (runtime_shape : RS.t) ~rec_env =
-    if S.DeBruijn_env.is_empty rec_env
+    if RS.DeBruijn_env.is_empty rec_env
     then RS.Cache.find_opt cache runtime_shape
     else None
 
   let add_to_cache (runtime_shape : RS.t) reference ~rec_env =
     (* [rec_env] being empty means that the shape is closed. *)
-    if S.DeBruijn_env.is_empty rec_env
+    if RS.DeBruijn_env.is_empty rec_env
     then RS.Cache.add cache runtime_shape reference
 end
 
@@ -1254,7 +1254,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
   in
   let die_with_extended_env sh new_ref =
     runtime_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
-      ~rec_env:(S.DeBruijn_env.push rec_env new_ref)
+      ~rec_env:(RS.DeBruijn_env.push rec_env new_ref)
       sh
   in
   match t.desc with
@@ -1383,7 +1383,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
              Format.pp_print_string)
           constructor_names)
   | Rec_var (de_bruijn_index, layout) -> (
-    match S.DeBruijn_env.get_opt rec_env ~de_bruijn_index with
+    match RS.DeBruijn_env.get_opt rec_env ~de_bruijn_index with
     | Some reference' ->
       create_typedef_die ~reference ~parent_proto_die ?name reference'
     | None ->
@@ -1391,7 +1391,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
           f
             "Recursive variable environment lookup failed: rec_env returned \
              None for de Bruijn index %a"
-            S.DeBruijn_index.print de_bruijn_index))
+            RS.DeBruijn_index.print de_bruijn_index))
   | Mu sh ->
     (* CR sspies: We are creating two typedefs for recursive types. One should
        be enough. *)
@@ -1550,7 +1550,7 @@ let runtime_shape_to_dwarf_die_with_aliased_name (type_name : string)
     let unnamed_die =
       runtime_shape_to_dwarf_die runtime_shape ~parent_proto_die
         ~fallback_value_die (* note that we do not pass the type name here *)
-        ~rec_env:S.DeBruijn_env.empty
+        ~rec_env:RS.DeBruijn_env.empty
     in
     let reference = Proto_die.create_reference () in
     let runtime_layout = RS.runtime_layout runtime_shape in

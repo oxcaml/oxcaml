@@ -343,10 +343,10 @@ and flatten_product_layout_exn (cs : t) =
 
 module Shape_cache : sig
   val find_in_cache :
-    Layout.t -> Shape.t -> rec_env:'a S.DeBruijn_env.t -> t option
+    Layout.t -> Shape.t -> rec_env:'a S.Rec_var_env.t -> t option
 
   val add_to_cache :
-    Shape.t -> Layout.t -> t -> rec_env:'a S.DeBruijn_env.t -> unit
+    Shape.t -> Layout.t -> t -> rec_env:'a S.Rec_var_env.t -> unit
 end = struct
   type t =
     { type_shape : Shape.t;
@@ -370,13 +370,13 @@ end = struct
   let cache = Cache.create 100
 
   let find_in_cache type_layout type_shape ~rec_env =
-    if S.DeBruijn_env.is_empty rec_env
+    if S.Rec_var_env.is_empty rec_env
     then Cache.find_opt cache { type_shape; type_layout }
     else None
 
   let add_to_cache type_shape type_layout value ~rec_env =
     (* [rec_env] being empty means that the shape is closed. *)
-    if S.DeBruijn_env.is_empty rec_env
+    if S.Rec_var_env.is_empty rec_env
     then Cache.add cache { type_shape; type_layout } value
 end
 
@@ -450,30 +450,35 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
       match runtime_layout with
       | Void -> void
       | Other runtime_layout -> runtime (RS.unknown runtime_layout)))
-  | Mu sh, type_layout ->
+  | Mu (rv, sh), type_layout ->
     (* We currently do not support unboxed recursive types (e.g., recursively
        defined mixed records). Those will fall back to default for printing the
        layout by forcing the runtime shape below. *)
     (* CR sspies: We should guess the layout from the recursive body [sh]
        instead of just using the current layout. *)
-    let rec_env = Shape.DeBruijn_env.push rec_env type_layout in
+    let rec_env =
+      rec_env
+      |> Shape.Rec_var_env.map (fun (idx, ly) ->
+          RS.DeBruijn_index.move_under_binder idx, ly)
+      |> Shape.Rec_var_env.add rv (RS.DeBruijn_index.create 0, type_layout)
+    in
     type_shape_to_complex_shape_exn ~rec_env sh type_layout
     |> force_runtime_shape_exn |> RS.mu |> runtime
-  | Rec_var i, layout -> (
-    match Shape.DeBruijn_env.get_opt rec_env ~de_bruijn_index:i, layout with
-    | Some (Some (Layout.Base base as ly1)), ly2_opt
+  | Rec_var rv, layout -> (
+    match Shape.Rec_var_env.find_opt rv rec_env, layout with
+    | Some (i, Some (Layout.Base base as ly1)), ly2_opt
     (* We combine the [None] and [Some] layout cases with the guard: *)
       when Option.value ~default:true (Option.map (Layout.equal ly1) ly2_opt)
       -> (
       match RS.Runtime_layout.of_base_layout base with
       | Void -> void
       | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
-    | Some (Some ly1), Some ly2 when not (Layout.equal ly1 ly2) ->
+    | Some (_, Some ly1), Some ly2 when not (Layout.equal ly1 ly2) ->
       err_or_unknown_exn (fun f ->
           f "Recursive variable has wrong layout. Expected %a, got %a"
             Layout.format ly2 Layout.format ly1)
       (* In all cases below, if there are two layouts, they are the same. *)
-    | (Some (Some ly1), (None | Some _)) as _ly2_opt ->
+    | Some (_, Some ly1), (None | Some _) ->
       (*= In this case, either:
           - [ly1] is a product and [_ly2_opt] is None
           - [ly1] is a product and [_ly2_opt] is equal to Some [ly1].
@@ -482,13 +487,14 @@ let rec type_shape_to_complex_shape_exn ~rec_env (type_shape : Shape.t)
           equal to the second layout) or the second branch (if not equal to the
           second layout). *)
       layout_to_unknown_shape ly1
-    | (Some None | None), Some (Layout.Base base) -> (
+    | Some (i, None), Some (Layout.Base base) -> (
       match RS.Runtime_layout.of_base_layout base with
       | Void -> void
       | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
-    | (Some None | None), Some (Layout.Product _ as ly) ->
+    | Some (_, None), Some (Layout.Product _ as ly) ->
       layout_to_unknown_shape ly
-    | (Some None | None), None -> raise Layout_missing)
+    | Some (_, None), None -> raise Layout_missing
+    | None, _ -> raise Layout_missing)
   | Alias sh, type_layout ->
     type_shape_to_complex_shape_exn ~rec_env sh type_layout
   | Arrow, (None | Some (Base Value)) -> runtime RS.func
@@ -798,5 +804,5 @@ and type_shape_to_complex_shape ~rec_env type_shape type_layout : t =
     shape
 
 let type_shape_to_complex_shape type_shape type_layout =
-  type_shape_to_complex_shape ~rec_env:Shape.DeBruijn_env.empty type_shape
+  type_shape_to_complex_shape ~rec_env:Shape.Rec_var_env.empty type_shape
     type_layout
