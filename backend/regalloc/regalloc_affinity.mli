@@ -26,3 +26,8 @@ val compute : Cfg_with_infos.t -> t
     (i.e. from the highest to the lowest affinity), returning an empty list
     if the temporary has no affinity with any physical register. *)
 val get : t -> Reg.t -> affinity list
+
+(** Returns the priority of the passed instruction, if it is a move between a
+    physical register and a temporary (it is then the highest priority for this
+    temporary, as fetched from `t`), otherwise returns `0`. *)
+val priority_of_instruction : t -> Cfg.basic Cfg.instruction -> int

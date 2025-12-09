@@ -38,7 +38,11 @@ module type Priority_queue = sig
 
   val get_and_remove : 'a t -> 'a element
 
+  val clear : 'a t -> unit
+
   val iter : 'a t -> f:('a element -> unit) -> unit
+
+  val fold : 'a t -> f:('acc -> 'a element -> 'acc) -> init:'acc -> 'acc
 end
 
 (* CR-soon gyorsh: check whether the dynamic array module from the stdlib can be
@@ -171,6 +175,11 @@ module Make (Priority : Order) :
       remove queue;
       res
 
+  let clear : 'a t -> unit =
+   fun queue ->
+    Array.fill queue.elements ~pos:0 ~len:queue.size dummy;
+    queue.size <- 0
+
   let iter : 'a t -> f:('a element -> unit) -> unit =
    fun queue ~f ->
     for i = 0 to pred queue.size do
@@ -178,4 +187,14 @@ module Make (Priority : Order) :
       assert (elem != dummy);
       f elem
     done
+
+  let fold : 'a t -> f:('acc -> 'a element -> 'acc) -> init:'acc -> 'acc =
+   fun queue ~f ~init ->
+    let res = ref init in
+    for i = 0 to pred queue.size do
+      let elem = Array.unsafe_get queue.elements i in
+      assert (elem != dummy);
+      res := f !res elem
+    done;
+    !res
 end

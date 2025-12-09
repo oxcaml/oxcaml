@@ -92,3 +92,14 @@ let compute : Cfg_with_infos.t -> t =
 
 let get : t -> Reg.t -> affinity list =
  fun t reg -> match Reg.Tbl.find_opt t reg with None -> [] | Some list -> list
+
+(* CR-soon xclerc for xclerc: it is not clear it is the best definition of
+   priority; for instance, we may want to consider moves between temporaries. *)
+let priority_of_instruction : t -> Cfg.basic Cfg.instruction -> _ =
+ fun t instr ->
+  match temp_and_phys_reg_of_instr instr with
+  | None -> 0
+  | Some (temp, _phys_reg) -> (
+    match get t temp with
+    | [] -> 0
+    | { priority; phys_reg = _ } :: _ -> priority)
