@@ -112,33 +112,26 @@ module Uid = struct
     | _ -> false
 end
 
-module DeBruijn_index = struct
+module Rec_var_ident = struct
   type t = int
 
-  let create n =
-    if n < 0
-    then Misc.fatal_errorf "De_bruijn_index.create: negative index %d" n
-    else n
+  let counter = ref 0
 
-  let move_under_binder n = n + 1
+  let mk_fresh () =
+    let n = !counter in
+    incr counter;
+    n
 
-  let equal n1 n2 = Int.equal n1 n2
+  let equal = Int.equal
 
-  let print fmt n = Format.fprintf fmt "%d" n
+  let compare = Int.compare
+
+  let hash n = n
+
+  let print fmt n = Format.fprintf fmt "rv%d" n
 end
 
-
-module DeBruijn_env = struct
-  type 'a t = 'a list
-
-  let empty = []
-
-  let get_opt t ~de_bruijn_index = List.nth_opt t de_bruijn_index
-
-  let push t x = x :: t
-
-  let is_empty = function [] -> true | _ -> false
-end
+module Rec_var_env = Map.Make (Rec_var_ident)
 
 module Sig_component_kind = struct
   type t =
@@ -521,8 +514,8 @@ and desc =
   | Predef of Predef.t * t list
   | Arrow
   | Poly_variant of t poly_variant_constructors
-  | Mu of t
-  | Rec_var of int
+  | Mu of Rec_var_ident.t * t
+  | Rec_var of Rec_var_ident.t
 
   (* constructors for type declarations *)
   | Variant of (t * Layout.t) complex_constructors
@@ -617,9 +610,9 @@ let rec equal_desc0 d1 d2 =
     if not (equal t1 t2) then false
     else equal v1 v2
   | Leaf, Leaf -> true
-  | Mu (t1_body), Mu (t2_body) ->
-    equal t1_body t2_body
-  | Rec_var i1, Rec_var i2 -> Int.equal i1 i2
+  | Mu (rv1, t1_body), Mu (rv2, t2_body) ->
+    Rec_var_ident.equal rv1 rv2 && equal t1_body t2_body
+  | Rec_var rv1, Rec_var rv2 -> Rec_var_ident.equal rv1 rv2
   | Struct t1, Struct t2 ->
     Item.Map.equal equal t1 t2
   | Proj (t1, i1), Proj (t2, i2) ->
@@ -733,14 +726,15 @@ let rec print fmt t =
         Format.fprintf fmt "@[%a(@,%a)%a@]" aux t1 aux t2 print_uid_opt uid
     | Leaf ->
         Format.fprintf fmt "<%a>" (Format.pp_print_option Uid.print) uid
-    | Mu (t_body) ->
-      Format.fprintf fmt "Rec@[%a %a@]"
+    | Mu (rv, t_body) ->
+      Format.fprintf fmt "Mu@[%a %a.%a@]"
         print_uid_opt uid
+        Rec_var_ident.print rv
         print_nested t_body
-    | Rec_var id ->
-      Format.fprintf fmt "#%d%a"
-      id
-      print_uid_opt uid
+    | Rec_var rv ->
+      Format.fprintf fmt "#%a%a"
+        Rec_var_ident.print rv
+        print_uid_opt uid
     | Proj (t, item) ->
         begin match uid with
         | None ->
@@ -1002,14 +996,14 @@ let comp_unit ?uid s =
     hash = Hashtbl.hash (hash_comp_unit, uid, s);
     approximated = false }
 
-let mu ?uid t_body =
-  { uid; desc = Mu (t_body);
-    hash = Hashtbl.hash (hash_mu, uid, t_body.hash);
+let mu ?uid rv t_body =
+  { uid; desc = Mu (rv, t_body);
+    hash = Hashtbl.hash (hash_mu, uid, Rec_var_ident.hash rv, t_body.hash);
     approximated = false }
 
-let rec_var ?uid n =
-  { uid; desc = Rec_var n;
-    hash = Hashtbl.hash (hash_rec_var, uid, n);
+let rec_var ?uid rv =
+  { uid; desc = Rec_var rv;
+    hash = Hashtbl.hash (hash_rec_var, uid, Rec_var_ident.hash rv);
     approximated = false }
 
 let app_list (base_shape : t) (args : t list) : t =
@@ -1163,8 +1157,8 @@ let set_uid_if_none t uid =
   | Proj (t, i) -> proj ~uid t i
   | Comp_unit c -> comp_unit ~uid c
   | Error s -> error ~uid s
-  | Mu t -> mu ~uid t
-  | Rec_var i -> rec_var ~uid i
+  | Mu (rv, t) -> mu ~uid rv t
+  | Rec_var rv -> rec_var ~uid rv
   | Constr (c, ts) -> constr ~uid c ts
   | Tuple ts -> tuple ~uid ts
   | Unboxed_tuple ts -> unboxed_tuple ~uid ts
