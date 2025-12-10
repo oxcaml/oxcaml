@@ -139,6 +139,7 @@ COMPILERLIBS_SOURCES=\
   typing/oprint.ml \
   typing/typemode.ml \
   typing/jkind.ml \
+  typing/typedtree.ml \
   typing/ikinds/global_counters.ml \
   typing/ikinds/product_lattice.ml \
   typing/ikinds/ldd_memo.ml \
