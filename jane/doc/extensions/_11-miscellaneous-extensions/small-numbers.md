@@ -6,7 +6,8 @@ title: Small Numbers
 
 # Small Numbers
 
-The small numbers extension adds `float32`, `int16`, and `int8` types to OxCaml.
+The small numbers extension adds the types `float32`, `int16`, and `int8` to
+OxCaml.
 
 ## Float32
 
