@@ -2427,8 +2427,9 @@ and transl_idx ~scopes loc env ba uas =
     let index = transl_exp ~scopes index_sort index in
     let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
     let array_kind =
-      array_type_kind ~elt_ty:(Some elt_ty) ~elt_layout:None (* Some elt_sort *) env loc
-        base_ty
+      (* CR zeisbach: after making a choice about elt_layout -> reformat! *)
+      array_type_kind ~elt_ty:(Some elt_ty) ~elt_layout:None (* Some elt_sort *)
+        env loc base_ty
     in
     let elt_layout = layout env loc elt_sort elt_ty in
     let mbe = mixed_block_element_of_layout elt_layout in

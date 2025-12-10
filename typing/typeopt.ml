@@ -159,13 +159,13 @@ type 'a classification =
    See comment on [classification] above to understand [classify_product]. *)
 let classify ~classify_product env ty layout : _ classification =
   let ty = scrape_ty env ty in
-  (* CR zeisbach: it seems plausible that this should be a layout *)
   match (layout : Jkind.Layout.Const.t) with
-  | Base (Scannable, _sa) -> begin
-  (* CR zeisbach: probably possible to use sa here instead of computing. try! *)
+  | Base (Scannable, { nullability; separability = _ }) -> begin
+  (* CR zeisbach: maybe only call the externality part here and use the
+     separability in the scannable axes? *)
   if Ctype.is_always_gc_ignorable env ty
   then
-    if Ctype.check_type_nullability env ty Non_null
+    if Jkind_axis.Nullability.(equal nullability Non_null)
     then Immediate else Immediate_or_null
   else match get_desc ty with
   | Tvar _ | Tunivar _ ->
@@ -243,10 +243,6 @@ let rec scannable_product_array_kind elt_ty_for_error loc layouts =
 
 and sort_to_scannable_product_element_kind elt_ty_for_error loc
       (layout : Jkind.Layout.Const.t) =
-  (* CR zeisbach: stale comment *)
-  (* Unfortunate: this never returns `Pint_scannable`.  Doing so would require
-     this to traverse the type, rather than just the kind, or to add product
-     kinds. *)
   match layout with
   | Any _ -> failwith "CR zeisbach:"
   | Base (Scannable, { separability; _ }) ->
@@ -303,7 +299,6 @@ let array_kind_of_elt ~elt_layout env loc ty =
   in
   (* CR dkalinichenko: many checks in [classify] are redundant
      with separability. *)
-  (* CR zeisbach: fix this extremely temporary patch! *)
   match classify ~classify_product env ty elt_layout with
   | Any ->
     if Config.flat_float_array
@@ -1200,7 +1195,6 @@ let lazy_val_requires_forward env loc ty =
     let kind = Jkind_types.Layout.Const.Product layouts in
     raise (Error (loc, Unsupported_product_in_lazy kind))
   in
-  (* CR zeisbach: fix this obviously wrong patch *)
   match classify ~classify_product env ty layout with
   | Any | Lazy -> true
   (* CR layouts: Fix this when supporting lazy unboxed values.
