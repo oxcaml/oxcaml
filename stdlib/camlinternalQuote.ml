@@ -1340,14 +1340,18 @@ module Ast = struct
     | ModuleApply of module_expr * module_expr
     | ModuleApply_unit of module_expr
 
-  and comprehension_clause =
+  and for_comprehension_iterator =
     | Range of Var.Value.t * expression * expression * direction_flag
     | In of pattern * expression
 
+  and comprehension_clause =
+    | WhenComp of expression
+    | ForComp of for_comprehension_iterator list
+
   and comprehension =
-    | Body of expression
-    | When of comprehension * expression
-    | ForComp of comprehension * comprehension_clause
+    { comp_body : expression;
+      clauses : comprehension_clause list
+    }
 
   (* quotation printing logic *)
 
@@ -1391,8 +1395,8 @@ module Ast = struct
       List.iter
         (fun e ->
            if with_space
-           then pp fmt "%s@ %a" delim printer e
-           else pp fmt "%s@,%a" delim printer e)
+           then pp fmt "%a@ %a" pp delim printer e
+           else pp fmt "%a@,%a" pp delim printer e)
         es);
     pp fmt "@]%s" close_sym
 
@@ -1740,7 +1744,7 @@ module Ast = struct
            (print_exp_with_parens env) fmt items
     else print_tuple_like ";" "[" "]" (print_exp env) fmt items
 
-  and print_comprehension_clause env fmt = function
+  and print_for_iterator env fmt = function
     | Range (var, exp_start, exp_stop, dir) ->
       pp fmt "@[%a = %a@]@ %a@ %a"
         (Var.Value.print env) var (print_exp env) exp_start
@@ -1748,19 +1752,23 @@ module Ast = struct
     | In (pat, exp) ->
       pp fmt "%a@ in@ %a" (print_pat env) pat (print_exp env) exp
 
-  and print_comprehension_body env fmt = function
-    | Body exp -> print_exp env fmt exp
-    | When (comp, _) -> print_comprehension_body env fmt comp
-    | ForComp (comp, _) -> print_comprehension_body env fmt comp
+  and print_comprehension_clause env fmt = function
+    | WhenComp exp -> pp fmt "@[when@ %a@]" (print_exp env) exp
+    | ForComp [] ->
+      failwith "Empty for clause in list comprehension. This should not happen."
+    | ForComp its ->
+      pp fmt "@[for@ %a@]"
+        (print_tuple_like ~with_space:false "@ and@ " "" ""
+           (print_for_iterator env))
+        its
 
-  and print_comprehension env fmt = function
-    | Body _ -> ()
-    | When (comp, exp) ->
-      pp fmt "@ when@ %a%a" (print_exp env) exp (print_comprehension env) comp
-    | ForComp (comp, clause) ->
-      pp fmt "@ for@ %a%a"
-        (print_comprehension_clause env) clause
-        (print_comprehension env) comp
+  and print_comprehension env fmt {comp_body; clauses} =
+    pp fmt "%a@ %a"
+      (print_exp env)
+      comp_body
+      (print_tuple_like ~with_space:true "" "" ""
+         (print_comprehension_clause env))
+      clauses
 
   and print_exp_desc env fmt exp =
     match exp.desc with
@@ -1915,11 +1923,9 @@ module Ast = struct
     | Quote exp -> pp fmt "@[<2><[@,%a@,@]]>" (print_exp env) exp
     | Antiquote exp -> pp fmt "@[<2>$@,%a@]" (print_exp_with_parens env) exp
     | List_comprehension compr ->
-      pp fmt "@[[@ %a%a@ ]@]"
-        (print_comprehension_body env) compr (print_comprehension env) compr
+      pp fmt "@[<2>[@ %a@ ]@]" (print_comprehension env) compr
     | Array_comprehension compr ->
-      pp fmt "@[[|@ %a%a@ |]@]"
-        (print_comprehension_body env) compr (print_comprehension env) compr
+      pp fmt "@[<2>[|@ %a@ |]@]" (print_comprehension env) compr
     | Eval typ -> pp fmt "@[<2>[%%eval:@ %a]@]" (print_core_type env) typ
     | Unreachable | Src_pos -> pp fmt "."
 
@@ -2484,37 +2490,52 @@ module Function = struct
 end
 
 module Comprehension = struct
+  module Iterator = struct
+    type t = Ast.for_comprehension_iterator With_free_vars.t
+    let ( let+ ) m f = With_free_vars.map f m
+    let ( and+ ) = With_free_vars.both
+
+    let range var start stop direction =
+      let+ start = start and+ stop = stop in
+      let dir = if direction then Ast.Upto else Ast.Downto in
+      Ast.Range (var, start, stop, dir)
+
+    let in_ loc vars pat exp =
+      let+ pat = pat and+ exp = exp in
+      let p =
+        With_bound_vars.value
+          ~extra:(Binding_error.unexpected_at_loc loc)
+          ~missing:Binding_error.missing pat
+          (Var.Value.generic_list vars)
+      in
+      Ast.In (p, exp)
+  end
+
   type t = Ast.comprehension With_free_vars.t
 
   let ( let+ ) m f = With_free_vars.map f m
-
   let ( and+ ) = With_free_vars.both
+
+  let mk clauses comp_body = Ast.{clauses; comp_body}
 
   let body exp =
     let+ exp = exp in
-    Ast.Body exp
+    mk [] exp
 
-  let when_clause compr exp =
-    let+ compr = compr and+ exp = exp in
-    Ast.When (compr, exp)
+  let when_ exp comprehension =
+    let+ Ast.{clauses; comp_body} = comprehension
+    and+ exp = exp
+    in
+    mk ((Ast.WhenComp exp) :: clauses) comp_body
 
-  let for_range loc name start stop direction compr =
-    With_free_vars.value_binding loc name (fun var ->
-        let+ start = start and+ stop = stop and+ compr = compr var in
-        let dir = if direction then Ast.Upto else Ast.Downto in
-        Ast.ForComp (compr, Ast.Range (var, start, stop, dir)))
-
-  let for_in loc exp names compr =
-    With_free_vars.value_bindings loc names (fun vars ->
-        let pat, compr = compr vars in
-        let+ pat = pat and+ compr = compr and+ exp = exp in
-        let p =
-          With_bound_vars.value
-            ~extra:(Binding_error.unexpected_at_loc loc)
-            ~missing:Binding_error.missing pat
-            (Var.Value.generic_list vars)
-        in
-        Ast.ForComp (compr, Ast.In (p, exp)))
+  let for_ loc names frest =
+    let+ its, Ast.{clauses; comp_body} =
+      With_free_vars.value_bindings loc names (fun vars ->
+        let its, comprehension = frest vars in
+        let+ its = With_free_vars.all its and+ comprehension = comprehension
+        in (its, comprehension))
+    in
+    mk ((Ast.ForComp its) :: clauses) comp_body
 end
 
 module Code = struct

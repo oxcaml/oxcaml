@@ -700,7 +700,7 @@ let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 ] ]>;;
 
 let _ = <[ [ a * b for a = 1 to 10 and b = 1 to 10 ] ]>;;
 [%%expect {|
-- : <[int list]> expr = <[[ a * b for b = 1 to 10 for a = 1 to 10 ]]>
+- : <[int list]> expr = <[[ a * b for a = 1 to 10 and b = 1 to 10 ]]>
 |}];;
 
 let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 ] ]>;;
@@ -723,7 +723,7 @@ let _ = <[ [| a ^ "!" for a in [|"foo"; "bar"|] |] ]>;;
 let _ = <[ [ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ] ]>;;
 [%%expect {|
 - : <[string list]> expr =
-<[[ a ^ b for b in ["!"; "?"; "!?"] for a in ["foo"; "bar"] ]]>
+<[[ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ]]>
 |}];;
 
 <[ let o = object method f = 1 end in o#f ]>;;

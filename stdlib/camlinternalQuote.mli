@@ -513,17 +513,22 @@ and Function : sig
 end
 
 and Comprehension : sig
+  module Iterator : sig
+    type t
+
+    val range : Var.Value.t -> Exp.t -> Exp.t -> bool -> t
+
+    val in_ : Loc.t -> Var.Value.t list -> Pat.t -> Exp.t -> t
+  end
+
   type t
 
   val body : Exp.t -> t
 
-  val when_clause : t -> Exp.t -> t
+  val when_ : Exp.t -> t -> t
 
-  val for_range :
-    Loc.t -> Name.t -> Exp.t -> Exp.t -> bool -> (Var.Value.t -> t) lam -> t
-
-  val for_in :
-    Loc.t -> Exp.t -> Name.t list -> (Var.Value.t list -> Pat.t * t) lam -> t
+  val for_ :
+    Loc.t -> Name.t list -> (Var.Value.t list -> Iterator.t list * t) lam -> t
 end
 
 and Exp_desc : sig

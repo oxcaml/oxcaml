@@ -1679,6 +1679,27 @@ end = struct
 end
 
 and Comprehension : sig
+  module Iterator : sig
+    type s
+
+    type t' = s lazy_t
+
+    type t = s lam
+
+    val wrap : t' -> t
+
+    val range :
+      Debuginfo.Scoped_location.t -> Var.Value.t -> Exp.t -> Exp.t -> bool -> t'
+
+    val in_ :
+      Debuginfo.Scoped_location.t ->
+      Loc.t ->
+      Var.Value.t list ->
+      Pat.t ->
+      Exp.t ->
+      t'
+  end
+
   type s
 
   type t' = s lazy_t
@@ -1689,26 +1710,34 @@ and Comprehension : sig
 
   val body : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
-  val when_clause : Debuginfo.Scoped_location.t -> t -> Exp.t -> t'
+  val when_ : Debuginfo.Scoped_location.t -> Exp.t -> t -> t'
 
-  val for_range :
+  val for_ :
     Debuginfo.Scoped_location.t ->
     Loc.t ->
-    Name.t ->
-    Exp.t ->
-    Exp.t ->
-    bool ->
-    (Var.Value.t -> t) lam ->
-    t'
-
-  val for_in :
-    Debuginfo.Scoped_location.t ->
-    Loc.t ->
-    Exp.t ->
     Name.t list ->
-    (Var.Value.t list -> Pat.t * t) lam ->
+    (Var.Value.t list -> Iterator.t list * t) lam ->
     t'
 end = struct
+  module Iterator = struct
+    type s = lambda
+
+    type t' = s lazy_t
+
+    type t = s lam
+
+    let wrap = inject_force
+
+    let range loc a1 a2 a3 a4 =
+      apply4 "Comprehension.Iterator" "range" loc (extract a1) (extract a2)
+        (extract a3) (transl_bool a4)
+
+    let in_ loc a1 a2 a3 a4 =
+      apply4 "Comprehension.Iterator" "in_" loc (extract a1)
+        (mk_list ~loc (List.map extract a2))
+        (extract a3) (extract a4)
+  end
+
   type s = lambda
 
   type t' = s lazy_t
@@ -1719,17 +1748,13 @@ end = struct
 
   let body loc a1 = apply1 "Comprehension" "body" loc (extract a1)
 
-  let when_clause loc a1 a2 =
-    apply2 "Comprehension" "when_clause" loc (extract a1) (extract a2)
+  let when_ loc a1 a2 =
+    apply2 "Comprehension" "when_" loc (extract a1) (extract a2)
 
-  let for_range loc a1 a2 a3 a4 a5 a6 =
-    apply6 "Comprehension" "for_range" loc (extract a1) (extract a2)
-      (extract a3) (extract a4) (transl_bool a5) (extract a6)
-
-  let for_in loc a1 a2 a3 a4 =
-    apply4 "Comprehension" "for_in" loc (extract a1) (extract a2)
-      (mk_list ~loc (List.map extract a3))
-      (extract a4)
+  let for_ loc a1 a2 a3 =
+    apply3 "Comprehension" "for_" loc (extract a1)
+      (mk_list ~loc (List.map extract a2))
+      (extract a3)
 end
 
 and Exp_desc : sig
@@ -2919,39 +2944,57 @@ and quote_comprehension ~scopes ~transl stage loc { comp_body; comp_clauses } =
     | Texp_comp_when _ -> ()
     | Texp_comp_for clbs -> List.iter remove_clb_idents clbs
   in
-  let add_clause body = function
+  let add_clause (body : Comprehension.t) = function
     | Texp_comp_when exp ->
       let exp = quote_expression ~scopes ~transl stage exp in
-      Comprehension.when_clause loc body exp |> Comprehension.wrap
+      Comprehension.when_ loc exp body |> Comprehension.wrap
     | Texp_comp_for clause_bindings ->
-      List.fold_left
-        (fun body clb ->
-          (match clb.comp_cb_iterator with
-          | Texp_comp_range rcd ->
-            let start = quote_expression ~scopes ~transl stage rcd.start
-            and stop = quote_expression ~scopes ~transl stage rcd.stop
-            and direction =
-              match rcd.direction with Upto -> true | Downto -> false
-            in
-            let body_fn = Lam.func ~loc Var_value extract rcd.ident body in
-            Comprehension.for_range loc (quote_loc loc)
-              (quote_name loc (Ident.name rcd.ident))
-              start stop direction body_fn
-          | Texp_comp_in { pattern; sequence } ->
-            let expr_lam = quote_expression ~scopes ~transl stage sequence in
-            let idents = pat_bound_idents pattern in
-            let names =
-              List.map (fun ident -> quote_name loc (Ident.name ident)) idents
-            in
-            let pat_lam = quote_value_pattern ~scopes pattern in
-            let body_fn =
-              Lam.list_param_binding ~loc Var_value
-                (fun (pat, compr) -> pair ~loc (extract pat, extract compr))
-                idents (pat_lam, body)
-            in
-            Comprehension.for_in loc (quote_loc loc) expr_lam names body_fn)
-          |> Comprehension.wrap)
-        body clause_bindings
+      let iterators =
+        List.map
+          (fun clb ->
+            (match clb.comp_cb_iterator with
+            | Texp_comp_range rcd ->
+              let start = quote_expression ~scopes ~transl stage rcd.start
+              and stop = quote_expression ~scopes ~transl stage rcd.stop
+              and direction =
+                match rcd.direction with Upto -> true | Downto -> false
+              in
+              let iter_var = Hashtbl.find vars_env.env_vals rcd.ident in
+              Comprehension.Iterator.range loc iter_var start stop direction
+            | Texp_comp_in { pattern; sequence } ->
+              let expr_lam = quote_expression ~scopes ~transl stage sequence in
+              let pat_lam = quote_value_pattern ~scopes pattern in
+              let iter_vars =
+                List.map
+                  (Hashtbl.find vars_env.env_vals)
+                  (pat_bound_idents pattern)
+              in
+              Comprehension.Iterator.in_ loc (quote_loc loc) iter_vars pat_lam
+                expr_lam)
+            |> Comprehension.Iterator.wrap)
+          clause_bindings
+      in
+      let idents =
+        List.concat
+          (List.map
+             (fun clb ->
+               match clb.comp_cb_iterator with
+               | Texp_comp_range rcd -> [rcd.ident]
+               | Texp_comp_in { pattern; _ } -> pat_bound_idents pattern)
+             clause_bindings)
+      in
+      let names =
+        List.map
+          (fun ident -> Name.mk loc (Ident.name ident) |> Name.wrap)
+          idents
+      in
+      let body_fn =
+        Lam.list_param_binding ~loc Var_value
+          (fun (its, compr) ->
+            pair ~loc (mk_list ~loc (List.map extract its), extract compr))
+          idents (iterators, body)
+      in
+      Comprehension.for_ loc (quote_loc loc) names body_fn |> Comprehension.wrap
   in
   List.iter add_comprehension_idents comp_clauses;
   let body =
