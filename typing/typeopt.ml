@@ -26,7 +26,7 @@ type error =
       Jkind.Sort.t * Language_extension.maturity * type_expr option
   | Small_number_sort_without_extension of Jkind.Sort.t * type_expr option
   | Simd_sort_without_extension of Jkind.Sort.t * type_expr option
-  (*= | Not_a_sort of type_expr * Jkind.Violation.t *)
+  | Not_a_sort of type_expr * Jkind.Violation.t
   | Unsupported_product_in_lazy of Jkind.Layout.Const.t
   | Unsupported_vector_in_product_array
   | Mixed_product_array of Jkind.Layout.Const.t * type_expr
@@ -110,15 +110,31 @@ let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
    sort info, or do something else. Internal ticket 5093. *)
 (* CR layouts v3.0: have a better error message
    for nullable jkinds.*)
-let type_layout (* ~why *) env _loc ty =
-  let jkind = Ctype.type_jkind env ty in
-  match Jkind.get_layout_defaulting_to_scannable jkind with
-  (* CR zeisbach: why would the previous type_sort raise an error? we should
-     make sure that the behavior isn't lost. *)
-  | Any sa -> (* maybe this should default to value? *)
-    Jkind_types.Layout.Const.Base (Scannable, sa)
-    (* raise (Error (loc, Not_a_sort (ty, err))) *)
-  | layout -> layout
+let type_layout ~why env loc ty =
+  (* To ensure that ty's jkind is representable, we first [type_sort].
+     We don't use this sort, though; we need the entire layout instead.
+     The need for this is demonstrated with the following example:
+
+     external foo : ('a : any mod separable). 'a array -> int = "%identity"
+     let f x = foo x
+
+     [type_sort] will make, constrain, and default a new sort variable for [f]'s
+     type parameter. Without it, calling [type_jkind] returns a jkind with
+     layout [Any] and [f]'s type parameter would have the wrong layout.
+
+     See also (3) in [Note regarding jkind checks on external declarations]. *)
+  (* CR zeisbach: is there a way to do this more efficiently? *)
+  (* CR zeisbach: try to clean up the comment above. *)
+  match Ctype.type_sort ~why ~fixed:false env ty with
+  | Ok _sort ->
+    let jkind = Ctype.type_jkind env ty in
+    (match Jkind.get_layout_defaulting_to_scannable jkind with
+    | Any _ ->
+      Misc.fatal_error "called type_sort but didn't get a representable layout"
+    | layout -> layout)
+  | Error err ->
+    (* It seems as if this is unreachable *)
+    raise (Error (loc, Not_a_sort (ty, err)))
 
 (* [classification]s are used for two things: things in arrays, and things in
    lazys. In the former case, we need detailed information about unboxed
@@ -270,9 +286,7 @@ let array_kind_of_elt ~elt_layout env loc ty =
   let elt_layout =
     match elt_layout with
     | Some layout -> layout
-    | None -> type_layout env loc ty
-      (*= Jkind.Sort.default_for_transl_and_get
-        (type_sort ~why:Array_element env loc ty) *)
+    | None -> type_layout ~why:Array_element env loc ty
   in
   let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
   let classify_product ty sorts =
@@ -1290,11 +1304,11 @@ let report_error ppf = function
          build file.@ \
          Otherwise, please report this error to the Jane Street compilers team."
         extension verb flags
-  (*= | Not_a_sort (ty, err) ->
+  | Not_a_sort (ty, err) ->
       fprintf ppf "A representable layout is required here.@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) ) err *)
+           ~level:(Ctype.get_current_level ()) ) err
   | Unsupported_product_in_lazy const ->
       fprintf ppf
         "Product layout %s detected in [lazy] in [Typeopt.Layout]@ \
