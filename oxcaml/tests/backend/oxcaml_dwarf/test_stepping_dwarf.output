@@ -1,14 +1,14 @@
     frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_start(param=0 : ocaml_value)
-    frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_step_through_mutations(counter=[0] : int ref @ value)
+    frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_step_through_mutations(counter={ contents = 0 } : int ref @ value)
 === Stepping through mutations ===
-(int ref @ value) counter = [0]
-    frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_step_through_mutations(counter=[1] : int ref @ value)
-(int ref @ value) counter = [1]
-    frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_step_through_mutations(counter=[2] : int ref @ value)
-(int ref @ value) counter = [2]
-    frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_step_through_mutations(counter=[3] : int ref @ value)
-(int ref @ value) counter = [3]
-    frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_step_through_mutations(counter=[4] : int ref @ value)
-(int ref @ value) counter = [4]
+(int ref @ value) counter = { contents = 0 }
+    frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_step_through_mutations(counter={ contents = 1 } : int ref @ value)
+(int ref @ value) counter = { contents = 1 }
+    frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_step_through_mutations(counter={ contents = 2 } : int ref @ value)
+(int ref @ value) counter = { contents = 2 }
+    frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_step_through_mutations(counter={ contents = 3 } : int ref @ value)
+(int ref @ value) counter = { contents = 3 }
+    frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_step_through_mutations(counter={ contents = 4 } : int ref @ value)
+(int ref @ value) counter = { contents = 4 }
 Final value: 4
 Process <PID> exited with status = 0 (0x00000000)
