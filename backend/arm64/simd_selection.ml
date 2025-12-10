@@ -103,14 +103,15 @@ let select_simd_instr op args dbg =
   | "caml_neon_int8x16_ext" ->
     let n, args = extract_constant args ~max:15 op dbg in
     Some (Extq_u8 n, args)
-  | "caml_simd_vec128_shift_left_bytes"| "caml_neon_vec128_shift_left_bytes" ->
+  | "caml_simd_vec128_shift_left_bytes" | "caml_neon_vec128_shift_left_bytes" ->
     let n, args = extract_constant args ~max:15 op dbg in
     let n' = 16 - n in
     let arg = one_arg op args in
     let zero = Cmm.Cconst_vec128 ({ word0 = 0L; word1 = 0L }, dbg) in
     let args = [zero; arg] in
     Some (Extq_u8 n', args)
-  | "caml_simd_vec128_shift_right_bytes" | "caml_neon_vec128_shift_right_bytes" ->
+  | "caml_simd_vec128_shift_right_bytes" | "caml_neon_vec128_shift_right_bytes"
+    ->
     let n, args = extract_constant args ~max:15 op dbg in
     let arg = one_arg op args in
     let zero = Cmm.Cconst_vec128 ({ word0 = 0L; word1 = 0L }, dbg) in
@@ -138,6 +139,9 @@ let select_simd_instr op args dbg =
   | "caml_simd_vec128_low_64_to_high_64" | "caml_neon_vec128_low_64_to_high_64"
     ->
     Some (Copyq_laneq_s64 { src_lane = 0; dst_lane = 1 }, args)
+  | "caml_neon_float64x2_insert" ->
+    let lane, args = extract_constant args ~max:1 op dbg in
+    Some (Setq_lane_f64 { lane }, args)
   | "caml_simd_int64x2_add" | "caml_neon_int64x2_add" -> Some (Addq_s64, args)
   | "caml_simd_int64x2_sub" | "caml_neon_int64x2_sub" -> Some (Subq_s64, args)
   | "caml_neon_int32x4_add" -> Some (Addq_s32, args)
@@ -277,7 +281,7 @@ let select_simd_instr op args dbg =
     Some (Shrq_n_u64 n, args)
   | "caml_neon_int32x4_sshl" -> Some (Shlq_s32, args)
   | "caml_neon_int64x2_sshl" -> Some (Shlq_s64, args)
-  | "caml_simd_int32x4_srai"| "caml_neon_int32x4_srai" ->
+  | "caml_simd_int32x4_srai" | "caml_neon_int32x4_srai" ->
     let n, args = extract_constant args ~max:32 op dbg in
     Some (Shrq_n_s32 n, args)
   | "caml_simd_int64x2_srai" | "caml_neon_int64x2_srai" ->
@@ -289,6 +293,9 @@ let select_simd_instr op args dbg =
   | "caml_neon_int64x2_extract" ->
     let lane, args = extract_constant args ~max:1 op dbg in
     Some (Getq_lane_s64 { lane }, args)
+  | "caml_neon_float64x2_extract" ->
+    let lane, args = extract_constant args ~max:1 op dbg in
+    Some (Getq_lane_f64 { lane }, args)
   | "caml_neon_int32x4_insert" ->
     let lane, args = extract_constant args ~max:3 op dbg in
     Some (Setq_lane_s32 { lane }, args)
@@ -411,7 +418,7 @@ let pseudoregs_for_operation (simd_op : Simd.operation) arg res =
   match Simd_proc.register_behavior simd_op with
   | Rs32x4_Rs32_to_First _ | Rs64x2_Rs64_to_First _ | Rs16x8_Rs16_to_First _
   | Rs8x16_Rs8_to_First _ | Rs64x2_Rs64x2_to_First _ | Rs16x8_Rs32x4_to_First
-  | Rs8x16_Rs16x8_to_First | Rs32x4_Rs64x2_to_First ->
+  | Rs8x16_Rs16x8_to_First | Rs32x4_Rs64x2_to_First | Rf64x2_Rf64_to_First _->
     let arg = Array.copy arg in
     let res = Array.copy res in
     assert (not (Reg.is_preassigned arg.(0)));
@@ -430,7 +437,7 @@ let pseudoregs_for_operation (simd_op : Simd.operation) arg res =
   | Rs16x8lane_to_Rs16x8 _ | Rs64x2_to_Rs32x2 | Rs8x16lane_to_Rs8x16 _
   | Rs8x16_to_Rs8 _ | Rs32x4_to_Rs16x4 | Rs16x8_to_Rs8x8
   | Rs16x8_Rs16x8_to_Rs32x4 | Rs16x4_Rs16x4_to_Rs32x4 | Rs16x4_to_Rs32x4
-  | Rs8x8_to_Rs16x8 ->
+  | Rs8x8_to_Rs16x8  | Rf64x2_to_Rf64 _ ->
     arg, res
 
 (* See `amd64/simd_selection.ml`. *)

@@ -272,8 +272,10 @@ type operation =
   | Shrq_n_s8 of int
   | Getq_lane_s32 of { lane : int (* 0 <= lane <= 3 *) }
   | Getq_lane_s64 of { lane : int (* 0 <= lane <= 1 *) }
+  | Getq_lane_f64 of { lane : int (* 0 <= lane <= 1 *) }
   | Setq_lane_s32 of { lane : int (* 0 <= lane <= 3 *) }
   | Setq_lane_s64 of { lane : int (* 0 <= lane <= 1 *) }
+  | Setq_lane_f64 of { lane : int (* 0 <= lane <= 1 *) }
   | Dupq_lane_s32 of { lane : int (* 0 <= lane <= 3 *) }
   | Dupq_lane_s64 of { lane : int (* 0 <= lane <= 1 *) }
   | Getq_lane_s16 of { lane : int (* 0 <= lane <= 7 *) }
@@ -460,8 +462,10 @@ let print_name op =
   | Shlq_s8 -> "Sshlq_s8"
   | Setq_lane_s32 { lane } -> "Setq_lane_s32_" ^ Int.to_string lane
   | Setq_lane_s64 { lane } -> "Setq_lane_s64_" ^ Int.to_string lane
+  | Setq_lane_f64 { lane } -> "Setq_lane_f64_" ^ Int.to_string lane
   | Getq_lane_s32 { lane } -> "Getq_lane_s32_" ^ Int.to_string lane
   | Getq_lane_s64 { lane } -> "Getq_lane_s64_" ^ Int.to_string lane
+  | Getq_lane_f64 { lane } -> "Getq_lane_f64_" ^ Int.to_string lane
   | Dupq_lane_s32 { lane } -> "Dupq_lane_s32_" ^ Int.to_string lane
   | Dupq_lane_s64 { lane } -> "Dupq_lane_s64_" ^ Int.to_string lane
   | Setq_lane_s16 { lane } -> "Setq_lane_s16_" ^ Int.to_string lane
@@ -663,8 +667,10 @@ let equal_operation op1 op2 =
     Int.equal n1 n2
   | Getq_lane_s32 { lane = l }, Getq_lane_s32 { lane = l' }
   | Getq_lane_s64 { lane = l }, Getq_lane_s64 { lane = l' }
+  | Getq_lane_f64 { lane = l }, Getq_lane_f64 { lane = l' }
   | Setq_lane_s32 { lane = l }, Setq_lane_s32 { lane = l' }
   | Setq_lane_s64 { lane = l }, Setq_lane_s64 { lane = l' }
+  | Setq_lane_f64 { lane = l }, Setq_lane_f64 { lane = l' }
   | Dupq_lane_s32 { lane = l }, Dupq_lane_s32 { lane = l' }
   | Dupq_lane_s64 { lane = l }, Dupq_lane_s64 { lane = l' }
   | Getq_lane_s16 { lane = l }, Getq_lane_s16 { lane = l' }
@@ -704,27 +710,27 @@ let equal_operation op1 op2 =
       | Movl_s8 | Movl_u8 | Paddq_f32 | Cmp_f32 _ | Cmpz_f32 _ | Cmpz_s32 _
       | Cmp_f64 _ | Cmpz_f64 _ | Cmp_s32 _ | Cmp_s64 _ | Cmpz_s64 _ | Mvnq_s32
       | Orrq_s32 | Andq_s32 | Eorq_s32 | Negq_s32 | Getq_lane_s32 _
-      | Getq_lane_s64 _ | Dupq_lane_s32 _ | Dupq_lane_s64 _ | Mulq_s32
-      | Mulq_s16 | Addq_s32 | Subq_s32 | Minq_s32 | Maxq_s32 | Minq_u32
-      | Maxq_u32 | Absq_s32 | Absq_s64 | Paddq_f64 | Paddq_s32 | Paddq_s64
-      | Mvnq_s64 | Orrq_s64 | Andq_s64 | Eorq_s64 | Negq_s64 | Shlq_u32
-      | Shlq_u64 | Shlq_n_u32 _ | Shlq_n_u64 _ | Shrq_n_u32 _ | Shrq_n_u64 _
-      | Shrq_n_s32 _ | Shrq_n_s64 _ | Shlq_s32 | Shlq_s64 | Setq_lane_s32 _
-      | Setq_lane_s64 _ | Addq_s16 | Paddq_s16 | Qaddq_s16 | Qaddq_u16
-      | Subq_s16 | Qsubq_s16 | Qsubq_u16 | Absq_s16 | Minq_s16 | Maxq_s16
-      | Minq_u16 | Maxq_u16 | Mvnq_s16 | Orrq_s16 | Andq_s16 | Eorq_s16
-      | Negq_s16 | Cntq_u16 | Shlq_u16 | Shlq_s16 | Cmp_s16 _ | Cmpz_s16 _
-      | Shlq_n_u16 _ | Shrq_n_u16 _ | Shrq_n_s16 _ | Getq_lane_s16 _
-      | Setq_lane_s16 _ | Dupq_lane_s16 _ | Addq_s8 | Paddq_s8 | Qaddq_s8
-      | Qaddq_u8 | Subq_s8 | Qsubq_s8 | Qsubq_u8 | Absq_s8 | Minq_s8 | Maxq_s8
-      | Minq_u8 | Maxq_u8 | Mvnq_s8 | Orrq_s8 | Andq_s8 | Eorq_s8 | Negq_s8
-      | Cntq_u8 | Shlq_u8 | Shlq_s8 | Cmp_s8 _ | Cmpz_s8 _ | Shlq_n_u8 _
-      | Shrq_n_u8 _ | Shrq_n_s8 _ | Getq_lane_s8 _ | Setq_lane_s8 _
-      | Dupq_lane_s8 _ | Copyq_laneq_s64 _ | Qmovn_high_s64 | Qmovn_s64
-      | Qmovn_high_s32 | Qmovn_s32 | Qmovn_high_u32 | Qmovn_u32 | Qmovn_high_s16
-      | Qmovn_s16 | Qmovn_high_u16 | Qmovn_u16 | Movn_high_s64 | Movn_s64
-      | Movn_high_s32 | Movn_s32 | Movn_high_s16 | Movn_s16 | Mullq_s16
-      | Mullq_u16 | Mullq_high_s16 | Mullq_high_u16 ),
+      | Getq_lane_s64 _ | Getq_lane_f64 _ | Dupq_lane_s32 _ | Dupq_lane_s64 _
+      | Mulq_s32 | Mulq_s16 | Addq_s32 | Subq_s32 | Minq_s32 | Maxq_s32
+      | Minq_u32 | Maxq_u32 | Absq_s32 | Absq_s64 | Paddq_f64 | Paddq_s32
+      | Paddq_s64 | Mvnq_s64 | Orrq_s64 | Andq_s64 | Eorq_s64 | Negq_s64
+      | Shlq_u32 | Shlq_u64 | Shlq_n_u32 _ | Shlq_n_u64 _ | Shrq_n_u32 _
+      | Shrq_n_u64 _ | Shrq_n_s32 _ | Shrq_n_s64 _ | Shlq_s32 | Shlq_s64
+      | Setq_lane_s32 _ | Setq_lane_s64 _ | Setq_lane_f64 _ | Addq_s16
+      | Paddq_s16 | Qaddq_s16 | Qaddq_u16 | Subq_s16 | Qsubq_s16 | Qsubq_u16
+      | Absq_s16 | Minq_s16 | Maxq_s16 | Minq_u16 | Maxq_u16 | Mvnq_s16
+      | Orrq_s16 | Andq_s16 | Eorq_s16 | Negq_s16 | Cntq_u16 | Shlq_u16
+      | Shlq_s16 | Cmp_s16 _ | Cmpz_s16 _ | Shlq_n_u16 _ | Shrq_n_u16 _
+      | Shrq_n_s16 _ | Getq_lane_s16 _ | Setq_lane_s16 _ | Dupq_lane_s16 _
+      | Addq_s8 | Paddq_s8 | Qaddq_s8 | Qaddq_u8 | Subq_s8 | Qsubq_s8 | Qsubq_u8
+      | Absq_s8 | Minq_s8 | Maxq_s8 | Minq_u8 | Maxq_u8 | Mvnq_s8 | Orrq_s8
+      | Andq_s8 | Eorq_s8 | Negq_s8 | Cntq_u8 | Shlq_u8 | Shlq_s8 | Cmp_s8 _
+      | Cmpz_s8 _ | Shlq_n_u8 _ | Shrq_n_u8 _ | Shrq_n_s8 _ | Getq_lane_s8 _
+      | Setq_lane_s8 _ | Dupq_lane_s8 _ | Copyq_laneq_s64 _ | Qmovn_high_s64
+      | Qmovn_s64 | Qmovn_high_s32 | Qmovn_s32 | Qmovn_high_u32 | Qmovn_u32
+      | Qmovn_high_s16 | Qmovn_s16 | Qmovn_high_u16 | Qmovn_u16 | Movn_high_s64
+      | Movn_s64 | Movn_high_s32 | Movn_s32 | Movn_high_s16 | Movn_s16
+      | Mullq_s16 | Mullq_u16 | Mullq_high_s16 | Mullq_high_u16 ),
       _ ) ->
     false
 
@@ -762,7 +768,7 @@ let class_of_operation op =
   | Qmovn_high_u32 | Qmovn_u32 | Qmovn_high_s16 | Qmovn_s16 | Qmovn_high_u16
   | Qmovn_u16 | Movn_high_s64 | Movn_s64 | Movn_high_s32 | Movn_s32
   | Movn_high_s16 | Movn_s16 | Mullq_s16 | Mullq_u16 | Mullq_high_s16
-  | Mullq_high_u16 ->
+  | Mullq_high_u16 | Getq_lane_f64 _ | Setq_lane_f64 _ ->
     Pure
 
 let operation_is_pure op = match class_of_operation op with Pure -> true

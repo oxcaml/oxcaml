@@ -384,6 +384,9 @@ end = struct
       ->
       check_reg Vec128 i.arg.(0);
       check_reg Int i.res.(0)
+    | Rf64x2_to_Rf64 _ ->
+      check_reg Vec128 i.arg.(0);
+      check_reg Float i.res.(0)
     | Rs64x2_Rs64x2_to_First _ | Rs16x8_Rs32x4_to_First | Rs8x16_Rs16x8_to_First
     | Rs32x4_Rs64x2_to_First ->
       check_reg Vec128 i.arg.(0);
@@ -393,6 +396,10 @@ end = struct
     | Rs8x16_Rs8_to_First _ ->
       check_reg Vec128 i.arg.(0);
       check_reg Int i.arg.(1);
+      assert (Reg.same_loc i.res.(0) i.arg.(0))
+    | Rf64x2_Rf64_to_First _ ->
+      check_reg Vec128 i.arg.(0);
+      check_reg Float i.arg.(1);
       assert (Reg.same_loc i.res.(0) i.arg.(0))
 
   let src_operands ops =
@@ -483,6 +490,8 @@ end = struct
       [| emit_reg i.res.(0); emit_reglane_s i.arg.(0) ~lane |]
     | Rs64x2_to_Rs64 { lane : int } ->
       [| emit_reg i.res.(0); emit_reglane_d i.arg.(0) ~lane |]
+    | Rf64x2_to_Rf64 { lane : int } ->
+      [| emit_reg i.res.(0); emit_reglane_d i.arg.(0) ~lane |]
     | Rs8x16_Rs8_to_First { lane } ->
       [| emit_reglane_b i.res.(0) ~lane; emit_reg_w i.arg.(1) |]
     | Rs16x8_Rs16_to_First { lane } ->
@@ -490,6 +499,9 @@ end = struct
     | Rs32x4_Rs32_to_First { lane } ->
       [| emit_reglane_s i.res.(0) ~lane; emit_reg_w i.arg.(1) |]
     | Rs64x2_Rs64_to_First { lane } ->
+      [| emit_reglane_d i.res.(0) ~lane; emit_reg i.arg.(1) |]
+    | Rf64x2_Rf64_to_First { lane } ->
+      (* CR gyorsh: emit as v[0]? *)
       [| emit_reglane_d i.res.(0) ~lane; emit_reg i.arg.(1) |]
     | Rs64x2_Rs64x2_to_First { src_lane; dst_lane } ->
       [| emit_reglane_d i.res.(0) ~lane:dst_lane;
@@ -549,7 +561,7 @@ end = struct
     | Qmovn_u32 | Qmovn_high_s16 | Qmovn_s16 | Qmovn_high_u16 | Qmovn_u16
     | Movn_high_s64 | Movn_high_s32 | Movn_s32 | Movn_high_s16 | Movn_s16
     | Mullq_s16 | Mullq_u16 | Mullq_high_s16 | Mullq_high_u16 | Movl_s16
-    | Movl_u16 | Movl_s8 | Movl_u8 ->
+    | Movl_u16 | Movl_s8 | Movl_u8 | Getq_lane_f64 _ | Setq_lane_f64 _ ->
       1
 
   let emit_rounding_mode (rm : Simd.Rounding_mode.t) : I.Rounding_mode.t =
@@ -670,7 +682,7 @@ end = struct
     | Shrq_n_s32 n | Shrq_n_s64 n | Shrq_n_s16 n | Shrq_n_s8 n ->
       ins I.SSHR (Array.append operands [| imm n |])
     | Setq_lane_s32 _ | Setq_lane_s64 _ | Setq_lane_s16 _ | Setq_lane_s8 _
-    | Getq_lane_s64 _ | Copyq_laneq_s64 _ ->
+    | Getq_lane_s64 _ | Copyq_laneq_s64 _ | Setq_lane_f64 _ | Getq_lane_f64 _->
       ins I.MOV operands
     | Getq_lane_s32 _ | Getq_lane_s16 _ | Getq_lane_s8 _ ->
       (* sign-extend the result to 64-bit and place in Xn *)

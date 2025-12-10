@@ -78,11 +78,13 @@ type register_behavior =
   | Rs16x8_to_Rs16 of { lane : int }
   | Rs32x4_to_Rs32 of { lane : int }
   | Rs64x2_to_Rs64 of { lane : int }
+  | Rf64x2_to_Rf64 of { lane : int }
   (* insert *)
   | Rs8x16_Rs8_to_First of { lane : int }
   | Rs16x8_Rs16_to_First of { lane : int }
   | Rs32x4_Rs32_to_First of { lane : int }
   | Rs64x2_Rs64_to_First of { lane : int }
+  | Rf64x2_Rf64_to_First of { lane : int }
   | Rs64x2_Rs64x2_to_First of
       { src_lane : int;
         dst_lane : int
@@ -156,10 +158,12 @@ let register_behavior (op : Simd.operation) =
   | Setq_lane_s16 { lane } -> Rs16x8_Rs16_to_First { lane }
   | Setq_lane_s32 { lane } -> Rs32x4_Rs32_to_First { lane }
   | Setq_lane_s64 { lane } -> Rs64x2_Rs64_to_First { lane }
+  | Setq_lane_f64 { lane } -> Rf64x2_Rf64_to_First { lane }
   | Getq_lane_s8 { lane } -> Rs8x16_to_Rs8 { lane }
   | Getq_lane_s16 { lane } -> Rs16x8_to_Rs16 { lane }
   | Getq_lane_s32 { lane } -> Rs32x4_to_Rs32 { lane }
   | Getq_lane_s64 { lane } -> Rs64x2_to_Rs64 { lane }
+  | Getq_lane_f64 { lane } -> Rf64x2_to_Rf64 { lane }
   | Dupq_lane_s8 { lane } -> Rs8x16lane_to_Rs8x16 { lane }
   | Dupq_lane_s16 { lane } -> Rs16x8lane_to_Rs16x8 { lane }
   | Dupq_lane_s32 { lane } -> Rs32x4lane_to_Rs32x4 { lane }
