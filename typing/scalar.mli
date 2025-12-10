@@ -79,6 +79,9 @@
     simple sum type (e.g., [to_string]).
 *)
 
+(* CR-someday jvanburen: for brevity, rename all of the [type 'a t =...]s to
+   [type 'a t1 = ...], and make [type t = any_locality_mode t1] *)
+
 type any_locality_mode = Any_locality_mode
 
 val equal_any_locality_mode : any_locality_mode -> any_locality_mode -> bool
@@ -108,6 +111,8 @@ module type S := sig
   val width : _ t -> any_locality_mode width
 
   val to_string : any_locality_mode t -> string
+
+  val pp : Format.formatter -> any_locality_mode t -> unit
 
   val sort : any_locality_mode t -> Jkind_types.Sort.Const.t
 
