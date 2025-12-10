@@ -214,6 +214,9 @@ let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
       (* CR-soon xclerc for xclerc: when the source and the destination are not
          the same, we should downgrade the operation to a mere move. *)
       let to_remove =
+        (* CR-soon xclerc for xclerc: we should add other cases, such as `Imul,
+           1` or `Idiv, 1`, but we need to be careful because these can clobber
+           registers on amd64. *)
         match op, imm with
         | Iadd, 0 | Isub, 0 | Ior, 0 | Ixor, 0 | Ilsl, 0 | Ilsr, 0 | Iasr, 0 ->
           true
@@ -221,11 +224,7 @@ let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
       in
       if to_remove
       then (
-        let continue =
-          match DLL.prev cell with
-          | None -> DLL.next cell
-          | Some _ as prev -> prev
-        in
+        let continue = Some (U.prev_at_most U.go_back_const cell) in
         DLL.delete_curr cell;
         continue)
       else None
