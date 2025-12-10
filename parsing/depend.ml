@@ -141,7 +141,7 @@ and add_jkind bv (jkind : jkind_annotation) =
   match jkind.pjkind_desc with
   | Pjk_default -> ()
   | Pjk_abbreviation _ -> ()
-  | Pjk_mod (jkind, (_ : modes)) -> add_jkind bv jkind
+  | Pjk_mod (jkind, (_ : crossings)) -> add_jkind bv jkind
   | Pjk_with (jkind, typ, (_ : modalities)) ->
       add_jkind bv jkind;
       add_type bv typ;

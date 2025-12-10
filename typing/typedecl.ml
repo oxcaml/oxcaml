@@ -3849,8 +3849,16 @@ let transl_value_decl env loc ~modal ~why valdecl =
   let mode, val_modalities =
     match modal with
     | Str_primitive ->
-        let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
-        let modes = List.map modality_to_mode valdecl.pval_modalities in
+        let modes =
+          match valdecl.pval_modalities with
+          | No_modalities -> No_modes
+          | Modalities { loc; modalities; crossings } ->
+            let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
+            let modes =
+              List.map modality_to_mode modalities
+            in
+            Modes { loc; modes; crossings }
+        in
         let mode =
           modes
           |> Typemode.transl_mode_annots
@@ -3863,8 +3871,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
     | Sig_value (md_mode, sig_modalities) ->
         let modalities =
           match valdecl.pval_modalities with
-          | [] -> sig_modalities
-          | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
+          | No_modalities -> sig_modalities
+          | modas -> Typemode.transl_modalities ~maturity:Stable Immutable modas
         in
         let modalities = Mode.Modality.of_const modalities in
         md_mode, modalities

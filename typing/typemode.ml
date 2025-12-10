@@ -250,7 +250,7 @@ let transl_mod_bounds annots =
     | [] -> Location.none
     | _ :: _ as locs -> Location.merge locs
   in
-  let step bounds_so_far { txt = Parsetree.Mode txt; loc } =
+  let step bounds_so_far { txt = Parsetree.Crossing txt; loc } =
     match Modifier_axis_pair.of_string txt with
     | P (type a) ((axis, mode) : a Axis.t * a) ->
       let is_top = Per_axis.(le axis (max axis) mode) in
@@ -389,7 +389,14 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   in
   { annots with forkable; yielding; contention; portability }
 
-let transl_mode_annots annots : Alloc.Const.Option.t =
+let transl_mode_annots (modes : Parsetree.modes) : Alloc.Const.Option.t =
+  let annots =
+    match modes with
+    | No_modes -> []
+    | Modes { modes; crossings = [] } -> modes
+    | Modes { crossings = _ :: _; _ } ->
+      Misc.fatal_error "crossings as mode annotations are not yet implemented"
+  in
   let step modes_so_far { txt = Parsetree.Mode txt; loc } =
     Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
     let (P (ax, a)) =
@@ -582,7 +589,8 @@ let least_modalities_implying mut (t : Modality.Const.t) =
   in
   exclude_implied @ overridden
 
-let untransl_mod_bounds (bounds : Types.Jkind_mod_bounds.t) : Parsetree.modes =
+let untransl_mod_bounds (bounds : Types.Jkind_mod_bounds.t) :
+    Parsetree.crossings =
   let crossing = Types.Jkind_mod_bounds.crossing bounds in
   let modality = Crossing.to_modality crossing in
   let modality_annots =
@@ -591,7 +599,7 @@ let untransl_mod_bounds (bounds : Types.Jkind_mod_bounds.t) : Parsetree.modes =
            let { Location.txt = Parsetree.Modality s; _ } =
              untransl_modality atom
            in
-           { Location.txt = Parsetree.Mode s; loc = Location.none })
+           { Location.txt = Parsetree.Crossing s; loc = Location.none })
   in
   let nonmodal_annots =
     let open Types.Jkind_mod_bounds in
@@ -600,7 +608,7 @@ let untransl_mod_bounds (bounds : Types.Jkind_mod_bounds.t) : Parsetree.modes =
       then None
       else
         let s = Format.asprintf "%a" print value in
-        Some { Location.txt = Parsetree.Mode s; loc = Location.none }
+        Some { Location.txt = Parsetree.Crossing s; loc = Location.none }
     in
     [ mk_annot Externality.max Externality.print (externality bounds);
       mk_annot Nullability.max Nullability.print (nullability bounds);
@@ -641,15 +649,22 @@ let sort_dedup_modalities ~warn l =
   in
   l |> List.stable_sort compare |> dedup ~on_dup |> List.map fst
 
-let transl_modalities ~maturity mut modalities =
-  let modalities_loc =
-    match List.map (fun { loc; _ } -> loc) modalities with
-    | [] -> Location.none
-    | _ :: _ as locs -> Location.merge locs
-  in
+let transl_modalities ~maturity mut (modalities : Parsetree.modalities) =
   let mut_modalities =
     mutable_implied_modalities (Types.is_mutable mut)
       ~for_mutable_variable:false
+  in
+  let modalities_loc =
+    match modalities with
+    | No_modalities -> Location.none
+    | Modalities { loc; _ } -> loc
+  in
+  let modalities =
+    match modalities with
+    | No_modalities -> []
+    | Modalities { modalities; crossings = []; _ } -> modalities
+    | Modalities { crossings = _ :: _; _ } ->
+      Misc.fatal_error "crossings as modalities are not yet implemented"
   in
   let modalities = List.map (transl_modality ~maturity) modalities in
   (* axes listed in the order of implication. *)
