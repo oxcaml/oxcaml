@@ -191,27 +191,32 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
     match width with
     | Sixty_four_or_more -> L.lambda_unit
     | Thirty_two { zero_init } ->
-      let zero_init_last_field =
-        L.Lprim
-          ( Parraysetu (array_set_kind, Ptagged_int_index),
-            (* [Popaque] is used to conceal the out-of-bounds write. *)
-            [Lprim (Popaque L.layout_unit, [Lvar array], loc); length; zero_init],
-            loc )
-      in
-      let length_is_greater_than_zero_and_is_one_mod_two =
-        L.Lprim
-          ( Psequand,
-            [ L.icmp ~loc Cgt L.int length (L.tagged_immediate 0);
-              L.icmp ~loc Cne L.int
-                (L.and_ L.int length (L.tagged_immediate 1) ~loc)
-                (L.tagged_immediate 0) ],
-            loc )
-      in
-      L.Lifthenelse
-        ( length_is_greater_than_zero_and_is_one_mod_two,
-          zero_init_last_field,
-          L.lambda_unit,
-          L.layout_unit )
+      if !Clflags.jsir
+      then L.lambda_unit
+      else
+        let zero_init_last_field =
+          L.Lprim
+            ( Parraysetu (array_set_kind, Ptagged_int_index),
+              (* [Popaque] is used to conceal the out-of-bounds write. *)
+              [ Lprim (Popaque L.layout_unit, [Lvar array], loc);
+                length;
+                zero_init ],
+              loc )
+        in
+        let length_is_greater_than_zero_and_is_one_mod_two =
+          L.Lprim
+            ( Psequand,
+              [ L.icmp ~loc Cgt L.int length (L.tagged_immediate 0);
+                L.icmp ~loc Cne L.int
+                  (L.and_ L.int length (L.tagged_immediate 1) ~loc)
+                  (L.tagged_immediate 0) ],
+              loc )
+        in
+        L.Lifthenelse
+          ( length_is_greater_than_zero_and_is_one_mod_two,
+            zero_init_last_field,
+            L.lambda_unit,
+            L.layout_unit )
   in
   let env, initialize =
     let index = Ident.create_local "index" in
