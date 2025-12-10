@@ -750,7 +750,7 @@ module Shape_map = struct
       (fun id shape acc -> Hashtbl.hash (Ident.hash id, shape.Shape.hash, acc))
       m 0
 
-  let equal = Ident.Map.equal Shape.equal
+  let equal m1 m2 = m1 == m2 || Ident.Map.equal Shape.equal m1 m2
 end
 
 (* Maps type variables to their shape substitutions. Used for beta
@@ -794,7 +794,7 @@ module Rec_constr_env = Hash_consed.Dedup (struct
     let equal_entry (args1, rb1) (args2, rb2) =
       List.equal Shape.equal args1 args2 && Recursive_binder.equal rb1 rb2
     in
-    Ident.Map.equal (List.equal equal_entry)
+    fun m1 m2 -> m1 == m2 || Ident.Map.equal (List.equal equal_entry) m1 m2
 end)
 
 module Eval_env = struct
