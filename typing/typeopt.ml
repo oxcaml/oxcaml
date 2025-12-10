@@ -283,6 +283,10 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
 
 let array_kind_of_elt ~elt_layout env loc ty =
+  (* CR zeisbach: this will scrape twice (once here, and once in classify).
+     Hopefully scraping a second time is not so expensive. Shifting things
+     around so that classify doesn't scrape seems unnecessary for now. *)
+  let ty = scrape_ty env ty in
   let elt_layout =
     match elt_layout with
     | Some layout -> layout
