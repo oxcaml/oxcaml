@@ -501,7 +501,6 @@ end = struct
     | Rs64x2_Rs64_to_First { lane } ->
       [| emit_reglane_d i.res.(0) ~lane; emit_reg i.arg.(1) |]
     | Rf64x2_Rf64_to_First { lane } ->
-      (* CR gyorsh: emit as v[0]? *)
       [| emit_reglane_d i.res.(0) ~lane; emit_reg i.arg.(1) |]
     | Rs64x2_Rs64x2_to_First { src_lane; dst_lane } ->
       [| emit_reglane_d i.res.(0) ~lane:dst_lane;
@@ -682,8 +681,13 @@ end = struct
     | Shrq_n_s32 n | Shrq_n_s64 n | Shrq_n_s16 n | Shrq_n_s8 n ->
       ins I.SSHR (Array.append operands [| imm n |])
     | Setq_lane_s32 _ | Setq_lane_s64 _ | Setq_lane_s16 _ | Setq_lane_s8 _
-    | Getq_lane_s64 _ | Copyq_laneq_s64 _ | Setq_lane_f64 _ | Getq_lane_f64 _->
+    | Getq_lane_s64 _ | Copyq_laneq_s64 _  | Getq_lane_f64 _->
       ins I.MOV operands
+    | Setq_lane_f64 { lane } ->
+      (* There is instruction whose source is a scalar (neon) register and
+         destination is a lane. Reinterpret the scalar as the low element
+         of the source vector. *)
+      ins I.MOV [| emit_reglane_d i.res.(0) ~lane; emit_reglane_d i.arg.(1) ~lane:0 |]
     | Getq_lane_s32 _ | Getq_lane_s16 _ | Getq_lane_s8 _ ->
       (* sign-extend the result to 64-bit and place in Xn *)
       ins I.SMOV operands
