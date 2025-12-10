@@ -191,8 +191,6 @@ let coalesce : State.t -> unit =
   then (
     log "coalesce";
     indent ());
-  (* CR-someday xclerc for xclerc: can we use affinity when we choose a move to
-     coalesce? *)
   let m = State.choose_and_remove_work_list_moves state in
   let x = m.res.(0) in
   let y = m.arg.(0) in
