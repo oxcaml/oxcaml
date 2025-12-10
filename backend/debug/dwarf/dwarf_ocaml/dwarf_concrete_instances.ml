@@ -74,7 +74,7 @@ let for_fundecl ~get_file_id state (fundecl : L.fundecl) ~fun_end_label
   let _inlined_frame_proto_dies =
     Profile.record "dwarf_inlined_frames"
       (fun () ->
-        Dwarf_inlined_frames.dwarf state fundecl
+        Dwarf_inlined_frames.dwarf state fundecl ~function_symbol:start_sym
           ~function_proto_die:concrete_instance_proto_die inlined_frame_ranges)
       ~accumulate:true ()
   in
@@ -82,7 +82,7 @@ let for_fundecl ~get_file_id state (fundecl : L.fundecl) ~fun_end_label
   then
     Profile.record "dwarf_variables_and_parameters"
       (fun () ->
-        Dwarf_variables_and_parameters.dwarf state
+        Dwarf_variables_and_parameters.dwarf state ~function_symbol:start_sym
           ~function_proto_die:concrete_instance_proto_die available_ranges_vars)
       ~accumulate:true ();
   (* CR mshinwell: When cross-referencing of DIEs across files is necessary we
