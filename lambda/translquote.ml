@@ -217,7 +217,8 @@ module Transl = struct
     [ `cons of expression list
     | `list of expression list
     | `nil
-    | `normal
+    | `single of expression
+    | `multiple
     | `simple of Longident.t
     | `tuple
     | `btrue
@@ -225,11 +226,11 @@ module Transl = struct
 
   let view_expr x =
     match x.exp_desc with
-    | Texp_construct ({ txt = Lident "()"; _ }, _, _, _) -> `tuple
-    | Texp_construct ({ txt = Lident "true"; _ }, _, _, _) -> `btrue
-    | Texp_construct ({ txt = Lident "false"; _ }, _, _, _) -> `bfalse
-    | Texp_construct ({ txt = Lident "[]"; _ }, _, _, _) -> `nil
-    | Texp_construct ({ txt = Lident "::"; _ }, _, _ :: _, _) ->
+    | Texp_construct ({ txt = Lident "()"; _ }, _, [], _) -> `tuple
+    | Texp_construct ({ txt = Lident "true"; _ }, _, [], _) -> `btrue
+    | Texp_construct ({ txt = Lident "false"; _ }, _, [], _) -> `bfalse
+    | Texp_construct ({ txt = Lident "[]"; _ }, _, [], _) -> `nil
+    | Texp_construct ({ txt = Lident "::"; _ }, _, [_; _], _) ->
       let rec loop exp acc =
         match exp with
         | { exp_desc = Texp_construct ({ txt = Lident "[]"; _ }, _, _, _);
@@ -245,11 +246,12 @@ module Transl = struct
       let ls, b = loop x [] in
       if b then `list ls else `cons ls
     | Texp_construct (x, _, [], _) -> `simple x.txt
-    | _ -> `normal
+    | Texp_construct (_, _, [a], _) -> `single a
+    | _ -> `multiple
 
   let is_simple_construct : construct -> bool = function
     | `nil | `tuple | `list _ | `simple _ | `btrue | `bfalse -> true
-    | `cons _ | `normal -> false
+    | `cons _ | `single _ | `multiple -> false
 
   let pp = fprintf
 
@@ -356,23 +358,11 @@ let reset_pipe ctxt = { ctxt with pipe=false }
     | Const_untagged_char i -> pp f "#%C" i
     | Const_string (i, _, None) -> pp f "%S" i
     | Const_string (i, _, Some delim) -> pp f "{%s|%s|%s}" delim i delim
-    | Const_int (i, None) -> paren (first_is '-' i) (fun f -> pp f "%s") f i
-    | Const_int (i, Some m) ->
-      paren (first_is '-' i) (fun f (i, m) -> pp f "%s%c" i m) f (i, m)
-    | Const_float (i, None) -> paren (first_is '-' i) (fun f -> pp f "%s") f i
-    | Const_float (i, Some m) ->
-      paren (first_is '-' i) (fun f (i, m) -> pp f "%s%c" i m) f (i, m)
-    | Const_unboxed_float (x, None) ->
-      paren (first_is '-' x)
-        (fun f -> pp f "%s")
-        f
-        (Misc.format_as_unboxed_literal x)
-    | Const_unboxed_float (x, Some suffix) | Const_unboxed_integer (x, suffix)
-      ->
-      paren (first_is '-' x)
-        (fun f (x, suffix) -> pp f "%s%c" x suffix)
-        f
-        (Misc.format_as_unboxed_literal x, suffix)
+    | Const_int i ->
+      let i = Int.to_string i in
+      paren (first_is '-' i) (fun f -> pp f "%s") f i
+    | Const_float i -> paren (first_is '-' i) (fun f -> pp f "%s") f i
+    | _ -> Misc.fatal_error "Translquote.constant"
 
   (* trailing space*)
   let mutable_flag f = function Immutable -> () | Mutable -> pp f "mutable@;"
@@ -396,6 +386,10 @@ let reset_pipe ctxt = { ctxt with pipe=false }
 
   let constant_string f s = pp f "%S" s
 
+  let drop_pat_sort : 'a * 'b * Jkind.sort -> 'a * 'b = fun (x, y, _) -> x, y
+
+  let with_no_label : 'a -> string option * 'a = fun x -> None, x
+
   let tyvar_of_name s =
     if String.length s >= 2 && s.[1] = '\''
     then
@@ -415,7 +409,7 @@ let reset_pipe ctxt = { ctxt with pipe=false }
   let string_quot f x = pp f "`%a" ident_of_name x
 
   (* legacy modes and modalities *)
-  let legacy_mode f { txt = Mode s; _ } =
+  let legacy_mode f (Parsetree.Mode s) =
     let s =
       match s with
       | "local" -> "local_"
@@ -454,16 +448,14 @@ let reset_pipe ctxt = { ctxt with pipe=false }
       pp_print_space f ()
 
   (* new mode and modality syntax *)
-  let mode f { txt = Mode s; _ } = pp_print_string f s
+  let mode f (Parsetree.Mode s) = pp_print_string f s
 
   let modes f m = pp_print_list ~pp_sep:(fun f () -> pp f " ") mode f m
 
   let optional_at_modes f m =
     match m with [] -> () | m -> pp f " %@ %a" modes m
 
-  let modality f m =
-    let { txt = Modality txt; _ } = m in
-    pp_print_string f txt
+  let modality f { txt = Parsetree.Modality m; loc = _ } = pp_print_string f m
 
   let modalities f m = pp_print_list ~pp_sep:(fun f () -> pp f " ") modality f m
 
@@ -486,22 +478,7 @@ let reset_pipe ctxt = { ctxt with pipe=false }
   (** For a list of modes, we either print everything in old syntax (if they
   are purely old modes), or everything in new syntax. *)
   let print_modes_in_old_syntax =
-    List.for_all (fun m ->
-        let (Mode txt) = m.txt in
-        match txt with "local" -> true | _ -> false)
-
-  (** For a list of modalities, we either print all in old syntax (if they are
-  purely old modalities), or all in new syntax. *)
-  let print_modality_in_old_syntax =
-    List.for_all (fun m ->
-        let (Modality txt) = m.txt in
-        match txt with "global" -> true | _ -> false)
-
-  let modalities_type pty ctxt f pca =
-    let m = pca.ca_modalities in
-    if print_modality_in_old_syntax m
-    then pp f "%a%a" optional_legacy_modalities m (pty ctxt) pca.ca_type
-    else pp f "%a%a" (pty ctxt) pca.ca_type optional_space_atat_modalities m
+    List.for_all (function Parsetree.Mode "local" -> true | _ -> false)
 
   (* c ['a,'b] *)
   let rec core_type_with_optional_legacy_modes pty ctxt f (c, m) =
@@ -531,18 +508,15 @@ let reset_pipe ctxt = { ctxt with pipe=false }
     match k.pjkind_desc with
     | Pjk_default -> pp f "_"
     | Pjk_abbreviation s -> pp f "%s" s
-    | Pjk_mod (t, modes) -> (
-      match modes with
+    | Pjk_mod (t, ms) -> (
+      match ms with
       | [] -> Misc.fatal_error "malformed jkind annotation"
       | _ :: _ ->
         Misc.pp_parens_if nested
-          (fun f (t, modes) ->
-            pp f "%a mod %a"
-              (jkind_annotation ~nested:true ctxt)
-              t
-              (pp_print_list ~pp_sep:pp_print_space mode)
-              modes)
-          f (t, modes))
+          (fun f (t, ms) ->
+            pp f "%a mod %a" (jkind_annotation ~nested:true ctxt) t modes ms)
+          f
+          (t, List.map Location.get_txt ms))
     | Pjk_with _ -> Misc.fatal_error "no jkind with in quotes"
     | Pjk_kind_of _ -> Misc.fatal_error "no jkind kind-of in quotes"
     | Pjk_product ts ->
@@ -582,9 +556,10 @@ let reset_pipe ctxt = { ctxt with pipe=false }
         (attributes ctxt) x.ctyp_attributes
     else
       match x.ctyp_desc with
-      | Ttyp_arrow (l, ct1, ct2, m1, m2) ->
+      (* CR jbachurski: Why does Ttyp_arrow not have mode annotations on it? *)
+      | Ttyp_arrow (l, ct1, ct2) ->
         pp f "@[<2>%a@;->@;%a@]" (* FIXME remove parens later *)
-          (type_with_label ctxt) (l, ct1, m1) (return_type ctxt) (ct2, m2)
+          (type_with_label ctxt) (l, ct1, []) (return_type ctxt) (ct2, [])
       | Ttyp_alias (ct, s, j) ->
         pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct tyvar_loc_option_jkind
           (s, j)
@@ -594,7 +569,7 @@ let reset_pipe ctxt = { ctxt with pipe=false }
           (fun f l ->
             match l with
             | [] -> ()
-            | _ -> pp f "%a@;.@;" (list (tyvar_loc_jkind tyvar) ~sep:"@;") l)
+            | _ -> pp f "%a@;.@;" (list (tyvar_jkind tyvar) ~sep:"@;") l)
           sl (core_type ctxt) ct
       | Ttyp_of_kind jkind ->
         pp f "@[(type@ :@ %a)@]" (jkind_annotation reset_ctxt) jkind
@@ -605,11 +580,12 @@ let reset_pipe ctxt = { ctxt with pipe=false }
     then core_type ctxt f x
     else
       match x.ctyp_desc with
-      | Ttyp_var (s, jkind) -> (tyvar_jkind tyvar) f (s, jkind)
+      | Ttyp_var (None, jkind) -> (tyvar_jkind tyvar) f ("_", jkind)
+      | Ttyp_var (Some s, jkind) -> (tyvar_jkind tyvar) f (s, jkind)
       | Ttyp_tuple tl ->
         pp f "(%a)" (list (labeled_core_type1 ctxt) ~sep:"@;*@;") tl
       | Ttyp_unboxed_tuple l -> core_type1_labeled_tuple ctxt f ~unboxed:true l
-      | Ttyp_constr (li, l) ->
+      | Ttyp_constr (_, li, l) ->
         pp f (* "%a%a@;" *) "%a%a"
           (fun f l ->
             match l with
@@ -619,7 +595,7 @@ let reset_pipe ctxt = { ctxt with pipe=false }
           l longident_loc li
       | Ttyp_variant (l, closed, low) ->
         let first_is_inherit =
-          match l with { rf_desc = Rinherit _ } :: _ -> true | _ -> false
+          match l with { rf_desc = Tinherit _ } :: _ -> true | _ -> false
         in
         let type_variant_helper f x =
           match x.rf_desc with
@@ -653,12 +629,12 @@ let reset_pipe ctxt = { ctxt with pipe=false }
           low
       | Ttyp_object (l, o) ->
         let core_field_type f x =
-          match x.pof_desc with
-          | Otag (l, ct) ->
+          match x.of_desc with
+          | OTtag (l, ct) ->
             (* Cf #7200 *)
             pp f "@[<hov2>%a: %a@ %a@ @]" ident_of_name l.txt (core_type ctxt)
-              ct (attributes ctxt) x.pof_attributes
-          | Oinherit ct -> pp f "@[<hov2>%a@ @]" (core_type ctxt) ct
+              ct (attributes ctxt) x.of_attributes
+          | OTinherit ct -> pp f "@[<hov2>%a@ @]" (core_type ctxt) ct
         in
         let field_var f = function
           | Asttypes.Closed -> ()
@@ -668,12 +644,12 @@ let reset_pipe ctxt = { ctxt with pipe=false }
         pp f "@[<hov2><@ %a%a@ > @]"
           (list core_field_type ~sep:";")
           l field_var o (* Cf #7200 *)
-      | Ttyp_class (li, l) ->
+      | Ttyp_class (_, li, l) ->
         (*FIXME*)
         pp f "@[<hov2>%a@;#%a@]"
           (list (core_type ctxt) ~sep:"," ~first:"(" ~last:")")
           l longident_loc li
-      | Ttyp_package (lid, cstrs) -> (
+      | Ttyp_package { pack_txt = lid; pack_fields = cstrs } -> (
         let aux f (s, ct) =
           pp f "type %a@ =@ %a" longident_loc s (core_type ctxt) ct
         in
@@ -682,12 +658,13 @@ let reset_pipe ctxt = { ctxt with pipe=false }
         | _ ->
           pp f "@[<hov2>(module@ %a@ with@ %a)@]" longident_loc lid
             (list aux ~sep:"@ and@ ") cstrs)
-      | Ttyp_open (li, ct) ->
+      | Ttyp_open (_, li, ct) ->
         pp f "@[<hov2>%a.(%a)@]" longident_loc li (core_type ctxt) ct
       | Ttyp_quote t -> pp f "@[<hov2><[%a]>@]" (core_type ctxt) t
       | Ttyp_splice t -> pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
       | Ttyp_arrow _ | Ttyp_alias _ | Ttyp_poly _ | Ttyp_of_kind _ ->
         paren true (core_type ctxt) f x
+      | Ttyp_call_pos -> Misc.fatal_error "Transl.core_type1: Ttyp_call_pos"
 
   and core_type2 ctxt f x =
     if x.ctyp_attributes <> []
@@ -699,7 +676,7 @@ let reset_pipe ctxt = { ctxt with pipe=false }
           (fun f l ->
             match l with
             | [] -> ()
-            | _ -> pp f "%a@;.@;" (list (tyvar_loc_jkind tyvar) ~sep:"@;") l)
+            | _ -> pp f "%a@;.@;" (list (tyvar_jkind tyvar) ~sep:"@;") l)
           sl (core_type1 ctxt) ct
       | _ -> core_type1 ctxt f x
 
@@ -739,14 +716,14 @@ let reset_pipe ctxt = { ctxt with pipe=false }
         (attributes ctxt) x.pat_attributes
     else
       match x.pat_desc with
-      | Tpat_alias (p, s) ->
+      | Tpat_alias (p, _, s, _, _, _, _) ->
         pp f "@[<2>%a@;as@;%a@]" (pattern ctxt) p ident_of_name s.txt
       | _ -> pattern_or ctxt f x
 
   and pattern_or ctxt f x =
     let rec left_associative x acc =
       match x with
-      | { pat_desc = Tpat_or (p1, p2); pat_attributes = [] } ->
+      | { pat_desc = Tpat_or (p1, p2, _); pat_attributes = [] } ->
         left_associative p1 (p2 :: acc)
       | x -> x :: acc
     in
@@ -759,11 +736,11 @@ let reset_pipe ctxt = { ctxt with pipe=false }
     let rec pattern_list_helper f p =
       match p with
       | { pat_desc =
-            Tpat_construct ({ txt = Lident "::"; _ }, Some ([], inner_pat));
+            Tpat_construct ({ txt = Lident "::"; _ }, _, _, Some ([], inner_pat));
           pat_attributes = []
         } -> (
         match inner_pat.pat_desc with
-        | Tpat_tuple ([(None, pat1); (None, pat2)], Closed) ->
+        | Tpat_tuple [(None, pat1); (None, pat2)] ->
           pp f "%a::%a" (simple_pattern ctxt) pat1 pattern_list_helper
             pat2 (*RA*)
         | _ -> pattern1 ctxt f p)
@@ -775,10 +752,10 @@ let reset_pipe ctxt = { ctxt with pipe=false }
       match x.pat_desc with
       | Tpat_variant (l, Some p) ->
         pp f "@[<2>`%a@;%a@]" ident_of_name l (simple_pattern ctxt) p
-      | Tpat_construct ({ txt = Lident ("()" | "[]" | "true" | "false"); _ }, _)
-        ->
+      | Tpat_construct
+          ({ txt = Lident ("()" | "[]" | "true" | "false"); _ }, _, _, _) ->
         simple_pattern ctxt f x
-      | Tpat_construct (({ txt; _ } as li), po) -> (
+      | Tpat_construct (({ txt; _ } as li), po, _, _) -> (
         if (* FIXME The third field always false *)
            txt = Lident "::"
         then pp f "%a" pattern_list_helper x
@@ -808,6 +785,7 @@ let reset_pipe ctxt = { ctxt with pipe=false }
       pattern1 ctxt f x
 
   and simple_pattern ctxt (f : Format.formatter) (x : pattern) : unit =
+    assert (x.pat_extra = []);
     if x.pat_attributes <> []
     then pattern ctxt f x
     else
@@ -816,20 +794,17 @@ let reset_pipe ctxt = { ctxt with pipe=false }
           ({ txt = Lident (("()" | "[]" | "true" | "false") as x); _ }, None) ->
         pp f "%s" x
       | Tpat_any -> pp f "_"
-      | Tpat_var { txt; _ } -> ident_of_name f txt
-      | Tpat_array (mut, l) ->
-        let punct = match mut with Mutable -> '|' | Immutable -> ':' in
+      | Tpat_var (_, { txt; _ }, _, _, _) -> ident_of_name f txt
+      | Tpat_array (mut, _, l) ->
+        let punct = match mut with Mutable _ -> '|' | Immutable -> ':' in
         pp f "@[<2>[%c%a%c]@]" punct (list (pattern1 ctxt) ~sep:";") l punct
-      | Tpat_unpack { txt = None } -> pp f "(module@ _)@ "
-      | Tpat_unpack { txt = Some s } -> pp f "(module@ %s)@ " s
-      | Tpat_type li -> pp f "#%a" longident_loc li
       | Tpat_record (l, closed) -> record_pattern ctxt f ~unboxed:false l closed
       | Tpat_record_unboxed_product (l, closed) ->
         record_pattern ctxt f ~unboxed:true l closed
-      | Tpat_tuple (l, closed) ->
-        labeled_tuple_pattern ctxt f ~unboxed:false l closed
-      | Tpat_unboxed_tuple (l, closed) ->
-        labeled_tuple_pattern ctxt f ~unboxed:true l closed
+      | Tpat_tuple l -> labeled_tuple_pattern ctxt f ~unboxed:false l Closed
+      | Tpat_unboxed_tuple l ->
+        labeled_tuple_pattern ctxt f ~unboxed:true (List.map drop_pat_sort l)
+          Closed
       | Tpat_constant c -> pp f "%a" constant c
       | Tpat_interval (c1, c2) -> pp f "%a..%a" constant c1 constant c2
       | Tpat_variant (l, None) -> pp f "`%a" ident_of_name l
@@ -870,143 +845,31 @@ let reset_pipe ctxt = { ctxt with pipe=false }
       pp f "@[<2>%s{@;%a;_}@]" hash (list longident_x_pattern ~sep:";@;") l
 
   and labeled_tuple_pattern ctxt f ~unboxed l closed =
-    let closed_flag ppf = function Closed -> () | Open -> pp ppf ",@;.." in
+    let closed_flag f = function Closed -> () | Open -> pp f ",@;.." in
     pp f "@[<1>%s(%a%a)@]"
       (if unboxed then "#" else "")
       (list ~sep:",@;" (labeled_pattern1 ctxt))
       l closed_flag closed
 
-  (** for special treatment of modes in labeled expressions *)
-  and pattern2 ctxt f p =
-    match p.pat_desc with
-    | Tpat_constraint (p, ct, m) -> (
-      match ct, print_modes_in_old_syntax m with
-      | Some ct, true ->
-        pp f "@[<2>%a%a@;:@;%a@]" optional_legacy_modes m (simple_pattern ctxt)
-          p (core_type ctxt) ct
-      | Some ct, false ->
-        pp f "@[<2>%a@;:@;%a@]" (simple_pattern ctxt) p
-          (core_type_with_optional_modes ctxt)
-          (ct, m)
-      | None, true ->
-        pp f "@[<2>%a%a@]" optional_legacy_modes m (simple_pattern ctxt) p
-      | None, false ->
-        pp f "@[<2>%a%a@]" (simple_pattern ctxt) p optional_at_modes m)
-    | _ -> pattern1 ctxt f p
+  (* CR jbachurski: pattern2 for modes *)
 
   (** for special treatment of modes in labeled expressions *)
   and simple_pattern1 ctxt f p =
     match p.pat_desc with
-    | Tpat_constraint _ -> pp f "(%a)" (pattern2 ctxt) p
+    | Tpat_constraint _ -> pp f "(%a)" (pattern1 ctxt) p
     | _ -> simple_pattern ctxt f p
 
-  and label_exp ctxt f (l, opt, p) =
-    match l with
-    | Nolabel ->
-      (* single case pattern parens needed here *)
-      pp f "%a" (simple_pattern1 ctxt) p
-    | Optional rest -> (
-      match p with
-      | { pat_desc = Tpat_var { txt; _ }; pat_attributes = [] } when txt = rest
-        -> (
-        match opt with
-        | Some o -> pp f "?(%a=@;%a)" ident_of_name rest (expression ctxt) o
-        | None -> pp f "?%a" ident_of_name rest)
-      | _ -> (
-        match opt with
-        | Some o ->
-          pp f "?%a:(%a=@;%a)@;" ident_of_name rest (pattern2 ctxt) p
-            (expression ctxt) o
-        | None -> pp f "?%a:%a@;" ident_of_name rest (simple_pattern1 ctxt) p))
-    | Labelled l | Position l -> (
-      match p with
-      | { pat_desc = Tpat_var { txt; _ }; pat_attributes = [] } when txt = l ->
-        pp f "~%a" ident_of_name l
-      | _ -> pp f "~%a:%a" ident_of_name l (simple_pattern1 ctxt) p)
+  and trivial_pattern _ctxt f (p : Parsetree.pattern) =
+    assert (p.ppat_attributes = []);
+    match p.ppat_desc with
+    | Ppat_any -> pp f "_"
+    | Ppat_var { txt; _ } -> ident_of_name f txt
+    | _ -> Misc.fatal_error "Translquote.trivial_pattern"
 
-  and sugar_expr ctxt f e =
-    if e.exp_attributes <> []
-    then false
-    else
-      match e.exp_desc with
-      | Texp_apply
-          ( { exp_desc = Texp_ident { txt = id; _ }; exp_attributes = []; _ },
-            args )
-        when List.for_all (fun (lab, _) -> lab = Nolabel) args -> (
-        let print_indexop a path_prefix assign left sep right print_index
-            indices rem_args =
-          let print_path ppf = function
-            | None -> ()
-            | Some m -> pp ppf ".%a" longident m
-          in
-          match assign, rem_args with
-          | false, [] ->
-            pp f "@[%a%a%s%a%s@]" (simple_expr ctxt) a print_path path_prefix
-              left (list ~sep print_index) indices right;
-            true
-          | true, [v] ->
-            pp f "@[%a%a%s%a%s@ <-@;<1 2>%a@]" (simple_expr ctxt) a print_path
-              path_prefix left (list ~sep print_index) indices right
-              (simple_expr ctxt) v;
-            true
-          | _ -> false
-        in
-        match id, List.map snd args with
-        | Lident "!", [e] ->
-          pp f "@[<hov>!%a@]" (simple_expr ctxt) e;
-          true
-        | Ldot (path, (("get" | "set") as func)), a :: other_args -> (
-          let assign = func = "set" in
-          let print = print_indexop a None assign in
-          match path, other_args with
-          | Lident "Array", i :: rest ->
-            print ".(" "" ")" (expression ctxt) [i] rest
-          | Lident "String", i :: rest ->
-            print ".[" "" "]" (expression ctxt) [i] rest
-          | Ldot (Lident "Bigarray", "Array1"), i1 :: rest ->
-            print ".{" "," "}" (simple_expr ctxt) [i1] rest
-          | Ldot (Lident "Bigarray", "Array2"), i1 :: i2 :: rest ->
-            print ".{" "," "}" (simple_expr ctxt) [i1; i2] rest
-          | Ldot (Lident "Bigarray", "Array3"), i1 :: i2 :: i3 :: rest ->
-            print ".{" "," "}" (simple_expr ctxt) [i1; i2; i3] rest
-          | ( Ldot (Lident "Bigarray", "Genarray"),
-              { exp_desc = Texp_array (_, indexes); exp_attributes = [] }
-              :: rest ) ->
-            print ".{" "," "}" (simple_expr ctxt) indexes rest
-          | _ -> false)
-        | (Lident s | Ldot (_, s)), a :: i :: rest when first_is '.' s ->
-          (* extract operator:
-             assignment operators end with [right_bracket ^ "<-"],
-             access operators end with [right_bracket] directly
-          *)
-          let multi_indices = String.contains s ';' in
-          let i =
-            match i.exp_desc with
-            | Texp_array (_, l) when multi_indices -> l
-            | _ -> [i]
-          in
-          let assign = last_is '-' s in
-          let kind =
-            (* extract the right end bracket *)
-            let n = String.length s in
-            if assign then s.[n - 3] else s.[n - 1]
-          in
-          let left, right =
-            match kind with
-            | ')' -> '(', ")"
-            | ']' -> '[', "]"
-            | '}' -> '{', "}"
-            | _ -> assert false
-          in
-          let path_prefix = match id with Ldot (m, _) -> Some m | _ -> None in
-          let left = String.sub s 0 (1 + String.index s left) in
-          print_indexop a path_prefix assign left ";" right
-            (if multi_indices then expression ctxt else simple_expr ctxt)
-            i rest
-        | _ -> false)
-      | _ -> false
+  (* CR jbachurski: cut [sugar_expr] *)
 
   and expression ctxt f x =
+    assert (x.exp_extra = []);
     if x.exp_attributes <> []
     then
       pp f "((%a)@,%a)" (expression ctxt)
@@ -1022,10 +885,10 @@ let reset_pipe ctxt = { ctxt with pipe=false }
       | Texp_letop _
         when ctxt.semi ->
         paren true (expression reset_ctxt) f x
-      | Texp_function (params, constraint_, body) -> (
-        match params, constraint_ with
+      | Texp_function { params; body } -> (
+        match params with
         (* Omit [fun] if there are no params. *)
-        | [], { ret_type_constraint = None; ret_mode_annotations = []; _ } ->
+        | [] ->
           (* If function cases are a direct body of a function,
              the function node should be wrapped in parens so
              it doesn't become part of the enclosing function. *)
@@ -1036,14 +899,10 @@ let reset_pipe ctxt = { ctxt with pipe=false }
           in
           let ctxt' = if should_paren then reset_ctxt else ctxt in
           pp f "@[<2>%a@]" (paren should_paren (function_body ctxt')) body
-        | [], constraint_ ->
-          pp f "@[<2>(%a%a)@]" (function_body ctxt) body
-            (function_constraint ctxt) constraint_
-        | _ :: _, _ ->
+        | _ :: _ ->
           pp f "@[<2>fun@;%t@]" (fun f ->
-              function_params_then_body ctxt f params constraint_ body
-                ~delimiter:"->"))
-      | Texp_match (e, l) ->
+              function_params_then_body ctxt f params body ~delimiter:"->"))
+      | Texp_match (e, _, l, _) ->
         pp f "@[<hv0>@[<hv0>@[<2>match %a@]@ with@]%a@]" (expression reset_ctxt)
           e (case_list ctxt) l
       | Texp_try (e, l) ->
@@ -1051,70 +910,77 @@ let reset_pipe ctxt = { ctxt with pipe=false }
           (* "try@;@[<2>%a@]@\nwith@\n%a"*)
           (expression reset_ctxt)
           e (case_list ctxt) l
-      | Texp_let (mf, rf, l, e) ->
+      | Texp_let (rf, l, e) ->
         (* pp f "@[<2>let %a%a in@;<1 -2>%a@]"
            (*no indentation here, a new line*) *)
         (*   rec_flag rf *)
         (*   mutable_flag mf *)
-        pp f "@[<2>%a in@;<1 -2>%a@]" (bindings reset_ctxt) (mf, rf, l)
+        pp f "@[<2>%a in@;<1 -2>%a@]" (bindings reset_ctxt) (Immutable, rf, l)
           (expression ctxt) e
-      | Texp_apply
-          ( { exp_desc = Texp_extension ({ txt = "extension.exclave" }, PStr [])
-            },
-            [(Nolabel, sbody)] ) ->
-        pp f "@[<2>exclave_ %a@]" (expression ctxt) sbody
-      | Texp_apply (e, l) -> (
-        if not (sugar_expr ctxt f x)
-        then
-          match view_fixity_of_exp e with
-          | `Infix s -> (
-            match l with
-            | [((Nolabel, _) as arg1); ((Nolabel, _) as arg2)] ->
-              (* FIXME associativity label_x_expression_param *)
-              pp f "@[<2>%a@;%s@;%a@]"
-                (label_x_expression_param reset_ctxt)
-                arg1 s
-                (label_x_expression_param ctxt)
-                arg2
-            | _ ->
-              pp f "@[<2>%a %a@]" (simple_expr ctxt) e
-                (list (label_x_expression_param ctxt))
-                l)
-          | `Prefix s -> (
-            let s =
-              if List.mem s ["~+"; "~-"; "~+."; "~-."]
-                 &&
-                 match l with
-                 (* See #7200: avoid turning (~- 1) into (- 1) which is
-                    parsed as an int literal *)
-                 | [(_, { exp_desc = Texp_constant _ })] -> false
-                 | _ -> true
-              then String.sub s 1 (String.length s - 1)
-              else s
-            in
-            match l with
-            | [(Nolabel, x)] -> pp f "@[<2>%s@;%a@]" s (simple_expr ctxt) x
-            | _ ->
-              pp f "@[<2>%a %a@]" (simple_expr ctxt) e
-                (list (label_x_expression_param ctxt))
-                l)
+      | Texp_letmutable (l, e) ->
+        (* pp f "@[<2>let %a%a in@;<1 -2>%a@]"
+           (*no indentation here, a new line*) *)
+        (*   rec_flag rf *)
+        (*   mutable_flag mf *)
+        pp f "@[<2>%a in@;<1 -2>%a@]" (bindings reset_ctxt)
+          (Mutable, Nonrecursive, [l])
+          (expression ctxt) e
+      | Texp_apply (e, l, _, _, _) -> (
+        match view_fixity_of_exp e with
+        | `Infix s -> (
+          match l with
+          | [((Nolabel, _) as arg1); ((Nolabel, _) as arg2)] ->
+            (* FIXME associativity label_x_expression_param *)
+            pp f "@[<2>%a@;%s@;%a@]"
+              (label_x_expression_param reset_ctxt)
+              arg1 s
+              (label_x_expression_param ctxt)
+              arg2
           | _ ->
-            pp f "@[<hov2>%a@]"
-              (fun f (e, l) ->
-                pp f "%a@ %a" (expression2 ctxt) e
-                  (list (label_x_expression_param reset_ctxt))
-                  l)
-                (* reset here only because [function,match,try,sequence]
-                   are lower priority *)
-              (e, l))
-      | Texp_construct (li, Some eo)
+            pp f "@[<2>%a %a@]" (simple_expr ctxt) e
+              (list (label_x_expression_param ctxt))
+              l)
+        | `Prefix s -> (
+          let s =
+            if List.mem s ["~+"; "~-"; "~+."; "~-."]
+               &&
+               match l with
+               (* See #7200: avoid turning (~- 1) into (- 1) which is
+                  parsed as an int literal *)
+               | [(_, Arg ({ exp_desc = Texp_constant _ }, _))] -> false
+               | _ -> true
+            then String.sub s 1 (String.length s - 1)
+            else s
+          in
+          match l with
+          | [(Nolabel, Arg (x, _))] ->
+            pp f "@[<2>%s@;%a@]" s (simple_expr ctxt) x
+          | _ ->
+            pp f "@[<2>%a %a@]" (simple_expr ctxt) e
+              (list (label_x_expression_param ctxt))
+              l)
+        | _ ->
+          pp f "@[<hov2>%a@]"
+            (fun f (e, l) ->
+              pp f "%a@ %a" (expression2 ctxt) e
+                (list (label_x_expression_param reset_ctxt))
+                l)
+              (* reset here only because [function,match,try,sequence]
+                 are lower priority *)
+            (e, l))
+      | Texp_construct (li, _, eo, _)
         when not (is_simple_construct (view_expr x)) -> (
         (* Not efficient FIXME*)
         match view_expr x with
         | `cons ls -> list (simple_expr ctxt) f ls ~sep:"@;::@;"
-        | `normal -> pp f "@[<2>%a@;%a@]" longident_loc li (simple_expr ctxt) eo
+        | `single eo ->
+          pp f "@[<2>%a@;%a@]" longident_loc li (simple_expr ctxt) eo
+        | `multiple ->
+          pp f "@[<2>%a@;%a@]" longident_loc li
+            (labeled_tuple_expr ctxt ~unboxed:false)
+            (List.map with_no_label eo)
         | _ -> assert false)
-      | Texp_setfield (e1, li, e2) ->
+      | Texp_setfield (e1, _, li, _, e2) ->
         pp f "@[<2>%a.%a@ <-@ %a@]" (simple_expr ctxt) e1 longident_loc li
           (simple_expr ctxt) e2
       | Texp_ifthenelse (e1, e2, eo) ->
@@ -1132,42 +998,30 @@ let reset_pipe ctxt = { ctxt with pipe=false }
           eo
       | Texp_sequence _ ->
         let rec sequence_helper acc = function
-          | { exp_desc = Texp_sequence (e1, e2); exp_attributes = [] } ->
+          | { exp_desc = Texp_sequence (e1, _, e2); exp_attributes = [] } ->
             sequence_helper (e1 :: acc) e2
           | v -> List.rev (v :: acc)
         in
         let lst = sequence_helper [] x in
         pp f "@[<hv>%a@]" (list (expression (under_semi ctxt)) ~sep:";@;") lst
-      | Texp_new li -> pp f "@[<hov2>new@ %a@]" longident_loc li
-      | Texp_override l ->
+      | Texp_new (_, li, _, _) -> pp f "@[<hov2>new@ %a@]" longident_loc li
+      | Texp_override (_, l) ->
         (* FIXME *)
-        let string_x_expression f (s, e) =
+        let string_x_expression f (_, s, e) =
           pp f "@[<hov2>%a@ =@ %a@]" ident_of_name s.txt (expression ctxt) e
         in
         pp f "@[<hov2>{<%a>}@]" (list string_x_expression ~sep:";") l
-      | Texp_letmodule (s, me, e) ->
-        pp f "@[<hov2>let@ module@ %s@ =@ %a@ in@ %a@]"
-          (Option.value s.txt ~default:"_")
-          (module_expr reset_ctxt) me (expression ctxt) e
-      | Texp_letexception (cd, e) ->
-        pp f "@[<hov2>let@ exception@ %a@ in@ %a@]"
-          (extension_constructor ctxt)
-          cd (expression ctxt) e
-      | Texp_assert e -> pp f "@[<hov2>assert@ %a@]" (simple_expr ctxt) e
+      | Texp_letmodule _ -> Misc.fatal_error "Translquote: Texp_letmodule"
+      | Texp_letexception _ -> Misc.fatal_error "Translquote: Texp_letexception"
+      | Texp_assert (e, _) -> pp f "@[<hov2>assert@ %a@]" (simple_expr ctxt) e
       | Texp_lazy e -> pp f "@[<hov2>lazy@ %a@]" (simple_expr ctxt) e
-      (* Texp_poly: impossible but we should print it anyway, rather than
-         assert false *)
-      | Texp_open (o, e) ->
-        pp f "@[<2>let open%s %a in@;%a@]"
-          (override o.popen_override)
-          (module_expr ctxt) o.popen_expr (expression ctxt) e
-      | Texp_variant (l, Some eo) ->
+      | Texp_open _ -> Misc.fatal_error "Translquote: Texp_letexception"
+      | Texp_variant (l, Some (eo, _)) ->
         pp f "@[<2>`%a@;%a@]" ident_of_name l (simple_expr ctxt) eo
       | Texp_letop { let_; ands; body } ->
         pp f "@[<2>@[<v>%a@,%a@] in@;<1 -2>%a@]" (binding_op ctxt) let_
           (list ~sep:"@," (binding_op ctxt))
           ands (expression ctxt) body
-      | Texp_extension e -> extension ctxt f e
       | Texp_unreachable -> pp f "."
       | Texp_overwrite (e1, e2) ->
         (* Similar to the case of [Texp_stack] *)
@@ -1179,12 +1033,7 @@ let reset_pipe ctxt = { ctxt with pipe=false }
       | _ -> expression1 ctxt f x
 
   and expression1 ctxt f x =
-    if x.exp_attributes <> []
-    then expression ctxt f x
-    else
-      match x.exp_desc with
-      | Texp_object cs -> pp f "%a" (class_structure ctxt) cs
-      | _ -> expression2 ctxt f x
+    if x.exp_attributes <> [] then expression ctxt f x else expression2 ctxt f x
   (* used in [Texp_apply] *)
 
   and expression2 ctxt f x =
@@ -1192,12 +1041,11 @@ let reset_pipe ctxt = { ctxt with pipe=false }
     then expression ctxt f x
     else
       match x.exp_desc with
-      | Texp_field (e, li) ->
+      | Texp_field (e, _, li, _, _, _) ->
         pp f "@[<hov2>%a.%a@]" (simple_expr ctxt) e longident_loc li
-      | Texp_unboxed_field (e, li) ->
+      | Texp_unboxed_field (e, _, li, _, _) ->
         pp f "@[<hov2>%a.#%a@]" (simple_expr ctxt) e longident_loc li
-      | Texp_send (e, s) ->
-        pp f "@[<hov2>%a#%a@]" (simple_expr ctxt) e ident_of_name s.txt
+      | Texp_send _ -> Misc.fatal_error "Translquote.expression2: Texp_send"
       | _ -> simple_expr ctxt f x
 
   and simple_expr ctxt f x =
@@ -1217,44 +1065,50 @@ let reset_pipe ctxt = { ctxt with pipe=false }
             xs
         | `simple x -> longident f x
         | _ -> assert false)
-      | Texp_ident li -> longident_loc f li
+      | Texp_ident (_, li, _, _, _) -> longident_loc f li
       (* (match view_fixity_of_exp x with *)
       (* |`Normal -> longident_loc f li *)
       (* | `Prefix _ | `Infix _ -> pp f "( %a )" longident_loc li) *)
       | Texp_constant c -> constant f c
-      | Texp_pack me -> pp f "(module@;%a)" (module_expr ctxt) me
-      | Texp_tuple l -> labeled_tuple_expr ctxt f ~unboxed:false l
-      | Texp_unboxed_tuple l -> labeled_tuple_expr ctxt f ~unboxed:true l
-      | Texp_constraint (e, ct, m) -> (
-        match ct, print_modes_in_old_syntax m with
-        | None, true -> pp f "(%a %a)" legacy_modes m (expression ctxt) e
-        | None, false ->
-          pp f "(%a : _%a)" (expression ctxt) e optional_at_modes m
-        | Some ct, _ ->
-          pp f "(%a : %a)" (expression ctxt) e
-            (core_type_with_optional_modes ctxt)
-            (ct, m))
-      | Texp_coerce (e, cto1, ct) ->
-        pp f "(%a%a :> %a)" (expression ctxt) e
-          (option (core_type ctxt) ~first:" : " ~last:" ")
-          cto1 (* no sep hint*)
-          (core_type ctxt) ct
+      | Texp_pack _ -> Misc.fatal_error "Translquote.simple_expr: Texp_pack"
+      (* CR jbachurski: mode? *)
+      | Texp_tuple (l, _) -> labeled_tuple_expr ctxt f ~unboxed:false l
+      | Texp_unboxed_tuple l ->
+        labeled_tuple_expr ctxt f ~unboxed:true (List.map drop_pat_sort l)
       | Texp_variant (l, None) -> pp f "`%a" ident_of_name l
-      | Texp_record (l, eo) -> record_expr ctxt f ~unboxed:false l eo
-      | Texp_record_unboxed_product (l, eo) ->
-        record_expr ctxt f ~unboxed:true l eo
-      | Texp_array (mut, l) ->
-        let punct = match mut with Immutable -> ':' | Mutable -> '|' in
+      (* CR jbachurski: mode? *)
+      | Texp_record
+          { fields = l;
+            representation = _;
+            extended_expression = eo;
+            alloc_mode = _
+          } ->
+        record_expr ctxt f ~unboxed:false l (Option.map (fun (e, _, _) -> e) eo)
+      (* CR jbachurski: mode? *)
+      | Texp_record_unboxed_product
+          { fields = l; representation = _; extended_expression = eo } ->
+        record_expr ctxt f ~unboxed:true l (Option.map (fun (e, _) -> e) eo)
+      | Texp_array (mut, _, l, _) ->
+        let punct = match mut with Immutable -> ':' | Mutable _ -> '|' in
         pp f "@[<0>@[<2>[%c%a%c]@]@]" punct
           (list (simple_expr (under_semi ctxt)) ~sep:";")
           l punct
       | Texp_idx (ba, uas) ->
         pp f "(%a%a)" (block_access ctxt) ba (list unboxed_access ~sep:"") uas
-      | Texp_comprehension comp -> comprehension_expr ctxt f comp
-      | Texp_while (e1, e2) ->
+      | (Texp_list_comprehension _ | Texp_array_comprehension _) as comp ->
+        comprehension_expr ctxt f comp
+      | Texp_while { wh_cond = e1; wh_body = e2; wh_body_sort = _ } ->
         let fmt : (_, _, _) format = "@[<2>while@;%a@;do@;%a@;done@]" in
         pp f fmt (expression ctxt) e1 (expression ctxt) e2
-      | Texp_for (s, e1, e2, df, e3) ->
+      | Texp_for
+          { for_pat = s;
+            for_from = e1;
+            for_to = e2;
+            for_dir = df;
+            for_body = e3;
+            for_debug_uid = _;
+            for_body_sort = _
+          } ->
         let fmt : (_, _, _) format =
           "@[<hv0>@[<hv2>@[<2>for %a =@;%a@;%a%a@;do@]@;%a@]@;done@]"
         in
@@ -1267,34 +1121,49 @@ let reset_pipe ctxt = { ctxt with pipe=false }
 
   and item_attributes ctxt f l = List.iter (item_attribute ctxt f) l
 
-  and attribute ctxt f a =
+  and attribute ctxt f (a : attribute) =
     pp f "@[<2>[@@%s@ %a]@]" a.attr_name.txt (payload ctxt) a.attr_payload
 
-  and item_attribute ctxt f a =
+  and item_attribute ctxt f (a : attribute) =
     pp f "@[<2>[@@@@%s@ %a]@]" a.attr_name.txt (payload ctxt) a.attr_payload
 
-  and floating_attribute ctxt f a =
+  and floating_attribute ctxt f (a : attribute) =
     pp f "@[<2>[@@@@@@%s@ %a]@]" a.attr_name.txt (payload ctxt) a.attr_payload
 
   and extension ctxt f (s, e) = pp f "@[<2>[%%%s@ %a]@]" s.txt (payload ctxt) e
 
-  and exception_declaration ctxt f x =
-    pp f "@[<hov2>exception@ %a@]%a"
-      (extension_constructor ctxt)
-      x.tyexn_constructor (item_attributes ctxt) x.tyexn_attributes
-
   and kind_abbrev ctxt f name jkind =
     pp f "@[<hov2>kind_abbrev_@ %a@ =@ %a@]" string_loc name
       (jkind_annotation ctxt) jkind
+
+  and payload ctxt f : Parsetree.payload -> unit = function
+    | PStr [{ pstr_desc = Pstr_eval (e, attrs) }] ->
+      pp f "@[<2>%a@]%a" Pprintast.expression e (item_attributes ctxt) attrs
+    | PStr _ -> Misc.fatal_error "Translquote.payload: PStr"
+    | PTyp x ->
+      pp f ":@ ";
+      Pprintast.core_type f x
+    | PSig _ -> Misc.fatal_error "Translquote.payload: PSig"
+    | PPat (x, None) ->
+      pp f "?@ ";
+      Pprintast.pattern f x
+    | PPat (x, Some e) ->
+      pp f "?@ ";
+      Pprintast.pattern f x;
+      pp f " when ";
+      Pprintast.expression f e
 
   and pp_print_params_then_equals ctxt f x =
     if x.exp_attributes <> []
     then pp f "=@;%a" (expression ctxt) x
     else
       match x.exp_desc with
-      | Texp_function (params, constraint_, body) ->
-        function_params_then_body ctxt f params constraint_ body ~delimiter:"="
-      | _ -> pp_print_exp_newtype ctxt "=" f x
+      | Texp_function { params; body; _ } ->
+        function_params_then_body ctxt f params body ~delimiter:"="
+      | _ ->
+        Misc.fatal_error
+          "Translquote.pp_print_params_then_equals: case for \
+           pp_print_pexp_newtype"
 
   and poly_type ctxt core_type f (vars, typ) =
     pp f "type@;%a.@;%a"
@@ -1311,99 +1180,19 @@ let reset_pipe ctxt = { ctxt with pipe=false }
 
   (* transform [f = fun g h -> ..] to [f g h = ... ] could be improved *)
   and binding ctxt f { vb_pat = p; vb_expr = x; _ } =
-    (* .vb_attributes have already been printed by the caller, #bindings *)
-    match ct with
-    | Some (Pvc_constraint { locally_abstract_univars = []; typ }) ->
-      pp f "%a@;:@;%a@;=@;%a" (simple_pattern ctxt) p
-        (core_type_with_optional_modes ctxt)
-        (typ, modes) (expression ctxt) x
-    | Some (Pvc_constraint { locally_abstract_univars = vars; typ }) ->
-      pp f "%a@;: %a@;=@;%a" (simple_pattern ctxt) p
-        (poly_type_with_optional_modes ctxt)
-        (List.map (fun x -> x, None) vars, typ, modes)
-        (expression ctxt) x
-    | Some (Pvc_coercion { ground = None; coercion }) ->
-      pp f "%a@;:>@;%a@;=@;%a" (simple_pattern ctxt) p (core_type ctxt) coercion
-        (expression ctxt) x
-    | Some (Pvc_coercion { ground = Some ground; coercion }) ->
-      pp f "%a@;:%a@;:>@;%a@;=@;%a" (simple_pattern ctxt) p (core_type ctxt)
-        ground (core_type ctxt) coercion (expression ctxt) x
-    | None -> (
-      (* CR layouts 1.5: We just need to check for [is_desugared_gadt] because
-         the parser hasn't been upgraded to parse [let x : type a. ... = ...] as
-         [Pvb_constraint] as it has been upstream. Once we move to the 5.2
-         parsetree encoding of type annotations.
-      *)
-      let tyvars_str tyvars = List.map (fun v -> v.txt) tyvars in
-      let tyvars_jkind_str tyvars =
-        List.map (fun (v, _jkind) -> v.txt) tyvars
-      in
-      let is_desugared_gadt p e =
-        let gadt_pattern =
-          match p with
-          | { pat_desc =
-                Tpat_constraint
-                  ( ({ pat_desc = Tpat_var _ } as pat),
-                    Some { ctyp_desc = Ttyp_poly (args_tyvars, rt) },
-                    _ );
-              pat_attributes = []
-            } ->
-            Some (pat, args_tyvars, rt)
-          | _ -> None
-        in
-        let rec gadt_exp tyvars e =
-          match e with
-          (* no need to handle jkind annotations here; the extracted variables
-             don't get printed -- they're just used to decide how to print *)
-          | { exp_desc = Texp_newtype (tyvar, _jkind, e); exp_attributes = [] }
-            ->
-            gadt_exp (tyvar :: tyvars) e
-          | { exp_desc = Texp_constraint (e, Some ct, _); exp_attributes = [] }
-            ->
-            Some (List.rev tyvars, e, ct)
-          | _ -> None
-        in
-        let gadt_exp = gadt_exp [] e in
-        match gadt_pattern, gadt_exp with
-        | Some (p, pt_tyvars, pt_ct), Some (e_tyvars, e, e_ct)
-          when tyvars_jkind_str pt_tyvars = tyvars_str e_tyvars ->
-          let ety = Ast_helper.Typ.varify_constructors e_tyvars e_ct in
-          if ety = pt_ct then Some (p, pt_tyvars, e_ct, e) else None
-        | _ -> None
-      in
-      match is_desugared_gadt p x with
-      | Some (p, (_ :: _ as tyvars), ct, e) ->
-        pp f "%a@;: %a@;=@;%a" (simple_pattern ctxt) p
-          (poly_type_with_optional_modes ctxt)
-          (tyvars, ct, modes) (expression ctxt) e
-      | _ -> (
-        match p with
-        | { pat_desc = Tpat_var _; pat_attributes = [] } -> (
-          match modes with
-          | [] ->
-            pp f "%a@ %a" (simple_pattern ctxt) p
-              (pp_print_params_then_equals ctxt)
-              x
-          | _ ->
-            pp f "(%a%a)@ %a" (simple_pattern ctxt) p optional_at_modes modes
-              (pp_print_params_then_equals ctxt)
-              x)
-        | _ ->
-          pp f "%a%a@;=@;%a" (pattern ctxt) p optional_at_modes modes
-            (expression ctxt) x))
+    (* CR jbachurski: modes? *)
+    (* CR jbachurski: printing GADTs *)
+    match p with
+    | { pat_desc = Tpat_var _; pat_attributes = [] } ->
+      pp f "%a@ %a" (simple_pattern ctxt) p (pp_print_params_then_equals ctxt) x
+    | _ -> pp f "%a@;=@;%a" (pattern ctxt) p (expression ctxt) x
 
   (* [in] is not printed *)
   and bindings ctxt f (mf, rf, l) =
     let binding kwd mf rf f x =
-      (* The other modes are printed inside [binding] *)
-      let legacy, x =
-        if print_modes_in_old_syntax x.vb_modes
-        then x.vb_modes, { x with vb_modes = [] }
-        else [], x
-      in
-      pp f "@[<2>%s %a%a%a%a@]%a" kwd mutable_flag mf rec_flag rf
-        optional_legacy_modes legacy (binding ctxt) x (item_attributes ctxt)
-        x.vb_attributes
+      (* CR jbachurski: No modes *)
+      pp f "@[<2>%s %a%a%a@]%a" kwd mutable_flag mf rec_flag rf (binding ctxt) x
+        (item_attributes ctxt) x.vb_attributes
     in
     match l with
     | [] -> ()
@@ -1413,27 +1202,18 @@ let reset_pipe ctxt = { ctxt with pipe=false }
         (list ~sep:"@," (binding "and" Immutable Nonrecursive))
         xs
 
-  and binding_op ctxt f x =
-    match x.pbop_pat, x.pbop_exp with
-    | ( { pat_desc = Tpat_var { txt = pvar; _ }; pat_attributes = []; _ },
-        { exp_desc = Texp_ident { txt = Lident evar; _ };
-          exp_attributes = [];
-          _
-        } )
-      when pvar = evar ->
-      pp f "@[<2>%s %s@]" x.pbop_op.txt evar
-    | pat, exp ->
-      pp f "@[<2>%s %a@;=@;%a@]" x.pbop_op.txt (pattern ctxt) pat
-        (expression ctxt) exp
+  and binding_op ctxt f
+      { bop_op_name = { txt = name; loc = _ }; bop_exp = exp; _ } =
+    pp f "@[<2>%s %a@;=@;%a@]" name (pattern ctxt) pat (expression ctxt) exp
 
   (* Don't just use [core_type] because we do not want parens around params
      with jkind annotations *)
   and core_type_param f ct =
     match ct.ctyp_desc with
-    | Ttyp_any None -> pp f "_"
-    | Ttyp_any (Some jk) -> pp f "_ : %a" (jkind_annotation reset_ctxt) jk
-    | Ttyp_var (s, None) -> tyvar f s
-    | Ttyp_var (s, Some jk) ->
+    | Ttyp_var (None, None) -> pp f "_"
+    | Ttyp_var (None, Some jk) -> pp f "_ : %a" (jkind_annotation reset_ctxt) jk
+    | Ttyp_var (Some s, None) -> tyvar f s
+    | Ttyp_var (Some s, Some jk) ->
       pp f "%a : %a" tyvar s (jkind_annotation reset_ctxt) jk
     | _ -> Misc.fatal_error "unexpected type in core_type_param"
 
@@ -1444,8 +1224,7 @@ let reset_pipe ctxt = { ctxt with pipe=false }
     | [] -> ()
     (* Normally, one param doesn't get parentheses, but it does when there is
        a jkind annotation. *)
-    | [(({ ctyp_desc = Ttyp_any (Some _) | Ttyp_var (_, Some _) }, _) as param)]
-      ->
+    | [(({ ctyp_desc = Ttyp_var (_, Some _) }, _) as param)] ->
       pp f "(%a) " type_param param
     | l -> pp f "%a " (list type_param ~first:"(" ~last:")" ~sep:",@;") l
 
@@ -1459,28 +1238,35 @@ let reset_pipe ctxt = { ctxt with pipe=false }
     in
     list aux f l ~sep:""
 
-  and label_x_expression_param ctxt f (l, e) =
-    let simple_name =
-      match e with
-      | { exp_desc = Texp_ident { txt = Lident l; _ }; exp_attributes = [] } ->
-        Some l
-      | _ -> None
-    in
-    match l with
-    | Nolabel -> expression2 ctxt f e (* level 2*)
-    | Optional str ->
-      if Some str = simple_name
-      then pp f "?%a" ident_of_name str
-      else pp f "?%a:%a" ident_of_name str (simple_expr ctxt) e
-    | Labelled lbl | Position lbl ->
-      if Some lbl = simple_name
-      then pp f "~%a" ident_of_name lbl
-      else pp f "~%a:%a" ident_of_name lbl (simple_expr ctxt) e
+  and label_x_expression_param ctxt f (l, a) =
+    match a with
+    | Arg (e, _) -> (
+      let simple_name =
+        match e with
+        | { exp_desc = Texp_ident (_, { txt = Lident l; _ }, _, _, _);
+            exp_attributes = []
+          } ->
+          Some l
+        | _ -> None
+      in
+      match l with
+      | Nolabel -> expression2 ctxt f e (* level 2*)
+      | Optional str ->
+        if Some str = simple_name
+        then pp f "?%a" ident_of_name str
+        else pp f "?%a:%a" ident_of_name str (simple_expr ctxt) e
+      | Labelled lbl | Position lbl ->
+        if Some lbl = simple_name
+        then pp f "~%a" ident_of_name lbl
+        else pp f "~%a:%a" ident_of_name lbl (simple_expr ctxt) e)
+    | Omitted _ -> Misc.fatal_error "Translquote.label_x_expression_param"
 
   and tuple_component ctxt f (l, e) =
     let simple_name =
       match e with
-      | { exp_desc = Texp_ident { txt = Lident l; _ }; exp_attributes = [] } ->
+      | { exp_desc = Texp_ident (_, { txt = Lident l; _ }, _, _, _);
+          exp_attributes = []
+        } ->
         Some l
       | _ -> None
     in
@@ -1494,8 +1280,8 @@ let reset_pipe ctxt = { ctxt with pipe=false }
     | _, None -> expression2 ctxt f e (* level 2*)
 
   and block_access ctxt f = function
-    | Baccess_field li -> pp f ".%a" longident_loc li
-    | Baccess_array (mut, index_kind, index) ->
+    | Baccess_field (li, _) -> pp f ".%a" longident_loc li
+    | Baccess_array { mut; index_kind; index; _ } ->
       let dotop = match mut with Mutable -> "." | Immutable -> ".:" in
       let suffix =
         match index_kind with
@@ -1512,15 +1298,16 @@ let reset_pipe ctxt = { ctxt with pipe=false }
       pp f ".%s(%a)" s (expression ctxt) index
 
   and unboxed_access f = function
-    | Uaccess_unboxed_field li -> pp f ".#%a" longident_loc li
+    | Uaccess_unboxed_field (li, _) -> pp f ".#%a" longident_loc li
 
   and comprehension_expr ctxt f cexp =
     let punct, comp =
       match cexp with
-      | Tcomp_list_comprehension comp -> "", comp
-      | Tcomp_array_comprehension (amut, comp) ->
-        let punct = match amut with Mutable -> "|" | Immutable -> ":" in
+      | Texp_list_comprehension comp -> "", comp
+      | Texp_array_comprehension (amut, _, comp) ->
+        let punct = match amut with Mutable _ -> "|" | Immutable -> ":" in
         punct, comp
+      | _ -> Misc.fatal_error "Translquote.comprehension_expr"
     in
     comprehension ctxt f ~open_:("[" ^ punct) ~close:(punct ^ "]") comp
 
@@ -1539,62 +1326,33 @@ let reset_pipe ctxt = { ctxt with pipe=false }
     | Texp_comp_when cond -> pp f "@[when %a@]" (expression ctxt) cond
 
   and comprehension_binding ctxt f x =
-    let { comp_cb_iterator = iterator;
-          comp_cb_pattern = pat;
-          comp_cb_attributes = attrs
-        } =
-      x
-    in
-    pp f "%a%a %a" (attributes ctxt) attrs (pattern ctxt) pat
-      (comprehension_iterator ctxt)
-      iterator
+    let { comp_cb_iterator = iterator; comp_cb_attributes = attrs } = x in
+    pp f "%a%a" (attributes ctxt) attrs (comprehension_iterator ctxt) iterator
 
   and comprehension_iterator ctxt f x =
     match x with
-    | Tcomp_range { start; stop; direction } ->
-      pp f "=@ %a %a%a" (expression ctxt) start direction_flag direction
-        (expression ctxt) stop
-    | Tcomp_in seq -> pp f "in %a" (expression ctxt) seq
-
-  and function_param ctxt f pparam_desc =
-    match pparam_desc with
-    | Tparam_val (a, b, c) -> label_exp ctxt f (a, b, c)
-    | Tparam_newtype (ty, None) -> pp f "(type %a)" ident_of_name ty.txt
-    | Tparam_newtype (ty, Some annot) ->
-      pp f "(type %a : %a)" ident_of_name ty.txt (jkind_annotation ctxt) annot
+    | Texp_comp_range { pattern = pat; start; stop; direction } ->
+      pp f "%a =@ %a %a%a" (trivial_pattern ctxt) pat (expression ctxt) start
+        direction_flag direction (expression ctxt) stop
+    | Texp_comp_in { pattern = pat; sequence } ->
+      pp f "%a in %a" (pattern ctxt) pat (expression ctxt) sequence
 
   and function_body ctxt f x =
     match x with
     | Tfunction_body body -> expression ctxt f body
-    | Tfunction_cases (cases, _, attrs) ->
+    | Tfunction_cases
+        { fc_cases = cases; fc_attributes = attrs; fc_exp_extra; _ } ->
+      assert (fc_exp_extra = None);
       pp f "@[<hv>function%a%a@]" (item_attributes ctxt) attrs (case_list ctxt)
         cases
 
-  and function_constraint ctxt f x =
-    (* We don't print [mode_annotations], which describes the whole function and goes on the
-       [let] binding. *)
-    (* Enable warning 9 to ensure that the record pattern doesn't miss any field.
-  *)
-    match[@ocaml.warning "+9"] x with
-    | { ret_type_constraint = Some (Pconstraint ty); ret_mode_annotations; _ }
-      ->
-      pp f "@;:@;%a@;"
-        (core_type_with_optional_modes ctxt)
-        (ty, ret_mode_annotations)
-    | { ret_type_constraint = Some (Pcoerce (ty1, ty2)); _ } ->
-      pp f "@;%a:>@;%a"
-        (option ~first:":@;" (core_type ctxt))
-        ty1 (core_type ctxt) ty2
-    | { ret_type_constraint = None; ret_mode_annotations; _ } ->
-      pp f "%a" optional_at_modes ret_mode_annotations
-
-  and function_params_then_body ctxt f params constraint_ body ~delimiter =
+  and function_params_then_body ctxt f params body ~delimiter =
     let pp_params f =
       match params with
       | [] -> ()
       | _ :: _ -> pp f "%a@;" (list (function_param ctxt) ~sep:"@ ") params
     in
-    pp f "%t%a%s@;%a" pp_params (function_constraint ctxt) constraint_ delimiter
+    pp f "%t%a%s@;%a" pp_params delimiter
       (function_body (under_functionrhs ctxt))
       body
 
@@ -1605,19 +1363,18 @@ let reset_pipe ctxt = { ctxt with pipe=false }
       x
 
   and record_expr ctxt f ~unboxed l eo =
-    let longident_x_expression f (li, e) =
+    let longident_x_expression f (_, e) =
       match e with
-      | { exp_desc = Texp_ident { txt; _ }; exp_attributes = []; _ }
-        when li.txt = txt ->
-        pp f "@[<hov2>%a@]" longident_loc li
-      | _ -> pp f "@[<hov2>%a@;=@;%a@]" longident_loc li (simple_expr ctxt) e
+      | Overridden (li, e) ->
+        pp f "@[<hov2>%a@;=@;%a@]" longident_loc li (simple_expr ctxt) e
+      | Kept _ -> ()
     in
     let hash = if unboxed then "#" else "" in
     pp f "@[<hv0>@[<hv2>%s{@;%a%a@]@;}@]" (* "@[<hov2>%s{%a%a}@]" *) hash
       (option ~last:" with@;" (simple_expr ctxt))
       eo
       (list longident_x_expression ~sep:";@;")
-      l
+      (Array.to_list l)
 
   (******************************************************************************)
   (* All exported functions must be defined or redefined below here and wrapped in
@@ -1647,8 +1404,6 @@ let reset_pipe ctxt = { ctxt with pipe=false }
   let pattern = print_reset_with_maximal_extensions pattern
 
   let binding = print_reset_with_maximal_extensions binding
-
-  let type_declaration = print_reset_with_maximal_extensions type_declaration
 
   let jkind_annotation = print_reset_with_maximal_extensions jkind_annotation
 end
