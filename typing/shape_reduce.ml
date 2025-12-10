@@ -197,9 +197,18 @@ end) = struct
 
   let approx_nf nf = { nf with approximated = true }
 
+  let equal_item_map eq =
+    Misc.map_equal_iter_find
+      ~iter:Item.Map.iter ~cardinal:Item.Map.cardinal ~find:Item.Map.find eq
+
+  let equal_ident_map eq =
+    Misc.map_equal_iter_find
+      ~iter:Ident.Map.iter ~cardinal:Ident.Map.cardinal ~find:Ident.Map.find eq
+
   let rec equal_local_env t1 t2 =
-    t1.depth = t2.depth &&
-    Ident.Map.equal (Option.equal equal_delayed_nf) t1.subst t2.subst
+    t1 == t2 ||
+    (t1.depth = t2.depth &&
+    Ident.Map.equal (Option.equal equal_delayed_nf) t1.subst t2.subst)
 
   and equal_delayed_nf t1 t2 =
     match t1, t2 with
@@ -220,7 +229,7 @@ end) = struct
       else false
     | NLeaf, NLeaf -> true
     | NStruct t1, NStruct t2 ->
-      Item.Map.equal equal_delayed_nf t1 t2
+      equal_item_map equal_delayed_nf t1 t2
     | NProj (t1, i1), NProj (t2, i2) ->
       if Item.compare i1 i2 <> 0 then false
       else equal_nf t1 t2
@@ -231,7 +240,7 @@ end) = struct
       Shape.Rec_var_ident.equal rv1 rv2 && equal_nf nf1 nf2
     | NRec_var rv1, NRec_var rv2 -> Shape.Rec_var_ident.equal rv1 rv2
     | NMutrec defs1, NMutrec defs2 ->
-      Ident.Map.equal equal_nf defs1 defs2
+      equal_ident_map equal_nf defs1 defs2
     | NProj_decl (nf1, id1), NProj_decl (nf2, id2) ->
       Ident.equal id1 id2 && equal_nf nf1 nf2
     | NConstr (id1, args1), NConstr (id2, args2) ->
@@ -284,8 +293,8 @@ end) = struct
         | NRec_var _ | NUnknown_type | NAt_layout _ ), _ ) -> false
 
   and equal_nf t1 t2 =
-    if not (Option.equal Uid.equal t1.uid t2.uid) then false
-    else equal_nf_desc t1.desc t2.desc
+    t1 == t2 ||
+    (Option.equal Uid.equal t1.uid t2.uid && equal_nf_desc t1.desc t2.desc)
 
   module ReduceMemoTable = Hashtbl.Make(struct
       type nonrec t = local_env * t

@@ -709,7 +709,9 @@ module Shape_map = struct
       (fun id shape acc -> Hashtbl.hash (Ident.hash id, shape.Shape.hash, acc))
       m 0
 
-  let equal = Ident.Map.equal Shape.equal
+  let equal =
+    Misc.map_equal_iter_find ~iter:Ident.Map.iter ~cardinal:Ident.Map.cardinal
+      ~find:Ident.Map.find Shape.equal
 end
 
 (* Maps type variables to their shape substitutions. Used for beta
@@ -749,7 +751,9 @@ module Rec_constr_env =
                List.equal Shape.equal args1 args2
                && Recursive_binder.equal rb1 rb2
              in
-             Ident.Map.equal (List.equal equal_entry)
+             Misc.map_equal_iter_find ~iter:Ident.Map.iter
+               ~cardinal:Ident.Map.cardinal ~find:Ident.Map.find
+               (List.equal equal_entry)
          end))
 
 module Eval_env = struct

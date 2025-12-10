@@ -849,6 +849,30 @@ let no_overflow_mul a b =
 let no_overflow_lsl a k =
   0 <= k && k < Sys.word_size - 1 && min_int asr k <= a && a <= max_int asr k
 
+(* Map equality using O(n * log n) algorithm via iter + find. Should typically
+   allocate less than Map.equal but have longer execution times. Includes
+   physical equality check for the common case of identical values. [find] must
+   raise [Not_found] when the key is not present. *)
+exception Map_not_equal
+
+let rec map_equal_iter_find ~iter ~cardinal ~find eq_val m1 m2 =
+  if m1 == m2 then true
+  else
+    let c1 = cardinal m1 in
+    let c2 = cardinal m2 in
+    if not (Int.equal c1 c2) then false
+    else if Int.equal c1 0 then true
+    else (match map_equal_iter_find_aux_exn ~iter ~find eq_val m1 m2 with
+          | () -> true
+          | exception Map_not_equal -> false)
+
+and map_equal_iter_find_aux_exn ~iter ~find eq_val m1 m2 =
+  iter (fun k v1 ->
+    match find k m2 with
+    | exception Not_found -> raise_notrace Map_not_equal
+    | v2 -> if not (eq_val v1 v2) then raise_notrace Map_not_equal
+  ) m1
+
 let letter_of_int n =
   let letter = String.make 1 (Char.chr (Char.code 'a' + n mod 26)) in
   let num = n / 26 in
