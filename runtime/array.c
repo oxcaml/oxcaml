@@ -618,6 +618,7 @@ static value caml_make_##TYPE##_vect0(value len, int local)                    \
     return caml_alloc_with_reserved(num_fields, tag, reserved);                \
 }
 
+/* Each of these are only used on 64-bit targets. */
 DEFINE_caml_make_vect0(untagged_int8, Untagged_int8, 8)
 DEFINE_caml_make_vect0(untagged_int16, Untagged_int16, 4)
 DEFINE_caml_make_vect0(unboxed_int32, Unboxed_int32, 2)
