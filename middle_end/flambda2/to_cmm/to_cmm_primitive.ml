@@ -324,9 +324,11 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
     C.int_array_ref arr index dbg
   | ( (Naked_ints | Naked_int64s | Naked_nativeints),
       (Naked_ints | Naked_int64s | Naked_nativeints) ) ->
-    C.naked_int_or_int64_or_nativeint_array_ref arr ~array_index:index dbg
+    C.unboxed_or_untagged_int_or_int64_or_nativeint_array_ref arr
+      ~array_index:index dbg
   | Unboxed_product _, (Naked_ints | Naked_int64s | Naked_nativeints) ->
-    C.naked_int_or_int64_or_nativeint_array_ref arr ~array_index:index dbg
+    C.unboxed_or_untagged_int_or_int64_or_nativeint_array_ref arr
+      ~array_index:index dbg
   | ( (Immediates | Gc_ignorable_values | Values | Unboxed_product _),
       (Gc_ignorable_values | Values) ) ->
     C.addr_array_ref arr index dbg

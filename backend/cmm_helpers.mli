@@ -1448,8 +1448,11 @@ val unboxed_mutable_int32_unboxed_product_array_set :
     (without bounds check).
 
     The zero-indexed element number is specified as a tagged immediate.
+
+    A better name would be `naked_int_or_int64_or_nativeint_array_ref`, but this
+    name was chosen for consistency.
 *)
-val naked_int_or_int64_or_nativeint_array_ref :
+val unboxed_or_untagged_int_or_int64_or_nativeint_array_ref :
   expression -> array_index:expression -> Debuginfo.t -> expression
 
 (** Update an unboxed float32 array (without bounds check). *)

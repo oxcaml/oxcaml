@@ -1956,7 +1956,8 @@ let unboxed_float32_array_ref =
   unboxed_or_untagged_packed_array_ref ~log2_size_addr:2
     ~memory_chunk:(Single { reg = Float32 })
 
-let naked_int_or_int64_or_nativeint_array_ref arr ~array_index dbg =
+let unboxed_or_untagged_int_or_int64_or_nativeint_array_ref arr ~array_index dbg
+    =
   bind "arr" arr (fun arr ->
       bind "index" array_index (fun index -> int_array_ref arr index dbg))
 
