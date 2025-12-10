@@ -3549,9 +3549,11 @@ let rec mcomp type_pairs env t1 t2 =
             with Escape _ -> raise Incompatible)
         | (Trepr (t1, []), Trepr (t2, []), _, _) ->
             mcomp type_pairs env t1 t2
-        | (Trepr _, Trepr _, _, _) ->
-            (* CR aivaskovic: implement mcomp for Trepr *)
-            fatal_error "Ctype: mcomp Trepr"
+        | (Trepr (t1, tl1), Trepr (t2, tl2), _, _) ->
+            (try
+               enter_poly env univar_pairs
+                 t1 tl1 t2 tl2 (mcomp type_pairs env)
+            with Escape _ -> raise Incompatible)
         | (Tunivar {jkind=jkind1}, Tunivar {jkind=jkind2}, _, _) ->
             (try unify_univar t1' t2' jkind1 jkind2 !univar_pairs
              with Cannot_unify_universal_variables -> raise Incompatible)
@@ -4298,9 +4300,9 @@ and unify3 uenv t1 t1' t2 t2' =
             (unify uenv)
       | (Trepr (t1, []), Trepr (t2, [])) ->
           unify uenv t1 t2
-      | (Trepr _, Trepr _) ->
-          (* CR aivaskovic: properly handle unification for Trepr *)
-          fatal_error "Ctype: unify3 Trepr"
+      | (Trepr (t1, tl1), Trepr (t2, tl2)) ->
+          enter_poly_for Unify (get_env uenv) univar_pairs t1 tl1 t2 tl2
+            (unify uenv)
       | (Tpackage (p1, fl1), Tpackage (p2, fl2)) ->
           begin try
             unify_package (get_env uenv) (unify_list uenv)
@@ -5472,9 +5474,9 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                 (moregen inst_nongen variance type_pairs env)
           | (Trepr (t1, []), Trepr (t2, [])) ->
               moregen inst_nongen variance type_pairs env t1 t2
-          | (Trepr _, Trepr _) ->
-              (* CR aivaskovic: properly handle Trepr moregen *)
-              fatal_error "Ctype: moregen Trepr"
+          | (Trepr (t1, tl1), Trepr (t2, tl2)) ->
+              enter_poly_for Moregen env univar_pairs t1 tl1 t2 tl2
+                (moregen inst_nongen variance type_pairs env)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Moregen t1' t2' k1 k2 !univar_pairs
           | (Tquote t1, Tquote t2) ->
@@ -5941,9 +5943,9 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
                 (eqtype rename type_pairs subst env ~do_jkind_check)
           | (Trepr (t1, []), Trepr (t2, [])) ->
               eqtype rename type_pairs subst env t1 t2 ~do_jkind_check
-          | (Trepr _, Trepr _) ->
-              (* CR aivaskovic: properly handle Trepr type equality *)
-              fatal_error "Ctype: eqtype Trepr"
+          | (Trepr (t1, tl1), Trepr (t2, tl2)) ->
+              enter_poly_for Equality env univar_pairs t1 tl1 t2 tl2
+                (eqtype rename type_pairs subst env ~do_jkind_check)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Equality t1' t2' k1 k2 !univar_pairs
           | (Tquote t1, Tquote t2) ->
@@ -6675,9 +6677,10 @@ let rec build_subtype env (visited : transient_expr list)
       let (t1', c) = build_subtype env visited loops posi level t1 in
       if c > Unchanged then (newty (Tpoly(t1', tl)), c)
       else (t, Unchanged)
-  | Trepr _ ->
-      (* CR aivaskovic: implement build_subtype for Trepr *)
-      fatal_error "Ctype: build_subtype Trepr"
+  | Trepr(t1, tl) ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Trepr(t1', tl)), c)
+      else (t, Unchanged)
   | Tunivar _ | Tpackage _ | Tof_kind _ -> (t, Unchanged)
 
 and build_subtype_tuple env visited loops posi level t labeled_tlist
@@ -6832,9 +6835,13 @@ let rec subtype_rec env trace t1 t2 cstrs =
         end
     | (Trepr (u1, []), Trepr (u2, [])) ->
         subtype_rec env trace u1 u2 cstrs
-    | (Trepr _, Trepr _) ->
-        (* CR aivaskovic: implement subtype for Trepr *)
-        fatal_error "Ctype: subtype_rec Trepr"
+    | (Trepr (u1, tl1), Trepr (u2,tl2)) ->
+        begin try
+          enter_poly env univar_pairs u1 tl1 u2 tl2
+            (fun t1 t2 -> subtype_rec env trace t1 t2 cstrs)
+        with Escape _ ->
+          (trace, t1, t2, !univar_pairs)::cstrs
+        end
     | (Tpackage (p1, fl1), Tpackage (p2, fl2)) ->
         begin try
           let ntl1 =
