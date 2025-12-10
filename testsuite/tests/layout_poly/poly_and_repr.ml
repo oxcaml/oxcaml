@@ -40,12 +40,51 @@ Error: This expression should not be a function, the expected type is
        "(repr_ 'a). 'a -> 'a"
 |}];;
 
+let const_fun_repr_arg : ((repr_ 'a). 'a -> unit) -> unit =
+  fun _ -> ();;
+[%%expect {|
+val const_fun_repr_arg : ((repr_ 'a). 'a -> unit) -> unit = <fun>
+|}]
+
+let poly_and_repr_1 : 'b. ((repr_ 'a). 'a -> 'b -> unit) -> unit =
+  fun _ -> ();;
+[%%expect {|
+val poly_and_repr_1 : ((repr_ 'a). 'a -> 'b -> unit) -> unit = <fun>
+|}]
+
+let poly_and_repr_2 : ('b : any). ((repr_ 'a). 'a -> 'b -> unit) -> unit =
+  fun _ -> ();;
+[%%expect {|
+val poly_and_repr_2 : ('b : any). ((repr_ 'a). 'a -> 'b -> unit) -> unit =
+  <fun>
+|}]
+
+let poly_and_repr_3 : ((repr_ 'a). 'a -> 'b -> unit) -> unit =
+  fun _ -> ();;
+[%%expect {|
+val poly_and_repr_3 : ('b : any). ((repr_ 'a). 'a -> 'b -> unit) -> unit =
+  <fun>
+|}]
+
+let poly_and_repr_4 : ('b : value). ((repr_ 'a). 'a -> 'b -> unit) -> unit =
+  fun _ -> ();;
+[%%expect {|
+val poly_and_repr_4 : ((repr_ 'a). 'a -> 'b -> unit) -> unit = <fun>
+|}]
+
 let forced : (repr_ 'a). unit =
   raise Force_type
 ;;
 [%%expect {|
 Exception: Force_type.
 |}];;
+
+let poly_and_repr_1 : 'b. ((repr_ 'a). 'a -> 'b -> unit) -> unit =
+  fun _ -> ();;
+[%%expect {|
+val poly_and_repr_1 : ((repr_ 'a). 'a -> 'b -> unit) -> unit = <fun>
+|}]
+
 
 let forced2 : (repr_ 'a) (repr_ 'b). unit =
   raise Force_type
