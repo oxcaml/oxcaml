@@ -97,7 +97,6 @@ COMPILERLIBS_SOURCES=\
   utils/terminfo.ml \
   utils/warnings.ml \
   utils/int_replace_polymorphic_compare.ml \
-  typing/ident.ml \
   utils/compilation_unit.ml \
   utils/import_info.ml \
   utils/linkage_name.ml \
@@ -117,23 +116,44 @@ COMPILERLIBS_SOURCES=\
   parsing/builtin_attributes.ml \
   parsing/ast_mapper.ml \
   parsing/camlinternalMenhirLib.ml \
+  parsing/parser_types.ml \
   parsing/parser.ml \
   parsing/lexer.ml \
   parsing/pprintast.ml \
-  typing/solver.ml \
-  typing/mode.ml \
   parsing/attr_helper.ml \
+  typing/global_module.ml \
   typing/ident.ml \
   typing/path.ml \
   typing/shape.ml \
+  typing/shape_reduce.ml \
+  typing/allowance.ml \
+  typing/solver.ml \
+  typing/mode.ml \
+  typing/jkind_intf.ml \
+  typing/jkind_axis.ml \
   typing/jkind_types.ml \
   typing/scalar.ml \
   typing/primitive.ml \
   typing/zero_alloc.ml \
   typing/types.ml \
   typing/oprint.ml \
+  typing/typemode.ml \
   typing/jkind.ml \
-  typing/typedtree.ml \
+  typing/ikinds/global_counters.ml \
+  typing/ikinds/product_lattice.ml \
+  typing/ikinds/ldd_memo.ml \
+  typing/ikinds/ldd_cached_down0.ml \
+  typing/ikinds/ldd.ml \
+  typing/ikinds/ldd_no_memo.ml \
+  typing/ikinds/ldd_unboxed.ml \
+  typing/ikinds/ldd_no_fast_path.ml \
+  typing/ikinds/ldd_leaf_specialized.ml \
+  typing/ikinds/axis_lattice.ml \
+  typing/ikinds/axis_lattice_conv.ml \
+  typing/ikinds/axis_lattice_array.ml \
+  typing/ikinds/axis_lattice_array_conv.ml \
+  typing/ikinds/ikind.ml \
+  typing/ikinds/ikinds.ml \
   typing/btype.ml \
   typing/subst.ml \
   typing/signature_with_global_bindings.ml \
@@ -142,7 +162,6 @@ COMPILERLIBS_SOURCES=\
   file_formats/cmi_format.ml \
   typing/persistent_env.ml \
   typing/env.ml \
-  typing/shape_reduce.ml \
   typing/type_shape.ml \
   typing/typedtree.ml \
   lambda/debuginfo.ml \
