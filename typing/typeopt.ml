@@ -111,30 +111,31 @@ let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 (* CR layouts v3.0: have a better error message
    for nullable jkinds.*)
 let type_layout ~why env loc ty =
-  (* To ensure that ty's jkind is representable, we first [type_sort].
-     We don't use this sort, though; we need the entire layout instead.
-     The need for this is demonstrated with the following example:
+  let jkind = Ctype.type_jkind env ty in
+  match Jkind.get_layout_defaulting_to_scannable jkind with
+  (* Surprisingly, it is possible to reach this branch; for example, when
+     translating [f] in the following example:
 
      external foo : ('a : any mod separable). 'a array -> int = "%identity"
      let f x = foo x
 
-     [type_sort] will make, constrain, and default a new sort variable for [f]'s
-     type parameter. Without it, calling [type_jkind] returns a jkind with
-     layout [Any] and [f]'s type parameter would have the wrong layout.
-
      See also (3) in [Note regarding jkind checks on external declarations]. *)
-  (* CR zeisbach: is there a way to do this more efficiently? *)
-  (* CR zeisbach: try to clean up the comment above. *)
-  match Ctype.type_sort ~why ~fixed:false env ty with
-  | Ok _sort ->
-    let jkind = Ctype.type_jkind env ty in
-    (match Jkind.get_layout_defaulting_to_scannable jkind with
-    | Any _ ->
-      Misc.fatal_error "called type_sort but didn't get a representable layout"
-    | layout -> layout)
-  | Error err ->
-    (* It seems as if this is unreachable *)
-    raise (Error (loc, Not_a_sort (ty, err)))
+  | Any _ ->
+    (* In this case (at least for now), we want to constrain [ty]'s jkind to
+       be representable, which is achieved by [type_sort]. Recomputing the jkind
+       will then yield one with the new, representable (defaulted) layout. *)
+    (* We postpone calling [type_sort] until this branch to make the common case
+       faster, even though it means that [type_jkind] must be called twice. *)
+    (match Ctype.type_sort ~why ~fixed:false env ty with
+    | Ok _sort ->
+      let jkind = Ctype.type_jkind env ty in
+      (match Jkind.get_layout_defaulting_to_scannable jkind with
+      | Any _ -> Misc.fatal_error
+                   "called type_sort but didn't get a representable layout"
+      | layout -> layout)
+    (* It seems as if this branch is never reached *)
+    | Error err -> raise (Error (loc, Not_a_sort (ty, err))))
+  | layout -> layout
 
 (* [classification]s are used for two things: things in arrays, and things in
    lazys. In the former case, we need detailed information about unboxed
