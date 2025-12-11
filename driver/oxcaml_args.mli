@@ -119,6 +119,8 @@ module type Oxcaml_options = sig
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
   val no_flambda2_expert_inline_effects_in_cmm : unit -> unit
+  val flambda2_expert_cmm_safe_subst : unit -> unit
+  val no_flambda2_expert_cmm_safe_subst : unit -> unit
   val flambda2_expert_phantom_lets : unit -> unit
   val no_flambda2_expert_phantom_lets : unit -> unit
   val flambda2_expert_max_block_size_for_projections : int -> unit

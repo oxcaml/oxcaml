@@ -1,6 +1,6 @@
 (* TEST
  flambda;
- ocamlopt_flags = "-Oclassic";
+ ocamlopt_flags = "-Oclassic -flambda2-expert-cmm-safe-subst";
  exit_status = "2";
  native;
 *)

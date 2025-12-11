@@ -272,6 +272,10 @@ module Expert = struct
     !Oxcaml_flags.Flambda2.Expert.inline_effects_in_cmm
     |> with_default ~f:(fun d -> d.inline_effects_in_cmm)
 
+  let cmm_safe_subst () =
+    !Oxcaml_flags.Flambda2.Expert.cmm_safe_subst
+    |> with_default ~f:(fun d -> d.cmm_safe_subst)
+
   (* CR mshinwell: Remove any uses of this flag, then remove the flag. *)
   let max_block_size_for_projections () =
     !Oxcaml_flags.Flambda2.Expert.max_block_size_for_projections

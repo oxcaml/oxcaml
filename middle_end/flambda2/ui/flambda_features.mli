@@ -159,6 +159,8 @@ module Expert : sig
 
   val inline_effects_in_cmm : unit -> bool
 
+  val cmm_safe_subst : unit -> bool
+
   val max_block_size_for_projections : unit -> int option
 
   val phantom_lets : unit -> bool

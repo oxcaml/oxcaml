@@ -952,12 +952,15 @@ let can_substitute_wrt_effects ?consider_inlining_effectful_expressions env var
     | Some env -> Possible env)
 
 let can_substitute_wrt_validity env var binding =
-  match Ece.validity binding.effs with
-  | Validity.Always_valid -> Possible env
-  | Validity.Valid_after_some_branch | Validity.Control_flow_point -> (
-    match pop_if_in_top_validity_stage env var with
-    | None -> Not_possible
-    | Some env -> Possible env)
+  if not (Flambda_features.Expert.cmm_safe_subst ())
+  then Possible env
+  else
+    match Ece.validity binding.effs with
+    | Validity.Always_valid -> Possible env
+    | Validity.Valid_after_some_branch | Validity.Control_flow_point -> (
+      match pop_if_in_top_validity_stage env var with
+      | None -> Not_possible
+      | Some env -> Possible env)
 
 let can_substitute ?consider_inlining_effectful_expressions env var binding =
   match can_substitute_wrt_validity env var binding with

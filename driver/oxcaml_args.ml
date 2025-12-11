@@ -624,6 +624,21 @@ let mk_no_flambda2_expert_inline_effects_in_cmm f =
       \     the arguments of allocation primitives%s (Flambda 2 only)"
       (format_not_default Flambda2.Expert.Default.inline_effects_in_cmm) )
 
+let mk_flambda2_expert_cmm_safe_subst f =
+  ( "-flambda2-expert-cmm-safe-subst",
+    Arg.Unit f,
+    Printf.sprintf
+      " Prevent potentially unsafe substitutions in cmm but may produce less \
+       optimized code%s"
+      (format_default Flambda2.Expert.Default.cmm_safe_subst) )
+
+let mk_no_flambda2_expert_cmm_safe_subst f =
+  ( "-no-flambda2-expert-cmm-safe-subst",
+    Arg.Unit f,
+    Printf.sprintf
+      " Allow more substitutions in cmm, even ones that may be unsafe%s"
+      (format_not_default Flambda2.Expert.Default.cmm_safe_subst) )
+
 let mk_flambda2_expert_phantom_lets f =
   ( "-flambda2-expert-phantom-lets",
     Arg.Unit f,
@@ -1144,6 +1159,8 @@ module type Oxcaml_options = sig
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
   val no_flambda2_expert_inline_effects_in_cmm : unit -> unit
+  val flambda2_expert_cmm_safe_subst : unit -> unit
+  val no_flambda2_expert_cmm_safe_subst : unit -> unit
   val flambda2_expert_phantom_lets : unit -> unit
   val no_flambda2_expert_phantom_lets : unit -> unit
   val flambda2_expert_max_block_size_for_projections : int -> unit
@@ -1303,6 +1320,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.flambda2_expert_inline_effects_in_cmm;
       mk_no_flambda2_expert_inline_effects_in_cmm
         F.no_flambda2_expert_inline_effects_in_cmm;
+      mk_flambda2_expert_cmm_safe_subst F.flambda2_expert_cmm_safe_subst;
+      mk_no_flambda2_expert_cmm_safe_subst F.no_flambda2_expert_cmm_safe_subst;
       mk_flambda2_expert_phantom_lets F.flambda2_expert_phantom_lets;
       mk_no_flambda2_expert_phantom_lets F.no_flambda2_expert_phantom_lets;
       mk_flambda2_expert_max_block_size_for_projections
@@ -1593,6 +1612,8 @@ module Oxcaml_options_impl = struct
   let no_flambda2_expert_inline_effects_in_cmm =
     clear Flambda2.Expert.inline_effects_in_cmm
 
+  let flambda2_expert_cmm_safe_subst = set Flambda2.Expert.cmm_safe_subst
+  let no_flambda2_expert_cmm_safe_subst = clear Flambda2.Expert.cmm_safe_subst
   let flambda2_expert_phantom_lets = set Flambda2.Expert.phantom_lets
   let no_flambda2_expert_phantom_lets = clear Flambda2.Expert.phantom_lets
 
@@ -2041,6 +2062,7 @@ module Extra_params = struct
     | "flambda2-join-depth" -> set_int Flambda2.join_depth
     | "flambda2-expert-inline-effects-in-cmm" ->
         set Flambda2.Expert.inline_effects_in_cmm
+    | "flambda2-expert-cmm-safe-subst" -> set Flambda2.Expert.cmm_safe_subst
     | "flambda2-expert-phantom-lets" -> set Flambda2.Expert.phantom_lets
     | "flambda2-expert-max-unboxing-depth" ->
         set_int Flambda2.Expert.max_unboxing_depth
