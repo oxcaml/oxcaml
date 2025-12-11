@@ -126,8 +126,9 @@ let close_phrase lam =
   ) (free_variables lam) lam
 
 let close_slambda_phrase slam =
+  let open Lambda in
   match slam with
-  | SL.Quote lam -> SL.Quote (close_phrase lam)
+  | SLquote lam -> SLquote (close_phrase lam)
 
 (* Return the value referred to by a path *)
 

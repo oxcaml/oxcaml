@@ -92,6 +92,9 @@ let assert_slambda_is_trivial (slam : Lambda.slambda) =
     with Found_a_splice ->
       Misc.fatal_error
         "Slambda contains splices but layout_poly extension is disabled")
+  | _ ->
+    Misc.fatal_error
+      "Encountered non-trivial slambda but layout_poly extension is disabled"
 
 (* Introduce dependencies on modules referenced only by "external". *)
 
@@ -130,7 +133,11 @@ let required_globals ~flambda body =
 let do_eval ({ Slambda.code = slam } as p) =
   if not Language_extension.(is_enabled Layout_poly)
   then assert_slambda_is_trivial slam;
-  let (SLquote lam) = slam in
+  let lam =
+    match slam with
+    | SLquote lam -> lam
+    | _ -> Misc.fatal_error "slambda eval not yet implemented"
+  in
   { Lambda.compilation_unit = p.compilation_unit;
     main_module_block_format = p.main_module_block_format;
     arg_block_idx = p.arg_block_idx;

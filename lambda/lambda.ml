@@ -1767,8 +1767,8 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lregion (subst s l e, layout)
     | Lexclave e ->
         Lexclave (subst s l e)
-    | Lsplice { splice_loc; slambda = (SLquote e) } ->
-        Lsplice { splice_loc; slambda = (SLquote (subst s l e)) }
+    | Lsplice { splice_loc; slambda } ->
+      Lsplice { splice_loc; slambda = subst_slambda s l slambda }
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
@@ -1779,6 +1779,26 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
   and subst_opt s l = function
     | None -> None
     | Some e -> Some (subst s l e)
+  and subst_slambda s l = function
+    | SLquote e -> SLquote (subst s l e)
+    | (SLlayout _  | SLvar _ | SLfield _ ) as slam -> slam
+    | SLrecord record -> SLrecord (Ident.Map.map (subst_slambda s l) record)
+    | SLvalue value -> SLvalue (subst_slambda_value s l value)
+    | SLproj_comptime slam -> SLproj_comptime (subst_slambda s l slam)
+    | SLproj_runtime slam -> SLproj_runtime (subst_slambda s l slam)
+    | SLfunction func -> SLfunction (subst_slambda_function s l func)
+    | SLapply apply -> SLapply (subst_slambda_apply s l apply)
+    | SLtemplate func -> SLtemplate (subst_slambda_function s l func)
+    | SLinstantiate apply -> SLinstantiate (subst_slambda_apply s l apply)
+    | SLlet slet -> SLlet (subst_slambda_let s l slet)
+  and subst_slambda_value s l { sval_comptime; sval_runtime } =
+    { sval_comptime = subst_slambda s l sval_comptime; sval_runtime = subst_slambda s l sval_runtime }
+  and subst_slambda_function s l { sfun_params; sfun_body } =
+    { sfun_params; sfun_body = subst_slambda s l sfun_body }
+  and subst_slambda_apply s l { sapp_func; sapp_arguments } =
+    { sapp_func = subst_slambda s l sapp_func; sapp_arguments = Array.map (subst_slambda s l) sapp_arguments }
+  and subst_slambda_let s l { slet_name; slet_value; slet_body } =
+    { slet_name; slet_value = subst_slambda s l slet_value; slet_body = subst_slambda s l slet_body }
   in
   { subst_lambda = (fun lam -> subst s Ident.Map.empty lam);
     subst_lfunction = (fun lfun -> subst_lfun s Ident.Map.empty lfun);
