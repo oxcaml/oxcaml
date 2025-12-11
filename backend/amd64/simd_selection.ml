@@ -1610,13 +1610,14 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       | W32 -> None (* See previous comment *)
       | W16 -> None
       | W8 -> None)
-    | Istore_int (_n, addressing_mode, is_assignment) -> (
+    | Istore_int { const = _n; addr = addressing_mode; is_assignment } -> (
       if not (Vectorize_utils.Width_in_bits.equal width_type W64)
       then None
       else
         let extract_store_int_imm (op : Operation.t) =
           match op with
-          | Specific (Istore_int (n, _addr, _is_assign)) -> Int64.of_nativeint n
+          | Specific (Istore_int { const = n; addr = _; is_assignment = _ }) ->
+            Int64.of_nativeint n
           | Specific
               ( Ifloatarithmem _ | Ioffset_loc _ | Iprefetch _ | Icldemote _
               | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
