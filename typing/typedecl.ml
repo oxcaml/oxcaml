@@ -1748,7 +1748,6 @@ module Element_repr = struct
       | Any _ ->
         Misc.fatal_error "Element_repr.classify: unexpected abstract layout"
       | Base (Scannable, sa) -> Value_element sa
-      (* CR zeisbach: nested match? *)
       | Base (Float64, _) -> Unboxed_element Float64
       | Base (Float32, _) -> Unboxed_element Float32
       | Base (Word, _) -> Unboxed_element Word
@@ -1967,8 +1966,6 @@ let rec update_decl_jkind env dpath decl =
                 List.find_map
                   (fun ((repr : Element_repr.t), lbl) ->
                      match repr with
-                     (* CR zeisbach: this could plausibly want to use
-                        the scannable axes! *)
                      | Value_element _ | Float_element -> None
                      | _ ->
                        if Types.is_atomic lbl.Types.ld_mutable

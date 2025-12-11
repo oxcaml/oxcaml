@@ -421,12 +421,9 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   match ly with
   | Base base -> (
     match base with
-    (* CR zeisbach: maybe clean up this comment... :( *)
-    (* CR layouts-scannable: With scannable axes, sorts are no longer sufficient
-       to know how something is laid out. Once a new data definition is made to
-       track this information (roughly sorts + scannable axes AKA layouts - any)
-       then the meaning of [Layout.t] could be changed to mean that type. Doing
-       so would avoid the need to default to max here. *)
+    (* CR layouts-scannable: since [Layout.t] does not (currently) store
+       scannable axis information, we are forced to default to max. If
+       [Layout.t] changes to store scannable axis info, change this too. *)
     | Scannable -> Scannable Jkind_types.Scannable_axes.max
     | Float64 -> Float64
     (* This is a case, where we potentially have mapped [Float_boxed] to

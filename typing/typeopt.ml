@@ -161,9 +161,11 @@ type 'a classification =
 let classify ~classify_product env ty layout : _ classification =
   let ty = scrape_ty env ty in
   match (layout : Jkind.Layout.Const.t) with
+  | Any _ -> failwith "CR zeisbach:"
   | Base (Scannable, { nullability; separability = _ }) -> begin
   (* CR zeisbach: maybe only call the externality part here and use the
-     separability in the scannable axes? *)
+     separability in the scannable axes? but also, is this the layout of the
+     type? if not, the nullability thing below might be wrong. *)
   if Ctype.is_always_gc_ignorable env ty
   then
     if Jkind_axis.Nullability.(equal nullability Non_null)
@@ -237,7 +239,6 @@ let classify ~classify_product env ty layout : _ classification =
   | Base (Untagged_immediate, _) -> Unboxed_int Untagged_int
   | Base (Void, _) -> Void
   | Product c -> Product (classify_product ty c)
-  | Any _ -> failwith "CR zeisbach:"
 
 let rec scannable_product_array_kind elt_ty_for_error loc layouts =
   List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) layouts
@@ -264,9 +265,8 @@ let rec ignorable_product_array_kind loc sorts =
 and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   match layout with
   | Any _ -> failwith "CR zeisbach:"
-  (* CR zeisbach: confirm that it is okay to drop these on the floor.
-     Then, add a comment explaining why. *)
-  | Base (Scannable, _) -> Pint_ignorable
+  (* Scannable axes are irrelevant, since we already know we can ignore *)
+  | Base (Scannable, _sa) -> Pint_ignorable
   | Base (Float64, _) -> Punboxedfloat_ignorable Unboxed_float64
   | Base (Float32, _) -> Punboxedfloat_ignorable Unboxed_float32
   | Base (Bits8, _) -> Punboxedoruntaggedint_ignorable Untagged_int8
@@ -304,8 +304,6 @@ let array_kind_of_elt ~elt_layout env loc ty =
   | Any ->
     if Config.flat_float_array
       && not (Language_extension.is_at_least Separability ()
-          (* CR zeisbach: if we have the layout sitting around here, we probably
-             can eliminate the call to check_type_separability! *)
           && Ctype.check_type_separability env ty Non_float)
     then Pgenarray
     else Paddrarray
@@ -742,12 +740,17 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     then non_nullable Pgenval
     else non_nullable Pintval
   | _ ->
+    let jkind = Ctype.estimate_type_jkind env ty in
     num_nodes_visited,
     (* CR zeisbach: this probably also wants to take the non_pointerness into
        account? but only if this branch gets hit for scannable stuff. we don't
        want to accidentally mess something up for the non-scannables *)
-    add_nullability_from_scannable_jkind
-      (Ctype.estimate_type_jkind env ty) Pgenval
+    (* CR zeisbach: we were already using [add_nullability_from_scannable_jkind]
+       so that would go wrong if the jkind was not scannable. now it's doing
+       this again. think about if the [value_kind_of_scannable_jkind] call is
+       right, and (more importantly!) think if a non-scannable kind can hit. *)
+    add_nullability_from_scannable_jkind jkind
+      (value_kind_of_scannable_jkind env jkind)
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty
@@ -761,12 +764,8 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       in
       num_nodes_visited, Value kind
     | None ->
-      (* CR zeisbach: refactor this, see the other commments where it got
-         copy/pasta-ed *)
       let raw_kind =
-        let open Jkind_axis.Separability in
-        if le separability (upper_bound_if_is_always_gc_ignorable ())
-          then Pintval else Pgenval
+        value_kind_of_pointerness (pointerness_of_separability separability)
       in
       num_nodes_visited, Value { generic_value with raw_kind }
     (* CR layouts v7.1: assess whether it is important for performance to
@@ -984,9 +983,6 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
     end
   | Record_inlined (_, _, Variant_with_null) -> assert false
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
-  (* CR zeisbach: storing sorts in here is a bit suspect and we may want to
-     change to layouts? or otherwise add scannable axes. but maybe the call
-     to [value_kind] can deal with that? *)
   | Record_boxed _ | Record_float | Record_ufloat | Record_mixed _ -> begin
       let is_mutable =
         List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)

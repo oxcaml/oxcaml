@@ -29,6 +29,11 @@
 [@@@warning "+4"]
 
 module Uid = Shape.Uid
+
+(* CR layouts-scannable: As noted on the CR on [Sort] in [jkind.ml], a sort no
+   longer contains sufficient information to compile: it's missing the scannable
+   axes! Once a better data definition for tracking this is added, the meaning
+   of [Layout] below perhaps should change as well. *)
 module Layout = Jkind_types.Sort.Const
 
 type base_layout = Jkind_types.Sort.base
@@ -360,9 +365,9 @@ end
 
 module Type_decl_shape = struct
   let rec mixed_block_shape_to_layout = function
-    (* CR zeisbach: this indicates to me that this is busted. since we have to
-       synthesize some sa when we make, and we're throwing it away right here
-       when we go back. if the return type was an actual layout -> good *)
+    (* CR layouts-scannable: We forget about the stored scannable axes when
+       converting, since a [Layout.t] (which is a [Sort.Const.t]) doesn't have
+       a place to put them. See the CR on [Layout] at the top of this file. *)
     | Types.Scannable _ -> Layout.Base Scannable
     | Types.Float_boxed ->
       Layout.Base Float64
