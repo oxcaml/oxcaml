@@ -723,7 +723,8 @@ and add_to_validity_stages env res var (Binding binding) =
   match inline with
   | Must_inline_and_duplicate -> (
     match Ece.validity binding.effs with
-    | Validity.Can_move_anywhere | Validity.Can't_move_before_any_branch -> env, res
+    | Validity.Can_move_anywhere | Validity.Can't_move_before_any_branch ->
+      env, res
     | Validity.Control_flow_point ->
       (* assuming that no primitive (or top-level operation) marked as
          must_inline contains a control flow point, this means we must split the
@@ -1200,8 +1201,8 @@ let flush_delayed_lets ~mode env res =
             Some binding
           | ( (Branching_point | Entering_loop | Flush_everything),
               (Pure | Generative_immutable | Coeffect_only | Effect),
-              (Can_move_anywhere | Can't_move_before_any_branch | Control_flow_point) )
-            -> (
+              ( Can_move_anywhere | Can't_move_before_any_branch
+              | Control_flow_point ) ) -> (
             let r, split_res = split_complex_binding ~env ~res:!res b in
             res := r;
             let split_binding =
@@ -1226,12 +1227,13 @@ let flush_delayed_lets ~mode env res =
              expressions are sunk down as far as possible, including past
              control flow branching points.
 
-             Note that his allows expressions that are `Can't_move_before_any_branch`
-             to be moved down across control flow points. This is safe because
-             once an operation/expression becomes valid (after a control flow
-             point), it can never lose that validity. At worst a load that was
-             **before** a length check may be moved down after it, transforming
-             a segfault into a raise at execution, which seems okay. *)
+             Note that his allows expressions that are
+             `Can't_move_before_any_branch` to be moved down across control flow
+             points. This is safe because once an operation/expression becomes
+             valid (after a control flow point), it can never lose that
+             validity. At worst a load that was **before** a length check may be
+             moved down after it, transforming a segfault into a raise at
+             execution, which seems okay. *)
           | ( (Pure | Generative_immutable),
               (Can_move_anywhere | Can't_move_before_any_branch) ) -> (
             match mode with
@@ -1240,7 +1242,8 @@ let flush_delayed_lets ~mode env res =
               None
             | Branching_point -> Some binding)
           | ( (Pure | Generative_immutable | Coeffect_only | Effect),
-              (Can_move_anywhere | Can't_move_before_any_branch | Control_flow_point) ) ->
+              ( Can_move_anywhere | Can't_move_before_any_branch
+              | Control_flow_point ) ) ->
             flush binding;
             None))
       env.bindings

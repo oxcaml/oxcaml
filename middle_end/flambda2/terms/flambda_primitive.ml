@@ -1090,7 +1090,8 @@ let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
   match p with
   | Invalid _ ->
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
-  | Optimised_out _ -> No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+  | Optimised_out _ ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Probe_is_enabled _ ->
     (* This doesn't really have effects, but we want to make sure it never gets
        moved around. *)
@@ -1099,8 +1100,10 @@ let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
     (* This doesn't really have effects, but without effects, these primitives
        get deleted during lambda_to_flambda. *)
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
-  | Dls_get | Tls_get -> No_effects, Has_coeffects, Strict, Can't_move_before_any_branch
-  | Poll | Cpu_relax -> Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
+  | Dls_get | Tls_get ->
+    No_effects, Has_coeffects, Strict, Can't_move_before_any_branch
+  | Poll | Cpu_relax ->
+    Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
 
 let nullary_classify_for_printing p =
   match p with
@@ -1520,9 +1523,13 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
   | Get_tag ->
     (* [Obj.truncate] has now been removed. *)
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch
-  | String_length _ -> No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+  | String_length _ ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Int_as_pointer alloc_mode ->
-    No_effects, coeffects_of_mode alloc_mode, Strict, Can't_move_before_any_branch
+    ( No_effects,
+      coeffects_of_mode alloc_mode,
+      Strict,
+      Can't_move_before_any_branch )
   | Opaque_identity _ ->
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Int_arith (_, Swap_byte_endianness)
@@ -1544,7 +1551,8 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
     else No_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   (* Since Obj.truncate has been deprecated, array_length should have no
      observable effect *)
-  | Array_length _ -> No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+  | Array_length _ ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Bigarray_length { dimension = _ } ->
     (* This is pretty much a direct access to a field of the bigarray, different
        from reading one of the values actually stored inside the array, hence
@@ -1553,7 +1561,8 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
     reading_from_a_block Mutable
   | Unbox_number _ | Untag_immediate ->
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch
-  | Tag_immediate -> No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+  | Tag_immediate ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Box_number (_, alloc_mode) ->
     (* Ensure boxing operations for numbers are inlined/substituted in to_cmm *)
     let placement : Placement.t =
@@ -1952,10 +1961,12 @@ let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
     reading_from_a_string_or_bigstring Immutable
   | String_or_bigstring_load ((Bytes | Bigstring), _) ->
     reading_from_a_string_or_bigstring Mutable
-  | Phys_equal _ -> No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+  | Phys_equal _ ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Int_arith (_kind, (Add | Sub | Mul | Div | Mod | And | Or | Xor)) ->
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch
-  | Int_shift _ -> No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+  | Int_shift _ ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Int_comp _ -> No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Float_arith (_width, (Add | Sub | Mul | Div)) ->
     (* See comments for Unary Float_arith *)
@@ -1971,7 +1982,8 @@ let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Atomic_load_field (Any_value | Immediate) ->
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
-  | Poke _ -> Arbitrary_effects, No_coeffects, Strict, Can't_move_before_any_branch
+  | Poke _ ->
+    Arbitrary_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Read_offset (_, mut) ->
     let coeffects : Coeffects.t =
       match mut with Immutable -> No_coeffects | Mutable -> Has_coeffects

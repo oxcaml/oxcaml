@@ -19,7 +19,8 @@ type t =
 
 let print fmt = function
   | Can_move_anywhere -> Format.fprintf fmt "Can_move_anywhere"
-  | Can't_move_before_any_branch -> Format.fprintf fmt "Can't_move_before_any_branch"
+  | Can't_move_before_any_branch ->
+    Format.fprintf fmt "Can't_move_before_any_branch"
   | Control_flow_point -> Format.fprintf fmt "Control_flow_point"
 
 let discr = function
@@ -32,7 +33,8 @@ let compare t1 t2 = discr t1 - discr t2
 let join t1 t2 =
   match t1, t2 with
   | Can_move_anywhere, Can_move_anywhere -> Can_move_anywhere
-  | (Can_move_anywhere | Can't_move_before_any_branch), Can't_move_before_any_branch
+  | ( (Can_move_anywhere | Can't_move_before_any_branch),
+      Can't_move_before_any_branch )
   | Can't_move_before_any_branch, Can_move_anywhere ->
     Can't_move_before_any_branch
   | ( (Can_move_anywhere | Can't_move_before_any_branch | Control_flow_point),
