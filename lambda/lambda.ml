@@ -1430,16 +1430,19 @@ let rec patch_guarded patch = function
       Levent (patch_guarded patch lam, ev)
   | _ -> fatal_error "Lambda.patch_guarded"
 
+let value_kind_of_pointerness = function
+  | Immediate -> Pintval
+  | Pointer -> Pgenval
+
+let pointerness_of_separability sep =
+  if Jkind_axis.Separability.(le sep (upper_bound_if_is_always_gc_ignorable ()))
+  then Immediate else Pointer
+
 let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   match elt with
-  | Scannable { separability } ->
-    (* CR zeisbach: probably factor this out, and consider replacing calls
-       to [value_kind_of_value_externality_separability] with calls to
-       two separate functions *)
+  | Scannable { separability; _ } ->
     let raw_kind =
-      let open Jkind_axis.Separability in
-      if le separability (upper_bound_if_is_always_gc_ignorable ())
-        then Pintval else Pgenval
+      value_kind_of_pointerness (pointerness_of_separability separability)
     in
     Value { generic_value with raw_kind }
   | Float_boxed -> Float_boxed ()
@@ -1464,12 +1467,9 @@ and transl_mixed_product_shape shape =
 let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   Array.mapi (fun i (elt : Types.mixed_block_element) ->
     match elt with
-    | Scannable { separability } ->
+    | Scannable { separability; _ } ->
       let raw_kind =
-        (* CR zeisbach: marking for refactor *)
-        let open Jkind_axis.Separability in
-        if le separability (upper_bound_if_is_always_gc_ignorable ())
-          then Pintval else Pgenval
+        value_kind_of_pointerness (pointerness_of_separability separability)
       in
       Value { (get_value_kind i) with raw_kind }
     | Float_boxed -> Float_boxed (get_mode i)
@@ -2459,11 +2459,9 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
   | Psplicevar id -> Splice_variable id
 
-let value_kind_of_value_with_externality_separability ext sep =
-  let open Jkind_axis in
-  if Externality.(le ext (upper_bound_if_is_always_gc_ignorable ()))
-     || Separability.(le sep (upper_bound_if_is_always_gc_ignorable ()))
-  then Pintval else Pgenval
+let pointerness_of_scannable_with_externality ext =
+  if Jkind_axis.Externality.(le ext (upper_bound_if_is_always_gc_ignorable ()))
+  then Immediate else Pointer
 
 let rec layout_of_mixed_block_element_for_idx_set
   ext (mbe : _ mixed_block_element)
@@ -2475,13 +2473,8 @@ let rec layout_of_mixed_block_element_for_idx_set
       (Array.to_list
         (Array.map (layout_of_mixed_block_element_for_idx_set ext) mbes))
   | Value ({ raw_kind = Pgenval; _ } as value_kind) ->
-    (* CR zeisbach: maybe this should propagate more information?
-       But probably not: look at call sites to make sure. ideally, the stored
-       value_kind will have already taken scannable axes into account.
-       which might mean the long named helper below should be refactored? *)
-    let sep_placeholder = Jkind_axis.Separability.max in
     let raw_kind =
-      value_kind_of_value_with_externality_separability ext sep_placeholder
+      value_kind_of_pointerness (pointerness_of_scannable_with_externality ext)
     in
     Pvalue { value_kind with raw_kind }
   | Value value_kind -> Pvalue value_kind
