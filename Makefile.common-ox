@@ -9,9 +9,13 @@ ws_main   = --root=. --workspace=duneconf/main.ws
 ifeq ($(coverage),yes)
   coverage_dune_flags=--instrument-with bisect_ppx
   ocaml_subdirs_to_ignore=otherlibs
+  flags_for_ocamlc_unix_artifacts=-g
+  flags_for_ocamlopt_unix_artifacts=-g
 else
   coverage_dune_flags=
   ocaml_subdirs_to_ignore=
+  flags_for_ocamlc_unix_artifacts=unix.cma
+  flags_for_ocamlopt_unix_artifacts=unix.cmxa
 endif
 
 define dune_boot_context
@@ -81,7 +85,10 @@ boot_targets = \
   ocamltest/ocamltest.native
 
 boot-compiler: _build/_bootinstall
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) $(coverage_dune_flags) $(boot_targets)
+	RUNTIME_DIR=$(RUNTIME_DIR) \
+	OCAMLC_UNIX_ARTIFACTS=$(flags_for_ocamlc_unix_artifacts) \
+	OCAMLOPT_UNIX_ARTIFACTS=$(flags_for_ocamlopt_unix_artifacts) \
+	$(dune) build $(ws_boot) $(coverage_dune_flags) $(boot_targets)
 
 boot-runtest: boot-compiler
 	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest $(ws_boot) $(coverage_dune_flags) --force
