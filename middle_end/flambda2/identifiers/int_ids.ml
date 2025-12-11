@@ -302,12 +302,13 @@ module Code_id_data = struct
   type t =
     { compilation_unit : Compilation_unit.t;
       name : string;
+      debug_info : Debuginfo.t;
       linkage_name : Linkage_name.t
     }
 
   let flags = code_id_flags
 
-  let [@ocamlformat "disable"] print ppf { compilation_unit; name; linkage_name; } =
+  let [@ocamlformat "disable"] print ppf { compilation_unit; name; debug_info = _; linkage_name; } =
     Format.fprintf ppf "@[<hov 1>(\
         @[<hov 1>(compilation_unit@ %a)@]@ \
         @[<hov 1>(name@ %s)@]@ \
@@ -317,13 +318,22 @@ module Code_id_data = struct
       name
       Linkage_name.print linkage_name
 
-  let hash { compilation_unit = _; name = _; linkage_name } =
+  let hash { compilation_unit = _; name = _; debug_info = _; linkage_name } =
     (* As per comment above, just looking at the linkage name suffices (same
        below), rather than the compilation unit as well. *)
     Linkage_name.hash linkage_name
 
-  let equal { compilation_unit = _; name = _; linkage_name = linkage_name1 }
-      { compilation_unit = _; name = _; linkage_name = linkage_name2 } =
+  let equal
+      { compilation_unit = _;
+        name = _;
+        debug_info = _;
+        linkage_name = linkage_name1
+      }
+      { compilation_unit = _;
+        name = _;
+        debug_info = _;
+        linkage_name = linkage_name2
+      } =
     Linkage_name.equal linkage_name1 linkage_name2
 end
 
@@ -811,9 +821,11 @@ module Code_id = struct
 
   let name t = (find_data t).name
 
+  let debug t = (find_data t).debug_info
+
   let previous_name_stamp = ref (-1)
 
-  let create ~name compilation_unit =
+  let create ~name ~(debug : Debuginfo.t) compilation_unit =
     let name_stamp =
       if !previous_name_stamp = max_int
       then Misc.fatal_error "Have run out of name stamps";
@@ -821,17 +833,39 @@ module Code_id = struct
       !previous_name_stamp
     in
     let linkage_name =
-      let name =
-        if Flambda_features.Expert.shorten_symbol_names ()
-        then Printf.sprintf "%s_%d" name name_stamp
-        else Printf.sprintf "%s_%d_code" name name_stamp
-      in
-      Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
+      match Config.name_mangling_version with
+      | Config.LegacyOCaml ->
+        let name =
+          if Flambda_features.Expert.shorten_symbol_names ()
+          then Printf.sprintf "%s_%d" name name_stamp
+          else Printf.sprintf "%s_%d_code" name name_stamp
+        in
+        Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
+      | Config.RunLengthEncoding ->
+        let suffix =
+          if Flambda_features.Expert.shorten_symbol_names ()
+          then Printf.sprintf "_%d" name_stamp
+          else Printf.sprintf "_%d_code" name_stamp
+        in
+        (* CR sspies: Note that the fallback name still contains the additional
+           stamp. *)
+        let path =
+          Debuginfo.to_runlength_mangling_path ~fallback_name:name debug
+        in
+        Symbol0.for_runlength_encoding_path ~compilation_unit ~path ~suffix
+        |> Symbol0.linkage_name
     in
-    let data : Code_id_data.t = { compilation_unit; name; linkage_name } in
+    let data : Code_id_data.t =
+      { compilation_unit; name; debug_info = debug; linkage_name }
+    in
     Table.add !grand_table_of_code_ids data
 
-  let rename t = create ~name:(name t) (Compilation_unit.get_current_exn ())
+  let rename ~preserve_debug_info:() t =
+    (* CR sspies: Should there be a check that the current compilation unit is
+       the same as the one in the debug information? If not, the old CU would be
+       in the debug info, but the new one would be used as the second
+       argument. *)
+    create ~name:(name t) ~debug:(debug t) (Compilation_unit.get_current_exn ())
 
   let in_compilation_unit t comp_unit =
     Compilation_unit.equal (get_compilation_unit t) comp_unit
