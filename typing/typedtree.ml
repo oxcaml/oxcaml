@@ -168,7 +168,8 @@ and 'k pattern_desc =
   | Tpat_construct :
       Longident.t loc * Types.constructor_description *
         value general_pattern list *
-        ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type) option *
+        ((Ident.t loc * Parsetree.jkind_annotation option) list *
+          core_type) option *
         ambiguity ->
       value pattern_desc
   | Tpat_variant :
@@ -1076,7 +1077,8 @@ let shallow_map_pattern_desc
       Tpat_unboxed_tuple
         (List.map (fun (label, pat, sort) -> label, f.f pat, sort) pats)
   | Tpat_record (lpats, closed, amb) ->
-      Tpat_record (List.map (fun (lid, l,p) -> lid, l, f.f p) lpats, closed, amb)
+      Tpat_record
+        (List.map (fun (lid, l,p) -> lid, l, f.f p) lpats, closed, amb)
   | Tpat_record_unboxed_product (lpats, closed, amb) ->
       Tpat_record_unboxed_product
         (List.map (fun (lid, l,p) -> lid, l, f.f p) lpats, closed, amb)

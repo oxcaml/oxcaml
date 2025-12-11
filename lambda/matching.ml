@@ -232,10 +232,12 @@ end = struct
           { p with pat_desc = Tpat_or (p1, p2, o) }
     | Tpat_record (lbls, closed, ambiguity) ->
         let all_lbls = all_record_args lbls in
-        { p with pat_desc = Tpat_record (all_lbls, closed, ambiguity) }
+        { p with pat_desc =
+          Tpat_record (all_lbls, closed, ambiguity) }
     | Tpat_record_unboxed_product (lbls, closed, ambiguity) ->
         let all_lbls = all_record_args lbls in
-        { p with pat_desc = Tpat_record_unboxed_product (all_lbls, closed, ambiguity) }
+        { p with pat_desc =
+          Tpat_record_unboxed_product (all_lbls, closed, ambiguity) }
     | _ -> p
 
   (* Explode or-patterns and turn aliases into bindings in actions *)

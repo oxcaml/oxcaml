@@ -111,9 +111,9 @@ val print_unique_use : Format.formatter -> unique_use -> unit
 
 type alloc_mode = Mode.Alloc.r
 
-(** Whether this construction required disambiguating at the time it was constructed.
+(** Whether this construction required type-driven label disambiguation.
     If so, the disambiguated path and arity of the underlying type constructor
-    is preserved for inserting an annotation. *)
+    is preserved for inserting an explicit annotation. *)
 type ambiguity =
   | Ambiguous of { path: Path.t; arity : int }
   | Unambiguous

@@ -1049,7 +1049,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
            transl_exp ~scopes sort body)
   | Texp_pack modl ->
       !transl_module ~scopes Tcoerce_none None modl
-  | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _, _)}, loc) ->
+  | Texp_assert ({ exp_desc = Texp_construct(_, {cstr_name="false"}, _, _, _)},
+                 loc) ->
       assert_failed loc ~scopes e
   | Texp_assert (cond, loc) ->
       if !Clflags.noassert

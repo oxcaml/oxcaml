@@ -325,7 +325,8 @@ let pat
     | Tpat_variant (l, po, rd) ->
         Tpat_variant (l, Option.map (sub.pat sub) po, rd)
     | Tpat_record (l, closed, amb) ->
-        Tpat_record (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed, amb)
+        Tpat_record
+          (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed, amb)
     | Tpat_record_unboxed_product (l, closed, amb) ->
         Tpat_record_unboxed_product
           (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed, amb)
@@ -519,10 +520,12 @@ let expr sub x =
         Texp_unboxed_tuple
           (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list)
     | Texp_construct (lid, cd, args, am, amb) ->
-        Texp_construct (map_loc sub lid, cd, List.map (sub.expr sub) args, am, amb)
+        Texp_construct
+          (map_loc sub lid, cd, List.map (sub.expr sub) args, am, amb)
     | Texp_variant (l, expo) ->
         Texp_variant (l, Option.map (fun (e, am) -> (sub.expr sub e, am)) expo)
-    | Texp_record { fields; representation; extended_expression; alloc_mode; ambiguity } ->
+    | Texp_record { fields; representation; extended_expression;
+                    alloc_mode; ambiguity } ->
         Texp_record {
           fields = map_fields fields; representation;
           extended_expression =
@@ -541,9 +544,11 @@ let expr sub x =
           ambiguity
         }
     | Texp_field (exp, sort, lid, ld, float, ubr, amb) ->
-        Texp_field (sub.expr sub exp, sort, map_loc sub lid, ld, float, ubr, amb)
+        Texp_field
+          (sub.expr sub exp, sort, map_loc sub lid, ld, float, ubr, amb)
     | Texp_unboxed_field (exp, sort, lid, ld, uu, amb) ->
-        Texp_unboxed_field (sub.expr sub exp, sort, map_loc sub lid, ld, uu, amb)
+        Texp_unboxed_field
+          (sub.expr sub exp, sort, map_loc sub lid, ld, uu, amb)
     | Texp_setfield (exp1, am, lid, ld, amb, exp2) ->
         Texp_setfield (
           sub.expr sub exp1,

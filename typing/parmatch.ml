@@ -999,7 +999,9 @@ let pats_of_type env ty =
               mknoloc (Longident.Lident ld.lbl_name), ld, omega)
               labels
           in
-          [make_pat (Tpat_record_unboxed_product (fields, Closed, Unambiguous)) ty env]
+          [make_pat
+            (Tpat_record_unboxed_product (fields, Closed, Unambiguous))
+            ty env]
       | Type_variant _ | Type_abstract _ | Type_open -> [omega]
       end
   | Has_no_typedecl ->

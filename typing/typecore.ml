@@ -2567,6 +2567,7 @@ let disambiguate_sort_lid_a_list
             lid, process_label qual_lid, a
       ) lid_a_list lbl_list
   in
+  (* These ambiguity check warnings could probably use [ambiguity] *)
   if !w_pr then
     Location.prerr_warning loc
       (Warnings.Not_principal
@@ -2590,8 +2591,8 @@ let disambiguate_sort_lid_a_list
             amb
     | _ -> ()
   end;
-  (* The ambiguity check warnings could probably use paths on [Ambiguous] *)
-  (* At this point we are sure all disambiguations are consistent, so we collapse them *)
+  (* At this point we are sure all disambiguations are consistent,
+     so we collapse them *)
   let ambiguity, lbl_a_list =
     List.fold_left_map
       (fun amb (lid,(lbl, amb'),a) ->
@@ -3008,13 +3009,13 @@ and type_pat_aux
           (Jkind.Sort.of_const label.lbl_sort))
       in
       let make_record_pat
-            (lbl_pat_list : (_ * rep gen_label_description * _) list) ambiguity =
+            (lbl_pat_list : (_ * rep gen_label_description * _) list) amb =
         check_recordpat_labels loc lbl_pat_list closed record_form;
         List.iter (forbid_atomic_field_patterns loc penv) lbl_pat_list;
         let pat_desc = match record_form with
-          | Legacy -> Tpat_record (lbl_pat_list, closed, ambiguity)
+          | Legacy -> Tpat_record (lbl_pat_list, closed, amb)
           | Unboxed_product ->
-            Tpat_record_unboxed_product (lbl_pat_list, closed, ambiguity)
+            Tpat_record_unboxed_product (lbl_pat_list, closed, amb)
         in
         {
           pat_desc; pat_loc = loc; pat_extra=[];
@@ -3272,7 +3273,8 @@ and type_pat_aux
                (Jkind.Sort.of_const arg.ca_sort))
           sargs args
       in
-      rvp { pat_desc=Tpat_construct(lid, constr, args, existential_ctyp, ambiguity);
+      rvp { pat_desc =
+              Tpat_construct(lid, constr, args, existential_ctyp, ambiguity);
             pat_loc = loc; pat_extra=[];
             pat_type = instance expected_ty;
             pat_attributes = sp.ppat_attributes;
@@ -3796,10 +3798,12 @@ let rec check_counter_example_pat
     match record_form with
     | Legacy ->
       map_fold_cont type_label_pat fields
-        (fun fields -> mkp k (Tpat_record (fields, closed, Unambiguous)))
+        (fun fields ->
+          mkp k (Tpat_record (fields, closed, Unambiguous)))
     | Unboxed_product ->
       map_fold_cont type_label_pat fields
-        (fun fields -> mkp k (Tpat_record_unboxed_product (fields, closed, Unambiguous)))
+        (fun fields ->
+          mkp k (Tpat_record_unboxed_product (fields, closed, Unambiguous)))
   in
   match tp.pat_desc with
     Tpat_any | Tpat_var _ ->
@@ -3864,7 +3868,8 @@ let rec check_counter_example_pat
         (fun (p,t) -> check_rec p t.Types.ca_type)
         (List.combine targs ty_args)
         (fun args ->
-          mkp k (Tpat_construct(cstr_lid, constr, args, existential_ctyp, Unambiguous)))
+          mkp k (Tpat_construct (
+            cstr_lid, constr, args, existential_ctyp, Unambiguous)))
   | Tpat_variant(tag, targ, _) ->
       let constant = (targ = None) in
       let arg_type, row, pat_type =
@@ -6617,7 +6622,8 @@ and type_expect_
       submode ~loc ~env mode expected_mode;
       let uu = unique_use ~loc ~env mode (as_single_mode expected_mode) in
       rue {
-        exp_desc = Texp_unboxed_field(record, record_sort, lid, label, uu, ambiguity);
+        exp_desc =
+          Texp_unboxed_field (record, record_sort, lid, label, uu, ambiguity);
         exp_loc = loc; exp_extra = [];
         exp_type = ty_arg;
         exp_attributes = sexp.pexp_attributes;
@@ -8440,7 +8446,8 @@ and type_label_access
   let label, ambiguity =
     wrap_disambiguate "This expression has" (mk_expected ty_exp)
       (label_disambiguate record_form usage lid env expected_type) labels in
-  (record, record_sort, Mode.Value.disallow_right mode, label, expected_type, ambiguity)
+  (record, record_sort, Mode.Value.disallow_right mode,
+   label, expected_type, ambiguity)
 
 (* Typing format strings for printing or reading.
    These formats are used by functions in modules Printf, Format, and Scanf.
@@ -8698,7 +8705,8 @@ and type_option_some env expected_mode sarg ty ty0 =
   let arg = type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0' in
   let lid = Longident.Lident "Some" in
   let csome = Env.find_ident_constructor Predef.ident_some env in
-  mkexp (Texp_construct(mknoloc lid , csome, [arg], Some alloc_mode, Unambiguous))
+  mkexp
+    (Texp_construct (mknoloc lid, csome, [arg], Some alloc_mode, Unambiguous))
     (type_option arg.exp_type) arg.exp_loc arg.exp_env
 
 (* [expected_mode] is the expected mode of the field. It's already adjusted for
