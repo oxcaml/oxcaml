@@ -509,7 +509,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       Lprim(Pmake_unboxed_product shape,
             ll,
             of_location ~scopes e.exp_loc)
-  | Texp_construct(_, cstr, args, alloc_mode) ->
+  | Texp_construct(_, cstr, args, alloc_mode, _) ->
       let args_with_sorts =
         List.map2 (fun { ca_sort } e -> e, ca_sort) cstr.cstr_args args
       in
@@ -657,7 +657,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let loc = of_location ~scopes e.exp_loc in
       Lprim (Pmakeblock (0, Immutable, shape, transl_alloc_mode alloc_mode),
              [arg; lbl], loc)
-  | Texp_field(arg, arg_sort, _id, lbl, float, ubr) ->
+  | Texp_field(arg, arg_sort, _id, lbl, float, ubr, _amb) ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let targ = transl_exp ~scopes arg_sort arg in
       let sem =
@@ -736,7 +736,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | None -> targ
       | Some (prim, args) -> Lprim (prim, args, of_location ~scopes e.exp_loc)
       end
-  | Texp_unboxed_field(arg, arg_sort, _id, lbl, _) ->
+  | Texp_unboxed_field(arg, arg_sort, _id, lbl, _, _) ->
     begin match lbl.lbl_repres with
     | Record_unboxed_product ->
       let lbl_layout l = layout e.exp_env l.lbl_loc l.lbl_sort l.lbl_arg in
@@ -750,7 +750,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         Lprim (Punboxed_product_field (lbl.lbl_pos, layouts), [targ],
                of_location ~scopes e.exp_loc)
     end
-  | Texp_setfield(arg, arg_mode, _id, lbl, newval) ->
+  | Texp_setfield(arg, arg_mode, _id, lbl, _amb, newval) ->
       (* CR layouts v2.5: When we allow `any` in record fields and check
          representability on construction, [sort_of_jkind] will be unsafe here.
          Probably we should add a sort to `Texp_setfield` in the typed tree,
@@ -1049,7 +1049,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
            transl_exp ~scopes sort body)
   | Texp_pack modl ->
       !transl_module ~scopes Tcoerce_none None modl
-  | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _)}, loc) ->
+  | Texp_assert ({ exp_desc = Texp_construct(_, {cstr_name="false"}, _, _, _)},
+                 loc) ->
       assert_failed loc ~scopes e
   | Texp_assert (cond, loc) ->
       if !Clflags.noassert

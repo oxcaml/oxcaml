@@ -259,7 +259,7 @@ let pat
   | Tpat_constant _ -> ()
   | Tpat_tuple l -> List.iter (fun (_, p) -> sub.pat sub p) l
   | Tpat_unboxed_tuple l -> List.iter (fun (_, p, _) -> sub.pat sub p) l
-  | Tpat_construct (lid, _, l, vto) ->
+  | Tpat_construct (lid, _, l, vto, _) ->
       iter_loc sub lid;
       List.iter (sub.pat sub) l;
       Option.iter (fun (vs, ct) ->
@@ -270,9 +270,9 @@ let pat
           vs;
         sub.typ sub ct) vto
   | Tpat_variant (_, po, _) -> Option.iter (sub.pat sub) po
-  | Tpat_record (l, _) ->
+  | Tpat_record (l, _, _) ->
       List.iter (fun (lid, _, i) -> iter_loc sub lid; sub.pat sub i) l
-  | Tpat_record_unboxed_product (l, _) ->
+  | Tpat_record_unboxed_product (l, _, _) ->
       List.iter (fun (lid, _, i) -> iter_loc sub lid; sub.pat sub i) l
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
   | Tpat_alias (p, _, s, _, _, _, _) -> sub.pat sub p; iter_loc sub s
@@ -370,7 +370,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       List.iter (sub.case sub) cases
   | Texp_tuple (list, _) -> List.iter (fun (_,e) -> sub.expr sub e) list
   | Texp_unboxed_tuple list -> List.iter (fun (_,e,_) -> sub.expr sub e) list
-  | Texp_construct (lid, _, args, _) ->
+  | Texp_construct (lid, _, args, _, _) ->
       iter_loc sub lid;
       List.iter (sub.expr sub) args
   | Texp_variant (_, expo) ->
@@ -381,13 +381,13 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_record_unboxed_product { fields; extended_expression; _} ->
       iter_fields fields;
       Option.iter (fun (exp, _) -> sub.expr sub exp) extended_expression;
-  | Texp_field (exp, _, lid, _, _, _) ->
+  | Texp_field (exp, _, lid, _, _, _, _) ->
       iter_loc sub lid;
       sub.expr sub exp
-  | Texp_unboxed_field (exp, _, lid, _, _) ->
+  | Texp_unboxed_field (exp, _, lid, _, _, _) ->
       iter_loc sub lid;
       sub.expr sub exp
-  | Texp_setfield (exp1, _, lid, _, exp2) ->
+  | Texp_setfield (exp1, _, lid, _, _, exp2) ->
       iter_loc sub lid;
       sub.expr sub exp1;
       sub.expr sub exp2

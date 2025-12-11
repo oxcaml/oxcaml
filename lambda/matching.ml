@@ -230,12 +230,14 @@ end = struct
           p1
         else
           { p with pat_desc = Tpat_or (p1, p2, o) }
-    | Tpat_record (lbls, closed) ->
+    | Tpat_record (lbls, closed, ambiguity) ->
         let all_lbls = all_record_args lbls in
-        { p with pat_desc = Tpat_record (all_lbls, closed) }
-    | Tpat_record_unboxed_product (lbls, closed) ->
+        { p with pat_desc =
+          Tpat_record (all_lbls, closed, ambiguity) }
+    | Tpat_record_unboxed_product (lbls, closed, ambiguity) ->
         let all_lbls = all_record_args lbls in
-        { p with pat_desc = Tpat_record_unboxed_product (all_lbls, closed) }
+        { p with pat_desc =
+          Tpat_record_unboxed_product (all_lbls, closed, ambiguity) }
     | _ -> p
 
   (* Explode or-patterns and turn aliases into bindings in actions *)
@@ -1895,12 +1897,12 @@ let divide_constant ctx m =
 (* Matching against a constructor *)
 
 let get_key_constr = function
-  | { pat_desc = Tpat_construct (_, cstr, _, _) } -> cstr
+  | { pat_desc = Tpat_construct (_, cstr, _, _, _) } -> cstr
   | _ -> assert false
 
 let get_pat_args_constr p rem =
   match p with
-  | { pat_desc = Tpat_construct (_, _, args, _) } ->
+  | { pat_desc = Tpat_construct (_, _, args, _, _) } ->
     args @ rem
   | _ -> assert false
 
@@ -2322,14 +2324,14 @@ let record_matching_line num_fields lbl_pat_list =
 let get_pat_args_record num_fields p rem =
   match p with
   | { pat_desc = Tpat_any } -> record_matching_line num_fields [] @ rem
-  | { pat_desc = Tpat_record (lbl_pat_list, _) } ->
+  | { pat_desc = Tpat_record (lbl_pat_list, _, _) } ->
       record_matching_line num_fields lbl_pat_list @ rem
   | _ -> assert false
 
 let get_pat_args_record_unboxed_product num_fields p rem =
   match p with
   | { pat_desc = Tpat_any } -> record_matching_line num_fields [] @ rem
-  | { pat_desc = Tpat_record_unboxed_product (lbl_pat_list, _) } ->
+  | { pat_desc = Tpat_record_unboxed_product (lbl_pat_list, _, _) } ->
       record_matching_line num_fields lbl_pat_list @ rem
   | _ -> assert false
 
@@ -4028,8 +4030,8 @@ let is_record_with_mutable_field p =
     List.exists (fun (_, lbl, _) -> Types.is_mutable lbl.lbl_mut) lps
   in
   match p.pat_desc with
-  | Tpat_record (lps, _) -> fields_have_mutable_type lps
-  | Tpat_record_unboxed_product (lps, _) -> fields_have_mutable_type lps
+  | Tpat_record (lps, _, _) -> fields_have_mutable_type lps
+  | Tpat_record_unboxed_product (lps, _, _) -> fields_have_mutable_type lps
   | Tpat_alias _
   | Tpat_variant _
   | Tpat_lazy _

@@ -2007,7 +2007,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       let ext1, uf = pattern_match_single pat' paths in
       Ienv.Extension.conjunct ext0 ext1, uf
     | Tpat_constant _ -> Ienv.Extension.empty, UF.unused
-    | Tpat_construct (lbl, cd, pats, _) ->
+    | Tpat_construct (lbl, cd, pats, _, _) ->
       let uf_tag =
         Paths.learn_tag { tag = cd.cstr_tag; name_for_error = lbl } paths
       in
@@ -2028,14 +2028,14 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
         let paths = Paths.variant_field lbl paths in
         pattern_match_single arg paths
       | None -> Ienv.Extension.empty, UF.unused)
-    | Tpat_record (pats, _) ->
+    | Tpat_record (pats, _, _) ->
       List.map
         (fun (_, l, pat) ->
           let paths = Paths.record_field l.lbl_modalities l.lbl_name paths in
           pattern_match_single pat paths)
         pats
       |> conjuncts_pattern_match
-    | Tpat_record_unboxed_product (pats, _) ->
+    | Tpat_record_unboxed_product (pats, _, _) ->
       List.map
         (fun (_, l, pat) ->
           let paths =
@@ -2295,7 +2295,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
       (List.map
          (fun (_, e, _) -> check_uniqueness_exp ~overwrite:None ienv e)
          es)
-  | Texp_construct (lbl, _, es, _) ->
+  | Texp_construct (lbl, _, es, _, _) ->
     let name = Longident.last lbl.txt in
     UF.pars
       (List.mapi
@@ -2361,10 +2361,10 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
   | Texp_field _ ->
     let value, uf = check_uniqueness_exp_as_value ienv exp in
     UF.seq uf (Value.mark_maybe_unique value)
-  | Texp_unboxed_field (_, _, _, _, _) ->
+  | Texp_unboxed_field (_, _, _, _, _, _) ->
     let value, uf = check_uniqueness_exp_as_value ienv exp in
     UF.seq uf (Value.mark_maybe_unique value)
-  | Texp_setfield (rcd, _, _, _, arg) ->
+  | Texp_setfield (rcd, _, _, _, _, arg) ->
     (* Ideally, we should treat this as creating a new alias of [arg], and
        further usages of the field should be directed at the alias, instead of
        the old value. However, this would require some big changes to the
@@ -2507,7 +2507,7 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
     let value, uf = check_uniqueness_exp_as_value ienv e1 in
     let uf_tag =
       match e2.exp_desc with
-      | Texp_construct (lbl, cd, _, _) ->
+      | Texp_construct (lbl, cd, _, _, _) ->
         Value.overwrite_tag { tag = cd.cstr_tag; name_for_error = lbl } value
       | Texp_record _ | Texp_tuple _ -> UF.unused
       | _ ->
@@ -2555,7 +2555,7 @@ and check_uniqueness_exp_as_value ienv exp : Value.t * UF.t =
       | Some value -> value
     in
     value, UF.unused
-  | Texp_field (e, _, _, l, float, unique_barrier) -> (
+  | Texp_field (e, _, _, l, float, unique_barrier, _) -> (
     let value, uf = check_uniqueness_exp_as_value ienv e in
     match Value.paths value with
     | None ->
@@ -2582,7 +2582,7 @@ and check_uniqueness_exp_as_value ienv exp : Value.t * UF.t =
             Value.fresh )
       in
       value, UF.seqs [uf; uf_read; uf_boxing])
-  | Texp_unboxed_field (e, _, _, l, unique_use) -> (
+  | Texp_unboxed_field (e, _, _, l, unique_use, _) -> (
     let value, uf = check_uniqueness_exp_as_value ienv e in
     match Value.paths value with
     | None -> Value.fresh, uf

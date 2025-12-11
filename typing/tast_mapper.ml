@@ -314,21 +314,22 @@ let pat
     | Tpat_unboxed_tuple l ->
       Tpat_unboxed_tuple
         (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
-    | Tpat_construct (loc, cd, l, vto) ->
+    | Tpat_construct (loc, cd, l, vto, amb) ->
         let vto = Option.map (fun (vl,cty) ->
           List.map
             (fun (v, jk) ->
                (map_loc sub v,
                 Option.map (sub.jkind_annotation sub) jk))
             vl, sub.typ sub cty) vto in
-        Tpat_construct (map_loc sub loc, cd, List.map (sub.pat sub) l, vto)
+        Tpat_construct (map_loc sub loc, cd, List.map (sub.pat sub) l, vto, amb)
     | Tpat_variant (l, po, rd) ->
         Tpat_variant (l, Option.map (sub.pat sub) po, rd)
-    | Tpat_record (l, closed) ->
-        Tpat_record (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
-    | Tpat_record_unboxed_product (l, closed) ->
+    | Tpat_record (l, closed, amb) ->
+        Tpat_record
+          (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed, amb)
+    | Tpat_record_unboxed_product (l, closed, amb) ->
         Tpat_record_unboxed_product
-          (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
+          (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed, amb)
     | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
     | Tpat_alias (p, id, s, uid, sort, m, ty) ->
         Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, sort, m, ty)
@@ -518,36 +519,43 @@ let expr sub x =
     | Texp_unboxed_tuple list ->
         Texp_unboxed_tuple
           (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list)
-    | Texp_construct (lid, cd, args, am) ->
-        Texp_construct (map_loc sub lid, cd, List.map (sub.expr sub) args, am)
+    | Texp_construct (lid, cd, args, am, amb) ->
+        Texp_construct
+          (map_loc sub lid, cd, List.map (sub.expr sub) args, am, amb)
     | Texp_variant (l, expo) ->
         Texp_variant (l, Option.map (fun (e, am) -> (sub.expr sub e, am)) expo)
-    | Texp_record { fields; representation; extended_expression; alloc_mode } ->
+    | Texp_record { fields; representation; extended_expression;
+                    alloc_mode; ambiguity } ->
         Texp_record {
           fields = map_fields fields; representation;
           extended_expression =
             Option.map (fun (exp, sort, ubr) -> (sub.expr sub exp, sort, ubr))
               extended_expression;
-          alloc_mode
+          alloc_mode;
+          ambiguity
         }
     | Texp_record_unboxed_product
-          { fields; representation; extended_expression } ->
+          { fields; representation; extended_expression; ambiguity } ->
         Texp_record_unboxed_product {
           fields = map_fields fields; representation;
           extended_expression =
             Option.map
-              (fun (exp, sort) -> (sub.expr sub exp, sort)) extended_expression
+              (fun (exp, sort) -> (sub.expr sub exp, sort)) extended_expression;
+          ambiguity
         }
-    | Texp_field (exp, sort, lid, ld, float, ubr) ->
-        Texp_field (sub.expr sub exp, sort, map_loc sub lid, ld, float, ubr)
-    | Texp_unboxed_field (exp, sort, lid, ld, uu) ->
-        Texp_unboxed_field (sub.expr sub exp, sort, map_loc sub lid, ld, uu)
-    | Texp_setfield (exp1, am, lid, ld, exp2) ->
+    | Texp_field (exp, sort, lid, ld, float, ubr, amb) ->
+        Texp_field
+          (sub.expr sub exp, sort, map_loc sub lid, ld, float, ubr, amb)
+    | Texp_unboxed_field (exp, sort, lid, ld, uu, amb) ->
+        Texp_unboxed_field
+          (sub.expr sub exp, sort, map_loc sub lid, ld, uu, amb)
+    | Texp_setfield (exp1, am, lid, ld, amb, exp2) ->
         Texp_setfield (
           sub.expr sub exp1,
           am,
           map_loc sub lid,
           ld,
+          amb,
           sub.expr sub exp2
         )
     | Texp_atomic_loc (exp, sort, lid, ld, alloc_mode) ->
