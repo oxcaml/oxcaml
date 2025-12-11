@@ -1984,3 +1984,60 @@ module FMA = struct
     = "caml_vec256_unreachable" "caml_fma_float32x8_neg_mul_sub"
     [@@noalloc] [@@unboxed] [@@builtin]
 end
+
+module Vec128_load_store = struct
+  type void : void
+  type addr = nativeint#
+
+  external load_aligned : addr -> (int64x2[@unboxed])
+    = "" "caml_vec128_load_aligned"
+    [@@noalloc] [@@builtin]
+
+  external load_unaligned : addr -> (int64x2[@unboxed])
+    = "" "caml_vec128_load_unaligned"
+    [@@noalloc] [@@builtin]
+
+  external store_aligned : addr -> (int64x2[@unboxed]) -> void
+    = "" "caml_vec128_store_aligned"
+    [@@noalloc] [@@builtin]
+
+  external store_unaligned : addr -> (int64x2[@unboxed]) -> void
+    = "" "caml_vec128_store_unaligned"
+  [@@noalloc] [@@builtin]
+
+  external load_aligned_uncached : addr -> (int64x2[@unboxed]) = "" "caml_sse41_vec128_load_aligned_uncached"
+      [@@noalloc] [@@builtin]
+
+  external store_aligned_uncached : addr -> (int64x2[@unboxed]) -> void = "" "caml_sse_vec128_store_aligned_uncached"
+  [@@noalloc] [@@builtin]
+
+  external load_low64 : addr -> (int64x2[@unboxed]) = "" "caml_sse2_vec128_load_low64"
+  [@@noalloc] [@@builtin]
+  external load_low64_copy_high64 : (int64x2[@unboxed]) -> addr -> (int64x2[@unboxed]) = "" "caml_sse2_vec128_load_low64_copy_high64"
+  [@@noalloc] [@@builtin]
+  external load_high64_copy_low64 : (int64x2[@unboxed]) -> addr -> (int64x2[@unboxed]) = "" "caml_sse2_vec128_load_high64_copy_low64"
+  [@@noalloc] [@@builtin]
+  external load_zero_low64 : addr -> (int64x2[@unboxed]) = "" "caml_sse2_vec128_load_zero_low64"
+  [@@noalloc] [@@builtin]
+  external load_broadcast64 : addr -> (int64x2[@unboxed]) = "" "caml_sse3_vec128_load_broadcast64"
+  [@@noalloc] [@@builtin]
+  external store_low64 : addr -> (int64x2[@unboxed]) -> void = "" "caml_sse2_vec128_store_low64"
+
+  external load_low32 : addr -> (int32x4[@unboxed]) = "" "caml_sse2_vec128_load_low32"
+  [@@noalloc] [@@builtin]
+  external load_zero_low32 : addr -> (int32x4[@unboxed]) = "" "caml_sse2_vec128_load_zero_low32"
+  [@@noalloc] [@@builtin]
+  external store_low32 : addr -> (int32x4[@unboxed]) -> void = "" "caml_sse2_vec128_store_low32"
+  [@@noalloc] [@@builtin]
+
+  external load_aligned32 : addr -> (int32x4[@unboxed]) = "" "caml_sse_vec128_load_aligned"
+  [@@noalloc] [@@builtin]
+  external store_aligned32 : addr -> (int32x4[@unboxed]) -> void = "" "caml_sse_vec128_store_aligned"
+  [@@noalloc] [@@builtin]
+
+   external store_int32_uncached : addr -> (int32[@unboxed]) -> void = "" "caml_sse2_int32_store_uncached"
+  [@@noalloc] [@@builtin]
+  external store_int64_uncached : addr -> (int64[@unboxed]) -> void = "" "caml_sse2_int64_store_uncached"
+  [@@noalloc] [@@builtin]
+
+end

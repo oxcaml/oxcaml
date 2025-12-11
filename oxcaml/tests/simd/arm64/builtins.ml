@@ -1244,3 +1244,30 @@ end
    comparing strings that correspond to [cmpestr*] and [cmpistr*] instructions
    from amd64. If needed, these can be implemented as sequences of intrinsics to
    match [SSE42_String]. *)
+
+module Vec128_load_store = struct
+  type void : void
+  type addr = nativeint#
+
+  external load_aligned : addr -> (int64x2[@unboxed])
+    = "" "caml_vec128_load_aligned"
+    [@@noalloc] [@@builtin]
+
+  external load_unaligned : addr -> (int64x2[@unboxed])
+    = "" "caml_vec128_load_unaligned"
+    [@@noalloc] [@@builtin]
+
+  external store_aligned : addr -> (int64x2[@unboxed]) -> void
+    = "" "caml_vec128_store_aligned"
+    [@@noalloc] [@@builtin]
+
+  external store_unaligned : addr -> (int64x2[@unboxed]) -> void
+    = "" "caml_vec128_store_unaligned"
+  [@@noalloc] [@@builtin]
+
+      external load_aligned_uncached : addr -> (int64x2[@unboxed]) = "" "caml_sse41_vec128_load_aligned_uncached"
+  [@@noalloc] [@@builtin]
+  external store_aligned_uncached : addr -> (int64x2[@unboxed]) -> void = "" "caml_sse_vec128_store_aligned_uncached"
+  [@@noalloc] [@@builtin]
+
+end

@@ -2,7 +2,6 @@
 
 open! Utils
 open! Utils256
-
 type void : void
 type addr = nativeint#
 
@@ -136,20 +135,21 @@ module Avx = struct
   external store_mask32x4 : addr -> (int32x4[@unboxed]) -> (int32x4[@unboxed]) -> void = "" "caml_avx_vec128_store_mask32"
   [@@noalloc] [@@builtin]
 
+  module Vec128 = Builtins.Vec128_load_store
   let () =
     let mem = aligned_alloc ~align:#16n ~size:#32n in
-    let _ = Sse.store_aligned mem (int64x2_of_int64s 0L 0L) in
+    let _ = Vec128.store_aligned mem (int64x2_of_int64s 0L 0L) in
     let _ = store_mask64x2 mem
                   (int64x2_of_int64s Int64.min_int 0L)
                   (int64x2_of_int64s 1L 2L) in
-    let x = Sse.load_aligned mem in
+    let x = Vec128.load_aligned mem in
     eq (int64x2_low_int64 x) (int64x2_high_int64 x)
        1L 0L;
-    let _ = Sse.store_aligned mem (int64x2_of_int64s 0L 0L) in
+    let _ = Vec128.store_aligned mem (int64x2_of_int64s 0L 0L) in
     let _ = store_mask32x4 mem
                 (Int32s.to_int32x4 Int32.min_int 0l Int32.min_int 0l)
                 (Int32s.to_int32x4 1l 2l 3l 4l) in
-    let x = Sse.load_aligned32 mem in
+    let x = Vec128.load_aligned32 mem in
     let y = Int32s.to_int32x4 1l 0l 3l 0l in
     eq_int32x4 ~result:x ~expect:y
 end
