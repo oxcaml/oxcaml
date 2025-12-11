@@ -75,7 +75,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,Oclassic=1'
-            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml'
+            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml'
 
           - name: runtime4 (aarch64-darwin)
             config: --disable-runtime5 --disable-warn-error
