@@ -23,7 +23,8 @@ type t =
     is_cold : bool
   }
 
-let create ~cont ~params ~lifted_params ~handler ~is_exn_handler ~is_wrapper ~is_cold =
+let create ~cont ~params ~lifted_params ~handler ~is_exn_handler ~is_wrapper
+    ~is_cold =
   { cont; params; lifted_params; handler; is_exn_handler; is_wrapper; is_cold }
 
 let[@ocamlformat "disable"] print ppf
