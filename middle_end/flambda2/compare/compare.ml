@@ -406,7 +406,11 @@ and subst_params_and_body env params_and_body =
 and subst_let_cont env (let_cont_expr : Let_cont_expr.t) =
   match let_cont_expr with
   | Non_recursive
-      { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
+      { handler;
+        num_free_occurrences = _;
+        is_applied_with_traps = _;
+        wrapper = _
+      } ->
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun cont ~body ->
         let body = subst_expr env body in
         let handler =
@@ -1271,12 +1275,14 @@ and let_cont_exprs env (let_cont1 : Let_cont.t) (let_cont2 : Let_cont.t) :
   | ( Non_recursive
         { handler = handler1;
           num_free_occurrences = _;
-          is_applied_with_traps = _
+          is_applied_with_traps = _;
+          wrapper = _
         },
       Non_recursive
         { handler = handler2;
           num_free_occurrences = _;
-          is_applied_with_traps = _
+          is_applied_with_traps = _;
+          wrapper = _
         } ) ->
     let module Non_rec = Non_recursive_let_cont_handler in
     let sorts_match =
