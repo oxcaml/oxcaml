@@ -6,17 +6,18 @@ module T = Product_lattice.Make (struct
      0 Areality (Regionality): Global, Regional, Local -> 3
      1 Linearity: Many, Once -> 2
      2 Uniqueness (monadic): Aliased, Unique -> 2
-     3 Portability: Portable, Nonportable -> 2
+     3 Portability: Portable, Shareable, Nonportable -> 3
      4 Contention (monadic): Contended, Shared, Uncontended -> 3
      5 Forkable: Forkable, Unforkable -> 2
      6 Yielding: Unyielding, Yielding -> 2
      7 Statefulness: Stateless, Observing, Stateful -> 3
      8 Visibility (monadic): Immutable, Read, Read_write -> 3
-     9 Externality: External, External64, Internal -> 3
-     10 Nullability: Non_null, Maybe_null -> 2
-     11 Separability: Non_float, Separable, Maybe_separable -> 3
+     9 Staticity (monadic): Dynamic, Static -> 2
+     10 Externality: External, External64, Internal -> 3
+     11 Nullability: Non_null, Maybe_null -> 2
+     12 Separability: Non_float, Separable, Maybe_separable -> 3
   *)
-  let axis_sizes = [| 3; 2; 2; 2; 3; 2; 2; 3; 3; 3; 2; 3 |]
+  let axis_sizes = [| 3; 2; 2; 3; 3; 2; 2; 3; 3; 2; 3; 2; 3 |]
 end)
 
 include T
@@ -47,9 +48,10 @@ let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
       | "yielding" -> Some 6
       | "statefulness" -> Some 7
       | "visibility" -> Some 8
-      | "externality" -> Some 9
-      | "nullability" -> Some 10
-      | "separability" -> Some 11
+      | "staticity" -> Some 9
+      | "externality" -> Some 10
+      | "nullability" -> Some 11
+      | "separability" -> Some 12
       | _ -> None
     in
     match idx with None -> () | Some i -> levels.(i) <- top i
@@ -111,7 +113,8 @@ module Levels = struct
   let level_of_portability (x : Mode.Portability.Const.t) : int =
     match x with
     | Mode.Portability.Const.Portable -> 0
-    | Mode.Portability.Const.Nonportable -> 1
+    | Mode.Portability.Const.Shareable -> 1
+    | Mode.Portability.Const.Nonportable -> 2
 
   let level_of_contention_monadic (x : Mode.Contention.Const.t) : int =
     match x with
@@ -140,6 +143,11 @@ module Levels = struct
     | Mode.Visibility.Const.Immutable -> 0
     | Mode.Visibility.Const.Read -> 1
     | Mode.Visibility.Const.Read_write -> 2
+
+  let level_of_staticity_monadic (x : Mode.Staticity.const) : int =
+    match x with
+    | Mode.Staticity.Dynamic -> 0
+    | Mode.Staticity.Static -> 1
 
   let level_of_externality (x : Jkind_axis.Externality.t) : int =
     match x with
@@ -176,7 +184,8 @@ module Levels = struct
 
   let portability_of_level = function
     | 0 -> Mode.Portability.Const.Portable
-    | 1 -> Mode.Portability.Const.Nonportable
+    | 1 -> Mode.Portability.Const.Shareable
+    | 2 -> Mode.Portability.Const.Nonportable
     | _ -> invalid_arg "Axis_lattice_array.portability_of_level"
 
   let contention_of_level_monadic = function
@@ -207,6 +216,11 @@ module Levels = struct
     | 2 -> Mode.Visibility.Const.Read_write
     | _ -> invalid_arg "Axis_lattice_array.visibility_of_level_monadic"
 
+  let staticity_of_level_monadic = function
+    | 0 -> Mode.Staticity.Dynamic
+    | 1 -> Mode.Staticity.Static
+    | _ -> invalid_arg "Axis_lattice_array.staticity_of_level_monadic"
+
   let externality_of_level = function
     | 0 -> Jkind_axis.Externality.External
     | 1 -> Jkind_axis.Externality.External64
@@ -227,7 +241,7 @@ end
 
 let const_of_levels
     ~areality ~linearity ~uniqueness ~portability
-    ~contention ~forkable ~yielding ~statefulness ~visibility
+    ~contention ~forkable ~yielding ~statefulness ~visibility ~staticity
     ~externality ~nullability ~separability =
   let open Levels in
   encode
@@ -241,6 +255,7 @@ let const_of_levels
          level_of_yielding yielding;
          level_of_statefulness statefulness;
          level_of_visibility_monadic visibility;
+         level_of_staticity_monadic staticity;
          level_of_externality externality;
          level_of_nullability nullability;
          level_of_separability separability
@@ -258,6 +273,7 @@ let nonfloat_value : t =
     ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -275,6 +291,7 @@ let immutable_data : t =
     ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -290,6 +307,7 @@ let mutable_data : t =
     ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -307,6 +325,7 @@ let value : t =
     ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Separable
@@ -322,6 +341,7 @@ let arrow : t =
     ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Immutable
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -339,6 +359,7 @@ let immediate : t =
     ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.min
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -360,6 +381,7 @@ let object_legacy : t =
     ~yielding
     ~statefulness
     ~visibility:Mode.Visibility.Const.Read_write
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -378,12 +400,14 @@ let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =
   | 7 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Statefulness))
   | 8 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Visibility))
   | 9 ->
-    Jkind_axis.Axis.Pack
-      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality)
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Staticity))
   | 10 ->
     Jkind_axis.Axis.Pack
-      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability)
+      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality)
   | 11 ->
+    Jkind_axis.Axis.Pack
+      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability)
+  | 12 ->
     Jkind_axis.Axis.Pack
       (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Separability)
   | _ -> failwith "axis_number_to_axis_packed: invalid axis number"

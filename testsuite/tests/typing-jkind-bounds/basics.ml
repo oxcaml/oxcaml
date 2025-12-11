@@ -223,12 +223,11 @@ type b = a
 type a : value mod global aliased once contended portable external_
 type b : value mod local unique many contended nonportable internal = a
 [%%expect{|
-type a : value mod global aliased contended portable external_
+type a : value mod global portable contended external_
 Line 2, characters 0-71:
 2 | type b : value mod local unique many contended nonportable internal = a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "a" is
-           value mod global aliased contended portable external_
+Error: The kind of type "a" is value mod global portable contended external_
          because of the definition of a at line 1, characters 0-67.
        But the kind of type "a" must be a subkind of value mod many contended
          because of the definition of b at line 2, characters 0-71.
@@ -797,7 +796,7 @@ Line 1, characters 0-65:
 Error: The kind of type "t" is immutable_data with t_value
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of
-           any mod global many contended portable
+           any mod global many portable contended
          because of the annotation on the declaration of the type t.
 |}]
 
@@ -996,6 +995,7 @@ Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
 
        The first mode-crosses less than the second along:
          locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
 |}]
 
 type ('a : immediate) t : value mod aliased = { mutable x : 'a }
@@ -1154,7 +1154,7 @@ Error: The kind of type "t" is value
 type 'a t : value mod global portable contended many aliased unyielding =
   { x : 'a @@ global portable contended many aliased } [@@unboxed]
 [%%expect {|
-type 'a t = { x : 'a @@ global many portable aliased contended; } [@@unboxed]
+type 'a t = { x : 'a @@ global many portable contended; } [@@unboxed]
 |}]
 
 type 'a t : value mod global immutable stateless many aliased unyielding non_float =
@@ -1167,7 +1167,7 @@ Error: The kind of type "t" is value
          because it instantiates an unannotated type parameter of t,
          chosen to have kind value.
        But the kind of type "t" must be a subkind of
-           immutable_data mod global aliased yielding unforkable
+           immutable_data mod global unforkable yielding
          because of the annotation on the declaration of the type t.
 |}]
 (* CR layouts v2.8: this could be accepted, if we infer ('a : value mod
@@ -1192,11 +1192,11 @@ type ('a : value mod global) t : value mod global = Foo of 'a @@ global [@@unbox
 type ('a : immediate) t : immediate = Foo of 'a @@ global [@@unboxed]
 type ('a : value mod global) t : value mod global = Foo of 'a @@ local [@@unboxed]
 [%%expect {|
-type ('a : value mod global) t = { global_ x : 'a; } [@@unboxed]
-type ('a : immediate) t = { global_ x : 'a; } [@@unboxed]
+type ('a : value mod global) t = { x : 'a @@ global; } [@@unboxed]
+type ('a : immediate) t = { x : 'a @@ global; } [@@unboxed]
 type ('a : value mod global) t = { x : 'a; } [@@unboxed]
-type ('a : value mod global) t = Foo of global_ 'a [@@unboxed]
-type ('a : immediate) t = Foo of global_ 'a [@@unboxed]
+type ('a : value mod global) t = Foo of 'a @@ global [@@unboxed]
+type ('a : immediate) t = Foo of 'a @@ global [@@unboxed]
 type ('a : value mod global) t = Foo of 'a [@@unboxed]
 |}]
 
@@ -1260,6 +1260,7 @@ Error: The kind of type "t" is immutable_data with 'a @@ forkable unyielding
 
        The first mode-crosses less than the second along:
          locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
 |}]
 
 (*****************************)
@@ -1273,13 +1274,13 @@ type ('a : value) t = ('a : any)
 type ('a : value) t = ('a : value)
 type ('a : bits32 mod aliased) t = ('a : any mod global)
 [%%expect {|
-type ('a : value mod global aliased) t = 'a
+type ('a : value mod global) t = 'a
 type ('a : immediate) t = 'a
 type ('a : immediate) t = 'a
 type ('a : immediate) t = 'a
 type 'a t = 'a
 type 'a t = 'a
-type ('a : bits32 mod global aliased) t = 'a
+type ('a : bits32 mod global) t = 'a
 |}]
 
 type ('a : bits32) t = ('a : word)
@@ -1298,7 +1299,7 @@ let f : ('a : any mod global aliased) -> ('a: any mod contended) = fun x -> x
 let f : ('a : value mod external64) -> ('a: any mod external_) = fun x -> x
 let f : ('a : value) -> ('a: immediate) = fun x -> x
 [%%expect {|
-val f : ('a : value_or_null mod global aliased contended). 'a -> 'a = <fun>
+val f : ('a : value_or_null mod global contended). 'a -> 'a = <fun>
 val f : ('a : value mod external_). 'a -> 'a = <fun>
 val f : ('a : immediate). 'a -> 'a = <fun>
 |}]
@@ -1361,7 +1362,7 @@ let f (type a : value) (x : a t) =
 [%%expect{|
 type _ t =
     A : ('a : immediate). 'a t
-  | B : ('b : value mod aliased portable). 'b -> 'b t
+  | B : ('b : value mod portable aliased). 'b -> 'b t
   | C : 'c t
 val f : 'a t -> unit = <fun>
 |}]
@@ -1387,7 +1388,7 @@ let f (type a : value) (x : a t) =
 [%%expect{|
 type _ t =
     A : ('a : immediate). 'a t
-  | B : ('b : value mod aliased portable). 'b -> 'b t
+  | B : ('b : value mod portable aliased). 'b -> 'b t
   | C : 'c t
 Line 17, characters 6-7:
 17 |     f y
@@ -1430,15 +1431,7 @@ val x : <  > = <obj>
 
 let x : (_ as (_ : value mod aliased)) = object end
 [%%expect {|
-Line 1, characters 41-51:
-1 | let x : (_ as (_ : value mod aliased)) = object end
-                                             ^^^^^^^^^^
-Error: This expression has type "<  >" but an expression was expected of type
-         "('a : value mod aliased)"
-       The kind of <  > is value mod global many non_float
-         because it's the type of an object.
-       But the kind of <  > must be a subkind of value mod aliased
-         because of the annotation on the wildcard _ at line 1, characters 19-36.
+val x : <  > = <obj>
 |}]
 
 let x : (_ as (_ : value mod portable)) = object end
@@ -1847,7 +1840,7 @@ end
 
 [%%expect{|
 module M :
-  sig type 'a t : value mod contended portable with 'a @@ portable end
+  sig type 'a t : value mod portable contended with 'a @@ portable end
 |}]
 
 (***********************************************)

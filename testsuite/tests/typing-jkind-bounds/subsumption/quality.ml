@@ -496,7 +496,13 @@ end
 (* CR layouts v2.8: If we ever give univars min mod-bounds, this should get
    rejected. Internal ticket 5746. *)
 [%%expect {|
-module M : sig type a = { foo : 'a. 'a; } type t end
+Line 3, characters 2-37:
+3 |   type t : value mod contended with a
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value
+         because of the annotation on the declaration of the type t.
+       But the kind of type "t" must be a subkind of value
+         because of the annotation on the declaration of the type t.
 |}]
 
 module M : sig
@@ -509,7 +515,13 @@ end
 (* CR layouts v2.8: If we ever give univars min mod-bounds, this should get
    rejected. Internal ticket 5746. *)
 [%%expect {|
-module M : sig type a = { foo : 'a. 'a; } [@@unboxed] type t end
+Line 3, characters 2-37:
+3 |   type t : value mod contended with a
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value
+         because of the annotation on the declaration of the type t.
+       But the kind of type "t" must be a subkind of value
+         because of the annotation on the declaration of the type t.
 |}]
 
 module type S = sig

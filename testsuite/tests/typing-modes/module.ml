@@ -43,9 +43,9 @@ Line 10, characters 17-20:
 10 |     portable_use foo
                       ^^^
 Error: This value is "nonportable"
-       because it closes over the module "F" (at Line 7, characters 23-24)
+       because it closes over the module "F" at Line 7, characters 23-24
        which is "nonportable"
-       because it closes over the value "foo" (at Line 15, characters 12-15)
+       because it closes over the value "foo" at Line 15, characters 12-15
        which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -180,7 +180,8 @@ Line 3, characters 4-9:
 3 |     N.foo ()
         ^^^^^
 Error: The value "N.foo" is "nonportable" but is expected to be "portable"
-       because it is used inside a function which is expected to be "portable".
+       because it is used inside the function at Lines 1-3, characters 21-12
+       which is expected to be "portable".
 |}]
 
 let (bar @ portable) () =
@@ -191,7 +192,8 @@ Line 3, characters 4-9:
 3 |     M.foo ()
         ^^^^^
 Error: The value "M.foo" is "nonportable" but is expected to be "portable"
-       because it is used inside a function which is expected to be "portable".
+       because it is used inside the function at Lines 1-3, characters 21-12
+       which is expected to be "portable".
 |}]
 
 (* chained aliases. Creating alias of alias is fine. *)
@@ -215,7 +217,8 @@ Line 4, characters 4-10:
 4 |     N'.foo ()
         ^^^^^^
 Error: The value "N'.foo" is "nonportable" but is expected to be "portable"
-       because it is used inside a function which is expected to be "portable".
+       because it is used inside the function at Lines 1-4, characters 21-13
+       which is expected to be "portable".
 |}]
 
 (* module aliases in structures still walk locks. *)
@@ -229,7 +232,8 @@ Line 3, characters 19-20:
 3 |         module L = M
                        ^
 Error: The module "M" is "nonportable" but is expected to be "portable"
-       because it is used inside a function which is expected to be "portable".
+       because it is used inside the function at Lines 1-5, characters 21-14
+       which is expected to be "portable".
 |}]
 
 module F (X : S @ portable) = struct
@@ -384,7 +388,8 @@ Line 4, characters 14-17:
 4 |     let bar = foo
                   ^^^
 Error: The value "foo" is "nonportable" but is expected to be "portable"
-       because it is used inside a functor which is expected to be "portable".
+       because it is used inside the functor at Lines 3-5, characters 22-3
+       which is expected to be "portable".
 |}]
 
 module (F @ portable) (X : sig val x : int -> int end) = struct
@@ -520,6 +525,6 @@ module type S = sig
     @@ portable
 end
 [%%expect{|
-Uncaught exception: File "typing/env.ml", line 2159, characters 13-19: Assertion failed
+Uncaught exception: File "typing/env.ml", line 2148, characters 13-19: Assertion failed
 
 |}]

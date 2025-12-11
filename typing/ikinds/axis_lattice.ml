@@ -1,33 +1,34 @@
 (* Axis lattice: efficient bitfield encoding of jkind axes.
 
-   This module packs 12 axes into an 18-bit integer, where each axis can have
-   2 or 3 possible values (levels). The axes are indexed 0-11 and their values
-   are ordered from most restrictive (0) to least restrictive (max).
+   This module packs 13 axes into an OCaml immediate-sized integer, where each
+   axis can have 2 or 3 possible values (levels). The axes are indexed 0-12 and
+   their values are ordered from most restrictive (0) to least restrictive
+   (max).
 
    Axis layout (index, name, values from level 0 to max):
    0. Areality (Regionality): Global -> Regional -> Local
    1. Linearity: Many -> Once
    2. Uniqueness (monadic): Aliased -> Unique
-   3. Portability: Portable -> Nonportable
+   3. Portability: Portable -> Shareable -> Nonportable
    4. Contention (monadic): Contended -> Shared -> Uncontended
    5. Forkable: Forkable -> Unforkable
    6. Yielding: Unyielding -> Yielding
    7. Statefulness: Stateless -> Observing -> Stateful
    8. Visibility (monadic): Immutable -> Read -> Read_write
-   9. Externality: External -> External64 -> Internal
-   10. Nullability: Non_null -> Maybe_null
-   11. Separability: Non_float -> Separable -> Maybe_separable
+   9. Staticity (monadic): Dynamic -> Static
+   10. Externality: External -> External64 -> Internal
+   11. Nullability: Non_null -> Maybe_null
+   12. Separability: Non_float -> Separable -> Maybe_separable
 
    Axes 0-8 are modal axes (affect mode-crossing).
-   Axes 9-11 are non-modal axes (externality and shallow axes).
-   Axes 10-11 are "shallow" axes (nullability and separability) that are
+   Axes 10-12 are non-modal axes (externality and shallow axes).
+   Axes 11-12 are "shallow" axes (nullability and separability) that are
    sometimes excluded from masking operations.
 
-   Each 3-valued axis uses 2 bits, each 2-valued axis uses 1 bit.
-   Total: 2*6 + 1*6 = 18 bits, fitting in an OCaml immediate integer. *)
+   Each 3-valued axis uses 2 bits, each 2-valued axis uses 1 bit. *)
 
-let axis_sizes = [| 3; 2; 2; 2; 3; 2; 2; 3; 3; 3; 2; 3 |]
-let num_axes = 12
+let axis_sizes = [| 3; 2; 2; 3; 3; 2; 2; 3; 3; 2; 3; 2; 3 |]
+let num_axes = 13
 
 (* Axes in the correct order matching axis_index (NOT Jkind_axis.Axis.all).
    This is the order used by Axis_set.create and axis_index.
@@ -43,6 +44,7 @@ let all_axes_correct_order : Jkind_axis.Axis.packed list =
     Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Yielding));
     Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Statefulness));
     Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Visibility));
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Staticity));
     Jkind_axis.Axis.Pack (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality);
     Jkind_axis.Axis.Pack (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability);
     Jkind_axis.Axis.Pack (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Separability) ]
@@ -186,19 +188,23 @@ let visibility_immutable  : t = set_axis bot ~axis:8 ~level:0
 let visibility_read       : t = set_axis bot ~axis:8 ~level:1
 let visibility_read_write : t = set_axis bot ~axis:8 ~level:2
 
+(* Staticity axis (monadic): 0=Dynamic, 1=Static *)
+let staticity_dynamic : t = set_axis bot ~axis:9 ~level:0
+let staticity_static : t = set_axis bot ~axis:9 ~level:1
+
 (* Externality axis: 0=External, 1=External64, 2=Internal *)
-let externality_external   : t = set_axis bot ~axis:9 ~level:0
-let externality_external64 : t = set_axis bot ~axis:9 ~level:1
-let externality_internal   : t = set_axis bot ~axis:9 ~level:2
+let externality_external   : t = set_axis bot ~axis:10 ~level:0
+let externality_external64 : t = set_axis bot ~axis:10 ~level:1
+let externality_internal   : t = set_axis bot ~axis:10 ~level:2
 
 (* Nullability axis: 0=Non_null, 1=Maybe_null *)
-let nullability_non_null   : t = set_axis bot ~axis:10 ~level:0
-let nullability_maybe_null : t = set_axis bot ~axis:10 ~level:1
+let nullability_non_null   : t = set_axis bot ~axis:11 ~level:0
+let nullability_maybe_null : t = set_axis bot ~axis:11 ~level:1
 
 (* Separability axis: 0=Non_float, 1=Separable, 2=Maybe_separable *)
-let separability_non_float       : t = set_axis bot ~axis:11 ~level:0
-let separability_separable       : t = set_axis bot ~axis:11 ~level:1
-let separability_maybe_separable : t = set_axis bot ~axis:11 ~level:2
+let separability_non_float       : t = set_axis bot ~axis:12 ~level:0
+let separability_separable       : t = set_axis bot ~axis:12 ~level:1
+let separability_maybe_separable : t = set_axis bot ~axis:12 ~level:2
 
 (* Build a mask from a set of relevant axes. *)
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
@@ -240,7 +246,7 @@ let relevant_axes_of_modality
 
 (* Mask that excludes the shallow axes (nullability and separability). *)
 let mask_shallow : t =
-  co_sub top (join axis_mask.(10) axis_mask.(11))
+  co_sub top (join axis_mask.(11) axis_mask.(12))
 
 (* Directly produce an axis-lattice mask from a constant modality. *)
 let mask_of_modality ~(relevant_for_shallow : [`Relevant | `Irrelevant])
@@ -268,7 +274,8 @@ module Levels = struct
   let level_of_portability (x : Mode.Portability.Const.t) : int =
     match x with
     | Mode.Portability.Const.Portable -> 0
-    | Mode.Portability.Const.Nonportable -> 1
+    | Mode.Portability.Const.Shareable -> 1
+    | Mode.Portability.Const.Nonportable -> 2
 
   let level_of_contention_monadic (x : Mode.Contention.Const.t) : int =
     match x with
@@ -297,6 +304,11 @@ module Levels = struct
     | Mode.Visibility.Const.Immutable -> 0
     | Mode.Visibility.Const.Read -> 1
     | Mode.Visibility.Const.Read_write -> 2
+
+  let level_of_staticity_monadic (x : Mode.Staticity.const) : int =
+    match x with
+    | Mode.Staticity.Dynamic -> 0
+    | Mode.Staticity.Static -> 1
 
   let level_of_externality (x : Jkind_axis.Externality.t) : int =
     match x with
@@ -333,7 +345,8 @@ module Levels = struct
 
   let portability_of_level = function
     | 0 -> Mode.Portability.Const.Portable
-    | 1 -> Mode.Portability.Const.Nonportable
+    | 1 -> Mode.Portability.Const.Shareable
+    | 2 -> Mode.Portability.Const.Nonportable
     | _ -> invalid_arg "Axis_lattice.portability_of_level"
 
   let contention_of_level_monadic = function
@@ -364,6 +377,11 @@ module Levels = struct
     | 2 -> Mode.Visibility.Const.Read_write
     | _ -> invalid_arg "Axis_lattice.visibility_of_level_monadic"
 
+  let staticity_of_level_monadic = function
+    | 0 -> Mode.Staticity.Dynamic
+    | 1 -> Mode.Staticity.Static
+    | _ -> invalid_arg "Axis_lattice.staticity_of_level_monadic"
+
   let externality_of_level = function
     | 0 -> Jkind_axis.Externality.External
     | 1 -> Jkind_axis.Externality.External64
@@ -384,7 +402,7 @@ end
 
 let const_of_levels
     ~areality ~linearity ~uniqueness ~portability
-    ~contention ~forkable ~yielding ~statefulness ~visibility
+    ~contention ~forkable ~yielding ~statefulness ~visibility ~staticity
     ~externality ~nullability ~separability =
   let open Levels in
   encode
@@ -398,6 +416,7 @@ let const_of_levels
          level_of_yielding yielding;
          level_of_statefulness statefulness;
          level_of_visibility_monadic visibility;
+         level_of_staticity_monadic staticity;
          level_of_externality externality;
          level_of_nullability nullability;
          level_of_separability separability
@@ -415,6 +434,7 @@ let nonfloat_value : t =
     ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -430,6 +450,7 @@ let immutable_data : t =
     ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -445,6 +466,7 @@ let mutable_data : t =
     ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -460,6 +482,7 @@ let value : t =
     ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Separable
@@ -475,6 +498,7 @@ let arrow : t =
     ~yielding:Mode.Yielding.Const.max
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Immutable
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -490,6 +514,7 @@ let immediate : t =
     ~yielding:Mode.Yielding.Const.min
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.min
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -509,6 +534,7 @@ let object_legacy : t =
     ~yielding
     ~statefulness
     ~visibility:Mode.Visibility.Const.Read_write
+    ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
     ~nullability:Jkind_axis.Nullability.Non_null
     ~separability:Jkind_axis.Separability.Non_float
@@ -526,12 +552,14 @@ let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =
   | 7 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Comonadic Statefulness))
   | 8 -> Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Visibility))
   | 9 ->
-    Jkind_axis.Axis.Pack
-      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality)
+    Jkind_axis.Axis.Pack (Jkind_axis.Axis.Modal (Monadic Staticity))
   | 10 ->
     Jkind_axis.Axis.Pack
-      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability)
+      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality)
   | 11 ->
+    Jkind_axis.Axis.Pack
+      (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Nullability)
+  | 12 ->
     Jkind_axis.Axis.Pack
       (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Separability)
   | _ -> failwith "axis_number_to_axis_packed: invalid axis number"

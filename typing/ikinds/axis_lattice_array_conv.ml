@@ -1,5 +1,5 @@
 let crossing_of_constants ~areality ~linearity ~uniqueness ~portability
-    ~contention ~forkable ~yielding ~statefulness ~visibility :
+    ~contention ~forkable ~yielding ~statefulness ~visibility ~staticity :
     Mode.Crossing.t =
   let open Mode.Crossing in
   let monadic =
@@ -13,6 +13,9 @@ let crossing_of_constants ~areality ~linearity ~uniqueness ~portability
       ~visibility:
         (Monadic.Atom.Modality
            (Mode.Modality.Monadic.Atom.Join_with visibility))
+      ~staticity:
+        (Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_with staticity))
   in
   let comonadic =
     Comonadic.create
@@ -50,6 +53,7 @@ let of_mod_bounds (mb : Types.Jkind_mod_bounds.t) : Axis_lattice_array.t =
        level_of_yielding (yielding_const mb);
        level_of_statefulness (statefulness_const mb);
        level_of_visibility_monadic (visibility_const mb);
+       level_of_staticity_monadic (Types.Jkind_mod_bounds.staticity_const mb);
        level_of_externality (externality mb);
        level_of_nullability (nullability mb);
        level_of_separability (separability mb)
@@ -69,12 +73,13 @@ let to_mod_bounds (v : Axis_lattice_array.t) : Types.Jkind_mod_bounds.t =
   let yielding = yielding_of_level lv.(6) in
   let statefulness = statefulness_of_level lv.(7) in
   let visibility = visibility_of_level_monadic lv.(8) in
-  let externality = externality_of_level lv.(9) in
-  let nullability = nullability_of_level lv.(10) in
-  let separability = separability_of_level lv.(11) in
+  let staticity = staticity_of_level_monadic lv.(9) in
+  let externality = externality_of_level lv.(10) in
+  let nullability = nullability_of_level lv.(11) in
+  let separability = separability_of_level lv.(12) in
   let crossing =
     crossing_of_constants ~areality ~linearity ~uniqueness ~portability
-      ~contention ~forkable ~yielding ~statefulness ~visibility
+      ~contention ~forkable ~yielding ~statefulness ~visibility ~staticity
   in
   Types.Jkind_mod_bounds.create crossing ~externality ~nullability
     ~separability

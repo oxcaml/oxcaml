@@ -190,7 +190,7 @@ end
 [%%expect{|
 module Portable :
   sig type 'a t = { portable : 'a @@ portable; } [@@unboxed] end
-module type S = sig type 'a key : value mod contended portable end
+module type S = sig type 'a key : value mod portable contended end
 module M : S
 |}]
 
@@ -208,7 +208,7 @@ module M : S = struct
 end
 [%%expect{|
 module Portable : sig type 'a t = { portable : 'a @@ portable; } end
-module type S = sig type 'a key : value mod contended portable end
+module type S = sig type 'a key : value mod portable contended end
 module M : S
 |}]
 
@@ -226,7 +226,7 @@ module M : S = struct
 end
 [%%expect{|
 module Portable : sig type 'a t = { portable : 'a @@ portable; } end
-module type S = sig type 'a key : value mod contended portable end
+module type S = sig type 'a key : value mod portable contended end
 module M : S
 |}]
 
@@ -244,7 +244,7 @@ end
 [%%expect{|
 module Portable :
   sig type 'a t = { portable : 'a @@ portable contended; } end
-module type S = sig type 'a key : value mod contended portable end
+module type S = sig type 'a key : value mod portable contended end
 module M : S
 |}]
 
@@ -302,7 +302,7 @@ module M : S = struct
 end
 
 [%%expect{|
-module type S = sig type 'a key : value mod contended portable end
+module type S = sig type 'a key : value mod portable contended end
 type t
 module M : S
 |}]
@@ -333,7 +333,7 @@ end
 [%%expect{|
 module Contended :
   sig type 'a t = { contended : 'a @@ contended; } [@@unboxed] end
-module type S = sig type 'a key : value mod contended portable end
+module type S = sig type 'a key : value mod portable contended end
 type t : value mod portable
 module M : S
 |}]
@@ -355,7 +355,7 @@ end
 [%%expect{|
 module Portable :
   sig type 'a t = { portable : 'a @@ portable; } [@@unboxed] end
-module type S = sig type 'a key : value mod contended portable end
+module type S = sig type 'a key : value mod portable contended end
 type t : value mod contended
 module M : S
 |}]
@@ -376,7 +376,7 @@ end
 [%%expect{|
 module Portable :
   sig type 'a t = { portable : 'a @@ portable; } [@@unboxed] end
-module type S = sig type 'a key : value mod contended portable end
+module type S = sig type 'a key : value mod portable contended end
 type t = unit -> unit
 module M : S
 |}]

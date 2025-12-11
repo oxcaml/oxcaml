@@ -131,6 +131,7 @@ module Jkind_mod_bounds : sig
   val yielding_const : t -> Mode.Yielding.Const.t
   val statefulness_const : t -> Mode.Statefulness.Const.t
   val visibility_const : t -> Mode.Visibility.Const.t
+  val staticity_const : t -> Mode.Staticity.Const.t
 
   val debug_print : Format.formatter -> t -> unit
 end

@@ -35,6 +35,7 @@ module Levels : sig
   val level_of_yielding : Mode.Yielding.Const.t -> int
   val level_of_statefulness : Mode.Statefulness.Const.t -> int
   val level_of_visibility_monadic : Mode.Visibility.Const.t -> int
+  val level_of_staticity_monadic : Mode.Staticity.const -> int
   val level_of_externality : Jkind_axis.Externality.t -> int
   val level_of_nullability : Jkind_axis.Nullability.t -> int
   val level_of_separability : Jkind_axis.Separability.t -> int
@@ -48,6 +49,7 @@ module Levels : sig
   val yielding_of_level : int -> Mode.Yielding.Const.t
   val statefulness_of_level : int -> Mode.Statefulness.Const.t
   val visibility_of_level_monadic : int -> Mode.Visibility.Const.t
+  val staticity_of_level_monadic : int -> Mode.Staticity.const
   val externality_of_level : int -> Jkind_axis.Externality.t
   val nullability_of_level : int -> Jkind_axis.Nullability.t
   val separability_of_level : int -> Jkind_axis.Separability.t

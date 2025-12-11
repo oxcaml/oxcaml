@@ -263,6 +263,8 @@ module Jkind_mod_bounds = struct
 
   let visibility_const t = extract_monadic visibility t
 
+  let staticity_const t = extract_monadic staticity t
+
   let max =
     { crossing = Mode.Crossing.max;
       externality = Externality.max;
