@@ -1,6 +1,7 @@
 (* TEST
  modules = "a.ml util.ml";
  flags = "-extension runtime_metaprogramming";
+ arch_amd64;
  native;
 *)
 
