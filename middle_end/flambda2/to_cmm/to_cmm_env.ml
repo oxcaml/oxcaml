@@ -672,10 +672,6 @@ let rec add_binding_to_env ?extra env res var (Binding binding as b) =
   in
   let env, res = add_to_effect_stages env res var (Binding binding) in
   let env, res = add_to_validity_stages env res var (Binding binding) in
-  if Flambda_features.debug_flambda2 ()
-  then
-    Format.eprintf "@[<v 2>add_binding:@ var: %a@ binding: %a@ env: %a@\n@."
-      Variable.print var print_binding binding print env;
   env, res
 
 and add_to_effect_stages env res var (Binding binding) =
@@ -829,11 +825,7 @@ let bind_variable_to_primitive = bind_variable_with_decision
 (* Variable lookup (for potential inlining) *)
 
 let will_inline_simple env res
-    { effs; bound_expr = Simple { cmm_expr; free_vars }; cmm_var; _ } =
-  if Flambda_features.debug_flambda2 ()
-  then
-    Format.eprintf "inline_simple: %a@." Backend_var.With_provenance.print
-      cmm_var;
+    { effs; bound_expr = Simple { cmm_expr; free_vars }; cmm_var = _; _ } =
   { env; res; expr = { cmm = cmm_expr; free_vars; effs } }
 
 let will_inline_complex env res { effs; bound_expr; _ } =
@@ -852,10 +844,6 @@ let will_inline_complex env res { effs; bound_expr; _ } =
 
 let will_not_inline_simple env res v
     ({ cmm_var; bound_expr = Simple _; _ } as b) =
-  if Flambda_features.debug_flambda2 ()
-  then
-    Format.eprintf "not_inline_simple: %a@." Backend_var.With_provenance.print
-      cmm_var;
   (* replace the binding "inline" field with a `Do_not_inline` to ensure that it
      is effectively flushed at the next flush, even if it is a branching
      point. *)
@@ -1163,13 +1151,9 @@ let flush_delayed_lets ~mode env res =
      loops. CR gbury: this is now done by creating a binding with the inline
      status `Must_inline_and_duplicate`, so the caller of `to_cmm_env` has to
      make that decision of whether to substitute inside loops. *)
-  if Flambda_features.debug_flambda2 ()
-  then Format.eprintf "** Flushing (start) ***@\nenv: %a@\n@." print env;
   let res = ref res in
   let bindings_to_flush = ref M.empty in
   let flush (Binding b as binding) =
-    if Flambda_features.debug_flambda2 ()
-    then Format.eprintf "flushing binding %a@." print_binding b;
     if M.mem b.order !bindings_to_flush
     then
       Misc.fatal_errorf "Duplicate order for bindings when flushing: %a = %a"
@@ -1293,6 +1277,4 @@ let flush_delayed_lets ~mode env res =
       symbol_inits = Backend_var.Map.empty
     }
   in
-  if Flambda_features.debug_flambda2 ()
-  then Format.eprintf "/// Flushing (end) ///@\nenv: %a@\n@." print env;
   flush, env, !res

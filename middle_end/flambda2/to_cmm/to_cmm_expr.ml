@@ -559,7 +559,7 @@ let translate_raise ~dbg_with_inlined:dbg env res apply exn_handler args =
 let translate_jump_to_continuation ~dbg_with_inlined:dbg env res apply types
     cont args =
   if List.compare_lengths types args = 0
-  then (
+  then
     let trap_actions =
       match Apply_cont.trap_action apply with
       | None -> []
@@ -572,13 +572,11 @@ let translate_jump_to_continuation ~dbg_with_inlined:dbg env res apply types
     in
     let args = C.remove_skipped_args args types in
     let args, free_vars, env, res, _ = C.simple_list ~dbg env res args in
-    if Flambda_features.debug_flambda2 ()
-    then Format.eprintf "flushing (call to %a)@." Static_label.print cont;
     let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     let cmm, free_vars, symbol_inits =
       wrap (C.cexit cont args trap_actions) free_vars Env.Symbol_inits.empty
     in
-    cmm, free_vars, symbol_inits, res)
+    cmm, free_vars, symbol_inits, res
   else
     Misc.fatal_errorf "Types (%a) do not match arguments of@ %a"
       (Format.pp_print_list ~pp_sep:Format.pp_print_space
@@ -1211,8 +1209,6 @@ and switch env res switch =
         else untagged_scrutinee_cmm, false)
     | _ -> untagged_scrutinee_cmm, false
   in
-  if Flambda_features.debug_flambda2 ()
-  then Format.eprintf "flushing (switch)@.";
   let wrap, env, res = Env.flush_delayed_lets ~mode:Branching_point env res in
   let prepare_discriminant ~must_tag d =
     let machine_width = Target_system.Machine_width.Sixty_four in

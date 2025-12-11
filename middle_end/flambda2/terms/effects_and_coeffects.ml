@@ -13,7 +13,6 @@
 (**************************************************************************)
 
 type t = Effects.t * Coeffects.t * Placement.t * Validity.t
-(* CR gbury: make this into a record ? *)
 
 let print fmt (eff, coeff, dup, validity) =
   Format.fprintf fmt "%a * %a * %a * %a" Effects.print eff Coeffects.print coeff
