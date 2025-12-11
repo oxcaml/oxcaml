@@ -416,15 +416,16 @@ let create_simple_variant_die ~reference ~parent_proto_die ?name
     simple_constructors
 
 (* CR mshinwell: it seems like this should move to the frontend *)
+(* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   match ly with
   | Base base -> (
     match base with
-    (* CR zeisbach: the fact that scannable axes have to get conjured up is bad
-       / wrong, and gets fixed if layout actually means layout. But if I just
-       project down to the sort for debugger, then making this up seems
-       unavoidable. Check out the call sites to see if this is ever actually
-       problematic? *)
+    (* CR layouts-scannable: With scannable axes, sorts are no longer sufficient
+       to know how something is laid out. Once a new data definition is made to
+       track this information (roughly sorts + scannable axes AKA layouts - any)
+       then the meaning of [Layout.t] could be changed to mean that type. Doing
+       so would avoid the need to default to max here. *)
     | Scannable -> Scannable Jkind_types.Scannable_axes.max
     | Float64 -> Float64
     (* This is a case, where we potentially have mapped [Float_boxed] to
@@ -513,6 +514,9 @@ let flatten_fields_in_mixed_record ~(mixed_block_shapes : Layout.t array)
   (* We go to arrays and back because it makes the reordering of the fields via
      accesses O(n) instead of O(n^2) *)
   let fields = Array.of_list fields in
+  (* The scannable axes in [mixed_block_shapes] are all set to max, but that is
+     OK because that information is (currently) never used as they get turned
+     into base_layouts below. *)
   let mixed_block_shapes =
     Array.map layout_to_types_layout mixed_block_shapes
   in
