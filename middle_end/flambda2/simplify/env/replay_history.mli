@@ -68,7 +68,7 @@ val replay : always_inline:bool -> t -> t
 val define_variable : Variable.t -> t -> t
 
 (** Define a new set of bound mutually recursive continuations. *)
-val define_continuations : Continuation.t list -> t -> t
+val define_continuations : is_wrapper:bool -> Continuation.t list -> t -> t
 
 (** {2 Inspection API} *)
 
