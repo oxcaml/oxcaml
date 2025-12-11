@@ -435,14 +435,14 @@ let value_kind_of_scannable_jkind env jkind =
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
      the principality check, as we're just trying to compute optimizations. *)
   let context = Ctype.mk_jkind_context_always_principal env in
-  let ext_upper_bound =
+  let externality_upper_bound =
     Jkind.get_externality_upper_bound ~context jkind
   in
   match layout with
-  | Base (Scannable, { separability; _ }) ->
+  | Base (Scannable, { separability; _ }) -> (
     (* use the better of the two [immediate_or_pointer]s *)
-    (match pointerness_of_separability separability,
-           pointerness_of_scannable_with_externality ext_upper_bound with
+    match pointerness_of_separability separability,
+          pointerness_of_scannable_with_externality externality_upper_bound with
     | Immediate, Immediate | Immediate, Pointer | Pointer, Immediate -> Pintval
     | Pointer, Pointer -> Pgenval)
   | Any _
