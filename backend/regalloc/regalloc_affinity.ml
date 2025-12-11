@@ -69,15 +69,16 @@ let compute : Cfg_with_infos.t -> t =
           | None -> 0
           | Some depth -> depth
         in
-        (* CR-soon like in `Regalloc_utils` or `regalloc.exe`, consider adding
-           an overflow check (to replace the condition about negative priorities
-           below). *)
+        (* CR-soon xclerc for xclerc: like in `Regalloc_utils` or
+           `regalloc.exe`, consider adding an overflow check (to replace the
+           condition about negative priorities below). *)
         let delta = Misc.power ~base:10 loop_depth in
         DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
             match temp_and_phys_reg_of_instr instr with
             | None -> ()
             | Some (temp, phys_reg) ->
               incr_move priorities ~temp ~phys_reg ~delta));
+    (* CR xclerc for xclerc: consider switching from list to (dynamic array). *)
     Reg.Tbl.iter
       (fun temp phys_reg_tbl ->
         let affinity_list =
