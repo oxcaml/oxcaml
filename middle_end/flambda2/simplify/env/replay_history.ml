@@ -141,13 +141,14 @@ let define_continuations ~is_wrapper conts replay =
       } -> (
     match prev_bound with
     | Bound_continuations prev_conts ->
-      (* Continuations that are created during the downwards pass (e.g. wrapper continuations
-         for over-applications) cannot be renamed versions of each other, so the check does
-         not make sense. *)
-      if not is_wrapper &&
-           not (List.compare_lengths prev_conts conts = 0
-           && Misc.Stdlib.List.equal Continuation.is_renamed_version_of
-                prev_conts conts)
+      (* Continuations that are created during the downwards pass (e.g. wrapper
+         continuations for over-applications) cannot be renamed versions of each
+         other, so the check does not make sense. *)
+      if (not is_wrapper)
+         && not
+              (List.compare_lengths prev_conts conts = 0
+              && Misc.Stdlib.List.equal Continuation.is_renamed_version_of
+                   prev_conts conts)
       then error_not_renamed_version_of replay prev_bound action
       else
         let continuations =

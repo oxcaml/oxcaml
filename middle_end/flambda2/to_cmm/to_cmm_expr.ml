@@ -811,7 +811,8 @@ and let_expr env res let_expr =
 
 and let_cont env res (let_cont : Flambda.Let_cont.t) =
   match let_cont with
-  | Non_recursive { handler; num_free_occurrences; is_applied_with_traps; wrapper = _; } ->
+  | Non_recursive
+      { handler; num_free_occurrences; is_applied_with_traps; wrapper = _ } ->
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun k ~body ->
         let handler = Non_recursive_let_cont_handler.handler handler in
         match

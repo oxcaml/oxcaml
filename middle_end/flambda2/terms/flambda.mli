@@ -92,7 +92,7 @@ and let_cont_expr = private
         is_applied_with_traps : bool;
             (** [is_applied_with_traps] is used to prevent inlining of
                 continuations that are applied with a trap action *)
-        wrapper : bool;
+        wrapper : bool
             (** [wrapper] is used to prevent some continuations from being
                 lifted during continuation specialization. *)
       }
