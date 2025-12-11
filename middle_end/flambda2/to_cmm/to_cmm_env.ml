@@ -633,7 +633,7 @@ let split_complex_binding ~env ~res (binding : complex binding) =
     in
     let () =
       match Ece.validity prim_effects with
-      | Always_valid | Valid_after_some_branch -> ()
+      | Can_move_anywhere | Can't_move_before_any_branch -> ()
       | Control_flow_point ->
         (* primitives should never have implicit control flow points, this is
            more of an internal sanity check *)
@@ -723,7 +723,7 @@ and add_to_validity_stages env res var (Binding binding) =
   match inline with
   | Must_inline_and_duplicate -> (
     match Ece.validity binding.effs with
-    | Validity.Always_valid | Validity.Valid_after_some_branch -> env, res
+    | Validity.Can_move_anywhere | Validity.Can't_move_before_any_branch -> env, res
     | Validity.Control_flow_point ->
       (* assuming that no primitive (or top-level operation) marked as
          must_inline contains a control flow point, this means we must split the
@@ -732,8 +732,8 @@ and add_to_validity_stages env res var (Binding binding) =
       env, res)
   | May_inline_once | Must_inline_once | Do_not_inline -> (
     match Ece.validity binding.effs with
-    | Validity.Always_valid -> env, res
-    | Validity.Valid_after_some_branch ->
+    | Validity.Can_move_anywhere -> env, res
+    | Validity.Can't_move_before_any_branch ->
       let validity_stages =
         match env.validity_stages with
         | Depend_on_control_flow vars :: stages ->
@@ -944,8 +944,8 @@ let can_substitute_wrt_validity env var binding =
   then Possible env
   else
     match Ece.validity binding.effs with
-    | Validity.Always_valid -> Possible env
-    | Validity.Valid_after_some_branch | Validity.Control_flow_point -> (
+    | Validity.Can_move_anywhere -> Possible env
+    | Validity.Can't_move_before_any_branch | Validity.Control_flow_point -> (
       match pop_if_in_top_validity_stage env var with
       | None -> Not_possible
       | Some env -> Possible env)
@@ -1196,11 +1196,11 @@ let flush_delayed_lets ~mode env res =
              before the branch in control flow). *)
           | ( Branching_point,
               (Pure | Generative_immutable),
-              (Always_valid | Valid_after_some_branch) ) ->
+              (Can_move_anywhere | Can't_move_before_any_branch) ) ->
             Some binding
           | ( (Branching_point | Entering_loop | Flush_everything),
               (Pure | Generative_immutable | Coeffect_only | Effect),
-              (Always_valid | Valid_after_some_branch | Control_flow_point) )
+              (Can_move_anywhere | Can't_move_before_any_branch | Control_flow_point) )
             -> (
             let r, split_res = split_complex_binding ~env ~res:!res b in
             res := r;
@@ -1226,21 +1226,21 @@ let flush_delayed_lets ~mode env res =
              expressions are sunk down as far as possible, including past
              control flow branching points.
 
-             Note that his allows expressions that are `Valid_after_some_branch`
+             Note that his allows expressions that are `Can't_move_before_any_branch`
              to be moved down across control flow points. This is safe because
              once an operation/expression becomes valid (after a control flow
              point), it can never lose that validity. At worst a load that was
              **before** a length check may be moved down after it, transforming
              a segfault into a raise at execution, which seems okay. *)
           | ( (Pure | Generative_immutable),
-              (Always_valid | Valid_after_some_branch) ) -> (
+              (Can_move_anywhere | Can't_move_before_any_branch) ) -> (
             match mode with
             | Flush_everything | Entering_loop ->
               flush binding;
               None
             | Branching_point -> Some binding)
           | ( (Pure | Generative_immutable | Coeffect_only | Effect),
-              (Always_valid | Valid_after_some_branch | Control_flow_point) ) ->
+              (Can_move_anywhere | Can't_move_before_any_branch | Control_flow_point) ) ->
             flush binding;
             None))
       env.bindings
@@ -1251,8 +1251,8 @@ let flush_delayed_lets ~mode env res =
       Variable.Map.fold
         (fun var (Binding binding) acc ->
           match Ece.validity binding.effs with
-          | Validity.Always_valid -> acc
-          | Validity.Valid_after_some_branch -> (
+          | Validity.Can_move_anywhere -> acc
+          | Validity.Can't_move_before_any_branch -> (
             match binding.inline with
             | Must_inline_and_duplicate -> acc
             | Must_inline_once | May_inline_once -> Variable.Set.add var acc

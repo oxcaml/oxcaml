@@ -35,8 +35,8 @@
 
 (** Validity of operations/expressions *)
 type t =
-  | Always_valid  (** Operations that are always valid *)
-  | Valid_after_some_branch
+  | Can_move_anywhere  (** Operations that are always valid *)
+  | Can't_move_before_any_branch
       (** Operations whose evaluation may change after a certain control flow branch.
       Examples of these include immutable array operations, but also primitives
       that operate on values, but expect a particular shape for these values,

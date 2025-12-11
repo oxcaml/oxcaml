@@ -33,14 +33,14 @@ let compare (e1, c1, d1, v1) (e2, c2, d2, v2) =
 let validity ((_, _, _, v) : t) = v
 
 (* Some useful constants *)
-let pure : t = No_effects, No_coeffects, Strict, Valid_after_some_branch
+let pure : t = No_effects, No_coeffects, Strict, Can't_move_before_any_branch
 
 let pure_can_be_duplicated : t =
-  No_effects, No_coeffects, Delay, Valid_after_some_branch
+  No_effects, No_coeffects, Delay, Can't_move_before_any_branch
 
 let all : t = Arbitrary_effects, Has_coeffects, Strict, Control_flow_point
 
-let read : t = No_effects, Has_coeffects, Strict, Valid_after_some_branch
+let read : t = No_effects, Has_coeffects, Strict, Can't_move_before_any_branch
 
 (* Joining effects, coeffects and placement *)
 let join (eff1, coeff1, dup1, val1) (eff2, coeff2, dup2, val2) =

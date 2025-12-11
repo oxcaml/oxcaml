@@ -767,7 +767,7 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
       | Heap -> No_coeffects
       | Local _ -> Has_coeffects),
       Strict,
-      Always_valid )
+      Can_move_anywhere )
   in
   let decl_map =
     decls |> Function_slot.Lmap.bindings |> Function_slot.Map.of_list
