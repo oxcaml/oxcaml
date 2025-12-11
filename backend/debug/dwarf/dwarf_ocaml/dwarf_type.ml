@@ -421,6 +421,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   match ly with
   | Base base -> (
     match base with
+    (* CR zeisbach: maybe clean up this comment... :( *)
     (* CR layouts-scannable: With scannable axes, sorts are no longer sufficient
        to know how something is laid out. Once a new data definition is made to
        track this information (roughly sorts + scannable axes AKA layouts - any)

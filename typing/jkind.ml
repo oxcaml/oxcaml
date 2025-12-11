@@ -31,6 +31,11 @@ let set_raw_type_expr p = raw_type_expr := p
 
 module Nonempty_list = Misc.Nonempty_list
 
+(* CR layouts-scannable: The comment below is no longer entirely accurate, after
+   the addition of scannable axes (which are needed when compiling to determine
+   GC behavior). It may be desirable to make a refined data definition that
+   separates "the thing needed for compiling" (sort + scannable axes, or
+   similarly layout - any) from "the discrete thing used for unification". *)
 (* A *sort* is the information the middle/back ends need to be able to
    compile a manipulation (storing, passing, etc) of a runtime value. *)
 module Sort = struct

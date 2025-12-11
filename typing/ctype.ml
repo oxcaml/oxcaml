@@ -2783,19 +2783,12 @@ let check_type_separability jkind env ty sep =
   | Error _ -> false
 
 let is_always_gc_ignorable env ty =
-  (* CR zeisbach: it would be good if this didn't have to call check_type_jkind
-     twice (meaning Typeopt.maybe_pointer_type actually calls it 3x). IDK how
-     to do this refactor, but seems important to note. Probably add a comment
-     in Typeopt too, and maybe make an internal ticket *)
-  (* CR zeisbach: also what is up with formatting here lol. Also double
-     check the Dummy_jkind *)
+  (* CR zeisbach: Liam suggested to make an internal ticket for this? *)
+  (* CR layouts: calling [check_type_jkind] two times (indirectly) is sad. *)
   (* CR layouts-scannable: Since we check against [scannable non_pointer(64)],
      a type of kind [value non_pointer & value non_pointer] will fail to be
-     recognized as being always_gc_ignorable, even though it is.
-     Perhaps [non_pointer(64)] should imply [external(64)], since there is
-     already machinery (IIUC) for it applying deeply? *)
-  (* CR zeisbach: look at the call sites to determine if this underapproximation
-     is acceptable or actually bad. *)
+     recognized as being always_gc_ignorable, even though it is. To avoid this,
+     [non_pointer(64)] should imply [external(64)]. *)
   check_type_externality env ty
     (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
   || check_type_separability (Jkind.Builtin.scannable ~why:Dummy_jkind) env ty

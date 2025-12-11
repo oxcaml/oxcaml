@@ -89,6 +89,7 @@ let is_base_type env ty base_ty_path =
 
 let maybe_pointer_type env ty =
   let ty = scrape_ty env ty in
+  (* CR layouts: calling [check_type_jkind] three times (indirectly) is sad *)
   let immediate_or_pointer =
     match Ctype.is_always_gc_ignorable env ty with
     | true -> Immediate

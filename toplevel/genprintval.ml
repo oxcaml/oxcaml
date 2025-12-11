@@ -648,7 +648,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   | Outval_record_mixed_block shape ->
                       let fld =
                         match shape.(pos) with
-                        (* CR zeisbach: getting ignored. don't forgor *)
+                        (* CR zeisbach: probably ok to ignore this but check *)
                         | Scannable _ -> `Continue (O.field obj pos)
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
