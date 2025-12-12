@@ -1175,7 +1175,7 @@ let rec mixed_block_element_to_string = function
 let mixed_block_element_to_lowercase_string = function
   (* CR zeisbach: check this out! is this proper printing? probably yes,
      but also look at the call sites to make sure. probably DWARF stuff. *)
-  | Scannable _ -> "value"
+  | Scannable _ -> "scannable"
   | Float_boxed -> "float"
   | Float32 -> "float32"
   | Float64 -> "float64"
