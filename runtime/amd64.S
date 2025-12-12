@@ -1472,9 +1472,9 @@ CFI_STARTPROC
            its gc_regs before resuming */
         movq    %rdx, Caml_state(gc_regs)  /* Save gc_regs */
         movq    %r15, Caml_state(young_ptr)
-        /* Before restoring registers, redo whatever allocation that was
-           interrupted by preemption. This ensures r15 will point to a valid
-           allocation in the (possibly new) young heap. */
+        /* Before restoring registers, redo whatever allocation was interrupted
+           by preemption. This ensures r15 will point to a valid allocation in
+           the (possibly new) young heap. */
         SWITCH_OCAML_TO_C
         C_call  (GCALL(caml_redo_preempted_allocation))
         SWITCH_C_TO_OCAML
