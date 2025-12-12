@@ -1279,14 +1279,14 @@ ENDFUNCTION(G(caml_callback3_asm))
 /******************************************************************************/
 /* Fibers */
 /*
- * A continuation is either a two or three word object:
+ * A continuation is a two or three word object:
  *
- *  - The first field points to the fiber to resume
- *  - The second field points to the parent fiber
- *  - The third field, if present, points to the saved gc_regs of a continuation for a preemption
- * A fiber [f] will point to its parent at Handler_parent(Stack_handler(f)). In
- * the following, the [last_fiber] refers to the last fiber in the linked-list
- * formed by the parent pointer.
+ * - The first field, if present, points to a fiber. That fiber will point to
+ *   its parent at Handler_parent(Stack_handler(f))
+ * - The second field points to the last fiber in the linked-list formed by the
+ *   parent pointer
+ * - The third field, if present, points to a [gc_regs] struct for a
+ *   continuation produced by a preemption
  */
 /******************************************************************************/
 
