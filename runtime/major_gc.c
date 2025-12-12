@@ -1366,13 +1366,10 @@ void caml_darken_cont(value cont)
               With_status_hd(hd, NOT_MARKABLE))) {
         value stk = Field(cont, 0);
         if (Ptr_val(stk) != NULL) {
-          value *gc_regs = 0;
-          mlsize_t size = Wosize_hd(hd);
-          CAMLassert(size == 2 || size == 3);
-          if (size == 3) {
-            gc_regs = (value *)(Field(cont, 2));
-          }
-
+          value *gc_regs =
+            /* Note this is NULL if the continuation is not a preemption. That's
+               fine; caml_scan_stack handles it */
+            caml_continuation_gc_regs(cont);
           caml_scan_stack(&caml_darken, darken_scanning_flags, Caml_state,
                           Ptr_val(stk), gc_regs);
         }

@@ -1034,6 +1034,9 @@ void caml_free_gc_regs_buckets(value *gc_regs_buckets)
   }
 }
 
+void assert_is_cont(value cont) {
+  CAMLassert(Is_block(cont) && Tag_val(cont) == Cont_tag);
+}
 
 CAMLprim value caml_continuation_use_noexc (value cont)
 {
@@ -1043,7 +1046,7 @@ CAMLprim value caml_continuation_use_noexc (value cont)
 
   fiber_debug_log("cont: is_block(%d) tag_val(%ul) is_young(%d)",
                   Is_block(cont), Tag_val(cont), Is_young(cont));
-  CAMLassert(Is_block(cont) && Tag_val(cont) == Cont_tag);
+  assert_is_cont(cont);
 
   /* this forms a barrier between execution and any other domains
      that might be marking this continuation */
@@ -1072,8 +1075,23 @@ CAMLprim value caml_continuation_use (value cont)
   return v;
 }
 
+bool caml_continuation_is_preemption(value cont) {
+  assert_is_cont(cont);
+  return Wosize_val(cont) == 3;
+}
+
+value* caml_continuation_gc_regs(value cont) {
+  assert_is_cont(cont);
+  if (caml_continuation_is_preemption(cont)) {
+    return (value*)Field(cont, 2);
+  } else {
+    return NULL;
+  }
+}
+
 void caml_continuation_replace(value cont, struct stack_info* stk)
 {
+  assert_is_cont(cont);
   value n = Val_ptr(NULL);
   int b = atomic_compare_exchange_strong(Op_atomic_val(cont), &n, Val_ptr(stk));
   CAMLassert(b);
