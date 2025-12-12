@@ -295,8 +295,7 @@ let recognize_switch_with_single_arg_to_same_destination machine_width ~arms =
   else recognize_switch_with_single_arg_to_same_destination0 machine_width ~arms
 
 let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
-    ~original ~tagged_scrutinee ~dest ~consts ~must_untag_lookup_table_result
-    dbg =
+    ~tagged_scrutinee ~dest ~consts ~must_untag_lookup_table_result dbg =
   let rebuilding = UA.are_rebuilding_terms uacc in
   let block_sym =
     let var = Variable.create "switch_block" K.value in
@@ -377,23 +376,20 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
       (NO.remove_var free_names_of_body ~var:final_arg_var)
   in
   let machine_width = DE.machine_width (DA.denv dacc_before_switch) in
-  let increase_in_code_size =
-    (* Very likely negative. *)
-    Code_size.( - )
+  let added_code_size =
+    Code_size.( + )
+      (Code_size.prim ~machine_width load_from_block_prim)
       (Code_size.( + )
-         (Code_size.prim ~machine_width load_from_block_prim)
-         (Code_size.( + )
-            (Code_size.apply_cont apply_cont)
-            (match must_untag_lookup_table_result with
-            | Must_untag -> Code_size.prim ~machine_width untag_arg_prim
-            | Leave_as_tagged_immediate -> Code_size.zero)))
-      (Code_size.switch original)
+         (Code_size.apply_cont apply_cont)
+         (match must_untag_lookup_table_result with
+         | Must_untag -> Code_size.prim ~machine_width untag_arg_prim
+         | Leave_as_tagged_immediate -> Code_size.zero))
   in
   let uacc =
     UA.add_free_names uacc extra_free_names
     (* CR mshinwell: it seems we need to fix [Cost_metrics] so we can note that
        we have *added* operations here (load, maybe untagging). *)
-    |> UA.notify_added ~code_size:increase_in_code_size
+    |> UA.notify_added ~code_size:added_code_size
   in
   expr, uacc
 
@@ -438,14 +434,14 @@ let ( let$ ) (name, kind, prim, dbg) k uacc ~dacc_before_switch =
     in
     EB.make_new_let_bindings uacc ~bindings_outermost_first:[binding] ~body
 
-let return ~code_size ~free_names expr uacc ~dacc_before_switch:_ =
-  let uacc = UA.notify_added ~code_size uacc in
+let return ~added_code_size ~free_names expr uacc ~dacc_before_switch:_ =
+  let uacc = UA.notify_added ~code_size:added_code_size uacc in
   let uacc = UA.add_free_names uacc free_names in
   expr, uacc
 
 let run uacc ~dacc_before_switch k = k uacc ~dacc_before_switch
 
-let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch ~original
+let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
     ~scrutinee ~tagged_scrutinee ~dest ~offset ~slope
     ~must_untag_lookup_table_result dbg =
   (* We are creating the following fragment: *)
@@ -479,15 +475,10 @@ let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch ~original
      let$ final_arg = bound_prim "final_arg" kind prim dbg in
      let apply_cont = Apply_cont.create dest ~args:[final_arg] ~dbg in
      let free_names = Apply_cont.free_names apply_cont in
-     let increase_in_code_size =
-       Code_size.( - )
-         (Code_size.apply_cont apply_cont)
-         (Code_size.switch original)
-     in
-     return ~code_size:increase_in_code_size ~free_names
-       (RE.create_apply_cont apply_cont))
+     let added_code_size = Code_size.apply_cont apply_cont in
+     return ~added_code_size ~free_names (RE.create_apply_cont apply_cont))
 
-let rebuild_switch ~original ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
+let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
     ~dacc_before_switch uacc ~after_rebuild =
   let new_let_conts, arms, mergeable_arms, identity_arms, not_arms =
     TI.Map.fold (rebuild_arm uacc) arms
@@ -574,11 +565,11 @@ let rebuild_switch ~original ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
             with
             | None ->
               rebuild_switch_with_single_arg_to_same_destination uacc
-                ~dacc_before_switch ~original ~tagged_scrutinee ~dest ~consts
+                ~dacc_before_switch ~tagged_scrutinee ~dest ~consts
                 ~must_untag_lookup_table_result dbg
             | Some (offset, slope) ->
               rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
-                ~original ~scrutinee ~tagged_scrutinee ~dest ~offset ~slope
+                ~scrutinee ~tagged_scrutinee ~dest ~offset ~slope
                 ~must_untag_lookup_table_result dbg))
       in
       match switch_merged with
@@ -805,8 +796,8 @@ let simplify_switch0 dacc switch ~down_to_up =
   in
   down_to_up dacc
     ~rebuild:
-      (rebuild_switch ~original:switch ~arms ~condition_dbg ~scrutinee
-         ~scrutinee_ty ~dacc_before_switch)
+      (rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
+         ~dacc_before_switch)
 
 let simplify_switch ~simplify_let_with_bound_pattern ~simplify_function_body
     dacc switch ~down_to_up =
