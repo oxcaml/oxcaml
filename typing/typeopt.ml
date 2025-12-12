@@ -282,16 +282,12 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   | Base (Void, _) -> raise (Error (loc, Unsupported_void_in_array))
   | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
 
-let array_kind_of_elt ~elt_layout env loc ty =
+let array_kind_of_elt env loc ty =
   (* CR zeisbach: this will scrape twice (once here, and once in classify).
      Hopefully scraping a second time is not so expensive. Shifting things
      around so that classify doesn't scrape seems unnecessary for now. *)
   let ty = scrape_ty env ty in
-  let elt_layout =
-    match elt_layout with
-    | Some layout -> layout
-    | None -> type_layout ~why:Array_element env loc ty
-  in
+  let elt_layout = type_layout ~why:Array_element env loc ty in
   let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
   let classify_product ty sorts =
     if Ctype.is_always_gc_ignorable env ty then
@@ -326,11 +322,11 @@ let array_kind_of_elt ~elt_layout env loc ty =
   | Void ->
     raise (Error (loc, Unsupported_void_in_array))
 
-let array_type_kind ~elt_layout ~elt_ty env loc ty =
+let array_type_kind ~elt_ty env loc ty =
   match scrape_poly env ty with
   | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_array
                               || Path.same p Predef.path_iarray ->
-      array_kind_of_elt ~elt_layout env loc elt_ty
+      array_kind_of_elt env loc elt_ty
   | Tconstr(p, [], _) when Path.same p Predef.path_floatarray ->
       Pfloatarray
   | _ ->
@@ -372,18 +368,11 @@ let array_type_mut env ty =
   | Tconstr(p, [_], _) when Path.same p Predef.path_iarray -> Immutable
   | _ -> Mutable
 
-(* CR zeisbach: will these ever actually get passed inputs? Maybe these should
-   be optional too? And then trigger the (potentially expensive) computation? *)
-let array_kind exp (* elt_layout *) =
-  array_type_kind
-    ~elt_layout:None (* Some elt_layout *) ~elt_ty:None
-    exp.exp_env exp.exp_loc exp.exp_type
+let array_kind exp =
+  array_type_kind ~elt_ty:None exp.exp_env exp.exp_loc exp.exp_type
 
-(* CR zeisbach: see comment above *)
-let array_pattern_kind pat (* elt_layout *) =
-  array_type_kind
-    ~elt_layout:None (* Some elt_layout *) ~elt_ty:None
-    pat.pat_env pat.pat_loc pat.pat_type
+let array_pattern_kind pat =
+  array_type_kind ~elt_ty:None pat.pat_env pat.pat_loc pat.pat_type
 
 let bigarray_decode_type env ty tbl dfl =
   match scrape env ty with
@@ -660,10 +649,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
   | Tconstr(p, [arg], _)
     when (Path.same p Predef.path_array
           || Path.same p Predef.path_iarray) ->
-    (* CR zeisbach: the existance of this comment is concerning *)
-    (* CR layouts: [~elt_sort:None] here is bad for performance. To
-       fix it, we need a place to store the sort on a [Tconstr]. *)
-    let ak = array_type_kind ~elt_ty:(Some arg) ~elt_layout:None env loc ty in
+    let ak = array_type_kind ~elt_ty:(Some arg) env loc ty in
     num_nodes_visited, non_nullable (Parrayval ak)
   | Tconstr(p, _, _) -> begin
       (* CR layouts v2.8: The uses of [decl.type_jkind] here are suspect:
@@ -1193,8 +1179,8 @@ let lazy_val_requires_forward env loc ty =
       Jkind_types.Scannable_axes.max
   in
   let classify_product _ layouts =
-    let kind = Jkind_types.Layout.Const.Product layouts in
-    raise (Error (loc, Unsupported_product_in_lazy kind))
+    let layout = Jkind_types.Layout.Const.Product layouts in
+    raise (Error (loc, Unsupported_product_in_lazy layout))
   in
   match classify ~classify_product env ty layout with
   | Any | Lazy -> true

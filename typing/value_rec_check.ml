@@ -619,9 +619,8 @@ let (>>) : bind_judg -> term_judg -> term_judg =
   fun binder term mode -> binder mode (term mode)
 
 (* Compute the appropriate [mode] for an array expression *)
-(* CR zeisbach: after making a decision about elt_sort: reformat! *)
-let array_mode exp (* elt_sort *) =
-  match Typeopt.array_kind exp (* elt_sort *) with
+let array_mode exp =
+  match Typeopt.array_kind exp with
   | Lambda.Pfloatarray ->
     (* (flat) float arrays unbox their elements *)
     Dereference
