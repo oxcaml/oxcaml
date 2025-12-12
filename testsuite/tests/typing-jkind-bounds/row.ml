@@ -328,14 +328,6 @@ type t3 : immediate with [ `A of string] t1 = C of string  (* should be accepted
 (* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 type t3 = C of string
-|}, Principal{|
-Line 1, characters 0-57:
-1 | type t3 : immediate with [ `A of string] t1 = C of string  (* should be accepted *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t3" is immutable_data
-         because it's a boxed variant type.
-       But the kind of type "t3" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t3.
 |}]
 
 type 'a t1 = [> `A of string | `B of int ] as 'a
@@ -355,14 +347,6 @@ type t3 : immediate with [ `A of string | `B of int | `C ] t1 = C of string  (* 
 (* CR layouts v2.8: This should be accepted. Internal ticket 4294 *)
 [%%expect{|
 type t3 = C of string
-|}, Principal{|
-Line 1, characters 0-75:
-1 | type t3 : immediate with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t3" is immutable_data
-         because it's a boxed variant type.
-       But the kind of type "t3" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t3.
 |}]
 
 module type S = sig
@@ -436,10 +420,10 @@ type t2 : immediate with string = M1.t
 Line 1, characters 0-38:
 1 | type t2 : immediate with string = M1.t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t2" is immutable_data
-         because of the annotation on the declaration of the type t2.
-       But the kind of type "t2" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t2.
+Error: The kind of type "M1.t" is value mod non_float
+         because it's a polymorphic variant type.
+       But the kind of type "M1.t" must be a subkind of immutable_data
+         because of the definition of t2 at line 1, characters 0-38.
 |}]
 
 type t2 : value mod portable = M1.t
