@@ -815,7 +815,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
       let mode = transl_alloc_mode alloc_mode in
       let element_sort = Jkind.Sort.default_for_transl_and_get element_sort in
-      let kind = array_kind e (* element_sort *) in
+      let kind = array_kind e in
       let ll =
         transl_list ~scopes
           (List.map (fun e -> (e, element_sort)) expr_list)
@@ -887,13 +887,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let loc = of_location ~scopes e.exp_loc in
       Transl_list_comprehension.comprehension
         ~transl_exp ~scopes ~loc comp
-  | Texp_array_comprehension (_amut, elt_sort, comp) ->
+  | Texp_array_comprehension (_amut, _, comp) ->
       (* We can ignore mutability here since we've already checked in in the
          type checker; both mutable and immutable arrays are created the same
          way *)
       let loc = of_location ~scopes e.exp_loc in
-      let _elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-      let array_kind = Typeopt.array_kind e (* elt_sort *) in
+      let array_kind = Typeopt.array_kind e in
       begin match array_kind with
       | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
       | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ -> ()

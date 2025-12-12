@@ -745,9 +745,8 @@ let rec expression : Typedtree.expression -> term_judg =
       list expression (List.map (fun (_, e, _) -> e) exprs) << Return
     | Texp_atomic_loc (expr, _, _, _, _) ->
       expression expr << Guard
-    | Texp_array (_, elt_sort, exprs, _) ->
-      let _elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-      list expression exprs << array_mode exp (* elt_sort *)
+    | Texp_array (_, _, exprs, _) ->
+      list expression exprs << array_mode exp
     | Texp_idx (ba, _uas) ->
       let block_access = function
         | Baccess_field _ -> empty
@@ -769,9 +768,8 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_list_comprehension { comp_body; comp_clauses } ->
       join ((expression comp_body << Guard) ::
             comprehension_clauses comp_clauses)
-    | Texp_array_comprehension (_, elt_sort, { comp_body; comp_clauses }) ->
-      let _elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-      join ((expression comp_body << array_mode exp (* elt_sort *)) ::
+    | Texp_array_comprehension (_, _, { comp_body; comp_clauses }) ->
+      join ((expression comp_body << array_mode exp) ::
             comprehension_clauses comp_clauses)
     | Texp_construct (_, desc, exprs, _) ->
       let access_constructor =
