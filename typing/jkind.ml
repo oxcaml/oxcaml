@@ -79,30 +79,16 @@ module Sub_result = struct
   let is_le t = require_le t |> Result.is_ok
 end
 
+(* CR zeisbach: refactor after rebasing onto abstract kinds part 1, and don't
+   worry too much about it before hand (split across here and jkind_types which
+   I believe is obviously wrong) *)
 module Scannable_axes = struct
-  type t = Jkind_types.Scannable_axes.t =
-    { nullability : Jkind_axis.Nullability.t;
-      separability : Jkind_axis.Separability.t
-    }
-
-  let max = { nullability = Nullability.max; separability = Separability.max }
-
-  let value_axes = { nullability = Non_null; separability = Separable }
+  include Jkind_types.Scannable_axes
 
   let immediate_axes = { nullability = Non_null; separability = Non_pointer }
 
   let immediate64_axes =
     { nullability = Non_null; separability = Non_pointer64 }
-
-  let equal { nullability = n1; separability = s1 }
-      { nullability = n2; separability = s2 } =
-    Nullability.equal n1 n2 && Separability.equal s1 s2
-
-  let less_or_equal { nullability = n1; separability = s1 }
-      { nullability = n2; separability = s2 } =
-    Misc.Le_result.combine
-      (Nullability.less_or_equal n1 n2)
-      (Separability.less_or_equal s1 s2)
 
   let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
 
@@ -319,14 +305,6 @@ module Layout = struct
             _ ) ->
         false
       | Product _ -> false
-
-    let rec get_sort : t -> Sort.Const.t option = function
-      | Any _ -> None
-      | Base (b, _) -> Some (Base b)
-      | Product ts ->
-        Option.map
-          (fun x -> Sort.Const.Product x)
-          (Misc.Stdlib.List.map_option get_sort ts)
 
     let of_sort s sa =
       let rec of_sort (s : Sort.t) sa =
@@ -1704,6 +1682,14 @@ module Const = struct
         name = "any mod everything"
       }
 
+    let scannable =
+      { jkind =
+          mk_jkind
+            (Base (Scannable, Scannable_axes.max))
+            ~crossing:Crossing.max ~externality:Externality.max;
+        name = "scannable"
+      }
+
     let value_or_null =
       { jkind =
           mk_jkind
@@ -2414,6 +2400,7 @@ module Const = struct
       let jkind_without_sa =
         (match name.txt with
         | "any" -> Builtin.any.jkind
+        | "scannable" -> Builtin.scannable.jkind
         | "value_or_null" -> Builtin.value_or_null.jkind
         | "value" -> Builtin.value.jkind
         | "void" -> Builtin.void.jkind
@@ -2621,6 +2608,8 @@ module Jkind_desc = struct
   module Builtin = struct
     let any = max
 
+    let scannable = of_const Const.Builtin.scannable.jkind
+
     let value_or_null = of_const Const.Builtin.value_or_null.jkind
 
     let value = of_const Const.Builtin.value.jkind
@@ -2711,6 +2700,10 @@ module Builtin = struct
     fresh_jkind Jkind_desc.Builtin.void ~annotation:(mk_annot "void")
       ~why:(Void_creation why)
     |> mark_best
+
+  let scannable ~(why : History.any_creation_reason) =
+    fresh_jkind Jkind_desc.Builtin.scannable ~annotation:(mk_annot "scannable")
+      ~why:(Any_creation why)
 
   let value_or_null ~why =
     match (why : History.value_or_null_creation_reason) with

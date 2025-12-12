@@ -713,10 +713,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 if i <> lbl.lbl_pos then Lambda.generic_value
                 else
                   let pointerness, nullable = maybe_pointer e in
-                  let raw_kind = match pointerness with
-                    | Pointer -> Pgenval
-                    | Immediate -> Pintval
-                  in
+                  let raw_kind = value_kind_of_pointerness pointerness in
                   Lambda.{ raw_kind; nullable })
               ~get_mode:(fun i ->
                 if i <> lbl.lbl_pos then Lambda.alloc_heap
@@ -818,7 +815,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
       let mode = transl_alloc_mode alloc_mode in
       let element_sort = Jkind.Sort.default_for_transl_and_get element_sort in
-      let kind = array_kind e element_sort in
+      let kind = array_kind e in
       let ll =
         transl_list ~scopes
           (List.map (fun e -> (e, element_sort)) expr_list)
@@ -890,13 +887,12 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let loc = of_location ~scopes e.exp_loc in
       Transl_list_comprehension.comprehension
         ~transl_exp ~scopes ~loc comp
-  | Texp_array_comprehension (_amut, elt_sort, comp) ->
+  | Texp_array_comprehension (_amut, _, comp) ->
       (* We can ignore mutability here since we've already checked in in the
          type checker; both mutable and immutable arrays are created the same
          way *)
       let loc = of_location ~scopes e.exp_loc in
-      let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-      let array_kind = Typeopt.array_kind e elt_sort in
+      let array_kind = Typeopt.array_kind e in
       begin match array_kind with
       | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
       | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ -> ()
@@ -2174,9 +2170,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                            let pointerness, nullable =
                              maybe_pointer_type env typ
                            in
-                           let raw_kind = match pointerness with
-                             | Pointer -> Pgenval
-                             | Immediate -> Pintval
+                           let raw_kind =
+                             value_kind_of_pointerness pointerness
                            in
                            Lambda.{ raw_kind; nullable })
                        ~get_mode:(fun _i ->
@@ -2426,10 +2421,7 @@ and transl_idx ~scopes loc env ba uas =
     in
     let index = transl_exp ~scopes index_sort index in
     let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-    let array_kind =
-      array_type_kind ~elt_ty:(Some elt_ty) ~elt_sort:(Some elt_sort) env loc
-        base_ty
-    in
+    let array_kind = array_type_kind ~elt_ty:(Some elt_ty)  env loc base_ty in
     let elt_layout = layout env loc elt_sort elt_ty in
     let mbe = mixed_block_element_of_layout elt_layout in
     (* CR layouts v8: remove this restriction once we stable sort (within) array

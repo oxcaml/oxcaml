@@ -647,11 +647,30 @@ module Sort = struct
   include Static.T
 end
 
+(* CR zeisbach: Having half of scannable_axes in here and the other half in
+   jkind.ml seems quite bad. After rebasing onto abstract kinds part 1, this
+   should be reorganized. *)
 module Scannable_axes = struct
+  open Jkind_axis
+
   type t =
-    { nullability : Jkind_axis.Nullability.t;
-      separability : Jkind_axis.Separability.t
+    { nullability : Nullability.t;
+      separability : Separability.t
     }
+
+  let max = { nullability = Nullability.max; separability = Separability.max }
+
+  let value_axes = { nullability = Non_null; separability = Separable }
+
+  let equal { nullability = n1; separability = s1 }
+      { nullability = n2; separability = s2 } =
+    Nullability.equal n1 n2 && Separability.equal s1 s2
+
+  let less_or_equal { nullability = n1; separability = s1 }
+      { nullability = n2; separability = s2 } =
+    Misc.Le_result.combine
+      (Nullability.less_or_equal n1 n2)
+      (Separability.less_or_equal s1 s2)
 end
 
 module Layout = struct

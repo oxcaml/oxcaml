@@ -15,6 +15,12 @@
 (* This module contains definitions that we do not otherwise need to repeat
    between the various Jkind modules. See comment in jkind_types.mli. *)
 module type Sort = sig
+  (* CR layouts-scannable: The comment below is no longer entirely accurate,
+     after the addition of scannable axes (which are needed when compiling to
+     determine GC behavior).
+     It may be desirable to make a refined data definition that separates "the
+     thing that stores enough info to compiling" (sort + scannable axes, or
+     similarly layout - any) from "the discrete thing used for unification". *)
   (** A sort classifies how a type is represented at runtime. Every concrete
       jkind has a sort, and knowing the sort is sufficient for knowing the
       calling convention of values of a given type. *)
