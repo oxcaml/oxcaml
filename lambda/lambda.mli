@@ -1278,7 +1278,7 @@ val structured_constant_layout : structured_constant -> layout
 
 val mixed_block_element_of_layout : layout -> unit mixed_block_element
 
-(* CR zeisbach: should this be renamed to be consistent with
+(* CR zeisbach for rtjoa: should this be renamed to be consistent with
    [pointerness_of_separability]? should that one be renamed? *)
 (** [Immediate] if a type of [scannable] jkind is GC-ignorable based on its
     provided externality, and [Pointer] otherwise. *)

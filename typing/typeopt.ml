@@ -162,13 +162,12 @@ let classify ~classify_product env ty layout : _ classification =
   let ty = scrape_ty env ty in
   match (layout : Jkind.Layout.Const.t) with
   | Any _ -> Misc.fatal_error "classify called with non-representable layout"
-  | Base (Scannable, { nullability; separability = _ }) -> begin
-  (* CR zeisbach: maybe only call the externality part here and use the
-     separability in the scannable axes? but also, is this the layout of the
-     type? if not, the nullability thing below might be wrong. *)
+  | Base (Scannable, _sa) -> begin
+  (* CR layouts-scannable: Consider using the scannable axes here to avoid
+     these calls. *)
   if Ctype.is_always_gc_ignorable env ty
   then
-    if Jkind_axis.Nullability.(equal nullability Non_null)
+    if Ctype.check_type_nullability env ty Non_null
     then Immediate else Immediate_or_null
   else match get_desc ty with
   | Tvar _ | Tunivar _ ->
@@ -283,9 +282,6 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
 
 let array_kind_of_elt env loc ty =
-  (* CR zeisbach: this will scrape twice (once here, and once in classify).
-     Hopefully scraping a second time is not so expensive. Shifting things
-     around so that classify doesn't scrape seems unnecessary for now. *)
   let ty = scrape_ty env ty in
   let elt_layout = type_layout ~why:Array_element env loc ty in
   let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
@@ -730,13 +726,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
   | _ ->
     let jkind = Ctype.estimate_type_jkind env ty in
     num_nodes_visited,
-    (* CR zeisbach: this probably also wants to take the non_pointerness into
-       account? but only if this branch gets hit for scannable stuff. we don't
-       want to accidentally mess something up for the non-scannables *)
-    (* CR zeisbach: we were already using [add_nullability_from_scannable_jkind]
-       so that would go wrong if the jkind was not scannable. now it's doing
-       this again. think about if the [value_kind_of_scannable_jkind] call is
-       right, and (more importantly!) think if a non-scannable kind can hit. *)
+    (* Since we are in value_kind, the jkind here should be scannable;
+       failing when it is not is appropriate. *)
     add_nullability_from_scannable_jkind jkind
       (value_kind_of_scannable_jkind env jkind)
 
@@ -1171,11 +1162,11 @@ let function_arg_layout env loc sort ty =
 (** Whether a forward block is needed for a lazy thunk on a value, i.e.
     if the value can be represented as a float/forward/lazy *)
 let lazy_val_requires_forward env loc ty =
-  (* CR zeisbach: replace this with the right layout / fix this!
-     IDK how this is even used. The max SA is suspicious. *)
   let layout =
     Jkind.Layout.Const.of_sort_const
       Jkind.Sort.Const.for_lazy_body
+      (* The scannable axes don't matter for the rest of the computation, so
+         setting them to [max] is totally fine. *)
       Jkind_types.Scannable_axes.max
   in
   let classify_product _ layouts =

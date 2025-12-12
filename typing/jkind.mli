@@ -398,9 +398,12 @@ module Builtin : sig
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
 
-  (* CR zeisbach: is any_creation_reason the right thing here? do the others
-     have a notion of dummy? there may be a better way to structure what I
-     have currently *)
+  (* CR zeisbach for rtjoa: It feels a little weird to have this take in an
+     [any_creation_reason] (it's scannable, not any), but none of the other
+     options have [Dummy_jkind] which is the only thing we call this function
+     with. Hard-coding a constant proved to be surprisingly difficult for some
+     confusing reasons (and I'm not even sure that it's better). Curious to
+     hear your thoughts here *)
   val scannable : why:History.any_creation_reason -> 'd Types.jkind
 
   val value_or_null :

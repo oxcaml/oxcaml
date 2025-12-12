@@ -1210,9 +1210,9 @@ val bound_value_identifiers_and_sorts :
 
 val signature_item_id : signature_item -> Ident.t
 
-(* CR zeisbach: These appear to be dead code; check and maybe remove *)
 val equal_mixed_block_element :
   mixed_block_element -> mixed_block_element -> bool
+(* CR layouts: this appears to be dead code *)
 val compare_mixed_block_element :
   mixed_block_element -> mixed_block_element -> int
 val mixed_block_element_to_string : mixed_block_element -> string

@@ -2783,7 +2783,6 @@ let check_type_separability jkind env ty sep =
   | Error _ -> false
 
 let is_always_gc_ignorable env ty =
-  (* CR zeisbach: Liam suggested to make an internal ticket for this? *)
   (* CR layouts: calling [check_type_jkind] two times (indirectly) is sad. *)
   (* CR layouts-scannable: Since we check against [scannable non_pointer(64)],
      a type of kind [value non_pointer & value non_pointer] will fail to be
