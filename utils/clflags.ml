@@ -43,9 +43,11 @@ type open_arg =
   | Open of string
   | Open_cmi of string
 
-let objfiles = ref ([] : string list)   (* .cmo and .cma files *)
-and ccobjs = ref ([] : string list)     (* .o, .a, .so and -cclib -lxxx *)
-and dllibs = ref ([] : string list)     (* .so and -dllib -lxxx *)
+let objfiles = ref ([] : string list)         (* .cmo and .cma files *)
+and ccobjs = ref ([] : string list)           (* .o, .a, .so and -cclib -lxxx *)
+and dllibs = ref ([] : (suffixed:bool * string) list)
+                                              (* .so, -dllib -lxxx and
+                                                 -dllib-suffixed -lxxx *)
 
 let cmi_file = ref None
 
@@ -176,6 +178,12 @@ and noinit = ref false                  (* -noinit *)
 and open_args = ref ([] : open_arg list) (* -open / -open-cmi *)
 and use_prims = ref ""                  (* -use-prims ... *)
 and use_runtime = ref ""                (* -use-runtime ... *)
+and target_bindir =                     (* -launch-method ... *)
+  ref Config.target_bindir
+and launch_method =
+  ref Config.launch_method
+and search_method =                     (* -search-method ... *)
+  ref Config.search_method
 and plugin = ref false                  (* -plugin ... *)
 and principal = ref false               (* -principal *)
 and real_paths = ref true               (* -short-paths *)

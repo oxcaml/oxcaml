@@ -231,9 +231,23 @@ CAMLprim value caml_dynlink_parse_ld_conf(value vstdlib)
    Abort on error. */
 static void open_shared_lib(char_os * name)
 {
-  char_os * realname;
+  char_os * realname, * suffixed = NULL;
   char * u8;
   void * handle;
+
+  if (*name == '\0')
+    caml_fatal_error("corrupt DLLS section");
+
+  if (*name == '-') {
+    char * suffix =
+      caml_stat_strconcat(4, "-", HOST, "-", BYTECODE_RUNTIME_ID);
+    char_os * suffix_os = caml_stat_strdup_to_os(suffix);
+    name = suffixed = caml_stat_strconcat_os(2, name + 1, suffix_os);
+    caml_stat_free(suffix_os);
+    caml_stat_free(suffix);
+  } else {
+    name++;
+  }
 
   realname = caml_search_dll_in_path(&caml_shared_libs_path, name);
   u8 = caml_stat_strdup_of_os(realname);
@@ -251,6 +265,7 @@ static void open_shared_lib(char_os * name)
       caml_dlerror()
     );
   caml_ext_table_add(&shared_libs, handle);
+  caml_stat_free(suffixed);
   caml_stat_free(realname);
 }
 

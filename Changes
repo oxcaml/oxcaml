@@ -23,12 +23,38 @@ OCaml 5.4 maintenance version
   (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez,
    Samuel Hym and Vincent Laviron)
 
+- #14245: Introduce Runtime IDs for use in filename mangling to allow different
+  configurations and different versions of the runtime system to coexist
+  harmoniously on a single system. The IDs are used, along with the host
+  triplet, to provide mangled names for the ocamlrun executable and its variants
+  and the DLL versions of both the bytecode and native runtimes, with symlinks
+  created for the original names. They are also used to mangle the names of stub
+  libraries so that stub libraries compiled for a given configuration of the
+  runtime will only be sought by that runtime. The behaviour is disabled by
+  configuring with --disable-suffixing.
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
+
+### Tools:
+
+- #14245: ocamlobjinfo now displays the runtime invoked by a bytecode
+  executable (either from the RNTM section or by analysing the shebang lines)
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
+
 ### Compiler user-interface and warnings:
 
 - #14244: Add -set-runtime-default option to the compiler, allowing the default
   value of the Standard Library location used by the runtime to be overridden.
   (Antonin Décimo, review by David Allsopp, Jonah Beckford, Damien Doligez and
    Samuel Hym)
+
+- #14245: New option -launch-method for ocamlc allows the method used by a
+  tendered bytecode executable to locate the interpreter to be given explicitly.
+  In particular, it makes it easier to specify the use of the executable
+  launcher on Unix. New option -runtime-search extends the bytecode executable
+  header to be able to search for the runtime interpreter in the directory
+  containing the executable and in PATH rather than relying on a single
+  hard-coded path.
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
 
 ### Internal/compiler-libs changes:
 
@@ -51,6 +77,12 @@ OCaml 5.4 maintenance version
   previously.
   (David Allsopp, review by Jonah Beckford, Antonin Décimo, Damien Doligez and
    Samuel Hym)
+
+- #14245: New --enable-runtime-search configure option controls the
+  -runtime-search option used to build the bytecode binaries in the compiler
+  distribution. --enable-runtime-search-target controls the default value of
+  -runtime-search used for bytecode executables produced by the compiler.
+  (David Allsopp, review by Damien Doligez and Samuel Hym)
 
 ### Bug fixes:
 

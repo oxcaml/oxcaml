@@ -19,6 +19,7 @@
    than compiled on its own *)
 
 let bindir = {@QS@|@ocaml_bindir@|@QS@}
+let target_bindir = {@QS@|@TARGET_BINDIR@|@QS@}
 
 let ccomp_type = {@QS@|@ccomp_type@|@QS@}
 let c_compiler = {@QS@|@CC@|@QS@}
@@ -74,6 +75,9 @@ let afl_instrument = @afl@
 let stack_allocation = @stack_allocation@
 let poll_insertion = @poll_insertion@
 
+let bytecode_runtime_id = {@QS@|@bytecode_runtime_id@|@QS@}
+let native_runtime_id = {@QS@|@native_runtime_id@|@QS@}
+
 let native_compiler = @native_compiler@
 
 let architecture = {@QS@|@arch@|@QS@}
@@ -116,6 +120,7 @@ let no_stack_checks = "@enable_stack_checks@" <> "yes"
 let multidomain = "@enable_multidomain@" = "yes"
 
 let tsan = @tsan@
+<<<<<<< OxCaml
 
 let shebangscripts = @shebangscripts@
 
@@ -155,3 +160,12 @@ let objcopy = {@QS@|@objcopy@|@QS@}
 let oxcaml_dwarf = "@enable_oxcaml_dwarf@" = "yes"
 
 let default_keyword_edition = @default_keyword_edition@
+||||||| Upstream OCaml
+=======
+
+let suffixing = @suffixing@
+
+let launch_method = {@QS@|@launch_method_target@|@QS@}
+
+let search_method = {@QS@|@runtime_search_target@|@QS@}
+>>>>>>> ocaml/ocaml#14245
