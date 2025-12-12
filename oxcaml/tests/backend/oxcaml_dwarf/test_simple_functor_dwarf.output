@@ -13,7 +13,7 @@
     frame #N: <ADDRESS> test_simple_functor_dwarf.exe`Test_simple_functor_dwarf.f_string_store(x=[] : StringStore.t @ value)
     frame #N: <ADDRESS> test_simple_functor_dwarf.exe`Test_simple_functor_dwarf.f_string_store(x=(:: ({ key = "key1"; value = 100 }, [])) : StringStore.t @ value)
     frame #N: <ADDRESS> test_simple_functor_dwarf.exe`Test_simple_functor_dwarf.f_string_store(x=(:: ({ key = "key2"; value = 200 }, (:: ({ key = "key1"; value = 100 }, [])))) : StringStore.t @ value)
-    frame #N: <ADDRESS> test_simple_functor_dwarf.exe`Test_simple_functor_dwarf.f_set_operations [inlined] Test_simple_functor_dwarf.MakeSet.size
+    frame #N: <ADDRESS> test_simple_functor_dwarf.exe`Test_simple_functor_dwarf.f_set_operations [inlined] Test_simple_functor_dwarf.MakeSet.mem
     frame #N: <ADDRESS> test_simple_functor_dwarf.exe`Test_simple_functor_dwarf.f_store_operations(store=(:: ({ key = 2; value = 200 }, (:: ({ key = 1; value = 100 }, [])))) : IntStore.t @ value)
     frame #N: <ADDRESS> test_simple_functor_dwarf.exe`Test_simple_functor_dwarf.f_int_compute_result(x={ value = 42; computed = 6.28; status = `Success } : IntCompute.result @ value)
     frame #N: <ADDRESS> test_simple_functor_dwarf.exe`Test_simple_functor_dwarf.f_int_compute_result(x={ value = 0; computed = 3.14; status = `Success } : IntCompute.result @ value)
