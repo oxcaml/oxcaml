@@ -38,7 +38,14 @@ module Scoped_location : sig
 
   val empty_scopes : scopes
   val enter_anonymous_function :
-    scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> scopes
+    scopes:scopes ->
+    assume_zero_alloc:ZA.Assume_info.t ->
+    loc:Location.t ->
+    scopes
+  val enter_anonymous_module :
+    scopes:scopes ->
+    loc:Location.t ->
+    scopes
   val enter_value_definition :
     scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> Ident.t -> scopes
   val enter_compilation_unit : scopes:scopes -> Compilation_unit.t -> scopes
