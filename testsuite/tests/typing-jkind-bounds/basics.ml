@@ -1967,3 +1967,18 @@ module type Result =
   end
 module Test : functor (A : S_portable) -> Result
 |}]
+
+module Id(A : sig type t : value end) : sig type t : value = A.t end = struct
+  type t = A.t
+end
+
+module M = struct
+  type t : value mod portable
+end
+
+module S : sig type t : value mod portable end = Id(M)
+[%%expect{|
+module Id : functor (A : sig type t end) -> sig type t = A.t end
+module M : sig type t : value mod portable end
+module S : sig type t : value mod portable end
+|}]
