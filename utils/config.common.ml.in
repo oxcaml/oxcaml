@@ -20,7 +20,25 @@
 (* The main OCaml version string has moved to ../build-aux/ocaml_version.m4 *)
 let version = Sys.ocaml_version
 
+<<<<<<< OxCaml
 let standard_library_default_raw = standard_library_default ()
+||||||| Upstream OCaml
+let standard_library_default_raw = standard_library_default
+
+external stdlib_dirs : string -> string * string option
+   = "caml_sys_get_stdlib_dirs"
+=======
+(* is_official_release and release_number are automatically updated autoconf
+   from values in ../build-aux/ocaml_version.m4 - do not edit these lines
+   directly. *)
+let is_official_release = false
+let release_number = 20
+
+let standard_library_default_raw = standard_library_default
+
+external stdlib_dirs : string -> string * string option
+   = "caml_sys_get_stdlib_dirs"
+>>>>>>> ocaml/ocaml#14245
 
 let standard_library_default, relative_root_dir =
   stdlib_dirs standard_library_default_raw
@@ -41,6 +59,11 @@ let standard_library =
     standard_library_default
 
 let bindir = Option.value ~default:bindir relative_root_dir
+let target_bindir =
+  if target_bindir = Filename.current_dir_name then
+    Filename.dirname Sys.executable_name
+  else
+    target_bindir
 
 let exec_magic_number = {magic|@EXEC_MAGIC_NUMBER@|magic}
     (* exec_magic_number is duplicated in runtime/caml/exec.h *)
@@ -64,6 +87,21 @@ let naked_pointers = false
 let flambda_backend = true
 let oxcaml = true
 let parameterised_modules = true
+
+type launch_method = Executable | Shebang of string option
+type search_method = Disable | Fallback | Enable
+
+let launch_method =
+  match launch_method with
+  | "exe" -> Executable
+  | "sh" -> Shebang None
+  | _ -> Shebang (Some launch_method)
+
+let search_method =
+  match search_method with
+  | "enable" -> Enable
+  | "fallback" -> Fallback
+  | _ -> Disable
 
 let interface_suffix = ref ".mli"
 
@@ -152,6 +190,8 @@ let configuration_variables () =
   p_bool "systhread_supported" systhread_supported;
   p "host" host;
   p "target" target;
+  p "bytecode_runtime_id" bytecode_runtime_id;
+  p "native_runtime_id" native_runtime_id;
   p_bool "flambda" flambda;
   p_bool "flambda2" flambda2;
   p_bool "safe_string" safe_string;

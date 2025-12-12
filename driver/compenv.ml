@@ -798,7 +798,7 @@ type deferred_action =
   | ProcessCFile of string
   | ProcessOtherFile of string
   | ProcessObjects of string list
-  | ProcessDLLs of string list
+  | ProcessDLLs of bool * string list
 
 let c_object_of_filename name =
   Filename.chop_suffix (Filename.basename name) ".c" ^ Config.ext_obj
@@ -836,12 +836,22 @@ let process_action
         ccobjs := obj_name :: !ccobjs
       end
   | ProcessObjects names ->
+<<<<<<< OxCaml
       if Clflags.target_is_jsir () then
         List.iter (fun name -> warn_jsir_ignore ("-cclib " ^ name)) names
       else
         ccobjs := names @ !ccobjs
   | ProcessDLLs names ->
       dllibs := names @ !dllibs
+||||||| Upstream OCaml
+      ccobjs := names @ !ccobjs
+  | ProcessDLLs names ->
+      dllibs := names @ !dllibs
+=======
+      ccobjs := names @ !ccobjs
+  | ProcessDLLs (suffixed, names) ->
+      dllibs := (List.map (fun n -> (~suffixed, n)) names) @ !dllibs
+>>>>>>> ocaml/ocaml#14245
   | ProcessOtherFile name ->
       if !Clflags.functorize then
         (* Anonymous args are module names, not filepaths. *)
@@ -859,6 +869,7 @@ let process_action
         has_linker_inputs := true;
         ccobjs := name :: !ccobjs
       end
+<<<<<<< OxCaml
       else if Filename.check_suffix name Config.ext_obj
            || Filename.check_suffix name Config.ext_lib then begin
         if Clflags.target_is_jsir () then
@@ -871,6 +882,13 @@ let process_action
       else if not (target_is_native ())
            && Filename.check_suffix name Config.ext_dll then
         dllibs := name :: !dllibs
+||||||| Upstream OCaml
+      else if not !native_code && Filename.check_suffix name Config.ext_dll then
+        dllibs := name :: !dllibs
+=======
+      else if not !native_code && Filename.check_suffix name Config.ext_dll then
+        dllibs := (~suffixed:false, name) :: !dllibs
+>>>>>>> ocaml/ocaml#14245
       else
         match Compiler_pass.of_input_filename name with
         | Some start_from ->
