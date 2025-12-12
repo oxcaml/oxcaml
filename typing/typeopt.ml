@@ -104,14 +104,16 @@ let maybe_pointer_type env ty =
 
 let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 
-(* CR layouts v2.8: Calling [type_sort] in [typeopt] is not ideal
-   and this function should be removed at some point. To do that, there
-   needs to be a way to store sort vars on [Tconstr]s. That means
-   either introducing a [Tpoly_constr], allow type parameters with
-   sort info, or do something else. Internal ticket 5093. *)
+(* CR layouts-scannable: calling [type_jkind] here in [typeopt] is not ideal.
+   Removing this function requires more careful tracking of representable
+   layouts in the typedtree (see [Sort] comment in [jkind_intf.ml]).
+
+   This function also may mutate [ty] to constrain its jkind (see below);
+   this is yet another reason why this function could use some attention.
+   Internal ticket 5093 (which references the former name, [type_sort]). *)
 (* CR layouts v3.0: have a better error message
    for nullable jkinds.*)
-let type_layout ~why env loc ty =
+let type_representable_layout ~why env loc ty =
   let jkind = Ctype.type_jkind env ty in
   match Jkind.get_layout_defaulting_to_scannable jkind with
   (* Surprisingly, it is possible to reach this branch; for example, when
@@ -134,7 +136,7 @@ let type_layout ~why env loc ty =
       | Any _ -> Misc.fatal_error
                    "called type_sort but didn't get a representable layout"
       | layout -> layout)
-    (* It seems as if this branch is never reached *)
+    (* CR layouts: It seems as if this is unreachable (see ticket above). *)
     | Error err -> raise (Error (loc, Not_a_sort (ty, err))))
   | layout -> layout
 
@@ -283,7 +285,7 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
 
 let array_kind_of_elt env loc ty =
   let ty = scrape_ty env ty in
-  let elt_layout = type_layout ~why:Array_element env loc ty in
+  let elt_layout = type_representable_layout ~why:Array_element env loc ty in
   let elt_ty_for_error = ty in (* report the un-scraped ty in errors *)
   let classify_product ty sorts =
     if Ctype.is_always_gc_ignorable env ty then
