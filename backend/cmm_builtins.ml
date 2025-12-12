@@ -1230,6 +1230,7 @@ let transl_builtin name args dbg typ_res =
   | "caml_bigstring_compare_and_swap_int32_unboxed" ->
     bigstring_cas Thirtytwo (four_args name args) dbg
   | "caml_pause_hint" -> Some (Cop (Cpause, args, dbg))
+  (* vector load/store *)
   | "caml_vec128_load_aligned" ->
     Some (Cop (mk_load_mut Onetwentyeight_aligned, args, dbg))
   | "caml_vec128_load_unaligned" ->
