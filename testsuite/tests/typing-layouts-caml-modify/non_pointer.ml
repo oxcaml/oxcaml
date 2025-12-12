@@ -183,3 +183,43 @@ let () =
       let arr = [| (Mnpval.mk 1 "a") |] in
       set arr 0 (Mnpval.mk 2 "b");
       ignore (Sys.opaque_identity arr))
+
+(* interaction with mixed modules *)
+module type MT = sig
+  type t : value non_pointer & value
+  val t1 : t
+  val t2 : t
+end
+
+let () =
+  let module M : MT = struct
+    type t = #{ x : int; y : string }
+    let t1 = #{ x = 1; y = "a" }
+    let t2 = #{ x = 2; y = "b" }
+  end in
+  let open struct
+    type t = { mutable x : M.t }
+  end in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      let outer = { x = M.t1 } in
+      outer.x <- M.t2;
+      ignore (Sys.opaque_identity outer))
+
+let () =
+  let m =
+    (module struct
+      type t = #{ x : int; y : string }
+      let t1 = #{ x = 1; y = "a" }
+      let t2 = #{ x = 2; y = "b" }
+    end : MT)
+  in
+  let module M = (val m : MT) in
+  let open struct
+    type t = { mutable x : M.t }
+  end in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      let outer = { x = M.t1 } in
+      outer.x <- M.t2;
+      ignore (Sys.opaque_identity outer))

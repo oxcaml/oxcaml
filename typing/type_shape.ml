@@ -30,10 +30,10 @@
 
 module Uid = Shape.Uid
 
-(* CR layouts-scannable: As noted on the CR on [Sort] in [jkind.ml], a sort no
-   longer contains sufficient information to compile: it's missing the scannable
-   axes! Once a better data definition for tracking this is added, the meaning
-   of [Layout] below perhaps should change as well. *)
+(* CR layouts-scannable: As noted on the CR on [Sort] in [jkind_intf.ml], a
+   sort no longer contains sufficient information to compile: it's missing the
+   scannable axes! Once a better data definition for tracking this is added,
+   the meaning of [Layout] below perhaps should change as well. *)
 module Layout = Jkind_types.Sort.Const
 
 type base_layout = Jkind_types.Sort.base

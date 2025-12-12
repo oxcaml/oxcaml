@@ -1498,6 +1498,10 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
     Pmixedfield([pos], shape_for_read, read_semantics)
 
 let transl_module_representation repr =
+  (* CR zeisbach for rtjoa:  *)
+  (* CR layouts-scannable: the shape here is potentially an underapproximation,
+     since the scannable axes in [shape] will all be [max]. This does not appear
+     to matter though,  *)
   let shape =
     Array.map
       (fun sort ->

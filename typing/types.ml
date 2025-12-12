@@ -1071,14 +1071,13 @@ let record_form_to_string (type rep) (record_form : rep record_form) =
   | Legacy -> "record"
   | Unboxed_product -> "unboxed record"
 
-(* CR zeisbach: consdier making this take a layout, see what breaks *)
+(* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
-  (* CR zeisbach
-     the fact that this uses a sort const and not a layout const is unfortunate
-     because we don't have enough scannable axis information. probably change
-     this?? but that might break a lot of things... it also yet again
-     introduces the problem of having to deal with sort products vs layout *)
+  (* CR layouts-scannable: since sorts do not store scannable axis information,
+     we are forced to default to max. It would be good to store the scannable
+     axis information, but doing so takes a sizable refactor. See the comment
+     on [Sort] in [jkind_intf.ml] *)
   | Base Scannable -> Scannable Jkind_types.Scannable_axes.max
   | Base Bits8 -> Bits8
   | Base Bits16 -> Bits16
