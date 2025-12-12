@@ -1674,3 +1674,11 @@ let f = function #false -> #true | #true -> #false
 [%%expect{|
 val f : bool# -> bool# = <fun>
 |}]
+
+(***********************)
+(* layout polymorphism *)
+
+let f (_ : (repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) = ()
+[%%expect{|
+val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) -> unit = <fun>
+|}]
