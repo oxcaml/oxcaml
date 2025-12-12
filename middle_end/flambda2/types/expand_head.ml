@@ -67,6 +67,8 @@ module Expanded_type : sig
 
   val is_unknown : t -> bool
 
+  val is_unknown_maybe_null : t -> bool
+
   val to_type : t -> Type_grammar.t
 
   type descr = private
@@ -214,6 +216,17 @@ end = struct
 
   let is_unknown t =
     match t.descr with Unknown -> true | Bottom | Ok _ -> false
+
+  let is_unknown_maybe_null t =
+    match t.descr with
+    | Unknown | Ok (Value { is_null = _; non_null = Unknown }) -> true
+    | Bottom
+    | Ok
+        ( Value _ | Naked_immediate _ | Naked_float32 _ | Naked_float _
+        | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
+        | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
+        | Rec_info _ | Region _ ) ->
+      false
 
   let of_non_alias_type ?coercion ty : t =
     match TG.descr ty with
@@ -505,6 +518,8 @@ let expand_head env ty =
 let is_bottom env t = ET.is_bottom (expand_head env t)
 
 let is_unknown env t = ET.is_unknown (expand_head env t)
+
+let is_unknown_maybe_null env t = ET.is_unknown_maybe_null (expand_head env t)
 
 let is_alias_to_a_symbol t =
   match TG.get_alias_opt t with

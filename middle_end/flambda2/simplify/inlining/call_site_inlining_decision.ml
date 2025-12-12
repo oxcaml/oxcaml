@@ -137,7 +137,7 @@ let argument_types_useful dacc apply =
         Simple.pattern_match simple
           ~name:(fun name ~coercion:_ ->
             let ty = TE.find typing_env name None in
-            not (T.is_unknown typing_env ty))
+            not (T.is_unknown_maybe_null typing_env ty))
           ~const:(fun _ -> true))
       (Apply.args apply)
 

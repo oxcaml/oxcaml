@@ -867,7 +867,7 @@ L201:
   %69 = ptrtoint ptr @camlAlloc__const_block115 to i64
   store i64 %69, ptr %12
   store i64 1, ptr %13
-  %70 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521 to i64
+  %70 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_501 to i64
   store i64 %70, ptr %14
   %71 = load i64, ptr %14
   store i64 %71, ptr %4
@@ -940,7 +940,7 @@ L205:
   %110 = ptrtoint ptr @camlAlloc__const_block127 to i64
   store i64 %110, ptr %23
   store i64 1, ptr %24
-  %111 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521 to i64
+  %111 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_501 to i64
   store i64 %111, ptr %25
   %112 = load i64, ptr %25
   store i64 %112, ptr %4
@@ -1054,7 +1054,7 @@ L209:
   %175 = ptrtoint ptr @camlAlloc__const_block138 to i64
   store i64 %175, ptr %48
   store i64 1, ptr %49
-  %176 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521 to i64
+  %176 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_501 to i64
   store i64 %176, ptr %50
   %177 = load i64, ptr %50
   store i64 %177, ptr %4
@@ -1167,7 +1167,7 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @header.camlAlloc__const_block111 = global i64 2828, section ".data", align 8
 @camlAlloc__const_block111 = global { i64, i64 } { i64 21, i64 1 }, section ".data", align 8
 @camlCamlinternalFormat__make_printf_HIDE_STAMP = external global ptr
-@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_521 = external global ptr
+@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1450$2c4$2d$2d59$5d_501 = external global ptr
 @caml_apply2 = external global ptr
 @caml_call_gc = external global ptr
 @caml_call_local_realloc = external global ptr
