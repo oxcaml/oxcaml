@@ -796,16 +796,20 @@ let tpoly_is_mono ty =
   match get_desc ty with
   | Tpoly(_, []) -> true
   | Tpoly(_, _ :: _) -> false
+  | Trepr(_, []) -> true
+  | Trepr(_, _ :: _) -> false
   | _ -> assert false
 
 let tpoly_get_poly ty =
   match get_desc ty with
   | Tpoly(ty, vars) -> (ty, vars)
+  | Trepr(ty, vars) -> (ty, vars)
   | _ -> assert false
 
 let tpoly_get_mono ty =
   match get_desc ty with
   | Tpoly(ty, []) -> ty
+  | Trepr(ty, []) -> ty
   | _ -> assert false
 
                   (**********)
