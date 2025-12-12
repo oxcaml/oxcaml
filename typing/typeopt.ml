@@ -161,7 +161,7 @@ type 'a classification =
 let classify ~classify_product env ty layout : _ classification =
   let ty = scrape_ty env ty in
   match (layout : Jkind.Layout.Const.t) with
-  | Any _ -> failwith "CR zeisbach:"
+  | Any _ -> Misc.fatal_error "classify called with non-representable layout"
   | Base (Scannable, { nullability; separability = _ }) -> begin
   (* CR zeisbach: maybe only call the externality part here and use the
      separability in the scannable axes? but also, is this the layout of the
@@ -246,7 +246,8 @@ let rec scannable_product_array_kind elt_ty_for_error loc layouts =
 and sort_to_scannable_product_element_kind elt_ty_for_error loc
       (layout : Jkind.Layout.Const.t) =
   match layout with
-  | Any _ -> failwith "CR zeisbach:"
+  | Any _ -> Misc.fatal_error "sort_to_scannable_product_element_kind called \
+                               with non-representable layout"
   | Base (Scannable, { separability; _ }) ->
       let open Jkind_axis.Separability in
       if le separability (upper_bound_if_is_always_gc_ignorable ())
@@ -264,7 +265,8 @@ let rec ignorable_product_array_kind loc sorts =
 
 and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   match layout with
-  | Any _ -> failwith "CR zeisbach:"
+  | Any _ -> Misc.fatal_error "sort_to_ignorable_product_element_kind called \
+                               with non-representable layout"
   (* Scannable axes are irrelevant, since we already know we can ignore *)
   | Base (Scannable, _sa) -> Pint_ignorable
   | Base (Float64, _) -> Punboxedfloat_ignorable Unboxed_float64

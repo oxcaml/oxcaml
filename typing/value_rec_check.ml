@@ -789,8 +789,6 @@ let rec expression : Typedtree.expression -> term_judg =
             | Constructor_uniform_value -> Guard
             | Constructor_mixed mixed_shape ->
                 (match mixed_shape.(i) with
-                 (* CR zeisbach: what is [Guard] and also what does this do?
-                    Do the new scannable axes have anything relevant?? *)
                  | Scannable _ | Float_boxed -> Guard
                  | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
                  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
@@ -819,7 +817,6 @@ let rec expression : Typedtree.expression -> term_judg =
           | Record_inlined (_, Constructor_mixed mixed_shape, _)
           | Record_mixed mixed_shape ->
             (match mixed_shape.(i) with
-             (* CR zeisbach: see the CR above *)
              | Scannable _ | Float_boxed -> Guard
              | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
              | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
