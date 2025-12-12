@@ -536,6 +536,15 @@ val no_overflow_lsl: int -> int -> bool
        (** [no_overflow_lsl n k] returns [true] if the computation of
            [n lsl k] does not overflow. *)
 
+val map_equal_iter_find :
+  iter:(('key -> 'a -> unit) -> 'map -> unit) ->
+  cardinal:('map -> int) ->
+  find:('key -> 'map -> 'a) ->
+  ('a -> 'a -> bool) -> 'map -> 'map -> bool
+(** Map equality using O(n * log n) iter + find algorithm. Should typically
+    allocate less than Map.equal but have longer execution times. [find] must
+    raise [Not_found] when the key is not present. *)
+
 val letter_of_int : int -> string
 
 module Int_literal_converter : sig

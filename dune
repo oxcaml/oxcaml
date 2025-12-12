@@ -151,6 +151,7 @@
   config
   build_path_prefix_map
   misc
+  hashing
   identifiable
   numbers
   arg_helper
@@ -677,6 +678,8 @@
   dwarf_reg_locations
   dwarf_state
   dwarf_variables_and_parameters
+  runtime_shape
+  complex_shape
   dwarf_type
   ;; optcomp/
   linkenv
