@@ -612,9 +612,6 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
             let uacc =
               UA.notify_removed ~operation:Removed_operations.branch uacc
             in
-            let not_scrutinee = Variable.create "not_scrutinee" K.value in
-            let not_scrutinee_duid = Flambda_debug_uid.none in
-            let not_scrutinee' = Simple.var not_scrutinee in
             let tagging_prim : P.t = Unary (Tag_immediate, scrutinee) in
             match
               find_cse_simple dacc_before_switch (UA.required_names uacc)
@@ -622,34 +619,18 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
             with
             | None -> normal_case uacc
             | Some tagged_scrutinee ->
-              (* CR bclement: look it up in CSE environment *)
-              let do_tagging =
-                Named.create_prim
-                  (P.Unary (Boolean_not, tagged_scrutinee))
-                  Debuginfo.none
-              in
-              let bound =
-                VB.create not_scrutinee not_scrutinee_duid NM.normal
-                |> Bound_pattern.singleton
-              in
-              let apply_cont =
-                Apply_cont.create dest ~args:[not_scrutinee'] ~dbg
-              in
-              let body = RE.create_apply_cont apply_cont in
-              let free_names_of_body = Apply_cont.free_names apply_cont in
-              let expr =
-                RE.create_let
-                  (UA.are_rebuilding_terms uacc)
-                  bound do_tagging ~body ~free_names_of_body
-              in
-              let uacc =
-                UA.add_free_names uacc
-                  (NO.union
-                     (Named.free_names do_tagging)
-                     (NO.diff free_names_of_body
-                        ~without:(NO.singleton_variable not_scrutinee NM.normal)))
-              in
-              expr, uacc)
+              run uacc ~dacc_before_switch
+                (let not_prim : P.t = Unary (Boolean_not, tagged_scrutinee) in
+                 let$ not_scrutinee =
+                   bound_prim "not_scrutinee" K.value not_prim dbg
+                 in
+                 let apply_cont =
+                   Apply_cont.create dest ~args:[not_scrutinee] ~dbg
+                 in
+                 let free_names = Apply_cont.free_names apply_cont in
+                 let added_code_size = Code_size.apply_cont apply_cont in
+                 return ~added_code_size ~free_names
+                   (RE.create_apply_cont apply_cont)))
           | None -> normal_case uacc))
   in
   let uacc, expr = EB.bind_let_conts uacc ~body new_let_conts in
