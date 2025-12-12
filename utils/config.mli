@@ -23,6 +23,16 @@
 val version: string
 (** The current version number of the system *)
 
+val release_number: int
+(** The release number for the compiler
+
+    @since 5.5 *)
+
+val is_official_release: bool
+(** True if the compiler is an unmodified official OCaml release
+
+    @since 5.5 *)
+
 val bindir: string
 (** The directory containing the binary programs. If the compiler was configured
     with [--with-relative-libdir] then this will be the directory containing the
@@ -32,6 +42,11 @@ val standard_library_relative: string option
 (** The explicit relative path from the compiler binaries to the standard
     libraries directory if the compiler was configured with
     [--with-relative-libdir], or [None] otherwise.
+
+    @since 5.5 *)
+
+val target_bindir: string
+(** The directory containing the runtime binaries on the target system
 
     @since 5.5 *)
 
@@ -426,6 +441,7 @@ val multidomain : bool
 val tsan : bool
 (** Whether ThreadSanitizer instrumentation is enabled *)
 
+<<<<<<< OxCaml
 val shebangscripts : bool
 (** Whether the target supports shebang scripts
 
@@ -437,6 +453,60 @@ val parameterised_modules : bool
 val syntax_quotations : bool
 (** Whether quote [<[_]>] and splice [$] syntax is enabled. *)
 
+||||||| Upstream OCaml
+=======
+(** Launch mechanisms for bytecode executables
+
+    @since 5.5 *)
+type launch_method =
+| Executable
+    (** Use the executable launcher stub *)
+| Shebang of string option
+    (** Use a shebang-style launcher. Whenever possible, the interpreter will be
+        the runtime itself, but if the path to the runtime is not valid for a
+        shebang line, then a shell script is generated. When this is necessary,
+        the parameter in [Shebang (Some sh)] is the full path to [sh]; if the
+        parameter is [None], then the linker searches PATH for [sh]. *)
+
+val launch_method : launch_method
+(** Default launch mechanism for bytecode executables
+
+    @since 5.5 *)
+
+(** Mechanisms used by tendered bytecode executables to locate the interpreter
+
+    @since 5.5 *)
+type search_method =
+| Disable
+    (** Interpreter searching disabled - check fixed absolute location only *)
+| Fallback
+    (** Check fixed absolute location first, but fall back to a search if that
+        fails *)
+| Enable
+    (** Always search for the interpreter *)
+
+val search_method : search_method
+(** Default search mechanism for bytecode executables
+
+    @since 5.5 *)
+
+val suffixing : bool
+(** Whether the runtime executable and shared library filenames and C stub
+    library filenames are being mangled with Runtime IDs and the {!target}.
+
+    @since 5.5 *)
+
+val bytecode_runtime_id : string
+(** The Runtime ID for this build of the bytecode runtime system
+
+    @since 5.5 *)
+
+val native_runtime_id : string
+(** The Runtime ID for this build of the native runtime system
+
+    @since 5.5 *)
+
+>>>>>>> ocaml/ocaml#14245
 (** Access to configuration values *)
 val print_config : out_channel -> unit
 

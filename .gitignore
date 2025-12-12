@@ -135,6 +135,7 @@ ocaml/primitives.new
 
 /bytecomp/opcodes.ml
 /bytecomp/opcodes.mli
+/bytecomp/byterntm.ml
 
 /debugger/debugger_lexer.ml
 /debugger/debugger_parser.ml
@@ -308,13 +309,10 @@ ocaml/primitives.new
 /runtime/build_config.h
 /runtime/sak
 
-/stdlib/runtime.info
 /stdlib/runtime-launch-info
 /stdlib/labelled-*
 /stdlib/caml
 /stdlib/sys.ml
-/stdlib/target_runtime.info
-/stdlib/target_runtime-launch-info
 
 /testsuite/**/*.result
 /testsuite/**/*.opt_result
@@ -328,6 +326,7 @@ ocaml/primitives.new
 /testsuite/_retries
 
 /testsuite/tools/codegen
+/testsuite/tools/poisonedruntime
 /testsuite/tools/expect
 /testsuite/tools/lexcmm.ml
 /testsuite/tools/parsecmm.ml

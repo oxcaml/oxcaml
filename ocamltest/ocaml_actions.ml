@@ -624,7 +624,9 @@ let mklib log env =
     Ocaml_commands.ocamlrun_ocamlmklib;
     "-ocamlc '" ^ ocamlc_command ^ "'";
     "-o " ^ program
-  ] @ modules env in
+  ] @ (if Ocamltest_config.suffixing then ["-suffixed"] else [])
+    @ modules env
+  in
   let expected_exit_status = 0 in
   let exit_status =
     Actions_helpers.run_cmd

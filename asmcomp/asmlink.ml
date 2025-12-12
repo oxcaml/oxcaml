@@ -42,6 +42,7 @@ type unit_link_info = Linkenv.unit_link_info =
   }
 
 let runtime_lib () =
+<<<<<<< OxCaml
   let variant =
     if !Clflags.runtime_variant = "nnp" then "" else !Clflags.runtime_variant
   in
@@ -51,6 +52,159 @@ let runtime_lib () =
     then []
     else [Load_path.find libname]
   with Not_found -> raise (Linkenv.Error (File_not_found libname))
+||||||| Upstream OCaml
+  let libname = "libasmrun" ^ !Clflags.runtime_variant ^ ext_lib in
+  try
+    if !Clflags.nopervasives || not !Clflags.with_runtime then []
+    else [ Load_path.find libname ]
+  with Not_found ->
+    raise(Error(File_not_found libname))
+
+(* First pass: determine which units are needed *)
+
+type file =
+  | Unit of string * unit_infos * Digest.t
+  | Library of string * library_infos
+
+let object_file_name_of_file = function
+  | Unit (fname, _, _) -> Some (Filename.chop_suffix fname ".cmx" ^ ext_obj)
+  | Library (fname, infos) ->
+      let obj_file = Filename.chop_suffix fname ".cmxa" ^ ext_lib in
+      (* MSVC doesn't support empty .lib files, and macOS struggles to make
+         them (#6550), so there shouldn't be one if the .cmxa contains no
+         units. The file_exists check is added to be ultra-defensive for the
+         case where a user has manually added things to the .a/.lib file *)
+      if infos.lib_units = [] && not (Sys.file_exists obj_file) then None else
+      Some obj_file
+
+let read_file obj_name =
+  let file_name =
+    try
+      Load_path.find obj_name
+    with Not_found ->
+      raise(Error(File_not_found obj_name)) in
+  if Filename.check_suffix file_name ".cmx" then begin
+    (* This is a .cmx file. It must be linked in any case.
+       Read the infos to see which modules it requires. *)
+    let (info, crc) = read_unit_info file_name in
+    Unit (file_name,info,crc)
+  end
+  else if Filename.check_suffix file_name ".cmxa" then begin
+    let infos =
+      try read_library_info file_name
+      with Compilenv.Error(Not_a_unit_info _) ->
+        raise(Error(Not_an_object_file file_name))
+    in
+    Library (file_name,infos)
+  end
+  else raise(Error(Not_an_object_file file_name))
+
+let scan_file ldeps file tolink = match file with
+  | Unit (file_name,info,crc) ->
+      (* This is a .cmx file. It must be linked in any case. *)
+      Linkdeps.add ldeps
+        ~filename:file_name ~compunit:info.ui_name
+        ~provides:[info.ui_name]
+        ~requires:(List.map fst info.ui_imports_cmx);
+      (info, file_name, crc) :: tolink
+  | Library (file_name,infos) ->
+      (* This is an archive file. Each unit contained in it will be linked
+         in only if needed. *)
+      add_ccobjs (Filename.dirname file_name) infos;
+      List.fold_right
+        (fun (info, crc) reqd ->
+           if info.ui_force_link
+           || !Clflags.link_everything
+           || Linkdeps.required ldeps info.ui_name
+           then begin
+             Linkdeps.add ldeps
+               ~filename:file_name ~compunit:info.ui_name
+               ~provides:[info.ui_name]
+               ~requires:(List.map fst info.ui_imports_cmx);
+             (info, file_name, crc) :: reqd
+           end else
+           reqd)
+        infos.lib_units tolink
+=======
+  if !Clflags.runtime_variant = "_shared" then
+    if Config.suffixing then
+      [Misc.RuntimeID.shared_runtime Sys.Native]
+    else
+      ["-lasmrun_shared"]
+  else
+    let libname = "libasmrun" ^ !Clflags.runtime_variant ^ ext_lib in
+    try
+      if !Clflags.nopervasives || not !Clflags.with_runtime then []
+      else [ Load_path.find libname ]
+    with Not_found ->
+      raise(Error(File_not_found libname))
+
+(* First pass: determine which units are needed *)
+
+type file =
+  | Unit of string * unit_infos * Digest.t
+  | Library of string * library_infos
+
+let object_file_name_of_file = function
+  | Unit (fname, _, _) -> Some (Filename.chop_suffix fname ".cmx" ^ ext_obj)
+  | Library (fname, infos) ->
+      let obj_file = Filename.chop_suffix fname ".cmxa" ^ ext_lib in
+      (* MSVC doesn't support empty .lib files, and macOS struggles to make
+         them (#6550), so there shouldn't be one if the .cmxa contains no
+         units. The file_exists check is added to be ultra-defensive for the
+         case where a user has manually added things to the .a/.lib file *)
+      if infos.lib_units = [] && not (Sys.file_exists obj_file) then None else
+      Some obj_file
+
+let read_file obj_name =
+  let file_name =
+    try
+      Load_path.find obj_name
+    with Not_found ->
+      raise(Error(File_not_found obj_name)) in
+  if Filename.check_suffix file_name ".cmx" then begin
+    (* This is a .cmx file. It must be linked in any case.
+       Read the infos to see which modules it requires. *)
+    let (info, crc) = read_unit_info file_name in
+    Unit (file_name,info,crc)
+  end
+  else if Filename.check_suffix file_name ".cmxa" then begin
+    let infos =
+      try read_library_info file_name
+      with Compilenv.Error(Not_a_unit_info _) ->
+        raise(Error(Not_an_object_file file_name))
+    in
+    Library (file_name,infos)
+  end
+  else raise(Error(Not_an_object_file file_name))
+
+let scan_file ldeps file tolink = match file with
+  | Unit (file_name,info,crc) ->
+      (* This is a .cmx file. It must be linked in any case. *)
+      Linkdeps.add ldeps
+        ~filename:file_name ~compunit:info.ui_name
+        ~provides:[info.ui_name]
+        ~requires:(List.map fst info.ui_imports_cmx);
+      (info, file_name, crc) :: tolink
+  | Library (file_name,infos) ->
+      (* This is an archive file. Each unit contained in it will be linked
+         in only if needed. *)
+      add_ccobjs (Filename.dirname file_name) infos;
+      List.fold_right
+        (fun (info, crc) reqd ->
+           if info.ui_force_link
+           || !Clflags.link_everything
+           || Linkdeps.required ldeps info.ui_name
+           then begin
+             Linkdeps.add ldeps
+               ~filename:file_name ~compunit:info.ui_name
+               ~provides:[info.ui_name]
+               ~requires:(List.map fst info.ui_imports_cmx);
+             (info, file_name, crc) :: reqd
+           end else
+           reqd)
+        infos.lib_units tolink
+>>>>>>> ocaml/ocaml#14245
 
 (* Second pass: generate the startup file and link it with everything else *)
 

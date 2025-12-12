@@ -29,11 +29,20 @@ m4_define([OCAML__DEVELOPMENT_VERSION], [false])
 
 # The three following components (major, minor and patch level) MUST be
 # integers. They MUST NOT be left-padded with zeros and all of them,
-# including the patchlevel, are mandatory.
+# including the patchlevel, are mandatory. OCAML__RELEASE_NUMBER must be
+# incremented with each minor release, and likewise must be an unpadded integer.
 
 m4_define([OCAML__VERSION_MAJOR], [5])
 m4_define([OCAML__VERSION_MINOR], [4])
+<<<<<<< OxCaml
 m4_define([OCAML__VERSION_PATCHLEVEL], [0])
+||||||| Upstream OCaml
+m4_define([OCAML__VERSION_PATCHLEVEL], [2])
+=======
+m4_define([OCAML__RELEASE_NUMBER], [20])
+m4_define([OCAML__VERSION_PATCHLEVEL], [2])
+
+>>>>>>> ocaml/ocaml#14245
 # Note that the OCAML__VERSION_EXTRA string defined below is always empty
 # for officially-released versions of OCaml.
 m4_define([OCAML__VERSION_EXTRA], [ox])

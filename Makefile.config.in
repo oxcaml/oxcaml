@@ -240,6 +240,10 @@ OPAM=@opam@
 OPAM_SWITCH=@opam_switch@
 OPAM_EXEC=@opam_exec@
 
+# Runtime ID values
+BYTECODE_RUNTIME_ID=@bytecode_runtime_id@
+NATIVE_RUNTIME_ID=@native_runtime_id@
+
 # Deprecated variables
 
 ## Variables deprecated since OCaml 5.3

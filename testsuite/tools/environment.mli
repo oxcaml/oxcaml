@@ -37,7 +37,7 @@ val make : (Format.formatter -> string -> unit) -> verbose:bool
     with [LD_LIBRARY_PATH] / [DYLD_LIBRARY_PATH] set or updated). *)
 
 val is_renamed : t -> bool
-(** [is_renamed t] if [~phase = Renamed] *)
+(** [is_renamed t] if [~phase <> Original] *)
 
 val test_root : t -> string
 (** Retrieves the [~test_root] passed to {!make}. *)
