@@ -36,6 +36,7 @@ val uniqueness_unique : t
 
 (* Portability axis *)
 val portability_portable : t
+val portability_shareable : t
 val portability_nonportable : t
 
 (* Contention axis (monadic) *)

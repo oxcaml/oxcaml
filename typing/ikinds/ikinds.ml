@@ -1,6 +1,9 @@
 (* This forces ikinds globally on. *)
 Clflags.ikinds := true;
 
+(* Global feature toggles for the ikinds experiment.
+   These are intended to be easy to flip while iterating on
+   performance or correctness. *)
 Types.ikind_debug := false
 let enable_crossing = true
 let enable_sub_jkind_l = true
@@ -11,8 +14,13 @@ let reset_constructor_ikind_on_substitution = true
 module Ldd = Ikind.Ldd
 
 module JK = struct
-  (* The JKind solver specialized to Ikind.Ldd and Types.type_expr, now without
-     threading an ops record through every evaluation. *)
+  (* A JKind/ikind solver specialized to [Ikind.Ldd] and [Types.type_expr].
+
+     The solver computes LDD polynomials of the form
+       base ⊔ Σ_i (arg_i ⊓ coeff_i)
+     where [base] is the intrinsic kind of a constructor and each [coeff_i]
+     describes the contribution coming from the i-th type argument.
+     Least fixed points are used to interpret recursive types. *)
 
   module Ldd = Ikind.Ldd
 
@@ -26,7 +34,8 @@ module JK = struct
 
   type kind = Ldd.node
 
-  (* Hash tables avoiding polymorphic structural comparison on deep values. *)
+  (* Hash tables avoiding polymorphic structural comparison on deep values.
+     We key types by their unique [Types.get_id] to keep lookups cheap. *)
   module TyTbl = Hashtbl.Make (struct
     type t = ty
 
@@ -66,6 +75,8 @@ module JK = struct
       constr_to_coeffs : (poly * poly list) ConstrTbl.t
     }
 
+  (* Start a new solver context.
+     LDD memo tables are global; clearing them keeps solves independent. *)
   let create (env : env) : ctx =
     Ldd.clear_memos ();
     { env;
@@ -73,10 +84,14 @@ module JK = struct
       constr_to_coeffs = ConstrTbl.create 0
     }
 
+  (* A rigid variable corresponding to a type parameter [t]. *)
   let rigid (t : ty) : kind =
     let param = Types.get_id t in
     Ldd.var (Ldd.rigid (Ldd.Name.param param))
 
+  (* Compute the kind for [t], memoizing results to preserve sharing.
+     For recursive types we install a fresh placeholder var, then solve a
+     least fixed point against the RHS produced by [env.kind_of]. *)
   let rec kind (ctx : ctx) (t : ty) : kind =
     match TyTbl.find_opt ctx.ty_to_kind t with
     | Some k -> k
@@ -88,13 +103,18 @@ module JK = struct
         Ldd.solve_lfp v rhs;
         rhs
 
+  (* Fetch or compute the polynomial for constructor [c].  The returned
+     nodes are placeholders stored in [constr_to_coeffs] so that mutually
+     recursive constructors can refer to each other. *)
   and constr_kind (ctx : ctx) (c : constr) : poly * poly list =
     match ConstrTbl.find_opt ctx.constr_to_coeffs c with
     | Some base_and_coeffs -> base_and_coeffs
     | None -> (
         match ctx.env.lookup c with
         | Poly (base, coeffs) ->
-            (* Install placeholder nodes before rehydrating cached polynomials to break recursion cycles. *)
+            (* Install placeholder nodes before rehydrating cached
+               polynomials.  This breaks recursion cycles between
+               mutually-recursive types. *)
             let base_var = Ldd.new_var () in
             let coeff_vars =
               List.init (List.length coeffs) (fun _ -> Ldd.new_var ())
@@ -102,6 +122,9 @@ module JK = struct
             let base_node = Ldd.var base_var in
             let coeff_nodes = List.map Ldd.var coeff_vars in
             ConstrTbl.add ctx.constr_to_coeffs c (base_node, coeff_nodes);
+            (* Replace rigid atoms that refer to other constructors with the
+               corresponding cached placeholders.  Atoms that refer back to
+               [c] are kept rigid to avoid infinite expansion. *)
             let instantiate (name : Ldd.Name.t) : kind =
               match name with
               | Ldd.Name.Param _  | Ldd.Name.Unknown _ -> Ldd.var (Ldd.rigid name)
@@ -136,13 +159,17 @@ module JK = struct
                 (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty)))
                 args
             in
+            (* Treat parameters as rigid vars while computing [kind'] so that
+               the result is linear in those vars. *)
             List.iter2
               (fun ty var -> TyTbl.add ctx.ty_to_kind ty (Ldd.var var))
               args rigid_vars;
             (* Compute body kind *)
-            (* CR jujacobs: still compute the kind in Right mode to keep the cache consistent. *)
+            (* CR jujacobs: still compute the kind in Right mode to keep
+               the cache consistent. *)
             let kind' = body ctx in
-            (* Extract coeffs' from kind' *)
+            (* Decompose [kind'] into a base and one coefficient
+               per parameter. *)
             let base', coeffs' =
               Ldd.decompose_linear ~universe:rigid_vars kind'
             in
@@ -155,7 +182,10 @@ module JK = struct
                    (List.length coeffs'));
             if abstract
             then (
-              (* We need to assert that kind' is less than or equal to the base *)
+              (* For abstract types we don't trust [kind'] as an exact formula.
+                 Instead we relate the placeholders to it via GFP bounds, while
+                 keeping the original rigid atoms around as conservative
+                 unknowns. *)
               Ldd.enqueue_gfp base_var
                 (Ldd.meet base' (Ldd.var (Ldd.rigid (Ldd.Name.atomic c 0))));
               let i = ref 0 in
@@ -177,6 +207,7 @@ module JK = struct
                 coeff_vars coeffs');
             base_node, coeff_nodes)
 
+  (* Apply a constructor polynomial to argument kinds. *)
   let constr (ctx : ctx) (c : constr) (args : kind list) : kind =
     let base, coeffs = constr_kind ctx c in
     let ks =
@@ -189,11 +220,15 @@ module JK = struct
     in
     List.fold_left Ldd.join base ks
 
+  (* Evaluate a ckind in [ctx] and flush pending GFP constraints. *)
   let normalize (ctx : ctx) (k : ckind) : poly =
     let k' = k ctx in
     Ldd.solve_pending ();
     k'
 
+  (* Materialize a solved polynomial for storing in
+     [Types.constructor_ikind].  Coefficients are recorded "minus base" so
+     that later application does not double-count axes already in [base]. *)
   let constr_kind_poly (ctx : ctx) (c : constr) : poly * poly list =
     let base, coeffs = constr_kind ctx c in
     Ldd.solve_pending ();
@@ -215,6 +250,7 @@ module JK = struct
 end
 let ikind_reset : string -> Types.type_ikind = Types.ikind_reset
 
+(* Converting surface jkinds to solver ckinds. *)
 let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
  fun (ctx : JK.ctx) ->
   (* Base is the modality bounds stored on this jkind. *)
@@ -241,10 +277,13 @@ let ckind_of_jkind_r (j : Types.jkind_r) : JK.ckind =
      base mod-bounds matter. *)
   Ldd.const (Axis_lattice_conv.of_mod_bounds j.jkind.mod_bounds)
 
+(* Guards against accidental infinite recursion when traversing types. *)
 let kind_of_depth = ref 0
 
 let kind_of_counter = ref 0
 
+(* Compute the ikind polynomial for an arbitrary [type_expr].  This is the
+   semantic counterpart of [Jkind.jkind_of_type], but expressed in LDD form. *)
 let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
  fun (ctx : JK.ctx) ->
   ignore context;
@@ -253,12 +292,14 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
   incr kind_of_counter;
   if !kind_of_counter > 100000000 then failwith "kind_of_counter too big" else ();
   let res =
+    (* [ty] is expected to be representative: no links/substs/fields/nil. *)
     match Types.get_desc ty with
     | Types.Tvar { name = _name; jkind } | Types.Tunivar { name = _name; jkind }
       -> 
       (* TODO: allow general jkinds here (including with-bounds) *)
       let jkind_l = Jkind.disallow_right jkind in
       let ckind = ckind_of_jkind_l jkind_l in
+      (* Keep a rigid param, but cap it by its annotated jkind. *)
       Ldd.meet (JK.rigid ty) (ckind ctx)
     | Types.Tconstr (p, args, _abbrev_memo) ->
       let arg_kinds = List.map (fun t -> JK.kind ctx t) args in
@@ -351,13 +392,17 @@ let constructor_ikind_polynomial
     (packed : Types.constructor_ikind) : JK.poly * JK.poly list =
   packed.base, Array.to_list packed.coeffs
 
+(* Lookup function supplied to the solver.
+   We prefer a stored ikind (when present) and otherwise recompute from the
+   type declaration in [context]. *)
 let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
     JK.constr_decl =
-  (* We may need to be careful here to look up the right thing: what happens on GADT-installed equations? *)
+  (* Note: this currently ignores any GADT-installed equations. *)
   match context.lookup_type p with
   | None ->
     (* Format.eprintf "ERROR: unknown constructor"; *)
-    (* Fallback for unknown constructors: treat them as abstract non-recursive values. *)
+    (* Fallback for unknown constructors: treat them as abstract,
+       non-recursive values. *)
     let kind : JK.ckind = fun _ctx -> Ldd.const Axis_lattice.value in
     JK.Ty { args = []; kind; abstract = true }
   | Some decl ->
@@ -388,6 +433,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
         let use_decl_jkind () = 
           let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
           JK.Ty { args = decl.type_params; kind; abstract = true } in
+        (* If we cannot soundly derive a polynomial from components, fall back
+           to the stored jkind and mark it abstract. *)
         match decl.type_kind with
         | _ when allow_any_crossing -> use_decl_jkind ()
         | Types.Type_abstract _ -> use_decl_jkind ()
@@ -512,7 +559,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           in
           JK.Ty { args = decl.type_params; kind; abstract = false }
         | Types.Type_open ->
-          (* Need to use the stored jkind here in case it is `exn`, which is special *)
+          (* Use the stored jkind here in case it is `exn`,
+             which is special. *)
           let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
           JK.Ty { args = decl.type_params; kind; abstract = false }
           (* 
@@ -525,6 +573,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           *)
         end
     in
+    (* Prefer a stored constructor ikind if one is present and enabled. *)
     let ikind = match decl.type_ikind with
     | Types.Constructor_ikind constructor when !Clflags.ikinds ->
       let base, coeffs =
@@ -763,8 +812,12 @@ let sub_or_error ?origin:_origin
     (* Delegate to Jkind for detailed error reporting. *)
     Jkind.sub_or_error ~type_equal ~context ~level t1 t2
 
-(** Substitute constructor ikinds according to [lookup] without requiring Env. *)
+(** Substitute constructor ikinds according to [lookup] without requiring
+    Env. *)
 
+(* Collect, for each constructor path, the maximum arity at which it occurs in
+   the given type/jkind.  This drives how many coefficients the identity
+   environment must provide. *)
 let rec max_arity_in_jkind (acc : int Path.Map.t) (jkind : _ Types.jkind) =
   Jkind.With_bounds.to_seq jkind.jkind.with_bounds
   |> Seq.fold_left (fun acc (ty, _) -> max_arity_in_type acc ty) acc
@@ -816,6 +869,7 @@ let identity_lookup_from_arity_map (arity : int Path.Map.t) (p : Path.t)
     : JK.constr_decl =
   let open Ldd in
   let n = match Path.Map.find_opt p arity with None -> 0 | Some m -> m in
+  (* Identity polynomial: base and coeffs are just fresh rigid atoms. *)
   let base = var (rigid (Name.atomic p 0)) in
   let coeffs =
     List.init n (fun i -> var (rigid (Name.atomic p (i + 1))))
@@ -825,7 +879,8 @@ let identity_lookup_from_arity_map (arity : int Path.Map.t) (p : Path.t)
 let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
     ~(body : Types.type_expr) : JK.poly * JK.poly list =
   (* Approximate type-function substitution by evaluating in an identity
-     environment. *)
+     environment, i.e. every constructor contributes an independent rigid
+     atom. *)
   let arity = max_arity_in_type Path.Map.empty body in
   let lookup p = identity_lookup_from_arity_map arity p in
   let dummy_context =
@@ -862,6 +917,7 @@ let substitute_decl_ikind_with_lookup
         (Path.t, (JK.poly * JK.poly list)) Hashtbl.t =
         Hashtbl.create 17
       in
+      (* Rewrite a polynomial by mapping each rigid atom through [lookup]. *)
       let rec map_poly (expanding : Path.Set.t) (poly : Ldd.node) : Ldd.node =
         Ldd.map_rigid (map_name expanding) poly
       and map_name (expanding : Path.Set.t) (name : Ldd.Name.t) : Ldd.node =
@@ -874,6 +930,9 @@ let substitute_decl_ikind_with_lookup
             | Some (`Path q) ->
                 Ldd.var (Ldd.rigid (Ldd.Name.atomic q arg_index))
             | Some (`Type_fun _ as tf) ->
+                (* Inline a type function by evaluating it in an identity
+                   environment.  The [expanding] set prevents infinite
+                   unfolding of recursive type functions. *)
                 if Path.Set.mem p expanding
                 then Ldd.var (Ldd.rigid name)
                 else
@@ -899,7 +958,8 @@ let substitute_decl_ikind_with_lookup
                     match List.nth_opt coeffs (arg_index - 1) with
                     | Some k -> k
                     | None ->
-                        (* Fallback: if coefficient missing, keep original atom *)
+                        (* Fallback: if coefficient missing, keep original
+                           atom. *)
                         Ldd.var (Ldd.rigid name))
       in
       let base' = map_poly Path.Set.empty payload.base in

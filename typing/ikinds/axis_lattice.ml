@@ -20,7 +20,7 @@
    11. Nullability: Non_null -> Maybe_null
    12. Separability: Non_float -> Separable -> Maybe_separable
 
-   Axes 0-8 are modal axes (affect mode-crossing).
+   Axes 0-9 are modal axes (affect mode-crossing).
    Axes 10-12 are non-modal axes (externality and shallow axes).
    Axes 11-12 are "shallow" axes (nullability and separability) that are
    sometimes excluded from masking operations.
@@ -72,12 +72,12 @@ let hi_mask   = Array.init num_axes (fun i ->
 let axis_mask = Array.init num_axes (fun i -> lo_mask.(i) lor hi_mask.(i))
 
 (* OR of all low bits (for size-2 axes that’s their only bit).
-   For this layout: 0xD5BD. *)
+   For this layout: 0x6D75D. *)
 let lows = Array.fold_left (lor) 0 lo_mask
 
 type t = int
 let bot : t = 0
-(* For this layout top happens to be all 17 bits set: 0x1_FFFF. *)
+(* For this layout top happens to be all 20 bits set: 0xF_FFFF. *)
 let top : t = Array.fold_left (lor) 0 axis_mask
 
 let join (a:t) (b:t) : t = a lor b
@@ -161,9 +161,10 @@ let linearity_once : t = set_axis bot ~axis:1 ~level:1
 let uniqueness_aliased : t = set_axis bot ~axis:2 ~level:0
 let uniqueness_unique  : t = set_axis bot ~axis:2 ~level:1
 
-(* Portability axis: 0=Portable, 1=Nonportable *)
-let portability_portable    : t = set_axis bot ~axis:3 ~level:0
-let portability_nonportable : t = set_axis bot ~axis:3 ~level:1
+(* Portability axis: 0=Portable, 1=Shareable, 2=Nonportable *)
+let portability_portable  : t = set_axis bot ~axis:3 ~level:0
+let portability_shareable : t = set_axis bot ~axis:3 ~level:1
+let portability_nonportable : t = set_axis bot ~axis:3 ~level:2
 
 (* Contention axis (monadic): 0=Contended, 1=Shared, 2=Uncontended *)
 let contention_contended   : t = set_axis bot ~axis:4 ~level:0
