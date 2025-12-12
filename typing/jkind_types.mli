@@ -118,10 +118,6 @@ module Layout : sig
     val equal : t -> t -> bool
 
     val max : t
-
-    val of_flat_sort : Sort.Flat.t -> t option
-
-    val of_sort : Sort.t -> t option
   end
 
   val of_const : Const.t -> Sort.t t

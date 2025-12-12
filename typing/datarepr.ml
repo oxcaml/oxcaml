@@ -20,6 +20,8 @@ open Asttypes
 open Types
 open Btype
 
+module Jkind = Types.Jkind0
+
 (* Simplified version of Ctype.free_vars *)
 let free_vars ?(param=false) ty =
   let ret = ref TypeSet.empty in
@@ -76,7 +78,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
          jkinds that are cheaper to deal with later. But doing so runs into some
          confusing mutual recursion that's non-trivial to debug. Reinvestigate
          later. Internal ticket 5102.  *)
-      let jkind = Jkind_jkind.for_boxed_record lbls in
+      let jkind = Jkind.for_boxed_record lbls in
       let tdecl =
         {
           type_params;

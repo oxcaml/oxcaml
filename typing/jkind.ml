@@ -37,7 +37,7 @@ module Sort = Jkind_types.Sort
 
 type sort = Sort.t
 
-module Sub_failure_reason = Jkind_violation.Sub_failure_reason
+module Sub_failure_reason = Jkind0.Violation.Sub_failure_reason
 
 module Sub_result = struct
   type t =
@@ -294,7 +294,7 @@ let raise ~loc err = raise (Error.User_error (loc, err))
 
 (******************************)
 module Mod_bounds = struct
-  include Types.Jkind_mod_bounds
+  include Jkind0.Mod_bounds
 
   let meet t1 t2 =
     let crossing = Crossing.meet (crossing t1) (crossing t2) in
@@ -387,7 +387,7 @@ module Mod_bounds = struct
 end
 
 module With_bounds = struct
-  include Jkind_with_bounds
+  include Jkind0.With_bounds
 
   module Type_info = struct
     include With_bounds_type_info
@@ -517,7 +517,7 @@ type jkind_context =
   }
 
 module Layout_and_axes = struct
-  include Jkind_layout_and_axes
+  include Jkind0.Layout_and_axes
 
   let equal eq_layout
       { layout = lay1;
@@ -1023,7 +1023,7 @@ end
 
 (*********************************)
 
-include Jkind_jkind
+include Jkind0.Jkind
 
 (***********************)
 (*** constant jkinds ***)
@@ -1056,7 +1056,7 @@ let outcometree_of_modalities = ref (fun _ _ -> assert false)
 let set_outcometree_of_modalities p = outcometree_of_modalities := p
 
 module Const = struct
-  include Jkind_const
+  include Jkind0.Const
 
   module To_out_jkind_const : sig
     (** Convert a [t] into a [Outcometree.out_jkind_const]. If [expanded] is
@@ -1154,7 +1154,7 @@ module Const = struct
     (** Write [actual] in terms of [base] *)
     let convert_with_base ~(base : Builtin.t) (actual : _ t) =
       let matching_layouts =
-        Jkind_types.Layout.Const.equal base.jkind.layout actual.layout
+        Layout.Const.equal base.jkind.layout actual.layout
       in
       let modal_bounds =
         get_modal_bounds ~base:base.jkind.mod_bounds actual.mod_bounds
@@ -1793,7 +1793,7 @@ let get_nullability ~context jk =
 
 let set_nullability_upper_bound jk nullability_upper_bound =
   let new_bounds =
-    Jkind_mod_bounds.set_nullability nullability_upper_bound jk.jkind.mod_bounds
+    Mod_bounds.set_nullability nullability_upper_bound jk.jkind.mod_bounds
   in
   { jk with jkind = { jk.jkind with mod_bounds = new_bounds } }
 
@@ -2302,7 +2302,7 @@ let format_history ~intro ppf t =
 
 module Violation = struct
   open Format
-  include Jkind_violation
+  include Jkind0.Violation
 
   let of_ ~context ?missing_cmi violation =
     (* Normalize for better printing *)

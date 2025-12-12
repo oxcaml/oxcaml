@@ -1,3 +1,5 @@
+module Jkind = Types.Jkind0
+
 (** Interpret mode syntax as mode annotation, where axes can be left unspecified *)
 val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t
 
@@ -31,8 +33,8 @@ val untransl_modalities :
   Types.mutability -> Mode.Modality.Const.t -> Parsetree.modalities
 
 (** Interpret a mod-bounds. *)
-val transl_mod_bounds : Parsetree.modes -> Types.Jkind_mod_bounds.t
+val transl_mod_bounds : Parsetree.modes -> Jkind.Mod_bounds.t
 
-val untransl_mod_bounds : Types.Jkind_mod_bounds.t -> Parsetree.modes
+val untransl_mod_bounds : Jkind.Mod_bounds.t -> Parsetree.modes
 
 val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t

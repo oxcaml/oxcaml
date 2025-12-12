@@ -25,6 +25,7 @@ open Types
 open Local_store
 
 module String = Misc.Stdlib.String
+module Jkind = Types.Jkind0
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
 
@@ -833,7 +834,7 @@ type lookup_error =
       }
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
-  | Non_value_used_in_object of Longident.t * type_expr * Jkind_violation.t
+  | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
@@ -3449,7 +3450,7 @@ let unboxed_type ~errors ~env ~loc ~lid ty =
        not a specific instance of that variable. *)
     match
       !constrain_type_jkind env ty
-        Jkind_jkind.Builtin.(value_or_null ~why:Captured_in_object)
+        Jkind.Builtin.(value_or_null ~why:Captured_in_object)
     with
     | Ok () -> ()
     | Result.Error err ->
@@ -4632,7 +4633,7 @@ let print_type_expr =
 let report_jkind_violation_with_offender =
   ref ((fun ~offender:_ ~level:_ _ _ -> assert false)
        : offender:(Format.formatter -> unit) -> level:int -> Format.formatter ->
-         Jkind_violation.t -> unit)
+         Jkind.Violation.t -> unit)
 
 let spellcheck ppf extract env lid =
   let choices ~path name = Misc.spellcheck (extract path env) name in
