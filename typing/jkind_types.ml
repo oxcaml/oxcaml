@@ -660,6 +660,8 @@ module Scannable_axes = struct
 
   let max = { nullability = Nullability.max; separability = Separability.max }
 
+  let value_axes = { nullability = Non_null; separability = Separable }
+
   let equal { nullability = n1; separability = s1 }
       { nullability = n2; separability = s2 } =
     Nullability.equal n1 n2 && Separability.equal s1 s2

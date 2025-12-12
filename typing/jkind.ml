@@ -79,30 +79,16 @@ module Sub_result = struct
   let is_le t = require_le t |> Result.is_ok
 end
 
+(* CR zeisbach: refactor after rebasing onto abstract kinds part 1, and don't
+   worry too much about it before hand (split across here and jkind_types which
+   I believe is obviously wrong) *)
 module Scannable_axes = struct
-  type t = Jkind_types.Scannable_axes.t =
-    { nullability : Jkind_axis.Nullability.t;
-      separability : Jkind_axis.Separability.t
-    }
-
-  let max = { nullability = Nullability.max; separability = Separability.max }
-
-  let value_axes = { nullability = Non_null; separability = Separable }
+  include Jkind_types.Scannable_axes
 
   let immediate_axes = { nullability = Non_null; separability = Non_pointer }
 
   let immediate64_axes =
     { nullability = Non_null; separability = Non_pointer64 }
-
-  let equal { nullability = n1; separability = s1 }
-      { nullability = n2; separability = s2 } =
-    Nullability.equal n1 n2 && Separability.equal s1 s2
-
-  let less_or_equal { nullability = n1; separability = s1 }
-      { nullability = n2; separability = s2 } =
-    Misc.Le_result.combine
-      (Nullability.less_or_equal n1 n2)
-      (Separability.less_or_equal s1 s2)
 
   let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
 
