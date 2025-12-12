@@ -19,7 +19,7 @@ linearity ::= `many` | `once`
 portability ::= `portable` | `shareable` | `nonportable`
 contention ::= `uncontended` | `shared` | `contended`
 yield ::= `unyielding` | `yielding`
-fork ::= `forkable` | `unforkable`
+forkability ::= `spawnable` | `forkable` | `unforkable`
 statefulness ::= `stateless` | `observing` | `stateful`
 visibility ::= `read_write` | `read` | `immutable`
 
@@ -69,7 +69,7 @@ axes that are omitted, the so-called *legacy* modes are used instead. The legacy
 modes are as follows:
 
 ```ocaml
-global aliased many nonportable uncontended forkable unyielding stateful read_write
+global aliased many nonportable uncontended spawnable unyielding stateful read_write
 ```
 
 This means that `t1 -> t2` is actually equivalent to
@@ -288,7 +288,7 @@ and modalities, according to this table:
 
 | this          | implies this |
 |---------------|--------------|
-| `global`      | `forkable`   |
+| `global`      | `spawnable`  |
 | `local`       | `unforkable` |
 | `global`      | `unyielding` |
 | `local`       | `yielding`   |

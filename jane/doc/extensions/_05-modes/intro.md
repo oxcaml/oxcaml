@@ -151,22 +151,24 @@ Portability is irrelevant for types that do not contain functions. Values of
 such types *mode cross* on the portability axis; they may be used as portable
 even when they are nonportable.
 
-## Future modes: Forkable
+## Future modes: Forkability
 
 |----------------|
 | unforkable     |
 | `|`            |
-| **forkable**   |
+| forkable       |
+| `|`            |
+| **spawnable**  |
 {: .table }
 
-Forkable is a future axis that tracks whether a function is permitted to access
-shared values in its parent stack. See [parallelism](../../parallelism/01-intro/).
+Forkability is a future axis that tracks whether a function is permitted to capture
+passwords. See [capsules](../../parallelism/02-capsules/).
 
-Forkable has different defaults depending on the locality axis: *global* values are
-defaulted to *forkable*, while *local* values are defaulted to *unforkable*.
+Forkability has different defaults depending on the locality axis: *global* values are
+defaulted to *spawnable*, while *local* values are defaulted to *unforkable*.
 More documentation on mode implications is available [here](../../kinds/syntax).
 
-Forkable is irrelevant for types that do not contain functions, and values of such types
+Forkability is irrelevant for types that do not contain functions, and values of such types
 *mode cross* on the forkable axis; they may be used as forkable even when they are
 unforkable.
 
