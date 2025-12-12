@@ -520,9 +520,6 @@ and type_origin =
   | Existential of string
 
 and mixed_block_element =
-  (* CR zeisbach: this vs Jkind_axes.Separability.t ?
-     since that's all that we really care about. for now, just bringing all
-     of the axes around since it seems no harder. *)
   | Scannable of Jkind_types.Scannable_axes.t
   | Float_boxed
   | Float64
@@ -891,8 +888,6 @@ let compare_tag t1 t2 =
 
 let rec equal_mixed_block_element e1 e2 =
   match e1, e2 with
-  (* CR zeisbach: (A) this function looks to be dead code, and (B) double check
-     this. I matched how equal deriving should work. *)
   | Scannable sa1, Scannable sa2 -> Jkind_types.Scannable_axes.equal sa1 sa2
   | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
   | Word, Word | Untagged_immediate, Untagged_immediate
@@ -1172,8 +1167,6 @@ let rec mixed_block_element_to_string = function
   | Void -> "Void"
 
 let mixed_block_element_to_lowercase_string = function
-  (* CR zeisbach: check this out! is this proper printing? probably yes,
-     but also look at the call sites to make sure. probably DWARF stuff. *)
   | Scannable _ -> "scannable"
   | Float_boxed -> "float"
   | Float32 -> "float32"

@@ -1313,7 +1313,6 @@ let report_error ppf = function
       fprintf ppf
         "Product layout %s detected in [lazy] in [Typeopt.Layout]@ \
          Please report this error to the Jane Street compilers team."
-        (* CR zeisbach: maybe change this?? *)
         (Jkind.Layout.Const.to_string const)
   | Unsupported_vector_in_product_array ->
       fprintf ppf
@@ -1333,7 +1332,6 @@ let report_error ppf = function
          @[Hint: if the array contents should not be scanned, annotating@ \
          contained abstract types as [mod external] may resolve this error.@]"
         Printtyp.type_expr elt_ty
-        (* CR zeisbach: maybe replace this with format?? does it matter? *)
         (Jkind.Layout.Const.to_string const)
   | Opaque_array_non_value { array_type; elt_kinding_failure }  ->
       begin match elt_kinding_failure with
