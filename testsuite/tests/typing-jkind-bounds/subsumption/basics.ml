@@ -254,6 +254,20 @@ type t = private u
 type v = { value : t; }
 |}]
 
+type t : value = private int
+type v : immutable_data = { value : t }
+[%%expect{|
+type t = private int
+type v = { value : t; }
+|}]
+
+type t = private int
+type v : immutable_data = { value : t }
+[%%expect{|
+type t = private int
+type v = { value : t; }
+|}]
+
 type t : immediate with t = [`foo | `bar]
 [%%expect {|
 type t = [ `bar | `foo ]
