@@ -72,6 +72,8 @@
 
 #undef HAS_TIMES
 
+#undef HAS_STRLCPY
+
 #undef HAS_SECURE_GETENV
 
 #undef HAS___SECURE_GETENV

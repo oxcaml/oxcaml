@@ -23,7 +23,11 @@ module Import : sig
 
   (** Kinds of executable *)
   type executable =
-  | Tendered of {header: launch_mode; dlls: bool; runtime: string}
+  | Tendered of {header: launch_mode;
+                 dlls: bool;
+                 runtime: string;
+                 id: Misc.RuntimeID.t option;
+                 search: Byterntm.search_method}
       (** Tendered bytecode image. Executable uses the given mechanism to locate
           a suitable runtime to execute the image. [dlls] is [true] if the
           bytecode image requires additional C libraries to be loaded. [runtime]
@@ -36,8 +40,11 @@ module Import : sig
 
   (** Test harness phases. *)
   type phase =
-  | Original (* Compiler installed in its original configured prefix. *)
-  | Renamed  (* Compiler moved to a different prefix from its configuration. *)
+  | Original  (* Compiler installed in its original configured prefix. *)
+  | Execution (* Executing programs built by the compiler installed in its
+                 original prefix after the compiler has been moved to a
+                 different prefix. *)
+  | Renamed   (* Compiler moved to a different prefix from its configuration. *)
 
   (* Tooling modes. *)
   type mode =
@@ -55,19 +62,20 @@ module Import : sig
     has_relative_libdir: string option;
       (** {v $(TARGET_LIBDIR_IS_RELATIVE) v} and {v $(TARGET_LIBDIR) v} -
           {v Makefile.build_config v} *)
-    has_runtime_search: bool option;
-      (** Not implemented; always None. *)
+    has_runtime_search: Config.search_method;
+      (** {v $(RUNTIME_SEARCH) v} - {v Makefile.build_config v} *)
     launcher_searches_for_ocamlrun: bool;
       (** Indicates whether bytecode executables in the compiler distribution
-          use a launcher that is capable of searching PATH to find ocamlrun. At
-          present, only native Windows has this behaviour. *)
+          use a launcher that is capable of searching PATH to find ocamlrun.
+          This used to be the behaviour for native Windows. *)
     target_launcher_searches_for_ocamlrun: bool;
       (** Indicates whether the executable launcher used by ocamlc is capable of
-          searching PATH to find ocamlrun. At present, only native Windows has
-          this behaviour. *)
+          searching PATH to find ocamlrun. This used to be the behaviour for
+          native Windows. *)
     bytecode_shebangs_by_default: bool;
       (** True if ocamlc uses a shebang-style header rather than an executable
           header for tendered bytecode executables. *)
+<<<<<<< OxCaml
     cross_module_inlining: bool;
       (** True if the native compiler exports cross-module inlining information
           (i.e. an optimising build), so that [config.cmx] inlines
@@ -75,6 +83,17 @@ module Import : sig
           true for its [main] profile and for upstream.
           Derived from {v [$(main_build_profile)] v} - {v Makefile.config v} *)
     libraries: string list list
+||||||| Upstream OCaml
+    shebangscripts: bool;
+      (** {v $(SHEBANGSCRIPTS) v} - {v Makefile.config v} *)
+    libraries: string list list
+=======
+    shebangscripts: bool;
+      (** {v $(SHEBANGSCRIPTS) v} - {v Makefile.config v} *)
+    filename_mangling: bool;
+      (** True if the Runtime ID is being used for filename mangling. *)
+    libraries: string list list;
+>>>>>>> ocaml/ocaml#14245
       (** Sorted list of basenames of libraries to test.
           Derived from {v [$(OTHERLIBRARIES)] v} - {v Makefile.config v} *)
   }
