@@ -851,7 +851,7 @@ and transl_structure ~scopes loc
             transl_structure ~scopes loc (List.rev_append newfields fields)
               cc rootpath final_env rem
           in
-          Value_rec_compiler.compile_letrec class_bindings body, repr
+          Ldelayedletrec (class_bindings, body), repr
       | Tstr_include incl ->
           let ids_with_sorts =
             bound_value_identifiers_and_sorts incl.incl_type
@@ -1241,7 +1241,7 @@ let transl_toplevel_item ~scopes item =
       let (ids, class_bindings) = transl_class_bindings ~scopes cl_list in
       List.iter set_toplevel_unique_name ids;
       let body = make_sequence toploop_setvalue_id ids in
-      Value_rec_compiler.compile_letrec class_bindings body
+      Ldelayedletrec (class_bindings, body)
   | Tstr_include incl ->
       let ids = bound_value_identifiers incl.incl_type in
       let loc = of_location ~scopes incl.incl_loc in

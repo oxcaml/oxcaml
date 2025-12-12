@@ -134,6 +134,14 @@ let compute_static_size lam =
       compute_expression_size env body
     | Lmutlet(_, _, _, _, body) ->
       compute_expression_size env body
+    | Ldelayedletrec (bindings, body) ->
+      let env =
+        List.fold_left (fun env_acc (id, _duid, _rec_kind, rhs) ->
+            Ident.Map.add id (Lazy_backtrack.create { lambda = rhs; env })
+              env_acc)
+          env bindings
+      in
+      compute_expression_size env body
     | Lletrec (bindings, body) ->
       let env =
         List.fold_left (fun env_acc { id; def } ->
@@ -558,6 +566,15 @@ let rec split_static_function lfun block_var local_idents lam :
       split_static_function lfun block_var (Ident.Set.add var local_idents) body
     in
     Lmutlet (vkind, var, debug_uid, def, body)
+  | Ldelayedletrec (bindings, body) ->
+    let local_idents =
+      List.fold_left (fun ids (id, _, _, _) -> Ident.Set.add id ids)
+        local_idents bindings
+    in
+    let+ body =
+      split_static_function lfun block_var local_idents body
+    in
+    Ldelayedletrec (bindings, body)
   | Lletrec (bindings, body) ->
     let local_idents =
       List.fold_left (fun ids { id } -> Ident.Set.add id ids)

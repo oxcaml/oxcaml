@@ -1151,6 +1151,14 @@ let simplify_local_functions lam =
   else
     rewrite lam
 
+let simplify_letrec lam =
+  Lambda.map
+    (function
+    | Ldelayedletrec (bindings, body) ->
+        Value_rec_compiler.compile_letrec bindings body
+    | lam -> lam)
+    lam
+
 (* The entry point:
    simplification
    + rewriting of tail-modulo-cons calls
@@ -1160,6 +1168,7 @@ let simplify_local_functions lam =
 let simplify_lambda lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   let lam =
     lam
+    |> simplify_letrec
     |> (if !Clflags.native_code || Clflags.is_flambda2() || not !Clflags.debug
         then simplify_local_functions else Fun.id
        )

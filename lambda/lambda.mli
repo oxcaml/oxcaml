@@ -806,6 +806,10 @@ type lambda =
   | Lfunction of lfunction
   | Llet of let_kind * layout * Ident.t * debug_uid * lambda * lambda
   | Lmutlet of layout * Ident.t * debug_uid * lambda * lambda
+  | Ldelayedletrec of
+      (Ident.t * debug_uid * Value_rec_types.recursive_binding_kind * lambda)
+      list
+      * lambda
   | Lletrec of rec_binding list * lambda
   | Lprim of primitive * lambda list * scoped_location
   | Lswitch of lambda * lambda_switch * scoped_location * layout

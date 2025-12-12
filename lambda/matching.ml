@@ -4231,6 +4231,7 @@ let rec map_return f = function
     Llet (str, k, id, duid, l1, map_return f l2)
   | Lmutlet (k, id, duid, l1, l2) ->
     Lmutlet (k, id, duid, l1, map_return f l2)
+  | Ldelayedletrec (l1, l2) -> Ldelayedletrec (l1, map_return f l2)
   | Lletrec (l1, l2) -> Lletrec (l1, map_return f l2)
   | Lifthenelse (lcond, lthen, lelse, k) ->
       Lifthenelse (lcond, map_return f lthen, map_return f lelse, k)

@@ -853,6 +853,10 @@ type lambda =
   | Lfunction of lfunction
   | Llet of let_kind * layout * Ident.t * debug_uid * lambda * lambda
   | Lmutlet of layout * Ident.t * debug_uid * lambda * lambda
+  | Ldelayedletrec of
+      (Ident.t * debug_uid * Value_rec_types.recursive_binding_kind * lambda)
+      list
+      * lambda
   | Lletrec of rec_binding list * lambda
   | Lprim of primitive * lambda list * scoped_location
   | Lswitch of lambda * lambda_switch * scoped_location * layout
@@ -1233,6 +1237,7 @@ let make_key e =
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
+    | Ldelayedletrec _
     | Lletrec _|Lfunction _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
@@ -1299,6 +1304,9 @@ let shallow_iter ~tail ~non_tail:f = function
   | Llet(_, _k, _id, _duid, arg, body)
   | Lmutlet(_k, _id, _duid, arg, body) ->
       f arg; tail body
+  | Ldelayedletrec(bindings, body) ->
+      tail body;
+      List.iter (fun (_, _, _, lam) -> f lam) bindings
   | Lletrec(decl, body) ->
       tail body;
       List.iter (fun { def } -> f (Lfunction def)) decl
@@ -1361,6 +1369,13 @@ let rec free_variables = function
       Ident.Set.union
         (free_variables arg)
         (Ident.Set.remove id (free_variables body))
+  | Ldelayedletrec(bindings, body) ->
+      let set =
+        free_variables_list (free_variables body)
+          (List.map (fun (_, _, _, lam) -> lam) bindings)
+      in
+      Ident.Set.diff set
+        (Ident.Set.of_list (List.map (fun (id, _, _, _) -> id) bindings))
   | Lletrec(decl, body) ->
       let set =
         free_variables_list (free_variables body)
@@ -1431,8 +1446,7 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lsplice { slambda = (SLquote e); _ } ->
-      free_variables e
+  | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -1644,6 +1658,12 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         ({ p with name = name'; debug_uid = duid' } :: params' , l)
       ) params ([], l)
   in
+  let bind_delayed_rec bindings l =
+    List.fold_right (fun (id, duid, rec_kind, rhs) (bindings', l) ->
+        let id', duid', l = bind id duid l in
+        ((id', duid', rec_kind, rhs) :: bindings' , l)
+      ) bindings ([], l)
+  in
   let bind_rec ids l =
     List.fold_right (fun (rb: rec_binding) (ids', l) ->
         let id', duid', l = bind rb.id rb.debug_uid l in
@@ -1681,6 +1701,9 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
     | Lmutlet(k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Lmutlet(k, id, duid, subst s l arg, subst s l' body)
+    | Ldelayedletrec(bindings, body) ->
+        let bindings, l' = bind_delayed_rec bindings l in
+        Ldelayedletrec(List.map (subst_rec_bind s l') bindings, subst s l' body)
     | Lletrec(decl, body) ->
         let decl, l' = bind_rec decl l in
         Lletrec(List.map (subst_decl s l') decl, subst s l' body)
@@ -1770,6 +1793,8 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
     | Lsplice { splice_loc; slambda } ->
       Lsplice { splice_loc; slambda = subst_slambda s l slambda }
   and subst_list s l li = List.map (subst s l) li
+  and subst_rec_bind s l (id, duid, rec_kind, rhs) =
+    (id, duid, rec_kind, subst s l rhs)
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
     let params, l' = bind_params lf.params l in
@@ -1792,13 +1817,20 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
     | SLinstantiate apply -> SLinstantiate (subst_slambda_apply s l apply)
     | SLlet slet -> SLlet (subst_slambda_let s l slet)
   and subst_slambda_value s l { sval_comptime; sval_runtime } =
-    { sval_comptime = subst_slambda s l sval_comptime; sval_runtime = subst_slambda s l sval_runtime }
+    { sval_comptime = subst_slambda s l sval_comptime;
+      sval_runtime = subst_slambda s l sval_runtime;
+    }
   and subst_slambda_function s l { sfun_params; sfun_body } =
     { sfun_params; sfun_body = subst_slambda s l sfun_body }
   and subst_slambda_apply s l { sapp_func; sapp_arguments } =
-    { sapp_func = subst_slambda s l sapp_func; sapp_arguments = Array.map (subst_slambda s l) sapp_arguments }
+    { sapp_func = subst_slambda s l sapp_func;
+      sapp_arguments = Array.map (subst_slambda s l) sapp_arguments
+    }
   and subst_slambda_let s l { slet_name; slet_value; slet_body } =
-    { slet_name; slet_value = subst_slambda s l slet_value; slet_body = subst_slambda s l slet_body }
+    { slet_name;
+      slet_value = subst_slambda s l slet_value;
+      slet_body = subst_slambda s l slet_body
+    }
   in
   { subst_lambda = (fun lam -> subst s Ident.Map.empty lam);
     subst_lfunction = (fun lfun -> subst_lfun s Ident.Map.empty lfun);
@@ -1851,6 +1883,12 @@ let shallow_map ~tail ~non_tail:f = function
       Llet (str, layout, v, v_duid, f e1, tail e2)
   | Lmutlet (layout, v, v_duid, e1, e2) ->
       Lmutlet (layout, v, v_duid, f e1, tail e2)
+  | Ldelayedletrec (bindings, body) ->
+      Ldelayedletrec
+        (List.map
+            (fun (id, duid, rec_kind, value) -> (id, duid, rec_kind, f value))
+            bindings,
+          tail body)
   | Lletrec (idel, e2) ->
       Lletrec
         (List.map (fun rb ->
@@ -2833,8 +2871,8 @@ let may_allocate_in_region lam =
        We should fix that at some point. *)
     | Lsplice _ -> raise Exit
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
-    | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
-      | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
+    | ( Lapply _ | Llet _ | Lmutlet _ | Ldelayedletrec _ | Lletrec _ | Lswitch _
+      | Lstringswitch _ | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
       | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
       | Levent _ | Lifused _) as lam ->
        iter_head_constructor loop lam
@@ -2877,6 +2915,7 @@ let rec try_to_find_location lam =
     loc
   | Llet (_, _, _, _, lam, _)
   | Lmutlet (_, _, _, lam, _)
+  | Ldelayedletrec ((_, _, _, lam) :: _, _)
   | Lifthenelse (lam, _, _, _)
   | Lstaticcatch (lam, _, _, _, _)
   | Lstaticraise (_, lam :: _)
@@ -2888,7 +2927,8 @@ let rec try_to_find_location lam =
   | Lexclave lam
   | Ltrywith (lam, _, _, _, _) ->
     try_to_find_location lam
-  | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, []) ->
+  | Lvar _ | Lmutvar _ | Lconst _ | Ldelayedletrec _ | Lletrec _
+  | Lstaticraise (_, []) ->
     Debuginfo.Scoped_location.Loc_unknown
 
 let try_to_find_debuginfo lam =
