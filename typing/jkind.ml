@@ -992,7 +992,7 @@ module Layout_and_axes = struct
             ({ tuple_fuel; seen_constrs; seen_row_vars; fuel_status = _ } as t)
             ty =
           match Types.get_desc ty with
-          | Tpoly (ty, _) -> check ~relevant_axes t ty
+          | Tpoly (ty, _) | Trepr (ty, _) -> check ~relevant_axes t ty
           | Ttuple _ ->
             if tuple_fuel > 0
             then
@@ -3406,6 +3406,7 @@ module Format_history = struct
     | Structure_item ->
       fprintf ppf "it's the type of something stored in a module"
     | Signature_item -> fprintf ppf "it's the type of something in a signature"
+    | Layout_poly -> fprintf ppf "it's the layout polymorphic type"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -4250,6 +4251,7 @@ module Debug_printers = struct
     | Idx_element -> fprintf ppf "Idx_element"
     | Structure_item -> fprintf ppf "Structure_item"
     | Signature_item -> fprintf ppf "Signature_item"
+    | Layout_poly -> fprintf ppf "Layout_poly"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function

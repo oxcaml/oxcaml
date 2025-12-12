@@ -311,6 +311,9 @@ let fold_type_expr f init ty =
   | Tpoly (ty, tyl)     ->
     let result = f init ty in
     List.fold_left f result tyl
+  | Trepr (ty, tyl)     ->
+    let result = f init ty in
+    List.fold_left f result tyl
   | Tpackage (_, fl)  ->
     List.fold_left (fun result (_n, ty) -> f result ty) init fl
   | Tof_kind _ -> init
@@ -524,6 +527,9 @@ let rec copy_type_desc ?(keep_names=false) f = function
   | Tpoly (ty, tyl)     ->
       let tyl = List.map f tyl in
       Tpoly (f ty, tyl)
+  | Trepr (ty, tyl)     ->
+      let tyl = List.map f tyl in
+      Trepr (f ty, tyl)
   | Tpackage (p, fl)  -> Tpackage (p, List.map (fun (n, ty) -> (n, f ty)) fl)
   | Tof_kind jk -> Tof_kind jk
 
@@ -790,16 +796,20 @@ let tpoly_is_mono ty =
   match get_desc ty with
   | Tpoly(_, []) -> true
   | Tpoly(_, _ :: _) -> false
+  | Trepr(_, []) -> true
+  | Trepr(_, _ :: _) -> false
   | _ -> assert false
 
 let tpoly_get_poly ty =
   match get_desc ty with
   | Tpoly(ty, vars) -> (ty, vars)
+  | Trepr(ty, vars) -> (ty, vars)
   | _ -> assert false
 
 let tpoly_get_mono ty =
   match get_desc ty with
   | Tpoly(ty, []) -> ty
+  | Trepr(ty, []) -> ty
   | _ -> assert false
 
                   (**********)
