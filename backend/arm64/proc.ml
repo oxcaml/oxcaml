@@ -462,7 +462,8 @@ let assemble_file infile outfile =
     else
       ""
   in
-  Ccomp.command (Config.asm ^ " " ^
+  let arch_flags = "-march=armv8-a+crc " in
+  Ccomp.command (Config.asm ^ " " ^ arch_flags ^
                  (String.concat " " (Misc.debug_prefix_map_flags ())) ^
                  dwarf_flag ^
                  " -o " ^ Filename.quote outfile ^ " " ^ Filename.quote infile)
