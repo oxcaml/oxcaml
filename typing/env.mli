@@ -17,6 +17,7 @@
 
 open Types
 open Misc
+module Jkind = Btype.Jkind0
 
 type value_unbound_reason =
   | Val_unbound_instance_variable
@@ -56,7 +57,7 @@ type summary =
 type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * Jkind.Sort.t array * int
+  | Adot of address * Jkind_types.Sort.t array * int
 
 type t
 
@@ -331,7 +332,7 @@ val lookup_all_labels_from_type:
 
 type settable_variable =
   | Instance_variable of Path.t * Asttypes.mutable_flag * string * type_expr
-  | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind.Sort.t
+  | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind_types.Sort.t
 
 (** For a mutable variable, [use] means mark as mutated. For an instance
     variable, it means mark as used. *)
@@ -671,6 +672,10 @@ val print_longident: (Format.formatter -> Longident.t -> unit) ref
 val print_path: (Format.formatter -> Path.t -> unit) ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_type_expr: (Format.formatter -> Types.type_expr -> unit) ref
+(* Forward declaration to break mutual recursion with Jkind. *)
+val report_jkind_violation_with_offender:
+  (offender:(Format.formatter -> unit) -> level:int -> Format.formatter ->
+   Jkind.Violation.t -> unit) ref
 
 
 (** Folds *)
