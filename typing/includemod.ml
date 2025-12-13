@@ -30,7 +30,10 @@ type pos =
 
 type modes = Includecore.mmodes =
   | All
-  | Specific of Mode.Value.l * Mode.Value.r * held_locks option
+  | Specific:
+      ((Mode.allowed * 'r) Mode.Value.t * Typedtree.held_locks option) *
+      ('l * Mode.allowed) Mode.Value.t ->
+      modes
 
 module Error = struct
 
@@ -56,7 +59,6 @@ module Error = struct
   type 'a core_mdiff =('a,unit) mdiff
   let diff x y s = {got=x;expected=y; symptom=s}
   let mdiff x y m s = {got=x;expected=y;modes=m;symptom=s}
-  let sdiff x y = {got=x; expected=y; symptom=()}
 
   type class_declaration_symptom =
     | Class_type of Ctype.class_match_failure list
@@ -103,7 +105,12 @@ module Error = struct
   and arg_functor_param_symptom =
     (functor_parameter, Ident.t) functor_param_symptom
 
-  and functor_params_diff = (functor_parameter list * module_type) core_diff
+  and functor_params_symptom =
+    | Param of (functor_parameter, unit) functor_param_symptom
+    | Incompatible
+
+  and functor_params_diff =
+    (functor_parameter list * module_type, functor_params_symptom) diff
 
   and signature_symptom = {
     env: Env.t;
@@ -230,38 +237,10 @@ module Directionality = struct
 end
 
 let modes_unit =
-  Specific (
-    Env.mode_unit |> Mode.Value.disallow_right,
-    Env.mode_unit |> Mode.Value.disallow_left,
-    None
-  )
+  Specific ((Env.mode_unit, None), Env.mode_unit)
 
 let modes_toplevel =
-  Specific (
-    Env.mode_unit |> Mode.Value.disallow_right,
-    Env.mode_unit |> Mode.Value.disallow_left,
-    None
-  )
-
-let modes_functor_param mod_mode =
-  let m = Types.functor_param_mode |> Mode.alloc_as_value in
-  let mode, close_over_coercion = mod_mode in
-  Specific (
-    mode,
-    m |> Mode.Value.disallow_left,
-    close_over_coercion
-  )
-
-let modes_functor_param_legacy =
-  modes_functor_param (Mode.Value.(disallow_right legacy), None)
-
-let modes_functor_res =
-  let m = Types.functor_res_mode |> Mode.alloc_as_value in
-  Specific (
-    m |> Mode.Value.disallow_right,
-    m |> Mode.Value.disallow_left,
-    None
-  )
+  Specific ((Env.mode_unit, None), Env.mode_unit)
 
 (* All functions "blah env x1 x2" check that x1 is included in x2,
    i.e. that x1 is the type of an implementation that fulfills the
@@ -538,7 +517,9 @@ let pair_components subst sig1_comps sig2 =
 let retrieve_functor_params env mty =
   let rec retrieve_functor_params before env mty =
     match Mtype.scrape_alias env mty with
-    | Mty_functor (p, res) ->
+    | Mty_functor (p, res, _) ->
+        (* the function is only used for functor parameter diff, so the return
+           mode is intentionally ignored. *)
         retrieve_functor_params (p :: before) env res
     | Mty_ident _ | Mty_alias _ | Mty_signature _ | Mty_strengthen _ as res ->
         List.rev before, res
@@ -697,7 +678,7 @@ and try_modtypes ~direction ~loc env subst ~modes
       | Error e -> Error (Error.Signature e)
       end
 
-  | Mty_functor (param1, res1), Mty_functor (param2, res2) ->
+  | Mty_functor (param1, res1, mres1), Mty_functor (param2, res2, mres2) ->
       let* () =
         Includecore.check_modes env ~item:Module
           ~crossing:Ctype.mode_crossing_functor modes
@@ -723,8 +704,10 @@ and try_modtypes ~direction ~loc env subst ~modes
             var, Shape.app orig_shape ~arg:shape_var
       in
       let cc_res : (_, _ Error.mdiff) result =
+        let mres1 = Mode.alloc_as_value mres1 in
+        let mres2 = Mode.alloc_as_value mres2 in
         modtypes ~direction ~loc env subst res1 res2 res_shape
-          ~modes:modes_functor_res
+          ~modes:(Specific ((mres1, None), mres2))
       in
       begin match cc_arg, cc_res with
       | Ok Tcoerce_none, Ok (Tcoerce_none, final_res_shape) ->
@@ -744,21 +727,23 @@ and try_modtypes ~direction ~loc env subst ~modes
       | _, Error {Error.symptom = Error.Functor Error.Params res; _} ->
           let got_params, got_res = res.got in
           let expected_params, expected_res = res.expected in
-          let d = Error.sdiff
+          let d = Error.diff
               (force_functor_parameter param1::got_params, got_res)
               (force_functor_parameter param2::expected_params, expected_res)
+              res.symptom
           in
           Error Error.(Functor (Params d))
-      | Error _, _ ->
+      | Error symptom, _ ->
           let params1, res1 =
             retrieve_functor_params env (Subst.Lazy.force_modtype res1)
           in
           let params2, res2 =
             retrieve_functor_params env (Subst.Lazy.force_modtype res2)
           in
-          let d = Error.sdiff
+          let d = Error.diff
             (force_functor_parameter param1::params1, res1)
             (force_functor_parameter param2::params2, res2)
+            (Error.Param symptom)
           in
           Error Error.(Functor (Params d))
       | Ok _, Error res ->
@@ -802,7 +787,7 @@ and try_modtypes ~direction ~loc env subst ~modes
             let params2 =
               retrieve_functor_params env (Subst.Lazy.force_modtype mty2)
             in
-            let d = Error.sdiff params1 params2 in
+            let d = Error.diff params1 params2 Error.Incompatible in
             Error Error.(Functor (Params d))
         | _, (Mty_ident _ | Mty_strengthen _) ->
             Error Error.(Mt_core Not_an_identifier)
@@ -818,12 +803,14 @@ and functor_param ~direction ~loc env subst param1 param2 =
   match param1, param2 with
   | Unit, Unit ->
       Ok Tcoerce_none, env, subst
-  | Named (name1, arg1), Named (name2, arg2) ->
+  | Named (name1, arg1, marg1), Named (name2, arg2, marg2) ->
       let arg2' = Subst.Lazy.modtype Keep subst arg2 in
+      let marg1 = Mode.alloc_as_value marg1 in
+      let marg2 = Mode.alloc_as_value marg2 in
       let cc_arg =
         match
           modtypes ~direction ~loc env Subst.identity arg2' arg1
-                Shape.dummy_mod ~modes:modes_functor_param_legacy
+                Shape.dummy_mod ~modes:(Specific ((marg2, None), marg1))
         with
         | Ok (cc, _) -> Ok cc
         | Error err -> Error (Error.Mismatch err)
@@ -1166,11 +1153,12 @@ and check_modtype_equiv ~direction ~loc env mty1 mty2 =
   | Error less_than, Some Error greater_than ->
       Error Error.(Incomparable {less_than; greater_than})
 
-let include_functor_signatures ~direction ~loc env subst sig1 sig2 mod_shape =
+let include_functor_signatures ~direction ~loc env subst sig1 sig2
+  ~modes mod_shape =
   let _, _, comps1 = build_component_table (fun _pos name -> name) sig1 in
   let paired, unpaired, subst = pair_components subst comps1 sig2 in
   let d = signature_components ~direction ~loc env subst mod_shape
-            Shape.Map.empty ~mmodes:modes_functor_param_legacy
+            Shape.Map.empty ~mmodes:modes
             (List.rev paired)
   in
   let open Sign_diff in
@@ -1227,7 +1215,7 @@ let check_functor_application_raw ~loc env mty1 path1 mty2 =
   let aliasable = can_alias env path1 in
   let direction = Directionality.unknown ~mark:true in
   strengthened_modtypes ~direction ~loc ~aliasable env
-    Subst.identity ~modes:modes_functor_param_legacy mty1 path1 mty2
+    Subst.identity ~modes:All mty1 path1 mty2
       Shape.dummy_mod
   |> Result.map fst
 
@@ -1312,7 +1300,7 @@ module Functor_inclusion_diff = struct
   module Diff = Diffing.Define(Defs)
 
   let param_name = function
-      | Named(x,_) -> x
+      | Named(x,_,_) -> x
       | Unit -> None
 
   let weight: Diff.change -> _ = function
@@ -1361,13 +1349,13 @@ module Functor_inclusion_diff = struct
 
   let rec update (d:Diff.change) st =
     match d with
-    | Insert (Unit | Named (None,_))
-    | Delete (Unit | Named (None,_))
+    | Insert (Unit | Named (None,_,_))
+    | Delete (Unit | Named (None,_,_))
     | Keep (Unit,_,_)
     | Keep (_,Unit,_) ->
         (* No named abstract parameters: we keep the same environment *)
         st, [||]
-    | Insert (Named (Some id, arg)) | Delete (Named (Some id, arg)) ->
+    | Insert (Named (Some id, arg, _)) | Delete (Named (Some id, arg, _)) ->
         (* one named parameter to bind *)
         st |> bind id arg |> expand_params
     | Change (delete, insert, _) ->
@@ -1375,7 +1363,7 @@ module Functor_inclusion_diff = struct
            to the environment without equating them. *)
         let st, _expansion = update (Diffing.Delete delete) st in
         update (Diffing.Insert insert) st
-    | Keep (Named (name1, _), Named (name2, arg2), _) ->
+    | Keep (Named (name1, _, _), Named (name2, arg2, _), _) ->
         let arg2 = Subst.Lazy.of_modtype arg2 in
         let arg = Subst.Lazy.modtype Keep st.subst arg2 in
         let env, subst =
@@ -1442,22 +1430,23 @@ module Functor_app_diff = struct
   let update (d: Diff.change) (st:Defs.state) =
     let open Error in
     match d with
-    | Insert (Unit|Named(None,_))
+    | Insert (Unit|Named(None,_,_))
     | Delete _ (* delete is a concrete argument, not an abstract parameter*)
     | Keep ((Unit,_,_),_,_) (* Keep(Unit,_) implies Keep(Unit,Unit) *)
-    | Keep (_,(Unit|Named(None,_)),_)
-    | Change (_,(Unit|Named (None,_)), _ ) ->
+    | Keep (_,(Unit|Named(None,_,_)),_)
+    | Change (_,(Unit|Named (None,_,_)), _ ) ->
         (* no abstract parameters to add, nor any equations *)
         st, [||]
-    | Insert(Named(Some param, param_ty))
-    | Change(_, Named(Some param, param_ty), _ ) ->
+    | Insert(Named(Some param, param_ty, _))
+    | Change(_, Named(Some param, param_ty, _), _ ) ->
         (* Change is Delete + Insert: we add the Inserted parameter to the
            environment to track equalities with external components that the
            parameter might add. *)
         let mty = Subst.modtype Keep st.subst param_ty in
         let env = Env.add_module ~arg:true param Mp_present mty st.env in
         I.expand_params { st with env }
-    | Keep ((Named arg,  _mty, _mode) , Named (Some param, _param), _) ->
+    | Keep ((Named arg,  _mty, _mode),
+      Named (Some param, _param, _param_m), _) ->
         let res =
           Option.map (fun res ->
               let scope = Ctype.create_scope () in
@@ -1469,7 +1458,7 @@ module Functor_app_diff = struct
         let subst = Subst.add_module param arg st.subst in
         I.expand_params { st with subst; res }
     | Keep (((Anonymous|Empty_struct), mty, (mode, _locks)),
-            Named (Some param, _param), _) ->
+            Named (Some param, _param, _param_m), _) ->
         let mty' = Subst.modtype Keep st.subst mty in
         let env = Env.add_module ~arg:true param Mp_present mty' ~mode st.env in
         let res = Option.map (Mtype.nondep_supertype env [param]) st.res in
@@ -1485,12 +1474,14 @@ module Functor_app_diff = struct
             | (Unit|Empty_struct), Unit -> Ok Tcoerce_none
             | Unit, Named _ | (Anonymous | Named _), Unit ->
                 Result.Error (Error.Incompatible_params(arg,param))
-            | ( Anonymous | Named _ | Empty_struct ), Named (_, param) ->
+            | ( Anonymous | Named _ | Empty_struct ),
+              Named (_, param, param_m) ->
+               let param_m = Mode.alloc_as_value param_m in
                let direction = Directionality.unknown ~mark:false in
                 match
                   modtypes ~direction ~loc state.env
                     state.subst arg_mty param
-                    ~modes:(modes_functor_param arg_mode) Shape.dummy_mod
+                    ~modes:(Specific (arg_mode, param_m)) Shape.dummy_mod
                 with
                 | Error mty -> Result.Error (Error.Mismatch mty)
                 | Ok (cc, _) -> Ok cc
@@ -1544,12 +1535,12 @@ let check_implementation env ~modes impl intf =
   in
   ignore (gen_signatures env ~direction ~modes impl intf)
 
-let include_functor_signatures env ~mark sig1 sig2 =
+let include_functor_signatures env ~mark sig1 sig2 ~modes =
   let sig1 = List.map Subst.Lazy.of_signature_item sig1 in
   let sig2 = List.map Subst.Lazy.of_signature_item sig2 in
   let direction = Directionality.unknown ~mark in
   match include_functor_signatures ~direction ~loc:Location.none env
-          Subst.identity sig1 sig2 Shape.dummy_mod
+          Subst.identity sig1 sig2 ~modes Shape.dummy_mod
   with
   | Ok cc -> cc
   | Error reason -> raise (Error(env,Error.(In_Include_functor_signature reason)))

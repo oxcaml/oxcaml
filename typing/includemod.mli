@@ -89,8 +89,17 @@ module Error: sig
   and arg_functor_param_symptom =
     (Types.functor_parameter, Ident.t) functor_param_symptom
 
+  and functor_params_symptom =
+    | Param of (functor_parameter, unit) functor_param_symptom
+    (** One of the parameters is mismatched *)
+    | Incompatible
+    (** One side is a functor but the other side is not *)
+
   and functor_params_diff =
-    (Types.functor_parameter list * Types.module_type) core_diff
+    (Types.functor_parameter list * Types.module_type,
+     functor_params_symptom) diff
+    (** the return mode of the functor is intentionally omitted, since the diff
+        is only about parameters. *)
 
   and signature_symptom = {
     env: Env.t;
@@ -160,13 +169,6 @@ val modes_unit : modes
   a structure *)
 val modes_toplevel : modes
 
-(** Takes the mode of functor argument, returns the [modes] suitable for
-  modal inclusion check against the parameter. *)
-val modes_functor_param : Typedtree.mode_with_locks -> modes
-
-(** The modes used for functor result inclusion check *)
-val modes_functor_res : modes
-
 (* Typechecking *)
 
 val modtypes:
@@ -207,7 +209,7 @@ val signatures: Env.t -> mark:bool -> modes:modes ->
   signature -> signature -> module_coercion
 
 val include_functor_signatures : Env.t -> mark:bool ->
-  signature -> signature -> (Ident.t * module_coercion) list
+  signature -> signature -> modes:modes -> (Ident.t * module_coercion) list
 
 val check_implementation: Env.t -> modes:modes -> signature -> signature -> unit
 (** Check an implementation against an interface *)

@@ -132,7 +132,10 @@ type type_mismatch =
 type mmodes =
   | All
   (** Check module inclusion [M1 : MT1 @ m <= MT2 @ m] for all [m]. *)
-  | Specific of Mode.Value.l * Mode.Value.r * Typedtree.held_locks option
+  | Specific:
+      ((Mode.allowed * 'r) Mode.Value.t * Typedtree.held_locks option) *
+      ('l * Mode.allowed) Mode.Value.t ->
+      mmodes
   (** Check module inclusion [M1 : MT1 @ m1 <= MT2 @ m2].
 
     No prior constraint between [m1] and [m2] is given. In particular, it's
