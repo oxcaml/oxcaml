@@ -270,7 +270,7 @@ value float32_min_max_num_boxed(value l, value r)
 
 value float32_frexp_boxed(value f)
 {
-    CAMLparam1(f);
+    CAMLparam0();
     CAMLlocal1(mantissa);
     value res;
     int exponent;
