@@ -407,7 +407,7 @@ CAMLprim value caml_signbit_float32_bytecode(value f)
 
 CAMLprim value caml_frexp_float32(value f)
 {
-  CAMLparam0 ();
+  CAMLparam1 (f);
   CAMLlocal1 (mantissa);
   value res;
   int exponent;
@@ -421,7 +421,7 @@ CAMLprim value caml_frexp_float32(value f)
 
 CAMLprim value caml_modf_float32(value f)
 {
-  CAMLparam0 ();
+  CAMLparam1 (f);
   CAMLlocal2 (quo, rem);
   value res;
   float frem;
