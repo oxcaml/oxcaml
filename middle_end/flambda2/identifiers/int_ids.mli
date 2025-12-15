@@ -247,7 +247,7 @@ module Code_id : sig
 
   (* The [rename] function, in addition to changing the stamp of the code ID,
      changes the compilation unit to the current one. *)
-  val rename : preserve_debug_info:unit -> t -> t
+  val rename : t -> t
 
   val invert_map : t Map.t -> t Map.t
 

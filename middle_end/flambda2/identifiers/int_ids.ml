@@ -845,7 +845,7 @@ module Code_id = struct
     in
     Table.add !grand_table_of_code_ids data
 
-  let rename ~preserve_debug_info:() t =
+  let rename t =
     create ~name:(name t) ~debug:(debug t) (Compilation_unit.get_current_exn ())
 
   let in_compilation_unit t comp_unit =

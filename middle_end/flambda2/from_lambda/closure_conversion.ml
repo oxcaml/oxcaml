@@ -2807,8 +2807,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let main_code_id =
     match calling_convention with
     | Normal_calling_convention -> code_id
-    | Unboxed_calling_convention _ ->
-      Code_id.rename ~preserve_debug_info:() code_id
+    | Unboxed_calling_convention _ -> Code_id.rename code_id
   in
   let contains_no_escaping_local_allocs =
     match Function_decl.result_mode decl with
