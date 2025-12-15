@@ -50,7 +50,7 @@ type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
 type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
 
 module Dwarf_config_defaults = struct
-  let shape_reduce_depth = Some 20
+  let shape_reduce_depth = Some 50
   let shape_eval_depth = Some 5
   let max_cms_files_per_unit = Some 1000
   let max_cms_files_per_variable = Some 50
