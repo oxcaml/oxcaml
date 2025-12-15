@@ -41,6 +41,81 @@ type section = {
   sh_name_str  : string;
 }
 
+(** ELF section header types (sh_type field). *)
+module Section_type : sig
+  val sht_null : u32
+  (** Inactive section header. *)
+
+  val sht_progbits : u32
+  (** Program-defined data. *)
+
+  val sht_symtab : u32
+  (** Symbol table. *)
+
+  val sht_strtab : u32
+  (** String table. *)
+
+  val sht_rela : u32
+  (** Relocation entries with addends. *)
+
+  val sht_symtab_shndx : u32
+  (** Extended section indices for symbols (when section count >= SHN_LORESERVE). *)
+end
+
+(** ELF section header flags (sh_flags field). *)
+module Section_flags : sig
+  (** Section attribute flags. These can be combined with [Int64.logor]. *)
+
+  val shf_write : u64
+  (** Section contains writable data. *)
+
+  val shf_alloc : u64
+  (** Section occupies memory during process execution. *)
+
+  val shf_execinstr : u64
+  (** Section contains executable machine instructions. *)
+
+  val shf_info_link : u64
+  (** sh_info field contains a section header table index. *)
+
+  val is_set : u64 -> flag:u64 -> bool
+  (** [is_set flags ~flag] returns true if [flag] is set in [flags]. *)
+
+  val is_alloc : u64 -> bool
+  (** [is_alloc flags] returns true if the section occupies memory during
+      execution (i.e., [shf_alloc] is set). *)
+end
+
+(** Create a PROGBITS section header. *)
+val make_progbits_section :
+  sh_name:u32 ->
+  sh_name_str:string ->
+  sh_flags:u64 ->
+  sh_offset:u64 ->
+  sh_size:u64 ->
+  sh_addralign:u64 ->
+  section
+
+(** Create a RELA section header. *)
+val make_rela_section :
+  sh_name:u32 ->
+  sh_name_str:string ->
+  sh_offset:u64 ->
+  sh_size:u64 ->
+  sh_link:u32 ->
+  sh_info:u32 ->
+  section
+
+(** Create a SYMTAB_SHNDX section header for extended section indices.
+    sh_link should be the index of the associated symbol table. *)
+val make_symtab_shndx_section :
+  sh_name:u32 ->
+  sh_name_str:string ->
+  sh_offset:u64 ->
+  sh_size:u64 ->
+  sh_link:u32 ->
+  section
+
 (** From a buffer pointing to an ELF image, [read_elf] decodes the header and
     section table. *)
 val read_elf : Owee_buf.t -> header * section array
@@ -143,3 +218,19 @@ end
 (** Fish out both the dynamic and static symbol tables (.dynsym and .symtab)
     from the given ELF buffer and section array. *)
 val find_symbol_table : Owee_buf.t -> section array -> Symbol_table.t option
+
+(** [iter_symbols ~symtab_body ~strtab_body ~f] iterates over all symbols in
+    the symbol table, calling [f] with each symbol's name and raw fields.
+    This is a lower-level interface than Symbol_table for cases where you need
+    to process all symbols sequentially. *)
+val iter_symbols :
+  symtab_body:Owee_buf.t ->
+  strtab_body:Owee_buf.t ->
+  f:(name:string ->
+     st_info:int ->
+     st_other:int ->
+     st_shndx:int ->
+     st_value:int64 ->
+     st_size:int64 ->
+     unit) ->
+  unit

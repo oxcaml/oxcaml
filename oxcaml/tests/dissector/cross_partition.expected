@@ -1,0 +1,56 @@
+=== Cross-partition test ===
+
+Test 1: Direct calls to Gen_module_a
+  Counter: 1, 2
+  Magic: 42
+  arr[5]: 5
+  f00010(100): 111
+
+Test 2: Calls through Gen_module_b
+  B.increment: 1
+  B.call_a_increment: 3
+  B.call_a_magic: 42
+  B.get_a_arr_element(10): 10
+  B.arr[15]: 200015
+
+Test 3: Calls through Gen_module_c
+  C.increment: 1
+  C.call_a_increment: 4
+  C.call_b_increment: 2
+  C.call_a_magic: 42
+  C.get_a_arr_element(20): 20
+  C.get_b_arr_element(25): 200025
+  C.arr[30]: 400030
+
+Test 4: call_all functions
+  A.call_all(1): 50015000
+  B.call_all(1): 150015000
+  C.call_all(1): 250015000
+  B.call_a_functions(1): 50015000
+  C.call_both_functions(1): 200030000
+
+Test 5: Direct mutable data access
+  B.read_a_counter_direct: 4
+  After B.write_a_counter_direct(100): 100
+  C.read_a_counter_direct: 100
+  C.read_b_counter_direct: 2
+  After C writes - A.counter: 200, B.counter: 50
+  B.get_a_static_data()[0]: 100
+  C.get_a_static_data()[1]: 200
+  C.get_b_static_data()[2]: 800
+
+Test 6: Closures with cross-partition refs
+  B.make_a_incrementer()(): 201
+  B.make_a_incrementer()() again: 202
+  B.make_a_arr_reader(7)(): 7
+  B.captured_a_increment(): 203
+  C.make_combined_incrementer()(): 255
+  C.make_multi_arr_reader(3,5)(): 200008
+  C.captured_b_via_a(): 205
+
+Test 7: Final counter state
+  A.counter: 205
+  B.counter: 51
+  C.counter: 1
+
+=== All tests passed! ===

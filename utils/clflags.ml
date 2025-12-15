@@ -896,6 +896,15 @@ let zero_alloc_assert = ref Zero_alloc_annotations.Assert.Assert_default (* -zer
 
 let no_auto_include_otherlibs = ref false      (* -no-auto-include-otherlibs *)
 
+let dissector = ref false                      (* -dissector *)
+let dissector_partition_size_default = 1.0     (* Default size in GiB *)
+let dissector_partition_size = ref None        (* -dissector-partition-size *)
+let ddissector = ref false                     (* -ddissector *)
+let ddissector_sizes = ref false               (* -ddissector-sizes *)
+let ddissector_verbose = ref false             (* -ddissector-verbose *)
+let ddissector_partitions = ref false          (* -ddissector-partitions *)
+let ddissector_inputs = ref None               (* -ddissector-inputs <file> *)
+
 let prepend_directory file_name =
   match !directory with
   | Some directory -> Filename.concat directory file_name

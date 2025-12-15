@@ -548,6 +548,8 @@ let read_one_param ppf position name v =
     if check_bool ppf name v then
       Language_extension.set_universe_and_enable_all No_extensions
 
+  | "dissector" -> set "dissector" [ Clflags.dissector ] v
+
   | _ ->
     if !warnings_for_discarded_params &&
        not (List.mem name !can_discard) then begin

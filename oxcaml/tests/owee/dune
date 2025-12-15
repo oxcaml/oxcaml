@@ -1,0 +1,74 @@
+; Tests for Owee_archive module
+; Works on both Linux (ELF) and macOS (Mach-O) - archive reading is
+; platform-independent, but ELF section parsing only works on Linux.
+
+; Build the test executable
+(executable
+ (name test_archive)
+ (modules test_archive)
+ (libraries compiler_owee unix))
+
+; Compile test_file1.c to test_file1.o
+(rule
+ (enabled_if (= %{context_name} "main"))
+ (target test_file1.o)
+ (deps test_file1.c)
+ (action (run %{cc} -c %{deps} -o %{target})))
+
+; Compile test_file2.c to test_file2.o
+(rule
+ (enabled_if (= %{context_name} "main"))
+ (target test_file2.o)
+ (deps test_file2.c)
+ (action (run %{cc} -c %{deps} -o %{target})))
+
+; Create archive from the object files
+(rule
+ (enabled_if (= %{context_name} "main"))
+ (target test_archive.a)
+ (deps test_file1.o test_file2.o)
+ (action (run ar rcs %{target} %{deps})))
+
+; Run the test and capture output
+(rule
+ (enabled_if (= %{context_name} "main"))
+ (target test_archive.output)
+ (deps test_archive.exe test_archive.a)
+ (action (with-outputs-to %{target} (run ./test_archive.exe test_archive.a))))
+
+; Generate expected output dynamically using system tools (Linux)
+; Uses ar and readelf to get the same information Owee should produce
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (target test_archive.expected)
+ (deps test_archive.a test_file1.o test_file2.o generate_expected.sh)
+ (action
+  (with-outputs-to %{target}
+   (run bash generate_expected.sh test_archive.a))))
+
+; Compare Owee output to system-generated expected output (Linux)
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (deps test_archive.expected test_archive.output)
+ (action (diff test_archive.expected test_archive.output)))
+
+; macOS: Just verify the test runs without error (no ELF parsing on Mach-O)
+; The test will report "not ELF" for each member, which is expected
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "macosx")))
+ (deps test_archive.output)
+ (action (bash "
+   # Verify output has expected structure
+   grep -q 'Archive: test_archive.a' test_archive.output || exit 1
+   grep -q 'Number of members:' test_archive.output || exit 1
+   grep -q 'Member:' test_archive.output || exit 1
+   echo 'macOS archive test passed'
+ ")))

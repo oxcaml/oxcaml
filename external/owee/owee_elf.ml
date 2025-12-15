@@ -144,6 +144,75 @@ type section = {
   sh_name_str : string;
 }
 
+module Section_type = struct
+  let sht_null = 0
+  let sht_progbits = 1
+  let sht_symtab = 2
+  let sht_strtab = 3
+  let sht_rela = 4
+  let sht_symtab_shndx = 18
+end
+
+module Section_flags = struct
+  let shf_write = 0x1L
+  let shf_alloc = 0x2L
+  let shf_execinstr = 0x4L
+  let shf_info_link = 0x40L
+
+  let is_set flags ~flag = Int64.logand flags flag <> 0L
+  let is_alloc flags = is_set flags ~flag:shf_alloc
+end
+
+let make_progbits_section ~sh_name ~sh_name_str ~sh_flags ~sh_offset ~sh_size
+    ~sh_addralign =
+  { sh_name;
+    sh_type = Section_type.sht_progbits;
+    sh_flags;
+    sh_addr = 0L;
+    sh_offset;
+    sh_size;
+    sh_link = 0;
+    sh_info = 0;
+    sh_addralign;
+    sh_entsize = 0L;
+    sh_name_str
+  }
+
+let rela_entry_size = 24
+
+let make_rela_section ~sh_name ~sh_name_str ~sh_offset ~sh_size ~sh_link
+    ~sh_info =
+  { sh_name;
+    sh_type = Section_type.sht_rela;
+    sh_flags = Section_flags.shf_info_link;
+    sh_addr = 0L;
+    sh_offset;
+    sh_size;
+    sh_link;
+    sh_info;
+    sh_addralign = 8L;
+    sh_entsize = Int64.of_int rela_entry_size;
+    sh_name_str
+  }
+
+(* Size of an entry in SYMTAB_SHNDX section (Elf32_Word) *)
+let symtab_shndx_entry_size = 4
+
+let make_symtab_shndx_section ~sh_name ~sh_name_str ~sh_offset ~sh_size ~sh_link
+    =
+  { sh_name;
+    sh_type = Section_type.sht_symtab_shndx;
+    sh_flags = 0L;
+    sh_addr = 0L;
+    sh_offset;
+    sh_size;
+    sh_link;
+    sh_info = 0;
+    sh_addralign = 4L;
+    sh_entsize = Int64.of_int symtab_shndx_entry_size;
+    sh_name_str
+  }
+
 let read_section header t n =
   seek t ((Int64.to_int header.e_shoff) + n * header.e_shentsize);
   ensure t 64 "Shdr truncated";
@@ -187,15 +256,53 @@ let write_section_name shstrndx t shdr name =
   seek t ((Int64.to_int shstrndx.sh_offset) + n);
   Write.zero_terminated_string t name
 
+(* ELF extended section numbering constants *)
+let shn_xindex = 0xFFFF
+let shn_loreserve = 0xFF00
+
+(* Resolve extended section numbering. Returns (actual_shnum, actual_shstrndx).
+   If e_shnum is 0, the actual count is in sh_size of section header 0.
+   If e_shstrndx >= SHN_LORESERVE, the actual string table index is in
+   sh_link of section header 0. *)
+let resolve_extended_numbering header t =
+  if header.e_shnum = 0 || header.e_shstrndx >= shn_loreserve then
+    let section0 = read_section header t 0 in
+    let actual_shnum =
+      if header.e_shnum = 0 then Int64.to_int section0.sh_size
+      else header.e_shnum
+    in
+    let actual_shstrndx =
+      if header.e_shstrndx >= shn_loreserve then section0.sh_link
+      else header.e_shstrndx
+    in
+    actual_shnum, actual_shstrndx
+  else
+    header.e_shnum, header.e_shstrndx
+
 let read_sections header t =
-  let sections = Array.init header.e_shnum (read_section header t) in
-  let shstrndx = sections.(header.e_shstrndx) in
+  let e_shnum, e_shstrndx = resolve_extended_numbering header t in
+  let sections = Array.init e_shnum (read_section header t) in
+  let shstrndx = sections.(e_shstrndx) in
   Array.map
     (fun s -> {s with sh_name_str = read_section_name shstrndx t s})
     sections
 
 let write_sections header t sections =
-  let shstrndx = sections.(header.e_shstrndx) in
+  (* Handle extended section numbering when writing. The header passed in
+     should have the actual (resolved) values for e_shnum and e_shstrndx.
+     We need to write extended numbering if either exceeds SHN_LORESERVE. *)
+  let num_sections = Array.length sections in
+  let shstrndx_val = header.e_shstrndx in
+  let needs_extended = num_sections >= shn_loreserve || shstrndx_val >= shn_loreserve in
+  (* Update section 0 for extended numbering if needed *)
+  if needs_extended && num_sections > 0 then begin
+    let s0 = sections.(0) in
+    sections.(0) <- { s0 with
+      sh_size = if num_sections >= shn_loreserve then Int64.of_int num_sections else s0.sh_size;
+      sh_link = if shstrndx_val >= shn_loreserve then shstrndx_val else s0.sh_link
+    }
+  end;
+  let shstrndx = sections.(shstrndx_val) in
   Array.iteri (write_section header t) sections;
   Array.iter (fun section ->
       write_section_name shstrndx t section section.sh_name_str) sections
@@ -204,14 +311,27 @@ let read_elf buffer =
   let elf = cursor buffer in
   read_magic elf;
   let e_ident = read_identification elf in
-  let header = read_header elf e_ident in
-  header, read_sections header elf
+  let raw_header = read_header elf e_ident in
+  let actual_shnum, actual_shstrndx = resolve_extended_numbering raw_header elf in
+  (* Return header with resolved values so callers can use them directly *)
+  let header = { raw_header with e_shnum = actual_shnum; e_shstrndx = actual_shstrndx } in
+  header, read_sections raw_header elf
 
 let write_elf buffer header sections =
   let elf = cursor buffer in
   write_magic elf;
   write_identification elf header.e_ident;
-  write_header elf header;
+  (* Write header with extended numbering markers if needed *)
+  let num_sections = Array.length sections in
+  let write_header_adjusted =
+    if num_sections >= shn_loreserve || header.e_shstrndx >= shn_loreserve then
+      { header with
+        e_shnum = if num_sections >= shn_loreserve then 0 else num_sections;
+        e_shstrndx = if header.e_shstrndx >= shn_loreserve then shn_xindex else header.e_shstrndx
+      }
+    else header
+  in
+  write_header elf write_header_adjusted;
   write_sections header elf sections
 
 let section_body buffer shdr =
@@ -404,3 +524,25 @@ let find_symbol_table buf sections =
   match find_section_body buf sections ~section_name:".symtab" with
   | None -> None
   | Some symtab -> Some (Symbol_table.create [symtab])
+
+let iter_symbols ~symtab_body ~strtab_body ~f =
+  let num_symbols = (size symtab_body) / Symbol_table.Symbol.struct_size in
+  for i = 0 to num_symbols - 1 do
+    let sym_cursor = cursor symtab_body ~at:(i * Symbol_table.Symbol.struct_size) in
+    let st_name_offset = Read.u32 sym_cursor in
+    let st_info = Read.u8 sym_cursor in
+    let st_other = Read.u8 sym_cursor in
+    let st_shndx = Read.u16 sym_cursor in
+    let st_value = Read.u64 sym_cursor in
+    let st_size = Read.u64 sym_cursor in
+    let name =
+      if st_name_offset = 0
+      then ""
+      else
+        let name_cursor = cursor strtab_body ~at:st_name_offset in
+        match Read.zero_string name_cursor () with
+        | Some s -> s
+        | None -> ""
+    in
+    f ~name ~st_info ~st_other ~st_shndx ~st_value ~st_size
+  done

@@ -55,6 +55,8 @@
 
 (copy_files# asmcomp/*.ml{,i})
 
+(copy_files# asmcomp/dissector/*.ml{,i})
+
 (copy_files# optcomp/*.ml{,i})
 
 (copy_files# backend/*.ml{,i})
@@ -538,6 +540,21 @@
   cm_bundle
   linkenv
   optlink
+  ;; asmcomp/dissector/
+  dissector_log
+  build_igot_and_iplt
+  build_linker_args
+  dissector
+  extract_relocations
+  form_rewrite_plan
+  igot
+  iplt
+  linker_script
+  measure_object_files
+  partial_link
+  partition
+  partition_object_files
+  rewrite_sections
   ;; backend/
   afl_instrument
   arch
