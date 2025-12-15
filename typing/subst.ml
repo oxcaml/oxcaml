@@ -22,6 +22,8 @@ open Btype
 
 open Local_store
 
+module Jkind = Btype.Jkind0
+
 type jkind_error =
   | Unconstrained_jkind_variable
 
@@ -145,7 +147,7 @@ end = struct
         ~ran_out_of_fuel_during_normalize
         ~annotation:(Some { pjkind_loc = Location.none;
                             pjkind_desc = Pjk_abbreviation builtin.name })
-        ~why:Jkind.History.Imported)
+        ~why:Jkind_intf.History.Imported)
 
   let best_builtins =
     let sufficient_fuel =
@@ -181,14 +183,14 @@ end = struct
     (match quality with
      | Best ->
        List.find_opt (fun ((builtin, _) : (allowed * disallowed) Jkind.Const.t * _) ->
-         Jkind.Const.no_with_bounds_and_equal
+         Jkind.Const.shallow_no_with_bounds_and_equal
            (const |> Jkind.Const.disallow_right)
            (builtin |> Jkind.Const.allow_left))
        (best_builtins ~ran_out_of_fuel_during_normalize)
        |> Option.map (fun (_, jkind) -> jkind |> Jkind.allow_left)
      | Not_best ->
        List.find_opt (fun (builtin, _) ->
-         Jkind.Const.no_with_bounds_and_equal
+         Jkind.Const.shallow_no_with_bounds_and_equal
            const
            (builtin |> Jkind.Const.allow_left |> Jkind.Const.allow_right))
          (not_best_builtins ~ran_out_of_fuel_during_normalize)

@@ -24,6 +24,7 @@ open Types
 
 open Local_store
 
+module Jkind = Btype.Jkind0
 module String = Misc.Stdlib.String
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
@@ -3472,12 +3473,16 @@ let unboxed_type ~errors ~env ~loc ~lid ty =
   match ty with
   | None -> ()
   | Some ty ->
-    (* The type is the type of a variable in the environment. It thus is likely generic. Despite
-       the fact that instantiated variables work better in [constrain_type_jkind] (because they
-       can be assigned more specific jkinds), we actually want to work on these generic types
-       here. After all, it's the value in the environment that is getting captured by the object,
+    (* The type is the type of a variable in the environment. It thus is likely
+       generic. Despite the fact that instantiated variables work better in
+       [constrain_type_jkind] (because they can be assigned more specific
+       jkinds), we actually want to work on these generic types here. After all,
+       it's the value in the environment that is getting captured by the object,
        not a specific instance of that variable. *)
-    match !constrain_type_jkind env ty Jkind.Builtin.(value_or_null ~why:Captured_in_object) with
+    match
+      !constrain_type_jkind env ty
+        Jkind.Builtin.(value_or_null ~why:Captured_in_object)
+    with
     | Ok () -> ()
     | Result.Error err ->
       may_lookup_error errors loc env (Non_value_used_in_object (lid, ty, err))
@@ -4352,7 +4357,7 @@ let lookup_all_labels_from_type ?(use=true) ~record_form ~loc usage ty_path env
 
 type settable_variable =
   | Instance_variable of Path.t * Asttypes.mutable_flag * string * type_expr
-  | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind.Sort.t
+  | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind_types.Sort.t
 
 let lookup_settable_variable ?(use=true) ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with
@@ -4646,6 +4651,11 @@ let print_path =
 let print_type_expr =
   ref ((fun _ _ -> assert false) : formatter -> Types.type_expr -> unit)
 
+let report_jkind_violation_with_offender =
+  ref ((fun ~offender:_ ~level:_ _ _ -> assert false)
+       : offender:(Format.formatter -> unit) -> level:int -> Format.formatter ->
+         Jkind.Violation.t -> unit)
+
 let spellcheck ppf extract env lid =
   let choices ~path name = Misc.spellcheck (extract path env) name in
   match lid with
@@ -4933,7 +4943,7 @@ let report_lookup_error ~level _loc env ppf = function
       fprintf ppf "@[%a must have a type of layout value because it is \
                    captured by an object.@ %a@]"
         (Style.as_inline_code !print_longident) lid
-        (fun v -> Jkind.Violation.report_with_offender
+        (fun v -> !report_jkind_violation_with_offender
            ~offender:(fun ppf -> !print_type_expr ppf typ)
            ~level v)
         err
