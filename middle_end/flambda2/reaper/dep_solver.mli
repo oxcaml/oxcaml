@@ -29,6 +29,12 @@ val print_unboxed_fields :
   'a unboxed_fields ->
   unit
 
+val fold_unboxed_with_kind :
+  (Flambda_kind.t -> 'a -> 'b -> 'b) ->
+  'a unboxed_fields Field.Map.t ->
+  'b ->
+  'b
+
 type unboxed = Variable.t unboxed_fields Field.Map.t
 
 type changed_representation =
@@ -76,10 +82,15 @@ val code_id_actually_directly_called :
 val rewrite_typing_env :
   result -> unit_symbol:Symbol.t -> typing_env -> typing_env
 
+type keep_or_delete =
+  | Keep
+  | Delete
+
 val rewrite_result_types :
   result ->
   old_typing_env:typing_env ->
-  Variable.t list ->
-  Variable.t list ->
+  my_closure:Variable.t ->
+  params:(Variable.t * keep_or_delete) list ->
+  results:(Variable.t * keep_or_delete) list ->
   Result_types.t ->
   Result_types.t
