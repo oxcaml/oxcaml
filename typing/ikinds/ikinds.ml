@@ -1,5 +1,5 @@
 (* This forces ikinds globally on. *)
-Clflags.ikinds := false;
+Clflags.ikinds := true;
 
 (* Global feature toggles for the ikinds experiment.
    These are intended to be easy to flip while iterating on
