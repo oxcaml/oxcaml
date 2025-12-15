@@ -18,6 +18,16 @@
 [@@@ocaml.warning "-60"] module Str = Ast_helper.Str (* For ocamldep *)
 [@@@ocaml.warning "+60"]
 
+let make_some_noisef fmt =
+  match Sys.getenv_opt "NOISY" with
+  | Some _ -> Format.eprintf fmt
+  | None -> Format.ifprintf Format.err_formatter fmt
+
+let making_some_noise (noisy : (unit -> 'a) -> 'a) (work : (unit -> 'a)) =
+  match Sys.getenv_opt "NOISY" with
+  | Some _ -> noisy work
+  | None -> work ()
+
 open Iarray_shim
 
 open Misc
@@ -28,6 +38,13 @@ open Mode
 open Typedtree
 open Btype
 open Ctype
+
+    let pp_lbl ppf lbl =
+      Format.fprintf ppf "@[<hv 2>%s@ : %a@ -> %a@]" lbl.lbl_name !Btype.printtyp_type_expr_fwd lbl.lbl_arg
+        !Btype.printtyp_type_expr_fwd lbl.lbl_res
+    let pp_lbls ppf lbls =
+      Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf "@.")
+        pp_lbl ppf (lbls |> Iarray.to_list)
 
 type comprehension_type =
   | List_comprehension
@@ -1542,6 +1559,8 @@ and build_as_type_and_mode_extra env p ~mode : _ -> _ * _ = function
 and build_as_type_aux (env : Env.t) p ~mode =
   let build_as_type env p = fst (build_as_type_and_mode env p ~mode) in
   let build_record_as_type lpl =
+    make_some_noisef "I HAS %d LABELS AT LEVEL %d@.%!" (List.length lpl) (get_current_level ());
+    make_some_noisef "PAT TYPE IS %a@.%!" Printtyp.raw_type_expr p.pat_type;
     let _, lbl, _, _ = List.hd lpl in
     if lbl.lbl_private = Private then p.pat_type, mode else
     (* The jkind here is filled in via unification with [ty_res] in
@@ -1558,16 +1577,32 @@ and build_as_type_aux (env : Env.t) p ~mode =
       let refinable =
         lbl.lbl_mut = Immutable && List.mem_assoc lbl.lbl_pos ppl &&
         match get_desc lbl.lbl_arg with Tpoly _ -> false | _ -> true in
+      if Sys.getenv_opt "NOISY" |> Option.is_some then begin
+        Format.eprintf "THE FIELD %s: WILL IT REFINE?? %b@.ITS TYPE IS %a@.RETURN TYPE IS %a@.%!"
+          lbl.lbl_name
+          refinable
+          Printtyp.raw_type_expr ty_arg
+          Printtyp.raw_type_expr ty_res
+      end;
       if refinable then begin
         let arg = List.assoc lbl.lbl_pos ppl in
+        make_some_noisef "ARG TYPE IS %a@.%!" Printtyp.raw_type_expr arg.pat_type;
         unify_pat env
-          {arg with pat_type = build_as_type env arg} ty_arg
+          {arg with pat_type = build_as_type env arg} ty_arg;
+        make_some_noisef "ARG TYPE IS NOW %a@.%!" Printtyp.raw_type_expr arg.pat_type
       end else begin
         let _, ty_arg', ty_res' = instance_label ~fixed:false lbl in
         unify_pat_types p.pat_loc env ty_arg ty_arg';
         unify_pat env p ty_res'
-      end in
+      end;
+      make_some_noisef "THE TYPE IS NOW %a@.%!" Printtyp.raw_type_expr ty;
+      in
+    make_some_noisef "THE TYPE STARTS AS %a@.%!" Printtyp.raw_type_expr ty;
     Iarray.iter do_label (Lazy.force lbl.lbl_all);
+    if Sys.getenv_opt "NOISY" |> Option.is_some then begin
+      Format.eprintf "LOOK MA I BUILT A RECORD AS TYPE: %a@.%!"
+        Printtyp.raw_type_expr ty
+    end;
     ty, mode
   in
   match p.pat_desc with
@@ -1589,6 +1624,12 @@ and build_as_type_aux (env : Env.t) p ~mode =
       let keep =
         priv ||
         vto <> None (* be lazy and keep the type for node constraints *) in
+      if Sys.getenv_opt "NOISY" |> Option.is_some then begin
+        Format.eprintf
+          "WHY NOT LET'S CONSTRUCT A %a@.KEEPING?? %b@.%!"
+          Printtyp.raw_type_expr p.pat_type
+          keep
+      end;
       let ty =
         if keep then p.pat_type else
         let tyl = List.map (fun (_, p) -> build_as_type env p) pl in
@@ -1601,6 +1642,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
           (List.combine pl tyl) ty_args;
         ty_res
       in
+      make_some_noisef "WE MADE A %a@.%!" Printtyp.raw_type_expr ty;
       ty, mode
   | Tpat_variant(l, p', _) ->
       let ty = Option.map (build_as_type env) p' in
@@ -1650,14 +1692,18 @@ and build_as_type_aux (env : Env.t) p ~mode =
   | Tpat_array _ | Tpat_lazy _ ->
       p.pat_type, mode
 
-let make_some_noisef fmt =
-  match Sys.getenv_opt "NOISY" with
-  | Some _ -> Format.eprintf fmt
-  | None -> Format.ifprintf Format.err_formatter fmt
-
 let update_labels (type rep) env labels (form : rep record_form) ~loc
       ~containing_type
     : rep gen_label_description iarray * rep =
+  begin fun (f : unit -> rep gen_label_description iarray * rep) ->
+    if Sys.getenv_opt "NOISY" |> Option.is_none then f () else begin
+      Format.eprintf "[%d] OH BOY SO MANY LABELS!!@.%a@.%!" (get_current_level ())
+        pp_lbls labels;
+      let (new_labels, _) as ans = f () in
+      Format.eprintf "WELL THAT WAS FUN@.%a@.%!" pp_lbls new_labels;
+      ans
+    end
+  end @@ fun () ->
   (* Might be good to short-circuit this. Possible we could do so by noticing
      that [containing_type] has no arguments (or only variables as
      arguments). *)
@@ -1694,14 +1740,18 @@ let update_label (type rep) env label (form : rep record_form) ~loc
       (labels |> Iarray.to_list)
   in
   let labels = Iarray.make 1 label in
-  make_some_noisef "BEFORE: %a@.%!" pp_labels labels;
+  if false then make_some_noisef "BEFORE: %a@.%!" pp_labels labels;
   let labels, rep = update_labels env labels form ~loc ~containing_type in
-  make_some_noisef "AFTAIR: %a@.%!" pp_labels labels;
+  if false then make_some_noisef "AFTAIR: %a@.%!" pp_labels labels;
   labels.:(0), rep
 
 (* Constraint solving during typing of patterns *)
 
 let solve_Ppat_alias ~mode env pat =
+  begin fun ((ty_var, _) as ans) ->
+    make_some_noisef "WE HAS A VAR AND IT'S %a@.%!" Printtyp.raw_type_expr ty_var;
+    ans
+  end @@
   with_local_level ~post:(fun (ty_var, _) -> generalize ty_var)
     (fun () -> build_as_type_and_mode ~mode env pat)
 
@@ -1970,19 +2020,31 @@ let solve_Ppat_construct ~refine tps penv loc constr no_existentials
 
 let solve_Ppat_record_field ~refine loc penv label label_lid record_ty
       record_form =
+  begin fun f ->
+    if Sys.getenv_opt "NOISY" |> Option.is_none then f () else begin
+      Format.eprintf "[%d] SOLVING %a FOR %a@.%!"
+        (get_current_level ())
+        pp_lbl label
+        Printtyp.raw_type_expr record_ty;
+      let ans = f () in
+      Format.eprintf "SOLUTION IS %a@.%!"
+        pp_lbl ans;
+      ans
+    end
+  end @@ fun () ->
   with_local_level_iter ~post:generalize_structure begin fun () ->
-    let _, ty_arg, ty_res = instance_label ~fixed:false label in
-    let record_ty = instance record_ty in
+    let _, _ty_arg, ty_res = instance_label ~fixed:false label in
+    let record_ty_instance = instance record_ty in
     begin try
-      unify_pat_types_refine ~refine loc penv ty_res record_ty
+      unify_pat_types_refine ~refine loc penv ty_res record_ty_instance
     with Error(_loc, _env, Pattern_type_clash(err, _)) ->
       raise(Error(label_lid.loc, !!penv,
                   Label_mismatch(P record_form, label_lid.txt, err)))
     end;
     let label, _rep =
-      update_label !!penv label record_form ~loc ~containing_type:record_ty
+      update_label !!penv label record_form ~loc ~containing_type:(instance record_ty)
     in
-    (label, [ty_res; ty_arg])
+    (label, [label.lbl_res; label.lbl_arg])
   end
 
 let solve_Ppat_array ~refine loc env mutability expected_ty =
@@ -2228,6 +2290,8 @@ let get_constr_type_path ty =
   | Tconstr(p, _, _) -> p
   | _ -> assert false
 
+let the_thing_that_is_not_principal = ref (None : type_expr option)
+
 module NameChoice(Name : sig
   type t
   type usage
@@ -2308,11 +2372,20 @@ end) = struct
     end
 
   (* a non-principal type was used for disambiguation *)
-  let warn_non_principal warn lid =
+  let warn_non_principal warn lid tpath0 tpath thing =
     let name = Datatype_kind.label_name kind in
+    (* CR lmaurer: if you're reading this I forgot to delete this *)
+    ignore (tpath0, tpath);
+    let details =
+      match !the_thing_that_is_not_principal with
+      | None -> ""
+      | Some thing ->
+        the_thing_that_is_not_principal := None;
+        Format.asprintf " involving %a" Printtyp.raw_type_expr thing
+    in
     warn lid.loc
       (Warnings.Not_principal
-         ("this type-based " ^ name ^ " disambiguation"))
+         ("[" ^ thing ^ "] this type-based " ^ name ^ " disambiguation at level " ^ (get_current_level () |> string_of_int) ^ details))
 
   (* we selected a name out of the lexical scope *)
   let warn_out_of_scope warn lid env tpath =
@@ -2401,10 +2474,10 @@ end) = struct
           if not principal then begin
             (* Check if non-principal type is affecting result *)
             match (candidates_in_scope : _ result) with
-            | Error _ -> warn_non_principal warn lid
+            | Error _ -> warn_non_principal warn lid tpath0 tpath "A"
             | Ok lbls ->
             match filter lbls with
-            | Error _ -> warn_non_principal warn lid
+            | Error _ -> warn_non_principal warn lid tpath0 tpath "B"
             | Ok [] -> assert false
             | Ok ((lbl', _use') :: rest) ->
             let lbl_tpath = get_type_path lbl' in
@@ -2412,7 +2485,7 @@ end) = struct
                type-based selection corresponds to the last
                definition in scope *)
             if not (compare_type_path env tpath lbl_tpath)
-            then warn_non_principal warn lid
+            then warn_non_principal warn lid tpath0 tpath "C"
             else warn_if_ambiguous warn lid env lbl rest;
           end;
           lbl
@@ -2423,7 +2496,7 @@ end) = struct
           (* warn only on nominal labels;
              structural labels cannot be qualified anyway *)
           if in_env lbl then warn_out_of_scope warn lid env tpath;
-          if not principal then warn_non_principal warn lid;
+          if not principal then warn_non_principal warn lid tpath0 tpath "D";
           lbl
         | exception Not_found ->
         match filter (force_error candidates_in_scope) with
@@ -2537,12 +2610,12 @@ let disambiguate_sort_lid_a_list
       (type rep) (record_form : rep record_form) loc closed env usage
       expected_type lid_a_list =
   let ids = List.map (fun (lid, _) -> Longident.last lid.txt) lid_a_list in
-  let w_pr = ref false and w_amb = ref []
+  let w_pr = ref [] and w_amb = ref []
   and w_scope = ref [] and w_scope_ty = ref "" in
   let warn loc msg =
     let open Warnings in
     match msg with
-    | Not_principal _ -> w_pr := true
+    | Not_principal s -> w_pr := s :: !w_pr
     | Ambiguous_name([s], l, _, ex) -> w_amb := (s, l, ex) :: !w_amb
     | Name_out_of_scope(ty, Name s) ->
         w_scope := s :: !w_scope; w_scope_ty := ty
@@ -2602,12 +2675,14 @@ let disambiguate_sort_lid_a_list
             lid, process_label qual_lid, a
       ) lid_a_list lbl_list
   in
-  if !w_pr then
+  begin match !w_pr with
+  | _ :: _ ->
+    let all = String.concat ", " !w_pr in
     Location.prerr_warning loc
       (Warnings.Not_principal
          ("this type-based " ^ (record_form_to_string record_form)
-          ^ " disambiguation"))
-  else begin
+          ^ " disambiguation (" ^ all ^ ")"))
+  | [] -> begin
     match List.rev !w_amb with
       (_,types,ex)::_ as amb ->
         let paths =
@@ -2624,7 +2699,7 @@ let disambiguate_sort_lid_a_list
                 (Warnings.Ambiguous_name ([s],l,false, ex)))
             amb
     | _ -> ()
-  end;
+  end end;
   (if !w_scope <> [] then
     let record_form = record_form_to_string record_form in
     let warning = Warnings.Fields { record_form; fields = List.rev !w_scope} in
@@ -2912,6 +2987,14 @@ and type_pat_aux
   in
   let loc = sp.ppat_loc in
   let solve_expected (x : pattern) : pattern =
+    making_some_noise begin fun f ->
+      Format.eprintf "BEFORE solve_expected: %a@.%!"
+        Printtyp.raw_type_expr x.pat_type;
+      let ans = f () in
+      Format.eprintf "AFTER solve_expected: %a@.%!"
+        Printtyp.raw_type_expr x.pat_type;
+      ans
+    end @@ fun () ->
     unify_pat ~sdesc_for_hint:sp.ppat_desc !!penv x (instance expected_ty);
     x
   in
@@ -3042,12 +3125,23 @@ and type_pat_aux
         match extract_concrete_record record_form !!penv expected_ty with
         | Record_type(p0, p, _, _) ->
             let ty = generic_instance expected_ty in
+            make_some_noisef
+              "@[<hov 2>I GENERICALLY INSTANTIATED %a@ \
+               AND ALL I GOT WAS THIS LOUSY %a@]@.%!"
+              Printtyp.raw_type_expr expected_ty
+              Printtyp.raw_type_expr ty;
+            the_thing_that_is_not_principal := Some expected_ty;
             Some (p0, p, is_principal expected_ty), ty
         | Record_type_of_other_form ->
           let error =
             Wrong_expected_record_boxing(Pattern, P record_form, expected_ty) in
           raise (Error (loc, !!penv, error))
         | Maybe_a_record_type ->
+          make_some_noisef
+            "[%d] WELP IT SURE IS %a@.%!"
+            (get_current_level ())
+            Printtyp.raw_type_expr expected_ty;
+          the_thing_that_is_not_principal := Some expected_ty;
           None,
           newvar (Jkind.of_new_sort ~level:(Ctype.get_current_level ())
                     ~why:Record_projection)
@@ -3081,50 +3175,18 @@ and type_pat_aux
       in
       let make_record_pat
             (lbl_pat_list : (_ * rep gen_label_description * _ * _) list) =
+        making_some_noise begin fun f ->
+          let ans = f () in
+          Format.eprintf "THE TYPE OF THE RECORD PATTERN IS %a@.%!"
+            Printtyp.raw_type_expr ans.pat_type;
+          ans
+        end @@ fun () ->
         check_recordpat_labels loc lbl_pat_list closed record_form;
         List.iter (forbid_atomic_field_patterns loc penv) lbl_pat_list;
-        let all_lbls, rep = match lbl_pat_list with
+        let rep = match lbl_pat_list with
           | [] -> assert false
-          | (_, label, _, _) :: _ -> Lazy.force label.lbl_all, label.lbl_repres
-        in
-        let explicit_lbl_pats =
-          Array.make (Iarray.length all_lbls) None
-        in
-        List.iter
-          (fun ((_, lbl, _, _) as lbl_pat) ->
-             explicit_lbl_pats.(lbl.lbl_pos) <- Some lbl_pat)
-          lbl_pat_list;
-        let lbl_pat_list : (_ * rep gen_label_description * _ * _) list =
-          Iarray.mapi
-            (fun i lbl ->
-               match explicit_lbl_pats.(i) with
-               | Some lbl_pat -> lbl_pat
-               | None ->
-                   let lid =
-                     Longident.Lident lbl.lbl_name |> Location.mknoloc
-                   in
-                   let lbl = all_lbls.:(i) in
-                   let sort =
-                     match lbl.lbl_sort with
-                     | None -> Misc.fatal_error "updated label with no sort"
-                     | Some sort -> sort |> Jkind.Sort.of_const
-                   in
-                   let pat =
-                     {
-                       pat_desc = Tpat_any; pat_loc = Location.none;
-                       pat_extra = []; pat_type = lbl.lbl_arg;
-                       pat_attributes = []; pat_env = !!penv;
-                       pat_unique_barrier = Unique_barrier.not_computed ()
-                     }
-                   in
-                   lid, lbl, sort, pat)
-            all_lbls
-          |> Iarray.to_list
-        in
-        let rep =
-          match rep with
-          | None -> Misc.fatal_error "no rep after update"
-          | Some rep -> rep
+          | (_, { lbl_repres = Some rep }, _, _) :: _ -> rep
+          | _ -> Misc.fatal_error "no rep after update"
         in
         let pat_desc = match record_form with
           | Legacy ->
@@ -3149,6 +3211,7 @@ and type_pat_aux
              Env.Projection expected_type)
           lid_sp_list
       in
+      the_thing_that_is_not_principal := None;
       let lbl_a_list = List.map type_label_pat lbl_a_list in
       rvp @@ solve_expected (make_record_pat lbl_a_list)
   in
@@ -3287,6 +3350,7 @@ and type_pat_aux
   | Ppat_unboxed_tuple (spl, oc) ->
       type_unboxed_tuple_pat spl oc
   | Ppat_construct(lid, sarg) ->
+      the_thing_that_is_not_principal := Some expected_ty;
       let expected_type =
         match extract_concrete_variant !!penv expected_ty with
         | Variant_type(p0, p, _) ->
@@ -3305,6 +3369,7 @@ and type_pat_aux
           (Constructor.disambiguate Env.Pattern lid !!penv expected_type)
           candidates
       in
+      the_thing_that_is_not_principal := None;
       begin match no_existentials, constr.cstr_existentials with
       | None, _ | _, [] -> ()
       | Some r, (_ :: _) ->
@@ -6054,6 +6119,25 @@ and type_expect_
             repres_might_allocate record_form lbl_repres)
           lbl_a_list
       in
+      if not is_boxed && (Sys.getenv_opt "NOISY" |> Option.is_some) then begin
+        let pp_repr_opt ppf (repr_opt : rep option) =
+          match repr_opt with
+          | Some repr ->
+              begin match record_form with
+              | Legacy -> Printtyped.record_representation 0 ppf repr
+              | Unboxed_product -> Printtyped.record_unboxed_product_representation 0 ppf repr
+              end
+          | None -> Format.fprintf ppf "<not fixed>"
+        in
+        let pp_label ppf label =
+          Format.fprintf ppf "%s:%a" label.lbl_name pp_repr_opt label.lbl_repres
+        in
+        Format.eprintf "IT AIN'T BOXED %a@.@[<hov 2>%a@]%!"
+          Printtyp.type_expr ty_record
+          (Format.pp_print_list ~pp_sep:Format.pp_print_space
+             (fun ppf (_, lbl, _) -> pp_label ppf lbl))
+            lbl_a_list
+      end;
       begin match overwrite with
       | (No_overwrite | Assigning _) -> ()
       | Overwriting _ ->
@@ -6239,9 +6323,9 @@ and type_expect_
       (if opt_sexp <> None && List.length lid_sexp_list = num_fields then
          Location.prerr_warning loc
            (Warnings.Useless_record_with (record_form_to_string record_form)));
-      let label_descriptions =
-        let (_, { lbl_all; _ }, _) = List.hd lbl_exp_list in
-        Lazy.force lbl_all
+      let label_descriptions, representation =
+        let (_, { lbl_all; lbl_repres; _ }, _) = List.hd lbl_exp_list in
+        Lazy.force lbl_all, lbl_repres
       in
       let label_descriptions, representation =
         let labels_with_updated_types =
@@ -6255,7 +6339,7 @@ and type_expect_
         in
         begin match
           Typedecl.update_record_representation_in_label_descriptions env
-            sexp.pexp_loc record_form labels_with_updated_types None
+            sexp.pexp_loc record_form labels_with_updated_types representation
         with
         | lbls, Ok rep -> (lbls |> Iarray.of_list), rep
         | _, Error _ ->

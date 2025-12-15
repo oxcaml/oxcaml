@@ -104,6 +104,8 @@ type ('a, 'variety) t = ('a, 'variety) elt list
 type 'variety trace = (type_expr,     'variety) t
 type 'variety error = (expanded_type, 'variety) t
 
+val map_elt : ('a -> 'b) -> ('a, 'variety) elt -> ('b, 'variety) elt
+
 val map : ('a -> 'b) -> ('a, 'variety) t -> ('b, 'variety) t
 
 val incompatible_fields :

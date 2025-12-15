@@ -2049,6 +2049,21 @@ and transl_setinstvar ~scopes loc self var expr =
 
 (* CR layouts v5: Invariant - this is only called on values.  Relax that. *)
 and transl_record ~scopes loc env mode fields repres opt_init_expr =
+  begin match Sys.getenv_opt "NOISY" with
+  | None -> ()
+  | Some _ ->
+    let pp_mode ppf (mode : locality_mode option) =
+      let open Format in
+      match mode with
+      | None -> fprintf ppf "<none>"
+      | Some Alloc_heap -> fprintf ppf "heap"
+      | Some Alloc_local -> fprintf ppf "local"
+    in
+    Format.eprintf "@[<hov 2>transl_record@ %a@ %a@ %a@]@.%!"
+      pp_mode mode
+      (Printtyped.record_representation 0) repres
+      Location.print_loc loc
+  end;
   (* Determine if there are "enough" fields (only relevant if this is a
      functional-style record update *)
   let size = Iarray.length fields in

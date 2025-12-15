@@ -1747,7 +1747,7 @@ let instance_label_update' copy_scope ~fixed ~all lbl =
 
 let instance_all_labels_update ~fixed lbls =
   begin fun f ->
-    if false && (Sys.getenv_opt "NOISY" |> Option.is_some) && Iarray.length lbls > 1 then begin
+    if false && Sys.getenv_opt "NOISY" |> Option.is_some then begin
       let pp_lbl ppf lbl =
         Format.fprintf ppf "%s : %a" lbl.lbl_name !Btype.printtyp_type_expr_fwd lbl.lbl_arg
       in

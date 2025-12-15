@@ -119,7 +119,7 @@ Line 1, characters 8-39:
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Here is an example of a case that is not matched:
-{left=Box 1; right=Box _}
+{left=Box 1; _ }
 
 val f : int box pair -> unit = <fun>
 |}]

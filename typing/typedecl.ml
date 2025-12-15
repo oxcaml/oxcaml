@@ -2120,9 +2120,21 @@ let update_record_kind (type rep) env loc (form : rep record_form) lbls
     in
     lbls, rep, jkind
   | Legacy, _, (Some ( Record_inlined _ | Record_float | Record_ufloat
-                     | Record_mixed _))
+                     | Record_mixed _ as rep)) ->
+    (* These are never created by [transl_declaration], so they will only
+       appear here when updating later for dealing with [any]. Since none of
+       these cases can have an [any], we don't need to do anything further. *)
+    let jkind =
+      (* This is rather awful, since it's not true (especially for
+         [Record_inlined]) but we can only get here from
+         [update_record_representation], which throws away the jkind. *)
+      Jkind.for_boxed_record lbls
+    in
+    lbls, Ok rep, jkind
   | Legacy, ([] | (_ :: _)), Some Record_unboxed ->
-    (* These are never created by [transl_declaration]. *)
+    (* These are never created by [transl_declaration], so they will only
+       appear here when updating later for dealing with [any]. Since none of
+       these cases can have an [any], we don't need to do anything further. *)
     Misc.fatal_error
       "Typedecl.update_record_kind: unexpected record representation"
 
