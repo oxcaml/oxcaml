@@ -1157,65 +1157,12 @@ struct
     in
     loop acc new_types
 
-  let rewrite_env_extension_with_extra_variables env live_vars extension bind_to
-      =
-    let base_env =
-      TE.create ~resolver:(TE.resolver env)
-        ~get_imported_names:(TE.get_imported_names env)
-        ~machine_width:(TE.machine_width env)
-    in
-    let base_env =
-      TE.with_code_age_relation base_env (TE.code_age_relation env)
-    in
-    let base_env =
-      Symbol.Set.fold
-        (fun symbol base_env ->
-          let bound_name = Bound_name.create_symbol symbol in
-          let base_env = TE.add_definition base_env bound_name K.value in
-          base_env)
-        (TE.defined_symbols env) base_env
-    in
-    let env =
-      Variable.Map.fold
-        (fun var (_, kind) env ->
-          let bound_name =
-            Bound_name.create_var
-              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
-          in
-          TE.add_definition env bound_name kind)
-        live_vars env
-    in
-    let env =
-      ME.use_meet_env env ~f:(fun env ->
-          ME.add_env_extension_with_extra_variables
-            ~meet_type:(Meet.meet_type ()) env extension)
-    in
-    let sbs, base_env, new_types, acc =
-      Variable.Map.fold
-        (fun var (thing, kind) (sbs, base_env, new_types, acc) ->
-          let name = Name.var var in
-          let ty = TG.alias_type_of kind (Simple.name name) in
-          fold_destructuring thing env ty (sbs, base_env, new_types, acc)
-            ~f:(fun (var, (name, abs)) ty (sbs, base_env, new_types, acc) ->
-              (* CR bclement: use existing name if [ty] is an alias *)
-              let var' = Variable.create name (TG.kind ty) in
-              let ty', acc = rewrite_arbitrary_type env acc abs ty in
-              let bound_name =
-                Bound_name.create_var
-                  (Bound_var.create var' Flambda_debug_uid.none Name_mode.normal)
-              in
-              let base_env =
-                TE.add_definition base_env bound_name (TG.kind ty')
-              in
-              let new_types = Name.Map.add (Name.var var') ty' new_types in
-              Var.Map.add var (var', ty') sbs, base_env, new_types, acc))
-        live_vars
-        (Var.Map.empty, base_env, Name.Map.empty, empty)
-    in
-    let new_types, aliases_of_names = rewrite_in_depth env acc new_types in
-    let base_env =
+  type context = { symbol_abstraction : Symbol.t -> X.t }
+
+  let add_rewritten_types ~aliases_of_names env_after_rewrite new_types =
+    let env_after_rewrite =
       Name.Map.fold
-        (fun _name aliases_of_name base_env ->
+        (fun _name aliases_of_name env_after_rewrite ->
           X.Map.fold
             (fun _metadata (name_after_rewrite, kind) base_env ->
               Name.pattern_match name_after_rewrite
@@ -1231,83 +1178,107 @@ struct
                            Flambda_debug_uid.none Name_mode.in_types)
                     in
                     TE.add_definition base_env bound_name kind))
-            aliases_of_name base_env)
-        aliases_of_names base_env
+            aliases_of_name env_after_rewrite)
+        aliases_of_names env_after_rewrite
     in
-    let final_env =
-      ME.use_meet_env base_env ~f:(fun env ->
-          Name.Map.fold
-            (fun name ty env ->
-              ME.add_equation env name ty ~meet_type:(Meet.meet_type ()))
-            new_types env)
+    ME.use_meet_env env_after_rewrite ~f:(fun env_after_rewrite ->
+        Name.Map.fold
+          (fun name ty env_after_rewrite ->
+            ME.add_equation env_after_rewrite name ty
+              ~meet_type:(Meet.meet_type ()))
+          new_types env_after_rewrite)
+
+  let create_context symbol_abstraction = { symbol_abstraction }
+
+  let prepare_for_rewrite { symbol_abstraction } env_before_rewrite =
+    let env_after_rewrite =
+      TE.create
+        ~resolver:(TE.resolver env_before_rewrite)
+        ~get_imported_names:(TE.get_imported_names env_before_rewrite)
+        ~machine_width:(TE.machine_width env_before_rewrite)
+    in
+    let env_after_rewrite =
+      TE.with_code_age_relation env_after_rewrite
+        (TE.code_age_relation env_before_rewrite)
+    in
+    Symbol.Set.fold
+      (fun symbol (base_env, aliases_of_names) ->
+        let abs = symbol_abstraction symbol in
+        let aliases_of_names =
+          Name.Map.add (Name.symbol symbol)
+            (X.Map.singleton abs (Name.symbol symbol, K.value))
+            aliases_of_names
+        in
+        let bound_name = Bound_name.create_symbol symbol in
+        let base_env = TE.add_definition base_env bound_name K.value in
+        base_env, aliases_of_names)
+      (TE.defined_symbols env_before_rewrite)
+      (env_after_rewrite, Name.Map.empty)
+
+  let rewrite_symbols context env_before_rewrite =
+    let env_after_rewrite, aliases_of_symbols =
+      prepare_for_rewrite context env_before_rewrite
+    in
+    let names_to_process =
+      Name.Map.fold
+        (fun name_before abstractions names_to_process ->
+          X.Map.fold
+            (fun abs (name_after, kind) names_to_process ->
+              (name_before, abs, kind, name_after) :: names_to_process)
+            abstractions names_to_process)
+        aliases_of_symbols []
+    in
+    let acc = { aliases_of_names = aliases_of_symbols; names_to_process } in
+    let new_types, aliases_of_names =
+      rewrite_in_depth env_before_rewrite acc Name.Map.empty
+    in
+    add_rewritten_types ~aliases_of_names env_after_rewrite new_types
+
+  let rewrite_variables context env_before_rewrite vars =
+    let env_after_rewrite, aliases_of_symbols =
+      prepare_for_rewrite context env_before_rewrite
+    in
+    let acc = { empty with aliases_of_names = aliases_of_symbols } in
+    let sbs, env_after_rewrite, new_types, acc =
+      Variable.Map.fold
+        (fun var (thing, kind) (sbs, env_after_rewrite, new_types, acc) ->
+          let name = Name.var var in
+          let ty = TG.alias_type_of kind (Simple.name name) in
+          fold_destructuring thing env_before_rewrite ty
+            (sbs, env_after_rewrite, new_types, acc)
+            ~f:(fun
+                 (var, (name, abs))
+                 ty
+                 (sbs, env_after_rewrite, new_types, acc)
+               ->
+              (* CR bclement: use existing name if [ty] is an alias *)
+              let var' = Variable.create name (TG.kind ty) in
+              let ty', acc =
+                rewrite_arbitrary_type env_before_rewrite acc abs ty
+              in
+              let bound_name =
+                Bound_name.create_var
+                  (Bound_var.create var' Flambda_debug_uid.none Name_mode.normal)
+              in
+              let base_env =
+                TE.add_definition env_after_rewrite bound_name (TG.kind ty')
+              in
+              let new_types = Name.Map.add (Name.var var') ty' new_types in
+              Var.Map.add var (var', ty') sbs, base_env, new_types, acc))
+        vars
+        (Var.Map.empty, env_after_rewrite, Name.Map.empty, acc)
+    in
+    let new_types, aliases_of_names =
+      rewrite_in_depth env_before_rewrite acc new_types
+    in
+    let env_after_rewrite =
+      add_rewritten_types ~aliases_of_names env_after_rewrite new_types
     in
     let subst var =
       match Var.Map.find_opt var sbs with
-      | Some (v, ty) ->
-        Name.var v, ET.to_type (Expand_head.expand_head final_env ty)
-      | None -> Misc.fatal_error "Not defined [subst]"
+      | Some (name, ty) -> name, ty
+      | None ->
+        Misc.fatal_errorf "Pattern variable %a is not bound@." Var.print var
     in
-    let to_keep =
-      Var.Map.fold
-        (fun _ (var, _) acc -> Variable.Set.add var acc)
-        sbs Variable.Set.empty
-    in
-    let teev =
-      Expand_head.make_suitable_for_environment final_env
-        (All_variables_except to_keep) (List.map subst bind_to)
-    in
-    Var.Map.map fst sbs, teev
-
-  let rewrite env symbol_abstraction =
-    (* CR vlaviron for bclement: This should share more code with
-       [rewrite_env_extension_with_extra_variables] above. *)
-    let base_env =
-      TE.create ~resolver:(TE.resolver env)
-        ~get_imported_names:(TE.get_imported_names env)
-        ~machine_width:(TE.machine_width env)
-    in
-    let base_env =
-      TE.with_code_age_relation base_env (TE.code_age_relation env)
-    in
-    let base_env, acc =
-      Symbol.Set.fold
-        (fun symbol (base_env, acc) ->
-          let abs = symbol_abstraction symbol in
-          let aliases_of_names =
-            Name.Map.add (Name.symbol symbol)
-              (X.Map.singleton abs (Name.symbol symbol, K.value))
-              acc.aliases_of_names
-          in
-          let names_to_process =
-            (Name.symbol symbol, abs, K.value, Name.symbol symbol)
-            :: acc.names_to_process
-          in
-          let bound_name = Bound_name.create_symbol symbol in
-          let base_env = TE.add_definition base_env bound_name K.value in
-          base_env, { aliases_of_names; names_to_process })
-        (TE.defined_symbols env) (base_env, empty)
-    in
-    let new_types, aliases_of_names = rewrite_in_depth env acc Name.Map.empty in
-    let base_env =
-      Name.Map.fold
-        (fun _name aliases_of_name base_env ->
-          X.Map.fold
-            (fun _metadata (name_after_rewrite, kind) base_env ->
-              Name.pattern_match name_after_rewrite
-                ~symbol:(fun _ -> base_env)
-                ~var:(fun var_after_rewrite ->
-                  let bound_name =
-                    Bound_name.create_var
-                      (Bound_var.create var_after_rewrite Flambda_debug_uid.none
-                         Name_mode.in_types)
-                  in
-                  TE.add_definition base_env bound_name kind))
-            aliases_of_name base_env)
-        aliases_of_names base_env
-    in
-    ME.use_meet_env base_env ~f:(fun env ->
-        Name.Map.fold
-          (fun name ty env ->
-            ME.add_equation env name ty ~meet_type:(Meet.meet_type ()))
-          new_types env)
+    subst, env_after_rewrite
 end

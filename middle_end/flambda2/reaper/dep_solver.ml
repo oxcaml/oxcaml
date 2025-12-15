@@ -3063,31 +3063,34 @@ end
 
 module TypesRewrite = Flambda2_types.Rewriter.Make (Rewriter)
 
+let symbol_metadata ~result ~db sym =
+  if not (Compilation_unit.is_current (Symbol.compilation_unit sym))
+  then result, Rewriter.Many_sources_any_usage
+  else
+    let sym = Code_id_or_name.symbol sym in
+    if not (has_source db sym)
+    then result, Rewriter.No_source
+    else if not (has_use db sym)
+    then result, Rewriter.No_usages
+    else
+      match get_allocation_point db sym with
+      | Some alloc_point -> result, Rewriter.Single_source alloc_point
+      | None ->
+        if is_top db sym
+        then result, Rewriter.Many_sources_any_usage
+        else
+          ( result,
+            Rewriter.Many_sources_usages
+              (get_direct_usages db (Code_id_or_name.Map.singleton sym ())) )
+
 let rewrite_typing_env result ~unit_symbol:_ typing_env =
   if Lazy.force debug_types
   then Format.eprintf "OLD typing env: %a@." Typing_env.print typing_env;
   let db = result.db in
-  let symbol_metadata sym =
-    if not (Compilation_unit.is_current (Symbol.compilation_unit sym))
-    then result, Rewriter.Many_sources_any_usage
-    else
-      let sym = Code_id_or_name.symbol sym in
-      if not (has_source db sym)
-      then result, Rewriter.No_source
-      else if not (has_use db sym)
-      then result, Rewriter.No_usages
-      else
-        match get_allocation_point db sym with
-        | Some alloc_point -> result, Rewriter.Single_source alloc_point
-        | None ->
-          if is_top db sym
-          then result, Rewriter.Many_sources_any_usage
-          else
-            ( result,
-              Rewriter.Many_sources_usages
-                (get_direct_usages db (Code_id_or_name.Map.singleton sym ())) )
+  let rewrite_context =
+    TypesRewrite.create_context (symbol_metadata ~result ~db)
   in
-  let r = TypesRewrite.rewrite typing_env symbol_metadata in
+  let r = TypesRewrite.rewrite_symbols rewrite_context typing_env in
   if Lazy.force debug_types
   then Format.eprintf "NEW typing env: %a@." Typing_env.print r;
   r
@@ -3201,16 +3204,46 @@ let rewrite_result_types result ~old_typing_env ~my_closure:func_my_closure
     | Some fields ->
       fold_unboxed_with_kind (fun kind v acc -> (v, kind) :: acc) fields []
   in
-  let new_vars, new_env_extension =
-    TypesRewrite.rewrite_env_extension_with_extra_variables old_typing_env
-      (Variable.Map.disjoint_union params_patterns results_patterns)
-      env_extension
-      (params_vars @ results_vars)
+  let all_patterns =
+    Variable.Map.disjoint_union params_patterns results_patterns
+  in
+  let old_typing_env_with_extension =
+    let old_typing_env_with_params_and_results =
+      Variable.Map.fold
+        (fun var (_, kind) env ->
+          let bound_name =
+            Bound_name.create_var
+              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+          in
+          Typing_env.add_definition env bound_name kind)
+        all_patterns old_typing_env
+    in
+    Typing_env.add_env_extension_with_extra_variables
+      old_typing_env_with_params_and_results env_extension
+  in
+  let rewrite_context =
+    TypesRewrite.create_context (symbol_metadata ~result ~db:result.db)
+  in
+  let subst, new_typing_env =
+    TypesRewrite.rewrite_variables rewrite_context old_typing_env_with_extension
+      all_patterns
+  in
+  let bind_to_vars = params_vars @ results_vars in
+  let to_keep, bind_to =
+    List.fold_left_map
+      (fun to_keep pat ->
+        let var, ty = subst pat in
+        Variable.Set.add var to_keep, (Name.var var, ty))
+      Variable.Set.empty bind_to_vars
+  in
+  let new_env_extension =
+    make_suitable_for_environment new_typing_env (All_variables_except to_keep)
+      bind_to
   in
   let make_bp vars =
     List.map
       (fun v ->
-        let var = Flambda2_types.Rewriter.Var.Map.find v new_vars in
+        let var, _ = subst v in
         Bound_parameter.create var
           (Flambda_kind.With_subkind.anything (Variable.kind var))
           Flambda_debug_uid.none)

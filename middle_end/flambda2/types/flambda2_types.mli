@@ -1067,13 +1067,16 @@ module Rewriter : sig
     val function_slot :
       set_of_closures -> Function_slot.t -> typing_env -> flambda_type -> t
   end) : sig
-    val rewrite : typing_env -> (Symbol.t -> X.t) -> typing_env
+    type context
 
-    val rewrite_env_extension_with_extra_variables :
+    val create_context : (Symbol.t -> X.t) -> context
+
+    val rewrite_symbols : context -> Typing_env.t -> Typing_env.t
+
+    val rewrite_variables :
+      context ->
       Typing_env.t ->
       ((string * X.t) pattern * Flambda_kind.t) Variable.Map.t ->
-      Typing_env_extension.With_extra_variables.t ->
-      Var.t list ->
-      Variable.t Var.Map.t * Typing_env_extension.With_extra_variables.t
+      (Var.t -> Variable.t * flambda_type) * Typing_env.t
   end
 end

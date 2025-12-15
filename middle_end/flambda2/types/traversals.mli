@@ -138,12 +138,15 @@ module Make (X : sig
   val function_slot :
     set_of_closures -> Function_slot.t -> Typing_env.t -> Type_grammar.t -> t
 end) : sig
-  val rewrite : Typing_env.t -> (Symbol.t -> X.t) -> Typing_env.t
+  type context
 
-  val rewrite_env_extension_with_extra_variables :
+  val create_context : (Symbol.t -> X.t) -> context
+
+  val rewrite_symbols : context -> Typing_env.t -> Typing_env.t
+
+  val rewrite_variables :
+    context ->
     Typing_env.t ->
     ((string * X.t) pattern * Flambda_kind.t) Variable.Map.t ->
-    Typing_env_extension.With_extra_variables.t ->
-    Var.t list ->
-    Variable.t Var.Map.t * Typing_env_extension.With_extra_variables.t
+    (Var.t -> Variable.t * Type_grammar.t) * Typing_env.t
 end
