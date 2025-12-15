@@ -2000,11 +2000,11 @@ module Const = struct
       match diff base actual with
       | None -> None
       | Some diff ->
-        let modes =
+        let crossings =
           Typemode.untransl_mod_bounds diff
-          |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
+          |> List.map (fun { Location.txt = Parsetree.Crossing s; _ } -> s)
         in
-        Some modes
+        Some crossings
 
     let modality_to_ignore_axes axes_to_ignore =
       (* The modality is constant along axes to ignore and id along others *)

@@ -143,19 +143,38 @@ let arg_label i ppf = function
   | Optional s -> line i ppf "Optional \"%s\"\n" s
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
 
+let crossing i ppf crossing =
+  line i ppf "mod %a\n" fmt_string_loc
+    (Location.map (fun (Crossing x) -> x) crossing)
+
+let crossings i ppf mods =
+  List.iter (fun m -> crossing i ppf m) mods
+
 let modality i ppf modality =
   line i ppf "modality %a\n" fmt_string_loc
     (Location.map (fun (Modality x) -> x) modality)
 
-let modalities i ppf modalities =
-  List.iter (fun m -> modality i ppf m) modalities
+let modalities i ppf m =
+  match m with
+  | No_modalities -> ()
+  | Modalities { modalities = m; crossings = c; loc } ->
+    line i ppf "modalities %a\n" fmt_location loc;
+    let i = i+1 in
+    List.iter (fun m -> modality i ppf m) m;
+    crossings i ppf c
 
 let mode i ppf mode =
   line i ppf "mode %a\n" fmt_string_loc
     (Location.map (fun (Mode x) -> x) mode)
 
-let modes i ppf modes =
-  List.iter (fun m -> mode i ppf m) modes
+let modes i ppf m =
+  match m with
+  | No_modes -> ()
+  | Modes { modes = m; crossings = c; loc } ->
+    line i ppf "modes %a\n" fmt_location loc;
+    let i = i+1 in
+    List.iter (fun m -> mode i ppf m) m;
+    crossings i ppf c
 
 let include_kind i ppf = function
   | Structure -> line i ppf "Structure\n"
@@ -553,7 +572,7 @@ and jkind_annotation i ppf (jkind : jkind_annotation) =
   | Pjk_mod (jkind, m) ->
       line i ppf "Pjk_mod\n";
       jkind_annotation (i+1) ppf jkind;
-      modes (i+1) ppf m
+      crossings (i+1) ppf m
   | Pjk_with (jkind, type_, modalities_) ->
       line i ppf "Pjk_with\n";
       jkind_annotation (i+1) ppf jkind;

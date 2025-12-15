@@ -239,25 +239,25 @@ Error: The module "M" is "nonportable" but is expected to be "portable"
 module F (X : S @ portable) = struct
 end
 [%%expect{|
-Line 1, characters 18-26:
+Line 1, characters 16-26:
 1 | module F (X : S @ portable) = struct
-                      ^^^^^^^^
+                    ^^^^^^^^^^
 Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module type S = functor () (M : S @ portable) (_ : S @ portable) -> S
 [%%expect{|
-Line 1, characters 36-44:
+Line 1, characters 34-44:
 1 | module type S = functor () (M : S @ portable) (_ : S @ portable) -> S
-                                        ^^^^^^^^
+                                      ^^^^^^^^^^
 Error: Mode annotations on functor parameters are not supported yet.
 |}]
 
 module type S = functor () (M : S) (_ : S) -> S @ portable
 [%%expect{|
-Line 1, characters 50-58:
+Line 1, characters 48-58:
 1 | module type S = functor () (M : S) (_ : S) -> S @ portable
-                                                      ^^^^^^^^
+                                                    ^^^^^^^^^^
 Error: Mode annotations on functor return are not supported yet.
 |}]
 

@@ -50,10 +50,10 @@ let nested_pat_constraint loc =
     (H.Pat.constraint_
        (H.Pat.mk Ppat_any)
        None
-       [mode "bar"]
+       (H.Modes.of_core_modes [mode "bar"])
     )
     (Some (H.Typ.mk (Ptyp_any None)))
-    [mode "foo"]
+    (H.Modes.of_core_modes [mode "foo"])
 
 (* Malformed labeled tuples *)
 
