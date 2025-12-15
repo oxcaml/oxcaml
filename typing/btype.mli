@@ -330,7 +330,12 @@ module Jkind0 : sig
     module Nullability = Jkind_axis.Nullability
     module Separability = Jkind_axis.Separability
 
-    type t = mod_bounds
+    type t = mod_bounds =
+      { crossing : Mode.Crossing.t;
+        externality: Jkind_axis.Externality.t;
+        nullability: Jkind_axis.Nullability.t;
+        separability: Jkind_axis.Separability.t;
+      }
 
     val create :
       Crossing.t->
@@ -473,15 +478,15 @@ module Jkind0 : sig
           other platforms, we know nothing other than that it's a value. *)
       val immediate64 : t
 
-      (** We know for sure that values of types of this jkind are always
-          immediate *)
-      val immediate64_or_null : t
-
-      (** Values of types of this jkind are either immediate or null pointers *)
-      val immediate : t
-
       (** Values of types of this jkind are either immediate64 or null pointers
           *)
+      val immediate64_or_null : t
+
+      (** We know for sure that values of types of this jkind are always
+          immediate *)
+      val immediate : t
+
+      (** Values of types of this jkind are either immediate or null pointers *)
       val immediate_or_null : t
 
       (** The jkind of unboxed 64-bit floats with no mode crossing. *)
@@ -662,10 +667,6 @@ module Jkind0 : sig
       type_expr:type_expr ->
       jkind_l ->
       jkind_l
-
-    val jkind_of_mutability :
-      mutability -> why:Jkind_intf.History.value_creation_reason ->
-      ('a * 'b) jkind
 
     val for_non_float : why:Jkind_intf.History.value_creation_reason -> 'd jkind
 
