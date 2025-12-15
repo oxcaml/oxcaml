@@ -12,8 +12,9 @@ Line 1, characters 0-29:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "t" is value non_float
          because it's a boxed variant type.
-       But the layout of type "t" must be a sublayout of immediate
+       But the layout of type "t" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 type 'a t : immutable_data = A of 'a

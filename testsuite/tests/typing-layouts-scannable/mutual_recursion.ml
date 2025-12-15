@@ -23,8 +23,10 @@ Error: The layout of type "a" is
            value maybe_separable maybe_null
            & value maybe_separable maybe_null
          because it is an unboxed record.
-       But the layout of type "a" must be a sublayout of immediate & immediate
+       But the layout of type "a" must be a sublayout of
+           value non_pointer & value non_pointer
          because of the annotation on the declaration of the type a.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 (* BUT adding in the additional kind annotation on [b] makes this work! *)
@@ -48,8 +50,10 @@ Error: The layout of type "a" is
            value maybe_separable maybe_null
            & value maybe_separable maybe_null
          because it is an unboxed record.
-       But the layout of type "a" must be a sublayout of immediate & immediate
+       But the layout of type "a" must be a sublayout of
+           value non_pointer & value non_pointer
          because of the annotation on the declaration of the type a.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 (* Same example as above, split across two recursive modules *)
@@ -73,8 +77,10 @@ Line 2, characters 2-64:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "a" is value
          because it is an unboxed record.
-       But the layout of type "a" must be a sublayout of immediate & immediate
+       But the layout of type "a" must be a sublayout of
+           value non_pointer & value non_pointer
          because of the annotation on the declaration of the type a.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 (* These almost demonstrate the bad mutual recursion behavior, but work. *)
@@ -106,12 +112,13 @@ and r = #{ i : int ; f : float# }
 Line 2, characters 0-33:
 2 | and r = #{ i : int ; f : float# }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "r" is immediate & float64
+Error: The layout of type "r" is value non_pointer & float64
          because it is an unboxed record.
        But the layout of type "r" must be a sublayout of
            value maybe_separable maybe_null
            & value maybe_separable maybe_null
          because it is an unboxed record.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 (* Adding the annotation fixes this, like the case above *)
@@ -130,12 +137,13 @@ and r = { i : int ; f : float# }
 Line 2, characters 0-32:
 2 | and r = { i : int ; f : float# }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "r#" is immediate & float64
+Error: The layout of type "r#" is value non_pointer & float64
          because it is an unboxed record.
        But the layout of type "r#" must be a sublayout of
            value maybe_separable maybe_null
            & value maybe_separable maybe_null
          because it is an unboxed record.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 type 'a t = #{ a : 'a ; a' : 'a } constraint ('a : immediate & float64) = r#

@@ -42,8 +42,9 @@ Error: Signature mismatch:
          type 'a t : immediate constraint 'a = int
        The layout of the first is value non_float
          because of the definition of t at line 4, characters 2-43.
-       But the layout of the first must be a sublayout of immediate
+       But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-43.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 module M : sig

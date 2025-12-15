@@ -26,8 +26,9 @@ Line 1, characters 0-45:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "bad" is value non_float
          because it's a boxed variant type.
-       But the layout of type "bad" must be a sublayout of immediate
+       But the layout of type "bad" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type bad.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 (* With-bounds for all-void variants *)

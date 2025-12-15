@@ -192,8 +192,9 @@ Lines 1-2, characters 0-27:
 2 | | P1 : ('b, 'a1) t -> 'a1 u
 Error: The layout of type "u" is value non_float
          because it's a boxed variant type.
-       But the layout of type "u" must be a sublayout of immediate
+       But the layout of type "u" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type u.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 type 'a u : immutable_data =
@@ -224,8 +225,9 @@ Lines 1-2, characters 0-25:
 2 |   | A : 'b -> 'b option t
 Error: The layout of type "t" is value non_float
          because it's a boxed variant type.
-       But the layout of type "t" must be a sublayout of immediate
+       But the layout of type "t" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 type 'a t : immutable_data =
@@ -242,8 +244,9 @@ Lines 1-2, characters 0-48:
 2 |   | A : ('b : immutable_data). 'b -> 'b option t
 Error: The layout of type "t" is value non_float
          because it's a boxed variant type.
-       But the layout of type "t" must be a sublayout of immediate
+       But the layout of type "t" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 type 'a cell : mutable_data with 'a =

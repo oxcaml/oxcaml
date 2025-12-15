@@ -494,9 +494,10 @@ type ('a : value & float64) t
 Line 3, characters 0-26:
 3 | and r = #{ x:int; y:bool }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "r" is immediate & immediate
+Error: The layout of type "r" is value non_pointer & value non_pointer
          because it is an unboxed record.
        But the layout of type "r" must be a sublayout of
            value maybe_separable maybe_null & float64
          because it is an unboxed record.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]

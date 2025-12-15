@@ -124,8 +124,9 @@ Error: This expression has type "string" but an expression was expected of type
          "('a : immediate)"
        The layout of string is value non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-25.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 (******************************************************************)
@@ -179,8 +180,9 @@ Line 2, characters 2-29:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "Bar3.t" is value
          because of the annotation on the declaration of the type t.
-       But the layout of type "Bar3.t" must be a sublayout of immediate
+       But the layout of type "Bar3.t" must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-29.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}];;
 
 module rec Foo3 : sig
@@ -330,10 +332,11 @@ Line 1, characters 10-15:
 1 | type t4 = M4'.s t4_void;;
               ^^^^^
 Error: This type "M4'.s" should be an instance of type "('a : void)"
-       The layout of M4'.s is immediate
+       The layout of M4'.s is value non_pointer
          because of the definition of s at line 2, characters 2-45.
        But the layout of M4'.s must be a sublayout of void
          because of the definition of t4_void at line 8, characters 0-24.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}];;
 
 (************************************)
@@ -365,8 +368,9 @@ Error: This expression has type "string" but an expression was expected of type
          "('a : immediate)"
        The layout of string is value non_float
          because it is the primitive type string.
-       But the layout of string must be a sublayout of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the definition of f at line 3, characters 2-20.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 module type S3_2 = sig
@@ -387,8 +391,9 @@ Error: In this "with" constraint, the new definition of "t"
          type t : immediate
        The layout of the first is value non_float
          because it is the primitive type string.
-       But the layout of the first must be a sublayout of immediate
+       But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-20.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}]
 
 (*****************************************)
@@ -411,10 +416,11 @@ Error: In this "with" constraint, the new definition of "t"
          type t = int
        is not included in
          type t : void
-       The layout of the first is immediate
+       The layout of the first is value non_pointer
          because it is the primitive type int.
        But the layout of the first must be a sublayout of void
          because of the definition of t at line 2, characters 2-15.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}];;
 
 module type S6_3 = sig
@@ -461,8 +467,9 @@ Error: In this "with" constraint, the new definition of "t"
          type t : immediate
        The layout of the first is value non_float
          because it is the primitive type string.
-       But the layout of the first must be a sublayout of immediate
+       But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-20.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}];;
 
 module type S6_6' = sig
@@ -481,8 +488,9 @@ Error: In this "with" constraint, the new definition of "t"
          type t : immediate
        The layout of the first is value
          because of the definition of s at line 2, characters 2-8.
-       But the layout of the first must be a sublayout of immediate
+       But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-20.
+       Hint: The kind of "immediate" is "value non_pointer".
 |}];;
 
 module type S6_6'' = sig
