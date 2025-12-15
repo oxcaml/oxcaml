@@ -4,7 +4,7 @@ let code switch_converted_to_lookup_table_0 deleted in
 let code switch_converted_to_lookup_table'_1 deleted in
 let code switch_converted_to_affine_2 deleted in
 let code switch_converted_to_affine'_3 deleted in
-let $camlCode_size_of_single_arg_switch__switch_block42 =
+let $camlCode_size_of_single_arg_switch__switch_block40 =
   Value_array [|1;
   2;
   4|]
@@ -15,7 +15,7 @@ let code loopify(never) size(2) newer_version_of(switch_converted_to_lookup_tabl
         -> k * k1
         : imm tagged =
   let arg =
-    %array_load $camlCode_size_of_single_arg_switch__switch_block42.(x)
+    %array_load $camlCode_size_of_single_arg_switch__switch_block40.(x)
   in
   cont k (arg)
 in

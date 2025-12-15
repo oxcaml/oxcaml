@@ -1,0 +1,38 @@
+
+After simplify:
+let code f_0 deleted in
+let code g_1 deleted in
+let code loopify(never) size(27) newer_version_of(f_0)
+      f_0_1 (b : imm tagged, x, y)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] =
+  (let untagged = %untag_imm b in
+   switch untagged
+     | 0 -> k2
+     | 1 -> k3)
+    where k3 =
+      let Pmakeblock = %Block 0 (x, y) in
+      cont k (Pmakeblock)
+    where k2 =
+      let Pmakeblock = %Block 0 (y, x) in
+      cont k (Pmakeblock)
+in
+let $camlRemoved_operations_of_switch__f_2 = closure f_0_1 @f in
+let code loopify(never) size(4) newer_version_of(g_1)
+      g_1_1 (b : imm tagged, x, y)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] =
+  apply direct(f_0_1)
+    ($camlRemoved_operations_of_switch__f_2 : _ -> [ 0 of val * val ])
+      (b, x, y)
+      -> k * k1
+in
+let $camlRemoved_operations_of_switch__g_3 = closure g_1_1 @g in
+let $camlRemoved_operations_of_switch =
+  Block 0 ($camlRemoved_operations_of_switch__f_2,
+           $camlRemoved_operations_of_switch__g_3)
+in
+cont done ($camlRemoved_operations_of_switch)
+
