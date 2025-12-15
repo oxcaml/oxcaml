@@ -35,43 +35,45 @@ module Unboxed_or_untagged_array_tags = struct
 
   let unboxed_int32_array_one_tag = 3
 
-  let untagged_int16_array_zero_tag = 4
+  let unboxed_float32_array_zero_tag = 4
 
-  let untagged_int16_array_three_tag = 5
+  let unboxed_float32_array_one_tag = 5
 
-  let untagged_int16_array_two_tag = 6
+  let unboxed_vec128_array_tag = 6
 
-  let untagged_int16_array_one_tag = 7
+  let unboxed_vec256_array_tag = 7
 
-  let untagged_int8_array_zero_tag = 8
+  let unboxed_vec512_array_tag = 8
 
-  let untagged_int8_array_seven_tag = 9
+  let unboxed_nativeint_array_tag = 9
 
-  let untagged_int8_array_six_tag = 10
+  let untagged_int_array_tag = 10
 
-  let untagged_int8_array_five_tag = 11
+  (* Tag 11 is currently unassigned to align the int16 and int8 tags *)
 
-  let untagged_int8_array_four_tag = 12
+  let untagged_int16_array_zero_tag = 12
 
-  let untagged_int8_array_three_tag = 13
+  let untagged_int16_array_three_tag = 13
 
-  let untagged_int8_array_two_tag = 14
+  let untagged_int16_array_two_tag = 14
 
-  let untagged_int8_array_one_tag = 15
+  let untagged_int16_array_one_tag = 15
 
-  let unboxed_float32_array_zero_tag = 16
+  let untagged_int8_array_zero_tag = 16
 
-  let unboxed_float32_array_one_tag = 17
+  let untagged_int8_array_seven_tag = 17
 
-  let unboxed_vec128_array_tag = 18
+  let untagged_int8_array_six_tag = 18
 
-  let unboxed_vec256_array_tag = 19
+  let untagged_int8_array_five_tag = 19
 
-  let unboxed_vec512_array_tag = 20
+  let untagged_int8_array_four_tag = 20
 
-  let unboxed_nativeint_array_tag = 21
+  let untagged_int8_array_three_tag = 21
 
-  let untagged_int_array_tag = 22
+  let untagged_int8_array_two_tag = 22
+
+  let untagged_int8_array_one_tag = 23
 
   let untagged_int8_array_tag n =
     match n mod 8 with
