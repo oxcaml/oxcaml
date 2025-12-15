@@ -384,9 +384,9 @@ Lines 1-2, characters 0-34:
 Error: This variant or record definition does not match that of type "'a t"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod forkable unyielding many stateless portable
+         the original has: mod spawnable unyielding many stateless portable
          immutable contended with 'a
-         but this has: mod forkable unyielding many stateless portable
+         but this has: mod spawnable unyielding many stateless portable
          immutable contended
 |}]
 
@@ -405,9 +405,9 @@ Error: This variant or record definition does not match that of type
          "('a, 'b) arity_2"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod forkable unyielding many stateless portable
+         the original has: mod spawnable unyielding many stateless portable
          immutable contended with 'b
-         but this has: mod forkable unyielding many stateless portable
+         but this has: mod spawnable unyielding many stateless portable
          immutable contended with 'a
 |}]
 
