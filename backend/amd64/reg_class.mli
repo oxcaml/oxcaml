@@ -17,4 +17,5 @@ type save_simd_regs =
   | Save_ymm
   | Save_zmm
 
-val gc_regs_offset : simd:save_simd_regs -> Cmm.machtype_component -> int -> int
+val gc_regs_offset :
+  simd:save_simd_regs option -> Cmm.machtype_component -> int -> int

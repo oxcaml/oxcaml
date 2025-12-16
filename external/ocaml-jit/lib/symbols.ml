@@ -45,6 +45,7 @@ let aggregate ~current ~new_symbols =
   String.Map.union current new_symbols ~f:(fun symbol_name _old new_ ->
     if is_gen_fun symbol_name
        || String.equal symbol_name ".Lcaml_call_gc_"
+       || String.equal symbol_name ".Lcaml_call_gc_sse_"
        || String.equal symbol_name ".Lcaml_call_gc_avx_"
        || String.equal symbol_name ".Lcaml_call_gc_avx512_"
        || String.starts_with ~prefix:".Lcaml_apply" symbol_name

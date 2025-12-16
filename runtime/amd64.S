@@ -534,6 +534,9 @@ G(caml_system__code_begin):
 
 #define SIMD_REGS_OFFSET (13*8) /* gc_regs_bucket starts with 13 int64 regs */
 
+#define SAVE__REGS
+#define RESTORE__REGS
+
 #define SAVE_XMM(i) movupd %xmm##i, (i*16 + SIMD_REGS_OFFSET)(%r15);
 #define SAVE_XMM_REGS DO_0_15(SAVE_XMM)
 
@@ -719,7 +722,8 @@ LBL(caml_call_gc ## suffix):                         \
     CFI_ENDPROC                 ;                    \
     ENDFUNCTION(G(caml_call_gc ## suffix))
 
-Make_call_gc(, XMM)
+Make_call_gc(,)
+Make_call_gc(_sse, XMM)
 Make_call_gc(_avx, YMM)
 Make_call_gc(_avx512, ZMM)
 
@@ -757,6 +761,7 @@ ENDFUNCTION(G(base_name ## simd)) ;
 
 #define Make_alloc_funs(words) \
 Make_alloc_fun(caml_alloc ## words, words,) \
+Make_alloc_fun(caml_alloc ## words, words, _sse) \
 Make_alloc_fun(caml_alloc ## words, words, _avx) \
 Make_alloc_fun(caml_alloc ## words, words, _avx512)
 
@@ -780,7 +785,8 @@ Make_alloc_funs(N) /* caml_allocN* */
    CFI_ENDPROC                  ;                    \
    ENDFUNCTION(G(caml_call_local_realloc ## suffix))
 
-Make_call_local_realloc(, XMM)
+Make_call_local_realloc(,)
+Make_call_local_realloc(_sse, XMM)
 Make_call_local_realloc(_avx, YMM)
 Make_call_local_realloc(_avx512, ZMM)
 

@@ -105,6 +105,8 @@ let encode { name; already_encoded } =
 module Predef = struct
   let caml_call_gc = create_without_encoding "caml_call_gc"
 
+  let caml_call_gc_sse = create_without_encoding "caml_call_gc_sse"
+
   let caml_call_gc_avx = create_without_encoding "caml_call_gc_avx"
 
   let caml_call_gc_avx512 = create_without_encoding "caml_call_gc_avx512"
@@ -113,11 +115,15 @@ module Predef = struct
 
   let caml_allocN = create_without_encoding "caml_allocN"
 
+  let caml_allocN_sse = create_without_encoding "caml_allocN_sse"
+
   let caml_allocN_avx = create_without_encoding "caml_allocN_avx"
 
   let caml_allocN_avx512 = create_without_encoding "caml_allocN_avx512"
 
   let caml_alloc1 = create_without_encoding "caml_alloc1"
+
+  let caml_alloc1_sse = create_without_encoding "caml_alloc1_sse"
 
   let caml_alloc1_avx = create_without_encoding "caml_alloc1_avx"
 
@@ -125,11 +131,15 @@ module Predef = struct
 
   let caml_alloc2 = create_without_encoding "caml_alloc2"
 
+  let caml_alloc2_sse = create_without_encoding "caml_alloc2_sse"
+
   let caml_alloc2_avx = create_without_encoding "caml_alloc2_avx"
 
   let caml_alloc2_avx512 = create_without_encoding "caml_alloc2_avx512"
 
   let caml_alloc3 = create_without_encoding "caml_alloc3"
+
+  let caml_alloc3_sse = create_without_encoding "caml_alloc3_sse"
 
   let caml_alloc3_avx = create_without_encoding "caml_alloc3_avx"
 
