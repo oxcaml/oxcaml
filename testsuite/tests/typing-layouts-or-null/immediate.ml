@@ -175,7 +175,7 @@ Line 1, characters 19-40:
                        ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate64_or_null" should be an instance of type
          "('a : immediate64)"
-       The layout of t_immediate64_or_null is value non_pointer maybe_null
+       The layout of t_immediate64_or_null is value non_pointer64 maybe_null
          because of the definition of t_immediate64_or_null at line 1, characters 0-48.
        But the layout of t_immediate64_or_null must be a sublayout of
            immediate64
@@ -189,7 +189,7 @@ Line 1, characters 19-40:
                        ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate64_or_null" should be an instance of type
          "('a : immediate)"
-       The layout of t_immediate64_or_null is value non_pointer maybe_null
+       The layout of t_immediate64_or_null is value non_pointer64 maybe_null
          because of the definition of t_immediate64_or_null at line 1, characters 0-48.
        But the layout of t_immediate64_or_null must be a sublayout of
            immediate
@@ -203,7 +203,7 @@ Line 1, characters 19-40:
                        ^^^^^^^^^^^^^^^^^^^^^
 Error: This type "t_immediate64_or_null" should be an instance of type
          "('a : value)"
-       The layout of t_immediate64_or_null is value non_pointer maybe_null
+       The layout of t_immediate64_or_null is value non_pointer64 maybe_null
          because of the definition of t_immediate64_or_null at line 1, characters 0-48.
        But the layout of t_immediate64_or_null must be a sublayout of value
          because of the definition of accept_value at line 1, characters 0-30.
@@ -235,7 +235,7 @@ Error: This type "exn or_null" should be an instance of type
        The layout of exn or_null is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of exn or_null must be a sublayout of
-           value non_pointer maybe_null
+           value non_pointer64 maybe_null
          because of the definition of accept_immediate64_or_null at line 1, characters 0-58.
 |}]
 
@@ -272,6 +272,6 @@ Error: Signature mismatch:
        The layout of the first is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of the first must be a sublayout of
-           value non_pointer maybe_null
+           value non_pointer64 maybe_null
          because of the definition of t at line 2, characters 2-30.
 |}]

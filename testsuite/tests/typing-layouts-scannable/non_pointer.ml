@@ -165,6 +165,50 @@ Error: This type "t_maybeptr_val" should be an instance of type
          because of the definition of accepts_nonptr64_val at line 1, characters 0-52.
 |}]
 
+type ('a : value non_pointer64 maybe_null) accepts_nonptr64_val_maybe_null
+
+type t_immediate64 : immediate64
+type t_immediate64_or_null : immediate64_or_null
+
+type succeeds = t_immediate64 accepts_nonptr64_val_maybe_null
+type succeeds = t_immediate64_or_null accepts_nonptr64_val_maybe_null
+[%%expect{|
+type ('a : value_or_null non_pointer64) accepts_nonptr64_val_maybe_null
+type t_immediate64 : immediate64
+type t_immediate64_or_null : immediate64_or_null
+type succeeds = t_immediate64 accepts_nonptr64_val_maybe_null
+type succeeds = t_immediate64_or_null accepts_nonptr64_val_maybe_null
+|}]
+
+type ('a : value non_pointer maybe_null) accepts_nonptr_val_maybe_null
+type fails = t_immediate64 accepts_nonptr_val_maybe_null
+[%%expect{|
+type ('a : value_or_null non_pointer) accepts_nonptr_val_maybe_null
+Line 2, characters 13-26:
+2 | type fails = t_immediate64 accepts_nonptr_val_maybe_null
+                 ^^^^^^^^^^^^^
+Error: This type "t_immediate64" should be an instance of type
+         "('a : value_or_null non_pointer)"
+       The layout of t_immediate64 is immediate64
+         because of the definition of t_immediate64 at line 3, characters 0-32.
+       But the layout of t_immediate64 must be a sublayout of
+           value non_pointer maybe_null
+         because of the definition of accepts_nonptr_val_maybe_null at line 1, characters 0-70.
+|}]
+type fails = t_immediate64_or_null accepts_nonptr_val_maybe_null
+[%%expect{|
+Line 1, characters 13-34:
+1 | type fails = t_immediate64_or_null accepts_nonptr_val_maybe_null
+                 ^^^^^^^^^^^^^^^^^^^^^
+Error: This type "t_immediate64_or_null" should be an instance of type
+         "('a : value_or_null non_pointer)"
+       The layout of t_immediate64_or_null is value non_pointer64 maybe_null
+         because of the definition of t_immediate64_or_null at line 4, characters 0-48.
+       But the layout of t_immediate64_or_null must be a sublayout of
+           value non_pointer maybe_null
+         because of the definition of accepts_nonptr_val_maybe_null at line 1, characters 0-70.
+|}]
+
 (* when the layout is not value, the scannable axes should not be relevant *)
 type succeeds = float# accepts_maybeptr
 type succeeds = float# accepts_nonptr
