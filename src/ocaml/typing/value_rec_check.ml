@@ -629,13 +629,7 @@ let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
     (* This is counted as a use, because constructing a generic array
        involves inspecting to decide whether to unbox (PR#6939). *)
     Dereference
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-25
-  | Paddrarray | Pintarray ->
-||||||| oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
-  | Lambda.Paddrarray | Lambda.Pintarray ->
-=======
-  | Lambda.Paddrarray | Lambda.Pgcignorableaddrarray | Lambda.Pintarray ->
->>>>>>> oxcaml/oxcaml:d6e630469425e02d8d45f8f10392e046689de2c5
+  | Paddrarray | Pgcignorableaddrarray | Pintarray ->
     (* non-generic, non-float arrays act as constructors *)
     Guard
   | Punboxedfloatarray _ | Punboxedoruntaggedintarray _

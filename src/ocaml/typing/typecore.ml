@@ -9540,26 +9540,6 @@ and type_application env app_loc expected_mode position_and_mode
         cross_left env ty_ret (alloc_as_value mode_ret)
       in
       let () =
-||||||| oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
-      let mode_ret = Alloc.disallow_right mode_ret in
-      let ap_mode = Alloc.proj_comonadic Areality mode_ret in
-      let mode_ret =
-        cross_left env ty_ret (alloc_as_value mode_ret)
-      in
-      submode ~loc:app_loc ~env ~reason:(Application ty_ret)
-        mode_ret expected_mode;
-
-      check_tail_call_local_returning app_loc env ap_mode position_and_mode;
-      args, ty_ret, ap_mode, position_and_mode
-
-and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
-    ~explanation ~attributes sexpl =
-=======
-      args, ty_ret, mode_ret, position_and_mode
-
-and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
-    ~explanation ~attributes sexpl =
->>>>>>> oxcaml/oxcaml:d6e630469425e02d8d45f8f10392e046689de2c5
         try submode ~loc:app_loc ~env ~reason:(Application ty_ret)
                             mode_ret expected_mode
         with exn ->
@@ -9585,6 +9565,26 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
 
 and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
     ~explanation ~attributes sexpl =
+||||||| oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
+      let mode_ret = Alloc.disallow_right mode_ret in
+      let ap_mode = Alloc.proj_comonadic Areality mode_ret in
+      let mode_ret =
+        cross_left env ty_ret (alloc_as_value mode_ret)
+      in
+      submode ~loc:app_loc ~env ~reason:(Application ty_ret)
+        mode_ret expected_mode;
+
+      check_tail_call_local_returning app_loc env ap_mode position_and_mode;
+      args, ty_ret, ap_mode, position_and_mode
+
+and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
+    ~explanation ~attributes sexpl =
+=======
+      args, ty_ret, mode_ret, position_and_mode
+
+and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
+    ~explanation ~attributes sexpl =
+>>>>>>> oxcaml/oxcaml:d6e630469425e02d8d45f8f10392e046689de2c5
   (* CR layouts v5: consider sharing code with [type_unboxed_tuple] below when
      we allow non-values in boxed tuples. *)
   let arity = List.length sexpl in

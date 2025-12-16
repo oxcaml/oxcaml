@@ -28,24 +28,7 @@ open Lambda
    return the original, rather than a partially expanded one.  The original may
    have cached jkind information that is more accurate than can be computed
    from its expanded form. *)
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-25
 let scrape_ty env ty =
-||||||| oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
-  | Unsupported_vector_in_product_array
-  | Mixed_product_array of Jkind.Sort.Const.t * type_expr
-  | Unsupported_void_in_array
-  | Product_iarrays_unsupported
-  | Opaque_array_non_value of
-      { array_type: type_expr;
-        elt_kinding_failure: (type_expr * Jkind.Violation.t) option }
-=======
-  | Unsupported_vector_in_product_array
-  | Mixed_product_array of Jkind.Sort.Const.t * type_expr
-  | Unsupported_void_in_array
-  | Opaque_array_non_value of
-      { array_type: type_expr;
-        elt_kinding_failure: (type_expr * Jkind.Violation.t) option }
->>>>>>> oxcaml/oxcaml:d6e630469425e02d8d45f8f10392e046689de2c5
   let ty =
     match get_desc ty with
     | Tpoly(ty, _) -> ty
@@ -253,31 +236,6 @@ let array_type_kind ~elt_sort ~elt_ty env loc ty =
   | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_array
                               || Path.same p Predef.path_iarray ->
       array_kind_of_elt ~elt_sort env loc elt_ty
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-25
-  | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_iarray ->
-      let kind = array_kind_of_elt ~elt_sort env loc elt_ty in
-      (* CR layouts v7.1: allow iarrays of products. *)
-      begin match kind with
-      | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
-        (* raise (Error (loc, Product_iarrays_unsupported)) *)
-        Misc.fatal_error "merlin-jst: product kind encountered in array_type_kind"
-      | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
-      | Punboxedoruntaggedintarray _ | Punboxedvectorarray _  ->
-        kind
-      end
-||||||| oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
-  | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_iarray ->
-      let kind = array_kind_of_elt ~elt_sort env loc elt_ty in
-      (* CR layouts v7.1: allow iarrays of products. *)
-      begin match kind with
-      | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
-        raise (Error (loc, Product_iarrays_unsupported))
-      | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
-      | Punboxedoruntaggedintarray _ | Punboxedvectorarray _  ->
-        kind
-      end
-=======
->>>>>>> oxcaml/oxcaml:d6e630469425e02d8d45f8f10392e046689de2c5
   | Tconstr(p, [], _) when Path.same p Predef.path_floatarray ->
       Pfloatarray
   | _ ->
@@ -1129,16 +1087,8 @@ let lazy_val_requires_forward env (* loc *) ty =
      type has layout [value] which is different from these unboxed layouts. *)
   | Unboxed_float _ | Unboxed_int _ | Unboxed_vector _ | Void ->
     Misc.fatal_error "Unboxed value encountered inside lazy expression"
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-25
-  | Float -> false (* TODO: Config.flat_float_array *)
-  | Addr | Int -> false
-||||||| oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
-  | Float -> Config.flat_float_array
-  | Addr | Int -> false
-=======
   | Float -> Config.flat_float_array
   | Addr | Immediate | Immediate_or_null -> false
->>>>>>> oxcaml/oxcaml:d6e630469425e02d8d45f8f10392e046689de2c5
   | Product _ -> assert false (* because [classify_product] raises *)
 
 (** The compilation of the expression [lazy e] depends on the form of e:
@@ -1167,86 +1117,3 @@ let classify_lazy_argument : Typedtree.expression ->
        `Identifier `Other
     | _ ->
        `Other
-
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-25
-(*
-let value_kind_union (k1 : Lambda.value_kind) (k2 : Lambda.value_kind) =
-  if Lambda.equal_value_kind k1 k2 then k1
-    (* CR vlaviron: we could be more precise by comparing nullability and
-       raw kinds separately *)
-  else Lambda.generic_value
-
-let rec layout_union l1 l2 =
-  match l1, l2 with
-  | Pbottom, l
-  | l, Pbottom -> l
-  | Pvalue layout1, Pvalue layout2 ->
-      Pvalue (value_kind_union layout1 layout2)
-  | Punboxed_float f1, Punboxed_float f2 ->
-      if Primitive.equal_unboxed_float f1 f2 then l1 else Ptop
-  | Punboxed_or_untagged_integer bi1, Punboxed_or_untagged_integer bi2 ->
-      if Primitive.equal_unboxed_or_untagged_integer bi1 bi2 then l1 else Ptop
-  | Punboxed_vector vi1, Punboxed_vector vi2 ->
-      if Primitive.equal_unboxed_vector vi1 vi2 then l1 else Ptop
-  | Punboxed_product layouts1, Punboxed_product layouts2 ->
-      if List.compare_lengths layouts1 layouts2 <> 0 then Ptop
-      else Punboxed_product (List.map2 layout_union layouts1 layouts2)
-  | (Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ |
-     Punboxed_vector _ | Punboxed_product _),
-    _ ->
-      Ptop
-||||||| oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
-let value_kind_union (k1 : Lambda.value_kind) (k2 : Lambda.value_kind) =
-  if Lambda.equal_value_kind k1 k2 then k1
-    (* CR vlaviron: we could be more precise by comparing nullability and
-       raw kinds separately *)
-  else Lambda.generic_value
-
-let rec layout_union l1 l2 =
-  match l1, l2 with
-  | Pbottom, l
-  | l, Pbottom -> l
-  | Pvalue layout1, Pvalue layout2 ->
-      Pvalue (value_kind_union layout1 layout2)
-  | Punboxed_float f1, Punboxed_float f2 ->
-      if Primitive.equal_unboxed_float f1 f2 then l1 else Ptop
-  | Punboxed_or_untagged_integer bi1, Punboxed_or_untagged_integer bi2 ->
-      if Primitive.equal_unboxed_or_untagged_integer bi1 bi2 then l1 else Ptop
-  | Punboxed_vector vi1, Punboxed_vector vi2 ->
-      if Primitive.equal_unboxed_vector vi1 vi2 then l1 else Ptop
-  | Punboxed_product layouts1, Punboxed_product layouts2 ->
-      if List.compare_lengths layouts1 layouts2 <> 0 then Ptop
-      else Punboxed_product (List.map2 layout_union layouts1 layouts2)
-  | (Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ |
-     Punboxed_vector _ | Punboxed_product _),
-    _ ->
-      Ptop
-
-(* Error report *)
-open Format
-
-=======
-(* Error report *)
-open Format
-
->>>>>>> oxcaml/oxcaml:d6e630469425e02d8d45f8f10392e046689de2c5
-*)
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-25
-||||||| oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
-         contained abstract types as [mod external] may resolve this error.@]"
-        Printtyp.type_expr elt_ty
-        Jkind.Sort.Const.format const
-  | Product_iarrays_unsupported ->
-      fprintf ppf
-        "Immutable arrays of unboxed products are not yet supported."
-  | Opaque_array_non_value { array_type; elt_kinding_failure }  ->
-      begin match elt_kinding_failure with
-      | Some (ty, err) ->
-=======
-         contained abstract types as [mod external] may resolve this error.@]"
-        Printtyp.type_expr elt_ty
-        Jkind.Sort.Const.format const
-  | Opaque_array_non_value { array_type; elt_kinding_failure }  ->
-      begin match elt_kinding_failure with
-      | Some (ty, err) ->
->>>>>>> oxcaml/oxcaml:d6e630469425e02d8d45f8f10392e046689de2c5
