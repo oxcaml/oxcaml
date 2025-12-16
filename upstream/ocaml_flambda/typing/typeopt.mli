@@ -87,8 +87,3 @@ val classify_lazy_argument : Typedtree.expression ->
                              | `Float_that_cannot_be_shortcut
                              | `Identifier of [`Forward_value | `Other]
                              | `Other]
-
-val layout_union :
-      Lambda.layout -> Lambda.layout -> Lambda.layout
-  (** [layout_union layout1 layout2] is a layout at least as general as
-      [layout1] and [layout2] *)
