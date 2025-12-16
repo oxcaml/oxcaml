@@ -430,7 +430,8 @@ module Genarray :
 
   external set
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) -> (int array[@local_opt]) -> ('a[@local_opt]) -> unit
+      (('a, 'b, 'c) t[@local_opt]) -> (int array[@local_opt])
+      -> ('a[@local_opt]) -> unit
     = "caml_ba_set_generic"
   (** Assign an element of a generic Bigarray.
      [Genarray.set a [|i1; ...; iN|] v] stores the value [v] in the
@@ -511,7 +512,8 @@ module Genarray :
 
   external slice_right
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, fortran_layout) t -> (int array[@local_opt]) -> ('a, 'b, fortran_layout) t
+      ('a, 'b, fortran_layout) t -> (int array[@local_opt]) -
+      > ('a, 'b, fortran_layout) t
     = "caml_ba_slice"
   (** Extract a sub-array of lower dimension from the given Bigarray
      by fixing one or several of the last (right-most) coordinates.
@@ -530,7 +532,8 @@ module Genarray :
 
   external blit
     : ('a : any) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt]) -> unit
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+      -> unit
     = "caml_ba_blit"
   (** Copy all elements of a Bigarray in another Bigarray.
      [Genarray.blit src dst] copies all elements of [src] into
@@ -618,7 +621,8 @@ module Array0 : sig
 
   external blit
     : ('a : any) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt]) -> unit
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+      -> unit
     = "caml_ba_blit"
   (** Copy the first Bigarray to the second Bigarray.
      See {!Genarray.blit} for more details. *)
@@ -753,7 +757,8 @@ module Array1 : sig
 
   external blit
     : ('a : any) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt]) -> unit
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+      -> unit
     = "caml_ba_blit"
   (** Copy the first Bigarray to the second Bigarray.
      See {!Genarray.blit} for more details. *)
@@ -929,7 +934,8 @@ module Array2 :
 
   external blit
     : ('a : any) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt]) -> unit
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+      -> unit
     = "caml_ba_blit"
   (** Copy the first Bigarray to the second Bigarray.
      See {!Bigarray.Genarray.blit} for more details. *)
@@ -1055,7 +1061,8 @@ module Array3 :
 
   external get
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> int -> ('a[@local_opt])
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> int
+      -> ('a[@local_opt])
     = "%caml_ba_ref_3"
   (** [Array3.get a x y z], also written [a.{x,y,z}],
      returns the element of [a] at coordinates ([x], [y], [z]).
@@ -1065,7 +1072,8 @@ module Array3 :
 
   external set
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) -> int -> int -> int -> ('a[@local_opt]) -> unit
+      (('a, 'b, 'c) t[@local_opt]) -> int -> int -> int -> ('a[@local_opt])
+      -> unit
     = "%caml_ba_set_3"
   (** [Array3.set a x y v], or alternatively [a.{x,y,z} <- v],
      stores the value [v] at coordinates ([x], [y], [z]) in [a].
@@ -1132,7 +1140,8 @@ module Array3 :
 
   external blit
     : ('a : any) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt]) -> unit
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+      -> unit
     = "caml_ba_blit"
   (** Copy the first Bigarray to the second Bigarray.
      See {!Bigarray.Genarray.blit} for more details. *)
@@ -1146,20 +1155,23 @@ module Array3 :
 
   val of_array
     : ('a : value_or_null mod separable) ('b : any) ('c : any).
-      ('a, 'b) kind -> 'c layout -> 'a array array array @ local -> ('a, 'b, 'c) t
+      ('a, 'b) kind -> 'c layout -> 'a array array array @ local
+      -> ('a, 'b, 'c) t
   (** Build a three-dimensional Bigarray initialized from the
      given array of arrays of arrays.  *)
 
   external unsafe_get
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> int -> ('a[@local_opt])
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> int
+      -> ('a[@local_opt])
     = "%caml_ba_unsafe_ref_3"
   (** Like {!Bigarray.Array3.get}, but bounds checking is not always
       performed. *)
 
   external unsafe_set
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) -> int -> int -> int -> ('a[@local_opt]) -> unit
+      (('a, 'b, 'c) t[@local_opt]) -> int -> int -> int -> ('a[@local_opt])
+      -> unit
     = "%caml_ba_unsafe_set_3"
   (** Like {!Bigarray.Array3.set}, but bounds checking is not always
       performed. *)

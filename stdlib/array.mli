@@ -32,14 +32,16 @@ open! Stdlib
     {!StdLabels} module.
 *)
 
-type 'a t = 'a array
+type ('a : any mod separable) t = 'a array
 (** An alias for the type of arrays. *)
 
-external length : ('a array[@local_opt]) @ immutable -> int @@ stateless
+external length : ('a : value_or_null mod separable).
+                  ('a array[@local_opt]) @ immutable -> int @@ stateless
   = "%array_length"
 (** Return the length (number of elements) of the given array. *)
 
-external get : ('a array[@local_opt]) -> int -> 'a = "%array_safe_get"
+external get : ('a : value_or_null mod separable).
+               ('a array[@local_opt]) -> int -> 'a = "%array_safe_get"
 (** [get a n] returns the element number [n] of array [a].
    The first element has number 0.
    The last element has number [length a - 1].
@@ -48,7 +50,8 @@ external get : ('a array[@local_opt]) -> int -> 'a = "%array_safe_get"
    @raise Invalid_argument
    if [n] is outside the range 0 to [(length a - 1)]. *)
 
-external set : ('a array[@local_opt]) -> int -> 'a -> unit = "%array_safe_set"
+external set : ('a : value_or_null mod separable).
+               ('a array[@local_opt]) -> int -> 'a -> unit = "%array_safe_set"
 (** [set a n x] modifies array [a] in place, replacing
    element number [n] with [x].
    You can also write [a.(n) <- x] instead of [set a n x].
@@ -456,8 +459,10 @@ let () = Domain.join d1; Domain.join d2
 
 (* The following is for system use only. Do not call directly. *)
 
-external unsafe_get : ('a array[@local_opt]) -> int -> 'a = "%array_unsafe_get"
-external unsafe_set : ('a array[@local_opt]) -> int -> 'a -> unit
+external unsafe_get : ('a : value_or_null mod separable).
+                      ('a array[@local_opt]) -> int -> 'a = "%array_unsafe_get"
+external unsafe_set : ('a : value_or_null mod separable).
+                      ('a array[@local_opt]) -> int -> 'a -> unit
   = "%array_unsafe_set"
 
 module Floatarray : sig
