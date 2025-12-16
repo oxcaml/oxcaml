@@ -573,6 +573,8 @@ module Make (X : sig
 
   module Map : Container_types.Map with type key = t
 
+  val in_coercion : t -> t
+
   val rewrite : t -> TE.t -> TG.t -> t rewrite
 
   (* CR vlaviron: Not all recursive calls to rewrite_arbitrary_type change the
@@ -795,6 +797,29 @@ struct
         Simple.pattern_match canonical
           ~const:(fun _ -> canonical, acc)
           ~name:(fun name ~coercion ->
+            let coercion, acc =
+              let acc_ref = ref acc in
+              let coercion =
+                Coercion.map_depth_variables coercion ~f:(fun variable ->
+                    if not
+                         (Compilation_unit.equal
+                            (Variable.compilation_unit variable)
+                            (Compilation_unit.get_current_exn ()))
+                    then variable
+                    else
+                      let canonical_var, acc =
+                        get_canonical_with !acc_ref (Name.var variable)
+                          K.rec_info (X.in_coercion abs)
+                      in
+                      acc_ref := acc;
+                      match Name.must_be_var_opt canonical_var with
+                      | Some var -> var
+                      | None ->
+                        Misc.fatal_error
+                          "Canonical name of depth variable is a symbol")
+              in
+              coercion, !acc_ref
+            in
             (* Do not rewrite the types of names coming from other compilation
                units, since we can't re-define them and it's hard to think of a
                situation where it would be useful anyways.

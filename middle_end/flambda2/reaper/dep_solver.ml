@@ -2077,6 +2077,8 @@ module Rewriter = struct
     let compare = Code_id_or_name.Map.compare Unit.compare
   end)
 
+  let in_coercion (result, _) = result, Many_sources_any_usage
+
   let identify_set_of_closures_with_one_code_id :
       Datalog.database -> Code_id.t -> unit Code_id_or_name.Map.t list =
     let open! Fixit in

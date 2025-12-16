@@ -107,6 +107,8 @@ module Make (X : sig
 
   module Map : Container_types.Map with type key = t
 
+  val in_coercion : t -> t
+
   val rewrite : t -> Typing_env.t -> Type_grammar.t -> t rewrite
 
   val block_slot :

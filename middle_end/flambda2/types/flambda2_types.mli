@@ -1033,6 +1033,8 @@ module Rewriter : sig
 
     module Map : Container_types.Map with type key = t
 
+    val in_coercion : t -> t
+
     val rewrite : t -> typing_env -> flambda_type -> t Rule.t
 
     (** [block_slot t ofs env ty] returns the abstraction of a field at offset
