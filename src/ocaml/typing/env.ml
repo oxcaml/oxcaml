@@ -206,7 +206,7 @@ let map_summary f = function
 type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * int
+  | Adot of address * module_representation * int
 
 module TycompTbl =
   struct
@@ -756,7 +756,10 @@ and functor_components = {
 }
 
 and address_unforced =
-  | Projection of { parent : address_lazy; pos : int; }
+  | Projection of
+    { parent : address_lazy;
+      module_repr: module_representation;
+      pos : int }
   | ModAlias of { env : t; path : Path.t; }
 
 and address_lazy = (address_unforced, address) Lazy_backtrack.t
@@ -1096,7 +1099,7 @@ let normalize_mda_mode mda =
 let rec print_address ppf = function
   | Aunit cu -> Format.fprintf ppf "%s" (Compilation_unit.full_path_as_string cu)
   | Alocal id -> Format.fprintf ppf "%s" (Ident.name id)
-  | Adot(a, pos) -> Format.fprintf ppf "%a.[%i]" print_address a pos
+  | Adot(a, _, pos) -> Format.fprintf ppf "%a.[%i]" print_address a pos
 
 type address_head =
   | AHunit of Compilation_unit.t
@@ -1105,7 +1108,7 @@ type address_head =
 let rec address_head = function
   | Aunit cu -> AHunit cu
   | Alocal id -> AHlocal id
-  | Adot (a, _) -> address_head a
+  | Adot (a, _, _) -> address_head a
 
 (* The name of the compilation unit currently compiled. *)
 module Current_unit_name : sig
@@ -1212,7 +1215,20 @@ let components_of_module ~alerts ~uid env ps path addr mty mode shape =
     }
   }
 
-let mode_unit = Mode.Value.legacy
+let mode_unit =
+  Mode.Value.of_const
+    { areality = Global;
+      linearity = Many;
+      uniqueness = Aliased;
+      portability = Nonportable;
+      contention = Uncontended;
+      forkable = Forkable;
+      yielding = Unyielding;
+      statefulness = Stateful;
+      visibility = Read_write;
+      staticity = Dynamic;
+      (* CR-soon zqian: persistent modules are always static *)
+    }
 
 let read_sign_of_cmi sign name uid ~shape ~address:addr ~flags =
   let id = Ident.create_global name in
@@ -1679,7 +1695,8 @@ and find_ident_module_address id env =
   get_address (find_ident_module id env).mda_address
 
 and force_address = function
-  | Projection { parent; pos } -> Adot(get_address parent, pos)
+  | Projection { parent; module_repr; pos } ->
+    Adot(get_address parent, module_repr, pos)
   | ModAlias { env; path } -> find_module_address path env
 
 and get_address a =
@@ -2240,6 +2257,9 @@ let add_to_tbl id decl tbl =
 let primitive_address_error =
   Invalid_argument "Primitives don't have addresses"
 
+let mutable_variable_address_error =
+  Invalid_argument "Mutable variables don't have addresses"
+
 let value_declaration_address (_ : t) id decl =
   match decl.Subst.Lazy.val_kind with
   | Val_prim _ -> Lazy_backtrack.create_failed primitive_address_error
@@ -2290,9 +2310,16 @@ let rec components_of_module_maker
       in
       let env = ref cm_env in
       let pos = ref 0 in
+      let module_repr =
+        List.filter_map
+          (fun (item, _) -> Subst.Lazy.sort_of_signature_item item)
+          items_and_paths
+        |> Array.of_list
+      in
       let next_address () =
         let addr : address_unforced =
-          Projection { parent = cm_addr; pos = !pos }
+          Projection
+            { parent = cm_addr; module_repr; pos = !pos }
         in
         incr pos;
         Lazy_backtrack.create addr
@@ -2304,7 +2331,11 @@ let rec components_of_module_maker
             let addr =
               match decl.val_kind with
               | Val_prim _ -> Lazy_backtrack.create_failed primitive_address_error
-              | _ -> next_address ()
+              | Val_reg _ -> next_address ()
+              | Val_ivar _ | Val_self _ | Val_anc _ ->
+                next_address ()
+              | Val_mut _ ->
+                Lazy_backtrack.create_failed mutable_variable_address_error
             in
             let vda_shape = Shape.proj cm_shape (Shape.Item.value id) in
             let vda =
@@ -4512,7 +4543,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
       | Val_mut _, _ -> assert false
       (* Unreachable because only [type_pat] creates mutable variables
          and it checks that they are simple identifiers. *)
-      | ((Val_reg | Val_prim _ | Val_self _ | Val_anc _), _) ->
+      | ((Val_reg _ | Val_prim _ | Val_self _ | Val_anc _), _) ->
           lookup_error loc env (Not_a_settable_variable name)
     end
   | Ok (_, _, Val_unbound Val_unbound_instance_variable) ->
@@ -4673,8 +4704,15 @@ and fold_types f =
   find_all wrap_identity
     (fun env -> env.types) (fun sc -> sc.comp_types)
     (fun k p tda acc -> f k p tda.tda_declaration acc)
+<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-25
 and fold_modtypes_lazy f =
   let f l path data acc = f l path data acc in
+||||||| oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
+and fold_modtypes f =
+  let f l path data acc = f l path (Subst.Lazy.force_modtype_decl data) acc in
+=======
+and fold_modtypes f =
+>>>>>>> oxcaml/oxcaml:d6e630469425e02d8d45f8f10392e046689de2c5
   find_all wrap_identity
     (fun env -> env.modtypes) (fun sc -> sc.comp_modtypes)
     (fun k p mta acc -> f k p mta.mtda_declaration acc)
