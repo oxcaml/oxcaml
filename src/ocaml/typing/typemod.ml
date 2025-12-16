@@ -107,8 +107,6 @@ type error =
   | Invalid_type_subst_rhs
   | Non_packable_local_modtype_subst of Path.t
   | With_cannot_remove_packed_modtype of Path.t * module_type
-  | Toplevel_nonvalue of string * Jkind.sort
-  | Toplevel_unnamed_nonvalue of Jkind.sort
   | Strengthening_mismatch of Longident.t * Includemod.explanation
   | Cannot_pack_parameter
   | Compiling_as_parameterised_parameter
@@ -189,12 +187,15 @@ let extract_sig_functor_open funct_body env loc mty sig_acc =
         | Mty_signature sg_param -> sg_param
         | _ -> raise (Error (loc,env,Signature_parameter_expected mty_func))
       in
-      let coercion =
+      let input_coercion =
         try
           Includemod.include_functor_signatures ~mark:true env
             sig_acc sg_param
         with Includemod.Error msg ->
           raise (Error(loc, env, Not_included_functor msg))
+      in
+      let input_repr =
+        List.filter_map sort_of_signature_item sg_param |> Array.of_list;
       in
       (* We must scrape the result type in an environment expanded with the
          parameter type (to avoid `Not_found` exceptions when it is referenced).
@@ -214,12 +215,14 @@ let extract_sig_functor_open funct_body env loc mty sig_acc =
            and
               sig..end -> () -> sig..end *)
         match Mtype.scrape extended_env mty_result with
-        | Mty_signature sg_result -> Tincl_functor coercion, sg_result
+        | Mty_signature sg_result ->
+            Tincl_functor { input_coercion; input_repr }, sg_result
         | Mty_functor (Unit,_) when funct_body && Mtype.contains_type env mty ->
             raise (Error (loc, env, Not_includable_in_functor_body))
         | Mty_functor (Unit,mty_result) -> begin
             match Mtype.scrape extended_env mty_result with
-            | Mty_signature sg_result -> Tincl_gen_functor coercion, sg_result
+            | Mty_signature sg_result ->
+              Tincl_gen_functor { input_coercion; input_repr }, sg_result
             | sg -> raise (Error (loc,env,Signature_result_expected
                                             (Mty_functor (Unit,sg))))
           end
@@ -323,6 +326,7 @@ let type_open_descr ?used_slot ?toplevel env sod =
     {
       open_expr = (path, sod.popen_expr);
       open_bound_items = [];
+      open_items_repr = [||];
       open_override = sod.popen_override;
       open_env = newenv;
       open_attributes = sod.popen_attributes;
@@ -1990,6 +1994,10 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
 and transl_signature ?(keep_warnings = false) env sig_acc {psg_items; psg_modalities; psg_loc} =
   let names = Signature_names.create () in
 
+  (* We assume the structure (described by the signature) to be at legacy mode,
+  for backward compatibility *)
+  let md_mode = Value.legacy in
+
   let sig_modalities = transl_modalities psg_modalities in
 
   let transl_include ~loc env sig_acc sincl modalities =
@@ -2023,14 +2031,15 @@ and transl_signature ?(keep_warnings = false) env sig_acc {psg_items; psg_modali
       | true -> sg
       | false -> apply_modalities_signature ~recursive env modalities sg
     in
-    (* Assume the structure is legacy, for backward compatibility *)
-    let sg, newenv = Env.enter_signature ~scope sg ~mode:Value.legacy env in
+    let sg, newenv = Env.enter_signature ~scope sg ~mode:md_mode env in
     Signature_group.iter
       (Signature_names.check_sig_item names loc)
       sg;
     let incl =
       { incl_mod = tmty;
         incl_type = sg;
+        incl_repr =
+          List.filter_map sort_of_signature_item sg |> Array.of_list;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;
@@ -2043,14 +2052,10 @@ and transl_signature ?(keep_warnings = false) env sig_acc {psg_items; psg_modali
     let loc = item.psig_loc in
     match item.psig_desc with
     | Psig_value sdesc ->
-        let modalities =
-          match sdesc.pval_modalities with
-          | [] -> sig_modalities
-          | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
-        in
-        let modalities = Mode.Modality.of_const modalities in
-        let (tdesc, newenv) =
-          Typedecl.transl_value_decl env ~modalities item.psig_loc sdesc
+        let (tdesc, _, newenv) =
+          Typedecl.transl_value_decl env loc sdesc
+            ~modal:(Sig_value (Value.disallow_right md_mode, sig_modalities))
+            ~why:Signature_item
         in
         Signature_names.check_value names tdesc.val_loc tdesc.val_id;
         mksig (Tsig_value tdesc) env loc,
@@ -2152,10 +2157,8 @@ and transl_signature ?(keep_warnings = false) env sig_acc {psg_items; psg_modali
           | None -> None, env
           | Some name ->
             let id, newenv =
-              (* Assume the enclosing structure is legacy, for backward
-                 compatibility *)
               Env.enter_module_declaration ~scope name pres md
-                ~mode:Value.legacy env
+                ~mode:md_mode env
             in
             let newenv = Env.update_short_paths newenv in
             Signature_names.check_module names pmd.pmd_name.loc id;
@@ -2198,11 +2201,9 @@ and transl_signature ?(keep_warnings = false) env sig_acc {psg_items; psg_modali
           | Mty_alias _ -> Mp_absent
           | _ -> Mp_present
         in
-        (* Assume the enclosing structure is legacy, for backward
-            compatibility *)
         let id, newenv =
           Env.enter_module_declaration ~scope pms.pms_name.txt pres md
-            ~mode:Value.legacy env
+            ~mode:md_mode env
         in
         let info =
           `Substituted_away (Subst.add_module id path Subst.identity)
@@ -3387,6 +3388,7 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     let open_descr = {
       open_expr = md;
       open_bound_items = [];
+      open_items_repr = [||];
       open_override = od.popen_override;
       open_env = newenv;
       open_loc = loc;
@@ -3423,6 +3425,8 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     let open_descr = {
       open_expr = md;
       open_bound_items = sg;
+      open_items_repr =
+        List.filter_map sort_of_signature_item sg |> Array.of_list;
       open_override = od.popen_override;
       open_env = newenv;
       open_loc = loc;
@@ -3475,6 +3479,8 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) funct_body anchor
     let incl =
       { incl_mod = modl;
         incl_type = sg;
+        incl_repr =
+          List.filter_map sort_of_signature_item sg |> Array.of_list;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;
@@ -3484,13 +3490,10 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) funct_body anchor
   in
 
   let force_toplevel =
-    (* A couple special cases are needed for the toplevel:
+    (* A special case is needed for the toplevel:
 
        - Expressions bound by '_' still escape in the toplevel, because they may
          be printed even though they are not named, and therefore can't be local
-       - Those expressions and also all [Pstr_eval]s must have types of layout
-         value for the same reason (see the special case in
-         [Opttoploop.execute_phrase]).
     *)
     Option.is_some toplevel
   in
@@ -3506,15 +3509,6 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) funct_body anchor
             (fun () -> Typecore.type_representable_expression
                          ~why:Structure_item_expression env sexpr)
         in
-        if force_toplevel then
-          (* See comment on [force_toplevel]. *)
-          begin match Jkind.Sort.default_to_value_and_get sort with
-          | Base Value -> ()
-          | Product _
-          | Base (Void | Untagged_immediate | Float64 | Float32 | Word |
-                 Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
-            raise (Error (sexpr.pexp_loc, env, Toplevel_unnamed_nonvalue sort))
-          end;
         Tstr_eval (expr, sort, attrs), [], shape_map, env
     | Pstr_value (rec_flag, sdefs) ->
         let (defs, newenv) =
@@ -3523,37 +3517,11 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) funct_body anchor
           | Recursive -> Typecore.annotate_recursive_bindings env defs
           | Nonrecursive -> defs
         in
-        if force_toplevel then
-          (* See comment on [force_toplevel] *)
-          List.iter (fun vb ->
-            match vb.vb_pat.pat_desc with
-            | Tpat_any ->
-              begin match Jkind.Sort.default_to_value_and_get vb.vb_sort with
-              | Base Value -> ()
-              | Product _
-              | Base (Void | Untagged_immediate | Float64 | Float32 | Word |
-                     Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 |
-                     Vec512) ->
-                raise (Error (vb.vb_loc, env,
-                              Toplevel_unnamed_nonvalue vb.vb_sort))
-              end
-            | _ -> ()
-          ) defs;
         (* Note: Env.find_value does not trigger the value_used event. Values
            will be marked as being used during the signature inclusion test. *)
         let items, shape_map =
           List.fold_left
             (fun (acc, shape_map) (id, id_info, zero_alloc) ->
-              List.iter
-                (fun (loc, _mode, sort) ->
-                   (* CR layouts v5: this jkind check has the effect of
-                      defaulting the sort of top-level bindings to value, which
-                      will change. *)
-                   if not Jkind.Sort.(equate sort value)
-                   then raise (Error (loc, env,
-                                   Toplevel_nonvalue (Ident.name id,sort)))
-                )
-                id_info;
               let zero_alloc =
                 (* We only allow "Check" attributes in signatures.  Here we
                    convert "Assume"s in structures to the equivalent "Check" for
@@ -3592,21 +3560,17 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) funct_body anchor
         shape_map,
         newenv
     | Pstr_primitive sdesc ->
-        (* primitive in structure still carries modalities, which doesn't make
-        sense. We convert them to modes. *)
-        (* CR zqian: remove this hack *)
-        let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
-        let modes = List.map modality_to_mode sdesc.pval_modalities in
-        let mode =
-          modes
-          |> Typemode.transl_alloc_mode
-          |> Alloc.of_const
-          |> alloc_as_value
+        let (desc, mode, newenv) =
+          Typedecl.transl_value_decl env ~modal:Str_primitive
+            ~why:Structure_item loc sdesc
         in
-        let modalities = infer_modalities ~loc ~env ~md_mode ~mode in
-        let (desc, newenv) =
-          Typedecl.transl_value_decl env ~modalities loc sdesc
-        in
+        assert
+          (desc.val_val.val_modalities
+           |> Modality.to_const_exn
+           |> Modality.Const.is_id);
+        let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
+        let val_val = {desc.val_val with val_modalities} in
+        let desc = {desc with val_val} in
         Signature_names.check_value names desc.val_loc desc.val_id;
         Tstr_primitive desc,
         [Sig_value(desc.val_id, desc.val_val, Exported)],
@@ -4860,18 +4824,6 @@ let report_error ~loc _env = function
          for an anonymous module type.@ %a"
         Style.inline_code (Path.name p)
         Misc.print_see_manual manual_ref
-  | Toplevel_nonvalue (id, sort) ->
-      Location.errorf ~loc
-        "@[Types of top-level module bindings must have layout %a, but@ \
-         the type of %a has layout@ %a.@]"
-        Style.inline_code "value"
-        Style.inline_code id
-        (Style.as_inline_code Jkind.Sort.format) sort
-  | Toplevel_unnamed_nonvalue sort ->
-      Location.errorf ~loc
-        "@[Types of unnamed expressions must have layout value when using@ \
-           the toplevel, but this expression has layout@ %a.@]"
-        (Style.as_inline_code Jkind.Sort.format) sort
  | Strengthening_mismatch(lid, explanation) ->
       let main = Includemod_errorprinter.err_msgs explanation in
       Location.errorf ~loc
