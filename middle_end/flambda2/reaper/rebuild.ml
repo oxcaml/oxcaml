@@ -992,7 +992,7 @@ let rebuild_apply env apply =
   | Not_changing_calling_convention ->
     (* Format.eprintf "NOT CHANGING CALLING CONVENTION %a@." Apply.print
        apply; *)
-    let _callee_with_known_arity =
+    let callee_and_known_arity =
       match (call_kind : Call_kind.t) with
       | Function { function_call = Direct _ | Indirect_known_arity _; _ } -> (
         match Apply.callee apply with
@@ -1000,22 +1000,43 @@ let rebuild_apply env apply =
         | Some callee ->
           Simple.pattern_match callee
             ~const:(fun _ -> None)
-            ~name:(fun name ~coercion:_ -> Some (Code_id_or_name.name name)))
-      | Function { function_call = Indirect_unknown_arity; _ }
-      | C_call _ | Method _ | Effect _ ->
-        None
+            ~name:(fun name ~coercion:_ ->
+              Some (Code_id_or_name.name name, true)))
+      | Function { function_call = Indirect_unknown_arity; _ } ->
+        Simple.pattern_match
+          (Option.get (Apply.callee apply))
+          ~const:(fun _ -> None)
+          ~name:(fun name ~coercion:_ ->
+            Some (Code_id_or_name.name name, false))
+      | C_call _ | Method _ | Effect _ -> None
     in
     let args =
-      List.mapi
-        (fun _i arg ->
-          (* match callee_with_known_arity with | Some callee -> if
-             DS.cofield_has_use env.uses callee (Param
-             (Known_arity_code_pointer, i)) then arg else Simple.pattern_match
-             arg ~const:(fun _ -> arg) ~name:(fun name ~coercion:_ ->
-             name_poison env name) | None -> *)
-          (* CR ncourant: fix this *)
-          rewrite_simple env arg)
-        (Apply.args apply)
+      match callee_and_known_arity with
+      | None -> List.map (rewrite_simple env) (Apply.args apply)
+      | Some (callee, known_arity) ->
+        let keep_or_poison (arg, to_keep) =
+          match (to_keep : DS.keep_or_delete) with
+          | Keep -> arg
+          | Delete ->
+            Simple.pattern_match arg
+              ~const:(fun _ -> arg)
+              ~name:(fun name ~coercion:_ -> name_poison env name)
+        in
+        let args_and_keep =
+          if known_arity
+          then
+            DS.arguments_used_by_known_arity_call env.uses callee
+              (Apply.args apply)
+          else
+            let grouped_args =
+              Flambda_arity.group_by_parameter (Apply.args_arity apply)
+                (Apply.args apply)
+            in
+            List.flatten
+              (DS.arguments_used_by_unknown_arity_call env.uses callee
+                 grouped_args)
+        in
+        List.map keep_or_poison args_and_keep
     in
     let args_arity = Apply.args_arity apply in
     let return_arity = Apply.return_arity apply in

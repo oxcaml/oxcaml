@@ -1337,13 +1337,6 @@ let has_source_query =
 
 let has_source db x = has_source_query [x] db
 
-let cofield_has_use =
-  let cofield_query =
-    let^? [x; f], [s; t] = ["x"; "f"], ["s"; "t"] in
-    [sources x s; cofield_sources s f t]
-  in
-  fun db x cofield -> any_source_query [x] db || cofield_query [x; cofield] db
-
 let not_local_field_has_source =
   let field_any_source_query =
     let^? [x; f], [s] = ["x"; "f"], ["s"] in
@@ -3475,8 +3468,6 @@ let has_use uses v = has_use uses.db v
 
 let field_used uses v f = field_used uses.db v f
 
-let cofield_has_use uses v f = cofield_has_use uses.db v f
-
 let has_source uses v = has_source uses.db v
 
 let not_local_field_has_source uses v f = not_local_field_has_source uses.db v f
@@ -3531,3 +3522,102 @@ let code_id_actually_directly_called uses closure =
                    Name.print name)
            in
            Code_id.Set.add codeid acc))
+
+type sources =
+  | Any_source
+  | Sources of unit Code_id_or_name.Map.t
+
+let get_direct_sources :
+    Datalog.database -> unit Code_id_or_name.Map.t -> sources =
+  let open! Fixit in
+  run
+    (let@ in_ = param "in_" Cols.[n] in
+     let+ [any; out] =
+       let@ [any; out] = fix' [empty One.cols; empty Cols.[n]] in
+       [ (let$ [x] = ["x"] in
+          [in_ % [x]; any_source x] ==> One.flag any);
+         (let$ [x; y] = ["x"; "y"] in
+          [~~(One.flag any); in_ % [x]; sources x y] ==> out % [y]) ]
+     in
+     if One.to_bool any then Any_source else Sources out)
+
+let get_field_sources :
+    Datalog.database -> unit Code_id_or_name.Map.t -> Field.t -> sources =
+  let open! Fixit in
+  run
+    (let@ in_ = param "in_" Cols.[n] in
+     let@ in_field =
+       paramc "in_field" Cols.[f] (fun f -> Field.Map.singleton f ())
+     in
+     let+ [any; out] =
+       let@ [any; out] = fix' [empty One.cols; empty Cols.[n]] in
+       [ (let$ [x; field] = ["x"; "field"] in
+          [in_ % [x]; in_field % [field]; field_sources_top x field]
+          ==> One.flag any);
+         (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ ~~(One.flag any);
+            in_ % [x];
+            in_field % [field];
+            field_sources x field y ]
+          ==> out % [y]) ]
+     in
+     if One.to_bool any then Any_source else Sources out)
+
+let cofield_has_use :
+    Datalog.database -> unit Code_id_or_name.Map.t -> Cofield.t -> bool =
+  let open! Fixit in
+  run
+    (let@ in_ = param "in_" Cols.[n] in
+     let@ in_field =
+       paramc "in_field" Cols.[cf] (fun f -> Cofield.Map.singleton f ())
+     in
+     let+ out =
+       let@ out = fix1' (empty One.cols) in
+       [ (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [in_ % [x]; in_field % [field]; cofield_sources x field y]
+          ==> One.flag out) ]
+     in
+     One.to_bool out)
+
+let rec arguments_used_by_call db ep callee_sources grouped_args =
+  match grouped_args with
+  | [] -> []
+  | first_arg_group :: grouped_args_rest -> (
+    match callee_sources with
+    | Any_source -> List.map (List.map (fun x -> x, Keep)) grouped_args
+    | Sources callee_sources -> (
+      let witness_sources =
+        get_field_sources db callee_sources (Field.code_of_closure ep)
+      in
+      match witness_sources with
+      | Any_source -> List.map (List.map (fun x -> x, Keep)) grouped_args
+      | Sources witness_sources ->
+        let first_arg_group =
+          List.mapi
+            (fun i x ->
+              ( x,
+                if cofield_has_use db witness_sources (Cofield.param i)
+                then Keep
+                else Delete ))
+            first_arg_group
+        in
+        let grouped_args_rest =
+          match grouped_args_rest with
+          | [] -> [] (* Avoid computing sources of result if no more args *)
+          | _ :: _ ->
+            arguments_used_by_call db ep
+              (get_field_sources db witness_sources (Field.apply (Normal 0)))
+              grouped_args_rest
+        in
+        first_arg_group :: grouped_args_rest))
+
+let arguments_used_by_known_arity_call result callee args =
+  List.flatten
+    (arguments_used_by_call result.db Field.Known_arity_code_pointer
+       (get_direct_sources result.db (Code_id_or_name.Map.singleton callee ()))
+       [args])
+
+let arguments_used_by_unknown_arity_call result callee args =
+  arguments_used_by_call result.db Field.Unknown_arity_code_pointer
+    (get_direct_sources result.db (Code_id_or_name.Map.singleton callee ()))
+    args

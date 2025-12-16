@@ -59,8 +59,6 @@ val has_source : result -> Code_id_or_name.t -> bool
 
 val field_used : result -> Code_id_or_name.t -> Field.t -> bool
 
-val cofield_has_use : result -> Code_id_or_name.t -> Cofield.t -> bool
-
 val not_local_field_has_source : result -> Code_id_or_name.t -> Field.t -> bool
 
 (** Color of node when producing the graph as a .dot *)
@@ -94,3 +92,9 @@ val rewrite_result_types :
   results:(Variable.t * keep_or_delete) list ->
   Result_types.t ->
   Result_types.t
+
+val arguments_used_by_known_arity_call :
+  result -> Code_id_or_name.t -> 'a list -> ('a * keep_or_delete) list
+
+val arguments_used_by_unknown_arity_call :
+  result -> Code_id_or_name.t -> 'a list list -> ('a * keep_or_delete) list list
