@@ -23,6 +23,14 @@ type constructor_ikind =
     coeffs : Ikind.Ldd.node array;
   }
 
+let constructor_ikind_create ~base ~coeffs : constructor_ikind =
+  for i = 0 to Array.length coeffs - 1 do
+    let coeff = coeffs.(i) in
+    let coeff' = Ikind.Ldd.sub_subsets coeff base in
+    if coeff != coeff' then coeffs.(i) <- coeff'
+  done;
+  { base; coeffs }
+
 type constructor_ikind_entry =
   | Constructor_ikind of constructor_ikind
   | No_constructor_ikind of string

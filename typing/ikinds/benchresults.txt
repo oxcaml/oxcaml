@@ -1,0 +1,161 @@
+# ikinds benchmark results
+#
+# Keep entries append-only so we can track changes over time.
+# Times are wall/user/sys from `/usr/bin/time -p`.
+
+=== 2025-12-16T15:18:03Z ===
+git: 6f5505791cbbb96fbc7cea700965b062466c1ec0 (dirty)
+host: Darwin 25.0.0 arm64 (macOS 26.0.1, build 25A362)
+cpu: Apple M4 Max (hw.ncpu=16)
+tools: dune 3.20.2; ocamlc 4.14.2
+dirty files:
+  M testsuite/tests/typing-jkind-bounds/composite.ml
+  M testsuite/tests/typing-jkind-bounds/records.ml
+  M testsuite/tests/typing-jkind-bounds/row.ml
+  M testsuite/tests/typing-jkind-bounds/subsumption/basics.ml
+  M testsuite/tests/typing-jkind-bounds/subsumption/quality.ml
+  M testsuite/tests/typing-jkind-bounds/subsumption/recursive.ml
+  M testsuite/tests/typing-jkind-bounds/subsumption/slow.ml
+  M testsuite/tests/typing-jkind-bounds/universal.ml
+  M testsuite/tests/typing-jkind-bounds/variants.ml
+  M testsuite/tests/typing-jkind-bounds/with_basics.ml
+  M testsuite/tests/typing-modes/val_modalities.ml
+  M typing/ikinds/ikinds.ml
+  ?? typing/ikinds/TODO.md
+
+prep: removed `_build/`, `_install/`, `_runtest/` before the run
+cmd: make boot-compiler
+time:
+  real 15.28
+  user 88.54
+  sys  38.20
+logs:
+  /tmp/oxcaml-boot-compiler-20251216T151803Z.out
+  /tmp/oxcaml-boot-compiler-20251216T151803Z.time
+notes:
+  - Likely affected by a warm global Dune cache.
+  - Skipped `make test` timing by request (tests take ages).
+
+=== 2025-12-16T16:57:58Z ===
+git: cb963aa069e8436054956741d6ebcd3962ce2444 (dirty)
+dirty files:
+  M typing/ikinds/ikinds.ml
+  M typing/types.ml
+  M typing/types.mli
+  ?? typing/ikinds/PLAN.md
+
+cmd: make boot-compiler
+result: success
+
+cmd: make promote-one (no timing)
+logs:
+  /tmp/oxcaml-ikinds-promote-pE45XSJq/
+
+results:
+  FAIL typing-jkind-bounds
+  PASS typing-layouts-products
+  PASS typing-layouts
+  PASS typing-modes
+  PASS typing-modules
+  PASS typing-layouts-or-null
+
+notes:
+  - typing-jkind-bounds failure is:
+    testsuite/tests/typing-jkind-bounds/inclusion/test.ml
+  - Reason: test expects ocamlc.byte exit status 2, but compilation succeeds.
+  - Promote log: /tmp/oxcaml-ikinds-promote-pE45XSJq/typing-jkind-bounds.log
+  - git diff after promote: only code diffs (no testsuite changes)
+    typing/ikinds/ikinds.ml
+    typing/types.ml
+    typing/types.mli
+
+=== 2025-12-16T17:05:26Z ===
+git: cb963aa069e8436054956741d6ebcd3962ce2444 (dirty)
+dirty files:
+  M typing/ikinds/baseline.txt
+  M typing/ikinds/ikinds.ml
+  M typing/types.ml
+  M typing/types.mli
+  ?? typing/ikinds/PLAN.md
+
+cmd: make boot-compiler
+result: success
+
+cmd: make promote-one (no timing)
+logs:
+  /tmp/oxcaml-ikinds-promote-fCghNPeg/
+
+results:
+  FAIL typing-jkind-bounds
+  PASS typing-layouts-products
+  PASS typing-layouts
+  PASS typing-modes
+  PASS typing-modules
+  PASS typing-layouts-or-null
+
+notes:
+  - typing-jkind-bounds failure is:
+    testsuite/tests/typing-jkind-bounds/inclusion/test.ml
+  - Promote log: /tmp/oxcaml-ikinds-promote-fCghNPeg/typing-jkind-bounds.log
+  - No diffs under testsuite/ after promote.
+
+=== 2025-12-16T17:56:18Z ===
+desc: baseline: make clean && make (before ctor_ikind normalization)
+git: cb963aa069e8436054956741d6ebcd3962ce2444 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-1nsEakCk
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   D typing/ikinds/baseline.txt
+  ?? typing/ikinds/PLAN.md
+  ?? typing/ikinds/bench_make.sh
+  ?? typing/ikinds/benchresults.txt
+
+run 1:
+  real 166.27
+  user 712.25
+  sys  134.59
+
+run 2:
+  real 165.61
+  user 711.02
+  sys  133.41
+
+run 3:
+  real 165.17
+  user 706.29
+  sys  132.48
+
+
+=== 2025-12-16T18:05:01Z ===
+desc: patched: make clean && make (ctor_ikind normalization)
+git: cb963aa069e8436054956741d6ebcd3962ce2444 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-oOUS5fjY
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   D typing/ikinds/baseline.txt
+   M typing/ikinds/ikinds.ml
+   M typing/types.ml
+   M typing/types.mli
+  ?? typing/ikinds/PLAN.md
+  ?? typing/ikinds/bench_make.sh
+  ?? typing/ikinds/benchresults.txt
+
+run 1:
+  real 164.54
+  user 704.51
+  sys  133.03
+
+run 2:
+  real 166.34
+  user 711.45
+  sys  135.06
+
+run 3:
+  real 165.46
+  user 709.03
+  sys  132.69
+

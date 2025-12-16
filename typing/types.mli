@@ -150,10 +150,15 @@ type field_kind
 type commutable
 
 (* CR jujacobs: temporary hack to avoid dependency cycle *)
-type constructor_ikind =
+type constructor_ikind = private
   { base : Ikind.Ldd.node;
     coeffs : Ikind.Ldd.node array;
   }
+
+val constructor_ikind_create :
+  base:Ikind.Ldd.node ->
+  coeffs:Ikind.Ldd.node array ->
+  constructor_ikind
 
 type constructor_ikind_entry =
   | Constructor_ikind of constructor_ikind

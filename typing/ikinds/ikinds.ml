@@ -227,15 +227,11 @@ module JK = struct
     k'
 
   (* Materialize a solved polynomial for storing in
-     [Types.constructor_ikind].  Coefficients are recorded "minus base" so
-     that later application does not double-count axes already in [base]. *)
+     [Types.constructor_ikind]. *)
   let constr_kind_poly (ctx : ctx) (c : constr) : poly * poly list =
     let base, coeffs = constr_kind ctx c in
     Ldd.solve_pending ();
-    let coeffs_minus_base =
-      List.map (fun p -> Ldd.sub_subsets p base) coeffs
-    in
-    base, coeffs_minus_base
+    base, coeffs
 
   let leq_with_reason (ctx : ctx) (k1 : ckind) (k2 : ckind) :
       int list option =
@@ -616,8 +612,8 @@ let type_declaration_ikind ~(context : Jkind.jkind_context)
     ~(path : Path.t) : Types.constructor_ikind =
   let ctx = make_ctx ~context in
   let base, coeffs = JK.constr_kind_poly ctx path in
-  let coeffs_array = Array.of_list coeffs in
-  { base; coeffs = coeffs_array }
+  let coeffs = Array.of_list coeffs in
+  Types.constructor_ikind_create ~base ~coeffs
 
 let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
     ~(path : Path.t) : Types.type_ikind =
@@ -652,9 +648,8 @@ let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
       List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
     in
     let base, coeffs = Ldd.decompose_linear ~universe:rigid_vars poly in
-    let payload =
-      { Types.base; coeffs = Array.of_list coeffs }
-    in
+    let coeffs = Array.of_list coeffs in
+    let payload = Types.constructor_ikind_create ~base ~coeffs in
     if !Types.ikind_debug
     then begin
       Format.eprintf "[ikind] from jkind: base=%s; coeffs=[%s]@."
@@ -964,4 +959,7 @@ let substitute_decl_ikind_with_lookup
       in
       let base' = map_poly Path.Set.empty payload.base in
       let coeffs' = Array.map (map_poly Path.Set.empty) payload.coeffs in
-      Types.Constructor_ikind { base = base'; coeffs = coeffs' }
+      let payload =
+        Types.constructor_ikind_create ~base:base' ~coeffs:coeffs'
+      in
+      Types.Constructor_ikind payload
