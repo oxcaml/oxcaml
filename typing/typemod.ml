@@ -169,7 +169,14 @@ let infer_modalities ~loc ~env ~md_mode ~mode =
       module type S = module type of M
       use_portable M.foo
 
-      would type error at the last line.
+      We want [bar] to access [foo] as portable. On the other hand, [S] will be
+      allowed on both sides of inclusion check, so stronger isn't always better.
+      For legacy compatibility, we will fix [S.foo] to be [nonportable], which
+      should fix [M.foo] to be [nonportable] as well, in order to ensure all
+      invocations of [module type of M] give the same module type.
+
+      To achieve that, the mode of [foo] to be exposed as [M.foo] should be a
+      flexible mode variable weaker than its actual mode.
     *)
     let mode, _ = Mode.Value.newvar_above mode in
     (* Upon construction, for comonadic (prescriptive) axes, module
