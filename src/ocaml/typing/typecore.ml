@@ -5864,7 +5864,7 @@ let create_merlin_type_error_node loc env ty_expected ~attributes =
             Location.mkloc (Longident.Lident "*type-error*") loc,
             { Types.
               val_type = ty_expected;
-              val_kind = Val_reg;
+              val_kind = Val_reg (Jkind.Sort.new_var ~level:(Ctype.get_current_level ()));
               val_loc = loc;
               val_attributes = [];
               val_uid = Uid.internal_not_actually_unique;

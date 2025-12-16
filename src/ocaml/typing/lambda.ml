@@ -37,7 +37,7 @@ type unboxed_vector = Primitive.unboxed_vector =
   | Unboxed_vec512
 
 type array_kind =
-    Pgenarray | Paddrarray | Pintarray | Pfloatarray
+    Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray of unboxed_float
   | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
