@@ -37,6 +37,7 @@
 #include <errno.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <stdalign.h>
 
 bool __attribute__((weak)) TCMalloc_MallocExtension_MallocIsTCMalloc(void) {
   return false;
@@ -101,18 +102,53 @@ static void* alloc_page_aligned_using_sbrk(size_t page_size, size_t size) {
   #endif
 #endif
 
+/* [musl] infamously does not provide a preprocessor macro of its own,
+   but this is good enough for practical purposes. */
+#if defined(__linux__) && !defined(__GLIBC__)
+  #define MUSL 1
+#else
+  #define MUSL 0
+#endif
+
+#define STATIC_BUFFER_ALIGNMENT (1U << 16)
+static void *alloc_page_aligned_statically(size_t page_size, size_t size) {
+  static char alignas(STATIC_BUFFER_ALIGNMENT) buffer[1U << 20];
+  static char *buffer_current = &buffer[0];
+  static const char *const buffer_end = &buffer[sizeof(buffer)];
+  assert(page_size <= STATIC_BUFFER_ALIGNMENT);
+  assert((page_size & (page_size - 1)) == 0); // [page_size] is a power of 2
+  assert((((uintptr_t)buffer_current) & (page_size - 1)) == 0); // [buffer_current] is aligned to [page_size]
+  // round up [size] to the nearest multiple of [page_size]
+  size = (size + (page_size - 1)) & ~(page_size - 1);
+  if (buffer_current + size > buffer_end) {
+    return NULL;
+  }
+  void *result = buffer_current;
+  buffer_current += size;
+  return result;
+}
+
 CAMLprim value jit_memalign(value section_size) {
   CAMLparam1 (section_size);
   CAMLlocal1 (result);
   const size_t size = Long_val(section_size);
   const size_t page_size = getpagesize();
-  /* AddressSanitizer and TCMalloc use [mmap], not [sbrk], which results in
-     addresses which are too large to apply relocations to against other
-     sections (e.g. [.rodata]), so we manually use [sbrk] when linked against
-     either. */
-  void *addr = ASAN_IS_ENABLED || TCMalloc_MallocExtension_MallocIsTCMalloc()
-                   ? alloc_page_aligned_using_sbrk(page_size, size)
-                   : aligned_alloc(page_size, size);
+  void* addr;
+  if (MUSL) {
+    /* [musl]'s [malloc] uses both [sbrk] *and* [mmap], so we resort to allocating
+       things statically when linked against it. This is really a bandaid solution
+       to make the tests pass. For serious usage of this under [musl], we'll need to
+       do better. */
+    addr = alloc_page_aligned_statically(page_size, size);
+  } else if (ASAN_IS_ENABLED || TCMalloc_MallocExtension_MallocIsTCMalloc()) {
+    /* AddressSanitizer and TCMalloc use [mmap], not [sbrk], which results in
+       addresses which are too large to apply relocations to against other
+       sections (e.g. [.rodata]), so we manually use [sbrk] when linked against
+       either. */
+    addr = alloc_page_aligned_using_sbrk(page_size, size);
+  } else {
+    addr = aligned_alloc(page_size, size);
+  }
   if (addr == NULL) {
     result = caml_alloc(1, 1);
     Store_field(result, 0, caml_copy_string(strerror(errno)));

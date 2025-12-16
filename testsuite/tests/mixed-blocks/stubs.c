@@ -1,6 +1,7 @@
 
 #include <assert.h>
 #include <immintrin.h>
+#include <stdint.h>
 
 #define BUILTIN(name) void name(void) { assert(0); }
 

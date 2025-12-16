@@ -123,15 +123,6 @@ let poison_value = 0 (* 123456789 *)
 let poison ~machine_width kind =
   Simple.const_int_of_kind ~machine_width kind poison_value
 
-let rec fold_unboxed_with_kind (f : K.t -> 'a -> 'b -> 'b)
-    (fields : 'a DS.unboxed_fields Field.Map.t) acc =
-  Field.Map.fold
-    (fun field elt acc ->
-      match (elt : _ DS.unboxed_fields) with
-      | Not_unboxed elt -> f (Field.kind field) elt acc
-      | Unboxed fields -> fold_unboxed_with_kind f fields acc)
-    fields acc
-
 (* This is not symmetrical!! [fields1] must define a subset of [fields2], but
    does not have to define all of them. *)
 let rec fold2_unboxed_subset (f : 'a -> 'b -> 'c -> 'c)
@@ -200,7 +191,7 @@ let get_parameters params_decisions =
       | Keep (var, kind) ->
         Bound_parameter.create var kind Flambda_debug_uid.none :: acc
       | Unbox fields ->
-        fold_unboxed_with_kind
+        DS.fold_unboxed_with_kind
           (fun kind v acc ->
             Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none
             :: acc)
@@ -216,7 +207,7 @@ let get_parameters_and_modes params_decisions modes =
       | Keep (var, kind) ->
         (Bound_parameter.create var kind Flambda_debug_uid.none, mode) :: acc
       | Unbox fields ->
-        fold_unboxed_with_kind
+        DS.fold_unboxed_with_kind
           (fun kind v acc ->
             ( Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none,
               mode )
@@ -234,7 +225,7 @@ let get_arity params_decisions =
         | Delete -> acc
         | Keep (_, kind) -> kind :: acc
         | Unbox fields ->
-          fold_unboxed_with_kind
+          DS.fold_unboxed_with_kind
             (fun kind _ acc -> KS.anything kind :: acc)
             fields acc)
       [] params_decisions
@@ -1001,7 +992,7 @@ let rebuild_apply env apply =
   | Not_changing_calling_convention ->
     (* Format.eprintf "NOT CHANGING CALLING CONVENTION %a@." Apply.print
        apply; *)
-    let _callee_with_known_arity =
+    let callee_and_known_arity =
       match (call_kind : Call_kind.t) with
       | Function { function_call = Direct _ | Indirect_known_arity _; _ } -> (
         match Apply.callee apply with
@@ -1009,22 +1000,43 @@ let rebuild_apply env apply =
         | Some callee ->
           Simple.pattern_match callee
             ~const:(fun _ -> None)
-            ~name:(fun name ~coercion:_ -> Some (Code_id_or_name.name name)))
-      | Function { function_call = Indirect_unknown_arity; _ }
-      | C_call _ | Method _ | Effect _ ->
-        None
+            ~name:(fun name ~coercion:_ ->
+              Some (Code_id_or_name.name name, true)))
+      | Function { function_call = Indirect_unknown_arity; _ } ->
+        Simple.pattern_match
+          (Option.get (Apply.callee apply))
+          ~const:(fun _ -> None)
+          ~name:(fun name ~coercion:_ ->
+            Some (Code_id_or_name.name name, false))
+      | C_call _ | Method _ | Effect _ -> None
     in
     let args =
-      List.mapi
-        (fun _i arg ->
-          (* match callee_with_known_arity with | Some callee -> if
-             DS.cofield_has_use env.uses callee (Param
-             (Known_arity_code_pointer, i)) then arg else Simple.pattern_match
-             arg ~const:(fun _ -> arg) ~name:(fun name ~coercion:_ ->
-             name_poison env name) | None -> *)
-          (* CR ncourant: fix this *)
-          rewrite_simple env arg)
-        (Apply.args apply)
+      match callee_and_known_arity with
+      | None -> List.map (rewrite_simple env) (Apply.args apply)
+      | Some (callee, known_arity) ->
+        let keep_or_poison (arg, to_keep) =
+          match (to_keep : DS.keep_or_delete) with
+          | Keep -> arg
+          | Delete ->
+            Simple.pattern_match arg
+              ~const:(fun _ -> arg)
+              ~name:(fun name ~coercion:_ -> name_poison env name)
+        in
+        let args_and_keep =
+          if known_arity
+          then
+            DS.arguments_used_by_known_arity_call env.uses callee
+              (Apply.args apply)
+          else
+            let grouped_args =
+              Flambda_arity.group_by_parameter (Apply.args_arity apply)
+                (Apply.args apply)
+            in
+            List.flatten
+              (DS.arguments_used_by_unknown_arity_call env.uses callee
+                 grouped_args)
+        in
+        List.map keep_or_poison args_and_keep
     in
     let args_arity = Apply.args_arity apply in
     let return_arity = Apply.return_arity apply in
@@ -1056,7 +1068,7 @@ let rebuild_apply env apply =
       | Some callee when simple_is_unboxable env callee ->
         let fields = get_simple_unboxable env callee in
         let new_args =
-          fold_unboxed_with_kind
+          DS.fold_unboxed_with_kind
             (fun kind v acc -> (Simple.var v, KS.anything kind) :: acc)
             fields []
         in
@@ -1711,7 +1723,7 @@ and rebuild_holed (env : env) res (rev_expr : Rev_expr.rev_expr_holed)
               match DS.get_unboxed_fields env.uses (Code_id_or_name.var v) with
               | None -> [param]
               | Some fields ->
-                fold_unboxed_with_kind
+                DS.fold_unboxed_with_kind
                   (fun kind v acc ->
                     Bound_parameter.create v (KS.anything kind)
                       Flambda_debug_uid.none
@@ -1889,9 +1901,33 @@ and rebuild_function_params_and_body (env : env) res code_metadata
         if Sys.getenv_opt "FORGETALL" <> None && true
         then Or_unknown_or_bottom.Unknown
         else
+          let params_vars_and_keep, results_vars_and_keep =
+            match updating_calling_convention with
+            | Not_changing_calling_convention ->
+              ( List.map (fun p -> p, DS.Keep) params_vars,
+                List.map (fun p -> p, DS.Keep) results_vars )
+            | Changing_calling_convention code_id ->
+              let return_decisions =
+                Code_id.Map.find code_id env.function_return_decision
+              in
+              let params_decision =
+                Code_id.Map.find code_id env.function_params_to_keep
+              in
+              ( List.map2
+                  (fun p -> function
+                    | Keep _ | Unbox _ -> p, DS.Keep
+                    | Delete -> p, DS.Delete)
+                  params_vars params_decision,
+                List.map2
+                  (fun p -> function
+                    | Keep _ | Unbox _ -> p, DS.Keep
+                    | Delete -> p, DS.Delete)
+                  results_vars return_decisions )
+          in
           Or_unknown_or_bottom.Ok
             (Dep_solver.rewrite_result_types env.uses ~old_typing_env
-               params_vars results_vars result_types)
+               ~my_closure ~params:params_vars_and_keep
+               ~results:results_vars_and_keep result_types)
       in
       Code_metadata.with_result_types result_types code_metadata
   in
@@ -1954,7 +1990,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       with
       | None -> [], code_metadata
       | Some fields ->
-        ( fold_unboxed_with_kind
+        ( DS.fold_unboxed_with_kind
             (fun kind v acc ->
               Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none
               :: acc)
