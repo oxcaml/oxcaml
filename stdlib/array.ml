@@ -19,19 +19,24 @@ open! Stdlib
 [@@@ocaml.flambda_o3]
 
 (* An alias for the type of arrays. *)
-type 'a t = 'a array
+type ('a : any mod separable) t = 'a array
 
 (* Array operations *)
 
-external length : ('a array[@local_opt]) @ immutable -> int @@ stateless
+external length : ('a : value_or_null mod separable).
+                  ('a array[@local_opt]) @ immutable -> int @@ stateless
   = "%array_length"
-external get : ('a array[@local_opt]) -> int -> 'a @@ portable
+external get : ('a : value_or_null mod separable).
+               ('a array[@local_opt]) -> int -> 'a @@ portable
   = "%array_safe_get"
-external set: ('a array[@local_opt]) -> int -> 'a -> unit @@ portable
+external set: ('a : value_or_null mod separable).
+              ('a array[@local_opt]) -> int -> 'a -> unit @@ portable
   = "%array_safe_set"
-external unsafe_get: ('a array[@local_opt]) -> int -> 'a @@ portable
+external unsafe_get: ('a : value_or_null mod separable).
+                     ('a array[@local_opt]) -> int -> 'a @@ portable
   = "%array_unsafe_get"
-external unsafe_set: ('a array[@local_opt]) -> int -> 'a -> unit @@ portable
+external unsafe_set: ('a : value_or_null mod separable).
+                     ('a array[@local_opt]) -> int -> 'a -> unit @@ portable
   = "%array_unsafe_set"
 external make: int -> 'a -> 'a array @@ portable = "caml_make_vect"
 external create: int -> 'a -> 'a array @@ portable = "caml_make_vect"

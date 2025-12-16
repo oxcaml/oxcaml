@@ -112,7 +112,7 @@ type nativeint_elt = Nativeint_elt
 type complex32_elt = Complex32_elt
 type complex64_elt = Complex64_elt
 
-type ('a, 'b) kind =
+type ('a : any, 'b : any) kind =
   | Float32 : (float, float32_elt) kind
   | Float64 : (float, float64_elt) kind
   | Int8_signed : (int, int8_signed_elt) kind
@@ -218,7 +218,7 @@ val char : (char, int8_unsigned_elt) kind
    characters instead of arrays of small integers, by using
    the kind value [char] instead of [int8_unsigned]. *)
 
-val kind_size_in_bytes : ('a, 'b) kind -> int
+val kind_size_in_bytes : ('a : any) ('b : any). ('a, 'b) kind -> int
 (** [kind_size_in_bytes k] is the number of bytes used to store
    an element of type [k].
 
@@ -260,19 +260,18 @@ type fortran_layout = Fortran_layout_typ (**)
    re-exported as values below for backward-compatibility reasons.
 *)
 
-type 'a layout =
+type ('a : any) layout =
     C_layout: c_layout layout
   | Fortran_layout: fortran_layout layout
 
 val c_layout : c_layout layout
 val fortran_layout : fortran_layout layout
 
-
 (** {1 Generic arrays (of arbitrarily many dimensions)} *)
 
 module Genarray :
   sig
-  type (!'a, !'b, !'c) t : mutable_data
+  type (!'a : any, !'b : any, !'c : any) t : mutable_data
   (** The type [Genarray.t] is the type of Bigarrays with variable
      numbers of dimensions.  Any number of dimensions between 0 and 16
      is supported.
@@ -293,7 +292,8 @@ module Genarray :
      OCaml type [float]. *)
 
   external create
-    : ('a, 'b) kind -> 'c layout -> (int array[@local_opt]) -> ('a, 'b, 'c) t
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b) kind -> 'c layout -> (int array[@local_opt]) -> ('a, 'b, 'c) t
     @@ portable
     = "caml_ba_create"
   (** [Genarray.create kind layout dimensions] returns a new Bigarray
@@ -318,7 +318,8 @@ module Genarray :
      is negative. *)
 
   val init
-    : ('a, 'b) kind -> 'c layout -> int array @ local ->
+    : ('a : value_or_null) ('b : any) ('c : any).
+      ('a, 'b) kind -> 'c layout -> int array @ local ->
       (int array -> 'a) @ local -> ('a, 'b, 'c) t
   (** [Genarray.init kind layout dimensions f] returns a new Bigarray [b]
       whose element kind is determined by the parameter [kind] (one of
@@ -347,16 +348,20 @@ module Genarray :
       @since 4.12 *)
 
   external num_dims
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "caml_ba_num_dims"
   (** Return the number of dimensions of the given Bigarray. *)
 
-  val dims : ('a, 'b, 'c) t @ immutable local -> int array
+  val dims
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t @ immutable local -> int array
   (** [Genarray.dims a] returns all dimensions of the Bigarray [a],
      as an array of integers of length [Genarray.num_dims a]. *)
 
   external nth_dim
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> int -> int @@ stateless
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> int -> int @@ stateless
     = "caml_ba_dim"
   (** [Genarray.nth_dim a n] returns the [n]-th dimension of the
      Bigarray [a].  The first dimension corresponds to [n = 0];
@@ -366,16 +371,20 @@ module Genarray :
      [Genarray.num_dims a]. *)
 
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   (** Return the kind of the given Bigarray. *)
 
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
   (** Return the layout of the given Bigarray. *)
 
-  external change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
+  external change_layout
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
       = "caml_ba_change_layout"
   (** [Genarray.change_layout a layout] returns a Bigarray with the
       specified [layout], sharing the data with [a] (and hence having
@@ -387,14 +396,17 @@ module Genarray :
       @since 4.04
   *)
 
-  val size_in_bytes : ('a, 'b, 'c) t @ immutable local -> int
+  val size_in_bytes
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t @ immutable local -> int
   (** [size_in_bytes a] is the number of elements in [a] multiplied
     by [a]'s {!kind_size_in_bytes}.
 
     @since 4.03 *)
 
   external get
-    : (('a, 'b, 'c) t[@local_opt]) @ shared -> (int array[@local_opt]) -> 'a
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> (int array[@local_opt]) -> 'a
     = "caml_ba_get_generic"
   (** Read an element of a generic Bigarray.
      [Genarray.get a [|i1; ...; iN|]] returns the element of [a]
@@ -417,8 +429,9 @@ module Genarray :
   *)
 
   external set
-    : (('a, 'b, 'c) t[@local_opt]) -> (int array[@local_opt]) ->
-      ('a[@local_opt]) -> unit
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) -> (int array[@local_opt])
+      -> ('a[@local_opt]) -> unit
     = "caml_ba_set_generic"
   (** Assign an element of a generic Bigarray.
      [Genarray.set a [|i1; ...; iN|] v] stores the value [v] in the
@@ -436,7 +449,9 @@ module Genarray :
      reserved for updating one-, two- and three-dimensional arrays
      as described below.) *)
 
-  external sub_left: ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t
+  external sub_left
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t
     = "caml_ba_sub"
   (** Extract a sub-array of the given Bigarray by restricting the
      first (left-most) dimension.  [Genarray.sub_left a ofs len]
@@ -455,8 +470,9 @@ module Genarray :
      a valid sub-array of [a], that is, if [ofs < 0], or [len < 0],
      or [ofs + len > Genarray.nth_dim a 0]. *)
 
-  external sub_right:
-    ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
+  external sub_right
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
     = "caml_ba_sub"
   (** Extract a sub-array of the given Bigarray by restricting the
      last (right-most) dimension.  [Genarray.sub_right a ofs len]
@@ -475,8 +491,9 @@ module Genarray :
      a valid sub-array of [a], that is, if [ofs < 1], or [len < 0],
      or [ofs + len > Genarray.nth_dim a (Genarray.num_dims a - 1)]. *)
 
-  external slice_left:
-    ('a, 'b, c_layout) t -> (int array[@local_opt]) -> ('a, 'b, c_layout) t
+  external slice_left
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, c_layout) t -> (int array[@local_opt]) -> ('a, 'b, c_layout) t
     = "caml_ba_slice"
   (** Extract a sub-array of lower dimension from the given Bigarray
      by fixing one or several of the first (left-most) coordinates.
@@ -493,9 +510,10 @@ module Genarray :
      @raise Invalid_argument if [M >= N], or if [[|i1; ... ; iM|]]
      is outside the bounds of [a]. *)
 
-  external slice_right:
-    ('a, 'b, fortran_layout) t -> (int array[@local_opt]) ->
-    ('a, 'b, fortran_layout) t
+  external slice_right
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, fortran_layout) t -> (int array[@local_opt])
+      -> ('a, 'b, fortran_layout) t
     = "caml_ba_slice"
   (** Extract a sub-array of lower dimension from the given Bigarray
      by fixing one or several of the last (right-most) coordinates.
@@ -513,8 +531,9 @@ module Genarray :
      is outside the bounds of [a]. *)
 
   external blit
-    : (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt]) ->
-      unit
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+      -> unit
     = "caml_ba_blit"
   (** Copy all elements of a Bigarray in another Bigarray.
      [Genarray.blit src dst] copies all elements of [src] into
@@ -523,7 +542,9 @@ module Genarray :
      to a sub-array of [dst] can be achieved by applying [Genarray.blit]
      to sub-array or slices of [src] and [dst]. *)
 
-  external fill: (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+  external fill
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
     = "caml_ba_fill"
   (** Set all elements of a Bigarray to a given value.
      [Genarray.fill a v] stores the value [v] in all elements of
@@ -541,32 +562,40 @@ module Genarray :
    faster operations, and more precise static type-checking.
    @since 4.05 *)
 module Array0 : sig
-  type (!'a, !'b, !'c) t : mutable_data
+  type (!'a : any, !'b : any, !'c : any) t : mutable_data
   (** The type of zero-dimensional Bigarrays whose elements have
      OCaml type ['a], representation kind ['b], and memory layout ['c]. *)
 
-  val create: ('a, 'b) kind -> 'c layout -> ('a, 'b, 'c) t
+  val create
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b) kind -> 'c layout -> ('a, 'b, 'c) t
   (** [Array0.create kind layout] returns a new Bigarray of zero dimension.
      [kind] and [layout] determine the array element kind and the array
      layout as described for {!Genarray.create}. *)
 
-  val init: ('a, 'b) kind -> 'c layout -> 'a @ local -> ('a, 'b, 'c) t
+  val init
+    : ('a : value_or_null) ('b : any) ('c : any).
+      ('a, 'b) kind -> 'c layout -> 'a @ local -> ('a, 'b, 'c) t
   (** [Array0.init kind layout v] behaves like [Array0.create kind layout]
      except that the element is additionally initialized to the value [v].
 
      @since 4.12 *)
 
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   (** Return the kind of the given Bigarray. *)
 
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
   (** Return the layout of the given Bigarray. *)
 
-  val change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
+  val change_layout
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
   (** [Array0.change_layout a layout] returns a Bigarray with the
       specified [layout], sharing the data with [a]. No copying of elements
       is involved: the new array and the original array share the same
@@ -575,33 +604,42 @@ module Array0 : sig
       @since 4.06
   *)
 
-  val size_in_bytes : ('a, 'b, 'c) t @ immutable local -> int
+  val size_in_bytes
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t @ immutable local -> int
   (** [size_in_bytes a] is [a]'s {!kind_size_in_bytes}. *)
 
-  val get: ('a, 'b, 'c) t @ local shared -> 'a
+  val get
+    : ('a : value_or_null) ('b : any) ('c : any).
+      ('a, 'b, 'c) t @ local shared -> 'a
   (** [Array0.get a] returns the only element in [a]. *)
 
-  val set: ('a, 'b, 'c) t @ local -> 'a @ local -> unit
+  val set
+    : ('a : value_or_null) ('b : any) ('c : any).
+      ('a, 'b, 'c) t @ local -> 'a @ local -> unit
   (** [Array0.set a x v] stores the value [v] in [a]. *)
 
   external blit
-    : (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt]) ->
-      unit
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+      -> unit
     = "caml_ba_blit"
   (** Copy the first Bigarray to the second Bigarray.
      See {!Genarray.blit} for more details. *)
 
-  external fill: (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+  external fill
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
     = "caml_ba_fill"
   (** Fill the given Bigarray with the given value.
      See {!Genarray.fill} for more details. *)
 
-  val of_value: ('a, 'b) kind -> 'c layout -> 'a @ local -> ('a, 'b, 'c) t
+  val of_value
+    : ('a : value_or_null) ('b : any) ('c : any).
+      ('a, 'b) kind -> 'c layout -> 'a @ local -> ('a, 'b, 'c) t
   (** Build a zero-dimensional Bigarray initialized from the
      given value.  *)
-
 end
-
 
 (** {1 One-dimensional arrays} *)
 
@@ -613,18 +651,21 @@ end
    Statically knowing the number of dimensions of the array allows
    faster operations, and more precise static type-checking. *)
 module Array1 : sig
-  type (!'a, !'b, !'c) t : mutable_data
+  type (!'a : any, !'b : any, !'c : any) t : mutable_data
   (** The type of one-dimensional Bigarrays whose elements have
      OCaml type ['a], representation kind ['b], and memory layout ['c]. *)
 
-  val create: ('a, 'b) kind -> 'c layout -> int -> ('a, 'b, 'c) t
+  val create
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b) kind -> 'c layout -> int -> ('a, 'b, 'c) t
   (** [Array1.create kind layout dim] returns a new Bigarray of
      one dimension, whose size is [dim].  [kind] and [layout]
      determine the array element kind and the array layout
      as described for {!Genarray.create}. *)
 
-  val init: ('a, 'b) kind -> 'c layout -> int -> (int -> 'a) @ local ->
-            ('a, 'b, 'c) t
+  val init
+    : ('a : value_or_null) ('b : any) ('c : any).
+      ('a, 'b) kind -> 'c layout -> int -> (int -> 'a) @ local -> ('a, 'b, 'c) t
   (** [Array1.init kind layout dim f] returns a new Bigarray [b]
      of one dimension, whose size is [dim].  [kind] and [layout]
      determine the array element kind and the array layout
@@ -639,22 +680,28 @@ module Array1 : sig
 
      @since 4.12 *)
 
-  external dim: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+  external dim
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_1"
   (** Return the size (dimension) of the given one-dimensional
      Bigarray. *)
 
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   (** Return the kind of the given Bigarray. *)
 
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
   (** Return the layout of the given Bigarray. *)
 
-  val change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
+  val change_layout
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
   (** [Array1.change_layout a layout] returns a Bigarray with the
       specified [layout], sharing the data with [a] (and hence having
       the same dimension as [a]). No copying of elements is involved: the
@@ -663,14 +710,17 @@ module Array1 : sig
       @since 4.06
   *)
 
-
-  val size_in_bytes : ('a, 'b, 'c) t @ immutable -> int
+  val size_in_bytes
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t @ immutable -> int
   (** [size_in_bytes a] is the number of elements in [a]
     multiplied by [a]'s {!kind_size_in_bytes}.
 
     @since 4.03 *)
 
-  external get: (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> ('a[@local_opt])
+  external get
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> ('a[@local_opt])
     = "%caml_ba_ref_1"
   (** [Array1.get a x], or alternatively [a.{x}],
      returns the element of [a] at index [x].
@@ -679,7 +729,9 @@ module Array1 : sig
      [x] must be greater or equal than [1] and less or equal than
      [Array1.dim a].  Otherwise, [Invalid_argument] is raised. *)
 
-  external set: (('a, 'b, 'c) t[@local_opt]) -> int -> ('a[@local_opt]) -> unit
+  external set
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) -> int -> ('a[@local_opt]) -> unit
     = "%caml_ba_set_1"
   (** [Array1.set a x v], also written [a.{x} <- v],
      stores the value [v] at index [x] in [a].
@@ -687,12 +739,16 @@ module Array1 : sig
      {!Bigarray.Array1.get};
      otherwise, [Invalid_argument] is raised. *)
 
-  external sub: ('a, 'b, 'c) t -> int -> int -> ('a, 'b, 'c) t
+  external sub
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t -> int -> int -> ('a, 'b, 'c) t
       = "caml_ba_sub"
   (** Extract a sub-array of the given one-dimensional Bigarray.
      See {!Genarray.sub_left} for more details. *)
 
-  val slice: ('a, 'b, 'c) t -> int -> ('a, 'b, 'c) Array0.t
+  val slice
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t -> int -> ('a, 'b, 'c) Array0.t
   (** Extract a scalar (zero-dimensional slice) of the given one-dimensional
      Bigarray.  The integer parameter is the index of the scalar to
      extract.  See {!Bigarray.Genarray.slice_left} and
@@ -700,37 +756,42 @@ module Array1 : sig
      @since 4.05 *)
 
   external blit
-    : (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt]) ->
-      unit
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+      -> unit
     = "caml_ba_blit"
   (** Copy the first Bigarray to the second Bigarray.
      See {!Genarray.blit} for more details. *)
 
-  external fill: (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+  external fill
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
     = "caml_ba_fill"
   (** Fill the given Bigarray with the given value.
      See {!Genarray.fill} for more details. *)
 
-  val of_array: ('a, 'b) kind -> 'c layout -> 'a array @ local -> ('a, 'b, 'c) t
+  val of_array
+    : ('a : value_or_null mod separable) ('b : any) ('c : any).
+      ('a, 'b) kind -> 'c layout -> 'a array @ local -> ('a, 'b, 'c) t
   (** Build a one-dimensional Bigarray initialized from the
      given array.  *)
 
   external unsafe_get
-    : (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> ('a[@local_opt])
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> ('a[@local_opt])
     = "%caml_ba_unsafe_ref_1"
   (** Like {!Bigarray.Array1.get}, but bounds checking is not always performed.
       Use with caution and only when the program logic guarantees that
       the access is within bounds. *)
 
   external unsafe_set
-    : (('a, 'b, 'c) t[@local_opt]) -> int -> ('a[@local_opt]) -> unit
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) -> int -> ('a[@local_opt]) -> unit
     = "%caml_ba_unsafe_set_1"
   (** Like {!Bigarray.Array1.set}, but bounds checking is not always performed.
       Use with caution and only when the program logic guarantees that
       the access is within bounds. *)
-
 end
-
 
 (** {1 Two-dimensional arrays} *)
 
@@ -739,19 +800,23 @@ end
    case of two-dimensional arrays. *)
 module Array2 :
   sig
-    type (!'a, !'b, !'c) t : mutable_data
+    type (!'a : any, !'b : any, !'c : any) t : mutable_data
   (** The type of two-dimensional Bigarrays whose elements have
      OCaml type ['a], representation kind ['b], and memory layout ['c]. *)
 
-  val create: ('a, 'b) kind ->  'c layout -> int -> int -> ('a, 'b, 'c) t
+  val create
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b) kind ->  'c layout -> int -> int -> ('a, 'b, 'c) t
   (** [Array2.create kind layout dim1 dim2] returns a new Bigarray of
      two dimensions, whose size is [dim1] in the first dimension
      and [dim2] in the second dimension.  [kind] and [layout]
      determine the array element kind and the array layout
      as described for {!Bigarray.Genarray.create}. *)
 
-  val init: ('a, 'b) kind ->  'c layout -> int -> int ->
-            (int -> int -> 'a) @ local -> ('a, 'b, 'c) t
+  val init
+    : ('a : value_or_null) ('b : any) ('c : any).
+      ('a, 'b) kind ->  'c layout -> int -> int -> (int -> int -> 'a) @ local
+      -> ('a, 'b, 'c) t
   (** [Array2.init kind layout dim1 dim2 f] returns a new Bigarray [b]
      of two dimensions, whose size is [dim2] in the first dimension
      and [dim2] in the second dimension.  [kind] and [layout]
@@ -767,25 +832,33 @@ module Array2 :
 
      @since 4.12 *)
 
-  external dim1: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+  external dim1
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_1"
   (** Return the first dimension of the given two-dimensional Bigarray. *)
 
-  external dim2: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+  external dim2
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_2"
   (** Return the second dimension of the given two-dimensional Bigarray. *)
 
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   (** Return the kind of the given Bigarray. *)
 
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
   (** Return the layout of the given Bigarray. *)
 
-  val change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
+  val change_layout
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
   (** [Array2.change_layout a layout] returns a Bigarray with the
       specified [layout], sharing the data with [a] (and hence having
       the same dimensions as [a]). No copying of elements is involved: the
@@ -796,15 +869,17 @@ module Array2 :
       @since 4.06
   *)
 
-
-  val size_in_bytes : ('a, 'b, 'c) t @ immutable -> int
+  val size_in_bytes
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t @ immutable -> int
   (** [size_in_bytes a] is the number of elements in [a]
     multiplied by [a]'s {!kind_size_in_bytes}.
 
     @since 4.03 *)
 
   external get
-    : (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> ('a[@local_opt])
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> ('a[@local_opt])
     = "%caml_ba_ref_2"
   (** [Array2.get a x y], also written [a.{x,y}],
      returns the element of [a] at coordinates ([x], [y]).
@@ -813,7 +888,8 @@ module Array2 :
      otherwise, [Invalid_argument] is raised. *)
 
   external set
-    : (('a, 'b, 'c) t[@local_opt]) -> int -> int -> ('a[@local_opt]) -> unit
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) -> int -> int -> ('a[@local_opt]) -> unit
     = "%caml_ba_set_2"
   (** [Array2.set a x y v], or alternatively [a.{x,y} <- v],
      stores the value [v] at coordinates ([x], [y]) in [a].
@@ -821,29 +897,35 @@ module Array2 :
      as described for {!Bigarray.Genarray.set};
      otherwise, [Invalid_argument] is raised. *)
 
-  external sub_left: ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t
+  external sub_left
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t
     = "caml_ba_sub"
   (** Extract a two-dimensional sub-array of the given two-dimensional
      Bigarray by restricting the first dimension.
      See {!Bigarray.Genarray.sub_left} for more details.
      [Array2.sub_left] applies only to arrays with C layout. *)
 
-  external sub_right:
-    ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
+  external sub_right
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
     = "caml_ba_sub"
   (** Extract a two-dimensional sub-array of the given two-dimensional
      Bigarray by restricting the second dimension.
      See {!Bigarray.Genarray.sub_right} for more details.
      [Array2.sub_right] applies only to arrays with Fortran layout. *)
 
-  val slice_left: ('a, 'b, c_layout) t -> int -> ('a, 'b, c_layout) Array1.t
+  val slice_left
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, c_layout) t -> int -> ('a, 'b, c_layout) Array1.t
   (** Extract a row (one-dimensional slice) of the given two-dimensional
      Bigarray.  The integer parameter is the index of the row to
      extract.  See {!Bigarray.Genarray.slice_left} for more details.
      [Array2.slice_left] applies only to arrays with C layout. *)
 
-  val slice_right:
-    ('a, 'b, fortran_layout) t -> int -> ('a, 'b, fortran_layout) Array1.t
+  val slice_right
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, fortran_layout) t -> int -> ('a, 'b, fortran_layout) Array1.t
   (** Extract a column (one-dimensional slice) of the given
      two-dimensional Bigarray.  The integer parameter is the
      index of the column to extract.  See {!Bigarray.Genarray.slice_right}
@@ -851,34 +933,39 @@ module Array2 :
      with Fortran layout. *)
 
   external blit
-    : (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt]) ->
-      unit
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+      -> unit
     = "caml_ba_blit"
   (** Copy the first Bigarray to the second Bigarray.
      See {!Bigarray.Genarray.blit} for more details. *)
 
-  external fill: (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+  external fill
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
     = "caml_ba_fill"
   (** Fill the given Bigarray with the given value.
      See {!Bigarray.Genarray.fill} for more details. *)
 
   val of_array
-    : ('a, 'b) kind -> 'c layout -> 'a array array @ local -> ('a, 'b, 'c) t
+    : ('a : value_or_null mod separable) ('b : any) ('c : any).
+      ('a, 'b) kind -> 'c layout -> 'a array array @ local -> ('a, 'b, 'c) t
   (** Build a two-dimensional Bigarray initialized from the
      given array of arrays.  *)
 
   external unsafe_get
-    : (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> ('a[@local_opt])
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> ('a[@local_opt])
     = "%caml_ba_unsafe_ref_2"
   (** Like {!Bigarray.Array2.get}, but bounds checking is not always
       performed. *)
 
   external unsafe_set
-    : (('a, 'b, 'c) t[@local_opt]) -> int -> int -> ('a[@local_opt]) -> unit
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) -> int -> int -> ('a[@local_opt]) -> unit
     = "%caml_ba_unsafe_set_2"
   (** Like {!Bigarray.Array2.set}, but bounds checking is not always
       performed. *)
-
 end
 
 (** {1 Three-dimensional arrays} *)
@@ -888,19 +975,23 @@ end
    of three-dimensional arrays. *)
 module Array3 :
   sig
-    type (!'a, !'b, !'c) t : mutable_data
+    type (!'a : any, !'b : any, !'c : any) t : mutable_data
   (** The type of three-dimensional Bigarrays whose elements have
      OCaml type ['a], representation kind ['b], and memory layout ['c]. *)
 
-  val create: ('a, 'b) kind -> 'c layout -> int -> int -> int -> ('a, 'b, 'c) t
+  val create
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b) kind -> 'c layout -> int -> int -> int -> ('a, 'b, 'c) t
   (** [Array3.create kind layout dim1 dim2 dim3] returns a new Bigarray of
      three dimensions, whose size is [dim1] in the first dimension,
      [dim2] in the second dimension, and [dim3] in the third.
      [kind] and [layout] determine the array element kind and
      the array layout as described for {!Bigarray.Genarray.create}. *)
 
-  val init: ('a, 'b) kind ->  'c layout -> int -> int -> int ->
-            (int -> int -> int -> 'a) @ local -> ('a, 'b, 'c) t
+  val init
+    : ('a : value_or_null) ('b : any) ('c : any).
+      ('a, 'b) kind ->  'c layout -> int -> int -> int
+      -> (int -> int -> int -> 'a) @ local -> ('a, 'b, 'c) t
   (** [Array3.init kind layout dim1 dim2 dim3 f] returns a new Bigarray [b]
      of three dimensions, whose size is [dim1] in the first dimension,
      [dim2] in the second dimension, and [dim3] in the third.
@@ -916,30 +1007,40 @@ module Array3 :
 
      @since 4.12 *)
 
-  external dim1: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+  external dim1
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_1"
   (** Return the first dimension of the given three-dimensional Bigarray. *)
 
-  external dim2: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+  external dim2
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_2"
   (** Return the second dimension of the given three-dimensional Bigarray. *)
 
-  external dim3: (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
+  external dim3
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> int @@ stateless
     = "%caml_ba_dim_3"
   (** Return the third dimension of the given three-dimensional Bigarray. *)
 
   external kind
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> ('a, 'b) kind @@ stateless
     = "caml_ba_kind"
   (** Return the kind of the given Bigarray. *)
 
   external layout
-    : (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
   (** Return the layout of the given Bigarray. *)
 
 
-  val change_layout: ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
+  val change_layout
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
   (** [Array3.change_layout a layout] returns a Bigarray with the
       specified [layout], sharing the data with [a] (and hence having
       the same dimensions as [a]). No copying of elements is involved: the
@@ -950,15 +1051,18 @@ module Array3 :
       @since 4.06
   *)
 
-  val size_in_bytes : ('a, 'b, 'c) t @ immutable -> int
+  val size_in_bytes
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, 'c) t @ immutable -> int
   (** [size_in_bytes a] is the number of elements in [a]
     multiplied by [a]'s {!kind_size_in_bytes}.
 
     @since 4.03 *)
 
   external get
-    : (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> int ->
-      ('a[@local_opt])
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> int
+      -> ('a[@local_opt])
     = "%caml_ba_ref_3"
   (** [Array3.get a x y z], also written [a.{x,y,z}],
      returns the element of [a] at coordinates ([x], [y], [z]).
@@ -967,8 +1071,9 @@ module Array3 :
      otherwise, [Invalid_argument] is raised. *)
 
   external set
-    : (('a, 'b, 'c) t[@local_opt]) -> int -> int -> int -> ('a[@local_opt]) ->
-      unit
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) -> int -> int -> int -> ('a[@local_opt])
+      -> unit
     = "%caml_ba_set_3"
   (** [Array3.set a x y v], or alternatively [a.{x,y,z} <- v],
      stores the value [v] at coordinates ([x], [y], [z]) in [a].
@@ -976,31 +1081,36 @@ module Array3 :
      as described for {!Bigarray.Genarray.set};
      otherwise, [Invalid_argument] is raised. *)
 
-  external sub_left: ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t
+  external sub_left
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t
     = "caml_ba_sub"
   (** Extract a three-dimensional sub-array of the given
      three-dimensional Bigarray by restricting the first dimension.
      See {!Bigarray.Genarray.sub_left} for more details.  [Array3.sub_left]
      applies only to arrays with C layout. *)
 
-  external sub_right:
-    ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
+  external sub_right
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
     = "caml_ba_sub"
   (** Extract a three-dimensional sub-array of the given
      three-dimensional Bigarray by restricting the second dimension.
      See {!Bigarray.Genarray.sub_right} for more details.  [Array3.sub_right]
      applies only to arrays with Fortran layout. *)
 
-  val slice_left_1:
-    ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) Array1.t
+  val slice_left_1
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) Array1.t
   (** Extract a one-dimensional slice of the given three-dimensional
      Bigarray by fixing the first two coordinates.
      The integer parameters are the coordinates of the slice to
      extract.  See {!Bigarray.Genarray.slice_left} for more details.
      [Array3.slice_left_1] applies only to arrays with C layout. *)
 
-  val slice_right_1:
-    ('a, 'b, fortran_layout) t ->
+  val slice_right_1
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, fortran_layout) t ->
     int -> int -> ('a, 'b, fortran_layout) Array1.t
   (** Extract a one-dimensional slice of the given three-dimensional
      Bigarray by fixing the last two coordinates.
@@ -1009,15 +1119,18 @@ module Array3 :
      [Array3.slice_right_1] applies only to arrays with Fortran
      layout. *)
 
-  val slice_left_2: ('a, 'b, c_layout) t -> int -> ('a, 'b, c_layout) Array2.t
+  val slice_left_2
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, c_layout) t -> int -> ('a, 'b, c_layout) Array2.t
   (** Extract a  two-dimensional slice of the given three-dimensional
      Bigarray by fixing the first coordinate.
      The integer parameter is the first coordinate of the slice to
      extract.  See {!Bigarray.Genarray.slice_left} for more details.
      [Array3.slice_left_2] applies only to arrays with C layout. *)
 
-  val slice_right_2:
-    ('a, 'b, fortran_layout) t -> int -> ('a, 'b, fortran_layout) Array2.t
+  val slice_right_2
+    : ('a : any) ('b : any) ('c : any).
+      ('a, 'b, fortran_layout) t -> int -> ('a, 'b, fortran_layout) Array2.t
   (** Extract a two-dimensional slice of the given
      three-dimensional Bigarray by fixing the last coordinate.
      The integer parameter is the coordinate of the slice
@@ -1026,94 +1139,103 @@ module Array3 :
      layout. *)
 
   external blit
-    : (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt]) ->
-      unit
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> (('a, 'b, 'c) t[@local_opt])
+      -> unit
     = "caml_ba_blit"
   (** Copy the first Bigarray to the second Bigarray.
      See {!Bigarray.Genarray.blit} for more details. *)
 
-  external fill: (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
+  external fill
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit
     = "caml_ba_fill"
   (** Fill the given Bigarray with the given value.
      See {!Bigarray.Genarray.fill} for more details. *)
 
-  val of_array:
-    ('a, 'b) kind -> 'c layout -> 'a array array array @ local -> ('a, 'b, 'c) t
+  val of_array
+    : ('a : value_or_null mod separable) ('b : any) ('c : any).
+      ('a, 'b) kind -> 'c layout -> 'a array array array @ local
+      -> ('a, 'b, 'c) t
   (** Build a three-dimensional Bigarray initialized from the
      given array of arrays of arrays.  *)
 
   external unsafe_get
-    : (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> int ->
-      ('a[@local_opt])
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ shared -> int -> int -> int
+      -> ('a[@local_opt])
     = "%caml_ba_unsafe_ref_3"
   (** Like {!Bigarray.Array3.get}, but bounds checking is not always
       performed. *)
 
   external unsafe_set
-    : (('a, 'b, 'c) t[@local_opt]) -> int -> int -> int -> ('a[@local_opt]) ->
-      unit
+    : ('a : value_or_null) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) -> int -> int -> int -> ('a[@local_opt])
+      -> unit
     = "%caml_ba_unsafe_set_3"
   (** Like {!Bigarray.Array3.set}, but bounds checking is not always
       performed. *)
-
 end
 
 (** {1 Coercions between generic Bigarrays and fixed-dimension Bigarrays} *)
 
-external genarray_of_array0 :
+external genarray_of_array0 : ('a : any) ('b : any) ('c : any).
   (('a, 'b, 'c) Array0.t[@local_opt]) -> (('a, 'b, 'c) Genarray.t[@local_opt])
   = "%identity"
 (** Return the generic Bigarray corresponding to the given zero-dimensional
     Bigarray.
     @since 4.05 *)
 
-external genarray_of_array1 :
+external genarray_of_array1 : ('a : any) ('b : any) ('c : any).
   (('a, 'b, 'c) Array1.t[@local_opt]) -> (('a, 'b, 'c) Genarray.t[@local_opt])
   = "%identity"
 (** Return the generic Bigarray corresponding to the given one-dimensional
    Bigarray. *)
 
-external genarray_of_array2 :
+external genarray_of_array2 : ('a : any) ('b : any) ('c : any).
   (('a, 'b, 'c) Array2.t[@local_opt]) -> (('a, 'b, 'c) Genarray.t[@local_opt])
   = "%identity"
 (** Return the generic Bigarray corresponding to the given two-dimensional
    Bigarray. *)
 
-external genarray_of_array3 :
+external genarray_of_array3 : ('a : any) ('b : any) ('c : any).
   (('a, 'b, 'c) Array3.t[@local_opt]) -> (('a, 'b, 'c) Genarray.t[@local_opt])
   = "%identity"
 (** Return the generic Bigarray corresponding to the given three-dimensional
    Bigarray. *)
 
-val array0_of_genarray : ('a, 'b, 'c) Genarray.t -> ('a, 'b, 'c) Array0.t
+val array0_of_genarray : ('a : any) ('b : any) ('c : any).
+  ('a, 'b, 'c) Genarray.t -> ('a, 'b, 'c) Array0.t
 (** Return the zero-dimensional Bigarray corresponding to the given
    generic Bigarray.
    @raise Invalid_argument if the generic Bigarray
    does not have exactly zero dimension.
    @since 4.05 *)
 
-val array1_of_genarray : ('a, 'b, 'c) Genarray.t -> ('a, 'b, 'c) Array1.t
+val array1_of_genarray : ('a : any) ('b : any) ('c : any).
+  ('a, 'b, 'c) Genarray.t -> ('a, 'b, 'c) Array1.t
 (** Return the one-dimensional Bigarray corresponding to the given
    generic Bigarray.
    @raise Invalid_argument if the generic Bigarray
    does not have exactly one dimension. *)
 
-val array2_of_genarray : ('a, 'b, 'c) Genarray.t -> ('a, 'b, 'c) Array2.t
+val array2_of_genarray : ('a : any) ('b : any) ('c : any).
+  ('a, 'b, 'c) Genarray.t -> ('a, 'b, 'c) Array2.t
 (** Return the two-dimensional Bigarray corresponding to the given
    generic Bigarray.
    @raise Invalid_argument if the generic Bigarray
    does not have exactly two dimensions. *)
 
-val array3_of_genarray : ('a, 'b, 'c) Genarray.t -> ('a, 'b, 'c) Array3.t
+val array3_of_genarray : ('a : any) ('b : any) ('c : any).
+  ('a, 'b, 'c) Genarray.t -> ('a, 'b, 'c) Array3.t
 (** Return the three-dimensional Bigarray corresponding to the given
    generic Bigarray.
    @raise Invalid_argument if the generic Bigarray
    does not have exactly three dimensions. *)
 
-
 (** {1 Re-shaping Bigarrays} *)
 
-val reshape:
+val reshape : ('a : any) ('b : any) ('c : any).
   ('a, 'b, 'c) Genarray.t -> int array @ local -> ('a, 'b, 'c) Genarray.t
 (** [reshape b [|d1;...;dN|]] converts the Bigarray [b] to a
    [N]-dimensional array of dimensions [d1]...[dN].  The returned
@@ -1130,20 +1252,23 @@ val reshape:
    of the dimensions of [b] must be equal to [i1 * ... * iN].
    Otherwise, [Invalid_argument] is raised. *)
 
-val reshape_0 : ('a, 'b, 'c) Genarray.t -> ('a, 'b, 'c) Array0.t
+val reshape_0 : ('a : any) ('b : any) ('c : any).
+  ('a, 'b, 'c) Genarray.t -> ('a, 'b, 'c) Array0.t
 (** Specialized version of {!Bigarray.reshape} for reshaping to
    zero-dimensional arrays.
    @since 4.05 *)
 
-val reshape_1 : ('a, 'b, 'c) Genarray.t -> int -> ('a, 'b, 'c) Array1.t
+val reshape_1 : ('a : any) ('b : any) ('c : any).
+  ('a, 'b, 'c) Genarray.t -> int -> ('a, 'b, 'c) Array1.t
 (** Specialized version of {!Bigarray.reshape} for reshaping to
    one-dimensional arrays. *)
 
-val reshape_2 : ('a, 'b, 'c) Genarray.t -> int -> int -> ('a, 'b, 'c) Array2.t
+val reshape_2 : ('a : any) ('b : any) ('c : any).
+  ('a, 'b, 'c) Genarray.t -> int -> int -> ('a, 'b, 'c) Array2.t
 (** Specialized version of {!Bigarray.reshape} for reshaping to
    two-dimensional arrays. *)
 
-val reshape_3 :
+val reshape_3 : ('a : any) ('b : any) ('c : any).
   ('a, 'b, 'c) Genarray.t -> int -> int -> int -> ('a, 'b, 'c) Array3.t
 (** Specialized version of {!Bigarray.reshape} for reshaping to
     three-dimensional arrays. *)
