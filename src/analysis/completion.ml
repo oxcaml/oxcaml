@@ -462,7 +462,7 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
               :: candidates)
           prefix_path env []
       | `Modules ->
-        Env.fold_modules_lazy
+        Env.fold_modules
           (fun name path v candidates ->
             let attrs = md_attributes v in
             let v = v.Subst.Lazy.md_type in
@@ -473,7 +473,7 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
               :: candidates)
           prefix_path env []
       | `Modules_type ->
-        Env.fold_modtypes_lazy
+        Env.fold_modtypes
           (fun name path v candidates ->
             if not @@ validate `Uident `Mod name then candidates
             else

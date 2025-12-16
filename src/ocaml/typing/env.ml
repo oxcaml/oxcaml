@@ -4638,7 +4638,7 @@ let find_all_simple_list proj1 proj2 f lid env acc =
           acc
       end
 
-let fold_modules_lazy f lid env acc =
+let fold_modules f lid env acc =
   match lid with
   | None ->
       IdTbl.fold_name wrap_module
@@ -4676,13 +4676,6 @@ let fold_modules_lazy f lid env acc =
           acc
       end
 
-let fold_modules f lid env acc =
-  fold_modules_lazy
-    (fun name path md acc ->
-      let md = Subst.Lazy.force_module_decl md in
-      f name path md acc)
-    lid env acc
-
 let fold_values f =
   find_all wrap_value (fun env -> env.values) (fun sc -> sc.comp_values)
     (fun k p ve acc ->
@@ -4704,15 +4697,7 @@ and fold_types f =
   find_all wrap_identity
     (fun env -> env.types) (fun sc -> sc.comp_types)
     (fun k p tda acc -> f k p tda.tda_declaration acc)
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-25
-and fold_modtypes_lazy f =
-  let f l path data acc = f l path data acc in
-||||||| oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
 and fold_modtypes f =
-  let f l path data acc = f l path (Subst.Lazy.force_modtype_decl data) acc in
-=======
-and fold_modtypes f =
->>>>>>> oxcaml/oxcaml:d6e630469425e02d8d45f8f10392e046689de2c5
   find_all wrap_identity
     (fun env -> env.modtypes) (fun sc -> sc.comp_modtypes)
     (fun k p mta acc -> f k p mta.mtda_declaration acc)
@@ -4723,9 +4708,6 @@ and fold_cltypes f =
   find_all wrap_identity
     (fun env -> env.cltypes) (fun sc -> sc.comp_cltypes)
     (fun k p cltda acc -> f k p cltda.cltda_declaration acc)
-
-let fold_modtypes f =
-  fold_modtypes_lazy (fun k p mdty acc -> f k p (Subst.Lazy.force_modtype_decl mdty) acc)
 
 let filter_non_loaded_persistent f env =
   let to_remove =

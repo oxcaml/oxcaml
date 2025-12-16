@@ -121,9 +121,9 @@ let values_from_module query env lident acc =
     | _ ->
       let acc = compute_values query env (Some lident) acc in
       Env.fold_modules
-        (fun name _ mdl acc ->
-          match mdl.Types.md_type with
-          | Types.Mty_alias _ -> acc
+        (fun name _ (mdl : Subst.Lazy.module_declaration) acc ->
+          match mdl.md_type with
+          | Mty_alias _ -> acc
           | _ ->
             let lident = Longident.Ldot (lident, name) in
             aux acc lident)
