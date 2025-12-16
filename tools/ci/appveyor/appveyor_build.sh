@@ -158,6 +158,10 @@ case "$1" in
     if $run_testsuite; then
       # The testsuite is too slow to run on AppVeyor in full. Run the dynlink
       # tests now (to include natdynlink)
+      # GNU Parallel 20250122 introduced a somewhat dubious check on the
+      # characters in $PWD and $OLDPWD - --unsafe disables these "checks"
+      # (as would sed -i -e 's/PWD OLDPWD//' /usr/bin/parallel)
+      export PARALLEL='--unsafe'
       run "test dynlink $PORT" \
           $MAKE -C "$FULL_BUILD_PREFIX-$PORT/testsuite" parallel-lib-dynlink
       # Now reconfigure ocamltest to run in bytecode-only mode
