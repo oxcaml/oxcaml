@@ -159,3 +159,171 @@ run 3:
   user 709.03
   sys  132.69
 
+
+=== 2025-12-16T19:15:41Z ===
+desc: Optimized ikinds allocation hotspots
+git: 734161bc05216c3184e09de2839460ed35d41256 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-Cf381zwH
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 147.62
+  user 660.77
+  sys  118.26
+
+run 2:
+  real 148.24
+  user 663.10
+  sys  118.94
+
+run 3:
+  real 147.88
+  user 665.77
+  sys  119.28
+
+
+=== 2025-12-16T21:11:35Z ===
+desc: Optimized ikinds allocation hotspots (cold build)
+git: 734161bc05216c3184e09de2839460ed35d41256 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-Rl9bGmML
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/bench_make.sh
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 153.75
+  user 676.40
+  sys  124.31
+
+run 2:
+  real 152.61
+  user 674.91
+  sys  123.06
+
+run 3:
+  real 153.61
+  user 672.17
+  sys  121.29
+
+
+=== 2025-12-16T21:35:14Z ===
+desc: ikinds=false
+git: 734161bc05216c3184e09de2839460ed35d41256 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-0oQw3riB
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 159.44
+  user 697.53
+  sys  122.22
+
+run 2:
+  real 157.85
+  user 699.16
+  sys  119.74
+
+run 3:
+  real 157.60
+  user 696.59
+  sys  119.45
+
+
+=== 2025-12-16T21:43:21Z ===
+desc: ikinds=true
+git: 734161bc05216c3184e09de2839460ed35d41256 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-DWOOz6en
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 150.13
+  user 671.14
+  sys  118.83
+
+run 2:
+  real 151.56
+  user 674.27
+  sys  121.85
+
+run 3:
+  real 152.64
+  user 674.62
+  sys  119.04
+
+
+=== 2025-12-16T21:52:07Z ===
+desc: ikinds=false (confirmation run)
+git: 734161bc05216c3184e09de2839460ed35d41256 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-wXx5XA2y
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 159.60
+  user 698.08
+  sys  120.72
+
+run 2:
+  real 158.79
+  user 702.71
+  sys  119.95
+
+run 3:
+  real 158.97
+  user 699.84
+  sys  119.94
+
+
+=== 2025-12-16T22:00:16Z ===
+desc: ikinds=true (confirmation run)
+git: 734161bc05216c3184e09de2839460ed35d41256 (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-HmaOnkX1
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/benchresults.txt
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 150.55
+  user 669.95
+  sys  121.43
+
+run 2:
+  real 151.71
+  user 673.33
+  sys  121.74
+
+run 3:
+  real 155.38
+  user 681.81
+  sys  124.51
+

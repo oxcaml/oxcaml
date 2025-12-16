@@ -62,7 +62,7 @@ module JK = struct
           kind : ckind;
           abstract : bool
         }
-    | Poly of poly * poly list
+    | Poly of poly * poly array
 
   and env =
     { kind_of : ty -> ckind;
@@ -72,7 +72,7 @@ module JK = struct
   and ctx =
     { env : env;
       ty_to_kind : kind TyTbl.t;
-      constr_to_coeffs : (poly * poly list) ConstrTbl.t
+      constr_to_coeffs : (poly * poly array) ConstrTbl.t
     }
 
   (* Start a new solver context.
@@ -80,8 +80,8 @@ module JK = struct
   let create (env : env) : ctx =
     Ldd.clear_memos ();
     { env;
-      ty_to_kind = TyTbl.create 0;
-      constr_to_coeffs = ConstrTbl.create 0
+      ty_to_kind = TyTbl.create 64;
+      constr_to_coeffs = ConstrTbl.create 64
     }
 
   (* A rigid variable corresponding to a type parameter [t]. *)
@@ -106,7 +106,7 @@ module JK = struct
   (* Fetch or compute the polynomial for constructor [c].  The returned
      nodes are placeholders stored in [constr_to_coeffs] so that mutually
      recursive constructors can refer to each other. *)
-  and constr_kind (ctx : ctx) (c : constr) : poly * poly list =
+  and constr_kind (ctx : ctx) (c : constr) : poly * poly array =
     match ConstrTbl.find_opt ctx.constr_to_coeffs c with
     | Some base_and_coeffs -> base_and_coeffs
     | None -> (
@@ -117,10 +117,10 @@ module JK = struct
                mutually-recursive types. *)
             let base_var = Ldd.new_var () in
             let coeff_vars =
-              List.init (List.length coeffs) (fun _ -> Ldd.new_var ())
+              Array.init (Array.length coeffs) (fun _ -> Ldd.new_var ())
             in
             let base_node = Ldd.var base_var in
-            let coeff_nodes = List.map Ldd.var coeff_vars in
+            let coeff_nodes = Array.map Ldd.var coeff_vars in
             ConstrTbl.add ctx.constr_to_coeffs c (base_node, coeff_nodes);
             (* Replace rigid atoms that refer to other constructors with the
                corresponding cached placeholders.  Atoms that refer back to
@@ -136,23 +136,23 @@ module JK = struct
                     if arg_index = 0
                     then base'
                     else
-                      match List.nth_opt coeffs' (arg_index - 1) with
-                      | Some coeff -> coeff
-                      | None -> Ldd.var (Ldd.rigid name)
+                      if arg_index - 1 < Array.length coeffs'
+                      then coeffs'.(arg_index - 1)
+                      else Ldd.var (Ldd.rigid name)
             in
             let rehydrate node = Ldd.map_rigid instantiate node in
             let base_rhs = rehydrate base in
-            let coeffs_rhs = List.map rehydrate coeffs in
+            let coeffs_rhs = Array.map rehydrate coeffs in
             Ldd.solve_lfp base_var base_rhs;
-            List.iter2 (fun v rhs -> Ldd.solve_lfp v rhs) coeff_vars coeffs_rhs;
+            Array.iter2 (fun v rhs -> Ldd.solve_lfp v rhs) coeff_vars coeffs_rhs;
             base_node, coeff_nodes
         | Ty { args; kind = body; abstract } ->
             let base_var = Ldd.new_var () in
             let coeff_vars =
-              List.init (List.length args) (fun _ -> Ldd.new_var ())
+              Array.init (List.length args) (fun _ -> Ldd.new_var ())
             in
             let base_node = Ldd.var base_var in
-            let coeff_nodes = List.map Ldd.var coeff_vars in
+            let coeff_nodes = Array.map Ldd.var coeff_vars in
             ConstrTbl.add ctx.constr_to_coeffs c (base_node, coeff_nodes);
             let rigid_vars =
               List.map
@@ -173,13 +173,14 @@ module JK = struct
             let base', coeffs' =
               Ldd.decompose_linear ~universe:rigid_vars kind'
             in
-            if List.length coeff_vars <> List.length coeffs'
+            let coeffs' = Array.of_list coeffs' in
+            if Array.length coeff_vars <> Array.length coeffs'
             then
               failwith
                 (Printf.sprintf
                    "jkind_solver: coeffs mismatch for constr %s (length %d vs %d)"
-                   (constr_to_string c) (List.length coeff_vars)
-                   (List.length coeffs'));
+                   (constr_to_string c) (Array.length coeff_vars)
+                   (Array.length coeffs'));
             if abstract
             then (
               (* For abstract types we don't trust [kind'] as an exact formula.
@@ -189,7 +190,7 @@ module JK = struct
               Ldd.enqueue_gfp base_var
                 (Ldd.meet base' (Ldd.var (Ldd.rigid (Ldd.Name.atomic c 0))));
               let i = ref 0 in
-              List.iter2
+              Array.iter2
                 (fun coeff coeff' ->
                   let idx = !i in
                   let rhs = Ldd.join coeff' base' in
@@ -202,7 +203,7 @@ module JK = struct
                 coeff_vars coeffs')
             else (
               Ldd.solve_lfp base_var base';
-              List.iter2
+              Array.iter2
                 (fun coeff coeff' -> Ldd.solve_lfp coeff coeff')
                 coeff_vars coeffs');
             base_node, coeff_nodes)
@@ -210,15 +211,16 @@ module JK = struct
   (* Apply a constructor polynomial to argument kinds. *)
   let constr (ctx : ctx) (c : constr) (args : kind list) : kind =
     let base, coeffs = constr_kind ctx c in
+    let args = Array.of_list args in
     let ks =
-      List.mapi
+      Array.mapi
         (fun i coeff ->
-          match List.nth_opt args i with
-          | Some k -> Ldd.meet k coeff
-          | None -> failwith "Missing arg")
+          if i < Array.length args
+          then Ldd.meet args.(i) coeff
+          else failwith "Missing arg")
         coeffs
     in
-    List.fold_left Ldd.join base ks
+    Array.fold_left Ldd.join base ks
 
   (* Evaluate a ckind in [ctx] and flush pending GFP constraints. *)
   let normalize (ctx : ctx) (k : ckind) : poly =
@@ -228,7 +230,7 @@ module JK = struct
 
   (* Materialize a solved polynomial for storing in
      [Types.constructor_ikind]. *)
-  let constr_kind_poly (ctx : ctx) (c : constr) : poly * poly list =
+  let constr_kind_poly (ctx : ctx) (c : constr) : poly * poly array =
     let base, coeffs = constr_kind ctx c in
     Ldd.solve_pending ();
     base, coeffs
@@ -256,8 +258,7 @@ let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
   (* For each with-bound (ty, axes), contribute
      modality(axes_mask, kind_of ty). *)
   Jkind.With_bounds.to_seq j.jkind.with_bounds
-  |> List.of_seq
-  |> List.fold_left (fun acc (ty, info) ->
+  |> Seq.fold_left (fun acc (ty, info) ->
          let axes = Jkind.With_bounds.type_info_relevant_axes info in
          let mask = Axis_lattice.of_axis_set axes in
          let kty = JK.kind ctx ty in
@@ -385,8 +386,8 @@ let relevance_of_rep = function
   | (`Record _ | `Variant _) -> `Irrelevant
 
 let constructor_ikind_polynomial
-    (packed : Types.constructor_ikind) : JK.poly * JK.poly list =
-  packed.base, Array.to_list packed.coeffs
+    (packed : Types.constructor_ikind) : JK.poly * JK.poly array =
+  packed.base, packed.coeffs
 
 (* Lookup function supplied to the solver.
    We prefer a stored ikind (when present) and otherwise recompute from the
@@ -589,7 +590,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
         | JK.Ty _ -> "Ty"
         | JK.Poly (base, coeffs) ->
             let coeffs =
-              coeffs |> List.map Ikind.Ldd.pp |> String.concat "; "
+              coeffs |> Array.map Ikind.Ldd.pp |> Array.to_list |> String.concat "; "
             in
             Format.asprintf "Poly(base=%s; coeffs=[%s])"
               (Ikind.Ldd.pp base) coeffs
@@ -612,7 +613,6 @@ let type_declaration_ikind ~(context : Jkind.jkind_context)
     ~(path : Path.t) : Types.constructor_ikind =
   let ctx = make_ctx ~context in
   let base, coeffs = JK.constr_kind_poly ctx path in
-  let coeffs = Array.of_list coeffs in
   Types.constructor_ikind_create ~base ~coeffs
 
 let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
@@ -867,12 +867,12 @@ let identity_lookup_from_arity_map (arity : int Path.Map.t) (p : Path.t)
   (* Identity polynomial: base and coeffs are just fresh rigid atoms. *)
   let base = var (rigid (Name.atomic p 0)) in
   let coeffs =
-    List.init n (fun i -> var (rigid (Name.atomic p (i + 1))))
+    Array.init n (fun i -> var (rigid (Name.atomic p (i + 1))))
   in
   JK.Poly (base, coeffs)
 
 let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
-    ~(body : Types.type_expr) : JK.poly * JK.poly list =
+    ~(body : Types.type_expr) : JK.poly * JK.poly array =
   (* Approximate type-function substitution by evaluating in an identity
      environment, i.e. every constructor contributes an independent rigid
      atom. *)
@@ -894,7 +894,8 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
   let rigid_vars =
     List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
   in
-  Ldd.decompose_linear ~universe:rigid_vars poly
+  let base, coeffs = Ldd.decompose_linear ~universe:rigid_vars poly in
+  base, Array.of_list coeffs
 
 let substitute_decl_ikind_with_lookup
     ~(lookup :
@@ -909,7 +910,7 @@ let substitute_decl_ikind_with_lookup
   | Types.Constructor_ikind packed ->
       let payload = packed in
       let memo :
-        (Path.t, (JK.poly * JK.poly list)) Hashtbl.t =
+        (Path.t, (JK.poly * JK.poly array)) Hashtbl.t =
         Hashtbl.create 17
       in
       (* Rewrite a polynomial by mapping each rigid atom through [lookup]. *)
@@ -946,16 +947,16 @@ let substitute_decl_ikind_with_lookup
                   in
                   let expanding = Path.Set.add p expanding in
                   let base = map_poly expanding base_raw in
-                  let coeffs = List.map (map_poly expanding) coeffs_raw in
+                  let coeffs = Array.map (map_poly expanding) coeffs_raw in
                   if arg_index = 0
                   then base
                   else
-                    match List.nth_opt coeffs (arg_index - 1) with
-                    | Some k -> k
-                    | None ->
-                        (* Fallback: if coefficient missing, keep original
-                           atom. *)
-                        Ldd.var (Ldd.rigid name))
+                    if arg_index - 1 < Array.length coeffs
+                    then coeffs.(arg_index - 1)
+                    else
+                      (* Fallback: if coefficient missing, keep original
+                         atom. *)
+                      Ldd.var (Ldd.rigid name))
       in
       let base' = map_poly Path.Set.empty payload.base in
       let coeffs' = Array.map (map_poly Path.Set.empty) payload.coeffs in

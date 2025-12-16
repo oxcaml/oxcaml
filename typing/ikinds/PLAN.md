@@ -31,7 +31,7 @@ need review.
 
 **Phase 1: Quick wins, low risk**
 
-- Enforce subtract-normal form for `Types.constructor_ikind` via a smart
+-[done] Enforce subtract-normal form for `Types.constructor_ikind` via a smart
   constructor:
   - Add `Types.constructor_ikind_create ~base ~coeffs` that stores
     `coeffs[i] := Ldd.sub_subsets coeffs[i] base`.
