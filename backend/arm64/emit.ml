@@ -896,20 +896,19 @@ let is_immediate_float32 bits =
 
 let is_offset_in_range ~size_in_bytes n =
   (n >= -256 && n <= 255)
-  ||
-  (n >= 0
-   && n land (size_in_bytes - 1) = 0
-   &&
-   let shift =
-     match size_in_bytes with
-     | 1 -> 0
-     | 2 -> 1
-     | 4 -> 2
-     | 8 -> 3
-     | 16 -> 4
-     | _ -> fatal_error "is_offset_in_range: unexpected size"
-   in
-   n lsr shift < 0x1000)
+  || n >= 0
+     && n land (size_in_bytes - 1) = 0
+     &&
+     let shift =
+       match size_in_bytes with
+       | 1 -> 0
+       | 2 -> 1
+       | 4 -> 2
+       | 8 -> 3
+       | 16 -> 4
+       | _ -> fatal_error "is_offset_in_range: unexpected size"
+     in
+     n lsr shift < 0x1000
 
 let emit_ldr_sp_offset ~dst ~offset =
   if is_offset_in_range ~size_in_bytes:8 offset
@@ -929,8 +928,7 @@ let emit_str_sp_offset ~src ~offset =
 
 let emit_ldr_stack ~dst (r : Reg.t) =
   match r.loc with
-  | Stack (Domainstate _) ->
-    DSL.ins I.LDR [| dst; DSL.emit_stack r |]
+  | Stack (Domainstate _) -> DSL.ins I.LDR [| dst; DSL.emit_stack r |]
   | Stack ((Local _ | Incoming _ | Outgoing _) as s) ->
     let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
     emit_ldr_sp_offset ~dst ~offset:ofs
@@ -938,8 +936,7 @@ let emit_ldr_stack ~dst (r : Reg.t) =
 
 let emit_str_stack ~src (r : Reg.t) =
   match r.loc with
-  | Stack (Domainstate _) ->
-    DSL.ins I.STR [| src; DSL.emit_stack r |]
+  | Stack (Domainstate _) -> DSL.ins I.STR [| src; DSL.emit_stack r |]
   | Stack ((Local _ | Incoming _ | Outgoing _) as s) ->
     let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
     emit_str_sp_offset ~src ~offset:ofs
@@ -947,8 +944,7 @@ let emit_str_stack ~src (r : Reg.t) =
 
 let emit_ldr_w_stack ~dst (r : Reg.t) =
   match r.loc with
-  | Stack (Domainstate _) ->
-    DSL.ins I.LDR [| dst; DSL.emit_stack r |]
+  | Stack (Domainstate _) -> DSL.ins I.LDR [| dst; DSL.emit_stack r |]
   | Stack ((Local _ | Incoming _ | Outgoing _) as s) ->
     let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
     if is_offset_in_range ~size_in_bytes:4 ofs
@@ -961,8 +957,7 @@ let emit_ldr_w_stack ~dst (r : Reg.t) =
 
 let emit_str_w_stack ~src (r : Reg.t) =
   match r.loc with
-  | Stack (Domainstate _) ->
-    DSL.ins I.STR [| src; DSL.emit_stack r |]
+  | Stack (Domainstate _) -> DSL.ins I.STR [| src; DSL.emit_stack r |]
   | Stack ((Local _ | Incoming _ | Outgoing _) as s) ->
     let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
     if is_offset_in_range ~size_in_bytes:4 ofs
@@ -1750,8 +1745,7 @@ let emit_instr i =
       emit_str_sp_offset ~src:DSL.reg_x_30 ~offset:(n - 8))
   | Lepilogue_open ->
     let n = frame_size () in
-    if !contains_calls
-    then emit_ldr_sp_offset ~dst:DSL.reg_x_30 ~offset:(n - 8);
+    if !contains_calls then emit_ldr_sp_offset ~dst:DSL.reg_x_30 ~offset:(n - 8);
     if n > 0 then emit_stack_adjustment n
   | Lepilogue_close ->
     let n = frame_size () in
