@@ -84,9 +84,9 @@ let nil = Lconst (Const_base (Const_int 0))
 let cons ~loc hd tl =
   Lprim (Pmakeblock (0, Immutable, None, alloc_heap), [hd; tl], loc)
 
-let hd ~loc l = Lprim (Pfield (0, Immediate, Reads_vary), [l], loc)
+let hd ~loc l = Lprim (Pfield (0, Pointer, Reads_agree), [l], loc)
 
-let tl ~loc l = Lprim (Pfield (1, Immediate, Reads_vary), [l], loc)
+let tl ~loc l = Lprim (Pfield (1, Pointer, Reads_agree), [l], loc)
 
 let rec mk_list ~loc list =
   match list with [] -> nil | hd :: tl -> cons ~loc hd (mk_list ~loc tl)
