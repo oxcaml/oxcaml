@@ -346,3 +346,30 @@ module F (M : Portable_Portable) = (M : Portable_Nonportable)
 module F : functor (M : Portable_Portable) -> Portable_Nonportable @@
   stateless
 |}]
+
+(* refering to [F(M).t] is allowed even if [M] is weaker than what [F] wants *)
+module F (X : S @ portable) = struct
+  type t = int
+end
+module M = struct
+    let f = let r = ref 42 in fun () -> r := 24; ()
+end
+type t' = F(M).t
+[%%expect{|
+module F : functor (X : S @ portable) -> sig type t = int end @@ stateless
+module M : sig val f : unit -> unit end
+type t' = F(M).t
+|}]
+
+module F @ nonportable = F
+module M @ nonportable = M
+
+(* Similarly, [F(M).t] is not closing over [F] or [M] *)
+let (foo @ portable) () =
+  let _ : F(M).t = 42 in
+  ()
+[%%expect{|
+module F = F @@ stateless nonportable
+module M = M
+val foo : unit -> unit = <fun>
+|}]
