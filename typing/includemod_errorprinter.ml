@@ -647,19 +647,17 @@ module Functor_suberror = struct
         for single change difference
     *)
     let single_diff ~is_modal g e more =
-      let _arg, mty1, mode1_with_locks = g.With_shorthand.item in
-      let mty2, mode2 =
+      let _arg, mty1, (mode1, _) = g.With_shorthand.item in
+      let mty1_with_mode = dmodtype mty1 |> dthen_mode_l ~is_modal mode1 in
+      let mty2_with_mode =
         match e.With_shorthand.item with
-        | Types.Unit -> Format.dprintf "()", Mode.Alloc.legacy
-        | Types.Named(_, mty, mm) -> dmodtype mty, mm
+        | Types.Unit -> Format.dprintf "()"
+        | Types.Named(_, mty, mm) -> dmodtype mty |> dthen_alloc_mode_r ~is_modal mm
       in
-      let mode2 = Mode.alloc_as_value mode2 in
-      let modes : Includemod.modes = Specific (mode1_with_locks, mode2) in
-      let mode1, mode2 = maybe_print_modes ~is_modal modes in
       Format.dprintf
-        "Modules do not match:@ @[%t%t@]@;<1 -2>\
-         is not included in@ @[%t%t@]%t"
-        (dmodtype mty1) mode1 mty2 mode2 (more ())
+        "Modules do not match:@ @[%t@]@;<1 -2>\
+         is not included in@ @[%t@]%t"
+        mty1_with_mode mty2_with_mode (more ())
 
 
     let incompatible = function
