@@ -772,6 +772,8 @@ let free_methods l =
     | Llet(_, _k, id, _duid, _arg, _body)
     | Lmutlet(_k, id, _duid, _arg, _body) ->
         fv := Ident.Set.remove id !fv
+    | Ldelayedletrec(bindings, _body) ->
+        List.iter (fun (id, _, _, _) -> fv := Ident.Set.remove id !fv) bindings
     | Lletrec(decl, _body) ->
         List.iter (fun { id } -> fv := Ident.Set.remove id !fv) decl
     | Lstaticcatch(_e1, (_,vars), _e2, _, _kind) ->

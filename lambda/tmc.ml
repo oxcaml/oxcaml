@@ -629,6 +629,7 @@ let rec choice ctx t =
         let ctx, bindings = traverse_let ctx var var_duid def in
         let+ body = choice ctx ~tail body in
         llets lk vk bindings body
+    | Ldelayedletrec _ -> Misc.unsimplified_delayedletrec ()
     | Lletrec (bindings, body) ->
         let ctx, bindings = traverse_letrec ctx bindings in
         let+ body = choice ctx ~tail body in

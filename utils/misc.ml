@@ -31,6 +31,10 @@ let unboxed_small_int_arrays_are_not_implemented () =
 let splices_should_not_exist_after_eval () =
   fatal_error "slambda splices should not exist in lambda after slambda eval"
 
+let unsimplified_delayedletrec () =
+  fatal_error
+    "Ldelayedletrec should have been removed by Simplif.simplify_letrec"
+
 (* Exceptions *)
 
 let try_finally ?(always=(fun () -> ())) ?(exceptionally=(fun () -> ())) work =
