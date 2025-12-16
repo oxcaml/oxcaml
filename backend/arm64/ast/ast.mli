@@ -339,8 +339,8 @@ module Addressing_mode : sig
 
   type single =
     [ `Base_reg
-    | `Offset_imm
-    | `Offset_unscaled
+    | `Offset_twelve_unsigned_scaled
+    | `Offset_nine_signed_unscaled
     | `Offset_sym
     | `Literal
     | `Pre
@@ -348,14 +348,14 @@ module Addressing_mode : sig
 
   type _ t = private
     | Reg : [`GP of [< `X | `SP]] Reg.t -> [> `Base_reg] t
-    | Offset_imm :
+    | Offset_twelve_unsigned_scaled :
         [`GP of [< `X | `SP]] Reg.t
         * [`Twelve_unsigned_scaled] Addressing_offset.t
-        -> [> `Offset_imm] t
-    | Offset_unscaled :
+        -> [> `Offset_twelve_unsigned_scaled] t
+    | Offset_nine_signed_unscaled :
         [`GP of [< `X | `SP]] Reg.t
         * [`Nine_signed_unscaled] Addressing_offset.t
-        -> [> `Offset_unscaled] t
+        -> [> `Offset_nine_signed_unscaled] t
     | Offset_sym :
         [`GP of [< `X | `SP]] Reg.t * [`Twelve] Symbol.t
         -> [> `Offset_sym] t
@@ -1666,10 +1666,60 @@ module DSL : sig
   val mem :
     base:[`GP of [< `X | `SP]] Reg.t -> [`Mem of [> `Base_reg]] Operand.t
 
+  (** A validated memory offset that is guaranteed to be encodable in ARM64
+      load/store immediate addressing modes. The validation ensures:
+      - The offset is in the 9-bit signed unscaled range: -256 to 255, OR
+      - The offset is non-negative, aligned to the scale, and in the 12-bit
+        unsigned scaled range (max offset = 4095 * scale) *)
+  module Validated_mem_offset : sig
+    type t
+
+    (** Validate an offset for use with load/store of the given scale (access
+        size in bytes: 1, 2, 4, 8, or 16). Returns [Some t] if the offset can be
+        encoded, [None] otherwise. *)
+    val create : scale:int -> offset:int -> t option
+
+    (** Convert to a memory operand. Never fails since the offset was validated
+        at construction time. *)
+    val to_operand :
+      base:[`GP of [< `X | `SP]] Reg.t ->
+      t ->
+      [`Mem of [> `Offset_twelve_unsigned_scaled | `Offset_nine_signed_unscaled]]
+      Operand.t
+
+    (** The byte offset (for debugging/error messages). *)
+    val offset : t -> int
+
+    (** The scale used for validation (for debugging/error messages). *)
+    val scale : t -> int
+
+    (** Check if an offset can be encoded for the given scale. *)
+    val is_valid : scale:int -> offset:int -> bool
+  end
+
+  (** Result type for [mem_offset]. Either [Ok operand] if the offset can be
+      encoded directly, or [Offset_out_of_range] if a multi-instruction sequence
+      is needed.
+
+      An offset can be encoded when:
+      - The offset is in the 9-bit signed unscaled range: -256 to 255, OR
+      - The offset is non-negative, aligned to the access size, and in the
+        12-bit unsigned scaled range (max offset depends on scale) *)
+  type 'a mem_offset_result = private
+    | Ok of 'a
+    | Offset_out_of_range
+
+  (** [mem_offset ~base ~scale ~offset] creates a memory operand for accessing
+      [base + offset]. The [scale] parameter is the access size in bytes (1, 2,
+      4, 8, or 16) and determines both the alignment requirement for the scaled
+      encoding and the maximum encodable offset. *)
   val mem_offset :
     base:[`GP of [< `X | `SP]] Reg.t ->
+    scale:int ->
     offset:int ->
-    [`Mem of [> `Offset_imm | `Offset_unscaled]] Operand.t
+    [`Mem of [> `Offset_twelve_unsigned_scaled | `Offset_nine_signed_unscaled]]
+    Operand.t
+    mem_offset_result
 
   val mem_symbol :
     base:[`GP of [< `X | `SP]] Reg.t ->

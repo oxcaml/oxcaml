@@ -23,24 +23,22 @@ open! Int_replace_polymorphic_compare
 [@@@ocaml.warning "+a-4-40-41-42"]
 
 open Arch
+module Validated_mem_offset = Arm64_ast.Ast.DSL.Validated_mem_offset
+
+let scale_of_chunk : Cmm.memory_chunk -> int = function
+  | Byte_unsigned | Byte_signed -> 1
+  | Sixteen_unsigned | Sixteen_signed -> 2
+  | Thirtytwo_unsigned | Thirtytwo_signed | Single { reg = Float64 | Float32 }
+    ->
+    4
+  | Word_int | Word_val | Double -> 8
+  | Onetwentyeight_aligned | Onetwentyeight_unaligned -> 16
+  | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
+  | Fivetwelve_unaligned ->
+    Misc.fatal_error "arm64: got 256/512 bit vector"
 
 let is_offset chunk n =
-  (n >= -256 && n <= 255) (* 9 bits signed unscaled *)
-  || n >= 0
-     &&
-     match (chunk : Cmm.memory_chunk) with
-     (* 12 bits unsigned, scaled by chunk size *)
-     | Byte_unsigned | Byte_signed -> n < 0x1000
-     | Sixteen_unsigned | Sixteen_signed -> n land 1 = 0 && n lsr 1 < 0x1000
-     | Thirtytwo_unsigned | Thirtytwo_signed
-     | Single { reg = Float64 | Float32 } ->
-       n land 3 = 0 && n lsr 2 < 0x1000
-     | Word_int | Word_val | Double -> n land 7 = 0 && n lsr 3 < 0x1000
-     | Onetwentyeight_aligned | Onetwentyeight_unaligned ->
-       n land 15 = 0 && n lsr 4 < 0x1000
-     | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-     | Fivetwelve_unaligned ->
-       Misc.fatal_error "arm64: got 256/512 bit vector"
+  Validated_mem_offset.is_valid ~scale:(scale_of_chunk chunk) ~offset:n
 
 let is_logical_immediate_int n =
   Arm64_ast.Logical_immediates.is_logical_immediate (Nativeint.of_int n)
@@ -102,6 +100,14 @@ let asm_symbol_of_cmm (s : Cmm.symbol) =
   in
   Asm_targets.Asm_symbol.create ~visibility s.sym_name
 
+let validated_offset chunk n =
+  let scale = scale_of_chunk chunk in
+  match Validated_mem_offset.create ~scale ~offset:n with
+  | Some v -> Iindexed v
+  | None ->
+    Misc.fatal_errorf "cfg_selection: offset %d invalid for chunk scale %d" n
+      scale
+
 let select_addressing' chunk (expr : Cmm.expression) :
     addressing_mode * Cmm.expression =
   match expr with
@@ -109,20 +115,20 @@ let select_addressing' chunk (expr : Cmm.expression) :
     when use_direct_addressing s ->
     Ibased (asm_symbol_of_cmm s, n), Ctuple []
   | Cop ((Caddv | Cadda), [arg; Cconst_int (n, _)], _) when is_offset chunk n ->
-    Iindexed n, arg
+    validated_offset chunk n, arg
   | Cop
       ( ((Caddv | Cadda) as op),
         [arg1; Cop (Caddi, [arg2; Cconst_int (n, _)], _)],
         dbg )
     when is_offset chunk n ->
-    Iindexed n, Cop (op, [arg1; arg2], dbg)
+    validated_offset chunk n, Cop (op, [arg1; arg2], dbg)
   | Cconst_symbol (s, _) when use_direct_addressing s ->
     Ibased (asm_symbol_of_cmm s, 0), Ctuple []
-  | arg -> Iindexed 0, arg
+  | arg -> validated_offset chunk 0, arg
 
 let select_addressing chunk exp : addressing_mode * Cmm.expression =
   if !Clflags.llvm_backend (* Llvmize only expects [Iindexed] *)
-  then Iindexed 0, exp
+  then validated_offset chunk 0, exp
   else select_addressing' chunk exp
 
 let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
@@ -185,7 +191,7 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
           (Op
              (Load
                 { memory_chunk;
-                  addressing_mode = Iindexed 0;
+                  addressing_mode = validated_offset memory_chunk 0;
                   mutability = Select_utils.select_mutable_flag mutability;
                   is_atomic = true
                 })),

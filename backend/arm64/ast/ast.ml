@@ -715,8 +715,8 @@ module Addressing_mode = struct
 
   type single =
     [ `Base_reg
-    | `Offset_imm
-    | `Offset_unscaled
+    | `Offset_twelve_unsigned_scaled
+    | `Offset_nine_signed_unscaled
     | `Offset_sym
     | `Literal
     | `Pre
@@ -725,14 +725,14 @@ module Addressing_mode = struct
   (* ARMARM Section C1.3.3, Table C1-8 *)
   type _ t =
     | Reg : [`GP of [< `X | `SP]] Reg.t -> [> `Base_reg] t
-    | Offset_imm :
+    | Offset_twelve_unsigned_scaled :
         [`GP of [< `X | `SP]] Reg.t
         * [`Twelve_unsigned_scaled] Addressing_offset.t
-        -> [> `Offset_imm] t
-    | Offset_unscaled :
+        -> [> `Offset_twelve_unsigned_scaled] t
+    | Offset_nine_signed_unscaled :
         [`GP of [< `X | `SP]] Reg.t
         * [`Nine_signed_unscaled] Addressing_offset.t
-        -> [> `Offset_unscaled] t
+        -> [> `Offset_nine_signed_unscaled] t
     | Offset_sym :
         [`GP of [< `X | `SP]] Reg.t * [`Twelve] Symbol.t
         -> [> `Offset_sym] t
@@ -760,9 +760,9 @@ module Addressing_mode = struct
     let open Format in
     match t with
     | Reg r -> fprintf ppf "[%s]" (Reg.name r)
-    | Offset_imm (r, off) ->
+    | Offset_twelve_unsigned_scaled (r, off) ->
       fprintf ppf "[%s, %a]" (Reg.name r) Addressing_offset.print off
-    | Offset_unscaled (r, off) ->
+    | Offset_nine_signed_unscaled (r, off) ->
       fprintf ppf "[%s, %a]" (Reg.name r) Addressing_offset.print off
     | Offset_sym (r, sym) ->
       fprintf ppf "[%s, %a]" (Reg.name r) Symbol.print sym
@@ -2661,18 +2661,6 @@ module DSL = struct
 
   let mem ~(base : [`GP of [< `X | `SP]] Reg.t) = Operand.Mem (Reg base)
 
-  let mem_offset ~(base : [`GP of [< `X | `SP]] Reg.t) ~offset =
-    (* Use unsigned scaled encoding for non-negative, 8-byte aligned offsets.
-       Use signed unscaled encoding (LDUR/STUR) for negative or unaligned
-       offsets. The scaled encoding requires alignment to access size; using
-       8-byte alignment is safe for all access sizes (1, 2, 4, 8 bytes). *)
-    if offset >= 0 && offset mod 8 = 0
-    then Operand.Mem (Offset_imm (base, Twelve_unsigned_scaled offset))
-    else Operand.Mem (Offset_unscaled (base, Nine_signed_unscaled offset))
-
-  let mem_symbol ~(base : [`GP of [< `X | `SP]] Reg.t) ~symbol =
-    Operand.Mem (Offset_sym (base, symbol))
-
   let check_nine_signed_unscaled offset =
     if offset < -256 || offset > 255
     then
@@ -2688,6 +2676,61 @@ module DSL = struct
     then
       Misc.fatal_errorf
         "Offset %d out of range for 7-bit signed scaled (-512 to 504)" offset
+
+  module Validated_mem_offset = struct
+    type operand_kind =
+      | Scaled
+      | Unscaled
+
+    type t =
+      { scale : int;
+        offset : int;
+        kind : operand_kind
+      }
+
+    (* Validate an offset for use with load/store instructions.
+
+       - Use unsigned scaled encoding for non-negative, aligned offsets.
+
+       - Use signed unscaled encoding for negative or unaligned offsets.
+
+       The scaled encoding requires alignment to access size and the offset
+       divided by scale must fit in 12 bits. *)
+    let create ~scale ~offset =
+      let max_scaled_offset = (4096 - 1) * scale in
+      if offset >= 0 && offset mod scale = 0 && offset <= max_scaled_offset
+      then Some { scale; offset; kind = Scaled }
+      else if offset >= -256 && offset <= 255
+      then Some { scale; offset; kind = Unscaled }
+      else None
+
+    let to_operand ~(base : [`GP of [< `X | `SP]] Reg.t) t =
+      match t.kind with
+      | Scaled ->
+        Operand.Mem
+          (Offset_twelve_unsigned_scaled (base, Twelve_unsigned_scaled t.offset))
+      | Unscaled ->
+        Operand.Mem
+          (Offset_nine_signed_unscaled (base, Nine_signed_unscaled t.offset))
+
+    let offset t = t.offset
+
+    let scale t = t.scale
+
+    let is_valid ~scale ~offset = Option.is_some (create ~scale ~offset)
+  end
+
+  type 'a mem_offset_result =
+    | Ok of 'a
+    | Offset_out_of_range
+
+  let mem_offset ~(base : [`GP of [< `X | `SP]] Reg.t) ~scale ~offset =
+    match Validated_mem_offset.create ~scale ~offset with
+    | Some validated -> Ok (Validated_mem_offset.to_operand ~base validated)
+    | None -> Offset_out_of_range
+
+  let mem_symbol ~(base : [`GP of [< `X | `SP]] Reg.t) ~symbol =
+    Operand.Mem (Offset_sym (base, symbol))
 
   let mem_pre ~(base : [`GP of [< `X | `SP]] Reg.t) ~offset =
     check_nine_signed_unscaled offset;

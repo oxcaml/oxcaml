@@ -24,7 +24,6 @@
 (* Correctness: carefully consider any use of [Config], [Clflags],
    [Oxcaml_flags] and shared variables. For details, see [asmgen.mli]. *)
 
-open Misc
 open Arch
 open Proc
 open Reg
@@ -142,7 +141,9 @@ let slot_offset loc stack_class =
   | Bytes_relative_to_domainstate_pointer _ ->
     Misc.fatal_errorf "Not a stack slot"
 
-(* Local wrapper for stack that provides the emit.ml-local values *)
+(* Local wrapper for stack that provides the emit.ml-local values. Returns a
+   stack_result indicating whether the offset fits in immediate encoding or
+   requires a multi-instruction sequence. *)
 let stack r =
   H.stack ~stack_offset:!stack_offset ~contains_calls:!contains_calls
     ~num_stack_slots r
@@ -155,7 +156,29 @@ let label ?offset reloc lbl =
 
 let runtime_function sym = symbol (Needs_reloc CALL26) sym
 
+(* Scale factor (access size in bytes) for memory chunk types. Used for
+   immediate offset encoding in load/store instructions. *)
+let scale_of_chunk : Cmm.memory_chunk -> int = function
+  | Byte_unsigned | Byte_signed -> 1
+  | Sixteen_unsigned | Sixteen_signed -> 2
+  | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> 4
+  | Word_int | Word_val | Double -> 8
+  | Onetwentyeight_aligned | Onetwentyeight_unaligned -> 16
+  | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
+  | Fivetwelve_unaligned ->
+    Misc.fatal_error "arm64: got 256/512 bit vector"
+
 let local_label lbl = label Same_section_and_unit lbl
+
+module Validated_mem_offset = Ast.DSL.Validated_mem_offset
+
+(* Create a validated Iindexed addressing mode. For domain state accesses and
+   other known-good offsets, these should always succeed. *)
+let iindexed_validated ~scale offset =
+  match Validated_mem_offset.create ~scale ~offset with
+  | Some v -> Iindexed v
+  | None ->
+    Misc.fatal_errorf "emit: offset %d invalid for scale %d" offset scale
 
 (* Create a symbol or label reference depending on whether the symbol is local.
    Local symbols are defined as labels (not linker symbols) to avoid ELF
@@ -770,6 +793,43 @@ let emit_cmpimm rs n =
   then A.ins_cmp rs (O.imm n) O.optional_none
   else A.ins_cmn rs (O.imm (-n)) O.optional_none
 
+(* Helper functions for load/store with large stack offsets. When stack frames
+   grow large, offsets can exceed the ARM64 immediate limits. For out-of-range
+   offsets, we compute the address in x16 (reg_tmp1) and then perform the
+   load/store. x16 (IP0) is safe as it's reserved for linker veneers and not
+   allocated by the register allocator. *)
+
+let emit_load_store_sp_offset instr reg offset =
+  match O.mem_offset ~base:R.sp ~scale:8 ~offset with
+  | Ok operand -> A.ins2 instr reg operand
+  | Offset_out_of_range ->
+    A.ins_mov_from_sp ~dst:reg_x_tmp1;
+    emit_addimm reg_x_tmp1 reg_x_tmp1 offset;
+    A.ins2 instr reg (H.mem reg_tmp1_base)
+
+(* Eta-expand to preserve polymorphism over register width (X, W, LR) *)
+let emit_ldr_sp_offset reg offset = emit_load_store_sp_offset LDR reg offset
+
+let emit_str_sp_offset reg offset = emit_load_store_sp_offset STR reg offset
+
+(* Generic load/store with stack register that handles large offsets. Works with
+   any instruction (LDR, STR, LDR_simd_and_fp, STR_simd_and_fp). *)
+let emit_stack_load_store instr reg (r : Reg.t) =
+  match stack r with
+  | Stack_operand operand -> A.ins2 instr reg operand
+  | Stack_large_offset_sp { bytes } ->
+    A.ins_mov_from_sp ~dst:reg_x_tmp1;
+    emit_addimm reg_x_tmp1 reg_x_tmp1 bytes;
+    A.ins2 instr reg (H.mem reg_tmp1_base)
+  | Stack_large_offset_domainstate { bytes } ->
+    A.ins_mov_reg reg_x_tmp1 (H.reg_x reg_domain_state_ptr);
+    emit_addimm reg_x_tmp1 reg_x_tmp1 bytes;
+    A.ins2 instr reg (H.mem reg_tmp1_base)
+
+let emit_stack_ldr reg r = emit_stack_load_store LDR reg r
+
+let emit_stack_str reg r = emit_stack_load_store STR reg r
+
 (* Name of current function *)
 let function_name = ref ""
 
@@ -1158,7 +1218,7 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Specific (Isignext _)) -> 1
     | Lop (Name_for_debugger _) -> 0
     | Lcall_op (Lprobe _) ->
-      fatal_error "Optimized probes not supported on arm64."
+      Misc.fatal_error "Optimized probes not supported on arm64."
     | Lop (Probe_is_enabled _) -> 3
     | Lop Dls_get -> 1
     | Lop Tls_get -> 1
@@ -1238,17 +1298,27 @@ let assembly_code_for_local_allocation i ~n =
   let domain_local_limit = DS.idx_of_field Domain_local_limit * 8 in
   let domain_local_top = DS.idx_of_field Domain_local_top * 8 in
   A.ins2 LDR reg_x_tmp1
-    (H.addressing (Iindexed domain_local_limit) reg_domain_state_ptr);
-  A.ins2 LDR r (H.addressing (Iindexed domain_local_sp) reg_domain_state_ptr);
+    (H.addressing ~scale:8
+       (iindexed_validated ~scale:8 domain_local_limit)
+       reg_domain_state_ptr);
+  A.ins2 LDR r
+    (H.addressing ~scale:8
+       (iindexed_validated ~scale:8 domain_local_sp)
+       reg_domain_state_ptr);
   emit_subimm r r n;
-  A.ins2 STR r (H.addressing (Iindexed domain_local_sp) reg_domain_state_ptr);
+  A.ins2 STR r
+    (H.addressing ~scale:8
+       (iindexed_validated ~scale:8 domain_local_sp)
+       reg_domain_state_ptr);
   A.ins_cmp_reg r reg_x_tmp1 O.optional_none;
   let lr_lbl = L.create Text in
   A.ins1 (B_cond (Branch_cond.Int LT)) (local_label lr_lbl);
   let lr_return_lbl = L.create Text in
   D.define_label lr_return_lbl;
   A.ins2 LDR reg_x_tmp1
-    (H.addressing (Iindexed domain_local_top) reg_domain_state_ptr);
+    (H.addressing ~scale:8
+       (iindexed_validated ~scale:8 domain_local_top)
+       reg_domain_state_ptr);
   A.ins4 ADD_shifted_register r r reg_x_tmp1 O.optional_none;
   A.ins4 ADD_immediate r r (O.imm 8) O.optional_none;
   local_realloc_sites
@@ -1262,7 +1332,10 @@ let assembly_code_for_fast_heap_allocation i ~n ~far ~dbginfo =
      reasonable to assume n < 0x1_000. This makes the generated code simpler. *)
   assert (16 <= n && n < 0x1_000 && n land 0x7 = 0);
   let offset = Domainstate.(idx_of_field Domain_young_limit) * 8 in
-  A.ins2 LDR reg_x_tmp1 (H.addressing (Iindexed offset) reg_domain_state_ptr);
+  A.ins2 LDR reg_x_tmp1
+    (H.addressing ~scale:8
+       (iindexed_validated ~scale:8 offset)
+       reg_domain_state_ptr);
   emit_subimm reg_x_alloc_ptr reg_x_alloc_ptr n;
   A.ins_cmp_reg reg_x_alloc_ptr reg_x_tmp1 O.optional_none;
   (if not far
@@ -1306,7 +1379,10 @@ let assembly_code_for_poll i ~far ~return_label =
     match return_label with None -> L.create Text | Some lbl -> lbl
   in
   let offset = Domainstate.(idx_of_field Domain_young_limit) * 8 in
-  A.ins2 LDR reg_x_tmp1 (H.addressing (Iindexed offset) reg_domain_state_ptr);
+  A.ins2 LDR reg_x_tmp1
+    (H.addressing ~scale:8
+       (iindexed_validated ~scale:8 offset)
+       reg_domain_state_ptr);
   A.ins_cmp_reg reg_x_alloc_ptr reg_x_tmp1 O.optional_none;
   (if not far
    then (
@@ -1379,21 +1455,21 @@ let move_between_distinct_locs (src : Reg.t) (dst : Reg.t) =
   | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
     A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
   | Float, Reg _, Float, Stack _ ->
-    A.ins2 STR_simd_and_fp (H.reg_d src) (stack dst)
+    emit_stack_load_store STR_simd_and_fp (H.reg_d src) dst
   | Float32, Reg _, Float32, Stack _ ->
-    A.ins2 STR_simd_and_fp (H.reg_s src) (stack dst)
+    emit_stack_load_store STR_simd_and_fp (H.reg_s src) dst
   | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Stack _ ->
-    A.ins2 STR_simd_and_fp (H.reg_q src) (stack dst)
+    emit_stack_load_store STR_simd_and_fp (H.reg_q src) dst
   | (Int | Val | Addr), Reg _, (Int | Val | Addr), Stack _ ->
-    A.ins2 STR (H.reg_x src) (stack dst)
+    emit_stack_str (H.reg_x src) dst
   | Float, Stack _, Float, Reg _ ->
-    A.ins2 LDR_simd_and_fp (H.reg_d dst) (stack src)
+    emit_stack_load_store LDR_simd_and_fp (H.reg_d dst) src
   | Float32, Stack _, Float32, Reg _ ->
-    A.ins2 LDR_simd_and_fp (H.reg_s dst) (stack src)
+    emit_stack_load_store LDR_simd_and_fp (H.reg_s dst) src
   | (Vec128 | Valx2), Stack _, (Vec128 | Valx2), Reg _ ->
-    A.ins2 LDR_simd_and_fp (H.reg_q dst) (stack src)
+    emit_stack_load_store LDR_simd_and_fp (H.reg_q dst) src
   | (Int | Val | Addr), Stack _, (Int | Val | Addr), Reg _ ->
-    A.ins2 LDR (H.reg_x dst) (stack src)
+    emit_stack_ldr (H.reg_x dst) src
   | _, Stack _, _, Stack _ ->
     Misc.fatal_errorf "Illegal move between stack slots (%a to %a)\n"
       Printreg.reg src Printreg.reg dst
@@ -1502,11 +1578,10 @@ let emit_instr i =
     if !contains_calls
     then (
       D.cfi_offset ~reg:(R.gp_encoding R.lr) ~offset:(-8);
-      A.ins2 STR O.lr (O.mem_offset ~base:R.sp ~offset:(n - 8)))
+      emit_str_sp_offset O.lr (n - 8))
   | Lepilogue_open ->
     let n = frame_size () in
-    if !contains_calls
-    then A.ins2 LDR O.lr (O.mem_offset ~base:R.sp ~offset:(n - 8));
+    if !contains_calls then emit_ldr_sp_offset O.lr (n - 8);
     if n > 0 then emit_stack_adjustment n
   | Lepilogue_close ->
     let n = frame_size () in
@@ -1524,8 +1599,8 @@ let emit_instr i =
     then
       match src.loc, dst.loc with
       | Reg _, Reg _ -> A.ins_mov_reg_w (H.reg_w dst) (H.reg_w src)
-      | Reg _, Stack _ -> A.ins2 STR (H.reg_w src) (stack dst)
-      | Stack _, Reg _ -> A.ins2 LDR (H.reg_w dst) (stack src)
+      | Reg _, Stack _ -> emit_stack_str (H.reg_w src) dst
+      | Stack _, Reg _ -> emit_stack_ldr (H.reg_w dst) src
       | Stack _, Stack _ | _, Unknown | Unknown, _ -> assert false)
   | Lop (Const_int n) -> emit_intconst (H.reg_x i.res.(0)) n
   | Lop (Const_float32 f) ->
@@ -1605,7 +1680,9 @@ let emit_instr i =
         D.cfi_def_cfa_register ~reg:(Int.to_string (R.gp_encoding R.fp));
         let offset = Domainstate.(idx_of_field Domain_c_stack) * 8 in
         A.ins2 LDR reg_x_tmp1
-          (H.addressing (Iindexed offset) reg_domain_state_ptr);
+          (H.addressing ~scale:8
+             (iindexed_validated ~scale:8 offset)
+             reg_domain_state_ptr);
         A.ins_mov_to_sp ~src:reg_x_tmp1)
       else D.cfi_remember_state ();
       A.ins1 BL (symbol (Needs_reloc CALL26) (S.create_global func));
@@ -1631,32 +1708,37 @@ let emit_instr i =
           (symbol_or_label_for_data ~offset:ofs (Needs_reloc PAGE) s);
         reg_tmp1
     in
-    let default_addressing = H.addressing addressing_mode base in
+    let addressing =
+      H.addressing ~scale:(scale_of_chunk memory_chunk) addressing_mode base
+    in
     match memory_chunk with
-    | Byte_unsigned -> A.ins2 LDRB (H.reg_w dst) default_addressing
-    | Byte_signed -> A.ins2 LDRSB (H.reg_x dst) default_addressing
-    | Sixteen_unsigned -> A.ins2 LDRH (H.reg_w dst) default_addressing
-    | Sixteen_signed -> A.ins2 LDRSH (H.reg_x dst) default_addressing
-    | Thirtytwo_unsigned -> A.ins2 LDR (H.reg_w dst) default_addressing
-    | Thirtytwo_signed -> A.ins2 LDRSW (H.reg_x dst) default_addressing
+    | Byte_unsigned -> A.ins2 LDRB (H.reg_w dst) addressing
+    | Byte_signed -> A.ins2 LDRSB (H.reg_x dst) addressing
+    | Sixteen_unsigned -> A.ins2 LDRH (H.reg_w dst) addressing
+    | Sixteen_signed -> A.ins2 LDRSH (H.reg_x dst) addressing
+    | Thirtytwo_unsigned -> A.ins2 LDR (H.reg_w dst) addressing
+    | Thirtytwo_signed -> A.ins2 LDRSW (H.reg_x dst) addressing
     | Single { reg = Float64 } ->
-      A.ins2 LDR_simd_and_fp reg_s7 default_addressing;
+      A.ins2 LDR_simd_and_fp reg_s7 addressing;
       A.ins2 FCVT (H.reg_d dst) reg_s7
     | Word_int | Word_val ->
       if is_atomic
       then (
-        assert (Arch.equal_addressing_mode addressing_mode (Iindexed 0));
+        assert (
+          match addressing_mode with
+          | Iindexed v -> Validated_mem_offset.offset v = 0
+          | Ibased _ -> false);
         A.ins0 (DMB ISHLD);
         A.ins2 LDAR (H.reg_x dst) (H.mem (H.gp_reg_of_reg i.arg.(0))))
-      else A.ins2 LDR (H.reg_x dst) default_addressing
-    | Double -> A.ins2 LDR_simd_and_fp (H.reg_d dst) default_addressing
+      else A.ins2 LDR (H.reg_x dst) addressing
+    | Double -> A.ins2 LDR_simd_and_fp (H.reg_d dst) addressing
     | Single { reg = Float32 } ->
-      A.ins2 LDR_simd_and_fp (H.reg_s dst) default_addressing
-    | Onetwentyeight_aligned ->
-      A.ins2 LDR_simd_and_fp (H.reg_q dst) default_addressing
+      A.ins2 LDR_simd_and_fp (H.reg_s dst) addressing
+    | Onetwentyeight_aligned -> A.ins2 LDR_simd_and_fp (H.reg_q dst) addressing
     | Onetwentyeight_unaligned ->
       (match addressing_mode with
-      | Iindexed n ->
+      | Iindexed v ->
+        let n = Validated_mem_offset.offset v in
         A.ins4 ADD_immediate reg_x_tmp1
           (H.reg_x i.arg.(0))
           (O.imm n) O.optional_none
@@ -1685,28 +1767,27 @@ let emit_instr i =
           (symbol_or_label_for_data ~offset:ofs (Needs_reloc PAGE) s);
         reg_tmp1
     in
+    let addressing = H.addressing ~scale:(scale_of_chunk size) addr base in
     match size with
-    | Byte_unsigned | Byte_signed ->
-      A.ins2 STRB (H.reg_w src) (H.addressing addr base)
-    | Sixteen_unsigned | Sixteen_signed ->
-      A.ins2 STRH (H.reg_w src) (H.addressing addr base)
+    | Byte_unsigned | Byte_signed -> A.ins2 STRB (H.reg_w src) addressing
+    | Sixteen_unsigned | Sixteen_signed -> A.ins2 STRH (H.reg_w src) addressing
     | Thirtytwo_unsigned | Thirtytwo_signed ->
-      A.ins2 STR (H.reg_w src) (H.addressing addr base)
+      A.ins2 STR (H.reg_w src) addressing
     | Single { reg = Float64 } ->
       A.ins2 FCVT reg_s7 (H.reg_d src);
-      A.ins2 STR_simd_and_fp reg_s7 (H.addressing addr base)
+      A.ins2 STR_simd_and_fp reg_s7 addressing
     | Word_int | Word_val ->
       (* memory model barrier for non-initializing store *)
       if assignment then A.ins0 (DMB ISHLD);
-      A.ins2 STR (H.reg_x src) (H.addressing addr base)
-    | Double -> A.ins2 STR_simd_and_fp (H.reg_d src) (H.addressing addr base)
+      A.ins2 STR (H.reg_x src) addressing
+    | Double -> A.ins2 STR_simd_and_fp (H.reg_d src) addressing
     | Single { reg = Float32 } ->
-      A.ins2 STR_simd_and_fp (H.reg_s src) (H.addressing addr base)
-    | Onetwentyeight_aligned ->
-      A.ins2 STR_simd_and_fp (H.reg_q src) (H.addressing addr base)
+      A.ins2 STR_simd_and_fp (H.reg_s src) addressing
+    | Onetwentyeight_aligned -> A.ins2 STR_simd_and_fp (H.reg_q src) addressing
     | Onetwentyeight_unaligned -> (
       match addr with
-      | Iindexed n ->
+      | Iindexed v ->
+        let n = Validated_mem_offset.offset v in
         A.ins4 ADD_immediate reg_x_tmp1
           (H.reg_x i.arg.(1))
           (O.imm n) O.optional_none;
@@ -1733,12 +1814,16 @@ let emit_instr i =
     let offset = Domainstate.(idx_of_field Domain_local_sp) * 8 in
     A.ins2 LDR
       (H.reg_x i.res.(0))
-      (H.addressing (Iindexed offset) reg_domain_state_ptr)
+      (H.addressing ~scale:8
+         (iindexed_validated ~scale:8 offset)
+         reg_domain_state_ptr)
   | Lop End_region ->
     let offset = Domainstate.(idx_of_field Domain_local_sp) * 8 in
     A.ins2 STR
       (H.reg_x i.arg.(0))
-      (H.addressing (Iindexed offset) reg_domain_state_ptr)
+      (H.addressing ~scale:8
+         (iindexed_validated ~scale:8 offset)
+         reg_domain_state_ptr)
   | Lop Poll -> assembly_code_for_poll i ~far:false ~return_label:None
   | Lop Pause -> A.ins0 YIELD
   | Lop (Specific Ifar_poll) ->
@@ -1919,7 +2004,7 @@ let emit_instr i =
   | Lop (Specific (Isimd simd)) -> simd_instr simd i
   | Lop (Name_for_debugger _) -> ()
   | Lcall_op (Lprobe _) ->
-    fatal_error "Optimized probes not supported on arm64."
+    Misc.fatal_error "Optimized probes not supported on arm64."
   | Lop (Probe_is_enabled { name; enabled_at_init }) ->
     let semaphore_sym =
       Probe_emission.find_or_add_semaphore name enabled_at_init i.dbg
@@ -1927,7 +2012,9 @@ let emit_instr i =
     (* Load address of the semaphore symbol *)
     emit_load_symbol_addr reg_tmp1 (S.create_global semaphore_sym);
     (* Load unsigned 2-byte integer value from offset 2 *)
-    A.ins2 LDRH (H.reg_w i.res.(0)) (H.addressing (Iindexed 2) reg_tmp1);
+    A.ins2 LDRH
+      (H.reg_w i.res.(0))
+      (H.addressing ~scale:2 (iindexed_validated ~scale:2 2) reg_tmp1);
     (* Compare with 0 and set result to 1 if non-zero, 0 if zero *)
     A.ins_cmp (H.reg_w i.res.(0)) (O.imm 0) O.optional_none;
     A.ins_cset (H.reg_x i.res.(0)) Cond.NE
@@ -1937,19 +2024,25 @@ let emit_instr i =
     let offset = Domainstate.(idx_of_field Domain_dls_state) * 8 in
     A.ins2 LDR
       (H.reg_x i.res.(0))
-      (H.addressing (Iindexed offset) reg_domain_state_ptr)
+      (H.addressing ~scale:8
+         (iindexed_validated ~scale:8 offset)
+         reg_domain_state_ptr)
   | Lop Tls_get ->
     let offset = Domainstate.(idx_of_field Domain_tls_state) * 8 in
     A.ins2 LDR
       (H.reg_x i.res.(0))
-      (H.addressing (Iindexed offset) reg_domain_state_ptr)
+      (H.addressing ~scale:8
+         (iindexed_validated ~scale:8 offset)
+         reg_domain_state_ptr)
   | Lop Domain_index ->
     if Config.runtime5
     then
       let offset = Domainstate.(idx_of_field Domain_id) * 8 in
       A.ins2 LDR
         (H.reg_x i.res.(0))
-        (H.addressing (Iindexed offset) reg_domain_state_ptr)
+        (H.addressing ~scale:8
+           (iindexed_validated ~scale:8 offset)
+           reg_domain_state_ptr)
     else A.ins3 MOVZ (H.reg_x i.res.(0)) (O.imm_sixteen 0) O.optional_none
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
@@ -2090,7 +2183,10 @@ let emit_instr i =
     in
     let f = sc_max_frame_size_in_bytes + threshold_offset in
     let offset = Domainstate.(idx_of_field Domain_current_stack) * 8 in
-    A.ins2 LDR reg_x_tmp1 (H.addressing (Iindexed offset) reg_domain_state_ptr);
+    A.ins2 LDR reg_x_tmp1
+      (H.addressing ~scale:8
+         (iindexed_validated ~scale:8 offset)
+         reg_domain_state_ptr);
     emit_addimm reg_x_tmp1 reg_x_tmp1 f;
     A.ins_cmp_reg O.sp reg_x_tmp1 O.optional_none;
     A.ins1 (B_cond (Branch_cond.Int CC)) (local_label sc_label);

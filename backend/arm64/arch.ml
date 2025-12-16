@@ -48,8 +48,8 @@ let command_line_options = [
 (* Addressing modes *)
 
 type addressing_mode =
-  | Iindexed of int                          (* reg + displ *)
-  | Ibased of Asm_targets.Asm_symbol.t * int (* symbol + displ *)
+  | Iindexed of Arm64_ast.Ast.DSL.Validated_mem_offset.t  (* reg + displ *)
+  | Ibased of Asm_targets.Asm_symbol.t * int              (* symbol + displ *)
 
 (* We do not support the reg + shifted reg addressing mode, because
    what we really need is reg + shifted reg + displ,
@@ -106,13 +106,27 @@ let division_crashes_on_overflow = false
 
 (* Operations on addressing modes *)
 
-let identity_addressing = Iindexed 0
+module Validated_mem_offset = Arm64_ast.Ast.DSL.Validated_mem_offset
+
+(* Identity addressing: offset 0, which is valid for any scale. Use scale=1. *)
+let identity_addressing =
+  match Validated_mem_offset.create ~scale:1 ~offset:0 with
+  | Some v -> Iindexed v
+  | None -> assert false (* 0 is always valid *)
 
 let offset_addressing addr delta =
   (* Resulting offset might not be representable, but that is the
      responsibility of the caller. *)
   match addr with
-  | Iindexed i -> Iindexed (i + delta)
+  | Iindexed v ->
+    let offset = Validated_mem_offset.offset v + delta in
+    let scale = Validated_mem_offset.scale v in
+    (match Validated_mem_offset.create ~scale ~offset with
+    | Some v' -> Iindexed v'
+    | None ->
+      Misc.fatal_errorf
+        "Arch.offset_addressing: offset %d out of range for scale %d" offset
+        scale)
   | Ibased (sym, i) -> Ibased (sym, i + delta)
 
 let num_args_addressing = function
@@ -127,7 +141,7 @@ let addressing_displacement_for_llvmize addr =
         -llvm-backend"
   else
     match addr with
-    | Iindexed d -> d
+    | Iindexed v -> Validated_mem_offset.offset v
     | Ibased _ ->
       Misc.fatal_error
         "Arch.displacement_addressing_for_llvmize: unexpected addressing mode"
@@ -136,9 +150,10 @@ let addressing_displacement_for_llvmize addr =
 
 let print_addressing printreg addr ppf arg =
   match addr with
-  | Iindexed n ->
-      printreg ppf arg.(0);
-      if n <> 0 then fprintf ppf " + %i" n
+  | Iindexed v ->
+    let n = Validated_mem_offset.offset v in
+    printreg ppf arg.(0);
+    if n <> 0 then fprintf ppf " + %i" n
   | Ibased(s, 0) ->
       fprintf ppf "\"%s\"" (Asm_targets.Asm_symbol.encode s)
   | Ibased(s, n) ->
@@ -247,8 +262,11 @@ let specific_operation_name : specific_operation -> string = fun op ->
 
 let equal_addressing_mode left right =
   match left, right with
-  | Iindexed left_int, Iindexed right_int ->
-    Int.equal left_int right_int
+  | Iindexed left_v, Iindexed right_v ->
+    Int.equal (Validated_mem_offset.offset left_v)
+      (Validated_mem_offset.offset right_v)
+    && Int.equal (Validated_mem_offset.scale left_v)
+         (Validated_mem_offset.scale right_v)
   | Ibased (left_sym, left_int), Ibased (right_sym, right_int) ->
     Asm_targets.Asm_symbol.equal left_sym right_sym
     && Int.equal left_int right_int

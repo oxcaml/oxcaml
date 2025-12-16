@@ -157,17 +157,39 @@ val mem :
   [`GP of [< `X | `SP]] Ast.Reg.t -> [`Mem of [> `Base_reg]] Ast.Operand.t
 
 val addressing :
+  scale:int ->
   Arch.addressing_mode ->
   Reg.t ->
-  [`Mem of [> `Offset_imm | `Offset_unscaled | `Offset_sym]] Ast.Operand.t
+  [ `Mem of
+    [> `Offset_twelve_unsigned_scaled
+    | `Offset_nine_signed_unscaled
+    | `Offset_sym ] ]
+  Ast.Operand.t
 
-(** [stack] returns a memory operand for accessing a stack slot. *)
+(** Result type for [stack]. Either [Stack_operand operand] if the offset can be
+    encoded directly, or a large offset variant if the offset exceeds the
+    immediate range and requires a multi-instruction sequence. *)
+type 'a stack_result = private
+  | Stack_operand of 'a
+  | Stack_large_offset_sp of { bytes : int }
+  | Stack_large_offset_domainstate of { bytes : int }
+
+(** [stack] returns a memory operand for accessing a stack slot.
+
+    For small offsets that fit in the immediate encoding, returns
+    [Stack_operand operand]. For large offsets (with large stack frames),
+    returns [Stack_large_offset_sp offset] (for SP-relative slots) or
+    [Stack_large_offset_domainstate offset] (for domain state slots). The caller
+    must then emit instructions to compute the address (typically: mov base to
+    tmp register, add offset, access via tmp). *)
 val stack :
   stack_offset:int ->
   contains_calls:bool ->
   num_stack_slots:int Stack_class.Tbl.t ->
   Reg.t ->
-  [`Mem of [> `Offset_imm | `Offset_unscaled]] Ast.Operand.t
+  [`Mem of [> `Offset_twelve_unsigned_scaled | `Offset_nine_signed_unscaled]]
+  Ast.Operand.t
+  stack_result
 
 val mem_symbol_reg :
   [`GP of [< `X | `SP]] Ast.Reg.t ->
