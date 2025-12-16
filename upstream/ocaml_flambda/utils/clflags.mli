@@ -119,6 +119,7 @@ val open_modules : string list ref
 val preprocessor : string option ref
 val all_ppx : string list ref
 val absname : bool ref
+val locs : bool ref
 val directory : string option ref
 val annotations : bool ref
 val binary_annotations : bool ref
@@ -224,6 +225,7 @@ val default_timings_precision : int
 val timings_precision : int ref
 val profile_columns : profile_column list ref
 val profile_granularity : profile_granularity_level ref
+val profile_output_name : string option ref
 val all_profile_granularity_levels : string list
 val set_profile_granularity : string -> unit
 val flambda_invariant_checks : flambda_invariant_checks ref

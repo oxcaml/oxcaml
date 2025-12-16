@@ -56,7 +56,7 @@ type summary =
 type address = Persistent_env.address =
   | Aunit of Compilation_unit.t
   | Alocal of Ident.t
-  | Adot of address * int
+  | Adot of address * Jkind.Sort.t array * int
 
 type t
 
@@ -699,11 +699,11 @@ val fold_labels:
 
 (** Persistent structures are only traversed if they are already loaded. *)
 val fold_modules:
-  (string -> Path.t -> module_declaration -> 'a -> 'a) ->
+  (string -> Path.t -> Subst.Lazy.module_declaration -> 'a -> 'a) ->
   Longident.t option -> t -> 'a -> 'a
 
 val fold_modtypes:
-  (string -> Path.t -> modtype_declaration -> 'a -> 'a) ->
+  (string -> Path.t -> Subst.Lazy.modtype_declaration -> 'a -> 'a) ->
   Longident.t option -> t -> 'a -> 'a
 val fold_classes:
   (string -> Path.t -> class_declaration -> 'a -> 'a) ->
@@ -752,10 +752,3 @@ val fold_all_labels: 'a fold_all_labels_f -> Longident.t option -> t -> 'a -> 'a
 
 val print_with_quote_promote :
   Format.formatter -> (string * stage * stage) -> unit
-
-val fold_modules_lazy:
-  (string -> Path.t -> Subst.Lazy.module_declaration -> 'a -> 'a) ->
-  Longident.t option -> t -> 'a -> 'a
-val fold_modtypes_lazy:
-  (string -> Path.t -> Subst.Lazy.modtype_declaration -> 'a -> 'a) ->
-  Longident.t option -> t -> 'a -> 'a

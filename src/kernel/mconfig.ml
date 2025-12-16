@@ -668,7 +668,20 @@ let ocaml_ignored_flags =
     "-dno-locations";
     "-dlocations";
     "-dcamlprimc";
-    "-dtimings-precision"
+    "-dtimings-precision";
+    "-dprofile-output";
+    "-locs";
+    "-no-locs";
+    "-flzcnt";
+    "-fno-lzcnt";
+    "-reaper-local-fields";
+    "-no-reaper-local-fields";
+    "-reaper-unbox";
+    "-no-reaper-unbox";
+    "-reaper-change-calling-conventions";
+    "-no-reaper-change-calling-conventions";
+    "-flambda2-expert-cmm-safe-subst";
+    "-no-flambda2-expert-cmm-safe-subst"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -764,7 +777,9 @@ let ocaml_ignored_parametrized_flags =
     "-config-var";
     "-stop-after";
     "-plugin";
-    "-dump-into-file"
+    "-dump-into-file";
+    "-ddwarf-metrics-output-file";
+    "-reaper-debug-flags"
   ]
 
 let ocaml_warnings_spec ~error =

@@ -33,6 +33,8 @@ logic.
   -alert
   -absname
   -no-absname
+  -locs
+  -no-locs
   -annot
   -as-argument-for
   -as-parameter
@@ -159,6 +161,7 @@ logic.
   -dcounters
   -dprofile
   -dgranularity
+  -dprofile-output
   -dump-into-file
   -dump-into-csv
   -dump-dir

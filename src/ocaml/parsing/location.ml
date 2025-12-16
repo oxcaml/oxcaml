@@ -288,6 +288,16 @@ let show_filename file =
 let print_filename ppf file =
   Format.pp_print_string ppf (show_filename file)
 
+let linenum ppf line =
+  if !Clflags.locs
+  then Format.fprintf ppf "%i" line
+  else Format.fprintf ppf "_"
+
+let colnum ppf char =
+  if !Clflags.locs
+  then Format.fprintf ppf "%i" char
+  else Format.fprintf ppf "_"
+
 (* Best-effort printing of the text describing a location, of the form
    'File "foo.ml", line 3, characters 10-12'.
 
@@ -334,12 +344,13 @@ let print_loc ~capitalize_first ppf loc =
      existing setup of editors that parse locations in error messages (e.g.
      Emacs). *)
   comma ();
-  Format.fprintf ppf "%s %i" (capitalize "line")
-    (if line_valid line then line else 1);
+  Format.fprintf ppf "%s %a" (capitalize "line")
+    linenum (if line_valid line then line else 1);
 
   if chars_valid ~startchar ~endchar then (
     comma ();
-    Format.fprintf ppf "%s %i-%i" (capitalize "characters") startchar endchar
+    Format.fprintf ppf "%s %a-%a"
+      (capitalize "characters") colnum startchar colnum endchar
   );
 
   Format.fprintf ppf "@}"
@@ -538,9 +549,12 @@ let highlight_quote ppf
         |> List.map (fun ({ text; start_pos } as line) ->
           let end_pos = start_pos + String.length text - 1 in
           let line_nb =
-            match ISet.find_bound_in iset ~range:(start_pos, end_pos) with
-            | None -> None
-            | Some (p, _) -> Some p.pos_lnum
+            match
+              ISet.find_bound_in iset ~range:(start_pos, end_pos),
+              !Clflags.locs
+            with
+            | None, _ | _, false -> None
+            | Some (p, _), true -> Some p.pos_lnum
           in
           (line_nb, line))
         |> infer_line_numbers
