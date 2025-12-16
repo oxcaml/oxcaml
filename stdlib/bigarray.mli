@@ -512,8 +512,8 @@ module Genarray :
 
   external slice_right
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, fortran_layout) t -> (int array[@local_opt]) -
-      > ('a, 'b, fortran_layout) t
+      ('a, 'b, fortran_layout) t -> (int array[@local_opt])
+      -> ('a, 'b, fortran_layout) t
     = "caml_ba_slice"
   (** Extract a sub-array of lower dimension from the given Bigarray
      by fixing one or several of the last (right-most) coordinates.
