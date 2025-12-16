@@ -344,29 +344,8 @@ let print_loc ~capitalize_first ppf loc =
      existing setup of editors that parse locations in error messages (e.g.
      Emacs). *)
   comma ();
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-25
-  Format.fprintf ppf "%s %i" (capitalize "line")
-    (if line_valid line then line else 1);
-||||||| oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
-  let startline = if line_valid startline then startline else 1 in
-  let endline = if line_valid endline then endline else startline in
-  begin if startline = endline then
-    Format.fprintf ppf "%s %i" (capitalize "line") startline
-  else
-    Format.fprintf ppf "%s %i-%i" (capitalize "lines") startline endline
-  end;
-=======
-  let startline = if line_valid startline then startline else 1 in
-  let endline = if line_valid endline then endline else startline in
-
-  begin if startline = endline then
-    Format.fprintf ppf "%s %a"
-      (capitalize "line") linenum startline
-  else
-    Format.fprintf ppf "%s %a-%a"
-      (capitalize "lines") linenum startline linenum endline
-  end;
->>>>>>> oxcaml/oxcaml:d6e630469425e02d8d45f8f10392e046689de2c5
+  Format.fprintf ppf "%s %a" (capitalize "line")
+    linenum (if line_valid line then line else 1);
 
   if chars_valid ~startchar ~endchar then (
     comma ();

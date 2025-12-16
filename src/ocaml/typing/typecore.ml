@@ -6577,7 +6577,25 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
       in
-      submode ~loc ~env ~reason:(Application ty_ret) mode_ret expected_mode;
+      let () =
+        try submode ~loc ~env ~reason:(Application ty_ret) mode_ret expected_mode
+        with exn ->
+          record_exp_and_reraise ~exn
+            { exp_desc =
+                Texp_apply (
+                  funct,
+                  args,
+                  pm.apply_position,
+                  ap_mode,
+                  None
+                );
+              exp_loc = loc;
+              exp_extra = [];
+              exp_type = ty_ret;
+              exp_attributes = [];
+              exp_env = env;
+            }
+      in
       check_tail_call_local_returning loc env ap_mode pm;
       exp
   | Pexp_match(sarg, caselist) ->
@@ -9533,58 +9551,10 @@ and type_application env app_loc expected_mode position_and_mode
           ty_ret, mode_ret, args, position_and_mode
         end ~post:(fun (ty_ret, _, _, _) -> generalize_structure ty_ret)
       in
-<<<<<<< janestreet/merlin-jst:merge-5.2.0minus-25
-      let mode_ret = Alloc.disallow_right mode_ret in
-      let ap_mode = Alloc.proj_comonadic Areality mode_ret in
-      let mode_ret =
-        cross_left env ty_ret (alloc_as_value mode_ret)
-      in
-      let () =
-        try submode ~loc:app_loc ~env ~reason:(Application ty_ret)
-                            mode_ret expected_mode
-        with exn ->
-          record_exp_and_reraise ~exn
-            { exp_desc =
-                Texp_apply (
-                  funct,
-                  args,
-                  position_and_mode.apply_position,
-                  ap_mode,
-                  None
-                );
-              exp_loc = app_loc;
-              exp_extra = [];
-              exp_type = ty_ret;
-              exp_attributes = [];
-              exp_env = env;
-            }
-      in
-
-      check_tail_call_local_returning app_loc env ap_mode position_and_mode;
-      args, ty_ret, ap_mode, position_and_mode
-
-and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
-    ~explanation ~attributes sexpl =
-||||||| oxcaml/oxcaml:996a6635f0b131d78288b07227effb84b88cd035
-      let mode_ret = Alloc.disallow_right mode_ret in
-      let ap_mode = Alloc.proj_comonadic Areality mode_ret in
-      let mode_ret =
-        cross_left env ty_ret (alloc_as_value mode_ret)
-      in
-      submode ~loc:app_loc ~env ~reason:(Application ty_ret)
-        mode_ret expected_mode;
-
-      check_tail_call_local_returning app_loc env ap_mode position_and_mode;
-      args, ty_ret, ap_mode, position_and_mode
-
-and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
-    ~explanation ~attributes sexpl =
-=======
       args, ty_ret, mode_ret, position_and_mode
 
 and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
     ~explanation ~attributes sexpl =
->>>>>>> oxcaml/oxcaml:d6e630469425e02d8d45f8f10392e046689de2c5
   (* CR layouts v5: consider sharing code with [type_unboxed_tuple] below when
      we allow non-values in boxed tuples. *)
   let arity = List.length sexpl in

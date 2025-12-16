@@ -55,5 +55,5 @@ val dwarf_pedantic : bool ref
 val gdwarf_config_shape_eval_depth : int option ref
 val gdwarf_config_max_type_to_shape_depth : int option ref
 val gdwarf_config_max_evaluation_steps_per_variable : int option ref
-
+val locs : bool ref
 val locations            : bool ref
