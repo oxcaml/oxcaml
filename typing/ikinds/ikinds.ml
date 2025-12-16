@@ -65,7 +65,7 @@ module JK = struct
     | Poly of poly * poly array
 
   and env =
-    { kind_of : ty -> ckind;
+    { kind_of : ctx -> ty -> kind;
       lookup : constr -> constr_decl
     }
 
@@ -99,7 +99,7 @@ module JK = struct
         let v = Ldd.new_var () in
         let placeholder = Ldd.var v in
         TyTbl.add ctx.ty_to_kind t placeholder;
-        let rhs = ctx.env.kind_of t ctx in
+        let rhs = ctx.env.kind_of ctx t in
         Ldd.solve_lfp v rhs;
         rhs
 
@@ -223,10 +223,9 @@ module JK = struct
     Array.fold_left Ldd.join base ks
 
   (* Evaluate a ckind in [ctx] and flush pending GFP constraints. *)
-  let normalize (ctx : ctx) (k : ckind) : poly =
-    let k' = k ctx in
+  let normalize (k : kind) : poly =
     Ldd.solve_pending ();
-    k'
+    k
 
   (* Materialize a solved polynomial for storing in
      [Types.constructor_ikind]. *)
@@ -235,22 +234,18 @@ module JK = struct
     Ldd.solve_pending ();
     base, coeffs
 
-  let leq_with_reason (ctx : ctx) (k1 : ckind) (k2 : ckind) :
+  let leq_with_reason (k1 : kind) (k2 : kind) :
       int list option =
-    let k2' = k2 ctx in
-    let k1' = k1 ctx in
     Ldd.solve_pending ();
-    Ldd.leq_with_reason k1' k2'
+    Ldd.leq_with_reason k1 k2
 
-  let round_up (ctx : ctx) (k : ckind) : lat =
-    let k' = k ctx in
-    Ldd.round_up k'
+  let round_up (k : kind) : lat =
+    Ldd.round_up k
 end
 let ikind_reset : string -> Types.type_ikind = Types.ikind_reset
 
 (* Converting surface jkinds to solver ckinds. *)
-let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
- fun (ctx : JK.ctx) ->
+let ckind_of_jkind (ctx : JK.ctx) (j : ('l * 'r) Types.jkind) : JK.kind =
   (* Base is the modality bounds stored on this jkind. *)
   let base =
     Ldd.const (Axis_lattice_conv.of_mod_bounds j.jkind.mod_bounds)
@@ -265,10 +260,9 @@ let ckind_of_jkind (j : ('l * 'r) Types.jkind) : JK.ckind =
          Ldd.join acc (Ldd.meet (Ldd.const mask) kty))
        base
 
-let ckind_of_jkind_l (j : Types.jkind_l) : JK.ckind = ckind_of_jkind j
+let ckind_of_jkind_l (ctx : JK.ctx) (j : Types.jkind_l) : JK.kind = ckind_of_jkind ctx j
 
-let ckind_of_jkind_r (j : Types.jkind_r) : JK.ckind =
- fun (_ctx : JK.ctx) ->
+let ckind_of_jkind_r (j : Types.jkind_r) : JK.kind =
   (* For r-jkinds used in sub checks, with-bounds are not present
      on the right (see Jkind_desc.sub's precondition). So only the
      base mod-bounds matter. *)
@@ -281,9 +275,7 @@ let kind_of_counter = ref 0
 
 (* Compute the ikind polynomial for an arbitrary [type_expr].  This is the
    semantic counterpart of [Jkind.jkind_of_type], but expressed in LDD form. *)
-let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
- fun (ctx : JK.ctx) ->
-  ignore context;
+let kind_of (ctx : JK.ctx) (ty : Types.type_expr) : JK.kind =
   incr kind_of_depth;
   if !kind_of_depth > 500 then failwith "kind_of_depth too deep" else ();
   incr kind_of_counter;
@@ -295,9 +287,8 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
       -> 
       (* TODO: allow general jkinds here (including with-bounds) *)
       let jkind_l = Jkind.disallow_right jkind in
-      let ckind = ckind_of_jkind_l jkind_l in
       (* Keep a rigid param, but cap it by its annotated jkind. *)
-      Ldd.meet (JK.rigid ty) (ckind ctx)
+      Ldd.meet (JK.rigid ty) (ckind_of_jkind_l ctx jkind_l)
     | Types.Tconstr (p, args, _abbrev_memo) ->
       let arg_kinds = List.map (fun t -> JK.kind ctx t) args in
       JK.constr ctx p arg_kinds
@@ -330,7 +321,7 @@ let kind_of ~(context : Jkind.jkind_context) (ty : Types.type_expr) : JK.ckind =
     | Types.Tpoly (ty, _) ->
       JK.kind ctx ty
     | Types.Tof_kind jkind ->
-      ckind_of_jkind jkind ctx
+      ckind_of_jkind ctx jkind
     | Types.Tobject _ ->
       Ldd.const Axis_lattice.object_legacy
     | Types.Tfield _ ->
@@ -428,7 +419,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
           | Types.Type_abstract _ | Types.Type_open -> false
         in
         let use_decl_jkind () = 
-          let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
+          let kind : JK.ckind = fun ctx -> ckind_of_jkind_l ctx decl.type_jkind in
           JK.Ty { args = decl.type_params; kind; abstract = true } in
         (* If we cannot soundly derive a polynomial from components, fall back
            to the stored jkind and mark it abstract. *)
@@ -558,7 +549,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
         | Types.Type_open ->
           (* Use the stored jkind here in case it is `exn`,
              which is special. *)
-          let kind : JK.ckind = ckind_of_jkind_l decl.type_jkind in
+          let kind : JK.ckind = fun ctx -> ckind_of_jkind_l ctx decl.type_jkind in
           JK.Ty { args = decl.type_params; kind; abstract = false }
           (* 
           (* This is the code we'd use otherwise *)
@@ -602,12 +593,12 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
 (* Package the above into a full evaluation context. *)
 let make_ctx ~(context : Jkind.jkind_context) : JK.ctx =
   JK.create
-    { kind_of = kind_of ~context; lookup = lookup_of_context ~context }
+    { kind_of = kind_of; lookup = lookup_of_context ~context }
 
 let normalize ~(context : Jkind.jkind_context) (jkind : Types.jkind_l) :
     Ikind.Ldd.node =
   let ctx = make_ctx ~context in
-  JK.normalize ctx (ckind_of_jkind_l jkind)
+  JK.normalize (ckind_of_jkind_l ctx jkind)
 
 let type_declaration_ikind ~(context : Jkind.jkind_context)
     ~(path : Path.t) : Types.constructor_ikind =
@@ -694,10 +685,8 @@ let sub_jkind_l ?allow_any_crossing ?origin
       Ok ())
     else
       let ctx = make_ctx ~context in
-      let sub_ckind = ckind_of_jkind_l sub in
-      let super_ckind = ckind_of_jkind_l super in
-      let sub_poly = sub_ckind ctx in
-      let super_poly = super_ckind ctx in
+      let sub_poly = ckind_of_jkind_l ctx sub in
+      let super_poly = ckind_of_jkind_l ctx super in
       Ldd.solve_pending ();
       if !Types.ikind_debug
       then
@@ -754,7 +743,7 @@ let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
   else
     let ctx = make_ctx ~context in
     match
-      JK.leq_with_reason ctx (ckind_of_jkind_l sub) (ckind_of_jkind_r super)
+      JK.leq_with_reason (ckind_of_jkind_l ctx sub) (ckind_of_jkind_r super)
     with
     | None -> true
     | Some _ -> false
@@ -766,7 +755,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
   then Jkind.get_mode_crossing ~context jkind
   else
     let ctx = make_ctx ~context in
-    let lat = JK.round_up ctx (ckind_of_jkind jkind) in
+    let lat = JK.round_up (ckind_of_jkind ctx jkind) in
   let mb = Axis_lattice_conv.to_mod_bounds lat in
     Jkind.Mod_bounds.to_mode_crossing mb
 
@@ -878,18 +867,10 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
      atom. *)
   let arity = max_arity_in_type Path.Map.empty body in
   let lookup p = identity_lookup_from_arity_map arity p in
-  let dummy_context =
-    (* dummy context; currently ignored *)
-    { Jkind.jkind_of_type = (fun _ -> None)
-    ; is_abstract = (fun _ -> false)
-    ; lookup_type = (fun _ -> None)
-    ; debug_print_env = (fun _ppf -> ())
-    }
-  in
-  let kind_of_identity = kind_of ~context:dummy_context in
+  let kind_of_identity = kind_of in
   let env : JK.env = { kind_of = kind_of_identity; lookup } in
   let ctx = JK.create env in
-  let poly = JK.normalize ctx (kind_of_identity body)
+  let poly = JK.normalize (kind_of_identity ctx body)
   in
   let rigid_vars =
     List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params

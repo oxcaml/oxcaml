@@ -327,3 +327,30 @@ run 3:
   user 681.81
   sys  124.51
 
+
+=== 2025-12-16T22:41:22Z ===
+desc: ikinds=true
+git: 34d0ac2329ccf43e0be5383d126e68de06b749ca (dirty)
+host: Darwin 25.0.0 arm64
+logdir: /tmp/oxcaml-ikinds-bench-JeG8pubc
+cmd: make clean && /usr/bin/time -p make
+runs: 3
+dirty files:
+   M typing/ikinds/PLAN.md
+   M typing/ikinds/ikinds.ml
+
+run 1:
+  real 152.24
+  user 669.44
+  sys  122.40
+
+run 2:
+  real 153.71
+  user 678.60
+  sys  124.89
+
+run 3:
+  real 151.55
+  user 673.96
+  sys  122.80
+

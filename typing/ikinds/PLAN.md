@@ -43,11 +43,27 @@ need review.
   - Avoid repeated `List.nth_opt` in hot loops (use arrays where helpful).
   - Pre-size hash tables where we can estimate sizes.
 
-**Phase 2: Main algorithm improvements**
+**Phase 2: Context closure optimization (DONE)**
+
+- [x] Remove the `ctx -> ...` closure indirection (`JK.ckind`) in `JK.env` and `kind_of`.
+  - Change `env.kind_of` to `ctx -> ty -> kind`.
+  - Update `kind_of` to take `ctx` as an explicit argument, avoiding closure allocation for every type node traversal.
+  - This is a high-impact optimization for the hot path.
+
+**Phase 3: Main algorithm improvements**
 
 - Substitute LDD atoms only when "now concrete" (has manifest):
   - Gate `Ldd.Name.Atom` expansion in `JK.constr_kind` so abstract/no-manifest
     constructors stay rigid (no deep expansion).
+  - Use `context.is_abstract` to check if a constructor is abstract before recursing in `instantiate`.
+- LHS normalization in sub checks:
+  - Before `Ldd.leq_with_reason`, compute RHS atom support and map LHS-only
+    abstract atoms to `⊤`.
+  - Preserve non-variable bounds by only erasing the abstract variable itself,
+    not its bound contributions (relies on current abstract encoding).
+- Mode-crossing special case:
+  - Since RHS is effectively plain mod-bounds, treat all abstract atoms as `⊤`
+    before rounding up; still meet in abstract bounds for non-variables.
 - LHS normalization in sub checks:
   - Before `Ldd.leq_with_reason`, compute RHS atom support and map LHS-only
     abstract atoms to `⊤`.
@@ -57,22 +73,17 @@ need review.
   - Since RHS is effectively plain mod-bounds, treat all abstract atoms as `⊤`
     before rounding up; still meet in abstract bounds for non-variables.
 
-**Phase 3: Reduce memoization pressure**
+**Phase 4: Reduce memoization pressure**
 
 - Limit `ty_to_kind` memoization to types that are potentially circular
   (polymorphic variants); keep `constr_to_coeffs` memoization.
 - Re-check whether the remaining hotspots justify larger refactors.
 
-**Phase 4: Preserve ikinds more broadly**
+**Phase 5: Preserve ikinds more broadly**
 
 - Reduce `Types.ikind_reset` cases where substitution/renaming can preserve the
   cached constructor ikind (use `substitute_decl_ikind_with_lookup`).
 - Consider keeping ikinds for unboxed-version aliases where safe.
-
-**Phase 5: Big refactor (do last)**
-
-- Remove the `ctx -> ...` closure indirection (`JK.ckind`) by switching to
-  direct `ctx`-passing APIs. This is invasive and should follow Phase 2/3.
 
 ### B. Mode solver representation
 
@@ -96,6 +107,15 @@ need review.
 
 ## Ordering notes
 
-- Do Phase 2 before the big refactor: it lands the main wins with small deltas.
 - The big refactor makes later refines easier, but makes small incremental work
   harder (wider surface area, more churn).
+
+## Future Work
+
+- `Ldd` fast paths (in `typing/ikinds/ldd_cached_down0.ml`):
+  - Add physical equality checks (`==`) in `join`, `meet`, `canonicalize`.
+  - Handle `bot` and `top` explicitly.
+- Memoize `Ldd.map_rigid` (in `typing/ikinds/ldd_cached_down0.ml`):
+  - Add a `Hashtbl` to memoize visited nodes during traversal to handle DAGs efficiently.
+- Balanced join in `ikinds.ml`:
+  - Use a balanced merge (divide and conquer) for `Ttuple` and `Tvariant` joins.
