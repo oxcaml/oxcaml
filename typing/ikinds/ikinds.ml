@@ -400,7 +400,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (p : Path.t) :
   (* Note: this currently ignores any GADT-installed equations. *)
   match context.lookup_type p with
   | None ->
-    (* Format.eprintf "ERROR: unknown constructor"; *)
+    Format.eprintf "ERROR: unknown constructor %a@." Path.print p;
     (* Fallback for unknown constructors: treat them as abstract,
        non-recursive values. *)
     let kind : JK.ckind = fun _ctx -> Ldd.const Axis_lattice.value in
