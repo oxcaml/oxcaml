@@ -462,7 +462,7 @@
       pattern (test.ml[4,57+9]..test.ml[4,57+12])
         Tpat_var \"_aa/278\"
         sort value
-        value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#f[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+        value_mode global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write,dynamic
     ]
     None
   ",
@@ -482,7 +482,7 @@
                                         "kind": "pattern (test.ml[4,57+9]..test.ml[4,57+12])
     Tpat_var \"_aa/278\"
     sort value
-    value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#f[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+    value_mode global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write,dynamic
   ",
                                         "children": []
                                       }
