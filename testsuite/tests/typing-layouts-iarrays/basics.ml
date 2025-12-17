@@ -354,7 +354,10 @@ let f () =
   let _ : #(string * int) iarray = [: #(x, 42) :] in
   ()
 [%%expect{|
-val f : unit -> unit = <fun>
+Line 3, characters 35-49:
+3 |   let _ : #(string * int) iarray = [: #(x, 42) :] in
+                                       ^^^^^^^^^^^^^^
+Error: Immutable arrays of unboxed products are not yet supported.
 |}]
 
 (* mutable arrays cannot hold unboxed products containing local values *)

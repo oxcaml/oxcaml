@@ -16,24 +16,14 @@ let f (b @ dynamic) @ static =
     if b then "hello"
     else "world"
 [%%expect{|
-Lines 2-3, characters 4-16:
-2 | ....if b then "hello"
-3 |     else "world"
-Error: The expression is "dynamic"
-       because it has branches.
-       However, the expression highlighted is expected to be "static".
+val f : bool -> string = <fun>
 |}]
 
 let f (b @ static) @ static =
     if b then "hello"
     else "world"
 [%%expect{|
-Lines 2-3, characters 4-16:
-2 | ....if b then "hello"
-3 |     else "world"
-Error: The expression is "dynamic"
-       because it has branches.
-       However, the expression highlighted is expected to be "static".
+val f : bool -> string = <fun>
 |}]
 
 let f (b @ dynamic) @ dynamic =
@@ -60,9 +50,7 @@ let x @ static = f true
 Line 1, characters 17-23:
 1 | let x @ static = f true
                      ^^^^^^
-Error: The expression is "dynamic"
-       because function applications are always dynamic.
-       However, the expression highlighted is expected to be "static".
+Error: This value is "dynamic" but is expected to be "static".
 |}]
 
 (* Testing pattern match *)
@@ -107,13 +95,7 @@ let foo (b @ static) @ static =
     | true -> "hello"
     | false -> "hello"
 [%%expect{|
-Lines 2-4, characters 4-22:
-2 | ....match b with
-3 |     | true -> "hello"
-4 |     | false -> "hello"
-Error: The result of the cases is "dynamic"
-       because it has branches.
-       However, the result of the cases highlighted is expected to be "static".
+val foo : bool -> string = <fun>
 |}]
 
 (* Similiarly, the matched value becomes dynamic *)
@@ -122,14 +104,7 @@ let foo (b @ static) =
     | Some x -> use_static x
     | None -> ()
 [%%expect{|
-Line 3, characters 27-28:
-3 |     | Some x -> use_static x
-                               ^
-Error: This value is "dynamic"
-       because it is contained (via constructor "Some") in the value at Line 3, characters 6-12
-       which is "dynamic"
-       because it has branches.
-       However, the highlighted expression is expected to be "static".
+val foo : 'a option -> unit = <fun>
 |}]
 
 let foo (b @ dynamic) @ static =
@@ -152,14 +127,7 @@ let foo (b @ static) =
     match b with
     | (Bar x | Baz x) -> use_static x
 [%%expect{|
-Line 3, characters 36-37:
-3 |     | (Bar x | Baz x) -> use_static x
-                                        ^
-Error: This value is "dynamic"
-       because it is contained (via constructor "Baz") in the value at Line 3, characters 15-20
-       which is "dynamic"
-       because it has branches.
-       However, the highlighted expression is expected to be "static".
+val foo : u -> unit = <fun>
 |}]
 
 (* or pattern makes the bound value dynamic, but the branch can still return static *)
@@ -206,13 +174,7 @@ let foo (b @ static) @ static =
     | x -> "hello"
     | exception _ -> "world"
 [%%expect{|
-Lines 2-4, characters 4-28:
-2 | ....match b with
-3 |     | x -> "hello"
-4 |     | exception _ -> "world"
-Error: The result of the cases is "dynamic"
-       because it has branches.
-       However, the result of the cases highlighted is expected to be "static".
+val foo : 'a -> string = <fun>
 |}]
 
 let foo (b @ dynamic) @ static =
@@ -265,14 +227,7 @@ Error: This value is "dynamic"
 
 let foo : _ @ static -> _ @ static = fun (Bar x | Baz x ) -> x
 [%%expect{|
-Line 1, characters 61-62:
-1 | let foo : _ @ static -> _ @ static = fun (Bar x | Baz x ) -> x
-                                                                 ^
-Error: This value is "dynamic"
-       because it is contained (via constructor "Baz") in the value at Line 1, characters 50-55
-       which is "dynamic"
-       because it has branches.
-       However, the highlighted expression is expected to be "static".
+val foo : u -> bool = <fun>
 |}]
 
 let foo : _ @ dynamic -> _ @ static = fun (Bar x | Baz x ) -> "hello"
@@ -338,36 +293,22 @@ let foo (b  @ static) =
     let (Bar x | Baz x) = b in
     use_static x
 [%%expect{|
-Line 3, characters 15-16:
-3 |     use_static x
-                   ^
-Error: This value is "dynamic"
-       because it is contained (via constructor "Baz") in the value at Line 2, characters 17-22
-       which is "dynamic"
-       because it has branches.
-       However, the highlighted expression is expected to be "static".
+val foo : u -> unit = <fun>
 |}]
 
 let foo (b : t @ dynamic) @ static =
     try b with e -> Foo true
 [%%expect{|
-Line 2, characters 4-28:
+Line 2, characters 8-9:
 2 |     try b with e -> Foo true
-        ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The expression is "dynamic"
-       because try-with clauses are always dynamic.
-       However, the expression highlighted is expected to be "static".
+            ^
+Error: This value is "dynamic" but is expected to be "static".
 |}]
 
 let foo (b : t @ static) @ static =
     try b with e -> Foo true
 [%%expect{|
-Line 2, characters 4-28:
-2 |     try b with e -> Foo true
-        ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The expression is "dynamic"
-       because try-with clauses are always dynamic.
-       However, the expression highlighted is expected to be "static".
+val foo : t -> t = <fun>
 |}]
 
 let foo (b : t @ static) @ dynamic =
@@ -416,7 +357,7 @@ module (M @ static) = struct
     let (Bar x | Baz x) @ static = Bar true
 end
 [%%expect{|
-module M : sig val x : bool @@ dynamic end
+module M : sig val x : bool end
 |}]
 
 module (M @ static) = struct
@@ -456,7 +397,10 @@ external reraise : exn -> 'a @@ portable = "%reraise"
 let _ @ static = reraise
 [%%expect{|
 external reraise : exn -> 'a = "%reraise"
-- : exn -> 'a = <fun>
+Line 2, characters 17-24:
+2 | let _ @ static = reraise
+                     ^^^^^^^
+Error: This value is "dynamic" but is expected to be "static".
 |}]
 
 external reraise : exn -> 'a @@ portable dynamic = "%reraise"

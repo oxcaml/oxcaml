@@ -190,7 +190,7 @@ Lines 1-3, characters 0-27:
 1 | type 'a u : immutable_data with 'a =
 2 | | P1 : ('a1, 'b) t -> 'a1 u
 3 | | P2 : ('a2, 'b) t -> 'a2 u
-Error: The kind of type "u" is value mod non_float
+Error: The kind of type "u" is value non_float
          because it's a boxed variant type.
        But the kind of type "u" must be a subkind of immutable_data with 'a
          because of the annotation on the declaration of the type u.
@@ -233,7 +233,7 @@ Lines 1-3, characters 0-25:
 1 | type ('x, 'y) t : immutable_data with 'x with 'y =
 2 |   | T : 'a -> ('a, 'a) t
 3 |   | U : 'c -> ('b,  'c) t
-Error: The kind of type "t" is value mod non_float
+Error: The kind of type "t" is value non_float
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of
            immutable_data with 'x with 'y
@@ -259,7 +259,7 @@ type 'a t : immutable_data =
 Lines 1-2, characters 0-48:
 1 | type 'a t : immutable_data =
 2 |   | A : ('b : immutable_data). 'b -> 'b option t
-Error: The kind of type "t" is value mod non_float
+Error: The kind of type "t" is value non_float
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
@@ -286,7 +286,7 @@ Lines 1-3, characters 0-49:
 1 | type 'a cell : mutable_data with 'a =
 2 |   | Nil : 'a cell
 3 |   | Cons of { value : 'a; mutable next: 'a cell }
-Error: The kind of type "cell" is value mod non_float
+Error: The kind of type "cell" is value non_float
          because it's a boxed variant type.
        But the kind of type "cell" must be a subkind of mutable_data with 'a
          because of the annotation on the declaration of the type cell.
@@ -301,7 +301,7 @@ Lines 1-3, characters 0-59:
 1 | type 'a cell : mutable_data with 'a =
 2 |   | Nil
 3 |   | Cons : { value : 'b; mutable next: 'b cell } -> 'b cell
-Error: The kind of type "cell" is value mod non_float
+Error: The kind of type "cell" is value non_float
          because it's a boxed variant type.
        But the kind of type "cell" must be a subkind of mutable_data with 'a
          because of the annotation on the declaration of the type cell.
@@ -316,7 +316,7 @@ Lines 1-3, characters 0-59:
 1 | type 'a cell : sync_data with 'a =
 2 |   | Nil : 'a cell
 3 |   | Cons of { value : 'a; mutable next: 'a cell [@atomic] }
-Error: The kind of type "cell" is value mod non_float
+Error: The kind of type "cell" is value non_float
          because it's a boxed variant type.
        But the kind of type "cell" must be a subkind of sync_data with 'a
          because of the annotation on the declaration of the type cell.
@@ -331,7 +331,7 @@ Lines 1-3, characters 0-69:
 1 | type 'a cell : sync_data with 'a =
 2 |   | Nil
 3 |   | Cons : { value : 'b; mutable next: 'b cell [@atomic] } -> 'b cell
-Error: The kind of type "cell" is value mod non_float
+Error: The kind of type "cell" is value non_float
          because it's a boxed variant type.
        But the kind of type "cell" must be a subkind of sync_data with 'a
          because of the annotation on the declaration of the type cell.
@@ -350,7 +350,7 @@ type 'a abstract : value mod portable
 Lines 2-3, characters 0-70:
 2 | type existential_abstract : immediate non_float =
 3 |   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-Error: The kind of type "existential_abstract" is value mod non_float
+Error: The kind of type "existential_abstract" is value non_float
          because it's a boxed variant type.
        But the kind of type "existential_abstract" must be a subkind of
            immediate non_float
@@ -364,7 +364,7 @@ type existential_abstract : immutable_data with (type : value mod portable) abst
 Lines 1-2, characters 0-70:
 1 | type existential_abstract : immutable_data with (type : value mod portable) abstract =
 2 |   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-Error: The kind of type "existential_abstract" is value mod non_float
+Error: The kind of type "existential_abstract" is value non_float
          because it's a boxed variant type.
        But the kind of type "existential_abstract" must be a subkind of
            immutable_data with (type : value mod portable) abstract
@@ -378,7 +378,7 @@ type existential_abstract : value mod portable =
 Lines 1-2, characters 0-70:
 1 | type existential_abstract : value mod portable =
 2 |   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-Error: The kind of type "existential_abstract" is value mod non_float
+Error: The kind of type "existential_abstract" is value non_float
          because it's a boxed variant type.
        But the kind of type "existential_abstract" must be a subkind of
            value mod portable
@@ -424,7 +424,7 @@ Error: Signature mismatch:
          type t = P : ('a : immediate). 'a abstract -> t
        is not included in
          type t : immutable_data with (type : value) abstract
-       The kind of the first is value mod non_float
+       The kind of the first is value non_float
          because of the definition of t at line 4, characters 2-49.
        But the kind of the first must be a subkind of
            immutable_data with (type : value) abstract
@@ -441,7 +441,7 @@ and 'a abstract : value mod portable
 Lines 1-2, characters 0-73:
 1 | type existential_abstract : value mod portable with (type : value mod portable) abstract =
 2 |   | P : ('a : value mod portable). 'a abstract t2 -> existential_abstract
-Error: The kind of type "existential_abstract" is value mod non_float
+Error: The kind of type "existential_abstract" is value non_float
          because it's a boxed variant type.
        But the kind of type "existential_abstract" must be a subkind of
            value mod portable with (type : value mod portable) abstract/2
@@ -479,7 +479,7 @@ end
 Line 2, characters 2-31:
 2 |   type t : immutable_data = M.t
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "M.t" is value mod non_float
+Error: The kind of type "M.t" is value non_float
          because of the definition of t at line 3, characters 2-47.
        But the kind of type "M.t" must be a subkind of immutable_data
          because of the definition of t at line 2, characters 2-31.
@@ -494,7 +494,7 @@ end
 Line 2, characters 2-35:
 2 |   type t : value mod portable = M.t
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "M/2.t" is value mod non_float
+Error: The kind of type "M/2.t" is value non_float
          because of the definition of t at line 3, characters 2-47.
        But the kind of type "M/2.t" must be a subkind of value mod portable
          because of the definition of t at line 2, characters 2-35.
@@ -567,7 +567,7 @@ type show_me_the_kind : immediate non_float = (int ref, int ref) box2
 Line 1, characters 0-69:
 1 | type show_me_the_kind : immediate non_float = (int ref, int ref) box2
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "(int ref, int ref) box2" is mutable_data
+Error: The kind of type "(int ref, int ref) box2" is value non_float
          because of the definition of box2 at line 1, characters 0-45.
        But the kind of type "(int ref, int ref) box2" must be a subkind of
            immediate non_float
@@ -581,7 +581,7 @@ type _ box : immediate non_float = Box : 'a -> 'a box
 Line 1, characters 0-53:
 1 | type _ box : immediate non_float = Box : 'a -> 'a box
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "box" is immutable_data with _
+Error: The kind of type "box" is value non_float
          because it's a boxed variant type.
        But the kind of type "box" must be a subkind of immediate non_float
          because of the annotation on the declaration of the type box.
@@ -619,7 +619,7 @@ type 'a t constraint 'a = 'b option
 Lines 2-3, characters 0-21:
 2 | type 'c t2 : immutable_data with (type : value) option t =
 3 |   | K : 'd t -> 'd t2
-Error: The kind of type "t2" is value mod non_float
+Error: The kind of type "t2" is value non_float
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of
            immutable_data with (type : value) option t
@@ -634,7 +634,7 @@ type 'a t constraint 'a = 'b option
 Lines 2-3, characters 0-21:
 2 | type 'c t2 : immediate non_float =
 3 |   | K : 'd t -> 'd t2
-Error: The kind of type "t2" is value mod non_float
+Error: The kind of type "t2" is value non_float
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of immediate non_float
          because of the annotation on the declaration of the type t2.
@@ -652,8 +652,7 @@ type show_me_the_kind : immediate non_float = exist_row1
 Line 1, characters 0-56:
 1 | type show_me_the_kind : immediate non_float = exist_row1
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "exist_row1" is
-           immutable_data with [< `A | `B of int ref ]
+Error: The kind of type "exist_row1" is value non_float
          because of the definition of exist_row1 at line 1, characters 0-67.
        But the kind of type "exist_row1" must be a subkind of
            immediate non_float
@@ -687,8 +686,7 @@ type show_me_the_kind : immediate non_float = exist_row2
 Line 1, characters 0-56:
 1 | type show_me_the_kind : immediate non_float = exist_row2
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "exist_row2" is
-           immutable_data with [> `A | `B of int ref ]
+Error: The kind of type "exist_row2" is value non_float
          because of the definition of exist_row2 at line 1, characters 0-67.
        But the kind of type "exist_row2" must be a subkind of
            immediate non_float
@@ -722,8 +720,7 @@ type 'a show_me_the_kind : immediate non_float = 'a option exist_row3
 Line 1, characters 0-69:
 1 | type 'a show_me_the_kind : immediate non_float = 'a option exist_row3
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a option exist_row3" is
-           immutable_data with [> `A | `B of int ref ]
+Error: The kind of type "'a option exist_row3" is value non_float
          because of the definition of exist_row3 at line 1, characters 0-80.
        But the kind of type "'a option exist_row3" must be a subkind of
            immediate non_float
