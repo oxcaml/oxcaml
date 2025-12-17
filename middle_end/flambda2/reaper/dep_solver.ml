@@ -2470,20 +2470,23 @@ module Rewriter = struct
           "[patterns_for_unboxed_fields] sees a block but needs to bind \
            function slots";
       let acc = Field.Map.empty in
-      let acc =
+      let pats = [] in
+      let acc, pats =
         match is_int with
-        | None -> acc
-        | Some (_, unboxed_fields) ->
-          Field.Map.add Field.is_int (forget unboxed_fields) acc
+        | None -> acc, pats
+        | Some use ->
+          let vars, pat = for_one_use Field.is_int use in
+          Field.Map.add Field.is_int vars acc, Pattern.is_int pat :: pats
       in
-      let acc =
+      let acc, pats =
         match get_tag with
-        | None -> acc
-        | Some (_, unboxed_fields) ->
-          Field.Map.add Field.get_tag (forget unboxed_fields) acc
+        | None -> acc, pats
+        | Some use ->
+          let vars, pat = for_one_use Field.get_tag use in
+          Field.Map.add Field.get_tag vars acc, Pattern.get_tag pat :: pats
       in
       let acc = ref acc in
-      let pats = ref [] in
+      let pats = ref pats in
       List.iteri
         (fun i use ->
           match use with
